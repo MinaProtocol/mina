@@ -74,7 +74,6 @@ let Spec =
           , depends_on : List Command.TaggedKey.Type
           , branch : Text
           , architectures : List Architecture.Type
-          , docker_repo : DockerRepo.Type
           , if_ : Optional Text
           }
       , default =
@@ -92,7 +91,6 @@ let Spec =
           , verify = True
           , branch = ""
           , architectures = [ Architecture.Type.Amd64, Architecture.Type.Arm64 ]
-          , docker_repo = DockerRepo.Type.Internal
           , if_ = None Text
           }
       }
