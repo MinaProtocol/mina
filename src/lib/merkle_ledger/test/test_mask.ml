@@ -18,7 +18,7 @@ module type Test_intf = sig
   module Location : Merkle_ledger.Location_intf.S
 
   module Mask_maps :
-    Merkle_mask.Mask_maps.Intf
+    Merkle_mask.Mask_maps_intf.S
       with type account := Account.t
        and type account_id := Account_id.t
        and type 'a account_id_map := 'a Account_id.Map.t

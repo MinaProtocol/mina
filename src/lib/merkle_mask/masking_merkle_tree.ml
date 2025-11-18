@@ -22,29 +22,25 @@ module Make (Inputs : Inputs_intf.S) = struct
     type t = unit Async.Ivar.t
   end
 
-  type maps_t = Inputs.Mask_maps.t =
-    { accounts : Account.t Location.Map.t
-    ; token_owners : Account_id.t Token_id.Map.t
-    ; hashes : Hash.t Addr.Map.t
-    ; locations : Location.t Account_id.Map.t
-    ; non_existent_accounts : Account_id.Set.t
-    }
+  type maps_t = Inputs.Mask_maps.t
 
   (** Merges second maps object into the first one,
       potentially overwriting some keys *)
-  let maps_merge base
-      { accounts; token_owners; hashes; locations; non_existent_accounts } =
+  let maps_merge (base : maps_t)
+      ({ accounts; token_owners; hashes; locations; non_existent_accounts } :
+        maps_t ) =
     let combine ~key:_ _ v = v in
-    { accounts = Map.merge_skewed ~combine base.accounts accounts
-    ; token_owners = Map.merge_skewed ~combine base.token_owners token_owners
-    ; hashes = Map.merge_skewed ~combine base.hashes hashes
-    ; locations = Map.merge_skewed ~combine base.locations locations
-    ; non_existent_accounts =
-        Account_id.Set.(
-          union
-            (diff base.non_existent_accounts @@ of_map_keys locations)
-            non_existent_accounts)
-    }
+    ( { accounts = Map.merge_skewed ~combine base.accounts accounts
+      ; token_owners = Map.merge_skewed ~combine base.token_owners token_owners
+      ; hashes = Map.merge_skewed ~combine base.hashes hashes
+      ; locations = Map.merge_skewed ~combine base.locations locations
+      ; non_existent_accounts =
+          Account_id.Set.(
+            union
+              (diff base.non_existent_accounts @@ of_map_keys locations)
+              non_existent_accounts)
+      }
+      : maps_t )
 
   (** Structure managing cache accumulated since the "base" ledger.
 
@@ -95,12 +91,13 @@ module Make (Inputs : Inputs_intf.S) = struct
   type unattached = t
 
   let empty_maps =
-    { accounts = Location.Map.empty
-    ; token_owners = Token_id.Map.empty
-    ; hashes = Addr.Map.empty
-    ; locations = Account_id.Map.empty
-    ; non_existent_accounts = Account_id.Set.empty
-    }
+    ( { accounts = Location.Map.empty
+      ; token_owners = Token_id.Map.empty
+      ; hashes = Addr.Map.empty
+      ; locations = Account_id.Map.empty
+      ; non_existent_accounts = Account_id.Set.empty
+      }
+      : maps_t )
 
   let create ~depth () =
     { uuid = Uuid_unix.create ()
@@ -297,7 +294,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             let cur_addr = Location.to_path_exn cur_loc in
             Addr.is_further_right ~than:cur_addr @@ Location.to_path_exn loc )
       in
-      let self_find ~maps:{ accounts; _ } id =
+      let self_find ~maps:({ accounts; _ } : maps_t) id =
         ( id
         , match Map.find accounts id with
           | None when is_empty id ->
@@ -787,7 +784,7 @@ module Make (Inputs : Inputs_intf.S) = struct
               failwith "Expected mask current location to represent an account"
           )
 
-    let self_lookup_account ~maps account_id =
+    let self_lookup_account ~(maps : maps_t) account_id =
       if Set.mem maps.non_existent_accounts account_id then Some None
       else Option.map ~f:Option.some @@ Map.find maps.locations account_id
 
@@ -997,7 +994,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =
       assert_is_attached t ;
-      let { locations; non_existent_accounts; _ }, ancestor =
+      let ({ locations; non_existent_accounts; _ } : maps_t), ancestor =
         maps_and_ancestor t
       in
       let add_location () =

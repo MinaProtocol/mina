@@ -4,16 +4,8 @@ open Mina_base
 
 module Location : Merkle_ledger.Location_intf.S
 
-type maps_t =
-  { accounts : Account.t Location.Map.t
-  ; token_owners : Account_id.t Token_id.Map.t
-  ; hashes : Ledger_hash.t Location.Addr.Map.t
-  ; locations : Location.t Account_id.Map.t
-  ; non_existent_accounts : Account_id.Set.t
-  }
-
 module Mask_maps :
-  Merkle_mask.Mask_maps.Intf
+  Merkle_mask.Mask_maps_intf.S
     with type account := Account.t
      and type account_id := Account_id.t
      and type 'a account_id_map := 'a Account_id.Map.t
@@ -87,7 +79,7 @@ module Mask :
      and type hash := Ledger_hash.t
      and type location := Location.t
      and type parent := Any_ledger.M.t
-     and type maps_t := maps_t
+     and type maps_t := Mask_maps.t
 
 module Maskable :
   Merkle_mask.Maskable_merkle_tree_intf.S
@@ -105,7 +97,7 @@ module Maskable :
      and type attached_mask := Mask.Attached.t
      and type accumulated_t := Mask.accumulated_t
      and type t := Any_ledger.M.t
-     and type maps_t := maps_t
+     and type maps_t := Mask_maps.t
 
 module Converting_ledger :
   Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
@@ -157,7 +149,7 @@ include
      and type attached_mask = Mask.Attached.t
      and type unattached_mask = Mask.t
      and type accumulated_t = Mask.accumulated_t
-     and type maps_t := maps_t
+     and type maps_t := Mask_maps.t
 
 (* We override the type of unregister_mask_exn that comes from
    Merkle_mask.Maskable_merkle_tree_intf.S because at this level callers aren't
@@ -168,9 +160,9 @@ val unregister_mask_exn : loc:string -> Mask.Attached.t -> Mask.t
 val unsafe_preload_accounts_from_parent :
   Mask.Attached.t -> Account_id.t list -> unit
 
-val append_maps : t -> maps_t -> unit
+val append_maps : t -> Mask_maps.t -> unit
 
-val get_maps : t -> maps_t
+val get_maps : t -> Mask_maps.t
 
 (* The maskable ledger is t = Mask.Attached.t because register/unregister
  * work off of this type *)
