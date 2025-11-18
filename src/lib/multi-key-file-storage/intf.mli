@@ -12,30 +12,15 @@ module type S = sig
     
     [write_value writer bin_prot_module value] serializes [value] using the
     provided bin_prot serializer and returns a [tag] that can be used to read the value later.
-    
-    Example (assuming the default implementation with [type filename_key = string]):
-    {[
-      write_values_exn "my.db" ~f:(fun writer ->
-        let tag1 = write_value writer (module Int) 42 in
-        let tag2 = write_value writer (module String) "hello" in
-        (* ... store tags for later use ... *)
-      )
-    ]}
 *)
   val write_value :
-    writer_t -> (module Bin_prot.Binable.S with type t = 'a) -> 'a -> 'a tag
+    'a. writer_t -> (module Bin_prot.Binable.S with type t = 'a) -> 'a -> 'a tag
 
   (** Write multiple keys to a database file.
-    
-    The [filename] parameter specifies the target file.
-    The file will be overwritten if exists (note, it is not appending).
     
     The [f] parameter is a callback that receives a [write_value] function which can be
     called multiple times to write different key-value pairs to the database.
     
-    Each call to [write_value bin_prot_module value] serializes [value] using the
-    provided bin_prot serializer and returns a [tag] that can be used to read the value later.
-    
     Example (assuming the default implementation with [type filename_key = string]):
     {[
       write_values_exn "my.db" ~f:(fun writer ->
@@ -44,8 +29,9 @@ module type S = sig
         (* ... store tags for later use ... *)
       )
     ]}
+    See the tests for a full usage example.
 *)
-  val write_values_exn : f:(writer_t -> 'a) -> filename_key -> 'a
+  val write_values_exn : 'tags. f:(writer_t -> 'tags) -> filename_key -> 'tags
 
   (** Read a value from the database using a tag.
     
