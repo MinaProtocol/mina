@@ -411,6 +411,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
         ] ;
     Child_processes.Termination.register_process pids process
       Child_processes.Termination.Verifier ;
+    Mina_metrics.Process_memory.Verifier.set_pid (Process.pid process) ;
     (* Always report termination as expected, and use the restart logic here
        instead.
     *)
@@ -447,6 +448,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
         don't_wait_for (Process.stdin process |> Writer.close) ;
         let pid = Process.pid process in
         Child_processes.Termination.remove pids pid ;
+        Mina_metrics.Process_memory.Verifier.clear_pid () ;
         let create_worker_trigger = Ivar.create () in
         don't_wait_for
           (* If we don't hear back that the process has died after 10 seconds,

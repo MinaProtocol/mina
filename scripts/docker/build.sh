@@ -47,6 +47,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -c|--cache-from) INPUT_CACHE="$2"; shift;;
   -r|--repo) MINA_REPO="$2"; shift;;
   -p|--platform) INPUT_PLATFORM="$2"; shift;;
+  --docker-registry) export DOCKER_REGISTRY="$2"; shift;;
   --no-cache) NO_CACHE="--no-cache"; ;;
   --deb-codename) INPUT_CODENAME="$2"; shift;;
   --deb-release) INPUT_RELEASE="$2"; shift;;

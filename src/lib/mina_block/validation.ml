@@ -620,6 +620,11 @@ let with_body (header_with_hash, validation) body =
   ( With_hash.map ~f:(fun header -> Block.create ~header ~body) header_with_hash
   , validation )
 
+let validate_genesis_protocol_state_block ~genesis_state_hash (b, v) =
+  validate_genesis_protocol_state ~genesis_state_hash
+    (With_hash.map ~f:Block.header b, v)
+  |> Result.map ~f:(Fn.flip with_body (Block.body @@ With_hash.data b))
+
 let wrap_header t : fully_invalid_with_header = (t, fully_invalid)
 
 let to_header (b, v) = (With_hash.map ~f:Block.header b, v)

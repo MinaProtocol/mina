@@ -49,43 +49,6 @@ let plugin_flag =
          times"
   else Command.Param.return []
 
-module Chain_state_locations = struct
-  (** The locations of the chain state in a daemon. These will be computed by
-      [chain_state_locations] based on the runtime daemon config. By default,
-      the [chain_state] will be located in the mina config directory and the
-      other directories will be located in the [chain_state]. *)
-  type t =
-    { chain_state : string  (** The top-level chain state directory *)
-    ; mina_net : string  (** Mina networking information *)
-    ; trust : string  (** P2P trust information *)
-    ; root : string  (** The root snarked ledgers *)
-    ; genesis : string  (** The genesis ledgers *)
-    ; frontier : string  (** The transition frontier *)
-    ; epoch_ledger : string  (** The epoch ledger snapshots *)
-    ; proof_cache : string  (** The proof cache *)
-    ; zkapp_vk_cache : string  (** The zkApp vk cache *)
-    ; snark_pool : string  (** The snark pool *)
-    }
-
-  (** Determine the locations of the chain state components based on the daemon
-      runtime config *)
-  let of_config ~conf_dir (config : Runtime_config.t) : t =
-    (* TODO: post hard fork, we should not be ignoring this *)
-    let _config = config in
-    let chain_state = conf_dir in
-    { chain_state
-    ; mina_net = chain_state ^/ "mina_net2"
-    ; trust = chain_state ^/ "trust"
-    ; root = chain_state ^/ "root"
-    ; genesis = chain_state ^/ "genesis"
-    ; frontier = chain_state ^/ "frontier"
-    ; epoch_ledger = chain_state
-    ; proof_cache = chain_state ^/ "proof_cache"
-    ; zkapp_vk_cache = chain_state ^/ "zkapp_vk_cache"
-    ; snark_pool = chain_state ^/ "snark_pool"
-    }
-end
-
 let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
     ~genesis_dir ~cli_proof_level ~proof_level ~genesis_backing_type
     config_files =
@@ -136,7 +99,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
             failwithf "Could not parse configuration file: %s" err () )
   in
   let chain_state_locations =
-    Chain_state_locations.of_config ~conf_dir config
+    Init.Chain_state_locations.of_config ~conf_dir config
   in
   let genesis_dir =
     Option.value ~default:chain_state_locations.genesis genesis_dir
@@ -1769,8 +1732,9 @@ let snark_hashes =
       fun () -> if json then Core.printf "[]\n%!"]
 
 let internal_commands logger ~itn_features =
-  [ ( Snark_worker.Intf.command_name
-    , Snark_worker.command ~proof_level:Genesis_constants.Compiled.proof_level
+  [ ( Snark_worker.Entry.command_name
+    , Snark_worker.Entry.command_from_rpcs
+        ~proof_level:Genesis_constants.Compiled.proof_level
         ~constraint_constants:Genesis_constants.Compiled.constraint_constants
         ~commit_id:Mina_version.commit_id )
   ; ("snark-hashes", snark_hashes)
@@ -1820,7 +1784,7 @@ let internal_commands logger ~itn_features =
           with
           | `Ok sexp -> (
               let%bind worker_state =
-                Snark_worker.Inputs.Worker_state.create ~proof_level
+                Snark_worker.Impl.Worker_state.create ~proof_level
                   ~constraint_constants ~signature_kind ()
               in
               let sok_message =
@@ -1835,7 +1799,7 @@ let internal_commands logger ~itn_features =
                   Snark_work_lib.Work.Single.Spec.t] sexp
               in
               match%map
-                Snark_worker.Inputs.perform_single worker_state
+                Snark_worker.Impl.perform_single worker_state
                   ~message:sok_message spec
               with
               | Ok _ ->

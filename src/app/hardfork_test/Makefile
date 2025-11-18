@@ -8,9 +8,6 @@ build:
 	@mkdir -p $(BUILD_DIR)
 	@( cd src && go build -o ../$(BUILD_DIR)/$(APP_NAME) ./cmd )
 
-test:
-	@( cd src && go test ./... )
-
 clean:
 	@echo "Cleaning..."
 	@rm -rf $(BUILD_DIR)
