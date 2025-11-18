@@ -103,7 +103,6 @@ nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfor
 SLOT_TX_END=${SLOT_TX_END:-$((40))}
 SLOT_CHAIN_END=${SLOT_CHAIN_END:-$((SLOT_TX_END+5))}
 
-NETWORK_ROOT=$(mktemp -d --tmpdir hardfork-network.XXXXXXX)
 
 hardfork_test/bin/hardfork_test \
   --main-mina-exe prefork-devnet/bin/mina \
@@ -112,7 +111,6 @@ hardfork_test/bin/hardfork_test \
   --fork-runtime-genesis-ledger postfork-devnet/bin/runtime_genesis_ledger \
   --slot-tx-end "$SLOT_TX_END" \
   --slot-chain-end "$SLOT_CHAIN_END" \
-  --script-dir "$SCRIPT_DIR" \
-  --root "$NETWORK_ROOT"
+  --script-dir "$SCRIPT_DIR"
 
 popd
