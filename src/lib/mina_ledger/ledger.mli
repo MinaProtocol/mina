@@ -12,7 +12,17 @@ type maps_t =
   ; non_existent_accounts : Account_id.Set.t
   }
 
-module Mask_maps : Mask_maps.S with type t = maps_t
+module Mask_maps :
+  Merkle_mask.Mask_maps.Intf
+    with type account := Account.t
+     and type account_id := Account_id.t
+     and type 'a account_id_map := 'a Account_id.Map.t
+     and type account_id_set := Account_id.Set.t
+     and type 'a address_map := 'a Location.Addr.Map.t
+     and type hash := Ledger_hash.t
+     and type location := Location.t
+     and type 'a location_map := 'a Location.Map.t
+     and type 'a token_id_map := 'a Token_id.Map.t
 
 module Db :
   Merkle_ledger.Intf.Ledger.DATABASE

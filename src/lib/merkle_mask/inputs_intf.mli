@@ -26,7 +26,7 @@ module type S = sig
     include Core_kernel.Comparable.S_binable with type t := Location.t
   end
 
-  module Maps : sig
+  module Mask_maps : sig
     type t =
       { accounts : Account.t Location.Map.t
       ; token_owners : Account_id.t Token_id.Map.t
