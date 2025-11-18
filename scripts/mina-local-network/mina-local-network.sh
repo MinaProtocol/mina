@@ -39,7 +39,7 @@ PROOF_LEVEL="full"
 LOG_PRECOMPUTED_BLOCKS=false
 
 SNARK_WORKER_FEE=0.001
-TRANSACTION_FREQUENCY=10 # in seconds
+TRANSACTION_INTERVAL=10 # in seconds
 
 SEED_START_PORT=3000
 ARCHIVE_SERVER_PORT=3086
@@ -122,8 +122,8 @@ help() {
                                          |   Default: ${VALUE_TRANSFERS}
 -zt  |--zkapp-transactions               | Whether to execute periodic zkapp transactions (presence of argument)
                                          |   Default: ${ZKAPP_TRANSACTIONS}
--tf  |--transactions-frequency <#>       | Frequency of periodic transactions execution (in seconds)
-                                         |   Default: ${TRANSACTION_FREQUENCY}
+-ti  |--transaction-interval <#>       | Frequency of periodic transactions execution (in seconds)
+                                         |   Default: ${TRANSACTION_INTERVAL}
 -sf  |--snark-worker-fee <#>             | SNARK Worker fee
                                          |   Default: ${SNARK_WORKER_FEE}
 -lp  |--log-precomputed-blocks           | Log precomputed blocks
@@ -387,8 +387,8 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   -vt | --value-transfer-txns) VALUE_TRANSFERS=true ;;
   -zt | --zkapp-transactions) ZKAPP_TRANSACTIONS=true ;;
-  -tf | --transactions-frequency)
-    TRANSACTION_FREQUENCY="${2}"
+  -ti | --transaction-interval)
+    TRANSACTION_INTERVAL="${2}"
     shift
     ;;
   -sf | --snark-worker-fee)
@@ -956,7 +956,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     sleep ${POLL_INTERVAL}
   done
 
-  echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_FREQUENCY} seconds"
+  echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_INTERVAL} seconds"
   printf "\n"
 
   if ${ZKAPP_TRANSACTIONS}; then
@@ -971,7 +971,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     ${MINA_EXE} account import -rest-server ${REST_SERVER} -privkey-path "${KEY_FILE}"
     ${MINA_EXE} account unlock -rest-server ${REST_SERVER} -public-key "${PUB_KEY}"
 
-    sleep "${TRANSACTION_FREQUENCY}"
+    sleep "${TRANSACTION_INTERVAL}"
     ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver "${PUB_KEY}" -sender "${PUB_KEY}"
   fi
 
@@ -982,7 +982,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   # TODO: simulate scripts/hardfork/run-localnet.sh to send txns to everyone in the ledger. 
   value_txn_id=0
   while is_process_running "${FISH_PIDS[0]}"; do
-    sleep ${TRANSACTION_FREQUENCY}
+    sleep ${TRANSACTION_INTERVAL}
     echo "Fish 1 at ${FISH_PIDS[0]} is alive, sending txns"
 
     if ${VALUE_TRANSFERS} && \
