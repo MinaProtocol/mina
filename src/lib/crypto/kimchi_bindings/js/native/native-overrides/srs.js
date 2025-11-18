@@ -61,6 +61,10 @@ var caml_fq_srs_lagrange_commitments_whole_domain =
 
 // Provides: caml_fp_srs_lagrange_commitment
 // Requires: tsSrs
+var caml_fp_srs_lagrange_commitment = tsSrs.fp.lagrangeCommitment;
+  
+// Provides: caml_fp_srs_lagrange_commitment
+// Requires: tsSrs
 var caml_fp_srs_lagrange_commitment = function (srs, i) {
   console.log("native caml_fp_srs_lagrange_commitment");
   return tsSrs.fp.lagrangeCommitment(srs, i);
@@ -168,10 +172,14 @@ var caml_fq_srs_read = function (offset, path) {
 
 // Provides: caml_fq_srs_lagrange_commitment
 // Requires: tsSrs
+var caml_fq_srs_lagrange_commitment = tsSrs.fq.lagrangeCommitment;
+
+// Provides: caml_fq_srs_lagrange_commitment
+// Requires: tsSrs
 var caml_fq_srs_lagrange_commitment = function (srs, i) {
   console.log("native caml_fq_srs_lagrange_commitment");
   return tsSrs.fq.lagrangeCommitment(srs, i);
-}
+};
 
 // Provides: caml_fq_srs_commit_evaluations
 // Requires: plonk_wasm, tsRustConversionNative
