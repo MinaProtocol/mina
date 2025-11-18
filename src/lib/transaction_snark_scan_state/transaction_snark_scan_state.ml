@@ -47,6 +47,21 @@ module Transaction_with_witness = struct
     end
   end]
 
+  module Tagged = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( State_hash.Stable.V1.t
+          , Stable.V2.t )
+          Multi_key_file_storage.Tag.Stable.V1.t
+        [@@deriving sexp]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
   type t =
     { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
     ; state_hash : State_hash.t * State_body_hash.t
@@ -110,6 +125,22 @@ module Ledger_proof_with_sok_message = struct
       let to_latest = Fn.id
     end
   end]
+
+  module Tagged = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( State_hash.Stable.V1.t
+          , Ledger_proof.Stable.V2.t )
+          Multi_key_file_storage.Tag.Stable.V1.t
+          * Sok_message.Stable.V1.t
+        [@@deriving sexp]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
 
   type t = Ledger_proof.Cached.t * Sok_message.t
 end
