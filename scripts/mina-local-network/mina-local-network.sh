@@ -63,7 +63,7 @@ SLOT_CHAIN_END=
 # Globals (assigned during execution of script)
 
 ARCHIVE_ADDRESS_CLI_ARG=""
-NETWORK_FOLDER="${HOME}/.mina-network"
+ROOT="${HOME}/.mina-network"
 SNARK_COORDINATOR_PUBKEY=""
 NODES_FOLDER=""
 CONFIG=""
@@ -143,8 +143,8 @@ help() {
                                          |   Default: None
 -sce |--slot-chain-end                   | When set, stop producing blocks from this chain on.
                                          |   Default: None
--r   |--root                             | When set, override the root working folder (i.e. the value of NETWORK_FOLDER) for this script. WARN: this script will clean up anything inside that folder when initializing any run!
-                                         |   Default: ${NETWORK_FOLDER}
+-r   |--root                             | When set, override the root working folder (i.e. the value of ROOT) for this script. WARN: this script will clean up anything inside that folder when initializing any run!
+                                         |   Default: ${ROOT}
 -h   |--help                             | Displays this help message
 
 Available logging levels:
@@ -441,7 +441,7 @@ while [[ "$#" -gt 0 ]]; do
     shift
     ;;
   -r | --root)
-    NETWORK_FOLDER="${2}"
+    ROOT="${2}"
     shift
     ;;
   *)
@@ -528,49 +528,49 @@ fi
 # Create the Genesis Ledger
 
 if ! config_mode_is_inherit "$CONFIG_MODE" ; then
-  rm -rf "${NETWORK_FOLDER}"
-elif [ ! -d "${NETWORK_FOLDER}" ]; then
-  echo "Error: NETWORK_FOLDER does not exist to inherit from."
+  rm -rf "${ROOT}"
+elif [ ! -d "${ROOT}" ]; then
+  echo "Error: ROOT does not exist to inherit from."
   exit 1
 fi
 
-if [ ! -d "${NETWORK_FOLDER}" ]; then
+if [ ! -d "${ROOT}" ]; then
   echo "Generating keypairs..."
   printf "\n"
 
-  mkdir -p "${NETWORK_FOLDER}"
+  mkdir -p "${ROOT}"
 
-  clean-dir "${NETWORK_FOLDER}"/offline_whale_keys
-  clean-dir "${NETWORK_FOLDER}"/offline_fish_keys
-  clean-dir "${NETWORK_FOLDER}"/online_whale_keys
-  clean-dir "${NETWORK_FOLDER}"/online_fish_keys
-  clean-dir "${NETWORK_FOLDER}"/snark_coordinator_keys
-  clean-dir "${NETWORK_FOLDER}"/libp2p_keys
-  clean-dir "${NETWORK_FOLDER}"/zkapp_keys
+  clean-dir "${ROOT}"/offline_whale_keys
+  clean-dir "${ROOT}"/offline_fish_keys
+  clean-dir "${ROOT}"/online_whale_keys
+  clean-dir "${ROOT}"/online_fish_keys
+  clean-dir "${ROOT}"/snark_coordinator_keys
+  clean-dir "${ROOT}"/libp2p_keys
+  clean-dir "${ROOT}"/zkapp_keys
 
   if ${ZKAPP_TRANSACTIONS}; then
-    generate-keypair ${NETWORK_FOLDER}/zkapp_keys/zkapp_account
+    generate-keypair ${ROOT}/zkapp_keys/zkapp_account
   fi
 
-  generate-keypair "${NETWORK_FOLDER}"/snark_coordinator_keys/snark_coordinator_account
+  generate-keypair "${ROOT}"/snark_coordinator_keys/snark_coordinator_account
   for ((i = 0; i < FISH; i++)); do
-    generate-keypair "${NETWORK_FOLDER}"/offline_fish_keys/offline_fish_account_${i}
-    generate-keypair "${NETWORK_FOLDER}"/online_fish_keys/online_fish_account_${i}
-    generate-libp2p-keypair "${NETWORK_FOLDER}"/libp2p_keys/fish_${i}
+    generate-keypair "${ROOT}"/offline_fish_keys/offline_fish_account_${i}
+    generate-keypair "${ROOT}"/online_fish_keys/online_fish_account_${i}
+    generate-libp2p-keypair "${ROOT}"/libp2p_keys/fish_${i}
   done
   for ((i = 0; i < WHALES; i++)); do
-    generate-keypair "${NETWORK_FOLDER}"/offline_whale_keys/offline_whale_account_${i}
-    generate-keypair "${NETWORK_FOLDER}"/online_whale_keys/online_whale_account_${i}
-    generate-libp2p-keypair "${NETWORK_FOLDER}"/libp2p_keys/whale_${i}
+    generate-keypair "${ROOT}"/offline_whale_keys/offline_whale_account_${i}
+    generate-keypair "${ROOT}"/online_whale_keys/online_whale_account_${i}
+    generate-libp2p-keypair "${ROOT}"/libp2p_keys/whale_${i}
   done
   for ((i = 0; i < NODES; i++)); do
-    generate-keypair "${NETWORK_FOLDER}"/offline_whale_keys/offline_whale_account_${i}
-    generate-keypair "${NETWORK_FOLDER}"/online_whale_keys/online_whale_account_${i}
-    generate-libp2p-keypair "${NETWORK_FOLDER}"/libp2p_keys/node_${i}
+    generate-keypair "${ROOT}"/offline_whale_keys/offline_whale_account_${i}
+    generate-keypair "${ROOT}"/online_whale_keys/online_whale_account_${i}
+    generate-libp2p-keypair "${ROOT}"/libp2p_keys/node_${i}
   done
 
   if [ "$(uname)" != "Darwin" ] && [ ${FISH} -gt 0 ]; then
-    FILE=$(find "${NETWORK_FOLDER}/offline_fish_keys" -mindepth 1 -maxdepth 1 -type f | head -n 1)
+    FILE=$(find "${ROOT}/offline_fish_keys" -mindepth 1 -maxdepth 1 -type f | head -n 1)
     OWNER=$(stat -c "%U" "${FILE}")
 
     if [ "${FILE}" != "${OWNER}" ]; then
@@ -581,30 +581,30 @@ if [ ! -d "${NETWORK_FOLDER}" ]; then
         SUDO_CMD=""
       fi
 
-      ${SUDO_CMD} chown -R "${OWNER}" "${NETWORK_FOLDER}"/zkapp_keys
-      ${SUDO_CMD} chown -R "${OWNER}" "${NETWORK_FOLDER}"/offline_fish_keys
-      ${SUDO_CMD} chown -R "${OWNER}" "${NETWORK_FOLDER}"/online_fish_keys
-      ${SUDO_CMD} chown -R "${OWNER}" "${NETWORK_FOLDER}"/offline_whale_keys
-      ${SUDO_CMD} chown -R "${OWNER}" "${NETWORK_FOLDER}"/online_whale_keys
-      ${SUDO_CMD} chown -R "${OWNER}" "${NETWORK_FOLDER}"/snark_coordinator_keys
-      ${SUDO_CMD} chown -R "${OWNER}" "${NETWORK_FOLDER}"/libp2p_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${ROOT}"/zkapp_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${ROOT}"/offline_fish_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${ROOT}"/online_fish_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${ROOT}"/offline_whale_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${ROOT}"/online_whale_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${ROOT}"/snark_coordinator_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${ROOT}"/libp2p_keys
     fi
   fi
 
-  chmod -R 0700 "${NETWORK_FOLDER}"/zkapp_keys
-  chmod -R 0700 "${NETWORK_FOLDER}"/offline_fish_keys
-  chmod -R 0700 "${NETWORK_FOLDER}"/online_fish_keys
-  chmod -R 0700 "${NETWORK_FOLDER}"/offline_whale_keys
-  chmod -R 0700 "${NETWORK_FOLDER}"/online_whale_keys
-  chmod -R 0700 "${NETWORK_FOLDER}"/snark_coordinator_keys
-  chmod -R 0700 "${NETWORK_FOLDER}"/libp2p_keys
+  chmod -R 0700 "${ROOT}"/zkapp_keys
+  chmod -R 0700 "${ROOT}"/offline_fish_keys
+  chmod -R 0700 "${ROOT}"/online_fish_keys
+  chmod -R 0700 "${ROOT}"/offline_whale_keys
+  chmod -R 0700 "${ROOT}"/online_whale_keys
+  chmod -R 0700 "${ROOT}"/snark_coordinator_keys
+  chmod -R 0700 "${ROOT}"/libp2p_keys
 fi
 
 printf "\n"
 echo "================================"
 printf "\n"
 
-SNARK_COORDINATOR_PUBKEY=$(cat "${NETWORK_FOLDER}"/snark_coordinator_keys/snark_coordinator_account.pub)
+SNARK_COORDINATOR_PUBKEY=$(cat "${ROOT}"/snark_coordinator_keys/snark_coordinator_account.pub)
 
 
 # ================================================
@@ -652,7 +652,7 @@ EOF
 # ================================================
 # Update the Genesis State Timestamp or Reset the Genesis Ledger
 
-CONFIG=${NETWORK_FOLDER}/daemon.json
+CONFIG=${ROOT}/daemon.json
 
 load_config() {
   local config_mode="${1}"
@@ -671,14 +671,14 @@ load_config() {
       python3 scripts/mina-local-network/generate-mina-local-network-ledger.py \
         --num-whale-accounts "${WHALES}" \
         --num-fish-accounts "${FISH}" \
-        --offline-whale-accounts-directory "${NETWORK_FOLDER}"/offline_whale_keys \
-        --offline-fish-accounts-directory "${NETWORK_FOLDER}"/offline_fish_keys \
-        --online-whale-accounts-directory "${NETWORK_FOLDER}"/online_whale_keys \
-        --online-fish-accounts-directory "${NETWORK_FOLDER}"/online_fish_keys \
-        --snark-coordinator-accounts-directory "${NETWORK_FOLDER}"/snark_coordinator_keys \
-        --out-genesis-ledger-file "${NETWORK_FOLDER}"/genesis_ledger.json
+        --offline-whale-accounts-directory "${ROOT}"/offline_whale_keys \
+        --offline-fish-accounts-directory "${ROOT}"/offline_fish_keys \
+        --online-whale-accounts-directory "${ROOT}"/online_whale_keys \
+        --online-fish-accounts-directory "${ROOT}"/online_fish_keys \
+        --snark-coordinator-accounts-directory "${ROOT}"/snark_coordinator_keys \
+        --out-genesis-ledger-file "${ROOT}"/genesis_ledger.json
 
-      reset-genesis-ledger "${NETWORK_FOLDER}" "${config_file}"
+      reset-genesis-ledger "${ROOT}" "${config_file}"
       ;;
     inherit_with:*)
       local replaced_config_file
@@ -734,7 +734,7 @@ fi
 # ================================================
 # Launch the Nodes
 
-NODES_FOLDER=${NETWORK_FOLDER}/nodes
+NODES_FOLDER=${ROOT}/nodes
 mkdir -p ${NODES_FOLDER}/seed
 
 if ! ${DEMO_MODE}; then
@@ -768,8 +768,8 @@ if ${DEMO_MODE}; then
   printf "\n"
 
   spawn-node ${NODES_FOLDER}/seed ${SEED_START_PORT} \
-    -block-producer-key ${NETWORK_FOLDER}/online_whale_keys/online_whale_account_0 \
-    --run-snark-worker "$(cat ${NETWORK_FOLDER}/snark_coordinator_keys/snark_coordinator_account.pub)" \
+    -block-producer-key ${ROOT}/online_whale_keys/online_whale_account_0 \
+    --run-snark-worker "$(cat ${ROOT}/snark_coordinator_keys/snark_coordinator_account.pub)" \
     --snark-worker-fee 0.001 \
     --proof-level ${PROOF_LEVEL} \
     --demo-mode \
@@ -823,10 +823,10 @@ done
 
 for ((i = 0; i < WHALES; i++)); do
   FOLDER=${NODES_FOLDER}/whale_${i}
-  KEY_FILE=${NETWORK_FOLDER}/online_whale_keys/online_whale_account_${i}
+  KEY_FILE=${ROOT}/online_whale_keys/online_whale_account_${i}
   mkdir -p "${FOLDER}"
   spawn-node "${FOLDER}" $((WHALE_START_PORT + i * 5)) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
-    -libp2p-keypair "${NETWORK_FOLDER}"/libp2p_keys/whale_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
+    -libp2p-keypair "${ROOT}"/libp2p_keys/whale_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   WHALE_PIDS[${i}]=$!
 done
 
@@ -834,10 +834,10 @@ done
 
 for ((i = 0; i < FISH; i++)); do
   FOLDER=${NODES_FOLDER}/fish_${i}
-  KEY_FILE=${NETWORK_FOLDER}/online_fish_keys/online_fish_account_${i}
+  KEY_FILE=${ROOT}/online_fish_keys/online_fish_account_${i}
   mkdir -p "${FOLDER}"
   spawn-node "${FOLDER}" $((FISH_START_PORT + i * 5)) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
-    -libp2p-keypair "${NETWORK_FOLDER}"/libp2p_keys/fish_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
+    -libp2p-keypair "${ROOT}"/libp2p_keys/fish_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   FISH_PIDS[${i}]=$!
 done
 
@@ -847,7 +847,7 @@ for ((i = 0; i < NODES; i++)); do
   FOLDER=${NODES_FOLDER}/node_${i}
   mkdir -p "${FOLDER}"
   spawn-node "${FOLDER}" $((NODE_START_PORT + i * 5)) -peer ${SEED_PEER_ID} \
-    -libp2p-keypair "${NETWORK_FOLDER}"/libp2p_keys/node_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
+    -libp2p-keypair "${ROOT}"/libp2p_keys/node_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   NODE_PIDS[${i}]=$!
 done
 
@@ -936,15 +936,15 @@ printf "\n"
 # Start sending transactions and zkApp transactions
 
 if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
-  FEE_PAYER_KEY_FILE=${NETWORK_FOLDER}/offline_whale_keys/offline_whale_account_0
-  SENDER_KEY_FILE=${NETWORK_FOLDER}/offline_whale_keys/offline_whale_account_1
+  FEE_PAYER_KEY_FILE=${ROOT}/offline_whale_keys/offline_whale_account_0
+  SENDER_KEY_FILE=${ROOT}/offline_whale_keys/offline_whale_account_1
   if ${ZKAPP_TRANSACTIONS}; then
-    ZKAPP_ACCOUNT_KEY_FILE=${NETWORK_FOLDER}/zkapp_keys/zkapp_account
-    ZKAPP_ACCOUNT_PUB_KEY=$(cat "${NETWORK_FOLDER}/zkapp_keys/zkapp_account.pub")
+    ZKAPP_ACCOUNT_KEY_FILE=${ROOT}/zkapp_keys/zkapp_account
+    ZKAPP_ACCOUNT_PUB_KEY=$(cat "${ROOT}/zkapp_keys/zkapp_account.pub")
   fi
 
-  KEY_FILE=${NETWORK_FOLDER}/online_fish_keys/online_fish_account_0
-  PUB_KEY=$(cat "${NETWORK_FOLDER}"/online_fish_keys/online_fish_account_0.pub)
+  KEY_FILE=${ROOT}/online_fish_keys/online_fish_account_0
+  PUB_KEY=$(cat "${ROOT}"/online_fish_keys/online_fish_account_0.pub)
   REST_SERVER="http://127.0.0.1:$((FISH_START_PORT + 1))/graphql"
 
   echo "Waiting for Node (${REST_SERVER}) to be up to start sending value transfer transactions..."
