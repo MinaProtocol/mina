@@ -1,7 +1,6 @@
-(executable
- (package archive_hardfork_toolbox)
- (name archive_hardfork_toolbox)
- (public_name archive_hardfork_toolbox)
+(library
+ (name archive_hardfork_toolbox_lib)
+ (public_name archive_hardfork_toolbox.lib)
  (libraries
   ;; opam libraries
   async_unix
@@ -18,7 +17,6 @@
   caqti-async
   base
   base.caml
-  async.async_command
   integers
   ;; local libraries
   logger
@@ -43,6 +41,67 @@
   signature_lib
   unsigned_extended
   with_hash)
+ (modules logic sql)
+ (preprocessor_deps ../../config.mlh)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_compare
+   ppx_hash
+   ppx_let
+   ppx_mina
+   ppx_sexp_conv
+   ppx_string
+   ppx_version)))
+
+(executable
+ (package archive_hardfork_toolbox)
+ (name archive_hardfork_toolbox)
+ (public_name archive_hardfork_toolbox)
+ (libraries
+  ;; opam libraries
+  async_unix
+  core
+  result
+  async_kernel
+  uri
+  stdio
+  caqti-driver-postgresql
+  caqti
+  cli_lib
+  async
+  core_kernel
+  caqti-async
+  base
+  base.caml
+  async.async_command
+  integers
+  ;; local libraries
+  archive_hardfork_toolbox_lib
+  logger
+  archive_lib
+  block_time
+  consensus
+  consensus_vrf
+  currency
+  genesis_constants
+  genesis_ledger_helper
+  mina_base
+  mina_base.import
+  mina_block
+  mina_caqti
+  mina_numbers
+  mina_state
+  mina_transaction
+  mina_wire_types
+  one_or_two
+  protocol_version
+  runtime_config
+  signature_lib
+  unsigned_extended
+  with_hash)
+ (modules archive_hardfork_toolbox)
  (preprocessor_deps ../../config.mlh)
  (instrumentation
   (backend bisect_ppx))
