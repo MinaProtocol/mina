@@ -510,11 +510,9 @@ function promote_and_verify_docker() {
     local __artifact_full_target_version=$__target_version-$__codename${__suffix}
 
     if [[ $__publish_to_docker_io == 1 ]]; then
-        local __publish_arg="-p"
-        local __repo=$DOCKER_IO_REPO
+        local __push_repo=$DOCKER_IO_REPO
     else
-        local __publish_arg=""
-        local __repo=$GCR_REPO
+        local __push_repo=$GCR_REPO
     fi
 
     echo " 🐋 Publishing $__artifact docker for '$__network' network and '$__codename' codename with '$__target_version' version and '$__arch' "
@@ -527,8 +525,8 @@ function promote_and_verify_docker() {
             -v $__artifact_full_source_version \
             -t $__artifact_full_target_version \
             -a $__arch \
-            -r "$__repo" \
-            $__publish_arg
+            --pull-registry "$GCR_REPO" \
+            --push-registry "$__push_repo" \
 
             echo ""
 
