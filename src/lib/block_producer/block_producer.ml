@@ -641,12 +641,6 @@ module Vrf_evaluation_state = struct
     poll ~logger ~vrf_evaluator ~vrf_poll_interval t
 end
 
-let validate_genesis_protocol_state_block ~genesis_state_hash (b, v) =
-  Validation.validate_genesis_protocol_state ~genesis_state_hash
-    (With_hash.map ~f:Mina_block.header b, v)
-  |> Result.map
-       ~f:(Fn.flip Validation.with_body (Mina_block.body @@ With_hash.data b))
-
 let log_bootstrap_mode ~logger () =
   [%log info] "Pausing block production while bootstrapping"
 
@@ -903,7 +897,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 |> Fn.flip Validation.with_body body
                 |> Validation.skip_protocol_versions_validation
                      `This_block_has_valid_protocol_versions
-                |> validate_genesis_protocol_state_block
+                |> Validation.validate_genesis_protocol_state_block
                      ~genesis_state_hash:
                        (Protocol_state.genesis_state_hash
                           ~state_hash:(Some previous_state_hash)
@@ -1480,7 +1474,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                  `This_block_has_valid_protocol_versions
             |> Validation.skip_proof_validation
                  `This_block_was_generated_internally
-            |> validate_genesis_protocol_state_block
+            |> Validation.validate_genesis_protocol_state_block
                  ~genesis_state_hash:
                    (Protocol_state.genesis_state_hash
                       ~state_hash:(Some previous_protocol_state_hash)
