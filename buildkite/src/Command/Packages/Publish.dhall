@@ -253,8 +253,10 @@ let publish
                                   ++  "--target-version ${r.value} "
                                   ++  "--codenames ${codenames} "
                                   ++  "--only-dockers "
-                                  ++  "--docker-repo ${DockerRepo.show
-                                                         spec.docker_repo} "
+                                  ++  "--source-docker-repo ${DockerRepo.show
+                                                                spec.docker_repo} "
+                                  ++  "--target-docker-repo ${DockerRepo.show
+                                                                spec.docker_repo} "
                                   ++  "--force-upload-debians "
                                 )
                             ]
