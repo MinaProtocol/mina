@@ -270,17 +270,19 @@ reset-genesis-ledger() {
   echo 'Resetting Genesis Ledger...'
   printf "\n"
 
-  jq --arg ts "$(date +"%Y-%m-%dT%H:%M:%S%z")" '
+  jq --arg timestamp "$(date +"%Y-%m-%dT%H:%M:%S%z")" \
+     --arg proof_level "$PROOF_LEVEL" \
+  '
   {
     genesis: {
       slot_per_epoch: 48,
       k: 10,
       grace_period_slots: 3,
-      genesis_state_timestamp: $ts
+      genesis_state_timestamp: $timestamp
     },
     proof: {
       work_delay: 1,
-      level: "full",
+      level: $proof_level,
       transaction_capacity: { 
         "2_to_the": 2 
       },
