@@ -193,31 +193,12 @@ module Ledger_inner = struct
        and type account_id_set := Account_id.Set.t
        and type account_id := Account_id.t
 
+  module Mask_maps = Mask_maps.F (Location_at_depth)
+
   module Inputs = struct
     include Make_inputs (Account.Stable.Latest) (Hash.Stable.Latest)
-    module Mask_maps = Mask_maps.F (Location_at_depth)
-
-    type maps_t = Mask_maps.t =
-      { accounts : Account.t Location.Map.t
-      ; token_owners : Account_id.t Token_id.Map.t
-      ; hashes : Hash.t Location.Addr.Map.t
-      ; locations : Location.t Account_id.Map.t
-      ; non_existent_accounts : Account_id.Set.t
-      }
+    module Mask_maps = Mask_maps
   end
-
-  module Mask_maps = struct
-    include Mask_maps
-    include Inputs.Mask_maps
-  end
-
-  type maps_t = Inputs.maps_t =
-    { accounts : Account.t Location_at_depth.Map.t
-    ; token_owners : Account_id.t Token_id.Map.t
-    ; hashes : Hash.t Location_at_depth.Addr.Map.t
-    ; locations : Location_at_depth.t Account_id.Map.t
-    ; non_existent_accounts : Account_id.Set.t
-    }
 
   module Unstable_inputs = Make_inputs (Account.Unstable) (Hash.Unstable)
   module Hardfork_inputs = Make_inputs (Account.Hardfork) (Hash.Hardfork)
@@ -257,7 +238,7 @@ module Ledger_inner = struct
        and type hash := Hash.t
        and type location := Location_at_depth.t
        and type parent := Any_ledger.M.t
-       and type maps_t := Inputs.maps_t =
+       and type maps_t := Mask_maps.t =
   Merkle_mask.Masking_merkle_tree.Make (struct
     include Inputs
     module Base = Any_ledger.M
@@ -278,7 +259,7 @@ module Ledger_inner = struct
        and type unattached_mask := Mask.t
        and type attached_mask := Mask.Attached.t
        and type accumulated_t := Mask.accumulated_t
-       and type maps_t := Inputs.maps_t
+       and type maps_t := Mask_maps.t
        and type t := Any_ledger.M.t =
   Merkle_mask.Maskable_merkle_tree.Make (struct
     include Inputs

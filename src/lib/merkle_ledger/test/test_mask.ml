@@ -17,6 +17,18 @@ module type Test_intf = sig
 
   module Location : Merkle_ledger.Location_intf.S
 
+  module Mask_maps :
+    Merkle_mask.Mask_maps_intf.S
+      with type account := Account.t
+       and type account_id := Account_id.t
+       and type 'a account_id_map := 'a Account_id.Map.t
+       and type account_id_set := Account_id.Set.t
+       and type 'a address_map := 'a Location.Addr.Map.t
+       and type hash := Hash.t
+       and type location := Location.t
+       and type 'a location_map := 'a Location.Map.t
+       and type 'a token_id_map := 'a Token_id.Map.t
+
   module Base :
     Merkle_mask.Base_merkle_tree_intf.S
       with module Addr = Location.Addr
@@ -43,6 +55,7 @@ module type Test_intf = sig
        and type token_id_set := Token_id.Set.t
        and type account_id := Account_id.t
        and type account_id_set := Account_id.Set.t
+       and type maps_t := Mask_maps.t
 
   module Maskable :
     Merkle_mask.Maskable_merkle_tree_intf.S
@@ -59,6 +72,7 @@ module type Test_intf = sig
        and type token_id_set := Token_id.Set.t
        and type account_id := Account_id.t
        and type account_id_set := Account_id.Set.t
+       and type maps_t := Mask_maps.t
 
   val with_instances : (Base.t -> Mask.t -> 'a) -> 'a
 
@@ -736,19 +750,20 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
     include Hashable.Make_binable (Arg) [@@deriving sexp, compare, hash, yojson]
   end
 
+  module Mask_maps = Merkle_mask.Mask_maps.Make (struct
+    module Account = Account
+    module Location = Location
+    module Hash = Hash
+    module Token_id = Token_id
+    module Account_id = Account_id
+  end)
+
   module Inputs = struct
     include Test_stubs.Base_inputs
     module Location = Location
     module Location_binable = Location_binable
     module Kvdb = In_memory_kvdb
-
-    type maps_t =
-      { accounts : Account.t Location.Map.t
-      ; token_owners : Account_id.t Token_id.Map.t
-      ; hashes : Hash.t Location.Addr.Map.t
-      ; locations : Location.t Account_id.Map.t
-      ; non_existent_accounts : Account_id.Set.t
-      }
+    module Mask_maps = Mask_maps
   end
 
   (* underlying Merkle tree *)
@@ -783,7 +798,7 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
        and type account_id_set := Account_id.Set.t
        and type hash := Hash.t
        and type parent := Base.t
-       and type maps_t = Inputs.maps_t =
+       and type maps_t := Inputs.Mask_maps.t =
   Merkle_mask.Masking_merkle_tree.Make (struct
     include Inputs
     module Base = Base
@@ -805,10 +820,9 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
        and type unattached_mask := Mask.t
        and type attached_mask := Mask.Attached.t
        and type accumulated_t = Mask.accumulated_t
+       and type maps_t := Inputs.Mask_maps.t
        and type t := Base.t = struct
     type accumulated_t = Mask.accumulated_t
-
-    type maps_t = Inputs.maps_t
 
     include Merkle_mask.Maskable_merkle_tree.Make (struct
       include Inputs

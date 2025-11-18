@@ -13,7 +13,7 @@ module type Inputs_intf = sig
        and type account_id := Account_id.t
        and type account_id_set := Account_id.Set.t
        and type parent := Base.t
-       and type maps_t := maps_t
+       and type maps_t := Mask_maps.t
 
   val mask_to_base : Mask.Attached.t -> Base.t
 end
@@ -34,4 +34,4 @@ module Make (I : Inputs_intf) :
      and type unattached_mask := I.Mask.t
      and type attached_mask := I.Mask.Attached.t
      and type accumulated_t := I.Mask.accumulated_t
-     and type maps_t := I.maps_t
+     and type maps_t := I.Mask_maps.t
