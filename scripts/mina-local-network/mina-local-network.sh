@@ -864,6 +864,7 @@ Network participants information:
 		Instance #0:
 		  pid ${SEED_PID}
 		  status: ${MINA_EXE} client status -daemon-port ${SEED_START_PORT}
+		  data dir: ${NODES_FOLDER}/seed
 EOF
 
 if [ "${SNARK_WORKERS_COUNT}" -gt 0 ]; then
@@ -872,6 +873,7 @@ if [ "${SNARK_WORKERS_COUNT}" -gt 0 ]; then
 		Instance #0:
 		  pid ${SNARK_COORDINATOR_PID}
 		  status: ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_PORT}
+		  data dir: ${NODES_FOLDER}/snark_coordinator
 
 	Snark Workers:
 EOF
@@ -880,6 +882,7 @@ EOF
     cat <<EOF
 		Instance #${i}:
 		  pid ${SNARK_WORKERS_PIDS[${i}]}
+		  data dir: ${NODES_FOLDER}/snark_workers/worker_${i}
 EOF
   done
 fi
@@ -890,6 +893,7 @@ if ${ARCHIVE}; then
 		Instance #0:
 		  pid ${ARCHIVE_PID}
 		  server-port: ${ARCHIVE_SERVER_PORT}
+		  data dir: "${NODES_FOLDER}"/archive
 EOF
 fi
 
@@ -902,6 +906,7 @@ EOF
 		Instance #${i}:
 		  pid ${WHALE_PIDS[${i}]}
 		  status: ${MINA_EXE} client status -daemon-port $((WHALE_START_PORT + i * 5))
+		  data dir: ${NODES_FOLDER}/whale_${i}
 EOF
   done
 fi
@@ -915,6 +920,7 @@ EOF
 		Instance #${i}:
 		  pid ${FISH_PIDS[${i}]}
 		  status: ${MINA_EXE} client status -daemon-port $((FISH_START_PORT + i * 5))
+		  data dir: ${NODES_FOLDER}/fish_${i}
 EOF
   done
 fi
@@ -928,6 +934,7 @@ EOF
 		Instance #${i}:
 		  pid ${NODE_PIDS[${i}]}
 		  status: ${MINA_EXE} client status -daemon-port $((NODE_START_PORT + i * 5))
+		  data dir: ${NODES_FOLDER}/node_${i}
 EOF
   done
 fi
