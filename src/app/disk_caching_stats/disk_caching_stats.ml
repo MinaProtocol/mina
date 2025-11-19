@@ -364,7 +364,7 @@ module Values (S : Sample) = struct
 
   let base_work varying witness :
       Transaction_snark_scan_state.Transaction_with_witness.t =
-    { transaction_with_info = { previous_hash = field (); varying = varying () }
+    { transaction_with_status = varying ()
     ; state_hash = (state_hash (), field ())
     ; statement =
         (*Transaction_snark.Statement.Stable.V2.t*)
@@ -397,36 +397,18 @@ module Values (S : Sample) = struct
       Transaction_snark_scan_state.Transaction_with_witness.t =
     base_work
       (fun () ->
-        Command
-          (Zkapp_command
-             { accounts =
-                 List.init Params.max_accounts_modified_per_zkapp_command
-                   ~f:(fun _ ->
-                     let a = account () in
-                     (Mina_base.Account.identifier a, Some a) )
-             ; command =
-                 { status = Applied; data = zkapp_command' () }
-                 (* the worst case is that no new accounts are created and they are all cached, so we leave this empty *)
-             ; new_accounts = []
-             } ) )
+        { Mina_base.With_status.status = Applied
+        ; data = Command (Zkapp_command (zkapp_command' ()))
+        } )
       (zkapp_command_witness ~config)
 
   let signed_command_base_work ~config () :
       Transaction_snark_scan_state.Transaction_with_witness.t =
     base_work
       (fun () ->
-        Command
-          (Signed_command
-             { common =
-                 { user_command =
-                     { status = Applied; data = signed_command' () }
-                 }
-             ; body =
-                 Payment
-                   { new_accounts =
-                       [ Mina_base.Account.identifier (account ()) ]
-                   }
-             } ) )
+        { Mina_base.With_status.status = Applied
+        ; data = Command (Signed_command (signed_command' ()))
+        } )
       (signed_command_witness ~config)
 
   let sok_message () : Mina_base.Sok_message.t =

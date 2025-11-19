@@ -8,28 +8,42 @@ module Ledger = Mina_ledger.Ledger
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V2 : sig
+  module V3 : sig
     type t
 
     val hash : t -> Staged_ledger_hash.Aux_hash.t
   end
+
+  module V2 : sig
+    type t
+
+    val to_latest : t -> V3.t
+  end
 end]
 
 type t
+
+val hash : t -> Staged_ledger_hash.Aux_hash.t
 
 module Transaction_with_witness : sig
   [%%versioned:
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
+    module V3 : sig
+      type t
+    end
+
     module V2 : sig
       type t
+
+      val to_latest : t -> V3.t
     end
   end]
 
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
+    { transaction_with_status : Transaction.t With_status.t
     ; state_hash : State_hash.t * State_body_hash.t
     ; statement : Transaction_snark.Statement.t
     ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t

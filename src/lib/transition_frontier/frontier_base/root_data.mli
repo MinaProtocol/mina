@@ -5,14 +5,20 @@ module Common : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
+    module V3 : sig
+      type t
+    end
+
     module V2 : sig
       type t
+
+      val to_latest : t -> V3.t
     end
   end]
 
   type t
 
-  val read_all_proofs_from_disk : t -> Stable.V2.t
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
 
 (* Historical root data is similar to Limited root data, except that it also
@@ -40,12 +46,12 @@ module Limited : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V3 : sig
+    module V4 : sig
       type t
 
       val hashes : t -> State_hash.State_hashes.Stable.V1.t
 
-      val common : t -> Common.Stable.V2.t
+      val common : t -> Common.Stable.V3.t
 
       val protocol_states :
            t
@@ -55,13 +61,19 @@ module Limited : sig
 
       val create :
            transition:Mina_block.Validated.Stable.V2.t
-        -> scan_state:Staged_ledger.Scan_state.Stable.V2.t
+        -> scan_state:Staged_ledger.Scan_state.Stable.V3.t
         -> pending_coinbase:Pending_coinbase.Stable.V2.t
         -> protocol_states:
              Mina_state.Protocol_state.value
              State_hash.With_state_hashes.Stable.V1.t
              list
         -> t
+    end
+
+    module V3 : sig
+      type t
+
+      val to_latest : t -> V4.t
     end
   end]
 
@@ -99,18 +111,24 @@ module Minimal : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V2 : sig
+    module V3 : sig
       type t
 
       val hash : t -> State_hash.t
 
-      val of_limited : common:Common.Stable.V2.t -> State_hash.Stable.V1.t -> t
+      val of_limited : common:Common.Stable.V3.t -> State_hash.Stable.V1.t -> t
 
-      val common : t -> Common.Stable.V2.t
+      val common : t -> Common.Stable.V3.t
 
-      val scan_state : t -> Staged_ledger.Scan_state.Stable.V2.t
+      val scan_state : t -> Staged_ledger.Scan_state.Stable.V3.t
 
       val pending_coinbase : t -> Pending_coinbase.Stable.V2.t
+    end
+
+    module V2 : sig
+      type t
+
+      val to_latest : t -> V3.t
     end
   end]
 
