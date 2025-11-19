@@ -23,6 +23,7 @@ module Transaction_with_witness = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    (* TODO In Mesa use Transaction_snark.Statement.t * Transaction_witness.t *)
     module V3 = struct
       type t =
         { transaction_with_status :
@@ -168,6 +169,7 @@ module Transaction_with_witness = struct
 end
 
 module Ledger_proof_with_sok_message = struct
+  (* TODO In Mesa use Ledger_proof.t, no need for sok message *)
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
