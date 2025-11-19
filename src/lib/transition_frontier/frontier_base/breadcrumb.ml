@@ -388,18 +388,20 @@ module For_tests = struct
              ; prover
              } )
       in
-      let current_state_view, state_and_body_hash =
+      let current_state_view, state_and_body_hash, parent_protocol_state_body =
         let prev_state =
           parent_breadcrumb |> block |> Mina_block.header
           |> Mina_block.Header.protocol_state
         in
         let prev_state_hashes = Protocol_state.hashes prev_state in
+        let parent_protocol_state_body = Protocol_state.body prev_state in
         let current_state_view =
-          Protocol_state.body prev_state |> Protocol_state.Body.view
+          Protocol_state.Body.view parent_protocol_state_body
         in
         ( current_state_view
         , ( prev_state_hashes.state_hash
-          , Option.value_exn prev_state_hashes.state_body_hash ) )
+          , Option.value_exn prev_state_hashes.state_body_hash )
+        , parent_protocol_state_body )
       in
       let current_global_slot =
         Mina_numbers.Global_slot_since_genesis.add
@@ -428,7 +430,8 @@ module For_tests = struct
             ~global_slot:current_global_slot ~coinbase_receiver ~logger
             staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
-            ~current_state_view ~state_and_body_hash ~supercharge_coinbase
+            ~parent_protocol_state_body ~state_and_body_hash
+            ~supercharge_coinbase
             ~zkapp_cmd_limit_hardcap:
               precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
             ~signature_kind:Testnet

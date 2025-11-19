@@ -199,9 +199,11 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
            ~body_hash:previous_protocol_state_body_hash previous_protocol_state )
           .state_hash
       in
-      let previous_state_view =
+      let previous_protocol_state_body =
         Protocol_state.body previous_protocol_state
-        |> Mina_state.Protocol_state.Body.view
+      in
+      let previous_state_view =
+        Protocol_state.Body.view previous_protocol_state_body
       in
       let global_slot =
         Consensus.Data.Block_data.global_slot_since_genesis block_data
@@ -282,7 +284,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
             let%bind.Deferred.Result diff = return diff in
             Staged_ledger.apply_diff_unchecked staged_ledger
               ~constraint_constants ~global_slot diff ~logger
-              ~current_state_view:previous_state_view
+              ~parent_protocol_state_body:previous_protocol_state_body
               ~state_and_body_hash:
                 (previous_protocol_state_hash, previous_protocol_state_body_hash)
               ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap

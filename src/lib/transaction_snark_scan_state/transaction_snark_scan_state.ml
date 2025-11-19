@@ -37,6 +37,9 @@ module Transaction_with_witness = struct
         ; second_pass_ledger_witness :
             (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
         ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+              (* TODO: in Mesa remove the option, just have the value *)
+        ; previous_protocol_state_body_opt :
+            Mina_state.Protocol_state.Body.Value.Stable.V2.t option
         }
       [@@deriving sexp, to_yojson]
 
@@ -81,6 +84,7 @@ module Transaction_with_witness = struct
         ; first_pass_ledger_witness
         ; second_pass_ledger_witness
         ; block_global_slot
+        ; previous_protocol_state_body_opt = None
         }
     end
   end]
@@ -108,6 +112,8 @@ module Transaction_with_witness = struct
     ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
+    ; previous_protocol_state_body_opt :
+        Mina_state.Protocol_state.Body.Value.t option
     }
 
   let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
@@ -118,6 +124,7 @@ module Transaction_with_witness = struct
       ; first_pass_ledger_witness
       ; second_pass_ledger_witness
       ; block_global_slot
+      ; previous_protocol_state_body_opt
       } =
     { transaction_with_status =
         With_status.map
@@ -131,6 +138,7 @@ module Transaction_with_witness = struct
     ; first_pass_ledger_witness
     ; second_pass_ledger_witness
     ; block_global_slot
+    ; previous_protocol_state_body_opt
     }
 
   let read_all_proofs_from_disk
@@ -141,6 +149,7 @@ module Transaction_with_witness = struct
       ; first_pass_ledger_witness
       ; second_pass_ledger_witness
       ; block_global_slot
+      ; previous_protocol_state_body_opt
       } =
     { Stable.Latest.transaction_with_status =
         With_status.map ~f:Transaction.read_all_proofs_from_disk
@@ -151,6 +160,7 @@ module Transaction_with_witness = struct
     ; first_pass_ledger_witness
     ; second_pass_ledger_witness
     ; block_global_slot
+    ; previous_protocol_state_body_opt
     }
 end
 
@@ -382,6 +392,7 @@ let create_expected_statement ~constraint_constants
     ; init_stack
     ; statement
     ; block_global_slot
+    ; previous_protocol_state_body_opt
     } =
   let open Or_error.Let_syntax in
   let source_first_pass_merkle_root =
@@ -393,8 +404,17 @@ let create_expected_statement ~constraint_constants
     @@ Sparse_ledger.merkle_root second_pass_ledger_witness
   in
   let transaction = With_status.data transaction_with_status in
-  let%bind protocol_state = get_state (fst state_hash) in
-  let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
+  let%bind previous_protocol_state_body =
+    match previous_protocol_state_body_opt with
+    | Some protocol_state ->
+        Ok protocol_state
+    | None ->
+        get_state (fst state_hash)
+        |> Or_error.map ~f:Mina_state.Protocol_state.body
+  in
+  let state_view =
+    Mina_state.Protocol_state.Body.view previous_protocol_state_body
+  in
   let empty_local_state = Mina_state.Local_state.empty () in
   let%bind ( target_first_pass_merkle_root
            , target_second_pass_merkle_root
@@ -1368,6 +1388,11 @@ let snark_job_list_json t =
       (List.map all_jobs ~f:(fun tree ->
            `List (List.map tree ~f:Job_view.to_yojson) ) ) )
 
+(* TODO create a function work_statements_length and use it
+   where only the length of the list is needed *)
+(* Length is used in ledger application. Whole list is
+   needed only in a test and in Snark_pool_refcount extension (i.e.
+   processing will happen once on each block) *)
 (*Always the same pairing of jobs*)
 let all_work_statements_exn t : Transaction_snark_work.Statement.t list =
   let work_seqs = all_jobs t in
@@ -1389,6 +1414,10 @@ let k_work_pairs_for_new_diff t ~k =
   List.(
     take (concat_map work_list ~f:(fun works -> One_or_two.group_list works)) k)
 
+(* TODO create a function work_statements_length and use it
+   where only the length of the list is needed *)
+(* Length is used in ledger application. Whole list is
+   needed only in a tests and in [Staged_ledger.create_diff] *)
 (*Always the same pairing of jobs*)
 let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
   let work_list = Parallel_scan.jobs_for_next_update t.scan_state in
@@ -1411,11 +1440,16 @@ let single_spec_of_job ~get_state :
       ; second_pass_ledger_witness
       ; init_stack
       ; block_global_slot
+      ; previous_protocol_state_body_opt
       } ->
       let%map.Or_error witness =
         let%bind.Or_error protocol_state_body =
-          get_state (fst state_hash)
-          |> Or_error.map ~f:Mina_state.Protocol_state.body
+          match previous_protocol_state_body_opt with
+          | Some protocol_state_body ->
+              Ok protocol_state_body
+          | None ->
+              get_state (fst state_hash)
+              |> Or_error.map ~f:Mina_state.Protocol_state.body
         in
         let%map.Or_error init_stack =
           match init_stack with

@@ -124,7 +124,9 @@ let mk_scan_state_base_node (transaction : Mina_transaction.Transaction.t)
       ; init_stack
       ; first_pass_ledger_witness = ledger_witness
       ; second_pass_ledger_witness = ledger_witness
-      ; block_global_slot = Mina_numbers.Global_slot_since_genesis.zero
+      ; block_global_slot =
+          Mina_numbers.Global_slot_since_genesis.zero (* TODO: add a value *)
+      ; previous_protocol_state_body_opt = None
       }
     in
     let record : _ Parallel_scan.Base.Record.t =
