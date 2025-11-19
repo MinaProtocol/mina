@@ -11,8 +11,6 @@ module type S = sig
 
   type location
 
-  val status_of_applied : Transaction_applied.t -> Transaction_status.t
-
   module Global_state : sig
     type t =
       { first_pass_ledger : ledger
@@ -440,19 +438,6 @@ module Make (L : Ledger_intf.S) :
       !"Current global slot %{sexp: Global_slot_since_genesis.t} greater than \
         transaction expiry slot %{sexp: Global_slot_since_genesis.t}"
       current_global_slot valid_until
-
-  let status_of_applied : Transaction_applied.t -> Transaction_status.t =
-   fun { varying; _ } ->
-    match varying with
-    | Command
-        (Signed_command { common = { user_command = { status; _ }; _ }; _ }) ->
-        status
-    | Command (Zkapp_command c) ->
-        c.command.status
-    | Fee_transfer f ->
-        f.fee_transfer.status
-    | Coinbase c ->
-        c.coinbase.status
 
   let get_new_accounts action pk =
     if Ledger_intf.equal_account_state action `Added then [ pk ] else []

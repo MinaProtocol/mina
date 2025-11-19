@@ -588,7 +588,10 @@ module T = struct
            ~constraint_constants applied_txn )
     in
     let%map () =
-      let actual_status = Ledger.status_of_applied applied_txn in
+      let actual_status =
+        Mina_transaction_logic.Transaction_applied.transaction_status
+          applied_txn
+      in
       if Transaction_status.equal pre_stmt.expected_status actual_status then
         return ()
       else

@@ -982,7 +982,9 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
         k ()
     | (expected_status, partially_applied_txn) :: partially_applied_txns' ->
         let%bind res = apply_second_pass ledger partially_applied_txn in
-        let status = Ledger.status_of_applied res in
+        let status =
+          Mina_transaction_logic.Transaction_applied.transaction_status res
+        in
         if Transaction_status.equal expected_status status then
           Ok
             (`Continue
