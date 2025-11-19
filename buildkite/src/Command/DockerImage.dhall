@@ -232,12 +232,15 @@ let generateStep =
                   }
                   spec.deb_repo
 
+          let target =
+                merge { Arm64 = Size.Arm64, Amd64 = Size.XLarge } spec.arch
+
           in  Command.build
                 Command.Config::{
                 , commands = commands
                 , label = "${stepLabel spec}"
                 , key = "${stepKey spec}"
-                , target = Size.XLarge
+                , target = target
                 , docker_login = Some DockerLogin::{=}
                 , depends_on = spec.deps
                 , if_ = spec.if_

@@ -141,7 +141,7 @@ let build_artifacts
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
             , target =
-                merge { Amd64 = Size.Multi, Arm64 = Size.XLarge } spec.arch
+                merge { Amd64 = Size.Multi, Arm64 = Size.Arm64 } spec.arch
             , if_ = spec.if_
             , retries =
               [ Command.Retry::{
