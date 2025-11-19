@@ -12,10 +12,16 @@ module Scan_state : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V2 : sig
+    module V3 : sig
       type t
 
       val hash : t -> Staged_ledger_hash.Aux_hash.t
+    end
+
+    module V2 : sig
+      type t
+
+      val to_latest : t -> V3.t
     end
   end]
 
