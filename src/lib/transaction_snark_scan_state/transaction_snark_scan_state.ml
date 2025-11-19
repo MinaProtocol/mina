@@ -273,8 +273,8 @@ let create_expected_statement ~constraint_constants
     Frozen_ledger_hash.of_ledger_hash
     @@ Sparse_ledger.merkle_root second_pass_ledger_witness
   in
-  let { With_status.data = transaction; status = _ } =
-    Ledger.transaction_of_applied transaction_with_info
+  let transaction =
+    Mina_transaction_logic.Transaction_applied.transaction transaction_with_info
   in
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
@@ -735,13 +735,13 @@ module Transactions_ordered = struct
                      (txn_with_witness : Transaction_with_witness.t)
                    ->
                   let txn =
-                    Ledger.transaction_of_applied
+                    Mina_transaction_logic.Transaction_applied.transaction
                       txn_with_witness.transaction_with_info
                   in
                   let target_first_pass_ledger =
                     txn_with_witness.statement.target.first_pass_ledger
                   in
-                  match txn.data with
+                  match txn with
                   | Transaction.Coinbase _
                   | Fee_transfer _
                   | Command (User_command.Signed_command _) ->
@@ -804,7 +804,8 @@ end
 let extract_txn_and_global_slot (txn_with_witness : Transaction_with_witness.t)
     =
   let txn =
-    Ledger.transaction_of_applied txn_with_witness.transaction_with_info
+    Mina_transaction_logic.Transaction_applied.transaction_with_status
+      txn_with_witness.transaction_with_info
   in
   let state_hash = fst txn_with_witness.state_hash in
   let global_slot = txn_with_witness.block_global_slot in
@@ -1076,8 +1077,8 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
           Previous_incomplete_txns.Unapplied
             (List.filter txns ~f:(fun txn ->
                  match
-                   (Ledger.transaction_of_applied txn.transaction_with_info)
-                     .data
+                   Mina_transaction_logic.Transaction_applied.transaction
+                     txn.transaction_with_info
                  with
                  | Command (Zkapp_command _) ->
                      true

@@ -570,8 +570,7 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
          ~f:(fun ((max_span, source_ledger, coinbase_stack_source), proofs)
                  (target_ledger, applied) ->
            let txn =
-             With_status.data
-             @@ Mina_ledger.Ledger.transaction_of_applied applied
+             Mina_transaction_logic.Transaction_applied.transaction applied
            in
            (* the txn was already valid before apply, we are just recasting it here after application *)
            let (`If_this_is_used_it_should_have_a_comment_justifying_it
@@ -792,8 +791,8 @@ let check_base_snarks ~genesis_constants ~constraint_constants ~logger
       |> List.fold ~init:sparse_ledger0
            ~f:(fun source_ledger (target_ledger, applied_txn) ->
              let txn =
-               With_status.data
-               @@ Mina_ledger.Ledger.transaction_of_applied applied_txn
+               Mina_transaction_logic.Transaction_applied.transaction
+                 applied_txn
              in
              (* the txn was already valid before apply, we are just recasting it here after application *)
              let (`If_this_is_used_it_should_have_a_comment_justifying_it
@@ -857,8 +856,8 @@ let generate_base_snarks_witness ~genesis_constants ~constraint_constants
       |> List.fold ~init:sparse_ledger0
            ~f:(fun source_ledger (target_ledger, applied_txn) ->
              let txn =
-               With_status.data
-               @@ Mina_ledger.Ledger.transaction_of_applied applied_txn
+               Mina_transaction_logic.Transaction_applied.transaction
+                 applied_txn
              in
              (* the txn was already valid before apply, we are just recasting it here after application *)
              let (`If_this_is_used_it_should_have_a_comment_justifying_it

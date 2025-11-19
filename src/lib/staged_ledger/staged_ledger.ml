@@ -565,7 +565,7 @@ module T = struct
       else
         let txn_with_expected_status =
           { With_status.data =
-              With_status.data (Ledger.transaction_of_applied applied_txn)
+              Mina_transaction_logic.Transaction_applied.transaction applied_txn
           ; status = pre_stmt.expected_status
           }
         in
@@ -780,7 +780,11 @@ module T = struct
       List.fold_right ~init:(Ok []) data
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
           let%map.Or_error acc = acc in
-          let t = d.transaction_with_info |> Ledger.transaction_of_applied in
+          let t =
+            d.transaction_with_info
+            |> Mina_transaction_logic.Transaction_applied
+               .transaction_with_status
+          in
           t :: acc )
     in
     let total_fee_excess txns =
