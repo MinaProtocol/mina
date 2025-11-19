@@ -75,6 +75,11 @@ module Base = struct
     end]
 
     let map (t : 'a t) ~(f : 'a -> 'b) : 'b t = { t with job = f t.job }
+
+    let map_result (t : 'a t) ~(f : 'a -> ('b, 'e) Result.t) :
+        ('b t, 'e) Result.t =
+      let%map.Result job = f t.job in
+      { t with job }
   end
 
   module Job = struct
@@ -89,6 +94,15 @@ module Base = struct
     let map (t : 'a t) ~(f : 'a -> 'b) : 'b t =
       match t with Empty -> Empty | Full r -> Full (Record.map r ~f)
 
+    let map_result (t : 'a t) ~(f : 'a -> ('b, 'e) Result.t) :
+        ('b t, 'e) Result.t =
+      match t with
+      | Empty ->
+          Ok Empty
+      | Full r ->
+          let%map.Result r = Record.map_result r ~f in
+          Full r
+
     let job_str = function Empty -> "Base.Empty" | Full _ -> "Base.Full"
   end
 
@@ -101,6 +115,11 @@ module Base = struct
   end]
 
   let map ((x, j) : 'a t) ~(f : 'a -> 'b) : 'b t = (x, Job.map j ~f)
+
+  let map_result ((x, j) : 'a t) ~(f : 'a -> ('b, 'e) Result.t) :
+      ('b t, 'e) Result.t =
+    let%map.Result j = Job.map_result j ~f in
+    (x, j)
 end
 
 (** For merge proofs: Merging two base proofs or two merge proofs*)
@@ -121,6 +140,12 @@ module Merge = struct
 
     let map (t : 'a t) ~(f : 'a -> 'b) : 'b t =
       { t with left = f t.left; right = f t.right }
+
+    let map_result (t : 'a t) ~(f : 'a -> ('b, 'e) Result.t) :
+        ('b t, 'e) Result.t =
+      let%bind.Result left = f t.left in
+      let%map.Result right = f t.right in
+      { t with left; right }
   end
 
   module Job = struct
@@ -144,6 +169,18 @@ module Merge = struct
       | Full r ->
           Full (Record.map r ~f)
 
+    let map_result (t : 'a t) ~(f : 'a -> ('b, 'e) Result.t) :
+        ('b t, 'e) Result.t =
+      match t with
+      | Empty ->
+          Ok Empty
+      | Part x ->
+          let%map.Result x = f x in
+          Part x
+      | Full r ->
+          let%map.Result r = Record.map_result r ~f in
+          Full r
+
     let job_str = function
       | Empty ->
           "Merge.Empty"
@@ -163,6 +200,11 @@ module Merge = struct
   end]
 
   let map ((x, j) : 'a t) ~(f : 'a -> 'b) : 'b t = (x, Job.map j ~f)
+
+  let map_result ((x, j) : 'a t) ~(f : 'a -> ('b, 'e) Result.t) :
+      ('b t, 'e) Result.t =
+    let%bind.Result j = Job.map_result j ~f in
+    Ok (x, j)
 end
 
 (**All the jobs on a tree that can be done. Base.Full and Merge.Full*)
@@ -287,6 +329,32 @@ module Tree = struct
                 ~f_base:(fun (x, y) -> (f_base x, f_base y))
                 sub_tree
           }
+
+  let result_pair x y =
+    let%bind.Result x' = x in
+    let%map.Result y' = y in
+    (x', y')
+
+  let rec map_depth_result :
+      type a_merge b_merge c_base d_base e.
+         f_merge:(int -> a_merge -> (b_merge, e) Result.t)
+      -> f_base:(c_base -> (d_base, e) Result.t)
+      -> (a_merge, c_base) t
+      -> ((b_merge, d_base) t, e) Result.t =
+   fun ~f_merge ~f_base tree ->
+    match tree with
+    | Leaf d ->
+        let%map.Result d' = f_base d in
+        Leaf d'
+    | Node { depth; value; sub_tree } ->
+        let%bind.Result value = f_merge depth value in
+        let%map.Result sub_tree =
+          map_depth_result
+            ~f_merge:(fun i (x, y) -> result_pair (f_merge i x) (f_merge i y))
+            ~f_base:(fun (x, y) -> result_pair (f_base x) (f_base y))
+            sub_tree
+        in
+        Node { depth; value; sub_tree }
 
   let map :
       type a_merge b_merge c_base d_base.
@@ -928,6 +996,31 @@ module State = struct
                ~f_base:(Base.map ~f:f2) )
     ; acc = Option.map t.acc ~f:(fun (m, bs) -> (f1 m, List.map bs ~f:f2))
     }
+
+  let map_result (type a1 a2 b1 b2 e) (t : (a1, a2) t)
+      ~(f1 : a1 -> (b1, e) Result.t) ~(f2 : a2 -> (b2, e) Result.t) :
+      ((b1, b2) t, e) Result.t =
+    let%bind.Result trees =
+      Mina_stdlib.Nonempty_list.map_result t.trees
+        ~f:
+          (Tree.map_depth_result
+             ~f_merge:(fun _ -> Merge.map_result ~f:f1)
+             ~f_base:(Base.map_result ~f:f2) )
+    in
+    let%map.Result acc =
+      match t.acc with
+      | None ->
+          Ok None
+      | Some (m, bs) ->
+          let%bind.Result m = f1 m in
+          let%map.Result bs =
+            List.fold_result bs ~init:[] ~f:(fun acc x ->
+                let%map.Result x' = f2 x in
+                x' :: acc )
+          in
+          Some (m, List.rev bs)
+    in
+    { t with trees; acc }
 
   let hash t f_merge f_base =
     let { trees; acc; max_base_jobs; curr_job_seq_no; delay; _ } =

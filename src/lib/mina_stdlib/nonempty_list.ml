@@ -28,6 +28,15 @@ let tail_opt t = of_list_opt (tail t)
 
 let map (x, xs) ~f = (f x, List.map ~f xs)
 
+let map_result (x, xs) ~f =
+  let%bind.Result x' = f x in
+  let%map.Result xs' =
+    List.fold_result xs ~init:[] ~f:(fun acc y ->
+        let%map.Result y' = f y in
+        y' :: acc )
+  in
+  (x', List.rev xs')
+
 let mapi (x, xs) ~f = (f 0 x, List.mapi ~f:(fun idx x -> f (idx + 1) x) xs)
 
 let rev (x, xs) = List.fold xs ~init:(singleton x) ~f:(Fn.flip cons)
