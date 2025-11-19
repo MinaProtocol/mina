@@ -8,12 +8,8 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) ([]byte, *BlockA
 	if err != nil {
 		return nil, nil, err
 	}
-	defer func() {
-		// Stop nodes first via daemon commands
-		t.StopNodes(t.Config.MainMinaExe)
-		// Then wait for graceful shutdown with timeout
-		t.gracefulShutdown(mainNetCmd, "Main network")
-	}()
+
+	defer t.gracefulShutdown(mainNetCmd, "Main network")
 
 	// Wait until best chain query time
 	t.WaitUntilBestChainQuery(t.Config.MainSlot, t.Config.MainDelay)
@@ -68,12 +64,8 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, configFile, 
 	if err != nil {
 		return err
 	}
-	defer func() {
-		// Stop nodes first via daemon commands
-		t.StopNodes(t.Config.ForkMinaExe)
-		// Then wait for graceful shutdown with timeout
-		t.gracefulShutdown(forkCmd, "Fork network")
-	}()
+
+	defer t.gracefulShutdown(forkCmd, "Fork network")
 
 	// Calculate expected genesis slot
 	expectedGenesisSlot := (forkGenesisTs - mainGenesisTs) / int64(t.Config.MainSlot)

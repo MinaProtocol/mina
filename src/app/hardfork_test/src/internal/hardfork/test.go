@@ -51,6 +51,8 @@ func (t *HardforkTest) gracefulShutdown(cmd *exec.Cmd, processName string) {
 	shutdownTimeout := time.NewTimer(time.Duration(t.Config.ShutdownTimeoutMinutes) * time.Minute)
 	processDone := make(chan error, 1)
 
+	cmd.Process.Signal(syscall.SIGTERM)
+
 	go func() {
 		processDone <- cmd.Wait()
 	}()
@@ -85,7 +87,7 @@ func (t *HardforkTest) cleanupAllProcesses() {
 	for _, cmd := range t.runningCmds {
 		if cmd != nil && cmd.Process != nil {
 			t.Logger.Info("Killing process PID %d", cmd.Process.Pid)
-			cmd.Process.Kill()
+			cmd.Process.Signal(syscall.SIGTERM)
 		}
 	}
 }

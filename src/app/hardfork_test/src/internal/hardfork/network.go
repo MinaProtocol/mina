@@ -1,14 +1,12 @@
 package hardfork
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
@@ -50,67 +48,6 @@ func (t *HardforkTest) AnyPortOfType(ty PortType) int {
 
 	idx := rand.Intn(len(candidates_ports))
 	return candidates_ports[idx]
-}
-
-func (t *HardforkTest) stopNode(execPath string, port int, tag string) error {
-	t.Logger.Info("Stopping %s at %d", tag, port)
-	cmd1 := exec.Command(execPath, "client", "stop-daemon", "--daemon-port", strconv.Itoa(port))
-	cmd1.Stdout = os.Stdout
-	cmd1.Stderr = os.Stderr
-	if err := cmd1.Run(); err != nil {
-		return fmt.Errorf("failed to stop %s on port %d: %w", tag, port, err)
-	}
-	return nil
-}
-
-func (t *HardforkTest) StopNodes(execPath string) error {
-	t.Logger.Info("Stopping nodes...")
-
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	var errs []error
-
-	stop := func(port int, name string) {
-		defer wg.Done()
-		if err := t.stopNode(execPath, port, name); err != nil {
-			mu.Lock()
-			errs = append(errs, err)
-			mu.Unlock()
-		}
-	}
-
-	// Step 1: stop all non-seed nodes
-	wg.Add(1)
-	go stop(SNARK_COORDINATOR_PORT, "snark-coordinator")
-
-	for i := 0; i < t.Config.NumWhales; i++ {
-		wg.Add(1)
-		go stop(WHALE_START_PORT+i*5, "whale")
-	}
-
-	for i := 0; i < t.Config.NumFish; i++ {
-		wg.Add(1)
-		go stop(FISH_START_PORT+i*5, "fish")
-	}
-
-	for i := 0; i < t.Config.NumNodes; i++ {
-		wg.Add(1)
-		go stop(NODE_START_PORT+i*5, "plain-node")
-	}
-
-	wg.Wait()
-
-	// Step 2: stop the seed node
-	if err := t.stopNode(execPath, SEED_START_PORT, "seed"); err != nil {
-		errs = append(errs, err)
-	}
-
-	if len(errs) > 0 {
-		return fmt.Errorf("multiple stopNode errors: %w", errors.Join(errs...))
-	} else {
-		t.Logger.Info("Nodes stopped successfully")
-		return nil
-	}
 }
 
 func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, extraArgs []string) (*exec.Cmd, error) {
