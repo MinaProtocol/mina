@@ -1,33 +1,26 @@
 #!/usr/bin/env bash
 
-# This scripts builds compatible and current branch with nix
-# It handles two cases differently:
-# - When given an $1 argument, it treats itself as being run in
-#   Buildkite CI and $1 to be "fork" branch that needs to be built
-# - When it isn't given any arguments, it asusmes it is being
-#   executed locally and builds code in $PWD as the fork branch
-#
-# When run locally, `compatible` branch is built in a temporary folder
-# (and fetched clean from Mina's repository). When run in CI,
-# `compatible` branch of git repo in $PWD is used to being the
-# compatible executable.
-#
-# In either case at the end of its execution this script leaves
-# current dir at the fork branch (in case of local run, it never
-# switches the branch with git) and nix builds put to `compatible-devnet`
-# and `fork-devnet` symlinks (located in $PWD).
+# This scripts builds master and current branch with nix
+# 0. Prepare environment if needed
+# 1. Build master as a prefork build;
+# 2. Upload to nix cache, the reason for not uploading cache for following 2 
+# steps is that they change for each PR. 
+# 3. Build current branch as a postfork build;
+# 4. Build hardfork_test on current branch;
+# 5. Execute hardfork_test on them.
 
-set -exo pipefail
+# Step 0. Prepare environment if needed
+set -eux -o pipefail
 
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
-if [[ "$NIX_CACHE_NAR_SECRET" != "" ]]; then
+if [[ -n "${NIX_CACHE_NAR_SECRET:-}" ]]; then
   echo "$NIX_CACHE_NAR_SECRET" > /tmp/nix-cache-secret
   echo "Configuring the NAR signing secret"
   NIX_SECRET_KEY=/tmp/nix-cache-secret
 fi
 
-if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
+if [[ -n "${NIX_CACHE_GCP_ID:-}" ]] && [[ -n "${NIX_CACHE_GCP_SECRET:-}" ]]; then
   echo "GCP uploading configured (for nix binaries)"
   cat <<'EOF'> /tmp/nix-post-build
 #!/bin/sh
@@ -42,22 +35,23 @@ EOF
   NIX_POST_BUILD_HOOK=/tmp/nix-post-build
 fi
 
-if [[ "$NIX_POST_BUILD_HOOK" != "" ]]; then
+if [[ -n "${NIX_POST_BUILD_HOOK:-}" ]]; then
   NIX_OPTS+=( --post-build-hook "$NIX_POST_BUILD_HOOK" )
 fi
-if [[ "$NIX_SECRET_KEY" != "" ]]; then
+if [[ -n "${NIX_SECRET_KEY:-}" ]]; then
   NIX_OPTS+=( --secret-key-files "$NIX_SECRET_KEY" )
 fi
 
-INIT_DIR="$PWD"
+pushd "$(git rev-parse --show-toplevel)"
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-if [[ $# -gt 0 ]]; then
-  # Branch is specified, this is a CI run
-  chown -R "${USER}" /workdir
-  git config --global --add safe.directory /workdir
-  git fetch
-  nix-env -iA unstable.{curl,git-lfs,gnused,jq}
+if [ -n "${BUILDKITE:-}" ]; then
+  # This is a CI run, ensure nix docker has everything what we want.
+  nix-env -iA unstable.{curl,git-lfs,gnused,jq,python311}
+
+  python -m venv .venv
+  source .venv/bin/activate
+  pip install -r scripts/mina-local-network/requirements.txt
 
   # Manually patch zone infos, nix doesn't provide stdenv breaking janestreet's core
   zone_info=(/nix/store/*tzdata*/share/zoneinfo)
@@ -72,40 +66,18 @@ if [[ $# -gt 0 ]]; then
     echo "Error: timezone file invalid!" >&2
     exit 1
   fi
+
+  git fetch origin
 fi
 
-if [[ ! -L compatible-devnet ]]; then
-  if [[ $# == 0 ]]; then
-    compatible_build=$(mktemp --tmpdir -d mina-compatible-worktree.XXXXXXXXXX)
-    git fetch origin compatible
-    git worktree add "$compatible_build" origin/compatible
-    cd "$compatible_build"
-  else
-    git checkout -f $1
-    git checkout -f compatible
-    git checkout -f $1 -- scripts/hardfork
-    compatible_build="$INIT_DIR"
-  fi
-  git submodule sync --recursive
-  git submodule update --init --recursive --depth 1
-  nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#devnet" --out-link "$INIT_DIR/compatible-devnet"
-  nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#devnet.genesis" --out-link "$INIT_DIR/compatible-devnet"
-  if [[ $# == 0 ]]; then
-    cd -
-    rm -Rf "$compatible_build"
-  fi
-fi
+# 1. Build master as a prefork build;
+git checkout origin/master
+git submodule update --init --recursive --depth 1
+nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet"
 
-if [[ $# -gt 0 ]]; then
-  # Branch is specified, this is a CI run
-  git checkout -f $1
-  git submodule sync --recursive
-  git submodule update --init --recursive --depth 1
-fi
-nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet" --out-link "$INIT_DIR/fork-devnet"
-nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet.genesis" --out-link "$INIT_DIR/fork-devnet"
+# 2. Upload to nix cache 
 
-if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
+if [[ -n "${NIX_CACHE_GCP_ID:-}" ]] && [[ -n "${NIX_CACHE_GCP_SECRET:-}" ]]; then
   mkdir -p $HOME/.aws
   cat <<EOF> $HOME/.aws/credentials
 [default]
@@ -113,23 +85,32 @@ aws_access_key_id=$NIX_CACHE_GCP_ID
 aws_secret_access_key=$NIX_CACHE_GCP_SECRET
 EOF
 
-  nix --experimental-features nix-command copy --to "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" --stdin </tmp/nix-paths
+  nix "${NIX_OPTS[@]}" copy \
+    --to "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" \
+    --stdin </tmp/nix-paths
 fi
 
+# 3. Build current branch as a postfork build;
+git checkout -
+git submodule update --init --recursive --depth 1
+nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devnet"
 
-nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#hardfork_test" --out-link "$INIT_DIR/hardfork_test"
+# 4. Build hardfork_test on current branch;
+nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfork_test"
 
-SLOT_TX_END=${SLOT_TX_END:-$((RANDOM%120+30))}
-SLOT_CHAIN_END=${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}
+# 5. Execute hardfork_test on them.
 
-echo "Running HF test with SLOT_TX_END=$SLOT_TX_END"
+SLOT_TX_END=${SLOT_TX_END:-$((40))}
+SLOT_CHAIN_END=${SLOT_CHAIN_END:-$((SLOT_TX_END+5))}
 
-"$INIT_DIR/hardfork_test/bin/hardfork_test" \
-  --main-mina-exe "$INIT_DIR/compatible-devnet/bin/mina" \
-  --main-runtime-genesis-ledger "$INIT_DIR/compatible-devnet-genesis/bin/runtime_genesis_ledger" \
-  --fork-mina-exe "$INIT_DIR/fork-devnet/bin/mina" \
-  --fork-runtime-genesis-ledger "$INIT_DIR/fork-devnet-genesis/bin/runtime_genesis_ledger" \
+
+hardfork_test/bin/hardfork_test \
+  --main-mina-exe prefork-devnet/bin/mina \
+  --main-runtime-genesis-ledger prefork-devnet/bin/runtime_genesis_ledger \
+  --fork-mina-exe postfork-devnet/bin/mina \
+  --fork-runtime-genesis-ledger postfork-devnet/bin/runtime_genesis_ledger \
   --slot-tx-end "$SLOT_TX_END" \
   --slot-chain-end "$SLOT_CHAIN_END" \
-  --script-dir "$SCRIPT_DIR" \
-&& echo "HF test completed successfully"
+  --script-dir "$SCRIPT_DIR"
+
+popd
