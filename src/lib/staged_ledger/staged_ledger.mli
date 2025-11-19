@@ -225,7 +225,7 @@ val apply :
         -> Transaction_snark_work.Checked.t option )
   -> logger:Logger.t
   -> verifier:Verifier.t
-  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
+  -> parent_protocol_state_body:Mina_state.Protocol_state.Body.Value.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
@@ -245,7 +245,7 @@ val apply_diff_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> logger:Logger.t
-  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
+  -> parent_protocol_state_body:Mina_state.Protocol_state.Body.Value.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
@@ -366,6 +366,7 @@ module Test_helpers : sig
     -> unit
     -> Mina_state.Protocol_state.value
        * Zkapp_precondition.Protocol_state.View.t
+       * Mina_state.Protocol_state.Body.Value.t
 
   val dummy_state_view :
        ?global_slot:Mina_numbers.Global_slot_since_genesis.t

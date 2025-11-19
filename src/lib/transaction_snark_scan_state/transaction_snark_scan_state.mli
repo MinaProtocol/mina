@@ -50,6 +50,8 @@ module Transaction_with_witness : sig
     ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
+    ; previous_protocol_state_body_opt :
+        Mina_state.Protocol_state.Body.Value.t option
     }
 
   val write_all_proofs_to_disk :

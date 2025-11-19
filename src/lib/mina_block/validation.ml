@@ -498,6 +498,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
       Deferred.Result.return ()
     else Deferred.Result.fail `Invalid_body_reference
   in
+  let parent_protocol_state_body = Protocol_state.body parent_protocol_state in
   let%bind.Deferred.Result ( `Ledger_proof proof_opt
                            , `Staged_ledger transitioned_staged_ledger
                            , `Accounts_created accounts_created
@@ -508,8 +509,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
         precomputed_values.Precomputed_values.constraint_constants ~global_slot
       ~logger ~verifier parent_staged_ledger
       (Staged_ledger_diff.Body.staged_ledger_diff body)
-      ~current_state_view:
-        Mina_state.Protocol_state.(Body.view @@ body parent_protocol_state)
+      ~parent_protocol_state_body
       ~state_and_body_hash:
         (let body_hash =
            Protocol_state.(Body.hash @@ body parent_protocol_state)

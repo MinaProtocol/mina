@@ -625,6 +625,7 @@ module T = struct
       ; init_stack = pre_stmt.init_stack
       ; statement
       ; block_global_slot = global_slot
+      ; previous_protocol_state_body_opt = None
       }
     , Mina_transaction_logic.Transaction_applied.new_accounts applied_txn )
 
@@ -1030,7 +1031,7 @@ module T = struct
           )
 
   let apply_diff ?(skip_verification = false) ~logger ~constraint_constants
-      ~global_slot ~current_state_view ~state_and_body_hash ~log_prefix
+      ~global_slot ~parent_protocol_state_body ~state_and_body_hash ~log_prefix
       ~zkapp_cmd_limit_hardcap ~signature_kind t pre_diff_info =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
@@ -1081,6 +1082,9 @@ module T = struct
         ; ("proofs_waiting", `Int proofs_waiting)
         ; ("max_throughput", `Int max_throughput)
         ] ;
+    let current_state_view =
+      Mina_state.Protocol_state.(Body.view parent_protocol_state_body)
+    in
     let%bind ( is_new_stack
              , data
              , stack_update_in_snark
@@ -1092,13 +1096,19 @@ module T = struct
             t.pending_coinbase_collection transactions current_state_view
             state_and_body_hash )
     in
-    let witnesses = List.map data ~f:fst in
     let accounts_created = List.concat_map data ~f:snd in
     let state_hash =
       Mina_state.Protocol_state.compute_state_hash
         ~previous_state_hash:(fst state_and_body_hash)
         ~state_body_hash:(snd state_and_body_hash)
     in
+    let to_witness (witness, _) =
+      { witness with
+        Transaction_snark_scan_state.Transaction_with_witness
+        .previous_protocol_state_body_opt = Some parent_protocol_state_body
+      }
+    in
+    let witnesses = List.map data ~f:to_witness in
     let _tagged_witnesses, _tagged_works =
       State_hash.File_storage.write_values_exn state_hash
         ~f:(persist_witnesses_and_works witnesses works)
@@ -1253,7 +1263,7 @@ module T = struct
   type transaction_pool_proxy = Check_commands.transaction_pool_proxy
 
   let apply ?skip_verification ~constraint_constants ~global_slot
-      ~get_completed_work ~logger ~verifier ~current_state_view
+      ~get_completed_work ~logger ~verifier ~parent_protocol_state_body
       ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
       ~zkapp_cmd_limit_hardcap ~signature_kind
       ?(transaction_pool_proxy = Check_commands.dummy_transaction_pool_proxy) t
@@ -1291,7 +1301,7 @@ module T = struct
           ([%equal: [ `All | `Proofs ] option] skip_verification (Some `All))
         ~constraint_constants ~global_slot t
         (forget_prediff_info prediff)
-        ~logger ~current_state_view ~state_and_body_hash
+        ~logger ~parent_protocol_state_body ~state_and_body_hash
         ~log_prefix:"apply_diff" ~zkapp_cmd_limit_hardcap ~signature_kind
     in
     [%log internal] "Diff_applied" ;
@@ -1312,7 +1322,7 @@ module T = struct
     res
 
   let apply_diff_unchecked ~constraint_constants ~global_slot ~logger
-      ~current_state_view ~state_and_body_hash ~coinbase_receiver
+      ~parent_protocol_state_body ~state_and_body_hash ~coinbase_receiver
       ~supercharge_coinbase ~zkapp_cmd_limit_hardcap ~signature_kind t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) =
     let open Deferred.Result.Let_syntax in
@@ -1324,7 +1334,7 @@ module T = struct
     in
     apply_diff t
       (forget_prediff_info prediff)
-      ~constraint_constants ~global_slot ~logger ~current_state_view
+      ~constraint_constants ~global_slot ~logger ~parent_protocol_state_body
       ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
       ~zkapp_cmd_limit_hardcap ~signature_kind
 
@@ -2361,12 +2371,15 @@ module Test_helpers = struct
               (Mina_state.Protocol_state.previous_state_hash state)
             ~body
     in
+    let parent_protocol_state_body =
+      Mina_state.Protocol_state.body state_with_global_slot
+    in
     ( state_with_global_slot
-    , Mina_state.Protocol_state.Body.view
-        (Mina_state.Protocol_state.body state_with_global_slot) )
+    , Mina_state.Protocol_state.Body.view parent_protocol_state_body
+    , parent_protocol_state_body )
 
   let dummy_state_view ?global_slot () =
-    dummy_state_and_view ?global_slot () |> snd
+    dummy_state_and_view ?global_slot () |> fun (_, view, _) -> view
 
   let update_coinbase_stack_and_get_data_impl =
     update_coinbase_stack_and_get_data_impl
@@ -2426,14 +2439,16 @@ let%test_module "staged ledger tests" =
       Sl.can_apply_supercharged_coinbase_exn ~winner ~global_slot ~epoch_ledger
 
     (* Functor for testing with different instantiated staged ledger modules. *)
-    let create_and_apply_with_state_body_hash
-        ~(current_state_view : Zkapp_precondition.Protocol_state.View.t)
+    let create_and_apply_with_state_body_hash ~parent_protocol_state_body
         ~global_slot ~state_and_body_hash ~signature_kind ?zkapp_cmd_limit
         ?(coinbase_receiver = coinbase_receiver) ?(winner = self_pk) sl txns
         stmt_to_work =
       let open Deferred.Let_syntax in
       let supercharge_coinbase =
         supercharge_coinbase ~ledger:(Sl.ledger !sl) ~winner ~global_slot
+      in
+      let current_state_view =
+        Mina_state.Protocol_state.(Body.view parent_protocol_state_body)
       in
       let diff =
         Sl.create_diff ~constraint_constants ~global_slot !sl ~logger
@@ -2455,9 +2470,9 @@ let%test_module "staged ledger tests" =
               , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
           Sl.apply ~constraint_constants ~global_slot !sl diff' ~logger
-            ~verifier ~get_completed_work:(Fn.const None) ~current_state_view
-            ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
-            ~zkapp_cmd_limit_hardcap ~signature_kind
+            ~verifier ~get_completed_work:(Fn.const None)
+            ~parent_protocol_state_body ~state_and_body_hash ~coinbase_receiver
+            ~supercharge_coinbase ~zkapp_cmd_limit_hardcap ~signature_kind
         with
         | Ok x ->
             x
@@ -2470,13 +2485,13 @@ let%test_module "staged ledger tests" =
       (ledger_proof, diff', is_new_stack, pc_update, supercharge_coinbase)
 
     let create_and_apply ?(coinbase_receiver = coinbase_receiver)
-        ?(winner = self_pk) ~global_slot ~protocol_state_view
+        ?(winner = self_pk) ~global_slot ~parent_protocol_state_body
         ~state_and_body_hash ~signature_kind sl txns stmt_to_work =
       let open Deferred.Let_syntax in
       let%map ledger_proof, diff, _, _, _ =
         create_and_apply_with_state_body_hash ~coinbase_receiver ~winner
-          ~current_state_view:protocol_state_view ~global_slot
-          ~state_and_body_hash sl txns stmt_to_work ~signature_kind
+          ~parent_protocol_state_body ~global_slot ~state_and_body_hash sl txns
+          stmt_to_work ~signature_kind
       in
       (ledger_proof, diff)
 
@@ -2768,7 +2783,7 @@ let%test_module "staged ledger tests" =
       in
       let state_tbl = State_hash.Table.create () in
       (*Add genesis state to the table*)
-      let genesis, _ = dummy_state_and_view () in
+      let genesis, _, _ = dummy_state_and_view () in
       let state_hash = (Mina_state.Protocol_state.hashes genesis).state_hash in
       State_hash.Table.add state_tbl ~key:state_hash ~data:genesis |> ignore ;
       let%map `Proof_count total_ledger_proofs, _ =
@@ -2776,7 +2791,7 @@ let%test_module "staged ledger tests" =
           (`Proof_count 0, `Slot global_slot)
           (fun cmds_left count_opt cmds_this_iter
                (`Proof_count proof_count, `Slot global_slot) ->
-            let current_state, current_view =
+            let current_state, current_view, parent_protocol_state_body =
               dummy_state_and_view ~global_slot ()
             in
             let state_hash =
@@ -2785,7 +2800,7 @@ let%test_module "staged ledger tests" =
             State_hash.Table.add state_tbl ~key:state_hash ~data:current_state
             |> ignore ;
             let%bind ledger_proof, diff =
-              create_and_apply ~global_slot ~protocol_state_view:current_view
+              create_and_apply ~global_slot ~parent_protocol_state_body
                 ~state_and_body_hash:
                   ( state_hash
                   , (Mina_state.Protocol_state.hashes current_state)
@@ -3402,7 +3417,7 @@ let%test_module "staged ledger tests" =
                         ~coinbase_amount:constraint_constants.coinbase_amount
                         ~global_slot cmds_this_iter work_done partitions
                     in
-                    let current_state, current_view =
+                    let current_state, _, parent_protocol_state_body =
                       dummy_state_and_view ~global_slot ()
                     in
                     let state_hashes =
@@ -3411,7 +3426,7 @@ let%test_module "staged ledger tests" =
                     let%bind apply_res =
                       Sl.apply ~constraint_constants ~global_slot !sl diff
                         ~logger ~verifier ~get_completed_work:(Fn.const None)
-                        ~current_state_view:current_view
+                        ~parent_protocol_state_body
                         ~state_and_body_hash:
                           ( state_hashes.state_hash
                           , state_hashes.state_body_hash |> Option.value_exn )
@@ -3551,7 +3566,7 @@ let%test_module "staged ledger tests" =
             let global_slot =
               Mina_numbers.Global_slot_since_genesis.of_int global_slot
             in
-            let current_state, current_state_view =
+            let current_state, current_state_view, parent_protocol_state_body =
               dummy_state_and_view ~global_slot ()
             in
             let state_and_body_hash =
@@ -3563,8 +3578,7 @@ let%test_module "staged ledger tests" =
             in
             let%map proof, diff =
               create_and_apply ~global_slot ~state_and_body_hash
-                ~protocol_state_view:current_state_view ~signature_kind sl
-                cmds_this_iter
+                ~parent_protocol_state_body ~signature_kind sl cmds_this_iter
                 (stmt_to_work_restricted
                    (List.take work_list proofs_available_this_iter)
                    provers )
@@ -3749,7 +3763,7 @@ let%test_module "staged ledger tests" =
             let global_slot =
               Mina_numbers.Global_slot_since_genesis.of_int global_slot
             in
-            let current_state, current_state_view =
+            let current_state, _, parent_protocol_state_body =
               dummy_state_and_view ~global_slot ()
             in
             let state_and_body_hash =
@@ -3760,9 +3774,8 @@ let%test_module "staged ledger tests" =
               , state_hashes.state_body_hash |> Option.value_exn )
             in
             let%map _proof, diff =
-              create_and_apply ~global_slot
-                ~protocol_state_view:current_state_view ~state_and_body_hash
-                ~signature_kind sl cmds_this_iter
+              create_and_apply ~global_slot ~state_and_body_hash
+                ~parent_protocol_state_body ~signature_kind sl cmds_this_iter
                 (stmt_to_work_random_fee work_to_be_done provers)
             in
             let sorted_work_from_diff1
@@ -3976,7 +3989,7 @@ let%test_module "staged ledger tests" =
               List.hd_exn proofs_available_left
             in
             let sl_before = !sl in
-            let current_state, current_state_view =
+            let current_state, current_state_view, parent_protocol_state_body =
               dummy_state_and_view ~global_slot ()
             in
             let state_and_body_hash =
@@ -3987,7 +4000,7 @@ let%test_module "staged ledger tests" =
               , state_hashes.state_body_hash |> Option.value_exn )
             in
             let%map proof, diff, is_new_stack, pc_update, supercharge_coinbase =
-              create_and_apply_with_state_body_hash ~current_state_view
+              create_and_apply_with_state_body_hash ~parent_protocol_state_body
                 ~global_slot ~state_and_body_hash ~signature_kind sl
                 cmds_this_iter
                 (stmt_to_work_restricted
@@ -4109,7 +4122,7 @@ let%test_module "staged ledger tests" =
           let global_slot =
             Mina_numbers.Global_slot_since_genesis.of_int block_count
           in
-          let current_state, current_state_view =
+          let current_state, _, parent_protocol_state_body =
             dummy_state_and_view ~global_slot ()
           in
           let state_and_body_hash =
@@ -4120,7 +4133,7 @@ let%test_module "staged ledger tests" =
           let%bind _ =
             create_and_apply_with_state_body_hash ~winner:delegator.public_key
               ~coinbase_receiver:coinbase_receiver.public_key sl
-              ~current_state_view
+              ~parent_protocol_state_body
               ~global_slot:
                 (Mina_numbers.Global_slot_since_genesis.of_int block_count)
               ~state_and_body_hash ~signature_kind Sequence.empty
@@ -4415,7 +4428,8 @@ let%test_module "staged ledger tests" =
               let global_slot =
                 Mina_numbers.Global_slot_since_genesis.of_int global_slot
               in
-              let current_state, current_state_view =
+              let current_state, current_state_view, parent_protocol_state_body
+                  =
                 dummy_state_and_view ~global_slot ()
               in
               let state_and_body_hash =
@@ -4463,7 +4477,7 @@ let%test_module "staged ledger tests" =
                     Sl.apply ~constraint_constants ~global_slot !sl
                       (Staged_ledger_diff.forget diff)
                       ~logger ~verifier ~get_completed_work:(Fn.const None)
-                      ~current_state_view ~state_and_body_hash
+                      ~parent_protocol_state_body ~state_and_body_hash
                       ~coinbase_receiver ~supercharge_coinbase:false
                       ~zkapp_cmd_limit_hardcap ~signature_kind
                   with
@@ -4628,7 +4642,7 @@ let%test_module "staged ledger tests" =
           let global_slot =
             Mina_numbers.Global_slot_since_genesis.of_int global_slot
           in
-          let current_state, current_state_view =
+          let current_state, current_state_view, parent_protocol_state_body =
             dummy_state_and_view ~global_slot ()
           in
           let state_and_body_hash =
@@ -4676,9 +4690,9 @@ let%test_module "staged ledger tests" =
                 Sl.apply ~constraint_constants ~global_slot sl
                   (Staged_ledger_diff.forget diff)
                   ~logger ~verifier ~get_completed_work:(Fn.const None)
-                  ~current_state_view ~state_and_body_hash ~coinbase_receiver
-                  ~supercharge_coinbase:false ~zkapp_cmd_limit_hardcap
-                  ~signature_kind
+                  ~parent_protocol_state_body ~state_and_body_hash
+                  ~coinbase_receiver ~supercharge_coinbase:false
+                  ~zkapp_cmd_limit_hardcap ~signature_kind
               with
               | Ok _x -> (
                   let valid_command_1_with_status =
@@ -4723,7 +4737,7 @@ let%test_module "staged ledger tests" =
                     Sl.apply ~constraint_constants ~global_slot sl
                       (Staged_ledger_diff.forget diff)
                       ~logger ~verifier ~get_completed_work:(Fn.const None)
-                      ~current_state_view ~state_and_body_hash
+                      ~parent_protocol_state_body ~state_and_body_hash
                       ~coinbase_receiver ~supercharge_coinbase:false
                       ~zkapp_cmd_limit_hardcap ~signature_kind
                   with
@@ -4807,7 +4821,7 @@ let%test_module "staged ledger tests" =
               let global_slot =
                 Mina_numbers.Global_slot_since_genesis.of_int 1
               in
-              let current_state, current_state_view =
+              let current_state, _, parent_protocol_state_body =
                 dummy_state_and_view ~global_slot ()
               in
               let state_and_body_hash =
@@ -4820,9 +4834,9 @@ let%test_module "staged ledger tests" =
               let%map result =
                 apply ~logger ~constraint_constants ~global_slot
                   ~get_completed_work:(Fn.const None) ~verifier
-                  ~current_state_view ~state_and_body_hash ~coinbase_receiver
-                  ~supercharge_coinbase:false sl diff ~zkapp_cmd_limit_hardcap
-                  ~signature_kind
+                  ~parent_protocol_state_body ~state_and_body_hash
+                  ~coinbase_receiver ~supercharge_coinbase:false sl diff
+                  ~zkapp_cmd_limit_hardcap ~signature_kind
               in
               match (expectation, result) with
               | `Accept, Ok _ | `Reject, Error _ ->
@@ -5102,7 +5116,7 @@ let%test_module "staged ledger tests" =
                       (Zkapp_command.Valid.For_tests.to_valid ~failed:true
                          ~find_vk:(find_vk ledger) zkapp_command )
                   in
-                  let current_state, current_state_view =
+                  let current_state, _, parent_protocol_state_body =
                     dummy_state_and_view ~global_slot ()
                   in
                   let state_and_body_hash =
@@ -5114,7 +5128,7 @@ let%test_module "staged ledger tests" =
                   in
                   let%bind _proof, diff =
                     create_and_apply ~global_slot ~state_and_body_hash
-                      ~protocol_state_view:current_state_view ~signature_kind sl
+                      ~parent_protocol_state_body ~signature_kind sl
                       (Sequence.singleton
                          (User_command.Zkapp_command failed_zkapp_command) )
                       stmt_to_work_one_prover
@@ -5154,7 +5168,7 @@ let%test_module "staged ledger tests" =
                   let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
                   let%bind _proof, diff =
                     create_and_apply sl ~global_slot ~state_and_body_hash
-                      ~protocol_state_view:current_state_view ~signature_kind
+                      ~parent_protocol_state_body ~signature_kind
                       (Sequence.singleton
                          (User_command.Zkapp_command valid_zkapp_command) )
                       stmt_to_work_one_prover
@@ -5225,7 +5239,9 @@ let%test_module "staged ledger tests" =
                   let global_slot =
                     Mina_numbers.Global_slot_since_genesis.of_int global_slot
                   in
-                  let current_state, current_state_view =
+                  let ( current_state
+                      , current_state_view
+                      , parent_protocol_state_body ) =
                     dummy_state_and_view ~global_slot ()
                   in
                   let state_and_body_hash =
@@ -5263,7 +5279,7 @@ let%test_module "staged ledger tests" =
                         Sl.apply ~constraint_constants ~global_slot !sl
                           (Staged_ledger_diff.forget diff)
                           ~get_completed_work:(Fn.const None) ~logger
-                          ~verifier:verifier_full ~current_state_view
+                          ~verifier:verifier_full ~parent_protocol_state_body
                           ~state_and_body_hash ~coinbase_receiver
                           ~supercharge_coinbase:false ~zkapp_cmd_limit_hardcap
                           ~signature_kind

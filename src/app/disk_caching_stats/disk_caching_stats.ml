@@ -390,7 +390,8 @@ module Values (S : Sample) = struct
     ; init_stack = Base (pending_coinbase_stack ())
     ; first_pass_ledger_witness = witness ()
     ; second_pass_ledger_witness = witness ()
-    ; block_global_slot = global_slot_since_genesis ()
+    ; block_global_slot = global_slot_since_genesis () (* TODO: add a value *)
+    ; previous_protocol_state_body_opt = None
     }
 
   let zkapp_command_base_work ~config () :
