@@ -625,14 +625,15 @@ module T = struct
       ; sok_digest = ()
       }
     in
-    { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn
-    ; state_hash = state_and_body_hash
-    ; first_pass_ledger_witness = pre_stmt.first_pass_ledger_witness
-    ; second_pass_ledger_witness = ledger_witness
-    ; init_stack = pre_stmt.init_stack
-    ; statement
-    ; block_global_slot = global_slot
-    }
+    ( { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn
+      ; state_hash = state_and_body_hash
+      ; first_pass_ledger_witness = pre_stmt.first_pass_ledger_witness
+      ; second_pass_ledger_witness = ledger_witness
+      ; init_stack = pre_stmt.init_stack
+      ; statement
+      ; block_global_slot = global_slot
+      }
+    , Mina_transaction_logic.Transaction_applied.new_accounts applied_txn )
 
   let apply_transactions_first_pass ~yield ~constraint_constants ~global_slot
       ~signature_kind ledger init_pending_coinbase_stack_state ts
@@ -1107,10 +1108,12 @@ module T = struct
         ~previous_state_hash:(fst state_and_body_hash)
         ~state_body_hash:(snd state_and_body_hash)
     in
+    let witnesses = List.map data ~f:fst in
     let _tagged_witnesses, _tagged_works =
       State_hash.File_storage.write_values_exn state_hash
-        ~f:(persist_witnesses_and_works data works)
+        ~f:(persist_witnesses_and_works witnesses works)
     in
+    let accounts_created = List.concat_map data ~f:snd in
     let slots = List.length data in
     let work_count = List.length works in
     let required_pairs = Scan_state.work_statements_for_new_diff t.scan_state in
@@ -1138,18 +1141,20 @@ module T = struct
           else Deferred.Result.return () )
     in
     [%log internal] "Check_zero_fee_excess" ;
-    let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
+    let%bind () =
+      Deferred.return (check_zero_fee_excess t.scan_state witnesses)
+    in
     [%log internal] "Fill_work_and_enqueue_transactions" ;
     let%bind res_opt, scan_state' =
       O1trace.thread "fill_work_and_enqueue_transactions" (fun () ->
           let r =
             Scan_state.fill_work_and_enqueue_transactions t.scan_state ~logger
-              data works
+              witnesses works
           in
           Or_error.iter_error r ~f:(fun e ->
               let data_json =
                 `List
-                  (List.map data
+                  (List.map witnesses
                      ~f:(fun
                           { Scan_state.Transaction_with_witness.statement; _ }
                         -> Transaction_snark.Statement.to_yojson statement ) )
@@ -1224,6 +1229,7 @@ module T = struct
     in
     ( `Ledger_proof res_opt
     , `Staged_ledger new_staged_ledger
+    , `Accounts_created accounts_created
     , `Pending_coinbase_update
         ( is_new_stack
         , { Pending_coinbase.Update.Poly.action = stack_update_in_snark
@@ -1290,7 +1296,7 @@ module T = struct
     in
     let apply_diff_start_time = Core.Time.now () in
     [%log internal] "Apply_diff" ;
-    let%map ((_, `Staged_ledger new_staged_ledger, _) as res) =
+    let%map ((_, `Staged_ledger new_staged_ledger, _, _) as res) =
       apply_diff
         ~skip_verification:
           ([%equal: [ `All | `Proofs ] option] skip_verification (Some `All))
@@ -2305,39 +2311,6 @@ module T = struct
             ( { Staged_ledger_diff.With_valid_signatures_and_proofs.diff }
             , invalid_on_this_ledger ) ) )
 
-  let latest_block_accounts_created t ~previous_block_state_hash =
-    let scan_state = scan_state t in
-    (* filter leaves by state hash from previous block *)
-    let block_transactions_applied =
-      let f
-          ({ state_hash = leaf_block_hash, _; transaction_with_info; _ } :
-            Scan_state.Transaction_with_witness.t ) =
-        if State_hash.equal leaf_block_hash previous_block_state_hash then
-          Some transaction_with_info.varying
-        else None
-      in
-      List.filter_map (Scan_state.base_jobs_on_latest_tree scan_state) ~f
-      @ List.filter_map
-          (Scan_state.base_jobs_on_earlier_tree ~index:0 scan_state)
-          ~f
-    in
-    List.map block_transactions_applied ~f:(function
-      | Command (Signed_command cmd) -> (
-          match cmd.body with
-          | Payment { new_accounts } ->
-              new_accounts
-          | Stake_delegation _ ->
-              []
-          | Failed ->
-              [] )
-      | Command (Zkapp_command { new_accounts; _ }) ->
-          new_accounts
-      | Fee_transfer { new_accounts; _ } ->
-          new_accounts
-      | Coinbase { new_accounts; _ } ->
-          new_accounts )
-    |> List.concat
-
   let convert_and_apply_all_masks_to_ledger ~hardfork_db ({ ledger; _ } : t) =
     let accounts =
       Ledger.all_accounts_on_masks ledger
@@ -2489,6 +2462,7 @@ let%test_module "staged ledger tests" =
       let diff' = Staged_ledger_diff.forget diff in
       let%map ( `Ledger_proof ledger_proof
               , `Staged_ledger sl'
+              , `Accounts_created _
               , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
           Sl.apply ~constraint_constants ~global_slot !sl diff' ~logger
@@ -3475,6 +3449,7 @@ let%test_module "staged ledger tests" =
                       | Ok
                           ( `Ledger_proof _ledger_proof
                           , `Staged_ledger sl'
+                          , `Accounts_created _
                           , `Pending_coinbase_update _ ) ->
                           sl := sl' ;
                           (false, diff)

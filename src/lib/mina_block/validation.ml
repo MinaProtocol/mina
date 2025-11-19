@@ -500,6 +500,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   in
   let%bind.Deferred.Result ( `Ledger_proof proof_opt
                            , `Staged_ledger transitioned_staged_ledger
+                           , `Accounts_created accounts_created
                            , `Pending_coinbase_update _ ) =
     Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
       ~get_completed_work
@@ -580,7 +581,8 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
         ( `Just_emitted_a_proof (Option.is_some proof_opt)
         , `Block_with_validation
             (t, Unsafe.set_valid_staged_ledger_diff validation)
-        , `Staged_ledger transitioned_staged_ledger )
+        , `Staged_ledger transitioned_staged_ledger
+        , `Accounts_created accounts_created )
   | Error errors ->
       Error (`Invalid_staged_ledger_diff errors)
 

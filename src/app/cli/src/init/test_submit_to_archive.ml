@@ -140,7 +140,7 @@ module Block = struct
       Frontier_base.Breadcrumb.create ~validated_transition:validated
         ~staged_ledger
         ~transition_receipt_time:(Some (Time.now ()))
-        ~just_emitted_a_proof:false
+        ~just_emitted_a_proof:false ~accounts_created:[]
     in
     (* Block proof contained in genesis header is just a stub.
        Hence we need to generate the real proof here, in order to

@@ -291,6 +291,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
           | Ok
               ( `Ledger_proof ledger_proof_opt
               , `Staged_ledger transitioned_staged_ledger
+              , `Accounts_created _
               , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
               ) ->
               [%log internal] "Hash_new_staged_ledger" ;

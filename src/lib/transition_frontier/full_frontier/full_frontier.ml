@@ -165,6 +165,8 @@ let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
     Breadcrumb.create ~validated_transition
       ~staged_ledger:root_data.staged_ledger ~just_emitted_a_proof:false
       ~transition_receipt_time
+        (* accounts created shouldn't be used for the root *)
+      ~accounts_created:[]
   in
   let root_node =
     { Node.breadcrumb = root_breadcrumb; successor_hashes = []; length = 0 }
@@ -560,6 +562,8 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
         (Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb)
       ~transition_receipt_time:
         (Breadcrumb.transition_receipt_time new_root_node.breadcrumb)
+        (* accounts created shouldn't be used for the root *)
+      ~accounts_created:[]
   in
   (*Update the protocol states required for scan state at the new root.
     Note: this should be after applying the transactions to the snarked ledger (Step 5)
