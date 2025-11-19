@@ -121,7 +121,7 @@ func (t *HardforkTest) Run() error {
 	}
 
 	// Define all fork_data file paths
-	forkConfigPath := "fork_data/prefork/config.json"
+	preforkConfig := "fork_data/prefork/config.json"
 
 	// Phase 1: Run and validate main network
 	t.Logger.Info("Phase 1: Running main network...")
@@ -136,13 +136,13 @@ func (t *HardforkTest) Run() error {
 		return err
 	}
 	// Write fork config to file
-	if err := os.WriteFile(forkConfigPath, forkConfigBytes, 0644); err != nil {
+	if err := os.WriteFile(preforkConfig, forkConfigBytes, 0644); err != nil {
 		return err
 	}
 	{
 		preforkLedgersDir := "fork_data/prefork/hf_ledgers"
 		preforkHashesFile := "fork_data/prefork/hf_ledger_hashes.json"
-		if err := t.GenerateAndValidatePreforkLedgers(analysis, forkConfigPath, preforkLedgersDir, preforkHashesFile); err != nil {
+		if err := t.GenerateAndValidatePreforkLedgers(analysis, preforkConfig, preforkLedgersDir, preforkHashesFile); err != nil {
 			return err
 		}
 	}
@@ -151,7 +151,7 @@ func (t *HardforkTest) Run() error {
 		return err
 	}
 
-	configFile := "fork_data/postfork/config.json"
+	postforkConfig := "fork_data/postfork/config.json"
 	forkLedgersDir := "fork_data/postfork/hf_ledgers"
 
 	// Calculate fork genesis timestamp relative to now (before starting fork network)
@@ -161,13 +161,13 @@ func (t *HardforkTest) Run() error {
 	{
 		preforkGenesisConfigFile := fmt.Sprintf("%s/daemon.json", t.Config.Root)
 		forkHashesFile := "fork_data/hf_ledger_hashes.json"
-		if err := t.GenerateForkConfigAndLedgers(analysis, forkConfigPath, forkLedgersDir, forkHashesFile, configFile, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs); err != nil {
+		if err := t.GenerateForkConfigAndLedgers(analysis, preforkConfig, forkLedgersDir, forkHashesFile, postforkConfig, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs); err != nil {
 			return err
 		}
 	}
 
 	t.Logger.Info("Phase 4: Running fork network...")
-	if err := t.RunForkNetworkPhase(analysis.LatestNonEmptyBlock.BlockHeight, configFile, forkLedgersDir, forkGenesisTs, mainGenesisTs); err != nil {
+	if err := t.RunForkNetworkPhase(analysis.LatestNonEmptyBlock.BlockHeight, postforkConfig, forkLedgersDir, forkGenesisTs, mainGenesisTs); err != nil {
 		return err
 	}
 
