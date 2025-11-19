@@ -2,6 +2,7 @@ package hardfork
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -115,7 +116,12 @@ func (t *HardforkTest) Run() error {
 	mainGenesisTs := time.Now().Unix() + int64(t.Config.MainDelay*60)
 
 	// Define all localnet file paths
-	forkConfigPath := "localnet/fork_config.json"
+	if err := os.MkdirAll("fork_data/prefork", 0755); err != nil {
+		return err
+	}
+
+	// Define all fork_data file paths
+	forkConfigPath := "fork_data/prefork/config.json"
 
 	// Phase 1: Run and validate main network
 	t.Logger.Info("Phase 1: Running main network...")
@@ -134,25 +140,28 @@ func (t *HardforkTest) Run() error {
 		return err
 	}
 	{
-		preforkLedgersDir := "localnet/prefork_hf_ledgers"
-		preforkHashesFile := "localnet/prefork_hf_ledger_hashes.json"
+		preforkLedgersDir := "fork_data/prefork/hf_ledgers"
+		preforkHashesFile := "fork_data/prefork/hf_ledger_hashes.json"
 		if err := t.GenerateAndValidatePreforkLedgers(analysis, forkConfigPath, preforkLedgersDir, preforkHashesFile); err != nil {
 			return err
 		}
 	}
 
-	configFile := "localnet/config.json"
-	forkLedgersDir := "localnet/hf_ledgers"
+	if err = os.MkdirAll("fork_data/postfork", 0755); err != nil {
+		return err
+	}
+
+	configFile := "fork_data/postfork/config.json"
+	forkLedgersDir := "fork_data/postfork/hf_ledgers"
 
 	// Calculate fork genesis timestamp relative to now (before starting fork network)
 	forkGenesisTs := time.Now().Unix() + int64(t.Config.ForkDelay*60)
 
 	t.Logger.Info("Phase 3: Generating fork configuration and ledgers...")
 	{
-		os.MkdirAll("localnet/config", 0755)
-		baseConfigFile := "localnet/config/base.json"
-		forkHashesFile := "localnet/hf_ledger_hashes.json"
-		if err := t.GenerateForkConfigAndLedgers(analysis, forkConfigPath, forkLedgersDir, forkHashesFile, configFile, baseConfigFile, forkGenesisTs, mainGenesisTs); err != nil {
+		preforkGenesisConfigFile := fmt.Sprintf("%s/daemon.json", t.Config.Root)
+		forkHashesFile := "fork_data/hf_ledger_hashes.json"
+		if err := t.GenerateForkConfigAndLedgers(analysis, forkConfigPath, forkLedgersDir, forkHashesFile, configFile, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs); err != nil {
 			return err
 		}
 	}
