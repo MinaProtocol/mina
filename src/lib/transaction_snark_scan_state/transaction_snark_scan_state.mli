@@ -46,7 +46,7 @@ module Transaction_with_witness : sig
     { transaction_with_status : Transaction.t With_status.t
     ; state_hash : State_hash.t * State_body_hash.t
     ; statement : Transaction_snark.Statement.t
-    ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
+    ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.t
     ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t

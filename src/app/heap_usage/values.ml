@@ -80,9 +80,7 @@ let mk_scan_state_base_node (transaction : Mina_transaction.Transaction.t)
     let state_hash = get Mina_base.State_hash.gen in
     let state_body_hash = get Mina_base.State_body_hash.gen in
     let statement = get Transaction_snark.Statement.gen in
-    let init_stack =
-      Transaction_snark.Pending_coinbase_stack_state.Init_stack.Merge
-    in
+    let init_stack = Mina_base.Pending_coinbase.Stack.empty in
     let ledger_witness =
       let depth = constraint_constants.ledger_depth in
       let account_access_statuses =
