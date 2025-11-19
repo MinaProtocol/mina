@@ -193,7 +193,7 @@ let generateStep =
                 then      "./scripts/docker/release.sh"
                       ++  " --service ${Artifacts.dockerName spec.service}"
                       ++  " --version ${spec.version}"
-                      ++  " --network ${Network.lowerName spec.network}"
+                      ++  " --network ${Network.debianSuffix spec.network}"
                       ++  " --deb-codename ${DebianVersions.lowerName
                                                spec.deb_codename}"
                       ++  " --deb-version ${spec.deb_version}"
