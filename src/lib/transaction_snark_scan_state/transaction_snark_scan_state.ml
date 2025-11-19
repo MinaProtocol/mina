@@ -1242,20 +1242,6 @@ let partition_if_overflowing t =
           (slots, bundle_count job_count) )
   }
 
-let extract_from_job (job : job) =
-  match job with
-  | Parallel_scan.Available_job.Base d ->
-      First
-        ( d.transaction_with_info
-        , d.statement
-        , d.state_hash
-        , d.first_pass_ledger_witness
-        , d.second_pass_ledger_witness
-        , d.init_stack
-        , d.block_global_slot )
-  | Merge ((p1, _), (p2, _)) ->
-      Second (p1, p2)
-
 let snark_job_list_json t =
   let all_jobs : Job_view.t list list =
     let fa (a : Ledger_proof_with_sok_message.t) =
@@ -1302,70 +1288,67 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
              | Some stmt ->
                  stmt ) ) )
 
+let single_spec_of_job ~get_state :
+    job -> Snark_work_lib.Spec.Single.t Or_error.t = function
+  | Parallel_scan.Available_job.Base
+      { transaction_with_info
+      ; statement
+      ; state_hash
+      ; first_pass_ledger_witness
+      ; second_pass_ledger_witness
+      ; init_stack
+      ; block_global_slot
+      } ->
+      let%map.Or_error witness =
+        let { With_status.data = transaction; status } =
+          Mina_transaction_logic.Transaction_applied.transaction_with_status
+            transaction_with_info
+        in
+        let%bind.Or_error protocol_state_body =
+          get_state (fst state_hash)
+          |> Or_error.map ~f:Mina_state.Protocol_state.body
+        in
+        let%map.Or_error init_stack =
+          match init_stack with
+          | Base x ->
+              Ok x
+          | Merge ->
+              Or_error.error_string "init_stack was Merge"
+        in
+        { Transaction_witness.first_pass_ledger = first_pass_ledger_witness
+        ; second_pass_ledger = second_pass_ledger_witness
+        ; transaction
+        ; protocol_state_body
+        ; init_stack
+        ; status
+        ; block_global_slot
+        }
+      in
+      Snark_work_lib.Work.Single.Spec.Transition (statement, witness)
+  | Merge ((p1, _), (p2, _)) ->
+      let%map.Or_error merged =
+        Transaction_snark.Statement.merge
+          (Ledger_proof.Cached.statement p1)
+          (Ledger_proof.Cached.statement p2)
+      in
+      Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
+
+let single_spec_one_or_twos_rev_of_job_list ~get_state jobs =
+  List.fold_result ~init:[] (One_or_two.group_list jobs) ~f:(fun acc' pair ->
+      let%map.Or_error spec =
+        One_or_two.Or_error.map ~f:(single_spec_of_job ~get_state) pair
+      in
+      spec :: acc' )
+
 let all_work_pairs t
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
-    ( Transaction_witness.t
-    , Ledger_proof.Cached.t )
-    Snark_work_lib.Work.Single.Spec.t
-    One_or_two.t
-    list
-    Or_error.t =
+    Snark_work_lib.Spec.Single.t One_or_two.t list Or_error.t =
   let all_jobs = all_jobs t in
-  let module A = Available_job in
-  let open Or_error.Let_syntax in
-  let single_spec (job : job) =
-    match extract_from_job job with
-    | First
-        ( transaction_with_info
-        , statement
-        , state_hash
-        , first_pass_ledger_witness
-        , second_pass_ledger_witness
-        , init_stack
-        , block_global_slot ) ->
-        let%map witness =
-          let { With_status.data = transaction; status } =
-            Mina_transaction_logic.Transaction_applied.transaction_with_status
-              transaction_with_info
-          in
-          let%bind protocol_state_body =
-            let%map state = get_state (fst state_hash) in
-            Mina_state.Protocol_state.body state
-          in
-          let%map init_stack =
-            match init_stack with
-            | Base x ->
-                Ok x
-            | Merge ->
-                Or_error.error_string "init_stack was Merge"
-          in
-          { Transaction_witness.first_pass_ledger = first_pass_ledger_witness
-          ; second_pass_ledger = second_pass_ledger_witness
-          ; transaction
-          ; protocol_state_body
-          ; init_stack
-          ; status
-          ; block_global_slot
-          }
-        in
-        Snark_work_lib.Work.Single.Spec.Transition (statement, witness)
-    | Second (p1, p2) ->
-        let%map merged =
-          Transaction_snark.Statement.merge
-            (Ledger_proof.Cached.statement p1)
-            (Ledger_proof.Cached.statement p2)
-        in
-        Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
-  in
   List.fold_until all_jobs ~init:[]
     ~finish:(fun lst -> Ok lst)
     ~f:(fun acc jobs ->
-      let specs_list : 'a One_or_two.t list Or_error.t =
-        List.fold ~init:(Ok []) (One_or_two.group_list jobs)
-          ~f:(fun acc' pair ->
-            let%bind acc' = acc' in
-            let%map spec = One_or_two.Or_error.map ~f:single_spec pair in
-            spec :: acc' )
+      let specs_list =
+        single_spec_one_or_twos_rev_of_job_list ~get_state jobs
       in
       match specs_list with
       | Ok list ->
