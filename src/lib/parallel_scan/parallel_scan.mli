@@ -210,6 +210,12 @@ module State : sig
 
   val map : ('a1, 'a2) t -> f1:('a1 -> 'b1) -> f2:('a2 -> 'b2) -> ('b1, 'b2) t
 
+  val map_result :
+       ('a1, 'a2) t
+    -> f1:('a1 -> ('b1, 'e) Result.t)
+    -> f2:('a2 -> ('b2, 'e) Result.t)
+    -> (('b1, 'b2) t, 'e) Result.t
+
   module Hash : sig
     type t = Digestif.SHA256.t
   end
