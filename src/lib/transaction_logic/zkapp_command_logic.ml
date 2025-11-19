@@ -549,6 +549,7 @@ module type Controller_intf = sig
 
   val check : proof_verifies:bool -> signature_verifies:bool -> t -> bool
 
+  (* This is used for fallbacking for Permissions.{set_verification_key, set_permissions}. *)
   val verification_key_perm_fallback_to_signature_with_older_version : t -> t
 end
 
@@ -1609,26 +1610,29 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_app_state app_state a in
       (a, local_state)
     in
+    let older_than_current_version =
+      Txn_version.older_than_current
+        (Account.Permissions.set_verification_key_txn_version a)
+    in
+    (* Generic helper that deals with fallback when the permissions are set for
+       a old protocol version for setting vk/perm *)
+    let auth_with_fallback_set_vk_or_perm original_auth =
+      Controller.if_ older_than_current_version
+        ~then_:
+          (Controller
+           .verification_key_perm_fallback_to_signature_with_older_version
+             original_auth )
+        ~else_:original_auth
+    in
     (* Set verification key. *)
     let a, local_state =
       let verification_key =
         Account_update.Update.verification_key account_update
       in
-      let older_than_current_version =
-        Txn_version.older_than_current
-          (Account.Permissions.set_verification_key_txn_version a)
-      in
-      let original_auth = Account.Permissions.set_verification_key_auth a in
-      let auth =
-        Controller.if_ older_than_current_version
-          ~then_:
-            (Controller
-             .verification_key_perm_fallback_to_signature_with_older_version
-               original_auth )
-          ~else_:original_auth
-      in
       let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies auth
+        Account.Permissions.set_verification_key_auth a
+        |> auth_with_fallback_set_vk_or_perm
+        |> Controller.check ~proof_verifies ~signature_verifies
       in
       let local_state =
         Local_state.add_check local_state Update_not_permitted_verification_key
@@ -1795,8 +1799,9 @@ module Make (Inputs : Inputs_intf) = struct
     let a, local_state =
       let permissions = Account_update.Update.permissions account_update in
       let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.set_permissions a)
+        Account.Permissions.set_permissions a
+        |> auth_with_fallback_set_vk_or_perm
+        |> Controller.check ~proof_verifies ~signature_verifies
       in
       let local_state =
         Local_state.add_check local_state Update_not_permitted_permissions
