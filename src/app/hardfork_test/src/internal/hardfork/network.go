@@ -16,13 +16,6 @@ import (
 
 // TODO: ensure integrity of ports in hf-test-go and mina-local-network
 
-const SEED_START_PORT = 3000
-const ARCHIVE_SERVER_PORT = 3086
-const SNARK_COORDINATOR_PORT = 7000
-const WHALE_START_PORT = 4000
-const FISH_START_PORT = 5000
-const NODE_START_PORT = 6000
-
 type PortType int
 
 const (
@@ -34,17 +27,17 @@ const (
 )
 
 func (t *HardforkTest) AllPortOfType(ty PortType) []int {
-	all_ports := []int{SEED_START_PORT, SNARK_COORDINATOR_PORT}
+	all_ports := []int{t.Config.SeedStartPort, t.Config.SnarkCoordinatorPort}
 
 	for i := 0; i < t.Config.NumWhales; i++ {
-		all_ports = append(all_ports, WHALE_START_PORT+i*5)
+		all_ports = append(all_ports, t.Config.WhaleStartPort+i*5)
 	}
 	for i := 0; i < t.Config.NumFish; i++ {
-		all_ports = append(all_ports, FISH_START_PORT+i*5)
+		all_ports = append(all_ports, t.Config.FishStartPort+i*5)
 	}
 
 	for i := 0; i < t.Config.NumNodes; i++ {
-		all_ports = append(all_ports, NODE_START_PORT+i*5)
+		all_ports = append(all_ports, t.Config.NodeStartPort+i*5)
 	}
 	for i := range all_ports {
 		all_ports[i] += int(ty)
@@ -125,6 +118,12 @@ func (t *HardforkTest) startLocalNetwork(profile string, extraArgs []string) (*e
 	t.Logger.Info("Starting network %s...", profile)
 	cmd := exec.Command(
 		filepath.Join(t.ScriptDir, "../mina-local-network/mina-local-network.sh"),
+		"--seed-start-port", strconv.Itoa(t.Config.SeedStartPort),
+		"--snark-coordinator-start-port", strconv.Itoa(t.Config.SnarkCoordinatorPort),
+
+		"--whale-start-port", strconv.Itoa(t.Config.WhaleStartPort),
+		"--fish-start-port", strconv.Itoa(t.Config.FishStartPort),
+		"--node-start-port", strconv.Itoa(t.Config.NodeStartPort),
 		"--whales", strconv.Itoa(t.Config.NumWhales),
 		"--fish", strconv.Itoa(t.Config.NumFish),
 		"--nodes", strconv.Itoa(t.Config.NumNodes),
