@@ -551,6 +551,8 @@ module type Controller_intf = sig
 
   (* This is used for fallbacking for Permissions.{set_verification_key, set_permissions}. *)
   val verification_key_perm_fallback_to_signature_with_older_version : t -> t
+
+  val access_perm_fallback_to_signature_with_older_version : t -> t
 end
 
 module type Txn_version_intf = sig
@@ -1547,11 +1549,23 @@ module Make (Inputs : Inputs_intf) = struct
        This must be done before updating zkApp fields!
     *)
     let a = Account.make_zkapp a in
+    let older_than_current_version =
+      Txn_version.older_than_current
+        (Account.Permissions.set_verification_key_txn_version a)
+    in
+    let auth_with_fallback_access original_auth =
+      Controller.if_ older_than_current_version
+        ~then_:
+          (Controller.access_perm_fallback_to_signature_with_older_version
+             original_auth )
+        ~else_:original_auth
+    in
     (* Check that the account can be accessed with the given authorization. *)
     let local_state =
       let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.access a)
+        Account.Permissions.access a
+        |> auth_with_fallback_access
+        |> Controller.check ~proof_verifies ~signature_verifies
       in
       Local_state.add_check local_state Update_not_permitted_access
         has_permission
@@ -1609,10 +1623,6 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let a = Account.set_app_state app_state a in
       (a, local_state)
-    in
-    let older_than_current_version =
-      Txn_version.older_than_current
-        (Account.Permissions.set_verification_key_txn_version a)
     in
     (* Generic helper that deals with fallback when the permissions are set for
        a old protocol version for setting vk/perm *)
