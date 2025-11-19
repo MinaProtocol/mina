@@ -120,31 +120,23 @@ func (t *HardforkTest) StopNodes(execPath string) error {
 	}
 }
 
-// RunMainNetwork starts the main network
-func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
-	t.Logger.Info("Starting main network...")
+func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, extraArgs []string) (*exec.Cmd, error) {
 
-	// Set environment variables
-	mainGenesisTimestamp := config.FormatTimestamp(mainGenesisTs)
-
-	// Prepare mina-local-network.sh command
+	t.Logger.Info("Starting network %s...", profile)
 	cmd := exec.Command(
 		filepath.Join(t.ScriptDir, "../mina-local-network/mina-local-network.sh"),
 		"--whales", strconv.Itoa(t.Config.NumWhales),
 		"--fish", strconv.Itoa(t.Config.NumFish),
 		"--nodes", strconv.Itoa(t.Config.NumNodes),
-		"--update-genesis-timestamp", fmt.Sprintf("fixed:%s", mainGenesisTimestamp),
 		"--log-level", "Error",
 		"--file-log-level", "Trace",
-		"--config", "reset",
 		"--value-transfer-txns",
 		"--transaction-interval", strconv.Itoa(t.Config.PaymentInterval),
-		"--override-slot-time", strconv.Itoa(t.Config.MainSlot*1000),
-		"--slot-transaction-end", strconv.Itoa(t.Config.SlotTxEnd),
-		"--slot-chain-end", strconv.Itoa(t.Config.SlotChainEnd),
 		"--root", t.Config.Root,
 	)
-	cmd.Env = append(os.Environ(), "MINA_EXE="+t.Config.MainMinaExe)
+
+	cmd.Args = append(cmd.Args, extraArgs...)
+	cmd.Env = append(os.Environ(), "MINA_EXE="+minaExecutable)
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -157,43 +149,32 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 	// Register command for cleanup on interrupt
 	t.registerCmd(cmd)
 
-	t.Logger.Info("Main network started successfully")
+	t.Logger.Info("Network %s started successfully", profile)
 	return cmd, nil
+}
+
+// RunMainNetwork starts the main network
+func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
+
+	// Set environment variables
+	mainGenesisTimestamp := config.FormatTimestamp(mainGenesisTs)
+
+	return t.startLocalNetwork(t.Config.MainMinaExe, "main", []string{
+		"--update-genesis-timestamp", fmt.Sprintf("fixed:%s", mainGenesisTimestamp),
+		"--config", "reset",
+		"--override-slot-time", strconv.Itoa(t.Config.MainSlot * 1000),
+		"--slot-transaction-end", strconv.Itoa(t.Config.SlotTxEnd),
+		"--slot-chain-end", strconv.Itoa(t.Config.SlotChainEnd),
+	})
 }
 
 // RunForkNetwork starts the fork network with hardfork configuration
 func (t *HardforkTest) RunForkNetwork(configFile, forkLedgersDir string) (*exec.Cmd, error) {
-	t.Logger.Info("Starting fork network...")
-
-	// Prepare mina-local-network.sh command
-	cmd := exec.Command(
-		filepath.Join(t.ScriptDir, "../mina-local-network/mina-local-network.sh"),
-		"--whales", strconv.Itoa(t.Config.NumWhales),
-		"--fish", strconv.Itoa(t.Config.NumFish),
-		"--nodes", strconv.Itoa(t.Config.NumNodes),
+	return t.startLocalNetwork(t.Config.ForkMinaExe, "fork", []string{
 		"--update-genesis-timestamp", fmt.Sprintf("delay_sec:%d", t.Config.ForkDelay*60),
-		"--log-level", "Error",
-		"--file-log-level", "Trace",
 		"--config", fmt.Sprintf("inherit_with:%s,%s", configFile, forkLedgersDir),
-		"--value-transfer-txns",
-		"--transaction-interval", strconv.Itoa(t.Config.PaymentInterval),
-		"--override-slot-time", strconv.Itoa(t.Config.ForkSlot*1000),
-		"--root", t.Config.Root,
+		"--override-slot-time", strconv.Itoa(t.Config.ForkSlot * 1000)},
 	)
-	cmd.Env = append(os.Environ(), "MINA_EXE="+t.Config.ForkMinaExe)
-
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start fork network: %w", err)
-	}
-
-	// Register command for cleanup on interrupt
-	t.registerCmd(cmd)
-
-	t.Logger.Info("Fork network started successfully")
-	return cmd, nil
 }
 
 // WaitForBlockHeight waits until the specified block height is reached
