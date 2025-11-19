@@ -2,8 +2,6 @@
 
 # Exit script when commands fail
 set -e
-# Kill background process when script exits
-trap "jobs -p | xargs -r kill" EXIT
 
 # ================================================
 # Constants
@@ -157,6 +155,57 @@ EOF
 
   exit
 }
+
+stop-node() {
+    local tag="$1"
+    local port="$2"
+
+    echo "Stopping $tag at $port"
+
+    "$MINA_EXE" client stop-daemon --daemon-port "$port"
+    if [ $? -ne 0 ]; then
+        echo "Failed to stop $tag on port $port" >&2
+    fi
+}
+
+# Kill all processes when script exits
+on-exit() {
+  echo "Shutting down mina local network"
+
+  # 1. stop all SNARK workers
+  for pid in "${SNARK_WORKERS_PIDS[@]}"; do
+    {
+      echo "Killing SNARK worker at $pid"
+      kill "$pid"
+    } &
+  done
+  wait
+
+  # 2. stop every non-seed nodes
+  stop-node "snark-coordinator" "$SNARK_COORDINATOR_PORT" &
+
+  for ((i=0; i<FISH; i++)); do
+      port=$((FISH_START_PORT + i*5))
+      stop-node "fish_${i}" "$port" &
+  done
+
+  for ((i=0; i<NODES; i++)); do
+      port=$((NODE_START_PORT + i*5))
+      stop-node "node_${i}" "$port" &
+  done
+
+  for ((i=0; i<WHALES; i++)); do
+      port=$((WHALE_START_PORT + i*5))
+      stop-node "whale_${i}" "$port" &
+  done
+
+  wait
+
+  # 3. stop the seed node
+  stop-node "seed" "$SEED_START_PORT"
+}
+
+trap on-exit TERM INT
 
 clean-dir() {
   rm -rf "${1}"
@@ -1030,18 +1079,9 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
 
   set -e
 
-  echo "Killing all SNARK workers"
-  printf "\n"
-
-  for pid in "${SNARK_WORKERS_PIDS[@]}"; do
-      kill "$pid"
-  done
 fi
 
 # ================================================
 # Wait for child processes to finish
 
 wait
-
-# All nodes has already exited
-trap - EXIT
