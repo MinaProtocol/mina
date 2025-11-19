@@ -310,18 +310,13 @@ module T = struct
       ~statement_check ~verifier:() ~error_prefix ~registers_end
       ~last_proof_statement
 
-  let of_scan_state_and_ledger_unchecked ~ledger ~scan_state
-      ~constraint_constants ~pending_coinbase_collection =
-    { ledger; scan_state; constraint_constants; pending_coinbase_collection }
-
   let of_scan_state_and_ledger ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~verifier ~last_proof_statement ~ledger ~scan_state
       ~pending_coinbase_collection ~get_state ~first_pass_ledger_target =
     let open Deferred.Or_error.Let_syntax in
     let t =
-      of_scan_state_and_ledger_unchecked ~ledger ~scan_state
-        ~constraint_constants ~pending_coinbase_collection
+      { ledger; scan_state; constraint_constants; pending_coinbase_collection }
     in
     let%bind pending_coinbase_stack =
       Pending_coinbase.latest_stack ~is_new_stack:false
@@ -349,6 +344,7 @@ module T = struct
       ~last_proof_statement ~ledger ~scan_state ~pending_coinbase_collection
       ~first_pass_ledger_target =
     let open Deferred.Or_error.Let_syntax in
+    (* TODO consider removing the invariants check *)
     let%bind pending_coinbase_stack =
       Pending_coinbase.latest_stack ~is_new_stack:false
         pending_coinbase_collection
@@ -413,6 +409,9 @@ module T = struct
       ~scan_state ~pending_coinbase_collection:pending_coinbases
       ~first_pass_ledger_target
 
+  (* Used in bootstrap (to verify data received from network)
+     Consider changing types to work on stable scan state
+  *)
   let of_scan_state_pending_coinbases_and_snarked_ledger ~logger
       ~constraint_constants ~verifier ~scan_state ~snarked_ledger
       ~snarked_local_state ~expected_merkle_root ~pending_coinbases ~get_state
@@ -422,6 +421,7 @@ module T = struct
       ~expected_merkle_root ~get_state ~signature_kind
       (of_scan_state_and_ledger ~logger ~get_state ~verifier)
 
+  (* Used in loading the root from disk *)
   let of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
       ~constraint_constants ~logger ~scan_state ~snarked_ledger
       ~snarked_local_state ~expected_merkle_root ~pending_coinbases ~get_state
