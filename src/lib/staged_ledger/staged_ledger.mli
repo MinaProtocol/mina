@@ -237,6 +237,7 @@ val apply :
            list )
          option ]
        * [ `Staged_ledger of t ]
+       * [ `Accounts_created of Account_id.t list ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
      , Staged_ledger_error.t )
      Deferred.Result.t
@@ -262,6 +263,7 @@ val apply_diff_unchecked :
            list )
          option ]
        * [ `Staged_ledger of t ]
+       * [ `Accounts_created of Account_id.t list ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
      , Staged_ledger_error.t )
      Deferred.Result.t
@@ -363,12 +365,6 @@ val all_work_pairs :
 (** Statements of all the pending work in t*)
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 
-(** Account ids created in the latest block, taken from the new_accounts
-    in the latest and next-to-latest trees of the scan state
-*)
-val latest_block_accounts_created :
-  t -> previous_block_state_hash:State_hash.t -> Account_id.t list
-
 (** Go through all masks until reach root, convert all accounts accumulated 
     along the way, and commit them to a HF database
 *)
@@ -401,7 +397,9 @@ module Test_helpers : sig
     -> Zkapp_precondition.Protocol_state.View.t
     -> Frozen_ledger_hash.t * Frozen_ledger_hash.t
     -> ( bool
-         * Transaction_snark_scan_state.Transaction_with_witness.t list
+         * ( Transaction_snark_scan_state.Transaction_with_witness.t
+           * Account_id.t list )
+           list
          * Pending_coinbase.Update.Action.t
          * [> `Update_none
            | `Update_one of Pending_coinbase.Stack_versioned.t
