@@ -622,7 +622,7 @@ module For_tests = struct
         in
         Breadcrumb.create ~validated_transition:genesis_transition
           ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false
-          ~transition_receipt_time )
+          ~transition_receipt_time ~accounts_created:[] )
 
   let gen_persistence ?(logger = Logger.null ()) ~verifier
       ~(precomputed_values : Precomputed_values.t) () =
