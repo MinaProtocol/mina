@@ -3538,6 +3538,11 @@ module Make_str (A : Wire_types.Concrete) = struct
           init_stack pending_coinbase_stack_state handler
 
   let verify_impl ~f ts =
+    (* TODO: move this check outside of verify_impl
+       Let's do it in Daemon, not verifier, and skip it entirely when
+       validating proofs from scan state (even when received
+       from the network, we simply don't need sok messages anymore)
+    *)
     if
       List.for_all ts ~f:(fun ((p : Stable.Latest.t), m) ->
           Sok_message.Digest.equal (Sok_message.digest m) p.data.sok_digest )

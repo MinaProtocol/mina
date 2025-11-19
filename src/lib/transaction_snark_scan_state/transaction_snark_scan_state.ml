@@ -23,6 +23,28 @@ module Transaction_with_witness = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    (* TODO In Mesa use Transaction_snark.Statement.t * Transaction_witness.t *)
+    module V3 = struct
+      type t =
+        { transaction_with_status :
+            Transaction.Stable.V2.t With_status.Stable.V2.t
+        ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
+        ; statement : Transaction_snark.Statement.Stable.V2.t
+        ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
+        ; first_pass_ledger_witness :
+            (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+        ; second_pass_ledger_witness :
+            (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+        ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+              (* TODO: in Mesa remove the option, just have the value *)
+        ; previous_protocol_state_body_opt :
+            Mina_state.Protocol_state.Body.Value.Stable.V2.t option
+        }
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       (* TODO: The statement is redundant here - it can be computed from the
          witness and the transaction
@@ -99,6 +121,7 @@ module Transaction_with_witness = struct
 end
 
 module Ledger_proof_with_sok_message = struct
+  (* TODO In Mesa use Ledger_proof.t, no need for sok message *)
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
