@@ -94,14 +94,13 @@ val fill_work_and_enqueue_transactions :
 
 val latest_ledger_proof : t -> Ledger_proof.Cached.t option
 
-val latest_ledger_proof_and_txs :
+val latest_ledger_proof_txs :
      t
-  -> ( Ledger_proof_with_sok_message.t
-     * ( Transaction.t With_status.t
-       * State_hash.t
-       * Mina_numbers.Global_slot_since_genesis.t )
-       Transactions_ordered.Poly.t
-       list )
+  -> ( Transaction.t With_status.t
+     * State_hash.t
+     * Mina_numbers.Global_slot_since_genesis.t )
+     Transactions_ordered.Poly.t
+     list
      option
 
 (** Apply transactions coorresponding to the last emitted proof based on the
