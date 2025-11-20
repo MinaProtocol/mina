@@ -155,7 +155,6 @@ func (t *HardforkTest) startLocalNetwork(profile string, extraArgs []string) (*e
 // RunMainNetwork starts the main network
 func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 
-	// Set environment variables
 	mainGenesisTimestamp := config.FormatTimestamp(mainGenesisTs)
 
 	return t.startLocalNetwork("main", []string{
