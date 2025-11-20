@@ -136,6 +136,10 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
   in
+  if List.length accounts > 1 lsl constraint_constants.ledger_depth then
+    failwith
+      "Ledger depth is too small to store all accounts provided, are you \
+       compiling this executable with correct profile? " ;
   let ledger =
     load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
       accounts
