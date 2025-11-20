@@ -100,7 +100,7 @@ val fill_work_and_enqueue_transactions :
      * t )
      Or_error.t
 
-val latest_ledger_proof :
+val latest_ledger_proof_and_txs :
      t
   -> ( Ledger_proof_with_sok_message.t
      * ( Transaction.t With_status.t
