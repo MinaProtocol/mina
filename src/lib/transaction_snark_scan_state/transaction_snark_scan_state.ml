@@ -811,6 +811,12 @@ let extract_txn_and_global_slot (txn_with_witness : Transaction_with_witness.t)
   let global_slot = txn_with_witness.block_global_slot in
   (txn, state_hash, global_slot)
 
+let latest_ledger_proof t =
+  let%map.Option (proof, _), _ =
+    Parallel_scan.last_emitted_value t.scan_state
+  in
+  proof
+
 let latest_ledger_proof_and_txs' t =
   let open Option.Let_syntax in
   let%map proof, txns_with_witnesses =
