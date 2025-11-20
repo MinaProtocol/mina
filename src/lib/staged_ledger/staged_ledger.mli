@@ -274,9 +274,6 @@ val apply_diff_unchecked :
      , Staged_ledger_error.t )
      Deferred.Result.t
 
-(** Most recent ledger proof in t *)
-val current_ledger_proof : t -> Ledger_proof.Cached.t option
-
 (* Internals of the txn application. This is only exposed to facilitate
    writing unit tests. *)
 module Application_state : sig
