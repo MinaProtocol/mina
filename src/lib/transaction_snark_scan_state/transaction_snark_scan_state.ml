@@ -827,6 +827,17 @@ let empty ~(constraint_constants : Genesis_constants.Constraint_constants.t) ()
 
 module Transactions_categorized = struct
   module Poly = struct
+    (** Represents sequence of transactions extracted from scan state
+           when it emitted a proof, split into:
+
+           * [first_pass] - transactions that went through first pass
+           * [second_pass] - transactions that went through second pass and correspond
+             to the current ledger proof (subset of first pass group)
+           * [current_incomplete] - transactions that went through second pass and correspond
+             to the the next ledger proof (subset of first pass group)
+           * [previous_incomplete] - leftover from previous ledger proof emitted with
+             the current ledger proof (not intersecting with other groups)
+        *)
     type 'a t =
       { first_pass : 'a list
       ; second_pass : 'a list
@@ -837,14 +848,6 @@ module Transactions_categorized = struct
   end
 
   type t = Transaction_with_witness.t Poly.t
-
-  let map (t : 'a Poly.t) ~f : 'b Poly.t =
-    let f = List.map ~f in
-    { Poly.first_pass = f t.first_pass
-    ; second_pass = f t.second_pass
-    ; previous_incomplete = f t.previous_incomplete
-    ; current_incomplete = f t.current_incomplete
-    }
 
   let fold (t : 'a Poly.t) ~f ~init =
     let init = List.fold ~init t.first_pass ~f in
@@ -1003,11 +1006,6 @@ let latest_ledger_proof_and_txs' t =
 
   (proof, txns)
 
-let latest_ledger_proof_txs t =
-  Option.map (latest_ledger_proof_and_txs' t) ~f:(fun (_, txns) ->
-      List.map txns
-        ~f:(Transactions_categorized.map ~f:extract_txn_and_global_slot) )
-
 let incomplete_txns_from_recent_proof_tree t =
   let%bind.Option (proof, _), txns_with_witnesses =
     Parallel_scan.last_emitted_value t.scan_state
@@ -1057,12 +1055,6 @@ let staged_transactions t =
         :: txns
   in
   List.concat txns
-
-(*All the transactions in the order in which they were applied along with the parent protocol state of the blocks that contained them*)
-let staged_transactions_with_state_hash t =
-  let pending_transactions_per_block = staged_transactions t in
-  List.map pending_transactions_per_block
-    ~f:(Transactions_categorized.map ~f:extract_txn_and_global_slot)
 
 (* written in continuation passing style so that implementation can be used both sync and async *)
 let apply_categorized_txns_stepwise ?(stop_at_first_pass = false)
@@ -1376,10 +1368,9 @@ let get_snarked_ledger_async ?async_batch_size ~ledger ~get_protocol_state
 let get_staged_ledger_async ?async_batch_size ~ledger ~get_protocol_state
     ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger
     ~signature_kind t =
-  let staged_transactions_with_state_hash = staged_transactions t in
-  apply_categorized_txns_async staged_transactions_with_state_hash
-    ?async_batch_size ~ledger ~get_protocol_state ~apply_first_pass
-    ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind
+  apply_categorized_txns_async (staged_transactions t) ?async_batch_size ~ledger
+    ~get_protocol_state ~apply_first_pass ~apply_second_pass
+    ~apply_first_pass_sparse_ledger ~signature_kind
 
 let free_space t = Parallel_scan.free_space t.scan_state
 
