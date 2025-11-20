@@ -32,7 +32,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) ([]byte, *BlockA
 	}
 
 	// Analyze blocks and get genesis epoch data
-	analysis, err := t.AnalyzeBlocks(t.AllPortOfType(PORT_REST))
+	analysis, err := t.AnalyzeBlocks()
 	if err != nil {
 		return nil, nil, err
 	}
