@@ -1002,24 +1002,19 @@ let latest_ledger_proof_txs t =
         ~f:(Transactions_categorized.map ~f:extract_txn_and_global_slot) )
 
 let incomplete_txns_from_recent_proof_tree t =
-  let open Option.Let_syntax in
-  let%map proof, txns_per_block = latest_ledger_proof_and_txs' t in
-  let txns =
-    match List.last txns_per_block with
-    | None ->
-        ([], `Border_block_continued_in_the_next_tree false)
-    | Some txns_in_last_block ->
-        (* First pass ledger is considered as the snarked ledger,
-           so any account update whether completed in the same tree
-           or not should be included in the next tree *)
-        if not (List.is_empty txns_in_last_block.second_pass) then
-          ( txns_in_last_block.second_pass
-          , `Border_block_continued_in_the_next_tree false )
-        else
-          ( txns_in_last_block.current_incomplete
-          , `Border_block_continued_in_the_next_tree true )
+  let%bind.Option (proof, _), txns_per_block = latest_ledger_proof_and_txs' t in
+  let%map.Option txns_in_last_block = List.last txns_per_block in
+  (* First pass ledger is considered as the snarked ledger,
+     so any account update whether completed in the same tree
+     or not should be included in the next tree *)
+  let second_pass_is_empty = List.is_empty txns_in_last_block.second_pass in
+  let incomplete =
+    if second_pass_is_empty then txns_in_last_block.current_incomplete
+    else txns_in_last_block.second_pass
   in
-  (proof, txns)
+  ( proof
+  , (incomplete, `Border_block_continued_in_the_next_tree second_pass_is_empty)
+  )
 
 let staged_transactions t =
   let ( previous_incomplete
@@ -1560,7 +1555,7 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
             ~default:
               (curr_stmt, ([], `Border_block_continued_in_the_next_tree false))
             old_proof_and_incomplete_zkapp_updates
-            ~f:(fun ((p', _), incomplete_zkapp_updates_from_old_proof) ->
+            ~f:(fun (p', incomplete_zkapp_updates_from_old_proof) ->
               ( Ledger_proof.Cached.statement p'
               , incomplete_zkapp_updates_from_old_proof ) )
         in
