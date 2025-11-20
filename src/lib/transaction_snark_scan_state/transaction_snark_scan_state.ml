@@ -718,88 +718,114 @@ module Transactions_ordered = struct
     let init = List.fold ~init t.previous_incomplete ~f in
     let init = List.fold ~init t.second_pass ~f in
     List.fold ~init t.current_incomplete ~f
-
-  let first_and_second_pass_transactions_per_tree ~previous_incomplete
-      (txns_per_tree : Transaction_with_witness.t list) =
-    let complete_and_incomplete_transactions = function
-      | [] ->
-          None
-      | (h : Transaction_with_witness.t) :: _ as txns_with_witnesses ->
-          let target_first_pass_ledger = h.statement.source.first_pass_ledger in
-          let first_pass_txns, second_pass_txns, target_first_pass_ledger =
-            let first_pass_txns, second_pass_txns, target_first_pass_ledger =
-              List.fold ~init:([], [], target_first_pass_ledger)
-                txns_with_witnesses
-                ~f:(fun
-                     (first_pass_txns, second_pass_txns, _old_root)
-                     (txn_with_witness : Transaction_with_witness.t)
-                   ->
-                  let txn =
-                    Mina_transaction_logic.Transaction_applied.transaction
-                      txn_with_witness.transaction_with_info
-                  in
-                  let target_first_pass_ledger =
-                    txn_with_witness.statement.target.first_pass_ledger
-                  in
-                  match txn with
-                  | Transaction.Coinbase _
-                  | Fee_transfer _
-                  | Command (User_command.Signed_command _) ->
-                      ( txn_with_witness :: first_pass_txns
-                      , second_pass_txns
-                      , target_first_pass_ledger )
-                  | Command (Zkapp_command _) ->
-                      ( txn_with_witness :: first_pass_txns
-                      , txn_with_witness :: second_pass_txns
-                      , target_first_pass_ledger ) )
-            in
-            ( List.rev first_pass_txns
-            , List.rev second_pass_txns
-            , target_first_pass_ledger )
-          in
-          let second_pass_txns, incomplete_txns =
-            match List.hd second_pass_txns with
-            | None ->
-                ([], [])
-            | Some txn_with_witness ->
-                if
-                  Frozen_ledger_hash.equal
-                    txn_with_witness.statement.source.second_pass_ledger
-                    target_first_pass_ledger
-                then
-                  (*second pass completed in the same tree*)
-                  (second_pass_txns, [])
-                else ([], second_pass_txns)
-          in
-          let previous_incomplete =
-            match previous_incomplete with
-            | [] ->
-                []
-            | (t : Transaction_with_witness.t) :: _ ->
-                if State_hash.equal (fst t.state_hash) (fst h.state_hash) then
-                  (*same block*)
-                  previous_incomplete
-                else []
-          in
-          Some
-            { Poly.first_pass = first_pass_txns
-            ; second_pass = second_pass_txns
-            ; current_incomplete = incomplete_txns
-            ; previous_incomplete
-            }
-    in
-    let txns_by_block (txns_per_tree : Transaction_with_witness.t list) =
-      List.group txns_per_tree ~break:(fun t1 t2 ->
-          State_hash.equal (fst t1.state_hash) (fst t2.state_hash) |> not )
-    in
-    List.filter_map ~f:complete_and_incomplete_transactions
-      (txns_by_block txns_per_tree)
-
-  let first_and_second_pass_transactions_per_forest scan_state_txns
-      ~previous_incomplete =
-    List.map scan_state_txns
-      ~f:(first_and_second_pass_transactions_per_tree ~previous_incomplete)
 end
+
+module Make_transaction_categorizer (Tx : sig
+  type t
+
+  val source_first_pass_ledger : t -> Ledger_hash.t
+
+  val source_second_pass_ledger : t -> Ledger_hash.t
+
+  val target_first_pass_ledger : t -> Ledger_hash.t
+
+  val transaction_type : t -> Mina_transaction.Transaction_type.t
+
+  val of_same_block : t -> t -> bool
+end) =
+struct
+  let txns_by_block txns_per_tree =
+    List.group txns_per_tree ~break:(fun t1 t2 -> not (Tx.of_same_block t1 t2))
+    |> List.filter_map ~f:Mina_stdlib.Nonempty_list.of_list_opt
+
+  let fold_tx (first_pass_txns, second_pass_txns, _old_root) txn =
+    let target_first_pass_ledger = Tx.target_first_pass_ledger txn in
+    match Tx.transaction_type txn with
+    | `Coinbase | `Fee_transfer | `Signed_command ->
+        (txn :: first_pass_txns, second_pass_txns, target_first_pass_ledger)
+    | `Zkapp_command ->
+        ( txn :: first_pass_txns
+        , txn :: second_pass_txns
+        , target_first_pass_ledger )
+
+  (** Compoutes representation for the sequence of transactions extracted from scan state
+      when it emitted a proof, split into:
+
+      * [first_pass] - transactions that went through first pass
+      * [second_pass] - transactions that went through second pass and correspond
+        to the current ledger proof (subset of first pass group)
+      * [current_incomplete] - transactions that went through second pass and correspond
+        to the the next ledger proof (subset of first pass group)
+      * [previous_incomplete] - leftover from previous ledger proof emitted with
+        the current ledger proof (not intersecting with other groups)
+        Received as a parameter and passed through if the first transaction in it
+        belongs to the same block as the first transaction in [txns_with_witnesses_non_empty].
+   *)
+  let categorize_transactions ~previous_incomplete txns_non_empty =
+    let first_txn = Mina_stdlib.Nonempty_list.head txns_non_empty in
+    let txns = Mina_stdlib.Nonempty_list.to_list txns_non_empty in
+    let init = ([], [], Tx.source_first_pass_ledger first_txn) in
+    let first_pass_txns, second_pass_txns, target_first_pass_ledger =
+      let first_pass_txns_rev, second_pass_txns_rev, target_first_pass_ledger =
+        List.fold ~init txns ~f:fold_tx
+      in
+      ( List.rev first_pass_txns_rev
+      , List.rev second_pass_txns_rev
+      , target_first_pass_ledger )
+    in
+    let second_pass_txns, incomplete_txns =
+      match List.hd second_pass_txns with
+      | None ->
+          ([], [])
+      | Some txn ->
+          if
+            Frozen_ledger_hash.equal
+              (Tx.source_second_pass_ledger txn)
+              target_first_pass_ledger
+          then (*second pass completed in the same tree*)
+            (second_pass_txns, [])
+          else ([], second_pass_txns)
+    in
+    let previous_incomplete =
+      match previous_incomplete with
+      | t :: _ when Tx.of_same_block t first_txn ->
+          previous_incomplete
+      | _ ->
+          []
+    in
+    { Transactions_ordered.Poly.first_pass = first_pass_txns
+    ; second_pass = second_pass_txns
+    ; current_incomplete = incomplete_txns
+    ; previous_incomplete
+    }
+
+  let categorize_transactions_per_tree ~previous_incomplete txns_per_tree =
+    List.map
+      (txns_by_block txns_per_tree)
+      ~f:(categorize_transactions ~previous_incomplete)
+
+  let categorize_transactions_per_forest scan_state_txns ~previous_incomplete =
+    List.map scan_state_txns
+      ~f:(categorize_transactions_per_tree ~previous_incomplete)
+end
+
+module Witness_categorizer = Make_transaction_categorizer (struct
+  include Transaction_with_witness
+
+  let source_first_pass_ledger t = t.statement.source.first_pass_ledger
+
+  let source_second_pass_ledger t = t.statement.source.second_pass_ledger
+
+  let target_first_pass_ledger t = t.statement.target.first_pass_ledger
+
+  let transaction_type t =
+    Transaction_type.of_transaction
+    @@ Mina_transaction_logic.Transaction_applied.transaction
+         t.transaction_with_info
+
+  let of_same_block t1 t2 =
+    State_hash.equal (fst t1.state_hash) (fst t2.state_hash)
+end)
 
 let extract_txn_and_global_slot (txn_with_witness : Transaction_with_witness.t)
     =
@@ -828,12 +854,12 @@ let latest_ledger_proof_and_txs' t =
   in
   let txns =
     if continued_in_next_tree then
-      Transactions_ordered.first_and_second_pass_transactions_per_tree
-        txns_with_witnesses ~previous_incomplete
+      Witness_categorizer.categorize_transactions_per_tree txns_with_witnesses
+        ~previous_incomplete
     else
       let txns =
-        Transactions_ordered.first_and_second_pass_transactions_per_tree
-          txns_with_witnesses ~previous_incomplete:[]
+        Witness_categorizer.categorize_transactions_per_tree txns_with_witnesses
+          ~previous_incomplete:[]
       in
       if List.is_empty previous_incomplete then txns
       else
@@ -858,7 +884,9 @@ let incomplete_txns_from_recent_proof_tree t =
     | None ->
         ([], `Border_block_continued_in_the_next_tree false)
     | Some txns_in_last_block ->
-        (*First pass ledger is considered as the snarked ledger, so any account update whether completed in the same tree or not should be included in the next tree *)
+        (* First pass ledger is considered as the snarked ledger,
+           so any account update whether completed in the same tree
+           or not should be included in the next tree *)
         if not (List.is_empty txns_in_last_block.second_pass) then
           ( txns_in_last_block.second_pass
           , `Border_block_continued_in_the_next_tree false )
@@ -878,12 +906,12 @@ let staged_transactions t =
   in
   let txns =
     if continued_in_next_tree then
-      Transactions_ordered.first_and_second_pass_transactions_per_forest
+      Witness_categorizer.categorize_transactions_per_forest
         (Parallel_scan.pending_data t.scan_state)
         ~previous_incomplete
     else
       let txns =
-        Transactions_ordered.first_and_second_pass_transactions_per_forest
+        Witness_categorizer.categorize_transactions_per_forest
           (Parallel_scan.pending_data t.scan_state)
           ~previous_incomplete:[]
       in
