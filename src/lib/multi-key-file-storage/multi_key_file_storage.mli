@@ -17,4 +17,7 @@ module Make_custom (Inputs : sig
   type filename_key
 
   val filename : filename_key -> string
-end) : S with type filename_key = Inputs.filename_key
+end) :
+  S
+    with type 'a tag = (Inputs.filename_key, 'a) Tag.t
+     and type filename_key = Inputs.filename_key
