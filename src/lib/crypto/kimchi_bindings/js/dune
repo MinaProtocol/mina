@@ -21,7 +21,8 @@
    native/native-overrides/prover-index.js
    native/native-overrides/srs.js
    native/native-overrides/util.js
-   native/native-overrides/proof.js))
+   native/native-overrides/proof.js
+   native/native-overrides/verifier-index.js))
  (instrumentation
   (backend bisect_ppx))
  (preprocess

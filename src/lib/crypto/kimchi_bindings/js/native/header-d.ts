@@ -4,14 +4,20 @@
 // This file gets auto-included in the generated plonk-napi types to supplement
 // external pointer types.
 
+type WasmGVesta = {};
+type WasmGPallas = {};
+type WasmPastaFp = {};
+type WasmPastaFq = {};
+type WasmLookupInfo = {};
 type WasmPastaFpPlonkIndex = {};
-type NapiVector<T> = {};
-type NapiGVesta = {};
-type NapiGPallas = {};
-type NapiPastaFpPlonkIndex = {};
-type NapiPastaFqPlonkIndex = {};
-type NapiLookupInfo = {};
-type NapiPastaFp = {};
-type NapiPastaFq = {};
+type WasmPastaFqPlonkIndex = {};
+type Proof = {}
+type WasmVector<T> = {};
+type WasmFlatVector<T> = {};
+type WasmVecVecFp = {};
+type WasmVecVecFq = {};
+type WasmFpSrs = {};
+type WasmFqSrs = {};
+type Self = {};
 
 // Header section end

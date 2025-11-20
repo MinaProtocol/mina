@@ -24,8 +24,13 @@ var caml_opt_to_rust = function (caml_optional_value, to_rust) {
 // Provides: caml_pasta_fp_plonk_verifier_index_create
 // Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fp_plonk_verifier_index_create = function (x) {
-  console.log("caml_pasta_fp_plonk_verifier_index_create")
-  var vk = plonk_wasm.caml_pasta_fp_plonk_verifier_index_create(x);
+  console.log("caml_pasta_fp_plonk_verifier_index_create", x)
+  var bytes = plonk_wasm.prover_index_fp_to_bytes(x);
+  console.log("bytes", bytes)
+  var index = plonk_wasm.WasmPastaFpPlonkIndex.deserialize(bytes)
+  console.log("index", index)
+  var vk = plonk_wasm.caml_pasta_fp_plonk_verifier_index_create(index);
+  console.log("vk", vk)
   return tsRustConversion.fp.verifierIndexFromRust(vk);
 };
 

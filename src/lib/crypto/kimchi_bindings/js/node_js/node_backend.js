@@ -17,10 +17,10 @@ var plonk_wasm = (function() {
       "prover_index_fq_to_bytes",
       "caml_pasta_fp_poseidon_block_cipher",
       "caml_pasta_fq_poseidon_block_cipher",
+      "caml_pasta_fp_plonk_proof_create",
+      "caml_pasta_fp_plonk_verifier_index_create",
       "caml_pasta_fp_plonk_verifier_index_shifts",
       "caml_pasta_fq_plonk_verifier_index_shifts",
-      "WasmFpPolyComm",
-      "WasmFqPolyComm",
       "caml_pasta_fp_plonk_gate_vector_create",
       "caml_pasta_fq_plonk_gate_vector_create",
       "caml_pasta_fp_plonk_gate_vector_add",
@@ -57,11 +57,22 @@ var plonk_wasm = (function() {
       "caml_pasta_fq_plonk_index_read",
       "caml_fp_srs_from_bytes",
       "caml_fq_srs_from_bytes",
+      "caml_fp_srs_to_bytes_external",
+      "caml_fq_srs_to_bytes_external",
+      "caml_fp_srs_from_bytes_external",
+      "caml_fq_srs_from_bytes_external",
+      "caml_fp_srs_to_bytes",
+      "caml_fq_srs_to_bytes",
       "WasmFpSrs",
       "caml_fp_srs_create",
       "caml_fp_srs_create_parallel",
-      "caml_fq_srs_get",
-      "caml_fq_srs_set",
+      "caml_fp_srs_get",
+      "caml_fp_srs_set",
+      "caml_fp_srs_lagrange_commitment",
+      "caml_fp_srs_maybe_lagrange_commitment",
+      "caml_fp_srs_lagrange_commitments_whole_domain_ptr",
+      "caml_fp_srs_set_lagrange_basis",
+      "caml_fp_srs_get_lagrange_basis",
       "caml_fp_srs_write",
       "caml_fp_srs_read",
       "caml_fp_srs_add_lagrange_basis",
@@ -75,6 +86,11 @@ var plonk_wasm = (function() {
       "caml_fq_srs_create_parallel",
       "caml_fq_srs_get",
       "caml_fq_srs_set",
+      "caml_fq_srs_lagrange_commitment",
+      "caml_fq_srs_maybe_lagrange_commitment",
+      "caml_fq_srs_lagrange_commitments_whole_domain_ptr",
+      "caml_fq_srs_set_lagrange_basis",
+      "caml_fq_srs_get_lagrange_basis",
       "caml_fq_srs_write",
       "caml_fq_srs_read",
       "caml_fq_srs_add_lagrange_basis",
@@ -101,10 +117,23 @@ var plonk_wasm = (function() {
       "fq_oracles_create_no_public",
       "fq_oracles_dummy",
       "fq_oracles_deep_copy",
+      "WasmFpOpeningProof",
+      "WasmFqOpeningProof",
+      "WasmFpLookupCommitments",
+      "WasmFqLookupCommitments",
+      "WasmFpProverProof",
+      "WasmFqProverProof",
+      "WasmFpProofEvaluations",
+      "WasmFqProofEvaluations",
+      "WasmFpProverCommitments",
+      "WasmFqProverCommitments",
     ];
 
     overrides.forEach(function (override) {
-      wasm[override] = native[override]
+      wasm[override] = function(x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12) {
+        console.log("calling native override:", override);
+        return native[override](x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12);
+      }
     })
     wasm.native = true;
   } catch (e) {
