@@ -11,9 +11,33 @@ module Tag = struct
     module V1 = struct
       type ('filename_key, 'a) t =
         { filename_key : 'filename_key; offset : int64; size : int }
-      [@@deriving sexp]
+
+      let compare filename_key_compare t1 t2 =
+        let c = filename_key_compare t1.filename_key t2.filename_key in
+        if c <> 0 then c
+        else
+          let c' = Int64.compare t1.offset t2.offset in
+          if c' <> 0 then c' else Int.compare t1.size t2.size
+
+      let equal filename_key_equal t1 t2 =
+        let c = filename_key_equal t1.filename_key t2.filename_key in
+        if c then
+          if Int64.equal t1.offset t2.offset then Int.equal t1.size t2.size
+          else false
+        else false
+
+      let sexp_of_t sexp_of_filename_key t =
+        [%sexp_of: Sexp.t * int64 * int]
+          (sexp_of_filename_key t.filename_key, t.offset, t.size)
+
+      let t_of_sexp filename_key_of_sexp sexp =
+        [%of_sexp: Sexp.t * int64 * int] sexp
+        |> fun (filename_key, offset, size) ->
+        { filename_key = filename_key_of_sexp filename_key; offset; size }
     end
   end]
+
+  [%%define_locally Stable.Latest.(compare, equal, t_of_sexp, sexp_of_t)]
 end
 
 module Make_custom (Inputs : sig
@@ -120,6 +144,14 @@ end) :
     In_channel.with_file
       (Inputs.filename tag.filename_key)
       ~binary:true ~f:do_reading
+
+  let read_many (type a) (module B : Bin_prot.Binable.S with type t = a) tags =
+    let%map.Or_error reversed =
+      List.fold_result tags ~init:[] ~f:(fun acc tag ->
+          let%map.Or_error value = read (module B) tag in
+          value :: acc )
+    in
+    List.rev reversed
 end
 
 include Make_custom (struct

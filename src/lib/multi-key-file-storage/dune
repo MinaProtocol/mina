@@ -3,7 +3,7 @@
  (public_name multi_key_file_storage)
  (libraries core_kernel bin_prot mina_stdlib)
  (preprocess
-  (pps ppx_jane ppx_version))
+  (pps ppx_mina ppx_jane ppx_version))
  (modules_without_implementation intf)
  (instrumentation
   (backend bisect_ppx)))

@@ -550,7 +550,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
         Protocol_state.snarked_ledger_hash parent_protocol_state
     | Some proof ->
         Mina_state.Snarked_ledger_state.snarked_ledger_hash
-        @@ Ledger_proof.Cached.statement proof
+        @@ Ledger_proof.Tagged.statement proof
   in
   let staged_ledger_hash_check staged_ledger_hash =
     if

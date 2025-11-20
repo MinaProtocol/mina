@@ -387,9 +387,7 @@ let initialize t ~root_data =
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
       Batch.set batch ~key:Root_hash ~data:root_state_hash ;
       Batch.set batch ~key:Root_common
-        ~data:
-          ( root_data |> Root_data.Limited.common
-          |> Root_data.Common.read_all_proofs_from_disk ) ;
+        ~data:(Root_data.Limited.common root_data) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
         ~data:

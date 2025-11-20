@@ -8,6 +8,37 @@ module Ledger = Mina_ledger.Ledger
 type t
 
 module Scan_state : sig
+  module Available_job : sig
+    type t
+
+    val single_spec_one_or_two :
+         get_state:
+           (   Mina_base.State_hash.t
+            -> Mina_state.Protocol_state.Value.t Or_error.t )
+      -> t One_or_two.t
+      -> ( Transaction_witness.Stable.Latest.t
+         , Ledger_proof.t )
+         Snark_work_lib.Spec.Single.Poly.t
+         One_or_two.t
+         Or_error.t
+
+    val statement : t -> Transaction_snark.Statement.t option
+
+    val single_spec :
+         get_state:
+           (   Mina_base.State_hash.t
+            -> Mina_state.Protocol_state.Value.t Or_error.t )
+      -> t
+      -> ( Transaction_witness.Stable.Latest.t
+         , Ledger_proof.t )
+         Snark_work_lib.Spec.Single.Poly.t
+         Or_error.t
+
+    val is_transition : t -> bool
+
+    val target_second_pass_ledger : t -> Frozen_ledger_hash.t option
+  end
+
   [%%versioned:
   module Stable : sig
     [@@@no_toplevel_latest_type]
@@ -25,7 +56,7 @@ module Scan_state : sig
     end
   end]
 
-  type t
+  type t = Stable.V3.t
 
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]
@@ -128,13 +159,7 @@ module Scan_state : sig
     -> t
     -> unit Deferred.Or_error.t
 
-  val write_all_proofs_to_disk :
-       signature_kind:Mina_signature_kind.t
-    -> proof_cache_db:Proof_cache_tag.cache_db
-    -> Stable.Latest.t
-    -> t
-
-  val read_all_proofs_from_disk : t -> Stable.Latest.t
+  (* val read_all_proofs_from_disk : t -> Stable.Latest.t Or_error.t *)
 end
 
 module Pre_diff_info : Pre_diff_info.S
@@ -200,7 +225,7 @@ val apply :
   -> ?transaction_pool_proxy:Check_commands.transaction_pool_proxy
   -> t
   -> Staged_ledger_diff.t
-  -> ( [ `Ledger_proof of Ledger_proof.Cached.t option ]
+  -> ( [ `Ledger_proof of Ledger_proof.Tagged.t option ]
        * [ `Staged_ledger of t ]
        * [ `Accounts_created of Account_id.t list ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
@@ -219,7 +244,7 @@ val apply_diff_unchecked :
   -> signature_kind:Mina_signature_kind.t
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
-  -> ( [ `Ledger_proof of Ledger_proof.Cached.t option ]
+  -> ( [ `Ledger_proof of Ledger_proof.Tagged.t option ]
        * [ `Staged_ledger of t ]
        * [ `Accounts_created of Account_id.t list ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
@@ -307,15 +332,7 @@ val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
   -> t Or_error.t Deferred.t
 
 (** All the pending work in t and the data required to generate proofs. *)
-val all_work_pairs :
-     t
-  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> ( Transaction_witness.t
-     , Ledger_proof.Cached.t )
-     Snark_work_lib.Work.Single.Spec.t
-     One_or_two.t
-     list
-     Or_error.t
+val all_work_pairs : t -> Scan_state.Available_job.t One_or_two.t list
 
 (** Statements of all the pending work in t*)
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list

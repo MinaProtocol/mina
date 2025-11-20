@@ -343,18 +343,14 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     match staged_ledger_data_download_result with
     | Error err ->
         Deferred.return (staged_ledger_data_download_time, None, Error err)
-    | Ok
-        ( scan_state_uncached
-        , expected_merkle_root
-        , pending_coinbases
-        , protocol_states ) -> (
+    | Ok (scan_state, expected_merkle_root, pending_coinbases, protocol_states)
+      -> (
         let%map staged_ledger_construction_result =
           O1trace.thread "construct_root_staged_ledger" (fun () ->
               let open Deferred.Or_error.Let_syntax in
               let received_staged_ledger_hash =
                 Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-                  (Staged_ledger.Scan_state.Stable.Latest.hash
-                     scan_state_uncached )
+                  (Staged_ledger.Scan_state.Stable.Latest.hash scan_state)
                   expected_merkle_root pending_coinbases
               in
               [%log debug]
@@ -382,10 +378,6 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
               let protocol_states =
                 List.map protocol_states
                   ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
-              in
-              let scan_state =
-                Staged_ledger.Scan_state.write_all_proofs_to_disk
-                  ~signature_kind ~proof_cache_db scan_state_uncached
               in
               let%bind protocol_states =
                 Staged_ledger.Scan_state.check_required_protocol_states

@@ -42,19 +42,24 @@ let persist_witnesses_and_works witnesses works writer =
       ( module Transaction_snark_scan_state.Transaction_with_witness.Stable
                .Latest )
   in
-  let write_proof = FS.write_value writer (module Ledger_proof.Stable.Latest) in
-  let write_witness' =
+  let write_proof = FS.write_value writer (module Proof.Stable.Latest) in
+  let write_witness' witness =
     (* TODO remove read_all_proofs_from_disk *)
-    Fn.compose write_witness
+    let stable =
       Transaction_snark_scan_state.Transaction_with_witness
-      .read_all_proofs_from_disk
+      .read_all_proofs_from_disk witness
+    in
+    Transaction_snark_scan_state.Transaction_with_witness.Tagged.create
+      ~tag:(write_witness stable) stable
   in
   let write_proof' ~fee ~prover proof =
     (* TODO remove read_proof_from_disk *)
-    let proof_tag =
-      Ledger_proof.Cached.read_proof_from_disk proof |> write_proof
-    in
-    (proof_tag, Sok_message.create ~fee ~prover)
+    let stable = Ledger_proof.Cached.read_proof_from_disk proof in
+    let statement = Ledger_proof.statement_with_sok stable in
+    let proof = Ledger_proof.underlying_proof stable in
+    let sok_message = Sok_message.create ~fee ~prover in
+    Transaction_snark_scan_state.Ledger_proof_with_sok_message.Tagged.create
+      ~tag:(write_proof proof) ~sok_message ~statement
   in
   let tagged_witnesses = List.map ~f:write_witness' witnesses in
   let tagged_works =
@@ -221,7 +226,7 @@ module T = struct
     let open Deferred.Let_syntax in
     match
       map_opt job_msg_proofs ~f:(fun (job, msg, proof) ->
-          Option.map (Scan_state.statement_of_job job) ~f:(fun s ->
+          Option.map (Scan_state.Available_job.statement job) ~f:(fun s ->
               (proof, s, msg) ) )
     with
     | None ->
@@ -251,10 +256,7 @@ module T = struct
 
     let verify ~verifier:{ logger; verifier } ts =
       verify_proofs ~logger ~verifier
-        (List.map ts ~f:(fun (p, m) ->
-             ( Ledger_proof.Cached.read_proof_from_disk p
-             , Ledger_proof.Cached.statement p
-             , m ) ) )
+        (List.map ts ~f:(fun (p, m) -> (p, Ledger_proof.statement p, m)))
   end
 
   module Statement_scanner_with_proofs =
@@ -272,10 +274,7 @@ module T = struct
 
   let scan_state { scan_state; _ } = scan_state
 
-  let all_work_pairs t
-      ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-      =
-    Scan_state.all_work_pairs t.scan_state ~get_state
+  let all_work_pairs t = Scan_state.all_work_pairs t.scan_state
 
   let all_work_statements_exn t =
     Scan_state.all_work_statements_exn t.scan_state
@@ -298,8 +297,7 @@ module T = struct
     in
     let statement_check = `Partial in
     let last_proof_statement =
-      Option.map ~f:Ledger_proof.Cached.statement
-        (Scan_state.latest_ledger_proof scan_state)
+      Scan_state.latest_ledger_proof_statement scan_state
     in
     Statement_scanner.check_invariants ~constraint_constants scan_state
       ~statement_check ~verifier:() ~error_prefix ~registers_end
@@ -397,8 +395,7 @@ module T = struct
                 expected_merkle_root staged_ledger_hash )
     in
     let last_proof_statement =
-      Scan_state.latest_ledger_proof scan_state
-      |> Option.map ~f:Ledger_proof.Cached.statement
+      Scan_state.latest_ledger_proof_statement scan_state
     in
     f ~constraint_constants ~last_proof_statement ~ledger:snarked_ledger
       ~scan_state ~pending_coinbase_collection:pending_coinbases
@@ -710,7 +707,7 @@ module T = struct
     let exception Statement_of_job_failure in
     let statement_of_job_exn job =
       Option.value_exn ~error:(Error.of_exn Statement_of_job_failure)
-      @@ Scan_state.statement_of_job job
+      @@ Scan_state.Available_job.statement job
     in
     try
       let job_statements = One_or_two.map ~f:statement_of_job_exn jobs in
@@ -974,7 +971,7 @@ module T = struct
             |> to_staged_ledger_or_error
           in
           let ledger_proof_stack =
-            (Ledger_proof.Cached.statement proof).target.pending_coinbase_stack
+            (Ledger_proof.Tagged.statement proof).target.pending_coinbase_stack
           in
           let%map () =
             if Pending_coinbase.Stack.equal oldest_stack ledger_proof_stack then
@@ -1103,7 +1100,7 @@ module T = struct
       }
     in
     let witnesses = List.map data ~f:to_witness in
-    let _tagged_witnesses, _tagged_works =
+    let tagged_witnesses, tagged_works =
       State_hash.File_storage.write_values_exn state_hash
         ~f:(persist_witnesses_and_works witnesses works)
     in
@@ -1142,7 +1139,7 @@ module T = struct
       O1trace.thread "fill_work_and_enqueue_transactions" (fun () ->
           let r =
             Scan_state.fill_work_and_enqueue_transactions t.scan_state ~logger
-              witnesses works
+              tagged_witnesses tagged_works
           in
           Or_error.iter_error r ~f:(fun e ->
               let data_json =
@@ -2704,11 +2701,11 @@ let%test_module "staged ledger tests" =
       |> Sequence.to_list
 
     (* Fee excess at top level ledger proofs should always be zero *)
-    let assert_fee_excess : Ledger_proof.Cached.t option -> unit =
+    let assert_fee_excess : Ledger_proof.Tagged.t option -> unit =
      fun proof_opt ->
       let fee_excess =
         Option.value_map ~default:Fee_excess.zero proof_opt ~f:(fun proof ->
-            (Ledger_proof.Cached.statement proof).fee_excess )
+            (Ledger_proof.Tagged.statement proof).fee_excess )
       in
       assert (Fee_excess.is_zero fee_excess)
 
@@ -2845,7 +2842,7 @@ let%test_module "staged ledger tests" =
                         !sl.scan_state
                     in
                     let target_snarked_ledger =
-                      let stmt = Ledger_proof.Cached.statement proof in
+                      let stmt = Ledger_proof.Tagged.statement proof in
                       stmt.target.first_pass_ledger
                     in
                     [%test_eq: Ledger_hash.t] target_snarked_ledger

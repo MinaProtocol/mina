@@ -1,7 +1,7 @@
 module Lib = Work_lib.Make (Inputs.Implementation_inputs)
 module State = Lib.State
 
-type work = Snark_work_lib.Selector.Single.Spec.t
+type work = Staged_ledger.Scan_state.Available_job.t
 
 type in_memory_work = Snark_work_lib.Selector.Single.Spec.Stable.Latest.t
 

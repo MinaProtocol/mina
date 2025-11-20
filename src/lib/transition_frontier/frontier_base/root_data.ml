@@ -4,8 +4,6 @@ open Mina_base
 module Common = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V3 = struct
       type t =
         { scan_state : Staged_ledger.Scan_state.Stable.V3.t
@@ -29,11 +27,6 @@ module Common = struct
     end
   end]
 
-  type t =
-    { scan_state : Staged_ledger.Scan_state.t
-    ; pending_coinbase : Pending_coinbase.t
-    }
-
   let to_yojson { scan_state = _; pending_coinbase } =
     `Assoc
       [ ("scan_state", `String "<opaque>")
@@ -46,11 +39,6 @@ module Common = struct
   let scan_state t = t.scan_state
 
   let pending_coinbase t = t.pending_coinbase
-
-  let read_all_proofs_from_disk { scan_state; pending_coinbase } =
-    { Stable.Latest.pending_coinbase
-    ; scan_state = Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
-    }
 end
 
 module Historical = struct
@@ -211,16 +199,6 @@ module Minimal = struct
   let scan_state t = Common.scan_state t.common
 
   let pending_coinbase t = Common.pending_coinbase t.common
-
-  let read_all_proofs_from_disk
-      { hash; common = { scan_state; pending_coinbase } } =
-    { Stable.Latest.hash
-    ; common =
-        { pending_coinbase
-        ; scan_state =
-            Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
-        }
-    }
 end
 
 type t =

@@ -1,117 +1,116 @@
 open Core_kernel
-open Currency
 
-module Test_inputs = struct
-  module Transaction_witness = struct
-    type t = Int.t
+(* module Test_inputs = struct
+     module Transaction_witness = struct
+       type t = Int.t
 
-    let transaction = Fn.id
-  end
+       let transaction = Fn.id
+     end
 
-  module Ledger_hash = Int
-  module Sparse_ledger = Int
+     module Ledger_hash = Int
+     module Sparse_ledger = Int
 
-  module Transaction = struct
-    type t = Int.t
+     module Transaction = struct
+       type t = Int.t
 
-    let yojson_summary t = `Int t
-  end
+       let yojson_summary t = `Int t
+     end
 
-  module Ledger_proof_statement = Fee
+     module Ledger_proof_statement = Fee
 
-  module Transaction_protocol_state = struct
-    type 'a t = 'a
-  end
+     module Transaction_protocol_state = struct
+       type 'a t = 'a
+     end
 
-  module Ledger_proof = struct
-    type t = Fee.t [@@deriving hash, compare, sexp]
+     module Ledger_proof = struct
+       type t = Fee.t [@@deriving hash, compare, sexp]
 
-    module Stable = struct
-      module Latest = struct
-        type nonrec t = t
-      end
-    end
+       module Stable = struct
+         module Latest = struct
+           type nonrec t = t
+         end
+       end
 
-    module Cached = struct
-      type nonrec t = t
+       module Cached = struct
+         type nonrec t = t
 
-      let read_proof_from_disk = Fn.id
-    end
-  end
+         let read_proof_from_disk = Fn.id
+       end
+     end
 
-  module Transaction_snark_work = struct
-    module Checked = struct
-      type t = Fee.t
+     module Transaction_snark_work = struct
+       module Checked = struct
+         type t = Fee.t
 
-      let fee = Fn.id
+         let fee = Fn.id
 
-      let prover _ = Key_gen.Sample_keypairs.genesis_winner |> fst
-    end
+         let prover _ = Key_gen.Sample_keypairs.genesis_winner |> fst
+       end
 
-    include Checked
+       include Checked
 
-    module Statement = struct
-      type t = Transaction_snark.Statement.t One_or_two.t
-    end
-  end
+       module Statement = struct
+         type t = Transaction_snark.Statement.t One_or_two.t
+       end
+     end
 
-  module Snark_pool = struct
-    [%%versioned
-    module Stable = struct
-      [@@@no_toplevel_latest_type]
+     module Snark_pool = struct
+       [%%versioned
+       module Stable = struct
+         [@@@no_toplevel_latest_type]
 
-      module V2 = struct
-        type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
-        [@@deriving hash, compare, sexp]
+         module V2 = struct
+           type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
+           [@@deriving hash, compare, sexp]
 
-        let to_latest = Fn.id
-      end
-    end]
+           let to_latest = Fn.id
+         end
+       end]
 
-    module Work = Hashable.Make_binable (Stable.Latest)
+       module Work = Hashable.Make_binable (Stable.Latest)
 
-    type t = Currency.Fee.t Work.Table.t
+       type t = Currency.Fee.t Work.Table.t
 
-    let get_completed_work (t : t) = Work.Table.find t
+       let get_completed_work (t : t) = Work.Table.find t
 
-    let create () = Work.Table.create ()
+       let create () = Work.Table.create ()
 
-    let add_snark t ~work ~fee =
-      Work.Table.update t work ~f:(function
-        | None ->
-            fee
-        | Some fee' ->
-            Currency.Fee.min fee fee' )
-  end
+       let add_snark t ~work ~fee =
+         Work.Table.update t work ~f:(function
+           | None ->
+               fee
+           | Some fee' ->
+               Currency.Fee.min fee fee' )
+     end
 
-  module Staged_ledger = struct
-    type t =
-      (int, Transaction_snark_work.t) Snark_work_lib.Work.Single.Spec.t List.t
+     module Staged_ledger = struct
+       type t =
+         (int, Transaction_snark_work.t) Snark_work_lib.Work.Single.Spec.t List.t
 
-    let work = Fn.id
+       let work = Fn.id
 
-    let all_work_pairs t ~get_state:_ = Ok (One_or_two.group_list t)
-  end
+       let all_work_pairs t = (One_or_two.group_list t)
+     end
 
-  module Transition_frontier = struct
-    type t = Staged_ledger.t
+     module Transition_frontier = struct
+       type t = Staged_ledger.t
 
-    type best_tip_view = unit
+       type best_tip_view = unit
 
-    let best_tip_pipe : t -> best_tip_view Pipe_lib.Broadcast_pipe.Reader.t =
-     fun _t ->
-      let reader, _writer = Pipe_lib.Broadcast_pipe.create () in
-      reader
+       let best_tip_pipe : t -> best_tip_view Pipe_lib.Broadcast_pipe.Reader.t =
+        fun _t ->
+         let reader, _writer = Pipe_lib.Broadcast_pipe.create () in
+         reader
 
-    let best_tip_staged_ledger = Fn.id
+       let best_tip_staged_ledger = Fn.id
 
-    let get_protocol_state _t _hash =
-      Ok
-        (Lazy.force Precomputed_values.for_unit_tests)
-          .protocol_state_with_hashes
-          .data
-  end
-end
+       let get_protocol_state _t _hash =
+         Ok
+           (Lazy.force Precomputed_values.for_unit_tests)
+             .protocol_state_with_hashes
+             .data
+     end
+   end *)
 
 module Implementation_inputs = struct
   open Mina_base

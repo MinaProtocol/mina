@@ -347,7 +347,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
           , next_staged_ledger_hash
           , ledger_proof_opt
           , is_new_stack
-          , pending_coinbase_update ) ->
+          , pending_coinbase_update ) -> (
           let diff_unwrapped =
             Staged_ledger_diff.read_all_proofs_from_disk
             @@ Staged_ledger_diff.forget diff
@@ -361,7 +361,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 let ledger_proof_statement =
                   match ledger_proof_opt with
                   | Some proof ->
-                      Ledger_proof.Cached.statement proof
+                      Ledger_proof.Tagged.statement proof
                   | None ->
                       let state =
                         previous_protocol_state
@@ -376,7 +376,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 let supply_increase =
                   Option.value_map ledger_proof_opt
                     ~f:(fun proof ->
-                      (Ledger_proof.Cached.statement proof).supply_increase )
+                      (Ledger_proof.Tagged.statement proof).supply_increase )
                     ~default:Currency.Amount.Signed.zero
                 in
                 let body_reference =
@@ -410,32 +410,44 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                       ~genesis_ledger_hash ~supply_increase ~logger
                       ~constraint_constants ) )
           in
-          lift_sync (fun () ->
-              let snark_transition =
-                O1trace.sync_thread "generate_snark_transition" (fun () ->
-                    Snark_transition.create_value
-                      ~blockchain_state:
-                        (Protocol_state.blockchain_state protocol_state)
-                      ~consensus_transition:consensus_transition_data
-                      ~pending_coinbase_update () )
-              in
-              let internal_transition =
-                O1trace.sync_thread "generate_internal_transition" (fun () ->
-                    Internal_transition.create ~snark_transition
-                      ~prover_state:
-                        (Consensus.Data.Block_data.prover_state block_data)
-                      ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
-                      ~ledger_proof:
-                        (Option.map ledger_proof_opt ~f:(fun proof ->
-                             Ledger_proof.Cached.read_proof_from_disk proof ) ) )
-              in
-              let witness =
-                { Pending_coinbase_witness.pending_coinbases =
-                    Staged_ledger.pending_coinbase_collection staged_ledger
-                ; is_new_stack
-                }
-              in
-              Some (protocol_state, internal_transition, witness) ) )
+          let finish ledger_proof =
+            lift_sync (fun () ->
+                let snark_transition =
+                  O1trace.sync_thread "generate_snark_transition" (fun () ->
+                      Snark_transition.create_value
+                        ~blockchain_state:
+                          (Protocol_state.blockchain_state protocol_state)
+                        ~consensus_transition:consensus_transition_data
+                        ~pending_coinbase_update () )
+                in
+                let internal_transition =
+                  O1trace.sync_thread "generate_internal_transition" (fun () ->
+                      Internal_transition.create ~snark_transition
+                        ~prover_state:
+                          (Consensus.Data.Block_data.prover_state block_data)
+                        ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
+                        ~ledger_proof )
+                in
+                let witness =
+                  { Pending_coinbase_witness.pending_coinbases =
+                      Staged_ledger.pending_coinbase_collection staged_ledger
+                  ; is_new_stack
+                  }
+                in
+                Some (protocol_state, internal_transition, witness) )
+          in
+          Option.map ledger_proof_opt
+            ~f:Ledger_proof.Tagged.read_proof_from_disk
+          |> function
+          | Some (Error e) ->
+              [%log error]
+                ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                "Failed to read ledger proof from disk" ;
+              Interruptible.return None
+          | Some (Ok ledger_proof) ->
+              finish (Some ledger_proof)
+          | None ->
+              finish None ) )
 
 let handle_block_production_errors ~logger ~rejected_blocks_logger
     ~time_taken:span ~previous_protocol_state ~protocol_state x =

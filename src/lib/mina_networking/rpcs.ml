@@ -312,7 +312,9 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       ->
         return
           (Some
-             ( Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
+             (* TODO convert to stable, current implementation is incorrect,
+                bootstrap won't happen *)
+             ( scan_state
              , expected_merkle_root
              , pending_coinbases
              , protocol_states ) )

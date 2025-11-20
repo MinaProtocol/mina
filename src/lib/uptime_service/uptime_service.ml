@@ -203,7 +203,7 @@ let read_all_proofs_for_work_single_spec =
 let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
     ~url ~snark_worker ~transition_frontier ~peer_id
     ~(submitter_keypair : Keypair.t) ~snark_work_fee ~graphql_control_port
-    ~built_with_commit_sha ~signature_kind =
+    ~built_with_commit_sha =
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       (* expected during daemon boot, so not logging as error *)
@@ -241,29 +241,28 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
         send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
           ~state_hash ~produced:false block_data )
       else
+        let get_state state_hash =
+          match Transition_frontier.find_protocol_state tf state_hash with
+          | None ->
+              Error
+                (Error.createf
+                   "Could not find state_hash %s in transition frontier for \
+                    uptime service"
+                   (State_hash.to_base58_check state_hash) )
+          | Some protocol_state ->
+              Ok protocol_state
+        in
         let best_tip_staged_ledger =
           Transition_frontier.Breadcrumb.staged_ledger best_tip
         in
-        match
-          Staged_ledger.all_work_pairs best_tip_staged_ledger
-            ~get_state:(fun state_hash ->
-              match Transition_frontier.find_protocol_state tf state_hash with
-              | None ->
-                  Error
-                    (Error.createf
-                       "Could not find state_hash %s in transition frontier \
-                        for uptime service"
-                       (State_hash.to_base58_check state_hash) )
-              | Some protocol_state ->
-                  Ok protocol_state )
-        with
-        | Error e ->
+        match Staged_ledger.all_work_pairs best_tip_staged_ledger with
+        (* | Error e ->
             [%log error]
               "Could not get SNARK work from best tip staged ledger for uptime \
                service"
               ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-            Interruptible.return ()
-        | Ok [] ->
+            Interruptible.return () *)
+        | [] ->
             [%log info]
               "No SNARK jobs available for uptime service, sending just the \
                block" ;
@@ -281,14 +280,11 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
             in
             send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
               ~state_hash ~produced:false block_data
-        | Ok job_one_or_twos -> (
+        | job_one_or_twos -> (
             let transitions =
               List.concat_map job_one_or_twos ~f:One_or_two.to_list
-              |> List.filter ~f:(function
-                   | Snark_work_lib.Work.Single.Spec.Transition _ ->
-                       true
-                   | Merge _ ->
-                       false )
+              |> List.filter
+                   ~f:Staged_ledger.Scan_state.Available_job.is_transition
             in
             let staged_ledger_hash =
               Mina_block.header best_tip_block
@@ -298,14 +294,10 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
             in
             match
               List.find transitions ~f:(fun transition ->
-                  match transition with
-                  | Snark_work_lib.Work.Single.Spec.Transition ({ target; _ }, _)
-                    ->
-                      Pasta_bindings.Fp.equal target.second_pass_ledger
-                        (Staged_ledger_hash.ledger_hash staged_ledger_hash)
-                  | Merge _ ->
-                      (* unreachable *)
-                      failwith "Expected Transition work, not Merge" )
+                  Option.equal Frozen_ledger_hash.equal
+                    (Some (Staged_ledger_hash.ledger_hash staged_ledger_hash))
+                    (Staged_ledger.Scan_state.Available_job
+                     .target_second_pass_ledger transition ) )
             with
             | None ->
                 [%log info]
@@ -327,48 +319,16 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                 send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
                   ~state_hash ~produced:false block_data
             | Some single_spec -> (
-                let module T = Transaction_snark.Make (struct
-                  let signature_kind = signature_kind
-
-                  let constraint_constants = constraint_constants
-
-                  let proof_level = Genesis_constants.Proof_level.Full
-                end) in
-                let s =
-                  match single_spec with
-                  | Transition (input, witness) -> (
-                      match witness.transaction with
-                      | Command (Zkapp_command zkapp_command) ->
-                          Ok (`Zk_app (input, witness, zkapp_command))
-                      | Command (Signed_command _) | Fee_transfer _ | Coinbase _
-                        ->
-                          Ok (`Transaction single_spec) )
-                  | Merge _ ->
-                      Error
-                        (Error.of_string "Undexpecetd merge operation in spec")
-                in
-                let work =
-                  match s with
-                  | Ok (`Zk_app (input, witness, zkapp_command)) ->
-                      let zkapp_command =
-                        Zkapp_command.read_all_proofs_from_disk zkapp_command
-                      in
-                      let witness =
-                        Transaction_witness.read_all_proofs_from_disk witness
-                      in
-                      make_interruptible
-                      @@ Uptime_snark_worker.perform_partitioned snark_worker
-                           (witness, input, zkapp_command, staged_ledger_hash)
-                  | Ok (`Transaction single_spec) ->
-                      make_interruptible
-                      @@ Uptime_snark_worker.perform_single snark_worker
-                           ( message
-                           , read_all_proofs_for_work_single_spec single_spec )
-                  | Error error ->
-                      Interruptible.return (Error error)
-                in
-
-                match%bind work with
+                match%bind
+                  make_interruptible
+                  @@ let%bind.Deferred.Or_error single_spec' =
+                       Staged_ledger.Scan_state.Available_job.single_spec
+                         ~get_state single_spec
+                       |> Deferred.return
+                     in
+                     Uptime_snark_worker.perform_single snark_worker
+                       (message, single_spec')
+                with
                 | Error e ->
                     (* error in submitting to process *)
                     [%log error]
@@ -410,7 +370,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
     ~protocol_constants ~transition_frontier ~time_controller
     ~block_produced_bvar ~uptime_submitter_keypair ~get_next_producer_timing
     ~get_snark_work_fee ~get_peer ~graphql_control_port ~built_with_commit_sha
-    ~signature_kind =
+    =
   match uptime_url with
   | None ->
       [%log info] "Not running uptime service, no URL given" ;
@@ -512,7 +472,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
                   send_block_and_transaction_snark ~logger ~interruptor ~url
                     ~constraint_constants ~snark_worker ~transition_frontier
                     ~peer_id ~submitter_keypair ~snark_work_fee
-                    ~graphql_control_port ~built_with_commit_sha ~signature_kind
+                    ~graphql_control_port ~built_with_commit_sha
                 in
                 match get_next_producer_time_opt () with
                 | None ->

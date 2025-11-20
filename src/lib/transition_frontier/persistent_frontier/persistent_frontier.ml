@@ -23,16 +23,15 @@ end
 
 exception Invalid_genesis_state_hash of Mina_block.Validated.t
 
-let construct_staged_ledger_at_root ~proof_cache_db
-    ~(precomputed_values : Precomputed_values.t) ~root_ledger ~root_transition
-    ~(root : Root_data.Minimal.Stable.Latest.t) ~protocol_states ~logger
-    ~signature_kind =
+let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
+    ~root_ledger ~root_transition ~(root : Root_data.Minimal.Stable.Latest.t)
+    ~protocol_states ~logger ~signature_kind =
   let blockchain_state =
     root_transition |> Mina_block.Validated.forget |> With_hash.data
     |> Mina_block.header |> Mina_block.Header.protocol_state
     |> Protocol_state.blockchain_state
   in
-  let pending_coinbases, scan_state_unwrapped =
+  let pending_coinbases, scan_state =
     Root_data.Minimal.Stable.Latest.(pending_coinbase root, scan_state root)
   in
   let protocol_states_map =
@@ -60,10 +59,6 @@ let construct_staged_ledger_at_root ~proof_cache_db
   let local_state = Blockchain_state.snarked_local_state blockchain_state in
   let staged_ledger_hash =
     Blockchain_state.staged_ledger_hash blockchain_state
-  in
-  let scan_state =
-    Staged_ledger.Scan_state.write_all_proofs_to_disk ~signature_kind
-      ~proof_cache_db scan_state_unwrapped
   in
   Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
     ~snarked_local_state:local_state ~snarked_ledger:mask ~scan_state
@@ -284,8 +279,8 @@ module Instance = struct
     let%bind root_staged_ledger =
       let open Deferred.Let_syntax in
       match%map
-        construct_staged_ledger_at_root ~proof_cache_db ~precomputed_values
-          ~root_ledger ~root_transition ~root ~protocol_states
+        construct_staged_ledger_at_root ~precomputed_values ~root_ledger
+          ~root_transition ~root ~protocol_states
           ~signature_kind:t.factory.signature_kind ~logger:t.factory.logger
       with
       | Error err ->
