@@ -1433,10 +1433,7 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
               value_exn is safe here
               [latest_ledger_proof_and_txs] generates ordered transactions
               appropriately*)
-            let (proof, _), txns =
-              Option.value_exn (latest_ledger_proof_and_txs scan_state')
-            in
-            Ok (Some (proof, txns), scan_state')
+            Ok (latest_ledger_proof scan_state', scan_state')
         | Error e ->
             Or_error.errorf
               "The new final statement does not connect to the previous \

@@ -358,7 +358,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 in
                 let ledger_proof_statement =
                   match ledger_proof_opt with
-                  | Some (proof, _) ->
+                  | Some proof ->
                       Ledger_proof.Cached.statement proof
                   | None ->
                       let state =
@@ -373,7 +373,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 in
                 let supply_increase =
                   Option.value_map ledger_proof_opt
-                    ~f:(fun (proof, _) ->
+                    ~f:(fun proof ->
                       (Ledger_proof.Cached.statement proof).supply_increase )
                     ~default:Currency.Amount.Signed.zero
                 in
@@ -424,7 +424,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                         (Consensus.Data.Block_data.prover_state block_data)
                       ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
                       ~ledger_proof:
-                        (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
+                        (Option.map ledger_proof_opt ~f:(fun proof ->
                              Ledger_proof.Cached.read_proof_from_disk proof ) ) )
               in
               let witness =

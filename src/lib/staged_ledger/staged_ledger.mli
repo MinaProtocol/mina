@@ -228,14 +228,7 @@ val apply :
   -> ?transaction_pool_proxy:Check_commands.transaction_pool_proxy
   -> t
   -> Staged_ledger_diff.t
-  -> ( [ `Ledger_proof of
-         ( Ledger_proof.Cached.t
-         * ( Transaction.t With_status.t
-           * State_hash.t
-           * Mina_numbers.Global_slot_since_genesis.t )
-           Scan_state.Transactions_ordered.Poly.t
-           list )
-         option ]
+  -> ( [ `Ledger_proof of Ledger_proof.Cached.t option ]
        * [ `Staged_ledger of t ]
        * [ `Accounts_created of Account_id.t list ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
@@ -254,14 +247,7 @@ val apply_diff_unchecked :
   -> signature_kind:Mina_signature_kind.t
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
-  -> ( [ `Ledger_proof of
-         ( Ledger_proof.Cached.t
-         * ( Transaction.t With_status.t
-           * State_hash.t
-           * Mina_numbers.Global_slot_since_genesis.t )
-           Scan_state.Transactions_ordered.Poly.t
-           list )
-         option ]
+  -> ( [ `Ledger_proof of Ledger_proof.Cached.t option ]
        * [ `Staged_ledger of t ]
        * [ `Accounts_created of Account_id.t list ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]

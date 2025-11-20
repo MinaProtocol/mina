@@ -90,15 +90,7 @@ val fill_work_and_enqueue_transactions :
   -> logger:Logger.t
   -> Transaction_with_witness.t list
   -> Transaction_snark_work.t list
-  -> ( ( Ledger_proof.Cached.t
-       * ( Transaction.t With_status.t
-         * State_hash.t
-         * Mina_numbers.Global_slot_since_genesis.t )
-         Transactions_ordered.Poly.t
-         list )
-       option
-     * t )
-     Or_error.t
+  -> (Ledger_proof.Cached.t option * t) Or_error.t
 
 val latest_ledger_proof : t -> Ledger_proof.Cached.t option
 
