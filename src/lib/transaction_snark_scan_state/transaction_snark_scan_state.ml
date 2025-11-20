@@ -853,23 +853,19 @@ let latest_ledger_proof_and_txs' t =
     t.previous_incomplete_zkapp_updates
   in
   let txns =
-    if continued_in_next_tree then
+    if continued_in_next_tree || List.is_empty previous_incomplete then
       Witness_categorizer.categorize_transactions_per_tree txns_with_witnesses
         ~previous_incomplete
     else
-      let txns =
-        Witness_categorizer.categorize_transactions_per_tree txns_with_witnesses
-          ~previous_incomplete:[]
-      in
-      if List.is_empty previous_incomplete then txns
-      else
-        { Transactions_categorized.Poly.first_pass = []
-        ; second_pass = []
-        ; previous_incomplete
-        ; current_incomplete = []
-        }
-        :: txns
+      { Transactions_categorized.Poly.first_pass = []
+      ; second_pass = []
+      ; previous_incomplete
+      ; current_incomplete = []
+      }
+      :: Witness_categorizer.categorize_transactions_per_tree
+           txns_with_witnesses ~previous_incomplete:[]
   in
+
   (proof, txns)
 
 let latest_ledger_proof_txs t =
