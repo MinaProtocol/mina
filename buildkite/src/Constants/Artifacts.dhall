@@ -201,19 +201,19 @@ let dockerTag =
 
           in  merge
                 { Daemon =
-                    "${spec.version}-${Network.lowerName
+                    "${spec.version}-${Network.debianSuffix
                                          spec.network}${profile_part}${build_flags_part}"
                 , DaemonLegacyHardfork =
-                    "${spec.version}-${Network.lowerName
+                    "${spec.version}-${Network.debianSuffix
                                          spec.network}${profile_part}"
                 , DaemonAutoHardfork =
-                    "${spec.version}-${Network.lowerName
+                    "${spec.version}-${Network.debianSuffix
                                          spec.network}${profile_part}"
                 , Archive = "${spec.version}${build_flags_part}"
                 , LogProc = "${spec.version}"
                 , TestExecutive = "${spec.version}"
                 , BatchTxn = "${spec.version}"
-                , Rosetta = "${spec.version}-${Network.lowerName spec.network}"
+                , Rosetta = "${spec.version}-${Network.debianSuffix spec.network}"
                 , ZkappTestTransaction = "${spec.version}"
                 , FunctionalTestSuite = "${spec.version}${build_flags_part}"
                 , Toolchain = "${spec.version}"
