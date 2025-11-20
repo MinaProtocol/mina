@@ -435,11 +435,6 @@ module T = struct
         |> Or_error.ok_exn
     }
 
-  let current_ledger_proof t =
-    Option.map
-      (Scan_state.latest_ledger_proof t.scan_state)
-      ~f:(Fn.compose fst fst)
-
   let replace_ledger_exn t ledger =
     [%test_result: Ledger_hash.t]
       ~message:"Cannot replace ledger since merkle_root differs"
