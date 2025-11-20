@@ -35,7 +35,7 @@ let make_conf ?executable ~keyspace : conf =
   let conn = make_conn_conf () in
   let credentials = make_cred_conf () in
   let executable =
-    Option.merge executable (Sys.getenv "CQLSH") ~f:Fn.const
+    Option.first_some executable (Sys.getenv "CQLSH")
     |> Option.value ~default:"cqlsh"
   in
   { executable; connection = conn; credentials; keyspace }

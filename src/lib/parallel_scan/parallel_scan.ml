@@ -1396,7 +1396,7 @@ let update_helper :
   (*update the latest emitted value *)
   let%bind () =
     State_or_error.put
-      { state with acc = Option.merge result_opt state.acc ~f:Fn.const }
+      { state with acc = Option.first_some result_opt state.acc }
   in
   (*Check the tree-list length is under max*)
   let%map () =
