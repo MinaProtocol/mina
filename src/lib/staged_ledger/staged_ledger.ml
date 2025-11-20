@@ -271,7 +271,7 @@ module T = struct
     }
 
   let proof_txns_with_state_hashes t =
-    Scan_state.latest_ledger_proof t.scan_state
+    Scan_state.latest_ledger_proof_and_txs t.scan_state
     |> Option.bind ~f:(Fn.compose Mina_stdlib.Nonempty_list.of_list_opt snd)
 
   let scan_state { scan_state; _ } = scan_state
@@ -304,7 +304,7 @@ module T = struct
     let last_proof_statement =
       Option.map
         ~f:(fun ((p, _), _) -> Ledger_proof.Cached.statement p)
-        (Scan_state.latest_ledger_proof scan_state)
+        (Scan_state.latest_ledger_proof_and_txs scan_state)
     in
     Statement_scanner.check_invariants ~constraint_constants scan_state
       ~statement_check ~verifier:() ~error_prefix ~registers_end
@@ -402,7 +402,7 @@ module T = struct
                 expected_merkle_root staged_ledger_hash )
     in
     let last_proof_statement =
-      Scan_state.latest_ledger_proof scan_state
+      Scan_state.latest_ledger_proof_and_txs scan_state
       |> Option.map ~f:(fun ((p, _), _) -> Ledger_proof.Cached.statement p)
     in
     f ~constraint_constants ~last_proof_statement ~ledger:snarked_ledger

@@ -940,7 +940,7 @@ let extract_txn_and_global_slot (txn_with_witness : Transaction_with_witness.t)
   let global_slot = txn_with_witness.block_global_slot in
   (txn, state_hash, global_slot)
 
-let latest_ledger_proof' t =
+let latest_ledger_proof_and_txs' t =
   let open Option.Let_syntax in
   let%map proof, txns_with_witnesses =
     Parallel_scan.last_emitted_value t.scan_state
@@ -969,15 +969,15 @@ let latest_ledger_proof' t =
   in
   (proof, txns)
 
-let latest_ledger_proof t =
-  Option.map (latest_ledger_proof' t) ~f:(fun (p, txns) ->
+let latest_ledger_proof_and_txs t =
+  Option.map (latest_ledger_proof_and_txs' t) ~f:(fun (p, txns) ->
       ( p
       , List.map txns
           ~f:(Transactions_ordered.map ~f:extract_txn_and_global_slot) ) )
 
 let incomplete_txns_from_recent_proof_tree t =
   let open Option.Let_syntax in
-  let%map proof, txns_per_block = latest_ledger_proof' t in
+  let%map proof, txns_per_block = latest_ledger_proof_and_txs' t in
   let txns =
     match List.last txns_per_block with
     | None ->
@@ -1318,7 +1318,7 @@ let apply_ordered_txns_async ?stop_at_first_pass ordered_txns
 
 let get_snarked_ledger_sync ~ledger ~get_protocol_state ~apply_first_pass
     ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind t =
-  match latest_ledger_proof' t with
+  match latest_ledger_proof_and_txs' t with
   | None ->
       Or_error.errorf "No transactions found"
   | Some (_, txns_per_block) ->
@@ -1330,7 +1330,7 @@ let get_snarked_ledger_sync ~ledger ~get_protocol_state ~apply_first_pass
 let get_snarked_ledger_async ?async_batch_size ~ledger ~get_protocol_state
     ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger
     ~signature_kind t =
-  match latest_ledger_proof' t with
+  match latest_ledger_proof_and_txs' t with
   | None ->
       Deferred.Or_error.errorf "No transactions found"
   | Some (_, txns_per_block) ->
@@ -1556,10 +1556,10 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
             in
             (*This block is for when there's a proof emitted so Option.
               value_exn is safe here
-              [latest_ledger_proof] generates ordered transactions
+              [latest_ledger_proof_and_txs] generates ordered transactions
               appropriately*)
             let (proof, _), txns =
-              Option.value_exn (latest_ledger_proof scan_state')
+              Option.value_exn (latest_ledger_proof_and_txs scan_state')
             in
             Ok (Some (proof, txns), scan_state')
         | Error e ->
