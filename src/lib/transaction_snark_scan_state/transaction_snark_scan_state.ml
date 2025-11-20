@@ -975,11 +975,9 @@ let latest_ledger_proof_and_txs' t =
   in
   (proof, txns)
 
-let latest_ledger_proof_and_txs t =
-  Option.map (latest_ledger_proof_and_txs' t) ~f:(fun (p, txns) ->
-      ( p
-      , List.map txns
-          ~f:(Transactions_ordered.map ~f:extract_txn_and_global_slot) ) )
+let latest_ledger_proof_txs t =
+  Option.map (latest_ledger_proof_and_txs' t) ~f:(fun (_, txns) ->
+      List.map txns ~f:(Transactions_ordered.map ~f:extract_txn_and_global_slot) )
 
 let incomplete_txns_from_recent_proof_tree t =
   let open Option.Let_syntax in
@@ -1562,7 +1560,7 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
             in
             (*This block is for when there's a proof emitted so Option.
               value_exn is safe here
-              [latest_ledger_proof_and_txs] generates ordered transactions
+              [latest_ledger_proof] generates ordered transactions
               appropriately*)
             Ok (latest_ledger_proof scan_state', scan_state')
         | Error e ->
