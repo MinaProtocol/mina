@@ -946,25 +946,7 @@ let upgrade_old_config ~logger filename json =
   match json with
   | `Assoc fields ->
       (* Fields previously part of daemon.json *)
-      let old_fields =
-        [ "client_port"
-        ; "libp2p-port"
-        ; "rest-port"
-        ; "block-producer-key"
-        ; "block-producer-pubkey"
-        ; "block-producer-password"
-        ; "coinbase-receiver"
-        ; "run-snark-worker"
-        ; "snark-worker-fee"
-        ; "peers"
-        ; "work-selection"
-        ; "work-reassignment-wait"
-        ; "log-received-blocks"
-        ; "log-txn-pool-gossip"
-        ; "log-snark-work-gossip"
-        ; "log-block-creation"
-        ]
-      in
+      let old_fields = [] in
       let found_daemon = ref false in
       let old_fields, remaining_fields =
         List.partition_tf fields ~f:(fun (key, _) ->
