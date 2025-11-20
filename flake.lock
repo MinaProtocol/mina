@@ -195,21 +195,6 @@
         "type": "github"
       }
     },
-    "mix-to-nix": {
-      "locked": {
-        "lastModified": 1643291492,
-        "narHash": "sha256-B+VIFF8qDJhF5hVMc8PbY/WPzUtbGgjsV1eAxTt5GuQ=",
-        "owner": "serokell",
-        "repo": "mix-to-nix",
-        "rev": "f6f0172b3ac4d32c0e6050a7d805734de0b7adef",
-        "type": "github"
-      },
-      "original": {
-        "owner": "serokell",
-        "repo": "mix-to-nix",
-        "type": "github"
-      }
-    },
     "nix-filter": {
       "locked": {
         "lastModified": 1666547822,
@@ -466,7 +451,6 @@
         "flake-compat": "flake-compat",
         "flockenzeit": "flockenzeit",
         "gitignore-nix": "gitignore-nix",
-        "mix-to-nix": "mix-to-nix",
         "nix-filter": "nix-filter",
         "nix-npm-buildPackage": "nix-npm-buildPackage",
         "nix-utils": "nix-utils",
