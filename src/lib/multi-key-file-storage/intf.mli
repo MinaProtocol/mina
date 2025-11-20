@@ -65,4 +65,9 @@ module type S = sig
        (module Bin_prot.Binable.S with type t = 'a)
     -> 'a tag
     -> 'a Core_kernel.Or_error.t
+
+  val read_many :
+       (module Bin_prot.Binable.S with type t = 'a)
+    -> 'a tag list
+    -> 'a list Core_kernel.Or_error.t
 end

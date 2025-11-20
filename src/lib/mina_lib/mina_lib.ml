@@ -891,14 +891,39 @@ let request_work t =
   let%bind.Option prover =
     Option.first_some (snark_worker_key t) (snark_coordinator_key t)
   in
+  let%bind.Option frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  let get_state hash =
+    Transition_frontier.find_protocol_state frontier hash
+    |> function
+    | Some state ->
+        Or_error.return state
+    | None ->
+        Or_error.error_string "Protocol state not found"
+  in
   let fee = snark_work_fee t in
   let sok_message = Sok_message.create ~fee ~prover in
   [%log' debug t.config.logger] "Received work request"
     ~metadata:[ ("sok_message", Sok_message.to_yojson sok_message) ] ;
   let work_from_selector =
     lazy
-      (Work_selection_method.work ~snark_pool:(snark_pool t) ~fee
-         ~logger:t.config.logger t.work_selector )
+      ( Work_selection_method.work ~snark_pool:(snark_pool t) ~fee
+          ~logger:t.config.logger t.work_selector
+      |> Option.map
+           ~f:
+             (Staged_ledger.Scan_state.Available_job.single_spec_one_or_two
+                ~get_state )
+      |> function
+      | Some (Error e) ->
+          [%log' fatal t.config.logger]
+            "Error occured when converting available work: $error"
+            ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+          None
+      | Some (Ok x) ->
+          Some x
+      | None ->
+          None )
   in
   Work_partitioner.request_partitioned_work ~work_from_selector ~sok_message
     ~partitioner:t.work_partitioner

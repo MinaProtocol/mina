@@ -61,6 +61,29 @@ module With_state_hashes = struct
         compute_hashes data )
 end
 
+module Tag = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'a t = (Stable.V1.t, 'a) Multi_key_file_storage.Tag.Stable.V1.t
+
+      let compare a b = Multi_key_file_storage.Tag.compare Stable.V1.compare a b
+
+      let equal a b = Multi_key_file_storage.Tag.equal Stable.V1.equal a b
+
+      let sexp_of_t a =
+        Multi_key_file_storage.Tag.sexp_of_t Stable.V1.sexp_of_t a
+
+      let t_of_sexp sexp =
+        Multi_key_file_storage.Tag.t_of_sexp Stable.V1.t_of_sexp sexp
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  [%%define_locally Stable.Latest.(compare, equal, sexp_of_t, t_of_sexp)]
+end
+
 module File_storage = Multi_key_file_storage.Make_custom (struct
   type filename_key = t
 

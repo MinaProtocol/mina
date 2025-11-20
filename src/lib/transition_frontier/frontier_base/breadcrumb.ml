@@ -450,7 +450,7 @@ module For_tests = struct
         |> Blockchain_state.ledger_proof_statement
       in
       let ledger_proof_statement =
-        Option.value_map ledger_proof_opt ~f:Ledger_proof.Cached.statement
+        Option.value_map ledger_proof_opt ~f:Ledger_proof.Tagged.statement
           ~default:previous_ledger_proof_stmt
       in
       let genesis_ledger_hash =

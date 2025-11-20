@@ -6,15 +6,22 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   module Inputs = Inputs
   module Work_spec = Snark_work_lib.Work.Single.Spec
 
-  let yojson_summary t =
-    let f = function
-      | Work_spec.Merge _ ->
-          `List [ `String "merge" ]
-      | Transition (_, witness) ->
-          Inputs.Transaction.yojson_summary
-            (Inputs.Transaction_witness.transaction witness)
-    in
-    `List (One_or_two.map ~f t |> One_or_two.to_list)
+  let yojson_summary _t =
+    (* TODO uncomment *)
+    (* let f = function
+         | Work_spec.Merge _ ->
+             `List [ `String "merge" ]
+         | Transition (_, _witness) ->
+             Inputs.Transaction.yojson_summary
+               (Inputs.Transaction_witness.transaction witness)
+       in
+       `List (One_or_two.map ~f t |> One_or_two.to_list) *)
+    `List []
+
+  let statement_of_job_exn job =
+    Inputs.Staged_ledger.Scan_state.Available_job.statement job
+    |> Option.value_exn
+         ~message:"unexpected failure to extract statement from job"
 
   module State = struct
     module Job_key = struct
@@ -22,7 +29,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type t = Transaction_snark.Statement.t One_or_two.t
         [@@deriving compare, sexp, to_yojson, hash]
 
-        let of_job x = One_or_two.map ~f:Work_spec.statement x
+        let of_job x = One_or_two.map ~f:statement_of_job_exn x
       end
 
       include T
@@ -31,11 +38,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
     type t =
       { mutable available_jobs :
-          ( Inputs.Transaction_witness.t
-          , Inputs.Ledger_proof.Cached.t )
-          Work_spec.t
-          One_or_two.t
-          list
+          Inputs.Staged_ledger.Scan_state.Available_job.t One_or_two.t list
             (** Jobs received from [frontier_broadcast_pipe], would be updated
                 whenever the pipe has broadcasted new frontier. The works
                 between consecutive frontier broadcasts should be largely
@@ -56,6 +59,9 @@ module Make (Inputs : Intf.Inputs_intf) = struct
               [%log debug] "No frontier, setting available work to be empty" ;
               t.available_jobs <- []
           | Some frontier ->
+              (* let get_state =
+                   Inputs.Transition_frontier.get_protocol_state frontier
+                 in *)
               Pipe_lib.Broadcast_pipe.Reader.iter
                 (Inputs.Transition_frontier.best_tip_pipe frontier) ~f:(fun _ ->
                   let best_tip_staged_ledger =
@@ -64,15 +70,12 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                   let start_time = Time.now () in
                   ( match
                       Inputs.Staged_ledger.all_work_pairs best_tip_staged_ledger
-                        ~get_state:
-                          (Inputs.Transition_frontier.get_protocol_state
-                             frontier )
                     with
-                  | Error e ->
+                  (* | Error e ->
                       [%log fatal]
                         "Error occured when updating available work: $error"
-                        ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                  | Ok new_available_jobs ->
+                        ~metadata:[ ("error", Error_json.error_to_yojson e) ] *)
+                  | new_available_jobs ->
                       let end_time = Time.now () in
                       [%log info] "Updating new available work took $time ms"
                         ~metadata:
@@ -128,7 +131,11 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       t
 
     let mark_scheduled ~logger t job =
-      let statement = One_or_two.map ~f:Work_spec.statement job in
+      let statement_exn j =
+        Inputs.Staged_ledger.Scan_state.Available_job.statement j
+        |> Option.value_exn
+      in
+      let statement = One_or_two.map ~f:statement_exn job in
       (* Log to internal trace all of the newly available jobs. *)
       [%log internal] "Snark_work_scheduled"
         ~metadata:
@@ -156,12 +163,12 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   end
 
   let get_expensive_work ~snark_pool ~fee
-      (jobs : ('a, 'b) Work_spec.t One_or_two.t list) :
-      ('a, 'b) Work_spec.t One_or_two.t list =
+      (jobs : Inputs.Staged_ledger.Scan_state.Available_job.t One_or_two.t list)
+      : Inputs.Staged_ledger.Scan_state.Available_job.t One_or_two.t list =
     O1trace.sync_thread "work_lib_get_expensive_work" (fun () ->
         List.filter jobs ~f:(fun job ->
             State.does_not_have_better_fee ~snark_pool ~fee
-              (One_or_two.map job ~f:Work_spec.statement) ) )
+              (One_or_two.map job ~f:statement_of_job_exn) ) )
 
   let all_pending_work ~snark_pool statements =
     List.filter statements ~f:(fun st ->
@@ -170,7 +177,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   let all_work ~snark_pool (state : State.t) =
     O1trace.sync_thread "work_lib_all_unseen_works" (fun () ->
         List.map state.available_jobs ~f:(fun job ->
-            let statement = One_or_two.map ~f:Work_spec.statement job in
+            let statement = One_or_two.map ~f:statement_of_job_exn job in
             let fee_prover_opt =
               Option.map
                 (Inputs.Snark_pool.get_completed_work snark_pool statement)
@@ -187,7 +194,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   (*Seen/Unseen jobs that are not in the snark pool yet*)
   let pending_work_statements ~snark_pool ~fee_opt (state : State.t) =
     let all_todo_statements =
-      List.map state.available_jobs ~f:(One_or_two.map ~f:Work_spec.statement)
+      List.map state.available_jobs ~f:(One_or_two.map ~f:statement_of_job_exn)
     in
     let expensive_work statements ~fee =
       List.filter statements
@@ -201,7 +208,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
   let completed_work_statements ~snark_pool (state : State.t) =
     let all_todo_statements =
-      List.map state.available_jobs ~f:(One_or_two.map ~f:Work_spec.statement)
+      List.map state.available_jobs ~f:(One_or_two.map ~f:statement_of_job_exn)
     in
     all_completed_work ~snark_pool all_todo_statements
 

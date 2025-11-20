@@ -169,7 +169,7 @@ let scan_state_base_node_payment =
 let scan_state_base_node_zkapp ~zkapp_command =
   mk_scan_state_base_node (Command (Zkapp_command zkapp_command))
 
-let scan_state_merge_node ~proof_cache_db :
+let scan_state_merge_node :
     Transaction_snark_scan_state.Ledger_proof_with_sok_message.t
     Parallel_scan.Merge.t =
   let weight1 : Parallel_scan.Weight.t = { base = 42; merge = 99 } in
@@ -190,8 +190,7 @@ let scan_state_merge_node ~proof_cache_db :
         { without_sok with sok_digest = Mina_base.Sok_message.digest sok_msg }
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
-      ( Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof
-      , sok_msg )
+      (ledger_proof, sok_msg)
     in
     let right =
       let sok_msg : Mina_base.Sok_message.t =
@@ -207,8 +206,7 @@ let scan_state_merge_node ~proof_cache_db :
         { without_sok with sok_digest = Mina_base.Sok_message.digest sok_msg }
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
-      ( Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof
-      , sok_msg )
+      (ledger_proof, sok_msg)
     in
     Full { left; right; seq_no = 1; status = Todo }
   in

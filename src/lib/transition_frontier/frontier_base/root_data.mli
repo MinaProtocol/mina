@@ -3,8 +3,6 @@ open Mina_base
 module Common : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V3 : sig
       type t
     end
@@ -15,10 +13,6 @@ module Common : sig
       val to_latest : t -> V3.t
     end
   end]
-
-  type t
-
-  val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
 
 (* Historical root data is similar to Limited root data, except that it also
@@ -157,14 +151,6 @@ module Minimal : sig
        hash:State_hash.t
     -> scan_state:Staged_ledger.Scan_state.t
     -> pending_coinbase:Pending_coinbase.t
-    -> t
-
-  val read_all_proofs_from_disk : t -> Stable.Latest.t
-
-  val write_all_proofs_to_disk :
-       proof_cache_db:Proof_cache_tag.cache_db
-    -> signature_kind:Mina_signature_kind.t
-    -> Stable.Latest.t
     -> t
 end
 

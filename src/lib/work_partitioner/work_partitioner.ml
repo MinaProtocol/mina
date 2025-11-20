@@ -208,8 +208,17 @@ let schedule_job_from_partitioner ~(partitioner : t) :
 (* WARN: this should only be called if [partitioner.tmp_slot] is None *)
 let consume_job_from_selector ~(partitioner : t)
     ~(sok_message : Mina_base.Sok_message.t)
-    ~(instances : Work.Spec.Single.t One_or_two.t) :
+    ~(instances : Work.Spec.Single.Stable.Latest.t One_or_two.t) :
     (Work.Spec.Partitioned.Stable.Latest.t, _) Result.t =
+  (* TODO: remove this conversion *)
+  let instances =
+    One_or_two.map
+      ~f:
+        (Work.Spec.Single.write_all_proofs_to_disk
+           ~signature_kind:Mina_signature_kind.t_DEPRECATED
+           ~proof_cache_db:partitioner.proof_cache_db )
+      instances
+  in
   let pairing_id = Id_generator.next_id partitioner.single_id_gen () in
   Hashtbl.add_exn partitioner.pairing_pool ~key:pairing_id
     ~data:(Spec_only { spec = instances; sok_message }) ;
@@ -227,7 +236,8 @@ let consume_job_from_selector ~(partitioner : t)
       convert_single_work_from_selector ~partitioner ~single_spec:spec2
         ~sok_message ~pairing:pairing2
 
-type work_from_selector = Work.Spec.Single.t One_or_two.t option Lazy.t
+type work_from_selector =
+  Work.Spec.Single.Stable.Latest.t One_or_two.t option Lazy.t
 
 let request_from_selector_and_consume_by_partitioner ~(partitioner : t)
     ~(work_from_selector : work_from_selector)

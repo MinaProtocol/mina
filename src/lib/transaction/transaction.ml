@@ -79,7 +79,7 @@ let forget : Valid.t -> t = function
   | Coinbase t ->
       Coinbase t
 
-let fee_excess : t -> Fee_excess.t Or_error.t = function
+let fee_excess : (_, _, _) with_forest -> Fee_excess.t Or_error.t = function
   | Command (Signed_command t) ->
       Ok (Signed_command.fee_excess t)
   | Command (Zkapp_command ps) ->

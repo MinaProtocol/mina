@@ -21,4 +21,5 @@
    ppx_hash
    ppx_compare
    ppx_version
-   ppx_deriving_yojson)))
+   ppx_deriving_yojson
+   ppx_let)))
