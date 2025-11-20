@@ -103,6 +103,17 @@ end
 
 module Transactions_ordered : sig
   module Poly : sig
+    (** Represents sequence of transactions extracted from scan state
+        when it emitted a proof, split into:
+
+        * [first_pass] - transactions that went through first pass
+        * [second_pass] - transactions that went through second pass and correspond
+          to the current ledger proof (subset of first pass group)
+        * [current_incomplete] - transactions that went through second pass and correspond
+          to the the next ledger proof (subset of first pass group)
+        * [previous_incomplete] - leftover from previous ledger proof emitted with
+          the current ledger proof (not intersecting with other groups)
+     *)
     type 'a t =
       { first_pass : 'a list
       ; second_pass : 'a list
