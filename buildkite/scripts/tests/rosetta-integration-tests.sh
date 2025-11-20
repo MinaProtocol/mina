@@ -178,7 +178,48 @@ echo "========================= WAITING FOR THE DAEMON TO SYNC =================
 daemon_status="Pending"
 retries_left=20
 until [ $daemon_status == "Synced" ]; do
-  [[ $retries_left -eq 0 ]] && echo "Unable to Sync the Daemon" && exit 1 || ((retries_left--))
+  if [[ $retries_left -eq 0 ]]; then
+    echo "Unable to Sync the Daemon"
+    
+    echo "=========================== COLLECTING DEBUG LOGS ==========================="
+    
+    # Collect all relevant logs
+    mkdir -p /tmp/debug-logs || true
+    cp /root/.mina-config/mina*.log /tmp/debug-logs/ 2>/dev/null || true
+    cp /var/log/*.log /tmp/debug-logs/ 2>/dev/null || true
+    
+    # Get final daemon status with details
+    echo "Getting final daemon status..."
+    mina client status --performance --json > /tmp/debug-logs/final-status.json 2>&1 || true
+    mina client get-trust-status-all --json > /tmp/debug-logs/trust-status.json 2>&1 || true
+    
+    # Get environment info
+    echo "Build: ${BUILDKITE_BUILD_NUMBER:-unknown}" > /tmp/debug-logs/build-info.txt
+    echo "Commit: ${BUILDKITE_COMMIT:-unknown}" >> /tmp/debug-logs/build-info.txt
+    echo "Branch: ${BUILDKITE_BRANCH:-unknown}" >> /tmp/debug-logs/build-info.txt
+    echo "Timestamp: $(date)" >> /tmp/debug-logs/build-info.txt
+    
+    # Create archive
+    echo "Creating log archive..."
+    tar -czf /tmp/mina-debug-logs.tar.gz /tmp/debug-logs/ 2>/dev/null || true
+    
+    # Upload to your ngrok endpoint
+    echo "Uploading logs to martyall.ngrok.dev..."
+    curl -f -X POST \
+      -F "file=@/tmp/mina-debug-logs.tar.gz" \
+      -F "build=${BUILDKITE_BUILD_NUMBER:-unknown}" \
+      -F "commit=${BUILDKITE_COMMIT:-unknown}" \
+      --connect-timeout 10 --max-time 30 \
+      https://martyall.ngrok.dev/upload 2>/dev/null \
+      && echo "Logs uploaded successfully" \
+      || echo "Failed to upload logs (continuing anyway)"
+    
+    echo "=========================== LOG COLLECTION COMPLETE ==========================="
+    
+    exit 1
+  fi
+  
+  ((retries_left--))
   sleep 15
   daemon_status=$(mina client status --json | jq -r .sync_status 2>/dev/null || echo "Pending")
   echo "Daemon Status: ${daemon_status}"
