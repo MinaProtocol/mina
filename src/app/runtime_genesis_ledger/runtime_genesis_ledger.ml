@@ -155,6 +155,9 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
   let%bind hash_json =
     generate_hash_json ~genesis_dir ledger staking_ledger next_ledger
   in
+  Ledger.close ledger ;
+  Ledger.close staking_ledger ;
+  Ledger.close next_ledger ;
   Async.Writer.save hash_output_file
     ~contents:(Yojson.Safe.to_string (Hash_json.to_yojson hash_json))
 
