@@ -396,8 +396,7 @@ let propose_block_onto_chain ~logger ~keys
     Staged_ledger.create_diff previous_staged_ledger ~logger ~self:proposer_pk
       ~transactions_by_fee ~get_completed_work ~coinbase_receiver:`Producer
   in
-  let%map ( `Hash_after_applying next_staged_ledger_hash
-          , `Ledger_proof ledger_proof_opt
+  let%map ( `Ledger_proof ledger_proof_opt
           , `Staged_ledger staged_ledger
           , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) ) =
     let%map res =

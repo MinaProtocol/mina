@@ -160,9 +160,14 @@ sleep 5
 
 # Daemon
 echo "========================= STARTING DAEMON connected to ${MINA_NETWORK} ==========================="
+
+# Enable core dumps and mark start time
+ulimit -c unlimited
+touch /tmp/daemon_start_marker
+
+# Start daemon with output capture but still backgrounded
 mina daemon \
   --archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} \
-  --background \
   --block-producer-pubkey "$BLOCK_PRODUCER_PUB_KEY" \
   --config-directory ${MINA_CONFIG_DIR} \
   --config-file ${MINA_CONFIG_FILE} \
@@ -172,7 +177,11 @@ mina daemon \
   --rest-port ${MINA_GRAPHQL_PORT} \
   --run-snark-worker "$SNARK_PRODUCER_PK" \
   --seed \
-  --demo-mode
+  --demo-mode \
+  > daemon_stdout.log 2> daemon_stderr.log &
+
+DAEMON_PID=$!
+echo "Daemon started with PID: $DAEMON_PID"
 
 echo "========================= WAITING FOR THE DAEMON TO SYNC ==========================="
 daemon_status="Pending"
@@ -183,10 +192,34 @@ until [ $daemon_status == "Synced" ]; do
     
     echo "=========================== COLLECTING DEBUG LOGS ==========================="
     
+    # Check if daemon crashed and collect crash info
+    echo "Checking daemon status..."
+    if ! kill -0 $DAEMON_PID 2>/dev/null; then
+      echo "Daemon crashed! Collecting crash information..."
+      
+      # Look for core dumps
+      find /tmp -name "core*" -newer /tmp/daemon_start_marker 2>/dev/null | head -5 > /tmp/crash_cores.txt || echo "No cores found" > /tmp/crash_cores.txt
+      find /root -name "core*" -newer /tmp/daemon_start_marker 2>/dev/null | head -5 >> /tmp/crash_cores.txt || true
+      find /var/crash -name "core*" -newer /tmp/daemon_start_marker 2>/dev/null | head -5 >> /tmp/crash_cores.txt || true
+      
+      # Capture kernel messages for segfaults
+      dmesg | tail -100 > /tmp/crash_dmesg.txt || echo "Failed to get dmesg" > /tmp/crash_dmesg.txt
+      
+      # Get daemon stdout/stderr if they exist
+      [ -f daemon_stdout.log ] && cp daemon_stdout.log /tmp/crash_stdout.txt || echo "No stdout captured" > /tmp/crash_stdout.txt
+      [ -f daemon_stderr.log ] && cp daemon_stderr.log /tmp/crash_stderr.txt || echo "No stderr captured" > /tmp/crash_stderr.txt
+      
+      echo "Daemon crashed with PID: $DAEMON_PID" > /tmp/crash_info.txt
+      echo "Crash detected at: $(date)" >> /tmp/crash_info.txt
+    else
+      echo "Daemon still running with PID: $DAEMON_PID" > /tmp/crash_info.txt
+    fi
+    
     # Collect all relevant logs
     mkdir -p /tmp/debug-logs || true
     cp /root/.mina-config/mina*.log /tmp/debug-logs/ 2>/dev/null || true
     cp /var/log/*.log /tmp/debug-logs/ 2>/dev/null || true
+    cp /tmp/crash_*.txt /tmp/debug-logs/ 2>/dev/null || true
     
     # Get final daemon status with details
     echo "Getting final daemon status..."
