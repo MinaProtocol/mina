@@ -803,6 +803,8 @@ struct
         ; continued_in_the_next_tree
         ; _
         } =
+      (* [previous_incomplete] is ok to be set empty because it affects
+         only the [previous_incomplete] field of the result *)
       categorize_transactions ~previous_incomplete:[] last_group
     in
     ( second_pass
@@ -852,30 +854,25 @@ let latest_ledger_proof t =
   in
   proof
 
-let latest_ledger_proof_and_txs' t =
-  let open Option.Let_syntax in
-  let%map proof, txns_with_witnesses =
+let latest_recent_proof_txs t =
+  let%map.Option _, txns_with_witnesses =
     Parallel_scan.last_emitted_value t.scan_state
   in
   let ( previous_incomplete
       , `Border_block_continued_in_the_next_tree continued_in_next_tree ) =
     t.previous_incomplete_zkapp_updates
   in
-  let txns =
-    if continued_in_next_tree || List.is_empty previous_incomplete then
-      Witness_categorizer.categorize_transactions_per_tree txns_with_witnesses
-        ~previous_incomplete
-    else
-      { Transactions_categorized.Poly.first_pass = []
-      ; second_pass = []
-      ; previous_incomplete
-      ; continued_in_the_next_tree = false
-      }
-      :: Witness_categorizer.categorize_transactions_per_tree
-           txns_with_witnesses ~previous_incomplete:[]
-  in
-
-  (proof, txns)
+  if continued_in_next_tree || List.is_empty previous_incomplete then
+    Witness_categorizer.categorize_transactions_per_tree txns_with_witnesses
+      ~previous_incomplete
+  else
+    { Transactions_categorized.Poly.first_pass = []
+    ; second_pass = []
+    ; previous_incomplete
+    ; continued_in_the_next_tree = false
+    }
+    :: Witness_categorizer.categorize_transactions_per_tree txns_with_witnesses
+         ~previous_incomplete:[]
 
 let incomplete_txns_from_recent_proof_tree t =
   let%map.Option (proof, _), txns_with_witnesses =
@@ -1212,10 +1209,10 @@ let apply_categorized_txns_async ?stop_at_first_pass categorized_txns
 
 let get_snarked_ledger_sync ~ledger ~get_protocol_state ~apply_first_pass
     ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind t =
-  match latest_ledger_proof_and_txs' t with
+  match latest_recent_proof_txs t with
   | None ->
       Or_error.errorf "No transactions found"
-  | Some (_, txns_per_block) ->
+  | Some txns_per_block ->
       apply_categorized_txns_sync ~stop_at_first_pass:true txns_per_block
         ~ledger ~get_protocol_state ~apply_first_pass ~apply_second_pass
         ~apply_first_pass_sparse_ledger ~signature_kind
@@ -1224,10 +1221,10 @@ let get_snarked_ledger_sync ~ledger ~get_protocol_state ~apply_first_pass
 let get_snarked_ledger_async ?async_batch_size ~ledger ~get_protocol_state
     ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger
     ~signature_kind t =
-  match latest_ledger_proof_and_txs' t with
+  match latest_recent_proof_txs t with
   | None ->
       Deferred.Or_error.errorf "No transactions found"
-  | Some (_, txns_per_block) ->
+  | Some txns_per_block ->
       apply_categorized_txns_async ~stop_at_first_pass:true txns_per_block
         ?async_batch_size ~ledger ~get_protocol_state ~apply_first_pass
         ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind
