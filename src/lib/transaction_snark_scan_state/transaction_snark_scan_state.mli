@@ -101,7 +101,7 @@ end) : sig
     -> (unit, Error.t) Deferred.Result.t
 end
 
-module Transactions_ordered : sig
+module Transactions_categorized : sig
   module Poly : sig
     (** Represents sequence of transactions extracted from scan state
         when it emitted a proof, split into:
@@ -143,7 +143,7 @@ val latest_ledger_proof_txs :
   -> ( Transaction.t With_status.t
      * State_hash.t
      * Mina_numbers.Global_slot_since_genesis.t )
-     Transactions_ordered.Poly.t
+     Transactions_categorized.Poly.t
      list
      option
 
@@ -252,7 +252,7 @@ val staged_transactions_with_state_hash :
   -> ( Transaction.t With_status.t
      * State_hash.t
      * Mina_numbers.Global_slot_since_genesis.t )
-     Transactions_ordered.Poly.t
+     Transactions_categorized.Poly.t
      list
 
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
