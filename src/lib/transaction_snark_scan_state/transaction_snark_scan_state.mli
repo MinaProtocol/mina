@@ -133,6 +133,8 @@ val fill_work_and_enqueue_transactions :
      * t )
      Or_error.t
 
+val latest_ledger_proof : t -> Ledger_proof.Cached.t option
+
 val latest_ledger_proof_and_txs :
      t
   -> ( Ledger_proof_with_sok_message.t
