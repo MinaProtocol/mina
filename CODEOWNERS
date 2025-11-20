@@ -1,13 +1,12 @@
-/CODEOWNERS @bkase @dannywillems @deepthiskumar @georgeee
+/CODEOWNERS @dannywillems @deepthiskumar @georgeee
 /buildkite @MinaProtocol/infra-eng-reviewers
-/frontend/ @MinaProtocol/product-eng-reviewers
 /dockerfiles/ @MinaProtocol/infra-eng-reviewers
 /scripts/ @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
 /Makefile @MinaProtocol/infra-eng-reviewers
 /src/config/dev.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
-/CODE_OF_CONDUCT.md @bkase
+/CODE_OF_CONDUCT.md @deepthiskumar
 /CONTRIBUTING.md @MinaProtocol/product-eng-reviewers
-/LICENSE @bkase
+/LICENSE @deepthiskumar
 /README.md @MinaProtocol/product-eng-reviewers
 /README-dev.md @MinaProtocol/protocol-eng-reviewers
 

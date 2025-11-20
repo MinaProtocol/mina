@@ -26,7 +26,7 @@ steps:
           - "BUILDKITE_PIPELINE_MODE=PullRequest"
           - "BUILDKITE_PIPELINE_STAGE=Test"
           - "BUILDKITE_PIPELINE_FILTER=AllTests"
-        image: codaprotocol/ci-toolchain-base:v3
+        image: europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/codaprotocol/ci-toolchain-base:v3
         mount-buildkite-agent: true
         propagate-environment: true
 
@@ -137,7 +137,7 @@ steps:
           - "CODENAMES=Focal,Bullseye"
           - "FROM_CHANNEL=Unstable"
           - "TO_CHANNEL=Experimental"
-        image: codaprotocol/ci-toolchain-base:v3
+        image: europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/codaprotocol/ci-toolchain-base:v3
         mount-buildkite-agent: true
         propagate-environment: true
 ```

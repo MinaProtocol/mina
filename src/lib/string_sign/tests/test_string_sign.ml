@@ -29,10 +29,11 @@ let test_default_network () =
   let s =
     "Now is the time for all good men to come to the aid of their party"
   in
-  let signature = sign keypair.private_key s in
+  let signature_kind = Mina_signature_kind.Testnet in
+  let signature = sign ~signature_kind keypair.private_key s in
   Alcotest.(check bool)
     "Sign and verify with default network" true
-    (verify signature keypair.public_key s)
+    (verify ~signature_kind signature keypair.public_key s)
 
 (* Test signing and verification with mainnet *)
 let test_mainnet () =

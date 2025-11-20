@@ -16,6 +16,8 @@ module type CONTEXT = sig
   val ledger_sync_config : Syncable_ledger.daemon_config
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 type Structured_log_events.t += Starting_transition_frontier_controller
@@ -172,8 +174,8 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ~cache_exceptions
-        ~network_transition_pipe ~frontier_w new_frontier
-      |> Fn.const () )
+        ~network_transition_pipe ~frontier_w new_frontier )
+  |> Fn.const ()
 
 let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
     ~network ~verifier ~trust_system ~most_recent_valid_block_writer
@@ -238,7 +240,7 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                 let body =
                   Mina_block.Stable.Latest.body peer_best_tip.data
                   |> Staged_ledger_diff.Body.write_all_proofs_to_disk
-                       ~proof_cache_db
+                       ~signature_kind ~proof_cache_db
                 in
                 return
                   (Some
@@ -398,7 +400,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
       let%map initial_root_transition =
         Persistent_frontier.(
           with_instance_exn persistent_frontier
-            ~f:(Instance.get_root_transition ~proof_cache_db))
+            ~f:(Instance.get_root_transition ~signature_kind ~proof_cache_db))
         >>| Result.ok_or_failwith
       in
       start_bootstrap_controller
@@ -548,6 +550,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
     ~producer_transition_reader ~get_most_recent_valid_block
     ~most_recent_valid_block_writer ~get_completed_work ~catchup_mode
     ~notify_online ~ledger_backing () =
+  (* signature_kind is passed through to various callees *)
   let open Context in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
@@ -596,8 +599,9 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       let () =
         let initial_validate =
           unstage
-            (Initial_validator.validate ~proof_cache_db ~logger ~trust_system
-               ~verifier ~initialization_finish_signal ~precomputed_values )
+            (Initial_validator.validate ~signature_kind ~proof_cache_db ~logger
+               ~trust_system ~verifier ~initialization_finish_signal
+               ~precomputed_values )
         in
         O1trace.background_thread "initially_validate_blocks" (fun () ->
             Pipe_lib.Strict_pipe.Reader.iter network_transition_reader
@@ -613,6 +617,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       let persistent_frontier =
         Transition_frontier.Persistent_frontier.create ~logger ~verifier
           ~time_controller ~directory:persistent_frontier_location
+          ~signature_kind
       in
       let persistent_root =
         Transition_frontier.Persistent_root.create ~logger
@@ -641,6 +646,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~verified_transition_writer ~most_recent_valid_block_writer
           ~consensus_local_state ~notify_online ~network_transition_pipe
       in
+
       Ivar.fill_if_empty initialization_finish_signal () ;
 
       let valid_transition_reader1, valid_transition_reader2 =

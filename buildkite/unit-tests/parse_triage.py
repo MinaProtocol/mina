@@ -21,7 +21,7 @@ tag_filters = [
 
 yaml_contents = []
 for tag in tag_filters:
-    dhall_cmd = f"""dhall-to-yaml --quoted <<< '(./src/Monorepo.dhall) {{ selection=(./src/Pipeline/JobSelection.dhall).Type.Full, tagFilter=(./src/Pipeline/TagFilter.dhall).Type.{tag}, scopeFilter=(./src/Pipeline/ScopeFilter.dhall).Type.All  }}'"""
+    dhall_cmd = f"""dhall-to-yaml --quoted <<< '(./src/Monorepo.dhall) {{ selection=(./src/Pipeline/JobSelection.dhall).Type.Full, tagFilter=(./src/Pipeline/TagFilter.dhall).Type.{tag}, filterMode=(./src/Pipeline/FilterMode.dhall).Type.Any, scopeFilter=(./src/Pipeline/ScopeFilter.dhall).Type.All  }}'"""
     result = subprocess.run(dhall_cmd, shell=True, capture_output=True, text=True, executable="/bin/bash")
     if result.returncode != 0:
         print(f"Failed to generate YAML from dhall-to-yaml for tagFilter {tag}")

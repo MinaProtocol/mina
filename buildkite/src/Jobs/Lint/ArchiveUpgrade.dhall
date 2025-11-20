@@ -20,8 +20,8 @@ in  Pipeline.build
         , dirtyWhen =
           [ SelectFiles.exactly "src/app/archive/create_schema" "sql"
           , SelectFiles.exactly "src/app/archive/drop_tables" "sql"
-          , SelectFiles.exactly "src/app/archive/upgrade-to-mesa" "sql"
-          , SelectFiles.exactly "src/app/archive/downgrade-to-berkeley" "sql"
+          , SelectFiles.exactly "src/app/archive/upgrade_to_mesa" "sql"
+          , SelectFiles.exactly "src/app/archive/downgrade_to_berkeley" "sql"
           , SelectFiles.exactly "buildkite/src/Jobs/Lint/ArchiveUpgrade" "dhall"
           , SelectFiles.exactly
               "buildkite/scripts/archive/upgrade-script-check"
@@ -36,7 +36,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run
-                  "buildkite/scripts/archive/upgrade-script-check.sh --mode verbose --branch develop"
+                  "buildkite/scripts/archive/upgrade-script-check.sh --mode verbose --comparison-branch develop"
               ]
             , label = "Archive: Check upgrade script need"
             , key = "archive-check-upgrade-script"

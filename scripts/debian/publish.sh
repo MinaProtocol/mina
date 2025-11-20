@@ -109,8 +109,9 @@ for _ in {1..10}; do (
 #>> Repository is locked by another user:  at host dc7eaad3c537
 #>> Attempting to obtain a lock
 #/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
+# shellcheck disable=SC2046
 deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
-  "$([ "$FORCE" -eq 0 ] && echo "--fail-if-exists")" \
+  $(if [[ "$FORCE" -eq 0 ]]; then echo "--fail-if-exists"; fi) \
   --lock \
   --arch $ARCH \
   --preserve-versions \

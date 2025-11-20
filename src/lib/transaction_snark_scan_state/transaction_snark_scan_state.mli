@@ -138,6 +138,7 @@ val get_snarked_ledger_sync :
         -> Mina_transaction.Transaction.t
         -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
            Or_error.t )
+  -> signature_kind:Mina_signature_kind.t
   -> t
   -> unit Or_error.t
 
@@ -163,6 +164,7 @@ val get_snarked_ledger_async :
         -> Mina_transaction.Transaction.t
         -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
            Or_error.t )
+  -> signature_kind:Mina_signature_kind.t
   -> t
   -> unit Deferred.Or_error.t
 
@@ -195,6 +197,7 @@ val get_staged_ledger_async :
         -> Mina_transaction.Transaction.t
         -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
            Or_error.t )
+  -> signature_kind:Mina_signature_kind.t
   -> t
   -> [ `First_pass_ledger_hash of Ledger_hash.t ] Deferred.Or_error.t
 
@@ -265,6 +268,9 @@ val all_work_pairs :
      Or_error.t
 
 val write_all_proofs_to_disk :
-  proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+     signature_kind:Mina_signature_kind.t
+  -> proof_cache_db:Proof_cache_tag.cache_db
+  -> Stable.Latest.t
+  -> t
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t

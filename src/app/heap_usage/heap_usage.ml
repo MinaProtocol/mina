@@ -13,7 +13,9 @@ let print_heap_usage name v =
     words (words * bytes_per_word)
 
 let initialize_proof_cache_db ~logger conf_dir =
-  let%map res = Proof_cache_tag.create_db ~logger (conf_dir ^/ "proof_cache") in
+  (* Ad-hoc proof cache location for convenience in this executable *)
+  let proof_cache_location = conf_dir ^/ "proof_cache" in
+  let%map res = Proof_cache_tag.create_db ~logger proof_cache_location in
   Result.(
     map_error ~f:(fun (`Initialization_error e) -> Error.to_exn e) res |> ok_exn)
 

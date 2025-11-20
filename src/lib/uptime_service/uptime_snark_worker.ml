@@ -3,7 +3,7 @@
 open Core_kernel
 open Async
 open Mina_base
-module Prod = Snark_worker.Inputs
+module Impl = Snark_worker.Impl
 
 module Worker_state = struct
   module type S = sig
@@ -23,11 +23,11 @@ module Worker_state = struct
     Deferred.return
       (let module M = struct
          let perform_single (message, single_spec) =
-           let%bind (worker_state : Prod.Worker_state.t) =
-             Prod.Worker_state.create ~constraint_constants ~proof_level:Full
+           let%bind (worker_state : Impl.Worker_state.t) =
+             Impl.Worker_state.create ~constraint_constants ~proof_level:Full
                ~signature_kind ()
            in
-           Prod.perform_single worker_state ~message single_spec
+           Impl.perform_single worker_state ~message single_spec
        end in
       (module M : S) )
 
@@ -118,6 +118,7 @@ let create ~logger ~constraint_constants ~pids : t Deferred.t =
       ] ;
   Child_processes.Termination.register_process pids process
     Child_processes.Termination.Uptime_snark_worker ;
+  Mina_metrics.Process_memory.Uptime_snark_worker.set_pid (Process.pid process) ;
   (* the wait loop in the daemon will terminate the daemon if this SNARK worker
      process dies
 

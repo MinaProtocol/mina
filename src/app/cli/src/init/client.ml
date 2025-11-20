@@ -950,23 +950,24 @@ let currency_in_ledger =
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
-    (Command.Param.return (fun () ->
-         let signature_kind = Mina_signature_kind.t_DEPRECATED in
-         let constraint_constants =
-           Genesis_constants.Compiled.constraint_constants
-         in
-         let proof_level = Genesis_constants.Compiled.proof_level in
-         let all =
-           Transaction_snark.constraint_system_digests ~signature_kind
-             ~constraint_constants ()
-           @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-               ~proof_level ~constraint_constants ()
-         in
-         let all =
-           List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
-         in
-         List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
-         Deferred.unit ) )
+    (let open Command.Let_syntax in
+    let%map signature_kind = Cli_lib.Flag.signature_kind in
+    fun () ->
+      let constraint_constants =
+        Genesis_constants.Compiled.constraint_constants
+      in
+      let proof_level = Genesis_constants.Compiled.proof_level in
+      let all =
+        Transaction_snark.constraint_system_digests ~signature_kind
+          ~constraint_constants ()
+        @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
+            ~proof_level ~constraint_constants ()
+      in
+      let all =
+        List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
+      in
+      List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
+      Deferred.unit)
 
 let snark_job_list =
   let open Deferred.Let_syntax in
@@ -2146,8 +2147,7 @@ let receipt_chain_hash =
          ~doc:
            "NN For a zkApp, 0 for fee payer or 1-based index of account update"
          (optional string)
-     in
-     let signature_kind = Mina_signature_kind.t_DEPRECATED in
+     and signature_kind = Cli_lib.Flag.signature_kind in
      fun () ->
        let previous_hash =
          Receipt.Chain_hash.of_base58_check_exn previous_hash
@@ -2287,6 +2287,30 @@ let thread_graph =
                "@[<v>Failed to retrieve runtime configuration. Error:@,%s@]@."
                (Error.to_string_hum
                   (humanize_graphql_error ~graphql_endpoint e) ) ;
+             exit 1 ) )
+
+let generate_hardfork_config =
+  let open Command.Param in
+  let hardfork_config_dir_flag =
+    flag "--hardfork-config-dir"
+      ~doc:
+        "DIR Directory to generate hardfork configuration, relative to the \
+         daemon working directory"
+      (required string)
+  in
+  Command.async ~summary:"Generate reference hardfork configuration"
+    (Cli_lib.Background_daemon.rpc_init hardfork_config_dir_flag
+       ~f:(fun port directory_name ->
+         match%bind
+           Daemon_rpcs.Client.dispatch_join_errors
+             Daemon_rpcs.Generate_hardfork_config.rpc directory_name port
+         with
+         | Ok () ->
+             printf "Hardfork configuration successfully generated\n" ;
+             exit 0
+         | Error e ->
+             eprintf "Failed to generate hard fork config: %s\n"
+               (Error.to_string_hum e) ;
              exit 1 ) )
 
 let signature_kind =
@@ -2533,9 +2557,12 @@ let advanced ~itn_features =
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
     ; ("print-signature-kind", signature_kind)
+    ; ("generate-hardfork-config", generate_hardfork_config)
     ; ( "test"
       , Command.group ~summary:"Testing-only commands"
-          [ ("create-genesis", test_genesis_creation) ] )
+          [ ("create-genesis", test_genesis_creation)
+          ; ("submit-to-archive", Test_submit_to_archive.command)
+          ] )
     ]
   in
   let cmds =

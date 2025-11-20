@@ -9,6 +9,7 @@ open Async
 module Graphql_cohttp_async =
   Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
     (Cohttp_async.Body)
+module Root_ledger = Mina_ledger.Root
 
 let snark_job_list_json t =
   let open Participating_state.Let_syntax in
@@ -215,7 +216,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   else Some (report_file, temp_config)
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
-let setup_local_server ?(client_trustlist = []) ?rest_server_port
+let setup_local_server ?(client_trustlist = []) ~rest_server_port
     ?limited_graphql_port ?itn_graphql_port ?auth_keys
     ?(open_limited_graphql_port = false) ?(insecure_rest_server = false) mina =
   let compile_config = (Mina_lib.config mina).compile_config in
@@ -316,7 +317,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                   let%map accts = Mina_ledger.Ledger.to_list l_inner in
                   Ok accts
               | Ledger_root l ->
-                  let casted = Mina_ledger.Ledger.Root.as_unmasked l in
+                  let casted = Root_ledger.as_unmasked l in
                   let%map accts =
                     Mina_ledger.Ledger.Any_ledger.M.to_list casted
                   in
@@ -369,6 +370,10 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
           return
             (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ()) )
+    ; implement Daemon_rpcs.Generate_hardfork_config.rpc
+        (fun () directory_name ->
+          Mina_lib.Hardfork_config.dump_reference_config
+            ~breadcrumb_spec:`Stop_slot ~directory_name mina )
     ; implement Daemon_rpcs.Submit_internal_log.rpc
         (fun () { timestamp; message; metadata; process } ->
           let metadata =
@@ -379,57 +384,42 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ]
   in
   let snark_worker_impls =
-    [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->
-          Deferred.return
-            (let open Option.Let_syntax in
-            let%bind key =
-              Option.merge
-                (Mina_lib.snark_worker_key mina)
-                (Mina_lib.snark_coordinator_key mina)
-                ~f:Fn.const
-            in
-            let%map work = Mina_lib.request_work mina in
-            let work =
-              Snark_work_lib.Work.Spec.map work
-                ~f:
-                  (Snark_work_lib.Work.Single.Spec.map
-                     ~f_proof:Ledger_proof.Cached.read_proof_from_disk
-                     ~f_witness:Transaction_witness.read_all_proofs_from_disk )
-            in
-            [%log trace]
-              ~metadata:
-                [ ( "work_spec"
-                  , Snark_work_lib.Selector.Spec.Stable.Latest.to_yojson work )
-                ]
-              "responding to a Get_work request with some new work" ;
-            Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-            (work, key)) )
-    ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
-        (fun () (work : Snark_work_lib.Selector.Result.Stable.Latest.t) ->
-          [%log trace] "received completed work from a snark worker"
-            ~metadata:
-              [ ( "work_spec"
-                , Snark_work_lib.Selector.Spec.Stable.Latest.to_yojson work.spec
-                )
-              ] ;
+    [ implement Snark_worker.Rpcs.Get_work.Stable.Latest.rpc (fun () () ->
+          match Mina_lib.request_work mina with
+          | None ->
+              Deferred.return None
+          | Some (Ok spec) ->
+              [%log debug] "responding to a Get_work request with some new work"
+                ~metadata:
+                  [ ( "work_id"
+                    , Snark_work_lib.(
+                        Spec.Partitioned.Poly.get_id spec |> Id.Any.to_yojson)
+                    )
+                  ] ;
 
+              Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
+              Deferred.return (Some spec)
+          | Some (Error (`Failed_to_generate_inputs (zkapp_cmd, e))) ->
+              let open Mina_base.Zkapp_command in
+              [%log error]
+                "Mina_lib.request_work failed to generate inputs for a zkapp \
+                 command"
+                ~metadata:
+                  [ ("error", `String (Error.to_string_hum e))
+                  ; ( "zkapp_cmd"
+                    , Stable.Latest.to_yojson
+                      @@ read_all_proofs_from_disk zkapp_cmd )
+                  ] ;
+              Deferred.return None )
+    ; implement Snark_worker.Rpcs.Submit_work.Stable.Latest.rpc
+        (fun () (result : Snark_work_lib.Result.Partitioned.Stable.Latest.t) ->
+          [%log debug] "received completed work from a snark worker"
+            ~metadata:[ ("work_id", Snark_work_lib.Id.Any.to_yojson result.id) ] ;
           Mina_metrics.(
             Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
-          One_or_two.zip_exn work.spec.instances work.metrics
-          |> One_or_two.iter ~f:(fun (single_spec, (elapsed, _tag)) ->
-                 Snark_work_lib.Metrics.(
-                   emit_single_metrics ~logger ~single_spec
-                     ~data:{ data = elapsed; proof = () }
-                     ~on_zkapp_command:emit_zkapp_metrics_legacy ()) ) ;
-          Deferred.return @@ Mina_lib.add_work mina work )
-    ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
-        (fun
-          ()
-          ((error, _work_spec, _prover_public_key) :
-            Error.t
-            * Snark_work_lib.Selector.Spec.Stable.Latest.t
-            * Signature_lib.Public_key.Compressed.t )
-        ->
+          Deferred.return @@ Mina_lib.add_work mina result )
+    ; implement Snark_worker.Rpcs.Failed_to_generate_snark.Stable.Latest.rpc
+        (fun () (error, _) ->
           [%str_log error]
             (Snark_worker.Events.Generating_snark_work_failed
                { error = Error_json.error_to_yojson error } ) ;
@@ -509,14 +499,13 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
       ~mk_context:(fun ~with_seq_no:_ _req -> mina)
       ?auth_keys:None
   in
-  Option.iter rest_server_port ~f:(fun rest_server_port ->
-      O1trace.background_thread "serve_graphql" (fun () ->
-          create_graphql_server
-            ~bind_to_address:
-              Tcp.Bind_to_address.(
-                if insecure_rest_server then All_addresses else Localhost)
-            ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
-            ~require_auth:false rest_server_port ) ) ;
+  O1trace.background_thread "serve_graphql" (fun () ->
+      create_graphql_server
+        ~bind_to_address:
+          Tcp.Bind_to_address.(
+            if insecure_rest_server then All_addresses else Localhost)
+        ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
+        ~require_auth:false rest_server_port ) ;
   (* Second graphql server with limited queries exposed *)
   Option.iter limited_graphql_port ~f:(fun rest_server_port ->
       O1trace.background_thread "serve_limited_graphql" (fun () ->

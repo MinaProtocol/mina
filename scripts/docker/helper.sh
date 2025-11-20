@@ -15,7 +15,7 @@ function export_base_image () {
         IMAGE="debian:${DEB_CODENAME##*=}-slim"
     ;;
     bookworm)
-        IMAGE="debian:bookworm"
+        IMAGE="europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bookworm"
     ;;
     esac
     export IMAGE="--build-arg image=${IMAGE}"
@@ -89,11 +89,18 @@ function get_platform_suffix() {
     esac
 }
 
+function check_docker_registry() {
+    if [[ -z "${DOCKER_REGISTRY:-}" ]]; then
+        echo "ERROR: DOCKER_REGISTRY environment variable is not set" >&2
+        exit 1
+    fi
+}
 
 function export_docker_tag() {
     export_suffixes
-
-    export DOCKER_REGISTRY="gcr.io/o1labs-192920"
+    
+    check_docker_registry
+    export DOCKER_REGISTRY="${DOCKER_REGISTRY}"
 
     PLATFORM_SUFFIX="$(get_platform_suffix)"
     export TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}${BUILD_FLAG_SUFFIX}${PLATFORM_SUFFIX}"

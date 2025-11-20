@@ -98,7 +98,12 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
                 ] ;
             failwithf "Could not parse configuration file: %s" err () )
   in
-  let genesis_dir = Option.value ~default:(conf_dir ^/ "genesis") genesis_dir in
+  let chain_state_locations =
+    Init.Chain_state_locations.of_config ~conf_dir config
+  in
+  let genesis_dir =
+    Option.value ~default:chain_state_locations.genesis genesis_dir
+  in
   let%bind precomputed_values =
     match%map
       Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
@@ -138,7 +143,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
           ~metadata ;
         Error.raise err
   in
-  return (precomputed_values, config_jsons, config)
+  return (precomputed_values, config_jsons, config, chain_state_locations)
 
 let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   let open Command.Let_syntax in
@@ -505,6 +510,14 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             were no slots won within an hour after the stop time) (Default: \
             %d)"
            Cli_lib.Default.stop_time )
+  and stop_time_interval =
+    flag "--stop-time-interval" ~aliases:[ "stop-time-interval" ] (optional int)
+      ~doc:
+        (sprintf
+           "UPTIME An upper bound (inclusive) on the random number of hours \
+            added to the stop-time. Setting it to zero disables this \
+            randomness. (Default: %d)"
+           Cli_lib.Default.stop_time_interval )
   and upload_blocks_to_gcloud =
     flag "--upload-blocks-to-gcloud"
       ~aliases:[ "upload-blocks-to-gcloud" ]
@@ -568,20 +581,24 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         "true|false Whether to send the commit SHA used to build the node to \
          the uptime service. (default: false)"
       no_arg
-  and hardfork_mode =
-    (*
-      There's 2 hardfork mode, namely Legacy and Auto. Reference:
-        - https://www.notion.so/o1labs/HF-Mina-node-changes-specification-216e79b1f910805d9865e44f2f4baf0e 
-        - https://www.notion.so/o1labs/V2-MIP-draft-HF-automation-250e79b1f9108010b0c5f2b1f416640b
-        *)
-    flag "--hardfork-mode" ~aliases:[ "hardfork-mode" ]
+  and hardfork_handling =
+    (* The two hard fork modes are migrate-exit (the "auto" hard fork mode) and
+       keep-running (the "legacy" hard fork mode). See
+       https://github.com/MinaProtocol/MIPs/pull/32. This option currently only
+       controls the ledger sync feature (keeping migrated versions of the root
+       and epoch ledger databases alongside the stable ones). TODO: the code
+       will eventually need to be updated so this option also causes the daemon
+       to generate and save its own hard fork config at the [slot_chain_end] and
+       then shut down. *)
+    flag "--hardfork-handling" ~aliases:[ "hardfork-handling" ]
       ~doc:
-        "auto|legacy Mode of hardfork. Under auto mode, the daemon would back \
-         all ledgers that are needed for post-hardfork node to bootstrap with \
-         2 databases, one for before, and one for after the hardfork. Under \
-         legacy mode, all databased backed ledgers are backed by one database. \
-         THIS FLAG IS INTERNAL USE ONLY AND WOULD BE REMOVED WITHOUT NOTICE"
-      (optional_with_default Hardfork_mode.Legacy Hardfork_mode.arg)
+        "keep-running|migrate-exit Internal flag, controlling how the daemon \
+         handles an upcoming hard fork. Exposed for testing purposes. \
+         Currently it only causes the daemon to maintain migrated versions of \
+         the root and epoch ledger databases alongside the stable databases. \
+         (default: keep-running). "
+      (optional_with_default Hardfork_handling.Keep_running
+         Hardfork_handling.arg )
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -791,15 +808,17 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           in
           let compile_config = Mina_compile_config.Compiled.t in
           let ledger_backing_type =
-            Mina_lib.Config.ledger_backing ~hardfork_mode
+            Mina_lib.Config.ledger_backing ~hardfork_handling
           in
-          let%bind precomputed_values, config_jsons, config =
+          let%bind ( precomputed_values
+                   , config_jsons
+                   , config
+                   , chain_state_locations ) =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
               ~genesis_backing_type:ledger_backing_type
           in
-
           constraint_constants.block_window_duration_ms |> Float.of_int
           |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
 
@@ -1133,7 +1152,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Logger.trace logger ~module_:__MODULE__ "Creating %s at %s"
               ~location typ
           in
-          let trust_dir = conf_dir ^/ "trust" in
+          let trust_dir = chain_state_locations.trust in
           let%bind () = Async.Unix.mkdir ~p:() trust_dir in
           let%bind trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
@@ -1151,7 +1170,9 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                    (kp, Public_key.compress kp.Keypair.public_key) )
             |> Option.to_list |> Keypair.And_compressed_pk.Set.of_list
           in
-          let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
+          let epoch_ledger_location =
+            chain_state_locations.epoch_ledger ^/ "epoch_ledger"
+          in
           let module Context = struct
             let logger = logger
 
@@ -1243,6 +1264,10 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             or_from_config YJ.Util.to_int_option "stop-time"
               ~default:Cli_lib.Default.stop_time stop_time
           in
+          let stop_time_interval =
+            or_from_config YJ.Util.to_int_option "stop-time-interval"
+              ~default:Cli_lib.Default.stop_time_interval stop_time_interval
+          in
           if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;
           let%bind () =
             if enable_internal_tracing then
@@ -1286,7 +1311,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             Gossip_net.Libp2p.Config.
               { timeout = Time.Span.of_sec 3.
               ; logger
-              ; conf_dir
+              ; mina_net_location = chain_state_locations.mina_net
               ; chain_id
               ; unsafe_no_trust_ip = false
               ; seed_peer_list_url =
@@ -1408,22 +1433,25 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                    ; num_threads = snark_worker_parallelism_flag
                    }
                  ~snark_coordinator_key:run_snark_coordinator_flag
-                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                 ~snark_pool_disk_location:chain_state_locations.snark_pool
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
-                 ~persistent_root_location:(conf_dir ^/ "root")
-                 ~persistent_frontier_location:(conf_dir ^/ "frontier")
-                 ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
-                 ~time_controller ~block_production_keypairs ~monitor
-                 ~consensus_local_state ~is_archive_rocksdb
-                 ~work_reassignment_wait ~archive_process_location
-                 ~log_block_creation ~precomputed_values ~start_time
-                 ?precomputed_blocks_path ~log_precomputed_blocks
-                 ~start_filtered_logs ~upload_blocks_to_gcloud
-                 ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
-                 ~uptime_send_node_commit ~stop_time ~node_status_url
+                 ~persistent_root_location:chain_state_locations.root
+                 ~persistent_frontier_location:chain_state_locations.frontier
+                 ~epoch_ledger_location
+                 ~proof_cache_location:chain_state_locations.proof_cache
+                 ~zkapp_vk_cache_location:chain_state_locations.zkapp_vk_cache
+                 ~snark_work_fee:snark_work_fee_flag ~time_controller
+                 ~block_production_keypairs ~monitor ~consensus_local_state
+                 ~is_archive_rocksdb ~work_reassignment_wait
+                 ~archive_process_location ~log_block_creation
+                 ~precomputed_values ~start_time ?precomputed_blocks_path
+                 ~log_precomputed_blocks ~start_filtered_logs
+                 ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
+                 ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
+                 ~stop_time_interval ~node_status_url
                  ~graphql_control_port:itn_graphql_port ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
-                 ~itn_features ~compile_config ~hardfork_mode () )
+                 ~itn_features ~compile_config ~hardfork_handling () )
           in
           { mina
           ; client_trustlist
@@ -1704,35 +1732,35 @@ let snark_hashes =
       fun () -> if json then Core.printf "[]\n%!"]
 
 let internal_commands logger ~itn_features =
-  [ ( Snark_worker.Intf.command_name
-    , Snark_worker.command ~proof_level:Genesis_constants.Compiled.proof_level
+  [ ( Snark_worker.Entry.command_name
+    , Snark_worker.Entry.command_from_rpcs
+        ~proof_level:Genesis_constants.Compiled.proof_level
         ~constraint_constants:Genesis_constants.Compiled.constraint_constants
-        ~commit_id:Mina_version.commit_id
-        ~signature_kind:Mina_signature_kind.t_DEPRECATED )
+        ~commit_id:Mina_version.commit_id )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
     , Command.async
         ~summary:"Run prover on a sexp provided on a single line of stdin"
-        (Command.Param.return (fun () ->
-             let logger = Logger.create () in
-             let constraint_constants =
-               Genesis_constants.Compiled.constraint_constants
-             in
-             let proof_level = Genesis_constants.Compiled.proof_level in
-             Parallel.init_master () ;
-             match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
-             | `Ok sexp ->
-                 let%bind conf_dir = Unix.mkdtemp "/tmp/mina-prover" in
-                 [%log info] "Prover state being logged to %s" conf_dir ;
-                 let%bind prover =
-                   Prover.create ~commit_id:Mina_version.commit_id ~logger
-                     ~proof_level ~constraint_constants
-                     ~pids:(Pid.Table.create ()) ~conf_dir
-                     ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
-                 in
-                 Prover.prove_from_input_sexp prover sexp >>| ignore
-             | `Eof ->
-                 failwith "early EOF while reading sexp" ) ) )
+        (let%map_open.Command signature_kind = Cli_lib.Flag.signature_kind in
+         fun () ->
+           let logger = Logger.create () in
+           let constraint_constants =
+             Genesis_constants.Compiled.constraint_constants
+           in
+           let proof_level = Genesis_constants.Compiled.proof_level in
+           Parallel.init_master () ;
+           match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
+           | `Ok sexp ->
+               let%bind conf_dir = Unix.mkdtemp "/tmp/mina-prover" in
+               [%log info] "Prover state being logged to %s" conf_dir ;
+               let%bind prover =
+                 Prover.create ~commit_id:Mina_version.commit_id ~logger
+                   ~proof_level ~constraint_constants
+                   ~pids:(Pid.Table.create ()) ~conf_dir ~signature_kind ()
+               in
+               Prover.prove_from_input_sexp prover sexp >>| ignore
+           | `Eof ->
+               failwith "early EOF while reading sexp" ) )
   ; ( "run-snark-worker-single"
     , Command.async
         ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
@@ -1740,7 +1768,7 @@ let internal_commands logger ~itn_features =
         let%map_open filename =
           flag "--file" (required string)
             ~doc:"File containing the s-expression of the snark work to execute"
-        in
+        and signature_kind = Cli_lib.Flag.signature_kind in
         fun () ->
           let open Deferred.Let_syntax in
           let logger = Logger.create () in
@@ -1755,9 +1783,8 @@ let internal_commands logger ~itn_features =
                 Reader.read_sexp reader )
           with
           | `Ok sexp -> (
-              let signature_kind = Mina_signature_kind.t_DEPRECATED in
               let%bind worker_state =
-                Snark_worker.Inputs.Worker_state.create ~proof_level
+                Snark_worker.Impl.Worker_state.create ~proof_level
                   ~constraint_constants ~signature_kind ()
               in
               let sok_message =
@@ -1772,7 +1799,7 @@ let internal_commands logger ~itn_features =
                   Snark_work_lib.Work.Single.Spec.t] sexp
               in
               match%map
-                Snark_worker.Inputs.perform_single worker_state
+                Snark_worker.Impl.perform_single worker_state
                   ~message:sok_message spec
               with
               | Ok _ ->
@@ -1958,7 +1985,7 @@ let internal_commands logger ~itn_features =
               "DIR Directory that contains the genesis ledger and the genesis \
                blockchain proof (default: <config-dir>)"
             (optional string)
-        in
+        and signature_kind = Cli_lib.Flag.signature_kind in
         fun () ->
           let open Deferred.Let_syntax in
           Parallel.init_master () ;
@@ -1975,7 +2002,10 @@ let internal_commands logger ~itn_features =
             List.map config_files ~f:(fun config_file ->
                 (config_file, `Must_exist) )
           in
-          let%bind precomputed_values, _config_jsons, _config =
+          let%bind ( precomputed_values
+                   , _config_jsons
+                   , _config
+                   , _chain_state_locations ) =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
               ~constraint_constants ~proof_level ~cli_proof_level:None
               ~genesis_backing_type:Stable_db config_files
@@ -1988,7 +2018,7 @@ let internal_commands logger ~itn_features =
             Prover.create ~commit_id:Mina_version.commit_id ~logger ~pids
               ~conf_dir ~proof_level
               ~constraint_constants:precomputed_values.constraint_constants
-              ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
+              ~signature_kind ()
           in
           match%bind
             Prover.create_genesis_block prover

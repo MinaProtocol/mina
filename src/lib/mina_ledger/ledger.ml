@@ -29,10 +29,6 @@ module Ledger_inner = struct
   module Kvdb : Intf.Key_value_database with type config := string =
     Rocksdb.Database
 
-  module Storage_locations : Intf.Storage_locations = struct
-    let key_value_db_dir = "mina_key_value_db"
-  end
-
   module Hash = struct
     module Arg = struct
       type t = Ledger_hash.Stable.Latest.t
@@ -183,7 +179,6 @@ module Ledger_inner = struct
     module Kvdb = Kvdb
     module Location = Location_at_depth
     module Location_binable = Location_binable
-    module Storage_locations = Storage_locations
   end
 
   module type Account_Db =
@@ -283,21 +278,51 @@ module Ledger_inner = struct
        and type token_id_set := Token_id.Set.t
        and type account_id := Account_id.t
        and type account_id_set := Account_id.Set.t
-       and type converted_account := Account.Unstable.t
+       and type converted_account := Account.Hardfork.t
        and type primary_ledger = Db.t
-       and type converting_ledger = Unstable_db.t =
+       and type converting_ledger = Hardfork_db.t =
     Converting_merkle_tree.With_database
       (struct
-        type converted_account = Account.Unstable.t
+        type converted_account = Account.Hardfork.t
 
-        let convert = Account.Unstable.of_stable
+        let convert = Account.Hardfork.of_stable
 
-        let converted_equal = Account.Unstable.equal
+        let converted_equal = Account.Hardfork.equal
 
         include Inputs
       end)
       (Db)
-      (Unstable_db)
+      (Hardfork_db)
+
+  module Make_converting (Converting_inputs : sig
+    val convert : Account.t -> Account.Hardfork.t
+  end) :
+    Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
+      with module Location = Location
+       and module Addr = Location.Addr
+      with type root_hash := Ledger_hash.t
+       and type hash := Ledger_hash.t
+       and type account := Account.t
+       and type key := Signature_lib.Public_key.Compressed.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
+       and type converted_account := Account.Hardfork.t
+       and type primary_ledger = Db.t
+       and type converting_ledger = Hardfork_db.t =
+    Converting_merkle_tree.With_database
+      (struct
+        type converted_account = Account.Hardfork.t
+
+        let convert = Converting_inputs.convert
+
+        let converted_equal = Account.Hardfork.equal
+
+        include Inputs
+      end)
+      (Db)
+      (Hardfork_db)
 
   let of_any_ledger ledger =
     let mask = Mask.create ~depth:(Any_ledger.M.depth ledger) () in
@@ -332,12 +357,6 @@ module Ledger_inner = struct
     let mask = Mask.create ~depth () in
     ( Maskable.register_mask casted mask
     , Converting_ledger.converting_ledger converting_ledger )
-
-  module Root = struct
-    include Root.Make (Any_ledger) (Db) (Unstable_db) (Converting_ledger)
-
-    let as_masked t = as_unmasked t |> of_any_ledger
-  end
 
   (** Create a new empty ledger.
 
@@ -909,7 +928,7 @@ let%test_unit "user_command application on converting ledger" =
       L.with_converting_ledger_exn ~logger ~depth ~f:(fun (l, cl) ->
           Init_ledger.init (module L) init_ledger l ;
           let init_merkle_root = L.merkle_root l in
-          let init_cl_merkle_root = Unstable_db.merkle_root cl in
+          let init_cl_merkle_root = Hardfork_db.merkle_root cl in
           let () =
             iter_err cmds
               ~f:
@@ -923,18 +942,15 @@ let%test_unit "user_command application on converting ledger" =
           assert (
             not
               (Ledger_hash.equal init_cl_merkle_root
-                 (Unstable_db.merkle_root cl) ) ) ;
-          (* Assert that the converted ledger has the same accounts as the first one, up to the new field*)
+                 (Hardfork_db.merkle_root cl) ) ) ;
+          (* Assert that the converted ledger has the same accounts as the first one, up to conversion *)
           L.iteri l ~f:(fun index account ->
-              let account_converted = Unstable_db.get_at_index_exn cl index in
+              let account_converted = Hardfork_db.get_at_index_exn cl index in
               assert (
-                Mina_base.Account.Key.(
-                  equal account.public_key account_converted.public_key) ) ;
-              assert (
-                Mina_base.Account.Nonce.(
-                  equal account_converted.nonce account_converted.unstable_field) ) ) ;
+                Mina_base.Account.Hardfork.(
+                  equal (of_stable account) account_converted) ) ) ;
           (* Assert that the converted ledger doesn't have anything "extra" compared to the primary ledger *)
-          Unstable_db.iteri cl ~f:(fun index account_converted ->
+          Hardfork_db.iteri cl ~f:(fun index account_converted ->
               let account = L.get_at_index_exn l index in
               assert (
                 Mina_base.Account.Key.(

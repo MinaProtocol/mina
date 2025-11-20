@@ -34,7 +34,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
     }
 
-  let run ~config:_ network t =
+  let run ~config:Test_config.{ signature_kind; _ } network t =
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
@@ -143,7 +143,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Malleable_error.lift
            @@ Transaction_snark.For_tests.deploy_snapp
                 ~constraint_constants:(Network.constraint_constants network)
-                parties_spec
+                ~signature_kind parties_spec
          in
          let%bind () =
            send_zkapp ~logger

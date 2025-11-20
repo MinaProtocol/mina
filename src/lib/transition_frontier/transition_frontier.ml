@@ -7,6 +7,7 @@ open Core
 open Async_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Root
 include Frontier_base
 module Full_frontier = Full_frontier
 module Extensions = Extensions
@@ -26,6 +27,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 let max_catchup_chunk_length = 20
@@ -97,13 +100,12 @@ let genesis_root_data ~precomputed_values =
 let load_from_persistence_and_start ~context:(module Context : CONTEXT)
     ~verifier ~consensus_local_state ~max_length ~persistent_root
     ~persistent_root_instance ~persistent_frontier ~persistent_frontier_instance
-    ~catchup_mode ignore_consensus_local_state =
+    ~catchup_mode ?max_frontier_depth ?(set_best_tip = true)
+    ignore_consensus_local_state =
   let open Context in
   let open Deferred.Result.Let_syntax in
   let root_identifier =
-    match
-      Persistent_root.Instance.load_root_identifier persistent_root_instance
-    with
+    match Persistent_root.load_root_identifier persistent_root with
     | Some root_identifier ->
         root_identifier
     | None ->
@@ -131,24 +133,30 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
             "Unable to fast forward persistent frontier: %s" msg ;
           Error (`Failure msg) )
   in
-  let%bind full_frontier, extensions =
-    O1trace.thread "persistent_frontier_read_from_disk" (fun () ->
-        let open Deferred.Let_syntax in
-        match%map
-          Persistent_frontier.Instance.load_full_frontier
-            ~context:(module Context)
-            persistent_frontier_instance ~max_length
-            ~root_ledger:
-              (Persistent_root.Instance.snarked_ledger persistent_root_instance)
-            ~consensus_local_state ~ignore_consensus_local_state
-            ~persistent_root_instance
-        with
-        | Error `Sync_cannot_be_running ->
-            Error (`Failure "sync job is already running on persistent frontier")
-        | Error (`Failure _) as err ->
-            err
-        | Ok result ->
-            Ok result )
+  let%bind root_ledger, best_tip_hash, full_frontier, extensions =
+    O1trace.thread "persistent_frontier_read_from_disk"
+    @@ fun () ->
+    match%map.Deferred
+      Persistent_frontier.Instance.load_full_frontier
+        ~context:(module Context)
+        persistent_frontier_instance ~max_length
+        ~root_ledger:
+          (Persistent_root.Instance.snarked_ledger persistent_root_instance)
+        ~consensus_local_state ~ignore_consensus_local_state
+        ~persistent_root_instance ?max_frontier_depth ()
+    with
+    | Error `Sync_cannot_be_running ->
+        Error (`Failure "sync job is already running on persistent frontier")
+    | Error (`Failure _) as err ->
+        err
+    | Ok result ->
+        Ok result
+  in
+  let%bind () =
+    if set_best_tip then
+      Persistent_frontier.Instance.set_best_tip ~logger ~frontier:full_frontier
+        ~extensions ~ignore_consensus_local_state ~root_ledger best_tip_hash
+    else return ()
   in
   [%log info] "Loaded full frontier and extensions" ;
   let%map () =
@@ -192,11 +200,13 @@ let rec load_with_max_length :
        context:(module CONTEXT)
     -> max_length:int
     -> ?retry_with_fresh_db:bool
+    -> ?max_frontier_depth:int
     -> verifier:Verifier.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
     -> catchup_mode:[ `Super ]
+    -> ?set_best_tip:bool
     -> unit
     -> ( t
        , [> `Bootstrap_required
@@ -205,8 +215,9 @@ let rec load_with_max_length :
          | `Failure of string ] )
        Deferred.Result.t =
  fun ~context:(module Context : CONTEXT) ~max_length
-     ?(retry_with_fresh_db = true) ~verifier ~consensus_local_state
-     ~persistent_root ~persistent_frontier ~catchup_mode () ->
+     ?(retry_with_fresh_db = true) ?max_frontier_depth ~verifier
+     ~consensus_local_state ~persistent_root ~persistent_frontier ~catchup_mode
+     ?set_best_tip () ->
   let open Context in
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
@@ -237,7 +248,8 @@ let rec load_with_max_length :
             ~context:(module Context)
             ~verifier ~consensus_local_state ~max_length ~persistent_root
             ~persistent_root_instance ~catchup_mode ~persistent_frontier
-            ~persistent_frontier_instance ignore_consensus_local_state
+            ~persistent_frontier_instance ?max_frontier_depth ?set_best_tip
+            ignore_consensus_local_state
         with
         | Ok _ as result ->
             [%str_log trace] Persisted_frontier_loaded ;
@@ -283,7 +295,9 @@ let rec load_with_max_length :
           (State_hash.With_state_hashes.state_hash
              precomputed_values.protocol_state_with_hashes )
     in
-    Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
+    let%bind () =
+      Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
+    in
     let genesis_ledger_hash =
       Precomputed_values.genesis_ledger precomputed_values
       |> Lazy.force |> Ledger.merkle_root |> Frozen_ledger_hash.of_ledger_hash
@@ -367,9 +381,9 @@ let rec load_with_max_length :
           [%str_log trace] Transition_frontier_loaded_from_persistence ;
           return res )
 
-let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
-    ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
-    ~catchup_mode () =
+let load ?(retry_with_fresh_db = true) ?max_frontier_depth ?set_best_tip
+    ~context:(module Context : CONTEXT) ~verifier ~consensus_local_state
+    ~persistent_root ~persistent_frontier ~catchup_mode () =
   let open Context in
   O1trace.thread "transition_frontier_load" (fun () ->
       let max_length =
@@ -378,8 +392,9 @@ let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
       in
       load_with_max_length
         ~context:(module Context)
-        ~max_length ~retry_with_fresh_db ~verifier ~consensus_local_state
-        ~persistent_root ~persistent_frontier ~catchup_mode () )
+        ~max_length ~retry_with_fresh_db ?max_frontier_depth ~verifier
+        ~consensus_local_state ~persistent_root ~persistent_frontier
+        ~catchup_mode ?set_best_tip () )
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
@@ -454,7 +469,7 @@ let add_breadcrumb_exn t breadcrumb =
   in
   [%log internal] "Apply_full_frontier_diffs_done" ;
   Option.iter new_root_identifier
-    ~f:(Persistent_root.Instance.set_root_identifier t.persistent_root_instance) ;
+    ~f:(Persistent_root.set_root_identifier t.persistent_root) ;
   [%log' trace t.logger]
     ~metadata:
       [ ( "state_hash"
@@ -522,16 +537,7 @@ include struct
 
   let iter = proxy1 iter
 
-  let common_ancestor = proxy1 common_ancestor
-
-  (* reduce successors functions (probably remove hashes special case *)
   let successors = proxy1 successors
-
-  let successors_rec = proxy1 successors_rec
-
-  let successor_hashes = proxy1 successor_hashes
-
-  let successor_hashes_rec = proxy1 successor_hashes_rec
 
   let hash_path = proxy1 hash_path
 
@@ -544,9 +550,6 @@ include struct
   let precomputed_values = proxy1 precomputed_values
 
   let genesis_constants = proxy1 genesis_constants
-
-  (* TODO: find -> option externally, find_exn internally *)
-  let find_exn = proxy1 find_exn
 
   (* TODO: is this an abstraction leak? *)
   let root_length = proxy1 root_length
@@ -574,8 +577,6 @@ module For_tests = struct
   let proxy2 f { full_frontier = x; _ } { full_frontier = y; _ } = f x y
 
   let equal = proxy2 equal
-
-  let load_with_max_length = load_with_max_length
 
   let rec deferred_rose_tree_iter (Mina_stdlib.Rose_tree.T (root, trees)) ~f =
     let%bind () = f root in
@@ -617,7 +618,7 @@ module For_tests = struct
                    ~snarked_ledger:genesis_ledger
                    ~snarked_local_state:(Mina_state.Local_state.empty ())
                    ~expected_merkle_root:(Ledger.merkle_root genesis_ledger)
-                   ~signature_kind:Mina_signature_kind.t_DEPRECATED ) )
+                   ~signature_kind:Testnet ) )
         in
         Breadcrumb.create ~validated_transition:genesis_transition
           ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false
@@ -658,7 +659,7 @@ module For_tests = struct
         let persistent_frontier =
           Persistent_frontier.create ~logger ~verifier
             ~time_controller:(Block_time.Controller.basic ~logger)
-            ~directory:frontier_dir
+            ~directory:frontier_dir ~signature_kind:Testnet
         in
         Gc.Expert.add_finalizer_exn persistent_root clean_temp_dirs ;
         Gc.Expert.add_finalizer_exn persistent_frontier (fun x ->
@@ -667,7 +668,7 @@ module For_tests = struct
               ~f:(fun instance ->
                 Persistent_frontier.Database.close instance.db ) ;
             Option.iter persistent_root.Persistent_root.Factory_type.instance
-              ~f:(fun instance -> Ledger.Root.close instance.snarked_ledger) ;
+              ~f:(fun instance -> Root_ledger.close instance.snarked_ledger) ;
             clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 
@@ -683,8 +684,8 @@ module For_tests = struct
 
   let gen ?(logger = Logger.null ()) ~verifier ?trust_system
       ?consensus_local_state ~precomputed_values
-      ?(populate_root_and_accounts =
-        ( Precomputed_values.populate_root precomputed_values
+      ?(create_root_and_accounts =
+        ( Precomputed_values.create_root precomputed_values
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?(gen_root_breadcrumb =
         gen_genesis_breadcrumb_with_protocol_states ~logger ~verifier
@@ -700,6 +701,8 @@ module For_tests = struct
       let consensus_constants = precomputed_values.consensus_constants
 
       let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
+      let signature_kind = Mina_signature_kind.Testnet
     end in
     let open Context in
     let open Quickcheck.Generator.Let_syntax in
@@ -723,7 +726,7 @@ module For_tests = struct
                   precomputed_values.protocol_state_with_hashes )
              ~epoch_ledger_backing_type:Stable_db )
     in
-    let populate_root, root_ledger_accounts = populate_root_and_accounts in
+    let create_root, root_ledger_accounts = create_root_and_accounts in
     (* TODO: ensure that rose_tree cannot be longer than k *)
     let%bind root, branches, protocol_states =
       let%bind root, protocol_states = gen_root_breadcrumb in
@@ -754,12 +757,11 @@ module For_tests = struct
           ~genesis_state_hash:
             (State_hash.With_state_hashes.state_hash
                precomputed_values.protocol_state_with_hashes ) ) ;
-    Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
-        let transition = Root_data.Limited.transition root_data in
-        Persistent_root.Instance.set_root_state_hash instance
-          (Mina_block.Validated.state_hash transition) ;
-        ignore
-        @@ populate_root (Persistent_root.Instance.snarked_ledger instance) ) ;
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Persistent_root.reset_factory_root_exn persistent_root ~create_root
+          ~root_state_hash:
+            ( Root_data.Limited.transition root_data
+            |> Mina_block.Validated.state_hash ) ) ;
     let frontier_result =
       Async.Thread_safe.block_on_async_exn (fun () ->
           load_with_max_length ~max_length ~retry_with_fresh_db:false
@@ -796,21 +798,21 @@ module For_tests = struct
 
   let gen_with_branch ?logger ~verifier ?trust_system ?consensus_local_state
       ~precomputed_values
-      ?(populate_root_and_accounts =
-        ( Precomputed_values.populate_root precomputed_values
+      ?(create_root_and_accounts =
+        ( Precomputed_values.create_root precomputed_values
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
       ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
       gen ?logger ~verifier ?trust_system ?consensus_local_state
-        ~precomputed_values ?gen_root_breadcrumb ~populate_root_and_accounts
+        ~precomputed_values ?gen_root_breadcrumb ~create_root_and_accounts
         ~max_length ~size:frontier_size ()
     in
     let%map make_branch =
       Breadcrumb.For_tests.gen_seq ?logger ~precomputed_values ~verifier
         ?trust_system
-        ~accounts_with_secret_keys:(snd populate_root_and_accounts)
+        ~accounts_with_secret_keys:(snd create_root_and_accounts)
         branch_size
     in
     let branch =

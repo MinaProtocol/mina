@@ -3257,9 +3257,10 @@ module Block = struct
 
   let add_from_precomputed conn ~proof_cache_db ~constraint_constants
       (t : Precomputed.t) =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let staged_ledger_diff =
-      Staged_ledger_diff.write_all_proofs_to_disk ~proof_cache_db
-        t.staged_ledger_diff
+      Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
+        ~proof_cache_db t.staged_ledger_diff
     in
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:t.protocol_state ~staged_ledger_diff
@@ -4597,9 +4598,12 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
             ~accounts_accessed ~accounts_created
         in
         let hash = State_hash.With_state_hashes.state_hash in
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let block =
           With_hash.map
-            ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db)
+            ~f:
+              (Mina_block.write_all_proofs_to_disk ~signature_kind
+                 ~proof_cache_db )
             block
         in
         match%bind
@@ -4754,7 +4758,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
       | Ok () ->
           () )
 
-let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
+let serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
     ~block_window_duration_ms pool =
   match metrics_server_port with
   | None ->
@@ -4764,18 +4768,19 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
         Option.value ~default:Metrics.default_missing_blocks_width
           missing_blocks_width
       in
-      let%bind metric_server =
+      let%map metric_server =
         Mina_metrics.Archive.create_archive_server ~port ~logger ()
       in
-      let interval = Float.of_int (block_window_duration_ms * 2) in
-      let rec go () =
+      let interval =
+        Time.Span.of_ms @@ Float.of_int (block_window_duration_ms * 2)
+      in
+      let serve () =
         let%bind () =
           Metrics.update pool metric_server ~logger ~missing_blocks_width
         in
-        let%bind () = after (Time.Span.of_ms interval) in
-        go ()
+        after interval
       in
-      go ()
+      Deferred.forever () serve
 
 (* for running the archive process *)
 let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
@@ -4888,7 +4893,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
                      Deferred.unit ) ) )
       |> don't_wait_for ;
       (*Update archive metrics*)
-      create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
+      serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
         ~block_window_duration_ms:constraint_constants.block_window_duration_ms
         pool
       |> don't_wait_for ;

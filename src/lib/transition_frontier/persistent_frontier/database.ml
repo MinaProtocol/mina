@@ -459,7 +459,7 @@ let move_root ~old_root_hash ~new_root ~garbage =
         Batch.remove batch ~key:(Transition node_hash) ;
         Batch.remove batch ~key:(Arcs node_hash) )
 
-let get_transition ~proof_cache_db t hash =
+let get_transition ~signature_kind ~proof_cache_db t hash =
   let%map transition =
     get t.db ~key:(Transition hash) ~error:(`Not_found (`Transition hash))
   in
@@ -475,7 +475,9 @@ let get_transition ~proof_cache_db t hash =
     |> Mina_state.Protocol_state.previous_state_hash
   in
   let cached_block =
-    With_hash.map ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db) block
+    With_hash.map
+      ~f:(Mina_block.write_all_proofs_to_disk ~signature_kind ~proof_cache_db)
+      block
   in
   (* TODO: the delta transition chain proof is incorrect (same behavior the daemon used to have, but we should probably fix this?) *)
   Mina_block.Validated.unsafe_of_trusted_block
@@ -492,17 +494,26 @@ let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 
 let set_best_tip data = Batch.set ~key:Best_tip ~data
 
-let rec crawl_successors ~proof_cache_db t hash ~init ~f =
+let rec crawl_successors ?max_depth ~signature_kind ~proof_cache_db ~init ~f t
+    hash =
   let open Deferred.Result.Let_syntax in
-  let%bind successors = Deferred.return (get_arcs t hash) in
-  deferred_list_result_iter successors ~f:(fun succ_hash ->
-      let%bind transition =
-        Deferred.return (get_transition ~proof_cache_db t succ_hash)
-      in
-      let%bind init' =
-        Deferred.map (f init transition)
-          ~f:(Result.map_error ~f:(fun err -> `Crawl_error err))
-      in
-      crawl_successors ~proof_cache_db t succ_hash ~init:init' ~f )
+  match max_depth with
+  | Some 0 ->
+      (* Depth limit reached, stop crawling *)
+      Deferred.Result.return ()
+  | _ ->
+      let remaining_depth = Option.map max_depth ~f:(fun d -> d - 1) in
+      let%bind successors = Deferred.return (get_arcs t hash) in
+      deferred_list_result_iter successors ~f:(fun succ_hash ->
+          let%bind transition =
+            Deferred.return
+              (get_transition ~signature_kind ~proof_cache_db t succ_hash)
+          in
+          let%bind init' =
+            Deferred.map (f init transition)
+              ~f:(Result.map_error ~f:(fun err -> `Crawl_error err))
+          in
+          crawl_successors ~signature_kind ~proof_cache_db
+            ?max_depth:remaining_depth t succ_hash ~init:init' ~f )
 
 let with_batch t = Batch.with_batch t.db

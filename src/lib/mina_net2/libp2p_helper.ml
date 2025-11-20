@@ -134,6 +134,7 @@ let handle_libp2p_helper_termination t ~pids ~killed result =
         (Or_error.error_string "libp2p_helper process died before answering") ) ;
   Hashtbl.clear t.outstanding_requests ;
   Child_processes.Termination.remove pids (Child_processes.pid t.process) ;
+  Mina_metrics.Process_memory.Libp2p_helper.clear_pid () ;
   if (not killed) && not t.finished then (
     match result with
     | Ok ((Error (`Exit_non_zero _) | Error (`Signal _)) as e) ->
@@ -247,6 +248,8 @@ let spawn ?(allow_multiple_instances = false) ~logger ~pids ~conf_dir
            MINA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper."
   | Ok process ->
       Child_processes.register_process pids process Libp2p_helper ;
+      Mina_metrics.Process_memory.Libp2p_helper.set_pid
+        (Child_processes.pid process) ;
       let t =
         { process
         ; logger

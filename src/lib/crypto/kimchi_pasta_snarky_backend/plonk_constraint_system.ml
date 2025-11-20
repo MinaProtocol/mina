@@ -95,8 +95,8 @@ module Position = struct
     Array.append cols padding
 
   (** Converts an array of [Constants.columns] to [Constants.permutation_cols].
-    This is useful to truncate arrays of cells to the ones that only matter for the permutation argument.
-    *)
+      This is useful to truncate arrays of cells to the ones that only matter for
+      the permutation argument. *)
   let cols_to_perms cols = Array.slice cols 0 Constants.permutation_cols
 
   (** Converts a [Position.t] into the Rust-compatible type [Kimchi_types.wire].
@@ -110,7 +110,9 @@ module Gate_spec = struct
 
   (* TODO: split kind/coeffs from row/wired_to *)
 
-  (** A gate/row/constraint consists of a type (kind), a row, the other cells its columns/cells are connected to (wired_to), and the selector polynomial associated with the gate. *)
+  (** A gate/row/constraint consists of a type (kind), a row, the other cells
+      its columns/cells are connected to (wired_to), and the selector polynomial
+      associated with the gate. *)
   type ('row, 'f) t =
     { kind : Kimchi_gate_type.t
     ; wired_to : 'row Position.t array
@@ -118,7 +120,8 @@ module Gate_spec = struct
     }
   [@@deriving sexp_of]
 
-  (** Applies a function [f] to the [row] of [t] and all the rows of its [wired_to]. *)
+  (** Applies a function [f] to the [row] of [t] and all the rows of its
+      [wired_to]. *)
   let map_rows (t : (_, _) t) ~f : (_, _) t =
     (* { wire with row = f row } *)
     let wired_to =
@@ -161,7 +164,8 @@ module Plonk_constraint = struct
           ; m : 'fp
           ; c : 'fp
           }
-          (** the Poseidon state is an array of states (and states are arrays of size 3). *)
+          (** the Poseidon state is an array of states (and states are arrays of
+              size 3). *)
       | Poseidon of { state : 'field_var array array }
       | EC_add_complete of
           { p1 : 'field_var * 'field_var
@@ -773,7 +777,7 @@ module V = struct
           (** An internal variable is generated to hold an intermediate value
               (e.g., in reducing linear combinations to single PLONK positions).
           *)
-    [@@deriving compare, hash, sexp]
+    [@@deriving compare, hash, sexp, bin_io]
   end
 
   include T
@@ -802,11 +806,14 @@ type 'f runtime_tables_cfg =
 
 (** The constraint system. *)
 type ('f, 'rust_gates) t =
-  { (* Map of cells that share the same value (enforced by to the permutation). *)
+  { (* Map of cells that share the same value (enforced by to the
+       permutation). *)
     equivalence_classes : Row.t Position.t list V.Table.t
-  ; (* How to compute each internal variable (as a linear combination of other variables). *)
+  ; (* How to compute each internal variable (as a linear combination of other
+       variables). *)
     internal_vars : (('f * V.t) list * 'f option) Internal_var.Table.t
-  ; (* The variables that hold each witness value for each row, in reverse order. *)
+  ; (* The variables that hold each witness value for each row, in reverse
+       order. *)
     mutable rows_rev : V.t option array list
   ; (* A circuit is described by a series of gates.
        A gate is finalized once [finalize_and_get_gates] is called.
@@ -822,7 +829,8 @@ type ('f, 'rust_gates) t =
   ; mutable runtime_tables_cfg : 'f runtime_tables_cfg
   ; (* The row to use the next time we add a constraint. *)
     mutable next_row : int
-  ; (* The size of the public input (which fills the first rows of our constraint system. *)
+  ; (* The size of the public input (which fills the first rows of our
+       constraint system. *)
     public_input_size : int Core_kernel.Set_once.t
   ; (* The number of previous recursion challenges. *)
     prev_challenges : int Core_kernel.Set_once.t
@@ -836,15 +844,16 @@ type ('f, 'rust_gates) t =
     *)
     cached_constants : ('f, V.t) Core_kernel.Hashtbl.t
         (* The [equivalence_classes] field keeps track of the positions which must be
-             enforced to be equivalent due to the fact that they correspond to the same V.t value.
-             I.e., positions that are different usages of the same [V.t].
+           enforced to be equivalent due to the fact that they correspond to
+           the same V.t value.
+           I.e., positions that are different usages of the same [V.t].
 
-             We use a union-find data structure to track equalities that a constraint system wants
-             enforced *between* [V.t] values. Then, at the end, for all [V.t]s that have been unioned
-             together, we combine their equivalence classes in the [equivalence_classes] table into
-             a single equivalence class, so that the permutation argument enforces these desired equalities
-             as well.
-        *)
+           We use a union-find data structure to track equalities that a
+           constraint system wants enforced *between* [V.t] values. Then, at
+           the end, for all [V.t]s that have been unioned together, we combine
+           their equivalence classes in the [equivalence_classes] table into a
+           single equivalence class, so that the permutation argument enforces
+           these desired equalities as well. *)
   ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
   }
 
@@ -899,16 +908,21 @@ let finalize_runtime_lookup_tables sys =
   | Compiled_runtime_tables_cfg _ ->
       failwith "Runtime table configurations have already been finalized"
 
-(* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
+(* TODO: shouldn't that Make create something bounded by a signature? As we know
+   what a back end should be? Check where this is used *)
 
-(* TODO: glossary of terms in this file (terms, reducing, feeding) + module doc *)
+(* TODO: glossary of terms in this file (terms, reducing, feeding) + module
+   doc *)
 
 (* TODO: rename Fp to F or Field *)
 
 (** ? *)
 module Make
     (Fp : Field.S)
-    (* We create a type for gate vector, instead of using `Gate.t list`. If we did, we would have to convert it to a `Gate.t array` to pass it across the FFI boundary, where then it gets converted to a `Vec<Gate>`; it's more efficient to just create the `Vec<Gate>` directly.
+    (* We create a type for gate vector, instead of using `Gate.t list`. If we
+       did, we would have to convert it to a `Gate.t array` to pass it across the
+       FFI boundary, where then it gets converted to a `Vec<Gate>`; it's more
+       efficient to just create the `Vec<Gate>` directly.
     *)
     (Gates : Gate_vector_intf with type field := Fp.t)
     (Params : sig
@@ -994,6 +1008,8 @@ module Make
   val digest : t -> Md5.t
 
   val to_json : t -> string
+
+  val dump_extra_circuit_data : t -> string -> unit
 end = struct
   open Core_kernel
   module Constraint = Plonk_constraint.Make (Fp)
@@ -1048,7 +1064,8 @@ end = struct
     res
 
   (** Compute the witness, given the constraint system `sys`
-      and a function that converts the indexed secret inputs to their concrete values.
+      and a function that converts the indexed secret inputs to their concrete
+      values.
    *)
   let compute_witness (sys : t) (external_values : int -> Fp.t) :
       Fp.t array array * Fp.t Kimchi_types.runtime_table array =
@@ -1199,7 +1216,8 @@ end = struct
   let set_primary_input_size (sys : t) num_pub_inputs =
     Set_once.set_exn sys.public_input_size [%here] num_pub_inputs
 
-  (** Sets the number of previous challenges. It must and can only be called once. *)
+  (** Sets the number of previous challenges. It must and can only be called
+      once. *)
   let set_prev_challenges (sys : t) num_prev_challenges =
     Set_once.set_exn sys.prev_challenges [%here] num_prev_challenges
 
@@ -1227,9 +1245,11 @@ end = struct
     ignore (union_find sys key : V.t Union_find.t) ;
     V.Table.add_multi sys.equivalence_classes ~key ~data:{ row; col }
 
-  (* TODO: rename to wire_abs and wire_rel? or wire_public and wire_after_public? or force a single use function that takes a Row.t? *)
+  (* TODO: rename to wire_abs and wire_rel? or wire_public and
+     wire_after_public? or force a single use function that takes a Row.t? *)
 
-  (** Same as wire', except that the row must be given relatively to the end of the public-input rows. *)
+  (** Same as wire', except that the row must be given relatively to the end of
+      the public-input rows. *)
   let wire sys key row col = wire' sys key (Row.After_public_input row) col
 
   (** Adds a row/gate/constraint to a constraint system `sys`. *)
@@ -1400,7 +1420,8 @@ end = struct
             if Fp.(equal zero res) then None else Some res ) )
 
   (** Converts a [Cvar.t] to a `(terms, terms_length, has_constant)`.
-      if `has_constant` is set, then terms start with a constant term in the form of (c, 0).
+      if `has_constant` is set, then terms start with a constant term in the
+      form of (c, 0).
     *)
   let canonicalize x =
     let c, terms =
@@ -2420,4 +2441,36 @@ end = struct
               Option.try_with (fun () -> reduce_to_v values.(i)) )
         in
         add_row sys values kind coeffs
+
+  (* ((Fp.t * V.t) list * Fp.t option) *)
+  type concrete_table = ((Fp.t * V.t) list * Fp.t option) Internal_var.Table.t
+  [@@deriving bin_io]
+
+  (* V.t option array list *)
+  type concrete_rows_rev = V.t option array list [@@deriving bin_io]
+
+  let dump_extra_circuit_data (sys : t) base_path =
+    let rows_rev_name = base_path ^ "_rows_rev.bin" in
+    let internal_vars_name = base_path ^ "_internal_vars.bin" in
+    let gates_json_name = base_path ^ "_gates.json" in
+    if Sys.file_exists rows_rev_name then Sys.remove rows_rev_name ;
+    if Sys.file_exists internal_vars_name then Sys.remove internal_vars_name ;
+    if Sys.file_exists gates_json_name then Sys.remove gates_json_name ;
+
+    let table : concrete_rows_rev = sys.rows_rev in
+    let size = bin_size_concrete_rows_rev table in
+    let buf = Bigstring.create size in
+    ignore (bin_write_concrete_rows_rev buf ~pos:0 table : int) ;
+    Core_kernel.Out_channel.write_all rows_rev_name
+      ~data:(Bigstring.to_string buf) ;
+
+    let table : concrete_table = sys.internal_vars in
+    let size = bin_size_concrete_table table in
+    let buf = Bigstring.create size in
+    ignore (bin_write_concrete_table buf ~pos:0 table : int) ;
+    Core_kernel.Out_channel.write_all internal_vars_name
+      ~data:(Bigstring.to_string buf) ;
+
+    let gates_json = to_json sys in
+    Core_kernel.Out_channel.write_all gates_json_name ~data:gates_json
 end

@@ -20,6 +20,8 @@ let DockerLogin = ../Command/DockerLogin/Type.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
+let DockerRepo = ../Constants/DockerRepo.dhall
+
 let DebianVersions = ../Constants/DebianVersions.dhall
 
 let Network = ../Constants/Network.dhall
@@ -27,8 +29,6 @@ let Network = ../Constants/Network.dhall
 let DockerPublish = ../Constants/DockerPublish.dhall
 
 let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
-
-let Extensions = ../Lib/Extensions.dhall
 
 let Arch = ../Constants/Arch.dhall
 
@@ -53,8 +53,9 @@ let ReleaseSpec =
           , build_flags : BuildFlags.Type
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
+          , docker_repo : DockerRepo.Type
           , verify : Bool
-          , if : Optional B/If
+          , if_ : Optional B/If
           }
       , default =
           { deps = [] : List Command.TaggedKey.Type
@@ -74,10 +75,11 @@ let ReleaseSpec =
           , docker_publish = DockerPublish.Type.Essential
           , no_cache = False
           , no_debian = False
+          , docker_repo = DockerRepo.Type.Internal
           , step_key_suffix = "-docker-image"
           , verify = False
           , deb_suffix = None Text
-          , if = None B/If
+          , if_ = None B/If
           }
       }
 
@@ -111,7 +113,8 @@ let generateStep =
                 then  " && echo Skipping local debian repo setup "
 
                 else      " && ./buildkite/scripts/debian/update.sh --verbose"
-                      ++  " && apt-get install aptly -y && ./buildkite/scripts/debian/start_local_repo.sh"
+                      ++  " && apt-get install aptly -y && ./buildkite/scripts/debian/start_local_repo.sh --arch ${Arch.lowerName
+                                                                                                                     spec.arch}"
 
           let maybeStopDebianRepo =
                       if spec.no_debian
@@ -119,26 +122,6 @@ let generateStep =
                 then  " && echo Skipping local debian repo teardown "
 
                 else  " && ./scripts/debian/aptly.sh stop"
-
-          let suffix =
-                Extensions.joinOptionals
-                  "-"
-                  [ merge
-                      { Mainnet = None Text
-                      , Devnet = None Text
-                      , Dev = None Text
-                      , Lightnet = Some
-                          "${Profiles.toSuffixLowercase spec.deb_profile}"
-                      }
-                      spec.deb_profile
-                  , merge
-                      { None = None Text
-                      , Instrumented = Some
-                          "${BuildFlags.toSuffixLowercase spec.build_flags}"
-                      }
-                      spec.build_flags
-                  , spec.deb_suffix
-                  ]
 
           let debSuffix =
                 merge
@@ -158,8 +141,9 @@ let generateStep =
                             , networks = [ spec.network ]
                             , version = spec.deb_version
                             , codenames = [ spec.deb_codename ]
-                            , suffix = suffix
-                            , arch = spec.arch
+                            , profile = spec.deb_profile
+                            , buildFlag = spec.build_flags
+                            , archs = [ spec.arch ]
                             }
 
                 else  ""
@@ -186,6 +170,7 @@ let generateStep =
                 ++  debSuffix
                 ++  " --repo ${spec.repo}"
                 ++  " --platform ${Arch.platform spec.arch}"
+                ++  " --docker-registry ${DockerRepo.show spec.docker_repo}"
 
           let releaseDockerCmd =
                       if DockerPublish.shouldPublish
@@ -204,6 +189,8 @@ let generateStep =
                       ++  " --deb-build-flags ${BuildFlags.lowerName
                                                   spec.build_flags}"
                       ++  " --platform ${Arch.platform spec.arch}"
+                      ++  " --docker-registry ${DockerRepo.show
+                                                  spec.docker_repo}"
 
                 else  " echo In order to ensure storage optimization, skipping publishing docker as this is not essential one or publishing is disabled . Docker publish setting is set to  ${DockerPublish.show
                                                                                                                                                                                                 spec.docker_publish}."
@@ -253,7 +240,7 @@ let generateStep =
                 , target = Size.XLarge
                 , docker_login = Some DockerLogin::{=}
                 , depends_on = spec.deps
-                , if = spec.if
+                , if_ = spec.if_
                 }
 
 in  { generateStep = generateStep

@@ -17,6 +17,7 @@ module Root_data = Root_data
 module Catchup_state = Catchup_state
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
+module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -28,6 +29,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 include Frontier_intf.S
@@ -63,6 +66,8 @@ val global_max_length : Genesis_constants.t -> int
 
 val load :
      ?retry_with_fresh_db:bool
+  -> ?max_frontier_depth:int
+  -> ?set_best_tip:bool
   -> context:(module CONTEXT)
   -> verifier:Verifier.t
   -> consensus_local_state:Consensus.Data.Local_state.t
@@ -87,7 +92,7 @@ val persistent_root : t -> Persistent_root.t
 
 val persistent_frontier : t -> Persistent_frontier.t
 
-val root_snarked_ledger : t -> Mina_ledger.Ledger.Root.t
+val root_snarked_ledger : t -> Root_ledger.t
 
 val extensions : t -> Extensions.t
 
@@ -115,23 +120,6 @@ module For_tests : sig
 
   val equal : t -> t -> bool
 
-  val load_with_max_length :
-       context:(module CONTEXT)
-    -> max_length:int
-    -> ?retry_with_fresh_db:bool
-    -> verifier:Verifier.t
-    -> consensus_local_state:Consensus.Data.Local_state.t
-    -> persistent_root:Persistent_root.t
-    -> persistent_frontier:Persistent_frontier.t
-    -> catchup_mode:[ `Super ]
-    -> unit
-    -> ( t
-       , [ `Failure of string
-         | `Bootstrap_required
-         | `Persistent_frontier_malformed
-         | `Snarked_ledger_mismatch ] )
-       Deferred.Result.t
-
   val gen_genesis_breadcrumb :
        ?logger:Logger.t
     -> verifier:Verifier.t
@@ -152,9 +140,11 @@ module For_tests : sig
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
-    -> ?populate_root_and_accounts:
-         (   Mina_ledger.Ledger.Root.t
-          -> Mina_ledger.Ledger.Root.t Core_kernel.Or_error.t )
+    -> ?create_root_and_accounts:
+         (   config:Mina_ledger.Root.Config.t
+          -> depth:int
+          -> unit
+          -> Root_ledger.t Core_kernel.Or_error.t )
          * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
          ( Breadcrumb.t
@@ -173,9 +163,11 @@ module For_tests : sig
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
-    -> ?populate_root_and_accounts:
-         (   Mina_ledger.Ledger.Root.t
-          -> Mina_ledger.Ledger.Root.t Core_kernel.Or_error.t )
+    -> ?create_root_and_accounts:
+         (   config:Mina_ledger.Root.Config.t
+          -> depth:int
+          -> unit
+          -> Root_ledger.t Core_kernel.Or_error.t )
          * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
          ( Breadcrumb.t

@@ -2,11 +2,13 @@
 open Core
 open Async
 open Mina_base
-module Ledger = Mina_ledger.Ledger
-module Sync_ledger = Mina_ledger.Sync_ledger
 open Mina_state
 open Pipe_lib.Strict_pipe
 open Network_peer
+open Mina_stdlib
+module Ledger = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Root
+module Sync_ledger = Mina_ledger.Sync_ledger
 module Transition_cache = Transition_cache
 
 module type CONTEXT = sig
@@ -21,6 +23,8 @@ module type CONTEXT = sig
   val ledger_sync_config : Syncable_ledger.daemon_config
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 type Structured_log_events.t += Bootstrap_complete
@@ -36,27 +40,14 @@ type t =
   ; mutable num_of_root_snarked_ledger_retargeted : int
   }
 
-type time = Time.Span.t
-
-let time_to_yojson span =
-  `String (Printf.sprintf "%f seconds" (Time.Span.to_sec span))
-
-type opt_time = time option
-
-let opt_time_to_yojson = function
-  | Some time ->
-      time_to_yojson time
-  | None ->
-      `Null
-
 (** An auxiliary data structure for collecting various metrics for bootstrap controller. *)
 type bootstrap_cycle_stats =
   { cycle_result : string
-  ; sync_ledger_time : time
-  ; staged_ledger_data_download_time : time
-  ; staged_ledger_construction_time : opt_time
+  ; sync_ledger_time : Time.Span.t
+  ; staged_ledger_data_download_time : Time.Span.t
+  ; staged_ledger_construction_time : Time.Span.t option
   ; local_state_sync_required : bool
-  ; local_state_sync_time : opt_time
+  ; local_state_sync_time : Time.Span.t option
   }
 [@@deriving to_yojson]
 
@@ -177,11 +168,15 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
         let pcd =
           peer_root_with_proof.data
           |> Proof_carrying_data.map
-               ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db)
+               ~f:
+                 (Mina_block.write_all_proofs_to_disk ~signature_kind
+                    ~proof_cache_db )
           |> Proof_carrying_data.map_proof
                ~f:
                  (Tuple2.map_snd
-                    ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db) )
+                    ~f:
+                      (Mina_block.write_all_proofs_to_disk ~signature_kind
+                         ~proof_cache_db ) )
         in
         match%bind
           Mina_block.verify_on_header
@@ -390,7 +385,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
               in
               let scan_state =
                 Staged_ledger.Scan_state.write_all_proofs_to_disk
-                  ~proof_cache_db scan_state_uncached
+                  ~signature_kind ~proof_cache_db scan_state_uncached
               in
               let%bind protocol_states =
                 Staged_ledger.Scan_state.check_required_protocol_states
@@ -434,7 +429,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
               let%map staged_ledger_construction_time, construction_result =
                 time_deferred
                   (let open Deferred.Let_syntax in
-                  let temp_mask = Ledger.Root.as_masked temp_snarked_ledger in
+                  let temp_mask = Root_ledger.as_masked temp_snarked_ledger in
                   let%map result =
                     Staged_ledger
                     .of_scan_state_pending_coinbases_and_snarked_ledger ~logger
@@ -446,8 +441,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
                           |> Blockchain_state.snarked_local_state)
                       ~verifier ~constraint_constants ~scan_state
                       ~snarked_ledger:temp_mask ~expected_merkle_root
-                      ~pending_coinbases ~get_state
-                      ~signature_kind:Mina_signature_kind.t_DEPRECATED
+                      ~pending_coinbases ~get_state ~signature_kind
                   in
                   ignore
                     ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ temp_mask
@@ -580,10 +574,9 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
           in
           (* TODO: lazy load db in persistent root to avoid unnecessary opens like this *)
           Transition_frontier.Persistent_root.(
-            with_instance_exn persistent_root ~f:(fun instance ->
-                Instance.set_root_state_hash instance
-                @@ Mina_block.Validated.state_hash
-                @@ Mina_block.Validated.lift new_root )) ;
+            set_root_state_hash persistent_root
+            @@ Mina_block.Validated.state_hash
+            @@ Mina_block.Validated.lift new_root) ;
           let%map new_frontier =
             let fail msg =
               failwith
@@ -695,7 +688,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   in
   [%log info] "Bootstrap completed in $time_elapsed: $bootstrap_stats"
     ~metadata:
-      [ ("time_elapsed", time_to_yojson time_elapsed)
+      [ ("time_elapsed", Time.Span.to_yojson_hum time_elapsed)
       ; ( "bootstrap_stats"
         , `List (List.map ~f:bootstrap_cycle_stats_to_yojson cycles) )
       ] ;
@@ -759,6 +752,8 @@ let%test_module "Bootstrap_controller tests" =
           ~max_subtree_depth:None ~default_subtree_depth:None ()
 
       let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
+      let signature_kind = Mina_signature_kind.Testnet
     end
 
     let verifier =
@@ -972,10 +967,10 @@ let%test_module "Bootstrap_controller tests" =
             ~root:(Transition_frontier.root new_frontier)
             sorted_external_transitions ;
           [%test_result: Ledger_hash.t]
-            ( Ledger.Root.merkle_root
+            ( Root_ledger.merkle_root
             @@ Transition_frontier.root_snarked_ledger new_frontier )
             ~expect:
-              ( Ledger.Root.merkle_root
+              ( Root_ledger.merkle_root
               @@ Transition_frontier.root_snarked_ledger peer_net.state.frontier
               ) )
 
@@ -997,7 +992,7 @@ let%test_module "Bootstrap_controller tests" =
               in
               let snarked_ledger =
                 Transition_frontier.root_snarked_ledger frontier
-                |> Ledger.Root.as_masked
+                |> Root_ledger.as_masked
               in
               let snarked_local_state =
                 Transition_frontier.root frontier
@@ -1023,8 +1018,7 @@ let%test_module "Bootstrap_controller tests" =
                 Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
                   ~scan_state ~logger ~verifier ~constraint_constants
                   ~snarked_ledger ~snarked_local_state ~expected_merkle_root
-                  ~pending_coinbases ~get_state
-                  ~signature_kind:Mina_signature_kind.t_DEPRECATED
+                  ~pending_coinbases ~get_state ~signature_kind:Testnet
                 |> Deferred.Or_error.ok_exn
               in
               let height =

@@ -31,7 +31,10 @@ in  Pipeline.build
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
-            , PipelineTag.Type.Stable
+            , PipelineTag.Type.Docker
+            , PipelineTag.Type.Mainnet
+            , PipelineTag.Type.Arm64
+            , PipelineTag.Type.Noble
             ]
           , debVersion = DebianVersions.DebVersion.Noble
           , arch = Arch.Type.Arm64

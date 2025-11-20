@@ -34,7 +34,7 @@ let load_ledger ~ignore_missing_fields ~pad_app_state
 let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ledger =
   let%bind tar_path =
     Deferred.Or_error.ok_exn
-    @@ Genesis_ledger_helper.Ledger.generate_tar ~genesis_dir ~logger
+    @@ Genesis_ledger_helper.Ledger.generate_ledger_tar ~genesis_dir ~logger
          ~ledger_name_prefix ledger
   in
   [%log info] "Generated ledger tar at %s" tar_path ;
@@ -55,8 +55,18 @@ let generate_hash_json ~genesis_dir ledger staking_ledger next_ledger =
       staking_ledger
   in
   let%map next =
-    generate_ledger_tarball ~ledger_name_prefix:"epoch_ledger" ~genesis_dir
-      next_ledger
+    (* If next ledger has the same merkle root as staking ledger, reuse the
+       same tar file to avoid generating it twice with different timestamps/hashes *)
+    let staking_hash = Mina_ledger.Ledger.merkle_root staking_ledger in
+    let next_hash = Mina_ledger.Ledger.merkle_root next_ledger in
+    if Mina_base.Ledger_hash.equal staking_hash next_hash then (
+      [%log info]
+        "Next epoch ledger has the same hash as staking ledger, reusing \
+         staking ledger tar" ;
+      Deferred.return staking )
+    else
+      generate_ledger_tarball ~ledger_name_prefix:"epoch_ledger" ~genesis_dir
+        next_ledger
   in
   { Hash_json.ledger = ledger_hashes; epoch_data = { staking; next } }
 

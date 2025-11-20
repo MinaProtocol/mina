@@ -67,6 +67,7 @@ module type S = sig
     -> commit_id:string
     -> blockchain_verification_key:Pickles.Verification_key.t
     -> transaction_verification_key:Pickles.Verification_key.t
+    -> signature_kind:Mina_signature_kind.t
     -> unit
     -> t Deferred.t
 end

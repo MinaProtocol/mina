@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo pipefail
+set -eoux pipefail
 
 
 # shellcheck disable=SC1091
@@ -8,11 +8,12 @@ source ./scripts/export-git-env-vars.sh
 
 PWD=$(pwd)
 
-if [ -z "${CONFIG_JSON_GZ_URL+x}" ] || [ -z "${NETWORK_NAME+x}" ] || [ -z "${MINA_DEB_CODENAME+x}" ]; then
+if [ -z "${CONFIG_JSON_GZ_URL+x}" ] || [ -z "${NETWORK_NAME+x}" ] || [ -z "${MINA_DEB_CODENAME+x}" ] || [ -z "${DUNE_PROFILE+x}" ]; then
     echo "❌ Error: Required environment variables not provided:"
     [ -z "${CONFIG_JSON_GZ_URL+x}" ] && echo "  - CONFIG_JSON_GZ_URL: URL to download the network configuration JSON file 🌐"
     [ -z "${NETWORK_NAME+x}" ] && echo "  - NETWORK_NAME: Name of the network to create hardfork package for 🔗"
     [ -z "${MINA_DEB_CODENAME+x}" ] && echo "  - MINA_DEB_CODENAME: Debian codename for package building 📦"
+    [ -z "${DUNE_PROFILE+x}" ] && echo "  - DUNE_PROFILE: Dune profile to use for building 🔧"
     exit 1
 fi
 
@@ -34,7 +35,6 @@ fi
 echo "✅ AWS CLI is available"
 
 export BYPASS_OPAM_SWITCH_UPDATE=1
-export DUNE_PROFILE=${NETWORK_NAME}
 
 make build
 make build-daemon-utils

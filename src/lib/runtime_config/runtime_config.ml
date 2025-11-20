@@ -472,7 +472,21 @@ module Json_layout = struct
       ; max_action_elements : int option [@default None]
       ; zkapp_cmd_limit_hardcap : int option [@default None]
       ; slot_tx_end : int option [@default None]
+            (** This option is set during a planned hard fork. This is the slot
+                at which the daemon should stop accepting transactions, or
+                producing or validating blocks with transactions or coinbase in
+                them. The last block produced before this slot will become the
+                hard fork block. *)
       ; slot_chain_end : int option [@default None]
+            (** This option is set during a planned hard fork. This is the slot
+                at which the daemon should stop producing blocks entirely. *)
+      ; hard_fork_genesis_slot_delta : int option [@default None]
+            (** This option is set during a planned hard fork. This is the
+                difference between the [slot_chain_end] and the genesis slot of
+                the hard fork chain. The genesis timestamp in the hard fork
+                config is expected to be set to the timestamp of the genesis
+                slot according to the current chain's genesis and slot time, and
+                so that parameter is not tracked separately. *)
       ; minimum_user_command_fee : Currency.Fee.t option [@default None]
       ; network_id : string option [@default None]
       ; sync_ledger_max_subtree_depth : int option [@default None]
@@ -833,6 +847,8 @@ module Accounts = struct
     Result.bind ~f:of_json_layout (Json_layout.Accounts.of_yojson json)
 end
 
+(** Parameters for protocol constants that specify the genesis ledger used by
+    the network *)
 module Ledger = struct
   type base =
     | Named of string  (** One of the named ledgers in [Genesis_ledger] *)
@@ -1056,7 +1072,7 @@ module Proof_keys = struct
     ; account_creation_fee : Currency.Fee.Stable.Latest.t option
     ; fork : Fork_config.t option
     }
-  [@@deriving bin_io_unversioned]
+  [@@deriving bin_io_unversioned, yojson]
 
   let make ?level ?sub_windows_per_window ?ledger_depth ?work_delay
       ?block_window_duration_ms ?transaction_capacity ?coinbase_amount
@@ -1186,6 +1202,8 @@ module Proof_keys = struct
     }
 end
 
+(** Parameters for protocol constants that specify slot spans, and relate slot
+    spans to system times *)
 module Genesis = struct
   type t = Json_layout.Genesis.t =
     { k : int option (* the depth of finality constant (in slots) *)
@@ -1262,6 +1280,7 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap : int option [@default None]
     ; slot_tx_end : int option [@default None]
     ; slot_chain_end : int option [@default None]
+    ; hard_fork_genesis_slot_delta : int option [@default None]
     ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t option
           [@default None]
     ; network_id : string option [@default None]
@@ -1306,6 +1325,9 @@ module Daemon = struct
     ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
     ; slot_chain_end =
         opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
+    ; hard_fork_genesis_slot_delta =
+        opt_fallthrough ~default:t1.hard_fork_genesis_slot_delta
+          t2.hard_fork_genesis_slot_delta
     ; minimum_user_command_fee =
         opt_fallthrough ~default:t1.minimum_user_command_fee
           t2.minimum_user_command_fee
@@ -1342,6 +1364,7 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
     ; slot_tx_end = None
     ; slot_chain_end = None
+    ; hard_fork_genesis_slot_delta = None
     ; minimum_user_command_fee = Some minimum_user_command_fee
     ; network_id = None
     ; sync_ledger_max_subtree_depth = None
@@ -1349,6 +1372,8 @@ module Daemon = struct
     }
 end
 
+(** Parameters for protocol constants that specify the genesis epoch ledger
+    snapshots used by the network *)
 module Epoch_data = struct
   module Data = struct
     type t = { ledger : Ledger.t; seed : string }
@@ -1573,6 +1598,17 @@ let ledger_of_accounts accounts =
     ; add_genesis_winner = Some false
     }
 
+let ledger_of_hashes ~root_hash ~s3_data_hash () =
+  Ledger.
+    { base = Hash
+    ; num_accounts = None
+    ; balances = []
+    ; hash = Some root_hash
+    ; s3_data_hash = Some s3_data_hash
+    ; name = None
+    ; add_genesis_winner = Some false
+    }
+
 let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
     ~next_epoch_seed =
@@ -1649,3 +1685,55 @@ let slot_tx_end, slot_chain_end =
     t.daemon >>= get_runtime >>| Mina_numbers.Global_slot_since_hard_fork.of_int
   in
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
+
+let hard_fork_genesis_slot_delta t =
+  let open Option.Let_syntax in
+  let%bind daemon = t.daemon in
+  let%map delta = daemon.hard_fork_genesis_slot_delta in
+  Mina_numbers.Global_slot_span.of_int delta
+
+(** This method creates a runtime daemon config for a hard fork, containing the
+    data that can't necessarily be computed in advance of the hard fork. This
+    ends up being data that's computed based on the last block produced before
+    the transaction stop slot. The only exception is the
+    [genesis_state_timestamp]; this value will be known in advance if the hard
+    fork automation MIP is accepted, but it is convenient to include this
+    parameter in the config for testing purposes. That way, the output of
+    [make_automatic_fork_config] will set the same fields as the config created
+    by the legacy hard fork config generation procedure. *)
+let make_automatic_fork_config ~genesis_state_timestamp ~genesis_ledger_config
+    ~global_slot_since_genesis ~state_hash ~blockchain_length
+    ~staking_ledger_config ~staking_epoch_seed ~next_epoch_ledger_config
+    ~next_epoch_seed =
+  let genesis =
+    Genesis.
+      { genesis_state_timestamp = Some genesis_state_timestamp
+      ; k = None
+      ; delta = None
+      ; slots_per_epoch = None
+      ; slots_per_sub_window = None
+      ; grace_period_slots = None
+      }
+  in
+  let global_slot_since_genesis =
+    Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
+  in
+  let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
+  let fork =
+    Fork_config.
+      { state_hash = Mina_base.State_hash.to_base58_check state_hash
+      ; blockchain_length
+      ; global_slot_since_genesis
+      }
+  in
+  let epoch_data =
+    let open Epoch_data in
+    let open Data in
+    { staking = { ledger = staking_ledger_config; seed = staking_epoch_seed }
+    ; next =
+        Option.map next_epoch_ledger_config ~f:(fun config ->
+            { ledger = config; seed = next_epoch_seed } )
+    }
+  in
+  make ~genesis ~epoch_data ~ledger:genesis_ledger_config
+    ~proof:(Proof_keys.make ~fork ()) ()
