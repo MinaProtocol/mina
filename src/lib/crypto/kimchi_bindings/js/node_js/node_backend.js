@@ -18,6 +18,7 @@ var plonk_wasm = (function() {
       "caml_pasta_fp_poseidon_block_cipher",
       "caml_pasta_fq_poseidon_block_cipher",
       "caml_pasta_fp_plonk_proof_create",
+      "caml_pasta_fp_plonk_verifier_index_create",
       "caml_pasta_fp_plonk_verifier_index_shifts",
       "caml_pasta_fq_plonk_verifier_index_shifts",
       "caml_pasta_fp_plonk_gate_vector_create",
@@ -98,10 +99,10 @@ var plonk_wasm = (function() {
       "caml_fq_srs_batch_accumulator_check",
       "caml_fq_srs_batch_accumulator_generate",
       "caml_fq_srs_h",
-/*       "WasmFpPolyComm",
-      "WasmFqPolyComm", */
-/*       "WasmGPallas",
-      "WasmGVesta", */
+      "WasmFpPolyComm",
+      "WasmFqPolyComm",
+      "WasmGPallas",
+      "WasmGVesta",
       "WasmPastaFp",
       "WasmPastaFq",
       "caml_pasta_fp_plonk_proof_create",

@@ -106,7 +106,7 @@ function caml_pasta_fq_plonk_index_domain_d8_size(prover_index) {
 
 
 // Provides: caml_pasta_fp_plonk_index_create
-// Requires: plonk_wasm, free_on_finalize, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversionNative
 var caml_pasta_fp_plonk_index_create = function (
   gates,
   public_inputs,
@@ -121,10 +121,10 @@ var caml_pasta_fp_plonk_index_create = function (
   var wasm_runtime_table_cfgs = tsRustConversionNative.fp.runtimeTableCfgsToRust(
     caml_runtime_table_cfgs
   );
- console.time("conversion")
+  console.time("conversion plonk index create")
   var gate_vec = plonk_wasm.caml_pasta_fp_plonk_gate_vector_from_bytes(gates.serialize());
   var urs_ser = plonk_wasm.caml_fp_srs_from_bytes_external(urs.serialize())
-  console.timeEnd("conversion")
+  console.timeEnd("conversion plonk index create")
 
   console.time("index_create")
   var t = plonk_wasm.caml_pasta_fp_plonk_index_create(
@@ -138,11 +138,7 @@ var caml_pasta_fp_plonk_index_create = function (
   );
   console.timeEnd("index_create");
 
-  console.time("finalize_conversion")
-  var wasm_t = plonk_wasm.WasmPastaFpPlonkIndex.deserialize(plonk_wasm.prover_index_fp_to_bytes(t))
-  console.timeEnd("finalize_conversion")
-
-  return free_on_finalize(wasm_t);
+  return plonk_wasm.prover_index_fp_to_bytes(t);
 };
 
 // Provides: caml_pasta_fp_plonk_index_create_bytecode
@@ -198,7 +194,7 @@ var caml_pasta_fp_plonk_index_write = function (append, t, path) {
 };
 
 // Provides: caml_pasta_fq_plonk_index_create
-// Requires: plonk_wasm, free_on_finalize, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversionNative
 var caml_pasta_fq_plonk_index_create = function (
   gates,
   public_inputs,
@@ -208,16 +204,20 @@ var caml_pasta_fq_plonk_index_create = function (
   urs,
   lazy_mode
 ) {
+  console.log("anais: 1");
   var wasm_lookup_tables =
     tsRustConversionNative.fq.lookupTablesToRust(caml_lookup_tables);
+    console.log("anais: 2");
   var wasm_runtime_table_cfgs = tsRustConversionNative.fq.runtimeTableCfgsToRust(
     caml_runtime_table_cfgs
   );
+  console.log("anais: 3");
 
   console.time("conversion")
   var gate_vec = plonk_wasm.caml_pasta_fq_plonk_gate_vector_from_bytes(gates.serialize());
   var urs_ser = plonk_wasm.caml_fq_srs_from_bytes_external(urs.serialize())
   console.timeEnd("conversion")
+  console.log("anais: 4");
 
   console.time("index_create")
   var t = plonk_wasm.caml_pasta_fq_plonk_index_create(
@@ -231,11 +231,7 @@ var caml_pasta_fq_plonk_index_create = function (
   );
   console.timeEnd("index_create");
 
-  console.time("finalize_conversion")
-  var wasm_t = plonk_wasm.WasmPastaFqPlonkIndex.deserialize(plonk_wasm.prover_index_fq_to_bytes(t))
-  console.timeEnd("finalize_conversion")
-
-  return free_on_finalize(wasm_t);
+  return plonk_wasm.prover_index_fq_to_bytes(t);
 }; 
 
 // Provides: caml_pasta_fq_plonk_index_create_bytecode
