@@ -11,6 +11,7 @@ var (
 	ErrMissingForkMinaExe              = errors.New("missing fork Mina executable path")
 	ErrMissingForkRuntimeGenesisLedger = errors.New("missing fork runtime genesis ledger executable path")
 	ErrMissingScriptDir                = errors.New("missing script dir path")
+	ErrMissingRoot                     = errors.New("missing network root")
 
 	// Errors related to file existence and permissions
 	ErrFileNotExists = errors.New("file does not exist")
