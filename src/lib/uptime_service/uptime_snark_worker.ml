@@ -6,7 +6,6 @@ open Mina_base
 
 open struct
   module Impl = Snark_worker.Impl
-  module Worker_state = Impl.Worker_state
 end
 
 module Worker = struct
@@ -26,7 +25,7 @@ module Worker = struct
       type init_arg = Logger.t * Genesis_constants.Constraint_constants.t
       [@@deriving bin_io_unversioned]
 
-      include Worker_state
+      include Impl.Worker_state
     end
 
     module Connection_state = struct
