@@ -974,7 +974,7 @@ module T = struct
     (* Deleting oldest stack if proof emitted *)
     let%bind pending_coinbase_collection_updated1 =
       match ledger_proof with
-      | Some (proof, _) ->
+      | Some proof ->
           let%bind oldest_stack, pending_coinbase_collection_updated1 =
             Pending_coinbase.remove_coinbase_stack ~depth
               pending_coinbase_collection
@@ -2711,17 +2711,10 @@ let%test_module "staged ledger tests" =
       |> Sequence.to_list
 
     (* Fee excess at top level ledger proofs should always be zero *)
-    let assert_fee_excess :
-           ( Ledger_proof.Cached.t
-           * (Transaction.t With_status.t * _ * _)
-             Sl.Scan_state.Transactions_ordered.Poly.t
-             list )
-           option
-        -> unit =
+    let assert_fee_excess : Ledger_proof.Cached.t option -> unit =
      fun proof_opt ->
       let fee_excess =
-        Option.value_map ~default:Fee_excess.zero proof_opt
-          ~f:(fun (proof, _txns) ->
+        Option.value_map ~default:Fee_excess.zero proof_opt ~f:(fun proof ->
             (Ledger_proof.Cached.statement proof).fee_excess )
       in
       assert (Fee_excess.is_zero fee_excess)
@@ -2849,7 +2842,7 @@ let%test_module "staged ledger tests" =
               in
               let%bind () =
                 match proof_opt with
-                | Some (proof, _transactions) ->
+                | Some proof ->
                     (*update snarked ledger with the transactions in the most recently emitted proof*)
                     let%map res =
                       Sl.Scan_state.get_snarked_ledger_async
