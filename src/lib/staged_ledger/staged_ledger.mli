@@ -37,7 +37,7 @@ module Scan_state : sig
     [@@deriving sexp]
   end
 
-  module Transactions_ordered : sig
+  module Transactions_categorized : sig
     module Poly : sig
       type 'a t =
         { first_pass : 'a list
@@ -64,7 +64,7 @@ module Scan_state : sig
     -> ( Transaction.t With_status.t
        * State_hash.t
        * Mina_numbers.Global_slot_since_genesis.t )
-       Transactions_ordered.Poly.t
+       Transactions_categorized.Poly.t
        list
 
   (** Statements of all the pending work. Fails if there are any invalid
@@ -200,7 +200,7 @@ val proof_txns_with_state_hashes :
   -> ( Transaction.t With_status.t
      * State_hash.t
      * Mina_numbers.Global_slot_since_genesis.t )
-     Scan_state.Transactions_ordered.Poly.t
+     Scan_state.Transactions_categorized.Poly.t
      Mina_stdlib.Nonempty_list.t
      option
 
