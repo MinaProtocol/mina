@@ -116,7 +116,7 @@ module Make
     | Empty ->
         "empty Snark_pool_diff"
 
-  let is_empty _ = false
+  let is_empty = function Add_solved_work _ -> false | Empty -> true
 
   let of_result
       (res :
