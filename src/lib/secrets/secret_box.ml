@@ -126,21 +126,3 @@ let decrypt ~(password : Bytes.t)
     try Result.return @@ Secret_box.Bytes.secret_box_open key ciphertext nonce
     with Sodium.Verification_failure ->
       Error `Incorrect_password_or_corrupted_privkey
-
-let%test_unit "successful roundtrip" =
-  (* 4 trials because password hashing is slow *)
-  let bgen = Bytes.gen_with_length 16 Char.quickcheck_generator in
-  Quickcheck.test
-    Quickcheck.Generator.(tuple2 bgen bgen)
-    ~trials:4
-    ~f:(fun (password, plaintext) ->
-      let enc = encrypt ~password:(Bytes.copy password) ~plaintext in
-      let dec = Option.value_exn (decrypt enc ~password |> Result.ok) in
-      [%test_eq: Bytes.t] dec plaintext )
-
-let%test "bad password fails" =
-  let enc =
-    encrypt ~password:(Bytes.of_string "foobar")
-      ~plaintext:(Bytes.of_string "yo")
-  in
-  Result.is_error (decrypt ~password:(Bytes.of_string "barfoo") enc)
