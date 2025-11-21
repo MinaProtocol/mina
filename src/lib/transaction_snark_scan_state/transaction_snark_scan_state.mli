@@ -196,19 +196,6 @@ val get_staged_ledger_async :
 
 val free_space : t -> int
 
-(* a 0 index means next-to-latest tree *)
-val base_jobs_on_earlier_tree :
-  t -> index:int -> Transaction_with_witness.t list
-
-(** All the transactions with hash of the parent block in which they were included in the order in which they were applied*)
-val staged_transactions_with_state_hash :
-     t
-  -> ( Transaction.t With_status.t
-     * State_hash.t
-     * Mina_numbers.Global_slot_since_genesis.t )
-     Transactions_ordered.Poly.t
-     list
-
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
 val partition_if_overflowing : t -> Space_partition.t
 
