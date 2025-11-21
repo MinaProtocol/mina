@@ -1253,9 +1253,6 @@ let all_jobs t = Parallel_scan.all_jobs t.scan_state
 
 let next_on_new_tree t = Parallel_scan.next_on_new_tree t.scan_state
 
-let base_jobs_on_latest_tree t =
-  Parallel_scan.base_jobs_on_latest_tree t.scan_state
-
 let base_jobs_on_earlier_tree t =
   Parallel_scan.base_jobs_on_earlier_tree t.scan_state
 
