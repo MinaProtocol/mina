@@ -1368,9 +1368,6 @@ let all_jobs t = Parallel_scan.all_jobs t.scan_state
 
 let next_on_new_tree t = Parallel_scan.next_on_new_tree t.scan_state
 
-let base_jobs_on_earlier_tree t =
-  Parallel_scan.base_jobs_on_earlier_tree t.scan_state
-
 let partition_if_overflowing t =
   let bundle_count work_count = (work_count + 1) / 2 in
   let { Space_partition.first = slots, job_count; second } =

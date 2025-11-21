@@ -206,10 +206,6 @@ val get_staged_ledger_async :
 
 val free_space : t -> int
 
-(* a 0 index means next-to-latest tree *)
-val base_jobs_on_earlier_tree :
-  t -> index:int -> Transaction_with_witness.t list
-
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
 val partition_if_overflowing : t -> Space_partition.t
 
