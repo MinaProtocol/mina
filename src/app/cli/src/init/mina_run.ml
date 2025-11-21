@@ -481,6 +481,17 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
                   [ ("uri", `String (Uri.to_string uri))
                   ; ("context", `String "rest_server")
                   ] ;
+              [%log spam] "Current graphql request context"
+                ~metadata:
+                  [ ( "request"
+                    , `String
+                        ( Request.sexp_of_t req
+                        |> Ppx_sexp_conv_lib.Sexp.to_string ) )
+                  ; ( "body"
+                    , `String
+                        (Body.sexp_of_t body |> Ppx_sexp_conv_lib.Sexp.to_string)
+                    )
+                  ] ;
               graphql_callback () req body
           | "/status" ->
               status `None >>| lift
