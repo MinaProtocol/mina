@@ -48,7 +48,7 @@ function usage() {
   echo "  CHANNEL                     Target debian channel"
   echo "  REPO                        Source debian repository"
   echo "  BUILD_ID                    The Buildkite build ID. If defined, script will use it to generate debian package version"
-  echo "  PUBLISH                     The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io"
+  echo "  DOCKER_REPO                 The Docker repository. If defined, script will publish docker to target repository. Otherwise it will only create docker image locally"
   echo "  VERIFY                      The Verify flag. If set, script will verify the artifacts before promoting them"
   echo ""
   exit 1
@@ -57,8 +57,8 @@ function usage() {
 if [[ -z "$ARTIFACTS" ]]; then usage "No artifacts defined for promoting!"; exit 1; fi;
 if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; exit 1; fi;
 if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
+if [[ -z "$DOCKER_REPO" ]]; then usage "Docker repo is not set!"; exit 1; fi;
 if [[ -z "$NETWORK" ]]; then NETWORK="Devnet"; fi;
-if [[ -z "$PUBLISH" ]]; then PUBLISH=0; fi;
 if [[ -z "$CHANNEL" ]]; then CHANNEL="Unstable"; fi;
 if [[ -z "$REPO" ]]; then REPO="Nightly"; fi;
 if [[ -z "$VERIFY" ]]; then VERIFY=0; fi;
@@ -66,11 +66,7 @@ if [[ -z "$VERSION" ]]; then usage "Version is not set!"; exit 1; fi;
 if [[ -z "$NEW_VERSION" ]];  then usage "New Version is not set!"; exit 1; fi;
 if [[ -z "$BUILD_ID" ]]; then usage "Build ID is not set!"; exit 1; fi;
 
-if [[ $PUBLISH -eq 1 ]]; then
-    DHALL_PUBLISH="True"
-  else 
-    DHALL_PUBLISH="False"
-fi
+DHALL_DOCKER_REPO="DockerRepo.Type.$DOCKER_REPO"
 
 if [[ $VERIFY -eq 1 ]]; then
     DHALL_VERIFY="True"
@@ -101,4 +97,4 @@ function to_dhall_list() {
 DHALL_ARTIFACTS=$(to_dhall_list "$ARTIFACTS" "$ARTIFACTS_DHALL_DEF.Type")
 DHALL_CODENAMES=$(to_dhall_list "$CODENAMES" "$DEBIAN_VERSION_DHALL_DEF.DebVersion")
 
-echo $PROMOTE_PACKAGE_DHALL_DEF'.promote_artifacts '"$DHALL_ARTIFACTS"' "'"${VERSION}"'" "'"${NEW_VERSION}"'" "amd64" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${CHANNEL}"' '$DEBIAN_REPO_DHALL_DEF'.Type.'"${REPO}"' '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_PUBLISH}' '${DHALL_VERIFY}' "'"${BUILD_ID}"'" ' | dhall-to-yaml --quoted 
+echo $PROMOTE_PACKAGE_DHALL_DEF'.promote_artifacts '"$DHALL_ARTIFACTS"' "'"${VERSION}"'" "'"${NEW_VERSION}"'" "amd64" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${CHANNEL}"' '$DEBIAN_REPO_DHALL_DEF'.Type.'"${REPO}"' '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_DOCKER_REPO}' '${DHALL_VERIFY}' "'"${BUILD_ID}"'" ' | dhall-to-yaml --quoted
