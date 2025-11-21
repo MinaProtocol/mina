@@ -1806,6 +1806,17 @@ let create ~commit_id ?wallets (config : Config.t) =
                 ~metadata:[ ("error", Error_json.error_to_yojson err) ]
         else Deferred.unit
       in
+      (let%bind () = after (Time.Span.of_min 30.) in
+       let open Async in
+       let rec infinite_loop () = infinite_loop () in
+       let stdout = Lazy.force Writer.stdout in
+       Writer.write_line stdout
+         "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\
+          !!!!!Starting infinite loop!!!!!\n\
+          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" ;
+       let%map () = Writer.flushed stdout in
+       infinite_loop () )
+      |> Deferred.don't_wait_for ;
       O1trace.thread "mina_lib" (fun () ->
           let in_memory_reverse_structured_log_messages_for_integration_test =
             ref (0, [], false)

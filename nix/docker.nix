@@ -30,6 +30,7 @@ let
       cp scripts/healthcheck-utilities.sh $out/healthcheck/utilities.sh
       cp scripts/cron_job_dump_ledger.sh $out/cron_job_dump_ledger.sh
       cp scripts/daemon-entrypoint.sh $out/entrypoint.sh
+      cp scripts/freeze-alert.sh $out/freeze-alert.sh
       cp puppeteer-context/* $out/
       chmod -R +x $out/*
     '';
