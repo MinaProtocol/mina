@@ -3,35 +3,9 @@
 open Core_kernel
 open Async
 open Mina_base
-module Impl = Snark_worker.Impl
 
-module Worker_state = struct
-  module type S = sig
-    val perform_single :
-         Sok_message.t * Snark_work_lib.Spec.Single.Stable.Latest.t
-      -> (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t
-  end
-
-  (* bin_io required by rpc_parallel *)
-  type init_arg = Logger.t * Genesis_constants.Constraint_constants.t
-  [@@deriving bin_io_unversioned]
-
-  type t = (module S)
-
-  let create ~constraint_constants () : t Deferred.t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
-    Deferred.return
-      (let module M = struct
-         let perform_single (message, single_spec) =
-           let%bind (worker_state : Impl.Worker_state.t) =
-             Impl.Worker_state.create ~constraint_constants ~proof_level:Full
-               ~signature_kind ()
-           in
-           Impl.perform_single worker_state ~message single_spec
-       end in
-      (module M : S) )
-
-  let get = Fn.id
+open struct
+  module Impl = Snark_worker.Impl
 end
 
 module Worker = struct
@@ -46,7 +20,13 @@ module Worker = struct
           F.t
       }
 
-    module Worker_state = Worker_state
+    module Worker_state = struct
+      (* required by rpc_parallel *)
+      type init_arg = Logger.t * Genesis_constants.Constraint_constants.t
+      [@@deriving bin_io_unversioned]
+
+      include Impl.Worker_state
+    end
 
     module Connection_state = struct
       (* bin_io required by rpc_parallel *)
@@ -60,9 +40,8 @@ module Worker = struct
                with type worker_state := Worker_state.t
                 and type connection_state := Connection_state.t) =
     struct
-      let perform_single (w : Worker_state.t) msg_and_single_spec =
-        let (module M) = Worker_state.get w in
-        M.perform_single msg_and_single_spec
+      let perform_single (state : Worker_state.t) (message, single_spec) =
+        Impl.perform_single ~message state single_spec
 
       let functions =
         let f (i, o, f) =
@@ -82,7 +61,8 @@ module Worker = struct
 
       let init_worker_state (logger, constraint_constants) =
         [%log info] "Uptime SNARK worker started" ;
-        Worker_state.create ~constraint_constants ()
+        Worker_state.create ~constraint_constants ~proof_level:Full
+          ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
     end
