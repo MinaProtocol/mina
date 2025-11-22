@@ -65,8 +65,4 @@ module Stable = struct
   end
 end]
 
-type t = (Transaction_witness.t, Ledger_proof.Cached.t) Poly.t
-
-let read_all_proofs_from_disk : t -> Stable.Latest.t =
-  Poly.map ~f_witness:Transaction_witness.read_all_proofs_from_disk
-    ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+type t = Stable.Latest.t

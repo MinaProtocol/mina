@@ -27,11 +27,9 @@ type t =
       (Work.Spec.Single.t * Work.Id.Single.t * Mina_base.Sok_message.t) option
         (** When receving a `Two works from the underlying Work_selector, store
             one of them here, so we could schedule them to another worker. *)
-  ; proof_cache_db : Proof_cache_tag.cache_db
   }
 
 let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t)
-    ~(proof_cache_db : Proof_cache_tag.cache_db)
     ~(signature_kind : Mina_signature_kind.t) : t =
   let module T = Transaction_snark.Make (struct
     let constraint_constants = Genesis_constants.Compiled.constraint_constants
@@ -49,7 +47,6 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t)
   ; zkapp_jobs_sent_by_partitioner = Sent_zkapp_job_pool.create ()
   ; single_jobs_sent_by_partitioner = Sent_single_job_pool.create ()
   ; tmp_slot = None
-  ; proof_cache_db
   }
 
 (* TODO: Consider remove all works no longer relevant for current frontier,
@@ -157,17 +154,22 @@ let convert_single_work_from_selector ~(partitioner : t)
   | Transition (input, witness) -> (
       match witness.transaction with
       | Command (Zkapp_command zkapp_command) ->
-          let witness = Transaction_witness.read_all_proofs_from_disk witness in
+          (* TODO: remove this conversion *)
+          let zkapp_command =
+            Mina_base.Zkapp_command.write_all_proofs_to_disk
+              ~signature_kind:Mina_signature_kind.t_DEPRECATED
+              ~proof_cache_db:(Proof_cache_tag.create_identity_db ())
+              zkapp_command
+          in
+          (* TODO: we have read from disk followed by write to disk in shared
+             function followed by read from disk again. Should consider refactor
+             this. *)
           Snark_worker_shared.extract_zkapp_segment_works
             ~m:partitioner.transaction_snark ~input ~witness ~zkapp_command
           |> Result.map
                ~f:
                  (convert_zkapp_command_from_selector ~partitioner ~job ~pairing)
       | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
-          let job =
-            Work.With_job_meta.map
-              ~f_spec:Work.Spec.Single.read_all_proofs_from_disk job
-          in
           Sent_single_job_pool.add_now_exn ~id:pairing ~job
             ~message:
               "Id generator generated a repeated Id that happens to be \
@@ -175,10 +177,6 @@ let convert_single_work_from_selector ~(partitioner : t)
             partitioner.single_jobs_sent_by_partitioner ;
           Ok (Single job) )
   | Merge _ ->
-      let job =
-        Work.With_job_meta.map
-          ~f_spec:Work.Spec.Single.read_all_proofs_from_disk job
-      in
       Sent_single_job_pool.add_now_exn ~id:pairing ~job
         ~message:
           "Id generator generated a repeated Id that happens to be occupied by \
@@ -207,15 +205,6 @@ let consume_job_from_selector ~(partitioner : t)
     ~(sok_message : Mina_base.Sok_message.t)
     ~(instances : Work.Spec.Single.Stable.Latest.t One_or_two.t) :
     (Work.Spec.Partitioned.Stable.Latest.t, _) Result.t =
-  (* TODO: remove this conversion *)
-  let instances =
-    One_or_two.map
-      ~f:
-        (Work.Spec.Single.write_all_proofs_to_disk
-           ~signature_kind:Mina_signature_kind.t_DEPRECATED
-           ~proof_cache_db:partitioner.proof_cache_db )
-      instances
-  in
   let pairing_id = Id_generator.next_id partitioner.single_id_gen () in
   Hashtbl.add_exn partitioner.pairing_pool ~key:pairing_id
     ~data:(Combining_result.of_spec ~sok_message instances) ;
@@ -289,10 +278,8 @@ let submit_into_combining_result ~submitted_result ~partitioner
          pool, ignoring"
         ~metadata:
           [ ( "spec"
-            , One_or_two.to_yojson
-                Work.Spec.Single.(
-                  Fn.compose Stable.Latest.to_yojson read_all_proofs_from_disk)
-                spec )
+            , One_or_two.to_yojson Work.Spec.Single.Stable.Latest.to_yojson spec
+            )
           ; ( "result"
             , Work.Result.Single.Poly.to_yojson
                 (fun () -> `Null)

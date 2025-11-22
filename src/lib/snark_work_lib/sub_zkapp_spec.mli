@@ -27,7 +27,8 @@ end]
 type t =
   | Segment of
       { statement : Transaction_snark.Statement.With_sok.t
-      ; witness : Transaction_snark.Zkapp_command_segment.Witness.t
+      ; witness :
+          Transaction_snark.Zkapp_command_segment.Witness.Stable.Latest.t
       ; spec : Transaction_snark.Zkapp_command_segment.Basic.t
       }
-  | Merge of { proof1 : Ledger_proof.Cached.t; proof2 : Ledger_proof.Cached.t }
+  | Merge of { proof1 : Ledger_proof.t; proof2 : Ledger_proof.t }

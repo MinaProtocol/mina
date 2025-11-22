@@ -51,5 +51,5 @@ module Result = struct
     end
   end]
 
-  type t = (Spec.t, Ledger_proof.Cached.t) Work.Result.Stable.V1.t
+  type t = (Spec.t, Ledger_proof.t) Work.Result.Stable.V1.t
 end

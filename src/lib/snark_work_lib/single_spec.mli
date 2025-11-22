@@ -44,6 +44,4 @@ module Stable : sig
   end
 end]
 
-type t = (Transaction_witness.t, Ledger_proof.Cached.t) Poly.t
-
-val read_all_proofs_from_disk : t -> Stable.Latest.t
+type t = Stable.Latest.t

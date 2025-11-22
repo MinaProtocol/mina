@@ -39,8 +39,9 @@ let emit_single_metrics ~logger ~(single_spec : _ Single_spec.Poly.t) =
   emit_single_metrics_impl ~logger
     ~single_spec:
       (Single_spec.Poly.map ~f_proof:Fn.id
-         ~f_witness:(fun { Transaction_witness.transaction = tx; _ } ->
-           Transaction_type.of_transaction tx )
+         ~f_witness:(fun { Transaction_witness.Stable.Latest.transaction = tx
+                         ; _
+                         } -> Transaction_type.of_transaction tx )
          single_spec )
 
 let emit_single_metrics_stable ~logger ~(single_spec : _ Single_spec.Poly.t) =

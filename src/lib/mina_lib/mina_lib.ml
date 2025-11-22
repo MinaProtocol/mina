@@ -2165,7 +2165,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             Work_partitioner.create ~signature_kind
               ~reassignment_timeout:
                 (Time.Span.of_ms (Float.of_int config.work_reassignment_wait))
-              ~logger:config.logger ~proof_cache_db
+              ~logger:config.logger
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
           let%bind net =
