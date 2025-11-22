@@ -933,7 +933,7 @@ let work_selection_method t = t.config.work_selection_method
 let add_complete_work ~logger ~fee ~prover
     ~(results :
        ( Snark_work_lib.Spec.Single.t
-       , Ledger_proof.Cached.t )
+       , Ledger_proof.t )
        Snark_work_lib.Result.Single.Poly.t
        One_or_two.t ) t =
   let update_metrics () =
@@ -968,12 +968,8 @@ let add_complete_work ~logger ~fee ~prover
     Local_sink.push t.pipes.snark_local_sink
       ( Add_solved_work
           ( stmts
-          , Network_pool.Priced_proof.
-              { proof =
-                  proofs
-                  |> One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
-              ; fee = fee_with_prover
-              } )
+          , Network_pool.Priced_proof.{ proof = proofs; fee = fee_with_prover }
+          )
       , Result.iter_error ~f:(fun err ->
             (* Possible reasons of failure: receiving pipe's capacity exceeded,
                 fee that isn't the lowest, failure in verification or application to the pool *)
@@ -2187,7 +2183,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             Work_partitioner.create ~signature_kind
               ~reassignment_timeout:
                 (Time.Span.of_ms (Float.of_int config.work_reassignment_wait))
-              ~logger:config.logger ~proof_cache_db
+              ~logger:config.logger
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
           let%bind net =

@@ -50,7 +50,7 @@ let finalize_two ~submitted_result ~other_spec ~in_pool_result ~submitted_half
 
 let merge_single_result
     ~(submitted_result :
-       (unit, Ledger_proof.Cached.t) Snark_work_lib.Result.Single.Poly.t )
+       (unit, Ledger_proof.t) Snark_work_lib.Result.Single.Poly.t )
     ~(submitted_half : submitted_half) (current : t) : merge_outcome =
   match (current, submitted_half) with
   | Spec_only { spec = `One spec; sok_message = { fee; prover } }, `One ->

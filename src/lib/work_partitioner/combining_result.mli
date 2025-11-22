@@ -45,8 +45,7 @@ type merge_outcome =
     to combine what we have in pool, [t], with the incoming single result 
     [submitted_result] corresponding to incoming half [submitted_half] *)
 val merge_single_result :
-     submitted_result:
-       (unit, Ledger_proof.Cached.t) Snark_work_lib.Result.Single.Poly.t
+     submitted_result:(unit, Ledger_proof.t) Snark_work_lib.Result.Single.Poly.t
   -> submitted_half:submitted_half
   -> t
   -> merge_outcome
