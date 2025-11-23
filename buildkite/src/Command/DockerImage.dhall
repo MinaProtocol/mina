@@ -201,7 +201,6 @@ let generateStep =
                       ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                       ++  " && "
                       ++  buildDockerCmd
-                      ++  " && "
                       ++  maybeVerify
                     )
                 ]
@@ -222,7 +221,6 @@ let generateStep =
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "
                           ++  buildDockerCmd
-                          ++  " && "
                           ++  maybeStopDebianRepo
                           ++  maybeVerify
                         )
