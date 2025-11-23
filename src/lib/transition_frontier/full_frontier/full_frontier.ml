@@ -115,9 +115,7 @@ let find_protocol_state (t : t) hash =
       in
       With_hash.data s
   | Some breadcrumb ->
-      Some
-        ( breadcrumb |> Breadcrumb.block |> Mina_block.header
-        |> Mina_block.Header.protocol_state )
+      Some (Breadcrumb.protocol_state breadcrumb)
 
 let root t = find_exn ~message:"root" t t.root
 
@@ -234,8 +232,6 @@ let precomputed_values { context = (module Context); _ } =
 
 let genesis_constants { context = (module Context); _ } =
   Context.precomputed_values.genesis_constants
-
-let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
 
 let best_tip_path_length_exn { table; root; best_tip; _ } =
   let open Option.Let_syntax in
