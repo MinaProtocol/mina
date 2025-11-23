@@ -10,8 +10,12 @@
     , arm64 =
         "gcr.io/o1labs-192920/mina-toolchain@sha256:87aacba132ae682e82f7f3edac7764a3fef0613e64e7f219e6f1085171643b91"
     }
-, minaToolchainBullseye.amd64 =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:f78963ea2e89e855f5e3b8de614a061e4c1ffc6c1c5c0b68d6c9e6329bf581c9"
+, minaToolchainBullseye =
+    { amd64 =
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:f78963ea2e89e855f5e3b8de614a061e4c1ffc6c1c5c0b68d6c9e6329bf581c9"
+    , arm64 =
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:e52f6d919ed66aa94e3c9d5965ffc348be5082b1be4a34fcc85c6344f3c545a8"
+    }
 , minaToolchainNoble =
     { amd64 =
         "gcr.io/o1labs-192920/mina-toolchain@sha256:967431a014fbdf0d9d0628c37536575c9d018a7cbf91fab0c8da178127b74093"
