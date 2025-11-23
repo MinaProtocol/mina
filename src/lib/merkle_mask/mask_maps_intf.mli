@@ -1,36 +1,18 @@
 open Core_kernel
 
 module type Inputs_intf = sig
-  module Account : sig
-    type t
-  end
+  module Account : T
 
-  module Account_id : sig
-    type t
+  module Account_id : Comparable.S
 
-    include Comparable.S with type t := t
-  end
+  module Hash : T
 
-  module Hash : sig
-    type t
-  end
-
-  module Token_id : sig
-    type t
-
-    include Comparable.S with type t := t
-  end
+  module Token_id : Comparable.S
 
   module Location : sig
-    type t
+    include Comparable.S
 
-    include Comparable.S with type t := t
-
-    module Addr : sig
-      type t
-
-      include Comparable.S with type t := t
-    end
+    module Addr : Comparable.S
   end
 end
 
