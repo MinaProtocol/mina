@@ -107,6 +107,11 @@ let nameSuffix
                                                                      spec.buildFlags}${Arch.nameSuffix
                                                                                          spec.arch}"
 
+let sizeFromArch
+    : Arch.Type -> Size
+    =     \(arch : Arch.Type)
+      ->  merge { Arm64 = Size.Arm64, Amd64 = Size.XLarge } arch
+
 let build_artifacts
     : MinaBuildSpec.Type -> Command.Type
     =     \(spec : MinaBuildSpec.Type)
@@ -171,6 +176,8 @@ let docker_step
 
           let docker_publish = DockerPublish.Type.Essential
 
+          let size = sizeFromArch spec.arch
+
           in  merge
                 { Daemon =
                   [ DockerImage.ReleaseSpec::{
@@ -185,6 +192,7 @@ let docker_step
                     , deb_legacy_version = spec.deb_legacy_version
                     , verify = True
                     , arch = spec.arch
+                    , size = size
                     , if_ = spec.if_
                     }
                   ]
@@ -207,6 +215,7 @@ let docker_step
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
+                    , size = size
                     }
                   ]
                 , DaemonLegacyHardfork =
@@ -229,6 +238,7 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
+                    , size = size
                     }
                   ]
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
@@ -247,6 +257,7 @@ let docker_step
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
                     , if_ = spec.if_
+                    , size = size
                     }
                   ]
                 , Archive =
@@ -263,6 +274,7 @@ let docker_step
                     , verify = True
                     , arch = spec.arch
                     , if_ = spec.if_
+                    , size = size
                     }
                   ]
                 , Rosetta =
@@ -278,6 +290,7 @@ let docker_step
                     , verify = True
                     , arch = spec.arch
                     , if_ = spec.if_
+                    , size = size
                     }
                   ]
                 , ZkappTestTransaction =
@@ -292,6 +305,7 @@ let docker_step
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
                     , if_ = spec.if_
+                    , size = size
                     }
                   ]
                 , FunctionalTestSuite =
@@ -306,6 +320,7 @@ let docker_step
                     , deb_profile = spec.profile
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
+                    , size = size
                     , if_ = spec.if_
                     }
                   ]

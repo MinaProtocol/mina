@@ -8,6 +8,8 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Arch = ../../Constants/Arch.dhall
 
+let Size = ../../Command/Size.dhall
+
 in  MinaArtifactToolchain.pipeline
       DockerImage.ReleaseSpec::{
       , service = Artifacts.Type.Toolchain
@@ -15,4 +17,5 @@ in  MinaArtifactToolchain.pipeline
       , no_cache = True
       , no_debian = True
       , arch = Arch.Type.Arm64
+      , size = Size.Arm64
       }
