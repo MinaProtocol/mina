@@ -14,6 +14,7 @@ module type S = sig
 
   val root_length : t -> int
 
+  (* Primary needed for consensus state *)
   val root : t -> Breadcrumb.t
 
   val best_tip : t -> Breadcrumb.t
@@ -31,8 +32,6 @@ module type S = sig
     t -> State_hash.t -> Mina_state.Protocol_state.value option
 
   val successors : t -> Breadcrumb.t -> Breadcrumb.t list
-
-  val iter : t -> f:(Breadcrumb.t -> unit) -> unit
 
   val best_tip_path_length_exn : t -> int
 

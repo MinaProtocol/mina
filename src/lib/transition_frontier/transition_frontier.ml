@@ -535,8 +535,6 @@ include struct
 
   let visualize_to_string = proxy1 visualize_to_string
 
-  let iter = proxy1 iter
-
   let successors = proxy1 successors
 
   let hash_path = proxy1 hash_path
