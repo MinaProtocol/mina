@@ -50,7 +50,7 @@ let Spec =
           , timeout = 1000
           , profile = Profiles.Type.Devnet
           , scope = PipelineScope.Full
-          , repo = DockerRepo.Type.Internal
+          , repo = DockerRepo.Type.InternalEurope
           , if_ =
               "build.pull_request.base_branch != \"develop\" && build.branch != \"develop\""
           }

@@ -75,7 +75,7 @@ let ReleaseSpec =
           , docker_publish = DockerPublish.Type.Essential
           , no_cache = False
           , no_debian = False
-          , docker_repo = DockerRepo.Type.Internal
+          , docker_repo = DockerRepo.Type.InternalEurope
           , step_key_suffix = "-docker-image"
           , verify = False
           , deb_suffix = None Text
@@ -144,6 +144,7 @@ let generateStep =
                             , profile = spec.deb_profile
                             , buildFlag = spec.build_flags
                             , archs = [ spec.arch ]
+                            , repo = spec.docker_repo
                             }
 
                 else  ""
