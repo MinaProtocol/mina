@@ -164,6 +164,15 @@ let generateStep =
                       }
                       spec.size
 
+          let loadOnlyArg =
+                      if DockerPublish.shouldPublish
+                           spec.docker_publish
+                           spec.service
+
+                then  ""
+
+                else  " --load-only "
+
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
                 ++  " --service ${Artifacts.dockerName spec.service}"
@@ -184,29 +193,7 @@ let generateStep =
                 ++  " --repo ${spec.repo}"
                 ++  " --platform ${Arch.platform spec.arch}"
                 ++  " --docker-registry ${DockerRepo.show spec.docker_repo}"
-
-          let releaseDockerCmd =
-                      if DockerPublish.shouldPublish
-                           spec.docker_publish
-                           spec.service
-
-                then      "./scripts/docker/release.sh"
-                      ++  " --service ${Artifacts.dockerName spec.service}"
-                      ++  " --version ${spec.version}"
-                      ++  " --network ${Network.lowerName spec.network}"
-                      ++  " --deb-codename ${DebianVersions.lowerName
-                                               spec.deb_codename}"
-                      ++  " --deb-version ${spec.deb_version}"
-                      ++  " --deb-profile ${Profiles.lowerName
-                                              spec.deb_profile}"
-                      ++  " --deb-build-flags ${BuildFlags.lowerName
-                                                  spec.build_flags}"
-                      ++  " --platform ${Arch.platform spec.arch}"
-                      ++  " --docker-registry ${DockerRepo.show
-                                                  spec.docker_repo}"
-
-                else  " echo In order to ensure storage optimization, skipping publishing docker as this is not essential one or publishing is disabled . Docker publish setting is set to  ${DockerPublish.show
-                                                                                                                                                                                                spec.docker_publish}."
+                ++  loadOnlyArg
 
           let remoteRepoCmds =
                 [ Cmd.run
@@ -215,7 +202,6 @@ let generateStep =
                       ++  " && "
                       ++  buildDockerCmd
                       ++  " && "
-                      ++  releaseDockerCmd
                       ++  maybeVerify
                     )
                 ]
@@ -237,7 +223,6 @@ let generateStep =
                           ++  " && "
                           ++  buildDockerCmd
                           ++  " && "
-                          ++  releaseDockerCmd
                           ++  maybeStopDebianRepo
                           ++  maybeVerify
                         )
