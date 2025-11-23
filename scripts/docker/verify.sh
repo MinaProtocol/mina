@@ -7,7 +7,7 @@
 
 set -eo pipefail
 
-REPO=gcr.io/o1labs-192920
+REPO=""
 VERSION=3.0.0-f872d85
 ARCH=amd64
 
@@ -20,6 +20,21 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -a|--arch) ARCH="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
+
+if [[ -z "$PACKAGE" ]]; then
+  echo "❌  Package is not set! Use -p or --package to set it."
+  exit 1
+fi
+
+if [[ -z "$CODENAME" ]]; then
+  echo "❌  Codename is not set! Use -c or --codename to set it."
+  exit 1
+fi
+
+if [[ -z "$REPO" ]]; then
+  echo "❌  Repo is not set! Use -r or --repo to set it."
+  exit 1
+fi
 
 COMMANDS=(--version --help)
 

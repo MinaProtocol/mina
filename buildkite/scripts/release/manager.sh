@@ -51,8 +51,7 @@ DEFAULT_ARCHITECTURES="amd64"
 DEFAULT_PROFILE=devnet
 
 DEBIAN_CACHE_FOLDER=${DEBIAN_CACHE_FOLDER:-~/.release/debian/cache}
-GCR_REPO="gcr.io/o1labs-192920"
-DOCKER_IO_REPO="docker.io/minaprotocol"
+DEFAULT_DOCKER_REPO="gcr.io/o1labs-192920"
 DEBIAN_REPO=packages.o1test.net
 
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
@@ -187,17 +186,6 @@ function get_arch_suffix() {
     esac
 }
 
-function get_repo() {
-    local __publish_to_docker_io="$1"
-
-    if [[ $__publish_to_docker_io == 1 ]]; then
-        echo $DOCKER_IO_REPO
-    else
-        echo $GCR_REPO
-    fi
-
-}
-
 function get_artifact_with_suffix() {
     local __artifact=$1
     local __network="${2:-""}"
@@ -250,7 +238,7 @@ function extract_version_from_deb() {
 
 
 function calculate_docker_tag() {
-    local __publish_to_docker_io=$1
+    local __docker_repo=$1
     local __artifact=$2
     local __target_version=$3
     local __codename=$4
@@ -263,11 +251,7 @@ function calculate_docker_tag() {
     local __arch_suffix
     __arch_suffix=$(get_arch_suffix $__arch)
 
-    if [[ $__publish_to_docker_io == 1 ]]; then
-        echo "$DOCKER_IO_REPO/$__artifact:$__target_version-$__codename$__network_suffix$__arch_suffix"
-    else
-        echo "$GCR_REPO/$__artifact:$__target_version-$__codename$__network_suffix$__arch_suffix"
-    fi
+    echo "$__docker_repo/$__artifact:$__target_version-$__codename$__network_suffix$__arch_suffix"
 }
 
 function storage_list() {
@@ -498,10 +482,11 @@ function promote_and_verify_docker() {
     local __codename=$4
     local __network=$5
     local __profile=$6
-    local __publish_to_docker_io=$7
-    local __verify=$8
-    local __arch=$9
-    local __dry_run=${10}
+    local __source_docker_repo=$7
+    local __target_docker_repo=$8
+    local __verify=$9
+    local __arch=${10}
+    local __dry_run=${11}
 
     local __suffix
     __suffix=$(get_suffix $__artifact $__network $__profile)
@@ -509,16 +494,8 @@ function promote_and_verify_docker() {
     local __artifact_full_source_version=$__source_version-$__codename${__suffix}
     local __artifact_full_target_version=$__target_version-$__codename${__suffix}
 
-    if [[ $__publish_to_docker_io == 1 ]]; then
-        local __publish_arg="-p"
-        local __repo=$DOCKER_IO_REPO
-    else
-        local __publish_arg=""
-        local __repo=$GCR_REPO
-    fi
-
     echo " 🐋 Publishing $__artifact docker for '$__network' network and '$__codename' codename with '$__target_version' version and '$__arch' "
-    echo "    📦 Target version: $(calculate_docker_tag $__publish_to_docker_io $__artifact $__target_version $__codename $__network $__profile )"
+    echo "    📦 Target version: $(calculate_docker_tag $__target_docker_repo $__artifact $__target_version $__codename "$__network" "$__profile")"
     echo ""
     if [[ $__dry_run == 0 ]]; then
         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/promote.sh \
@@ -527,7 +504,8 @@ function promote_and_verify_docker() {
             -v $__artifact_full_source_version \
             -t $__artifact_full_target_version \
             -a $__arch \
-            $__publish_arg
+            --pull-registry $__source_docker_repo \
+            --push-registry $__target_docker_repo
 
             echo ""
 
@@ -541,7 +519,7 @@ function promote_and_verify_docker() {
                 -v "$__target_version" \
                 -c "$__codename" \
                 -s "$__suffix" \
-                -r "$__repo" \
+                -r "$__target_docker_repo" \
                 -a "$__arch"
 
             echo ""
@@ -624,7 +602,8 @@ function publish_help(){
     printf "  %-25s %s\n" "--target-version" "[path] target version of build to publish";
     printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal";
     printf "  %-25s %s\n" "--channel" "[string] target debian channel";
-    printf "  %-25s %s\n" "--publish-to-docker-io" "[bool] publish to docker.io instead of gcr.io";
+    printf "  %-25s %s\n" "--source-docker-repo" "[string] source docker repo. Default: $DEFAULT_DOCKER_REPO";
+    printf "  %-25s %s\n" "--target-docker-repo" "[string] target docker repo. Default: $DEFAULT_DOCKER_REPO";
     printf "  %-25s %s\n" "--only-dockers" "[bool] publish only docker images";
     printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages";
     printf "  %-25s %s\n" "--verify" "[bool] verify packages are published correctly. WARINING: it requires docker engine to be installed";
@@ -657,7 +636,8 @@ function publish(){
     local __target_version
     local __codenames="$DEFAULT_CODENAMES"
     local __channel
-    local __publish_to_docker_io=0
+    local __source_docker_repo=$DEFAULT_DOCKER_REPO
+    local __target_docker_repo=$DEFAULT_DOCKER_REPO
     local __only_dockers=0
     local __only_debians=0
     local __verify=0
@@ -704,9 +684,13 @@ function publish(){
                 __channel=${2:?$error_message}
                 shift 2;
             ;;
-            --publish-to-docker-io )
-                __publish_to_docker_io=1
-                shift 1;
+            --source-docker-repo )
+                __source_docker_repo=${2:?$error_message}
+                shift 2;
+            ;;
+            --target-docker-repo )
+                __target_docker_repo=${2:?$error_message}
+                shift 2;
             ;;
             --only-dockers )
                 __only_dockers=1
@@ -789,7 +773,7 @@ function publish(){
     echo " - Target version: $__target_version"
     echo " - Publishing codenames: $__codenames"
     echo " - Target channel: $__channel"
-    echo " - Publish to docker.io: $__publish_to_docker_io"
+    echo " - Docker repository: $__source_docker_repo -> $__target_docker_repo"
     echo " - Only dockers: $__only_dockers"
     echo " - Only debians: $__only_debians"
     echo " - Verify: $__verify"
@@ -890,7 +874,7 @@ function publish(){
                                     fi
 
                                     if [[ $__only_debians == 0 ]]; then
-                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__publish_to_docker_io $__verify $__arch $__dry_run
+                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__source_docker_repo $__target_docker_repo $__verify $__arch $__dry_run
                                     fi
                                 done
                             ;;
@@ -914,7 +898,7 @@ function publish(){
                                     fi
 
                                     if [[ $__only_debians == 0 ]]; then
-                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__publish_to_docker_io $__verify $__arch $__dry_run
+                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__source_docker_repo $__target_docker_repo $__verify $__arch $__dry_run
                                     fi
                                 done
                             ;;
@@ -938,7 +922,7 @@ function publish(){
                                     fi
 
                                     if [[ $__only_debians == 0 ]]; then
-                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__publish_to_docker_io $__verify $__arch $__dry_run
+                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__source_docker_repo $__target_docker_repo $__verify $__arch $__dry_run
                                     fi
                                 done
                             ;;
@@ -968,6 +952,7 @@ function promote_help(){
     echo ""
     printf "  %-25s %s\n" "-h  | --help" "show help";
     printf "  %-25s %s\n" "--arch" "[string] target architecture. Default: $DEFAULT_ARCHITECTURES";
+    printf "  %-25s %s\n" "--profile" "[string] build profile to publish. e.g lightnet, mainnet. default: $DEFAULT_PROFILE";
     printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to publish. e.g mina-logproc,mina-archive,mina-rosetta";
     printf "  %-25s %s\n" "--networks" "[comma separated list] list of networks to publish. e.g devnet,mainnet";
     printf "  %-25s %s\n" "--source-version" "[path] source version of build to publish";
@@ -975,7 +960,8 @@ function promote_help(){
     printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal";
     printf "  %-25s %s\n" "--source-channel" "[string] source debian channel";
     printf "  %-25s %s\n" "--target-channel" "[string] target debian channel";
-    printf "  %-25s %s\n" "--publish-to-docker-io" "[bool] publish to docker.io instead of gcr.io";
+    printf "  %-25s %s\n" "--source-docker-repo" "[string] source docker repo. Default: $DEFAULT_DOCKER_REPO";
+    printf "  %-25s %s\n" "--target-docker-repo" "[string] target docker repo. Default: $DEFAULT_DOCKER_REPO";
     printf "  %-25s %s\n" "--only-dockers" "[bool] publish only docker images";
     printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages";
     printf "  %-25s %s\n" "--verify" "[bool] verify packages are published correctly. WARINING: it requires docker engine to be installed";
@@ -1005,7 +991,8 @@ function promote(){
     local __strip_network_from_archive=0
     local __source_channel
     local __target_channel
-    local __publish_to_docker_io=0
+    local __source_docker_repo="$DEFAULT_DOCKER_REPO"
+    local __target_docker_repo="$DEFAULT_DOCKER_REPO"
     local __only_dockers=0
     local __only_debians=0
     local __verify=0
@@ -1013,6 +1000,7 @@ function promote(){
     local __debian_repo=$DEBIAN_REPO
     local __debian_sign_key=""
     local __arch="$DEFAULT_ARCHITECTURES"
+    local __profile="$DEFAULT_PROFILE"
 
 
     while [ ${#} -gt 0 ]; do
@@ -1049,9 +1037,13 @@ function promote(){
                 __target_channel=${2:?$error_message}
                 shift 2;
             ;;
-            --publish-to-docker-io )
-                __publish_to_docker_io=1
-                shift 1;
+            --source-docker-repo )
+                __source_docker_repo=${2:?$error_message}
+                shift 2;
+            ;;
+            --target-docker-repo )
+                __target_docker_repo=${2:?$error_message}
+                shift 2;
             ;;
             --only-dockers )
                 __only_dockers=1
@@ -1083,6 +1075,10 @@ function promote(){
             ;;
             --arch )
                 __arch=${2:?$error_message}
+                shift 2;
+            ;;
+            --profile )
+                __profile=${2:?$error_message}
                 shift 2;
             ;;
             * )
@@ -1132,7 +1128,8 @@ function promote(){
             echo " - Target version: $__target_version"
         fi
     fi
-    echo " - Publish to docker.io: $__publish_to_docker_io"
+    echo " - Source Docker repo: $__source_docker_repo"
+    echo " - Target Docker repo: $__target_docker_repo"
     echo " - Only dockers: $__only_dockers"
     echo " - Only debians: $__only_debians"
     echo " - Verify: $__verify"
@@ -1148,7 +1145,7 @@ function promote(){
 
     if [[ $__source_version == "$__target_version" ]]; then
         echo " ⚠️  Warning: Source version and target version are the same.
-    Script will do promotion but it won't have an effect at the end unless you are publishing dockers from gcr.io to docker.io ..."
+    Script will do promotion but it won't have an effect at the end unless you are publishing dockers..."
         echo ""
     fi
 
@@ -1202,7 +1199,7 @@ function promote(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__publish_to_docker_io $__verify $__arch $__dry_run
+                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__source_docker_repo $__target_docker_repo $__verify $__arch $__dry_run
                                 fi
                             done
                         ;;
@@ -1225,7 +1222,7 @@ function promote(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__publish_to_docker_io $__verify $__arch $__dry_run
+                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__source_docker_repo $__target_docker_repo $__verify $__arch $__dry_run
                                 fi
                             done
                         ;;
@@ -1247,7 +1244,7 @@ function promote(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__publish_to_docker_io $__verify $__arch $__dry_run
+                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__source_docker_repo $__target_docker_repo $__verify $__arch $__dry_run
                                 fi
                             done
                         ;;
@@ -1282,7 +1279,7 @@ function verify_help(){
     printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal";
     printf "  %-25s %s\n" "--channel" "[string] target debian channel";
     printf "  %-25s %s\n" "--debian-repo" "[string] debian repository. default: $DEBIAN_REPO";
-    printf "  %-25s %s\n" "--docker-io" "[bool] publish to docker.io instead of gcr.io";
+    printf "  %-25s %s\n" "--docker-repo" "[string] docker repo. Default: $DEFAULT_DOCKER_REPO";
     printf "  %-25s %s\n" "--only-dockers" "[bool] publish only docker images";
     printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages";
     printf "  %-25s %s\n" "--arch" "[string] architecture (amd64 or arm64)";
@@ -1334,13 +1331,13 @@ function verify(){
     local __version
     local __codenames="$DEFAULT_CODENAMES"
     local __channel="unstable"
-    local __docker_io=0
     local __only_dockers=0
     local __only_debians=0
     local __debian_repo=$DEBIAN_REPO
     local __debian_repo_signed=0
     local __archs="$DEFAULT_ARCHITECTURES"
     local __profile=$DEFAULT_PROFILE
+    local __docker_repo="$DEFAULT_DOCKER_REPO"
     local __build_flag=""
 
     while [ ${#} -gt 0 ]; do
@@ -1377,8 +1374,8 @@ function verify(){
                 __signed_debian_repo=1
                 shift 1;
             ;;
-            --docker-io )
-                __publish_to_docker_io=1
+            --docker-repo )
+                __docker_repo=${2:?$error_message}
                 shift 1;
             ;;
             --only-dockers )
@@ -1415,7 +1412,7 @@ function verify(){
     echo " - Networks: $__networks"
     echo " - Version: $__version"
     echo " - Promoting codenames: $__codenames"
-    echo " - Published to docker.io: $__docker_io"
+    echo " - Docker repo: $__docker_repo"
     echo " - Debian repo: $__debian_repo"
     echo " - Debian repos is signed: $__debian_repo_signed"
     echo " - Channel: $__channel"
@@ -1436,8 +1433,6 @@ function verify(){
     read -r -a __networks_arr <<< "$__networks"
     read -r -a __codenames_arr <<< "$__codenames"
     read -r -a __archs_arr <<< "$__archs"
-    local __repo
-    __repo=$(get_repo $__docker_io)
 
     for __arch in "${__archs_arr[@]}"; do
         echo " 🖥️  Verifying for architecture: $__arch"
@@ -1489,14 +1484,14 @@ function verify(){
 
                                     if [[ $__only_debians == 0 ]]; then
 
-                                        echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $artifact $__version $__codename "$network" "$__arch")"
+                                        echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_repo" $artifact $__version $__codename "$network" "$__arch")"
 
                                         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
                                             -p "$artifact" \
                                             -v $__version \
                                             -c "$__codename" \
                                             -s "$__docker_suffix_combined" \
-                                            -r "$__repo"  \
+                                            -r "$__docker_repo"  \
                                             -a "$__arch"
 
                                         echo ""
@@ -1530,7 +1525,7 @@ function verify(){
 
                                     if [[ $__only_debians == 0 ]]; then
 
-                                        echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename $network "$__arch" )"
+                                        echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_repo" $__artifact_full_name $__version $__codename $network "$__arch" )"
                                         echo ""
 
                                         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
@@ -1538,7 +1533,7 @@ function verify(){
                                             -v $__version \
                                             -c "$__codename" \
                                             -s "$__docker_suffix_combined" \
-                                            -r "$__repo" \
+                                            -r "$__docker_repo" \
                                             -a "$__arch"
 
                                         echo ""
@@ -1570,14 +1565,14 @@ function verify(){
                                     fi
 
                                     if [[ $__only_debians == 0 ]]; then
-                                        echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename "$network" "$__arch" )"
+                                        echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_repo" $__artifact_full_name $__version $__codename "$network" "$__arch" )"
                                     echo ""
                                         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
                                             -p "$artifact" \
                                             -v $__version \
                                             -c "$__codename" \
                                             -s "$__docker_suffix_combined" \
-                                            -r "$__repo" \
+                                            -r "$__docker_repo" \
                                             -a "$__arch"
 
                                         echo ""

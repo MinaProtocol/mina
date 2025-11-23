@@ -20,6 +20,8 @@ let DockerLogin = ../Command/DockerLogin/Type.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
+let DockerRepo = ../Constants/DockerRepo.dhall
+
 let DebianVersions = ../Constants/DebianVersions.dhall
 
 let Network = ../Constants/Network.dhall
@@ -51,6 +53,7 @@ let ReleaseSpec =
           , build_flags : BuildFlags.Type
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
+          , docker_repo : DockerRepo.Type
           , verify : Bool
           , if_ : Optional B/If
           }
@@ -72,6 +75,7 @@ let ReleaseSpec =
           , docker_publish = DockerPublish.Type.Essential
           , no_cache = False
           , no_debian = False
+          , docker_repo = DockerRepo.Type.Internal
           , step_key_suffix = "-docker-image"
           , verify = False
           , deb_suffix = None Text
@@ -166,6 +170,7 @@ let generateStep =
                 ++  debSuffix
                 ++  " --repo ${spec.repo}"
                 ++  " --platform ${Arch.platform spec.arch}"
+                ++  " --docker-registry ${DockerRepo.show spec.docker_repo}"
 
           let releaseDockerCmd =
                       if DockerPublish.shouldPublish
@@ -184,6 +189,8 @@ let generateStep =
                       ++  " --deb-build-flags ${BuildFlags.lowerName
                                                   spec.build_flags}"
                       ++  " --platform ${Arch.platform spec.arch}"
+                      ++  " --docker-registry ${DockerRepo.show
+                                                  spec.docker_repo}"
 
                 else  " echo In order to ensure storage optimization, skipping publishing docker as this is not essential one or publishing is disabled . Docker publish setting is set to  ${DockerPublish.show
                                                                                                                                                                                                 spec.docker_publish}."

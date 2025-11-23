@@ -70,6 +70,9 @@ func init() {
 	// Script directory configuration
 	rootCmd.Flags().StringVar(&cfg.ScriptDir, "script-dir", cfg.ScriptDir, "Path to the hardfork script directory")
 
+	// Network root dir
+	rootCmd.Flags().StringVar(&cfg.Root, "root", cfg.Root, "Directory in which to create a network, please use absolute path")
+
 	// Shutdown timeout configuration
 	rootCmd.Flags().IntVar(&cfg.ShutdownTimeoutMinutes, "shutdown-timeout", cfg.ShutdownTimeoutMinutes, "Timeout in minutes to wait for graceful shutdown before forcing kill")
 

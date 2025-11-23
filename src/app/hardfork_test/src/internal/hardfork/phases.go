@@ -8,18 +8,14 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) ([]byte, *BlockA
 	if err != nil {
 		return nil, nil, err
 	}
-	defer func() {
-		// Stop nodes first via daemon commands
-		t.StopNodes(t.Config.MainMinaExe)
-		// Then wait for graceful shutdown with timeout
-		t.gracefulShutdown(mainNetCmd, "Main network")
-	}()
+
+	defer t.gracefulShutdown(mainNetCmd, "Main network")
 
 	// Wait until best chain query time
 	t.WaitUntilBestChainQuery(t.Config.MainSlot, t.Config.MainDelay)
 
 	// Check block height at slot BestChainQueryFrom
-	blockHeight, err := t.Client.GetHeight(10303)
+	blockHeight, err := t.Client.GetHeight(t.AnyPortOfType(PORT_REST))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -32,7 +28,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) ([]byte, *BlockA
 	}
 
 	// Analyze blocks and get genesis epoch data
-	analysis, err := t.AnalyzeBlocks([]int{10303, 10313})
+	analysis, err := t.AnalyzeBlocks()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -48,12 +44,12 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) ([]byte, *BlockA
 	}
 
 	// Validate no new blocks are created after chain end
-	if err := t.ValidateNoNewBlocks(10303); err != nil {
+	if err := t.ValidateNoNewBlocks(t.AnyPortOfType(PORT_REST)); err != nil {
 		return nil, nil, err
 	}
 
 	// Extract fork config before nodes shutdown
-	forkConfigBytes, err := t.GetForkConfig(10313)
+	forkConfigBytes, err := t.GetForkConfig(t.AnyPortOfType(PORT_REST))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -68,18 +64,14 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, configFile, 
 	if err != nil {
 		return err
 	}
-	defer func() {
-		// Stop nodes first via daemon commands
-		t.StopNodes(t.Config.ForkMinaExe)
-		// Then wait for graceful shutdown with timeout
-		t.gracefulShutdown(forkCmd, "Fork network")
-	}()
+
+	defer t.gracefulShutdown(forkCmd, "Fork network")
 
 	// Calculate expected genesis slot
 	expectedGenesisSlot := (forkGenesisTs - mainGenesisTs) / int64(t.Config.MainSlot)
 
 	// Validate fork network blocks
-	if err := t.ValidateFirstBlockOfForkChain(10303, latestPreForkHeight, expectedGenesisSlot); err != nil {
+	if err := t.ValidateFirstBlockOfForkChain(t.AnyPortOfType(PORT_REST), latestPreForkHeight, expectedGenesisSlot); err != nil {
 		return err
 	}
 
@@ -87,7 +79,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, configFile, 
 	t.WaitUntilBestChainQuery(t.Config.ForkSlot, t.Config.ForkDelay)
 
 	// Check block height at slot BestChainQueryFrom
-	blockHeight, err := t.Client.GetHeight(10303)
+	blockHeight, err := t.Client.GetHeight(t.AnyPortOfType(PORT_REST))
 	if err != nil {
 		return err
 	}
@@ -100,7 +92,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, configFile, 
 	}
 
 	// Validate user commands in blocks
-	if err := t.ValidateBlockWithUserCommandCreated(10303); err != nil {
+	if err := t.ValidateBlockWithUserCommandCreated(t.AnyPortOfType(PORT_REST)); err != nil {
 		return err
 	}
 
