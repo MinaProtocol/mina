@@ -94,6 +94,15 @@ let command_hashes
   Mina_block.Validated.body validated_transition
   |> Body.staged_ledger_diff |> Staged_ledger_diff.command_hashes
 
+let valid_commands_hashed (t : T.t) =
+  List.map2_exn (Mina_block.Validated.valid_commands t.validated_transition)
+    (command_hashes t) ~f:(fun command hash ->
+      With_status.map command
+        ~f:
+          (Fn.flip
+             Mina_transaction.Transaction_hash.User_command_with_valid_signature
+             .make hash ) )
+
 (* TODO: for better efficiency, add set of tx hashes to `maps_t`
    and use existing mechanism of mask handling to get accumulated lookups,
    then in transaction_status it will be necessary to only traverse
