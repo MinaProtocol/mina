@@ -53,7 +53,7 @@
      -w 2 \
      -f 1 \
      -n 1 \
-     -u \
+     -u delay_sec:0 \
      -ll Trace \
      -fll Trace \
      -a
@@ -131,7 +131,7 @@ Then you will need to run the network manager script with additional `-pl` argum
   -w 2 \
   -f 1 \
   -n 1 \
-  -u \
+  -u delay_sec:0 \
   -ll Trace \
   -fll Trace \
   -pl none \

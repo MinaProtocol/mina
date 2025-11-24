@@ -100,7 +100,8 @@ let genesis_root_data ~precomputed_values =
 let load_from_persistence_and_start ~context:(module Context : CONTEXT)
     ~verifier ~consensus_local_state ~max_length ~persistent_root
     ~persistent_root_instance ~persistent_frontier ~persistent_frontier_instance
-    ~catchup_mode ignore_consensus_local_state =
+    ~catchup_mode ?max_frontier_depth ?(set_best_tip = true)
+    ignore_consensus_local_state =
   let open Context in
   let open Deferred.Result.Let_syntax in
   let root_identifier =
@@ -132,24 +133,30 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
             "Unable to fast forward persistent frontier: %s" msg ;
           Error (`Failure msg) )
   in
-  let%bind full_frontier, extensions =
-    O1trace.thread "persistent_frontier_read_from_disk" (fun () ->
-        let open Deferred.Let_syntax in
-        match%map
-          Persistent_frontier.Instance.load_full_frontier
-            ~context:(module Context)
-            persistent_frontier_instance ~max_length
-            ~root_ledger:
-              (Persistent_root.Instance.snarked_ledger persistent_root_instance)
-            ~consensus_local_state ~ignore_consensus_local_state
-            ~persistent_root_instance
-        with
-        | Error `Sync_cannot_be_running ->
-            Error (`Failure "sync job is already running on persistent frontier")
-        | Error (`Failure _) as err ->
-            err
-        | Ok result ->
-            Ok result )
+  let%bind root_ledger, best_tip_hash, full_frontier, extensions =
+    O1trace.thread "persistent_frontier_read_from_disk"
+    @@ fun () ->
+    match%map.Deferred
+      Persistent_frontier.Instance.load_full_frontier
+        ~context:(module Context)
+        persistent_frontier_instance ~max_length
+        ~root_ledger:
+          (Persistent_root.Instance.snarked_ledger persistent_root_instance)
+        ~consensus_local_state ~ignore_consensus_local_state
+        ~persistent_root_instance ?max_frontier_depth ()
+    with
+    | Error `Sync_cannot_be_running ->
+        Error (`Failure "sync job is already running on persistent frontier")
+    | Error (`Failure _) as err ->
+        err
+    | Ok result ->
+        Ok result
+  in
+  let%bind () =
+    if set_best_tip then
+      Persistent_frontier.Instance.set_best_tip ~logger ~frontier:full_frontier
+        ~extensions ~ignore_consensus_local_state ~root_ledger best_tip_hash
+    else return ()
   in
   [%log info] "Loaded full frontier and extensions" ;
   let%map () =
@@ -193,11 +200,13 @@ let rec load_with_max_length :
        context:(module CONTEXT)
     -> max_length:int
     -> ?retry_with_fresh_db:bool
+    -> ?max_frontier_depth:int
     -> verifier:Verifier.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
     -> catchup_mode:[ `Super ]
+    -> ?set_best_tip:bool
     -> unit
     -> ( t
        , [> `Bootstrap_required
@@ -206,8 +215,9 @@ let rec load_with_max_length :
          | `Failure of string ] )
        Deferred.Result.t =
  fun ~context:(module Context : CONTEXT) ~max_length
-     ?(retry_with_fresh_db = true) ~verifier ~consensus_local_state
-     ~persistent_root ~persistent_frontier ~catchup_mode () ->
+     ?(retry_with_fresh_db = true) ?max_frontier_depth ~verifier
+     ~consensus_local_state ~persistent_root ~persistent_frontier ~catchup_mode
+     ?set_best_tip () ->
   let open Context in
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
@@ -238,7 +248,8 @@ let rec load_with_max_length :
             ~context:(module Context)
             ~verifier ~consensus_local_state ~max_length ~persistent_root
             ~persistent_root_instance ~catchup_mode ~persistent_frontier
-            ~persistent_frontier_instance ignore_consensus_local_state
+            ~persistent_frontier_instance ?max_frontier_depth ?set_best_tip
+            ignore_consensus_local_state
         with
         | Ok _ as result ->
             [%str_log trace] Persisted_frontier_loaded ;
@@ -370,9 +381,9 @@ let rec load_with_max_length :
           [%str_log trace] Transition_frontier_loaded_from_persistence ;
           return res )
 
-let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
-    ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
-    ~catchup_mode () =
+let load ?(retry_with_fresh_db = true) ?max_frontier_depth ?set_best_tip
+    ~context:(module Context : CONTEXT) ~verifier ~consensus_local_state
+    ~persistent_root ~persistent_frontier ~catchup_mode () =
   let open Context in
   O1trace.thread "transition_frontier_load" (fun () ->
       let max_length =
@@ -381,8 +392,9 @@ let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
       in
       load_with_max_length
         ~context:(module Context)
-        ~max_length ~retry_with_fresh_db ~verifier ~consensus_local_state
-        ~persistent_root ~persistent_frontier ~catchup_mode () )
+        ~max_length ~retry_with_fresh_db ?max_frontier_depth ~verifier
+        ~consensus_local_state ~persistent_root ~persistent_frontier
+        ~catchup_mode ?set_best_tip () )
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
@@ -525,8 +537,6 @@ include struct
 
   let iter = proxy1 iter
 
-  let common_ancestor = proxy1 common_ancestor
-
   let successors = proxy1 successors
 
   let hash_path = proxy1 hash_path
@@ -540,9 +550,6 @@ include struct
   let precomputed_values = proxy1 precomputed_values
 
   let genesis_constants = proxy1 genesis_constants
-
-  (* TODO: find -> option externally, find_exn internally *)
-  let find_exn = proxy1 find_exn
 
   (* TODO: is this an abstraction leak? *)
   let root_length = proxy1 root_length
@@ -570,8 +577,6 @@ module For_tests = struct
   let proxy2 f { full_frontier = x; _ } { full_frontier = y; _ } = f x y
 
   let equal = proxy2 equal
-
-  let load_with_max_length = load_with_max_length
 
   let rec deferred_rose_tree_iter (Mina_stdlib.Rose_tree.T (root, trees)) ~f =
     let%bind () = f root in

@@ -252,6 +252,16 @@ let convert_chain_to_canonical ~postgres_uri ~latest_block_state_hash
         (Sql.blocks_between_both_inclusive ~oldest_block_id:oldest_block.id
            ~latest_block_id:latest_block.id )
   in
+
+  let () =
+    printf "Blocks to ensure canonical (%d blocks):\n"
+      (List.length blocks_to_ensure_canonical) ;
+    List.iter blocks_to_ensure_canonical ~f:(fun b ->
+        printf "  - id: %d, state_hash: %s, height: %Ld, protocol_version: %s\n"
+          b.id b.state_hash b.height
+          (Sql.Protocol_version.to_string b.protocol_version) )
+  in
+
   let%bind.Deferred.Or_error () =
     match blocks_to_ensure_canonical with
     | [] ->
@@ -301,6 +311,6 @@ let convert_chain_to_canonical ~postgres_uri ~latest_block_state_hash
     query_db
       ~f:
         (Sql.mark_pending_blocks_as_canonical_or_orphaned ~canonical_block_ids
-           ~stop_at_slot )
+           ~stop_at_slot ~protocol_version:expected_protocol_version )
   in
   Ok ()

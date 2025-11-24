@@ -81,6 +81,27 @@ val skip_time_received_validation :
      , 'f )
      with_header
 
+val validate_genesis_protocol_state_block :
+     genesis_state_hash:State_hash.t
+  -> ( 'a
+     , [ `Genesis_state ] * unit Mina_stdlib.Truth.false_t
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_block
+  -> ( ( 'a
+       , [ `Genesis_state ] * unit Mina_stdlib.Truth.true_t
+       , 'b
+       , 'c
+       , 'd
+       , 'e
+       , 'f )
+       with_block
+     , [> `Invalid_genesis_protocol_state ] )
+     Result.t
+
 val validate_genesis_protocol_state :
      genesis_state_hash:State_hash.t
   -> ( 'a

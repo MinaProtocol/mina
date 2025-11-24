@@ -2833,7 +2833,8 @@ module Block = struct
 
   let add_parts_if_doesn't_exist ~logger (module Conn : Mina_caqti.CONNECTION)
       ~constraint_constants ~protocol_state ~staged_ledger_diff
-      ~protocol_version ~proposed_protocol_version ~hash ~v1_transaction_hash =
+      ~protocol_version ~proposed_protocol_version ~hash ~v1_transaction_hash
+      ~accounts_accessed ~accounts_created =
     let open Deferred.Result.Let_syntax in
     match%bind find_opt (module Conn) ~state_hash:hash with
     | Some block_id ->
@@ -2995,6 +2996,17 @@ module Block = struct
                 Transaction_status.Failure.Collection.to_display failures
               in
               (failed_str, Some display)
+        in
+        let%bind _accounts_accessed =
+          Accounts_accessed.add_accounts_if_don't_exist
+            (module Conn)
+            block_id accounts_accessed
+        in
+
+        let%bind _accounts_created =
+          Accounts_created.add_accounts_created_if_don't_exist
+            (module Conn)
+            block_id accounts_created
         in
         let%bind _seq_no =
           Metrics.time ~label:"adding_transactions" ~logger
@@ -4467,17 +4479,8 @@ let retry ~f ~logger ~error_str retries =
   go retries
 
 let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
-    ~hash ~delete_older_than ~accounts_accessed ~accounts_created ~tokens_used
-    block =
+    ~hash ~delete_older_than ~tokens_used block =
   let state_hash = hash block in
-
-  (* the block itself is added in a single transaction with a transaction block
-
-     once that transaction is committed, we can get a block id
-
-     so we add accounts accessed, accounts created, contained in another
-     transaction block
-  *)
   let add () =
     [%log info]
       "Populating token owners table for block with state hash $state_hash"
@@ -4546,71 +4549,15 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
                     ; ("error", `String (Caqti_error.show err))
                     ] ;
                 Conn.rollback ()
-            | Ok () -> (
+            | Ok () ->
                 (* added block data, now add accounts accessed *)
                 [%log info]
                   "Added block with state hash $state_hash to archive database"
                   ~metadata:
                     [ ("state_hash", State_hash.to_yojson state_hash)
-                    ; ( "num_accounts_accessed"
-                      , `Int (List.length accounts_accessed) )
+                    ; ("block_id", `Int block_id)
                     ] ;
-                let%bind.Deferred.Result () = Conn.start () in
-                match%bind
-                  Mina_caqti.Pool.use
-                    (fun (module Conn : Mina_caqti.CONNECTION) ->
-                      Accounts_accessed.add_accounts_if_don't_exist
-                        (module Conn)
-                        block_id accounts_accessed )
-                    pool
-                with
-                | Error err ->
-                    [%log error]
-                      "Could not add accounts accessed in block with state \
-                       hash $state_hash to archive database: $error"
-                      ~metadata:
-                        [ ("state_hash", State_hash.to_yojson state_hash)
-                        ; ("error", `String (Caqti_error.show err))
-                        ] ;
-                    Conn.rollback ()
-                | Ok _block_and_account_ids -> (
-                    [%log info]
-                      "Added accounts accessed for block with state hash \
-                       $state_hash to archive database"
-                      ~metadata:
-                        [ ("state_hash", State_hash.to_yojson state_hash)
-                        ; ( "num_accounts_accessed"
-                          , `Int (List.length accounts_accessed) )
-                        ] ;
-                    match%bind
-                      Mina_caqti.Pool.use
-                        (fun (module Conn : Mina_caqti.CONNECTION) ->
-                          Accounts_created.add_accounts_created_if_don't_exist
-                            (module Conn)
-                            block_id accounts_created )
-                        pool
-                    with
-                    | Ok _block_and_public_key_ids ->
-                        [%log info]
-                          "Added accounts created for block with state hash \
-                           $state_hash to archive database"
-                          ~metadata:
-                            [ ( "state_hash"
-                              , Mina_base.State_hash.to_yojson (hash block) )
-                            ; ( "num_accounts_created"
-                              , `Int (List.length accounts_created) )
-                            ] ;
-                        Conn.commit ()
-                    | Error err ->
-                        [%log warn]
-                          "Could not add accounts created in block with state \
-                           hash $state_hash to archive database: $error"
-                          ~metadata:
-                            [ ("state_hash", State_hash.to_yojson state_hash)
-                            ; ("error", `String (Caqti_error.show err))
-                            ] ;
-
-                        Conn.rollback () ) ) ) )
+                Deferred.return (Ok ()) ) )
       pool
   in
   retry ~f:add ~logger ~error_str:"add_block_aux" retries
@@ -4618,13 +4565,15 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
 (* used by `archive_blocks` app *)
 let add_block_aux_precomputed ~proof_cache_db ~constraint_constants ~logger
     ?retries ~pool ~delete_older_than block =
+  (* Now the function signature of add_block_aux is weird here. We should
+     consider further refactor to decouple the logic.*)
   add_block_aux ~logger ?retries ~pool ~delete_older_than
     ~add_block:
-      (Block.add_from_precomputed ~logger ~proof_cache_db ~constraint_constants)
+      (Block.add_from_precomputed ~logger ~proof_cache_db ~constraint_constants
+         ~accounts_accessed:block.Precomputed.accounts_accessed
+         ~accounts_created:block.Precomputed.accounts_created )
     ~hash:(fun block ->
       (block.Precomputed.protocol_state |> Protocol_state.hashes).state_hash )
-    ~accounts_accessed:block.Precomputed.accounts_accessed
-    ~accounts_created:block.Precomputed.accounts_created
     ~tokens_used:block.Precomputed.tokens_used block
 
 (* used by `archive_blocks` app *)
@@ -4635,8 +4584,6 @@ let add_block_aux_extensional ~proof_cache_db ~logger ~signature_kind ?retries
       (Block.add_from_extensional ~logger ~proof_cache_db
          ~v1_transaction_hash:false ~signature_kind )
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
-    ~accounts_accessed:block.Extensional.Block.accounts_accessed
-    ~accounts_created:block.Extensional.Block.accounts_created
     ~tokens_used:block.Extensional.Block.tokens_used block
 
 (* receive blocks from a daemon, write them to the database *)
@@ -4648,6 +4595,7 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
           { block; accounts_accessed; accounts_created; tokens_used; _ } ) -> (
         let add_block =
           Block.add_if_doesn't_exist ~logger ~constraint_constants
+            ~accounts_accessed ~accounts_created
         in
         let hash = State_hash.With_state_hashes.state_hash in
         let signature_kind = Mina_signature_kind.t_DEPRECATED in
@@ -4660,8 +4608,7 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
         in
         match%bind
           add_block_aux ~logger ~genesis_constants ~pool ~delete_older_than
-            ~hash ~add_block ~accounts_accessed ~accounts_created ~tokens_used
-            block
+            ~hash ~add_block ~tokens_used block
         with
         | Error e ->
             let state_hash = hash block in
@@ -4711,6 +4658,9 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
         in
         With_hash.{ data = block; hash = the_hash }
       in
+      (* NOTE: it's fine for accounts_accessed to be added non-atomically.
+         Since we're bootstrapping, I guess? *)
+      (* TODO: figure out whether we need to add genesis accounts to accounts_created *)
       let add_accounts () =
         let%bind.Deferred.Result ledger_hash, genesis_block_id =
           Mina_caqti.Pool.use
@@ -4720,7 +4670,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
                   (module Conn)
                   ~logger
                   ~constraint_constants:precomputed_values.constraint_constants
-                  genesis_block
+                  genesis_block ~accounts_accessed:[] ~accounts_created:[]
               in
               let%bind.Deferred.Result { ledger_hash; _ } =
                 Block.load (module Conn) ~id:genesis_block_id
