@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# This scripts builds master and current branch with nix
+# This scripts builds a designated PREFORK branch and current branch with nix
 # 0. Prepare environment if needed
-# 1. Build master as a prefork build;
+# 1. Build PREFORK as a prefork build;
 # 2. Upload to nix cache, the reason for not uploading cache for following 2 
 # steps is that they change for each PR. 
 # 3. Build current branch as a postfork build;
@@ -11,6 +11,45 @@
 
 # Step 0. Prepare environment if needed
 set -eux -o pipefail
+
+PREFORK=""
+
+usage() {
+  echo "Usage: $0 --fork-from <PREFORK>"
+  exit 1
+}
+
+# ---- argument parsing --------------------------------------------------------
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --fork-from)
+      # ensure value exists
+      if [[ $# -lt 2 ]]; then
+        echo "Error: --fork-from requires an argument."
+        usage
+      fi
+      PREFORK="$2"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      ;;
+    --*)
+      echo "Unknown option: $1"
+      usage
+      ;;
+    *)
+      # positional arg — store if needed later
+      echo "Unexpected argument: $1"
+      usage
+      ;;
+  esac
+done
+
+if [[ -z "$PREFORK" ]]; then
+  echo "Error: --fork-from must be provided."
+  usage
+fi
 
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
@@ -70,8 +109,8 @@ if [ -n "${BUILDKITE:-}" ]; then
   git fetch origin
 fi
 
-# 1. Build master as a prefork build;
-git checkout origin/master
+# 1. Build PREFORK as a prefork build;
+git checkout $PREFORK
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet"
 
