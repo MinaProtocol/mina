@@ -52,6 +52,9 @@ val build :
 
 val command_hashes : t -> Mina_transaction.Transaction_hash.t list
 
+val contains_transaction_by_hash :
+  t -> Mina_transaction.Transaction_hash.t -> bool
+
 val validated_transition : t -> Mina_block.Validated.t
 
 val block_with_hash : t -> Mina_block.with_hash
