@@ -571,10 +571,6 @@ module For_tests = struct
       (Mina_ledger.Ledger)
       (Mina_ledger.Ledger.Db)
 
-  let rec deferred_rose_tree_iter (Mina_stdlib.Rose_tree.T (root, trees)) ~f =
-    let%bind () = f root in
-    Deferred.List.iter trees ~f:(deferred_rose_tree_iter ~f)
-
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
   let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~verifier
       ~(precomputed_values : Precomputed_values.t) () =
@@ -777,8 +773,10 @@ module For_tests = struct
           frontier
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
-        Deferred.List.iter ~how:`Sequential branches
-          ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) ) ;
+        Deferred.List.iter branches ~how:`Sequential
+          ~f:
+            (Mina_stdlib.Rose_tree.Deferred.iter
+               ~f:(add_breadcrumb_exn frontier) ) ) ;
     Core.Gc.Expert.add_finalizer_exn consensus_local_state
       (fun consensus_local_state ->
         Consensus.Data.Local_state.(
@@ -787,7 +785,12 @@ module For_tests = struct
         Consensus.Data.Local_state.(
           Snapshot.Ledger_snapshot.close
           @@ next_epoch_ledger consensus_local_state) ) ;
-    frontier
+    let all_breadcrumbs = ref [] in
+    List.iter branches
+      ~f:
+        (Mina_stdlib.Rose_tree.iter ~f:(fun b ->
+             all_breadcrumbs := b :: !all_breadcrumbs ) ) ;
+    (frontier, !all_breadcrumbs)
 
   let gen_with_branch ?logger ~verifier ?trust_system ?consensus_local_state
       ~precomputed_values
@@ -797,7 +800,7 @@ module For_tests = struct
       ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
       ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
-    let%bind frontier =
+    let%bind frontier, _ =
       gen ?logger ~verifier ?trust_system ?consensus_local_state
         ~precomputed_values ?gen_root_breadcrumb ~create_root_and_accounts
         ~max_length ~size:frontier_size ()

@@ -990,11 +990,10 @@ let%test_module "Bootstrap_controller tests" =
       Quickcheck.test ~trials:1
         (Transition_frontier.For_tests.gen ~precomputed_values ~verifier
            ~max_length:max_frontier_length ~size:max_frontier_length () )
-        ~f:(fun frontier ->
+        ~f:(fun (frontier, breadcrumbs) ->
           Thread_safe.block_on_async_exn
           @@ fun () ->
-          Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)
-            ~f:(fun breadcrumb ->
+          Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
               let staged_ledger =
                 Transition_frontier.Breadcrumb.staged_ledger breadcrumb
               in
