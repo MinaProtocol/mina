@@ -249,6 +249,7 @@ val validate_commands :
      t
   -> check:
        (   User_command.t With_status.t list
+        -> Mina_transaction.Transaction_hash.t list
         -> (User_command.Valid.t list, 'e) Result.t Async.Deferred.Or_error.t )
   -> (With_valid_signatures.t, 'e) Result.t Async.Deferred.Or_error.t
 
