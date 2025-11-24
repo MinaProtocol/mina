@@ -413,11 +413,12 @@ end
 let validate_commands (t : t)
     ~(check :
           User_command.t With_status.t list
+       -> Mina_transaction.Transaction_hash.t list
        -> (User_command.Valid.t list, 'e) Result.t Async.Deferred.Or_error.t ) :
     (With_valid_signatures.t, 'e) Result.t Async.Deferred.Or_error.t =
   let map t ~f = Async.Deferred.Or_error.map t ~f:(Result.map ~f) in
-  let validate cs =
-    map (check cs)
+  let validate cs hashes =
+    map (check cs hashes)
       ~f:
         (List.map2_exn cs ~f:(fun c data ->
              { With_status.data; status = c.status } ) )
@@ -425,7 +426,9 @@ let validate_commands (t : t)
   let d1, d2 = t.diff in
   map
     (validate
-       (d1.commands @ Option.value_map d2 ~default:[] ~f:(fun d2 -> d2.commands)) )
+       (d1.commands @ Option.value_map d2 ~default:[] ~f:(fun d2 -> d2.commands))
+       ( d1.command_hashes
+       @ Option.value_map d2 ~default:[] ~f:(fun d2 -> d2.command_hashes) ) )
     ~f:(fun commands_all ->
       let commands1, commands2 =
         List.split_n commands_all (List.length d1.commands)
