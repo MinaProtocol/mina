@@ -256,6 +256,8 @@ val forget : With_valid_signatures_and_proofs.t -> t
 
 val commands : t -> User_command.t With_status.t list
 
+val command_hashes : t -> Mina_transaction.Transaction_hash.t list
+
 val completed_works : t -> Transaction_snark_work.t list
 
 val net_return :

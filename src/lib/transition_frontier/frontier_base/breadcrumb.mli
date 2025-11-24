@@ -50,6 +50,8 @@ val build :
      Result.t
      Deferred.t
 
+val command_hashes : t -> Mina_transaction.Transaction_hash.t list
+
 val validated_transition : t -> Mina_block.Validated.t
 
 val block_with_hash : t -> Mina_block.with_hash
