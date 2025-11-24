@@ -647,7 +647,7 @@ let%test_module "Runtime config" =
         sprintf
           {json| {"accounts": [ { "pk": "%s",
                                   "balance": "1087.37",
-                                  "zkapp": { "app_state": [ "14", "0", "0", "0", "0", "0", "0", "0" ],
+                                  "zkapp": { "app_state": [ "14", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0" ],
                                              "verification_key": null,
                                              "zkapp_version": "0",
                                              "action_state": [ "0", "0", "0", "0", "0" ],
