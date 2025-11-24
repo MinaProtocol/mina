@@ -42,7 +42,7 @@ function usage() {
 
 # Defines if build is for pushing to remote registry or loading locally only.
 # Can be overridden with --load-only flag.
-LOAD=""
+DOCKER_ACTION="push"
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -s|--service) SERVICE="$2"; shift;;
@@ -52,7 +52,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -c|--cache-from) INPUT_CACHE="$2"; shift;;
   -r|--repo) MINA_REPO="$2"; shift;;
   -p|--platform) INPUT_PLATFORM="$2"; shift;;
-  -l|--load-only) LOAD="--load" ;;
+  -l|--load-only) DOCKER_ACTION="load" ;;
   --docker-registry) export DOCKER_REGISTRY="$2"; shift;;
   --no-cache) NO_CACHE="--no-cache"; ;;
   --deb-codename) INPUT_CODENAME="$2"; shift;;
@@ -260,9 +260,9 @@ BUILD_NETWORK="--allow=network.host"
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
-  $LOAD --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -t "$HASHTAG" -
+  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -t "$HASHTAG" -
 else
-  docker buildx build $LOAD --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."
