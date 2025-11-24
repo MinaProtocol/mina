@@ -166,7 +166,8 @@ All list of available parameters:
 
 - TO_CHANNEL                  Target debian channel. By default: Unstable. All available profiles are located in `buildkite/src/Constants/DebianChannel.dhall` file. Only CamelCase format is supported
 
-- PUBLISH                     The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io
+- DOCKER_REPO                 The Docker repository. If defined, script will publish docker to target repository. Otherwise it will only create docker image locally
+"
 
 
 #### Examples 

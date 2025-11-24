@@ -2561,7 +2561,9 @@ let advanced ~itn_features =
     ; ("fix-persistent-frontier", Fix_persistent_frontier.command)
     ; ( "test"
       , Command.group ~summary:"Testing-only commands"
-          [ ("create-genesis", test_genesis_creation) ] )
+          [ ("create-genesis", test_genesis_creation)
+          ; ("submit-to-archive", Test_submit_to_archive.command)
+          ] )
     ]
   in
   let cmds =

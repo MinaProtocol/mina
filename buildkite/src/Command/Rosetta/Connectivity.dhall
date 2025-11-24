@@ -24,6 +24,8 @@ let Dockers = ../../Constants/DockerVersions.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let DockerRepo = ../../Constants/DockerRepo.dhall
+
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let B/If = B.definitions/commandStep/properties/if/Type
@@ -37,6 +39,7 @@ let Spec =
           , timeout : Natural
           , profile : Profiles.Type
           , scope : List PipelineScope.Type
+          , repo : DockerRepo.Type
           , if_ : B/If
           }
       , default =
@@ -47,6 +50,7 @@ let Spec =
           , timeout = 1000
           , profile = Profiles.Type.Devnet
           , scope = PipelineScope.Full
+          , repo = DockerRepo.Type.Internal
           , if_ =
               "build.pull_request.base_branch != \"develop\" && build.branch != \"develop\""
           }
@@ -64,7 +68,8 @@ let command
                   , "source ./buildkite/scripts/export-git-env-vars.sh"
                   , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
                                                                          spec.network} --tag \\\${MINA_DOCKER_TAG} --timeout ${Natural/show
-                                                                                                                                 spec.timeout} --run-compatibility-test develop --run-load-test "
+                                                                                                                                 spec.timeout} --repo ${DockerRepo.show
+                                                                                                                                                          spec.repo} --run-compatibility-test develop --run-load-test "
                   ]
               ]
             , label =

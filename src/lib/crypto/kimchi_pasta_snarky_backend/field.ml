@@ -75,6 +75,8 @@ end
 module type S = sig
   type t [@@deriving sexp, compare, yojson, bin_io, hash]
 
+  val to_hex_string : t -> string
+
   include Input_intf with type t := t
 
   val size : Bigint.t
@@ -155,6 +157,8 @@ module type S_with_version = sig
           - Returns Error if the string cannot be parsed as a valid number in
             the given format *)
       val of_yojson : Yojson.Safe.t -> (t, string) Result.t
+
+      val to_hex_string : t -> string
     end
   end]
 
@@ -222,8 +226,9 @@ module Make (F : Input_intf) :
 
       let equal = equal
 
-      let to_yojson t : Yojson.Safe.t =
-        `String (Bigint.to_hex_string (to_bigint t))
+      let to_hex_string = Fn.compose Bigint.to_hex_string to_bigint
+
+      let to_yojson t : Yojson.Safe.t = `String (to_hex_string t)
 
       let of_yojson j =
         match j with

@@ -289,18 +289,22 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
               ~signature_kind
           with
           | Ok
-              ( `Hash_after_applying next_staged_ledger_hash
-              , `Ledger_proof ledger_proof_opt
+              ( `Ledger_proof ledger_proof_opt
               , `Staged_ledger transitioned_staged_ledger
               , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
               ) ->
+              [%log internal] "Hash_new_staged_ledger" ;
+              let staged_ledger_hash =
+                Staged_ledger.hash transitioned_staged_ledger
+              in
+              [%log internal] "Hash_new_staged_ledger_done" ;
               (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
               ignore
               @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
                    (Staged_ledger.ledger transitioned_staged_ledger) ;
               Some
                 ( (match diff with Ok diff -> diff | Error _ -> assert false)
-                , next_staged_ledger_hash
+                , staged_ledger_hash
                 , ledger_proof_opt
                 , is_new_stack
                 , pending_coinbase_update )
@@ -641,12 +645,6 @@ module Vrf_evaluation_state = struct
     poll ~logger ~vrf_evaluator ~vrf_poll_interval t
 end
 
-let validate_genesis_protocol_state_block ~genesis_state_hash (b, v) =
-  Validation.validate_genesis_protocol_state ~genesis_state_hash
-    (With_hash.map ~f:Mina_block.header b, v)
-  |> Result.map
-       ~f:(Fn.flip Validation.with_body (Mina_block.body @@ With_hash.data b))
-
 let log_bootstrap_mode ~logger () =
   [%log info] "Pausing block production while bootstrapping"
 
@@ -903,7 +901,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 |> Fn.flip Validation.with_body body
                 |> Validation.skip_protocol_versions_validation
                      `This_block_has_valid_protocol_versions
-                |> validate_genesis_protocol_state_block
+                |> Validation.validate_genesis_protocol_state_block
                      ~genesis_state_hash:
                        (Protocol_state.genesis_state_hash
                           ~state_hash:(Some previous_state_hash)
@@ -1480,7 +1478,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                  `This_block_has_valid_protocol_versions
             |> Validation.skip_proof_validation
                  `This_block_was_generated_internally
-            |> validate_genesis_protocol_state_block
+            |> Validation.validate_genesis_protocol_state_block
                  ~genesis_state_hash:
                    (Protocol_state.genesis_state_hash
                       ~state_hash:(Some previous_protocol_state_hash)
