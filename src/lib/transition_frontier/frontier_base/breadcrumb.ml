@@ -366,7 +366,10 @@ module For_tests = struct
       let transactions =
         gen_payments ~send_to_random_pk parent_staged_ledger
           accounts_with_secret_keys
-        |> Sequence.map ~f:(fun x -> User_command.Signed_command x)
+        |> Sequence.map ~f:(fun x ->
+               Mina_transaction.Transaction_hash
+               .User_command_with_valid_signature
+               .create @@ User_command.Signed_command x )
       in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys

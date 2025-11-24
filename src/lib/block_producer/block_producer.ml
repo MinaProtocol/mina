@@ -152,7 +152,10 @@ let report_transaction_inclusion_failures ~commit_id ~logger failed_txns =
       | (txn, error) :: remaining_failures ->
           let element =
             `Assoc
-              [ ("transaction", User_command.Valid.to_yojson txn)
+              [ ( "transaction_hash"
+                , Transaction_hash.to_yojson
+                  @@ Transaction_hash.User_command_with_valid_signature
+                     .transaction_hash txn )
               ; ("error", Error_json.error_to_yojson error)
               ]
           in
@@ -784,8 +787,6 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
       let transactions =
         Network_pool.Transaction_pool.Resource_pool.transactions
           transaction_resource_pool
-        |> Sequence.map
-             ~f:Transaction_hash.User_command_with_valid_signature.data
       in
       let%bind () = Interruptible.lift (Deferred.return ()) (Ivar.read ivar) in
       [%log internal] "Generate_next_state" ;
