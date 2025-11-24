@@ -570,11 +570,6 @@ module For_tests = struct
     Mina_ledger.Ledger_transfer.Make
       (Mina_ledger.Ledger)
       (Mina_ledger.Ledger.Db)
-  open Full_frontier.For_tests
-
-  let proxy2 f { full_frontier = x; _ } { full_frontier = y; _ } = f x y
-
-  let equal = proxy2 equal
 
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
   let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~verifier
