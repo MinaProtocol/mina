@@ -83,6 +83,17 @@ T.
   , staged_ledger_hash
   , accounts_created )]
 
+let command_hashes
+    { T.validated_transition
+    ; staged_ledger = _
+    ; just_emitted_a_proof = _
+    ; transition_receipt_time = _
+    ; staged_ledger_hash = _
+    ; accounts_created = _
+    } =
+  Mina_block.Validated.body validated_transition
+  |> Body.staged_ledger_diff |> Staged_ledger_diff.command_hashes
+
 include Allocation_functor.Make.Basic (T)
 
 let compute_block_trace_metadata transition_with_validation =
