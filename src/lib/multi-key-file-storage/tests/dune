@@ -1,0 +1,15 @@
+(test
+ (name test_multi_key_file_storage)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core
+  core_kernel
+  bin_prot
+  ;; local libraries
+  multi_key_file_storage
+  data_hash_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_version)))
