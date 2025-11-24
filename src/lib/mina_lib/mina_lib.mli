@@ -344,7 +344,8 @@ module Hardfork_config : sig
       config was generated successfully. *)
   val dump_reference_config :
        breadcrumb_spec:breadcrumb_spec
-    -> directory_name:string
+    -> config_dir:string
+    -> generate_fork_validation:bool
     -> mina_lib
     -> unit Deferred.Or_error.t
 end
