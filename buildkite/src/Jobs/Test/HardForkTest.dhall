@@ -54,7 +54,7 @@ in  Pipeline.build
                   , privileged = True
                   , useBash = False
                   }
-                  "./scripts/hardfork/build-and-test.sh \$BUILDKITE_BRANCH"
+                  "./scripts/hardfork/build-and-test.sh"
               ]
             , label = "hard fork test"
             , key = "hard-fork-test"
