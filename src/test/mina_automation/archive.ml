@@ -120,41 +120,40 @@ let start t =
   let archive_process : Process.t = { process; config = t.config } in
   Deferred.return archive_process
 
-let wait_for ~log =
+let wait_for ~log_file =
   let open Deferred.Let_syntax in
   let timeout = 30.0 in
+  let interval = 1 in
   let start_time = Time.now () in
+  let has_timeout_elapsed () =
+    int_of_float (Time.Span.to_sec (Time.diff (Time.now ()) start_time))
+    > int_of_float timeout
+  in
+  let expected_message = "Archive process ready. Clients can now connect" in
   let rec loop () =
-    Core.Unix.sleep 1 ;
+    Core.Unix.sleep interval ;
     let%bind log_exists =
-      Sys.file_exists log
+      Sys.file_exists log_file
       >>| fun exists -> match exists with `Yes -> true | _ -> false
     in
     if not log_exists then
-      if
-        int_of_float (Time.Span.to_sec (Time.diff (Time.now ()) start_time))
-        > int_of_float timeout
-      then (
+      if has_timeout_elapsed () then (
         eprintf "Timeout waiting for log file to be created\n" ;
         Deferred.return () )
       else loop ()
     else
-      let%bind log_contents = Reader.file_contents log in
+      let%bind log_contents = Reader.file_contents log_file in
       let lines = String.split_lines log_contents in
       let found =
         List.exists lines ~f:(fun line ->
             match Yojson.Safe.from_string line |> Logger.Message.of_yojson with
             | Ok msg ->
-                String.equal msg.message
-                  "Archive process ready. Clients can now connect"
+                String.equal msg.message expected_message
             | Error _ ->
                 false )
       in
       if found then Deferred.return ()
-      else if
-        int_of_float (Time.Span.to_sec (Time.diff (Time.now ()) start_time))
-        > int_of_float timeout
-      then (
+      else if has_timeout_elapsed () then (
         eprintf "Timeout waiting for archive process to be ready\n" ;
         Deferred.return () )
       else loop ()
