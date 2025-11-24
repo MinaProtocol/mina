@@ -101,17 +101,8 @@ module Ops = struct
     read_key (module Db) db key
 end
 
-(* Temporary directory management *)
-let make_temp_dir prefix =
-  let pid = Unix.getpid () |> Pid.to_int in
-  let dir_name = Printf.sprintf "%s_%d" prefix pid in
-  Unix.mkdir_p dir_name ; dir_name
-
-let cleanup_temp_dir dir =
-  match Sys.file_exists dir with
-  | `Yes ->
-      ignore
-        ( Core_unix.system (Printf.sprintf "rm -rf %s" (Filename.quote dir))
-          : Core_unix.Exit_or_signal.t )
-  | _ ->
-      ()
+let with_temp_dir prefix ~f =
+  let dir_name = Unix.mkdtemp prefix in
+  Fun.protect
+    ~finally:(fun () -> Mina_stdlib_unix.File_system.rmrf dir_name)
+    (fun () -> f dir_name)

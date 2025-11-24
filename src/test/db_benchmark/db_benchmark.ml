@@ -10,9 +10,8 @@ module Single_file_db = Single_file_impl.Make ()
 
 module Multi_file_db = Multi_file_impl.Make ()
 
-let init_db (type db) (module Db : Common.Database with type t = db) name =
+let init_db (type db) ~dir (module Db : Common.Database with type t = db) name =
   (* Initialization: create DB and warmup *)
-  let dir = Common.make_temp_dir (Printf.sprintf "db_bench_%s" name) in
   let db = Db.create dir in
   Common.Ops.warmup (module Db) db ;
   eprintf "Warmup complete for %s\n" name ;
@@ -37,8 +36,9 @@ let make_read_bench (type db) (module Db : Common.Database with type t = db)
 
 let test ~name (type db) (module Db : Common.Database with type t = db)
     (f : (module Common.Database with type t = db) -> db -> unit -> unit) =
-  Bench.Test.create_with_initialization ~name (fun `init ->
-      init_db (module Db) name |> f (module Db) )
+  Common.with_temp_dir name ~f:(fun dir ->
+      Bench.Test.create_with_initialization ~name (fun `init () ->
+          init_db ~dir (module Db) name |> f (module Db) ) )
 
 (* Create all benchmarks *)
 let all_benchmarks () =
