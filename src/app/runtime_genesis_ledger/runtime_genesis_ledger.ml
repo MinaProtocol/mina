@@ -46,29 +46,37 @@ let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ledger =
   { Hashes.s3_data_hash; hash }
 
 let generate_hash_json ~genesis_dir ledger staking_ledger next_ledger =
-  let%bind ledger_hashes =
+  let open Deferred.Let_syntax in
+  let ledger_hashes_deferred =
     generate_ledger_tarball ~ledger_name_prefix:"genesis_ledger" ~genesis_dir
       ledger
   in
-  let%bind staking =
+  let staking_hash = Mina_ledger.Ledger.merkle_root staking_ledger in
+  let next_hash = Mina_ledger.Ledger.merkle_root next_ledger in
+  let staking_deferred =
     generate_ledger_tarball ~ledger_name_prefix:"epoch_ledger" ~genesis_dir
       staking_ledger
   in
-  let%map next =
-    (* If next ledger has the same merkle root as staking ledger, reuse the
-       same tar file to avoid generating it twice with different timestamps/hashes *)
-    let staking_hash = Mina_ledger.Ledger.merkle_root staking_ledger in
-    let next_hash = Mina_ledger.Ledger.merkle_root next_ledger in
+  let next_deferred =
     if Mina_base.Ledger_hash.equal staking_hash next_hash then (
       [%log info]
         "Next epoch ledger has the same hash as staking ledger, reusing \
          staking ledger tar" ;
-      Deferred.return staking )
+      staking_deferred )
     else
       generate_ledger_tarball ~ledger_name_prefix:"epoch_ledger" ~genesis_dir
         next_ledger
   in
-  { Hash_json.ledger = ledger_hashes; epoch_data = { staking; next } }
+  let%bind ledger_hashes, staking, next =
+    Deferred.all [ ledger_hashes_deferred; staking_deferred; next_deferred ]
+    >>| function
+    | [ ledger_hashes; staking; next ] ->
+        (ledger_hashes, staking, next)
+    | _ ->
+        failwith "Unexpected result from Deferred.all3"
+  in
+  Deferred.return
+    { Hash_json.ledger = ledger_hashes; epoch_data = { staking; next } }
 
 let is_dirty_proof = function
   | Runtime_config.Proof_keys.
