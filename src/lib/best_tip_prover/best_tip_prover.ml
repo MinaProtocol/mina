@@ -68,11 +68,6 @@ module Make (Inputs : Inputs_intf) :
     let best_verified_tip =
       Transition_frontier.Breadcrumb.validated_transition best_tip_breadcrumb
     in
-    let best_tip = Mina_block.Validated.forget best_verified_tip in
-    let root =
-      Transition_frontier.root frontier
-      |> Transition_frontier.Breadcrumb.validated_transition
-    in
     let _, merkle_list =
       Merkle_list_prover.prove ~context:frontier best_verified_tip
     in
@@ -83,9 +78,7 @@ module Make (Inputs : Inputs_intf) :
         ]
       "Best tip prover produced a merkle list of $merkle_list" ;
     Proof_carrying_data.
-      { data = best_tip
-      ; proof = (merkle_list, With_hash.data @@ Mina_block.Validated.forget root)
-      }
+      { data = best_tip_breadcrumb; proof = (merkle_list, root) }
 
   let validate_proof ~verifier ~genesis_state_hash
       (header_hashed : Mina_block.Header.with_hash) :
