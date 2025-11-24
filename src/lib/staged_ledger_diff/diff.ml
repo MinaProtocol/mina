@@ -502,6 +502,10 @@ let commands (t : t) =
   (fst t.diff).commands
   @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.commands)
 
+let command_hashes (t : t) =
+  (fst t.diff).command_hashes
+  @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.command_hashes)
+
 let completed_works (t : t) =
   (fst t.diff).completed_works
   @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.completed_works)
