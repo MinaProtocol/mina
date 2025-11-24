@@ -927,9 +927,9 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 >>= Validation.validate_frontier_dependencies
                       ~to_header:Mina_block.header
                       ~context:(module Context)
-                      ~root_block:
+                      ~root_consensus_state:
                         ( Transition_frontier.root frontier
-                        |> Breadcrumb.block_with_hash )
+                        |> Breadcrumb.consensus_state_with_hashes )
                       ~is_block_in_frontier:
                         (Fn.compose Option.is_some
                            (Transition_frontier.find frontier) )
@@ -1502,9 +1502,9 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
             >>= Validation.validate_frontier_dependencies
                   ~to_header:Mina_block.header
                   ~context:(module Context)
-                  ~root_block:
+                  ~root_consensus_state:
                     ( Transition_frontier.root frontier
-                    |> Breadcrumb.block_with_hash )
+                    |> Breadcrumb.consensus_state_with_hashes )
                   ~is_block_in_frontier:
                     (Fn.compose Option.is_some
                        (Transition_frontier.find frontier) )
