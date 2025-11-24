@@ -122,8 +122,6 @@ module For_tests : sig
   open Core_kernel
   open Signature_lib
 
-  val equal : t -> t -> bool
-
   val gen_genesis_breadcrumb :
        ?logger:Logger.t
     -> verifier:Verifier.t
