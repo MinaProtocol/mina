@@ -159,7 +159,7 @@ module For_tests : sig
     -> max_length:int
     -> size:int
     -> unit
-    -> t Quickcheck.Generator.t
+    -> (t * Breadcrumb.t list) Quickcheck.Generator.t
 
   val gen_with_branch :
        ?logger:Logger.t
