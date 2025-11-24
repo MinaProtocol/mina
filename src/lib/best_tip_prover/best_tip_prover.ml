@@ -17,23 +17,20 @@ module Make (Inputs : Inputs_intf) :
   end
 
   module Merkle_list_prover = Merkle_list_prover.Make_ident (struct
-    type value = Mina_block.Validated.t
+    type value = Frontier_base.Breadcrumb.t
 
     type context = Transition_frontier.t
 
     type proof_elem = State_body_hash.t
 
-    let to_proof_elem = Mina_block.Validated.state_body_hash
+    let to_proof_elem b =
+      Frontier_base.Breadcrumb.protocol_state_with_hashes b
+      |> State_hash.With_state_hashes.state_body_hash
+           ~compute_hashes:Mina_state.Protocol_state.hashes
 
     let get_previous ~context transition =
-      let parent_hash =
-        transition |> Mina_block.Validated.header
-        |> Mina_block.Header.protocol_state
-        |> Protocol_state.previous_state_hash
-      in
-      let open Option.Let_syntax in
-      let%map breadcrumb = Transition_frontier.find context parent_hash in
-      Transition_frontier.Breadcrumb.validated_transition breadcrumb
+      let parent_hash = transition |> Frontier_base.Breadcrumb.parent_hash in
+      Transition_frontier.find context parent_hash
   end)
 
   module Merkle_list_verifier = Merkle_list_verifier.Make (struct
@@ -65,11 +62,8 @@ module Make (Inputs : Inputs_intf) :
         ()
     in
     let best_tip_breadcrumb = Transition_frontier.best_tip frontier in
-    let best_verified_tip =
-      Transition_frontier.Breadcrumb.validated_transition best_tip_breadcrumb
-    in
     let _, merkle_list =
-      Merkle_list_prover.prove ~context:frontier best_verified_tip
+      Merkle_list_prover.prove ~context:frontier best_tip_breadcrumb
     in
     [%log debug]
       ~metadata:
