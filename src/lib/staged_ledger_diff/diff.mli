@@ -31,38 +31,76 @@ module At_most_one : sig
   val increase : 'a t -> 'a list -> 'a t Or_error.t
 end
 
+module Pre_diff_generic : sig
+  [%%versioned:
+  module Stable : sig
+    [@@@no_toplevel_latest_type]
+
+    module V2 : sig
+      type ('a, 'b, 'coinbase) t =
+        { completed_works : 'a list
+        ; commands : 'b list
+        ; coinbase : 'coinbase
+        ; internal_command_statuses : Transaction_status.Stable.V2.t list
+        }
+
+      val extract_prediff :
+           ('a, 'b, 'coinbase) t
+        -> 'a list * 'b list * 'coinbase * Transaction_status.Stable.V2.t list
+    end
+  end]
+
+  type ('a, 'b, 'coinbase) t =
+    { command_hashes : Mina_transaction.Transaction_hash.t list [@sexp.opaque]
+    ; completed_works : 'a list
+    ; commands : 'b list
+    ; coinbase : 'coinbase
+    ; internal_command_statuses : Transaction_status.t list
+    }
+
+  val extract_prediff :
+       ('a, 'b, 'coinbase) t
+    -> 'a list * 'b list * 'coinbase * Transaction_status.t list
+end
+
 module Pre_diff_two : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V2 : sig
       type ('a, 'b) t =
-        { completed_works : 'a list
-        ; commands : 'b list
-        ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_two.Stable.V1.t
-        ; internal_command_statuses : Transaction_status.Stable.V2.t list
-        }
+        ( 'a
+        , 'b
+        , Coinbase.Fee_transfer.Stable.V1.t At_most_two.Stable.V1.t )
+        Pre_diff_generic.Stable.V2.t
       [@@deriving equal, compare, sexp, yojson]
     end
   end]
 
-  val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
+  type ('a, 'b) t =
+    ('a, 'b, Coinbase.Fee_transfer.t At_most_two.t) Pre_diff_generic.t
+  [@@deriving equal, compare, sexp_of, to_yojson]
 end
 
 module Pre_diff_one : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V2 : sig
       type ('a, 'b) t =
-        { completed_works : 'a list
-        ; commands : 'b list
-        ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_one.Stable.V1.t
-        ; internal_command_statuses : Transaction_status.Stable.V2.t list
-        }
+        ( 'a
+        , 'b
+        , Coinbase.Fee_transfer.Stable.V1.t At_most_one.Stable.V1.t )
+        Pre_diff_generic.Stable.V2.t
       [@@deriving equal, compare, sexp, yojson]
     end
   end]
 
-  val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
+  type ('a, 'b) t =
+    ('a, 'b, Coinbase.Fee_transfer.t At_most_one.t) Pre_diff_generic.t
+  [@@deriving equal, compare, sexp_of, to_yojson]
 end
 
 module Pre_diff_with_at_most_two_coinbase : sig
