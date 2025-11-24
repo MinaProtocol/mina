@@ -27,8 +27,8 @@ func NewClient(timeoutSeconds int, maxRetries int) *Client {
 	}
 }
 
-// Query sends a GraphQL query to the specified port with retry logic
-func (c *Client) Query(port int, query string) (gjson.Result, error) {
+// query sends a GraphQL query to the specified port with retry logic
+func (c *Client) query(port int, query string) (gjson.Result, error) {
 	url := fmt.Sprintf("http://localhost:%d/graphql", port)
 
 	// Format the query payload
@@ -99,7 +99,7 @@ func (c *Client) Query(port int, query string) (gjson.Result, error) {
 
 // GetHeight gets the current block height
 func (c *Client) GetHeight(port int) (int, error) {
-	result, err := c.Query(port, "bestChain(maxLength: 1) { protocolState { consensusState { blockHeight } } }")
+	result, err := c.query(port, "bestChain(maxLength: 1) { protocolState { consensusState { blockHeight } } }")
 	if err != nil {
 		return 0, err
 	}
@@ -110,7 +110,7 @@ func (c *Client) GetHeight(port int) (int, error) {
 
 // GetHeightAndSlotOfEarliest gets the height and slot of the earliest block
 func (c *Client) GetHeightAndSlotOfEarliest(port int) (height, slot int, err error) {
-	result, err := c.Query(port, "bestChain { protocolState { consensusState { blockHeight slotSinceGenesis } } }")
+	result, err := c.query(port, "bestChain { protocolState { consensusState { blockHeight slotSinceGenesis } } }")
 	if err != nil {
 		return 0, 0, err
 	}
@@ -123,7 +123,7 @@ func (c *Client) GetHeightAndSlotOfEarliest(port int) (height, slot int, err err
 
 // GetForkConfig gets the fork configuration
 func (c *Client) GetForkConfig(port int) (gjson.Result, error) {
-	result, err := c.Query(port, "fork_config")
+	result, err := c.query(port, "fork_config")
 	if err != nil {
 		return gjson.Result{}, err
 	}
@@ -133,7 +133,7 @@ func (c *Client) GetForkConfig(port int) (gjson.Result, error) {
 
 // BlocksWithUserCommands gets the number of blocks with user commands
 func (c *Client) BlocksWithUserCommands(port int) (int, error) {
-	result, err := c.Query(port, "bestChain { commandTransactionCount }")
+	result, err := c.query(port, "bestChain { commandTransactionCount }")
 	if err != nil {
 		return 0, err
 	}
@@ -150,7 +150,7 @@ func (c *Client) BlocksWithUserCommands(port int) (int, error) {
 }
 
 // Blocks gets blocks data as in the original shell script
-const BlocksQuery = `
+const Blocksquery = `
 bestChain {
   commandTransactionCount
   protocolState {
@@ -197,7 +197,7 @@ type BlockData struct {
 
 // GetBlocks retrieves block data from the node
 func (c *Client) GetBlocks(port int) ([]BlockData, error) {
-	result, err := c.Query(port, BlocksQuery)
+	result, err := c.query(port, Blocksquery)
 	if err != nil {
 		return nil, err
 	}
