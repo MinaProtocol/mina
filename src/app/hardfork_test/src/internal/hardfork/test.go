@@ -31,7 +31,7 @@ func NewHardforkTest(cfg *config.Config) *HardforkTest {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &HardforkTest{
 		Config:      cfg,
-		Client:      client.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.GraphQLMaxRetries),
+		Client:      client.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.ClientMaxRetries),
 		Logger:      utils.NewLogger(),
 		ScriptDir:   cfg.ScriptDir,
 		runningCmds: make([]*exec.Cmd, 0),
