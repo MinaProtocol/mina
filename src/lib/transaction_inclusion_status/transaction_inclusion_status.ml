@@ -108,8 +108,9 @@ let%test_module "transaction_status" =
           (Option.value_exn random_key_opt) )
 
     let gen_frontier =
-      Transition_frontier.For_tests.gen ~logger ~precomputed_values ~verifier
-        ~trust_system ~max_length ~size:frontier_size ()
+      Quickcheck.Generator.map ~f:fst
+      @@ Transition_frontier.For_tests.gen ~logger ~precomputed_values ~verifier
+           ~trust_system ~max_length ~size:frontier_size ()
 
     (* TODO: Generate zkApps txns *)
     let gen_user_command =

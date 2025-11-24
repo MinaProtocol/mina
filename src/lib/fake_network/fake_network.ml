@@ -242,7 +242,7 @@ module Generator = struct
           precomputed_values.protocol_state_with_hashes.hash.state_hash
         ~epoch_ledger_backing_type:Stable_db
     in
-    let%map frontier =
+    let%map frontier, _ =
       Transition_frontier.For_tests.gen ~precomputed_values ~verifier
         ~consensus_local_state ~max_length:max_frontier_length ~size:0 ()
     in
