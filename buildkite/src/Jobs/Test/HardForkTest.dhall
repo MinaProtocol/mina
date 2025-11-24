@@ -54,10 +54,10 @@ in  Pipeline.build
                   , privileged = True
                   , useBash = False
                   }
-                  "./scripts/hardfork/build-and-test.sh"
+                  "./scripts/hardfork/build-and-test.sh --fork-from origin/master"
               ]
-            , label = "hard fork test"
-            , key = "hard-fork-test"
+            , label = "hard fork test - legacy mode"
+            , key = "hard-fork-test-legacy"
             , target = Size.Integration
             , soft_fail = Some (B/SoftFail.Boolean False)
             , docker = None Docker.Type
