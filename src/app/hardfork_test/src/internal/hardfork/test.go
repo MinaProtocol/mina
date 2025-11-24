@@ -9,15 +9,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
-	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/graphql"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/utils"
 )
 
 // HardforkTest represents the main hardfork test logic
 type HardforkTest struct {
 	Config         *config.Config
-	Client         *graphql.Client
+	Client         *client.Client
 	Logger         *utils.Logger
 	ScriptDir      string
 	runningCmds    []*exec.Cmd
@@ -31,7 +31,7 @@ func NewHardforkTest(cfg *config.Config) *HardforkTest {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &HardforkTest{
 		Config:      cfg,
-		Client:      graphql.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.GraphQLMaxRetries),
+		Client:      client.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.GraphQLMaxRetries),
 		Logger:      utils.NewLogger(),
 		ScriptDir:   cfg.ScriptDir,
 		runningCmds: make([]*exec.Cmd, 0),
