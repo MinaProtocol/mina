@@ -399,8 +399,8 @@ let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
       (Mina_stdlib.Nonempty_list.singleton previous_protocol_state_hash) )
 
 let validate_frontier_dependencies ~to_header
-    ~context:(module Context : CONTEXT) ~root_block ~is_block_in_frontier
-    (t, validation) =
+    ~context:(module Context : CONTEXT) ~root_consensus_state
+    ~is_block_in_frontier (t, validation) =
   let module Context = struct
     include Context
 
@@ -413,13 +413,6 @@ let validate_frontier_dependencies ~to_header
   let open Result.Let_syntax in
   let hash = State_hash.With_state_hashes.state_hash t in
   let protocol_state = Fn.compose Header.protocol_state to_header in
-  let root_consensus_state =
-    With_hash.map
-      ~f:
-        (Fn.compose Protocol_state.consensus_state
-           (Fn.compose Header.protocol_state Block.header) )
-      root_block
-  in
   let parent_hash =
     Protocol_state.previous_state_hash (protocol_state @@ With_hash.data t)
   in

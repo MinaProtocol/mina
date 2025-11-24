@@ -101,6 +101,9 @@ module Block = struct
 
   let protocol_state t = Frontier_base.Breadcrumb.protocol_state t.breadcrumb
 
+  let consensus_state_with_hashes t =
+    Frontier_base.Breadcrumb.consensus_state_with_hashes t.breadcrumb
+
   let state_timestamp t =
     Blockchain_state.timestamp @@ Protocol_state.blockchain_state
     @@ protocol_state t
@@ -365,7 +368,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
               ~state_hash:(Some previous_state_hash) previous_protocol_state )
     >>| V.skip_proof_validation `This_block_was_generated_internally
     >>= V.validate_frontier_dependencies ~to_header:Mina_block.header ~context
-          ~root_block:(Block.block_with_hash previous)
+          ~root_consensus_state:(Block.consensus_state_with_hashes previous)
           ~is_block_in_frontier:(State_hash.equal previous_state_hash)
     |> Result.map_error
          ~f:(const (Error.of_string "failed to validate just created block"))
