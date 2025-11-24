@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/graphql"
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 )
 
 // ValidatePreforkLedgerHashes validates the generated prefork ledger hashes
 func (t *HardforkTest) ValidatePreforkLedgerHashes(
-	latestNonEmptyBlock graphql.BlockData,
+	latestNonEmptyBlock client.BlockData,
 	genesisEpochStaking string,
 	genesisEpochNext string,
 	latestSnarkedHashPerEpoch map[int]string,
@@ -75,7 +75,7 @@ func (t *HardforkTest) ValidatePreforkLedgerHashes(
 }
 
 // ValidateForkConfigData validates the extracted fork config against expected values
-func (t *HardforkTest) ValidateForkConfigData(latestNonEmptyBlock graphql.BlockData, forkConfigBytes []byte) error {
+func (t *HardforkTest) ValidateForkConfigData(latestNonEmptyBlock client.BlockData, forkConfigBytes []byte) error {
 	forkConfigJson := string(forkConfigBytes)
 
 	// Validate field values
@@ -131,7 +131,7 @@ func (t *HardforkTest) ValidateForkConfigData(latestNonEmptyBlock graphql.BlockD
 }
 
 // ValidateForkRuntimeConfig validates that the runtime config has correct fork data
-func (t *HardforkTest) ValidateForkRuntimeConfig(latestNonEmptyBlock graphql.BlockData, configData []byte, forkGenesisTs, mainGenesisTs int64) error {
+func (t *HardforkTest) ValidateForkRuntimeConfig(latestNonEmptyBlock client.BlockData, configData []byte, forkGenesisTs, mainGenesisTs int64) error {
 	// Calculate expected genesis slot
 	expectedGenesisSlot := (forkGenesisTs - mainGenesisTs) / int64(t.Config.MainSlot)
 
