@@ -10,6 +10,8 @@ module type S = sig
 
   val consensus_local_state : t -> Consensus.Data.Local_state.t
 
+  val all_state_hashes : t -> State_hash.t list
+
   val all_breadcrumbs : t -> Breadcrumb.t list
 
   val root_length : t -> int
