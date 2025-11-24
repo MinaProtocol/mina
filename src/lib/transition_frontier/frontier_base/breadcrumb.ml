@@ -94,6 +94,14 @@ let command_hashes
   Mina_block.Validated.body validated_transition
   |> Body.staged_ledger_diff |> Staged_ledger_diff.command_hashes
 
+(* TODO: for better efficiency, add set of tx hashes to `maps_t`
+   and use existing mechanism of mask handling to get accumulated lookups,
+   then in transaction_status it will be necessary to only traverse
+   all of the tips instead of all of the breadcrumbs. *)
+let contains_transaction_by_hash t hash =
+  List.exists (command_hashes t)
+    ~f:(Mina_transaction.Transaction_hash.equal hash)
+
 include Allocation_functor.Make.Basic (T)
 
 let compute_block_trace_metadata transition_with_validation =
