@@ -89,8 +89,6 @@ module Util : sig
 end
 
 module For_tests : sig
-  val equal : t -> t -> bool
-
   val find_protocol_state_exn :
     t -> State_hash.t -> Mina_state.Protocol_state.value
 
