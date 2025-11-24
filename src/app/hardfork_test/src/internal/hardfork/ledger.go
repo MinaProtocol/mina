@@ -64,7 +64,10 @@ func (t *HardforkTest) GenerateAndValidatePreforkLedgers(analysis *BlockAnalysis
 	return nil
 }
 
-// GenerateForkConfigAndLedgers generates the fork configuration and ledgers
+// GenerateForkConfigAndLedgers does the following:
+// 1. generate fork ledgers with runtime-genesis-ledger
+// 2. patch the genesis time & slot for fork config with create_runtime_config.sh
+// 3. perform some base sanity check on the fork config
 func (t *HardforkTest) GenerateForkConfigAndLedgers(analysis *BlockAnalysisResult, forkConfigPath, forkLedgersDir, forkHashesFile, configFile, preforkGenesisConfigFile string, forkGenesisTs, mainGenesisTs int64) error {
 	// Generate fork ledgers using fork network executable
 	if err := t.GenerateForkLedgers(t.Config.ForkRuntimeGenesisLedger, forkConfigPath, forkLedgersDir, forkHashesFile); err != nil {
