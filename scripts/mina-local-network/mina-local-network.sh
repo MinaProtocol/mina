@@ -12,7 +12,6 @@ MINA_EXE=${MINA_EXE:-_build/default/src/app/cli/src/mina.exe}
 ARCHIVE_EXE=${ARCHIVE_EXE:-_build/default/src/app/archive/archive.exe}
 ZKAPP_EXE=${ZKAPP_EXE:-_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe}
 
-unset MINA_BP_PRIVKEY
 export MINA_PRIVKEY_PASS='naughty blue worm'
 export MINA_LIBP2P_PASS="${MINA_PRIVKEY_PASS}"
 SEED_PEER_KEY="CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
