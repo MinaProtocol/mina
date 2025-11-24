@@ -449,8 +449,7 @@ let add_breadcrumb_exn t breadcrumb =
       [ ( "state_hash"
         , State_hash.to_yojson
             (Breadcrumb.state_hash (Full_frontier.best_tip t.full_frontier)) )
-      ; ( "n"
-        , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier) )
+      ; ("n", `Int (Full_frontier.size t.full_frontier))
       ]
     "PRE: ($state_hash, $n)" ;
   [%str_log' trace t.logger]
@@ -475,8 +474,7 @@ let add_breadcrumb_exn t breadcrumb =
       [ ( "state_hash"
         , State_hash.to_yojson
             (Breadcrumb.state_hash @@ Full_frontier.best_tip t.full_frontier) )
-      ; ( "n"
-        , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier) )
+      ; ("n", `Int (Full_frontier.size t.full_frontier))
       ]
     "POST: ($state_hash, $n)" ;
   let user_cmds =
@@ -530,6 +528,8 @@ include struct
   let consensus_local_state = proxy1 consensus_local_state
 
   let all_breadcrumbs = proxy1 all_breadcrumbs
+
+  let all_state_hashes = proxy1 all_state_hashes
 
   let visualize ~filename = proxy1 (visualize ~filename)
 

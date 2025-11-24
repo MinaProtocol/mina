@@ -92,6 +92,12 @@ let consensus_local_state { consensus_local_state; _ } = consensus_local_state
 let all_breadcrumbs t =
   List.map (Hashtbl.data t.table) ~f:(fun { breadcrumb; _ } -> breadcrumb)
 
+let size t = Hashtbl.length t.table
+
+let all_state_hashes t =
+  List.map (Hashtbl.data t.table) ~f:(fun { breadcrumb; _ } ->
+      Breadcrumb.state_hash breadcrumb )
+
 let find t hash =
   let open Option.Let_syntax in
   let%map node = Hashtbl.find t.table hash in
