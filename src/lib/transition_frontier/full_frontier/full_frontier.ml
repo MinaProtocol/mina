@@ -942,28 +942,6 @@ module For_tests = struct
              !"Protocol state with hash %s not found"
              (State_body_hash.to_yojson hash |> Yojson.Safe.to_string) )
 
-  let equal t1 t2 =
-    let sort_breadcrumbs = List.sort ~compare:Breadcrumb.compare in
-    let equal_breadcrumb breadcrumb1 breadcrumb2 =
-      let open Breadcrumb in
-      let open Option.Let_syntax in
-      let get_successor_nodes frontier breadcrumb =
-        let%map node = Hashtbl.find frontier.table @@ state_hash breadcrumb in
-        Node.successor_hashes node
-      in
-      equal breadcrumb1 breadcrumb2
-      && State_hash.equal (parent_hash breadcrumb1) (parent_hash breadcrumb2)
-      && (let%bind successors1 = get_successor_nodes t1 breadcrumb1 in
-          let%map successors2 = get_successor_nodes t2 breadcrumb2 in
-          List.equal State_hash.equal
-            (successors1 |> List.sort ~compare:State_hash.compare)
-            (successors2 |> List.sort ~compare:State_hash.compare) )
-         |> Option.value_map ~default:false ~f:Fn.id
-    in
-    List.equal equal_breadcrumb
-      (all_breadcrumbs t1 |> sort_breadcrumbs)
-      (all_breadcrumbs t2 |> sort_breadcrumbs)
-
   (* TODO: Don't force here!! *)
 
   let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
