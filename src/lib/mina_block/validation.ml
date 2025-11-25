@@ -496,7 +496,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
                            , `Staged_ledger transitioned_staged_ledger
                            , `Accounts_created accounts_created
                            , `Pending_coinbase_update _ ) =
-    Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
+    Staged_ledger.apply_diff ?skip_verification:skip_staged_ledger_verification
       ~get_completed_work
       ~constraint_constants:
         precomputed_values.Precomputed_values.constraint_constants ~global_slot
@@ -535,7 +535,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
       [ ( "time_elapsed"
         , `Float Core.Time.(Span.to_ms @@ diff (now ()) apply_start_time) )
       ]
-    "Staged_ledger.apply takes $time_elapsed" ;
+    "Staged_ledger.apply_diff takes $time_elapsed" ;
   let snarked_ledger_hash =
     match proof_opt with
     | None ->
