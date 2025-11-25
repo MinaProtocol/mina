@@ -4653,8 +4653,9 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
         Account_id.Set.to_list account_id_set
       in
       let genesis_block =
-        let With_hash.{ data = block; hash = the_hash }, _ =
+        let With_hash.{ data = block; hash = the_hash } =
           Mina_block.genesis ~precomputed_values
+          |> fst |> Mina_block.Validated.forget
         in
         With_hash.{ data = block; hash = the_hash }
       in

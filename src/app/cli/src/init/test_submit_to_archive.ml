@@ -113,11 +113,8 @@ module Block = struct
   let compute_genesis ~logger ~precomputed_values (module Keys : Keys_S) =
     (* Generate genesis block, used in a bunch of other places
        (including block producer and tests) *)
-    let genesis_block_with_hash, genesis_validation =
+    let genesis_block, genesis_block_tag =
       Mina_block.genesis ~precomputed_values
-    in
-    let validated =
-      Mina_block.Validated.lift (genesis_block_with_hash, genesis_validation)
     in
     let constraint_constants = precomputed_values.constraint_constants in
     (* Create a staged ledger out of genesis ledger.
@@ -140,10 +137,11 @@ module Block = struct
     in
     [%log info] "Generating genesis breadcrumb" ;
     let breadcrumb =
-      Frontier_base.Breadcrumb.create ~validated_transition:validated
+      Frontier_base.Breadcrumb.create ~validated_transition:genesis_block
         ~staged_ledger
         ~transition_receipt_time:(Some (Time.now ()))
         ~just_emitted_a_proof:false ~accounts_created:[]
+        ~block_tag:genesis_block_tag
     in
     (* Block proof contained in genesis header is just a stub.
        Hence we need to generate the real proof here, in order to

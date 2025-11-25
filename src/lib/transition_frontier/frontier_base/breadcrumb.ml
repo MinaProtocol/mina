@@ -15,6 +15,7 @@ module T = struct
     ; transition_receipt_time : Time.t option
     ; staged_ledger_hash : Staged_ledger_hash.t
     ; accounts_created : Account_id.t list
+    ; block_tag : Mina_block.Stable.Latest.t State_hash.File_storage.tag
     }
   [@@deriving fields]
 
@@ -24,16 +25,18 @@ module T = struct
     -> just_emitted_a_proof:bool
     -> transition_receipt_time:Time.t option
     -> accounts_created:Account_id.t list
+    -> block_tag:Mina_block.Stable.Latest.t State_hash.File_storage.tag
     -> 'a
 
   let map_creator creator ~f ~validated_transition ~staged_ledger
-      ~just_emitted_a_proof ~transition_receipt_time ~accounts_created =
+      ~just_emitted_a_proof ~transition_receipt_time ~accounts_created
+      ~block_tag =
     f
       (creator ~validated_transition ~staged_ledger ~just_emitted_a_proof
-         ~transition_receipt_time ~accounts_created )
+         ~transition_receipt_time ~accounts_created ~block_tag )
 
   let create ~validated_transition ~staged_ledger ~just_emitted_a_proof
-      ~transition_receipt_time ~accounts_created =
+      ~transition_receipt_time ~accounts_created ~block_tag =
     (* TODO This looks terrible, consider removing this in the hardfork by either
        removing staged_ledger_hash from the header or computing it consistently
        for the genesis block *)
@@ -51,6 +54,7 @@ module T = struct
     ; transition_receipt_time
     ; staged_ledger_hash
     ; accounts_created
+    ; block_tag
     }
 
   let to_yojson
@@ -60,6 +64,7 @@ module T = struct
       ; transition_receipt_time
       ; staged_ledger_hash = _
       ; accounts_created = _
+      ; block_tag = _
       } =
     `Assoc
       [ ( "validated_transition"
@@ -81,17 +86,11 @@ T.
   , transition_receipt_time
   , to_yojson
   , staged_ledger_hash
-  , accounts_created )]
+  , accounts_created
+  , block_tag )]
 
-let command_hashes
-    { T.validated_transition
-    ; staged_ledger = _
-    ; just_emitted_a_proof = _
-    ; transition_receipt_time = _
-    ; staged_ledger_hash = _
-    ; accounts_created = _
-    } =
-  Mina_block.Validated.body validated_transition
+let command_hashes t =
+  T.validated_transition t |> Mina_block.Validated.body
   |> Body.staged_ledger_diff |> Staged_ledger_diff.command_hashes
 
 let valid_commands_hashed (t : T.t) =
@@ -166,14 +165,14 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
           , `Block_with_validation fully_valid_block
           , `Staged_ledger transitioned_staged_ledger
           , `Accounts_created accounts_created
-          , _ ) ->
+          , `Block_serialized block_tag ) ->
           [%log internal] "Create_breadcrumb" ;
           Deferred.Result.return
             (create
                ~validated_transition:
                  (Mina_block.Validated.lift fully_valid_block)
                ~staged_ledger:transitioned_staged_ledger ~accounts_created
-               ~just_emitted_a_proof ~transition_receipt_time )
+               ~just_emitted_a_proof ~transition_receipt_time ~block_tag )
       | Error `Invalid_body_reference ->
           let message = "invalid body reference" in
           let%map () =

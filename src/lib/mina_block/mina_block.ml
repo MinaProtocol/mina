@@ -21,7 +21,8 @@ type almost_valid_header = Validation.almost_valid_with_header
 
 type fully_valid_block = Validation.fully_valid_with_block
 
-let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
+let genesis ~precomputed_values :
+    Validated_block.t * Block.Stable.Latest.t State_hash.File_storage.tag =
   let genesis_state =
     Precomputed_values.genesis_state_with_hashes precomputed_values
   in
@@ -38,6 +39,15 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
     let block = Block.create ~header ~body in
     With_hash.map genesis_state ~f:(Fn.const block)
   in
+  let state_hash = State_hash.With_state_hashes.state_hash genesis_state in
+  let block_tag =
+    (* TODO write only if file is not existent, otherwise just create a tag
+       using file size as data length and position 0 *)
+    State_hash.File_storage.write_values_exn state_hash ~f:(fun writer ->
+        State_hash.File_storage.write_value writer
+          (module Block.Stable.Latest)
+          (With_hash.data block_with_hash |> Block.read_all_proofs_from_disk) )
+  in
   let validation =
     ( (`Time_received, Mina_stdlib.Truth.True ())
     , (`Genesis_state, Mina_stdlib.Truth.True ())
@@ -50,11 +60,13 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
     , (`Staged_ledger_diff, Mina_stdlib.Truth.True ())
     , (`Protocol_versions, Mina_stdlib.Truth.True ()) )
   in
-  (block_with_hash, validation)
+  (Validated_block.lift (block_with_hash, validation), block_tag)
 
 let genesis_header ~precomputed_values =
-  let b, v = genesis ~precomputed_values in
+  let validated, _ = genesis ~precomputed_values in
+  let b, v = Validated_block.remember validated in
   (With_hash.map ~f:Block.header b, v)
+  |> Validation.reset_staged_ledger_diff_validation
 
 let handle_dropped_transition ?pipe_name ?valid_cb ~logger block =
   [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"

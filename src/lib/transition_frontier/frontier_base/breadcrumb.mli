@@ -26,6 +26,7 @@ val create :
   -> just_emitted_a_proof:bool
   -> transition_receipt_time:Time.t option
   -> accounts_created:Account_id.t list
+  -> block_tag:Mina_block.Stable.Latest.t State_hash.File_storage.tag
   -> t
 
 val build :
@@ -62,6 +63,8 @@ val contains_transaction_by_hash :
   t -> Mina_transaction.Transaction_hash.t -> bool
 
 val validated_transition : t -> Mina_block.Validated.t
+
+val block_tag : t -> Mina_block.Stable.Latest.t State_hash.File_storage.tag
 
 val block_with_hash : t -> Mina_block.with_hash
 
