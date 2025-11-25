@@ -96,6 +96,8 @@ func DefaultConfig() *Config {
 		WhaleStartPort:       4000,
 		FishStartPort:        5000,
 		NodeStartPort:        6000,
+
+		ForkMethod: Legacy,
 	}
 }
 
