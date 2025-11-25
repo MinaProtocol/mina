@@ -3,7 +3,6 @@ Module to run archive process over archive PostgreSQL database.
 *)
 open Core
 
-open Logger
 open Async
 
 module Config = struct
@@ -113,49 +112,49 @@ let start t =
   let open Deferred.Let_syntax in
   let args = Config.to_args t.config in
   let%bind _, process = Executor.run_in_background t.executor ~args () in
+  (* TODO: consider internalize [wait_until_ready] here and replace this wait *)
+  let%map () = after (Time.Span.of_sec 5.) in
+  Process.{ process; config = t.config }
 
-  (* TODO: wait until ready *)
-  Core.Unix.sleep 5 ;
-
-  let archive_process : Process.t = { process; config = t.config } in
-  Deferred.return archive_process
-
-let wait_for ~log_file =
-  let open Deferred.Let_syntax in
-  let timeout = 30.0 in
-  let interval = 1 in
+let wait_until_ready ~log_file =
+  let timeout = Time.Span.of_sec 30.0 in
+  let poll_interval = Time.Span.of_sec 1.0 in
   let start_time = Time.now () in
-  let has_timeout_elapsed () =
-    int_of_float (Time.Span.to_sec (Time.diff (Time.now ()) start_time))
-    > int_of_float timeout
+  let is_timeout () =
+    let elapsed = Time.(diff (now ()) start_time) in
+    Time.Span.( > ) elapsed timeout
   in
   let expected_message = "Archive process ready. Clients can now connect" in
-  let rec loop () =
-    Core.Unix.sleep interval ;
-    let%bind log_exists =
-      Sys.file_exists log_file
-      >>| fun exists -> match exists with `Yes -> true | _ -> false
-    in
-    if not log_exists then
-      if has_timeout_elapsed () then (
-        eprintf "Timeout waiting for log file to be created\n" ;
-        Deferred.return () )
-      else loop ()
-    else
-      let%bind log_contents = Reader.file_contents log_file in
-      let lines = String.split_lines log_contents in
-      let found =
-        List.exists lines ~f:(fun line ->
-            match Yojson.Safe.from_string line |> Logger.Message.of_yojson with
-            | Ok msg ->
-                String.equal msg.message expected_message
-            | Error _ ->
-                false )
-      in
-      if found then Deferred.return ()
-      else if has_timeout_elapsed () then (
-        eprintf "Timeout waiting for archive process to be ready\n" ;
-        Deferred.return () )
-      else loop ()
+  let rec wait_until_log_created () =
+    let%bind () = after poll_interval in
+    match%bind Sys.file_exists log_file with
+    | `Yes ->
+        Deferred.Or_error.return ()
+    | _ when is_timeout () ->
+        Deferred.Or_error.error_string
+          "Timeout waiting for archive log file to be created"
+    | _ ->
+        wait_until_log_created ()
   in
-  loop ()
+  let%bind.Deferred.Or_error () = wait_until_log_created () in
+  let rec wait_til_log_ready_emitted () =
+    if is_timeout () then
+      Deferred.Or_error.error_string
+        "Timeout waiting for archive process to be ready"
+    else
+      let%bind reader = Reader.open_file log_file in
+      let rec impl () =
+        match%bind Reader.read_line reader with
+        | `Eof ->
+            let%bind () = after poll_interval in
+            wait_til_log_ready_emitted ()
+        | `Ok line -> (
+            match Yojson.Safe.from_string line |> Logger.Message.of_yojson with
+            | Ok { message; _ } when String.equal message expected_message ->
+                Deferred.Or_error.return ()
+            | _ ->
+                impl () )
+      in
+      impl ()
+  in
+  wait_til_log_ready_emitted ()
