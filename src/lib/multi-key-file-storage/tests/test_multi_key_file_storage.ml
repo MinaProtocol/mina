@@ -112,9 +112,13 @@ let triple gen =
   let%map.Q gen3 = gen in
   (gen1, gen2, gen3)
 
-let expanded_read_ops_group =
+let expanded_read_ops_group ?length () =
   let module Q = Base_quickcheck.Generator in
-  let%bind.Q group = Q.list_non_empty @@ Write_and_test_later.gen in
+  let list_gen =
+    Option.value_map length ~default:Q.list_non_empty ~f:(fun length ->
+        Q.list_with_length ~length )
+  in
+  let%bind.Q group = list_gen Write_and_test_later.gen in
   let sz = List.length group in
   let%map.Q expansions = Q.list_with_length ~length:sz @@ Q.int_inclusive 1 4 in
   let expansions_total = List.sum (module Int) ~f:ident expansions in
@@ -125,10 +129,10 @@ let expanded_read_ops_group =
         ~f:(fun (n, op) -> List.init n ~f:(const op))
         (List.zip_exn expansions read_ops) )
 
-let three_op_groups =
+let three_op_groups ?length () =
   let module Q = Base_quickcheck.Generator in
   let%bind.Q (sz1, group1), (sz2, group2), (sz3, group3) =
-    triple expanded_read_ops_group
+    triple (expanded_read_ops_group ?length ())
   in
   let%map.Q permutation =
     Q.list_permutations (List.init (sz1 + sz2 + sz3) ~f:ident)
@@ -143,14 +147,14 @@ let three_op_groups =
     Write three files with different write operations.
     Read the values back (some repeatedly) in a random order.
     Check that the values retrieved are correct. *)
-let test_property () =
+let test_property ?length () =
   let file1 = temp_filename "file1" in
   let file2 = temp_filename "file2" in
   let file3 = temp_filename "file3" in
   let res =
     Or_error.try_with
     @@ fun () ->
-    Quickcheck.test three_op_groups ~f:(fun write_three_groups ->
+    Quickcheck.test (three_op_groups ?length ()) ~f:(fun write_three_groups ->
         let read_ops =
           write_values_exn file1 ~f:(fun writer1 ->
               write_values_exn file2 ~f:(fun writer2 ->
@@ -173,6 +177,8 @@ let () =
         ; Alcotest.test_case "Multiple same type" `Quick test_multiple_same_type
         ; Alcotest.test_case "Custom filename key" `Quick
             test_custom_filename_key
-        ; Alcotest.test_case "Property test" `Quick test_property
+        ; Alcotest.test_case "Property test" `Quick (test_property ?length:None)
+        ; Alcotest.test_case "Property test (big lists)" `Quick
+            (test_property ~length:64000)
         ] )
     ]
