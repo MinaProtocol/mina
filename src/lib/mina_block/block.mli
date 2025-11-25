@@ -16,6 +16,9 @@ module Stable : sig
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> t
       -> Transaction.Stable.V2.t With_status.t list
+
+    val create :
+      header:Header.Stable.V2.t -> body:Staged_ledger_diff.Body.Stable.V1.t -> t
   end
 end]
 

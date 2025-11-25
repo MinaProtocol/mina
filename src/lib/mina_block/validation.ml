@@ -482,10 +482,12 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   let state_hash = State_hash.With_state_hashes.state_hash t in
   let apply_start_time = Core.Time.now () in
   let body_ref_from_header = Blockchain_state.body_reference blockchain_state in
+  let body_stable = Staged_ledger_diff.Body.read_all_proofs_from_disk body in
+  let block_stable = Block.Stable.Latest.create ~header ~body:body_stable in
   let body_ref_computed =
     Staged_ledger_diff.Body.compute_reference
       ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-    @@ Staged_ledger_diff.Body.read_all_proofs_from_disk body
+      body_stable
   in
   let%bind.Deferred.Result () =
     if Blake2.equal body_ref_computed body_ref_from_header then
@@ -505,7 +507,8 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   in
   let%bind.Deferred.Result ( transitioned_staged_ledger
                            , proof_opt
-                           , accounts_created ) =
+                           , accounts_created
+                           , tagged_block ) =
     Deferred.Result.map_error ~f:(fun e -> `Staged_ledger_application_failed e)
     @@ let%bind.Deferred.Result ( `Ledger new_ledger
                                 , `Accounts_created accounts_created
@@ -530,7 +533,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
            ~signature_kind:Mina_signature_kind.t_DEPRECATED
            ?transaction_pool_proxy
        in
-       let tagged_witnesses, tagged_works =
+       let tagged_witnesses, tagged_works, tagged_block =
          State_hash.File_storage.write_values_exn state_hash ~f:(fun writer ->
              let witnesses' =
                Staged_ledger.Scan_state.Transaction_with_witness.persist_many
@@ -540,7 +543,12 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
                Staged_ledger.Scan_state.Ledger_proof_with_sok_message
                .persist_many works writer
              in
-             (witnesses', works') )
+             let block' =
+               State_hash.File_storage.write_value writer
+                 (module Block.Stable.Latest)
+                 block_stable
+             in
+             (witnesses', works', block') )
        in
        let%map.Deferred.Result new_staged_ledger, res_opt =
          let skip_verification =
@@ -562,7 +570,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
            [%log error]
              ~metadata:[ ("error", Error_json.error_to_yojson e) ]
              !"Error updating metrics after applying scan state: $error" ) ;
-       (new_staged_ledger, res_opt, accounts_created)
+       (new_staged_ledger, res_opt, accounts_created, tagged_block)
   in
   [%log internal] "Diff_applied" ;
   let staged_ledger_hash_opt =
@@ -620,7 +628,8 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
         , `Block_with_validation
             (t, Unsafe.set_valid_staged_ledger_diff validation)
         , `Staged_ledger transitioned_staged_ledger
-        , `Accounts_created accounts_created )
+        , `Accounts_created accounts_created
+        , `Block_serialized tagged_block )
   | Error errors ->
       Error (`Invalid_staged_ledger_diff errors)
 

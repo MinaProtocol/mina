@@ -380,6 +380,7 @@ val validate_staged_ledger_diff :
            with_block ]
        * [ `Staged_ledger of Staged_ledger.t ]
        * [ `Accounts_created of Account_id.t list ]
+       * [ `Block_serialized of Block.Stable.V2.t State_hash.File_storage.tag ]
      , [> `Staged_ledger_application_failed of
           Staged_ledger.Staged_ledger_error.t
        | `Invalid_body_reference
