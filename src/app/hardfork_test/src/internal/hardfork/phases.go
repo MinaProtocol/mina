@@ -164,7 +164,7 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, forkConfig
 }
 
 // Uses `mina advanced generate-hardfork-config CLI`
-func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, forkConfigBytes []byte, mainGenesisTs int64) (*ForkData, error) {
+func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, forkConfigBytes []byte) (*ForkData, error) {
 
 	cwd := ""
 	var err error = nil

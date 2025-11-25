@@ -10,14 +10,17 @@ type ForkMethod int
 
 const (
 	Legacy ForkMethod = iota
+	Advanced
 )
 
 var forkMethodToString = map[ForkMethod]string{
-	Legacy: "legacy",
+	Legacy:   "legacy",
+	Advanced: "advanced",
 }
 
 var stringToForkMethod = map[string]ForkMethod{
-	"legacy": Legacy,
+	"legacy":   Legacy,
+	"advanced": Advanced,
 }
 
 func (m *ForkMethod) String() string {

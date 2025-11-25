@@ -123,11 +123,22 @@ func (t *HardforkTest) Run() error {
 		return err
 	}
 
-	t.Logger.Info("Phase 2: Forking the legacy way...")
+	var forkData *ForkData
+	switch t.Config.ForkMethod {
+	case config.Legacy:
+		t.Logger.Info("Phase 2: Forking the legacy way...")
 
-	forkData, err := t.LegacyForkPhase(analysis, forkConfigBytes, mainGenesisTs)
-	if err != nil {
-		return err
+		forkData, err = t.LegacyForkPhase(analysis, forkConfigBytes, mainGenesisTs)
+		if err != nil {
+			return err
+		}
+	case config.Advanced:
+		t.Logger.Info("Phase 2: Forking with `mina advanced generate-hardfork-config`...")
+
+		forkData, err = t.AdvancedForkPhase(analysis, forkConfigBytes)
+		if err != nil {
+			return err
+		}
 	}
 
 	t.Logger.Info("Phase 3: Running fork network...")
