@@ -56,6 +56,12 @@ module Historical = struct
 
   let pending_coinbase t = Common.pending_coinbase t.common
 
+  let protocol_state t =
+    Mina_block.Validated.header t.transition |> Mina_block.Header.protocol_state
+
+  let required_state_hashes t =
+    Staged_ledger.Scan_state.required_state_hashes t.common.scan_state
+
   let of_breadcrumb breadcrumb =
     let transition = Breadcrumb.validated_transition breadcrumb in
     let staged_ledger = Breadcrumb.staged_ledger breadcrumb in
