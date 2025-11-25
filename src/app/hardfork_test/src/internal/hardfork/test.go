@@ -118,31 +118,48 @@ func (t *HardforkTest) Run() error {
 
 	// Phase 1: Run and validate main network
 	t.Logger.Info("Phase 1: Running main network...")
-	forkConfigBytes, analysis, err := t.RunMainNetworkPhase(mainGenesisTs)
+	forkDataChan := make(chan ForkData, 1)
+
+	var beforeShutdown HFHandler
+	switch t.Config.ForkMethod {
+	case config.Legacy:
+
+		beforeShutdown = func(t *HardforkTest, analysis *BlockAnalysisResult) error {
+			t.Logger.Info("Phase 2: Forking the legacy way...")
+
+			forkConfigBytes, err := t.GetForkConfig(t.AnyPortOfType(PORT_REST))
+			if err != nil {
+				return err
+			}
+			var forkData *ForkData
+			forkData, err = t.LegacyForkPhase(analysis, forkConfigBytes, mainGenesisTs)
+			if err != nil {
+				return err
+			}
+			forkDataChan <- *forkData
+			return nil
+		}
+
+	case config.Advanced:
+		beforeShutdown = func(t *HardforkTest, analysis *BlockAnalysisResult) error {
+			t.Logger.Info("Phase 2: Forking with `mina advanced generate-hardfork-config`...")
+
+			forkData, err := t.AdvancedForkPhase(analysis)
+			if err != nil {
+				return err
+			}
+			forkDataChan <- *forkData
+			return nil
+		}
+	}
+
+	analysis, err := t.RunMainNetworkPhase(mainGenesisTs, beforeShutdown)
 	if err != nil {
 		return err
 	}
 
-	var forkData *ForkData
-	switch t.Config.ForkMethod {
-	case config.Legacy:
-		t.Logger.Info("Phase 2: Forking the legacy way...")
-
-		forkData, err = t.LegacyForkPhase(analysis, forkConfigBytes, mainGenesisTs)
-		if err != nil {
-			return err
-		}
-	case config.Advanced:
-		t.Logger.Info("Phase 2: Forking with `mina advanced generate-hardfork-config`...")
-
-		forkData, err = t.AdvancedForkPhase(analysis, forkConfigBytes)
-		if err != nil {
-			return err
-		}
-	}
-
 	t.Logger.Info("Phase 3: Running fork network...")
-	if err := t.RunForkNetworkPhase(analysis.LatestNonEmptyBlock.BlockHeight, *forkData, mainGenesisTs); err != nil {
+	if err := t.RunForkNetworkPhase(analysis.LatestNonEmptyBlock.BlockHeight, <-forkDataChan, mainGenesisTs); err != nil {
 		return err
 	}
 

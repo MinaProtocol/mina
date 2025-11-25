@@ -11,13 +11,15 @@ import (
 	"time"
 )
 
+type HFHandler func(*HardforkTest, *BlockAnalysisResult) error
+
 // RunMainNetworkPhase runs the main network and validates its operation
 // and returns the fork config bytes and block analysis result
-func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) ([]byte, *BlockAnalysisResult, error) {
+func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown HFHandler) (*BlockAnalysisResult, error) {
 	// Start the main network
 	mainNetCmd, err := t.RunMainNetwork(mainGenesisTs)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	defer t.gracefulShutdown(mainNetCmd, "Main network")
@@ -28,44 +30,42 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) ([]byte, *BlockA
 	// Check block height at slot BestChainQueryFrom
 	blockHeight, err := t.Client.GetHeight(t.AnyPortOfType(PORT_REST))
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	t.Logger.Info("Block height is %d at slot %d.", blockHeight, t.Config.BestChainQueryFrom)
 
 	// Validate slot occupancy
 	if err := t.ValidateSlotOccupancy(0, blockHeight); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Analyze blocks and get genesis epoch data
 	analysis, err := t.AnalyzeBlocks()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Validate max slot
 	if err := t.ValidateLatestOccupiedSlot(analysis.LatestOccupiedSlot); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Validate latest block slot
 	if err := t.ValidateLatestNonEmptyBlockSlot(analysis.LatestNonEmptyBlock); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Validate no new blocks are created after chain end
 	if err := t.ValidateNoNewBlocks(t.AnyPortOfType(PORT_REST)); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	// Extract fork config before nodes shutdown
-	forkConfigBytes, err := t.GetForkConfig(t.AnyPortOfType(PORT_REST))
-	if err != nil {
-		return nil, nil, err
+	if err := beforeShutdown(t, analysis); err != nil {
+		return nil, err
 	}
 
-	return forkConfigBytes, analysis, nil
+	return analysis, nil
 }
 
 type ForkData struct {
@@ -164,7 +164,7 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, forkConfig
 }
 
 // Uses `mina advanced generate-hardfork-config CLI`
-func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, forkConfigBytes []byte) (*ForkData, error) {
+func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult) (*ForkData, error) {
 
 	cwd := ""
 	var err error = nil
