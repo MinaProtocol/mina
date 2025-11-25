@@ -1,6 +1,26 @@
 #!/bin/bash
 set -eox pipefail
 
+# Function to collect logs (called on exit or at end of script)
+collect_logs() {
+    echo "========================= COLLECTING LOGS ==========================="
+    mkdir -p test_output/artifacts
+    
+    # application logs
+    cp daemon-stdout.log test_output/artifacts/ 2>/dev/null || echo "daemon-stdout.log not found"
+    # crash logs
+    cp daemon-stderr.log test_output/artifacts/ 2>/dev/null || echo "daemon-stderr.log not found"
+    # mina config
+    cp -r ${MINA_CONFIG_DIR} test_output/artifacts/mina-config 2>/dev/null || echo "mina config dir not accessible"
+    # daemon status at end of test
+    mina client status --json > test_output/artifacts/daemon-status.json 2>/dev/null || echo "Could not get daemon status" > test_output/artifacts/daemon-status.json
+    
+    echo "Logs collected in test_output/artifacts/"
+}
+
+# Ensure logs are collected on exit (even on failure)
+trap collect_logs EXIT
+
 # These tests use the mina binary, as rosetta-cli assumes we use a testnet.
 # See https://github.com/coinbase/rosetta-sdk-go/blob/master/keys/signer_pallas.go#L222
 
@@ -271,16 +291,5 @@ rosetta-cli check:data --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 echo "========================= ROSETTA CLI: CHECK:PERF ==========================="
 echo "rosetta-cli check:perf" # Will run this command when tests are fully implemented
 
-echo "========================= COLLECTING LOGS ==========================="
-mkdir -p test_output/artifacts
-
-# application logs
-cp daemon-stdout.log test_output/artifacts/ 2>/dev/null || echo "daemon-stdout.log not found"
-# crash logs
-cp daemon-stderr.log test_output/artifacts/ 2>/dev/null || echo "daemon-stderr.log not found"
-# mina config
-cp -r ${MINA_CONFIG_DIR} test_output/artifacts/mina-config 2>/dev/null || echo "mina config dir not accessible"
-# daemon status at end of test
-mina client status --json > test_output/artifacts/daemon-status.json 2>/dev/null || echo "Could not get daemon status" > test_output/artifacts/daemon-status.json
-
-echo "Logs collected in test_output/artifacts/"
+# Call log collection function (also called automatically on exit via trap)
+collect_logs
