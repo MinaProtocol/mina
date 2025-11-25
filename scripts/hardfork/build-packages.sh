@@ -1,10 +1,51 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -eoux pipefail
 
 
 # shellcheck disable=SC1091
 source ./scripts/export-git-env-vars.sh
+
+
+# Default path to executables; can be overridden by environment variables
+# This is to alow to use prebuilt executable rather than building them from source
+RUNTIME_GENESIS_LEDGER=${RUNTIME_GENESIS_LEDGER:-_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe}
+LOGPROC=${LOGPROC:-_build/default/src/app/logproc/logproc.exe}
+
+# Optional: reuse build artifacts from Buildkite builds instead of building from source
+SKIP_APPS_BUILD=${SKIP_APPS_BUILD:-}
+
+# Optional: skip building the debian packages but inject the runtime config and ledger tarballs instead
+SKIP_DEBIAN_PACKAGE_BUILD=${SKIP_DEBIAN_PACKAGE_BUILD:-}
+
+# Optional: skip generation of ledger tarballs
+SKIP_TARBALLS_GENERATION=${SKIP_TARBALLS_GENERATION:-}
+
+# Optional: skip upload of generated tarballs
+SKIP_TARBALL_UPLOAD=${SKIP_TARBALL_UPLOAD:-}
+
+
+# Path to the generated runtime config JSON; can be overridden by environment variable
+RUNTIME_CONFIG_JSON=${RUNTIME_CONFIG_JSON:-$PWD/new_config.json}
+
+LEDGER_TARBALLS=${LEDGER_TARBALLS:-"$(echo $PWD/hardfork_ledgers/*.tar.gz)"}
+
+
+build_packages() {
+  if [ "${NETWORK_NAME}" = "mainnet" ]; then
+    export MINA_BUILD_MAINNET=1
+  fi
+
+  export BYPASS_OPAM_SWITCH_UPDATE=1
+
+  make build
+  make build-daemon-utils
+  make build-devnet-sigs
+  make build-archive
+  make build-archive-utils
+  make build-test-utils
+}
+
 
 PWD=$(pwd)
 
@@ -19,74 +60,39 @@ fi
 
 echo "--- Starting hardfork package generation for network: ${NETWORK_NAME} with Debian codename: ${MINA_DEB_CODENAME}"
 
-if [ "${NETWORK_NAME}" = "mainnet" ]; then
-  export MINA_BUILD_MAINNET=1
+if [ -z "$SKIP_APPS_BUILD" ]; then
+  echo "--- Skipping build of executables; using prebuilt ones"
+else
+  echo "--- Building necessary executables from source"
+  build_packages
 fi
 
-echo "--- Checking for AWS CLI installation"
-if ! command -v aws &> /dev/null; then
-  echo "❌ Error: AWS CLI is not installed. Please install it first."
-  echo "You can install it using:"
-  echo "  - curl \"https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip\" -o \"awscliv2.zip\""
-  echo "  - unzip awscliv2.zip"
-  echo "  - sudo ./aws/install"
-  exit 1
+if [ -z "$SKIP_TARBALLS_GENERATION" ]; then
+  echo "--- Generating runtime config and ledger tarballs"
+  ./scripts/hardfork/generate-tarballs.sh \
+    --network "$NETWORK_NAME" \
+    --config-url "$CONFIG_JSON_GZ_URL" \
+    --runtime-ledger "$RUNTIME_GENESIS_LEDGER" \
+    --logproc "$LOGPROC"
+else
+  echo "--- Skipping generation of runtime config and ledger tarballs"
 fi
-echo "✅ AWS CLI is available"
 
-export BYPASS_OPAM_SWITCH_UPDATE=1
-
-make build
-make build-daemon-utils
-make build-devnet-sigs
-make build-archive
-make build-archive-utils
-make build-test-utils
-
-echo "--- Clean up any existing config files"
-rm -f config.json config.json.gz
-rm -rf hardfork_ledgers
-
-# Set the base network config for ./scripts/hardfork/create_runtime_config.sh
-export FORKING_FROM_CONFIG_JSON="genesis_ledgers/${NETWORK_NAME}.json"
-[ ! -f "${FORKING_FROM_CONFIG_JSON}" ] && echo "${NETWORK_NAME} is not a known network name; check for existing network configs in 'genesis_ledgers/'" && exit 1
-
-echo "--- Download and extract previous network config"
-curl -o config.json.gz $CONFIG_JSON_GZ_URL
-gunzip config.json.gz
-
-echo "--- Generate hardfork ledger tarballs"
-mkdir hardfork_ledgers
-_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --config-file config.json --genesis-dir hardfork_ledgers/ --hash-output-file hardfork_ledger_hashes.json | tee runtime_genesis_ledger.log | _build/default/src/app/logproc/logproc.exe
-
-echo "--- Create hardfork config"
-FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
-
-echo "--- Checking AWS S3 permissions for bucket access"
-if ! aws s3 ls s3://snark-keys.o1test.net/ > /dev/null 2>&1; then
-  echo "❌ Error: Unable to access S3 bucket 's3://snark-keys.o1test.net/'"
-  echo "Please check your AWS credentials and permissions."
-  exit 1
+if [ -z "$SKIP_TARBALL_UPLOAD" ]; then
+  echo "--- Uploading generated ledger tarballs to aws"
+  ./scripts/hardfork/upload-ledger-tarballs.sh \
+    --network "$NETWORK_NAME" \
+    --logproc "$LOGPROC"
+else
+  echo "--- Skipping upload of generated ledger tarballs"
 fi
-echo "✅ S3 bucket access verified"
-
-existing_files=$(aws s3 ls s3://snark-keys.o1test.net/ | awk '{print $4}')
-for file in hardfork_ledgers/*; do
-  filename=$(basename "$file")
-  
-  if echo "$existing_files" | grep -q "$filename"; then
-    echo "Info: $filename already exists in the bucket, packaging it instead."
-    oldhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
-    aws s3 cp "s3://snark-keys.o1test.net/$filename" "$file"
-    newhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
-    sed -i "s/$oldhash/$newhash/g" new_config.json 
-  else
-    aws s3 cp --acl public-read "$file" s3://snark-keys.o1test.net/
-  fi
-done
-
-echo "--- New genesis config"
-head new_config.json
 
 echo "--- Build hardfork package for Debian ${MINA_DEB_CODENAME}"
-RUNTIME_CONFIG_JSON=$PWD/new_config.json LEDGER_TARBALLS="$(echo $PWD/hardfork_ledgers/*.tar.gz)" ./scripts/debian/build.sh "$@"
+if [ -n "$SKIP_DEBIAN_PACKAGE_BUILD" ]; then
+  echo "--- Skipping debian package build; injecting runtime config and ledger tarballs into existing packages"
+  ./scripts/debian/replace-entry.sh mina-daemon.deb /var/lib/coda/config_*.json "$RUNTIME_CONFIG_JSON"
+  ./scripts/debian/insert-entries.sh mina-daemon.deb /var/lib/coda/ "$LEDGER_TARBALLS"
+else
+  echo "--- Building debian packages from source"
+  RUNTIME_CONFIG_JSON=$RUNTIME_CONFIG_JSON LEDGER_TARBALLS="$LEDGER_TARBALLS" ./scripts/debian/build.sh "$@"
+fi

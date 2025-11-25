@@ -13,6 +13,7 @@ Required:
 
 Optional:
   --precomputed-block-prefix  Precomputed block prefix
+  --reference-data-dir        Reference data directory. Defaults to empty, which skips comparison with reference data.
 
 This script is used to validate that an installed package is correct
 according to an exported fork_config.json file.
@@ -66,6 +67,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --precomputed-block-prefix)
             PRECOMPUTED_BLOCK_PREFIX="$2"
+            shift 2
+            ;;
+        --reference-data-dir)
+            REFERENCE_DATA_DIR="$2"
             shift 2
             ;;
         -*)
@@ -170,12 +175,16 @@ if [ ! -e "$WORKDIR/keys/p2p" ]; then
     "$MINA_EXE" libp2p generate-keypair --privkey-path "$WORKDIR/keys/p2p"
 fi
 
-echo "generating genesis ledgers ... (this may take a while)" >&2
-
-"$MINA_LEGACY_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$WORKDIR/legacy_ledgers" --hash-output-file "$WORKDIR/legacy_hashes.json"
+if [ -z "$REFERENCE_DATA_DIR" ]; then
+    echo "generating genesis ledgers ... (this may take a while)" >&2
+    "$MINA_LEGACY_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$WORKDIR/legacy_ledgers" --hash-output-file "$WORKDIR/legacy_hashes.json"
+    REFERENCE_DATA_DIR="$WORKDIR"
+else
+    echo "using reference data dir: $REFERENCE_DATA_DIR. Skipping legacy ledger generation." >&2
+fi
 
 result=$(jq --slurpfile block "$WORKDIR/precomputed_fork_block.json" \
-  --slurpfile legacy_hashes "$WORKDIR/legacy_hashes.json" -n '
+  --slurpfile legacy_hashes "$REFERENCE_DATA_DIR/legacy_hashes.json" -n '
   ($legacy_hashes[0].epoch_data.staking.hash == $block[0].data.protocol_state.body.consensus_state.staking_epoch_data.ledger.hash and
    $legacy_hashes[0].epoch_data.next.hash == $block[0].data.protocol_state.body.consensus_state.next_epoch_data.ledger.hash and
    $legacy_hashes[0].ledger.hash == $block[0].data.protocol_state.body.blockchain_state.staged_ledger_hash.non_snark.ledger_hash)')
