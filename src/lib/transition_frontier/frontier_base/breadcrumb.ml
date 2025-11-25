@@ -452,11 +452,15 @@ module For_tests = struct
       let body =
         Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff
       in
-      let%bind ( `Ledger_proof ledger_proof_opt
-               , `Staged_ledger transitioned_staged_ledger
-               , `Accounts_created _
-               , `Pending_coinbase_update _ ) =
-        match%bind
+      let ledger_and_proof =
+        let%bind.Deferred.Result ( `Ledger new_ledger
+                                 , `Accounts_created _
+                                 , `Stack_update stack_update
+                                 , `First_pass_ledger_end first_pass_ledger_end
+                                 , `Witnesses witnesses
+                                 , `Works works
+                                 , `Pending_coinbase_update (is_new_stack, _) )
+            =
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
             ~global_slot:current_global_slot ~coinbase_receiver ~logger
             staged_ledger_diff
@@ -466,7 +470,17 @@ module For_tests = struct
             ~zkapp_cmd_limit_hardcap:
               precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
             ~signature_kind:Testnet
-        with
+        in
+        Staged_ledger.apply_to_scan_state ~logger ~skip_verification:false
+          ~log_prefix:"apply_diff" ~state_and_body_hash ~ledger:new_ledger
+          ~previous_pending_coinbase_collection:
+            (Staged_ledger.pending_coinbase_collection parent_staged_ledger)
+          ~previous_scan_state:(Staged_ledger.scan_state parent_staged_ledger)
+          ~constraint_constants:precomputed_values.constraint_constants
+          ~is_new_stack ~stack_update ~first_pass_ledger_end works witnesses
+      in
+      let%bind transitioned_staged_ledger, ledger_proof_opt =
+        match%bind ledger_and_proof with
         | Ok r ->
             return r
         | Error e ->
