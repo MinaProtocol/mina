@@ -1106,7 +1106,7 @@ module T = struct
 
   (* TODO Remove hashing from first & second passes and then
      remove Deferred.t from [apply_diff], now it's there only for yielding *)
-  let apply_diff ~logger ~constraint_constants ~global_slot
+  let apply_diff_impl ~logger ~constraint_constants ~global_slot
       ~parent_protocol_state_body ~state_and_body_hash ~log_prefix
       ~zkapp_cmd_limit_hardcap ~signature_kind ~previous_scan_state
       ~previous_pending_coinbase_collection ~previous_ledger pre_diff_info =
@@ -1315,7 +1315,7 @@ module T = struct
              , `Works works
              , `Pending_coinbase_update
                  (is_new_stack, pending_coinbase_update_action) ) =
-      apply_diff ~constraint_constants ~global_slot
+      apply_diff_impl ~constraint_constants ~global_slot
         ~previous_scan_state:t.scan_state
         ~previous_pending_coinbase_collection:t.pending_coinbase_collection
         ~previous_ledger:t.ledger
@@ -1372,7 +1372,7 @@ module T = struct
              , `Works works
              , `Pending_coinbase_update
                  (is_new_stack, pending_coinbase_update_action) ) =
-      apply_diff ~constraint_constants ~global_slot
+      apply_diff_impl ~constraint_constants ~global_slot
         ~previous_scan_state:t.scan_state
         ~previous_pending_coinbase_collection:t.pending_coinbase_collection
         ~previous_ledger:t.ledger
