@@ -147,7 +147,6 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, forkConfig
 	// Calculate fork genesis timestamp relative to now (before starting fork network)
 	forkGenesisTs := time.Now().Unix() + int64(t.Config.ForkDelay*60)
 
-	t.Logger.Info("Phase 3: Generating fork configuration and ledgers...")
 	{
 		preforkGenesisConfigFile := fmt.Sprintf("%s/daemon.json", t.Config.Root)
 		forkHashesFile := "fork_data/hf_ledger_hashes.json"
