@@ -1106,20 +1106,25 @@ module T = struct
 
   (* TODO Remove hashing from first & second passes and then
      remove Deferred.t from [apply_diff], now it's there only for yielding *)
-  let apply_diff ?(skip_verification = false) ~logger ~constraint_constants
-      ~global_slot ~parent_protocol_state_body ~state_and_body_hash ~log_prefix
-      ~zkapp_cmd_limit_hardcap ~signature_kind t pre_diff_info =
+  let apply_diff ~logger ~constraint_constants ~global_slot
+      ~parent_protocol_state_body ~state_and_body_hash ~log_prefix
+      ~zkapp_cmd_limit_hardcap ~signature_kind ~previous_scan_state
+      ~previous_pending_coinbase_collection ~previous_ledger pre_diff_info =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
-      Int.pow 2 t.constraint_constants.transaction_capacity_log_2
+      Int.pow 2
+        constraint_constants
+          .Genesis_constants.Constraint_constants.transaction_capacity_log_2
     in
     let spots_available, proofs_waiting =
-      let jobs = Scan_state.all_work_statements_exn t.scan_state in
-      ( Int.min (Scan_state.free_space t.scan_state) max_throughput
+      let jobs = Scan_state.all_work_statements_exn previous_scan_state in
+      ( Int.min (Scan_state.free_space previous_scan_state) max_throughput
       , List.length jobs )
     in
-    let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
-    let new_ledger = Ledger.register_mask t.ledger new_mask in
+    let new_mask =
+      Ledger.Mask.create ~depth:(Ledger.depth previous_ledger) ()
+    in
+    let new_ledger = Ledger.register_mask previous_ledger new_mask in
     let transactions, works, commands_count, coinbases = pre_diff_info in
     let accounts_accessed =
       List.fold_left ~init:Account_id.Set.empty transactions ~f:(fun set txn ->
@@ -1168,8 +1173,8 @@ module T = struct
              , `First_pass_ledger_end first_pass_ledger_end ) =
       O1trace.thread "update_coinbase_stack_start_time" (fun () ->
           update_coinbase_stack_and_get_data ~logger ~constraint_constants
-            ~global_slot ~signature_kind t.scan_state new_ledger
-            t.pending_coinbase_collection transactions current_state_view
+            ~global_slot ~signature_kind previous_scan_state new_ledger
+            previous_pending_coinbase_collection transactions current_state_view
             state_and_body_hash )
     in
     let to_witness (witness, _) =
@@ -1181,13 +1186,15 @@ module T = struct
     let witnesses = List.map data ~f:to_witness in
     let slots = List.length data in
     let work_count = List.length works in
-    let required_pairs = Scan_state.work_statements_for_new_diff t.scan_state in
+    let required_pairs =
+      Scan_state.work_statements_for_new_diff previous_scan_state
+    in
     [%log internal] "Check_for_sufficient_snark_work"
       ~metadata:
         [ ("required_pairs", `Int (List.length required_pairs))
         ; ("work_count", `Int work_count)
         ; ("slots", `Int slots)
-        ; ("free_space", `Int (Scan_state.free_space t.scan_state))
+        ; ("free_space", `Int (Scan_state.free_space previous_scan_state))
         ] ;
     let%bind () =
       O1trace.thread "check_for_sufficient_snark_work" (fun () ->
@@ -1195,7 +1202,8 @@ module T = struct
           if
             work_count < required
             && slots
-               > Scan_state.free_space t.scan_state - required + work_count
+               > Scan_state.free_space previous_scan_state
+                 - required + work_count
           then
             Deferred.Result.fail
               (Staged_ledger_error.Insufficient_work
@@ -1207,14 +1215,7 @@ module T = struct
     in
     [%log internal] "Check_zero_fee_excess" ;
     let%bind () =
-      Deferred.return (check_zero_fee_excess t.scan_state witnesses)
-    in
-    let%bind new_staged_ledger, res_opt =
-      apply_to_scan_state ~logger ~skip_verification ~log_prefix
-        ~state_and_body_hash ~ledger:new_ledger
-        ~previous_pending_coinbase_collection:t.pending_coinbase_collection
-        ~previous_scan_state:t.scan_state ~constraint_constants ~is_new_stack
-        ~stack_update ~first_pass_ledger_end works witnesses
+      Deferred.return (check_zero_fee_excess previous_scan_state witnesses)
     in
     [%log debug]
       ~metadata:
@@ -1234,9 +1235,12 @@ module T = struct
     let%map coinbase_amount =
       Deferred.return (coinbase_for_blockchain_snark coinbases)
     in
-    ( `Ledger_proof res_opt
-    , `Staged_ledger new_staged_ledger
+    ( `Ledger new_ledger
     , `Accounts_created accounts_created
+    , `Stack_update stack_update
+    , `First_pass_ledger_end first_pass_ledger_end
+    , `Witnesses witnesses
+    , `Works works
     , `Pending_coinbase_update
         ( is_new_stack
         , { Pending_coinbase.Update.Poly.action = stack_update_in_snark
@@ -1303,14 +1307,31 @@ module T = struct
     in
     let apply_diff_start_time = Core.Time.now () in
     [%log internal] "Apply_diff" ;
-    let%map ((_, `Staged_ledger new_staged_ledger, _, _) as res) =
-      apply_diff
-        ~skip_verification:
-          ([%equal: [ `All | `Proofs ] option] skip_verification (Some `All))
-        ~constraint_constants ~global_slot t
+    let%bind ( `Ledger new_ledger
+             , `Accounts_created accounts_created
+             , `Stack_update stack_update
+             , `First_pass_ledger_end first_pass_ledger_end
+             , `Witnesses witnesses
+             , `Works works
+             , `Pending_coinbase_update
+                 (is_new_stack, pending_coinbase_update_action) ) =
+      apply_diff ~constraint_constants ~global_slot
+        ~previous_scan_state:t.scan_state
+        ~previous_pending_coinbase_collection:t.pending_coinbase_collection
+        ~previous_ledger:t.ledger
         (forget_prediff_info prediff)
         ~logger ~parent_protocol_state_body ~state_and_body_hash
         ~log_prefix:"apply_diff" ~zkapp_cmd_limit_hardcap ~signature_kind
+    in
+    let%map new_staged_ledger, res_opt =
+      let skip_verification =
+        [%equal: [ `All | `Proofs ] option] skip_verification (Some `All)
+      in
+      apply_to_scan_state ~logger ~skip_verification ~log_prefix:"apply_diff"
+        ~state_and_body_hash ~ledger:new_ledger
+        ~previous_pending_coinbase_collection:t.pending_coinbase_collection
+        ~previous_scan_state:t.scan_state ~constraint_constants ~is_new_stack
+        ~stack_update ~first_pass_ledger_end works witnesses
     in
     [%log internal] "Diff_applied" ;
     [%log debug]
@@ -1327,7 +1348,10 @@ module T = struct
             ~metadata:[ ("error", Error_json.error_to_yojson e) ]
             !"Error updating metrics after applying staged_ledger diff: $error" )
     in
-    res
+    ( `Ledger_proof res_opt
+    , `Staged_ledger new_staged_ledger
+    , `Accounts_created accounts_created
+    , `Pending_coinbase_update (is_new_stack, pending_coinbase_update_action) )
 
   let apply_diff_unchecked ~constraint_constants ~global_slot ~logger
       ~parent_protocol_state_body ~state_and_body_hash ~coinbase_receiver
@@ -1340,11 +1364,36 @@ module T = struct
            ~supercharge_coinbase sl_diff
       |> Deferred.return
     in
-    apply_diff t
-      (forget_prediff_info prediff)
-      ~constraint_constants ~global_slot ~logger ~parent_protocol_state_body
-      ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
-      ~zkapp_cmd_limit_hardcap ~signature_kind
+    let%bind ( `Ledger new_ledger
+             , `Accounts_created accounts_created
+             , `Stack_update stack_update
+             , `First_pass_ledger_end first_pass_ledger_end
+             , `Witnesses witnesses
+             , `Works works
+             , `Pending_coinbase_update
+                 (is_new_stack, pending_coinbase_update_action) ) =
+      apply_diff ~constraint_constants ~global_slot
+        ~previous_scan_state:t.scan_state
+        ~previous_pending_coinbase_collection:t.pending_coinbase_collection
+        ~previous_ledger:t.ledger
+        (forget_prediff_info prediff)
+        ~logger ~parent_protocol_state_body ~state_and_body_hash
+        ~log_prefix:"apply_diff_unchecked" ~zkapp_cmd_limit_hardcap
+        ~signature_kind
+    in
+    let%map new_staged_ledger, res_opt =
+      (* TODO consider skipping verification *)
+      apply_to_scan_state ~logger ~skip_verification:false
+        ~log_prefix:"apply_diff_unchecked" ~state_and_body_hash
+        ~ledger:new_ledger
+        ~previous_pending_coinbase_collection:t.pending_coinbase_collection
+        ~previous_scan_state:t.scan_state ~constraint_constants ~is_new_stack
+        ~stack_update ~first_pass_ledger_end works witnesses
+    in
+    ( `Ledger_proof res_opt
+    , `Staged_ledger new_staged_ledger
+    , `Accounts_created accounts_created
+    , `Pending_coinbase_update (is_new_stack, pending_coinbase_update_action) )
 
   module Resources = struct
     module Discarded = struct
