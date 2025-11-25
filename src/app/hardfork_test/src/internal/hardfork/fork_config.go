@@ -43,7 +43,7 @@ func (t *HardforkTest) GetForkConfig(port int) ([]byte, error) {
 }
 
 // CreateRuntimeConfig creates the runtime configuration for the fork
-func (t *HardforkTest) CreateRuntimeConfig(forkGenesisTimestamp, forkConfigPath, configFile, baseConfigFile, forkHashesFile string) ([]byte, error) {
+func (t *HardforkTest) PatchRuntimeConfigLegacy(forkGenesisTimestamp, forkConfigPath, configFile, baseConfigFile, forkHashesFile string) ([]byte, error) {
 	cmd := exec.Command(filepath.Join(t.ScriptDir, "create_runtime_config.sh"))
 	cmd.Env = append(os.Environ(),
 		"GENESIS_TIMESTAMP="+forkGenesisTimestamp,

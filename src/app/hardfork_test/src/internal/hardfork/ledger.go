@@ -64,11 +64,11 @@ func (t *HardforkTest) GenerateAndValidatePreforkLedgers(analysis *BlockAnalysis
 	return nil
 }
 
-// GenerateForkConfigAndLedgers does the following:
+// PatchForkConfigAndGenerateLedgersLegacy does the following:
 // 1. generate fork ledgers with runtime-genesis-ledger
 // 2. patch the genesis time & slot for fork config with create_runtime_config.sh
 // 3. perform some base sanity check on the fork config
-func (t *HardforkTest) GenerateForkConfigAndLedgers(analysis *BlockAnalysisResult, forkConfigPath, forkLedgersDir, forkHashesFile, configFile, preforkGenesisConfigFile string, forkGenesisTs, mainGenesisTs int64) error {
+func (t *HardforkTest) PatchForkConfigAndGenerateLedgersLegacy(analysis *BlockAnalysisResult, forkConfigPath, forkLedgersDir, forkHashesFile, configFile, preforkGenesisConfigFile string, forkGenesisTs, mainGenesisTs int64) error {
 	// Generate fork ledgers using fork network executable
 	if err := t.GenerateForkLedgers(t.Config.ForkRuntimeGenesisLedger, forkConfigPath, forkLedgersDir, forkHashesFile); err != nil {
 		return err
@@ -76,7 +76,7 @@ func (t *HardforkTest) GenerateForkConfigAndLedgers(analysis *BlockAnalysisResul
 
 	// Create runtime config
 	forkGenesisTimestamp := config.FormatTimestamp(forkGenesisTs)
-	runtimeConfigBytes, err := t.CreateRuntimeConfig(forkGenesisTimestamp, forkConfigPath, configFile, preforkGenesisConfigFile, forkHashesFile)
+	runtimeConfigBytes, err := t.PatchRuntimeConfigLegacy(forkGenesisTimestamp, forkConfigPath, configFile, preforkGenesisConfigFile, forkHashesFile)
 	if err != nil {
 		return err
 	}
@@ -99,6 +99,11 @@ func (t *HardforkTest) AdvancedGenerateHardForkConfig(configDir string) error {
 	}
 
 	cmd.Wait()
+
+	_, err := os.Stat(fmt.Sprintf("%s/activated", configDir))
+	if err != nil {
+		return fmt.Errorf("failed to check on activated file for advanced generate fork config: %w", err)
+	}
 
 	return nil
 }
