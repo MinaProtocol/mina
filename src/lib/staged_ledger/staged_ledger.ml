@@ -1250,15 +1250,23 @@ module T = struct
           ; coinbase_amount
           } ) )
 
-  let update_metrics (t : t) (witness : Staged_ledger_diff.t) =
-    let open Or_error.Let_syntax in
+  let update_scan_state_metrics scan_state =
+    let%bind.Or_error () = Scan_state.update_metrics scan_state in
+    Or_error.try_with (fun () ->
+        let open Mina_metrics in
+        Gauge.set Scan_state_metrics.snark_work_required
+          (Float.of_int
+             (List.length (Scan_state.all_work_statements_exn scan_state)) ) )
+
+  let update_diff_metrics (witness : Staged_ledger_diff.t) =
     let commands = Staged_ledger_diff.commands witness in
     let work = Staged_ledger_diff.completed_works witness in
-    let%bind total_txn_fee =
+    let%bind.Or_error total_txn_fee =
       sum_fees commands ~f:(fun { data = cmd; _ } -> User_command.fee cmd)
     in
-    let%bind total_snark_fee = sum_fees work ~f:Transaction_snark_work.fee in
-    let%bind () = Scan_state.update_metrics t.scan_state in
+    let%bind.Or_error total_snark_fee =
+      sum_fees work ~f:Transaction_snark_work.fee
+    in
     Or_error.try_with (fun () ->
         let open Mina_metrics in
         Gauge.set Scan_state_metrics.snark_fee_per_block
@@ -1266,10 +1274,7 @@ module T = struct
         Gauge.set Scan_state_metrics.transaction_fees_per_block
           (Int.to_float @@ Fee.to_nanomina_int total_txn_fee) ;
         Gauge.set Scan_state_metrics.purchased_snark_work_per_block
-          (Float.of_int @@ List.length work) ;
-        Gauge.set Scan_state_metrics.snark_work_required
-          (Float.of_int
-             (List.length (Scan_state.all_work_statements_exn t.scan_state)) ) )
+          (Float.of_int @@ List.length work) )
 
   let forget_prediff_info ((a : Transaction.Valid.t With_status.t list), b, c, d)
       =
@@ -1282,9 +1287,9 @@ module T = struct
       ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
       ~zkapp_cmd_limit_hardcap ~signature_kind
       ?(transaction_pool_proxy = Check_commands.dummy_transaction_pool_proxy) t
-      (witness : Staged_ledger_diff.t) =
+      (staged_ledger_diff : Staged_ledger_diff.t) =
     let open Deferred.Result.Let_syntax in
-    let work = Staged_ledger_diff.completed_works witness in
+    let work = Staged_ledger_diff.completed_works staged_ledger_diff in
     let%bind () =
       O1trace.thread "check_completed_works" (fun () ->
           match skip_verification with
@@ -1298,8 +1303,8 @@ module T = struct
     in
     [%log internal] "Prediff" ;
     let%bind prediff =
-      Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
-        ~supercharge_coinbase
+      Pre_diff_info.get staged_ledger_diff ~constraint_constants
+        ~coinbase_receiver ~supercharge_coinbase
         ~check:
           (Check_commands.check_commands t.ledger ~verifier
              ~transaction_pool_proxy )
@@ -1326,6 +1331,10 @@ module T = struct
         ~logger ~parent_protocol_state_body ~state_and_body_hash
         ~log_prefix:"apply_diff" ~zkapp_cmd_limit_hardcap ~signature_kind
     in
+    Or_error.iter_error (update_diff_metrics staged_ledger_diff) ~f:(fun e ->
+        [%log error]
+          ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+          !"Error updating metrics after applying diff: $error" ) ;
     let%map new_staged_ledger, res_opt =
       let skip_verification =
         [%equal: [ `All | `Proofs ] option] skip_verification (Some `All)
@@ -1344,13 +1353,10 @@ module T = struct
           )
         ]
       "Staged_ledger.apply_diff take $time_elapsed" ;
-    let () =
-      Or_error.iter_error (update_metrics new_staged_ledger witness)
-        ~f:(fun e ->
-          [%log error]
-            ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-            !"Error updating metrics after applying staged_ledger diff: $error" )
-    in
+    Or_error.iter_error (update_scan_state_metrics t.scan_state) ~f:(fun e ->
+        [%log error]
+          ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+          !"Error updating metrics after applying scan state: $error" ) ;
     ( `Ledger_proof res_opt
     , `Staged_ledger new_staged_ledger
     , `Accounts_created accounts_created
