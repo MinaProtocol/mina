@@ -492,34 +492,66 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     else Deferred.Result.fail `Invalid_body_reference
   in
   let parent_protocol_state_body = Protocol_state.body parent_protocol_state in
-  let%bind.Deferred.Result ( `Ledger_proof proof_opt
-                           , `Staged_ledger transitioned_staged_ledger
-                           , `Accounts_created accounts_created
-                           , `Pending_coinbase_update _ ) =
-    Staged_ledger.apply_diff ?skip_verification:skip_staged_ledger_verification
-      ~get_completed_work
-      ~constraint_constants:
-        precomputed_values.Precomputed_values.constraint_constants ~global_slot
-      ~logger ~verifier parent_staged_ledger
-      (Staged_ledger_diff.Body.staged_ledger_diff body)
-      ~parent_protocol_state_body
-      ~state_and_body_hash:
-        (let body_hash =
-           Protocol_state.(Body.hash @@ body parent_protocol_state)
-         in
-         ( (Protocol_state.hashes_with_body parent_protocol_state ~body_hash)
-             .state_hash
-         , body_hash ) )
-      ~coinbase_receiver:(Consensus_state.coinbase_receiver consensus_state)
-      ~supercharge_coinbase:
-        (Consensus_state.supercharge_coinbase consensus_state)
-      ~zkapp_cmd_limit_hardcap:
-        precomputed_values.Precomputed_values.genesis_constants
-          .zkapp_cmd_limit_hardcap
-      ~signature_kind:Mina_signature_kind.t_DEPRECATED ?transaction_pool_proxy
-    |> Deferred.Result.map_error ~f:(fun e ->
-           `Staged_ledger_application_failed e )
+  [%log internal] "Apply_diff" ;
+  let state_and_body_hash =
+    let body_hash = Protocol_state.(Body.hash @@ body parent_protocol_state) in
+    ( (Protocol_state.hashes_with_body parent_protocol_state ~body_hash)
+        .state_hash
+    , body_hash )
   in
+  let constraint_constants =
+    precomputed_values.Precomputed_values.constraint_constants
+  in
+  let%bind.Deferred.Result ( transitioned_staged_ledger
+                           , proof_opt
+                           , accounts_created ) =
+    Deferred.Result.map_error ~f:(fun e -> `Staged_ledger_application_failed e)
+    @@ let%bind.Deferred.Result ( `Ledger new_ledger
+                                , `Accounts_created accounts_created
+                                , `Stack_update stack_update
+                                , `First_pass_ledger_end first_pass_ledger_end
+                                , `Witnesses witnesses
+                                , `Works works
+                                , `Pending_coinbase_update (is_new_stack, _) ) =
+         Staged_ledger.apply_diff
+           ?skip_verification:skip_staged_ledger_verification
+           ~get_completed_work ~constraint_constants ~global_slot ~logger
+           ~verifier parent_staged_ledger
+           (Staged_ledger_diff.Body.staged_ledger_diff body)
+           ~parent_protocol_state_body ~state_and_body_hash
+           ~coinbase_receiver:
+             (Consensus_state.coinbase_receiver consensus_state)
+           ~supercharge_coinbase:
+             (Consensus_state.supercharge_coinbase consensus_state)
+           ~zkapp_cmd_limit_hardcap:
+             precomputed_values.Precomputed_values.genesis_constants
+               .zkapp_cmd_limit_hardcap
+           ~signature_kind:Mina_signature_kind.t_DEPRECATED
+           ?transaction_pool_proxy
+       in
+       let%map.Deferred.Result new_staged_ledger, res_opt =
+         let skip_verification =
+           [%equal: [ `All | `Proofs ] option] skip_staged_ledger_verification
+             (Some `All)
+         in
+         Staged_ledger.apply_to_scan_state ~logger ~skip_verification
+           ~log_prefix:"apply_diff" ~state_and_body_hash ~ledger:new_ledger
+           ~previous_pending_coinbase_collection:
+             (Staged_ledger.pending_coinbase_collection parent_staged_ledger)
+           ~previous_scan_state:(Staged_ledger.scan_state parent_staged_ledger)
+           ~constraint_constants ~is_new_stack ~stack_update
+           ~first_pass_ledger_end works witnesses
+       in
+       Or_error.iter_error
+         ( Staged_ledger.update_scan_state_metrics
+         @@ Staged_ledger.scan_state new_staged_ledger )
+         ~f:(fun e ->
+           [%log error]
+             ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+             !"Error updating metrics after applying scan state: $error" ) ;
+       (new_staged_ledger, res_opt, accounts_created)
+  in
+  [%log internal] "Diff_applied" ;
   let staged_ledger_hash_opt =
     match skip_staged_ledger_verification with
     | Some `All ->

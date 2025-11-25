@@ -283,22 +283,45 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                         diff_result )
           in
           [%log internal] "Apply_staged_ledger_diff" ;
-          match%map
+          let application_res =
             let%bind.Deferred.Result diff = return diff in
-            Staged_ledger.apply_diff_unchecked staged_ledger
-              ~constraint_constants ~global_slot diff ~logger
-              ~parent_protocol_state_body:previous_protocol_state_body
-              ~state_and_body_hash:
-                (previous_protocol_state_hash, previous_protocol_state_body_hash)
-              ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
-              ~signature_kind
-          with
+            let state_and_body_hash =
+              (previous_protocol_state_hash, previous_protocol_state_body_hash)
+            in
+            let%bind.Deferred.Result ( `Ledger new_ledger
+                                     , `Accounts_created _
+                                     , `Stack_update stack_update
+                                     , `First_pass_ledger_end
+                                         first_pass_ledger_end
+                                     , `Witnesses witnesses
+                                     , `Works works
+                                     , `Pending_coinbase_update
+                                         (is_new_stack, pcu_action) ) =
+              Staged_ledger.apply_diff_unchecked staged_ledger
+                ~constraint_constants ~global_slot diff ~logger
+                ~parent_protocol_state_body:previous_protocol_state_body
+                ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
+                ~zkapp_cmd_limit_hardcap ~signature_kind
+            in
+            (* TODO consider skipping verification (i.e. ~skip_verification:true) *)
+            let%map.Deferred.Result new_staged_ledger, ledger_proof_opt =
+              Staged_ledger.apply_to_scan_state ~logger ~skip_verification:false
+                ~log_prefix:"apply_diff_unchecked" ~state_and_body_hash
+                ~ledger:new_ledger
+                ~previous_pending_coinbase_collection:
+                  (Staged_ledger.pending_coinbase_collection staged_ledger)
+                ~previous_scan_state:(Staged_ledger.scan_state staged_ledger)
+                ~constraint_constants ~is_new_stack ~stack_update
+                ~first_pass_ledger_end works witnesses
+            in
+            (new_staged_ledger, ledger_proof_opt, is_new_stack, pcu_action)
+          in
+          match%map application_res with
           | Ok
-              ( `Ledger_proof ledger_proof_opt
-              , `Staged_ledger transitioned_staged_ledger
-              , `Accounts_created _
-              , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
-              ) ->
+              ( transitioned_staged_ledger
+              , ledger_proof_opt
+              , is_new_stack
+              , pending_coinbase_update ) ->
               [%log internal] "Hash_new_staged_ledger" ;
               let staged_ledger_hash =
                 Staged_ledger.hash transitioned_staged_ledger
