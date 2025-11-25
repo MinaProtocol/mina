@@ -137,24 +137,28 @@ let wait_until_ready ~log_file =
         wait_until_log_created ()
   in
   let%bind.Deferred.Or_error () = wait_until_log_created () in
+  let lines_to_check_from = ref 0 in
   let rec wait_til_log_ready_emitted () =
     if is_timeout () then
       Deferred.Or_error.error_string
         "Timeout waiting for archive process to be ready"
     else
       let%bind reader = Reader.open_file log_file in
-      let rec impl () =
+      let rec check_lines_from cur_line =
         match%bind Reader.read_line reader with
         | `Eof ->
             let%bind () = after poll_interval in
+            lines_to_check_from := cur_line ;
             wait_til_log_ready_emitted ()
-        | `Ok line -> (
+        | `Ok line when cur_line >= !lines_to_check_from -> (
             match Yojson.Safe.from_string line |> Logger.Message.of_yojson with
             | Ok { message; _ } when String.equal message expected_message ->
                 Deferred.Or_error.return ()
             | _ ->
-                impl () )
+                check_lines_from (cur_line + 1) )
+        | `Ok _ ->
+            check_lines_from (cur_line + 1)
       in
-      impl ()
+      check_lines_from 0
   in
   wait_til_log_ready_emitted ()
