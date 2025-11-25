@@ -82,9 +82,7 @@ type Structured_log_events.t += Persisted_frontier_dropped
   [@@deriving register_event { msg = "Persistent frontier dropped" }]
 
 let genesis_root_data ~precomputed_values =
-  let transition =
-    Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
-  in
+  let transition, _ = Mina_block.genesis ~precomputed_values in
   let constraint_constants = precomputed_values.constraint_constants in
   let scan_state = Staged_ledger.Scan_state.empty ~constraint_constants () in
   (*if scan state is empty the protocol states required is also empty*)
@@ -571,8 +569,8 @@ module For_tests = struct
     let constraint_constants = precomputed_values.constraint_constants in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let transition_receipt_time = Some (Time.now ()) in
-        let genesis_transition =
-          Mina_block.Validated.lift (Mina_block.genesis ~precomputed_values)
+        let genesis_transition, genesis_block_tag =
+          Mina_block.genesis ~precomputed_values
         in
         let genesis_ledger =
           Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
@@ -605,7 +603,8 @@ module For_tests = struct
         in
         Breadcrumb.create ~validated_transition:genesis_transition
           ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false
-          ~transition_receipt_time ~accounts_created:[] )
+          ~transition_receipt_time ~accounts_created:[]
+          ~block_tag:genesis_block_tag )
 
   let gen_persistence ?(logger = Logger.null ()) ~verifier
       ~(precomputed_values : Precomputed_values.t) () =

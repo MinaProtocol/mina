@@ -2226,8 +2226,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             Broadcast_pipe.create
               ( Mina_block.genesis_header
                   ~precomputed_values:config.precomputed_values
-              |> Validation.reset_frontier_dependencies_validation
-              |> Validation.reset_staged_ledger_diff_validation )
+              |> Validation.reset_frontier_dependencies_validation )
           in
           let get_most_recent_valid_block () =
             Broadcast_pipe.Reader.peek most_recent_valid_block_reader

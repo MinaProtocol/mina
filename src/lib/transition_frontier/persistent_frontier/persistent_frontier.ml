@@ -7,6 +7,17 @@ open Frontier_base
 module Database = Database
 module Root_ledger = Mina_ledger.Root
 
+(* TODO get rid of the hack, preserve block tag in database
+   instead of the full transition *)
+let temp_state_hash =
+  lazy
+    (Quickcheck.random_value
+       ~seed:
+         (`Deterministic
+           Blake2.(
+             digest_string "temporary state hash for root" |> to_raw_string) )
+       State_hash.gen )
+
 module type CONTEXT = sig
   val logger : Logger.t
 
@@ -288,6 +299,15 @@ module Instance = struct
       | Ok staged_ledger ->
           Ok staged_ledger
     in
+    (* TODO remove the hack *)
+    let root_block_tag =
+      State_hash.File_storage.write_values_exn (Lazy.force temp_state_hash)
+        ~f:(fun writer ->
+          State_hash.File_storage.write_value writer
+            (module Mina_block.Stable.Latest)
+          @@ Mina_block.read_all_proofs_from_disk @@ With_hash.data
+          @@ Mina_block.Validated.forget root_transition )
+    in
     (* initialize the new in memory frontier and extensions *)
     let frontier =
       Full_frontier.create
@@ -299,6 +319,7 @@ module Instance = struct
           ; protocol_states =
               List.map protocol_states
                 ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
+          ; block_tag = root_block_tag
           }
         ~root_ledger:(Root_ledger.as_unmasked root_ledger)
         ~consensus_local_state ~max_length ~persistent_root_instance

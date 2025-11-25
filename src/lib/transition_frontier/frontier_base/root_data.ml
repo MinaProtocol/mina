@@ -213,9 +213,10 @@ type t =
   ; protocol_states :
       Mina_state.Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
       list
+  ; block_tag : Mina_block.Stable.Latest.t Mina_base.State_hash.File_storage.tag
   }
 
-let minimize { transition; staged_ledger; protocol_states = _ } =
+let minimize { transition; staged_ledger; protocol_states = _; block_tag = _ } =
   let scan_state = Staged_ledger.scan_state staged_ledger in
   let pending_coinbase =
     Staged_ledger.pending_coinbase_collection staged_ledger
@@ -223,7 +224,7 @@ let minimize { transition; staged_ledger; protocol_states = _ } =
   let common = Common.create ~scan_state ~pending_coinbase in
   { Minimal.hash = Mina_block.Validated.state_hash transition; common }
 
-let limit { transition; staged_ledger; protocol_states } =
+let limit { transition; staged_ledger; protocol_states; block_tag = _ } =
   let scan_state = Staged_ledger.scan_state staged_ledger in
   let pending_coinbase =
     Staged_ledger.pending_coinbase_collection staged_ledger

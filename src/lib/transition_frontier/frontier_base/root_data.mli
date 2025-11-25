@@ -160,6 +160,7 @@ type t =
   ; protocol_states :
       Mina_state.Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
       list
+  ; block_tag : Mina_block.Stable.Latest.t Mina_base.State_hash.File_storage.tag
   }
 
 val minimize : t -> Minimal.t

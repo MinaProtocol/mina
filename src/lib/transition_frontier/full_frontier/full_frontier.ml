@@ -170,7 +170,7 @@ let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
       ~staged_ledger:root_data.staged_ledger ~just_emitted_a_proof:false
       ~transition_receipt_time
         (* accounts created shouldn't be used for the root *)
-      ~accounts_created:[]
+      ~accounts_created:[] ~block_tag:root_data.block_tag
   in
   let root_node =
     { Node.breadcrumb = root_breadcrumb; successor_hashes = []; length = 0 }
@@ -196,6 +196,7 @@ let root_data t =
   { transition = Breadcrumb.validated_transition root
   ; staged_ledger = Breadcrumb.staged_ledger root
   ; protocol_states = State_hash.Map.data t.protocol_states_for_root_scan_state
+  ; block_tag = Breadcrumb.block_tag root
   }
 
 let max_length { max_length; _ } = max_length
@@ -563,6 +564,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
         (Breadcrumb.transition_receipt_time new_root_node.breadcrumb)
         (* accounts created shouldn't be used for the root *)
       ~accounts_created:[]
+      ~block_tag:(Breadcrumb.block_tag new_root_node.breadcrumb)
   in
   (*Update the protocol states required for scan state at the new root.
     Note: this should be after applying the transactions to the snarked ledger (Step 5)
@@ -1018,11 +1020,8 @@ module For_tests = struct
     in
     let root_data =
       let open Root_data in
-      { transition =
-          Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
-      ; staged_ledger
-      ; protocol_states = []
-      }
+      let transition, block_tag = Mina_block.genesis ~precomputed_values in
+      { transition; staged_ledger; protocol_states = []; block_tag }
     in
     let persistent_root =
       Persistent_root.create ~logger ~backing_type:Stable_db
