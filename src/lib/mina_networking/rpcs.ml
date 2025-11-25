@@ -298,24 +298,16 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash ~logger
         ~frontier hash
     in
-    match result with
-    | None ->
+    let%map () =
+      if Option.is_none result then
         Trust_system.(
           record_envelope_sender trust_system logger
             (Envelope.Incoming.sender request)
             Actions.
               (Requested_unknown_item, Some (receipt_trust_action_message hash)))
-        >>| const None
-    | Some (scan_state, expected_merkle_root, pending_coinbases, protocol_states)
-      ->
-        return
-          (Some
-             (* TODO convert to stable, current implementation is incorrect,
-                bootstrap won't happen *)
-             ( scan_state
-             , expected_merkle_root
-             , pending_coinbases
-             , protocol_states ) )
+      else Deferred.unit
+    in
+    result
 
   let rate_limit_budget = (4, `Per Time.Span.minute)
 

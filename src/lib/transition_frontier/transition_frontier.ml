@@ -562,6 +562,36 @@ include struct
     proxy1 protocol_states_for_root_scan_state
 end
 
+let protocol_states_of_scan_state ~frontier scan_state =
+  Staged_ledger.Scan_state.required_state_hashes scan_state
+  |> State_hash.Set.to_list
+  |> List.fold_until ~init:(Some [])
+       ~f:(fun acc hash ->
+         match
+           Option.map2 (find_protocol_state frontier hash) acc ~f:List.cons
+         with
+         | None ->
+             Stop None
+         | Some acc' ->
+             Continue (Some acc') )
+       ~finish:Fn.id
+
+let staged_ledger_aux_and_pending_coinbases_at_hash frontier state_hash =
+  let%bind.Option breadcrumb = find frontier state_hash in
+  let staged_ledger = Breadcrumb.staged_ledger breadcrumb in
+  let scan_state = Staged_ledger.scan_state staged_ledger in
+  let staged_ledger_hash = Breadcrumb.staged_ledger_hash breadcrumb in
+  let merkle_root = Staged_ledger_hash.ledger_hash staged_ledger_hash in
+  let%map.Option scan_state_protocol_states =
+    protocol_states_of_scan_state ~frontier scan_state
+  in
+  let pending_coinbase =
+    Staged_ledger.pending_coinbase_collection staged_ledger
+  in
+  (* Cache in frontier and return tag *)
+  ( (scan_state, merkle_root, pending_coinbase, scan_state_protocol_states)
+  , staged_ledger_hash )
+
 module For_tests = struct
   open Signature_lib
   module Ledger_transfer =
