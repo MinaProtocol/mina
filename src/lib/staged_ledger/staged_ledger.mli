@@ -207,7 +207,7 @@ val hash : t -> Staged_ledger_hash.t
 
 type transaction_pool_proxy = Check_commands.transaction_pool_proxy
 
-val apply :
+val apply_diff :
      ?skip_verification:[ `Proofs | `All ]
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t

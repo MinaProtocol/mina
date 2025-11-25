@@ -1277,7 +1277,7 @@ module T = struct
 
   type transaction_pool_proxy = Check_commands.transaction_pool_proxy
 
-  let apply ?skip_verification ~constraint_constants ~global_slot
+  let apply_diff ?skip_verification ~constraint_constants ~global_slot
       ~get_completed_work ~logger ~verifier ~parent_protocol_state_body
       ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
       ~zkapp_cmd_limit_hardcap ~signature_kind
@@ -2487,7 +2487,7 @@ let%test_module "staged ledger tests" =
               , `Accounts_created _
               , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
-          Sl.apply ~constraint_constants ~global_slot !sl diff' ~logger
+          Sl.apply_diff ~constraint_constants ~global_slot !sl diff' ~logger
             ~verifier ~get_completed_work:(Fn.const None)
             ~parent_protocol_state_body ~state_and_body_hash ~coinbase_receiver
             ~supercharge_coinbase ~zkapp_cmd_limit_hardcap ~signature_kind
@@ -3451,7 +3451,7 @@ let%test_module "staged ledger tests" =
                       Mina_state.Protocol_state.hashes current_state
                     in
                     let%bind apply_res =
-                      Sl.apply ~constraint_constants ~global_slot !sl diff
+                      Sl.apply_diff ~constraint_constants ~global_slot !sl diff
                         ~logger ~verifier ~get_completed_work:(Fn.const None)
                         ~parent_protocol_state_body
                         ~state_and_body_hash:
@@ -4514,7 +4514,7 @@ let%test_module "staged ledger tests" =
                     }
                   in
                   match%map
-                    Sl.apply ~constraint_constants ~global_slot !sl
+                    Sl.apply_diff ~constraint_constants ~global_slot !sl
                       (Staged_ledger_diff.forget diff)
                       ~logger ~verifier ~get_completed_work:(Fn.const None)
                       ~parent_protocol_state_body ~state_and_body_hash
@@ -4731,7 +4731,7 @@ let%test_module "staged ledger tests" =
                   |> List.map ~f:(fun cmd -> User_command.forget_check cmd) ) ) ;
               assert (List.length invalid_txns = 3) ;
               match%bind
-                Sl.apply ~constraint_constants ~global_slot sl
+                Sl.apply_diff ~constraint_constants ~global_slot sl
                   (Staged_ledger_diff.forget diff)
                   ~logger ~verifier ~get_completed_work:(Fn.const None)
                   ~parent_protocol_state_body ~state_and_body_hash
@@ -4778,7 +4778,7 @@ let%test_module "staged ledger tests" =
                     }
                   in
                   match%map
-                    Sl.apply ~constraint_constants ~global_slot sl
+                    Sl.apply_diff ~constraint_constants ~global_slot sl
                       (Staged_ledger_diff.forget diff)
                       ~logger ~verifier ~get_completed_work:(Fn.const None)
                       ~parent_protocol_state_body ~state_and_body_hash
@@ -4881,7 +4881,7 @@ let%test_module "staged ledger tests" =
                 , state_hashes.state_body_hash |> Option.value_exn )
               in
               let%map result =
-                apply ~logger ~constraint_constants ~global_slot
+                apply_diff ~logger ~constraint_constants ~global_slot
                   ~get_completed_work:(Fn.const None) ~verifier
                   ~parent_protocol_state_body ~state_and_body_hash
                   ~coinbase_receiver ~supercharge_coinbase:false sl diff
@@ -5327,7 +5327,7 @@ let%test_module "staged ledger tests" =
                           ~proof_level:Full ()
                       in
                       match%map
-                        Sl.apply ~constraint_constants ~global_slot !sl
+                        Sl.apply_diff ~constraint_constants ~global_slot !sl
                           (Staged_ledger_diff.forget diff)
                           ~get_completed_work:(Fn.const None) ~logger
                           ~verifier:verifier_full ~parent_protocol_state_body
