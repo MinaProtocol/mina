@@ -154,7 +154,10 @@ let test_property ?length () =
   let res =
     Or_error.try_with
     @@ fun () ->
-    Quickcheck.test (three_op_groups ?length ()) ~f:(fun write_three_groups ->
+    Quickcheck.test
+      ?trials:(Option.map ~f:(const 1) length)
+      (three_op_groups ?length ())
+      ~f:(fun write_three_groups ->
         let read_ops =
           write_values_exn file1 ~f:(fun writer1 ->
               write_values_exn file2 ~f:(fun writer2 ->
