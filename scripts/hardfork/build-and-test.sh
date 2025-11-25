@@ -15,9 +15,16 @@ set -eux -o pipefail
 PREFORK=""
 FORK_METHOD="legacy"
 
+USAGE="Usage: $0 --fork-from <PREFORK> [--fork-method <FORK_METHOD>]"
 usage() {
-  echo "Usage: $0 --fork-from <PREFORK> --fork-method <FORK_METHOD>"
-  exit 1
+  if (( $# > 0 )); then
+    echo "$1" >&2
+    echo "$USAGE"
+    exit 1
+  else
+    echo "$USAGE"
+    exit 0
+  fi
 }
 
 # ---- argument parsing --------------------------------------------------------
@@ -26,8 +33,7 @@ while [[ $# -gt 0 ]]; do
     --fork-from)
       # ensure value exists
       if [[ $# -lt 2 ]]; then
-        echo "Error: $1 requires an argument."
-        usage
+        usage "Error: $1 requires an argument."
       fi
       PREFORK="$2"
       shift 2
@@ -35,16 +41,14 @@ while [[ $# -gt 0 ]]; do
     --fork-method)
       # ensure value exists
       if [[ $# -lt 2 ]]; then
-        echo "Error: $1 requires an argument."
-        usage
+        usage "Error: $1 requires an argument."
       fi
       case "$2" in
         legacy|advanced-generate-hf-config)
           FORK_METHOD="$2"
           ;;
         *)
-          echo "Error: $1 must be either 'legacy' or 'advanced-generate-hf-config'."
-          usage
+          usage "Error: $1 must be either 'legacy' or 'advanced-generate-hf-config'."
           ;;
       esac
       shift 2
@@ -53,25 +57,21 @@ while [[ $# -gt 0 ]]; do
       usage
       ;;
     --*)
-      echo "Unknown option: $1"
-      usage
+      usage "Unknown option: $1"
       ;;
     *)
       # positional arg — store if needed later
-      echo "Unexpected argument: $1"
-      usage
+      usage "Unexpected argument: $1"
       ;;
   esac
 done
 
 if [[ -z "$PREFORK" ]]; then
-  echo "Error: --fork-from must be provided."
-  usage
+  usage "Error: --fork-from must be provided."
 fi
 
 if [[ "$FORK_METHOD" == "advanced-generate-hf-config" ]]; then
-  echo "Error: unimplemented fork mode 'advanced-generate-hf-config'"
-  usage
+  usage "Error: unimplemented fork mode '$FORK_METHOD'"
 fi
 
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
