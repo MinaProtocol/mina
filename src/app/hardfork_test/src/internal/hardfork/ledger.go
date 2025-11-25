@@ -81,3 +81,21 @@ func (t *HardforkTest) GenerateForkConfigAndLedgers(analysis *BlockAnalysisResul
 	// Validate modified fork data
 	return t.ValidateForkRuntimeConfig(analysis.LatestNonEmptyBlock, runtimeConfigBytes, forkGenesisTs, mainGenesisTs)
 }
+
+func (t *HardforkTest) AdvancedGenerateHardForkConfig(configDir string) error {
+	cmd := exec.Command(t.Config.MainMinaExe,
+		"advanced", "generate-hardfork-config",
+		"--hardfork-config-dir", configDir,
+	)
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to call mina CLI: %w", err)
+	}
+
+	cmd.Wait()
+
+	return nil
+}
