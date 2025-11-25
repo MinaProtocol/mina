@@ -1,7 +1,7 @@
 open Core_kernel
 
 (** Buffer size for writing: 128 KB *)
-let buffer_size = 131072
+let default_buffer_size = 131072
 
 module type S = Intf.S
 
@@ -62,7 +62,8 @@ end) :
     Out_channel.output_string oc (Buffer.contents buffer)
 
   (* Write key function provided to the callback *)
-  let make_writer ~init_offset ~oc ~filename_key ~buffer : writer_t =
+  let make_writer ~buffer_size ~init_offset ~oc ~filename_key ~buffer : writer_t
+      =
     let offset = ref init_offset in
     { f =
         (fun (type a) (module B : Bin_prot.Binable.S with type t = a)
@@ -94,11 +95,13 @@ end) :
     }
 
   (** Write multiple keys to a database file with buffered I/O *)
-  let write_values_exn ~f filename_key =
+  let write_values_exn ?(buffer_size = default_buffer_size) ~f filename_key =
     let do_writing oc =
       (* Buffer for accumulating writes *)
       let buffer = Buffer.create buffer_size in
-      let writer = make_writer ~init_offset:0L ~oc ~filename_key ~buffer in
+      let writer =
+        make_writer ~buffer_size ~init_offset:0L ~oc ~filename_key ~buffer
+      in
 
       (* Call user function with write_value *)
       let result = f writer in
@@ -111,6 +114,31 @@ end) :
     Out_channel.with_file
       (Inputs.filename filename_key)
       ~binary:true ~f:do_writing
+
+  (** Append multiple keys to an existing database file with buffered I/O *)
+  let append_values_exn ?(buffer_size = default_buffer_size) ~f filename_key =
+    let filename = Inputs.filename filename_key in
+    let do_appending oc =
+      (* Get current file size to calculate offset for new writes *)
+      let init_offset = Out_channel.length oc in
+
+      (* Buffer for accumulating writes *)
+      let buffer = Buffer.create buffer_size in
+
+      (* Create a modified writer that accounts for the initial file offset *)
+      let writer =
+        make_writer ~buffer_size ~init_offset ~oc ~filename_key ~buffer
+      in
+
+      (* Call user function with write_value *)
+      let result = f writer in
+
+      (* Flush any remaining data *)
+      if Buffer.length buffer > 0 then flush_buffer oc buffer ;
+
+      result
+    in
+    Out_channel.with_file filename ~binary:true ~append:true ~f:do_appending
 
   (** Read a value from the database using a tag *)
   let read :
