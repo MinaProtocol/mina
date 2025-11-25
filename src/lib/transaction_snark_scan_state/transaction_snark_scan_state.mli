@@ -45,6 +45,8 @@ module Transaction_with_witness : sig
     type t
 
     val create : tag:Tag.t -> Stable.Latest.t -> t
+
+    val statement : t -> Transaction_snark.Statement.t
   end
 
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)

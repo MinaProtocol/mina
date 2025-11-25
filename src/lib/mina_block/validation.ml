@@ -479,6 +479,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   let consensus_state = Protocol_state.consensus_state protocol_state in
   let global_slot = Consensus_state.global_slot_since_genesis consensus_state in
   let body = Block.body block in
+  let state_hash = State_hash.With_state_hashes.state_hash t in
   let apply_start_time = Core.Time.now () in
   let body_ref_from_header = Blockchain_state.body_reference blockchain_state in
   let body_ref_computed =
@@ -529,18 +530,30 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
            ~signature_kind:Mina_signature_kind.t_DEPRECATED
            ?transaction_pool_proxy
        in
+       let tagged_witnesses, tagged_works =
+         State_hash.File_storage.write_values_exn state_hash ~f:(fun writer ->
+             let witnesses' =
+               Staged_ledger.Scan_state.Transaction_with_witness.persist_many
+                 witnesses writer
+             in
+             let works' =
+               Staged_ledger.Scan_state.Ledger_proof_with_sok_message
+               .persist_many works writer
+             in
+             (witnesses', works') )
+       in
        let%map.Deferred.Result new_staged_ledger, res_opt =
          let skip_verification =
            [%equal: [ `All | `Proofs ] option] skip_staged_ledger_verification
              (Some `All)
          in
          Staged_ledger.apply_to_scan_state ~logger ~skip_verification
-           ~log_prefix:"apply_diff" ~state_and_body_hash ~ledger:new_ledger
+           ~log_prefix:"apply_diff" ~ledger:new_ledger
            ~previous_pending_coinbase_collection:
              (Staged_ledger.pending_coinbase_collection parent_staged_ledger)
            ~previous_scan_state:(Staged_ledger.scan_state parent_staged_ledger)
            ~constraint_constants ~is_new_stack ~stack_update
-           ~first_pass_ledger_end works witnesses
+           ~first_pass_ledger_end tagged_works tagged_witnesses
        in
        Or_error.iter_error
          ( Staged_ledger.update_scan_state_metrics

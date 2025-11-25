@@ -303,16 +303,34 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
                 ~zkapp_cmd_limit_hardcap ~signature_kind
             in
+            (* TODO this is wrong to write to the previous state hash *)
+            let prev_state_hash =
+              Mina_state.Protocol_state.compute_state_hash
+                ~previous_state_hash:(fst state_and_body_hash)
+                ~state_body_hash:(snd state_and_body_hash)
+            in
+            let tagged_witnesses, tagged_works =
+              State_hash.File_storage.write_values_exn prev_state_hash
+                ~f:(fun writer ->
+                  let witnesses' =
+                    Staged_ledger.Scan_state.Transaction_with_witness
+                    .persist_many witnesses writer
+                  in
+                  let works' =
+                    Staged_ledger.Scan_state.Ledger_proof_with_sok_message
+                    .persist_many works writer
+                  in
+                  (witnesses', works') )
+            in
             (* TODO consider skipping verification (i.e. ~skip_verification:true) *)
             let%map.Deferred.Result new_staged_ledger, ledger_proof_opt =
               Staged_ledger.apply_to_scan_state ~logger ~skip_verification:false
-                ~log_prefix:"apply_diff_unchecked" ~state_and_body_hash
-                ~ledger:new_ledger
+                ~log_prefix:"apply_diff_unchecked" ~ledger:new_ledger
                 ~previous_pending_coinbase_collection:
                   (Staged_ledger.pending_coinbase_collection staged_ledger)
                 ~previous_scan_state:(Staged_ledger.scan_state staged_ledger)
                 ~constraint_constants ~is_new_stack ~stack_update
-                ~first_pass_ledger_end works witnesses
+                ~first_pass_ledger_end tagged_works tagged_witnesses
             in
             (new_staged_ledger, ledger_proof_opt, is_new_stack, pcu_action)
           in
