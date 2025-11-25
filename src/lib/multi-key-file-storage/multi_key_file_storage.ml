@@ -62,7 +62,8 @@ end) :
     Out_channel.output_string oc (Buffer.contents buffer)
 
   (* Write key function provided to the callback *)
-  let make_writer ~oc ~filename_key ~buffer : writer_t =
+  let make_writer ~init_offset ~oc ~filename_key ~buffer : writer_t =
+    let offset = ref init_offset in
     { f =
         (fun (type a) (module B : Bin_prot.Binable.S with type t = a)
              (value : a) ->
@@ -77,11 +78,10 @@ end) :
 
           (* Create tag before writing *)
           let tag =
-            { Tag.filename_key
-            ; offset = Int64.of_int @@ Buffer.length buffer
-            ; size = serialized_size
-            }
+            { Tag.filename_key; offset = !offset; size = serialized_size }
           in
+
+          (offset := Int64.(!offset + of_int serialized_size)) ;
 
           (* Add to buffer *)
           Buffer.add_string buffer data ;
@@ -98,7 +98,7 @@ end) :
     let do_writing oc =
       (* Buffer for accumulating writes *)
       let buffer = Buffer.create buffer_size in
-      let writer = make_writer ~oc ~filename_key ~buffer in
+      let writer = make_writer ~init_offset:0L ~oc ~filename_key ~buffer in
 
       (* Call user function with write_value *)
       let result = f writer in
