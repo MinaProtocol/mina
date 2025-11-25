@@ -160,9 +160,8 @@ sleep 5
 
 # Daemon
 echo "========================= STARTING DAEMON connected to ${MINA_NETWORK} ==========================="
-mina daemon \
+nohup mina daemon \
   --archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} \
-  --background \
   --block-producer-pubkey "$BLOCK_PRODUCER_PUB_KEY" \
   --config-directory ${MINA_CONFIG_DIR} \
   --config-file ${MINA_CONFIG_FILE} \
@@ -172,7 +171,11 @@ mina daemon \
   --rest-port ${MINA_GRAPHQL_PORT} \
   --run-snark-worker "$SNARK_PRODUCER_PK" \
   --seed \
-  --demo-mode
+  --demo-mode \
+  > daemon-stdout.log 2> daemon-stderr.log < /dev/null &
+
+DAEMON_PID=$!
+echo "Daemon started with PID: ${DAEMON_PID}"
 
 echo "========================= WAITING FOR THE DAEMON TO SYNC ==========================="
 daemon_status="Pending"
@@ -267,3 +270,17 @@ rosetta-cli check:data --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
 echo "========================= ROSETTA CLI: CHECK:PERF ==========================="
 echo "rosetta-cli check:perf" # Will run this command when tests are fully implemented
+
+echo "========================= COLLECTING LOGS ==========================="
+mkdir -p test_output/artifacts
+
+# application logs
+cp daemon-stdout.log test_output/artifacts/ 2>/dev/null || echo "daemon-stdout.log not found"
+# crash logs
+cp daemon-stderr.log test_output/artifacts/ 2>/dev/null || echo "daemon-stderr.log not found"
+# mina config
+cp -r ${MINA_CONFIG_DIR} test_output/artifacts/mina-config 2>/dev/null || echo "mina config dir not accessible"
+# daemon status at end of test
+mina client status --json > test_output/artifacts/daemon-status.json 2>/dev/null || echo "Could not get daemon status" > test_output/artifacts/daemon-status.json
+
+echo "Logs collected in test_output/artifacts/"
