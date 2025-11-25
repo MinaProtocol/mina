@@ -26,7 +26,7 @@ while [[ $# -gt 0 ]]; do
     --fork-from)
       # ensure value exists
       if [[ $# -lt 2 ]]; then
-        echo "Error: --fork-from requires an argument."
+        echo "Error: $1 requires an argument."
         usage
       fi
       PREFORK="$2"
@@ -35,7 +35,7 @@ while [[ $# -gt 0 ]]; do
     --fork-method)
       # ensure value exists
       if [[ $# -lt 2 ]]; then
-        echo "Error: --fork-from requires an argument."
+        echo "Error: $1 requires an argument."
         usage
       fi
       case "$2" in
@@ -43,7 +43,7 @@ while [[ $# -gt 0 ]]; do
           FORK_METHOD="$2"
           ;;
         *)
-          echo "Error: --fork-method must be either 'legacy' or 'advanced-generate-hf-config'."
+          echo "Error: $1 must be either 'legacy' or 'advanced-generate-hf-config'."
           usage
           ;;
       esac
