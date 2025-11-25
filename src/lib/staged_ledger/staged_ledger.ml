@@ -1021,6 +1021,91 @@ module T = struct
              (Pre_diff_info.Error.Coinbase_error "More than two coinbase parts")
           )
 
+  let log_scan_state_update_error ~logger ~witnesses ~previous_scan_state
+      ~log_prefix e =
+    let data_json =
+      `List
+        (List.map witnesses
+           ~f:(fun { Scan_state.Transaction_with_witness.statement; _ } ->
+             Transaction_snark.Statement.to_yojson statement ) )
+    in
+    [%log error]
+      ~metadata:
+        [ ( "scan_state"
+          , `String (Scan_state.snark_job_list_json previous_scan_state) )
+        ; ("data", data_json)
+        ; ("error", Error_json.error_to_yojson e)
+        ; ("prefix", `String log_prefix)
+        ]
+      !"$prefix: Unexpected error when applying diff data $data to the \
+        scan_state $scan_state: $error"
+
+  let apply_to_scan_state ~logger ~skip_verification ~log_prefix
+      ~state_and_body_hash ~ledger ~previous_pending_coinbase_collection
+      ~previous_scan_state ~constraint_constants ~is_new_stack ~stack_update
+      ~first_pass_ledger_end works witnesses =
+    let open Deferred.Result.Let_syntax in
+    let state_hash =
+      Mina_state.Protocol_state.compute_state_hash
+        ~previous_state_hash:(fst state_and_body_hash)
+        ~state_body_hash:(snd state_and_body_hash)
+    in
+    let tagged_witnesses, tagged_works =
+      State_hash.File_storage.write_values_exn state_hash
+        ~f:(persist_witnesses_and_works witnesses works)
+    in
+    [%log internal] "Fill_work_and_enqueue_transactions" ;
+    let%bind res_opt, scan_state =
+      O1trace.thread "fill_work_and_enqueue_transactions"
+      @@ fun () ->
+      let r =
+        Scan_state.fill_work_and_enqueue_transactions previous_scan_state
+          ~logger tagged_witnesses tagged_works
+      in
+      Or_error.iter_error r
+        ~f:
+          (log_scan_state_update_error ~logger ~witnesses ~previous_scan_state
+             ~log_prefix ) ;
+      Deferred.return (to_staged_ledger_or_error r)
+    in
+    let%bind () = yield_result () in
+    [%log internal] "Update_pending_coinbase_collection" ;
+    let%bind pending_coinbase_collection =
+      O1trace.thread "update_pending_coinbase_collection" (fun () ->
+          update_pending_coinbase_collection
+            ~depth:
+              constraint_constants
+                .Genesis_constants.Constraint_constants.pending_coinbase_depth
+            previous_pending_coinbase_collection stack_update ~is_new_stack
+            ~ledger_proof:res_opt
+          |> Deferred.return )
+    in
+    let%bind () = yield_result () in
+    let%map () =
+      if skip_verification || List.is_empty witnesses then
+        Deferred.return (Ok ())
+      else (
+        [%log internal] "Verify_scan_state_after_apply" ;
+        O1trace.thread "verify_scan_state_after_apply" (fun () ->
+            let%bind pending_coinbase_stack =
+              Pending_coinbase.latest_stack ~is_new_stack:false
+                pending_coinbase_collection
+              |> to_staged_ledger_or_error |> Deferred.return
+            in
+            Deferred.(
+              verify_scan_state_after_apply ~constraint_constants ~logger
+                ~first_pass_ledger_end
+                ~second_pass_ledger_end:
+                  (Frozen_ledger_hash.of_ledger_hash
+                     (Ledger.merkle_root ledger) )
+                ~pending_coinbase_stack scan_state
+              >>| to_staged_ledger_or_error) ) )
+    in
+    ( { scan_state; ledger; constraint_constants; pending_coinbase_collection }
+    , res_opt )
+
+  (* TODO Remove hashing from first & second passes and then
+     remove Deferred.t from [apply_diff], now it's there only for yielding *)
   let apply_diff ?(skip_verification = false) ~logger ~constraint_constants
       ~global_slot ~parent_protocol_state_body ~state_and_body_hash ~log_prefix
       ~zkapp_cmd_limit_hardcap ~signature_kind t pre_diff_info =
@@ -1087,12 +1172,6 @@ module T = struct
             t.pending_coinbase_collection transactions current_state_view
             state_and_body_hash )
     in
-    let accounts_created = List.concat_map data ~f:snd in
-    let state_hash =
-      Mina_state.Protocol_state.compute_state_hash
-        ~previous_state_hash:(fst state_and_body_hash)
-        ~state_body_hash:(snd state_and_body_hash)
-    in
     let to_witness (witness, _) =
       { witness with
         Transaction_snark_scan_state.Transaction_with_witness
@@ -1100,10 +1179,6 @@ module T = struct
       }
     in
     let witnesses = List.map data ~f:to_witness in
-    let tagged_witnesses, tagged_works =
-      State_hash.File_storage.write_values_exn state_hash
-        ~f:(persist_witnesses_and_works witnesses works)
-    in
     let slots = List.length data in
     let work_count = List.length works in
     let required_pairs = Scan_state.work_statements_for_new_diff t.scan_state in
@@ -1119,7 +1194,7 @@ module T = struct
           let required = List.length required_pairs in
           if
             work_count < required
-            && List.length data
+            && slots
                > Scan_state.free_space t.scan_state - required + work_count
           then
             Deferred.Result.fail
@@ -1134,67 +1209,12 @@ module T = struct
     let%bind () =
       Deferred.return (check_zero_fee_excess t.scan_state witnesses)
     in
-    [%log internal] "Fill_work_and_enqueue_transactions" ;
-    let%bind res_opt, scan_state' =
-      O1trace.thread "fill_work_and_enqueue_transactions" (fun () ->
-          let r =
-            Scan_state.fill_work_and_enqueue_transactions t.scan_state ~logger
-              tagged_witnesses tagged_works
-          in
-          Or_error.iter_error r ~f:(fun e ->
-              let data_json =
-                `List
-                  (List.map witnesses
-                     ~f:(fun
-                          { Scan_state.Transaction_with_witness.statement; _ }
-                        -> Transaction_snark.Statement.to_yojson statement ) )
-              in
-              [%log error]
-                ~metadata:
-                  [ ( "scan_state"
-                    , `String (Scan_state.snark_job_list_json t.scan_state) )
-                  ; ("data", data_json)
-                  ; ("error", Error_json.error_to_yojson e)
-                  ; ("prefix", `String log_prefix)
-                  ]
-                !"$prefix: Unexpected error when applying diff data $data to \
-                  the scan_state $scan_state: $error" ) ;
-          Deferred.return (to_staged_ledger_or_error r) )
-    in
-    let%bind () = yield_result () in
-    [%log internal] "Update_pending_coinbase_collection" ;
-    let%bind updated_pending_coinbase_collection' =
-      O1trace.thread "update_pending_coinbase_collection" (fun () ->
-          update_pending_coinbase_collection
-            ~depth:t.constraint_constants.pending_coinbase_depth
-            t.pending_coinbase_collection stack_update ~is_new_stack
-            ~ledger_proof:res_opt
-          |> Deferred.return )
-    in
-    let%bind () = yield_result () in
-    let%bind coinbase_amount =
-      Deferred.return (coinbase_for_blockchain_snark coinbases)
-    in
-    let%bind latest_pending_coinbase_stack =
-      Pending_coinbase.latest_stack ~is_new_stack:false
-        updated_pending_coinbase_collection'
-      |> to_staged_ledger_or_error |> Deferred.return
-    in
-    let%bind () = yield_result () in
-    let%map () =
-      if skip_verification || List.is_empty data then Deferred.return (Ok ())
-      else (
-        [%log internal] "Verify_scan_state_after_apply" ;
-        O1trace.thread "verify_scan_state_after_apply" (fun () ->
-            Deferred.(
-              verify_scan_state_after_apply ~constraint_constants ~logger
-                ~first_pass_ledger_end
-                ~second_pass_ledger_end:
-                  (Frozen_ledger_hash.of_ledger_hash
-                     (Ledger.merkle_root new_ledger) )
-                ~pending_coinbase_stack:latest_pending_coinbase_stack
-                scan_state'
-              >>| to_staged_ledger_or_error) ) )
+    let%bind new_staged_ledger, res_opt =
+      apply_to_scan_state ~logger ~skip_verification ~log_prefix
+        ~state_and_body_hash ~ledger:new_ledger
+        ~previous_pending_coinbase_collection:t.pending_coinbase_collection
+        ~previous_scan_state:t.scan_state ~constraint_constants ~is_new_stack
+        ~stack_update ~first_pass_ledger_end works witnesses
     in
     [%log debug]
       ~metadata:
@@ -1210,12 +1230,9 @@ module T = struct
       \      Coinbase parts:$coinbase_count Spots\n\
       \      available:$spots_available Pending work in the \
        scan-state:$proof_bundles_waiting Work included:$work_count" ;
-    let new_staged_ledger =
-      { scan_state = scan_state'
-      ; ledger = new_ledger
-      ; constraint_constants = t.constraint_constants
-      ; pending_coinbase_collection = updated_pending_coinbase_collection'
-      }
+    let accounts_created = List.concat_map data ~f:snd in
+    let%map coinbase_amount =
+      Deferred.return (coinbase_for_blockchain_snark coinbases)
     in
     ( `Ledger_proof res_opt
     , `Staged_ledger new_staged_ledger
