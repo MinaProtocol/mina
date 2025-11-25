@@ -53,22 +53,6 @@ let persist_witnesses witnesses writer =
   in
   List.map ~f:write_witness' witnesses
 
-let persist_works works writer =
-  let module FS = State_hash.File_storage in
-  let write_proof = FS.write_value writer (module Proof.Stable.Latest) in
-  let write_proof' ~fee ~prover proof =
-    (* TODO remove read_proof_from_disk *)
-    let stable = Ledger_proof.Cached.read_proof_from_disk proof in
-    let statement = Ledger_proof.statement_with_sok stable in
-    let proof = Ledger_proof.underlying_proof stable in
-    let sok_message = Sok_message.create ~fee ~prover in
-    Transaction_snark_scan_state.Ledger_proof_with_sok_message.Tagged.create
-      ~tag:(write_proof proof) ~sok_message ~statement
-  in
-  List.concat_map works
-    ~f:(fun { Transaction_snark_work.proofs; fee; prover } ->
-      One_or_two.to_list proofs |> List.map ~f:(write_proof' ~fee ~prover) )
-
 module T = struct
   module Scan_state = Transaction_snark_scan_state
   module Pre_diff_info = Pre_diff_info
@@ -1053,7 +1037,9 @@ module T = struct
     let tagged_witnesses, tagged_works =
       State_hash.File_storage.write_values_exn state_hash ~f:(fun writer ->
           let witnesses' = persist_witnesses witnesses writer in
-          let works' = persist_works works writer in
+          let works' =
+            Scan_state.Ledger_proof_with_sok_message.persist_many works writer
+          in
           (witnesses', works') )
     in
     [%log internal] "Fill_work_and_enqueue_transactions" ;
