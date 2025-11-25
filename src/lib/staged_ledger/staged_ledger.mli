@@ -39,6 +39,17 @@ module Scan_state : sig
     val target_second_pass_ledger : t -> Frozen_ledger_hash.t option
   end
 
+  module Ledger_proof_with_sok_message : sig
+    module Tagged : sig
+      type t
+    end
+
+    val persist_many :
+         Transaction_snark_work.t list
+      -> State_hash.File_storage.writer_t
+      -> Tagged.t list
+  end
+
   module Transaction_with_witness : sig
     type t
   end

@@ -81,6 +81,11 @@ module Ledger_proof_with_sok_message : sig
       -> statement:Mina_state.Snarked_ledger_state.With_sok.t
       -> t
   end
+
+  val persist_many :
+       Transaction_snark_work.t list
+    -> State_hash.File_storage.writer_t
+    -> Tagged.t list
 end
 
 module Available_job : sig

@@ -283,6 +283,21 @@ module Ledger_proof_with_sok_message = struct
     let sok_digest (t : t) = t.statement.sok_digest
   end
 
+  let persist_many works writer =
+    let module FS = State_hash.File_storage in
+    let write_proof = FS.write_value writer (module Proof.Stable.Latest) in
+    let write_proof' ~fee ~prover proof =
+      (* TODO remove read_proof_from_disk *)
+      let stable = Ledger_proof.Cached.read_proof_from_disk proof in
+      let statement = Ledger_proof.statement_with_sok stable in
+      let proof = Ledger_proof.underlying_proof stable in
+      let sok_message = Sok_message.create ~fee ~prover in
+      Tagged.create ~tag:(write_proof proof) ~sok_message ~statement
+    in
+    List.concat_map works
+      ~f:(fun { Transaction_snark_work.proofs; fee; prover } ->
+        One_or_two.to_list proofs |> List.map ~f:(write_proof' ~fee ~prover) )
+
   let read_tag ({ tag; sok_message; statement } : Tagged.t) :
       Stable.Latest.t Or_error.t =
     let%map.Or_error proof =
