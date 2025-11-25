@@ -52,6 +52,13 @@ module Scan_state : sig
 
   module Transaction_with_witness : sig
     type t
+
+    module Tagged : sig
+      type t
+    end
+
+    val persist_many :
+      t list -> State_hash.File_storage.writer_t -> Tagged.t list
   end
 
   [%%versioned:

@@ -243,6 +243,16 @@ module Transaction_with_witness = struct
     ; block_global_slot
     ; previous_protocol_state_body_opt
     }
+
+  let persist_many witnesses writer =
+    let module FS = State_hash.File_storage in
+    let write_witness = FS.write_value writer (module Stable.Latest) in
+    let write_witness' witness =
+      (* TODO remove read_all_proofs_from_disk *)
+      let stable = read_all_proofs_from_disk witness in
+      Tagged.create ~tag:(write_witness stable) stable
+    in
+    List.map ~f:write_witness' witnesses
 end
 
 module Ledger_proof_with_sok_message = struct
