@@ -471,13 +471,28 @@ module For_tests = struct
               precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
             ~signature_kind:Testnet
         in
+        (* For test it is not important which file to write to *)
+        let state_hash = Quickcheck.random_value State_hash.gen in
+        let tagged_witnesses, tagged_works =
+          State_hash.File_storage.write_values_exn state_hash ~f:(fun writer ->
+              let witnesses' =
+                Staged_ledger.Scan_state.Transaction_with_witness.persist_many
+                  witnesses writer
+              in
+              let works' =
+                Staged_ledger.Scan_state.Ledger_proof_with_sok_message
+                .persist_many works writer
+              in
+              (witnesses', works') )
+        in
         Staged_ledger.apply_to_scan_state ~logger ~skip_verification:false
-          ~log_prefix:"apply_diff" ~state_and_body_hash ~ledger:new_ledger
+          ~log_prefix:"apply_diff" ~ledger:new_ledger
           ~previous_pending_coinbase_collection:
             (Staged_ledger.pending_coinbase_collection parent_staged_ledger)
           ~previous_scan_state:(Staged_ledger.scan_state parent_staged_ledger)
           ~constraint_constants:precomputed_values.constraint_constants
-          ~is_new_stack ~stack_update ~first_pass_ledger_end works witnesses
+          ~is_new_stack ~stack_update ~first_pass_ledger_end tagged_works
+          tagged_witnesses
       in
       let%bind transitioned_staged_ledger, ledger_proof_opt =
         match%bind ledger_and_proof with

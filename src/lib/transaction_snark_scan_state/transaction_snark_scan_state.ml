@@ -183,6 +183,8 @@ module Transaction_with_witness = struct
       ; parent_state_hash = fst @@ t.state_hash
       }
 
+    let statement t = t.Stable.Latest.statement
+
     type t = Stable.Latest.t
   end
 

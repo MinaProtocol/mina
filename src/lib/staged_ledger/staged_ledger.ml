@@ -994,9 +994,9 @@ module T = struct
       ~log_prefix e =
     let data_json =
       `List
-        (List.map witnesses
-           ~f:(fun { Scan_state.Transaction_with_witness.statement; _ } ->
-             Transaction_snark.Statement.to_yojson statement ) )
+        (List.map witnesses ~f:(fun tagged ->
+             Transaction_snark.Statement.to_yojson
+             @@ Scan_state.Transaction_with_witness.Tagged.statement tagged ) )
     in
     [%log error]
       ~metadata:
@@ -1009,26 +1009,11 @@ module T = struct
       !"$prefix: Unexpected error when applying diff data $data to the \
         scan_state $scan_state: $error"
 
-  let apply_to_scan_state ~logger ~skip_verification ~log_prefix
-      ~state_and_body_hash ~ledger ~previous_pending_coinbase_collection
-      ~previous_scan_state ~constraint_constants ~is_new_stack ~stack_update
-      ~first_pass_ledger_end works witnesses =
+  let apply_to_scan_state ~logger ~skip_verification ~log_prefix ~ledger
+      ~previous_pending_coinbase_collection ~previous_scan_state
+      ~constraint_constants ~is_new_stack ~stack_update ~first_pass_ledger_end
+      tagged_works tagged_witnesses =
     let open Deferred.Result.Let_syntax in
-    let state_hash =
-      Mina_state.Protocol_state.compute_state_hash
-        ~previous_state_hash:(fst state_and_body_hash)
-        ~state_body_hash:(snd state_and_body_hash)
-    in
-    let tagged_witnesses, tagged_works =
-      State_hash.File_storage.write_values_exn state_hash ~f:(fun writer ->
-          let witnesses' =
-            Scan_state.Transaction_with_witness.persist_many witnesses writer
-          in
-          let works' =
-            Scan_state.Ledger_proof_with_sok_message.persist_many works writer
-          in
-          (witnesses', works') )
-    in
     [%log internal] "Fill_work_and_enqueue_transactions" ;
     let%bind res_opt, scan_state =
       O1trace.thread "fill_work_and_enqueue_transactions"
@@ -1039,8 +1024,8 @@ module T = struct
       in
       Or_error.iter_error r
         ~f:
-          (log_scan_state_update_error ~logger ~witnesses ~previous_scan_state
-             ~log_prefix ) ;
+          (log_scan_state_update_error ~logger ~witnesses:tagged_witnesses
+             ~previous_scan_state ~log_prefix ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
     let%bind () = yield_result () in
@@ -1057,7 +1042,7 @@ module T = struct
     in
     let%bind () = yield_result () in
     let%map () =
-      if skip_verification || List.is_empty witnesses then
+      if skip_verification || List.is_empty tagged_witnesses then
         Deferred.return (Ok ())
       else (
         [%log internal] "Verify_scan_state_after_apply" ;
@@ -2400,12 +2385,24 @@ let%test_module "staged ledger tests" =
           ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
           ~zkapp_cmd_limit_hardcap ~signature_kind
       in
+      (* For test it is not important which file to write to *)
+      let state_hash = Quickcheck.random_value State_hash.gen in
+      let tagged_witnesses, tagged_works =
+        State_hash.File_storage.write_values_exn state_hash ~f:(fun writer ->
+            let witnesses' =
+              Scan_state.Transaction_with_witness.persist_many witnesses writer
+            in
+            let works' =
+              Scan_state.Ledger_proof_with_sok_message.persist_many works writer
+            in
+            (witnesses', works') )
+      in
       let%map.Deferred.Result new_staged_ledger, res_opt =
         apply_to_scan_state ~logger ~skip_verification:false
-          ~log_prefix:"apply_diff" ~state_and_body_hash ~ledger:new_ledger
+          ~log_prefix:"apply_diff" ~ledger:new_ledger
           ~previous_pending_coinbase_collection:t.pending_coinbase_collection
           ~previous_scan_state:t.scan_state ~constraint_constants ~is_new_stack
-          ~stack_update ~first_pass_ledger_end works witnesses
+          ~stack_update ~first_pass_ledger_end tagged_works tagged_witnesses
       in
       ( `Ledger_proof res_opt
       , `Staged_ledger new_staged_ledger

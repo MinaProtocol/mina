@@ -295,7 +295,6 @@ val apply_to_scan_state :
      logger:Logger.t
   -> skip_verification:bool
   -> log_prefix:string
-  -> state_and_body_hash:Frozen_ledger_hash.t * Frozen_ledger_hash.t
   -> ledger:Ledger.t
   -> previous_pending_coinbase_collection:Pending_coinbase.t
   -> previous_scan_state:Scan_state.t
@@ -308,8 +307,8 @@ val apply_to_scan_state :
          Pending_coinbase.Stack_versioned.t * Pending_coinbase.Stack_versioned.t
        ]
   -> first_pass_ledger_end:Frozen_ledger_hash.t
-  -> Transaction_snark_work.t list
-  -> Scan_state.Transaction_with_witness.t list
+  -> Scan_state.Ledger_proof_with_sok_message.Tagged.t list
+  -> Scan_state.Transaction_with_witness.Tagged.t list
   -> (t * Ledger_proof.Tagged.t option, Staged_ledger_error.t) Deferred.Result.t
 
 (* This should memoize the snark verifications *)
