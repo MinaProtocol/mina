@@ -3,7 +3,7 @@
 # NOTE: This script patches the genesis timestamp of a fork config so a new 
 # network could be schedueld to genesis in some instant in the future.
 
-set -eo pipefail
+set -eux -o pipefail
 
 # ==================== Inputs to this script ====================
 # The fork config we aim to patch on 
