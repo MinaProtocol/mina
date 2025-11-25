@@ -13,9 +13,10 @@
 set -eux -o pipefail
 
 PREFORK=""
+FORK_METHOD="legacy"
 
 usage() {
-  echo "Usage: $0 --fork-from <PREFORK>"
+  echo "Usage: $0 --fork-from <PREFORK> --fork-method <FORK_METHOD>"
   exit 1
 }
 
@@ -29,6 +30,23 @@ while [[ $# -gt 0 ]]; do
         usage
       fi
       PREFORK="$2"
+      shift 2
+      ;;
+    --fork-method)
+      # ensure value exists
+      if [[ $# -lt 2 ]]; then
+        echo "Error: --fork-from requires an argument."
+        usage
+      fi
+      case "$2" in
+        legacy|advanced-generate-hf-config)
+          FORK_METHOD="$2"
+          ;;
+        *)
+          echo "Error: --fork-method must be either 'legacy' or 'advanced-generate-hf-config'."
+          usage
+          ;;
+      esac
       shift 2
       ;;
     --help|-h)
@@ -48,6 +66,11 @@ done
 
 if [[ -z "$PREFORK" ]]; then
   echo "Error: --fork-from must be provided."
+  usage
+fi
+
+if [[ "$FORK_METHOD" == "advanced-generate-hf-config" ]]; then
+  echo "Error: unimplemented fork mode 'advanced-generate-hf-config'"
   usage
 fi
 
@@ -152,6 +175,7 @@ hardfork_test/bin/hardfork_test \
   --slot-tx-end "$SLOT_TX_END" \
   --slot-chain-end "$SLOT_CHAIN_END" \
   --script-dir "$SCRIPT_DIR" \
-  --root "$NETWORK_ROOT"
+  --root "$NETWORK_ROOT" \
+  --fork-method "$FORK_METHOD"
 
 popd
