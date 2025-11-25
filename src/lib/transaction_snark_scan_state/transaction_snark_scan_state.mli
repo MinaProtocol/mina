@@ -67,6 +67,8 @@ module Transaction_with_witness : sig
     -> t
 
   val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+  val persist_many : t list -> State_hash.File_storage.writer_t -> Tagged.t list
 end
 
 module Ledger_proof_with_sok_message : sig

@@ -35,24 +35,6 @@ module Pre_statement = struct
     }
 end
 
-let persist_witnesses witnesses writer =
-  let module FS = State_hash.File_storage in
-  let write_witness =
-    FS.write_value writer
-      ( module Transaction_snark_scan_state.Transaction_with_witness.Stable
-               .Latest )
-  in
-  let write_witness' witness =
-    (* TODO remove read_all_proofs_from_disk *)
-    let stable =
-      Transaction_snark_scan_state.Transaction_with_witness
-      .read_all_proofs_from_disk witness
-    in
-    Transaction_snark_scan_state.Transaction_with_witness.Tagged.create
-      ~tag:(write_witness stable) stable
-  in
-  List.map ~f:write_witness' witnesses
-
 module T = struct
   module Scan_state = Transaction_snark_scan_state
   module Pre_diff_info = Pre_diff_info
@@ -1039,7 +1021,9 @@ module T = struct
     in
     let tagged_witnesses, tagged_works =
       State_hash.File_storage.write_values_exn state_hash ~f:(fun writer ->
-          let witnesses' = persist_witnesses witnesses writer in
+          let witnesses' =
+            Scan_state.Transaction_with_witness.persist_many witnesses writer
+          in
           let works' =
             Scan_state.Ledger_proof_with_sok_message.persist_many works writer
           in
