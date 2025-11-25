@@ -289,7 +289,7 @@ cp -R "$LEDGER_DIR/ledgers/" genesis
 mkdir -p tmp
 
 echo "Running warmup mina advanced test submit-to-archive (1 block, 1 payment, 0 zkapp)..."
-TMP=tmp MINA_PRIVKEY_PASS="$MINA_EXE" advanced test submit-to-archive \
+TMP=tmp MINA_PRIVKEY_PASS="" "$MINA_EXE" advanced test submit-to-archive \
     --archive-node-port "$ARCHIVE_PORT" \
     --config-file "$LEDGER_DIR/runtime_config.json" \
     --privkey-path "$LEDGER_DIR/plain1" \
@@ -320,7 +320,7 @@ echo ""
 # Run main submit-to-archive test
 echo "[Main Test] Submitting blocks to archive..."
 echo "Running mina advanced test submit-to-archive..."
-TMP=tmp MINA_PRIVKEY_PASS="$MINA_EXE" advanced test submit-to-archive \
+TMP=tmp MINA_PRIVKEY_PASS="" "$MINA_EXE" advanced test submit-to-archive \
     --archive-node-port "$ARCHIVE_PORT" \
     --config-file "$LEDGER_DIR/runtime_config.json" \
     --privkey-path "$LEDGER_DIR/plain1" \
