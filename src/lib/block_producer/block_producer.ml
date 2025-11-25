@@ -6,6 +6,27 @@ open Mina_transaction
 open Mina_state
 open Mina_block
 
+(** State hash that is temporarily used in block creation
+   to be able to write work/witness tags before passing them
+   on to scan state construction. It's safe to use hardcoded value, given
+   that block production is single threaded and state hash is not used
+   in any other place. *)
+let temp_state_hash =
+  (* TODO don't use quick check for generating this value:
+       1. Define min/max bounds for big number in state hash module (extract it out of
+          [State_hash.gen])
+       2. Compute hash the same way it's done now
+       3. Take necessary number of bits (use hash of the hash if more bits needed)
+
+     I.e. this value should be computed once but shouldn't be prone to manipulation
+  *)
+  lazy
+    (Quickcheck.random_value
+       ~seed:
+         (`Deterministic
+           Blake2.(digest_string "temporary state hash" |> to_raw_string) )
+       State_hash.gen )
+
 module type CONTEXT = sig
   val logger : Logger.t
 
@@ -303,15 +324,9 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
                 ~zkapp_cmd_limit_hardcap ~signature_kind
             in
-            (* TODO this is wrong to write to the previous state hash *)
-            let prev_state_hash =
-              Mina_state.Protocol_state.compute_state_hash
-                ~previous_state_hash:(fst state_and_body_hash)
-                ~state_body_hash:(snd state_and_body_hash)
-            in
             let tagged_witnesses, tagged_works =
-              State_hash.File_storage.write_values_exn prev_state_hash
-                ~f:(fun writer ->
+              State_hash.File_storage.write_values_exn
+                (Lazy.force temp_state_hash) ~f:(fun writer ->
                   let witnesses' =
                     Staged_ledger.Scan_state.Transaction_with_witness
                     .persist_many witnesses writer
@@ -345,6 +360,18 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 Staged_ledger.hash transitioned_staged_ledger
               in
               [%log internal] "Hash_new_staged_ledger_done" ;
+              (* TODO instead of throwing the new staged ledger away:
+                  1. Construct new block
+                  2. Replace [temp_state_hash] with the new state hash by traversing
+                     the new scan state and checking equality of state hash against
+                     every entry
+                  3. Use the new staged ledger with fixed-up scan state in breadcrumb
+                     building
+                  4. Move the state hash file from [temp_state_hash]'s location to
+                     a new location
+                  5. Append necessary serializations (e.g. block's raw data) at the
+                     new location
+              *)
               (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
               ignore
               @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
