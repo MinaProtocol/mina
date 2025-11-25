@@ -61,6 +61,8 @@ type Config struct {
 	ForkEarliestBlockMaxRetries   int // Max retries to wait for earliest block in fork network
 	HTTPClientTimeoutSeconds      int // HTTP client timeout for GraphQL requests
 	ClientMaxRetries              int // Max number of retries for client requests
+
+	ForkMethod ForkMethod
 }
 
 // DefaultConfig returns the default configuration with values
