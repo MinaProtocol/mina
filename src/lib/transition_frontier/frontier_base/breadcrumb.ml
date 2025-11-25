@@ -165,7 +165,8 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
           ( `Just_emitted_a_proof just_emitted_a_proof
           , `Block_with_validation fully_valid_block
           , `Staged_ledger transitioned_staged_ledger
-          , `Accounts_created accounts_created ) ->
+          , `Accounts_created accounts_created
+          , _ ) ->
           [%log internal] "Create_breadcrumb" ;
           Deferred.Result.return
             (create
