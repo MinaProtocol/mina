@@ -8,10 +8,5 @@ find _build -type f -name "*.exe" | while read -r entry; do
     continue
   fi
 
-    # Get stem from filename (remove path and extension)
-  filename=$(basename "$entry")
-  stem="${filename%.exe}"
-  # Transform stem: add 'mina' at beginning and convert _ to -
-  new_entry="mina-${stem//_/-}"
-  ./buildkite/scripts/cache/manager.sh write "$new_entry" "apps/${CODENAME}/"
+  ./buildkite/scripts/cache/manager.sh write "$entry" "apps/${CODENAME}/"
 done
