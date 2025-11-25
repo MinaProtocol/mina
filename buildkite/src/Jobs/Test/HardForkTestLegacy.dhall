@@ -35,7 +35,7 @@ in  Pipeline.build
           , S.exactly "default" "nix"
           ]
         , path = "Test"
-        , name = "HardForkTest"
+        , name = "HardForkTestLegacy"
         , scope = PipelineScope.AllButPullRequest
         , tags =
           [ PipelineTag.Type.Long
