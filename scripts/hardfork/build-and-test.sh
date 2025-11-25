@@ -44,11 +44,11 @@ while [[ $# -gt 0 ]]; do
         usage "Error: $1 requires an argument."
       fi
       case "$2" in
-        legacy|advanced-generate-hf-config)
+        legacy|advanced)
           FORK_METHOD="$2"
           ;;
         *)
-          usage "Error: $1 must be either 'legacy' or 'advanced-generate-hf-config'."
+          usage "Error: $1 must be either 'legacy' or 'advanced'."
           ;;
       esac
       shift 2
@@ -68,10 +68,6 @@ done
 
 if [[ -z "$PREFORK" ]]; then
   usage "Error: --fork-from must be provided."
-fi
-
-if [[ "$FORK_METHOD" == "advanced-generate-hf-config" ]]; then
-  usage "Error: unimplemented fork mode '$FORK_METHOD'"
 fi
 
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
