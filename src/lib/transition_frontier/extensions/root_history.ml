@@ -44,7 +44,7 @@ module T = struct
         Full_frontier.Protocol_states_for_root_scan_state
         .protocol_states_for_next_root_scan_state
           t.protocol_states_for_root_scan_state
-          ~new_scan_state:(scan_state new_oldest_root)
+          ~new_scan_state:(Root_data.Historical.scan_state new_oldest_root)
           ~old_root_state:
             ( transition oldest_root |> Mina_block.Validated.forget
             |> With_hash.map ~f:(fun block ->
@@ -98,11 +98,9 @@ let protocol_states_for_scan_state t state_hash =
     t.protocol_states_for_root_scan_state
   in
   let open Option.Let_syntax in
-  let open Root_data.Historical in
   let%bind data = Queue.lookup history state_hash in
   let required_state_hashes =
-    Staged_ledger.Scan_state.required_state_hashes (scan_state data)
-    |> State_hash.Set.to_list
+    Root_data.Historical.required_state_hashes data |> State_hash.Set.to_list
   in
   List.fold_until ~init:[]
     ~finish:(fun lst -> Some lst)
@@ -111,9 +109,7 @@ let protocol_states_for_scan_state t state_hash =
       let res =
         match Queue.lookup history hash with
         | Some data ->
-            Some
-              ( transition data |> Mina_block.Validated.forget |> With_hash.data
-              |> Mina_block.header |> Mina_block.Header.protocol_state )
+            Some (Root_data.Historical.protocol_state data)
         | None ->
             (*Not present in the history queue, check in the protocol states map that has all the protocol states required for transactions in the root*)
             let%map.Option state_with_hash =

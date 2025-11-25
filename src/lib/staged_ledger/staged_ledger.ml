@@ -35,14 +35,13 @@ module Pre_statement = struct
     }
 end
 
-let persist_witnesses_and_works witnesses works writer =
+let persist_witnesses witnesses writer =
   let module FS = State_hash.File_storage in
   let write_witness =
     FS.write_value writer
       ( module Transaction_snark_scan_state.Transaction_with_witness.Stable
                .Latest )
   in
-  let write_proof = FS.write_value writer (module Proof.Stable.Latest) in
   let write_witness' witness =
     (* TODO remove read_all_proofs_from_disk *)
     let stable =
@@ -52,6 +51,11 @@ let persist_witnesses_and_works witnesses works writer =
     Transaction_snark_scan_state.Transaction_with_witness.Tagged.create
       ~tag:(write_witness stable) stable
   in
+  List.map ~f:write_witness' witnesses
+
+let persist_works works writer =
+  let module FS = State_hash.File_storage in
+  let write_proof = FS.write_value writer (module Proof.Stable.Latest) in
   let write_proof' ~fee ~prover proof =
     (* TODO remove read_proof_from_disk *)
     let stable = Ledger_proof.Cached.read_proof_from_disk proof in
@@ -61,13 +65,9 @@ let persist_witnesses_and_works witnesses works writer =
     Transaction_snark_scan_state.Ledger_proof_with_sok_message.Tagged.create
       ~tag:(write_proof proof) ~sok_message ~statement
   in
-  let tagged_witnesses = List.map ~f:write_witness' witnesses in
-  let tagged_works =
-    List.concat_map works
-      ~f:(fun { Transaction_snark_work.proofs; fee; prover } ->
-        One_or_two.to_list proofs |> List.map ~f:(write_proof' ~fee ~prover) )
-  in
-  (tagged_witnesses, tagged_works)
+  List.concat_map works
+    ~f:(fun { Transaction_snark_work.proofs; fee; prover } ->
+      One_or_two.to_list proofs |> List.map ~f:(write_proof' ~fee ~prover) )
 
 module T = struct
   module Scan_state = Transaction_snark_scan_state
@@ -1051,8 +1051,10 @@ module T = struct
         ~state_body_hash:(snd state_and_body_hash)
     in
     let tagged_witnesses, tagged_works =
-      State_hash.File_storage.write_values_exn state_hash
-        ~f:(persist_witnesses_and_works witnesses works)
+      State_hash.File_storage.write_values_exn state_hash ~f:(fun writer ->
+          let witnesses' = persist_witnesses witnesses writer in
+          let works' = persist_works works writer in
+          (witnesses', works') )
     in
     [%log internal] "Fill_work_and_enqueue_transactions" ;
     let%bind res_opt, scan_state =

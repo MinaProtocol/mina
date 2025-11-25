@@ -30,6 +30,10 @@ module Historical : sig
 
   val staged_ledger_target_ledger_hash : t -> Ledger_hash.t
 
+  val protocol_state : t -> Mina_state.Protocol_state.Value.t
+
+  val required_state_hashes : t -> State_hash.Set.t
+
   val of_breadcrumb : Breadcrumb.t -> t
 end
 
