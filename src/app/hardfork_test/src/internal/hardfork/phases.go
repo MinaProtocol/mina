@@ -177,7 +177,7 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, forkConf
 		return nil, err
 	}
 
-	if err := t.AdvancedGenerateHardForkConfig(forkDataPath); err != nil {
+	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, t.AnyPortOfType(PORT_CLIENT)); err != nil {
 		return nil, err
 	}
 

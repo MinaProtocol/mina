@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
@@ -85,10 +86,11 @@ func (t *HardforkTest) PatchForkConfigAndGenerateLedgersLegacy(analysis *BlockAn
 	return t.ValidateForkRuntimeConfig(analysis.LatestNonEmptyBlock, runtimeConfigBytes, forkGenesisTs, mainGenesisTs)
 }
 
-func (t *HardforkTest) AdvancedGenerateHardForkConfig(configDir string) error {
+func (t *HardforkTest) AdvancedGenerateHardForkConfig(configDir string, clientPort int) error {
 	cmd := exec.Command(t.Config.MainMinaExe,
 		"advanced", "generate-hardfork-config",
 		"--hardfork-config-dir", configDir,
+		"--daemon-port", strconv.Itoa(clientPort),
 	)
 
 	cmd.Stdout = os.Stdout
