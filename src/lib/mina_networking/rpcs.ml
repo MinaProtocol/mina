@@ -567,13 +567,7 @@ module Get_transition_chain = struct
     in
     match result with
     | Some blocks ->
-        let%map valid_versions =
-          validate_protocol_versions ~logger ~trust_system
-            ~rpc_name:"Get_transition_chain"
-            ~sender:(Envelope.Incoming.sender request)
-            (List.map blocks ~f:Mina_block.header)
-        in
-        Option.some_if valid_versions
+        Deferred.return @@ Option.some
         @@ List.map ~f:Mina_block.read_all_proofs_from_disk blocks
     | None ->
         let%map () =
