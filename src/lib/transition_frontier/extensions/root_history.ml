@@ -92,33 +92,41 @@ let lookup { history; _ } = Queue.lookup history
 
 let mem { history; _ } = Queue.mem history
 
+(** Looks up values by key using the lookup function and returns
+   obtained values in reverse order or None if any of the lookups fail *)
+let lookup_all_reversed ~lookup =
+  List.fold_until ~init:[] ~finish:Option.some ~f:(fun acc key ->
+      match lookup key with
+      | Some value ->
+          Continue (value :: acc)
+      | None ->
+          Stop None )
+
 let protocol_states_for_scan_state t state_hash =
   let history = t.history in
-  let protocol_states_for_root_scan_state =
-    t.protocol_states_for_root_scan_state
+  let lookup_in_scan_states hash =
+    let%map.Option state_with_hash =
+      State_hash.Map.find t.protocol_states_for_root_scan_state hash
+    in
+    With_hash.data state_with_hash
+  in
+  let lookup_in_root_history hash =
+    Option.map ~f:Root_data.Historical.protocol_state
+      (Queue.lookup t.history hash)
+  in
+  let lookup hash =
+    match lookup_in_root_history hash with
+    | Some value ->
+        Some value
+    | None ->
+        lookup_in_scan_states hash
   in
   let open Option.Let_syntax in
   let%bind data = Queue.lookup history state_hash in
   let required_state_hashes =
     Root_data.Historical.required_state_hashes data |> State_hash.Set.to_list
   in
-  List.fold_until ~init:[]
-    ~finish:(fun lst -> Some lst)
-    required_state_hashes
-    ~f:(fun acc hash ->
-      let res =
-        match Queue.lookup history hash with
-        | Some data ->
-            Some (Root_data.Historical.protocol_state data)
-        | None ->
-            (*Not present in the history queue, check in the protocol states map that has all the protocol states required for transactions in the root*)
-            let%map.Option state_with_hash =
-              State_hash.Map.find protocol_states_for_root_scan_state hash
-            in
-            With_hash.data state_with_hash
-      in
-      match res with None -> Stop None | Some state -> Continue (state :: acc)
-      )
+  lookup_all_reversed ~lookup required_state_hashes
 
 let most_recent { history; _ } =
   (* unfortunately, there is not function to inspect the last element in the queue,
