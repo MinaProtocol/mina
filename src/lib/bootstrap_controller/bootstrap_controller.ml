@@ -905,9 +905,7 @@ let%test_module "Bootstrap_controller tests" =
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions : Transition_cache.element list) =
-      let root =
-        Transition_frontier.Breadcrumb.block root |> Mina_block.header
-      in
+      let root = Transition_frontier.Breadcrumb.header root in
       ignore
         ( List.fold_result ~init:root incoming_transitions
             ~f:(fun max_acc incoming_transition ->

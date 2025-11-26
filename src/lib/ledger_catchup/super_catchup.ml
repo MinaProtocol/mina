@@ -692,7 +692,7 @@ let create_node ~logger ~downloader t x =
     match x with
     | `Root root ->
         let blockchain_length =
-          Breadcrumb.block root |> Mina_block.blockchain_length
+          Breadcrumb.header root |> Mina_block.Header.blockchain_length
         in
         Internal_tracing.with_state_hash (Breadcrumb.state_hash root)
         @@ fun () ->

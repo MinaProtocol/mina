@@ -745,8 +745,7 @@ let get_snarked_ledger_full t state_hash_opt =
             else return () )
       in
       let snarked_ledger_hash =
-        Transition_frontier.Breadcrumb.block b
-        |> Mina_block.header |> Header.protocol_state
+        Transition_frontier.Breadcrumb.protocol_state b
         |> Mina_state.Protocol_state.blockchain_state
         |> Mina_state.Blockchain_state.snarked_ledger_hash
       in
@@ -2864,11 +2863,10 @@ module Hardfork_config = struct
       hard fork genesis slot delta in the runtime config, if those have been set
       and the [breadcrum_spec] was [`Stop_slot]. Otherwise, it will be the
       global slot since genesis of the hard fork block. *)
-  let hard_fork_global_slot ~breadcrumb_spec ~block mina :
+  let hard_fork_global_slot ~breadcrumb_spec ~consensus_state mina :
       Mina_numbers.Global_slot_since_hard_fork.t =
     let block_global_slot =
-      Mina_block.consensus_state block
-      |> Consensus.Data.Consensus_state.curr_global_slot
+      Consensus.Data.Consensus_state.curr_global_slot consensus_state
     in
     let configured_slot =
       match breadcrumb_spec with
@@ -2920,15 +2918,18 @@ module Hardfork_config = struct
   let prepare_inputs ~breadcrumb_spec mina =
     let open Deferred.Result.Let_syntax in
     let%bind breadcrumb = breadcrumb ~breadcrumb_spec mina in
-    let block = Transition_frontier.Breadcrumb.block breadcrumb in
-    let blockchain_length = Mina_block.blockchain_length block in
+    let consensus_state =
+      Transition_frontier.Breadcrumb.consensus_state breadcrumb
+    in
+    let blockchain_length =
+      Consensus.Data.Consensus_state.blockchain_length consensus_state
+    in
     let global_slot_since_hard_fork =
-      hard_fork_global_slot ~breadcrumb_spec ~block mina
+      hard_fork_global_slot ~breadcrumb_spec ~consensus_state mina
     in
     let global_slot_since_genesis =
       move_hard_fork_consensus_to_scheduled_genesis
-        ~hard_fork_consensus_data:(Mina_block.consensus_state block)
-        global_slot_since_hard_fork
+        ~hard_fork_consensus_data:consensus_state global_slot_since_hard_fork
     in
     let genesis_state_timestamp =
       genesis_timestamp_str
