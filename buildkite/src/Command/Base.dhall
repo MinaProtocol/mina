@@ -132,6 +132,8 @@ let targetToAgent =
             , QA = toMap { size = "qa" }
             , Perf = toMap { size = "performance" }
             , Multi = toMap { size = "generic-multi" }
+            , Arm64 = toMap { size = "arm64-static" }
+            , Dev = toMap { size = "development-0" }
             }
             target
 

@@ -7,8 +7,6 @@ let Cmd = ./Lib/Cmds.dhall
 
 let Command = ./Command/Base.dhall
 
-let Docker = ./Command/Docker/Type.dhall
-
 let JobSpec = ./Pipeline/JobSpec.dhall
 
 let Pipeline = ./Pipeline/Dsl.dhall
@@ -41,18 +39,12 @@ let config
               , Cmd.run "export BUILDKITE_PIPELINE_FILTER=${tagFilter}"
               , Cmd.run "export BUILDKITE_PIPELINE_SCOPE=${scopeFilter}"
               , Cmd.run "export BUILDKITE_PIPELINE_FILTER_MODE=${filterMode}"
-              , Cmd.run
-                  "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall"
               , Cmd.quietly
                   "dhall-to-yaml --quoted <<< '(./buildkite/src/Monorepo.dhall) { selection=(./buildkite/src/Pipeline/JobSelection.dhall).Type.${selection}, tagFilter=(./buildkite/src/Pipeline/TagFilter.dhall).Type.${tagFilter}, scopeFilter=(./buildkite/src/Pipeline/ScopeFilter.dhall).Type.${scopeFilter}, filterMode=(./buildkite/src/Pipeline/FilterMode.dhall).Type.${filterMode} }' | buildkite-agent pipeline upload"
               ]
             , label = "Prepare monorepo triage"
             , key = "monorepo-${selection}-${tagFilter}-${scopeFilter}"
-            , target = Size.Multi
-            , docker = Some Docker::{
-              , image = (./Constants/ContainerImages.dhall).toolchainBase
-              , environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
-              }
+            , target = Size.Dev
             }
         ]
       }

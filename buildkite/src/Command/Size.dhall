@@ -1,1 +1,1 @@
-< XLarge | Large | Medium | Small | Integration | QA | Multi | Perf >
+< XLarge | Large | Medium | Small | Integration | QA | Multi | Perf | Arm64 | Dev >

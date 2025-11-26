@@ -21,7 +21,7 @@ let dump_pipelines_cmd =
         Cmd.Docker::{
         , image = (../../Constants/ContainerImages.dhall).toolchainBase
         }
-        "buildkite/scripts/dhall/dump_dhall_to_pipelines.sh buildkite/src/Jobs _pipelines"
+        "buildkite/scripts/dhall/dump_dhall_to_pipelines.sh ./buildkite/src/ _pipelines"
 
 in  Pipeline.build
       Pipeline.Config::{

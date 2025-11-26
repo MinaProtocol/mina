@@ -145,7 +145,20 @@ let generateStep =
                 else  ""
 
           let pruneDockerImages =
-                "docker system prune --all --force --filter until=24h"
+                    "docker system prune --all --force "
+                ++  merge
+                      { Arm64 = ""
+                      , XLarge = "--filter until=24h"
+                      , Large = "--filter until=24h"
+                      , Medium = "--filter until=24h"
+                      , Small = "--filter until=24h"
+                      , Integration = "--filter until=24h"
+                      , QA = "--filter until=24h"
+                      , Multi = "--filter until=24h"
+                      , Perf = "--filter until=24h"
+                      , Dev = "--filter until=24h"
+                      }
+                      spec.size
 
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
