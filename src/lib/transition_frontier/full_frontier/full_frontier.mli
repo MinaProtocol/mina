@@ -29,7 +29,7 @@ module Protocol_states_for_root_scan_state : sig
 
   val protocol_states_for_next_root_scan_state :
        t
-    -> new_scan_state:Staged_ledger.Scan_state.t
+    -> next_root_required_hashes:State_hash.t list
     -> old_root_state:Protocol_state.value State_hash.With_state_hashes.t
     -> Protocol_state.value State_hash.With_state_hashes.t list
 end

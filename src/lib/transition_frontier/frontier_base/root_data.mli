@@ -24,21 +24,22 @@ module Historical : sig
 
   val transition : t -> Mina_block.Validated.t
 
-  val scan_state : t -> Staged_ledger.Scan_state.t
-
-  val pending_coinbase : t -> Pending_coinbase.t
-
-  val staged_ledger_target_ledger_hash : t -> Ledger_hash.t
-
-  val protocol_state : t -> Mina_state.Protocol_state.Value.t
+  val staged_ledger_aux_and_pending_coinbases :
+       t
+    -> Network_types.Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+       .data_tag
 
   val required_state_hashes : t -> State_hash.Set.t
 
+  val protocol_state : t -> Mina_state.Protocol_state.Value.t
+
   val create :
        transition:Mina_block.Validated.t
-    -> scan_state:Staged_ledger.Scan_state.t
-    -> pending_coinbase:Pending_coinbase.t
-    -> staged_ledger_target_ledger_hash:Ledger_hash.t
+    -> staged_ledger_aux_and_pending_coinbases:
+         Network_types
+         .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+         .data_tag
+    -> required_state_hashes:State_hash.Set.t
     -> t
 end
 

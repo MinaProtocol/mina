@@ -50,12 +50,8 @@ module Protocol_states_for_root_scan_state = struct
   type t = Protocol_state.value State_hash.With_state_hashes.t State_hash.Map.t
 
   let protocol_states_for_next_root_scan_state protocol_states_for_old_root
-      ~new_scan_state
+      ~next_root_required_hashes
       ~(old_root_state : Protocol_state.value State_hash.With_state_hashes.t) =
-    let required_state_hashes =
-      Staged_ledger.Scan_state.required_state_hashes new_scan_state
-      |> State_hash.Set.to_list
-    in
     let protocol_state_map =
       (*Note: Protocol states for the next root should all be in this map
         assuming roots transition to their successors and do not skip any node in
@@ -64,7 +60,7 @@ module Protocol_states_for_root_scan_state = struct
         ~key:(State_hash.With_state_hashes.state_hash old_root_state)
         ~data:old_root_state
     in
-    List.map required_state_hashes
+    List.map next_root_required_hashes
       ~f:(State_hash.Map.find_exn protocol_state_map)
 end
 
@@ -346,10 +342,14 @@ module Util = struct
           { transition; scan_state } )
     in
     let new_scan_state = Staged_ledger.scan_state heir_staged_ledger in
+    let next_root_required_hashes =
+      Staged_ledger.Scan_state.required_state_hashes new_scan_state
+      |> State_hash.Set.to_list
+    in
     let protocol_states =
       Protocol_states_for_root_scan_state
       .protocol_states_for_next_root_scan_state
-        protocol_states_for_root_scan_state ~new_scan_state
+        protocol_states_for_root_scan_state ~next_root_required_hashes
         ~old_root_state:(Breadcrumb.protocol_state_with_hashes parent)
     in
     let heir_transition =
