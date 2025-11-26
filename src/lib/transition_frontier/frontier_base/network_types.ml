@@ -1,7 +1,7 @@
 open Core_kernel
 open Mina_base
 
-module Get_staged_ledger_aux_and_pending_coinbases_at_hash_result = struct
+module Staged_ledger_aux_and_pending_coinbases = struct
   module Data = struct
     [%%versioned
     module Stable = struct

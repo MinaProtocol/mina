@@ -240,9 +240,7 @@ module type Sync_handler_intf = sig
        logger:Logger.t
     -> frontier:transition_frontier
     -> State_hash.t
-    -> Frontier_base.Network_types
-       .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
-       .t
+    -> Frontier_base.Network_types.Staged_ledger_aux_and_pending_coinbases.t
        option
 
   val get_transition_chain :

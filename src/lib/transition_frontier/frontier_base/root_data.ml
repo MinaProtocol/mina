@@ -45,8 +45,7 @@ module Historical = struct
   type t =
     { transition : Mina_block.Validated.t
     ; staged_ledger_aux_and_pending_coinbases :
-        Network_types.Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
-        .data_tag
+        Network_types.Staged_ledger_aux_and_pending_coinbases.data_tag
     ; required_state_hashes : State_hash.Set.t
     }
   [@@deriving fields]

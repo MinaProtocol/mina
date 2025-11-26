@@ -88,10 +88,7 @@ let staged_ledger_aux_and_pending_coinbases_of_breadcrumb
     , scan_state_protocol_states )
   in
   let module Data =
-    Network_types.Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
-    .Data
-    .Stable
-    .Latest
+    Network_types.Staged_ledger_aux_and_pending_coinbases.Data.Stable.Latest
   in
   (* Cache in frontier and return tag *)
   State_hash.File_storage.append_values_exn (Breadcrumb.state_hash breadcrumb)
@@ -101,7 +98,7 @@ let staged_ledger_aux_and_pending_coinbases_of_breadcrumb
 let historical_of_breadcrumb ~protocol_states_for_root_scan_state ~history
     breadcrumb =
   let cached_opt =
-    Breadcrumb.staged_ledger_aux_and_pending_coinbases_at_hash_cached breadcrumb
+    Breadcrumb.staged_ledger_aux_and_pending_coinbases_cached breadcrumb
   in
   let transition = Breadcrumb.validated_transition breadcrumb in
   let%map.Option staged_ledger_aux_and_pending_coinbases =

@@ -118,11 +118,10 @@ val rejected_blocks :
 val validated_blocks :
   (State_hash.t * Network_peer.Envelope.Sender.t * Block_time.t) Core.Queue.t
 
-val staged_ledger_aux_and_pending_coinbases_at_hash :
+val staged_ledger_aux_and_pending_coinbases :
      t
   -> State_hash.t
-  -> ( Network_types.Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
-       .data_tag
+  -> ( Network_types.Staged_ledger_aux_and_pending_coinbases.data_tag
      * Staged_ledger_hash.t )
      option
 

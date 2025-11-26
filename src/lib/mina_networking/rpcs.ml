@@ -213,9 +213,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type query = State_hash.t
 
       type response =
-        Frontier_base.Network_types
-        .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
-        .t
+        Frontier_base.Network_types.Staged_ledger_aux_and_pending_coinbases.t
         option
     end
 
@@ -254,8 +252,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type query = State_hash.Stable.V1.t
 
       type response =
-        Frontier_base.Network_types
-        .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+        Frontier_base.Network_types.Staged_ledger_aux_and_pending_coinbases
         .Stable
         .V1
         .t
