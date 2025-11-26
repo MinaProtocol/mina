@@ -840,15 +840,15 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
             )
           ]
         "Producing new block with parent $parent_hash%!" ;
-      let previous_transition = Breadcrumb.block_with_hash crumb in
-      let previous_protocol_state =
-        Header.protocol_state
-        @@ Mina_block.header (With_hash.data previous_transition)
+      let previous_header = Breadcrumb.header crumb in
+      let previous_consensus_state_with_hashes =
+        Breadcrumb.consensus_state_with_hashes crumb
       in
+      let previous_protocol_state = Breadcrumb.protocol_state crumb in
       let%bind previous_protocol_state_proof =
         if
           Consensus.Data.Consensus_state.is_genesis_state
-            (Protocol_state.consensus_state previous_protocol_state)
+            (With_hash.data previous_consensus_state_with_hashes)
           && Option.is_none precomputed_values.proof_data
         then (
           match%bind Interruptible.uninterruptible (genesis_breadcrumb ()) with
@@ -860,10 +860,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 "Aborting block production: cannot generate a genesis proof"
                 ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
               Interruptible.lift (Deferred.never ()) (Deferred.return ()) )
-        else
-          return
-            ( Header.protocol_state_proof
-            @@ Mina_block.header (With_hash.data previous_transition) )
+        else return (Header.protocol_state_proof previous_header)
       in
       [%log internal] "Get_transactions_from_pool" ;
       let transactions =
@@ -910,9 +907,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
             phys_equal
               (Consensus.Hooks.select
                  ~context:(module Context)
-                 ~existing:
-                   (With_hash.map ~f:Mina_block.consensus_state
-                      previous_transition )
+                 ~existing:previous_consensus_state_with_hashes
                  ~candidate:consensus_state_with_hashes )
               `Take
             || failwith
@@ -1504,18 +1499,15 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
         [%log trace]
           ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson crumb) ]
           "Emitting precomputed block with parent $breadcrumb%!" ;
-        let previous_transition = Breadcrumb.block_with_hash crumb in
-        let previous_protocol_state =
-          Header.protocol_state
-          @@ Mina_block.header (With_hash.data previous_transition)
+        let previous_consensus_state_with_hashes =
+          Breadcrumb.consensus_state_with_hashes crumb
         in
+        let previous_protocol_state = Breadcrumb.protocol_state crumb in
         assert (
           phys_equal
             (Consensus.Hooks.select
                ~context:(module Context)
-               ~existing:
-                 (With_hash.map ~f:Mina_block.consensus_state
-                    previous_transition )
+               ~existing:previous_consensus_state_with_hashes
                ~candidate:consensus_state_with_hashes )
             `Take
           || failwith
@@ -1538,7 +1530,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
         let emit_breadcrumb () =
           let open Deferred.Result.Let_syntax in
           let previous_protocol_state_hash =
-            State_hash.With_state_hashes.state_hash previous_transition
+            State_hash.With_state_hashes.state_hash
+              previous_consensus_state_with_hashes
           in
           let header =
             Header.create ~protocol_state ~protocol_state_proof
