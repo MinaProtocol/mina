@@ -4897,6 +4897,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
         ~block_window_duration_ms:constraint_constants.block_window_duration_ms
         pool
       |> don't_wait_for ;
+      (* NOTE: this is depended on by archive fixture, so whenever updating this message, consider updating the fixture as well *)
       [%log info] "Archive process ready. Clients can now connect" ;
       Async.never ()
 
