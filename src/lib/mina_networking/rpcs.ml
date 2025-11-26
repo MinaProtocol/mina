@@ -978,17 +978,12 @@ module Get_ancestry = struct
     | Some { proof = chain, base_block; data = block } ->
         let block = Frontier_base.Breadcrumb.block block in
         let base_block = Frontier_base.Breadcrumb.block base_block in
-        let%map valid_versions =
-          validate_protocol_versions ~logger ~trust_system
-            ~rpc_name:"Get_ancestry"
-            ~sender:(Envelope.Incoming.sender request)
-            [ Mina_block.header base_block ]
-        in
-        Option.some_if valid_versions
-          { Proof_carrying_data.proof =
-              (chain, Mina_block.read_all_proofs_from_disk base_block)
-          ; data = Mina_block.read_all_proofs_from_disk block
-          }
+        Deferred.return
+        @@ Some
+             { Proof_carrying_data.proof =
+                 (chain, Mina_block.read_all_proofs_from_disk base_block)
+             ; data = Mina_block.read_all_proofs_from_disk block
+             }
 
   let rate_limit_budget = (5, `Per Time.Span.minute)
 
@@ -1179,23 +1174,12 @@ module Get_best_tip = struct
     | Some { data = data_block; proof = chain, proof_block } ->
         let data_block = Frontier_base.Breadcrumb.block data_block in
         let proof_block = Frontier_base.Breadcrumb.block proof_block in
-        let%map data_valid_versions =
-          validate_protocol_versions ~logger ~trust_system
-            ~rpc_name:"Get_best_tip (data)"
-            ~sender:(Envelope.Incoming.sender request)
-            [ Mina_block.header data_block ]
-        and proof_valid_versions =
-          validate_protocol_versions ~logger ~trust_system
-            ~rpc_name:"Get_best_tip (proof)"
-            ~sender:(Envelope.Incoming.sender request)
-            [ Mina_block.header proof_block ]
-        in
-        Option.some_if
-          (data_valid_versions && proof_valid_versions)
-          { Proof_carrying_data.data =
-              Mina_block.read_all_proofs_from_disk data_block
-          ; proof = (chain, Mina_block.read_all_proofs_from_disk proof_block)
-          }
+        Deferred.return
+        @@ Some
+             { Proof_carrying_data.data =
+                 Mina_block.read_all_proofs_from_disk data_block
+             ; proof = (chain, Mina_block.read_all_proofs_from_disk proof_block)
+             }
 
   let rate_limit_budget = (3, `Per Time.Span.minute)
 
