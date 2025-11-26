@@ -115,10 +115,10 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       ~conf_dir:(Some config_directory) ()
   in
   let tmp_root_location = chain_state_locations.root ^ "-tmp" in
-  let%bind () =
+  let%bind.Deferred.Result () =
     Mina_stdlib_unix.File_system.copy_dir chain_state_locations.root
       tmp_root_location
-    >>| Result.ok_exn
+    >>| Result.map_error ~f:Exn.to_string
   in
   (* Set up persistent root and frontier *)
   let persistent_root =
@@ -137,9 +137,14 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
     Persistent_frontier.with_instance_exn persistent_frontier
       ~f:Persistent_frontier.Instance.get_root_hash
   in
-  let persistent_root_id =
-    Persistent_root.load_root_identifier persistent_root
-    |> Option.value_exn ~message:"couldn't load persistent root hash"
+  let%bind.Deferred.Result persistent_root_id =
+    Deferred.return
+    @@
+    match Persistent_root.load_root_identifier persistent_root with
+    | Some id ->
+        Ok id
+    | None ->
+        Error "couldn't load persistent root hash"
   in
   let persistent_root_hash = persistent_root_id.state_hash in
   Persistent_root.set_root_state_hash persistent_root
@@ -202,9 +207,6 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
     Transition_frontier.root frontier |> Breadcrumb.state_hash
   in
   assert (State_hash.equal frontier_root_hash persistent_frontier_root_hash) ;
-  let with_persistent_frontier_instance f =
-    Persistent_frontier.with_instance_exn persistent_frontier ~f
-  in
   let clean_frontier () =
     let%bind () = Transition_frontier.close ~loc:__LOC__ frontier in
     Mina_stdlib_unix.File_system.remove_dir tmp_root_location
@@ -258,8 +260,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
                 breadcrumb
             in
             let res =
-              Diff.Full.E.to_lite
-                (Diff.Full.E.E (Root_transitioned root_transition))
+              Diff.Full.E.to_lite (E (Root_transitioned root_transition))
             in
             ( ( breadcrumb
               , Transition_frontier.Util.to_protocol_states_map_exn
@@ -272,7 +273,8 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       let%bind () = clean_frontier () in
       (* Apply the diffs to persistent frontier database *)
       let%map.Deferred.Result () =
-        with_persistent_frontier_instance (fun instance ->
+        Persistent_frontier.with_instance_exn persistent_frontier
+          ~f:(fun instance ->
             apply_root_transitions ~logger ~db:instance.db diffs )
       in
       [%log info] "Successfully moved frontier root to match persistent root"
