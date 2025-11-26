@@ -450,6 +450,7 @@ let add_breadcrumb_exn t breadcrumb =
       ; ("n", `Int (Full_frontier.size t.full_frontier))
       ]
     "PRE: ($state_hash, $n)" ;
+  let user_cmd_hashes = Breadcrumb.command_hashes breadcrumb in
   [%str_log' trace t.logger]
     (Applying_diffs { diffs = List.map ~f:Diff.Full.E.to_yojson diffs }) ;
   [%log internal] "Apply_catchup_state_diffs" ;
@@ -475,7 +476,6 @@ let add_breadcrumb_exn t breadcrumb =
       ; ("n", `Int (Full_frontier.size t.full_frontier))
       ]
     "POST: ($state_hash, $n)" ;
-  let user_cmd_hashes = Breadcrumb.command_hashes breadcrumb in
   [%str_log' trace t.logger] Added_breadcrumb_user_commands
     ~metadata:
       [ ( "user_commands"
