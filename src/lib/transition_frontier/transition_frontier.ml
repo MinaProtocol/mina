@@ -570,11 +570,11 @@ let protocol_states_of_scan_state ~frontier scan_state =
              Continue (Some acc') )
        ~finish:Fn.id
 
-let staged_ledger_aux_and_pending_coinbases_at_hash frontier state_hash =
+let staged_ledger_aux_and_pending_coinbases frontier state_hash =
   let%bind.Option breadcrumb = find frontier state_hash in
   let scan_state_protocol_states = protocol_states_of_scan_state ~frontier in
   let%map.Option res =
-    Breadcrumb.staged_ledger_aux_and_pending_coinbases_at_hash
+    Breadcrumb.staged_ledger_aux_and_pending_coinbases
       ~scan_state_protocol_states breadcrumb
   in
   let staged_ledger_hash = Breadcrumb.staged_ledger_hash breadcrumb in

@@ -472,7 +472,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
         let result =
           State_hash.File_storage.read
             ( module Frontier_base.Network_types
-                     .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+                     .Staged_ledger_aux_and_pending_coinbases
                      .Data
                      .Stable
                      .Latest )

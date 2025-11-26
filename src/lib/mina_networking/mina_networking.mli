@@ -53,9 +53,7 @@ module Rpcs : sig
     type query = State_hash.t
 
     type response =
-      Frontier_base.Network_types
-      .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
-      .t
+      Frontier_base.Network_types.Staged_ledger_aux_and_pending_coinbases.t
       option
   end
 
@@ -228,9 +226,7 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
   -> Peer.Id.t
   -> State_hash.t
-  -> Frontier_base.Network_types
-     .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
-     .t
+  -> Frontier_base.Network_types.Staged_ledger_aux_and_pending_coinbases.t
      Deferred.Or_error.t
 
 val get_completed_checked_snarks :

@@ -25,9 +25,7 @@ module Historical : sig
   val transition : t -> Mina_block.Validated.t
 
   val staged_ledger_aux_and_pending_coinbases :
-       t
-    -> Network_types.Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
-       .data_tag
+    t -> Network_types.Staged_ledger_aux_and_pending_coinbases.data_tag
 
   val required_state_hashes : t -> State_hash.Set.t
 
@@ -36,9 +34,7 @@ module Historical : sig
   val create :
        transition:Mina_block.Validated.t
     -> staged_ledger_aux_and_pending_coinbases:
-         Network_types
-         .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
-         .data_tag
+         Network_types.Staged_ledger_aux_and_pending_coinbases.data_tag
     -> required_state_hashes:State_hash.Set.t
     -> t
 end
