@@ -122,8 +122,7 @@ module Make (Inputs : Inputs_intf) :
         let%map.Option historical =
           Root_history.lookup root_history state_hash
         in
-        Frontier_base.Network_types.Staged_ledger_aux_and_pending_coinbases.M
-        .Tag
+        Frontier_base.Network_types.Tag_or_data.Tag
           (Root_data.Historical.staged_ledger_aux_and_pending_coinbases
              historical )
     | Some (res, staged_ledger_hash) ->
@@ -152,7 +151,7 @@ module Make (Inputs : Inputs_intf) :
       Option.first_some
         Transition_frontier.(find frontier hash >>| Breadcrumb.block_tag)
         (find_in_root_history frontier hash >>| Root_data.Historical.block_tag)
-      |> Option.map ~f:(fun x -> Frontier_base.Network_types.Block.M.Tag x)
+      |> Option.map ~f:(fun x -> Frontier_base.Network_types.Tag_or_data.Tag x)
     in
     match Transition_frontier.catchup_state frontier with
     | Full _ ->

@@ -1,36 +1,48 @@
 open Core_kernel
 open Mina_base
 
-module Make (Data : Binable.S) = struct
-  type t = Tag of Data.t State_hash.File_storage.tag | Data of Data.t
+module Tag_or_data = struct
+  type 'a t = Tag of 'a State_hash.File_storage.tag | Data of 'a
+end
 
-  type data_tag = Data.t State_hash.File_storage.tag
+module Make' (Data : Binable.S) = struct
+  include Bin_prot.Utils.Of_minimal (struct
+    type t = Data.t Tag_or_data.t
+
+    let bin_shape_t = Data.bin_shape_t
+
+    let __bin_read_t__ buf ~pos_ref vint =
+      Tag_or_data.Data (Data.__bin_read_t__ buf ~pos_ref vint)
+
+    let bin_read_t buf ~pos_ref =
+      Tag_or_data.Data (Data.bin_read_t buf ~pos_ref)
+
+    let bin_size_t = function
+      | Tag_or_data.Tag tag ->
+          State_hash.File_storage.size tag
+      | Data x ->
+          Data.bin_size_t x
+
+    let bin_write_t buf ~pos = function
+      | Tag_or_data.Tag tag ->
+          let data =
+            State_hash.File_storage.read_bytes tag |> Or_error.ok_exn
+          in
+          let bs = Bigstring.of_bytes data in
+          let len = Bigstring.length bs in
+          Bigstring.blit ~src:bs ~src_pos:0 ~dst:buf ~dst_pos:pos ~len ;
+          pos + len
+      | Data x ->
+          Data.bin_write_t buf ~pos x
+  end)
 
   let extract = function
-    | Tag x ->
+    | Tag_or_data.Tag x ->
         State_hash.File_storage.read (module Data) x
     | Data x ->
         Or_error.return x
 
-  let to_latest = Fn.id
-
-  module Arg = struct
-    type nonrec t = t
-
-    let to_binable = function
-      | Tag x ->
-          (* TODO This code deserializes the data stored in the file
-             and serializes it back. This is a bad thing to do.
-             But in future we will have a special communication
-             protocol between libp2p helper and daemon to push file reading
-             to the helper, and then we won't have deserialization anymore.
-          *)
-          State_hash.File_storage.read (module Data) x |> Or_error.ok_exn
-      | Data x ->
-          x
-
-    let of_binable x = Data x
-  end
+  type data_tag = Data.t State_hash.File_storage.tag
 end
 
 module Staged_ledger_aux_and_pending_coinbases = struct
@@ -52,39 +64,35 @@ module Staged_ledger_aux_and_pending_coinbases = struct
     end]
   end
 
-  module M = Make (Data.Stable.V1)
-
-  type data_tag = M.data_tag
-
-  let extract = M.extract
-
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = M.t
+      type t = Data.Stable.V1.t Tag_or_data.t
 
-      let to_latest = M.to_latest
+      let to_latest = Fn.id
 
-      include Binable.Of_binable_without_uuid (Data.Stable.V1) (M.Arg)
+      include Make' (Data.Stable.V1)
     end
   end]
+
+  let extract = Stable.Latest.extract
+
+  type data_tag = Stable.Latest.data_tag
 end
 
 module Block = struct
-  module M = Make (Mina_block.Stable.V2)
-
-  type data_tag = M.data_tag
-
-  let extract = M.extract
-
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = M.t
+      type t = Mina_block.Stable.V2.t Tag_or_data.t
 
-      let to_latest = M.to_latest
+      let to_latest = Fn.id
 
-      include Binable.Of_binable_without_uuid (Mina_block.Stable.V2) (M.Arg)
+      include Make' (Mina_block.Stable.V2)
     end
   end]
+
+  let extract = Stable.Latest.extract
+
+  type data_tag = Stable.Latest.data_tag
 end

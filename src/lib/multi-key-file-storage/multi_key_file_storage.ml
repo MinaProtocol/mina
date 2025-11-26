@@ -140,11 +140,12 @@ end) :
     in
     Out_channel.with_file filename ~binary:true ~append:true ~f:do_appending
 
-  (** Read a value from the database using a tag *)
-  let read :
-      type a.
-      (module Bin_prot.Binable.S with type t = a) -> a tag -> a Or_error.t =
-   fun (module B : Bin_prot.Binable.S with type t = a) tag ->
+  (** Get the size of the value stored at the given tag *)
+  let size (tag : _ tag) = tag.size
+
+  (** Read the bytes stored at the given tag *)
+  let read_bytes : _ tag -> Bytes.t Or_error.t =
+   fun tag ->
     let do_reading ic =
       (* Seek to the specified offset *)
       In_channel.seek ic tag.offset ;
@@ -152,7 +153,22 @@ end) :
       (* Read the exact number of bytes *)
       let buffer = Bytes.create tag.size in
       In_channel.really_input_exn ic ~buf:buffer ~pos:0 ~len:tag.size ;
+      buffer
+    in
+    Or_error.tag ~tag:(Inputs.filename tag.filename_key)
+    @@ Or_error.try_with ~backtrace:true
+    @@ fun () ->
+    In_channel.with_file
+      (Inputs.filename tag.filename_key)
+      ~binary:true ~f:do_reading
 
+  (** Read a value from the database using a tag *)
+  let read :
+      type a.
+      (module Bin_prot.Binable.S with type t = a) -> a tag -> a Or_error.t =
+   fun (module B : Bin_prot.Binable.S with type t = a) tag ->
+    let%bind.Or_error buffer = read_bytes tag in
+    let do_parsing () =
       (* Deserialize using bin_prot *)
       let bigstring = Bigstring.of_bytes buffer in
       let pos_ref = ref 0 in
@@ -167,11 +183,7 @@ end) :
       else Ok value
     in
     Or_error.tag ~tag:(Inputs.filename tag.filename_key)
-    @@ Or_error.try_with_join ~backtrace:true
-    @@ fun () ->
-    In_channel.with_file
-      (Inputs.filename tag.filename_key)
-      ~binary:true ~f:do_reading
+    @@ Or_error.try_with_join ~backtrace:true do_parsing
 
   let read_many (type a) (module B : Bin_prot.Binable.S with type t = a) tags =
     let%map.Or_error reversed =
