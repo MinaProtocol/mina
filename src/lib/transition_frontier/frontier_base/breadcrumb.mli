@@ -104,6 +104,21 @@ val staged_ledger_hash : t -> Staged_ledger_hash.t
     For convenience of implementation, it's by definition an empty list for the root *)
 val accounts_created : t -> Account_id.t list
 
+val staged_ledger_aux_and_pending_coinbases_at_hash_cached :
+     t
+  -> Network_types.Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+     .data_tag
+     option
+
+val staged_ledger_aux_and_pending_coinbases_at_hash :
+     scan_state_protocol_states:
+       (   Staged_ledger.Scan_state.t
+        -> Mina_state.Protocol_state.Value.t list option )
+  -> t
+  -> Network_types.Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+     .data_tag
+     option
+
 module For_tests : sig
   val gen :
        ?logger:Logger.t

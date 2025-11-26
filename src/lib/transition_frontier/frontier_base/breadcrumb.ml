@@ -16,6 +16,10 @@ module T = struct
     ; staged_ledger_hash : Staged_ledger_hash.t
     ; accounts_created : Account_id.t list
     ; block_tag : Mina_block.Stable.Latest.t State_hash.File_storage.tag
+    ; mutable staged_ledger_aux_and_pending_coinbases_at_hash_cached :
+        Network_types.Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+        .data_tag
+        option
     }
   [@@deriving fields]
 
@@ -55,6 +59,7 @@ module T = struct
     ; staged_ledger_hash
     ; accounts_created
     ; block_tag
+    ; staged_ledger_aux_and_pending_coinbases_at_hash_cached = None
     }
 
   let to_yojson
@@ -65,6 +70,7 @@ module T = struct
       ; staged_ledger_hash = _
       ; accounts_created = _
       ; block_tag = _
+      ; staged_ledger_aux_and_pending_coinbases_at_hash_cached = _
       } =
     `Assoc
       [ ( "validated_transition"
@@ -87,7 +93,8 @@ T.
   , to_yojson
   , staged_ledger_hash
   , accounts_created
-  , block_tag )]
+  , block_tag
+  , staged_ledger_aux_and_pending_coinbases_at_hash_cached )]
 
 let command_hashes t =
   T.validated_transition t |> Mina_block.Validated.body
@@ -312,6 +319,47 @@ let display t =
   ; consensus_state = Consensus.Data.Consensus_state.display consensus_state
   ; parent
   }
+
+let staged_ledger_aux_and_pending_coinbases_at_hash_compute
+    ~scan_state_protocol_states breadcrumb =
+  let staged_ledger = staged_ledger breadcrumb in
+  let scan_state = Staged_ledger.scan_state staged_ledger in
+  let%map.Option protocol_states = scan_state_protocol_states scan_state in
+  let staged_ledger_hash = staged_ledger_hash breadcrumb in
+  let merkle_root = Staged_ledger_hash.ledger_hash staged_ledger_hash in
+  let pending_coinbase =
+    Staged_ledger.pending_coinbase_collection staged_ledger
+  in
+  let module Data =
+    Network_types.Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+    .Data
+    .Stable
+    .Latest
+  in
+  (* Cache in frontier and return tag *)
+  State_hash.File_storage.append_values_exn (state_hash breadcrumb)
+    ~f:(fun writer ->
+      State_hash.File_storage.write_value writer
+        (module Data)
+        (scan_state, merkle_root, pending_coinbase, protocol_states) )
+
+let staged_ledger_aux_and_pending_coinbases_at_hash ~scan_state_protocol_states
+    breadcrumb :
+    Network_types.Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+    .data_tag
+    option =
+  match staged_ledger_aux_and_pending_coinbases_at_hash_cached breadcrumb with
+  | Some res ->
+      Some res
+  | None ->
+      let res =
+        staged_ledger_aux_and_pending_coinbases_at_hash_compute
+          ~scan_state_protocol_states breadcrumb
+      in
+      Option.iter res ~f:(fun tag ->
+          breadcrumb.staged_ledger_aux_and_pending_coinbases_at_hash_cached <-
+            Some tag ) ;
+      res
 
 module For_tests = struct
   open Currency
