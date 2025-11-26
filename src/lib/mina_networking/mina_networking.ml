@@ -270,9 +270,18 @@ let get_transition_chain ?heartbeat_timeout ?timeout t peer req =
     ~label:"chain of transitions" t peer req
   >>=? Fn.compose Deferred.return extract
 
+let extract_block_proof { Proof_carrying_data.data; proof = chain, proof_block }
+    =
+  let%bind.Or_error proof_block =
+    Frontier_base.Network_types.Block.extract proof_block
+  in
+  let%map.Or_error data = Frontier_base.Network_types.Block.extract data in
+  { Proof_carrying_data.data; proof = (chain, proof_block) }
+
 let get_best_tip ?heartbeat_timeout ?timeout t peer =
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_best_tip
     ~label:"best tip" t peer ()
+  >>=? Fn.compose Deferred.return extract_block_proof
 
 let get_completed_checked_snarks t peer =
   make_rpc_request ~rpc:Rpcs.Get_completed_snarks
@@ -377,7 +386,12 @@ let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
          .extract
 
 let get_ancestry t inet_addr input =
+  let extract_block_proof' env =
+    let%map.Or_error data' = extract_block_proof (Envelope.Incoming.data env) in
+    Envelope.Incoming.map env ~f:(const data')
+  in
   rpc_peer_then_random t inet_addr input ~rpc:Rpcs.Get_ancestry
+  >>=? Fn.compose Deferred.return extract_block_proof'
 
 module Sl_downloader = struct
   module Key = struct

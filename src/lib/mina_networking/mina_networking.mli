@@ -89,8 +89,8 @@ module Rpcs : sig
       (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
 
     type response =
-      ( Mina_block.Stable.Latest.t
-      , State_body_hash.t list * Mina_block.Stable.Latest.t )
+      ( Frontier_base.Network_types.Block.t
+      , State_body_hash.t list * Frontier_base.Network_types.Block.t )
       Proof_carrying_data.t
       option
   end
@@ -106,8 +106,8 @@ module Rpcs : sig
     type query = unit
 
     type response =
-      ( Mina_block.Stable.Latest.t
-      , State_body_hash.t list * Mina_block.Stable.Latest.t )
+      ( Frontier_base.Network_types.Block.t
+      , State_body_hash.t list * Frontier_base.Network_types.Block.t )
       Proof_carrying_data.t
       option
   end

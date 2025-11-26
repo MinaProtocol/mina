@@ -879,8 +879,8 @@ module Get_ancestry = struct
       [@@deriving sexp, to_yojson]
 
       type response =
-        ( Mina_block.Stable.Latest.t
-        , State_body_hash.t list * Mina_block.Stable.Latest.t )
+        ( Frontier_base.Network_types.Block.t
+        , State_body_hash.t list * Frontier_base.Network_types.Block.t )
         Proof_carrying_data.t
         option
     end
@@ -918,8 +918,9 @@ module Get_ancestry = struct
       [@@deriving sexp]
 
       type response =
-        ( Mina_block.Stable.V2.t
-        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
+        ( Frontier_base.Network_types.Block.Stable.V1.t
+        , State_body_hash.Stable.V1.t list
+          * Frontier_base.Network_types.Block.Stable.V1.t )
         Proof_carrying_data.Stable.V1.t
         option
 
@@ -976,14 +977,14 @@ module Get_ancestry = struct
         in
         None
     | Some { proof = chain, base_block; data = block } ->
-        let block = Frontier_base.Breadcrumb.block block in
-        let base_block = Frontier_base.Breadcrumb.block base_block in
+        let block = Frontier_base.Breadcrumb.block_tag block in
+        let base_block = Frontier_base.Breadcrumb.block_tag base_block in
         Deferred.return
-        @@ Some
-             { Proof_carrying_data.proof =
-                 (chain, Mina_block.read_all_proofs_from_disk base_block)
-             ; data = Mina_block.read_all_proofs_from_disk block
-             }
+        @@ ( Some
+               { Proof_carrying_data.proof = (chain, Tag base_block)
+               ; data = Tag block
+               }
+             : response )
 
   let rate_limit_budget = (5, `Per Time.Span.minute)
 
@@ -1085,8 +1086,8 @@ module Get_best_tip = struct
       type query = unit [@@deriving sexp, to_yojson]
 
       type response =
-        ( Mina_block.Stable.Latest.t
-        , State_body_hash.t list * Mina_block.Stable.Latest.t )
+        ( Frontier_base.Network_types.Block.t
+        , State_body_hash.t list * Frontier_base.Network_types.Block.t )
         Proof_carrying_data.t
         option
     end
@@ -1120,8 +1121,9 @@ module Get_best_tip = struct
       type query = unit [@@deriving sexp]
 
       type response =
-        ( Mina_block.Stable.V2.t
-        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
+        ( Frontier_base.Network_types.Block.Stable.V1.t
+        , State_body_hash.Stable.V1.t list
+          * Frontier_base.Network_types.Block.Stable.V1.t )
         Proof_carrying_data.Stable.V1.t
         option
 
@@ -1172,14 +1174,14 @@ module Get_best_tip = struct
         in
         None
     | Some { data = data_block; proof = chain, proof_block } ->
-        let data_block = Frontier_base.Breadcrumb.block data_block in
-        let proof_block = Frontier_base.Breadcrumb.block proof_block in
+        let data_block = Frontier_base.Breadcrumb.block_tag data_block in
+        let proof_block = Frontier_base.Breadcrumb.block_tag proof_block in
         Deferred.return
-        @@ Some
-             { Proof_carrying_data.data =
-                 Mina_block.read_all_proofs_from_disk data_block
-             ; proof = (chain, Mina_block.read_all_proofs_from_disk proof_block)
-             }
+        @@ ( Some
+               { Proof_carrying_data.data = Tag data_block
+               ; proof = (chain, Tag proof_block)
+               }
+             : response )
 
   let rate_limit_budget = (3, `Per Time.Span.minute)
 
