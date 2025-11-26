@@ -31,6 +31,9 @@ module Historical : sig
 
   val protocol_state : t -> Mina_state.Protocol_state.Value.t
 
+  val protocol_state_with_hashes :
+    t -> Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t
+
   val create :
        transition:Mina_block.Validated.t
     -> staged_ledger_aux_and_pending_coinbases:

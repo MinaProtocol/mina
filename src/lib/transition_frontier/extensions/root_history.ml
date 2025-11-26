@@ -155,11 +155,7 @@ module T = struct
           ~next_root_required_hashes:
             ( Root_data.Historical.required_state_hashes new_oldest_root
             |> State_hash.Set.to_list )
-          ~old_root_state:
-            ( transition oldest_root |> Mina_block.Validated.forget
-            |> With_hash.map ~f:(fun block ->
-                   block |> Mina_block.header
-                   |> Mina_block.Header.protocol_state ) )
+          ~old_root_state:(protocol_state_with_hashes oldest_root)
         |> List.map ~f:(fun s -> State_hash.With_state_hashes.(state_hash s, s))
         |> State_hash.Map.of_alist_exn
       in
