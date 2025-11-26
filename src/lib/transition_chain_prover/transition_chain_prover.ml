@@ -18,12 +18,7 @@ module Make (Inputs : Inputs_intf) :
       get_extension (Transition_frontier.extensions frontier) Root_history
     in
     let%map root_data = Root_history.lookup root_history state_hash in
-    let validated_block =
-      Frontier_base.Root_data.Historical.transition root_data
-    in
-    Mina_block.Validated.forget validated_block
-    |> With_hash.map
-         ~f:(Fn.compose Mina_block.Header.protocol_state Mina_block.header)
+    Frontier_base.Root_data.Historical.protocol_state_with_hashes root_data
 
   module Merkle_list = Merkle_list_prover.Make_ident (struct
     type value =

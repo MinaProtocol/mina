@@ -53,6 +53,11 @@ module Historical = struct
   let protocol_state t =
     Mina_block.Validated.header t.transition |> Mina_block.Header.protocol_state
 
+  let protocol_state_with_hashes t =
+    Mina_block.Validated.forget t.transition
+    |> With_hash.map
+         ~f:(Fn.compose Mina_block.Header.protocol_state Mina_block.header)
+
   let create ~transition ~staged_ledger_aux_and_pending_coinbases
       ~required_state_hashes =
     { transition
