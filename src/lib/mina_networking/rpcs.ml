@@ -213,10 +213,9 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type query = State_hash.t
 
       type response =
-        ( Staged_ledger.Scan_state.Stable.Latest.t
-        * Ledger_hash.t
-        * Pending_coinbase.t
-        * Mina_state.Protocol_state.value list )
+        Frontier_base.Network_types
+        .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+        .t
         option
     end
 
@@ -255,10 +254,11 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type query = State_hash.Stable.V1.t
 
       type response =
-        ( Staged_ledger.Scan_state.Stable.V3.t
-        * Ledger_hash.Stable.V1.t
-        * Pending_coinbase.Stable.V2.t
-        * Mina_state.Protocol_state.Value.Stable.V2.t list )
+        Frontier_base.Network_types
+        .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+        .Stable
+        .V1
+        .t
         option
 
       let query_of_caller_model = Fn.id

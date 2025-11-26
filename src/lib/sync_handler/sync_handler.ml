@@ -108,36 +108,12 @@ module Make (Inputs : Inputs_intf) :
         Sync_ledger.Any_ledger.Responder.answer_query responder query
 
   let get_staged_ledger_aux_and_pending_coinbases_at_hash ~logger ~frontier
-      state_hash :
-      Frontier_base.Network_types
-      .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
-      .Data
-      .Stable
-      .Latest
-      .t
-      option =
+      state_hash =
+    (* TODO: CAUTION we don't convert the scan state to serialized format *)
     match
       Transition_frontier.staged_ledger_aux_and_pending_coinbases_at_hash
         frontier state_hash
     with
-    | Some (res, staged_ledger_hash) ->
-        [%log debug]
-          ~metadata:
-            [ ( "staged_ledger_hash"
-              , Staged_ledger_hash.to_yojson staged_ledger_hash )
-            ; ("state_hash", State_hash.to_yojson state_hash)
-            ]
-          "sending scan state and pending coinbase generated from frontier" ;
-        (* TODO: CAUTION we don't convert the scan state to serialized format *)
-        (* TODO: don't deserialize it here, return a tag *)
-        Option.some @@ Or_error.ok_exn
-        @@ State_hash.File_storage.read
-             ( module Frontier_base.Network_types
-                      .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
-                      .Data
-                      .Stable
-                      .Latest )
-             res
     | None ->
         let open Transition_frontier.Extensions in
         let root_history =
@@ -146,16 +122,20 @@ module Make (Inputs : Inputs_intf) :
         let%map.Option historical =
           Root_history.lookup root_history state_hash
         in
-        (* TODO: don't deserialize it here, return a tag *)
-        Or_error.ok_exn
-        @@ State_hash.File_storage.read
-             ( module Frontier_base.Network_types
-                      .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
-                      .Data
-                      .Stable
-                      .Latest )
-        @@ Root_data.Historical.staged_ledger_aux_and_pending_coinbases
-             historical
+        Frontier_base.Network_types
+        .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+        .Tag
+          (Root_data.Historical.staged_ledger_aux_and_pending_coinbases
+             historical )
+    | Some (res, staged_ledger_hash) ->
+        [%log debug]
+          ~metadata:
+            [ ( "staged_ledger_hash"
+              , Staged_ledger_hash.to_yojson staged_ledger_hash )
+            ; ("state_hash", State_hash.to_yojson state_hash)
+            ]
+          "sending scan state and pending coinbase generated from frontier" ;
+        Some (Tag res)
 
   let get_transition_chain ~frontier hashes =
     let open Option.Let_syntax in
