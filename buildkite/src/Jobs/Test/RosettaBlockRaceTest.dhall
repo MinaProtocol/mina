@@ -28,6 +28,7 @@ in  Pipeline.build
           [ S.strictlyStart (S.contains "src")
           , S.exactly "scripts/rosetta/test-block-race-with-data" "sh"
           , S.exactly "scripts/rosetta/test-block-race" "sh"
+          , S.exactly "buildkite/scripts/tests/rosetta-block-race-test" "sh"
           , S.exactly "buildkite/src/Jobs/Test/RosettaBlockRaceTest" "dhall"
           , S.exactly "buildkite/src/Command/RosettaBlockRaceTest" "dhall"
           ]
