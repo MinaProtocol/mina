@@ -335,11 +335,11 @@ module Util = struct
     let garbage_nodes =
       List.map garbage_breadcrumbs ~f:(fun breadcrumb ->
           let open Diff.Node_list in
-          let transition = Breadcrumb.validated_transition breadcrumb in
+          let state_hash = Breadcrumb.state_hash breadcrumb in
           let scan_state =
             Staged_ledger.scan_state (Breadcrumb.staged_ledger breadcrumb)
           in
-          { transition; scan_state } )
+          { state_hash; scan_state } )
     in
     let new_scan_state = Staged_ledger.scan_state heir_staged_ledger in
     let next_root_required_hashes =
@@ -444,7 +444,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     (* STEP 1 *)
     List.iter garbage ~f:(fun node ->
         let open Diff.Node_list in
-        let hash = Mina_block.Validated.state_hash node.transition in
+        let hash = node.state_hash in
         let breadcrumb = find_exn ~message:"garbage" t hash in
         let mask = Breadcrumb.mask breadcrumb in
         (* this should get garbage collected and should not require additional destruction *)
