@@ -6,19 +6,23 @@ collect_logs() {
     # Try graceful shutdown first if daemon is still running
     if [ ! -z "$DAEMON_PID" ] && kill -0 "$DAEMON_PID" 2>/dev/null; then
         echo "Stopping daemon gracefully..."
-        kill -TERM "$DAEMON_PID"
-        sleep 2
+        mina client stop-daemon  2>/dev/null
+        if [ $? -ne 0 ]; then
+            echo "Failed to stop daemon gracefully, using SIGTERM" >&2
+            kill -TERM "$DAEMON_PID"
+            sleep 2
+        fi
     fi
 
     echo "========================= COLLECTING LOGS ==========================="
     mkdir -p test_output/artifacts
     
     # application logs
-    cp daemon-stdout.log test_output/artifacts/ 2>/dev/null || echo "daemon-stdout.log not found"
+    cp daemon-stdout.log test_output/artifacts/ || echo "daemon-stdout.log not found"
     # crash logs
-    cp daemon-stderr.log test_output/artifacts/ 2>/dev/null || echo "daemon-stderr.log not found"
+    cp daemon-stderr.log test_output/artifacts/ || echo "daemon-stderr.log not found"
     # mina config
-    cp -r ${MINA_CONFIG_DIR} test_output/artifacts/mina-config 2>/dev/null || echo "mina config dir not accessible"
+    cp -r ${MINA_CONFIG_DIR} test_output/artifacts/mina-config || echo "mina config dir not accessible"
     # daemon status at end of test
     mina client status --json > test_output/artifacts/daemon-status.json 2>/dev/null || echo "Could not get daemon status" > test_output/artifacts/daemon-status.json
     
@@ -187,7 +191,7 @@ sleep 5
 
 # Daemon
 echo "========================= STARTING DAEMON connected to ${MINA_NETWORK} ==========================="
-nohup mina daemon \
+mina daemon \
   --archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} \
   --block-producer-pubkey "$BLOCK_PRODUCER_PUB_KEY" \
   --config-directory ${MINA_CONFIG_DIR} \
