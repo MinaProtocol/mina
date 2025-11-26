@@ -117,10 +117,8 @@ val validated_blocks :
 val staged_ledger_aux_and_pending_coinbases_at_hash :
      t
   -> State_hash.t
-  -> ( ( Staged_ledger.Scan_state.t
-       * Ledger_hash.t
-       * Pending_coinbase.t
-       * Mina_state.Protocol_state.value list )
+  -> ( Network_types.Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+       .data_tag
      * Staged_ledger_hash.t )
      option
 

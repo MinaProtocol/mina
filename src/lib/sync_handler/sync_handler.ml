@@ -115,7 +115,14 @@ module Make (Inputs : Inputs_intf) :
         Sync_ledger.Any_ledger.Responder.answer_query responder query
 
   let get_staged_ledger_aux_and_pending_coinbases_at_hash ~logger ~frontier
-      state_hash =
+      state_hash :
+      Frontier_base.Network_types
+      .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+      .Data
+      .Stable
+      .Latest
+      .t
+      option =
     match
       Transition_frontier.staged_ledger_aux_and_pending_coinbases_at_hash
         frontier state_hash
@@ -127,9 +134,17 @@ module Make (Inputs : Inputs_intf) :
               , Staged_ledger_hash.to_yojson staged_ledger_hash )
             ; ("state_hash", State_hash.to_yojson state_hash)
             ]
-          "sending scan state and pending coinbase" ;
+          "sending scan state and pending coinbase generated from frontier" ;
         (* TODO: CAUTION we don't convert the scan state to serialized format *)
-        Some res
+        (* TODO: don't deserialize it here, return a tag *)
+        Option.some @@ Or_error.ok_exn
+        @@ State_hash.File_storage.read
+             ( module Frontier_base.Network_types
+                      .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+                      .Data
+                      .Stable
+                      .Latest )
+             res
     | None ->
         let open Root_data.Historical in
         let%bind.Option root = find_in_root_history frontier state_hash in
