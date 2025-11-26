@@ -136,3 +136,21 @@ let oldest { history; _ } = Queue.first history
 let is_empty { history; _ } = Queue.is_empty history
 
 let to_list { history; _ } = Queue.to_list history
+
+let get_staged_ledger_aux_and_pending_coinbases_at_hash t state_hash :
+    Frontier_base.Network_types
+    .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+    .Data
+    .Stable
+    .Latest
+    .t
+    option =
+  let%bind.Option root = lookup t state_hash in
+  let%map.Option scan_state_protocol_states =
+    protocol_states_for_scan_state t state_hash
+  in
+  Root_data.Historical.
+    ( scan_state root
+    , staged_ledger_target_ledger_hash root
+    , pending_coinbase root
+    , scan_state_protocol_states )

@@ -43,13 +43,6 @@ module Make (Inputs : Inputs_intf) :
     in
     Root_history.lookup root_history state_hash
 
-  let protocol_states_in_root_history frontier state_hash =
-    let open Transition_frontier.Extensions in
-    let root_history =
-      get_extension (Transition_frontier.extensions frontier) Root_history
-    in
-    Root_history.protocol_states_for_scan_state root_history state_hash
-
   let get_ledger_by_hash ~frontier ledger_hash =
     let root_ledger =
       Root_ledger.as_unmasked
@@ -146,15 +139,12 @@ module Make (Inputs : Inputs_intf) :
                       .Latest )
              res
     | None ->
-        let open Root_data.Historical in
-        let%bind.Option root = find_in_root_history frontier state_hash in
-        let%map.Option scan_state_protocol_states =
-          protocol_states_in_root_history frontier state_hash
+        let open Transition_frontier.Extensions in
+        let root_history =
+          get_extension (Transition_frontier.extensions frontier) Root_history
         in
-        ( scan_state root
-        , staged_ledger_target_ledger_hash root
-        , pending_coinbase root
-        , scan_state_protocol_states )
+        Root_history.get_staged_ledger_aux_and_pending_coinbases_at_hash
+          root_history state_hash
 
   let get_transition_chain ~frontier hashes =
     let open Option.Let_syntax in
