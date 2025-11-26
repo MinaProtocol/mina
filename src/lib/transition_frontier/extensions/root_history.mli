@@ -22,5 +22,13 @@ val oldest : t -> Root_data.Historical.t option
 
 val to_list : t -> Root_data.Historical.t list
 
-val protocol_states_for_scan_state :
-  t -> State_hash.t -> Mina_state.Protocol_state.value list option
+val get_staged_ledger_aux_and_pending_coinbases_at_hash :
+     t
+  -> State_hash.t
+  -> Frontier_base.Network_types
+     .Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+     .Data
+     .Stable
+     .Latest
+     .t
+     option
