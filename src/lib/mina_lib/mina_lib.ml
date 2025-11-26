@@ -1647,8 +1647,8 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
     | Some frontier ->
         let tip = Transition_frontier.best_tip frontier in
         let top_block =
-          Transition_frontier.Breadcrumb.validated_transition tip
-          |> Mina_block.Validated.header |> Mina_block.Header.blockchain_length
+          Transition_frontier.Breadcrumb.header tip
+          |> Mina_block.Header.blockchain_length
         in
         let delta =
           Unsigned.UInt32.(Infix.(received_block - top_block) |> to_int)
@@ -2656,14 +2656,8 @@ let best_chain_block_by_height (t : t) height =
   let%bind transition_frontier = get_transition_frontier t in
   Transition_frontier.best_tip_path transition_frontier
   |> List.find ~f:(fun bc ->
-         let validated_transition =
-           Transition_frontier.Breadcrumb.validated_transition bc
-         in
-         let block_height =
-           Mina_block.(
-             blockchain_length @@ With_hash.data
-             @@ Validated.forget validated_transition)
-         in
+         let header = Transition_frontier.Breadcrumb.header bc in
+         let block_height = Mina_block.Header.blockchain_length header in
          Unsigned.UInt32.equal block_height height )
   |> Result.of_option
        ~error:

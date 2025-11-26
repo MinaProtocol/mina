@@ -706,12 +706,7 @@ module Metrics = struct
 
   let empty_blocks_at_best_tip t =
     let rec go acc b =
-      if
-        not
-          (List.is_empty
-             ( Breadcrumb.validated_transition b
-             |> Mina_block.Validated.valid_commands ) )
-      then acc
+      if (Breadcrumb.command_stats b).total <> 0 then acc
       else match parent t b with None -> acc | Some b -> go (acc + 1) b
     in
     go 0 (best_tip t)
@@ -798,10 +793,7 @@ let update_metrics_with_diff (type mutant)
           Int.to_float (1 + List.length garbage_breadcrumbs)
         in
         let num_finalized_staged_txns =
-          Int.to_float
-            (List.length
-               ( Breadcrumb.validated_transition new_root_breadcrumb
-               |> Mina_block.Validated.valid_commands ) )
+          Int.to_float (Breadcrumb.command_stats new_root_breadcrumb).total
         in
         Gauge.dec Transition_frontier.active_breadcrumbs num_breadcrumbs_removed ;
         Gauge.set Transition_frontier.recently_finalized_staged_txns
@@ -842,24 +834,14 @@ let update_metrics_with_diff (type mutant)
         in
         Block_time.Span.( <= ) (Block_time.diff now slot_time) two_slots
       in
-      let valid_commands =
-        Breadcrumb.validated_transition best_tip
-        |> Mina_block.Validated.valid_commands
+      let { Command_stats.total; zkapp_commands } =
+        Breadcrumb.command_stats best_tip
       in
       Mina_metrics.(
-        Gauge.set Transition_frontier.best_tip_user_txns
-          (Int.to_float (List.length valid_commands)) ;
+        Gauge.set Transition_frontier.best_tip_user_txns (Int.to_float total) ;
         Mina_metrics.(
           Gauge.set Transition_frontier.best_tip_zkapp_txns
-            (Int.to_float
-               (List.fold ~init:0
-                  ~f:(fun c cmd ->
-                    match cmd.data with
-                    | Mina_base.User_command.Poly.Zkapp_command _ ->
-                        c + 1
-                    | _ ->
-                        c )
-                  valid_commands ) )) ;
+            (Int.to_float zkapp_commands)) ;
         if is_recent_block then
           Gauge.set Transition_frontier.best_tip_coinbase
             (if has_coinbase best_tip then 1. else 0.) ;
