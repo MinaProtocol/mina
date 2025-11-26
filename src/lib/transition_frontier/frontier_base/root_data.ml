@@ -44,28 +44,22 @@ end
 module Historical = struct
   type t =
     { transition : Mina_block.Validated.t
-    ; common : Common.t
-    ; staged_ledger_target_ledger_hash : Ledger_hash.t
+    ; staged_ledger_aux_and_pending_coinbases :
+        Network_types.Get_staged_ledger_aux_and_pending_coinbases_at_hash_result
+        .data_tag
+    ; required_state_hashes : State_hash.Set.t
     }
-
-  let transition t = t.transition
-
-  let staged_ledger_target_ledger_hash t = t.staged_ledger_target_ledger_hash
-
-  let scan_state t = Common.scan_state t.common
-
-  let pending_coinbase t = Common.pending_coinbase t.common
+  [@@deriving fields]
 
   let protocol_state t =
     Mina_block.Validated.header t.transition |> Mina_block.Header.protocol_state
 
-  let required_state_hashes t =
-    Staged_ledger.Scan_state.required_state_hashes t.common.scan_state
-
-  let create ~transition ~scan_state ~pending_coinbase
-      ~staged_ledger_target_ledger_hash =
-    let common = Common.create ~scan_state ~pending_coinbase in
-    { transition; common; staged_ledger_target_ledger_hash }
+  let create ~transition ~staged_ledger_aux_and_pending_coinbases
+      ~required_state_hashes =
+    { transition
+    ; staged_ledger_aux_and_pending_coinbases
+    ; required_state_hashes
+    }
 end
 
 module Limited = struct
