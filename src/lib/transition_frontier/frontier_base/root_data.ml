@@ -62,16 +62,8 @@ module Historical = struct
   let required_state_hashes t =
     Staged_ledger.Scan_state.required_state_hashes t.common.scan_state
 
-  let of_breadcrumb breadcrumb =
-    let transition = Breadcrumb.validated_transition breadcrumb in
-    let staged_ledger = Breadcrumb.staged_ledger breadcrumb in
-    let scan_state = Staged_ledger.scan_state staged_ledger in
-    let pending_coinbase =
-      Staged_ledger.pending_coinbase_collection staged_ledger
-    in
-    let staged_ledger_target_ledger_hash =
-      Breadcrumb.staged_ledger_hash breadcrumb |> Staged_ledger_hash.ledger_hash
-    in
+  let create ~transition ~scan_state ~pending_coinbase
+      ~staged_ledger_target_ledger_hash =
     let common = Common.create ~scan_state ~pending_coinbase in
     { transition; common; staged_ledger_target_ledger_hash }
 end

@@ -34,7 +34,12 @@ module Historical : sig
 
   val required_state_hashes : t -> State_hash.Set.t
 
-  val of_breadcrumb : Breadcrumb.t -> t
+  val create :
+       transition:Mina_block.Validated.t
+    -> scan_state:Staged_ledger.Scan_state.t
+    -> pending_coinbase:Pending_coinbase.t
+    -> staged_ledger_target_ledger_hash:Ledger_hash.t
+    -> t
 end
 
 (* Limited root data is similar to Minimal root data, except that it contains
