@@ -152,8 +152,10 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
 
 let block_base64_of_breadcrumb breadcrumb =
   let external_transition =
-    breadcrumb |> Transition_frontier.Breadcrumb.block
-    |> Mina_block.read_all_proofs_from_disk
+    breadcrumb |> Transition_frontier.Breadcrumb.block_tag
+    |> State_hash.File_storage.read (module Mina_block.Stable.Latest)
+    |> Or_error.tag ~tag:"uptime_service"
+    |> Or_error.ok_exn
   in
   let block_string =
     Binable.to_string (module Mina_block.Stable.Latest) external_transition
@@ -200,10 +202,9 @@ let read_all_proofs_for_work_single_spec =
     ~f_proof:Ledger_proof.Cached.read_proof_from_disk
     ~f_witness:Transaction_witness.read_all_proofs_from_disk
 
-let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
-    ~url ~snark_worker ~transition_frontier ~peer_id
-    ~(submitter_keypair : Keypair.t) ~snark_work_fee ~graphql_control_port
-    ~built_with_commit_sha =
+let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
+    ~transition_frontier ~peer_id ~(submitter_keypair : Keypair.t)
+    ~snark_work_fee ~graphql_control_port ~built_with_commit_sha =
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       (* expected during daemon boot, so not logging as error *)
@@ -220,11 +221,10 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
           ~prover:(Public_key.compress submitter_keypair.public_key)
       in
       let best_tip = Transition_frontier.best_tip tf in
-      let best_tip_block = Transition_frontier.Breadcrumb.block best_tip in
-      if
-        List.is_empty
-          (Mina_block.transactions ~constraint_constants best_tip_block)
-      then (
+      let best_tip_stats =
+        Transition_frontier.Breadcrumb.command_stats best_tip
+      in
+      if (not best_tip_stats.has_coinbase) && best_tip_stats.total = 0 then (
         [%log info]
           "No transactions in block, sending block without SNARK work to \
            uptime service" ;
@@ -287,8 +287,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                    ~f:Staged_ledger.Scan_state.Available_job.is_transition
             in
             let staged_ledger_hash =
-              Mina_block.header best_tip_block
-              |> Mina_block.Header.protocol_state
+              Transition_frontier.Breadcrumb.protocol_state best_tip
               |> Mina_state.Protocol_state.blockchain_state
               |> Mina_state.Blockchain_state.staged_ledger_hash
             in
@@ -469,9 +468,9 @@ let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
                     "Uptime service will attempt to send a block and SNARK work" ;
                   let snark_work_fee = get_snark_work_fee () in
                   send_block_and_transaction_snark ~logger ~interruptor ~url
-                    ~constraint_constants ~snark_worker ~transition_frontier
-                    ~peer_id ~submitter_keypair ~snark_work_fee
-                    ~graphql_control_port ~built_with_commit_sha
+                    ~snark_worker ~transition_frontier ~peer_id
+                    ~submitter_keypair ~snark_work_fee ~graphql_control_port
+                    ~built_with_commit_sha
                 in
                 match get_next_producer_time_opt () with
                 | None ->
