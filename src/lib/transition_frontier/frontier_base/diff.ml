@@ -13,9 +13,7 @@ end
 
 module Node_list = struct
   type full_node =
-    { transition : Mina_block.Validated.t
-    ; scan_state : Staged_ledger.Scan_state.t
-    }
+    { state_hash : State_hash.t; scan_state : Staged_ledger.Scan_state.t }
 
   type lite_node = State_hash.t
 
@@ -25,9 +23,7 @@ module Node_list = struct
 
   type 'repr node_list = 'repr t
 
-  let to_lite =
-    List.map ~f:(fun { transition; _ } ->
-        Mina_block.Validated.state_hash transition )
+  let to_lite = List.map ~f:(fun { state_hash; _ } -> state_hash)
 
   module Lite = struct
     module Binable_arg = struct
