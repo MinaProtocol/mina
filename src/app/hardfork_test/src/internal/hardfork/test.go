@@ -125,6 +125,9 @@ func (t *HardforkTest) Run() error {
 	case config.Legacy:
 
 		beforeShutdown = func(t *HardforkTest, analysis *BlockAnalysisResult) error {
+			// TODO: refactor so that:
+			// 1. stuff here go into LegacyForkPhase
+			// 2. fork validation is agnostic to fork method and it's checked regardless of fork method
 			t.Logger.Info("Phase 2: Forking the legacy way...")
 
 			forkConfigBytes, err := t.GetForkConfig(t.AnyPortOfType(PORT_REST))
