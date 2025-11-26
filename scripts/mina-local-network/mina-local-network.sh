@@ -794,6 +794,10 @@ load_config() {
     inherit_with:*)
       local replaced_config_file
       IFS=',' read -r replaced_config_file OVERRIDE_GENSIS_LEDGER <<< "${config_mode#inherit_with:}"
+      if [ ! -f "${replaced_config_file}" ]; then
+        echo "Error: Config file '${replaced_config_file}' does not exist, can't inherit_with." >&2
+        exit 1
+      fi
       cp -f "${replaced_config_file}" "${config_file}"
       ;;
   esac
