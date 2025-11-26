@@ -752,6 +752,9 @@ load_config() {
       if [ ! -f "${replaced_config_file}" ]; then
         echo "Error: Config file '${replaced_config_file}' does not exist, can't inherit_with." >&2
         exit 1
+      else
+        echo "Inheriting config at ${replaced_config_file}:"
+        cat "${replaced_config_file}"
       fi
       cp -f "${replaced_config_file}" "${config_file}"
       ;;
