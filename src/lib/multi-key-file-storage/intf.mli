@@ -79,4 +79,10 @@ module type S = sig
        (module Bin_prot.Binable.S with type t = 'a)
     -> 'a tag list
     -> 'a list Core_kernel.Or_error.t
+
+  (** Read the bytes stored at the given tag *)
+  val read_bytes : 'a tag -> Bytes.t Core_kernel.Or_error.t
+
+  (** Get the size of the value stored at the given tag *)
+  val size : 'a tag -> int
 end
