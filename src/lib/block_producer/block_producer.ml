@@ -293,15 +293,15 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
               , `Staged_ledger transitioned_staged_ledger
               , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
               ) ->
+              (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
+              ignore
+              @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
+                   (Staged_ledger.ledger transitioned_staged_ledger) ;
               [%log internal] "Hash_new_staged_ledger" ;
               let staged_ledger_hash =
                 Staged_ledger.hash transitioned_staged_ledger
               in
               [%log internal] "Hash_new_staged_ledger_done" ;
-              (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
-              ignore
-              @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
-                   (Staged_ledger.ledger transitioned_staged_ledger) ;
               Some
                 ( (match diff with Ok diff -> diff | Error _ -> assert false)
                 , staged_ledger_hash
