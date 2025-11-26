@@ -246,7 +246,7 @@ module type Sync_handler_intf = sig
   val get_transition_chain :
        frontier:transition_frontier
     -> State_hash.t list
-    -> Mina_block.t list option
+    -> Frontier_base.Network_types.Block.t list option
 
   val best_tip_path : frontier:transition_frontier -> State_hash.t list
 

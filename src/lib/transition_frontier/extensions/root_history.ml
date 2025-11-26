@@ -100,7 +100,6 @@ let historical_of_breadcrumb ~protocol_states_for_root_scan_state ~history
   let cached_opt =
     Breadcrumb.staged_ledger_aux_and_pending_coinbases_cached breadcrumb
   in
-  let transition = Breadcrumb.validated_transition breadcrumb in
   let%map.Option staged_ledger_aux_and_pending_coinbases =
     match cached_opt with
     | Some value ->
@@ -115,8 +114,11 @@ let historical_of_breadcrumb ~protocol_states_for_root_scan_state ~history
   let required_state_hashes =
     Staged_ledger.Scan_state.required_state_hashes scan_state
   in
-  Root_data.Historical.create ~transition
+  Root_data.Historical.create
+    ~block_tag:(Breadcrumb.block_tag breadcrumb)
     ~staged_ledger_aux_and_pending_coinbases ~required_state_hashes
+    ~protocol_state_with_hashes:
+      (Breadcrumb.protocol_state_with_hashes breadcrumb)
 
 module T = struct
   type view = t
@@ -163,7 +165,8 @@ module T = struct
     assert (
       [%equal: [ `Ok | `Key_already_present ]] `Ok
         (Queue.enqueue_back t.history
-           (Mina_block.Validated.state_hash @@ transition t.current_root)
+           ( State_hash.With_state_hashes.state_hash
+           @@ protocol_state_with_hashes t.current_root )
            t.current_root ) ) ;
     t.current_root <- new_root
 

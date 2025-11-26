@@ -495,7 +495,7 @@ module Get_transition_chain = struct
     module T = struct
       type query = State_hash.t list [@@deriving sexp, to_yojson]
 
-      type response = Mina_block.Stable.Latest.t list option
+      type response = Frontier_base.Network_types.Block.t list option
     end
 
     module Caller = T
@@ -526,7 +526,7 @@ module Get_transition_chain = struct
     module T = struct
       type query = State_hash.Stable.V1.t list [@@deriving sexp]
 
-      type response = Mina_block.Stable.V2.t list option
+      type response = Frontier_base.Network_types.Block.Stable.V1.t list option
 
       let query_of_caller_model = Fn.id
 
@@ -567,8 +567,7 @@ module Get_transition_chain = struct
     in
     match result with
     | Some blocks ->
-        Deferred.return @@ Option.some
-        @@ List.map ~f:Mina_block.read_all_proofs_from_disk blocks
+        Deferred.return @@ Option.some blocks
     | None ->
         let%map () =
           Trust_system.(
