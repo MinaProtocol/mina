@@ -429,17 +429,15 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                       () )
               | `Local_breadcrumb breadcrumb ->
                   let state_hash =
-                    Transition_frontier.Breadcrumb.validated_transition
+                    Transition_frontier.Breadcrumb.state_hash
                       (Cached.peek breadcrumb)
-                    |> Mina_block.Validated.state_hash
                   in
                   Internal_tracing.with_state_hash state_hash
                   @@ fun () ->
                   [%log internal] "Begin_local_block_processing" ;
                   let transition_time =
-                    Transition_frontier.Breadcrumb.validated_transition
+                    Transition_frontier.Breadcrumb.header
                       (Cached.peek breadcrumb)
-                    |> Mina_block.Validated.header
                     |> Mina_block.Header.protocol_state
                     |> Protocol_state.blockchain_state
                     |> Blockchain_state.timestamp |> Block_time.to_time_exn

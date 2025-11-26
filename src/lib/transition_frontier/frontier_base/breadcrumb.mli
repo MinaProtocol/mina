@@ -62,6 +62,10 @@ val valid_commands_hashed :
 val contains_transaction_by_hash :
   t -> Mina_transaction.Transaction_hash.t -> bool
 
+val header : t -> Mina_block.Header.t
+
+val command_stats : t -> Command_stats.t
+
 val validated_transition : t -> Mina_block.Validated.t
 
 val block_tag : t -> Mina_block.Stable.Latest.t State_hash.File_storage.tag

@@ -94,6 +94,8 @@ T.
   , block_tag
   , staged_ledger_aux_and_pending_coinbases_cached )]
 
+let header t = T.validated_transition t |> Mina_block.Validated.header
+
 let command_hashes t =
   T.validated_transition t |> Mina_block.Validated.body
   |> Body.staged_ledger_diff |> Staged_ledger_diff.command_hashes
@@ -258,6 +260,8 @@ let block_with_hash =
   Fn.compose Mina_block.Validated.forget validated_transition
 
 let block = Fn.compose With_hash.data block_with_hash
+
+let command_stats t = Command_stats.of_body @@ Mina_block.body @@ block t
 
 let state_hash = Fn.compose Mina_block.Validated.state_hash validated_transition
 
