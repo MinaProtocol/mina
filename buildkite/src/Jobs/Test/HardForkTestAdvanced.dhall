@@ -54,7 +54,7 @@ in  Pipeline.build
                   , privileged = True
                   , useBash = False
                   }
-                  "./scripts/hardfork/build-and-test.sh --fork-from origin/compatible --fork-method advanced"
+                  "./scripts/hardfork/build-and-test.sh --fork-from origin/cjjdespres/auto-config-dump-thread --fork-method advanced"
               ]
             , label = "hard fork test - advanced mode"
             , key = "hard-fork-test-advanced"
