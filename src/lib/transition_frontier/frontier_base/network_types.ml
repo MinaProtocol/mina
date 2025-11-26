@@ -6,6 +6,12 @@ module Make (Data : Binable.S) = struct
 
   type data_tag = Data.t State_hash.File_storage.tag
 
+  let extract = function
+    | Tag x ->
+        State_hash.File_storage.read (module Data) x
+    | Data x ->
+        Or_error.return x
+
   let to_latest = Fn.id
 
   module Arg = struct
@@ -50,6 +56,8 @@ module Staged_ledger_aux_and_pending_coinbases = struct
 
   type data_tag = M.data_tag
 
+  let extract = M.extract
+
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
@@ -66,6 +74,8 @@ module Block = struct
   module M = Make (Mina_block.Stable.V2)
 
   type data_tag = M.data_tag
+
+  let extract = M.extract
 
   [%%versioned_binable
   module Stable = struct

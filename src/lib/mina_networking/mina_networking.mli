@@ -69,7 +69,7 @@ module Rpcs : sig
   module Get_transition_chain : sig
     type query = State_hash.t list
 
-    type response = Mina_block.Stable.Latest.t list option
+    type response = Frontier_base.Network_types.Block.t list option
   end
 
   module Get_transition_chain_proof : sig
@@ -226,7 +226,10 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
   -> Peer.Id.t
   -> State_hash.t
-  -> Frontier_base.Network_types.Staged_ledger_aux_and_pending_coinbases.t
+  -> Frontier_base.Network_types.Staged_ledger_aux_and_pending_coinbases.Data
+     .Stable
+     .Latest
+     .t
      Deferred.Or_error.t
 
 val get_completed_checked_snarks :

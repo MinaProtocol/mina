@@ -43,26 +43,23 @@ end
 
 module Historical = struct
   type t =
-    { transition : Mina_block.Validated.t
+    { block_tag : Network_types.Block.data_tag
     ; staged_ledger_aux_and_pending_coinbases :
         Network_types.Staged_ledger_aux_and_pending_coinbases.data_tag
     ; required_state_hashes : State_hash.Set.t
+    ; protocol_state_with_hashes :
+        Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t
     }
   [@@deriving fields]
 
-  let protocol_state t =
-    Mina_block.Validated.header t.transition |> Mina_block.Header.protocol_state
+  let protocol_state t = With_hash.data t.protocol_state_with_hashes
 
-  let protocol_state_with_hashes t =
-    Mina_block.Validated.forget t.transition
-    |> With_hash.map
-         ~f:(Fn.compose Mina_block.Header.protocol_state Mina_block.header)
-
-  let create ~transition ~staged_ledger_aux_and_pending_coinbases
-      ~required_state_hashes =
-    { transition
+  let create ~block_tag ~staged_ledger_aux_and_pending_coinbases
+      ~required_state_hashes ~protocol_state_with_hashes =
+    { block_tag
     ; staged_ledger_aux_and_pending_coinbases
     ; required_state_hashes
+    ; protocol_state_with_hashes
     }
 end
 

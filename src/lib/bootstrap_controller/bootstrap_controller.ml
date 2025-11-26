@@ -457,29 +457,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     match staged_ledger_data_download_result with
     | Error err ->
         Deferred.return (staged_ledger_data_download_time, (None, Error err))
-    | Ok (Data result) ->
-        let%map res =
-          handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
-            ~temp_snarked_ledger ~verifier ~constraint_constants ~signature_kind
-            t result
-        in
-        (staged_ledger_data_download_time, res)
-    | Ok (Tag tag) ->
-        (* This is an unexpected case, deserialization should always return [Data x] *)
-        [%log warn]
-          "Unexpected Tag returned from \
-           get_staged_ledger_aux_and_pending_coinbases_at_hash" ;
-        let result =
-          State_hash.File_storage.read
-            ( module Frontier_base.Network_types
-                     .Staged_ledger_aux_and_pending_coinbases
-                     .Data
-                     .Stable
-                     .Latest )
-            tag
-          |> Or_error.tag ~tag:"failed to read unexpected Tag"
-          |> Or_error.ok_exn
-        in
+    | Ok result ->
         let%map res =
           handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
             ~temp_snarked_ledger ~verifier ~constraint_constants ~signature_kind
