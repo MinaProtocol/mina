@@ -3,6 +3,13 @@ set -eox pipefail
 
 # Function to collect logs (called on exit or at end of script)
 collect_logs() {
+    # Try graceful shutdown first if daemon is still running
+    if [ ! -z "$DAEMON_PID" ] && kill -0 "$DAEMON_PID" 2>/dev/null; then
+        echo "Stopping daemon gracefully..."
+        kill -TERM "$DAEMON_PID"
+        sleep 2
+    fi
+
     echo "========================= COLLECTING LOGS ==========================="
     mkdir -p test_output/artifacts
     
@@ -192,7 +199,7 @@ nohup mina daemon \
   --run-snark-worker "$SNARK_PRODUCER_PK" \
   --seed \
   --demo-mode \
-  > daemon-stdout.log 2> daemon-stderr.log < /dev/null &
+  > daemon-stdout.log 2> daemon-stderr.log &
 
 DAEMON_PID=$!
 echo "Daemon started with PID: ${DAEMON_PID}"
