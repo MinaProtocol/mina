@@ -149,6 +149,7 @@ let%test_module "Block storage tests" =
           f conf_dir helper )
 
     let send_and_receive ~helper ~reader ~db breadcrumb =
+      (* TODO use block tag *)
       let body =
         Breadcrumb.block breadcrumb
         |> Mina_block.body |> Mina_block.Body.read_all_proofs_from_disk

@@ -1042,8 +1042,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 ~metadata:
                   [ ( "blockchain_length"
                     , Mina_numbers.Length.to_yojson
-                      @@ Mina_block.blockchain_length
-                      @@ Breadcrumb.block breadcrumb )
+                      @@ Mina_block.Header.blockchain_length
+                      @@ Breadcrumb.header breadcrumb )
                   ; ("transactions", `List txs)
                   ] ;
               [%str_log info]

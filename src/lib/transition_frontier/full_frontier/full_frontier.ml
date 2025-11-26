@@ -726,18 +726,6 @@ module Metrics = struct
     in
     r -. Mina_metrics.time_offset_sec
 
-  let has_coinbase b =
-    let d1, d2 =
-      ( Breadcrumb.block b |> Mina_block.body
-      |> Mina_block.Body.staged_ledger_diff )
-        .diff
-    in
-    match (d1.coinbase, d2) with
-    | Zero, None | Zero, Some { coinbase = Zero; _ } ->
-        false
-    | Zero, Some { coinbase = One _; _ } | One _, _ | Two _, _ ->
-        true
-
   let intprop f b = Unsigned.UInt32.to_int (f (Breadcrumb.consensus_state b))
 
   (* Rate of slots filled on the main chain in the k slots preceeding the best tip. *)
@@ -834,7 +822,7 @@ let update_metrics_with_diff (type mutant)
         in
         Block_time.Span.( <= ) (Block_time.diff now slot_time) two_slots
       in
-      let { Command_stats.total; zkapp_commands } =
+      let { Command_stats.total; zkapp_commands; has_coinbase } =
         Breadcrumb.command_stats best_tip
       in
       Mina_metrics.(
@@ -844,7 +832,7 @@ let update_metrics_with_diff (type mutant)
             (Int.to_float zkapp_commands)) ;
         if is_recent_block then
           Gauge.set Transition_frontier.best_tip_coinbase
-            (if has_coinbase best_tip then 1. else 0.) ;
+            (if has_coinbase then 1. else 0.) ;
         Gauge.set Transition_frontier.slot_fill_rate (slot_fill_rate t) ;
         Gauge.set Transition_frontier.min_window_density
           (Int.to_float (intprop min_window_density best_tip)) ;

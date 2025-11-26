@@ -2210,8 +2210,8 @@ module Queries = struct
                     |> Staged_ledger_diff.commands
                   in
                   let block_number =
-                    bc |> Transition_frontier.Breadcrumb.block
-                    |> Mina_block.header |> Mina_block.Header.blockchain_length
+                    bc |> Transition_frontier.Breadcrumb.header
+                    |> Mina_block.Header.blockchain_length
                   in
                   let transaction_seq = ref 0 in
                   let action_list_list =
