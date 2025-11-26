@@ -173,9 +173,6 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult) (*ForkDa
 	}
 
 	forkDataPath := fmt.Sprintf("%s/fork_data", cwd)
-	if err := os.MkdirAll(forkDataPath, 0755); err != nil {
-		return nil, err
-	}
 
 	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, t.AnyPortOfType(PORT_CLIENT)); err != nil {
 		return nil, err
