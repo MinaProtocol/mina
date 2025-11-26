@@ -1,6 +1,37 @@
 #!/bin/bash
 set -eox pipefail
 
+# Function to collect logs (called on exit or at end of script)
+collect_logs() {
+    # Try graceful shutdown first if daemon is still running
+    if [ ! -z "$DAEMON_PID" ] && kill -0 "$DAEMON_PID" 2>/dev/null; then
+        echo "Stopping daemon gracefully..."
+        mina client stop-daemon  2>/dev/null
+        if [ $? -ne 0 ]; then
+            echo "Failed to stop daemon gracefully, using SIGTERM" >&2
+            kill -TERM "$DAEMON_PID"
+            sleep 2
+        fi
+    fi
+
+    echo "========================= COLLECTING LOGS ==========================="
+    mkdir -p test_output/artifacts
+    
+    # application logs
+    cp daemon-stdout.log test_output/artifacts/ || echo "daemon-stdout.log not found"
+    # crash logs
+    cp daemon-stderr.log test_output/artifacts/ || echo "daemon-stderr.log not found"
+    # mina config
+    cp -r ${MINA_CONFIG_DIR} test_output/artifacts/mina-config || echo "mina config dir not accessible"
+    # daemon status at end of test
+    mina client status --json > test_output/artifacts/daemon-status.json 2>/dev/null || echo "Could not get daemon status" > test_output/artifacts/daemon-status.json
+    
+    echo "Logs collected in test_output/artifacts/"
+}
+
+# Ensure logs are collected on exit (even on failure)
+trap collect_logs EXIT
+
 # These tests use the mina binary, as rosetta-cli assumes we use a testnet.
 # See https://github.com/coinbase/rosetta-sdk-go/blob/master/keys/signer_pallas.go#L222
 
@@ -162,7 +193,6 @@ sleep 5
 echo "========================= STARTING DAEMON connected to ${MINA_NETWORK} ==========================="
 mina daemon \
   --archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} \
-  --background \
   --block-producer-pubkey "$BLOCK_PRODUCER_PUB_KEY" \
   --config-directory ${MINA_CONFIG_DIR} \
   --config-file ${MINA_CONFIG_FILE} \
@@ -172,7 +202,11 @@ mina daemon \
   --rest-port ${MINA_GRAPHQL_PORT} \
   --run-snark-worker "$SNARK_PRODUCER_PK" \
   --seed \
-  --demo-mode
+  --demo-mode \
+  > daemon-stdout.log 2> daemon-stderr.log &
+
+DAEMON_PID=$!
+echo "Daemon started with PID: ${DAEMON_PID}"
 
 echo "========================= WAITING FOR THE DAEMON TO SYNC ==========================="
 daemon_status="Pending"
@@ -267,3 +301,6 @@ rosetta-cli check:data --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
 echo "========================= ROSETTA CLI: CHECK:PERF ==========================="
 echo "rosetta-cli check:perf" # Will run this command when tests are fully implemented
+
+# Call log collection function (also called automatically on exit via trap)
+collect_logs
