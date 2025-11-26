@@ -3,6 +3,19 @@ open Mina_base
 open Frontier_base
 module Queue = Hash_queue.Make (State_hash)
 
+let historical_of_breadcrumb breadcrumb =
+  let transition = Breadcrumb.validated_transition breadcrumb in
+  let staged_ledger = Breadcrumb.staged_ledger breadcrumb in
+  let scan_state = Staged_ledger.scan_state staged_ledger in
+  let pending_coinbase =
+    Staged_ledger.pending_coinbase_collection staged_ledger
+  in
+  let staged_ledger_target_ledger_hash =
+    Breadcrumb.staged_ledger_hash breadcrumb |> Staged_ledger_hash.ledger_hash
+  in
+  Root_data.Historical.create ~transition ~scan_state ~pending_coinbase
+    ~staged_ledger_target_ledger_hash
+
 module T = struct
   type t =
     { history : Root_data.Historical.t Queue.t
@@ -19,9 +32,7 @@ module T = struct
   let create ~logger:_ frontier =
     let capacity = 2 * Full_frontier.max_length frontier in
     let history = Queue.create () in
-    let current_root =
-      Root_data.Historical.of_breadcrumb (Full_frontier.root frontier)
-    in
+    let current_root = historical_of_breadcrumb (Full_frontier.root frontier) in
     let t =
       { history
       ; capacity
@@ -72,8 +83,7 @@ module T = struct
             in
             match Full_frontier.find frontier state_hash with
             | Some breadcrumb ->
-                enqueue root_history
-                  (Root_data.Historical.of_breadcrumb breadcrumb) ;
+                enqueue root_history (historical_of_breadcrumb breadcrumb) ;
                 true
             | None ->
                 failwithf "root_history: new root %s not found in frontier"
