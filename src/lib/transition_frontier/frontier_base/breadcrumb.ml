@@ -5,6 +5,10 @@ open Mina_state
 open Mina_block
 open Network_peer
 
+let command_hashes_of_transition validated_transition =
+  Mina_block.Validated.body validated_transition
+  |> Body.staged_ledger_diff |> Staged_ledger_diff.command_hashes
+
 module T = struct
   let id = "breadcrumb"
 
@@ -18,6 +22,7 @@ module T = struct
     ; block_tag : Mina_block.Stable.Latest.t State_hash.File_storage.tag
     ; mutable staged_ledger_aux_and_pending_coinbases_cached :
         Network_types.Staged_ledger_aux_and_pending_coinbases.data_tag option
+    ; transaction_hashes : Mina_transaction.Transaction_hash.Set.t
     }
   [@@deriving fields]
 
@@ -58,6 +63,9 @@ module T = struct
     ; accounts_created
     ; block_tag
     ; staged_ledger_aux_and_pending_coinbases_cached = None
+    ; transaction_hashes =
+        command_hashes_of_transition validated_transition
+        |> Mina_transaction.Transaction_hash.Set.of_list
     }
 
   let to_yojson
@@ -69,6 +77,7 @@ module T = struct
       ; accounts_created = _
       ; block_tag = _
       ; staged_ledger_aux_and_pending_coinbases_cached = _
+      ; transaction_hashes = _
       } =
     `Assoc
       [ ( "validated_transition"
@@ -96,9 +105,7 @@ T.
 
 let header t = T.validated_transition t |> Mina_block.Validated.header
 
-let command_hashes t =
-  T.validated_transition t |> Mina_block.Validated.body
-  |> Body.staged_ledger_diff |> Staged_ledger_diff.command_hashes
+let command_hashes t = command_hashes_of_transition t.T.validated_transition
 
 let valid_commands_hashed (t : T.t) =
   List.map2_exn (Mina_block.Validated.valid_commands t.validated_transition)
@@ -114,8 +121,7 @@ let valid_commands_hashed (t : T.t) =
    then in transaction_status it will be necessary to only traverse
    all of the tips instead of all of the breadcrumbs. *)
 let contains_transaction_by_hash t hash =
-  List.exists (command_hashes t)
-    ~f:(Mina_transaction.Transaction_hash.equal hash)
+  Mina_transaction.Transaction_hash.Set.mem t.T.transaction_hashes hash
 
 include Allocation_functor.Make.Basic (T)
 
