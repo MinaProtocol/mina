@@ -129,7 +129,11 @@ val crawl_successors :
   -> signature_kind:Mina_signature_kind.t
   -> proof_cache_db:Proof_cache_tag.cache_db
   -> init:'a
-  -> f:('a -> Mina_block.Validated.t -> ('a, 'b) Deferred.Result.t)
+  -> f:
+       (   state_hash:State_hash.t
+        -> 'a
+        -> (Mina_block.Validated.t, Block_data.Full.t) Either.t
+        -> ('a, 'b) Deferred.Result.t )
   -> t
   -> State_hash.t
   -> ( unit

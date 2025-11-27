@@ -1,7 +1,14 @@
 open Core_kernel
 open Mina_base
 
-type t = { total : int; zkapp_commands : int; has_coinbase : bool }
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t = { total : int; zkapp_commands : int; has_coinbase : bool }
+
+    let to_latest = Fn.id
+  end
+end]
 
 let has_coinbase (staged_ledger_diff : Staged_ledger_diff.t) =
   let d1, d2 = staged_ledger_diff.diff in

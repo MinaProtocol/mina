@@ -423,13 +423,13 @@ let to_block_data_exn (breadcrumb : T.t) : Block_data.Full.t =
   ; block_tag = breadcrumb.block_tag
   ; delta_block_chain_proof = delta_block_chain_proof breadcrumb
   ; staged_ledger_data = (to_maps breadcrumb.staged_ledger, application_data)
-  ; staged_ledger_hash = breadcrumb.staged_ledger_hash
   ; accounts_created = breadcrumb.accounts_created
   ; staged_ledger_aux_and_pending_coinbases_cached =
       breadcrumb.staged_ledger_aux_and_pending_coinbases_cached
   ; transaction_hashes_unordered =
       Mina_transaction.Transaction_hash.Set.to_list
         breadcrumb.transaction_hashes
+  ; command_stats = command_stats breadcrumb
   }
 
 let lighten (breadcrumb : T.t) : T.t =
@@ -497,6 +497,56 @@ let valid_commands_hashed (t : T.t) =
           (Fn.flip
              Mina_transaction.Transaction_hash.User_command_with_valid_signature
              .make hash ) )
+
+let stored_transition_of_block_data ~state_hash (block_data : Block_data.Full.t)
+    : stored_transition =
+  Lite
+    { hashes = { State_hash.State_hashes.state_hash; state_body_hash = None }
+    ; delta_block_chain_proof = block_data.delta_block_chain_proof
+    ; command_stats = block_data.command_stats
+    ; header = block_data.header
+    }
+
+let of_block_data ~logger ~constraint_constants ~parent_staged_ledger
+    ~state_hash (block_data : Block_data.Full.t) : (t, _) Deferred.Result.t =
+  let maps_stable, application_data = block_data.staged_ledger_data in
+  let parent_ledger = Staged_ledger.ledger parent_staged_ledger in
+  let maps =
+    Mina_ledger.Ledger.Mask_maps.of_stable
+      ~ledger_depth:(Mina_ledger.Ledger.depth parent_ledger)
+      maps_stable
+  in
+  let new_mask =
+    Mina_ledger.Ledger.Mask.create
+      ~depth:(Mina_ledger.Ledger.depth parent_ledger)
+      ()
+  in
+  let new_ledger = Mina_ledger.Ledger.register_mask parent_ledger new_mask in
+  Mina_ledger.Ledger.append_maps new_ledger maps ;
+  let%map.Deferred.Result staged_ledger, res_opt =
+    Staged_ledger.apply_to_scan_state ~logger ~skip_verification:true
+      ~log_prefix:"of_block_data" ~ledger:new_ledger
+      ~previous_pending_coinbase_collection:
+        (Staged_ledger.pending_coinbase_collection parent_staged_ledger)
+      ~previous_scan_state:(Staged_ledger.scan_state parent_staged_ledger)
+      ~constraint_constants application_data
+  in
+  { T.validated_transition =
+      stored_transition_of_block_data ~state_hash block_data
+  ; staged_ledger
+  ; accounts_created = block_data.accounts_created
+  ; just_emitted_a_proof = Option.is_some res_opt
+  ; transition_receipt_time = None
+  ; block_tag = block_data.block_tag
+  ; application_data = None
+  ; staged_ledger_hash =
+      Mina_block.Header.protocol_state block_data.header
+      |> Protocol_state.blockchain_state |> Blockchain_state.staged_ledger_hash
+  ; staged_ledger_aux_and_pending_coinbases_cached = None
+  ; transaction_hashes =
+      Mina_transaction.Transaction_hash.Set.of_list
+        block_data.transaction_hashes_unordered
+  }
 
 module For_tests = struct
   open Currency

@@ -109,7 +109,7 @@ val staged_ledger_aux_and_pending_coinbases :
 (** Convert a breadcrumb to a block data
 
     Will return an exception if called on transition frontier root or
-    a transition that was saved to frontier.
+    a lite breadcrumb (i.e. one that was added to frontier).
 *)
 val to_block_data_exn : t -> Block_data.Full.t
 
@@ -161,6 +161,14 @@ val valid_commands_hashed :
   -> Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
      With_status.t
      list
+
+val of_block_data :
+     logger:Logger.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> parent_staged_ledger:Staged_ledger.t
+  -> state_hash:Frozen_ledger_hash.t
+  -> Block_data.Full.t
+  -> (t, Staged_ledger.Staged_ledger_error.t) Deferred.Result.t
 
 module For_tests : sig
   val gen :
