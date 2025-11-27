@@ -690,10 +690,10 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
   | Root_transitioned { new_root; garbage = Full garbage; _ } ->
-      let new_root_hash = Root_data.Limited.Stable.Latest.state_hash new_root in
+      let new_root_hash = Root_data.Limited.state_hash new_root in
       let old_root_hash = t.root in
       let new_root_protocol_states =
-        Root_data.Limited.Stable.Latest.protocol_states new_root
+        Root_data.Limited.protocol_states new_root
       in
       [%log' internal t.logger] "Move_frontier_root" ;
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage

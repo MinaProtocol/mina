@@ -64,70 +64,19 @@ module Historical = struct
 end
 
 module Limited = struct
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    (* TODO replace block with block tag *)
-    module V4 = struct
-      type t =
-        { block_tag :
-            ( State_hash.Stable.V1.t
-            , Mina_block.Stable.V2.t )
-            Multi_key_file_storage.Tag.Stable.V1.t
-        ; state_hash : State_hash.Stable.V1.t
-        ; protocol_states :
-            Mina_state.Protocol_state.Value.Stable.V2.t
-            Mina_base.State_hash.With_state_hashes.Stable.V1.t
-            list
-        ; common : Common.Stable.V3.t
-        }
-      [@@deriving fields]
-
-      let to_latest = Fn.id
-    end
-
-    module V3 = struct
-      type t =
-        { transition : Mina_block.Validated.Stable.V2.t
-        ; protocol_states :
-            Mina_state.Protocol_state.Value.Stable.V2.t
-            Mina_base.State_hash.With_state_hashes.Stable.V1.t
-            list
-        ; common : Common.Stable.V2.t
-        }
-      [@@deriving fields]
-
-      let to_latest { transition; protocol_states; common } =
-        let state_hash =
-          (Mina_block.Validated.Stable.Latest.hashes transition).state_hash
-        in
-        (* We use append out of caution here, in case part of the system already
-           migrated to the new format and the file exists *)
-        let block_tag =
-          State_hash.File_storage.append_values_exn state_hash ~f:(fun writer ->
-              State_hash.File_storage.write_value writer
-                (module Mina_block.Stable.Latest)
-                (Mina_block.Validated.Stable.Latest.block transition) )
-        in
-        { V4.block_tag
-        ; state_hash
-        ; protocol_states
-        ; common = Common.Stable.V2.to_latest common
-        }
-    end
-  end]
-
-  type t = Stable.Latest.t =
-    { block_tag : Mina_block.Stable.Latest.t State_hash.File_storage.tag
-    ; state_hash : State_hash.Stable.V1.t
+  type t =
+    { block_tag :
+        ( State_hash.Stable.Latest.t
+        , Mina_block.Stable.Latest.t )
+        Multi_key_file_storage.Tag.Stable.Latest.t
+    ; state_hash : State_hash.Stable.Latest.t
     ; protocol_states :
-        Mina_state.Protocol_state.Value.t
-        Mina_base.State_hash.With_state_hashes.t
+        Mina_state.Protocol_state.Value.Stable.Latest.t
+        Mina_base.State_hash.With_state_hashes.Stable.Latest.t
         list
-    ; common : Common.t
+    ; common : Common.Stable.Latest.t
     }
-  [@@deriving fields]
+  [@@deriving bin_io_unversioned, fields]
 
   let to_yojson { state_hash; common; _ } =
     `Assoc
