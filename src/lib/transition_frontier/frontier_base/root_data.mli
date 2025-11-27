@@ -47,38 +47,7 @@ end
 (* Limited root data is similar to Minimal root data, except that it contains
  * the full validated transition at a root instead of just a pointer to one and protocol states for the root scan state *)
 module Limited : sig
-  [%%versioned:
-  module Stable : sig
-    [@@@no_toplevel_latest_type]
-
-    module V4 : sig
-      type t
-
-      val state_hash : t -> State_hash.Stable.V1.t
-
-      val common : t -> Common.Stable.V3.t
-
-      val protocol_states :
-           t
-        -> Mina_state.Protocol_state.Value.Stable.V2.t
-           Mina_base.State_hash.With_state_hashes.Stable.V1.t
-           list
-
-      val block_tag :
-           t
-        -> ( State_hash.Stable.V1.t
-           , Mina_block.Stable.V2.t )
-           Multi_key_file_storage.Tag.Stable.V1.t
-    end
-
-    module V3 : sig
-      type t
-
-      val to_latest : t -> V4.t
-    end
-  end]
-
-  type t = Stable.Latest.t [@@deriving to_yojson]
+  type t [@@deriving to_yojson, bin_io]
 
   val block_tag : t -> Mina_block.Stable.Latest.t State_hash.File_storage.tag
 

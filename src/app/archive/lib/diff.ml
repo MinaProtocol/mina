@@ -26,9 +26,6 @@ module Transition_frontier = struct
             (Account_id.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
             list
         }
-    | Root_transitioned of
-        Transition_frontier.Diff.Root_transition.Lite.Stable.Latest.t
-    | Bootstrap of { lost_blocks : State_hash.Stable.Latest.t list }
   [@@deriving bin_io_unversioned]
 end
 
