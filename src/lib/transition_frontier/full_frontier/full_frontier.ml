@@ -138,7 +138,6 @@ let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
     ~time_controller ~staged_ledger =
   let open Context in
   let open Root_data in
-  let transition_receipt_time = None in
   let root_block_stable =
     root_data.block_tag
     |> State_hash.File_storage.read (module Mina_block.Stable.Latest)
@@ -191,7 +190,7 @@ let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
   let root_breadcrumb =
     Breadcrumb.create ~validated_transition ~staged_ledger
       ~just_emitted_a_proof:false
-      ~transition_receipt_time
+      ~transition_receipt_time:None
         (* accounts created shouldn't be used for the root *)
       ~accounts_created:[] ~block_tag:root_data.block_tag
   in

@@ -81,7 +81,8 @@ val find_arcs_and_root :
 
 val add :
      arcs_cache:State_hash.t list State_hash.Table.t
-  -> transition:Mina_block.Validated.t
+  -> state_hash:State_hash.t
+  -> transition_data:Block_data.Full.t
   -> batch_t
   -> unit
 

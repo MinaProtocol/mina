@@ -23,7 +23,7 @@ type lite = Lite
 module Node : sig
   type 'a t =
     | Full : Breadcrumb.t -> full t
-    | Lite : Mina_block.Validated.t -> lite t
+    | Lite : State_hash.t * Block_data.Full.t -> lite t
 end
 
 module Node_list : sig

@@ -37,8 +37,8 @@ module Worker = struct
   let apply_diff (type mutant) ~old_root_hash ~arcs_cache
       (diff : mutant Diff.Lite.t) : Database.batch_t -> unit =
     match diff with
-    | New_node (Lite transition) ->
-        Database.add ~arcs_cache ~transition
+    | New_node (Lite (state_hash, transition_data)) ->
+        Database.add ~arcs_cache ~state_hash ~transition_data
     | Root_transitioned { new_root; garbage = Lite garbage; _ } ->
         Database.move_root ~old_root_hash ~new_root ~garbage
     | Best_tip_changed best_tip_hash ->
@@ -86,17 +86,17 @@ module Worker = struct
         let apply_funcs =
           let state_hashes =
             List.filter_map input ~f:(function
-              | E (New_node (Lite transition)) ->
-                  Mina_block.Validated.state_hash transition |> Option.some
+              | E (New_node (Lite (state_hash, _))) ->
+                  Option.some state_hash
               | _ ->
                   None )
             |> State_hash.Set.of_list
           in
           let parent_hashes =
             List.filter_map input ~f:(function
-              | E (New_node (Lite transition)) ->
+              | E (New_node (Lite (_, transition))) ->
                   let parent_hash =
-                    Mina_block.Validated.header transition
+                    transition.Block_data.Full.Stable.Latest.header
                     |> Header.protocol_state
                     |> Mina_state.Protocol_state.previous_state_hash
                   in

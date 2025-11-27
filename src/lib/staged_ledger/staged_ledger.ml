@@ -36,7 +36,11 @@ module Pre_statement = struct
 end
 
 module T = struct
-  module Scan_state = Transaction_snark_scan_state
+  module Scan_state = struct
+    include Transaction_snark_scan_state
+    module Application_data = Scan_state_application_data
+  end
+
   module Pre_diff_info = Pre_diff_info
 
   module Staged_ledger_error = struct
@@ -833,7 +837,7 @@ module T = struct
       ( is_new_stack
       , data
       , Pending_coinbase.Update.Action.Update_one
-      , `Update_one updated_stack
+      , Some (`One updated_stack)
       , `First_pass_ledger_end first_pass_ledger_end ) )
     else
       (*Two partition:
@@ -866,24 +870,24 @@ module T = struct
         match (coinbase_in_first_partition, second_has_data) with
         | true, true ->
             ( Pending_coinbase.Update.Action.Update_two_coinbase_in_first
-            , `Update_two (updated_stack1, updated_stack2) )
+            , Some (`Two (updated_stack1, updated_stack2)) )
         (* updated_stack2 does not have coinbase and but has the state from the
            previous stack *)
         | true, false ->
             (* updated_stack1 has some new coinbase but parition 2 has no
                data and so we have only one stack to update *)
-            (Update_one, `Update_one updated_stack1)
+            (Update_one, Some (`One updated_stack1))
         | false, true ->
             (* updated_stack1 just has the new state. [updated stack2] might
                have coinbase, definitely has some data and therefore will have a
                non-dummy state. *)
             ( Update_two_coinbase_in_second
-            , `Update_two (updated_stack1, updated_stack2) )
+            , Some (`Two (updated_stack1, updated_stack2)) )
         | false, false ->
             (* a diff consists of only non-coinbase transactions. This is
                currently not possible because a diff will have a coinbase at the
                very least, so don't update anything? *)
-            (Update_none, `Update_none)
+            (Update_none, None)
       in
       [%log internal] "Update_coinbase_stack_done"
         ~metadata:
@@ -919,7 +923,7 @@ module T = struct
            ( false
            , []
            , Pending_coinbase.Update.Action.Update_none
-           , `Update_none
+           , None
            , `First_pass_ledger_end (Ledger.merkle_root ledger) ) ) )
 
   (* Update the pending_coinbase tree with the updated/new stack and delete the
@@ -956,13 +960,13 @@ module T = struct
     in
     (* Updating the latest stack and/or adding a new one *)
     match stack_update with
-    | `Update_none ->
+    | None ->
         Ok pending_coinbase_collection_updated1
-    | `Update_one stack1 ->
+    | Some (`One stack1) ->
         Pending_coinbase.update_coinbase_stack ~depth
           pending_coinbase_collection_updated1 stack1 ~is_new_stack
         |> to_staged_ledger_or_error
-    | `Update_two (stack1, stack2) ->
+    | Some (`Two (stack1, stack2)) ->
         (* The case when some of the transactions go into the old tree and
            remaining on to the new tree *)
         let%bind update1 =
@@ -1008,8 +1012,13 @@ module T = struct
 
   let apply_to_scan_state ~logger ~skip_verification ~log_prefix ~ledger
       ~previous_pending_coinbase_collection ~previous_scan_state
-      ~constraint_constants ~is_new_stack ~stack_update ~first_pass_ledger_end
-      tagged_works tagged_witnesses =
+      ~constraint_constants
+      { Scan_state.Application_data.is_new_stack
+      ; stack_update
+      ; first_pass_ledger_end
+      ; tagged_works
+      ; tagged_witnesses
+      } =
     let open Deferred.Result.Let_syntax in
     [%log internal] "Fill_work_and_enqueue_transactions" ;
     let%bind res_opt, scan_state =
@@ -2369,7 +2378,7 @@ let%test_module "staged ledger tests" =
         ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
         ~zkapp_cmd_limit_hardcap ~signature_kind =
       let%bind.Deferred.Result ( `Ledger new_ledger
-                               , `Accounts_created accounts_created
+                               , `Accounts_created _
                                , `Stack_update stack_update
                                , `First_pass_ledger_end first_pass_ledger_end
                                , `Witnesses witnesses
@@ -2394,16 +2403,22 @@ let%test_module "staged ledger tests" =
             in
             (witnesses', works') )
       in
+      let data =
+        { Scan_state.Application_data.is_new_stack
+        ; stack_update
+        ; first_pass_ledger_end
+        ; tagged_works
+        ; tagged_witnesses
+        }
+      in
       let%map.Deferred.Result new_staged_ledger, res_opt =
         apply_to_scan_state ~logger ~skip_verification:false
           ~log_prefix:"apply_diff" ~ledger:new_ledger
           ~previous_pending_coinbase_collection:t.pending_coinbase_collection
-          ~previous_scan_state:t.scan_state ~constraint_constants ~is_new_stack
-          ~stack_update ~first_pass_ledger_end tagged_works tagged_witnesses
+          ~previous_scan_state:t.scan_state ~constraint_constants data
       in
       ( `Ledger_proof res_opt
       , `Staged_ledger new_staged_ledger
-      , `Accounts_created accounts_created
       , `Pending_coinbase_update (is_new_stack, pending_coinbase_update_action)
       )
 
@@ -2439,7 +2454,6 @@ let%test_module "staged ledger tests" =
       let diff' = Staged_ledger_diff.forget diff in
       let%map ( `Ledger_proof ledger_proof
               , `Staged_ledger sl'
-              , `Accounts_created _
               , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
           apply_diff_full ~constraint_constants ~global_slot !sl diff' ~logger
@@ -3429,7 +3443,6 @@ let%test_module "staged ledger tests" =
                       | Ok
                           ( `Ledger_proof _ledger_proof
                           , `Staged_ledger sl'
-                          , `Accounts_created _
                           , `Pending_coinbase_update _ ) ->
                           sl := sl' ;
                           (false, diff)

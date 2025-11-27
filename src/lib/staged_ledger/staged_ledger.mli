@@ -8,6 +8,8 @@ module Ledger = Mina_ledger.Ledger
 type t
 
 module Scan_state : sig
+  module Application_data = Scan_state_application_data
+
   module Available_job : sig
     type t
 
@@ -40,9 +42,8 @@ module Scan_state : sig
   end
 
   module Ledger_proof_with_sok_message : sig
-    module Tagged : sig
-      type t
-    end
+    module Tagged =
+      Transaction_snark_scan_state.Ledger_proof_with_sok_message.Tagged
 
     val persist_many :
          Transaction_snark_work.t list
@@ -53,9 +54,7 @@ module Scan_state : sig
   module Transaction_with_witness : sig
     type t
 
-    module Tagged : sig
-      type t
-    end
+    module Tagged = Transaction_snark_scan_state.Transaction_with_witness.Tagged
 
     val persist_many :
       t list -> State_hash.File_storage.writer_t -> Tagged.t list
@@ -252,11 +251,7 @@ val apply_diff :
   -> ( [ `Ledger of Ledger.t ]
        * [ `Accounts_created of Account_id.t list ]
        * [ `Stack_update of
-           [ `Update_none
-           | `Update_one of Pending_coinbase.Stack_versioned.t
-           | `Update_two of
-             Pending_coinbase.Stack_versioned.t
-             * Pending_coinbase.Stack_versioned.t ] ]
+           Pending_coinbase.Stack_versioned.t One_or_two.t option ]
        * [ `First_pass_ledger_end of Frozen_ledger_hash.t ]
        * [ `Witnesses of Scan_state.Transaction_with_witness.t list ]
        * [ `Works of Transaction_snark_work.t list ]
@@ -279,11 +274,7 @@ val apply_diff_unchecked :
   -> ( [ `Ledger of Ledger.t ]
        * [ `Accounts_created of Account_id.t list ]
        * [ `Stack_update of
-           [ `Update_none
-           | `Update_one of Pending_coinbase.Stack_versioned.t
-           | `Update_two of
-             Pending_coinbase.Stack_versioned.t
-             * Pending_coinbase.Stack_versioned.t ] ]
+           Pending_coinbase.Stack_versioned.t One_or_two.t option ]
        * [ `First_pass_ledger_end of Frozen_ledger_hash.t ]
        * [ `Witnesses of Scan_state.Transaction_with_witness.t list ]
        * [ `Works of Transaction_snark_work.t list ]
@@ -299,16 +290,7 @@ val apply_to_scan_state :
   -> previous_pending_coinbase_collection:Pending_coinbase.t
   -> previous_scan_state:Scan_state.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
-  -> is_new_stack:bool
-  -> stack_update:
-       [< `Update_none
-       | `Update_one of Pending_coinbase.Stack_versioned.t
-       | `Update_two of
-         Pending_coinbase.Stack_versioned.t * Pending_coinbase.Stack_versioned.t
-       ]
-  -> first_pass_ledger_end:Frozen_ledger_hash.t
-  -> Scan_state.Ledger_proof_with_sok_message.Tagged.t list
-  -> Scan_state.Transaction_with_witness.Tagged.t list
+  -> Scan_state.Application_data.t
   -> (t * Ledger_proof.Tagged.t option, Staged_ledger_error.t) Deferred.Result.t
 
 (* This should memoize the snark verifications *)
@@ -413,11 +395,7 @@ module Test_helpers : sig
            * Account_id.t list )
            list
          * Pending_coinbase.Update.Action.t
-         * [> `Update_none
-           | `Update_one of Pending_coinbase.Stack_versioned.t
-           | `Update_two of
-             Pending_coinbase.Stack_versioned.t
-             * Pending_coinbase.Stack_versioned.t ]
+         * Pending_coinbase.Stack_versioned.t One_or_two.t option
          * [> `First_pass_ledger_end of Frozen_ledger_hash.t ]
        , Staged_ledger_error.t )
        Deferred.Result.t

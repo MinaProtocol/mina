@@ -8,7 +8,7 @@ type lite = Lite
 module Node = struct
   type 'a t =
     | Full : Breadcrumb.t -> full t
-    | Lite : Mina_block.Validated.t -> lite t
+    | Lite : State_hash.t * Block_data.Full.t -> lite t
 end
 
 module Node_list = struct
@@ -99,8 +99,8 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
     match key with
     | New_node (Full breadcrumb) ->
         State_hash.to_yojson (Breadcrumb.state_hash breadcrumb)
-    | New_node (Lite transition) ->
-        State_hash.to_yojson (Mina_block.Validated.state_hash transition)
+    | New_node (Lite (state_hash, _)) ->
+        State_hash.to_yojson state_hash
     | Root_transitioned
         { new_root; garbage; just_emitted_a_proof; old_root_scan_state = _ } ->
         let garbage_hashes =
@@ -123,8 +123,8 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
 let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
   match diff with
   | New_node (Full breadcrumb) ->
-      let external_transition = Breadcrumb.validated_transition breadcrumb in
-      New_node (Lite external_transition)
+      let external_transition = Breadcrumb.to_block_data_exn breadcrumb in
+      New_node (Lite (Breadcrumb.state_hash breadcrumb, external_transition))
   | Root_transitioned
       { new_root
       ; garbage = Full garbage_nodes
