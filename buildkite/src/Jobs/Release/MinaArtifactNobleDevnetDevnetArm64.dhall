@@ -25,17 +25,17 @@ in  Pipeline.build
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreateLegacyGenesis
             ]
-          , network = Network.Type.Mesa
+          , network = Network.Type.Devnet
           , arch = Arch.Type.Arm64
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
-            , PipelineTag.Type.Arm64
-            , PipelineTag.Type.Bookworm
             , PipelineTag.Type.Devnet
+            , PipelineTag.Type.Arm64
+            , PipelineTag.Type.Noble
             ]
-          , debVersion = DebianVersions.DebVersion.Bookworm
+          , debVersion = DebianVersions.DebVersion.Noble
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }

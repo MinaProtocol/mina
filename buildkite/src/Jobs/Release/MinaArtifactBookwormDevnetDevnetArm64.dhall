@@ -25,15 +25,15 @@ in  Pipeline.build
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreateLegacyGenesis
             ]
-          , network = Network.Type.Mesa
+          , network = Network.Type.Devnet
           , arch = Arch.Type.Arm64
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
+            , PipelineTag.Type.Devnet
             , PipelineTag.Type.Arm64
             , PipelineTag.Type.Bookworm
-            , PipelineTag.Type.Devnet
             ]
           , debVersion = DebianVersions.DebVersion.Bookworm
           , scope =

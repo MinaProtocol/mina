@@ -12,8 +12,6 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Arch = ../../Constants/Arch.dhall
-
 let Profiles = ../../Constants/Profiles.dhall
 
 in  Pipeline.build
@@ -26,7 +24,6 @@ in  Pipeline.build
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
-            , PipelineTag.Type.Mesa
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Bookworm
             , PipelineTag.Type.Lightnet
