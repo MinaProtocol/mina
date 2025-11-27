@@ -8,6 +8,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let Expr = ../../Pipeline/Expr.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
@@ -27,5 +29,6 @@ in  Pipeline.build
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Bullseye
             ]
+          , excludeIf = [] : List Expr.Type
           }
       )

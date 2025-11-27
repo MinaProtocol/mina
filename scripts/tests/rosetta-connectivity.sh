@@ -19,7 +19,7 @@
 #
 # PARAMETERS:
 #   -t, --tag           Docker image tag version (required)
-#   -n, --network       Network configuration: devnet or mainnet (default: devnet)
+#   -n, --network       Network configuration: devnet,mainnet or mesa (default: devnet)
 #   --timeout           Timeout duration in seconds for tests (default: 900)
 #   --run-load-test     Enable load testing (default: false)
 #   --run-compatibility-test  Enable compatibility testing with specified branch
@@ -87,9 +87,9 @@ while [[ "$#" -gt 0 ]]; do case $1 in
     *) echo "Unknown parameter passed: $1"; usage; exit 1;;
 esac; shift; done
 
-if [[ "$NETWORK" != "devnet" && "$NETWORK" != "mainnet" && "$NETWORK" != "berkeley" ]]; then
+if [[ "$NETWORK" != "devnet" && "$NETWORK" != "mainnet" && "$NETWORK" != "mesa" ]]; then
     echo "❌  Invalid network: $NETWORK"
-    echo "❌  Network must be either 'devnet' or 'mainnet' or 'berkeley'"
+    echo "❌  Network must be either 'devnet' or 'mainnet' or 'mesa'"
     echo ""
     usage; exit 1;
 fi

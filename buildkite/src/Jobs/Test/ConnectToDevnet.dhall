@@ -16,6 +16,8 @@ let Network = ../../Constants/Network.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let Mesa = ../../Lib/Mesa.dhall
+
 let network = Network.Type.Devnet
 
 let dependsOn = Dockers.dependsOn Dockers.DepsSpec::{ network = network }
@@ -36,6 +38,7 @@ in  Pipeline.build
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
           ]
+        , excludeIf = [ Mesa.forMesa ]
         }
       , steps =
         [ ConnectToNetwork.step

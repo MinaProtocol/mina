@@ -52,6 +52,7 @@ let ReleaseSpec =
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
           , verify : Bool
+          , size : Size
           , if_ : Optional B/If
           }
       , default =
@@ -75,6 +76,7 @@ let ReleaseSpec =
           , step_key_suffix = "-docker-image"
           , verify = False
           , deb_suffix = None Text
+          , size = Size.XLarge
           , if_ = None B/If
           }
       }

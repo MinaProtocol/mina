@@ -22,6 +22,8 @@ let Profile = ../../Constants/Profiles.dhall
 
 let network = Network.Type.Mainnet
 
+let Mesa = ../../Lib/Mesa.dhall
+
 let dependsOn =
       Dockers.dependsOn
         Dockers.DepsSpec::{ network = network, profile = Profile.Type.Mainnet }
@@ -45,6 +47,7 @@ in  Pipeline.build
           , PipelineTag.Type.Stable
           , PipelineTag.Type.Rosetta
           ]
+        , excludeIf = [ Mesa.forMesa ]
         }
       , steps =
         [ ConnectToNetwork.step

@@ -14,6 +14,10 @@ let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
+let Expr = ../../Pipeline/Expr.dhall
+
+let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -29,7 +33,14 @@ in  Pipeline.build
           ]
         , path = "Lint"
         , name = "ArchiveUpgrade"
-        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
+        , tags = [ PipelineTag.Type.Lint, PipelineTag.Type.Fast ]
+        , excludeIf =
+          [ Expr.Type.DescendantOf
+              { ancestor = MainlineBranch.Type.Mesa
+              , reason =
+                  "Archive upgrade scripts are only relevant on Develop/Compatible/Master branches"
+              }
+          ]
         }
       , steps =
         [ Command.build

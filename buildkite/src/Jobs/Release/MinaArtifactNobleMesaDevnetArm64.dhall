@@ -14,6 +14,10 @@ let Network = ../../Constants/Network.dhall
 
 let Arch = ../../Constants/Arch.dhall
 
+let Mesa = ../../Lib/Mesa.dhall
+
+let Expr = ../../Pipeline/Expr.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
@@ -34,6 +38,8 @@ in  Pipeline.build
             , PipelineTag.Type.Arm64
             , PipelineTag.Type.Noble
             ]
+          , excludeIf = [] : List Expr.Type
+          , includeIf = [ Mesa.forMesa ]
           , debVersion = DebianVersions.DebVersion.Noble
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]

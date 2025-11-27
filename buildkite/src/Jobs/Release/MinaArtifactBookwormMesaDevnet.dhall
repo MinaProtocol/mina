@@ -8,9 +8,13 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let Mesa = ../../Lib/Mesa.dhall
+
 let PipelineScope = ../../Pipeline/Scope.dhall
 
 let Network = ../../Constants/Network.dhall
+
+let Expr = ../../Pipeline/Expr.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
@@ -33,6 +37,8 @@ in  Pipeline.build
             , PipelineTag.Type.Devnet
             ]
           , debVersion = DebianVersions.DebVersion.Bookworm
+          , excludeIf = [] : List Expr.Type
+          , includeIf = [ Mesa.forMesa ]
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }

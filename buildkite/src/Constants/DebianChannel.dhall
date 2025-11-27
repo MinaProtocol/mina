@@ -12,6 +12,7 @@ let Channel
       | Beta
       | Experimental
       | Stable
+      | Mesa
       >
 
 let capitalName =
@@ -29,6 +30,7 @@ let capitalName =
             , Beta = "Beta"
             , Stable = "Stable"
             , Experimental = "Experimental"
+            , Mesa = "Mesa"
             }
             channel
 
@@ -47,6 +49,7 @@ let lowerName =
             , Beta = "beta"
             , Stable = "stable"
             , Experimental = "experimental"
+            , Mesa = "mesa"
             }
             channel
 

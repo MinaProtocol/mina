@@ -28,6 +28,8 @@ let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let B/If = B.definitions/commandStep/properties/if/Type
 
+let Expr = ../../Pipeline/Expr.dhall
+
 let Spec =
       { Type =
           { dockerType : Dockers.Type
@@ -37,6 +39,8 @@ let Spec =
           , timeout : Natural
           , profile : Profiles.Type
           , scope : List PipelineScope.Type
+          , includeIf : List Expr.Type
+          , excludeIf : List Expr.Type
           , if_ : B/If
           }
       , default =
@@ -47,6 +51,8 @@ let Spec =
           , timeout = 1000
           , profile = Profiles.Type.Devnet
           , scope = PipelineScope.Full
+          , includeIf = [] : List Expr.Type
+          , excludeIf = [] : List Expr.Type
           , if_ =
               "build.pull_request.base_branch != \"develop\" && build.branch != \"develop\""
           }
@@ -110,6 +116,8 @@ let pipeline
             , path = "Test"
             , name = "Rosetta${Network.capitalName spec.network}Connect"
             , scope = spec.scope
+            , includeIf = spec.includeIf
+            , excludeIf = spec.excludeIf
             , tags =
               [ PipelineTag.Type.Long
               , PipelineTag.Type.Test

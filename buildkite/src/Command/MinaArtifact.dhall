@@ -46,6 +46,10 @@ let Toolchain = ../Constants/Toolchain.dhall
 
 let Arch = ../Constants/Arch.dhall
 
+let Mesa = ../Lib/Mesa.dhall
+
+let Expr = ../Pipeline/Expr.dhall
+
 let MinaBuildSpec =
       { Type =
           { prefix : Text
@@ -64,6 +68,8 @@ let MinaBuildSpec =
           , arch : Arch.Type
           , deb_legacy_version : Text
           , suffix : Optional Text
+          , excludeIf : List Expr.Type
+          , includeIf : List Expr.Type
           , if_ : Optional B/If
           }
       , default =
@@ -83,6 +89,8 @@ let MinaBuildSpec =
           , suffix = None Text
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
           , arch = Arch.Type.Amd64
+          , excludeIf = [ Mesa.forMesa ]
+          , includeIf = [] : List Expr.Type
           , if_ = None B/If
           }
       }
@@ -353,6 +361,8 @@ let pipelineBuilder
             , name = "${spec.prefix}${nameSuffix spec}"
             , tags = spec.tags
             , scope = spec.scope
+            , excludeIf = spec.excludeIf
+            , includeIf = spec.includeIf
             }
           , steps = steps
           }

@@ -88,7 +88,8 @@ in  Pipeline.build
         , path = "Promote"
         , tags = [ PipelineTag.Type.Promote, PipelineTag.Type.TearDown ]
         , name = "AutoPromoteNightly"
-        , scope = [ PipelineScope.Type.MainlineNightly ]
+        , scope =
+          [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
         }
       , steps =
             PublishPackages.publish
@@ -111,6 +112,12 @@ in  Pipeline.build
               )
           # PublishPackages.publish
               ( specs_for_branch
+                  "mesa"
+                  DebianChannel.Type.Mesa
+                  Profiles.Type.Lightnet
+              )
+          # PublishPackages.publish
+              ( specs_for_branch
                   "compatible"
                   DebianChannel.Type.Compatible
                   Profiles.Type.Devnet
@@ -125,6 +132,12 @@ in  Pipeline.build
               ( specs_for_branch
                   "master"
                   DebianChannel.Type.Master
+                  Profiles.Type.Devnet
+              )
+          # PublishPackages.publish
+              ( specs_for_branch
+                  "mesa"
+                  DebianChannel.Type.Mesa
                   Profiles.Type.Devnet
               )
       }

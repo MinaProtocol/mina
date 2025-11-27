@@ -12,6 +12,10 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 
 let Network = ../../Constants/Network.dhall
 
+let Mesa = ../../Lib/Mesa.dhall
+
+let Expr = ../../Pipeline/Expr.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
@@ -24,7 +28,16 @@ in  Pipeline.build
             , Artifacts.Type.CreateLegacyGenesis
             ]
           , network = Network.Type.Mesa
-          , tags = [] : List PipelineTag.Type
+          , tags =
+            [ PipelineTag.Type.Long
+            , PipelineTag.Type.Release
+            , PipelineTag.Type.Docker
+            , PipelineTag.Type.Devnet
+            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Noble
+            ]
+          , excludeIf = [] : List Expr.Type
+          , includeIf = [ Mesa.forMesa ]
           , debVersion = DebianVersions.DebVersion.Noble
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
