@@ -77,17 +77,21 @@ module T = struct
       ; accounts_created = _
       ; block_tag = _
       ; staged_ledger_aux_and_pending_coinbases_cached = _
-      ; transaction_hashes = _
+      ; transaction_hashes
       } =
     `Assoc
-      [ ( "validated_transition"
-        , Mina_block.Validated.to_yojson validated_transition )
-      ; ("staged_ledger", `String "<opaque>")
+      [ ( "state_hash"
+        , State_hash.to_yojson
+          @@ Mina_block.Validated.state_hash validated_transition )
       ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
       ; ( "transition_receipt_time"
         , `String
             (Option.value_map transition_receipt_time ~default:"<not available>"
                ~f:(Time.to_string_iso8601_basic ~zone:Time.Zone.utc) ) )
+      ; ( "transaction_hashes_unordered"
+        , `List
+            ( Mina_transaction.Transaction_hash.Set.to_list transaction_hashes
+            |> List.map ~f:Mina_transaction.Transaction_hash.to_yojson ) )
       ]
 end
 
