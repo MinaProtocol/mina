@@ -303,10 +303,7 @@ module Instance = struct
             let delta_block_chain_proof =
               Mina_block.Validated.delta_block_chain_proof root_transition
             in
-            { Root_data.Minimal.Block_data.block_tag
-            ; protocol_state
-            ; delta_block_chain_proof
-            }
+            { Block_data.block_tag; protocol_state; delta_block_chain_proof }
       in
       let%bind best_tip = Database.get_best_tip t.db in
       let%map protocol_states =
@@ -428,7 +425,7 @@ let with_instance_exn t ~f =
   x
 
 let reset_database_exn t ~root_data ~genesis_state_hash =
-  let root_state_hash = Root_data.Limited.state_hash root_data in
+  let root_state_hash = root_data.Root_data.state_hash in
   [%log' info t.logger]
     ~metadata:[ ("state_hash", State_hash.to_yojson root_state_hash) ]
     "Resetting transition frontier database to new root" ;

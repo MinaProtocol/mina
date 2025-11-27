@@ -69,7 +69,7 @@ val check :
          | `Raised of Core_kernel.Error.t ] ] )
      Result.t
 
-val initialize : t -> root_data:Root_data.Limited.t -> unit
+val initialize : t -> root_data:Root_data.t -> unit
 
 val find_arcs_and_root :
      t
@@ -87,7 +87,7 @@ val add :
 
 val move_root :
      old_root_hash:State_hash.t
-  -> new_root:Root_data.Limited.t
+  -> new_root:Root_data.t
   -> garbage:State_hash.t list
   -> batch_t
   -> unit

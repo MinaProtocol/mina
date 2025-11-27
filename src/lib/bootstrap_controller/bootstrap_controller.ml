@@ -568,7 +568,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
             State_hash.With_state_hashes.state_hash root_block_with_hash
           in
           (* step 5. Close the old frontier and reload a new one from disk. *)
-          let new_root_data : Transition_frontier.Root_data.Limited.t =
+          let new_root_data : Transition_frontier.Root_data.t =
             let block =
               With_hash.data root_block_with_hash
               |> Mina_block.read_all_proofs_from_disk
@@ -583,12 +583,17 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
                     (module Mina_block.Stable.Latest)
                     block )
             in
-            Transition_frontier.Root_data.Limited.create ~block_tag
-              ~state_hash:new_root_state_hash ~scan_state ~pending_coinbase
-              ~protocol_states_for_scan_state
-              ~protocol_state:
-                ( Mina_block.Stable.Latest.header block
-                |> Mina_block.Header.protocol_state )
+            { block_tag
+            ; state_hash = new_root_state_hash
+            ; scan_state
+            ; pending_coinbase
+            ; protocol_states_for_scan_state
+            ; protocol_state =
+                Mina_block.Stable.Latest.header block
+                |> Mina_block.Header.protocol_state
+            ; delta_block_chain_proof =
+                Mina_block.Validated.(delta_block_chain_proof @@ lift new_root)
+            }
           in
           let%bind () =
             Transition_frontier.Persistent_frontier.reset_database_exn

@@ -66,7 +66,7 @@ module Root_transition = struct
     | Full : Staged_ledger.Scan_state.t -> full root_transition_scan_state
 
   type 'repr t =
-    { new_root : Root_data.Limited.t
+    { new_root : Root_data.t
     ; garbage : 'repr Node_list.t
     ; old_root_scan_state : 'repr root_transition_scan_state
     ; just_emitted_a_proof : bool
@@ -111,8 +111,7 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
               hashes
         in
         `Assoc
-          [ ( "new_root"
-            , State_hash.to_yojson (Root_data.Limited.state_hash new_root) )
+          [ ("new_root", State_hash.to_yojson new_root.state_hash)
           ; ("garbage", `List (List.map ~f:State_hash.to_yojson garbage_hashes))
           ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
           ]

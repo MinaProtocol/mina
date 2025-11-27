@@ -175,8 +175,7 @@ module T = struct
     let should_produce_view =
       List.exists diffs_with_mutants ~f:(function
         (* TODO: send full diffs to extensions to avoid extra lookups in frontier *)
-        | E (Root_transitioned { new_root; _ }, _) ->
-            let state_hash = Root_data.Limited.state_hash new_root in
+        | E (Root_transitioned { new_root = { state_hash; _ }; _ }, _) ->
             let breadcrumb =
               Full_frontier.find frontier state_hash
               |> Option.value_exn
