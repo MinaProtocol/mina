@@ -22,24 +22,21 @@ let rec build_path_to_root ~(frontier : Transition_frontier.t) ~current_hash
 
 let check_directories_exist ~logger ~persistent_root_location
     ~persistent_frontier_location =
-  let%bind root_exists =
-    Sys.file_exists persistent_root_location
-    >>| function `Yes -> true | `No | `Unknown -> false
-  in
-  let%bind frontier_exists =
-    Sys.file_exists persistent_frontier_location
-    >>| function `Yes -> true | `No | `Unknown -> false
-  in
-  if not root_exists then (
-    [%log' error logger] "Persistent root directory not found at $location"
-      ~metadata:[ ("location", `String persistent_root_location) ] ;
-    Deferred.return (Error "Persistent root not found - nothing to fix against")
-    )
-  else if not frontier_exists then (
-    [%log' info logger]
-      "Persistent frontier directory not found - nothing to fix" ;
-    Deferred.return (Ok `No_frontier) )
-  else Deferred.return (Ok `Both_exist)
+  match%map
+    Deferred.both
+      (Sys.file_exists persistent_root_location)
+      (Sys.file_exists persistent_frontier_location)
+  with
+  | (`No | `Unknown), _ ->
+      [%log' error logger] "Persistent root directory not found at $location"
+        ~metadata:[ ("location", `String persistent_root_location) ] ;
+      Error "Persistent root not found - nothing to fix against"
+  | _, (`No | `Unknown) ->
+      [%log' info logger]
+        "Persistent frontier directory not found - nothing to fix" ;
+      Ok `No_frontier
+  | _ ->
+      Ok `Both_exist
 
 (* Apply a sequence of root transition diffs to the persistent database *)
 let apply_root_transitions ~logger ~db diffs =
@@ -55,9 +52,10 @@ let apply_root_transitions ~logger ~db diffs =
                     .message err ) ) )
       |> Result.ok_exn
     in
-    Transition_frontier.Persistent_frontier.Database.with_batch db
-      ~f:(fun batch ->
-        ( List.fold diffs ~init:initial_root_hash ~f:(fun old_root_hash diff ->
+    let final_state_hash =
+      Transition_frontier.Persistent_frontier.Database.with_batch db
+        ~f:(fun batch ->
+          List.fold diffs ~init:initial_root_hash ~f:(fun old_root_hash diff ->
               match diff with
               | Diff.Lite.E.E
                   (Diff.Root_transitioned
@@ -74,11 +72,13 @@ let apply_root_transitions ~logger ~db diffs =
                   (* Return new root hash for next iteration *)
                   (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
               | _ ->
-                  failwith "Expected Root_transitioned diff" )
-          : State_hash.t )
-        |> ignore ) ;
+                  failwith "Expected Root_transitioned diff" ) )
+    in
     [%log' info logger] "Successfully applied $count diffs"
-      ~metadata:[ ("count", `Int (List.length diffs)) ] ;
+      ~metadata:
+        [ ("count", `Int (List.length diffs))
+        ; ("final_state_hash", Frozen_ledger_hash.to_yojson final_state_hash)
+        ] ;
     Ok ()
   with exn ->
     [%log' error logger] "Failed to apply root transitions: $error"
