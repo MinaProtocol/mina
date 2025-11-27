@@ -316,7 +316,8 @@ module Instance = struct
 
   let load_full_frontier t ~context:(module Context : CONTEXT) ~root_ledger
       ~consensus_local_state ~max_length ~ignore_consensus_local_state
-      ~persistent_root_instance ?max_frontier_depth () =
+      ~persistent_root_instance ?max_frontier_depth ?retain_application_data ()
+      =
     let open Context in
     let open Deferred.Result.Let_syntax in
     let%bind () = Deferred.return (assert_no_sync t) in
@@ -426,7 +427,7 @@ module Instance = struct
         apply_diff ~logger ~frontier ~extensions ~ignore_consensus_local_state
           ~root_ledger (E (New_node (Full breadcrumb)))
       in
-      Full_frontier.lighten frontier state_hash ;
+      Full_frontier.lighten ?retain_application_data frontier state_hash ;
       [%log internal] "Breadcrumb_integrated" ;
       breadcrumb
     in

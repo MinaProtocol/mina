@@ -78,8 +78,20 @@ let apply_root_transitions ~logger ~db diffs =
       ~metadata:[ ("error", `String (Exn.to_string exn)) ] ;
     Error ("Failed to apply root transitions: " ^ Exn.to_string exn)
 
+let persist_all_transitions ~logger ~db breadcrumbs =
+  [%log info] "Re-persisting %d transitions" (List.length breadcrumbs) ;
+  Transition_frontier.Persistent_frontier.Database.with_batch db
+    ~f:(fun batch ->
+      List.iter breadcrumbs ~f:(fun breadcrumb ->
+          Transition_frontier.Persistent_frontier.Database.set_transition
+            ~state_hash:(Breadcrumb.state_hash breadcrumb)
+            ~transition_data:(Breadcrumb.to_block_data_exn breadcrumb)
+            batch ) ) ;
+  [%log info] "Re-persisted %d transitions" (List.length breadcrumbs)
+
 let fix_persistent_frontier_root_do ~logger ~config_directory
-    ~chain_state_locations ~max_frontier_depth runtime_config =
+    ~chain_state_locations ~max_frontier_depth ~migrate_frontier runtime_config
+    =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
   (* Get compile-time constants *)
   let genesis_constants = Genesis_constants.Compiled.genesis_constants in
@@ -171,7 +183,10 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
         ~context:(module Context)
         ~retry_with_fresh_db:false ~max_frontier_depth ~verifier
         ~consensus_local_state ~persistent_root ~persistent_frontier
-        ~catchup_mode:`Super ~set_best_tip:false ()
+        ~catchup_mode:`Super
+        ~set_best_tip:false
+          (* application data is used in frontier migration, so we need to retain it *)
+        ~retain_application_data:migrate_frontier ()
     with
     | Error err ->
         let err_str =
@@ -198,7 +213,25 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
   let with_persistent_frontier_instance f =
     Persistent_frontier.with_instance_exn persistent_frontier ~f
   in
+  let migrate_frontier_do (instance : Persistent_frontier.Instance.t) =
+    if migrate_frontier then
+      let root_hash =
+        Transition_frontier.root frontier |> Breadcrumb.state_hash
+      in
+      let breadcrumbs =
+        (* Excluding root, because for it application data is not preserved,
+           and transition record isn't used. *)
+        Transition_frontier.all_breadcrumbs frontier
+        |> List.filter ~f:(fun breadcrumb ->
+               not @@ State_hash.equal root_hash
+               @@ Breadcrumb.state_hash breadcrumb )
+      in
+      persist_all_transitions ~logger ~db:instance.db breadcrumbs
+    else ()
+  in
   let clean_frontier () =
+    Transition_frontier.with_persistent_frontier_instance_exn frontier
+      ~f:migrate_frontier_do ;
     let%bind () = Transition_frontier.close ~loc:__LOC__ frontier in
     Mina_stdlib_unix.File_system.remove_dir tmp_root_location
   in
@@ -270,7 +303,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       [%log info] "Successfully moved frontier root to match persistent root"
 
 let fix_persistent_frontier_root ~config_directory ~config_file
-    ~max_frontier_depth =
+    ~max_frontier_depth ~migrate_frontier =
   Logger.Consumer_registry.register ~commit_id:"" ~id:Logger.Logger_id.mina
     ~processor:Internal_tracing.For_logger.processor
     ~transport:
@@ -314,7 +347,8 @@ let fix_persistent_frontier_root ~config_directory ~config_file
       Deferred.Result.return ()
   | `Both_exist ->
       fix_persistent_frontier_root_do ~logger ~config_directory
-        ~chain_state_locations ~max_frontier_depth runtime_config
+        ~chain_state_locations ~max_frontier_depth ~migrate_frontier
+        runtime_config
 
 let command =
   Command.async
@@ -329,6 +363,11 @@ let command =
     and max_frontier_depth =
       flag "--max-frontier-depth"
         ~doc:"INT maximum frontier depth (default: 10)" (optional int)
+    and migrate_frontier =
+      flag "--migrate-frontier"
+        ~doc:
+          "BOOL whether to migrate frontier to the new format (default: false)"
+        no_arg
     in
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
@@ -344,6 +383,7 @@ let command =
     match%bind
       fix_persistent_frontier_root ~config_directory:conf_dir ~config_file
         ~max_frontier_depth:(Option.value max_frontier_depth ~default:10)
+        ~migrate_frontier
     with
     | Ok () ->
         printf "Persistent frontier root fix completed successfully.\n" ;

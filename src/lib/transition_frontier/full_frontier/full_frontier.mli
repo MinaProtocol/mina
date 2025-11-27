@@ -76,7 +76,7 @@ val common_ancestor :
      , [ `Parent_not_found of State_hash.t * [ `Parent of State_hash.t ] ] )
      Result.t
 
-val lighten : t -> State_hash.t -> unit
+val lighten : ?retain_application_data:bool -> t -> State_hash.t -> unit
 
 module Util : sig
   (** given an heir, calculate the diff that will transition

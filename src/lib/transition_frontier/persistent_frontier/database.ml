@@ -449,6 +449,9 @@ let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
   | _ ->
       Error (`Not_found `Old_root_transition)
 
+let set_transition ~state_hash ~transition_data =
+  Batch.set ~key:(Transition state_hash) ~data:(New_format transition_data)
+
 let add ~arcs_cache ~state_hash ~transition_data =
   let parent_hash =
     transition_data.Block_data.Full.Stable.Latest.header
@@ -459,8 +462,7 @@ let add ~arcs_cache ~state_hash ~transition_data =
     ~data:(state_hash :: parent_arcs) ;
   State_hash.Table.set arcs_cache ~key:state_hash ~data:[] ;
   fun batch ->
-    Batch.set batch ~key:(Transition state_hash)
-      ~data:(New_format transition_data) ;
+    set_transition batch ~state_hash ~transition_data ;
     Batch.set batch ~key:(Arcs state_hash) ~data:[] ;
     Batch.set batch ~key:(Arcs parent_hash) ~data:(state_hash :: parent_arcs)
 
