@@ -90,7 +90,8 @@ module Schema = struct
 
   type _ t =
     | Db_version : int t
-    | Transition : State_hash.Stable.V1.t -> Transition.Stable.V3.t t
+    | Transition : State_hash.Stable.V1.t -> Mina_block.Stable.V2.t t
+    | Transition_new : State_hash.Stable.V1.t -> Block_data.Full.Stable.V1.t t
     | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
     (* TODO:
        In hard forks, `Root` should be replaced by `(Root_hash, Root_common)`;
@@ -104,7 +105,8 @@ module Schema = struct
     *)
     | Root : Root_data.Minimal.Stable.V3.t t
     | Root_hash : State_hash.Stable.V1.t t
-    | Root_common : Root_data.Common.Stable.V3.t t
+    | Root_common : Root_data.Common.Stable.V2.t t
+    | Root_new : Root_data.Common.Stable.V3.t t
     | Best_tip : State_hash.Stable.V1.t t
     | Protocol_states_for_root_scan_state
         : Mina_state.Protocol_state.Value.Stable.V2.t list t
@@ -116,6 +118,8 @@ module Schema = struct
         "Db_version"
     | Transition _ ->
         "Transition _"
+    | Transition_new _ ->
+        "Transition_new _"
     | Arcs _ ->
         "Arcs _"
     | Root ->
@@ -124,6 +128,8 @@ module Schema = struct
         "Root_hash"
     | Root_common ->
         "Root_common"
+    | Root_new ->
+        "Root_new"
     | Best_tip ->
         "Best_tip"
     | Protocol_states_for_root_scan_state ->
@@ -133,7 +139,9 @@ module Schema = struct
     | Db_version ->
         [%bin_type_class: int]
     | Transition _ ->
-        [%bin_type_class: Transition.Stable.Latest.t]
+        [%bin_type_class: Mina_block.Stable.Latest.t]
+    | Transition_new _ ->
+        [%bin_type_class: Block_data.Full.Stable.Latest.t]
     | Arcs _ ->
         [%bin_type_class: State_hash.Stable.Latest.t list]
     | Root ->
@@ -141,6 +149,8 @@ module Schema = struct
     | Root_hash ->
         [%bin_type_class: State_hash.Stable.Latest.t]
     | Root_common ->
+        [%bin_type_class: Root_data.Common.Stable.V2.t]
+    | Root_new ->
         [%bin_type_class: Root_data.Common.Stable.Latest.t]
     | Best_tip ->
         [%bin_type_class: State_hash.Stable.Latest.t]
@@ -186,6 +196,11 @@ module Schema = struct
           (module Keys.Prefixed_state_hash.Stable.Latest)
           ~to_gadt:(fun (_, hash) -> Transition hash)
           ~of_gadt:(fun (Transition hash) -> ("transition", hash))
+    | Transition_new _ ->
+        gadt_input_type_class
+          (module Keys.Prefixed_state_hash.Stable.Latest)
+          ~to_gadt:(fun (_, hash) -> Transition_new hash)
+          ~of_gadt:(fun (Transition_new hash) -> ("transition_new", hash))
     | Arcs _ ->
         gadt_input_type_class
           (module Keys.Prefixed_state_hash.Stable.Latest)
@@ -201,6 +216,11 @@ module Schema = struct
           (module Keys.String)
           ~to_gadt:(fun _ -> Root_hash)
           ~of_gadt:(fun Root_hash -> "root_hash")
+    | Root_new ->
+        gadt_input_type_class
+          (module Keys.String)
+          ~to_gadt:(fun _ -> Root_new)
+          ~of_gadt:(fun Root_new -> "root_new")
     | Root_common ->
         gadt_input_type_class
           (module Keys.String)
@@ -313,11 +333,23 @@ let get db ~key ~error =
 Don't use this when possible. It cost ~90s while get_root_hash cost seconds.
 *)
 let get_root t =
-  match get_batch t.db ~keys:[ Some_key Root_hash; Some_key Root_common ] with
+  match
+    get_batch t.db
+      ~keys:[ Some_key Root_hash; Some_key Root_new; Some_key Root_common ]
+  with
   | [ Some (Some_key_value (Root_hash, hash))
-    ; Some (Some_key_value (Root_common, common))
+    ; Some (Some_key_value (Root_new, common))
+    ; _
     ] ->
       Ok (Root_data.Minimal.of_common common ~state_hash:hash)
+  | [ Some (Some_key_value (Root_hash, hash))
+    ; None
+    ; Some (Some_key_value (Root_common, common))
+    ] ->
+      Ok
+        (Root_data.Minimal.of_common
+           (Root_data.Common.Stable.V2.to_latest common)
+           ~state_hash:hash )
   | _ -> (
       match get t.db ~key:Root ~error:(`Not_found `Root) with
       | Ok root ->
@@ -327,7 +359,7 @@ let get_root t =
               let common = Root_data.Minimal.common root in
               Batch.remove batch ~key:Root ;
               Batch.set batch ~key:Root_hash ~data:hash ;
-              Batch.set batch ~key:Root_common ~data:common ) ;
+              Batch.set batch ~key:Root_new ~data:common ) ;
 
           Ok root
       | Error _ as e ->
@@ -339,6 +371,15 @@ let get_root_hash t =
       Ok hash
   | Error _ ->
       Result.map ~f:Root_data.Minimal.state_hash (get_root t)
+
+let get_transition_do t hash =
+  let error = `Not_found (`Transition hash) in
+  match get t.db ~key:(Transition_new hash) ~error with
+  | Ok transition ->
+      Ok (Transition.Stable.Latest.New_format transition)
+  | Error _ ->
+      get t.db ~key:(Transition hash) ~error
+      |> Result.map ~f:(fun x -> Transition.Stable.Latest.Old_format x)
 
 (* TODO: check that best tip is connected to root *)
 (* TODO: check for garbage *)
@@ -362,16 +403,18 @@ let check t ~genesis_state_hash =
           get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
         in
         let%bind root_transition =
-          get t.db ~key:(Transition root_hash)
-            ~error:(`Corrupt (`Not_found `Root_transition))
+          get_transition_do t root_hash
+          |> Result.map_error
+               ~f:(const @@ `Corrupt (`Not_found `Root_transition))
         in
         let%bind _ =
           get t.db ~key:Protocol_states_for_root_scan_state
             ~error:(`Corrupt (`Not_found `Protocol_states_for_root_scan_state))
         in
         let%map _ =
-          get t.db ~key:(Transition best_tip)
-            ~error:(`Corrupt (`Not_found `Best_tip_transition))
+          get_transition_do t best_tip
+          |> Result.map_error
+               ~f:(const @@ `Corrupt (`Not_found `Best_tip_transition))
         in
         (root_hash, root_transition)
       in
@@ -383,8 +426,8 @@ let check t ~genesis_state_hash =
         List.fold successors ~init:(Ok ()) ~f:(fun acc succ_hash ->
             let%bind () = acc in
             let%bind _ =
-              get t.db ~key:(Transition succ_hash)
-                ~error:(`Corrupt (`Not_found (`Transition succ_hash)))
+              get_transition_do t succ_hash
+              |> Result.map_error ~f:(fun e -> `Corrupt e)
             in
             check_arcs succ_hash )
       in
@@ -419,7 +462,7 @@ let initialize t ~root_data =
       Batch.set batch ~key:Db_version ~data:version ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
       Batch.set batch ~key:Root_hash ~data:root_state_hash ;
-      Batch.set batch ~key:Root_common ~data:root_common ;
+      Batch.set batch ~key:Root_new ~data:root_common ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
         ~data:
@@ -450,7 +493,7 @@ let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
       Error (`Not_found `Old_root_transition)
 
 let set_transition ~state_hash ~transition_data =
-  Batch.set ~key:(Transition state_hash) ~data:(New_format transition_data)
+  Batch.set ~key:(Transition_new state_hash) ~data:transition_data
 
 let add ~arcs_cache ~state_hash ~transition_data =
   let parent_hash =
@@ -471,7 +514,7 @@ let move_root ~old_root_hash ~new_root ~garbage =
   fun batch ->
     Batch.remove batch ~key:Root ;
     Batch.set batch ~key:Root_hash ~data:new_root_hash ;
-    Batch.set batch ~key:Root_common ~data:(Root_data.to_common new_root) ;
+    Batch.set batch ~key:Root_new ~data:(Root_data.to_common new_root) ;
     Batch.set batch ~key:Protocol_states_for_root_scan_state
       ~data:(List.map ~f:With_hash.data new_root.protocol_states_for_scan_state) ;
     List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
@@ -480,12 +523,12 @@ let move_root ~old_root_hash ~new_root ~garbage =
          * we are deleting since there we are deleting all of a node's
          * parents as well
          *)
+        Batch.remove batch ~key:(Transition_new node_hash) ;
         Batch.remove batch ~key:(Transition node_hash) ;
         Batch.remove batch ~key:(Arcs node_hash) )
 
 let get_transition_data ~signature_kind ~proof_cache_db t hash =
-  let error = `Not_found (`Transition hash) in
-  match%map.Result get t.db ~key:(Transition hash) ~error with
+  match%map.Result get_transition_do t hash with
   | Old_format block ->
       Either.First
         (Block_data.validated_of_stable ~signature_kind ~proof_cache_db
@@ -496,7 +539,7 @@ let get_transition_data ~signature_kind ~proof_cache_db t hash =
 let get_transition ~signature_kind ~proof_cache_db t hash =
   (* TODO: consider using a more specific error *)
   let error = `Not_found (`Transition hash) in
-  let%bind.Result transition_data = get t.db ~key:(Transition hash) ~error in
+  let%bind.Result transition_data = get_transition_do t hash in
   Transition.to_validated_block ~signature_kind ~proof_cache_db ~state_hash:hash
     transition_data
   |> Result.map_error ~f:(fun _ -> error)
