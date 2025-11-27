@@ -70,7 +70,7 @@ module Full = struct
         ; staged_ledger_data :
             Mina_ledger.Mask_maps.Stable.V1.t
             * Staged_ledger.Scan_state.Application_data.Stable.V1.t
-        ; staged_ledger_hash : Staged_ledger_hash.Stable.V1.t
+              (* TODO consider removing the field, it's not used on lite breadcrumb *)
         ; accounts_created : Account_id.Stable.V2.t list
         ; staged_ledger_aux_and_pending_coinbases_cached :
             ( State_hash.Stable.V1.t
@@ -81,6 +81,7 @@ module Full = struct
             option
         ; transaction_hashes_unordered :
             Mina_transaction.Transaction_hash.Stable.V1.t list
+        ; command_stats : Command_stats.Stable.V1.t
         }
 
       let to_latest = Fn.id

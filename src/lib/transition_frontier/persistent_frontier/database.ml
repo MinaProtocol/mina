@@ -481,6 +481,16 @@ let move_root ~old_root_hash ~new_root ~garbage =
         Batch.remove batch ~key:(Transition node_hash) ;
         Batch.remove batch ~key:(Arcs node_hash) )
 
+let get_transition_data ~signature_kind ~proof_cache_db t hash =
+  let error = `Not_found (`Transition hash) in
+  match%map.Result get t.db ~key:(Transition hash) ~error with
+  | Old_format block ->
+      Either.First
+        (Block_data.validated_of_stable ~signature_kind ~proof_cache_db
+           ~state_hash:hash block )
+  | New_format transition ->
+      Either.Second transition
+
 let get_transition ~signature_kind ~proof_cache_db t hash =
   (* TODO: consider using a more specific error *)
   let error = `Not_found (`Transition hash) in
@@ -512,10 +522,11 @@ let rec crawl_successors ?max_depth ~signature_kind ~proof_cache_db ~init ~f t
       deferred_list_result_iter successors ~f:(fun succ_hash ->
           let%bind transition =
             Deferred.return
-              (get_transition ~signature_kind ~proof_cache_db t succ_hash)
+              (get_transition_data ~signature_kind ~proof_cache_db t succ_hash)
           in
           let%bind init' =
-            Deferred.map (f init transition)
+            Deferred.map
+              (f ~state_hash:succ_hash init transition)
               ~f:(Result.map_error ~f:(fun err -> `Crawl_error err))
           in
           crawl_successors ~signature_kind ~proof_cache_db

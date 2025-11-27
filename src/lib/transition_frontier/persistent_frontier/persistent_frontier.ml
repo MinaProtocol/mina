@@ -221,7 +221,7 @@ module Instance = struct
 
   let downgrade_transition transition genesis_state_hash :
       ( Mina_block.almost_valid_block
-      , [ `Invalid_genesis_protocol_state ] )
+      , [> `Invalid_genesis_protocol_state ] )
       Result.t =
     (* we explicitly re-validate the genesis protocol state here to prevent X-version bugs *)
     transition |> Mina_block.Validated.remember
@@ -246,15 +246,11 @@ module Instance = struct
     [%log internal] "Notify_frontier_extensions_done" ;
     Result.return result
 
-  let load_transition ~root_genesis_state_hash ~logger ~precomputed_values t
-      ~parent transition =
+  let load_transition_old_format ~root_genesis_state_hash ~logger
+      ~precomputed_values ~verifier ~parent (transition : Mina_block.Validated.t)
+      =
     let%bind.Deferred.Result transition =
-      match downgrade_transition transition root_genesis_state_hash with
-      | Ok t ->
-          Deferred.Result.return t
-      | Error `Invalid_genesis_protocol_state ->
-          Error (`Fatal_error (Invalid_genesis_state_hash transition))
-          |> Deferred.return
+      downgrade_transition transition root_genesis_state_hash |> Deferred.return
     in
     let state_hash =
       (With_hash.hash @@ Mina_block.Validation.block_with_hash transition)
@@ -272,11 +268,49 @@ module Instance = struct
     (* we're loading transitions from persistent storage,
        don't assign a timestamp
     *)
-    Breadcrumb.build ~skip_staged_ledger_verification:`All
-      ~logger:t.factory.logger ~precomputed_values ~verifier:t.factory.verifier
-      ~trust_system:(Trust_system.null ()) ~parent ~transition
-      ~get_completed_work:(Fn.const None) ~sender:None
+    Breadcrumb.build ~skip_staged_ledger_verification:`All ~logger
+      ~precomputed_values ~verifier ~trust_system:(Trust_system.null ()) ~parent
+      ~transition ~get_completed_work:(Fn.const None) ~sender:None
       ~transition_receipt_time:None ()
+
+  let load_transition_new_format ~state_hash ~root_genesis_state_hash ~logger
+      ~precomputed_values ~parent (block_data : Block_data.Full.t) =
+    let hashes =
+      { State_hash.State_hashes.state_hash; state_body_hash = None }
+    in
+    let%bind.Deferred.Result _ =
+      Validation.wrap_header
+        { With_hash.hash = hashes; data = block_data.header }
+      |> Validation.validate_genesis_protocol_state
+           ~genesis_state_hash:root_genesis_state_hash
+      |> Deferred.return
+    in
+    Internal_tracing.with_state_hash state_hash
+    @@ fun () ->
+    [%log internal] "@block_metadata"
+      ~metadata:
+        [ ( "blockchain_length"
+          , Mina_numbers.Length.to_yojson
+            @@ Mina_block.Header.blockchain_length block_data.header )
+        ] ;
+    [%log internal] "Loaded_transition_from_storage" ;
+    Breadcrumb.of_block_data ~logger
+      ~constraint_constants:
+        precomputed_values.Precomputed_values.constraint_constants
+      ~parent_staged_ledger:(Breadcrumb.staged_ledger parent)
+      ~state_hash block_data
+    |> Deferred.Result.map_error ~f:(fun e ->
+           `Invalid_staged_ledger_diff
+             (Staged_ledger.Staged_ledger_error.to_error e) )
+
+  let load_transition ~root_genesis_state_hash ~logger ~precomputed_values
+      ~verifier ~parent ~state_hash = function
+    | Either.First old ->
+        load_transition_old_format ~root_genesis_state_hash ~logger
+          ~precomputed_values ~parent ~verifier old
+    | Second new_ ->
+        load_transition_new_format ~state_hash ~root_genesis_state_hash ~logger
+          ~precomputed_values ~parent new_
 
   let set_best_tip ~logger ~frontier ~extensions ~ignore_consensus_local_state
       ~root_ledger best_tip_hash =
@@ -385,10 +419,11 @@ module Instance = struct
         (Extensions.create ~logger:t.factory.logger frontier)
         ~f:Result.return
     in
-    let visit parent transition =
+    let visit ~state_hash parent transition =
       let%bind breadcrumb =
-        load_transition ~root_genesis_state_hash ~logger ~precomputed_values t
-          ~parent transition
+        load_transition ~state_hash ~root_genesis_state_hash
+          ~logger:t.factory.logger ~precomputed_values ~parent
+          ~verifier:t.factory.verifier transition
       in
       let%map () =
         apply_diff ~logger ~frontier ~extensions ~ignore_consensus_local_state
@@ -412,6 +447,9 @@ module Instance = struct
                   match err with
                   | `Fatal_error exn ->
                       "fatal error -- " ^ Exn.to_string exn
+                  | `Invalid_genesis_protocol_state ->
+                      "loaded block doesn't correspond to the genesis protocol \
+                       state"
                   | `Invalid_staged_ledger_diff err
                   | `Invalid_staged_ledger_hash err ->
                       "staged ledger diff application failed -- "
