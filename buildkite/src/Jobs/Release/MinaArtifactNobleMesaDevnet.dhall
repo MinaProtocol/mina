@@ -12,29 +12,19 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Arch = ../../Constants/Arch.dhall
-
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
-            [ Artifacts.Type.LogProc
-            , Artifacts.Type.Daemon
+            [ Artifacts.Type.Daemon
+            , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreateLegacyGenesis
             ]
-          , network = Network.Type.Devnet
-          , arch = Arch.Type.Arm64
-          , tags =
-            [ PipelineTag.Type.Long
-            , PipelineTag.Type.Release
-            , PipelineTag.Type.Docker
-            , PipelineTag.Type.Devnet
-            , PipelineTag.Type.Arm64
-            , PipelineTag.Type.Noble
-            ]
+          , network = Network.Type.Mesa
+          , tags = [] : List PipelineTag.Type
           , debVersion = DebianVersions.DebVersion.Noble
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
