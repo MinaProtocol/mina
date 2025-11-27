@@ -84,17 +84,19 @@ type Structured_log_events.t += Persisted_frontier_dropped
 let genesis_root_data ~precomputed_values =
   let transition, block_tag = Mina_block.genesis ~precomputed_values in
   let state_hash = Mina_block.Validated.state_hash transition in
+  let protocol_state =
+    Mina_block.Validated.header transition |> Mina_block.Header.protocol_state
+  in
   let constraint_constants = precomputed_values.constraint_constants in
   let scan_state = Staged_ledger.Scan_state.empty ~constraint_constants () in
   (*if scan state is empty the protocol states required is also empty*)
-  let protocol_states = [] in
   let pending_coinbase =
     Or_error.ok_exn
       (Pending_coinbase.create
          ~depth:constraint_constants.pending_coinbase_depth () )
   in
   Root_data.Limited.create ~block_tag ~state_hash ~scan_state ~pending_coinbase
-    ~protocol_states
+    ~protocol_states_for_scan_state:[] ~protocol_state
 
 let load_from_persistence_and_start ~context:(module Context : CONTEXT)
     ~verifier ~consensus_local_state ~max_length ~persistent_root
@@ -742,7 +744,7 @@ module For_tests = struct
     in
     let create_root, root_ledger_accounts = create_root_and_accounts in
     (* TODO: ensure that rose_tree cannot be longer than k *)
-    let%bind root, branches, protocol_states =
+    let%bind root, branches, protocol_states_for_scan_state =
       let%bind root, protocol_states = gen_root_breadcrumb in
       let%map (Mina_stdlib.Rose_tree.T (root, branches)) =
         Quickcheck.Generator.with_size ~size
@@ -762,7 +764,8 @@ module For_tests = struct
         ~pending_coinbase:
           ( Breadcrumb.staged_ledger root
           |> Staged_ledger.pending_coinbase_collection )
-        ~protocol_states
+        ~protocol_states_for_scan_state
+        ~protocol_state:(Breadcrumb.protocol_state root)
     in
     let%map persistent_root, persistent_frontier =
       gen_persistence ~logger ~precomputed_values ~verifier ()

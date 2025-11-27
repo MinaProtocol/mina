@@ -277,14 +277,14 @@ let get_root t =
   | [ Some (Some_key_value (Root_hash, hash))
     ; Some (Some_key_value (Root_common, common))
     ] ->
-      Ok (Root_data.Minimal.Stable.Latest.of_limited ~common hash)
+      Ok (Root_data.Minimal.of_legacy_minimal common ~state_hash:hash)
   | _ -> (
       match get t.db ~key:Root ~error:(`Not_found `Root) with
       | Ok root ->
           (* automatically split Root into (Root_hash, Root_common) *)
           Batch.with_batch t.db ~f:(fun batch ->
-              let hash = Root_data.Minimal.Stable.Latest.state_hash root in
-              let common = Root_data.Minimal.Stable.Latest.common root in
+              let hash = Root_data.Minimal.state_hash root in
+              let common = Root_data.Minimal.common root in
               Batch.remove batch ~key:Root ;
               Batch.set batch ~key:Root_hash ~data:hash ;
               Batch.set batch ~key:Root_common ~data:common ) ;
@@ -298,7 +298,7 @@ let get_root_hash t =
   | Ok hash ->
       Ok hash
   | Error _ ->
-      Result.map ~f:Root_data.Minimal.Stable.Latest.state_hash (get_root t)
+      Result.map ~f:Root_data.Minimal.state_hash (get_root t)
 
 (* TODO: check that best tip is connected to root *)
 (* TODO: check for garbage *)
@@ -390,7 +390,7 @@ let initialize t ~root_data =
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
         ~data:
-          ( Root_data.Limited.protocol_states root_data
+          ( Root_data.Limited.protocol_states_for_scan_state root_data
           |> List.map ~f:With_hash.data ) )
 
 let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
@@ -443,7 +443,7 @@ let move_root ~old_root_hash ~new_root ~garbage =
     Batch.set batch ~key:Protocol_states_for_root_scan_state
       ~data:
         (List.map ~f:With_hash.data
-           (Root_data.Limited.protocol_states new_root) ) ;
+           (Root_data.Limited.protocol_states_for_scan_state new_root) ) ;
     List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
         (* because we are removing entire forks of the tree, there is
          * no need to have extra logic to any remove arcs to the node

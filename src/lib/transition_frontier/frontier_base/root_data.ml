@@ -70,11 +70,12 @@ module Limited = struct
         , Mina_block.Stable.Latest.t )
         Multi_key_file_storage.Tag.Stable.Latest.t
     ; state_hash : State_hash.Stable.Latest.t
-    ; protocol_states :
+    ; protocol_states_for_scan_state :
         Mina_state.Protocol_state.Value.Stable.Latest.t
         Mina_base.State_hash.With_state_hashes.Stable.Latest.t
         list
     ; common : Common.Stable.Latest.t
+    ; protocol_state : Mina_state.Protocol_state.Value.Stable.Latest.t
     }
   [@@deriving bin_io_unversioned, fields]
 
@@ -85,9 +86,14 @@ module Limited = struct
       ]
 
   let create ~block_tag ~state_hash ~scan_state ~pending_coinbase
-      ~protocol_states =
+      ~protocol_states_for_scan_state ~protocol_state =
     let common = { Common.scan_state; pending_coinbase } in
-    { block_tag; state_hash; protocol_states; common }
+    { block_tag
+    ; state_hash
+    ; protocol_states_for_scan_state
+    ; common
+    ; protocol_state
+    }
 
   let scan_state t = Common.scan_state t.common
 
@@ -95,24 +101,46 @@ module Limited = struct
 end
 
 module Minimal = struct
+  module Block_data = struct
+    [%%versioned
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
+
+      module V1 = struct
+        type t =
+          { protocol_state : Mina_state.Protocol_state.Value.Stable.V2.t
+          ; block_tag :
+              ( State_hash.Stable.V1.t
+              , Mina_block.Stable.V2.t )
+              Multi_key_file_storage.Tag.Stable.V1.t
+          ; delta_block_chain_proof :
+              State_hash.Stable.V1.t Mina_stdlib.Nonempty_list.Stable.V1.t
+          }
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t =
+      { protocol_state : Mina_state.Protocol_state.value
+      ; block_tag :
+          Mina_block.Stable.Latest.t Mina_base.State_hash.File_storage.tag
+      ; delta_block_chain_proof : State_hash.t Mina_stdlib.Nonempty_list.t
+      }
+  end
+
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V3 = struct
       type t =
-        { state_hash : State_hash.Stable.V1.t; common : Common.Stable.V3.t }
-      [@@deriving fields]
-
-      let of_limited ~common state_hash = { state_hash; common }
+        { state_hash : State_hash.Stable.V1.t
+        ; common : Common.Stable.V3.t
+        ; block_data_opt : Block_data.Stable.V1.t option
+        }
 
       let to_latest = Fn.id
-
-      let common t = t.common
-
-      let scan_state t = t.common.Common.Stable.Latest.scan_state
-
-      let pending_coinbase t = t.common.Common.Stable.Latest.pending_coinbase
     end
 
     module V2 = struct
@@ -120,17 +148,25 @@ module Minimal = struct
         { state_hash : State_hash.Stable.V1.t; common : Common.Stable.V2.t }
 
       let to_latest { state_hash; common } =
-        { V3.state_hash; common = Common.Stable.V2.to_latest common }
+        { V3.state_hash
+        ; common = Common.Stable.V2.to_latest common
+        ; block_data_opt = None
+        }
     end
   end]
 
-  type t = { state_hash : State_hash.t; common : Common.t } [@@deriving fields]
+  type t = Stable.Latest.t =
+    { state_hash : State_hash.t
+    ; common : Common.t
+    ; block_data_opt : Block_data.Stable.Latest.t option
+    }
+  [@@deriving fields]
 
-  let of_limited ~common state_hash = { state_hash; common }
+  let common t = t.common
 
-  let upgrade t ~block_tag ~protocol_states =
-    let protocol_states =
-      List.map protocol_states ~f:(fun (state_hash, s) ->
+  let upgrade t ~protocol_states_for_scan_state ~protocol_state ~block_tag =
+    let protocol_states_for_scan_state =
+      List.map protocol_states_for_scan_state ~f:(fun (state_hash, s) ->
           { With_hash.data = s
           ; hash =
               { Mina_base.State_hash.State_hashes.state_hash
@@ -140,18 +176,27 @@ module Minimal = struct
     in
     ignore
       ( Staged_ledger.Scan_state.check_required_protocol_states
-          t.common.scan_state ~protocol_states
+          t.common.scan_state ~protocol_states:protocol_states_for_scan_state
         |> Or_error.ok_exn
         : Mina_state.Protocol_state.value State_hash.With_state_hashes.t list ) ;
     { Limited.block_tag
     ; state_hash = t.state_hash
-    ; protocol_states
     ; common = t.common
+    ; protocol_states_for_scan_state
+    ; protocol_state
     }
 
-  let create ~state_hash ~scan_state ~pending_coinbase =
+  let create ~state_hash ~scan_state ~pending_coinbase ~block_tag
+      ~protocol_state ~delta_block_chain_proof =
     let common = { Common.scan_state; pending_coinbase } in
-    { state_hash; common }
+    { state_hash
+    ; common
+    ; block_data_opt =
+        Some { block_tag; protocol_state; delta_block_chain_proof }
+    }
+
+  let of_legacy_minimal ~state_hash common =
+    { state_hash; common; block_data_opt = None }
 
   let scan_state t = Common.scan_state t.common
 
@@ -161,8 +206,9 @@ end
 type t =
   { block_tag : Mina_block.Stable.Latest.t Mina_base.State_hash.File_storage.tag
   ; state_hash : State_hash.t
+  ; protocol_state : Mina_state.Protocol_state.Value.t
   ; staged_ledger : Staged_ledger.t
-  ; protocol_states :
+  ; protocol_states_for_scan_state :
       Mina_state.Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
       list
   ; delta_block_chain_proof : State_hash.t Mina_stdlib.Nonempty_list.t
@@ -170,28 +216,38 @@ type t =
 
 let minimize
     { staged_ledger
-    ; protocol_states = _
-    ; block_tag = _
+    ; protocol_states_for_scan_state = _
+    ; block_tag
     ; state_hash
-    ; delta_block_chain_proof = _
+    ; delta_block_chain_proof
+    ; protocol_state
     } =
   let scan_state = Staged_ledger.scan_state staged_ledger in
   let pending_coinbase =
     Staged_ledger.pending_coinbase_collection staged_ledger
   in
   let common = Common.create ~scan_state ~pending_coinbase in
-  { Minimal.state_hash; common }
+  { Minimal.state_hash
+  ; common
+  ; block_data_opt = Some { block_tag; protocol_state; delta_block_chain_proof }
+  }
 
 let limit
     { staged_ledger
-    ; protocol_states
+    ; protocol_states_for_scan_state
     ; block_tag
     ; state_hash
     ; delta_block_chain_proof = _
+    ; protocol_state
     } =
   let scan_state = Staged_ledger.scan_state staged_ledger in
   let pending_coinbase =
     Staged_ledger.pending_coinbase_collection staged_ledger
   in
   let common = Common.create ~scan_state ~pending_coinbase in
-  { Limited.block_tag; common; protocol_states; state_hash }
+  { Limited.block_tag
+  ; common
+  ; protocol_states_for_scan_state
+  ; state_hash
+  ; protocol_state
+  }

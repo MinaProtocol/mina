@@ -35,15 +35,12 @@ end
 exception Invalid_genesis_state_hash of Mina_block.Validated.t
 
 let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
-    ~root_ledger ~root_transition ~(root : Root_data.Minimal.Stable.Latest.t)
-    ~protocol_states ~logger ~signature_kind =
-  let blockchain_state =
-    root_transition |> Mina_block.Validated.forget |> With_hash.data
-    |> Mina_block.header |> Mina_block.Header.protocol_state
-    |> Protocol_state.blockchain_state
-  in
+    ~root_ledger ~root_protocol_state
+    ~(root : Root_data.Minimal.Stable.Latest.t) ~protocol_states ~logger
+    ~signature_kind =
+  let blockchain_state = Protocol_state.blockchain_state root_protocol_state in
   let pending_coinbases, scan_state =
-    Root_data.Minimal.Stable.Latest.(pending_coinbase root, scan_state root)
+    Root_data.Minimal.(pending_coinbase root, scan_state root)
   in
   let protocol_states_map =
     List.fold protocol_states ~init:State_hash.Map.empty
@@ -268,33 +265,70 @@ module Instance = struct
     let open Deferred.Result.Let_syntax in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)
-    let%bind root, root_transition, best_tip, protocol_states, root_hash =
+    let%bind ( root
+             , best_tip
+             , protocol_states
+             , root_hash
+             , { block_tag = root_block_tag
+               ; protocol_state = root_protocol_state
+               ; delta_block_chain_proof = root_delta_block_chain_proof
+               } ) =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
-      let root_hash = Root_data.Minimal.Stable.Latest.state_hash root in
-      let%bind root_transition =
-        Database.get_transition t.db ~signature_kind ~proof_cache_db root_hash
+      let root_hash = Root_data.Minimal.state_hash root in
+      let%bind root_block_data =
+        match Root_data.Minimal.block_data_opt root with
+        | Some block_data ->
+            Result.return block_data
+        | None ->
+            let%map root_transition =
+              Database.get_transition t.db ~signature_kind ~proof_cache_db
+                root_hash
+            in
+            let block =
+              Mina_block.Validated.forget root_transition
+              |> With_hash.data |> Mina_block.read_all_proofs_from_disk
+            in
+            (* We're initializing frontier, so there shouldn't be any data preserved at the
+               state hash's multi-key file storage, and root block won't be validated, so there won't
+               be an overwrite *)
+            let block_tag =
+              State_hash.File_storage.write_values_exn root_hash
+                ~f:(fun writer ->
+                  State_hash.File_storage.write_value writer
+                    (module Mina_block.Stable.Latest)
+                    block )
+            in
+            let protocol_state =
+              Mina_block.Validated.header root_transition
+              |> Mina_block.Header.protocol_state
+            in
+            let delta_block_chain_proof =
+              Mina_block.Validated.delta_block_chain_proof root_transition
+            in
+            { Root_data.Minimal.Block_data.block_tag
+            ; protocol_state
+            ; delta_block_chain_proof
+            }
       in
       let%bind best_tip = Database.get_best_tip t.db in
       let%map protocol_states =
         Database.get_protocol_states_for_root_scan_state t.db
       in
-      (root, root_transition, best_tip, protocol_states, root_hash))
+      (root, best_tip, protocol_states, root_hash, root_block_data))
       |> Result.map_error ~f:(fun err ->
              `Failure (Database.Error.not_found_message err) )
       |> Deferred.return
     in
     let root_genesis_state_hash =
-      root_transition |> Mina_block.Validated.forget |> With_hash.data
-      |> Mina_block.header |> Mina_block.Header.protocol_state
-      |> Protocol_state.genesis_state_hash
+      Protocol_state.genesis_state_hash root_protocol_state
     in
     (* construct the root staged ledger in memory *)
     let%bind root_staged_ledger =
       let open Deferred.Let_syntax in
       match%map
         construct_staged_ledger_at_root ~precomputed_values ~root_ledger
-          ~root_transition ~root ~protocol_states
+          ~root_protocol_state ~root ~protocol_states
           ~signature_kind:t.factory.signature_kind ~logger:t.factory.logger
       with
       | Error err ->
@@ -302,16 +336,7 @@ module Instance = struct
       | Ok staged_ledger ->
           Ok staged_ledger
     in
-    let root_state_hash = Root_data.Minimal.Stable.Latest.state_hash root in
-    (* TODO remove the hack *)
-    let root_block_tag =
-      State_hash.File_storage.write_values_exn (Lazy.force temp_state_hash)
-        ~f:(fun writer ->
-          State_hash.File_storage.write_value writer
-            (module Mina_block.Stable.Latest)
-          @@ Mina_block.read_all_proofs_from_disk @@ With_hash.data
-          @@ Mina_block.Validated.forget root_transition )
-    in
+    let root_state_hash = Root_data.Minimal.state_hash root in
     (* initialize the new in memory frontier and extensions *)
     let frontier =
       Full_frontier.create
@@ -320,12 +345,12 @@ module Instance = struct
         ~root_data:
           { state_hash = root_state_hash
           ; staged_ledger = root_staged_ledger
-          ; protocol_states =
+          ; protocol_states_for_scan_state =
               List.map protocol_states
                 ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
           ; block_tag = root_block_tag
-          ; delta_block_chain_proof =
-              Mina_block.Validated.delta_block_chain_proof root_transition
+          ; delta_block_chain_proof = root_delta_block_chain_proof
+          ; protocol_state = root_protocol_state
           }
         ~root_ledger:(Root_ledger.as_unmasked root_ledger)
         ~consensus_local_state ~max_length ~persistent_root_instance
