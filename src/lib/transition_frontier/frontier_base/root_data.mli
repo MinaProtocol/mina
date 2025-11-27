@@ -13,6 +13,12 @@ module Common : sig
       val to_latest : t -> V3.t
     end
   end]
+
+  val create :
+       scan_state:Staged_ledger.Scan_state.t
+    -> pending_coinbase:Pending_coinbase.t
+    -> block_data_opt:Block_data.t option
+    -> t
 end
 
 (* Historical root data is similar to Limited root data, except that it also
@@ -71,8 +77,6 @@ module Limited : sig
          Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
     -> protocol_state:Mina_state.Protocol_state.value
     -> t
-
-  val common : t -> Common.t
 end
 
 (* Minimal root data contains the smallest amount of information about a root.
@@ -81,15 +85,6 @@ end
  * pending_coinbase).
  *)
 module Minimal : sig
-  module Block_data : sig
-    type t =
-      { protocol_state : Mina_state.Protocol_state.value
-      ; block_tag :
-          Mina_block.Stable.Latest.t Mina_base.State_hash.File_storage.tag
-      ; delta_block_chain_proof : State_hash.t Mina_stdlib.Nonempty_list.t
-      }
-  end
-
   [%%versioned:
   module Stable : sig
     module V3 : sig
@@ -105,7 +100,7 @@ module Minimal : sig
 
   val pending_coinbase : t -> Pending_coinbase.t
 
-  val of_legacy_minimal : state_hash:State_hash.t -> Common.t -> t
+  val of_common : state_hash:State_hash.t -> Common.t -> t
 
   val block_data_opt : t -> Block_data.t option
 
@@ -142,3 +137,5 @@ type t =
 val minimize : t -> Minimal.t
 
 val limit : t -> Limited.t
+
+val to_common : t -> Common.t

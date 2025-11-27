@@ -277,7 +277,7 @@ let get_root t =
   | [ Some (Some_key_value (Root_hash, hash))
     ; Some (Some_key_value (Root_common, common))
     ] ->
-      Ok (Root_data.Minimal.of_legacy_minimal common ~state_hash:hash)
+      Ok (Root_data.Minimal.of_common common ~state_hash:hash)
   | _ -> (
       match get t.db ~key:Root ~error:(`Not_found `Root) with
       | Ok root ->
@@ -370,27 +370,27 @@ let check t ~genesis_state_hash =
   |> Result.join
 
 let initialize t ~root_data =
-  let root_state_hash = Root_data.Limited.state_hash root_data in
+  let root_state_hash = root_data.Root_data.state_hash in
   let root_block =
     (* TODO preserve block tags in frontier *)
-    Root_data.Limited.block_tag root_data
+    root_data.block_tag
     |> State_hash.File_storage.read (module Mina_block.Stable.Latest)
     |> Or_error.ok_exn
   in
+  let root_common = Root_data.to_common root_data in
   [%log' trace t.logger]
-    ~metadata:[ ("root_data", Root_data.Limited.to_yojson root_data) ]
+    ~metadata:[ ("root_data", State_hash.to_yojson root_state_hash) ]
     "Initializing persistent frontier database with $root_data" ;
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;
       Batch.set batch ~key:(Transition root_state_hash) ~data:root_block ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
       Batch.set batch ~key:Root_hash ~data:root_state_hash ;
-      Batch.set batch ~key:Root_common
-        ~data:(Root_data.Limited.common root_data) ;
+      Batch.set batch ~key:Root_common ~data:root_common ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
         ~data:
-          ( Root_data.Limited.protocol_states_for_scan_state root_data
+          ( root_data.protocol_states_for_scan_state
           |> List.map ~f:With_hash.data ) )
 
 let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
@@ -435,15 +435,13 @@ let add ~arcs_cache ~transition =
     Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
 let move_root ~old_root_hash ~new_root ~garbage =
-  let new_root_hash = Root_data.Limited.state_hash new_root in
+  let new_root_hash = new_root.Root_data.state_hash in
   fun batch ->
     Batch.remove batch ~key:Root ;
     Batch.set batch ~key:Root_hash ~data:new_root_hash ;
-    Batch.set batch ~key:Root_common ~data:(Root_data.Limited.common new_root) ;
+    Batch.set batch ~key:Root_common ~data:(Root_data.to_common new_root) ;
     Batch.set batch ~key:Protocol_states_for_root_scan_state
-      ~data:
-        (List.map ~f:With_hash.data
-           (Root_data.Limited.protocol_states_for_scan_state new_root) ) ;
+      ~data:(List.map ~f:With_hash.data new_root.protocol_states_for_scan_state) ;
     List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
         (* because we are removing entire forks of the tree, there is
          * no need to have extra logic to any remove arcs to the node

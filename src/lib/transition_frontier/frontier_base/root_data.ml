@@ -8,6 +8,7 @@ module Common = struct
       type t =
         { scan_state : Staged_ledger.Scan_state.Stable.V3.t
         ; pending_coinbase : Pending_coinbase.Stable.V2.t
+        ; block_data_opt : Block_data.Stable.V1.t option
         }
 
       let to_latest = Fn.id
@@ -23,18 +24,13 @@ module Common = struct
         { V3.scan_state =
             Staged_ledger.Scan_state.Stable.V2.to_latest scan_state
         ; pending_coinbase
+        ; block_data_opt = None
         }
     end
   end]
 
-  let to_yojson { scan_state = _; pending_coinbase } =
-    `Assoc
-      [ ("scan_state", `String "<opaque>")
-      ; ( "pending_coinbase"
-        , Pending_coinbase.Stable.V2.to_yojson pending_coinbase )
-      ]
-
-  let create ~scan_state ~pending_coinbase = { scan_state; pending_coinbase }
+  let create ~scan_state ~pending_coinbase ~block_data_opt =
+    { scan_state; pending_coinbase; block_data_opt }
 
   let scan_state t = t.scan_state
 
@@ -65,80 +61,51 @@ end
 
 module Limited = struct
   type t =
-    { block_tag :
-        ( State_hash.Stable.Latest.t
-        , Mina_block.Stable.Latest.t )
-        Multi_key_file_storage.Tag.Stable.Latest.t
-    ; state_hash : State_hash.Stable.Latest.t
+    { state_hash : State_hash.Stable.Latest.t
     ; protocol_states_for_scan_state :
         Mina_state.Protocol_state.Value.Stable.Latest.t
         Mina_base.State_hash.With_state_hashes.Stable.Latest.t
         list
-    ; common : Common.Stable.Latest.t
+    ; scan_state : Staged_ledger.Scan_state.Stable.Latest.t
+    ; pending_coinbase : Pending_coinbase.Stable.Latest.t
     ; protocol_state : Mina_state.Protocol_state.Value.Stable.Latest.t
+    ; block_tag :
+        ( State_hash.Stable.Latest.t
+        , Mina_block.Stable.Latest.t )
+        Multi_key_file_storage.Tag.Stable.Latest.t
     }
   [@@deriving bin_io_unversioned, fields]
 
-  let to_yojson { state_hash; common; _ } =
-    `Assoc
-      [ ("state_hash", State_hash.to_yojson state_hash)
-      ; ("common", Common.to_yojson common)
-      ]
+  let to_yojson { state_hash; _ } =
+    `Assoc [ ("state_hash", State_hash.to_yojson state_hash) ]
 
   let create ~block_tag ~state_hash ~scan_state ~pending_coinbase
       ~protocol_states_for_scan_state ~protocol_state =
-    let common = { Common.scan_state; pending_coinbase } in
-    { block_tag
-    ; state_hash
+    { state_hash
     ; protocol_states_for_scan_state
-    ; common
+    ; scan_state
+    ; pending_coinbase
     ; protocol_state
+    ; block_tag
     }
 
-  let scan_state t = Common.scan_state t.common
+  let scan_state t = t.scan_state
 
-  let pending_coinbase t = Common.pending_coinbase t.common
+  let pending_coinbase t = t.pending_coinbase
+
+  let block_tag t = t.block_tag
+
+  let protocol_state t = t.protocol_state
 end
 
 module Minimal = struct
-  module Block_data = struct
-    [%%versioned
-    module Stable = struct
-      [@@@no_toplevel_latest_type]
-
-      module V1 = struct
-        type t =
-          { protocol_state : Mina_state.Protocol_state.Value.Stable.V2.t
-          ; block_tag :
-              ( State_hash.Stable.V1.t
-              , Mina_block.Stable.V2.t )
-              Multi_key_file_storage.Tag.Stable.V1.t
-          ; delta_block_chain_proof :
-              State_hash.Stable.V1.t Mina_stdlib.Nonempty_list.Stable.V1.t
-          }
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    type t = Stable.Latest.t =
-      { protocol_state : Mina_state.Protocol_state.value
-      ; block_tag :
-          Mina_block.Stable.Latest.t Mina_base.State_hash.File_storage.tag
-      ; delta_block_chain_proof : State_hash.t Mina_stdlib.Nonempty_list.t
-      }
-  end
-
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V3 = struct
       type t =
-        { state_hash : State_hash.Stable.V1.t
-        ; common : Common.Stable.V3.t
-        ; block_data_opt : Block_data.Stable.V1.t option
-        }
+        { state_hash : State_hash.Stable.V1.t; common : Common.Stable.V3.t }
 
       let to_latest = Fn.id
     end
@@ -148,23 +115,19 @@ module Minimal = struct
         { state_hash : State_hash.Stable.V1.t; common : Common.Stable.V2.t }
 
       let to_latest { state_hash; common } =
-        { V3.state_hash
-        ; common = Common.Stable.V2.to_latest common
-        ; block_data_opt = None
-        }
+        { V3.state_hash; common = Common.Stable.V2.to_latest common }
     end
   end]
 
-  type t = Stable.Latest.t =
-    { state_hash : State_hash.t
-    ; common : Common.t
-    ; block_data_opt : Block_data.Stable.Latest.t option
-    }
+  type t = Stable.Latest.t = { state_hash : State_hash.t; common : Common.t }
   [@@deriving fields]
 
   let common t = t.common
 
+  let block_data_opt t = t.common.block_data_opt
+
   let upgrade t ~protocol_states_for_scan_state ~protocol_state ~block_tag =
+    (* TODO: make common always contain block_data and then remove three last parameters of this function *)
     let protocol_states_for_scan_state =
       List.map protocol_states_for_scan_state ~f:(fun (state_hash, s) ->
           { With_hash.data = s
@@ -179,24 +142,26 @@ module Minimal = struct
           t.common.scan_state ~protocol_states:protocol_states_for_scan_state
         |> Or_error.ok_exn
         : Mina_state.Protocol_state.value State_hash.With_state_hashes.t list ) ;
-    { Limited.block_tag
-    ; state_hash = t.state_hash
-    ; common = t.common
+    { Limited.state_hash = t.state_hash
     ; protocol_states_for_scan_state
+    ; scan_state = t.common.scan_state
+    ; pending_coinbase = t.common.pending_coinbase
+    ; block_tag
     ; protocol_state
     }
 
   let create ~state_hash ~scan_state ~pending_coinbase ~block_tag
       ~protocol_state ~delta_block_chain_proof =
-    let common = { Common.scan_state; pending_coinbase } in
-    { state_hash
-    ; common
-    ; block_data_opt =
-        Some { block_tag; protocol_state; delta_block_chain_proof }
-    }
+    let common =
+      { Common.scan_state
+      ; pending_coinbase
+      ; block_data_opt =
+          Some { block_tag; protocol_state; delta_block_chain_proof }
+      }
+    in
+    { state_hash; common }
 
-  let of_legacy_minimal ~state_hash common =
-    { state_hash; common; block_data_opt = None }
+  let of_common ~state_hash common = { state_hash; common }
 
   let scan_state t = Common.scan_state t.common
 
@@ -224,11 +189,12 @@ let minimize
     ; delta_block_chain_proof
     ; protocol_state
     } =
-  let common = Common.create ~scan_state ~pending_coinbase in
-  { Minimal.state_hash
-  ; common
-  ; block_data_opt = Some { block_tag; protocol_state; delta_block_chain_proof }
-  }
+  let common =
+    Common.create ~scan_state ~pending_coinbase
+      ~block_data_opt:
+        (Some { block_tag; protocol_state; delta_block_chain_proof })
+  in
+  { Minimal.state_hash; common }
 
 let limit
     { scan_state
@@ -239,10 +205,21 @@ let limit
     ; delta_block_chain_proof = _
     ; protocol_state
     } =
-  let common = Common.create ~scan_state ~pending_coinbase in
   { Limited.block_tag
-  ; common
+  ; protocol_state
   ; protocol_states_for_scan_state
   ; state_hash
-  ; protocol_state
+  ; scan_state
+  ; pending_coinbase
   }
+
+let to_common
+    { scan_state
+    ; pending_coinbase
+    ; block_tag
+    ; protocol_state
+    ; delta_block_chain_proof
+    ; _
+    } =
+  Common.create ~scan_state ~pending_coinbase
+    ~block_data_opt:(Some { block_tag; protocol_state; delta_block_chain_proof })

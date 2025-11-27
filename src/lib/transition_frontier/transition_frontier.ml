@@ -95,8 +95,15 @@ let genesis_root_data ~precomputed_values =
       (Pending_coinbase.create
          ~depth:constraint_constants.pending_coinbase_depth () )
   in
-  Root_data.Limited.create ~block_tag ~state_hash ~scan_state ~pending_coinbase
-    ~protocol_states_for_scan_state:[] ~protocol_state
+  { Root_data.block_tag
+  ; state_hash
+  ; scan_state
+  ; pending_coinbase
+  ; protocol_states_for_scan_state = []
+  ; protocol_state
+  ; delta_block_chain_proof =
+      Mina_block.Validated.delta_block_chain_proof transition
+  }
 
 let load_from_persistence_and_start ~context:(module Context : CONTEXT)
     ~verifier ~consensus_local_state ~max_length ~persistent_root
@@ -757,15 +764,18 @@ module For_tests = struct
       (root, branches, protocol_states)
     in
     let root_data =
-      Root_data.Limited.create
-        ~block_tag:(Breadcrumb.block_tag root)
-        ~state_hash:(Breadcrumb.state_hash root)
-        ~scan_state:(Breadcrumb.staged_ledger root |> Staged_ledger.scan_state)
-        ~pending_coinbase:
-          ( Breadcrumb.staged_ledger root
-          |> Staged_ledger.pending_coinbase_collection )
-        ~protocol_states_for_scan_state
-        ~protocol_state:(Breadcrumb.protocol_state root)
+      { Root_data.block_tag = Breadcrumb.block_tag root
+      ; state_hash = Breadcrumb.state_hash root
+      ; scan_state = Breadcrumb.staged_ledger root |> Staged_ledger.scan_state
+      ; pending_coinbase =
+          Breadcrumb.staged_ledger root
+          |> Staged_ledger.pending_coinbase_collection
+      ; protocol_states_for_scan_state
+      ; protocol_state = Breadcrumb.protocol_state root
+      ; delta_block_chain_proof =
+          Mina_block.Validated.delta_block_chain_proof
+            (Breadcrumb.validated_transition root)
+      }
     in
     let%map persistent_root, persistent_frontier =
       gen_persistence ~logger ~precomputed_values ~verifier ()
@@ -777,7 +787,7 @@ module For_tests = struct
                precomputed_values.protocol_state_with_hashes ) ) ;
     Async.Thread_safe.block_on_async_exn (fun () ->
         Persistent_root.reset_factory_root_exn persistent_root ~create_root
-          ~root_state_hash:(Root_data.Limited.state_hash root_data) ) ;
+          ~root_state_hash:root_data.state_hash ) ;
     let frontier_result =
       Async.Thread_safe.block_on_async_exn (fun () ->
           load_with_max_length ~max_length ~retry_with_fresh_db:false

@@ -387,13 +387,17 @@ module Util = struct
         ~old_root_state:(Breadcrumb.protocol_state_with_hashes parent)
     in
     let new_root_data =
-      Root_data.Limited.create
-        ~block_tag:(Breadcrumb.block_tag heir)
-        ~state_hash:heir_hash ~scan_state:new_scan_state
-        ~pending_coinbase:
-          (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
-        ~protocol_states_for_scan_state
-        ~protocol_state:(Breadcrumb.protocol_state heir)
+      { Root_data.block_tag = Breadcrumb.block_tag heir
+      ; state_hash = heir_hash
+      ; scan_state = new_scan_state
+      ; pending_coinbase =
+          Staged_ledger.pending_coinbase_collection heir_staged_ledger
+      ; protocol_states_for_scan_state
+      ; protocol_state = Breadcrumb.protocol_state heir
+      ; delta_block_chain_proof =
+          Breadcrumb.validated_transition heir
+          |> Mina_block.Validated.delta_block_chain_proof
+      }
     in
     let just_emitted_a_proof = Breadcrumb.just_emitted_a_proof heir in
     { Diff.Root_transition.new_root = new_root_data
@@ -694,12 +698,16 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let old_best_tip = t.best_tip in
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
-  | Root_transitioned { new_root; garbage = Full garbage; _ } ->
-      let new_root_hash = Root_data.Limited.state_hash new_root in
+  | Root_transitioned
+      { new_root =
+          { state_hash = new_root_hash
+          ; protocol_states_for_scan_state = new_root_protocol_states
+          ; _
+          }
+      ; garbage = Full garbage
+      ; _
+      } ->
       let old_root_hash = t.root in
-      let new_root_protocol_states =
-        Root_data.Limited.protocol_states_for_scan_state new_root
-      in
       [%log' internal t.logger] "Move_frontier_root" ;
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         ~enable_epoch_ledger_sync ;

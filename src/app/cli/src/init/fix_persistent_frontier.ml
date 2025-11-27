@@ -65,7 +65,7 @@ let apply_root_transitions ~logger ~db diffs =
                   Transition_frontier.Persistent_frontier.Database.move_root
                     ~old_root_hash ~new_root ~garbage batch ;
                   (* Return new root hash for next iteration *)
-                  Root_data.Limited.state_hash new_root
+                  new_root.state_hash
               | _ ->
                   failwith "Expected Root_transitioned diff" )
           : State_hash.t )
@@ -256,8 +256,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
             in
             ( ( breadcrumb
               , Transition_frontier.Util.to_protocol_states_map_exn
-                @@ Root_data.Limited.protocol_states_for_scan_state
-                     root_transition.new_root )
+                  root_transition.new_root.protocol_states_for_scan_state )
             , res ) )
       in
       [%log info] "Generated $count transition diffs"
