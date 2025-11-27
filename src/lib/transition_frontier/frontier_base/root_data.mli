@@ -131,7 +131,8 @@ type t =
   { block_tag : Mina_block.Stable.Latest.t Mina_base.State_hash.File_storage.tag
   ; state_hash : State_hash.t
   ; protocol_state : Mina_state.Protocol_state.Value.t
-  ; staged_ledger : Staged_ledger.t
+  ; scan_state : Staged_ledger.Scan_state.t
+  ; pending_coinbase : Pending_coinbase.t
   ; protocol_states_for_scan_state :
       Mina_state.Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
       list

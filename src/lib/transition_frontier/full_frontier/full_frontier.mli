@@ -46,6 +46,7 @@ val create :
   -> max_length:int
   -> persistent_root_instance:Persistent_root.Instance.t
   -> time_controller:Block_time.Controller.t
+  -> staged_ledger:Staged_ledger.t
   -> t
 
 val persistent_root_instance : t -> Persistent_root.Instance.t

@@ -135,7 +135,7 @@ let close ~loc t =
 
 let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
     ~consensus_local_state ~max_length ~persistent_root_instance
-    ~time_controller =
+    ~time_controller ~staged_ledger =
   let open Context in
   let open Root_data in
   let transition_receipt_time = None in
@@ -189,8 +189,8 @@ let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
          (Ledger.Any_ledger.M.merkle_root root_ledger) )
       root_blockchain_state_ledger_hash ) ;
   let root_breadcrumb =
-    Breadcrumb.create ~validated_transition
-      ~staged_ledger:root_data.staged_ledger ~just_emitted_a_proof:false
+    Breadcrumb.create ~validated_transition ~staged_ledger
+      ~just_emitted_a_proof:false
       ~transition_receipt_time
         (* accounts created shouldn't be used for the root *)
       ~accounts_created:[] ~block_tag:root_data.block_tag
@@ -217,7 +217,9 @@ let root_data t =
   let open Root_data in
   let root = root t in
   { state_hash = Breadcrumb.state_hash root
-  ; staged_ledger = Breadcrumb.staged_ledger root
+  ; scan_state = Breadcrumb.staged_ledger root |> Staged_ledger.scan_state
+  ; pending_coinbase =
+      Breadcrumb.staged_ledger root |> Staged_ledger.pending_coinbase_collection
   ; protocol_states_for_scan_state =
       State_hash.Map.data t.protocol_states_for_root_scan_state
   ; block_tag = Breadcrumb.block_tag root
@@ -1022,7 +1024,9 @@ module For_tests = struct
       { state_hash = Mina_block.Validated.state_hash transition
       ; delta_block_chain_proof =
           Mina_block.Validated.delta_block_chain_proof transition
-      ; staged_ledger
+      ; scan_state = Staged_ledger.scan_state staged_ledger
+      ; pending_coinbase =
+          Staged_ledger.pending_coinbase_collection staged_ledger
       ; protocol_states_for_scan_state = []
       ; block_tag
       ; protocol_state =
@@ -1050,7 +1054,7 @@ module For_tests = struct
            root_ledger )
       ~consensus_local_state ~max_length
       ~time_controller:(Block_time.Controller.basic ~logger)
-      ~persistent_root_instance
+      ~persistent_root_instance ~staged_ledger
 
   let clean_up_persistent_root ~frontier =
     let persistent_root_instance = persistent_root_instance frontier in

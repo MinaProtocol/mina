@@ -342,9 +342,12 @@ module Instance = struct
       Full_frontier.create
         ~context:(module Context)
         ~time_controller:t.factory.time_controller
+        ~staged_ledger:root_staged_ledger
         ~root_data:
           { state_hash = root_state_hash
-          ; staged_ledger = root_staged_ledger
+          ; scan_state = Staged_ledger.scan_state root_staged_ledger
+          ; pending_coinbase =
+              Staged_ledger.pending_coinbase_collection root_staged_ledger
           ; protocol_states_for_scan_state =
               List.map protocol_states
                 ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
