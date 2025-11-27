@@ -4,6 +4,8 @@ let Cmd = ./Lib/Cmds.dhall
 
 let Command = ./Command/Base.dhall
 
+let Docker = ./Command/Docker/Type.dhall
+
 let JobSpec = ./Pipeline/JobSpec.dhall
 
 let Pipeline = ./Pipeline/Dsl.dhall
@@ -21,6 +23,8 @@ let PipelineScope = ./Pipeline/Scope.dhall
 let PipelineScopeFilter = ./Pipeline/ScopeFilter.dhall
 
 let Size = ./Command/Size.dhall
+
+let MainlineBranch = ./Pipeline/MainlineBranch.dhall
 
 let prefixCommands =
       [ Cmd.run
@@ -51,8 +55,11 @@ let commands
                   ++  " --tags ${PipelineTag.join requestedTags} "
                   ++  " --filter-mode ${PipelineFilterMode.show filterMode} "
                   ++  " --selection ${PipelineJobSelection.show selection} "
+                  ++  " --mainline-branches ${MainlineBranch.join
+                                                MainlineBranch.Full}"
                   ++  " --jobs ./buildkite/src/gen"
                   ++  " --git-diff-file _computed_diff.txt "
+                  ++  " --debug "
                 )
 
 in      \ ( args
@@ -90,7 +97,12 @@ in      \ ( args
                                                                    args.scopeFilter} ${PipelineJobSelection.capitalName
                                                                                          args.selection}"
                       , key = "cmds"
-                      , target = Size.Dev
+                      , target = Size.Multi
+                      , docker = Some Docker::{
+                        , image =
+                            (./Constants/ContainerImages.dhall).toolchainBase
+                        , environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
+                        }
                       }
                   ]
                 }

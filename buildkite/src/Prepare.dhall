@@ -13,6 +13,8 @@ let Pipeline = ./Pipeline/Dsl.dhall
 
 let Size = ./Command/Size.dhall
 
+let Docker = ./Command/Docker/Type.dhall
+
 let mode = env:BUILDKITE_PIPELINE_MODE as Text ? "Stable"
 
 let selection = env:BUILDKITE_PIPELINE_JOB_SELECTION as Text ? "Triaged"
@@ -44,7 +46,11 @@ let config
               ]
             , label = "Prepare monorepo triage"
             , key = "monorepo-${selection}-${tagFilter}-${scopeFilter}"
-            , target = Size.Dev
+            , target = Size.Multi
+            , docker = Some Docker::{
+              , image = (./Constants/ContainerImages.dhall).toolchainBase
+              , environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
+              }
             }
         ]
       }
