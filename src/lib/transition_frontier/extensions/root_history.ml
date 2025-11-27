@@ -177,7 +177,7 @@ module T = struct
         (* TODO: send full diffs to extensions to avoid extra lookups in frontier *)
         | E (Root_transitioned { new_root; _ }, _) ->
             let state_hash =
-              (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
+              Root_data.Limited.Stable.Latest.state_hash new_root
             in
             let breadcrumb =
               Full_frontier.find frontier state_hash

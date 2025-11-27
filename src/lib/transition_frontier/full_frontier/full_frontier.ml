@@ -139,17 +139,44 @@ let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
   let open Context in
   let open Root_data in
   let transition_receipt_time = None in
-  let validated_transition = root_data.transition in
-  let root_hash = Mina_block.Validated.state_hash validated_transition in
+  let root_block_stable =
+    root_data.block_tag
+    |> State_hash.File_storage.read (module Mina_block.Stable.Latest)
+    |> Or_error.tag ~tag:"Full_frontier.create"
+    |> Or_error.ok_exn
+  in
+  let root_block =
+    (* It's ok to use identity DB because root is a short-lived
+       object: when frontier moves, it will be utilized,
+       and it's just one block in memory, so no concern
+       about excessive RAM usage *)
+    Mina_block.write_all_proofs_to_disk root_block_stable
+      ~signature_kind:Mina_signature_kind.t_DEPRECATED
+      ~proof_cache_db:(Proof_cache_tag.create_identity_db ())
+  in
+  let root_hash = root_data.state_hash in
+  let root_block_with_hashes =
+    { With_hash.data = root_block
+    ; hash =
+        State_hash.State_hashes.
+          { state_hash = root_hash; state_body_hash = None }
+    }
+  in
+  let validated_transition =
+    Mina_block.Validated.unsafe_of_trusted_block
+      ~delta_block_chain_proof:root_data.delta_block_chain_proof
+      (`This_block_is_trusted_to_be_safe root_block_with_hashes)
+  in
   let protocol_states_for_root_scan_state =
     root_data.protocol_states
     |> List.map ~f:(fun s -> (State_hash.With_state_hashes.state_hash s, s))
     |> State_hash.Map.of_alist_exn
   in
   let root_protocol_state =
-    validated_transition |> Mina_block.Validated.forget |> With_hash.data
-    |> Mina_block.header |> Mina_block.Header.protocol_state
+    Mina_block.Stable.Latest.header root_block_stable
+    |> Mina_block.Header.protocol_state
   in
+
   let root_blockchain_state =
     Protocol_state.blockchain_state root_protocol_state
   in
@@ -189,10 +216,13 @@ let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
 let root_data t =
   let open Root_data in
   let root = root t in
-  { transition = Breadcrumb.validated_transition root
+  { state_hash = Breadcrumb.state_hash root
   ; staged_ledger = Breadcrumb.staged_ledger root
   ; protocol_states = State_hash.Map.data t.protocol_states_for_root_scan_state
   ; block_tag = Breadcrumb.block_tag root
+  ; delta_block_chain_proof =
+      Breadcrumb.validated_transition root
+      |> Mina_block.Validated.delta_block_chain_proof
   }
 
 let max_length { max_length; _ } = max_length
@@ -352,13 +382,10 @@ module Util = struct
         protocol_states_for_root_scan_state ~next_root_required_hashes
         ~old_root_state:(Breadcrumb.protocol_state_with_hashes parent)
     in
-    let heir_transition =
-      Breadcrumb.validated_transition heir
-      |> Mina_block.Validated.read_all_proofs_from_disk
-    in
     let new_root_data =
-      Root_data.Limited.Stable.Latest.create ~transition:heir_transition
-        ~scan_state:new_scan_state
+      Root_data.Limited.create
+        ~block_tag:(Breadcrumb.block_tag heir)
+        ~state_hash:heir_hash ~scan_state:new_scan_state
         ~pending_coinbase:
           (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
         ~protocol_states
@@ -663,9 +690,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
   | Root_transitioned { new_root; garbage = Full garbage; _ } ->
-      let new_root_hash =
-        (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
-      in
+      let new_root_hash = Root_data.Limited.Stable.Latest.state_hash new_root in
       let old_root_hash = t.root in
       let new_root_protocol_states =
         Root_data.Limited.Stable.Latest.protocol_states new_root
@@ -991,7 +1016,13 @@ module For_tests = struct
     let root_data =
       let open Root_data in
       let transition, block_tag = Mina_block.genesis ~precomputed_values in
-      { transition; staged_ledger; protocol_states = []; block_tag }
+      { state_hash = Mina_block.Validated.state_hash transition
+      ; delta_block_chain_proof =
+          Mina_block.Validated.delta_block_chain_proof transition
+      ; staged_ledger
+      ; protocol_states = []
+      ; block_tag
+      }
     in
     let persistent_root =
       Persistent_root.create ~logger ~backing_type:Stable_db

@@ -560,11 +560,31 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
           in
           Deferred.return (`Repeat (this_cycle :: previous_cycles))
       | Ok () ->
+          let root_block_with_hash =
+            Mina_block.Validation.block_with_hash new_root
+          in
+          let new_root_state_hash =
+            State_hash.With_state_hashes.state_hash root_block_with_hash
+          in
           (* step 5. Close the old frontier and reload a new one from disk. *)
           let new_root_data : Transition_frontier.Root_data.Limited.t =
-            Transition_frontier.Root_data.Limited.create
-              ~transition:(Mina_block.Validated.lift new_root)
-              ~scan_state ~pending_coinbase ~protocol_states
+            let block =
+              With_hash.data root_block_with_hash
+              |> Mina_block.read_all_proofs_from_disk
+            in
+            (* We're initializing frontier, so there shouldn't be any data preserved at the
+               state hash's multi-key file storage, and root block won't be validated, so there won't
+               be an overwrite *)
+            let block_tag =
+              State_hash.File_storage.write_values_exn new_root_state_hash
+                ~f:(fun writer ->
+                  State_hash.File_storage.write_value writer
+                    (module Mina_block.Stable.Latest)
+                    block )
+            in
+            Transition_frontier.Root_data.Limited.create ~block_tag
+              ~state_hash:new_root_state_hash ~scan_state ~pending_coinbase
+              ~protocol_states
           in
           let%bind () =
             Transition_frontier.Persistent_frontier.reset_database_exn
@@ -575,9 +595,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
           in
           (* TODO: lazy load db in persistent root to avoid unnecessary opens like this *)
           Transition_frontier.Persistent_root.(
-            set_root_state_hash persistent_root
-            @@ Mina_block.Validated.state_hash
-            @@ Mina_block.Validated.lift new_root) ;
+            set_root_state_hash persistent_root new_root_state_hash) ;
           let%map new_frontier =
             let fail msg =
               failwith

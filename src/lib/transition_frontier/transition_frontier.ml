@@ -82,7 +82,8 @@ type Structured_log_events.t += Persisted_frontier_dropped
   [@@deriving register_event { msg = "Persistent frontier dropped" }]
 
 let genesis_root_data ~precomputed_values =
-  let transition, _ = Mina_block.genesis ~precomputed_values in
+  let transition, block_tag = Mina_block.genesis ~precomputed_values in
+  let state_hash = Mina_block.Validated.state_hash transition in
   let constraint_constants = precomputed_values.constraint_constants in
   let scan_state = Staged_ledger.Scan_state.empty ~constraint_constants () in
   (*if scan state is empty the protocol states required is also empty*)
@@ -92,7 +93,7 @@ let genesis_root_data ~precomputed_values =
       (Pending_coinbase.create
          ~depth:constraint_constants.pending_coinbase_depth () )
   in
-  Root_data.Limited.create ~transition ~scan_state ~pending_coinbase
+  Root_data.Limited.create ~block_tag ~state_hash ~scan_state ~pending_coinbase
     ~protocol_states
 
 let load_from_persistence_and_start ~context:(module Context : CONTEXT)
@@ -749,7 +750,8 @@ module For_tests = struct
     in
     let root_data =
       Root_data.Limited.create
-        ~transition:(Breadcrumb.validated_transition root)
+        ~block_tag:(Breadcrumb.block_tag root)
+        ~state_hash:(Breadcrumb.state_hash root)
         ~scan_state:(Breadcrumb.staged_ledger root |> Staged_ledger.scan_state)
         ~pending_coinbase:
           ( Breadcrumb.staged_ledger root
@@ -766,9 +768,7 @@ module For_tests = struct
                precomputed_values.protocol_state_with_hashes ) ) ;
     Async.Thread_safe.block_on_async_exn (fun () ->
         Persistent_root.reset_factory_root_exn persistent_root ~create_root
-          ~root_state_hash:
-            ( Root_data.Limited.transition root_data
-            |> Mina_block.Validated.state_hash ) ) ;
+          ~root_state_hash:(Root_data.Limited.state_hash root_data) ) ;
     let frontier_result =
       Async.Thread_safe.block_on_async_exn (fun () ->
           load_with_max_length ~max_length ~retry_with_fresh_db:false

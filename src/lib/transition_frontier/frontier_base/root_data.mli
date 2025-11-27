@@ -54,7 +54,7 @@ module Limited : sig
     module V4 : sig
       type t
 
-      val hashes : t -> State_hash.State_hashes.Stable.V1.t
+      val state_hash : t -> State_hash.Stable.V1.t
 
       val common : t -> Common.Stable.V3.t
 
@@ -64,15 +64,11 @@ module Limited : sig
            Mina_base.State_hash.With_state_hashes.Stable.V1.t
            list
 
-      val create :
-           transition:Mina_block.Validated.Stable.V2.t
-        -> scan_state:Staged_ledger.Scan_state.Stable.V3.t
-        -> pending_coinbase:Pending_coinbase.Stable.V2.t
-        -> protocol_states:
-             Mina_state.Protocol_state.value
-             State_hash.With_state_hashes.Stable.V1.t
-             list
-        -> t
+      val block_tag :
+           t
+        -> ( State_hash.Stable.V1.t
+           , Mina_block.Stable.V2.t )
+           Multi_key_file_storage.Tag.Stable.V1.t
     end
 
     module V3 : sig
@@ -82,11 +78,11 @@ module Limited : sig
     end
   end]
 
-  type t [@@deriving to_yojson]
+  type t = Stable.Latest.t [@@deriving to_yojson]
 
-  val transition : t -> Mina_block.Validated.t
+  val block_tag : t -> Mina_block.Stable.Latest.t State_hash.File_storage.tag
 
-  val hashes : t -> State_hash.State_hashes.t
+  val state_hash : t -> State_hash.t
 
   val scan_state : t -> Staged_ledger.Scan_state.t
 
@@ -96,7 +92,8 @@ module Limited : sig
     t -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
 
   val create :
-       transition:Mina_block.Validated.t
+       block_tag:Mina_block.Stable.Latest.t State_hash.File_storage.tag
+    -> state_hash:State_hash.t
     -> scan_state:Staged_ledger.Scan_state.t
     -> pending_coinbase:Pending_coinbase.t
     -> protocol_states:
@@ -119,7 +116,7 @@ module Minimal : sig
     module V3 : sig
       type t
 
-      val hash : t -> State_hash.t
+      val state_hash : t -> State_hash.t
 
       val of_limited : common:Common.Stable.V3.t -> State_hash.Stable.V1.t -> t
 
@@ -139,7 +136,7 @@ module Minimal : sig
 
   type t
 
-  val hash : t -> State_hash.t
+  val state_hash : t -> State_hash.t
 
   val scan_state : t -> Staged_ledger.Scan_state.t
 
@@ -149,25 +146,26 @@ module Minimal : sig
 
   val upgrade :
        t
-    -> transition:Mina_block.Validated.t
+    -> block_tag:Mina_block.Stable.Latest.t State_hash.File_storage.tag
     -> protocol_states:
          (Mina_base.State_hash.t * Mina_state.Protocol_state.Value.t) list
     -> Limited.t
 
   val create :
-       hash:State_hash.t
+       state_hash:State_hash.t
     -> scan_state:Staged_ledger.Scan_state.t
     -> pending_coinbase:Pending_coinbase.t
     -> t
 end
 
 type t =
-  { transition : Mina_block.Validated.t
+  { block_tag : Mina_block.Stable.Latest.t Mina_base.State_hash.File_storage.tag
+  ; state_hash : State_hash.t
   ; staged_ledger : Staged_ledger.t
   ; protocol_states :
       Mina_state.Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
       list
-  ; block_tag : Mina_block.Stable.Latest.t Mina_base.State_hash.File_storage.tag
+  ; delta_block_chain_proof : State_hash.t Mina_stdlib.Nonempty_list.t
   }
 
 val minimize : t -> Minimal.t

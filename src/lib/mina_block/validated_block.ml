@@ -14,6 +14,10 @@ module Stable = struct
     let to_latest = ident
 
     let hashes (t, _) = With_hash.hash t
+
+    let header (t, _) = With_hash.data t |> Block.Stable.V2.header
+
+    let block (t, _) = With_hash.data t
   end
 end]
 
