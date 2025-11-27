@@ -46,6 +46,15 @@ module Transaction_with_witness : sig
 
     val create : tag:Tag.t -> Stable.Latest.t -> t
 
+    [%%versioned:
+    module Stable : sig
+      [@@@no_toplevel_latest_type]
+
+      module V1 : sig
+        type nonrec t = t
+      end
+    end]
+
     val statement : t -> Transaction_snark.Statement.t
   end
 
@@ -77,7 +86,12 @@ module Ledger_proof_with_sok_message : sig
   type t = Ledger_proof.t * Sok_message.t
 
   module Tagged : sig
-    type t
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t
+      end
+    end]
 
     val create :
          tag:Proof.t State_hash.Tag.t

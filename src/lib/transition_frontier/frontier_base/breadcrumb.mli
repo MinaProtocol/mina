@@ -118,6 +118,13 @@ val staged_ledger_aux_and_pending_coinbases :
   -> t
   -> Network_types.Staged_ledger_aux_and_pending_coinbases.data_tag option
 
+(** Convert a breadcrumb to a block data
+
+    Will return an exception if called on transition frontier root or
+    a transition that was saved to frontier.
+*)
+val to_block_data_exn : t -> Block_data.Full.t
+
 module For_tests : sig
   val gen :
        ?logger:Logger.t

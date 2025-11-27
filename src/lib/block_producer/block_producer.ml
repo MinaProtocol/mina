@@ -337,6 +337,14 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                   in
                   (witnesses', works') )
             in
+            let scan_state_application_data =
+              { Staged_ledger.Scan_state.Application_data.is_new_stack
+              ; stack_update
+              ; first_pass_ledger_end
+              ; tagged_works
+              ; tagged_witnesses
+              }
+            in
             (* TODO consider skipping verification (i.e. ~skip_verification:true) *)
             let%map.Deferred.Result new_staged_ledger, ledger_proof_opt =
               Staged_ledger.apply_to_scan_state ~logger ~skip_verification:false
@@ -344,8 +352,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 ~previous_pending_coinbase_collection:
                   (Staged_ledger.pending_coinbase_collection staged_ledger)
                 ~previous_scan_state:(Staged_ledger.scan_state staged_ledger)
-                ~constraint_constants ~is_new_stack ~stack_update
-                ~first_pass_ledger_end tagged_works tagged_witnesses
+                ~constraint_constants scan_state_application_data
             in
             (new_staged_ledger, ledger_proof_opt, is_new_stack, pcu_action)
           in

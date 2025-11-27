@@ -48,9 +48,49 @@ module Schema = struct
 
   [@@@warning "-22"]
 
+  module Transition = struct
+    [%%versioned
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
+
+      module V3 = struct
+        type t =
+          | Old_format of Mina_block.Stable.V2.t
+          | New_format of Block_data.Full.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+
+      module V2 = struct
+        type t = Mina_block.Stable.V2.t =
+          { header : Header.Stable.V2.t
+          ; body : Staged_ledger_diff.Body.Stable.V1.t
+          }
+
+        let to_latest : t -> V3.t = fun block -> Old_format block
+      end
+    end]
+
+    let header = function
+      | Stable.Latest.Old_format block ->
+          Mina_block.Stable.V2.header block
+      | New_format { header; _ } ->
+          header
+
+    let to_validated_block ~signature_kind ~proof_cache_db ~state_hash =
+      function
+      | Stable.Latest.Old_format transition ->
+          Result.return
+          @@ Block_data.validated_of_stable ~signature_kind ~proof_cache_db
+               ~state_hash transition
+      | New_format transition ->
+          Block_data.Full.to_validated_block ~signature_kind ~proof_cache_db
+            ~state_hash transition
+  end
+
   type _ t =
     | Db_version : int t
-    | Transition : State_hash.Stable.V1.t -> Mina_block.Stable.V2.t t
+    | Transition : State_hash.Stable.V1.t -> Transition.Stable.V3.t t
     | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
     (* TODO:
        In hard forks, `Root` should be replaced by `(Root_hash, Root_common)`;
@@ -93,7 +133,7 @@ module Schema = struct
     | Db_version ->
         [%bin_type_class: int]
     | Transition _ ->
-        [%bin_type_class: Mina_block.Stable.Latest.t]
+        [%bin_type_class: Transition.Stable.Latest.t]
     | Arcs _ ->
         [%bin_type_class: State_hash.Stable.Latest.t list]
     | Root ->
@@ -351,8 +391,7 @@ let check t ~genesis_state_hash =
       let%bind () = check_version () in
       let%bind root_hash, root_block = check_base () in
       let root_protocol_state =
-        root_block |> Mina_block.Stable.Latest.header
-        |> Mina_block.Header.protocol_state
+        Transition.header root_block |> Mina_block.Header.protocol_state
       in
       let%bind () =
         let persisted_genesis_state_hash =
@@ -363,7 +402,8 @@ let check t ~genesis_state_hash =
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
       let%map () = check_arcs root_hash in
-      root_block |> Mina_block.Stable.Latest.header |> Header.protocol_state
+      Transition.header root_block
+      |> Mina_block.Header.protocol_state
       |> Mina_state.Protocol_state.blockchain_state
       |> Mina_state.Blockchain_state.snarked_ledger_hash )
   |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
@@ -409,23 +449,20 @@ let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
   | _ ->
       Error (`Not_found `Old_root_transition)
 
-let add ~arcs_cache ~transition =
-  let transition = Mina_block.Validated.forget transition in
-  let hash = State_hash.With_state_hashes.state_hash transition in
+let add ~arcs_cache ~state_hash ~transition_data =
   let parent_hash =
-    With_hash.data transition |> Mina_block.header |> Header.protocol_state
-    |> Mina_state.Protocol_state.previous_state_hash
+    transition_data.Block_data.Full.Stable.Latest.header
+    |> Header.protocol_state |> Mina_state.Protocol_state.previous_state_hash
   in
   let parent_arcs = State_hash.Table.find_exn arcs_cache parent_hash in
-  State_hash.Table.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
-  State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
-  let transition_unwrapped =
-    With_hash.data transition |> Mina_block.read_all_proofs_from_disk
-  in
+  State_hash.Table.set arcs_cache ~key:parent_hash
+    ~data:(state_hash :: parent_arcs) ;
+  State_hash.Table.set arcs_cache ~key:state_hash ~data:[] ;
   fun batch ->
-    Batch.set batch ~key:(Transition hash) ~data:transition_unwrapped ;
-    Batch.set batch ~key:(Arcs hash) ~data:[] ;
-    Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
+    Batch.set batch ~key:(Transition state_hash)
+      ~data:(New_format transition_data) ;
+    Batch.set batch ~key:(Arcs state_hash) ~data:[] ;
+    Batch.set batch ~key:(Arcs parent_hash) ~data:(state_hash :: parent_arcs)
 
 let move_root ~old_root_hash ~new_root ~garbage =
   let new_root_hash = new_root.Root_data.state_hash in
@@ -445,29 +482,12 @@ let move_root ~old_root_hash ~new_root ~garbage =
         Batch.remove batch ~key:(Arcs node_hash) )
 
 let get_transition ~signature_kind ~proof_cache_db t hash =
-  let%map transition =
-    get t.db ~key:(Transition hash) ~error:(`Not_found (`Transition hash))
-  in
-  let block =
-    { With_hash.data = transition
-    ; hash =
-        { State_hash.State_hashes.state_hash = hash; state_body_hash = None }
-    }
-  in
-  let parent_hash =
-    block |> With_hash.data |> Mina_block.Stable.Latest.header
-    |> Mina_block.Header.protocol_state
-    |> Mina_state.Protocol_state.previous_state_hash
-  in
-  let cached_block =
-    With_hash.map
-      ~f:(Mina_block.write_all_proofs_to_disk ~signature_kind ~proof_cache_db)
-      block
-  in
-  (* TODO: the delta transition chain proof is incorrect (same behavior the daemon used to have, but we should probably fix this?) *)
-  Mina_block.Validated.unsafe_of_trusted_block
-    ~delta_block_chain_proof:(Mina_stdlib.Nonempty_list.singleton parent_hash)
-    (`This_block_is_trusted_to_be_safe cached_block)
+  (* TODO: consider using a more specific error *)
+  let error = `Not_found (`Transition hash) in
+  let%bind.Result transition_data = get t.db ~key:(Transition hash) ~error in
+  Transition.to_validated_block ~signature_kind ~proof_cache_db ~state_hash:hash
+    transition_data
+  |> Result.map_error ~f:(fun _ -> error)
 
 let get_arcs t hash = get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
 

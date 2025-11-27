@@ -23,6 +23,8 @@ module T = struct
     ; mutable staged_ledger_aux_and_pending_coinbases_cached :
         Network_types.Staged_ledger_aux_and_pending_coinbases.data_tag option
     ; transaction_hashes : Mina_transaction.Transaction_hash.Set.t
+          (* Should be some for non-root *)
+    ; application_data : Staged_ledger.Scan_state.Application_data.t option
     }
   [@@deriving fields]
 
@@ -66,6 +68,7 @@ module T = struct
     ; transaction_hashes =
         command_hashes_of_transition validated_transition
         |> Mina_transaction.Transaction_hash.Set.of_list
+    ; application_data = None
     }
 
   let to_yojson
@@ -78,6 +81,7 @@ module T = struct
       ; block_tag = _
       ; staged_ledger_aux_and_pending_coinbases_cached = _
       ; transaction_hashes
+      ; application_data = _
       } =
     `Assoc
       [ ( "state_hash"
@@ -182,14 +186,30 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
           , `Block_with_validation fully_valid_block
           , `Staged_ledger transitioned_staged_ledger
           , `Accounts_created accounts_created
-          , `Block_serialized block_tag ) ->
+          , `Block_serialized block_tag
+          , `Scan_state_application_data application_data ) ->
           [%log internal] "Create_breadcrumb" ;
+          let validated_transition =
+            Mina_block.Validated.lift fully_valid_block
+          in
           Deferred.Result.return
-            (create
-               ~validated_transition:
-                 (Mina_block.Validated.lift fully_valid_block)
-               ~staged_ledger:transitioned_staged_ledger ~accounts_created
-               ~just_emitted_a_proof ~transition_receipt_time ~block_tag )
+            { T.validated_transition
+            ; staged_ledger = transitioned_staged_ledger
+            ; accounts_created
+            ; just_emitted_a_proof
+            ; transition_receipt_time
+            ; block_tag
+            ; application_data = Some application_data
+            ; staged_ledger_hash =
+                Mina_block.Validated.header validated_transition
+                |> Mina_block.Header.protocol_state
+                |> Protocol_state.blockchain_state
+                |> Blockchain_state.staged_ledger_hash
+            ; staged_ledger_aux_and_pending_coinbases_cached = None
+            ; transaction_hashes =
+                command_hashes_of_transition validated_transition
+                |> Mina_transaction.Transaction_hash.Set.of_list
+            }
       | Error `Invalid_body_reference ->
           let message = "invalid body reference" in
           let%map () =
@@ -367,6 +387,37 @@ let staged_ledger_aux_and_pending_coinbases ~scan_state_protocol_states
           breadcrumb.staged_ledger_aux_and_pending_coinbases_cached <- Some tag ) ;
       res
 
+let to_maps (staged_ledger : Staged_ledger.t) =
+  let ledger = Staged_ledger.ledger staged_ledger in
+  Mina_ledger.Ledger.get_maps ledger
+  |> Mina_ledger.Ledger.Mask_maps.to_stable
+       ~ledger_depth:(Mina_ledger.Ledger.depth ledger)
+
+let to_block_data_exn (breadcrumb : T.t) : Block_data.Full.t =
+  let application_data =
+    match breadcrumb.application_data with
+    | Some application_data ->
+        application_data
+    | None ->
+        failwithf "application_data is not set for breadcrumb %s"
+          (State_hash.to_base58_check @@ state_hash breadcrumb)
+          ()
+  in
+  { Block_data.Full.Stable.Latest.header = header breadcrumb
+  ; block_tag = breadcrumb.block_tag
+  ; delta_block_chain_proof =
+      Mina_block.Validated.delta_block_chain_proof
+        breadcrumb.validated_transition
+  ; staged_ledger_data = (to_maps breadcrumb.staged_ledger, application_data)
+  ; staged_ledger_hash = breadcrumb.staged_ledger_hash
+  ; accounts_created = breadcrumb.accounts_created
+  ; staged_ledger_aux_and_pending_coinbases_cached =
+      breadcrumb.staged_ledger_aux_and_pending_coinbases_cached
+  ; transaction_hashes_unordered =
+      Mina_transaction.Transaction_hash.Set.to_list
+        breadcrumb.transaction_hashes
+  }
+
 module For_tests = struct
   open Currency
   open Signature_lib
@@ -539,14 +590,21 @@ module For_tests = struct
               in
               (witnesses', works') )
         in
+        let scan_state_application_data =
+          { Staged_ledger.Scan_state.Application_data.is_new_stack
+          ; stack_update
+          ; first_pass_ledger_end
+          ; tagged_works
+          ; tagged_witnesses
+          }
+        in
         Staged_ledger.apply_to_scan_state ~logger ~skip_verification:false
           ~log_prefix:"apply_diff" ~ledger:new_ledger
           ~previous_pending_coinbase_collection:
             (Staged_ledger.pending_coinbase_collection parent_staged_ledger)
           ~previous_scan_state:(Staged_ledger.scan_state parent_staged_ledger)
           ~constraint_constants:precomputed_values.constraint_constants
-          ~is_new_stack ~stack_update ~first_pass_ledger_end tagged_works
-          tagged_witnesses
+          scan_state_application_data
       in
       let%bind transitioned_staged_ledger, ledger_proof_opt =
         match%bind ledger_and_proof with

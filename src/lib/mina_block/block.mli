@@ -6,7 +6,11 @@ module Stable : sig
   [@@@no_toplevel_latest_type]
 
   module V2 : sig
-    type t [@@deriving sexp, equal]
+    type t =
+      { header : Header.Stable.V2.t
+      ; body : Staged_ledger_diff.Body.Stable.V1.t
+      }
+    [@@deriving sexp, equal]
 
     val header : t -> Header.Stable.V2.t
 

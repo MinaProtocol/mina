@@ -508,7 +508,8 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   let%bind.Deferred.Result ( transitioned_staged_ledger
                            , proof_opt
                            , accounts_created
-                           , tagged_block ) =
+                           , tagged_block
+                           , scan_state_application_data ) =
     Deferred.Result.map_error ~f:(fun e -> `Staged_ledger_application_failed e)
     @@ let%bind.Deferred.Result ( `Ledger new_ledger
                                 , `Accounts_created accounts_created
@@ -550,6 +551,14 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
              in
              (witnesses', works', block') )
        in
+       let scan_state_application_data =
+         { Staged_ledger.Scan_state.Application_data.is_new_stack
+         ; stack_update
+         ; first_pass_ledger_end
+         ; tagged_works
+         ; tagged_witnesses
+         }
+       in
        let%map.Deferred.Result new_staged_ledger, res_opt =
          let skip_verification =
            [%equal: [ `All | `Proofs ] option] skip_staged_ledger_verification
@@ -560,8 +569,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
            ~previous_pending_coinbase_collection:
              (Staged_ledger.pending_coinbase_collection parent_staged_ledger)
            ~previous_scan_state:(Staged_ledger.scan_state parent_staged_ledger)
-           ~constraint_constants ~is_new_stack ~stack_update
-           ~first_pass_ledger_end tagged_works tagged_witnesses
+           ~constraint_constants scan_state_application_data
        in
        Or_error.iter_error
          ( Staged_ledger.update_scan_state_metrics
@@ -570,7 +578,11 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
            [%log error]
              ~metadata:[ ("error", Error_json.error_to_yojson e) ]
              !"Error updating metrics after applying scan state: $error" ) ;
-       (new_staged_ledger, res_opt, accounts_created, tagged_block)
+       ( new_staged_ledger
+       , res_opt
+       , accounts_created
+       , tagged_block
+       , scan_state_application_data )
   in
   [%log internal] "Diff_applied" ;
   let staged_ledger_hash_opt =
@@ -629,7 +641,8 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
             (t, Unsafe.set_valid_staged_ledger_diff validation)
         , `Staged_ledger transitioned_staged_ledger
         , `Accounts_created accounts_created
-        , `Block_serialized tagged_block )
+        , `Block_serialized tagged_block
+        , `Scan_state_application_data scan_state_application_data )
   | Error errors ->
       Error (`Invalid_staged_ledger_diff errors)
 

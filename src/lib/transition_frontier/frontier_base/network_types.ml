@@ -2,7 +2,17 @@ open Core_kernel
 open Mina_base
 
 module Tag_or_data = struct
-  type 'a t = Tag of 'a State_hash.File_storage.tag | Data of 'a
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'a t =
+        | Tag of
+            (State_hash.Stable.V1.t, 'a) Multi_key_file_storage.Tag.Stable.V1.t
+        | Data of 'a
+
+      let to_latest = Fn.id
+    end
+  end]
 end
 
 module Make' (Data : Binable.S) = struct
@@ -67,7 +77,7 @@ module Staged_ledger_aux_and_pending_coinbases = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Data.Stable.V1.t Tag_or_data.t
+      type t = Data.Stable.Latest.t Tag_or_data.t
 
       let to_latest = Fn.id
 
