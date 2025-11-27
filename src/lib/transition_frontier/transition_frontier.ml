@@ -506,6 +506,7 @@ let add_breadcrumb_exn t breadcrumb =
     Extensions.notify t.extensions ~logger ~frontier:t.full_frontier
       ~diffs_with_mutants
   in
+  (* TODO: Drop validated transition from the block *)
   [%log internal] "Notify_frontier_extensions_done" ;
   [%log internal] "Add_breadcrumb_to_frontier_done"
 

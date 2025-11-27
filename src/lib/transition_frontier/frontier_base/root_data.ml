@@ -68,6 +68,7 @@ module Limited = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    (* TODO replace block with block tag *)
     module V4 = struct
       type t =
         { transition : Mina_block.Validated.Stable.V2.t
