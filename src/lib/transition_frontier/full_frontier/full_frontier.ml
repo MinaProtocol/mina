@@ -168,7 +168,7 @@ let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
       (`This_block_is_trusted_to_be_safe root_block_with_hashes)
   in
   let protocol_states_for_root_scan_state =
-    root_data.protocol_states
+    root_data.protocol_states_for_scan_state
     |> List.map ~f:(fun s -> (State_hash.With_state_hashes.state_hash s, s))
     |> State_hash.Map.of_alist_exn
   in
@@ -218,11 +218,13 @@ let root_data t =
   let root = root t in
   { state_hash = Breadcrumb.state_hash root
   ; staged_ledger = Breadcrumb.staged_ledger root
-  ; protocol_states = State_hash.Map.data t.protocol_states_for_root_scan_state
+  ; protocol_states_for_scan_state =
+      State_hash.Map.data t.protocol_states_for_root_scan_state
   ; block_tag = Breadcrumb.block_tag root
   ; delta_block_chain_proof =
       Breadcrumb.validated_transition root
       |> Mina_block.Validated.delta_block_chain_proof
+  ; protocol_state = Breadcrumb.protocol_state root
   }
 
 let max_length { max_length; _ } = max_length
@@ -376,7 +378,7 @@ module Util = struct
       Staged_ledger.Scan_state.required_state_hashes new_scan_state
       |> State_hash.Set.to_list
     in
-    let protocol_states =
+    let protocol_states_for_scan_state =
       Protocol_states_for_root_scan_state
       .protocol_states_for_next_root_scan_state
         protocol_states_for_root_scan_state ~next_root_required_hashes
@@ -388,7 +390,8 @@ module Util = struct
         ~state_hash:heir_hash ~scan_state:new_scan_state
         ~pending_coinbase:
           (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
-        ~protocol_states
+        ~protocol_states_for_scan_state
+        ~protocol_state:(Breadcrumb.protocol_state heir)
     in
     let just_emitted_a_proof = Breadcrumb.just_emitted_a_proof heir in
     { Diff.Root_transition.new_root = new_root_data
@@ -693,7 +696,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let new_root_hash = Root_data.Limited.state_hash new_root in
       let old_root_hash = t.root in
       let new_root_protocol_states =
-        Root_data.Limited.protocol_states new_root
+        Root_data.Limited.protocol_states_for_scan_state new_root
       in
       [%log' internal t.logger] "Move_frontier_root" ;
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage
@@ -1020,8 +1023,11 @@ module For_tests = struct
       ; delta_block_chain_proof =
           Mina_block.Validated.delta_block_chain_proof transition
       ; staged_ledger
-      ; protocol_states = []
+      ; protocol_states_for_scan_state = []
       ; block_tag
+      ; protocol_state =
+          Mina_block.Validated.header transition
+          |> Mina_block.Header.protocol_state
       }
     in
     let persistent_root =

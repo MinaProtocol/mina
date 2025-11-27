@@ -498,7 +498,8 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
         }
       in
       `Repeat (this_cycle :: previous_cycles)
-  | Ok (scan_state, pending_coinbase, new_root, protocol_states) -> (
+  | Ok (scan_state, pending_coinbase, new_root, protocol_states_for_scan_state)
+    -> (
       let%bind () =
         Trust_system.(
           record t.trust_system logger sender
@@ -584,7 +585,10 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
             in
             Transition_frontier.Root_data.Limited.create ~block_tag
               ~state_hash:new_root_state_hash ~scan_state ~pending_coinbase
-              ~protocol_states
+              ~protocol_states_for_scan_state
+              ~protocol_state:
+                ( Mina_block.Stable.Latest.header block
+                |> Mina_block.Header.protocol_state )
           in
           let%bind () =
             Transition_frontier.Persistent_frontier.reset_database_exn

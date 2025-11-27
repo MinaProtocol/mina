@@ -256,8 +256,8 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
             in
             ( ( breadcrumb
               , Transition_frontier.Util.to_protocol_states_map_exn
-                @@ Root_data.Limited.protocol_states @@ root_transition.new_root
-              )
+                @@ Root_data.Limited.protocol_states_for_scan_state
+                     root_transition.new_root )
             , res ) )
       in
       [%log info] "Generated $count transition diffs"
