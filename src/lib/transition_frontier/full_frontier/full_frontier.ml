@@ -878,9 +878,12 @@ let update_metrics_with_diff (type mutant)
         Gauge.set Transition_frontier.empty_blocks_at_best_tip
           (Int.to_float (empty_blocks_at_best_tip t)))
 
-let lighten t state_hash =
+let lighten ?retain_application_data t state_hash =
   let f node =
-    { node with Node.breadcrumb = Breadcrumb.lighten node.Node.breadcrumb }
+    { node with
+      Node.breadcrumb =
+        Breadcrumb.lighten ?retain_application_data node.Node.breadcrumb
+    }
   in
   Hashtbl.change t.table state_hash ~f:(Option.map ~f)
 

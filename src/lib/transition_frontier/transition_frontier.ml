@@ -109,7 +109,7 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
     ~verifier ~consensus_local_state ~max_length ~persistent_root
     ~persistent_root_instance ~persistent_frontier ~persistent_frontier_instance
     ~catchup_mode ?max_frontier_depth ?(set_best_tip = true)
-    ignore_consensus_local_state =
+    ?retain_application_data ignore_consensus_local_state =
   let open Context in
   let open Deferred.Result.Let_syntax in
   let root_identifier =
@@ -151,7 +151,8 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
         ~root_ledger:
           (Persistent_root.Instance.snarked_ledger persistent_root_instance)
         ~consensus_local_state ~ignore_consensus_local_state
-        ~persistent_root_instance ?max_frontier_depth ()
+        ~persistent_root_instance ?max_frontier_depth ?retain_application_data
+        ()
     with
     | Error `Sync_cannot_be_running ->
         Error (`Failure "sync job is already running on persistent frontier")
@@ -215,6 +216,7 @@ let rec load_with_max_length :
     -> persistent_frontier:Persistent_frontier.t
     -> catchup_mode:[ `Super ]
     -> ?set_best_tip:bool
+    -> ?retain_application_data:bool
     -> unit
     -> ( t
        , [> `Bootstrap_required
@@ -225,7 +227,7 @@ let rec load_with_max_length :
  fun ~context:(module Context : CONTEXT) ~max_length
      ?(retry_with_fresh_db = true) ?max_frontier_depth ~verifier
      ~consensus_local_state ~persistent_root ~persistent_frontier ~catchup_mode
-     ?set_best_tip () ->
+     ?set_best_tip ?retain_application_data () ->
   let open Context in
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
@@ -257,7 +259,7 @@ let rec load_with_max_length :
             ~verifier ~consensus_local_state ~max_length ~persistent_root
             ~persistent_root_instance ~catchup_mode ~persistent_frontier
             ~persistent_frontier_instance ?max_frontier_depth ?set_best_tip
-            ignore_consensus_local_state
+            ?retain_application_data ignore_consensus_local_state
         with
         | Ok _ as result ->
             [%str_log trace] Persisted_frontier_loaded ;
@@ -362,7 +364,8 @@ let rec load_with_max_length :
         load_with_max_length
           ~context:(module Context)
           ~max_length ~verifier ~consensus_local_state ~persistent_root
-          ~persistent_frontier ~retry_with_fresh_db:false ~catchup_mode ()
+          ~persistent_frontier ~retry_with_fresh_db:false ~catchup_mode
+          ?retain_application_data ()
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -390,8 +393,9 @@ let rec load_with_max_length :
           return res )
 
 let load ?(retry_with_fresh_db = true) ?max_frontier_depth ?set_best_tip
-    ~context:(module Context : CONTEXT) ~verifier ~consensus_local_state
-    ~persistent_root ~persistent_frontier ~catchup_mode () =
+    ?retain_application_data ~context:(module Context : CONTEXT) ~verifier
+    ~consensus_local_state ~persistent_root ~persistent_frontier ~catchup_mode
+    () =
   let open Context in
   O1trace.thread "transition_frontier_load" (fun () ->
       let max_length =
@@ -402,7 +406,7 @@ let load ?(retry_with_fresh_db = true) ?max_frontier_depth ?set_best_tip
         ~context:(module Context)
         ~max_length ~retry_with_fresh_db ?max_frontier_depth ~verifier
         ~consensus_local_state ~persistent_root ~persistent_frontier
-        ~catchup_mode ?set_best_tip () )
+        ~catchup_mode ?set_best_tip () ?retain_application_data )
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
@@ -428,6 +432,10 @@ let close ~loc
   in
   Persistent_root.Instance.close persistent_root_instance ;
   Ivar.fill_if_empty closed ()
+
+let with_persistent_frontier_instance_exn t ~f =
+  if Option.is_none (Ivar.peek t.closed) then f t.persistent_frontier_instance
+  else failwith "Transition frontier is closed"
 
 let closed t = Ivar.read t.closed
 

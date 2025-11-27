@@ -114,7 +114,7 @@ val staged_ledger_aux_and_pending_coinbases :
 val to_block_data_exn : t -> Block_data.Full.t
 
 (** Convert a full breadcrumb to a lite breadcrumb *)
-val lighten : t -> t
+val lighten : ?retain_application_data:bool -> t -> t
 
 (** Get the validated transition from a breadcrumb.
 

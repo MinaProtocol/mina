@@ -432,7 +432,7 @@ let to_block_data_exn (breadcrumb : T.t) : Block_data.Full.t =
   ; command_stats = command_stats breadcrumb
   }
 
-let lighten (breadcrumb : T.t) : T.t =
+let lighten ?(retain_application_data = false) (breadcrumb : T.t) : T.t =
   match breadcrumb.T.validated_transition with
   | Full validated_transition ->
       { breadcrumb with
@@ -445,7 +445,9 @@ let lighten (breadcrumb : T.t) : T.t =
             ; delta_block_chain_proof = delta_block_chain_proof breadcrumb
             ; command_stats = command_stats breadcrumb
             }
-      ; application_data = None
+      ; application_data =
+          (let%bind.Option () = Option.some_if retain_application_data () in
+           breadcrumb.application_data )
       }
   | Lite _ ->
       breadcrumb

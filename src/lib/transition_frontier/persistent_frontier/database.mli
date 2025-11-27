@@ -102,6 +102,12 @@ val get_transition :
      , [> `Not_found of [> `Transition of State_hash.t ] ] )
      Result.t
 
+val set_transition :
+     state_hash:State_hash.t
+  -> transition_data:Block_data.Full.t
+  -> batch_t
+  -> unit
+
 val get_arcs :
      t
   -> State_hash.t
