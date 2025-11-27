@@ -175,6 +175,8 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       ~epoch_ledger_backing_type:Stable_db
       Signature_lib.Public_key.Compressed.Set.empty
   in
+  let rss_before = Mina_stdlib_unix.File_system.read_rss_kb None in
+  let start = Time.now () in
   (* TODO loading of frontier is redundant unless fixing is needed *)
   (* Load transition frontier using the standard API *)
   let%bind frontier =
@@ -206,6 +208,19 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
     | Ok f ->
         f
   in
+  let rss_after = Mina_stdlib_unix.File_system.read_rss_kb None in
+  let elapsed = Time.diff (Time.now ()) start in
+  [%log info]
+    "Loaded transition frontier of %d breadcrumbs in $elapsed seconds with RSS \
+     $rss_after (started with $rss_before)"
+    (Transition_frontier.all_breadcrumbs frontier |> List.length)
+    ~metadata:
+      [ ("elapsed", `Float (Time.Span.to_sec elapsed))
+      ; ( "rss_after"
+        , Option.value_map ~default:`Null rss_after ~f:(fun x -> `Float x) )
+      ; ( "rss_before"
+        , Option.value_map ~default:`Null rss_before ~f:(fun x -> `Float x) )
+      ] ;
   let frontier_root_hash =
     Transition_frontier.root frontier |> Breadcrumb.state_hash
   in
