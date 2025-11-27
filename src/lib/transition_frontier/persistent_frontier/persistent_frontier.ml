@@ -271,7 +271,7 @@ module Instance = struct
     let%bind root, root_transition, best_tip, protocol_states, root_hash =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
-      let root_hash = Root_data.Minimal.Stable.Latest.hash root in
+      let root_hash = Root_data.Minimal.Stable.Latest.state_hash root in
       let%bind root_transition =
         Database.get_transition t.db ~signature_kind ~proof_cache_db root_hash
       in
@@ -302,6 +302,7 @@ module Instance = struct
       | Ok staged_ledger ->
           Ok staged_ledger
     in
+    let root_state_hash = Root_data.Minimal.Stable.Latest.state_hash root in
     (* TODO remove the hack *)
     let root_block_tag =
       State_hash.File_storage.write_values_exn (Lazy.force temp_state_hash)
@@ -317,12 +318,14 @@ module Instance = struct
         ~context:(module Context)
         ~time_controller:t.factory.time_controller
         ~root_data:
-          { transition = root_transition
+          { state_hash = root_state_hash
           ; staged_ledger = root_staged_ledger
           ; protocol_states =
               List.map protocol_states
                 ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
           ; block_tag = root_block_tag
+          ; delta_block_chain_proof =
+              Mina_block.Validated.delta_block_chain_proof root_transition
           }
         ~root_ledger:(Root_ledger.as_unmasked root_ledger)
         ~consensus_local_state ~max_length ~persistent_root_instance
@@ -400,15 +403,9 @@ let with_instance_exn t ~f =
   x
 
 let reset_database_exn t ~root_data ~genesis_state_hash =
-  let open Root_data.Limited in
-  let open Deferred.Let_syntax in
-  let root_transition = transition root_data in
+  let root_state_hash = Root_data.Limited.state_hash root_data in
   [%log' info t.logger]
-    ~metadata:
-      [ ( "state_hash"
-        , State_hash.to_yojson
-          @@ Mina_block.Validated.state_hash root_transition )
-      ]
+    ~metadata:[ ("state_hash", State_hash.to_yojson root_state_hash) ]
     "Resetting transition frontier database to new root" ;
   let%bind () = destroy_database_exn t in
   with_instance_exn t ~f:(fun instance ->

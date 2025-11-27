@@ -62,17 +62,10 @@ let apply_root_transitions ~logger ~db diffs =
               | Diff.Lite.E.E
                   (Diff.Root_transitioned
                     { new_root; garbage = Lite garbage; _ } ) ->
-                  let parent_hash =
-                    Root_data.Limited.Stable.Latest.transition new_root
-                    |> Mina_block.Validated.Stable.Latest.header
-                    |> Mina_block.Header.protocol_state
-                    |> Mina_state.Protocol_state.previous_state_hash
-                  in
-                  assert (State_hash.equal parent_hash old_root_hash) ;
                   Transition_frontier.Persistent_frontier.Database.move_root
                     ~old_root_hash ~new_root ~garbage batch ;
                   (* Return new root hash for next iteration *)
-                  (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
+                  Root_data.Limited.Stable.Latest.state_hash new_root
               | _ ->
                   failwith "Expected Root_transitioned diff" )
           : State_hash.t )

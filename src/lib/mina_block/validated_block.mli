@@ -10,6 +10,8 @@ module Stable : sig
     val hashes : t -> State_hash.State_hashes.Stable.V1.t
 
     val header : t -> Header.Stable.V2.t
+
+    val block : t -> Block.Stable.V2.t
   end
 end]
 

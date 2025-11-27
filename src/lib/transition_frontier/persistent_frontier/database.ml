@@ -283,7 +283,7 @@ let get_root t =
       | Ok root ->
           (* automatically split Root into (Root_hash, Root_common) *)
           Batch.with_batch t.db ~f:(fun batch ->
-              let hash = Root_data.Minimal.Stable.Latest.hash root in
+              let hash = Root_data.Minimal.Stable.Latest.state_hash root in
               let common = Root_data.Minimal.Stable.Latest.common root in
               Batch.remove batch ~key:Root ;
               Batch.set batch ~key:Root_hash ~data:hash ;
@@ -298,7 +298,7 @@ let get_root_hash t =
   | Ok hash ->
       Ok hash
   | Error _ ->
-      Result.map ~f:Root_data.Minimal.Stable.Latest.hash (get_root t)
+      Result.map ~f:Root_data.Minimal.Stable.Latest.state_hash (get_root t)
 
 (* TODO: check that best tip is connected to root *)
 (* TODO: check for garbage *)
@@ -370,20 +370,19 @@ let check t ~genesis_state_hash =
   |> Result.join
 
 let initialize t ~root_data =
-  let root_state_hash, root_transition =
-    let t =
-      Mina_block.Validated.forget (Root_data.Limited.transition root_data)
-    in
-    ( State_hash.With_state_hashes.state_hash t
-    , State_hash.With_state_hashes.data t )
+  let root_state_hash = Root_data.Limited.state_hash root_data in
+  let root_block =
+    (* TODO preserve block tags in frontier *)
+    Root_data.Limited.block_tag root_data
+    |> State_hash.File_storage.read (module Mina_block.Stable.Latest)
+    |> Or_error.ok_exn
   in
-  let root_transition = Mina_block.read_all_proofs_from_disk root_transition in
   [%log' trace t.logger]
     ~metadata:[ ("root_data", Root_data.Limited.to_yojson root_data) ]
     "Initializing persistent frontier database with $root_data" ;
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;
-      Batch.set batch ~key:(Transition root_state_hash) ~data:root_transition ;
+      Batch.set batch ~key:(Transition root_state_hash) ~data:root_block ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
       Batch.set batch ~key:Root_hash ~data:root_state_hash ;
       Batch.set batch ~key:Root_common
@@ -436,9 +435,7 @@ let add ~arcs_cache ~transition =
     Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
 let move_root ~old_root_hash ~new_root ~garbage =
-  let new_root_hash =
-    (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
-  in
+  let new_root_hash = Root_data.Limited.Stable.Latest.state_hash new_root in
   fun batch ->
     Batch.remove batch ~key:Root ;
     Batch.set batch ~key:Root_hash ~data:new_root_hash ;

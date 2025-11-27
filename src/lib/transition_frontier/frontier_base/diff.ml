@@ -194,7 +194,7 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
         `Assoc
           [ ( "new_root"
             , State_hash.to_yojson
-                (Root_data.Limited.Stable.Latest.hashes new_root).state_hash )
+                (Root_data.Limited.Stable.Latest.state_hash new_root) )
           ; ("garbage", `List (List.map ~f:State_hash.to_yojson garbage_hashes))
           ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
           ]
