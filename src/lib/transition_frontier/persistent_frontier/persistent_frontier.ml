@@ -391,6 +391,7 @@ module Instance = struct
         apply_diff ~logger ~frontier ~extensions ~ignore_consensus_local_state
           ~root_ledger (E (New_node (Full breadcrumb)))
       in
+      Full_frontier.lighten frontier state_hash ;
       [%log internal] "Breadcrumb_integrated" ;
       breadcrumb
     in

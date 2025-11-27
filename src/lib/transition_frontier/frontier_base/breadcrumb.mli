@@ -51,14 +51,6 @@ val build :
      Result.t
      Deferred.t
 
-val command_hashes : t -> Mina_transaction.Transaction_hash.t list
-
-val valid_commands_hashed :
-     t
-  -> Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
-     With_status.t
-     list
-
 val contains_transaction_by_hash :
   t -> Mina_transaction.Transaction_hash.t -> bool
 
@@ -66,13 +58,7 @@ val header : t -> Mina_block.Header.t
 
 val command_stats : t -> Command_stats.t
 
-val validated_transition : t -> Mina_block.Validated.t
-
 val block_tag : t -> Mina_block.Stable.Latest.t State_hash.File_storage.tag
-
-val block_with_hash : t -> Mina_block.with_hash
-
-val block : t -> Mina_block.t
 
 val staged_ledger : t -> Staged_ledger.t
 
@@ -108,6 +94,8 @@ val staged_ledger_hash : t -> Staged_ledger_hash.t
     For convenience of implementation, it's by definition an empty list for the root *)
 val accounts_created : t -> Account_id.t list
 
+val delta_block_chain_proof : t -> State_hash.t Mina_stdlib.Nonempty_list.t
+
 val staged_ledger_aux_and_pending_coinbases_cached :
   t -> Network_types.Staged_ledger_aux_and_pending_coinbases.data_tag option
 
@@ -124,6 +112,55 @@ val staged_ledger_aux_and_pending_coinbases :
     a transition that was saved to frontier.
 *)
 val to_block_data_exn : t -> Block_data.Full.t
+
+(** Convert a full breadcrumb to a lite breadcrumb *)
+val lighten : t -> t
+
+(** Get the validated transition from a breadcrumb.
+
+    Caution: operation is expensive if called on a lite
+    breadcrumb (and can throw an exception on reading from
+    multi-key file storage for block).
+*)
+val validated_transition : t -> Mina_block.Validated.t
+
+(** Get the block with hash from a breadcrumb.
+
+    Caution: operation is expensive if called on a lite
+    breadcrumb (and can throw an exception on reading from
+    multi-key file storage for block).
+*)
+val block_with_hash : t -> Mina_block.with_hash
+
+(** Get the block from a breadcrumb.
+
+    Caution: operation is expensive if called on a lite
+    breadcrumb (and can throw an exception on reading from
+    multi-key file storage for block).
+*)
+val block : t -> Mina_block.t
+
+(** Get the command hashes from a breadcrumb
+    (in order of transaction appearance in block).
+
+    Caution: operation is expensive if called on a lite
+    breadcrumb (and can throw an exception on reading from
+    multi-key file storage for block).
+*)
+val command_hashes : t -> Mina_transaction.Transaction_hash.t list
+
+(** Get the valid commands from a breadcrumb along with their hashes
+    (in order of transaction appearance in block).
+
+    Caution: operation is expensive if called on a lite
+    breadcrumb (and can throw an exception on reading from
+    multi-key file storage for block).
+*)
+val valid_commands_hashed :
+     t
+  -> Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
+     With_status.t
+     list
 
 module For_tests : sig
   val gen :
