@@ -51,6 +51,7 @@ esac
 
 MINA_DEB_NAME="mina-berkeley"
 MINA_DEVNET_DEB_NAME="mina-devnet"
+MINA_MESA_DEB_NAME="mina-mesa"
 DUNE_PROFILE="${DUNE_PROFILE}"
 DEB_SUFFIX=""
 
@@ -63,6 +64,7 @@ case "${DUNE_PROFILE}" in
     _SUFFIX=${DUNE_PROFILE//_/-}
     DEB_SUFFIX="${_SUFFIX}"
     MINA_DEB_NAME="${MINA_DEB_NAME}-${DEB_SUFFIX}"
+    MINA_MESA_DEB_NAME="${MINA_MESA_DEB_NAME}-${DEB_SUFFIX}"
     MINA_DEVNET_DEB_NAME="${MINA_DEVNET_DEB_NAME}-${DEB_SUFFIX}"
     ;;
 esac
@@ -72,6 +74,7 @@ esac
 if [[ -v DUNE_INSTRUMENT_WITH ]]; then
     INSTRUMENTED_SUFFIX=instrumented
     MINA_DEB_NAME="${MINA_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
+    MINA_MESA_DEB_NAME="${MINA_MESA_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
     DEB_SUFFIX="${DEB_SUFFIX}-${INSTRUMENTED_SUFFIX}"
 fi
 
@@ -429,6 +432,31 @@ build_rosetta_berkeley_deb() {
 }
 ## END BERKELEY PACKAGE ##
 
+## ROSETTA MESA PACKAGE ##
+
+#
+# Builds mina-rosetta-mesa package for Mesa testnet Rosetta API
+#
+# Output: mina-rosetta-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}
+#
+# Rosetta API implementation for Mesa testnet with testnet signature binaries.
+#
+build_rosetta_mesa_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building mesa rosetta deb"
+
+  create_control_file mina-rosetta-mesa "${SHARED_DEPS}" \
+    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_configs "testnet"
+
+  build_deb mina-rosetta-mesa
+}
+## END MESA PACKAGE ##
+
+
 ## MAINNET PACKAGE ##
 
 #
@@ -484,6 +512,38 @@ build_daemon_devnet_deb() {
   build_deb "${MINA_DEVNET_DEB_NAME}"
 }
 ## END DEVNET PACKAGE ##
+
+## MESA PACKAGE ##
+
+#
+# Builds mesa daemon package with profile-aware naming
+#
+# Output: ${MINA_MESA_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Where MINA_MESA_DEB_NAME can be:
+#   - "mina-mesa" (default)
+#   - "mina-mesa-lightnet" (if DUNE_PROFILE=lightnet)
+#   - "mina-mesa-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#   - "mina-mesa-lightnet-instrumented" (both conditions)
+#
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Mesa daemon with testnet signatures and mesa genesis ledger as default.
+# Package name includes suffixes for different profiles and instrumentation.
+#
+build_daemon_mesa_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building testnet signatures deb without keys:"
+
+  create_control_file "${MINA_MESA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon for the Mesa Network' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_configs mesa testnet 'seed-lists/mesa_seeds.txt'
+
+  build_deb "${MINA_MESA_DEB_NAME}"
+}
+## END MESA PACKAGE ##
+
 
 ## MAINNET LEGACY PACKAGE ##
 
@@ -788,6 +848,37 @@ build_archive_berkeley_deb () {
 
 }
 ## END ARCHIVE PACKAGE ##
+
+## ARCHIVE MESA PACKAGE ##
+
+#
+# Builds Mesa archive package with profile-aware naming
+#
+# Output: mina-archive-mesa${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Where DEB_SUFFIX can be:
+#   - "" (empty, default)
+#   - "-lightnet" (if DUNE_PROFILE=lightnet)
+#   - "-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#   - "-lightnet-instrumented" (both conditions)
+#
+# Dependencies: ${ARCHIVE_DEPS}
+#
+# Archive node package for Mesa with suffix-aware naming for different profiles.
+#
+build_archive_mesa_deb () {
+  ARCHIVE_DEB=mina-archive-mesa${DEB_SUFFIX}
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive mesa deb"
+
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
+ Compatible with Mina Daemon'
+
+  copy_common_archive_configs "$ARCHIVE_DEB"
+
+}
+## END MESA PACKAGE ##
+
 
 ## ARCHIVE MAINNET PACKAGE ##
 
