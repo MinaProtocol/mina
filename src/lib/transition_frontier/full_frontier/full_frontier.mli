@@ -75,6 +75,8 @@ val common_ancestor :
      , [ `Parent_not_found of State_hash.t * [ `Parent of State_hash.t ] ] )
      Result.t
 
+val lighten : t -> State_hash.t -> unit
+
 module Util : sig
   (** given an heir, calculate the diff that will transition
       the root to that heir (assuming parent is the root) *)

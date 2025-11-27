@@ -518,6 +518,7 @@ let add_breadcrumb_exn t breadcrumb =
   in
   (* TODO: Drop validated transition from the block *)
   [%log internal] "Notify_frontier_extensions_done" ;
+  Full_frontier.lighten t.full_frontier state_hash ;
   [%log internal] "Add_breadcrumb_to_frontier_done"
 
 (* proxy full frontier functions *)
@@ -772,9 +773,7 @@ module For_tests = struct
           |> Staged_ledger.pending_coinbase_collection
       ; protocol_states_for_scan_state
       ; protocol_state = Breadcrumb.protocol_state root
-      ; delta_block_chain_proof =
-          Mina_block.Validated.delta_block_chain_proof
-            (Breadcrumb.validated_transition root)
+      ; delta_block_chain_proof = Breadcrumb.delta_block_chain_proof root
       }
     in
     let%map persistent_root, persistent_frontier =

@@ -222,9 +222,7 @@ let root_data t =
   ; protocol_states_for_scan_state =
       State_hash.Map.data t.protocol_states_for_root_scan_state
   ; block_tag = Breadcrumb.block_tag root
-  ; delta_block_chain_proof =
-      Breadcrumb.validated_transition root
-      |> Mina_block.Validated.delta_block_chain_proof
+  ; delta_block_chain_proof = Breadcrumb.delta_block_chain_proof root
   ; protocol_state = Breadcrumb.protocol_state root
   }
 
@@ -393,9 +391,7 @@ module Util = struct
           Staged_ledger.pending_coinbase_collection heir_staged_ledger
       ; protocol_states_for_scan_state
       ; protocol_state = Breadcrumb.protocol_state heir
-      ; delta_block_chain_proof =
-          Breadcrumb.validated_transition heir
-          |> Mina_block.Validated.delta_block_chain_proof
+      ; delta_block_chain_proof = Breadcrumb.delta_block_chain_proof heir
       }
     in
     let just_emitted_a_proof = Breadcrumb.just_emitted_a_proof heir in
@@ -881,6 +877,12 @@ let update_metrics_with_diff (type mutant)
           (Mina_numbers.Length.to_int height |> Int.to_float) ;
         Gauge.set Transition_frontier.empty_blocks_at_best_tip
           (Int.to_float (empty_blocks_at_best_tip t)))
+
+let lighten t state_hash =
+  let f node =
+    { node with Node.breadcrumb = Breadcrumb.lighten node.Node.breadcrumb }
+  in
+  Hashtbl.change t.table state_hash ~f:(Option.map ~f)
 
 let apply_diffs ({ context = (module Context); _ } as t) diffs
     ~enable_epoch_ledger_sync ~has_long_catchup_job =
