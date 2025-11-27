@@ -158,9 +158,35 @@ module Instance = struct
 
   let get_root_transition ~signature_kind ~proof_cache_db t =
     let open Result.Let_syntax in
-    Database.get_root_hash t.db
-    >>= Database.get_transition t.db ~signature_kind ~proof_cache_db
-    |> Result.map_error ~f:Database.Error.message
+    let%bind root =
+      Database.get_root t.db |> Result.map_error ~f:Database.Error.message
+    in
+    let root_hash = Root_data.Minimal.state_hash root in
+    match Root_data.Minimal.block_data_opt root with
+    | None ->
+        Database.get_transition t.db ~signature_kind ~proof_cache_db root_hash
+        |> Result.map_error ~f:Database.Error.message
+    | Some { block_tag; delta_block_chain_proof; _ } ->
+        let%map block_stable =
+          State_hash.File_storage.read
+            (module Mina_block.Stable.Latest)
+            block_tag
+          (* TODO consider using a more specific error *)
+          |> Result.map_error ~f:(fun e ->
+                 Error.(tag ~tag:"get_root_transition" e |> to_string_mach) )
+        in
+        let block =
+          Mina_block.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+            block_stable
+        in
+        Mina_block.Validated.unsafe_of_trusted_block ~delta_block_chain_proof
+          (`This_block_is_trusted_to_be_safe
+            { With_hash.data = block
+            ; hash =
+                { State_hash.State_hashes.state_hash = root_hash
+                ; state_body_hash = None
+                }
+            } )
 
   let fast_forward t target_root :
       (unit, [> `Failure of string | `Bootstrap_required ]) Result.t =

@@ -371,19 +371,12 @@ let check t ~genesis_state_hash =
 
 let initialize t ~root_data =
   let root_state_hash = root_data.Root_data.state_hash in
-  let root_block =
-    (* TODO preserve block tags in frontier *)
-    root_data.block_tag
-    |> State_hash.File_storage.read (module Mina_block.Stable.Latest)
-    |> Or_error.ok_exn
-  in
   let root_common = Root_data.to_common root_data in
   [%log' trace t.logger]
     ~metadata:[ ("root_data", State_hash.to_yojson root_state_hash) ]
     "Initializing persistent frontier database with $root_data" ;
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;
-      Batch.set batch ~key:(Transition root_state_hash) ~data:root_block ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
       Batch.set batch ~key:Root_hash ~data:root_state_hash ;
       Batch.set batch ~key:Root_common ~data:root_common ;
