@@ -50,7 +50,8 @@ val create : logger:Logger.t -> directory:string -> t
 val close : t -> unit
 
 val check :
-     t
+     ?check_arcs:bool
+  -> t
   -> genesis_state_hash:State_hash.t
   -> ( Frozen_ledger_hash.t
      , [> `Not_initialized

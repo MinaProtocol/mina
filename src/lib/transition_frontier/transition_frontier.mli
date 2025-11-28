@@ -69,6 +69,7 @@ val load :
   -> ?max_frontier_depth:int
   -> ?set_best_tip:bool
   -> ?retain_application_data:bool
+  -> ?check_arcs:bool
   -> context:(module CONTEXT)
   -> verifier:Verifier.t
   -> consensus_local_state:Consensus.Data.Local_state.t
