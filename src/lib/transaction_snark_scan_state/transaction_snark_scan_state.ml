@@ -1012,12 +1012,8 @@ struct
   let check_invariants t ~verifier =
     let verify tagged_list =
       let%bind.Deferred.Or_error ps =
-        (* Reversed list, it's ok here *)
-        List.fold_result tagged_list ~init:[] ~f:(fun acc tagged ->
-            let%map.Or_error p =
-              Ledger_proof_with_sok_message.read_tag tagged
-            in
-            p :: acc )
+        Mina_stdlib.Result.List.map ~f:Ledger_proof_with_sok_message.read_tag
+          tagged_list
         |> Deferred.return
       in
       Verifier.verify ~verifier ps
@@ -1276,14 +1272,9 @@ let staged_transactions_untagged ~signature_kind ~proof_cache_db t =
   in
   let txns_with_witnesses_tagged = Parallel_scan.pending_data t.scan_state in
   let%bind.Or_error txns_with_witnesses =
-    List.fold_result ~init:[]
-      ~f:(fun acc lst ->
-        let%map.Or_error lst' =
-          read_tags_and_write_proofs ~signature_kind ~proof_cache_db lst
-        in
-        lst' :: acc )
+    Mina_stdlib.Result.List.map
+      ~f:(read_tags_and_write_proofs ~signature_kind ~proof_cache_db)
       txns_with_witnesses_tagged
-    |> Or_error.map ~f:List.rev
   in
   let%map.Or_error previous_incomplete =
     read_tags_and_write_proofs ~signature_kind ~proof_cache_db
@@ -1703,29 +1694,6 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
              | Some stmt ->
                  stmt ) ) )
 
-(* let single_spec_one_or_twos_rev_of_job_list ~get_state jobs =
-   List.fold_result ~init:[] (One_or_two.group_list jobs) ~f:(fun acc' pair ->
-       let%map.Or_error spec =
-         One_or_two.Or_error.map ~f:(single_spec_of_job ~get_state) pair
-       in
-       spec :: acc' ) *)
-
-(* let all_work_pairs t
-     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
-     Snark_work_lib.Spec.Single.t One_or_two.t list Or_error.t =
-   let all_jobs = all_jobs t in
-   List.fold_until all_jobs ~init:[]
-     ~finish:(fun lst -> Ok lst)
-     ~f:(fun acc jobs ->
-       let specs_list =
-         single_spec_one_or_twos_rev_of_job_list ~get_state jobs
-       in
-       match specs_list with
-       | Ok list ->
-           Continue (acc @ List.rev list)
-       | Error e ->
-           Stop (Error e) ) *)
-
 let all_work_pairs t : Available_job.t One_or_two.t list =
   all_jobs t |> List.concat_map ~f:One_or_two.group_list
 
@@ -1844,22 +1812,3 @@ let check_required_protocol_states t ~protocol_states =
   in
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc
-
-(* let read_all_proofs_from_disk
-     { scan_state = cached
-     ; previous_incomplete_zkapp_updates = tx_list, border_status
-     } =
-   let%bind.Result scan_state =
-     Parallel_scan.State.map_result ~f1:Ledger_proof_with_sok_message.read_tag
-       ~f2:Transaction_with_witness.read_tag cached
-   in
-   let%map.Result tx_list' =
-     List.fold_result tx_list ~init:[] ~f:(fun acc tx ->
-         let%map.Result tx' = Transaction_with_witness.read_tag tx in
-         tx' :: acc )
-     |> Result.map ~f:List.rev
-   in
-   Stable.Latest.
-     { scan_state
-     ; previous_incomplete_zkapp_updates = (tx_list', border_status)
-     } *)

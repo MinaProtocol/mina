@@ -1013,12 +1013,8 @@ module State = struct
           Ok None
       | Some (m, bs) ->
           let%bind.Result m = f1 m in
-          let%map.Result bs =
-            List.fold_result bs ~init:[] ~f:(fun acc x ->
-                let%map.Result x' = f2 x in
-                x' :: acc )
-          in
-          Some (m, List.rev bs)
+          let%map.Result bs = Mina_stdlib.Result.List.map ~f:f2 bs in
+          Some (m, bs)
     in
     { t with trees; acc }
 
