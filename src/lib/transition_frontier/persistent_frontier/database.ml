@@ -383,7 +383,7 @@ let get_transition_do t hash =
 
 (* TODO: check that best tip is connected to root *)
 (* TODO: check for garbage *)
-let check t ~genesis_state_hash =
+let check ?(check_arcs = true) t ~genesis_state_hash =
   Or_error.try_with (fun () ->
       let check_version () =
         match get_if_exists t.db ~key:Db_version ~default:0 with
@@ -418,7 +418,7 @@ let check t ~genesis_state_hash =
         in
         (root_hash, root_transition)
       in
-      let rec check_arcs pred_hash =
+      let rec check_arcs_do pred_hash =
         let%bind successors =
           get t.db ~key:(Arcs pred_hash)
             ~error:(`Corrupt (`Not_found (`Arcs pred_hash)))
@@ -429,7 +429,7 @@ let check t ~genesis_state_hash =
               get_transition_do t succ_hash
               |> Result.map_error ~f:(fun e -> `Corrupt e)
             in
-            check_arcs succ_hash )
+            check_arcs_do succ_hash )
       in
       let%bind () = check_version () in
       let%bind root_hash, root_block = check_base () in
@@ -444,7 +444,7 @@ let check t ~genesis_state_hash =
           Ok ()
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
-      let%map () = check_arcs root_hash in
+      let%map () = if check_arcs then check_arcs_do root_hash else Ok () in
       Transition.header root_block
       |> Mina_block.Header.protocol_state
       |> Mina_state.Protocol_state.blockchain_state

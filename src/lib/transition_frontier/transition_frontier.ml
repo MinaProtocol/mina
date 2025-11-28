@@ -217,6 +217,7 @@ let rec load_with_max_length :
     -> catchup_mode:[ `Super ]
     -> ?set_best_tip:bool
     -> ?retain_application_data:bool
+    -> ?check_arcs:bool
     -> unit
     -> ( t
        , [> `Bootstrap_required
@@ -227,7 +228,7 @@ let rec load_with_max_length :
  fun ~context:(module Context : CONTEXT) ~max_length
      ?(retry_with_fresh_db = true) ?max_frontier_depth ~verifier
      ~consensus_local_state ~persistent_root ~persistent_frontier ~catchup_mode
-     ?set_best_tip ?retain_application_data () ->
+     ?set_best_tip ?retain_application_data ?check_arcs () ->
   let open Context in
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
@@ -320,7 +321,7 @@ let rec load_with_max_length :
   match
     time ~label:"Persistent_frontier.Instance.check_database" ~logger
     @@ fun () ->
-    Persistent_frontier.Instance.check_database
+    Persistent_frontier.Instance.check_database ?check_arcs
       ~genesis_state_hash:
         (State_hash.With_state_hashes.state_hash
            precomputed_values.protocol_state_with_hashes )
@@ -365,7 +366,7 @@ let rec load_with_max_length :
           ~context:(module Context)
           ~max_length ~verifier ~consensus_local_state ~persistent_root
           ~persistent_frontier ~retry_with_fresh_db:false ~catchup_mode
-          ?retain_application_data ()
+          ?retain_application_data ?check_arcs ()
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -393,9 +394,9 @@ let rec load_with_max_length :
           return res )
 
 let load ?(retry_with_fresh_db = true) ?max_frontier_depth ?set_best_tip
-    ?retain_application_data ~context:(module Context : CONTEXT) ~verifier
-    ~consensus_local_state ~persistent_root ~persistent_frontier ~catchup_mode
-    () =
+    ?retain_application_data ?check_arcs ~context:(module Context : CONTEXT)
+    ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
+    ~catchup_mode () =
   let open Context in
   O1trace.thread "transition_frontier_load" (fun () ->
       let max_length =
@@ -406,7 +407,7 @@ let load ?(retry_with_fresh_db = true) ?max_frontier_depth ?set_best_tip
         ~context:(module Context)
         ~max_length ~retry_with_fresh_db ?max_frontier_depth ~verifier
         ~consensus_local_state ~persistent_root ~persistent_frontier
-        ~catchup_mode ?set_best_tip () ?retain_application_data )
+        ~catchup_mode ?set_best_tip ?retain_application_data ?check_arcs () )
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)

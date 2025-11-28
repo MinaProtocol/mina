@@ -154,7 +154,7 @@ module Instance = struct
 
   let factory { factory; _ } = factory
 
-  let check_database t = Database.check t.db
+  let check_database ?check_arcs t = Database.check ?check_arcs t.db
 
   let get_root_hash t =
     Database.get_root_hash t.db |> Result.map_error ~f:Database.Error.message

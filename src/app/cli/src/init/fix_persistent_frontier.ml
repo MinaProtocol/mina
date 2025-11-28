@@ -188,7 +188,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
         ~catchup_mode:`Super
         ~set_best_tip:false
           (* application data is used in frontier migration, so we need to retain it *)
-        ~retain_application_data:migrate_frontier ()
+        ~retain_application_data:migrate_frontier ~check_arcs:false ()
     with
     | Error err ->
         let err_str =
