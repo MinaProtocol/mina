@@ -185,13 +185,8 @@ end) :
     Or_error.tag ~tag:(Inputs.filename tag.filename_key)
     @@ Or_error.try_with_join ~backtrace:true do_parsing
 
-  let read_many (type a) (module B : Bin_prot.Binable.S with type t = a) tags =
-    let%map.Or_error reversed =
-      List.fold_result tags ~init:[] ~f:(fun acc tag ->
-          let%map.Or_error value = read (module B) tag in
-          value :: acc )
-    in
-    List.rev reversed
+  let read_many (type a) (module B : Bin_prot.Binable.S with type t = a) =
+    Mina_stdlib.Result.List.map ~f:(read (module B))
 end
 
 include Make_custom (struct
