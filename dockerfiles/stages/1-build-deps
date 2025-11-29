@@ -34,8 +34,8 @@ ARG TARGETARCH
 # - dockerfiles/1-build-deps
 # - opam.export
 # - scripts/update_opam_switch.sh
-ARG OCAML_VERSION=4.14
-ARG OCAML_REVISION=.2
+ARG OCAML_VERSION=5.2
+ARG OCAML_REVISION=.1
 ARG OCAML_VARIANT=
 ARG OCAML_PACKAGE=
 ARG OPAM_VERSION=2.3.0
