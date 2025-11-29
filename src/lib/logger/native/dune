@@ -8,7 +8,6 @@
   ;; opam libraries
   result
   core
-  core_kernel
   sexplib0
   bin_prot.shape
   base.base_internalhash_types

@@ -14,7 +14,6 @@
   ;; opam libraries
   bin_prot.shape
   sexplib0
-  core_kernel
   result
   ;; local libraries
   snarky.backendless

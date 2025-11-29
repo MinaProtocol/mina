@@ -12,7 +12,6 @@
   async_kernel
   async.async_rpc
   camlp-streams
-  core_kernel
   yojson
   sodium
   core

@@ -8,7 +8,6 @@
   (pps ppx_jane))
  (libraries
   ; Opam
-  core_kernel
   alcotest
   ; Mina
   plonkish_prelude)

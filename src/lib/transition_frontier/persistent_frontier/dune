@@ -5,7 +5,6 @@
   ;;opam libraries
   result
   bin_prot.shape
-  core_kernel
   async
   core
   async_kernel

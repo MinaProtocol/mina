@@ -8,7 +8,6 @@
   ;; opam libraries
   result
   base
-  core_kernel
   integers
   sexplib0
   bignum.bigint

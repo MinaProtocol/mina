@@ -8,7 +8,6 @@
   ;; opam libraries
   core
   async
-  core_kernel
   bin_prot.shape
   bin_prot
   base

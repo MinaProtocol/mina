@@ -27,7 +27,6 @@
   ;; opam libraries
   async_unix
   async_kernel
-  core_kernel
   core
   async
   cmdliner

@@ -7,7 +7,6 @@
  (libraries
   ;; opam libraries
   base64
-  core_kernel
   ppx_deriving_yojson.runtime
   result
   yojson

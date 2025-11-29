@@ -11,7 +11,6 @@
   (pps ppx_version ppx_jane))
  (libraries
   ;; opam libraries
-  core_kernel
   ;; local libraries
   snarky.backendless
   pickles_types))

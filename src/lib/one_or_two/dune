@@ -8,7 +8,6 @@
   bin_prot.shape
   base
   async_kernel
-  core_kernel
   ppx_hash.runtime-lib
   sexplib0
   ppx_version.runtime)

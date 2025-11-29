@@ -7,7 +7,6 @@
   base
   core
   async
-  core_kernel
   stdio
   async_kernel
   ;; local libraries

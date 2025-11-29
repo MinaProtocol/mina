@@ -9,7 +9,6 @@
   ;; opam libraries
   integers
   async_kernel
-  core_kernel
   core
   async
   sexplib0

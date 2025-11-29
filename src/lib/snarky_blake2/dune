@@ -7,7 +7,6 @@
   (pps ppx_compare ppx_jane ppx_version))
  (libraries
   blake2
-  core_kernel
   digestif
   integers
   mina_stdlib

@@ -10,7 +10,6 @@
   sexplib0
   yojson
   sexp_diff_kernel
-  core_kernel
   base
   base.base_internalhash_types
   integers

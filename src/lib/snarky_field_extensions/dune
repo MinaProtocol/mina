@@ -11,7 +11,6 @@
   ;; opam libraries
   bignum.bigint
   sexplib0
-  core_kernel
   ppx_inline_test.config
   result
   ;; local libraries

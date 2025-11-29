@@ -6,7 +6,6 @@
   (pps ppx_deriving_yojson ppx_version ppx_jane))
  (libraries
   ;; opam libraries
-  core_kernel
   bin_prot.shape
   base
   sexplib0

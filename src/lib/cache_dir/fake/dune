@@ -4,7 +4,6 @@
  (libraries
   ; opam deps
   async_kernel
-  core_kernel
   ; libs
   key_cache)
  (instrumentation

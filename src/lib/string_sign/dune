@@ -3,7 +3,6 @@
  (public_name string_sign)
  (libraries
   ;; opam libraries
-  core_kernel
   result
   ;; local libraries
   kimchi_backend

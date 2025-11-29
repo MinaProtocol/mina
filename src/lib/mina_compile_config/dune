@@ -4,7 +4,6 @@
  (libraries
   mina_node_config
   mina_node_config.for_unit_tests
-  core_kernel
   currency)
  (instrumentation
   (backend bisect_ppx))

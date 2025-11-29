@@ -4,7 +4,6 @@
  (libraries
   ;;opam libraries
   core_kernel.uuid
-  core_kernel
   core
   ;;local libraries
   precomputed_values

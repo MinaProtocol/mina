@@ -5,7 +5,6 @@
   ;; opam libraries
   async_kernel
   core
-  core_kernel
   sexplib0
   ;; local libraries
   mina_net2

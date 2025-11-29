@@ -7,7 +7,6 @@
   async.async_command
   async_kernel
   async_unix
-  core_kernel
   sexplib0)
  (preprocess
   (pps ppx_jane))

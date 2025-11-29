@@ -9,7 +9,6 @@
   ;; opam libraries
   bignum
   bignum.bigint
-  core_kernel
   sexplib0
   ;; local libraries
   snarky.backendless

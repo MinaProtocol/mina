@@ -27,7 +27,6 @@
  (libraries
   ;; opam libraries
   bin_prot.shape
-  core_kernel
   result
   sexplib0
   ;; local libraries

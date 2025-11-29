@@ -10,7 +10,6 @@
   async
   async_kernel
   core
-  core_kernel
   base
   sexplib0
   base_quickcheck

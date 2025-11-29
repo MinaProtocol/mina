@@ -7,7 +7,6 @@
   async
   async.async_rpc
   async_rpc_kernel
-  core_kernel
   bin_prot.shape
   sexplib0
   base.base_internalhash_types

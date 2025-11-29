@@ -8,7 +8,6 @@
  (libraries
   ;; opam libraries
   base
-  core_kernel
   ;; local libraries
   sponge
   pickles

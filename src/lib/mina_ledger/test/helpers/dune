@@ -3,7 +3,6 @@
  (libraries
   ;; opam libraries
   base
-  core_kernel
   core
   integers
   sexplib0

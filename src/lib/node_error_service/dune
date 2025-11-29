@@ -8,7 +8,6 @@
   uri
   cohttp-async
   async
-  core_kernel
   core
   cohttp
   async_kernel

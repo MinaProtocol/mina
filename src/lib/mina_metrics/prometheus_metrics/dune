@@ -10,7 +10,6 @@
   base
   core
   async_kernel
-  core_kernel
   prometheus
   cohttp-async
   cohttp

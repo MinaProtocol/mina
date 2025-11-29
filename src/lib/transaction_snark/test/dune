@@ -9,7 +9,6 @@
   async_unix
   core
   base
-  core_kernel
   base64
   yojson
   integers

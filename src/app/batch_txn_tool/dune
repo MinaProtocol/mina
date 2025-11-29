@@ -8,7 +8,6 @@
   integers
   base
   uri
-  core_kernel
   core
   async
   async_kernel

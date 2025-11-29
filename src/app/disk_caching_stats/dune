@@ -35,7 +35,6 @@
   bigarray-compat
   ; --
   core
-  core_kernel
   base
   bin_prot
   splittable_random

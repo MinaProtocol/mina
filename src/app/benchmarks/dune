@@ -5,7 +5,6 @@
   core_bench.inline_benchmarks
   vrf_lib_tests
   mina_base
-  core_kernel
   core
   base
   mina_stdlib

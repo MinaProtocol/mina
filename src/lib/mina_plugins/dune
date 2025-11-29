@@ -3,7 +3,6 @@
  (name mina_plugins)
  (libraries
   ;; opam libraries
-  core_kernel
   dynlink
   core
   base

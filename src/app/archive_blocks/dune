@@ -13,7 +13,6 @@
   caqti-async
   caqti-driver-postgresql
   core
-  core_kernel
   result
   stdio
   uri

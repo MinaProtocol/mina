@@ -7,7 +7,6 @@
   bignum.bigint
   base
   base64
-  core_kernel
   sexplib0
   result
   bignum

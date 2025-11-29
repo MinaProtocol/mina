@@ -4,7 +4,6 @@
  (implements disk_cache)
  (libraries
   ;; opam libraries
-  core_kernel
   core
   ;; local libraries
   lmdb_storage

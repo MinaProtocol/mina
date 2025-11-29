@@ -8,7 +8,6 @@
   rpc_parallel
   core
   async
-  core_kernel
   bin_prot.shape
   sexplib0
   integers

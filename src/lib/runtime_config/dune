@@ -6,7 +6,6 @@
   async
   async_kernel
   async_unix
-  core_kernel
   bin_prot.shape
   base
   base64

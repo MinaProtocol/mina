@@ -10,7 +10,6 @@
   stdio
   yojson
   lib
-  core_kernel
   async
   ppx_deriving_yojson.runtime
   core

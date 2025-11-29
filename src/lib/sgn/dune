@@ -5,7 +5,6 @@
  (libraries
   ;; opam libraries
   ppx_deriving_yojson.runtime
-  core_kernel
   yojson
   sexplib0
   base

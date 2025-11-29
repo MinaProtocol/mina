@@ -11,7 +11,6 @@
   async_unix
   base.base_internalhash_types
   core
-  core_kernel
   core_kernel.uuid
   ppx_inline_test.config
   rocks

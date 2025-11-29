@@ -13,7 +13,6 @@
   core_kernel.uuid
   core
   async
-  core_kernel
   async_unix
   result
   sexplib0

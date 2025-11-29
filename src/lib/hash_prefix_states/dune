@@ -6,7 +6,6 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  core_kernel
   base
   ;; local libraries
   snark_params

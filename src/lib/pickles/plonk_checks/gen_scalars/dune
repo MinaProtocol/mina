@@ -8,7 +8,6 @@
  (link_flags (-linkall))
  (libraries
   ;; opam libraries
-  core_kernel
   stdio
   base
   ;; local libraries

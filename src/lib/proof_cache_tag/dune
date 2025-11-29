@@ -3,7 +3,6 @@
  (public_name proof_cache_tag)
  (libraries
   ;; opam libraries
-  core_kernel
   async_kernel
   ;; local libraries
   logger

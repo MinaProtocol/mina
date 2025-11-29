@@ -4,7 +4,6 @@
  (libraries
   ;; opam libraries
   core
-  core_kernel
   ;; local libraries
   genesis_constants
   mina_state

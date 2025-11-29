@@ -10,7 +10,6 @@
   async_unix
   result
   base
-  core_kernel
   cohttp
   caqti
   async

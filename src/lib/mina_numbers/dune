@@ -9,7 +9,6 @@
   result
   bin_prot.shape
   bignum.bigint
-  core_kernel
   integers
   sexplib0
   base

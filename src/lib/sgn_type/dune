@@ -7,7 +7,6 @@
   (pps ppx_jane ppx_version ppx_compare ppx_deriving_yojson))
  (libraries
   ;; opam libraries
-  core_kernel
   ppx_deriving_yojson.runtime
   yojson
   sexplib0

@@ -4,7 +4,6 @@
  (modules logproc_lib filter)
  (libraries
   ;; opam libraries
-  core_kernel
   yojson
   angstrom
   re2
@@ -28,7 +27,6 @@
  (modules interpolator)
  (libraries
   ;; opam libraries
-  core_kernel
   yojson
   angstrom
   ;; local libraries

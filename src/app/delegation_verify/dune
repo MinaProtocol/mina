@@ -1,7 +1,6 @@
 (executable
  (name delegation_verify)
  (libraries
-  core_kernel
   async
   async_kernel
   async_unix

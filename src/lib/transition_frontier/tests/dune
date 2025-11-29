@@ -5,7 +5,6 @@
   core
   async
   async_kernel
-  core_kernel
   ppx_inline_test.config
   async_unix
   core_kernel.uuid

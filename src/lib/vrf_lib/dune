@@ -10,7 +10,6 @@
   bin_prot.shape
   core
   sexplib0
-  core_kernel
   bignum
   ppx_inline_test.config
   ;; local libraries

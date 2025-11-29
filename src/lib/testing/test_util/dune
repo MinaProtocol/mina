@@ -4,7 +4,6 @@
  (library_flags -linkall)
  (libraries
   ;; opam libraries
-  core_kernel
   bin_prot
   ;; local libraries
   snark_params

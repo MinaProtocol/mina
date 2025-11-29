@@ -26,7 +26,6 @@
   base.base_internalhash_types
   bitstring
   core
-  core_kernel
   core_kernel.uuid
   integers
   sexplib0

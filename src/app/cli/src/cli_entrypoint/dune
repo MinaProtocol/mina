@@ -8,7 +8,6 @@
   async_kernel
   async_unix
   base
-  core_kernel
   core
   bin_prot
   bin_prot.shape

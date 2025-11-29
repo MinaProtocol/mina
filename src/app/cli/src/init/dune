@@ -21,7 +21,6 @@
   async_kernel
   async_unix
   uri
-  core_kernel
   core_kernel.uuid
   core
   base

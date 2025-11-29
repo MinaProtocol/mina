@@ -10,7 +10,6 @@
   caqti-driver-postgresql
   caqti
   async
-  core_kernel
   caqti-async
   base
   async_unix

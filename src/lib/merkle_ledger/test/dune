@@ -20,7 +20,6 @@
   bin_prot.shape
   codable
   core
-  core_kernel
   core_kernel.uuid
   currency
   data_hash_lib

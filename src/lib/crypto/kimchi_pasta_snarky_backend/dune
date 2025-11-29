@@ -9,7 +9,6 @@
  (libraries
   ;; opam libraries
   integers
-  core_kernel
   ppx_inline_test.config
   sexplib0
   bin_prot.shape

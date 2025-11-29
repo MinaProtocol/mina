@@ -9,7 +9,6 @@
   bin_prot.shape
   async_unix
   async_kernel
-  core_kernel
   core
   async
   sexplib0

@@ -6,7 +6,6 @@
  (libraries
   ;; opam libraries
   sexplib
-  core_kernel
   async_kernel
   core
   ppx_inline_test.config

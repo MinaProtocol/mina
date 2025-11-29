@@ -4,7 +4,6 @@
  (libraries
   ;;opam libraries
   base
-  core_kernel
   async_kernel
   async
   core

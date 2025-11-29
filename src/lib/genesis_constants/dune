@@ -9,7 +9,6 @@
   ppx_inline_test.config
   base
   bin_prot.shape
-  core_kernel
   sexplib0
   integers
   ;; local libraries

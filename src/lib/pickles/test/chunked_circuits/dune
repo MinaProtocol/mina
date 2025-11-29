@@ -7,7 +7,6 @@
   integers
   result
   bignum.bigint
-  core_kernel
   base64
   digestif
   ppx_inline_test.config

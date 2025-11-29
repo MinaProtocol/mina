@@ -13,7 +13,6 @@
   async_unix
   bin_prot.shape
   core
-  core_kernel
   ppx_deriving_yojson.runtime
   sexplib0
   yojson

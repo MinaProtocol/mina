@@ -11,7 +11,6 @@
   async
   bin_prot.shape
   caqti-async
-  core_kernel
   archive_lib
   caqti-driver-postgresql
   async_kernel

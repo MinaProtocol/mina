@@ -13,7 +13,6 @@
   core
   async
   incremental
-  core_kernel
   async_kernel
   base.base_internalhash_types
   uri

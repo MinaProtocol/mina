@@ -9,7 +9,6 @@
   core_kernel.uuid
   async_unix
   async
-  core_kernel
   core
   async_kernel
   sexplib0

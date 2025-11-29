@@ -6,7 +6,6 @@
   base
   core
   core_bench
-  core_kernel
   yojson
   ; mina libraries
   mina_runtime_config)

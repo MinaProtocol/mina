@@ -6,7 +6,6 @@
   ;; opam libraries
   result
   caqti
-  core_kernel
   base
   async_kernel
   uri

@@ -6,7 +6,6 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  core_kernel
   sexplib0
   base
   ppx_inline_test.config

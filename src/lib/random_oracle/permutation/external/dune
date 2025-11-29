@@ -11,7 +11,6 @@
   ;; opam libraries
   ppx_inline_test.config
   base
-  core_kernel
   sexplib0
   ;; local libraries
   sponge

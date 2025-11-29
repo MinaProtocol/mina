@@ -5,7 +5,6 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  core_kernel
   base64
   cstruct
   mirage-crypto-ec

@@ -9,7 +9,6 @@
  (libraries
   ; Opam
   alcotest
-  core_kernel
   ; Mina
   pickles_base
   pickles_types)

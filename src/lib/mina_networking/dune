@@ -8,7 +8,6 @@
   result
   core
   async
-  core_kernel
   sexplib0
   base
   bin_prot.shape

@@ -6,7 +6,6 @@
   async
   async_kernel
   async_unix
-  core_kernel
   sexplib0
   ppx_deriving_yojson.runtime
   result

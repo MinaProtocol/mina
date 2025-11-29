@@ -5,7 +5,6 @@
   ;;opam libraries
   integers
   core
-  core_kernel
   sexplib0
   base.base_internalhash_types
   stdio

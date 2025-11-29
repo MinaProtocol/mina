@@ -3,7 +3,6 @@
  (public_name staged_ledger_diff)
  (libraries
   ;; opam libraries
-  core_kernel
   sexplib0
   async
   bin_prot.shape

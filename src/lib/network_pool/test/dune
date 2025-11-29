@@ -7,7 +7,6 @@
   async_unix
   base
   base.base_internalhash_types
-  core_kernel
   core
   integers
   sexplib0

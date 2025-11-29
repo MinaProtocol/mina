@@ -9,7 +9,6 @@
   core.linux_ext
   cohttp-async
   async
-  core_kernel
   cohttp
   async_kernel
   uri

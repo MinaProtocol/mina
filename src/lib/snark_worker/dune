@@ -14,7 +14,6 @@
   base.base_internalhash_types
   bin_prot.shape
   core
-  core_kernel
   core_kernel.hash_heap
   ppx_hash.runtime-lib
   ppx_version.runtime

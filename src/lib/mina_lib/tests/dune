@@ -6,7 +6,6 @@
  (libraries
   ;; opam libraries
   core
-  core_kernel
   core_kernel.uuid
   async_kernel
   async

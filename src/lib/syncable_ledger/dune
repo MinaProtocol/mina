@@ -6,7 +6,6 @@
  (libraries
   ;; opam libraries
   async_kernel
-  core_kernel
   bin_prot.shape
   sexplib0
   core

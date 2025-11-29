@@ -14,7 +14,6 @@
   async_rpc_kernel
   async
   core
-  core_kernel
   sexplib0
   cohttp-async
   async_unix

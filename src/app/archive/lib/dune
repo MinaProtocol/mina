@@ -15,7 +15,6 @@
   caqti-async
   caqti-driver-postgresql
   core
-  core_kernel
   integers
   ppx_deriving_yojson.runtime
   ppx_inline_test.config

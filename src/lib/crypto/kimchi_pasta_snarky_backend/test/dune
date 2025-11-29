@@ -3,7 +3,6 @@
  (libraries
   alcotest
   bin_prot.shape
-  core_kernel
   kimchi_pasta_snarky_backend
   hex
   sexplib0)

@@ -6,7 +6,6 @@
   ;;opam libraries
   async.async_command
   base
-  core_kernel
   core
   async_kernel
   zkapp_test_transaction_lib

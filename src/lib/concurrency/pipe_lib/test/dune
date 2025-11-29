@@ -5,7 +5,6 @@
   alcotest
   alcotest-async
   async
-  core_kernel
   ;; Local libraries
   pipe_lib)
  (preprocess

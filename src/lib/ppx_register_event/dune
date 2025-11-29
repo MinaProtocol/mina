@@ -7,7 +7,6 @@
   ocaml-compiler-libs.common
   ppxlib.ast
   ppx_deriving_yojson
-  core_kernel
   ppxlib
   compiler-libs.common
   ocaml-migrate-parsetree

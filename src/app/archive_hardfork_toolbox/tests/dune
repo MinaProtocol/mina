@@ -12,7 +12,6 @@
    caqti-driver-postgresql
    caqti
    async
-   core_kernel
    caqti-async
    base
    threads.posix

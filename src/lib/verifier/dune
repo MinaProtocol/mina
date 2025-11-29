@@ -4,7 +4,6 @@
  (libraries
   ;; opam libraries
   async
-  core_kernel
   async_kernel
   rpc_parallel
   sexplib0

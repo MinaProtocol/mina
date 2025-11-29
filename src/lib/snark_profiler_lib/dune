@@ -9,7 +9,6 @@
   result
   async_kernel
   async_unix
-  core_kernel
   core
   base
   async

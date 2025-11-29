@@ -13,7 +13,6 @@
   core
   capnp
   stdint
-  core_kernel
   async_unix
   ppx_sexp_conv.runtime-lib
   ppx_hash.runtime-lib

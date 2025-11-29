@@ -24,7 +24,6 @@
  (libraries
   ; Opam libraries
   alcotest
-  core_kernel
   fmt
   integers
   sexplib0

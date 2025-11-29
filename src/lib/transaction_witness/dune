@@ -7,7 +7,6 @@
   ;; opam libraries
   bin_prot.shape
   sexplib0
-  core_kernel
   core
   ;; local libraries
   currency

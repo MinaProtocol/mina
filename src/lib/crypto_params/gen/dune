@@ -4,7 +4,6 @@
   ;; opam libraries
   stdio
   sexplib0
-  core_kernel
   compiler-libs
   ppxlib
   ppxlib.astlib

@@ -12,7 +12,6 @@
   base.base_internalhash_types
   bigarray-compat
   bin_prot.shape
-  core_kernel
   digestif
   ppx_inline_test.config
   sexplib0

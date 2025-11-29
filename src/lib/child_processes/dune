@@ -27,7 +27,6 @@
   base
   base.base_internalhash_types
   core
-  core_kernel
   ctypes
   ctypes.foreign
   integers

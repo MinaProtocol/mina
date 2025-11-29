@@ -8,7 +8,6 @@
  (libraries
   ;; opam libraries
   bin_prot.shape
-  core_kernel
   sexplib0
   ;; local libraries
   cache_dir

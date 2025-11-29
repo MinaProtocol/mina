@@ -10,7 +10,6 @@
   base.base_internalhash_types
   cmdliner
   core
-  core_kernel
   sexplib0
   stdio
   uri

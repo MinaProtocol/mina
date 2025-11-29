@@ -8,7 +8,6 @@
   async_unix
   base
   core
-  core_kernel
   integers
   result
   sexplib0

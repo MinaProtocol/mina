@@ -9,7 +9,6 @@
   base
   base.base_internalhash_types
   bin_prot.shape
-  core_kernel
   integers
   ppx_inline_test.config
   result
