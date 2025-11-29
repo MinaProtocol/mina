@@ -31,7 +31,7 @@
   inputs.describe-dune.inputs.nixpkgs.follows = "nixpkgs";
   inputs.describe-dune.inputs.flake-utils.follows = "utils";
 
-  inputs.o1-opam-repository.url = "github:o1-labs/opam-repository/dd90c5c72b7b7caeca3db3224b2503924deea08a";
+  inputs.o1-opam-repository.url = "github:o1-labs/opam-repository/5a86178017864741537d7b1cac96a957b4ddcb88";
   inputs.o1-opam-repository.flake = false;
 
   # The version must be the same as the version used in:
@@ -40,7 +40,7 @@
   #   `nix flake update opam-repository`).
   # - scripts/update-opam-switch.sh
   inputs.opam-repository.url =
-    "github:ocaml/opam-repository/08d8c16c16dc6b23a5278b06dff0ac6c7a217356";
+    "github:ocaml/opam-repository/2e72379851a4769911b11b7f85be197919fe4b82";
   inputs.opam-repository.flake = false;
 
   inputs.nixpkgs-mozilla.url = "github:mozilla/nixpkgs-mozilla";
