@@ -113,8 +113,6 @@ module Transaction_with_witness = struct
           Mina_state.Protocol_state.Body.Value.t option
       }
 
-    let source_first_pass_ledger t = t.statement.source.first_pass_ledger
-
     let source_second_pass_ledger t = t.statement.source.second_pass_ledger
 
     let target_first_pass_ledger t = t.statement.target.first_pass_ledger
@@ -160,9 +158,6 @@ module Transaction_with_witness = struct
         let to_latest = Fn.id
       end
     end]
-
-    let source_first_pass_ledger t =
-      t.Stable.Latest.statement.source.first_pass_ledger
 
     let source_second_pass_ledger t =
       t.Stable.Latest.statement.source.second_pass_ledger
@@ -1067,8 +1062,6 @@ end
 module Make_transaction_categorizer (Tx : sig
   type t
 
-  val source_first_pass_ledger : t -> Ledger_hash.t
-
   val source_second_pass_ledger : t -> Ledger_hash.t
 
   val target_first_pass_ledger : t -> Ledger_hash.t
@@ -1081,16 +1074,6 @@ struct
   let txns_by_block txns_per_tree =
     List.group txns_per_tree ~break:(fun t1 t2 -> not (Tx.of_same_block t1 t2))
     |> List.filter_map ~f:Mina_stdlib.Nonempty_list.of_list_opt
-
-  let fold_tx (first_pass_txns, second_pass_txns, _old_root) txn =
-    let target_first_pass_ledger = Tx.target_first_pass_ledger txn in
-    match Tx.transaction_type txn with
-    | `Coinbase | `Fee_transfer | `Signed_command ->
-        (txn :: first_pass_txns, second_pass_txns, target_first_pass_ledger)
-    | `Zkapp_command ->
-        ( txn :: first_pass_txns
-        , txn :: second_pass_txns
-        , target_first_pass_ledger )
 
   (** Compoutes representation for the sequence of transactions extracted from scan state
       when it emitted a proof, split into:
@@ -1108,14 +1091,17 @@ struct
   let categorize_transactions ~previous_incomplete txns_non_empty =
     let first_txn = Mina_stdlib.Nonempty_list.head txns_non_empty in
     let txns = Mina_stdlib.Nonempty_list.to_list txns_non_empty in
-    let init = ([], [], Tx.source_first_pass_ledger first_txn) in
-    let first_pass_txns, second_pass_txns, target_first_pass_ledger =
-      let first_pass_txns_rev, second_pass_txns_rev, target_first_pass_ledger =
-        List.fold ~init txns ~f:fold_tx
-      in
-      ( List.rev first_pass_txns_rev
-      , List.rev second_pass_txns_rev
-      , target_first_pass_ledger )
+    let target_first_pass_ledger =
+      Tx.target_first_pass_ledger
+        (Mina_stdlib.Nonempty_list.last txns_non_empty)
+    in
+    let second_pass_txns =
+      List.filter txns ~f:(fun txn ->
+          match Tx.transaction_type txn with
+          | `Zkapp_command ->
+              true
+          | _ ->
+              false )
     in
     (* determine whether second pass completed in the same tree *)
     let continued_in_the_next_tree =
@@ -1133,7 +1119,7 @@ struct
       | _ ->
           []
     in
-    { Transactions_categorized.Poly.first_pass = first_pass_txns
+    { Transactions_categorized.Poly.first_pass = txns
     ; second_pass = second_pass_txns
     ; previous_incomplete
     ; continued_in_the_next_tree
