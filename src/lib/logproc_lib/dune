@@ -29,8 +29,8 @@
   ;; opam libraries
   yojson
   angstrom
-  ;; local libraries
-  )
+  core)
+  
  (instrumentation
   (backend bisect_ppx))
  (preprocess
