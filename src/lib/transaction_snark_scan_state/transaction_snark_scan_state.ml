@@ -1490,7 +1490,9 @@ let apply_categorized_txns_stepwise ?(stop_at_first_pass = false)
                 in
                 let do_second_pass =
                   (*if transactions completed in the same tree; do second pass now*)
-                  (not txns_per_block.continued_in_the_next_tree)
+                  (not
+                     ( txns_per_block.continued_in_the_next_tree
+                     || List.is_empty txns_per_block.second_pass ) )
                   || continue_previous_tree's_txns
                 in
                 if do_second_pass then
