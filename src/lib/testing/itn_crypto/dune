@@ -9,7 +9,6 @@
   cstruct
   mirage-crypto-ec
   mirage-crypto-rng
-  mirage-crypto-rng-async
   ;; local libraries
   codable)
  (instrumentation

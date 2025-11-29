@@ -13,7 +13,6 @@
   bin_prot.shape
   init
   async
-  core.daemon
   uri
   async.async_command
   result

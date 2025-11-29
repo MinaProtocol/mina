@@ -6,7 +6,6 @@
  (libraries
   ;; opam libraries
   core
-  core.linux_ext
   cohttp-async
   async
   cohttp
