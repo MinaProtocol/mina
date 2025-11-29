@@ -22,7 +22,7 @@ switch_dir=opam_switches/"$sum"
 # - dockerfiles/1-build-deps
 # - opam.export
 # - scripts/update_opam_switch.sh
-ocaml_version=4.14.2
+ocaml_version=5.2.1
 
 # The version must be the same as the version used in:
 # - dockerfiles/1-build-deps
