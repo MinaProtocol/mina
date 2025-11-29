@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Foo = struct
   module Bar = struct
@@ -6,7 +6,6 @@ module Foo = struct
   end
 
   type t = string [@@deriving bin_io]
-
   type t' = string [@@deriving bin_io]
 
   module Quux = struct

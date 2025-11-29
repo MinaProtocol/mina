@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* a signature *)
 module type Some_intf = sig
@@ -185,16 +185,28 @@ module M11 = struct
   end]
 end
 
+module QueueV1 = struct
+  include Queue.Stable.V1
+
+  let __versioned__ = ()
+end
+
 (* Jane Street trustlisting *)
 module M12 = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = int Core_kernel.Queue.Stable.V1.t
+      type t = int QueueV1.t
 
       let to_latest = Fn.id
     end
   end]
+end
+
+module TimeSpanV1 = struct
+  include Time.Stable.Span.V1
+
+  let __versioned__ = ()
 end
 
 (* Jane Street special case *)
@@ -202,7 +214,7 @@ module M13 = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Core_kernel.Time.Stable.Span.V1.t [@@deriving bin_io, version]
+      type t = TimeSpanV1 [@@deriving bin_io, version]
 
       let to_latest = Fn.id
     end
