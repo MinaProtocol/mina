@@ -21,7 +21,6 @@
   core
   async_unix
   stdio
-  base.caml
   result
   mina_automation
   mina_stdlib)

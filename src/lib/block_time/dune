@@ -7,7 +7,6 @@
  (libraries
   ;; opam libraries
   integers
-  base.caml
   bin_prot.shape
   sexplib0
   async_kernel

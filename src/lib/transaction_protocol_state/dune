@@ -10,7 +10,6 @@
   core_kernel
   core
   bin_prot.shape
-  base.caml
   ;; local libraries
   pickles
   genesis_constants

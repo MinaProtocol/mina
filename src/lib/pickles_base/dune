@@ -22,7 +22,6 @@
   base.base_internalhash_types
   sexplib0
   bin_prot.shape
-  base.caml
   ppxlib
   core_kernel
   ;; local libraries

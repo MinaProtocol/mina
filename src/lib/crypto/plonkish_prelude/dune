@@ -26,7 +26,6 @@
   (backend bisect_ppx))
  (libraries
   ;; opam libraries
-  base.caml
   bin_prot.shape
   core_kernel
   result

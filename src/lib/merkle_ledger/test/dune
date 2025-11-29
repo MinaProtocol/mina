@@ -16,7 +16,6 @@
   async_kernel
   async_unix
   base.base_internalhash_types
-  base.caml
   base58_check
   bin_prot.shape
   codable

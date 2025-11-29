@@ -3,7 +3,6 @@
  (public_name transition_frontier_extensions)
  (libraries
   ;;opam libraries
-  base.caml
   async_kernel
   core_kernel
   sexplib0

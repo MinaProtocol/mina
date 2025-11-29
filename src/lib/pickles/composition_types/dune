@@ -33,7 +33,6 @@
   sexplib0
   bin_prot.shape
   core_kernel
-  base.caml
   ;; local libraries
   mina_wire_types
   kimchi_pasta

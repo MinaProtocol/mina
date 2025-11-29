@@ -4,7 +4,6 @@
  (libraries
   ;;opam libraries
   async_unix
-  base.caml
   async_kernel
   core_kernel
   bin_prot.shape

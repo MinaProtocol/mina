@@ -9,7 +9,6 @@
   async_rpc_kernel
   async_unix
   base.base_internalhash_types
-  base.caml
   base64
   bin_prot.shape
   caqti

@@ -15,7 +15,6 @@
   init
   async
   core.daemon
-  base.caml
   uri
   async.async_command
   result

@@ -4,7 +4,6 @@
  (libraries
   ;; opam libraries
   base
-  base.caml
   core_kernel
   integers
   sexplib0

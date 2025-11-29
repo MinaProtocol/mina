@@ -24,7 +24,6 @@
   async
   async_kernel
   base.base_internalhash_types
-  base.caml
   bitstring
   core
   core.uuid

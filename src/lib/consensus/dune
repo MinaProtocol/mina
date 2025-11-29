@@ -13,7 +13,6 @@
   core.uuid
   async_kernel
   sexplib0
-  base.caml
   integers
   async
   core

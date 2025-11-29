@@ -15,7 +15,6 @@
   bin_prot.shape
   sexplib0
   core_kernel
-  base.caml
   result
   ;; local libraries
   snarky.backendless

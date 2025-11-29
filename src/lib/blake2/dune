@@ -10,7 +10,6 @@
  (libraries
   ;; opam libraries
   base.base_internalhash_types
-  base.caml
   bigarray-compat
   bin_prot.shape
   core_kernel

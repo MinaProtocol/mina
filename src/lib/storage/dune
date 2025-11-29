@@ -15,7 +15,6 @@
   sexplib0
   async_kernel
   async_unix
-  base.caml
   ;; local libraries
   logger
   ppx_version.runtime)

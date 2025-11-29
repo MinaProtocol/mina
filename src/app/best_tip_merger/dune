@@ -8,7 +8,6 @@
   async.async_command
   async_kernel
   stdio
-  base.caml
   yojson
   lib
   core_kernel

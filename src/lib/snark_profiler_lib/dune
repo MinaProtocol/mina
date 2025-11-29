@@ -13,7 +13,6 @@
   core
   base
   async
-  base.caml
   base.base_internalhash_types
   ;;local libraries
   mina_stdlib

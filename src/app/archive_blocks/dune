@@ -9,7 +9,6 @@
   async_kernel
   async_unix
   base
-  base.caml
   caqti
   caqti-async
   caqti-driver-postgresql

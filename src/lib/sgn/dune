@@ -10,7 +10,6 @@
   sexplib0
   base
   bin_prot.shape
-  base.caml
   ;; local libraries
   snark_params
   sgn_type

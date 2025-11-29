@@ -8,7 +8,6 @@
   ppxlib.astlib
   yojson
   mina_base
-  base.caml
   compiler-libs
   ocaml-migrate-parsetree
   stdio)

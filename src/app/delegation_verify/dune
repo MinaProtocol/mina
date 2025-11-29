@@ -8,7 +8,6 @@
   core
   stdio
   base
-  base.caml
   ppx_deriving_yojson.runtime
   yojson
   base64

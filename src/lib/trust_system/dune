@@ -7,7 +7,6 @@
   sexplib0
   core
   ppx_inline_test.config
-  base.caml
   async_kernel
   core_kernel
   bin_prot.shape

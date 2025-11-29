@@ -17,7 +17,6 @@
   caqti-async
   cohttp-async
   archive_lib
-  base.caml
   async_kernel
   uri
   core

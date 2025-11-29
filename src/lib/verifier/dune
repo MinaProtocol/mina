@@ -3,7 +3,6 @@
  (public_name verifier)
  (libraries
   ;; opam libraries
-  base.caml
   async
   core_kernel
   async_kernel
