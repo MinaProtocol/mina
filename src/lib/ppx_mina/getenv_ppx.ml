@@ -3,7 +3,7 @@ open Ppxlib
 let name = "getenv"
 
 let expand ~loc ~path:_ var =
-  match Caml.Sys.getenv var with
+  match Sys.getenv var with
   | s ->
       [%expr Some [%e Ast_builder.Default.estring s ~loc]]
   | exception Not_found ->
