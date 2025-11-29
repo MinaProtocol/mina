@@ -109,6 +109,6 @@ let _cli =
          ~doc:"Return with error code if any file needs formatting"
      in
      fun () -> main dry_run check path )
-  |> Command.run
+  |> Command_unix.run
 
 let () = never_returns (Scheduler.go ())
