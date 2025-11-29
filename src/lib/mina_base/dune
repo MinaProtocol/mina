@@ -13,7 +13,6 @@
   sexplib0
   yojson
   digestif
-  sexp_diff_kernel
   base
   base.base_internalhash_types
   integers
