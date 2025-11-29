@@ -1,7 +1,7 @@
 (library
  (name visualization)
  (public_name visualization)
- (libraries core_kernel async_kernel ocamlgraph yojson sexplib0)
+ (libraries core async_kernel ocamlgraph yojson sexplib0)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
