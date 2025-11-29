@@ -5,7 +5,6 @@
   ;; opam libraries
   async_unix
   stdio
-  ocaml-migrate-parsetree
   core
   async
   ppxlib

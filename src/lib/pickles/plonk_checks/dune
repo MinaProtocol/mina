@@ -13,7 +13,6 @@
   ;; opam libraries
   sexplib0
   ppxlib.ast
-  ocaml-migrate-parsetree
   base.base_internalhash_types
   ;; local libraries
   pickles_types

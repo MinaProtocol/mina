@@ -10,7 +10,6 @@
   digestif
   core
   async
-  ocaml-migrate-parsetree
   ppxlib.ast
   base
   bin_prot.shape

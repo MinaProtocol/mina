@@ -9,7 +9,6 @@
   ppx_deriving_yojson
   ppxlib
   compiler-libs.common
-  ocaml-migrate-parsetree
   base
   ;; local libraries
   interpolator_lib)
