@@ -1229,14 +1229,15 @@ let latest_recent_proof_txs_untagged ~signature_kind ~proof_cache_db t =
       |> Option.some
 
 let incomplete_txns_from_recent_proof_tree t =
-  let%bind.Option tagged, txns_with_witnesses =
+  let%map.Option tagged, txns_with_witnesses =
     Parallel_scan.last_emitted_value t.scan_state
   in
   (* First pass ledger is considered as the snarked ledger,
      so any account update whether completed in the same tree
      or not should be included in the next tree *)
-  let%map.Option res =
+  let res =
     Tagged_categorizer.second_pass_last_block txns_with_witnesses
+    |> Option.value ~default:([], `Border_block_continued_in_the_next_tree false)
   in
   (Ledger_proof_with_sok_message.Tagged.statement tagged, res)
 
