@@ -7,7 +7,6 @@
   async_unix
   base.base_internalhash_types
   core
-  core.uuid
   core_kernel
   core_kernel.uuid
   rocks

@@ -6,7 +6,6 @@
   core_kernel.uuid
   core_kernel
   core
-  core.uuid
   ;;local libraries
   precomputed_values
   mina_stdlib_unix

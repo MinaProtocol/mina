@@ -24,7 +24,6 @@
   core_kernel
   core_kernel.uuid
   core
-  core.uuid
   base
   async
   cohttp
