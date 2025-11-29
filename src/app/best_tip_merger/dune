@@ -42,6 +42,5 @@
    ppx_mina
    ppx_deriving.show
    ppx_deriving_yojson
-   ppx_jane
    ppx_version
    ppx_compare)))

@@ -1,15 +1,15 @@
-open Core_kernel
-include Core_kernel.Time
+open Core
+include Core.Time
 
 module Span = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
       (* NOTE:
-         `Core_kernel.Time.Stable.Span.V3.t` tracks time in seconds in an IEEE754
+         `Core.Time.Stable.Span.V3.t` tracks time in seconds in an IEEE754
          64bit float. Hence conversion to/from float poses no precision lost.
       *)
-      type t = Core_kernel.Time.Stable.Span.V3.t [@@deriving sexp]
+      type t = Core.Time.Stable.Span.V3.t [@@deriving sexp]
 
       let to_yojson_hum span =
         `String (Printf.sprintf "%f seconds" (Time.Span.to_sec span))
@@ -28,5 +28,5 @@ module Span = struct
 
   [%%define_locally Stable.Latest.(to_yojson_hum, to_yojson, of_yojson)]
 
-  include Core_kernel.Time.Span
+  include Core.Time.Span
 end

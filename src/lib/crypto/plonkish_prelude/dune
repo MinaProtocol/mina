@@ -18,7 +18,6 @@
    h_list.ppx
    ppx_deriving.std
    ppx_deriving_yojson
-   ppx_jane
    ppx_mina
    ppx_version))
  (modules_without_implementation sigs poly_types)

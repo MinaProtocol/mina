@@ -1,6 +1,6 @@
 (** Utilities for dealing with "multimaps" or mapsets. *)
 
-open Core_kernel
+open Core
 
 (* TODO consider using a lighter interface than Comparable.S *)
 module Make (Key : Comparable.S) (Set : Generic_set.S0) = struct
@@ -25,7 +25,8 @@ module Make (Key : Comparable.S) (Set : Generic_set.S0) = struct
 end
 
 module Make_with_sexp_of
-    (Key : Comparable.S) (Set : sig
+    (Key : Comparable.S)
+    (Set : sig
       include Generic_set.S0
 
       val sexp_of_t : t -> Sexp.t

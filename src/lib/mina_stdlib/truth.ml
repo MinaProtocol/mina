@@ -1,5 +1,3 @@
-include Core_kernel
-
 module True = struct
   type t = True
 end

@@ -1,5 +1,5 @@
-open Core_kernel
-open Core_kernel.Hash.Builtin
+open Core
+open Hash.Builtin
 
 module N16 = struct
   let max_array_len = 16
@@ -21,7 +21,7 @@ struct
 
       let hash_fold_t = hash_fold_array_frozen
 
-      [%%define_locally Core_kernel.Array.(compare, equal)]
+      [%%define_locally Array.(compare, equal)]
 
       let to_latest s = s
 
@@ -66,7 +66,7 @@ module String = struct
 
       let to_latest s = s
 
-      [%%define_locally Core_kernel.String.(compare, equal)]
+      [%%define_locally String.(compare, equal)]
 
       let hash = hash_string
 
@@ -141,20 +141,18 @@ end
 module Wrapped_error = struct
   module Stable = struct
     module V1 = struct
-      type t = Core_kernel.Error.Stable.V2.t [@@deriving sexp]
+      type t = Error.Stable.V2.t [@@deriving sexp]
 
       let __versioned__ = ()
 
-      let to_latest = Core_kernel.Fn.id
+      let to_latest = Fn.id
 
       include String.Of_stringable (struct
         type nonrec t = t
 
-        let to_string (s : t) =
-          Core_kernel.Error.sexp_of_t s |> Core_kernel.Sexp.to_string_mach
+        let to_string (s : t) = Error.sexp_of_t s |> Sexp.to_string_mach
 
-        let of_string s =
-          Core_kernel.Error.t_of_sexp (Core_kernel.Sexp.of_string s)
+        let of_string s = Error.t_of_sexp (Sexp.of_string s)
       end)
     end
   end

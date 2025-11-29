@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 include (
@@ -34,7 +34,7 @@ module Result = struct
     open Deferred.Result.Let_syntax
 
     let fold ls ~init ~f =
-      Core_kernel.List.fold ls ~init:(return init) ~f:(fun acc x ->
+      Core.List.fold ls ~init:(return init) ~f:(fun acc x ->
           let%bind acc' = acc in
           f acc' x )
 
@@ -42,7 +42,7 @@ module Result = struct
       fold ls ~init:[] ~f:(fun acc x ->
           let%map x' = f x in
           x' :: acc )
-      >>| Core_kernel.List.rev
+      >>| Core.List.rev
 
     let iter ls ~f = fold ls ~init:() ~f:(fun () -> f)
   end

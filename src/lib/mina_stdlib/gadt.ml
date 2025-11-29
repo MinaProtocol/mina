@@ -1,3 +1,5 @@
+open Core
+
 module Peano = struct
   type zero = unit
 
@@ -68,8 +70,8 @@ module Vect = struct
   let rec map : type n. f:('a -> 'b) -> ('a, n) t -> ('b, n) t =
    fun ~f ls -> match ls with [] -> [] | h :: t -> f h :: map ~f t
 
-  let rec map2 :
-      type n. f:('a -> 'b -> 'c) -> ('a, n) t -> ('b, n) t -> ('c, n) t =
+  let rec map2 : type n.
+      f:('a -> 'b -> 'c) -> ('a, n) t -> ('b, n) t -> ('c, n) t =
    fun ~f ls_a ls_b ->
     match (ls_a, ls_b) with
     | [], [] ->
@@ -81,9 +83,8 @@ module Vect = struct
    fun ~init ~f ls ->
     match ls with [] -> init | h :: t -> fold ~init:(f init h) ~f t
 
-  let rec fold_map :
-      type n. init:'b -> f:('b -> 'a -> 'b * 'c) -> ('a, n) t -> 'b * ('c, n) t
-      =
+  let rec fold_map : type n.
+      init:'b -> f:('b -> 'a -> 'b * 'c) -> ('a, n) t -> 'b * ('c, n) t =
    fun ~init ~f ls ->
     match ls with
     | [] ->
@@ -94,11 +95,11 @@ module Vect = struct
         (init'', h' :: t')
 
   module Quickcheck_generator = struct
-    open Core_kernel.Quickcheck
+    open Quickcheck
     open Generator.Let_syntax
 
-    let rec map :
-        type n. f:('a -> 'b Generator.t) -> ('a, n) t -> ('b, n) t Generator.t =
+    let rec map : type n.
+        f:('a -> 'b Generator.t) -> ('a, n) t -> ('b, n) t Generator.t =
      fun ~f ls ->
       match ls with
       | [] ->
