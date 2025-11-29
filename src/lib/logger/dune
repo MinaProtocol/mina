@@ -9,6 +9,6 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_mina ppx_jane ppx_deriving_yojson ppx_deriving.std))
+  (pps ppx_compare ppx_enumerate ppx_deriving.show ppx_deriving_yojson ppx_mina ppx_sexp_conv ppx_version))
  (virtual_modules logger)
  (default_implementation logger.native))

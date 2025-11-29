@@ -12,7 +12,7 @@
   ;; local libraries
   logger)
  (preprocess
-  (pps ppx_jane ppx_mina ppx_version ppx_deriving_yojson))
+  (pps ppx_compare ppx_enumerate ppx_deriving.show ppx_deriving_yojson ppx_mina ppx_sexp_conv ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis
