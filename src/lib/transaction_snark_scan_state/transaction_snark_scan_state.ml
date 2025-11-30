@@ -1172,7 +1172,7 @@ let latest_recent_proof_txs_impl ~process ~continued_in_next_tree
         (if continued_in_next_tree then previous_incomplete else [])
       txns_with_witnesses
   in
-  if List.is_empty previous_incomplete then txns
+  if List.is_empty previous_incomplete || continued_in_next_tree then txns
   else
     { Transactions_categorized.Poly.first_pass = []
     ; second_pass = []
