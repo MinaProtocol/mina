@@ -51,17 +51,20 @@ let plugin_flag =
 
 let make_ledger_backing ~logger ~constraint_constants ~runtime_config
     ~hardfork_handling =
-  let hardfork_slot =
-    let open Option.Let_syntax in
-    let%bind { global_slot_since_genesis = current_genesis_global_slot; _ } =
+  let current_genesis_global_slot =
+    let%map.Option { global_slot_since_genesis = current_genesis_global_slot
+                   ; _
+                   } =
       constraint_constants.Genesis_constants.Constraint_constants.fork
     in
-    let%map hardfork_slot_since_last_hf =
+    current_genesis_global_slot
+  in
+  let hardfork_slot =
+    let%map.Option hardfork_slot_since_last_hf =
       Runtime_config.scheduled_hard_fork_genesis_slot runtime_config
     in
     Mina_numbers.Global_slot_since_hard_fork.to_global_slot_since_genesis
-      ~current_genesis_global_slot:(Some current_genesis_global_slot)
-      hardfork_slot_since_last_hf
+      ~current_genesis_global_slot hardfork_slot_since_last_hf
   in
 
   match (hardfork_handling, hardfork_slot) with
