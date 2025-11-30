@@ -207,11 +207,10 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult) (*ForkDa
 	)
 	cmd.Stderr = os.Stderr
 
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to run patch-runtime-config-advanced-gen-fork-config.sh: %w", err)
-	}
-
 	patchedConfigString, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run script: %w", err)
+	}
 
 	err = os.WriteFile(configToPatch, patchedConfigString, 0644)
 	if err != nil {
