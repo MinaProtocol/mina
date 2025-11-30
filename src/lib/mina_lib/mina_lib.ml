@@ -3140,7 +3140,7 @@ module Hardfork_config = struct
          ~state_hash ~blockchain_length ~staking_epoch_seed ~next_epoch_seed
          genesis_config )
 
-  let generate_hardfork_configs ~logger
+  let generate_hardfork_configs ~logger ~generate_fork_validation
       ~inputs:
         { source_ledgers
         ; global_slot_since_genesis
@@ -3190,12 +3190,14 @@ module Hardfork_config = struct
     in
     [%log debug] "Writing hard fork config directories" ;
     let%bind () =
-      write_stable_config_directory ~logger ~genesis_state_timestamp
-        ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
-        ~next_epoch_seed ~blockchain_length
-        ~config_dir:(directory_name ^/ "fork_validation" ^/ "legacy")
-        genesis_ledger_legacy genesis_staking_ledger_legacy
-        genesis_next_epoch_ledger_legacy
+      if generate_fork_validation then
+        write_stable_config_directory ~logger ~genesis_state_timestamp
+          ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
+          ~next_epoch_seed ~blockchain_length
+          ~config_dir:(directory_name ^/ "fork_validation" ^/ "legacy")
+          genesis_ledger_legacy genesis_staking_ledger_legacy
+          genesis_next_epoch_ledger_legacy
+      else Deferred.Or_error.ok_unit
     in
     let%bind () =
       write_migrated_config_directory ~logger ~genesis_state_timestamp
@@ -3212,13 +3214,14 @@ module Hardfork_config = struct
     [%log debug]
       "Successfully generated and activated reference hard fork config"
 
-  let dump_reference_config ~breadcrumb_spec ~directory_name mina =
+  let dump_reference_config ~breadcrumb_spec ~config_dir
+      ~generate_fork_validation mina =
     let open Deferred.Or_error.Let_syntax in
     let logger = mina.config.logger in
     Deferred.Or_error.try_with_join ~here:[%here]
     @@ fun () ->
     let%bind.Deferred dir_exists =
-      Mina_stdlib_unix.File_system.dir_exists directory_name
+      Mina_stdlib_unix.File_system.dir_exists config_dir
     in
     let%bind () =
       if dir_exists then
@@ -3227,14 +3230,13 @@ module Hardfork_config = struct
       else return ()
     in
     [%log debug] "Creating reference hard fork config in $directory_name"
-      ~metadata:[ ("directory_name", `String directory_name) ] ;
-    let%bind.Deferred () =
-      Mina_stdlib_unix.File_system.create_dir directory_name
-    in
+      ~metadata:[ ("directory_name", `String config_dir) ] ;
+    let%bind.Deferred () = Mina_stdlib_unix.File_system.create_dir config_dir in
     let%bind inputs = prepare_inputs ~breadcrumb_spec mina in
-    Mina_stdlib_unix.File_system.with_temp_dir (directory_name ^/ "_build")
+    Mina_stdlib_unix.File_system.with_temp_dir (config_dir ^/ "_build")
       ~f:(fun build_dir ->
-        generate_hardfork_configs ~logger ~inputs ~build_dir directory_name )
+        generate_hardfork_configs ~logger ~inputs ~build_dir
+          ~generate_fork_validation config_dir )
 end
 
 let zkapp_cmd_limit t = t.config.zkapp_cmd_limit
