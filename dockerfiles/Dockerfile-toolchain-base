@@ -7,7 +7,6 @@ ENV YQ_VERSION=4.44.3
 
 ENV GIT_SSL_CAINFO=/etc/ssl/certs/ca-certificates.crt
 
-# Pin package versions and use --no-install-recommends
 RUN apt-get update && apt-get install -y --no-install-recommends \
 	bash \
 	curl \
@@ -19,27 +18,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	make \
 	&& rm -rf /var/lib/apt/lists/*
 
-# Use bash and pipefail for all RUN commands
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 
 RUN git config --system --add safe.directory '*'
 
-
-# Install dhall and dhall-to-yaml
 RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/${DHALL_VERSION}/dhall-${DHALL_VERSION}-x86_64-linux.tar.bz2 | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall
 RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/${DHALL_VERSION}/dhall-json-${DHALL_JSON_VERSION}-x86_64-linux.tar.bz2 | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
 
 
-# Install yq
 RUN curl -L "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_amd64" -o "/usr/local/bin/yq" && chmod +x "/usr/local/bin/yq"
 
 
-# Add Buildkite APT key
 RUN curl -fsSL https://keys.openpgp.org/vks/v1/by-fingerprint/32A37959C2FA5C3C99EFBC32A79206696452D198 | gpg --dearmor -o /usr/share/keyrings/buildkite-agent-archive-keyring.gpg
 RUN echo "deb [signed-by=/usr/share/keyrings/buildkite-agent-archive-keyring.gpg] https://apt.buildkite.com/buildkite-agent stable main" > /etc/apt/sources.list.d/buildkite-agent.list
 
-
-# Install Buildkite Agent (pin version and use --no-install-recommends)
 RUN apt-get update && apt-get install -y --no-install-recommends buildkite-agent \
 	&& rm -rf /var/lib/apt/lists/*
