@@ -4690,7 +4690,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
           Genesis_ledger_helper.init_from_config_file ~logger
             ~proof_level:Genesis_constants.Compiled.proof_level
             ~genesis_constants ~constraint_constants runtime_config
-            ~cli_proof_level:None ~hardfork_handling:Keep_running
+            ~cli_proof_level:None ~ledger_backing:Stable_db
         with
         | Ok precomputed_values ->
             precomputed_values

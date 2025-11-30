@@ -857,30 +857,10 @@ let global_slot_since_hard_fork_to_genesis
   Mina_numbers.Global_slot_since_genesis.add current_genesis_global_slot
     global_slot_span
 
-let make_ledger_backing ~logger ~constraint_constants ~runtime_config
-    ~hardfork_handling =
-  let hardfork_slot =
-    Runtime_config.scheduled_hard_fork_genesis_slot runtime_config
-    |> Option.map
-         ~f:(global_slot_since_hard_fork_to_genesis ~constraint_constants)
-  in
-  match (hardfork_handling, hardfork_slot) with
-  | Cli_lib.Arg_type.Hardfork_handling.Migrate_exit, Some hardfork_slot ->
-      Root_ledger.Config.Converting_db hardfork_slot
-  | Migrate_exit, _ ->
-      failwith "No hardfork slot provided for Migrate_exit mode"
-  | Keep_running, Some _ ->
-      [%log warn]
-        "hardfork slot is set for keep_running hardfork handle, ignoring" ;
-      Stable_db
-  | Keep_running, None ->
-      Stable_db
-
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~(hardfork_handling : Cli_lib.Arg_type.Hardfork_handling.t)
-    ~proof_level:compiled_proof_level ?overwrite_version
+    ~ledger_backing ~proof_level:compiled_proof_level ?overwrite_version
     (config : Runtime_config.t) =
   print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
@@ -936,15 +916,11 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           "Proof level %s is not compatible with compile-time proof level %s"
           (str proof_level) (str compiled)
   in
-  let genesis_backing_type =
-    make_ledger_backing ~logger ~constraint_constants ~runtime_config:config
-      ~hardfork_handling
-  in
   let%bind genesis_ledger, ledger_config, ledger_file =
     match config.ledger with
     | Some ledger ->
         Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-          ~genesis_backing_type ?overwrite_version ledger
+          ~genesis_backing_type:ledger_backing ?overwrite_version ledger
     | None ->
         [%log fatal] "No ledger was provided in the runtime configuration" ;
         Deferred.Or_error.errorf
@@ -954,7 +930,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~metadata:[ ("ledger_file", `String ledger_file) ] ;
   let%bind genesis_epoch_data, genesis_epoch_data_config =
     Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      ~genesis_backing_type config.epoch_data
+      ~genesis_backing_type:ledger_backing config.epoch_data
   in
   let config =
     { config with
@@ -971,11 +947,11 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~blockchain_proof_system_id ~genesis_epoch_data
 
 let init_from_config_file ~cli_proof_level ~genesis_constants
-    ~constraint_constants ~logger ~proof_level ~hardfork_handling
+    ~constraint_constants ~logger ~proof_level ~ledger_backing
     ?overwrite_version ?genesis_dir (config : Runtime_config.t) :
     Precomputed_values.t Deferred.Or_error.t =
   inputs_from_config_file ~cli_proof_level ~genesis_constants
-    ~constraint_constants ~logger ~proof_level ~hardfork_handling
+    ~constraint_constants ~logger ~proof_level ~ledger_backing
     ?overwrite_version ?genesis_dir config
   |> Deferred.Or_error.map ~f:Genesis_proof.create_values_no_proof
 

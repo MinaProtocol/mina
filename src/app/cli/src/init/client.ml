@@ -1854,8 +1854,7 @@ let compile_time_constants =
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
                  ~constraint_constants ~logger:(Logger.null ()) ~proof_level
-                 ~cli_proof_level:None ~genesis_dir
-                 ~hardfork_handling:Keep_running
+                 ~cli_proof_level:None ~genesis_dir ~ledger_backing:Stable_db
            >>| Or_error.ok_exn
          in
          let all_constants =

@@ -72,6 +72,7 @@ type t =
   ; compile_config : Mina_compile_config.t
   ; itn_features : bool
   ; hardfork_handling : Cli_lib.Arg_type.Hardfork_handling.t
+  ; ledger_backing : Mina_ledger.Root.Config.backing_type
   ; hardfork_slot : Mina_numbers.Global_slot_since_genesis.t option
   }
 [@@deriving make]

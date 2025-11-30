@@ -2224,14 +2224,6 @@ let create ~commit_id ?wallets (config : Config.t) =
             }
           in
 
-          let ledger_backing =
-            Genesis_ledger_helper.make_ledger_backing ~logger:config.logger
-              ~constraint_constants:
-                config.precomputed_values.constraint_constants
-              ~runtime_config:config.precomputed_values.runtime_config
-              ~hardfork_handling:config.hardfork_handling
-          in
-
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
@@ -2248,7 +2240,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ~transaction_pool_proxy ~ledger_backing ()
+              ~notify_online ~transaction_pool_proxy
+              ~ledger_backing:config.ledger_backing ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

@@ -86,6 +86,27 @@ module Chain_state_locations = struct
     }
 end
 
+let make_ledger_backing ~logger ~constraint_constants ~runtime_config
+    ~hardfork_handling =
+  let hardfork_slot =
+    Runtime_config.scheduled_hard_fork_genesis_slot runtime_config
+    |> Option.map
+         ~f:
+           (Genesis_ledger_helper.global_slot_since_hard_fork_to_genesis
+              ~constraint_constants )
+  in
+  match (hardfork_handling, hardfork_slot) with
+  | Cli_lib.Arg_type.Hardfork_handling.Migrate_exit, Some hardfork_slot ->
+      Mina_ledger.Root.Config.Converting_db hardfork_slot
+  | Migrate_exit, _ ->
+      failwith "No hardfork slot provided for Migrate_exit mode"
+  | Keep_running, Some _ ->
+      [%log warn]
+        "hardfork slot is set for keep_running hardfork handle, ignoring" ;
+      Stable_db
+  | Keep_running, None ->
+      Stable_db
+
 let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
     ~genesis_dir ~cli_proof_level ~proof_level ~hardfork_handling config_files =
   let%bind config_jsons =
@@ -134,17 +155,21 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
                 ] ;
             failwithf "Could not parse configuration file: %s" err () )
   in
+  let ledger_backing =
+    make_ledger_backing ~logger ~constraint_constants ~runtime_config:config
+      ~hardfork_handling
+  in
   let chain_state_locations =
     Chain_state_locations.of_config ~conf_dir config
   in
   let genesis_dir =
     Option.value ~default:chain_state_locations.genesis genesis_dir
   in
-  let%bind precomputed_values =
+  let%map precomputed_values =
     match%map
       Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
         ~logger ~genesis_constants ~constraint_constants ~proof_level
-        ~hardfork_handling config
+        ~ledger_backing config
     with
     | Ok precomputed_values ->
         precomputed_values
@@ -179,7 +204,11 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
           ~metadata ;
         Error.raise err
   in
-  return (precomputed_values, config_jsons, config, chain_state_locations)
+  ( precomputed_values
+  , config_jsons
+  , config
+  , chain_state_locations
+  , ledger_backing )
 
 let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   let open Command.Let_syntax in
@@ -846,7 +875,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let%bind ( precomputed_values
                    , config_jsons
                    , config
-                   , chain_state_locations ) =
+                   , chain_state_locations
+                   , ledger_backing ) =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
@@ -1213,10 +1243,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
 
             let consensus_constants = precomputed_values.consensus_constants
           end in
-          let ledger_backing =
-            Genesis_ledger_helper.make_ledger_backing ~logger
-              ~constraint_constants ~runtime_config:config ~hardfork_handling
-          in
           let consensus_local_state =
             Consensus.Data.Local_state.create
               ~context:(module Context)
@@ -1488,7 +1514,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~stop_time_interval ~node_status_url
                  ~graphql_control_port:itn_graphql_port ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
-                 ~itn_features ~compile_config ~hardfork_handling () )
+                 ~itn_features ~compile_config ~hardfork_handling
+                 ~ledger_backing () )
           in
           { mina
           ; client_trustlist
@@ -2041,7 +2068,8 @@ let internal_commands logger ~itn_features =
           let%bind ( precomputed_values
                    , _config_jsons
                    , _config
-                   , _chain_state_locations ) =
+                   , _chain_state_locations
+                   , _ ) =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
               ~constraint_constants ~proof_level ~cli_proof_level:None
               ~hardfork_handling:Keep_running config_files
