@@ -19,12 +19,16 @@ let run (module F : Intf.Fixture) =
           eprintf "Teardown failed with error: %s\n" (Error.to_string_hum err)
       )
     (fun () ->
-      match%bind F.test_case test_case_after_setup with
-      | Ok result ->
-          return result
-      | Error err ->
-          let%map () = F.on_test_fail test_case_after_setup in
-          Intf.Failed (Error.to_string_hum err) )
+      try
+        match%bind F.test_case test_case_after_setup with
+        | Ok result ->
+            return result
+        | Error err ->
+            let%map () = F.on_test_fail test_case_after_setup in
+            Intf.Failed (Error.to_string_hum err)
+      with exn ->
+        let%map () = F.on_test_fail test_case_after_setup in
+        Intf.Failed (Exn.to_string exn) )
 
 let run_blocking test_case () =
   match Async.Thread_safe.block_on_async_exn (fun () -> run test_case) with
