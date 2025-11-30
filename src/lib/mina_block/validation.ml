@@ -600,7 +600,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
       [ ( "time_elapsed"
         , `Float Core.Time.(Span.to_ms @@ diff (now ()) apply_start_time) )
       ]
-    "Staged_ledger.apply_diff takes $time_elapsed" ;
+    "Staged ledger diff application (diffs + scan state) takes $time_elapsed" ;
   let snarked_ledger_hash =
     match proof_opt with
     | None ->

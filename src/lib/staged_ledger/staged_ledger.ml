@@ -1299,7 +1299,7 @@ module T = struct
           , `Float Core.Time.(Span.to_ms @@ diff (now ()) apply_diff_start_time)
           )
         ]
-      "Staged_ledger.apply_diff take $time_elapsed" ;
+      "Staged_ledger.apply_diff takes $time_elapsed" ;
     res
 
   let apply_diff_unchecked ~constraint_constants ~global_slot ~logger
