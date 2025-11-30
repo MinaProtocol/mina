@@ -91,6 +91,7 @@ func (t *HardforkTest) AdvancedGenerateHardForkConfig(configDir string, clientPo
 		"advanced", "generate-hardfork-config",
 		"--hardfork-config-dir", configDir,
 		"--daemon-port", strconv.Itoa(clientPort),
+		"--generate-fork-validation", "false",
 	)
 
 	cmd.Stdout = os.Stdout
