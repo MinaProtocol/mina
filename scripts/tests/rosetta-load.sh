@@ -59,7 +59,7 @@ readonly DEFAULT_PAYMENT_TX_INTERVAL="2"
 readonly DEFAULT_ZKAPP_TX_INTERVAL="1"
 
 # Default memory threshold for PostgreSQL processes
-readonly DEFAULT_POSTGRES_MEMORY_THRESHOLD="3000"  # MB
+readonly DEFAULT_POSTGRES_MEMORY_THRESHOLD="3500"  # MB
 
 # Default memory threshold for Rosetta API processes
 readonly DEFAULT_ROSETTA_MEMORY_THRESHOLD="300"   # MB
