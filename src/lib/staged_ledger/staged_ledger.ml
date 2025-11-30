@@ -1264,13 +1264,28 @@ module T = struct
               check_completed_works ~get_completed_work ~logger ~verifier
                 t.scan_state work )
     in
+    let check_commands txs hashes =
+      match skip_verification with
+      | Some `All ->
+          let f { With_status.data = tx; _ } =
+            (* Skipping verification when [`All] is provided (this
+               is used only when loading an already verified
+               transition from disk). *)
+            let (`If_this_is_used_it_should_have_a_comment_justifying_it tx') =
+              User_command.to_valid_unsafe tx
+            in
+            tx'
+          in
+          let res = List.map ~f txs in
+          Deferred.Result.return (Ok res)
+      | _ ->
+          Check_commands.check_commands t.ledger ~verifier
+            ~transaction_pool_proxy txs hashes
+    in
     [%log internal] "Prediff" ;
     let%bind prediff =
       Pre_diff_info.get staged_ledger_diff ~constraint_constants
-        ~coinbase_receiver ~supercharge_coinbase
-        ~check:
-          (Check_commands.check_commands t.ledger ~verifier
-             ~transaction_pool_proxy )
+        ~coinbase_receiver ~supercharge_coinbase ~check:check_commands
       |> Deferred.map
            ~f:
              (Result.map_error ~f:(fun error ->
