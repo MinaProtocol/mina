@@ -836,7 +836,6 @@ if ${DEMO_MODE}; then
     -block-producer-key ${ROOT}/online_whale_keys/online_whale_account_0 \
     --run-snark-worker "$(cat ${ROOT}/snark_coordinator_keys/snark_coordinator_account.pub)" \
     --snark-worker-fee 0.001 \
-    --proof-level ${PROOF_LEVEL} \
     --demo-mode \
     --external-ip "$(hostname -i)" \
     --seed \
