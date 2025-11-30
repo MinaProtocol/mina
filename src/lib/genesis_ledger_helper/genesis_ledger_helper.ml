@@ -67,6 +67,8 @@ let assert_filehash_equal ~file ~hash ~logger =
   let%bind computed_hash = sha3_hash file in
   if String.equal computed_hash hash then Deferred.unit
   else
+    let%bind stats = Unix.stat file in
+    let file_size = stats.size in
     let%map () = Unix.rename ~src:file ~dst:(file ^ ".incorrect-hash") in
     [%log error]
       "Verification failure: downloaded $path and expected SHA3-256 = \
@@ -75,6 +77,7 @@ let assert_filehash_equal ~file ~hash ~logger =
         [ ("path", `String file)
         ; ("expected_hash", `String hash)
         ; ("computed_hash", `String computed_hash)
+        ; ("file_size", `String (Int64.to_string file_size))
         ] ;
     failwith "Tarball hash mismatch"
 

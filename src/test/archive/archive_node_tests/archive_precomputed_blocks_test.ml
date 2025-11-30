@@ -124,6 +124,7 @@ let test_case (test_data : t) =
   in
   let log_file = output ^ "/precomputed_blocks_test.log" in
   Archive.Process.start_logging test_data.archive ~log_file ;
+  let%bind.Deferred.Or_error () = Archive.wait_until_ready ~log_file in
   let%bind () =
     Daemon.archive_blocks_from_files daemon.executor
       ~archive_address:test_data.archive.config.server_port ~format:`Precomputed

@@ -27,7 +27,6 @@ let construct_staged_ledger_at_root ~proof_cache_db
     ~(precomputed_values : Precomputed_values.t) ~root_ledger ~root_transition
     ~(root : Root_data.Minimal.Stable.Latest.t) ~protocol_states ~logger
     ~signature_kind =
-  let open Deferred.Or_error.Let_syntax in
   let blockchain_state =
     root_transition |> Mina_block.Validated.forget |> With_hash.data
     |> Mina_block.header |> Mina_block.Header.protocol_state
@@ -66,27 +65,12 @@ let construct_staged_ledger_at_root ~proof_cache_db
     Staged_ledger.Scan_state.write_all_proofs_to_disk ~signature_kind
       ~proof_cache_db scan_state_unwrapped
   in
-  let%bind staged_ledger =
-    Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
-      ~snarked_local_state:local_state ~snarked_ledger:mask ~scan_state
-      ~constraint_constants:precomputed_values.constraint_constants ~logger
-      ~pending_coinbases
-      ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
-      ~get_state ~signature_kind
-  in
-  let constructed_staged_ledger_hash = Staged_ledger.hash staged_ledger in
-  if
-    Mina_block.Validated.is_genesis root_transition
-    || Staged_ledger_hash.equal staged_ledger_hash
-         constructed_staged_ledger_hash
-  then Deferred.return (Ok staged_ledger)
-  else
-    Deferred.return
-      (Or_error.errorf
-         !"Constructed staged ledger %{sexp: Staged_ledger_hash.t} did not \
-           match the staged ledger hash in the protocol state %{sexp: \
-           Staged_ledger_hash.t}"
-         constructed_staged_ledger_hash staged_ledger_hash )
+  Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
+    ~snarked_local_state:local_state ~snarked_ledger:mask ~scan_state
+    ~constraint_constants:precomputed_values.constraint_constants ~logger
+    ~pending_coinbases
+    ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
+    ~get_state ~signature_kind
 
 module rec Instance_type : sig
   type t =
@@ -197,29 +181,82 @@ module Instance = struct
          ($current_root --> $target_root)" ;
       Error `Bootstrap_required )
 
+  let validate genesis_state_hash (b, v) =
+    Validation.validate_genesis_protocol_state ~genesis_state_hash
+      (With_hash.map ~f:Mina_block.header b, v)
+    |> Result.map
+         ~f:(Fn.flip Validation.with_body (Mina_block.body @@ With_hash.data b))
+
+  let downgrade_transition transition genesis_state_hash :
+      ( Mina_block.almost_valid_block
+      , [ `Invalid_genesis_protocol_state ] )
+      Result.t =
+    (* we explicitly re-validate the genesis protocol state here to prevent X-version bugs *)
+    transition |> Mina_block.Validated.remember
+    |> Validation.reset_staged_ledger_diff_validation
+    |> Validation.reset_genesis_protocol_state_validation
+    |> validate genesis_state_hash
+
+  let apply_diff ~logger ~frontier ~extensions ~ignore_consensus_local_state
+      ~root_ledger diff =
+    [%log internal] "Apply_full_frontier_diffs" ;
+    let (`New_root_and_diffs_with_mutants (_, diffs_with_mutants)) =
+      Full_frontier.apply_diffs frontier [ diff ] ~has_long_catchup_job:false
+        ~enable_epoch_ledger_sync:
+          ( if ignore_consensus_local_state then `Disabled
+          else `Enabled root_ledger )
+    in
+    [%log internal] "Apply_full_frontier_diffs_done" ;
+    [%log internal] "Notify_frontier_extensions" ;
+    let%map.Deferred result =
+      Extensions.notify extensions ~logger ~frontier ~diffs_with_mutants
+    in
+    [%log internal] "Notify_frontier_extensions_done" ;
+    Result.return result
+
+  let load_transition ~root_genesis_state_hash ~logger ~precomputed_values t
+      ~parent transition =
+    let%bind.Deferred.Result transition =
+      match downgrade_transition transition root_genesis_state_hash with
+      | Ok t ->
+          Deferred.Result.return t
+      | Error `Invalid_genesis_protocol_state ->
+          Error (`Fatal_error (Invalid_genesis_state_hash transition))
+          |> Deferred.return
+    in
+    let state_hash =
+      (With_hash.hash @@ Mina_block.Validation.block_with_hash transition)
+        .state_hash
+    in
+    Internal_tracing.with_state_hash state_hash
+    @@ fun () ->
+    [%log internal] "@block_metadata"
+      ~metadata:
+        [ ( "blockchain_length"
+          , Mina_numbers.Length.to_yojson
+            @@ Mina_block.(blockchain_length (Validation.block transition)) )
+        ] ;
+    [%log internal] "Loaded_transition_from_storage" ;
+    (* we're loading transitions from persistent storage,
+       don't assign a timestamp
+    *)
+    let transition_receipt_time = None in
+    Breadcrumb.build ~skip_staged_ledger_verification:`All
+      ~logger:t.factory.logger ~precomputed_values ~verifier:t.factory.verifier
+      ~trust_system:(Trust_system.null ()) ~parent ~transition
+      ~get_completed_work:(Fn.const None) ~sender:None ~transition_receipt_time
+      ()
+
+  let set_best_tip ~logger ~frontier ~extensions ~ignore_consensus_local_state
+      ~root_ledger best_tip_hash =
+    apply_diff ~logger ~frontier ~extensions ~ignore_consensus_local_state
+      ~root_ledger (E (Best_tip_changed best_tip_hash))
+
   let load_full_frontier t ~context:(module Context : CONTEXT) ~root_ledger
       ~consensus_local_state ~max_length ~ignore_consensus_local_state
-      ~persistent_root_instance =
+      ~persistent_root_instance ?max_frontier_depth () =
     let open Context in
     let open Deferred.Result.Let_syntax in
-    let validate genesis_state_hash (b, v) =
-      Validation.validate_genesis_protocol_state ~genesis_state_hash
-        (With_hash.map ~f:Mina_block.header b, v)
-      |> Result.map
-           ~f:
-             (Fn.flip Validation.with_body
-                (Mina_block.body @@ With_hash.data b) )
-    in
-    let downgrade_transition transition genesis_state_hash :
-        ( Mina_block.almost_valid_block
-        , [ `Invalid_genesis_protocol_state ] )
-        Result.t =
-      (* we explicitly re-validate the genesis protocol state here to prevent X-version bugs *)
-      transition |> Mina_block.Validated.remember
-      |> Validation.reset_staged_ledger_diff_validation
-      |> Validation.reset_genesis_protocol_state_validation
-      |> validate genesis_state_hash
-    in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)
     let%bind root, root_transition, best_tip, protocol_states, root_hash =
@@ -276,68 +313,25 @@ module Instance = struct
         (Extensions.create ~logger:t.factory.logger frontier)
         ~f:Result.return
     in
-    let apply_diff diff =
-      [%log internal] "Apply_full_frontier_diffs" ;
-      let (`New_root_and_diffs_with_mutants (_, diffs_with_mutants)) =
-        Full_frontier.apply_diffs frontier [ diff ] ~has_long_catchup_job:false
-          ~enable_epoch_ledger_sync:
-            ( if ignore_consensus_local_state then `Disabled
-            else `Enabled root_ledger )
+    let visit parent transition =
+      let%bind breadcrumb =
+        load_transition ~root_genesis_state_hash ~logger ~precomputed_values t
+          ~parent transition
       in
-      [%log internal] "Apply_full_frontier_diffs_done" ;
-      [%log internal] "Notify_frontier_extensions" ;
-      let%map.Deferred result =
-        Extensions.notify extensions ~logger ~frontier ~diffs_with_mutants
+      let%map () =
+        apply_diff ~logger ~frontier ~extensions ~ignore_consensus_local_state
+          ~root_ledger (E (New_node (Full breadcrumb)))
       in
-      [%log internal] "Notify_frontier_extensions_done" ;
-      Result.return result
+      [%log internal] "Breadcrumb_integrated" ;
+      breadcrumb
     in
     (* crawl through persistent frontier and load transitions into in memory frontier *)
-    let%bind () =
+    let%map () =
       Deferred.map
         (Database.crawl_successors ~signature_kind ~proof_cache_db t.db
-           root_hash ~init:(Full_frontier.root frontier)
-           ~f:(fun parent transition ->
-             let%bind transition =
-               match
-                 downgrade_transition transition root_genesis_state_hash
-               with
-               | Ok t ->
-                   Deferred.Result.return t
-               | Error `Invalid_genesis_protocol_state ->
-                   Error (`Fatal_error (Invalid_genesis_state_hash transition))
-                   |> Deferred.return
-             in
-             let state_hash =
-               ( With_hash.hash
-               @@ Mina_block.Validation.block_with_hash transition )
-                 .state_hash
-             in
-             Internal_tracing.with_state_hash state_hash
-             @@ fun () ->
-             [%log internal] "@block_metadata"
-               ~metadata:
-                 [ ( "blockchain_length"
-                   , Mina_numbers.Length.to_yojson
-                     @@ Mina_block.(
-                          blockchain_length (Validation.block transition)) )
-                 ] ;
-             [%log internal] "Loaded_transition_from_storage" ;
-             (* we're loading transitions from persistent storage,
-                don't assign a timestamp
-             *)
-             let transition_receipt_time = None in
-             let%bind breadcrumb =
-               Breadcrumb.build ~skip_staged_ledger_verification:`All
-                 ~logger:t.factory.logger ~precomputed_values
-                 ~verifier:t.factory.verifier
-                 ~trust_system:(Trust_system.null ()) ~parent ~transition
-                 ~get_completed_work:(Fn.const None) ~sender:None
-                 ~transition_receipt_time ()
-             in
-             let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
-             [%log internal] "Breadcrumb_integrated" ;
-             breadcrumb ) )
+           ?max_depth:max_frontier_depth root_hash
+           ~init:(Full_frontier.root frontier)
+           ~f:visit )
         ~f:
           (Result.map_error ~f:(function
             | `Crawl_error err ->
@@ -356,8 +350,7 @@ module Instance = struct
             | `Not_found _ as err ->
                 `Failure (Database.Error.not_found_message err) ) )
     in
-    let%map () = apply_diff Diff.(E (Best_tip_changed best_tip)) in
-    (frontier, extensions)
+    (root_ledger, best_tip, frontier, extensions)
 end
 
 type t = Factory_type.t

@@ -223,8 +223,9 @@ let dockerTag =
 
 let fullDockerTag =
           \(spec : Tag.Type)
-      ->  "${Repo.show Repo.Type.Internal}/${dockerName
-                                               spec.artifact}:${dockerTag spec}"
+      ->  "${Repo.show Repo.Type.InternalEurope}/${dockerName
+                                                     spec.artifact}:${dockerTag
+                                                                        spec}"
 
 in  { Type = Artifact
     , Tag = Tag

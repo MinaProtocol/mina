@@ -196,8 +196,8 @@ module Snark_worker = struct
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary ?env
         ~args:
-          ( "internal" :: Snark_worker.Intf.command_name
-          :: Snark_worker.arguments ~proof_level
+          ( "internal" :: Snark_worker.Entry.command_name
+          :: Snark_worker.Entry.arguments ~proof_level
                ~daemon_address:
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect:false ~conf_dir ~file_log_level ~log_json
@@ -284,6 +284,8 @@ module Snark_worker = struct
               , `Int (Pid.to_int (Process.pid snark_worker_process)) )
             ]
           "Started snark worker process with pid: $snark_worker_pid" ;
+        Mina_metrics.Process_memory.Snark_worker.set_pid
+          (Process.pid snark_worker_process) ;
         if Ivar.is_full process_ivar then
           [%log' error t.config.logger] "Ivar.fill bug is here!" ;
         Ivar.fill process_ivar snark_worker_process
@@ -302,6 +304,7 @@ module Snark_worker = struct
           ~metadata:
             [ ("snark_worker_pid", `Int (Pid.to_int (Process.pid process))) ] ;
         Signal.send_exn Signal.term (`Pid (Process.pid process)) ;
+        Mina_metrics.Process_memory.Snark_worker.clear_pid () ;
         if should_wait_kill then Ivar.read kill_ivar else Deferred.unit
     | `Off _ ->
         [%log' warn t.config.logger]

@@ -16,7 +16,7 @@ func (t *HardforkTest) ValidatePreforkLedgerHashes(
 	preforkHashesFile string,
 ) error {
 	// Calculate slot_tx_end_epoch
-	// 48 as specififed by run-localnet.sh
+	// 48 as specififed by mina-local-network.sh
 	slotTxEndEpoch := latestNonEmptyBlock.Slot / 48
 
 	// Find expected staking and next hashes
