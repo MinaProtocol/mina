@@ -837,26 +837,6 @@ let print_config ~logger config =
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
     ~metadata
 
-(** Helper to convert a global slot since hard fork to a global slot since genesis *)
-let global_slot_since_hard_fork_to_genesis
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    global_slot =
-  (* Convert the global slot to a span of slots since the current hard fork *)
-  let global_slot_span =
-    global_slot |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
-    |> Mina_numbers.Global_slot_span.of_uint32
-  in
-  (* Retrieve the global slot since genesis of the genesis of the current
-     chain *)
-  let current_genesis_global_slot =
-    constraint_constants.fork
-    |> Option.value_map ~default:Mina_numbers.Global_slot_since_genesis.zero
-         ~f:(fun fork -> fork.global_slot_since_genesis)
-  in
-  (* Add the slot span to the current chain's genesis slot to get the desired quantity *)
-  Mina_numbers.Global_slot_since_genesis.add current_genesis_global_slot
-    global_slot_span
-
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)

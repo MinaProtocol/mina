@@ -141,13 +141,34 @@ let load_config_exn config_file =
 
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
-    ~pad_app_state ~hardfork_slot () =
+    ~pad_app_state ~hardfork_slot ~prefork_genesis_config () =
   let hardfork_slot =
-    Option.map
-      ~f:
-        (Genesis_ledger_helper.global_slot_since_hard_fork_to_genesis
-           ~constraint_constants )
-      hardfork_slot
+    match (hardfork_slot, prefork_genesis_config) with
+    | None, None ->
+        None
+    | Some hardfork_slot, Some prefork_genesis_config ->
+        let runtime_config =
+          Yojson.Safe.from_file prefork_genesis_config
+          |> Runtime_config.of_yojson |> Result.ok_or_failwith
+        in
+        let current_genesis_global_slot =
+          let open Option.Let_syntax in
+          let%bind proof = runtime_config.proof in
+          let%map { global_slot_since_genesis; _ } = proof.fork in
+          Mina_numbers.Global_slot_since_genesis.of_int
+            global_slot_since_genesis
+        in
+        Option.some
+        @@ Mina_numbers.Global_slot_since_hard_fork.to_global_slot_since_genesis
+             ~current_genesis_global_slot hardfork_slot
+    | Some _, None ->
+        failwith
+          "hardfork slot is present but no prefork genesis config is provided"
+    | None, Some _ ->
+        [%log info]
+          "prefork genesis config is provided with no hardfork slot provided, \
+           ignoring" ;
+        None
   in
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
@@ -222,6 +243,14 @@ let () =
                "INT the scheduled hardfork slot since last hardfork at which \
                 vesting parameter update should happen. If absent, don't \
                 update the vesting parameters"
+         and prefork_genesis_config =
+           flag "--prefork-genesis-config" (optional string)
+             ~doc:
+               "STRING path to prefork genesis confg, should be present if \
+                `--hardfork-slot` is set, the program would read the genesis \
+                timestamps in the config to calculate the proper hardfork \
+                slot."
          in
          main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
-           ~ignore_missing_fields ~pad_app_state ~hardfork_slot) )
+           ~ignore_missing_fields ~pad_app_state ~hardfork_slot
+           ~prefork_genesis_config) )

@@ -89,12 +89,18 @@ end
 let make_ledger_backing ~logger ~constraint_constants ~runtime_config
     ~hardfork_handling =
   let hardfork_slot =
-    Runtime_config.scheduled_hard_fork_genesis_slot runtime_config
-    |> Option.map
-         ~f:
-           (Genesis_ledger_helper.global_slot_since_hard_fork_to_genesis
-              ~constraint_constants )
+    let open Option.Let_syntax in
+    let%bind { global_slot_since_genesis = current_genesis_global_slot; _ } =
+      constraint_constants.Genesis_constants.Constraint_constants.fork
+    in
+    let%map hardfork_slot_since_last_hf =
+      Runtime_config.scheduled_hard_fork_genesis_slot runtime_config
+    in
+    Mina_numbers.Global_slot_since_hard_fork.to_global_slot_since_genesis
+      ~current_genesis_global_slot:(Some current_genesis_global_slot)
+      hardfork_slot_since_last_hf
   in
+
   match (hardfork_handling, hardfork_slot) with
   | Cli_lib.Arg_type.Hardfork_handling.Migrate_exit, Some hardfork_slot ->
       Mina_ledger.Root.Config.Converting_db hardfork_slot
