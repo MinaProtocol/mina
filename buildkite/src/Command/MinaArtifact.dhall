@@ -142,6 +142,9 @@ let build_artifacts
                 # [ Cmd.run
                       "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                         spec.debVersion}"
+                  , Cmd.run
+                      "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
+                                                                      spec.debVersion}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
