@@ -1,5 +1,5 @@
+open Core
 open Async_kernel
-open Core_kernel
 
 let read_all_values ~expected ?pipe iterator =
   let counter = ref 0 in
@@ -25,7 +25,7 @@ let create_buffered_swappable capacity =
 let read_all_values_or_timeout ?pipe ~expected iterator =
   let read_all_values = read_all_values iterator ~expected ?pipe in
   Deferred.choose
-    [ Deferred.choice read_all_values ident
+    [ Deferred.choice read_all_values Fn.id
     ; Deferred.choice
         (after (Time_ns.Span.of_sec 1.5))
         (fun () -> failwith "Swappable strict pipe hangs, timeout!")
