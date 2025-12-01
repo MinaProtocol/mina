@@ -229,10 +229,10 @@ module Instance = struct
     |> Validation.reset_genesis_protocol_state_validation
     |> validate genesis_state_hash
 
-  let apply_diff ~logger ~frontier ~extensions ~ignore_consensus_local_state
+  let apply_diff ~logger ~frontier ~extensions:_ ~ignore_consensus_local_state
       ~root_ledger diff =
     [%log internal] "Apply_full_frontier_diffs" ;
-    let (`New_root_and_diffs_with_mutants (_, diffs_with_mutants)) =
+    let (`New_root_and_diffs_with_mutants (_, _diffs_with_mutants)) =
       Full_frontier.apply_diffs frontier [ diff ] ~has_long_catchup_job:false
         ~enable_epoch_ledger_sync:
           ( if ignore_consensus_local_state then `Disabled
@@ -240,11 +240,12 @@ module Instance = struct
     in
     [%log internal] "Apply_full_frontier_diffs_done" ;
     [%log internal] "Notify_frontier_extensions" ;
-    let%map.Deferred result =
-      Extensions.notify extensions ~logger ~frontier ~diffs_with_mutants
+    let%map.Deferred () =
+      (* Extensions.notify extensions ~logger ~frontier ~diffs_with_mutants *)
+      Deferred.unit
+      (* TMP change *)
     in
-    [%log internal] "Notify_frontier_extensions_done" ;
-    Result.return result
+    [%log internal] "Notify_frontier_extensions_done"
 
   let load_transition_old_format ~root_genesis_state_hash ~logger
       ~precomputed_values ~verifier ~parent (transition : Mina_block.Validated.t)
@@ -429,6 +430,7 @@ module Instance = struct
       let%map () =
         apply_diff ~logger ~frontier ~extensions ~ignore_consensus_local_state
           ~root_ledger (E (New_node (Full breadcrumb)))
+        |> Deferred.map ~f:Result.return
       in
       Full_frontier.lighten ?retain_application_data frontier state_hash ;
       [%log internal] "Breadcrumb_integrated" ;
