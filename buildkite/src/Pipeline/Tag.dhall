@@ -36,6 +36,7 @@ let Tag
       | Noble
       | Focal
       | Jammy
+      | Archive
       >
 
 let toNatural
@@ -66,6 +67,7 @@ let toNatural
             , Noble = 22
             , Focal = 23
             , Jammy = 24
+            , Archive = 25
             }
             tag
 
@@ -133,6 +135,7 @@ let capitalName =
             , Noble = "Noble"
             , Focal = "Focal"
             , Jammy = "Jammy"
+            , Archive = "Archive"
             }
             tag
 
@@ -163,6 +166,7 @@ let lowerName =
             , Noble = "noble"
             , Focal = "focal"
             , Jammy = "jammy"
+            , Archive = "archive"
             }
             tag
 
