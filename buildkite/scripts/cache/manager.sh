@@ -62,16 +62,12 @@ function version(){
     exit 0
 }
 
-#========
-# Read
-#========
-
-# Display the help message for the read command
+# Display the help message for the read-many command
 function read_help(){
-    echo "Read file or files from CI cache"
+    echo "Read multiple files from CI cache into a local directory."
     echo "Script requires to be executed in buildkite context. e.g (BUILDKITE_BUILD_ID env var to be defined)"
     echo ""
-    echo "     $CLI_NAME read [-options] INPUT_CACHE_LOCATION OUTPUT_LOCAL_LOCATION"
+    echo "     $CLI_NAME read-many [-options] INPUT_CACHE_LOCATION_1 [INPUT_CACHE_LOCATION_2 ...] OUTPUT_LOCAL_LOCATION"
     echo ""
     echo "Parameters:"
     echo ""
@@ -82,20 +78,19 @@ function read_help(){
     echo ""
     echo "Values:"
     echo ""
-    echo " INPUT_CACHE_LOCATION - path from which we will read (copy) cached artifact(s) (supports wildcard)"
-    echo " OUTPUT_LOCAL_LOCATION - local destination"
+    echo " INPUT_CACHE_LOCATION_X - path(s) from which to read (copy) cached artifact(s) (supports wildcard)"
+    echo " OUTPUT_LOCAL_LOCATION - local destination directory"
     echo ""
     echo "Example:"
     echo ""
-    echo "  " "$CLI_NAME" read  debians/mina-devnet*.deb /workdir
+    echo "  $CLI_NAME read-many debians/mina-devnet*.deb debians/mina-archive*.deb /workdir"
     echo ""
-    echo " Above command will copy 'debians/mina-devnet*.deb' files from CACHE_MOUNTPOINT/BUILDKITE_BUILD_ID/debians to /workdir"
-    echo ""
+    echo " Above command will copy all matching files from CACHE_MOUNTPOINT/BUILDKITE_BUILD_ID/debians to /workdir"
     echo ""
     exit 0
 }
 
-# Read files from the cache
+# Read multiple files from the cache
 function read(){
     if [[ "$#" == 0 ]]; then
         read_help;
@@ -104,15 +99,17 @@ function read(){
     local __override=0
     local __root="$BUILDKITE_BUILD_ID"
     local __skip_dirs_creation=0
-      
+    local __inputs=()
+    local __to=""
+
     while [ "$#" -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
         case $1 in
-            -h | --help ) 
+            -h | --help )
                 read_help;
             ;;
             -o | --override )
-               __override=1
+                __override=1
                 shift 1;
             ;;
             -r | --root )
@@ -124,28 +121,26 @@ function read(){
                 shift 1;
             ;;
             * )
-                if [[ -z ${__from+x} ]]; then
-                   __from="$CACHE_BASE_URL/$__root/$1"
-                   shift 1;
-                   continue
+                # Collect all but last argument as inputs
+                if [[ "$#" -eq 1 ]]; then
+                    __to="$1"
+                    shift 1;
+                    continue
                 fi
-                
-                if [[ -z ${__to+x} ]]; then
-                   __to="$1"
-                   shift 1;
-                   continue
-                fi
-                echo -e "${RED} !! Unknown option or missing argument: $1${CLEAR}\n";
-                echo "";
-                read_help;
+                __inputs+=("$CACHE_BASE_URL/$__root/$1")
+                shift 1;
             ;;
         esac
     done
-    
+
+    if [[ -z "$__to" ]]; then
+        echo -e "${RED} !! Missing destination directory ('to')${CLEAR}\n";
+        read_help;
+    fi
 
     if [[ $__skip_dirs_creation == 1 ]]; then
         echo "..Skipping dirs creation"
-    else 
+    else
         mkdir -p "$__to"
     fi
 
@@ -155,34 +150,31 @@ function read(){
         exit 1
     fi
 
-    echo "..Copying $__from -> $__to"
-
-    if [[ $__override == 1 ]]; then 
+    if [[ $__override == 1 ]]; then
         EXTRA_FLAGS=""
-    else 
+    else
         EXTRA_FLAGS="-f"
     fi
 
-    mkdir -p "$__to"
-
-    if ! cp -R "${EXTRA_FLAGS}" $__from "$__to"; then
-        echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
-        exit 2
-    fi
+    for input_path in "${__inputs[@]}"; do
+        echo "..Copying $input_path -> $__to"
+        if ! cp -R ${EXTRA_FLAGS} $input_path "$__to"; then
+            echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
+            exit 2
+        fi
+    done
 }
 
-
 #==============
-# write
+# write-many
 #==============
 
-# Display the help message for the write command
+# Display the help message for the write-many command
 function write_help(){
-    echo Writes file or files to CI cache
+    echo "Write multiple files to CI cache into a cache directory."
     echo "Script requires to be executed in buildkite context. e.g (BUILDKITE_BUILD_ID env var to be defined)"
     echo ""
-    echo "     $CLI_NAME write [-options] INPUT_LOCAL_LOCATION OUTPUT_CACHE_LOCATION"
-    echo ""
+    echo "     $CLI_NAME write-many [-options] INPUT_LOCAL_LOCATION_1 [INPUT_LOCAL_LOCATION_2 ...] OUTPUT_CACHE_LOCATION"
     echo ""
     echo "Parameters:"
     echo ""
@@ -192,38 +184,37 @@ function write_help(){
     echo ""
     echo "Values:"
     echo ""
-    echo " INPUT_LOCAL_LOCATION - single or multiple files to write (supports wildcard)"
+    echo " INPUT_LOCAL_LOCATION_X - path(s) of files to write (supports wildcard)"
     echo " OUTPUT_CACHE_LOCATION - destination at cache mount"
     echo ""
     echo "Example:"
     echo ""
-    echo "  " $CLI_NAME write  mina-devnet*.deb debians/
+    echo "  $CLI_NAME write-many mina-devnet*.deb mina-archive*.deb debians/"
     echo ""
-    echo " Above command will write mina-devnet*.deb files to CACHE_MOUNTPOINT/BUILDKITE_BUILD_ID/debians"
-    echo ""
+    echo " Above command will write all matching files to CACHE_MOUNTPOINT/BUILDKITE_BUILD_ID/debians"
     echo ""
     exit 0
 }
 
-# Writes files to the cache
+# Write multiple files to the cache
 function write(){
-
     if [[ "$#" == 0 ]]; then
         write_help;
     fi
 
-    
     local __override=0
     local __root="$BUILDKITE_BUILD_ID"
-      
-    while [ ${#} -gt 0 ]; do
+    local __inputs=()
+    local __to=""
+
+    while [ "$#" -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
         case $1 in
-            -h | --help ) 
+            -h | --help )
                 write_help;
             ;;
             -o | --override )
-               __override=1
+                __override=1
                 shift 1;
             ;;
             -r | --root )
@@ -231,40 +222,39 @@ function write(){
                 shift 2;
             ;;
             * )
-                if [[ ! -v __from ]]; then
-                   __from="$1"
-                   shift 1;
-                   continue
+                # Collect all but last argument as inputs
+                if [[ "$#" -eq 1 ]]; then
+                    __to=$CACHE_BASE_URL/$__root/"$1"
+                    shift 1;
+                    continue
                 fi
-
-                if [[ ! -v __to ]]; then
-                   __to=$CACHE_BASE_URL/$__root/"$1"
-                   shift 1;
-                   continue
-                fi
-                echo -e "${RED} !! Unknown option or missing argument: $1${CLEAR}\n";
-                echo "";
-                write_help;
+                __inputs+=("$1")
+                shift 1;
             ;;
         esac
     done
-    
-    echo "..Copying $__from -> $__to"
-    
-    if [[ $__override == 1 ]]; then 
+
+    if [[ -z "$__to" ]]; then
+        echo -e "${RED} !! Missing destination directory ('to')${CLEAR}\n";
+        write_help;
+    fi
+
+    if [[ $__override == 1 ]]; then
         EXTRA_FLAGS=""
-    else 
+    else
         EXTRA_FLAGS="-f"
     fi
 
     mkdir -p "$__to"
-    
-    if ! cp -R "${EXTRA_FLAGS}" "$__from" "$__to"; then
-        echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
-        exit 2
-    fi
-}
 
+    for input_path in "${__inputs[@]}"; do
+        echo "..Copying $input_path -> $__to"
+        if ! cp -R ${EXTRA_FLAGS} $input_path "$__to"; then
+            echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
+            exit 2
+        fi
+    done
+}
 # Main function to handle the CLI
 function main(){
     if (( "$#" == 0 )); then

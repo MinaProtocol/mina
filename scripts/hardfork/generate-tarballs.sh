@@ -72,3 +72,7 @@ FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json scri
 
 echo "--- New genesis config"
 head new_config.json
+
+echo "--- Ledger tarballs generated:"
+
+ls -lh hardfork_ledgers/

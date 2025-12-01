@@ -90,8 +90,7 @@ fi
 echo "--- Build hardfork package for Debian ${MINA_DEB_CODENAME}"
 if [ -n "$SKIP_DEBIAN_PACKAGE_BUILD" ]; then
   echo "--- Skipping debian package build; injecting runtime config and ledger tarballs into existing packages"
-  ./scripts/debian/replace-entry.sh mina-daemon.deb /var/lib/coda/config_*.json "$RUNTIME_CONFIG_JSON"
-  ./scripts/debian/insert-entries.sh mina-daemon.deb /var/lib/coda/ "$LEDGER_TARBALLS"
+  ./scripts/convert-debian-to-hf.sh -d mina-daemon.deb -c "$RUNTIME_CONFIG_JSON" -l "$LEDGER_TARBALLS"
 else
   echo "--- Building debian packages from source"
   RUNTIME_CONFIG_JSON=$RUNTIME_CONFIG_JSON LEDGER_TARBALLS="$LEDGER_TARBALLS" ./scripts/debian/build.sh "$@"

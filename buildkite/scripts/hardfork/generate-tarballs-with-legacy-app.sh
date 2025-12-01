@@ -1,0 +1,45 @@
+#!/bin/bash
+
+set -e
+
+NETWORK="devnet"
+VERSION=""
+WORKDIR=$(pwd)
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --network)
+      NETWORK="$2"
+      shift 2
+      ;;
+    --version)
+      VERSION="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown argument: $1"
+      echo "Usage: $0 --network <network> --version <version>"
+      exit 1
+      ;;
+  esac
+done
+
+if [ -z "$NETWORK" ] || [ -z "$VERSION" ]; then
+  echo "Usage: $0 --network <network> --version <version>"
+  exit 1
+fi
+
+
+./buildkite/scripts/debian/install.sh mina-${NETWORK}-legacy 1
+
+./buildkite/scripts/cache/manager.sh read "hardfork/new_config.json" .
+
+"mina-create-legacy-genesis" --config-file "new_config.json" --genesis-dir "$WORKDIR/legacy_ledgers" --hash-output-file "$WORKDIR/legacy_hashes.json"
+
+echo "--- Caching legacy ledger tarballs and hashes"
+
+ls -lh $WORKDIR/legacy_ledgers/
+
+head -n 10 "$WORKDIR/legacy_hashes.json"
+
+./buildkite/scripts/cache/manager.sh write "$WORKDIR/legacy_hashes.json" "$WORKDIR/legacy_ledgers/*.tar.gz" "hardfork/legacy"

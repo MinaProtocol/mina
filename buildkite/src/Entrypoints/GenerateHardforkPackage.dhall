@@ -34,6 +34,8 @@ let Profiles = ../Constants/Profiles.dhall
 
 let Network = ../Constants/Network.dhall
 
+let RunInToolchain = ../Command/RunInToolchain.dhall
+
 let Spec =
       { Type =
           { codenames : List DebianVersions.DebVersion
@@ -73,11 +75,13 @@ let generateDockerForCodename =
 
           let profile = Profiles.fromNetwork spec.network
 
+          let lowerNameCodename = DebianVersions.lowerName codename
+
           let dockerDaemonSpec =
                 DockerImage.ReleaseSpec::{
                 , deps =
                   [ { name = pipelineName
-                    , key = "build-deb-pkg-${DebianVersions.lowerName codename}"
+                    , key = "build-deb-pkg-${lowerNameCodename}"
                     }
                   ]
                 , service = Artifacts.Type.Daemon
@@ -87,27 +91,32 @@ let generateDockerForCodename =
                 , deb_repo = DebianRepo.Type.Local
                 , deb_suffix = Some "hardfork"
                 , step_key_suffix =
-                    "-${DebianVersions.lowerName codename}-docker-image"
+                    "-${lowerNameCodename}-docker-image"
                 , size = spec.size
                 }
 
           let dockerDaemonStep = DockerImage.stepKey dockerDaemonSpec
 
-          let dependsOnTest =
-                [ { name = pipelineName, key = dockerDaemonStep } ]
+let artifactsGenKey =
+                "build-or-download-artifacts-${lowerNameCodename}"
 
           let tarballGenKey =
-                "generate-hardfork-tarballs-${DebianVersions.lowerName codename}"
+                "generate-hardfork-tarballs-${lowerNameCodename}"
+
+          let tarballUploadKey =
+                "upload-hardfork-tarballs-${lowerNameCodename}"
 
           let dependsOnTarballs =
                 [ { name = pipelineName, key = tarballGenKey } ]
 
-
-          let tarballUploadKey =
-                "upload-hardfork-tarballs-${DebianVersions.lowerName codename}"
+          let dependsOnTest =
+                [ { name = pipelineName, key = dockerDaemonStep } ]
 
           let dependsOnUpload =
                 [ { name = pipelineName, key = tarballUploadKey } ]
+
+          let dependsOnArtifacts =
+                [ { name = pipelineName, key = artifactsGenKey } ]
 
           let precomputed_block_prefix_arg =
                 merge
@@ -118,32 +127,70 @@ let generateDockerForCodename =
                   }
                   spec.precomputed_block_prefix
 
-          in  [
+          let buildOrGetArtifacts =
+                merge
+                  { Some =
+                          \(build : Text)
+                      ->  []: List Command.Type
+
+                  , None = [
+                    MinaArtifact.buildArtifacts
+                      MinaArtifact.MinaBuildSpec::{
+                      , artifacts =
+                        [ Artifacts.Type.LogProc
+                        , Artifacts.Type.Daemon
+                        , Artifacts.Type.Archive
+                        , Artifacts.Type.Rosetta
+                        ]
+                      , debVersion = codename
+                      , profile = profile
+                      , network = spec.network
+                      , prefix = pipelineName
+                      , suffix = Some "-${lowerNameCodename}"
+                      }
+                    ]
+                  }
+                  spec.use_artifacts_from_buildkite_build
+
+          let useArtifactsEnvVar =
+                merge
+                  { Some =
+                          \(build : Text)
+                      ->  "CACHED_BUILDKITE_BUILD_ID=${build} "
+                          ++ build
+                  , None = "CACHED_BUILDKITE_BUILD_ID=\\\$BUILDKITE_BUILD_ID"
+                  }
+                  spec.use_artifacts_from_buildkite_build
+
+
+          let generateTarballsCommand =
               Command.build
                 Command.Config::{
                   , commands =
                       RunInToolchain.runInToolchain
-                          [ "NETWORK_NAME=${Network.lowerName spec.network}"
-                          , "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
-                          ]
-                          "./buildkite/scripts/hardfork/generate-tarballs.sh"
-
-                  , label = "Generate hardfork tarballs for ${DebianVersions.lowerName codename}"
+                          ([] : List Text)
+                          ("./buildkite/scripts/hardfork/generate-tarballs.sh "
+                              ++ "--network ${Network.lowerName spec.network} "
+                              ++ "--config-url ${spec.config_json_gz_url} "
+                          )
+                  , label = "Generate hardfork tarballs for ${lowerNameCodename}"
                   , key = tarballGenKey
+                  , depends_on = dependsOnArtifacts
                   , target = Size.Large
                   }
+
+          in  buildOrGetArtifacts # [
+              generateTarballsCommand
               , Command.build
                 Command.Config::{
                   , commands =
                       RunInToolchain.runInToolchain
-                          [ "NETWORK_NAME=${Network.lowerName spec.network}"
-                          , "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
-                          ]
-                          "./buildkite/scripts/hardfork/upload-ledger-tarballs.sh"
-
-                  , label = "Upload hardfork tarballs for ${DebianVersions.lowerName codename}"
+                          ([] : List Text)
+                          "./buildkite/scripts/hardfork/upload-ledger-tarballs-to-s3.sh"
+                  , label = "Upload hardfork tarballs for ${lowerNameCodename}"
                   , key = tarballUploadKey
                   , target = Size.Large
+                  , depends_on = dependsOnTarballs
                   }
               , Command.build
                 Command.Config::{
@@ -151,33 +198,24 @@ let generateDockerForCodename =
                       RunInToolchain.runInToolchain
                           ([] : List Text)
                           "./buildkite/scripts/hardfork/generate-tarballs-with-legacy-app.sh"
-                  , label = "Legacy hardfork tarballs for ${DebianVersions.lowerName codename}"
+                  , label = "Legacy hardfork tarballs for ${lowerNameCodename}"
                   , key = tarballGenKey ++ "-legacy"
                   , target = Size.Large
                   }
-              , MinaArtifact.buildArtifacts
-                  MinaArtifact.MinaBuildSpec::{
-                  , artifacts =
-                    [ Artifacts.Type.LogProc
-                    , Artifacts.Type.DaemonLegacyHardfork
-                    , Artifacts.Type.Archive
-                    , Artifacts.Type.Rosetta
-                    , Artifacts.Type.ZkappTestTransaction
-                    ]
-                  , debVersion = codename
-                  , profile = profile
-                  , network = spec.network
-                  , prefix = pipelineName
-                  , dependsOn = dependsOnTarballs
-                  , suffix = Some "-${DebianVersions.lowerName codename}"
-                  , extraBuildEnvs =
-                    [ "NETWORK_NAME=${Network.lowerName spec.network}"
-                    , "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
-                    , "SKIP_TARBALLS_GENERATION=true"
-                    , "SKIP_TARBALL_UPLOAD=true"
-                    ]
-                  , buildScript =
-                      "./buildkite/scripts/hardfork/build-packages.sh"
+              , Command.build
+                Command.Config::{
+                  , commands =
+                      RunInToolchain.runInToolchain
+                          [ "NETWORK_NAME=${Network.lowerName spec.network}"
+                          , "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
+                          , "CACHED_BUILDKITE_BUILD_ID=${useArtifactsEnvVar}"
+                          , "CODENAME=${lowerNameCodename}"
+                          ]
+                          "./buildkite/scripts/hardfork/prepare-hf-debian.sh"
+                  , label = "Create hardfork packages for ${lowerNameCodename}"
+                  , key = tarballUploadKey
+                  , target = Size.Large
+                  , depends_on = dependsOnTarballs
                   }
               , DockerImage.generateStep dockerDaemonSpec
               , DockerImage.generateStep
@@ -237,13 +275,17 @@ let generateDockerForCodename =
               , Command.build
                   Command.Config::{
                   , commands =
+                   (RunInToolchain.runInToolchain
+                        ([]: List Text)
+                        "./buildkite/scripts/cache/manager.sh read hardfork/legacy legacy-ledgers ")
+                        #
                     [ Cmd.run
                         "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                       codename} && source ./buildkite/scripts/export-git-env-vars.sh"
                     , Cmd.runInDocker
                         Cmd.Docker::{ image = image }
                         "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                          spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir ${reference_data_dir}"
+                                                                                                                                                                                          spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir ./legacy-ledgers "
                     ]
                   , label = "Verify packaged artifacts"
                   , key =

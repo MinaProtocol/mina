@@ -176,6 +176,9 @@ if [ ! -e "$WORKDIR/keys/p2p" ]; then
 fi
 
 if [ -z "$REFERENCE_DATA_DIR" ]; then
+
+    if []
+
     echo "generating genesis ledgers ... (this may take a while)" >&2
     "$MINA_LEGACY_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$WORKDIR/legacy_ledgers" --hash-output-file "$WORKDIR/legacy_hashes.json"
     REFERENCE_DATA_DIR="$WORKDIR"
