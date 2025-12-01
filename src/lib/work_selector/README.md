@@ -1,0 +1,3 @@
+A work selector pulls work from best tip staged ledger in the transition frontier via a pipe. Whenever a new batch of work specs arrived from the pipe, all previous work specs tracked by the work selector are no longer relevant, so they are erased and replaced by the new batch of work specs. 
+
+When queried, work selector use a configurable method to sample works from its internal state. It'll try to reschedule when the work has already been scheduled for a long time ago so few SNARK workers being stale won't affect the health of the SNARK coordinator. This rescheduling mechanism should be removed after we update the SNARK worker protocol with work partitioner so we don't have two incompatible rescheduling mechanisms.
