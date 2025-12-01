@@ -1,3 +1,5 @@
+open Core
+
 module Params : sig
   type 'f t = 'f Group_map.Params.t
 
@@ -20,7 +22,7 @@ module Checked : sig
        (module Snark_intf.Run with type field = 'f and type field_var = 'v)
     -> potential_xs:('input -> 'v * 'v * 'v)
     -> y_squared:(x:'v -> 'v)
-    -> ('input -> 'v * 'v) Core_kernel.Staged.t
+    -> ('input -> 'v * 'v) Staged.t
 
   val to_group :
        (module Snark_intf.Run with type field = 'f and type field_var = 'v)
