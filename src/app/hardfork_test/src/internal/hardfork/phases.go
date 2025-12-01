@@ -114,35 +114,35 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData For
 
 func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, forkConfigBytes []byte, mainGenesisTs int64) (*ForkData, error) {
 
-	if err := os.MkdirAll("fork_data/prefork", 0755); err != nil {
+	if err := os.MkdirAll("fork_data/prepatch", 0755); err != nil {
 		return nil, err
 	}
 
 	// Define all fork_data file paths
-	preforkConfig := "fork_data/prefork/config.json"
+	prepatchConfig := "fork_data/prepatch/config.json"
 
 	// Validate fork config data
-	if err := t.ValidateForkConfigData(analysis.LatestNonEmptyBlock, forkConfigBytes); err != nil {
+	if err := t.ValidateLegacyPrepatchForkConfig(analysis.LatestNonEmptyBlock, forkConfigBytes); err != nil {
 		return nil, err
 	}
 	// Write fork config to file
-	if err := os.WriteFile(preforkConfig, forkConfigBytes, 0644); err != nil {
+	if err := os.WriteFile(prepatchConfig, forkConfigBytes, 0644); err != nil {
 		return nil, err
 	}
 	{
-		preforkLedgersDir := "fork_data/prefork/hf_ledgers"
-		preforkHashesFile := "fork_data/prefork/hf_ledger_hashes.json"
-		if err := t.GenerateAndValidatePreforkLedgers(analysis, preforkConfig, preforkLedgersDir, preforkHashesFile); err != nil {
+		preforkLedgersDir := "fork_data/prepatch/hf_ledgers"
+		preforkHashesFile := "fork_data/prepatch/hf_ledger_hashes.json"
+		if err := t.GenerateAndValidateHashesAndLedgers(analysis, prepatchConfig, preforkLedgersDir, preforkHashesFile); err != nil {
 			return nil, err
 		}
 	}
 
-	if err := os.MkdirAll("fork_data/postfork", 0755); err != nil {
+	if err := os.MkdirAll("fork_data/postpatch", 0755); err != nil {
 		return nil, err
 	}
 
-	postforkConfig := "fork_data/postfork/config.json"
-	forkLedgersDir := "fork_data/postfork/hf_ledgers"
+	postforkConfig := "fork_data/postpatch/config.json"
+	forkLedgersDir := "fork_data/postpatch/hf_ledgers"
 
 	// Calculate fork genesis timestamp relative to now (before starting fork network)
 	forkGenesisTs := time.Now().Unix() + int64(t.Config.ForkDelay*60)
@@ -150,7 +150,7 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, forkConfig
 	{
 		preforkGenesisConfigFile := fmt.Sprintf("%s/daemon.json", t.Config.Root)
 		forkHashesFile := "fork_data/hf_ledger_hashes.json"
-		if err := t.PatchForkConfigAndGenerateLedgersLegacy(analysis, preforkConfig, forkLedgersDir, forkHashesFile, postforkConfig, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs); err != nil {
+		if err := t.PatchForkConfigAndGenerateLedgersLegacy(analysis, prepatchConfig, forkLedgersDir, forkHashesFile, postforkConfig, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs); err != nil {
 			return nil, err
 		}
 	}

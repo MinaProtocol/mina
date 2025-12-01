@@ -43,26 +43,19 @@ func (t *HardforkTest) GenerateForkLedgers(executablePath, forkConfigPath, ledge
 	return nil
 }
 
-// GenerateAndValidatePreforkLedgers validates fork config and ledgers
-// Note: Fork config extraction happens in RunMainNetworkPhase before nodes shutdown
-func (t *HardforkTest) GenerateAndValidatePreforkLedgers(analysis *BlockAnalysisResult, forkConfigPath, preforkLedgersDir, preforkHashesFile string) error {
+func (t *HardforkTest) GenerateAndValidateHashesAndLedgers(analysis *BlockAnalysisResult, forkConfigPath, preforkLedgersDir, prepatchForkConfig string) error {
 	// Generate prefork ledgers using main network executable
-	if err := t.GenerateForkLedgers(t.Config.MainRuntimeGenesisLedger, forkConfigPath, preforkLedgersDir, preforkHashesFile); err != nil {
+	if err := t.GenerateForkLedgers(t.Config.MainRuntimeGenesisLedger, forkConfigPath, preforkLedgersDir, prepatchForkConfig); err != nil {
 		return err
 	}
 
-	// Validate prefork ledger hashes
-	if err := t.ValidatePreforkLedgerHashes(
+	return t.ValidateRuntimeGenesisLedgerHashes(
 		analysis.LatestNonEmptyBlock,
 		analysis.GenesisEpochStaking,
 		analysis.GenesisEpochNext,
 		analysis.LatestSnarkedHashPerEpoch,
-		preforkHashesFile,
-	); err != nil {
-		return err
-	}
-
-	return nil
+		prepatchForkConfig,
+	)
 }
 
 // PatchForkConfigAndGenerateLedgersLegacy does the following:
@@ -83,7 +76,7 @@ func (t *HardforkTest) PatchForkConfigAndGenerateLedgersLegacy(analysis *BlockAn
 	}
 
 	// Validate modified fork data
-	return t.ValidateForkRuntimeConfig(analysis.LatestNonEmptyBlock, runtimeConfigBytes, forkGenesisTs, mainGenesisTs)
+	return t.ValidateLegacyPostpatchForkConfig(analysis.LatestNonEmptyBlock, runtimeConfigBytes, forkGenesisTs, mainGenesisTs)
 }
 
 func (t *HardforkTest) AdvancedGenerateHardForkConfig(configDir string, clientPort int) error {
