@@ -49,15 +49,15 @@ module T = struct
 
   let most_recent_id = ref 0
 
-  let on_job_enter (fiber : O1trace.Thread.Fiber.t) =
+  let on_job_enter (fiber : O1trace.O1thread.Fiber.t) =
     if fiber.id <> !most_recent_id then (
       most_recent_id := fiber.id ;
       emit_event (new_thread_event fiber.id Thread_switch) )
 
   let on_job_exit _fiber _time_elapsed = ()
 
-  let on_new_fiber (fiber : O1trace.Thread.Fiber.t) =
-    let fullname = String.concat ~sep:"/" (O1trace.Thread.Fiber.key fiber) in
+  let on_new_fiber (fiber : O1trace.O1thread.Fiber.t) =
+    let fullname = String.concat ~sep:"/" (O1trace.O1thread.Fiber.key fiber) in
     emit_event (new_thread_event ~include_name:fullname fiber.id New_thread)
 
   let on_cycle_end () =
@@ -71,7 +71,7 @@ let start_tracing wr =
   else (
     current_wr := Some wr ;
     emit_event (new_event Pid_is) ;
-    O1trace.Thread.iter_fibers ~f:T.on_new_fiber ;
+    O1trace.O1thread.iter_fibers ~f:T.on_new_fiber ;
     O1trace.Plugins.enable_plugin (module T) )
 
 let stop_tracing () =

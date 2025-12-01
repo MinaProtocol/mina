@@ -1,13 +1,13 @@
-open Core_kernel
+open Core
 open Async
 module Execution_timer = Execution_timer
 module Plugins = Plugins
-module Thread = Thread
+module O1thread = O1thread
 
 (* TODO: this should probably go somewhere else (mina_cli_entrypoint or coda_run) *)
 let () = Plugins.enable_plugin (module Execution_timer)
 
-let on_job_enter' (fiber : Thread.Fiber.t) =
+let on_job_enter' (fiber : O1thread.Fiber.t) =
   Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
       Plugin.on_job_enter fiber )
 
@@ -16,13 +16,13 @@ let on_job_exit' fiber elapsed_time =
       Plugin.on_job_exit fiber elapsed_time )
 
 let on_job_enter ctx =
-  Option.iter (Thread.Fiber.of_context ctx) ~f:on_job_enter'
+  Option.iter (O1thread.Fiber.of_context ctx) ~f:on_job_enter'
 
 let on_job_exit ctx elapsed_time =
-  Option.iter (Thread.Fiber.of_context ctx) ~f:(fun thread ->
+  Option.iter (O1thread.Fiber.of_context ctx) ~f:(fun thread ->
       on_job_exit' thread elapsed_time )
 
-let on_new_fiber (fiber : Thread.Fiber.t) =
+let on_new_fiber (fiber : O1thread.Fiber.t) =
   Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
       Plugin.on_new_fiber fiber )
 
@@ -33,14 +33,14 @@ let grab_parent_fiber () =
   let ctx = Scheduler.current_execution_context () in
   match !current_sync_fiber with
   | None ->
-      Execution_context.find_local ctx Thread.Fiber.ctx_id
+      Execution_context.find_local ctx O1thread.Fiber.ctx_id
   | Some fiber ->
       current_sync_fiber := None ;
       Some fiber
 
 (* look through a fiber stack to find a recursive fiber call *)
 let rec find_recursive_fiber thread_name parent_thread_name
-    (fiber : Thread.Fiber.t) =
+    (fiber : O1thread.Fiber.t) =
   let thread_matches = String.equal fiber.thread.name thread_name in
   let parent_thread_matches =
     Option.equal String.equal
@@ -76,7 +76,7 @@ let exec_thread ~exec_same_thread ~exec_new_thread name =
         | Some fiber ->
             fiber
         | None ->
-            let fib = Thread.Fiber.register name parent in
+            let fib = O1thread.Fiber.register name parent in
             on_new_fiber fib ; fib
       in
       exec_new_thread fiber
@@ -87,7 +87,7 @@ let exec_thread ~exec_same_thread ~exec_new_thread name =
 let thread name f =
   exec_thread name ~exec_same_thread:f ~exec_new_thread:(fun fiber ->
       let ctx = Scheduler.current_execution_context () in
-      let ctx = Thread.Fiber.apply_to_context fiber ctx in
+      let ctx = O1thread.Fiber.apply_to_context fiber ctx in
       let ctx = with_o1trace ~name ctx in
       match Scheduler.within_context ctx f with
       | Error () ->
@@ -118,7 +118,7 @@ let sync_thread name f =
           result )
 
 let () =
-  Stdlib.(Async_kernel.Tracing.fns := { on_job_enter; on_job_exit }) ;
+  Async_kernel.Tracing.set_tracers ~on_job_enter ~on_job_exit ;
   Scheduler.Expert.run_every_cycle_end (fun () ->
       Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
           Plugin.on_cycle_end () ) )
@@ -126,7 +126,7 @@ let () =
 (*
 let () =
   Scheduler.Expert.set_on_end_of_cycle (fun () ->
-    Option.iter (Thread.current_thread ()) ~f:(fun thread ->
+    Option.iter (O1thread.current_thread ()) ~f:(fun thread ->
       dispatch_plugins thread (fun (module Plugin) state -> Plugin.on_cycle_end thread.name state)) ;
     (* this line should probably live inside Async_kernel *)
     sch.cycle_started <- true)
@@ -147,10 +147,10 @@ let%test_module "thread tests" =
           false
 
     let test' f =
-      Hashtbl.clear Thread.threads ;
+      Hashtbl.clear O1thread.threads ;
       Thread_safe.block_on_async_exn (fun () ->
           let s = Ivar.create () in
-          f (Ivar.fill s) ;
+          f (Ivar.fill_exn s) ;
           let%bind () = Ivar.read s in
           Writer.(flushed (Lazy.force stdout)) )
 
