@@ -376,7 +376,7 @@ function print_memory_usage() {
     
     # PostgreSQL memory usage (sum of all postgres processes)
     local postgres_memory
-    postgres_memory=$(ps -p $(pgrep -d, -f postgres) -o rss= 2>/dev/null | awk '{sum+=$1} END {print sum/1024}' 2>/dev/null)
+    postgres_memory=$(ps -p $(pgrep -d, '^postgres:') -o rss= 2>/dev/null | awk '{sum+=$1} END {print sum/1024}' 2>/dev/null)
     if [[ -n "$postgres_memory" ]]; then
         echo "   - 🐘 PostgreSQL: ${postgres_memory} MB"
     else
