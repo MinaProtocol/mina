@@ -118,7 +118,6 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 // RunForkNetwork starts the fork network with hardfork configuration
 func (t *HardforkTest) RunForkNetwork(configFile, forkLedgersDir string) (*exec.Cmd, error) {
 	return t.startLocalNetwork(t.Config.ForkMinaExe, "fork", []string{
-		"--update-genesis-timestamp", fmt.Sprintf("delay_sec:%d", t.Config.ForkDelay*60),
 		"--config", fmt.Sprintf("inherit_with:%s,%s", configFile, forkLedgersDir),
 		"--override-slot-time", strconv.Itoa(t.Config.ForkSlot * 1000)},
 	)
