@@ -5,6 +5,8 @@ set -e
 NETWORK="devnet"
 CODENAME=""
 WORKDIR=$(pwd)
+export FORCE_VERSION="*"
+CACHED_BUILDKITE_BUILD_ID=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -20,9 +22,13 @@ while [[ $# -gt 0 ]]; do
       CODENAME="$2"
       shift 2
       ;;
+    --cached-buildkite-build-id)
+      CACHED_BUILDKITE_BUILD_ID="$2"
+      shift 2
+      ;;
     *)
       echo "Unknown argument: $1"
-      echo "Usage: $0 --network <network> [--version <version>] --codename <codename>"
+      echo "Usage: $0 --network <network> [--version <version>] --codename <codename> [--cached-buildkite-build-id <id>]"
       exit 1
       ;;
   esac
@@ -33,8 +39,11 @@ if [ -z "$NETWORK" ] || [ -z "$CODENAME" ]; then
   exit 1
 fi
 
+if [[ -n "$CACHED_BUILDKITE_BUILD_ID" ]]; then
+  MINA_DEB_CODENAME=$CODENAME ROOT="$CACHED_BUILDKITE_BUILD_ID" ./buildkite/scripts/debian/install.sh mina-logproc 1
+fi
 
-MINA_DEB_CODENAME=$CODENAME ./buildkite/scripts/debian/install.sh mina-create-legacy-genesis 1
+MINA_DEB_CODENAME=$CODENAME ROOT="legacy" ./buildkite/scripts/debian/install.sh mina-create-legacy-genesis 1
 
 ./buildkite/scripts/cache/manager.sh read "hardfork/new_config.json" .
 
