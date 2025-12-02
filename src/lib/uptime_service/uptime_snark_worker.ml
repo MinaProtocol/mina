@@ -12,14 +12,6 @@ module Worker = struct
   module T = struct
     module F = Rpc_parallel.Function
 
-    module Worker_state = struct
-      (* required by rpc_parallel *)
-      type init_arg = Logger.t * Genesis_constants.Constraint_constants.t
-      [@@deriving bin_io_unversioned]
-
-      include Impl.Worker_state
-    end
-
     type 'w functions =
       { perform_single :
           ( 'w
@@ -28,10 +20,20 @@ module Worker = struct
           F.t
       ; perform_partitioned :
           ( 'w
-          , Snark_work_lib.Spec.Partitioned.Stable.Latest.t
+          , Transaction_witness.Zkapp_command_segment_witness.Stable.Latest.t
+            * Mina_state.Snarked_ledger_state.With_sok.t
+            * Transaction_snark.Zkapp_command_segment.Basic.t
           , (Ledger_proof.t * Time.Span.t) Or_error.t )
           F.t
       }
+
+    module Worker_state = struct
+      (* required by rpc_parallel *)
+      type init_arg = Logger.t * Genesis_constants.Constraint_constants.t
+      [@@deriving bin_io_unversioned]
+
+      include Impl.Worker_state
+    end
 
     module Connection_state = struct
       (* bin_io required by rpc_parallel *)
@@ -48,11 +50,27 @@ module Worker = struct
       let perform_single (state : Worker_state.t) (message, single_spec) =
         Impl.perform_single ~message state single_spec
 
-      let perform_partitioned (state : Worker_state.t) spec =
-        let%map.Deferred.Or_error { Proof_carrying_data.proof; data } =
-          Impl.perform_partitioned ~state ~spec
-        in
-        (proof, data)
+      let perform_partitioned (state : Worker_state.t) (witness, statement, spec)
+          =
+        match state.proof_level_snark with
+        | Full (module S) ->
+            let witness =
+              Transaction_witness.Zkapp_command_segment_witness
+              .write_all_proofs_to_disk ~signature_kind:state.signature_kind
+                ~proof_cache_db:state.proof_cache_db witness
+            in
+            Snark_worker.Impl.measure_runtime ~logger:state.logger
+              ~spec_json:
+                ( lazy
+                  ( "zkapp_segment_spec"
+                  , Transaction_snark.Zkapp_command_segment.Basic.Stable.Latest
+                    .to_yojson spec ) )
+              (fun () ->
+                S.of_zkapp_command_segment_exn ~statement ~witness ~spec
+                |> Deferred.map ~f:(fun a -> Result.Ok a) )
+        | _ ->
+            Deferred.Or_error.error_string
+              "Unexpected prover mode in uptime snark worker"
 
       let functions =
         let f (i, o, f) =
@@ -71,7 +89,12 @@ module Worker = struct
         ; perform_partitioned =
             f
               ( [%bin_type_class:
-                  Snark_work_lib.Spec.Partitioned.Stable.Latest.t]
+                  Transaction_witness.Zkapp_command_segment_witness.Stable
+                  .Latest
+                  .t
+                  * Mina_state.Snarked_ledger_state.With_sok.Stable.Latest.t
+                  * Transaction_snark.Zkapp_command_segment.Basic.Stable.Latest
+                    .t]
               , [%bin_type_class:
                   (Ledger_proof.Stable.Latest.t * Time.Span.t) Or_error.t]
               , perform_partitioned )
