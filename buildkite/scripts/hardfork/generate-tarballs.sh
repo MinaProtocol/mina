@@ -39,7 +39,7 @@ echo "--- Restoring cached build artifacts for apps/${CODENAME}/"
 
 prefix=apps/${CODENAME}/
 
-./buildkite/scripts/cache/manager.sh read-many $prefix/logproc.exe $prefix/runtime_genesis_ledger.exe .
+./buildkite/scripts/cache/manager.sh read $prefix/logproc.exe $prefix/runtime_genesis_ledger.exe .
 
 echo "--- Generating ledger tarballs for hardfork network: $NETWORK_NAME"
 

@@ -14,6 +14,7 @@ fi
 
 DEBS=$1
 USE_SUDO=${2:-0}
+VERSION="${FORCE_VERSION:-"*"}"
 
 # Source git environment variables first to get MINA_DEB_CODENAME
 source ./buildkite/scripts/export-git-env-vars.sh
@@ -41,11 +42,11 @@ else
         # Downaload mina-logproc too
         ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
       ;;
-      mina-devnet-legacy|mina-mainnet-legacy)
-        ./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/$MINA_DEB_CODENAME/${i}*" $LOCAL_DEB_FOLDER
+      *legacy*)
+        ./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/$MINA_DEB_CODENAME/${i}_${VERSION}" $LOCAL_DEB_FOLDER
       ;;
       *)
-        ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/${i}_*" $LOCAL_DEB_FOLDER
+      ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/${i}_${VERSION}" $LOCAL_DEB_FOLDER
       ;;
     esac
   done
