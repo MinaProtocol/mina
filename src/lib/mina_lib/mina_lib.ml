@@ -1528,7 +1528,8 @@ let start t =
     ~graphql_control_port:t.config.graphql_control_port ~built_with_commit_sha
     ~get_next_producer_timing:(fun () -> t.next_producer_timing)
     ~get_snark_work_fee:(fun () -> snark_work_fee t)
-    ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer) ;
+    ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer)
+    ~signature_kind:t.signature_kind ;
   stop_long_running_daemon t ;
   Snark_worker.start t
 

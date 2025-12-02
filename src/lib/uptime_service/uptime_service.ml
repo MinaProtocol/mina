@@ -200,10 +200,36 @@ let read_all_proofs_for_work_single_spec =
     ~f_proof:Ledger_proof.Cached.read_proof_from_disk
     ~f_witness:Transaction_witness.read_all_proofs_from_disk
 
+let extract_terminal_zk_segment ~(m : (module Transaction_snark.S)) ~witness
+    ~input ~zkapp_command ~staged_ledger_hash =
+  let%bind.Result final_segment =
+    Work_partitioner.make_zkapp_segments ~m ~input ~witness ~zkapp_command
+    |> Result.map_error
+         ~f:
+           Work_partitioner.Snark_worker_shared.Failed_to_generate_inputs
+           .error_of_t
+    |> Result.map ~f:Mina_stdlib.Nonempty_list.last
+  in
+  match final_segment with
+  | Snark_work_lib.Spec.Sub_zkapp.Stable.V1.Segment s as res ->
+      let expected = Staged_ledger_hash.ledger_hash staged_ledger_hash in
+      if Ledger_hash.(s.statement.target.second_pass_ledger = expected) then
+        Ok res
+      else
+        Error
+          ( Error.of_string
+          @@ sprintf "Mismatch segment target hash, expected %s, got %s"
+               (Ledger_hash0.to_base58_check expected)
+               (Ledger_hash0.to_base58_check
+                  s.statement.target.second_pass_ledger ) )
+  | _ ->
+      Error
+        (Error.of_string "Expected last zkapp segment to be segment, not merge")
+
 let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
     ~url ~snark_worker ~transition_frontier ~peer_id
     ~(submitter_keypair : Keypair.t) ~snark_work_fee ~graphql_control_port
-    ~built_with_commit_sha =
+    ~built_with_commit_sha ~signature_kind =
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       (* expected during daemon boot, so not logging as error *)
@@ -327,12 +353,56 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                 send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
                   ~state_hash ~produced:false block_data
             | Some single_spec -> (
-                match%bind
-                  make_interruptible
-                    (Uptime_snark_worker.perform_single snark_worker
-                       ( message
-                       , read_all_proofs_for_work_single_spec single_spec ) )
-                with
+                let s =
+                  match single_spec with
+                  | Transition (input, witness) -> (
+                      match witness.transaction with
+                      | Command (Zkapp_command zkapp_command) ->
+                          let module T = Transaction_snark.Make (struct
+                            let signature_kind = signature_kind
+
+                            let constraint_constants = constraint_constants
+
+                            let proof_level = Genesis_constants.Proof_level.Full
+                          end) in
+                          let%map.Result final_segment =
+                            extract_terminal_zk_segment
+                              ~m:(module T)
+                              ~input ~witness ~zkapp_command ~staged_ledger_hash
+                          in
+                          `Zk_app final_segment
+                      | Command (Signed_command _) | Fee_transfer _ | Coinbase _
+                        ->
+                          Ok (`Transaction single_spec) )
+                  | Merge _ ->
+                      Error
+                        (Error.of_string "Undexpecetd merge operation in spec")
+                in
+                let work =
+                  match s with
+                  | Ok (`Zk_app final_segment) ->
+                      let job =
+                        Snark_work_lib.With_job_meta.
+                          { spec = final_segment
+                          ; job_id = failwith "" (*TODO*)
+                          ; sok_message = message
+                          }
+                      in
+                      make_interruptible
+                      @@ Uptime_snark_worker.perform_partitioned snark_worker
+                           (Snark_work_lib.Spec.Partitioned.Poly
+                            .Sub_zkapp_command
+                              job )
+                  | Ok (`Transaction single_spec) ->
+                      make_interruptible
+                        (Uptime_snark_worker.perform_single snark_worker
+                           ( message
+                           , read_all_proofs_for_work_single_spec single_spec ) )
+                  | Error error ->
+                      Interruptible.return (Error error)
+                in
+
+                match%bind work with
                 | Error e ->
                     (* error in submitting to process *)
                     [%log error]
@@ -373,7 +443,8 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
 let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
     ~protocol_constants ~transition_frontier ~time_controller
     ~block_produced_bvar ~uptime_submitter_keypair ~get_next_producer_timing
-    ~get_snark_work_fee ~get_peer ~graphql_control_port ~built_with_commit_sha =
+    ~get_snark_work_fee ~get_peer ~graphql_control_port ~built_with_commit_sha
+    ~signature_kind =
   match uptime_url with
   | None ->
       [%log info] "Not running uptime service, no URL given" ;
@@ -475,7 +546,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
                   send_block_and_transaction_snark ~logger ~interruptor ~url
                     ~constraint_constants ~snark_worker ~transition_frontier
                     ~peer_id ~submitter_keypair ~snark_work_fee
-                    ~graphql_control_port ~built_with_commit_sha
+                    ~graphql_control_port ~built_with_commit_sha ~signature_kind
                 in
                 match get_next_producer_time_opt () with
                 | None ->
