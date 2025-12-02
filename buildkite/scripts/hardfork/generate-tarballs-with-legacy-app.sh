@@ -35,7 +35,7 @@ if [ -z "$NETWORK" ] || [ -z "$VERSION" ]; then
 fi
 
 
-MINA_DEB_CODENAME=$CODENAME VERSION="$VERSION" ./buildkite/scripts/debian/install.sh mina-create-legacy-genesis 1
+MINA_DEB_CODENAME=$CODENAME FORCE_VERSION="$VERSION" ./buildkite/scripts/debian/install.sh mina-create-legacy-genesis 1
 
 ./buildkite/scripts/cache/manager.sh read "hardfork/new_config.json" .
 
