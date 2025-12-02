@@ -75,7 +75,7 @@ func DefaultConfig() *Config {
 		MainSlot:                      30,
 		ForkSlot:                      30,
 		MainDelay:                     7,
-		ForkDelay:                     7,
+		ForkDelay:                     9,
 		NumWhales:                     2,
 		NumFish:                       1,
 		NumNodes:                      0,
