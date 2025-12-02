@@ -2,6 +2,7 @@ package hardfork
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -94,13 +95,24 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 
 	mainGenesisTimestamp := config.FormatTimestamp(mainGenesisTs)
 
-	return t.startLocalNetwork(t.Config.MainMinaExe, "main", []string{
+	args := []string{
 		"--update-genesis-timestamp", fmt.Sprintf("fixed:%s", mainGenesisTimestamp),
 		"--config", "reset",
 		"--override-slot-time", strconv.Itoa(t.Config.MainSlot * 1000),
 		"--slot-transaction-end", strconv.Itoa(t.Config.SlotTxEnd),
 		"--slot-chain-end", strconv.Itoa(t.Config.SlotChainEnd),
-	})
+	}
+
+	switch t.Config.ForkMethod {
+	case config.Advanced:
+		forkDelay := time.Duration(t.Config.ForkDelay) * time.Minute
+		hardforkGenesisDelta := int(math.Ceil(forkDelay.Seconds() / float64(t.Config.MainSlot)))
+		args = append(args, "--hardfork-genesis-slot-delta", strconv.Itoa(hardforkGenesisDelta))
+	case config.Legacy:
+		// Do nothing as we'll patch the slot at the end of main network
+	}
+
+	return t.startLocalNetwork(t.Config.MainMinaExe, "main", args)
 }
 
 // RunForkNetwork starts the fork network with hardfork configuration
