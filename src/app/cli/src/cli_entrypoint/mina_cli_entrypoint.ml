@@ -49,8 +49,8 @@ let plugin_flag =
          times"
   else Command.Param.return []
 
-let make_ledger_backing ~logger ~constraint_constants ~runtime_config
-    ~hardfork_handling =
+let make_ledger_backing ~constraint_constants ~runtime_config ~hardfork_handling
+    =
   let current_genesis_global_slot =
     let%map.Option { global_slot_since_genesis = current_genesis_global_slot
                    ; _
@@ -71,12 +71,11 @@ let make_ledger_backing ~logger ~constraint_constants ~runtime_config
   | Cli_lib.Arg_type.Hardfork_handling.Migrate_exit, Some hardfork_slot ->
       Mina_ledger.Root.Config.Converting_db hardfork_slot
   | Migrate_exit, _ ->
-      failwith "No hardfork slot provided for Migrate_exit mode"
-  | Keep_running, Some _ ->
-      [%log warn]
-        "hardfork slot is set for keep_running hardfork handle, ignoring" ;
-      Stable_db
-  | Keep_running, None ->
+      failwith
+        "No hardfork slot provided for Migrate_exit mode, \
+         `daemon.{slot_chain_end,hard_fork_genesis_slot_delta}` need to be \
+         configured for using this HF mode."
+  | Keep_running, _ ->
       Stable_db
 
 let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
@@ -128,7 +127,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
             failwithf "Could not parse configuration file: %s" err () )
   in
   let ledger_backing =
-    make_ledger_backing ~logger ~constraint_constants ~runtime_config:config
+    make_ledger_backing ~constraint_constants ~runtime_config:config
       ~hardfork_handling
   in
   let chain_state_locations =
