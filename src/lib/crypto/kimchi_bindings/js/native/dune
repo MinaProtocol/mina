@@ -1,0 +1,28 @@
+(library
+ (name native_backend)
+ (public_name bindings_js.native_backend)
+ (js_of_ocaml
+  (javascript_files native_backend.js))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version js_of_ocaml-ppx)))
+
+(rule
+ (targets plonk_napi.node index.d.ts)
+ (mode
+  (promote
+   (into ./artifacts)))
+ (deps
+  package.json
+  build.sh
+  header-d.ts
+  ../../dune-build-root
+  (source_tree ../../../proof-systems))
+ (locks /cargo-lock)
+ (action
+  (progn
+   (setenv
+    CARGO_TARGET_DIR
+    "%{read:../../dune-build-root}/cargo_kimchi_native"
+    (run bash build.sh)))))

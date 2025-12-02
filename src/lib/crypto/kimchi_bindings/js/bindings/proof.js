@@ -137,6 +137,3 @@ var caml_pasta_fq_plonk_proof_deep_copy = function (proof) {
   );
 };
 
-// Provides: prover_to_json
-// Requires: plonk_wasm
-var prover_to_json = plonk_wasm.prover_to_json;
