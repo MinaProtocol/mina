@@ -3,11 +3,7 @@ package hardfork
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"strconv"
 	"time"
 )
 
@@ -185,38 +181,14 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult) (*ForkDa
 		return nil, err
 	}
 
+	// TODO: validate fork config here instead of using a generic map to read it.
 	var configRaw map[string]map[string]string
 	json.Unmarshal(configJsonString, &configRaw)
 
-	preforkChainEndTs, err := time.Parse(time.RFC3339Nano, configRaw["genesis"]["genesis_state_timestamp"])
+	forkGenesisTs, err := time.Parse(time.RFC3339Nano, configRaw["genesis"]["genesis_state_timestamp"])
 	if err != nil {
 		return nil, err
 	}
-	roughForkGenesisTs := time.Now().Add(time.Duration(t.Config.ForkDelay) * time.Minute)
-	hardforkGenesisSecDelta := roughForkGenesisTs.Sub(preforkChainEndTs).Seconds()
-	hardforkGenesisSlotDelta := int(math.Ceil(hardforkGenesisSecDelta / float64(t.Config.MainSlot)))
-	forkSlotDuration := time.Duration(t.Config.MainSlot) * time.Second
-	forkGenesisTs := preforkChainEndTs.Add(time.Duration(hardforkGenesisSlotDelta) * forkSlotDuration).Unix()
-
-	cmd := exec.Command(filepath.Join(t.ScriptDir, "patch-runtime-config-advanced-gen-fork-config.sh"))
-
-	cmd.Env = append(os.Environ(),
-		"FORK_CONFIG_TO_PATCH="+configToPatch,
-		"PREFORK_SLOT_TIME_SEC="+strconv.Itoa(t.Config.MainSlot),
-		"HARDFORK_GENESIS_SLOT_DELTA="+strconv.Itoa(hardforkGenesisSlotDelta),
-	)
-	cmd.Stderr = os.Stderr
-
-	patchedConfigString, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to run script: %w", err)
-	}
-
-	err = os.WriteFile(configToPatch, patchedConfigString, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("failed to patch fork config: %w", err)
-	}
-
 	forkLedgersDir := fmt.Sprintf("%s/genesis", forkDataPath)
-	return &ForkData{config: configToPatch, ledgersDir: forkLedgersDir, genesis: forkGenesisTs}, nil
+	return &ForkData{config: configToPatch, ledgersDir: forkLedgersDir, genesis: forkGenesisTs.Unix()}, nil
 }
