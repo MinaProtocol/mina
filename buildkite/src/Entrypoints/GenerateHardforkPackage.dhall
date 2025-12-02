@@ -67,7 +67,16 @@ let generateTarballsCommand =
       ->  \(lowerNameCodename : Text)
       ->  \(key : Text)
       ->  \(depends_on : List Command.TaggedKey.Type)
-      ->  Command.build
+      ->
+          let cacheArg = merge {
+                          Some =
+                                  \(build : Text)
+                              ->  "--cached-buildkite-build-id " ++ build
+                      , None = ""
+                      }
+                      spec.use_artifacts_from_buildkite_build
+          in
+          Command.build
             Command.Config::{
             , commands =
                 RunInToolchain.runInToolchain
@@ -75,7 +84,7 @@ let generateTarballsCommand =
                   (     "./buildkite/scripts/hardfork/generate-tarballs.sh "
                     ++  "--network ${Network.lowerName spec.network} "
                     ++  "--config-url ${spec.config_json_gz_url} "
-                    ++  "--codename ${lowerNameCodename}"
+                    ++  "--codename ${lowerNameCodename} ${cacheArg}"
                   )
             , label = "Generate hardfork tarballs for ${lowerNameCodename}"
             , key = key

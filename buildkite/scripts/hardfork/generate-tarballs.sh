@@ -9,7 +9,8 @@ usage() {
 
 NETWORK_NAME=""
 CONFIG_JSON_GZ_URL=""
-CODENAME=
+CODENAME=""
+CACHED_BUILDKITE_BUILD_ID=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -25,6 +26,10 @@ while [[ $# -gt 0 ]]; do
       CODENAME="$2"
       shift 2
       ;;
+    --cached-buildkite-build-id)
+      CACHED_BUILDKITE_BUILD_ID="$2"
+      shift 2
+      ;;
     *)
       usage
       ;;
@@ -37,7 +42,12 @@ fi
 
 echo "--- Restoring cached build artifacts for apps/${CODENAME}/"
 
-MINA_DEB_CODENAME=$CODENAME ./buildkite/scripts/debian/install.sh mina-${NETWORK_NAME} 1
+
+INSTALL_ARGS="mina-${NETWORK_NAME} 1"
+if [[ -n "$CACHED_BUILDKITE_BUILD_ID" ]]; then
+  INSTALL_ARGS="--root \"$CACHED_BUILDKITE_BUILD_ID\" $INSTALL_ARGS"
+fi
+eval MINA_DEB_CODENAME="$CODENAME" ./buildkite/scripts/debian/install.sh $INSTALL_ARGS
 
 echo "--- Generating ledger tarballs for hardfork network: $NETWORK_NAME"
 

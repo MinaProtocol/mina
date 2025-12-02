@@ -166,15 +166,15 @@ function read(){
 }
 
 #==============
-# write-many
+# write
 #==============
 
-# Display the help message for the write-many command
+# Display the help message for the write command
 function write_help(){
     echo "Write multiple files to CI cache into a cache directory."
     echo "Script requires to be executed in buildkite context. e.g (BUILDKITE_BUILD_ID env var to be defined)"
     echo ""
-    echo "     $CLI_NAME write-many [-options] INPUT_LOCAL_LOCATION_1 [INPUT_LOCAL_LOCATION_2 ...] OUTPUT_CACHE_LOCATION"
+    echo "     $CLI_NAME write [-options] INPUT_LOCAL_LOCATION_1 [INPUT_LOCAL_LOCATION_2 ...] OUTPUT_CACHE_LOCATION"
     echo ""
     echo "Parameters:"
     echo ""
