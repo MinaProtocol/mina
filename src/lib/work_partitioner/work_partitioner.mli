@@ -76,3 +76,12 @@ val submit_partitioned_work :
      result:Snark_work_lib.Result.Partitioned.Stable.V1.t
   -> partitioner:t
   -> submit_result
+
+val make_zkapp_segments :
+     m:(module Transaction_snark.S)
+  -> zkapp_command:Mina_base.Zkapp_command.t
+  -> witness:Transaction_witness.t
+  -> input:Mina_state.Snarked_ledger_state.t
+  -> ( Snark_work_lib.Spec.Sub_zkapp.Stable.V1.t Mina_stdlib.Nonempty_list.t
+     , Snark_worker_shared.Failed_to_generate_inputs.t )
+     result

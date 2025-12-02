@@ -131,13 +131,6 @@ let schedule_from_any_pending_zkapp_command ~(partitioner : t) :
 
 let convert_zkapp_command_from_selector ~partitioner ~job ~pairing
     unscheduled_segments =
-  let unscheduled_segments =
-    Snark_worker_shared.Zkapp_command_inputs.read_all_proofs_from_disk
-      unscheduled_segments
-    |> Mina_stdlib.Nonempty_list.map ~f:(fun (witness, spec, statement) ->
-           Work.Spec.Sub_zkapp.Stable.Latest.Segment
-             { statement; witness; spec } )
-  in
   let pending_zkapp_command, first_segment, first_range =
     Pending_zkapp_command.create_and_yield_segment ~job ~unscheduled_segments
   in
@@ -146,6 +139,18 @@ let convert_zkapp_command_from_selector ~partitioner ~job ~pairing
       partitioner.pending_zkapp_commands ;
   register_pending_zkapp_command_job ~id:pairing ~partitioner ~range:first_range
     ~sub_zkapp_spec:first_segment ~pending:pending_zkapp_command
+
+let make_zkapp_segments ~(m : (module Transaction_snark.S))
+    ~(zkapp_command : Mina_base.Zkapp_command.t) ~witness ~input =
+  let witness = Transaction_witness.read_all_proofs_from_disk witness in
+  Snark_worker_shared.extract_zkapp_segment_works ~m ~input ~witness
+    ~zkapp_command
+  |> Result.map ~f:(function unscheduled_segments ->
+         Snark_worker_shared.Zkapp_command_inputs.read_all_proofs_from_disk
+           unscheduled_segments
+         |> Mina_stdlib.Nonempty_list.map ~f:(fun (witness, spec, statement) ->
+                Work.Spec.Sub_zkapp.Stable.Latest.Segment
+                  { statement; witness; spec } ) )
 
 let convert_single_work_from_selector ~(partitioner : t)
     ~(single_spec : Work.Spec.Single.t) ~sok_message ~pairing :
@@ -160,9 +165,8 @@ let convert_single_work_from_selector ~(partitioner : t)
           (* TODO: we have read from disk followed by write to disk in shared
              function followed by read from disk again. Should consider refactor
              this. *)
-          let witness = Transaction_witness.read_all_proofs_from_disk witness in
-          Snark_worker_shared.extract_zkapp_segment_works
-            ~m:partitioner.transaction_snark ~input ~witness ~zkapp_command
+          make_zkapp_segments ~m:partitioner.transaction_snark ~input ~witness
+            ~zkapp_command
           |> Result.map
                ~f:
                  (convert_zkapp_command_from_selector ~partitioner ~job ~pairing)
