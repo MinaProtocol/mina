@@ -202,26 +202,30 @@ let read_all_proofs_for_work_single_spec =
 
 let extract_terminal_zk_segment ~(m : (module Transaction_snark.S)) ~witness
     ~input ~zkapp_command ~staged_ledger_hash =
+  let staged_ledger_hash = Staged_ledger_hash.ledger_hash staged_ledger_hash in
+  let p x =
+    match x with
+    | Snark_work_lib.Spec.Sub_zkapp.Stable.V1.Segment s ->
+        Ledger_hash.(s.statement.target.second_pass_ledger = staged_ledger_hash)
+    | _ ->
+        false
+  in
   let%bind.Result final_segment =
     Work_partitioner.make_zkapp_segments ~m ~input ~witness ~zkapp_command
     |> Result.map_error
          ~f:
            Work_partitioner.Snark_worker_shared.Failed_to_generate_inputs
            .error_of_t
-    |> Result.map ~f:Mina_stdlib.Nonempty_list.last
+    |> Result.map ~f:(Mina_stdlib.Nonempty_list.find ~f:p)
   in
   match final_segment with
-  | Snark_work_lib.Spec.Sub_zkapp.Stable.V1.Segment s as res ->
-      let expected = Staged_ledger_hash.ledger_hash staged_ledger_hash in
-      if Ledger_hash.(s.statement.target.second_pass_ledger = expected) then
-        Ok res
-      else
-        Error
-          ( Error.of_string
-          @@ sprintf "Mismatch segment target hash, expected %s, got %s"
-               (Ledger_hash0.to_base58_check expected)
-               (Ledger_hash0.to_base58_check
-                  s.statement.target.second_pass_ledger ) )
+  | Some (Snark_work_lib.Spec.Sub_zkapp.Stable.V1.Segment _ as res) ->
+      Ok res
+  | _ ->
+      Error
+        ( Error.of_string
+        @@ sprintf "Failed to find zkapp segment with target hash %s"
+             (Ledger_hash0.to_base58_check staged_ledger_hash) )
   | _ ->
       Error
         (Error.of_string "Expected last zkapp segment to be segment, not merge")
