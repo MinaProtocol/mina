@@ -147,7 +147,7 @@ func (t *HardforkTest) Run() error {
 		beforeShutdown = func(t *HardforkTest, analysis *BlockAnalysisResult) error {
 			t.Logger.Info("Phase 2: Forking with `mina advanced generate-hardfork-config`...")
 
-			forkData, err := t.AdvancedForkPhase(analysis)
+			forkData, err := t.AdvancedForkPhase(analysis, mainGenesisTs)
 			if err != nil {
 				return err
 			}

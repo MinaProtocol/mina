@@ -1,7 +1,6 @@
 package hardfork
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -153,7 +152,7 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, forkConfig
 	if err != nil {
 		return nil, err
 	}
-	err = t.ValidateLegacyPostpatchForkConfig(analysis.LatestNonEmptyBlock, patchedConfigBytes, forkGenesisTs, mainGenesisTs)
+	err = t.ValidateFinalForkConfig(analysis.LatestNonEmptyBlock, patchedConfigBytes, forkGenesisTs, mainGenesisTs)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +162,7 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, forkConfig
 }
 
 // Uses `mina advanced generate-hardfork-config CLI`
-func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult) (*ForkData, error) {
+func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) (*ForkData, error) {
 
 	cwd := ""
 	var err error = nil
@@ -177,21 +176,21 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult) (*ForkDa
 		return nil, err
 	}
 
-	configToPatch := fmt.Sprintf("%s/daemon.json", forkDataPath)
+	forkConfig := fmt.Sprintf("%s/daemon.json", forkDataPath)
 
-	configJsonString, err := os.ReadFile(configToPatch)
+	forkConfigBytes, err := os.ReadFile(forkConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: validate fork config here instead of using a generic map to read it.
-	var configRaw map[string]map[string]string
-	json.Unmarshal(configJsonString, &configRaw)
+	forkGenesisSlot := t.Config.SlotChainEnd + t.Config.HfSlotDelta()
+	forkGenesisTs := mainGenesisTs + int64(forkGenesisSlot*t.Config.MainSlot)
 
-	forkGenesisTs, err := time.Parse(time.RFC3339Nano, configRaw["genesis"]["genesis_state_timestamp"])
+	err = t.ValidateFinalForkConfig(analysis.LatestNonEmptyBlock, forkConfigBytes, forkGenesisTs, mainGenesisTs)
 	if err != nil {
 		return nil, err
 	}
+
 	forkLedgersDir := fmt.Sprintf("%s/genesis", forkDataPath)
-	return &ForkData{config: configToPatch, ledgersDir: forkLedgersDir, genesis: forkGenesisTs.Unix()}, nil
+	return &ForkData{config: forkConfig, ledgersDir: forkLedgersDir, genesis: forkGenesisTs}, nil
 }

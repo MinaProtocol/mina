@@ -2,7 +2,6 @@ package hardfork
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -105,9 +104,7 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 
 	switch t.Config.ForkMethod {
 	case config.Advanced:
-		forkDelay := time.Duration(t.Config.ForkDelay) * time.Minute
-		hardforkGenesisDelta := int(math.Ceil(forkDelay.Seconds() / float64(t.Config.MainSlot)))
-		args = append(args, "--hardfork-genesis-slot-delta", strconv.Itoa(hardforkGenesisDelta))
+		args = append(args, "--hardfork-genesis-slot-delta", strconv.Itoa(t.Config.HfSlotDelta()))
 	case config.Legacy:
 		// Do nothing as we'll patch the slot at the end of main network
 	}
