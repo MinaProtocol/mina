@@ -3,7 +3,6 @@
 set -e
 
 NETWORK="devnet"
-VERSION=""
 CODENAME=""
 WORKDIR=$(pwd)
 
@@ -14,7 +13,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --version)
-      VERSION="$2"
+      export FORCE_VERSION="$2"
       shift 2
       ;;
     --codename)
@@ -35,7 +34,7 @@ if [ -z "$NETWORK" ] || [ -z "$VERSION" ] || [ -z "$CODENAME" ]; then
 fi
 
 
-MINA_DEB_CODENAME=$CODENAME FORCE_VERSION="${VERSION}_*" ./buildkite/scripts/debian/install.sh mina-create-legacy-genesis 1
+MINA_DEB_CODENAME=$CODENAME ./buildkite/scripts/debian/install.sh mina-create-legacy-genesis 1
 
 ./buildkite/scripts/cache/manager.sh read "hardfork/new_config.json" .
 
