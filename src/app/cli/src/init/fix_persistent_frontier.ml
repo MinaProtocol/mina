@@ -89,6 +89,43 @@ let persist_all_transitions ~logger ~db breadcrumbs =
             batch ) ) ;
   [%log info] "Re-persisted %d transitions" (List.length breadcrumbs)
 
+let print_ram_usage ~logger frontier_length rss_before rss_after rss_after_gc
+    elapsed =
+  let gc_stats = Gc.stat () in
+  let float_opt_json = Option.value_map ~default:`Null ~f:(fun x -> `Float x) in
+  [%log info]
+    "Loaded transition frontier of %d breadcrumbs in $elapsed seconds with RSS \
+     $rss_after_gc (started with $rss_before, before GC: $rss_after), see \
+     $gc_stats (taken after GC)"
+    frontier_length
+    ~metadata:
+      [ ("elapsed", `Float (Time.Span.to_sec elapsed))
+      ; ("rss_after", float_opt_json rss_after)
+      ; ("rss_after_gc", float_opt_json rss_after_gc)
+      ; ("rss_before", float_opt_json rss_before)
+      ; ( "gc_stats"
+        , `Assoc
+            [ ("heap_words", `Int gc_stats.heap_words)
+            ; ("major_words", `Float gc_stats.major_words)
+            ; ("minor_words", `Float gc_stats.minor_words)
+            ; ( "forced_major_collections"
+              , `Int gc_stats.forced_major_collections )
+            ; ("major_collections", `Int gc_stats.major_collections)
+            ; ("minor_collections", `Int gc_stats.minor_collections)
+            ; ("compactions", `Int gc_stats.compactions)
+            ; ("promoted_words", `Float gc_stats.promoted_words)
+            ; ("heap_chunks", `Int gc_stats.heap_chunks)
+            ; ("live_words", `Int gc_stats.live_words)
+            ; ("free_words", `Int gc_stats.free_words)
+            ; ("largest_free", `Int gc_stats.largest_free)
+            ; ("fragments", `Int gc_stats.fragments)
+            ; ("live_blocks", `Int gc_stats.live_blocks)
+            ; ("free_blocks", `Int gc_stats.free_blocks)
+            ; ("top_heap_words", `Int gc_stats.top_heap_words)
+            ; ("stack_size", `Int gc_stats.stack_size)
+            ] )
+      ]
+
 let fix_persistent_frontier_root_do ~logger ~config_directory
     ~chain_state_locations ~max_frontier_depth ~migrate_frontier runtime_config
     =
@@ -212,17 +249,9 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
   Gc.compact () ;
   let rss_after_gc = Mina_stdlib_unix.File_system.read_rss_kb None in
   let elapsed = Time.diff (Time.now ()) start in
-  let flot_opt_json = Option.value_map ~default:`Null ~f:(fun x -> `Float x) in
-  [%log info]
-    "Loaded transition frontier of %d breadcrumbs in $elapsed seconds with RSS \
-     $rss_after_gc (started with $rss_before, before GC: $rss_after)"
+  print_ram_usage ~logger
     (Transition_frontier.all_breadcrumbs frontier |> List.length)
-    ~metadata:
-      [ ("elapsed", `Float (Time.Span.to_sec elapsed))
-      ; ("rss_after", flot_opt_json rss_after)
-      ; ("rss_after_gc", flot_opt_json rss_after_gc)
-      ; ("rss_before", flot_opt_json rss_before)
-      ] ;
+    rss_before rss_after rss_after_gc elapsed ;
   let frontier_root_hash =
     Transition_frontier.root frontier |> Breadcrumb.state_hash
   in
