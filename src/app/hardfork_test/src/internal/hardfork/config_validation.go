@@ -146,13 +146,13 @@ func (t *HardforkTest) ValidateLegacyPrepatchForkConfig(latestNonEmptyBlock clie
 	return nil
 }
 
-type EpochDataPatched struct {
+type EpochData struct {
 	Hash       string `json:"hash"`
 	S3DataHash string `json:"s3_data_hash"`
 	Seed       string `json:"seed"`
 }
 
-type LegacyPostpatchForkConfigView struct {
+type FinalForkConfigView struct {
 	Proof struct {
 		Fork struct {
 			BlockChainLength       int    `json:"blockchain_length"`
@@ -161,8 +161,8 @@ type LegacyPostpatchForkConfigView struct {
 		} `json:"fork"`
 	} `json:"proof"`
 	EpochData struct {
-		Staking EpochDataPatched `json:"staking"`
-		Next    EpochDataPatched `json:"next"`
+		Staking EpochData `json:"staking"`
+		Next    EpochData `json:"next"`
 	} `json:"epoch_data"`
 	Genesis struct {
 		GenesisStateTimeStamp time.Time `json:"genesis_state_timestamp"`
@@ -174,13 +174,13 @@ type LegacyPostpatchForkConfigView struct {
 	} `json:"ledger"`
 }
 
-func (t *HardforkTest) ValidateLegacyPostpatchForkConfig(latestNonEmptyBlock client.BlockData, forkConfigBytes []byte, forkGenesisTs, mainGenesisTs int64) error {
+func (t *HardforkTest) ValidateFinalForkConfig(latestNonEmptyBlock client.BlockData, forkConfigBytes []byte, forkGenesisTs, mainGenesisTs int64) error {
 
-	t.Logger.Info("Validating legacy postpatch fork config")
+	t.Logger.Info("Validating final fork config")
 	// Calculate expected genesis slot
 	expectedGenesisSlot := (forkGenesisTs - mainGenesisTs) / int64(t.Config.MainSlot)
 
-	var config LegacyPostpatchForkConfigView
+	var config FinalForkConfigView
 	dec := json.NewDecoder(bytes.NewReader(forkConfigBytes))
 	dec.DisallowUnknownFields()
 
@@ -204,6 +204,6 @@ func (t *HardforkTest) ValidateLegacyPostpatchForkConfig(latestNonEmptyBlock cli
 		return fmt.Errorf("Expected genesis.genesis_state_timestamp to be `%d`(unix timestamp), got `%s`(RFC3339)", forkGenesisTs, config.Genesis.GenesisStateTimeStamp.Format(time.RFC3339))
 	}
 
-	t.Logger.Info("Legacy postpatch fork config validated successfully")
+	t.Logger.Info("Final fork config validated successfully")
 	return nil
 }

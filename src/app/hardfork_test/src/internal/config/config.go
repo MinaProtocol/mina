@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"time"
 )
@@ -142,6 +143,11 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+func (c *Config) HfSlotDelta() int {
+
+	forkDelayDuration := time.Duration(c.ForkDelay) * time.Minute
+	return int(math.Ceil(forkDelayDuration.Seconds() / float64(c.MainSlot)))
 }
 
 // FormatTimestamp formats a UNIX timestamp into the format used by the shell script
