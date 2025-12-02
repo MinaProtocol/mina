@@ -209,17 +209,19 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
         f
   in
   let rss_after = Mina_stdlib_unix.File_system.read_rss_kb None in
+  Gc.compact () ;
+  let rss_after_gc = Mina_stdlib_unix.File_system.read_rss_kb None in
   let elapsed = Time.diff (Time.now ()) start in
+  let flot_opt_json = Option.value_map ~default:`Null ~f:(fun x -> `Float x) in
   [%log info]
     "Loaded transition frontier of %d breadcrumbs in $elapsed seconds with RSS \
-     $rss_after (started with $rss_before)"
+     $rss_after_gc (started with $rss_before, before GC: $rss_after)"
     (Transition_frontier.all_breadcrumbs frontier |> List.length)
     ~metadata:
       [ ("elapsed", `Float (Time.Span.to_sec elapsed))
-      ; ( "rss_after"
-        , Option.value_map ~default:`Null rss_after ~f:(fun x -> `Float x) )
-      ; ( "rss_before"
-        , Option.value_map ~default:`Null rss_before ~f:(fun x -> `Float x) )
+      ; ("rss_after", flot_opt_json rss_after)
+      ; ("rss_after_gc", flot_opt_json rss_after_gc)
+      ; ("rss_before", flot_opt_json rss_before)
       ] ;
   let frontier_root_hash =
     Transition_frontier.root frontier |> Breadcrumb.state_hash
