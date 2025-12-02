@@ -841,22 +841,22 @@ update_genesis_timestamp() {
 update_genesis_timestamp "${UPDATE_GENESIS_TIMESTAMP}"
 
 if [ ! -z "${OVERRIDE_SLOT_TIME_MS}" ]; then
-  echo 'Modifying configuration to override slot time...'
+  echo "Setting proof.block_window_duration_ms to ${OVERRIDE_SLOT_TIME_MS}..."
   jq-inplace ".proof.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" "${CONFIG}"
 fi
 
 if [ ! -z "${SLOT_TX_END}" ]; then
-  echo 'Modifying configuration to override slot transaction end...'
+  echo "Setting daemon.slot_tx_end to ${SLOT_TX_END}..."
   jq-inplace ".daemon.slot_tx_end=${SLOT_TX_END}" "${CONFIG}"
 fi
 
 if [ ! -z "${SLOT_CHAIN_END}" ]; then
-  echo 'Modifying configuration to override slot chain end...'
+  echo "Setting daemon.slot_chain_end to ${SLOT_CHAIN_END}..."
   jq-inplace ".daemon.slot_chain_end=${SLOT_CHAIN_END}" "${CONFIG}"
 fi
 
 if [ ! -z "${HARDFORK_GENESIS_SLOT_DELTA}" ]; then
-  echo 'Modifying configuration to override hardfork genesis slot delta...'
+  echo "Setting daemon.hard_fork_genesis_slot_delta to ${HARDFORK_GENESIS_SLOT_DELTA}..."
   jq-inplace ".daemon.hard_fork_genesis_slot_delta=${HARDFORK_GENESIS_SLOT_DELTA}" "${CONFIG}"
 fi
 
