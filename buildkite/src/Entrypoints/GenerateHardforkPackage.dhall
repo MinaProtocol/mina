@@ -199,7 +199,7 @@ let generateDockerForCodename =
                   , commands =
                       RunInToolchain.runInToolchain
                           ([] : List Text)
-                          "./buildkite/scripts/hardfork/generate-tarballs-with-legacy-app.sh"
+                          "./buildkite/scripts/hardfork/generate-tarballs-with-legacy-app.sh --network ${Network.lowerName spec.network} --version 3.2.0-f77c8c9 "
                   , label = "Legacy hardfork tarballs for ${lowerNameCodename}"
                   , key = tarballGenKey ++ "-legacy"
                   , target = Size.Large
