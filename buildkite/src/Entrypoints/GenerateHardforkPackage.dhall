@@ -77,13 +77,33 @@ let generateDockerForCodename =
 
           let lowerNameCodename = DebianVersions.lowerName codename
 
+          let artifactsGenKey =
+                "build-or-download-artifacts-${lowerNameCodename}"
+
+          let tarballGenKey =
+                "generate-hardfork-tarballs-${lowerNameCodename}"
+
+          let tarballUploadKey =
+                "upload-hardfork-tarballs-${lowerNameCodename}"
+
+          let buildHfDebian =
+                "build-hf-debian-${lowerNameCodename}"
+
+          let dependsOnTarballs =
+                [ { name = pipelineName, key = tarballGenKey } ]
+
+          let dependsOnUpload =
+                [ { name = pipelineName, key = tarballUploadKey } ]
+
+          let dependsOnBuildHfDebian =
+                [ { name = pipelineName, key = buildHfDebian } ]
+
+          let dependsOnArtifacts =
+                [ { name = pipelineName, key = artifactsGenKey } ]
+
           let dockerDaemonSpec =
                 DockerImage.ReleaseSpec::{
-                , deps =
-                  [ { name = pipelineName
-                    , key = "build-deb-pkg-${lowerNameCodename}"
-                    }
-                  ]
+                , deps = dependsOnBuildHfDebian
                 , service = Artifacts.Type.Daemon
                 , network = spec.network
                 , deb_codename = codename
@@ -97,26 +117,8 @@ let generateDockerForCodename =
 
           let dockerDaemonStep = DockerImage.stepKey dockerDaemonSpec
 
-let artifactsGenKey =
-                "build-or-download-artifacts-${lowerNameCodename}"
-
-          let tarballGenKey =
-                "generate-hardfork-tarballs-${lowerNameCodename}"
-
-          let tarballUploadKey =
-                "upload-hardfork-tarballs-${lowerNameCodename}"
-
-          let dependsOnTarballs =
-                [ { name = pipelineName, key = tarballGenKey } ]
-
           let dependsOnTest =
                 [ { name = pipelineName, key = dockerDaemonStep } ]
-
-          let dependsOnUpload =
-                [ { name = pipelineName, key = tarballUploadKey } ]
-
-          let dependsOnArtifacts =
-                [ { name = pipelineName, key = artifactsGenKey } ]
 
           let precomputed_block_prefix_arg =
                 merge
@@ -220,12 +222,7 @@ let artifactsGenKey =
               , DockerImage.generateStep dockerDaemonSpec
               , DockerImage.generateStep
                   DockerImage.ReleaseSpec::{
-                  , deps =
-                    [ { name = pipelineName
-                      , key =
-                          "build-deb-pkg-${DebianVersions.lowerName codename}"
-                      }
-                    ]
+                  , deps = dependsOnBuildHfDebian
                   , service = Artifacts.Type.Archive
                   , network = spec.network
                   , deb_codename = codename
@@ -237,12 +234,7 @@ let artifactsGenKey =
                   }
               , DockerImage.generateStep
                   DockerImage.ReleaseSpec::{
-                  , deps =
-                    [ { name = pipelineName
-                      , key =
-                          "build-deb-pkg-${DebianVersions.lowerName codename}"
-                      }
-                    ]
+                  , deps = dependsOnBuildHfDebian
                   , service = Artifacts.Type.Rosetta
                   , network = spec.network
                   , deb_profile = profile
