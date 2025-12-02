@@ -75,6 +75,7 @@ let generateTarballsCommand =
                   (     "./buildkite/scripts/hardfork/generate-tarballs.sh "
                     ++  "--network ${Network.lowerName spec.network} "
                     ++  "--config-url ${spec.config_json_gz_url} "
+                    ++  "--codename ${lowerNameCodename}"
                   )
             , label = "Generate hardfork tarballs for ${lowerNameCodename}"
             , key = key
