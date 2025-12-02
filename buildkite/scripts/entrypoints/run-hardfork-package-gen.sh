@@ -125,7 +125,7 @@ fi
 DHALL_CODENAMES=$(to_dhall_list "${CODENAMES:-}" "$DEBIAN_VERSION_DHALL_DEF.DebVersion")
 
 # shellcheck disable=SC2089
-printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s\n' \
+printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s\n' \
   "$GENERATE_HARDFORK_PACKAGE_DHALL_DEF" \
   "$DHALL_CODENAMES" \
   "$NETWORK_DHALL_DEF" \
