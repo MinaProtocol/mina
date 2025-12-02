@@ -129,33 +129,36 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, forkConfig
 	if err := os.WriteFile(prepatchConfig, forkConfigBytes, 0644); err != nil {
 		return nil, err
 	}
-	{
-		preforkLedgersDir := "fork_data/prepatch/hf_ledgers"
-		preforkHashesFile := "fork_data/prepatch/hf_ledger_hashes.json"
-		if err := t.GenerateAndValidateHashesAndLedgers(analysis, prepatchConfig, preforkLedgersDir, preforkHashesFile); err != nil {
-			return nil, err
-		}
+
+	prepatchLedgersDir := "fork_data/prepatch/hf_ledgers"
+	prepatchHashesFile := "fork_data/prepatch/hf_ledger_hashes.json"
+	if err := t.GenerateAndValidateHashesAndLedgers(analysis, prepatchConfig, prepatchLedgersDir, prepatchHashesFile); err != nil {
+		return nil, err
 	}
 
 	if err := os.MkdirAll("fork_data/postpatch", 0755); err != nil {
 		return nil, err
 	}
 
-	postforkConfig := "fork_data/postpatch/config.json"
-	forkLedgersDir := "fork_data/postpatch/hf_ledgers"
+	postpatchConfig := "fork_data/postpatch/config.json"
+	postpatchLedgersDir := "fork_data/postpatch/hf_ledgers"
 
 	// Calculate fork genesis timestamp relative to now (before starting fork network)
 	forkGenesisTs := time.Now().Unix() + int64(t.Config.ForkDelay*60)
 
-	{
-		preforkGenesisConfigFile := fmt.Sprintf("%s/daemon.json", t.Config.Root)
-		forkHashesFile := "fork_data/hf_ledger_hashes.json"
-		if err := t.PatchForkConfigAndGenerateLedgersLegacy(analysis, prepatchConfig, forkLedgersDir, forkHashesFile, postforkConfig, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs); err != nil {
-			return nil, err
-		}
+	preforkGenesisConfigFile := fmt.Sprintf("%s/daemon.json", t.Config.Root)
+	forkHashesFile := "fork_data/hf_ledger_hashes.json"
+
+	patchedConfigBytes, err := t.PatchForkConfigAndGenerateLedgersLegacy(analysis, prepatchConfig, postpatchLedgersDir, forkHashesFile, postpatchConfig, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs)
+	if err != nil {
+		return nil, err
+	}
+	err = t.ValidateLegacyPostpatchForkConfig(analysis.LatestNonEmptyBlock, patchedConfigBytes, forkGenesisTs, mainGenesisTs)
+	if err != nil {
+		return nil, err
 	}
 
-	return &ForkData{config: postforkConfig, ledgersDir: forkLedgersDir, genesis: forkGenesisTs}, nil
+	return &ForkData{config: postpatchConfig, ledgersDir: postpatchLedgersDir, genesis: forkGenesisTs}, nil
 
 }
 

@@ -62,21 +62,15 @@ func (t *HardforkTest) GenerateAndValidateHashesAndLedgers(analysis *BlockAnalys
 // 1. generate fork ledgers with runtime-genesis-ledger
 // 2. patch the genesis time & slot for fork config with create_runtime_config.sh
 // 3. perform some base sanity check on the fork config
-func (t *HardforkTest) PatchForkConfigAndGenerateLedgersLegacy(analysis *BlockAnalysisResult, forkConfigPath, forkLedgersDir, forkHashesFile, configFile, preforkGenesisConfigFile string, forkGenesisTs, mainGenesisTs int64) error {
+func (t *HardforkTest) PatchForkConfigAndGenerateLedgersLegacy(analysis *BlockAnalysisResult, forkConfigPath, forkLedgersDir, forkHashesFile, configFile, preforkGenesisConfigFile string, forkGenesisTs, mainGenesisTs int64) ([]byte, error) {
 	// Generate fork ledgers using fork network executable
 	if err := t.GenerateForkLedgers(t.Config.ForkRuntimeGenesisLedger, forkConfigPath, forkLedgersDir, forkHashesFile); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Create runtime config
 	forkGenesisTimestamp := config.FormatTimestamp(forkGenesisTs)
-	runtimeConfigBytes, err := t.PatchRuntimeConfigLegacy(forkGenesisTimestamp, forkConfigPath, configFile, preforkGenesisConfigFile, forkHashesFile)
-	if err != nil {
-		return err
-	}
-
-	// Validate modified fork data
-	return t.ValidateLegacyPostpatchForkConfig(analysis.LatestNonEmptyBlock, runtimeConfigBytes, forkGenesisTs, mainGenesisTs)
+	return t.PatchRuntimeConfigLegacy(forkGenesisTimestamp, forkConfigPath, configFile, preforkGenesisConfigFile, forkHashesFile)
 }
 
 func (t *HardforkTest) AdvancedGenerateHardForkConfig(configDir string, clientPort int) error {
