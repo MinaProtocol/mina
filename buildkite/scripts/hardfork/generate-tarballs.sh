@@ -37,7 +37,7 @@ fi
 
 echo "--- Restoring cached build artifacts for apps/${CODENAME}/"
 
-MINA_DEB_VERSION=$CODENAME ./buildkite/scripts/debian/install.sh mina-${NETWORK_NAME} 1
+MINA_DEB_CODENAME=$CODENAME ./buildkite/scripts/debian/install.sh mina-${NETWORK_NAME} 1
 
 echo "--- Generating ledger tarballs for hardfork network: $NETWORK_NAME"
 
