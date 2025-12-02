@@ -153,7 +153,7 @@ func (c *Config) HfSlotDelta() int {
 // FormatTimestamp formats a UNIX timestamp into the format used by the shell script
 func FormatTimestamp(unixTs int64) string {
 	t := time.Unix(unixTs, 0).UTC()
-	return t.Format("2006-01-02 15:04:05+00:00")
+	return t.Format(time.RFC3339)
 }
 
 // validateExecutable checks if a file exists and has executable permissions
