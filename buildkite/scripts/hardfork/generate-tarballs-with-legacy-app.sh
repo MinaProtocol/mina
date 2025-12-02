@@ -4,6 +4,7 @@ set -e
 
 NETWORK="devnet"
 VERSION=""
+CODENAME=""
 WORKDIR=$(pwd)
 
 while [[ $# -gt 0 ]]; do
@@ -16,9 +17,13 @@ while [[ $# -gt 0 ]]; do
       VERSION="$2"
       shift 2
       ;;
+    --codename)
+      CODENAME="$2"
+      shift 2
+      ;;
     *)
       echo "Unknown argument: $1"
-      echo "Usage: $0 --network <network> --version <version>"
+      echo "Usage: $0 --network <network> --version <version> --codename <codename>"
       exit 1
       ;;
   esac
@@ -30,7 +35,7 @@ if [ -z "$NETWORK" ] || [ -z "$VERSION" ]; then
 fi
 
 
-./buildkite/scripts/debian/install.sh mina-${NETWORK}-legacy 1
+MINA_DEB_CODENAME="$CODENAME" ./buildkite/scripts/debian/install.sh mina-${NETWORK}-legacy 1
 
 ./buildkite/scripts/cache/manager.sh read "hardfork/new_config.json" .
 
