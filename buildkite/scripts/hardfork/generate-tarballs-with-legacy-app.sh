@@ -29,13 +29,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [ -z "$NETWORK" ] || [ -z "$VERSION" ]; then
-  echo "Usage: $0 --network <network> --version <version>"
+if [ -z "$NETWORK" ] || [ -z "$VERSION" ] || [ -z "$CODENAME" ]; then
+  echo "Usage: $0 --network <network> --version <version> --codename <codename>"
   exit 1
 fi
 
 
-MINA_DEB_CODENAME=$CODENAME FORCE_VERSION="$VERSION" ./buildkite/scripts/debian/install.sh mina-create-legacy-genesis 1
+MINA_DEB_CODENAME=$CODENAME FORCE_VERSION="${VERSION}_*" ./buildkite/scripts/debian/install.sh mina-create-legacy-genesis 1
 
 ./buildkite/scripts/cache/manager.sh read "hardfork/new_config.json" .
 
