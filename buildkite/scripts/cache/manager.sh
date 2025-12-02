@@ -62,12 +62,12 @@ function version(){
     exit 0
 }
 
-# Display the help message for the read-many command
+# Display the help message for the read command
 function read_help(){
     echo "Read multiple files from CI cache into a local directory."
     echo "Script requires to be executed in buildkite context. e.g (BUILDKITE_BUILD_ID env var to be defined)"
     echo ""
-    echo "     $CLI_NAME read-many [-options] INPUT_CACHE_LOCATION_1 [INPUT_CACHE_LOCATION_2 ...] OUTPUT_LOCAL_LOCATION"
+    echo "     $CLI_NAME read [-options] INPUT_CACHE_LOCATION_1 [INPUT_CACHE_LOCATION_2 ...] OUTPUT_LOCAL_LOCATION"
     echo ""
     echo "Parameters:"
     echo ""
@@ -83,7 +83,7 @@ function read_help(){
     echo ""
     echo "Example:"
     echo ""
-    echo "  $CLI_NAME read-many debians/mina-devnet*.deb debians/mina-archive*.deb /workdir"
+    echo "  $CLI_NAME read debians/mina-devnet*.deb debians/mina-archive*.deb /workdir"
     echo ""
     echo " Above command will copy all matching files from CACHE_MOUNTPOINT/BUILDKITE_BUILD_ID/debians to /workdir"
     echo ""
