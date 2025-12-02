@@ -215,7 +215,7 @@ let generateDockerForCodename =
                           ]
                           "./buildkite/scripts/hardfork/prepare-hf-debian.sh"
                   , label = "Create hardfork packages for ${lowerNameCodename}"
-                  , key = tarballUploadKey
+                  , key = buildHfDebian
                   , target = Size.Large
                   , depends_on = dependsOnTarballs
                   }
