@@ -98,7 +98,7 @@ let generateDockerForCodename =
           let lowerNameCodename = DebianVersions.lowerName codename
 
           let artifactsGenKey =
-                "build-or-download-artifacts-${lowerNameCodename}"
+                "build-deb-pkg-${lowerNameCodename}"
 
           let tarballGenKey = "generate-hardfork-tarballs-${lowerNameCodename}"
 
