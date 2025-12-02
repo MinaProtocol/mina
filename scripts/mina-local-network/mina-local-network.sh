@@ -55,6 +55,7 @@ DEMO_MODE=false
 
 SLOT_TX_END=
 SLOT_CHAIN_END=
+HARDFORK_GENESIS_SLOT_DELTA=
 
 # ================================================
 # Globals (assigned during execution of script)
@@ -149,6 +150,7 @@ help() {
                                          |   Default: None
 --itn-keys <keys>                        | Use ITN keys for nodes authentication
                                          |   Default: not set
+-hfd |--hardfork-genesis-slot-delta      | When set override the value `hard_fork_genesis_slot_delta` in daemon config. 
 -r   |--root                             | When set, override the root working folder (i.e. the value of ROOT) for this script. WARN: this script will clean up anything inside that folder when initializing any run!
                                          |   Default: ${ROOT}
 --redirect-logs                          | When set, redirect logs for nodes (excluding workers) and archive to file instead of console output
@@ -548,6 +550,10 @@ while [[ "$#" -gt 0 ]]; do
     ITN_KEYS="${2}"
     shift
     ;;
+  -hfd |--hardfork-genesis-slot-delta)
+    HARDFORK_GENESIS_SLOT_DELTA="${2}"
+    shift
+    ;;
   -r | --root)
     ROOT="${2}"
     shift
@@ -847,6 +853,11 @@ fi
 if [ ! -z "${SLOT_CHAIN_END}" ]; then
   echo 'Modifying configuration to override slot chain end...'
   jq-inplace ".daemon.slot_chain_end=${SLOT_CHAIN_END}" "${CONFIG}"
+fi
+
+if [ ! -z "${HARDFORK_GENESIS_SLOT_DELTA}" ]; then
+  echo 'Modifying configuration to override hardfork genesis slot delta...'
+  jq-inplace ".daemon.hard_fork_genesis_slot_delta=${HARDFORK_GENESIS_SLOT_DELTA}" "${CONFIG}"
 fi
 
 # ================================================
