@@ -12,14 +12,6 @@ module Worker = struct
   module T = struct
     module F = Rpc_parallel.Function
 
-    type 'w functions =
-      { perform_single :
-          ( 'w
-          , Sok_message.t * Snark_work_lib.Spec.Single.Stable.Latest.t
-          , (Ledger_proof.t * Time.Span.t) Or_error.t )
-          F.t
-      }
-
     module Worker_state = struct
       (* required by rpc_parallel *)
       type init_arg = Logger.t * Genesis_constants.Constraint_constants.t
@@ -27,6 +19,19 @@ module Worker = struct
 
       include Impl.Worker_state
     end
+
+    type 'w functions =
+      { perform_single :
+          ( 'w
+          , Sok_message.t * Snark_work_lib.Spec.Single.Stable.Latest.t
+          , (Ledger_proof.t * Time.Span.t) Or_error.t )
+          F.t
+      ; perform_partitioned :
+          ( 'w
+          , Snark_work_lib.Spec.Partitioned.Stable.Latest.t
+          , (Ledger_proof.t * Time.Span.t) Or_error.t )
+          F.t
+      }
 
     module Connection_state = struct
       (* bin_io required by rpc_parallel *)
@@ -43,6 +48,12 @@ module Worker = struct
       let perform_single (state : Worker_state.t) (message, single_spec) =
         Impl.perform_single ~message state single_spec
 
+      let perform_partitioned (state : Worker_state.t) spec =
+        let%map.Deferred.Or_error { Proof_carrying_data.proof; data } =
+          Impl.perform_partitioned ~state ~spec
+        in
+        (proof, data)
+
       let functions =
         let f (i, o, f) =
           C.create_rpc
@@ -57,6 +68,13 @@ module Worker = struct
               , [%bin_type_class:
                   (Ledger_proof.Stable.Latest.t * Time.Span.t) Or_error.t]
               , perform_single )
+        ; perform_partitioned =
+            f
+              ( [%bin_type_class:
+                  Snark_work_lib.Spec.Partitioned.Stable.Latest.t]
+              , [%bin_type_class:
+                  (Ledger_proof.Stable.Latest.t * Time.Span.t) Or_error.t]
+              , perform_partitioned )
         }
 
       let init_worker_state (logger, constraint_constants) =
@@ -123,3 +141,6 @@ let create ~logger ~constraint_constants ~pids : t Deferred.t =
 
 let perform_single { connection; _ } ((_message, _single_spec) as arg) =
   Worker.Connection.run connection ~f:Worker.functions.perform_single ~arg
+
+let perform_partitioned { connection; _ } arg =
+  Worker.Connection.run connection ~f:Worker.functions.perform_partitioned ~arg
