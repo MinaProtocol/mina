@@ -22,14 +22,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       echo "Unknown argument: $1"
-      echo "Usage: $0 --network <network> --version <version> --codename <codename>"
+      echo "Usage: $0 --network <network> [--version <version>] --codename <codename>"
       exit 1
       ;;
   esac
 done
 
-if [ -z "$NETWORK" ] || [ -z "$VERSION" ] || [ -z "$CODENAME" ]; then
-  echo "Usage: $0 --network <network> --version <version> --codename <codename>"
+if [ -z "$NETWORK" ] || [ -z "$CODENAME" ]; then
+  echo "Usage: $0 --network <network> [--version <version>] --codename <codename>"
   exit 1
 fi
 

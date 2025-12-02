@@ -42,13 +42,10 @@ fi
 
 echo "--- Restoring cached build artifacts for apps/${CODENAME}/"
 
-
-INSTALL_ARGS="mina-${NETWORK_NAME} 1"
 if [[ -n "$CACHED_BUILDKITE_BUILD_ID" ]]; then
   export ROOT="$CACHED_BUILDKITE_BUILD_ID"
 fi
-MINA_DEB_CODENAME="$CODENAME" ./buildkite/scripts/debian/install.sh $INSTALL_ARGS
-
+MINA_DEB_CODENAME="$CODENAME" ./buildkite/scripts/debian/install.sh mina-${NETWORK_NAME} 1
 echo "--- Generating ledger tarballs for hardfork network: $NETWORK_NAME"
 
 ./scripts/hardfork/generate-tarballs.sh --network "$NETWORK_NAME" --config-url "$CONFIG_JSON_GZ_URL" --runtime-ledger mina-create-genesis --logproc mina-logproc
