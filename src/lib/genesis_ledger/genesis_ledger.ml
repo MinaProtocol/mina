@@ -81,6 +81,16 @@ module Utils = struct
     assert (Root_ledger.depth root = depth) ;
     Root_ledger.create_checkpoint ~config root () |> Or_error.return
 
+  let create_root_from_backing_root_with_directory genesis_mask root ~directory
+      ~depth () =
+    assert (
+      Ledger_hash.equal
+        (Ledger.merkle_root genesis_mask)
+        (Root_ledger.merkle_root root) ) ;
+    assert (Root_ledger.depth root = depth) ;
+    Root_ledger.create_checkpoint_with_directory root ~directory_name:directory
+    |> Or_error.return
+
   let keypair_of_account_record_exn (private_key, account) =
     let open Account in
     let sk_error_msg =
@@ -181,6 +191,29 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
     | `Root ledger ->
         create_root_from_backing_root mask ledger ~config ~depth ()
 
+  let create_root_with_directory ~directory ~depth () =
+    let backing_ledger, mask = Lazy.force backing_ledger in
+    match backing_ledger with
+    | `Ephemeral ledger ->
+        (* For ephemeral ledgers, create a fresh root with stable_db backing
+           and transfer accounts to it *)
+        let open Or_error.Let_syntax in
+        let config =
+          Root_ledger.Config.with_directory ~backing_type:Stable_db
+            ~directory_name:directory
+        in
+        let root = Root_ledger.create ~logger ~config ~depth () in
+        (* We are transferring to an unmasked view of the root, so this is
+           used solely for the transfer side effect *)
+        let%map _dest =
+          Ledger_transfer_mask.transfer_accounts ~src:ledger
+            ~dest:(Root_ledger.as_unmasked root)
+        in
+        root
+    | `Root ledger ->
+        create_root_from_backing_root_with_directory mask ledger ~directory
+          ~depth ()
+
   include Utils
 
   let find_account_record_exn ~f =
@@ -218,6 +251,8 @@ module Packed = struct
   let t ((module L) : t) = L.t
 
   let create_root ((module L) : t) = L.create_root
+
+  let create_root_with_directory ((module L) : t) = L.create_root_with_directory
 
   let depth ((module L) : t) = L.depth
 
@@ -264,6 +299,11 @@ end) : Intf.S = struct
   let create_root ~config ~depth () =
     let genesis_root, mask = Lazy.force backing_ledger in
     create_root_from_backing_root mask genesis_root ~config ~depth ()
+
+  let create_root_with_directory ~directory ~depth () =
+    let genesis_root, mask = Lazy.force backing_ledger in
+    create_root_from_backing_root_with_directory mask genesis_root ~directory
+      ~depth ()
 
   let find_account_record_exn ~f =
     find_account_record_exn ~f (Lazy.force accounts)
