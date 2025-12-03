@@ -151,11 +151,15 @@ let wait_until_ready ~log_file =
             lines_to_check_from := cur_line ;
             wait_til_log_ready_emitted ()
         | `Ok line when cur_line >= !lines_to_check_from -> (
-            match Yojson.Safe.from_string line |> Logger.Message.of_yojson with
-            | Ok { message; _ } when String.equal message expected_message ->
-                Deferred.Or_error.return ()
-            | _ ->
-                check_lines_from (cur_line + 1) )
+            if String.is_empty line then check_lines_from (cur_line + 1)
+            else
+              match
+                Yojson.Safe.from_string line |> Logger.Message.of_yojson
+              with
+              | Ok { message; _ } when String.equal message expected_message ->
+                  Deferred.Or_error.return ()
+              | _ ->
+                  check_lines_from (cur_line + 1) )
         | `Ok _ ->
             check_lines_from (cur_line + 1)
       in
