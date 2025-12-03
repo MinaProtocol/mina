@@ -13,7 +13,7 @@ let runner =
       ->  \(arch : Arch.Type)
       ->  merge
             { Bookworm = RunInToolchain.runInToolchainBookworm arch
-            , Bullseye = RunInToolchain.runInToolchain
+            , Bullseye = RunInToolchain.runInToolchainBullseye arch
             , Jammy = RunInToolchain.runInToolchainJammy
             , Focal = RunInToolchain.runInToolchain
             , Noble = RunInToolchain.runInToolchainNoble arch
