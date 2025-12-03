@@ -34,8 +34,6 @@ let Profiles = ../Constants/Profiles.dhall
 
 let Network = ../Constants/Network.dhall
 
-let RunInToolchain = ../Command/RunInToolchain.dhall
-
 let Toolchain = ../Constants/Toolchain.dhall
 
 let Arch = ../Constants/Arch.dhall
@@ -82,7 +80,10 @@ let generateTarballsCommand =
           in  Command.build
                 Command.Config::{
                 , commands =
-                    RunInToolchain.runInToolchain
+                      Toolchain.select
+                          Toolchain.SelectionMode.ByDebianAndArch
+                          codename
+                          Arch.Type.Amd64
                       ([] : List Text)
                       (     "./buildkite/scripts/hardfork/generate-tarballs.sh "
                         ++  "--network ${Network.lowerName spec.network} "
@@ -192,7 +193,7 @@ let generateDockerForCodename =
                 merge
                   { Some =
                           \(build : Text)
-                      ->  "CACHED_BUILDKITE_BUILD_ID=${build} " ++ build
+                      ->  "CACHED_BUILDKITE_BUILD_ID=${build} "
                   , None = "CACHED_BUILDKITE_BUILD_ID=\\\$BUILDKITE_BUILD_ID"
                   }
                   spec.use_artifacts_from_buildkite_build
@@ -220,7 +221,7 @@ let generateDockerForCodename =
                           Toolchain.SelectionMode.ByDebianAndArch
                           codename
                           Arch.Type.Amd64
-                          [ useArtifactsEnvVar ]
+                          ([]: List Text)
                           "./buildkite/scripts/hardfork/generate-tarballs-with-legacy-app.sh --network ${Network.lowerName
                                                                                                            spec.network} --version 3.2.0-f77c8c9  --codename ${lowerNameCodename} "
                     , label =

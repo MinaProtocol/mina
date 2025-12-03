@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo pipefail
+set -eox pipefail
 
 ./buildkite/scripts/cache/manager.sh read --root ${CACHED_BUILDKITE_BUILD_ID} debians/${CODENAME}/mina-daemon* ./
 
