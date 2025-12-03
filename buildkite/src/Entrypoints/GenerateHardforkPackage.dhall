@@ -201,7 +201,10 @@ let generateDockerForCodename =
               # [ Command.build
                     Command.Config::{
                     , commands =
-                        RunInToolchain.runInToolchain
+                        Toolchain.select
+                          Toolchain.SelectionMode.ByDebianAndArch
+                          codename
+                          Arch.Type.Amd64
                           ([] : List Text)
                           "./buildkite/scripts/hardfork/upload-ledger-tarballs-to-s3.sh"
                     , label =
@@ -217,7 +220,7 @@ let generateDockerForCodename =
                           Toolchain.SelectionMode.ByDebianAndArch
                           codename
                           Arch.Type.Amd64
-                          ([] : List Text)
+                          [ useArtifactsEnvVar ]
                           "./buildkite/scripts/hardfork/generate-tarballs-with-legacy-app.sh --network ${Network.lowerName
                                                                                                            spec.network} --version 3.2.0-f77c8c9  --codename ${lowerNameCodename} "
                     , label =
@@ -228,7 +231,10 @@ let generateDockerForCodename =
                 , Command.build
                     Command.Config::{
                     , commands =
-                        RunInToolchain.runInToolchain
+                        Toolchain.select
+                          Toolchain.SelectionMode.ByDebianAndArch
+                          codename
+                          Arch.Type.Amd64
                           [ "NETWORK_NAME=${Network.lowerName spec.network}"
                           , "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
                           , "CACHED_BUILDKITE_BUILD_ID=${useArtifactsEnvVar}"

@@ -6,7 +6,7 @@ NETWORK="devnet"
 CODENAME=""
 WORKDIR=$(pwd)
 export FORCE_VERSION="*"
-CACHED_BUILDKITE_BUILD_ID=""
+CACHED_BUILDKITE_BUILD_ID="${CACHED_BUILDKITE_BUILD_ID:-}"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -39,7 +39,7 @@ if [ -z "$NETWORK" ] || [ -z "$CODENAME" ]; then
   exit 1
 fi
 
-if [[ -n "$CACHED_BUILDKITE_BUILD_ID" ]]; then
+if [[ -n "${CACHED_BUILDKITE_BUILD_ID:-}" ]]; then
   MINA_DEB_CODENAME=$CODENAME ROOT="$CACHED_BUILDKITE_BUILD_ID" ./buildkite/scripts/debian/install.sh mina-logproc 1
 fi
 
