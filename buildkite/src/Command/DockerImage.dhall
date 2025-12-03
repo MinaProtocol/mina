@@ -55,6 +55,7 @@ let ReleaseSpec =
           , docker_publish : DockerPublish.Type
           , docker_repo : DockerRepo.Type
           , verify : Bool
+          , size : Size
           , if_ : Optional B/If
           }
       , default =
@@ -75,7 +76,7 @@ let ReleaseSpec =
           , docker_publish = DockerPublish.Type.Essential
           , no_cache = False
           , no_debian = False
-          , docker_repo = DockerRepo.Type.Internal
+          , docker_repo = DockerRepo.Type.InternalEurope
           , step_key_suffix = "-docker-image"
           , verify = False
           , deb_suffix = None Text
@@ -144,12 +145,25 @@ let generateStep =
                             , profile = spec.deb_profile
                             , buildFlag = spec.build_flags
                             , archs = [ spec.arch ]
+                            , repo = spec.docker_repo
                             }
 
                 else  ""
 
           let pruneDockerImages =
-                "docker system prune --all --force --filter until=24h"
+                    "docker system prune --all --force "
+                ++  merge
+                      { Arm64 = ""
+                      , XLarge = "--filter until=24h"
+                      , Large = "--filter until=24h"
+                      , Medium = "--filter until=24h"
+                      , Small = "--filter until=24h"
+                      , Integration = "--filter until=24h"
+                      , QA = "--filter until=24h"
+                      , Multi = "--filter until=24h"
+                      , Perf = "--filter until=24h"
+                      }
+                      spec.size
 
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
@@ -232,12 +246,15 @@ let generateStep =
                   }
                   spec.deb_repo
 
+          let target =
+                merge { Arm64 = Size.Arm64, Amd64 = Size.XLarge } spec.arch
+
           in  Command.build
                 Command.Config::{
                 , commands = commands
                 , label = "${stepLabel spec}"
                 , key = "${stepKey spec}"
-                , target = Size.XLarge
+                , target = target
                 , docker_login = Some DockerLogin::{=}
                 , depends_on = spec.deps
                 , if_ = spec.if_

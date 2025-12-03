@@ -13,7 +13,7 @@ let Size = ../../Command/Size.dhall
 in  MinaArtifactToolchain.pipeline
       DockerImage.ReleaseSpec::{
       , service = Artifacts.Type.Toolchain
-      , deb_codename = DebianVersions.DebVersion.Noble
+      , deb_codename = DebianVersions.DebVersion.Bullseye
       , no_cache = True
       , no_debian = True
       , arch = Arch.Type.Arm64

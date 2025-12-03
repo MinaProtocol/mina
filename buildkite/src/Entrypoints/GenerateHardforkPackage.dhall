@@ -43,6 +43,7 @@ let Spec =
           , version : Text
           , suffix : Text
           , precomputed_block_prefix : Optional Text
+          , size : Size
           }
       , default =
           { codenames = [ DebianVersions.DebVersion.Bullseye ]
@@ -53,6 +54,7 @@ let Spec =
           , suffix = ""
           , version = "\\\$MINA_DEB_VERSION"
           , precomputed_block_prefix = None Text
+          , size = Size.XLarge
           }
       }
 
@@ -84,6 +86,7 @@ let generateDockerForCodename =
                 , deb_suffix = Some "hardfork"
                 , step_key_suffix =
                     "-${DebianVersions.lowerName codename}-docker-image"
+                , size = spec.size
                 }
 
           let dockerDaemonStep = DockerImage.stepKey dockerDaemonSpec
@@ -135,6 +138,7 @@ let generateDockerForCodename =
                   , deb_codename = codename
                   , deb_profile = profile
                   , deb_repo = DebianRepo.Type.Local
+                  , size = spec.size
                   , step_key_suffix =
                       "-${DebianVersions.lowerName codename}-docker-image"
                   }
@@ -152,6 +156,7 @@ let generateDockerForCodename =
                   , deb_repo = DebianRepo.Type.Local
                   , deb_codename = codename
                   , deb_suffix = Some "hardfork"
+                  , size = spec.size
                   , step_key_suffix =
                       "-${DebianVersions.lowerName codename}-docker-image"
                   }
