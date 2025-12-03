@@ -68,6 +68,7 @@ in  Pipeline.build
             , label = "Rosetta integration tests Bullseye"
             , key = "rosetta-integration-tests-bullseye"
             , target = Size.Small
+            , artifact_paths = [ S.contains "test_output/artifacts/*" ]
             , depends_on =
                 Dockers.dependsOn
                   Dockers.DepsSpec::{

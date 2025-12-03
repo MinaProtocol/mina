@@ -348,7 +348,8 @@ module Get_object_lifetime_statistics = struct
 end
 
 module Generate_hardfork_config = struct
-  type query = string [@@deriving bin_io_unversioned]
+  type query = { config_dir : string; generate_fork_validation : bool }
+  [@@deriving bin_io_unversioned]
 
   type response = unit Or_error.t [@@deriving bin_io_unversioned]
 
