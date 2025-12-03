@@ -165,7 +165,6 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
     if set_best_tip then
       Persistent_frontier.Instance.set_best_tip ~logger ~frontier:full_frontier
         ~extensions ~ignore_consensus_local_state ~root_ledger best_tip_hash
-      |> Deferred.map ~f:Result.return
     else return ()
   in
   [%log info] "Loaded full frontier and extensions" ;
