@@ -6,8 +6,6 @@ open Mina_base
 module type S = sig
   type t
 
-  val find_exn : t -> State_hash.t -> Breadcrumb.t
-
   val max_length : t -> int
 
   val consensus_local_state : t -> Consensus.Data.Local_state.t
@@ -33,8 +31,6 @@ module type S = sig
     t -> State_hash.t -> Mina_state.Protocol_state.value option
 
   val successors : t -> Breadcrumb.t -> Breadcrumb.t list
-
-  val common_ancestor : t -> Breadcrumb.t -> Breadcrumb.t -> State_hash.t
 
   val iter : t -> f:(Breadcrumb.t -> unit) -> unit
 

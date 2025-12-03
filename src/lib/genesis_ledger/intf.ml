@@ -79,6 +79,11 @@ module type S = sig
   val create_root :
     config:Root_ledger.Config.t -> depth:int -> unit -> Root_ledger.t Or_error.t
 
+  (** Create a new root ledger that is equal in state to the genesis ledger,
+      using a directory path instead of a config *)
+  val create_root_with_directory :
+    directory:string -> depth:int -> unit -> Root_ledger.t Or_error.t
+
   val depth : int
 
   val accounts : (Private_key.t option * Account.t) list Lazy.t

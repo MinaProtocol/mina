@@ -289,18 +289,22 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
               ~signature_kind
           with
           | Ok
-              ( `Hash_after_applying next_staged_ledger_hash
-              , `Ledger_proof ledger_proof_opt
+              ( `Ledger_proof ledger_proof_opt
               , `Staged_ledger transitioned_staged_ledger
               , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
               ) ->
+              [%log internal] "Hash_new_staged_ledger" ;
+              let staged_ledger_hash =
+                Staged_ledger.hash transitioned_staged_ledger
+              in
+              [%log internal] "Hash_new_staged_ledger_done" ;
               (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
               ignore
               @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
                    (Staged_ledger.ledger transitioned_staged_ledger) ;
               Some
                 ( (match diff with Ok diff -> diff | Error _ -> assert false)
-                , next_staged_ledger_hash
+                , staged_ledger_hash
                 , ledger_proof_opt
                 , is_new_stack
                 , pending_coinbase_update )
@@ -641,12 +645,6 @@ module Vrf_evaluation_state = struct
     poll ~logger ~vrf_evaluator ~vrf_poll_interval t
 end
 
-let validate_genesis_protocol_state_block ~genesis_state_hash (b, v) =
-  Validation.validate_genesis_protocol_state ~genesis_state_hash
-    (With_hash.map ~f:Mina_block.header b, v)
-  |> Result.map
-       ~f:(Fn.flip Validation.with_body (Mina_block.body @@ With_hash.data b))
-
 let log_bootstrap_mode ~logger () =
   [%log info] "Pausing block production while bootstrapping"
 
@@ -712,10 +710,10 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
           (Transition_frontier.extensions frontier)
           Transition_registry
       in
-      let crumb = Transition_frontier.best_tip frontier in
-      let crumb =
+      let%bind crumb =
+        let best_tip = Transition_frontier.best_tip frontier in
         let crumb_global_slot_since_genesis =
-          Breadcrumb.protocol_state crumb
+          Breadcrumb.protocol_state best_tip
           |> Protocol_state.consensus_state
           |> Consensus.Data.Consensus_state.global_slot_since_genesis
         in
@@ -726,13 +724,26 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
         if
           Mina_numbers.Global_slot_since_genesis.equal
             crumb_global_slot_since_genesis block_global_slot_since_genesis
-        then
+        then (
           (* We received a block for this slot over the network before
              attempting to produce our own. Build upon its parent instead
              of attempting (and failing) to build upon the block itself.
           *)
-          Transition_frontier.find_exn frontier (Breadcrumb.parent_hash crumb)
-        else crumb
+          match
+            Transition_frontier.find frontier (Breadcrumb.parent_hash best_tip)
+          with
+          | Some parent ->
+              return parent
+          | None ->
+              [%log error]
+                "Aborting block production: parent of $best_tip not found in \
+                 frontier (unexpected case, there is likely a bug somewhere)"
+                ~metadata:
+                  [ ( "best_tip"
+                    , State_hash.to_yojson (Breadcrumb.state_hash best_tip) )
+                  ] ;
+              Interruptible.lift (Deferred.never ()) (Deferred.return ()) )
+        else return best_tip
       in
       let start = Block_time.now time_controller in
       [%log info]
@@ -890,7 +901,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 |> Fn.flip Validation.with_body body
                 |> Validation.skip_protocol_versions_validation
                      `This_block_has_valid_protocol_versions
-                |> validate_genesis_protocol_state_block
+                |> Validation.validate_genesis_protocol_state_block
                      ~genesis_state_hash:
                        (Protocol_state.genesis_state_hash
                           ~state_hash:(Some previous_state_hash)
@@ -1467,7 +1478,7 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                  `This_block_has_valid_protocol_versions
             |> Validation.skip_proof_validation
                  `This_block_was_generated_internally
-            |> validate_genesis_protocol_state_block
+            |> Validation.validate_genesis_protocol_state_block
                  ~genesis_state_hash:
                    (Protocol_state.genesis_state_hash
                       ~state_hash:(Some previous_protocol_state_hash)

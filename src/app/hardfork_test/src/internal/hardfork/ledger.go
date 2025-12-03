@@ -68,7 +68,7 @@ func (t *HardforkTest) GenerateAndValidatePreforkLedgers(analysis *BlockAnalysis
 }
 
 // GenerateForkConfigAndLedgers generates the fork configuration and ledgers
-func (t *HardforkTest) GenerateForkConfigAndLedgers(analysis *BlockAnalysisResult, forkConfigPath, forkLedgersDir, forkHashesFile, configFile, baseConfigFile string, forkGenesisTs, mainGenesisTs int64) error {
+func (t *HardforkTest) GenerateForkConfigAndLedgers(analysis *BlockAnalysisResult, forkConfigPath, forkLedgersDir, forkHashesFile, configFile, preforkGenesisConfigFile string, forkGenesisTs, mainGenesisTs int64) error {
 	// Generate fork ledgers using fork network executable
 	if err := t.GenerateForkLedgers(t.Config.ForkRuntimeGenesisLedger, forkConfigPath, forkLedgersDir, forkHashesFile); err != nil {
 		return err
@@ -76,7 +76,7 @@ func (t *HardforkTest) GenerateForkConfigAndLedgers(analysis *BlockAnalysisResul
 
 	// Create runtime config
 	forkGenesisTimestamp := config.FormatTimestamp(forkGenesisTs)
-	runtimeConfigBytes, err := t.CreateRuntimeConfig(forkGenesisTimestamp, forkConfigPath, configFile, baseConfigFile, forkHashesFile)
+	runtimeConfigBytes, err := t.CreateRuntimeConfig(forkGenesisTimestamp, forkConfigPath, configFile, preforkGenesisConfigFile, forkHashesFile)
 	if err != nil {
 		return err
 	}

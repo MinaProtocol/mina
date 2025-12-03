@@ -371,9 +371,10 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
           return
             (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ()) )
     ; implement Daemon_rpcs.Generate_hardfork_config.rpc
-        (fun () directory_name ->
+        (fun () { config_dir; generate_fork_validation } ->
           Mina_lib.Hardfork_config.dump_reference_config
-            ~breadcrumb_spec:`Stop_slot ~directory_name mina )
+            ~breadcrumb_spec:`Stop_slot ~config_dir ~generate_fork_validation
+            mina )
     ; implement Daemon_rpcs.Submit_internal_log.rpc
         (fun () { timestamp; message; metadata; process } ->
           let metadata =
@@ -384,7 +385,7 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
     ]
   in
   let snark_worker_impls =
-    [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->
+    [ implement Snark_worker.Rpcs.Get_work.Stable.Latest.rpc (fun () () ->
           match Mina_lib.request_work mina with
           | None ->
               Deferred.return None
@@ -411,14 +412,14 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
                       @@ read_all_proofs_from_disk zkapp_cmd )
                   ] ;
               Deferred.return None )
-    ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
+    ; implement Snark_worker.Rpcs.Submit_work.Stable.Latest.rpc
         (fun () (result : Snark_work_lib.Result.Partitioned.Stable.Latest.t) ->
           [%log debug] "received completed work from a snark worker"
             ~metadata:[ ("work_id", Snark_work_lib.Id.Any.to_yojson result.id) ] ;
           Mina_metrics.(
             Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
           Deferred.return @@ Mina_lib.add_work mina result )
-    ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
+    ; implement Snark_worker.Rpcs.Failed_to_generate_snark.Stable.Latest.rpc
         (fun () (error, _) ->
           [%str_log error]
             (Snark_worker.Events.Generating_snark_work_failed

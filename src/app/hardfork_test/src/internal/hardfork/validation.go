@@ -75,15 +75,16 @@ func (t *HardforkTest) ValidateNoNewBlocks(port int) error {
 }
 
 // CollectBlocks gathers blocks from multiple slots across different ports
-func (t *HardforkTest) CollectBlocks(ports []int, startSlot, endSlot int) ([]graphql.BlockData, error) {
+func (t *HardforkTest) CollectBlocks(startSlot, endSlot int) ([]graphql.BlockData, error) {
 	var allBlocks []graphql.BlockData
 
 	for i := startSlot; i <= endSlot; i++ {
-		port := ports[i%len(ports)]
 
-		blocksBatch, err := t.Client.GetBlocks(port)
+		portUsed := t.AnyPortOfType(PORT_REST)
+
+		blocksBatch, err := t.Client.GetBlocks(portUsed)
 		if err != nil {
-			t.Logger.Debug("Failed to get blocks for slot %d: %v from port %d", i, err, port)
+			t.Logger.Debug("Failed to get blocks for slot %d: %v from port %d", i, err, portUsed)
 		} else {
 			allBlocks = append(allBlocks, blocksBatch...)
 		}
@@ -95,11 +96,12 @@ func (t *HardforkTest) CollectBlocks(ports []int, startSlot, endSlot int) ([]gra
 }
 
 // AnalyzeBlocks performs comprehensive block analysis including finding genesis epoch hashes
-func (t *HardforkTest) AnalyzeBlocks(ports []int) (*BlockAnalysisResult, error) {
+func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 	// Get initial blocks to find genesis epoch hashes
-	blocks, err := t.Client.GetBlocks(ports[0])
+	portUsed := t.AnyPortOfType(PORT_REST)
+	blocks, err := t.Client.GetBlocks(portUsed)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get blocks: %w from port %d", err, ports[0])
+		return nil, fmt.Errorf("failed to get blocks: %w from port %d", err, portUsed)
 	}
 
 	// Find the first non-empty block to get genesis epoch hashes
@@ -129,7 +131,7 @@ func (t *HardforkTest) AnalyzeBlocks(ports []int) (*BlockAnalysisResult, error) 
 		genesisEpochStakingHash, genesisEpochNextHash)
 
 	// Collect blocks from BestChainQueryFrom to SlotChainEnd
-	allBlocks, err := t.CollectBlocks(ports, t.Config.BestChainQueryFrom, t.Config.SlotChainEnd)
+	allBlocks, err := t.CollectBlocks(t.Config.BestChainQueryFrom, t.Config.SlotChainEnd)
 	if err != nil {
 		return nil, err
 	}

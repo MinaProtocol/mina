@@ -65,6 +65,14 @@ val apply_diffs :
   -> [ `New_root_and_diffs_with_mutants of
        Root_identifier.t option * Diff.Full.With_mutant.t list ]
 
+val common_ancestor :
+     t
+  -> Breadcrumb.t
+  -> Breadcrumb.t
+  -> ( State_hash.t
+     , [ `Parent_not_found of State_hash.t * [ `Parent of State_hash.t ] ] )
+     Result.t
+
 module Util : sig
   (** given an heir, calculate the diff that will transition
       the root to that heir (assuming parent is the root) *)

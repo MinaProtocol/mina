@@ -2298,12 +2298,24 @@ let generate_hardfork_config =
          daemon working directory"
       (required string)
   in
+  let generate_fork_validation =
+    flag "--generate-fork-validation"
+      ~doc:
+        "BOOL whether generating the fork validation folder. Defaults to true"
+      (optional_with_default true bool)
+  in
+  let args =
+    Command.Param.map2 hardfork_config_dir_flag generate_fork_validation
+      ~f:(fun config_dir generate_fork_validation ->
+        Daemon_rpcs.Generate_hardfork_config.
+          { config_dir; generate_fork_validation } )
+  in
+
   Command.async ~summary:"Generate reference hardfork configuration"
-    (Cli_lib.Background_daemon.rpc_init hardfork_config_dir_flag
-       ~f:(fun port directory_name ->
+    (Cli_lib.Background_daemon.rpc_init args ~f:(fun port args ->
          match%bind
            Daemon_rpcs.Client.dispatch_join_errors
-             Daemon_rpcs.Generate_hardfork_config.rpc directory_name port
+             Daemon_rpcs.Generate_hardfork_config.rpc args port
          with
          | Ok () ->
              printf "Hardfork configuration successfully generated\n" ;
@@ -2560,7 +2572,9 @@ let advanced ~itn_features =
     ; ("generate-hardfork-config", generate_hardfork_config)
     ; ( "test"
       , Command.group ~summary:"Testing-only commands"
-          [ ("create-genesis", test_genesis_creation) ] )
+          [ ("create-genesis", test_genesis_creation)
+          ; ("submit-to-archive", Test_submit_to_archive.command)
+          ] )
     ]
   in
   let cmds =

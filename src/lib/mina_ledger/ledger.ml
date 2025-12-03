@@ -193,7 +193,13 @@ module Ledger_inner = struct
        and type account_id_set := Account_id.Set.t
        and type account_id := Account_id.t
 
-  module Inputs = Make_inputs (Account.Stable.Latest) (Hash.Stable.Latest)
+  module Mask_maps = Mask_maps.F (Location_at_depth)
+
+  module Inputs = struct
+    include Make_inputs (Account.Stable.Latest) (Hash.Stable.Latest)
+    module Mask_maps = Mask_maps
+  end
+
   module Unstable_inputs = Make_inputs (Account.Unstable) (Hash.Unstable)
   module Hardfork_inputs = Make_inputs (Account.Hardfork) (Hash.Hardfork)
 
@@ -231,7 +237,8 @@ module Ledger_inner = struct
        and type account_id_set := Account_id.Set.t
        and type hash := Hash.t
        and type location := Location_at_depth.t
-       and type parent := Any_ledger.M.t =
+       and type parent := Any_ledger.M.t
+       and type maps_t := Mask_maps.t =
   Merkle_mask.Masking_merkle_tree.Make (struct
     include Inputs
     module Base = Any_ledger.M
@@ -252,6 +259,7 @@ module Ledger_inner = struct
        and type unattached_mask := Mask.t
        and type attached_mask := Mask.Attached.t
        and type accumulated_t := Mask.accumulated_t
+       and type maps_t := Mask_maps.t
        and type t := Any_ledger.M.t =
   Merkle_mask.Maskable_merkle_tree.Make (struct
     include Inputs
@@ -448,6 +456,10 @@ module Ledger_inner = struct
   let register_mask t mask =
     let accumulated = Mask.Attached.to_accumulated t in
     Maskable.register_mask ~accumulated (packed t) mask
+
+  let append_maps = Maskable.append_maps
+
+  let get_maps = Maskable.get_maps
 
   let unsafe_preload_accounts_from_parent =
     Maskable.unsafe_preload_accounts_from_parent

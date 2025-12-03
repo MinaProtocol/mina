@@ -66,11 +66,19 @@ module T = struct
     let should_produce_view =
       List.exists diffs_with_mutants ~f:(function
         (* TODO: send full diffs to extensions to avoid extra lookups in frontier *)
-        | E (Root_transitioned { new_root; _ }, _) ->
-            Full_frontier.find_exn frontier
+        | E (Root_transitioned { new_root; _ }, _) -> (
+            let state_hash =
               (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
-            |> Root_data.Historical.of_breadcrumb |> enqueue root_history ;
-            true
+            in
+            match Full_frontier.find frontier state_hash with
+            | Some breadcrumb ->
+                enqueue root_history
+                  (Root_data.Historical.of_breadcrumb breadcrumb) ;
+                true
+            | None ->
+                failwithf "root_history: new root %s not found in frontier"
+                  (State_hash.to_base58_check state_hash)
+                  () )
         | E _ ->
             false )
     in
