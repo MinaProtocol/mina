@@ -80,17 +80,20 @@ let generateTarballsCommand =
           in  Command.build
                 Command.Config::{
                 , commands =
-                      Toolchain.select
-                          Toolchain.SelectionMode.ByDebianAndArch
-                          codename
-                          Arch.Type.Amd64
+                    Toolchain.select
+                      Toolchain.SelectionMode.ByDebianAndArch
+                      codename
+                      Arch.Type.Amd64
                       ([] : List Text)
                       (     "./buildkite/scripts/hardfork/generate-tarballs.sh "
                         ++  "--network ${Network.lowerName spec.network} "
                         ++  "--config-url ${spec.config_json_gz_url} "
-                        ++  "--codename ${DebianVersions.lowerName codename} ${cacheArg}"
+                        ++  "--codename ${DebianVersions.lowerName
+                                            codename} ${cacheArg}"
                       )
-                , label = "Generate hardfork tarballs for ${DebianVersions.lowerName codename}"
+                , label =
+                    "Generate hardfork tarballs for ${DebianVersions.lowerName
+                                                        codename}"
                 , key = key
                 , depends_on = depends_on
                 , target = Size.Large
@@ -193,8 +196,8 @@ let generateDockerForCodename =
                 merge
                   { Some =
                           \(build : Text)
-                      ->  "CACHED_BUILDKITE_BUILD_ID=${build} "
-                  , None = "CACHED_BUILDKITE_BUILD_ID=\\\$BUILDKITE_BUILD_ID"
+                      ->  [ "CACHED_BUILDKITE_BUILD_ID=${build} " ]
+                  , None = [] : List Text
                   }
                   spec.use_artifacts_from_buildkite_build
 
@@ -206,7 +209,9 @@ let generateDockerForCodename =
                           Toolchain.SelectionMode.ByDebianAndArch
                           codename
                           Arch.Type.Amd64
-                          ([] : List Text)
+                          ["AWS_ACCESS_KEY_ID"
+                            , "AWS_SECRET_ACCESS_KEY"
+                          ]
                           "./buildkite/scripts/hardfork/upload-ledger-tarballs-to-s3.sh"
                     , label =
                         "Upload hardfork tarballs for ${lowerNameCodename}"
@@ -221,7 +226,7 @@ let generateDockerForCodename =
                           Toolchain.SelectionMode.ByDebianAndArch
                           codename
                           Arch.Type.Amd64
-                          ([] : List Text)
+                          useArtifactsEnvVar
                           "./buildkite/scripts/hardfork/generate-tarballs-with-legacy-app.sh --network ${Network.lowerName
                                                                                                            spec.network} --version 3.2.0-f77c8c9  --codename ${lowerNameCodename} "
                     , label =
@@ -236,11 +241,12 @@ let generateDockerForCodename =
                           Toolchain.SelectionMode.ByDebianAndArch
                           codename
                           Arch.Type.Amd64
-                          [ "NETWORK_NAME=${Network.lowerName spec.network}"
-                          , "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
-                          , "CACHED_BUILDKITE_BUILD_ID=${useArtifactsEnvVar}"
-                          , "CODENAME=${lowerNameCodename}"
-                          ]
+                          (   [ "NETWORK_NAME=${Network.lowerName spec.network}"
+                              , "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
+                              , "CODENAME=${lowerNameCodename}"
+                              ]
+                            # useArtifactsEnvVar
+                          )
                           "./buildkite/scripts/hardfork/prepare-hf-debian.sh"
                     , label =
                         "Create hardfork packages for ${lowerNameCodename}"
