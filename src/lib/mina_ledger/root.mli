@@ -4,7 +4,9 @@ module Config : sig
   type t [@@deriving yojson]
 
   (** The kind of database backing that should be used for this root. *)
-  type backing_type = Stable_db | Converting_db
+  type backing_type =
+    | Stable_db
+    | Converting_db of Mina_numbers.Global_slot_since_genesis.t
 
   (** Create a root ledger configuration with the given backing type, using
       the [directory_name] as a template for its location *)
@@ -95,9 +97,13 @@ val make_checkpoint : t -> config:Config.t -> unit
 val create_checkpoint_with_directory : t -> directory_name:string -> t
 
 (** Convert a root backed by a [Config.Stable_db] to one backed by a
-      [Config.Converting_db] by gradually migrating the stable database. Does
-      nothing if the backing is already [Config.Converting_db]. *)
-val make_converting : t -> t Async.Deferred.t
+      [Config.Converting_db] by gradually migrating the stable database with a 
+      designated hardfork slot. Only checks if the hardfork_slot is correct if 
+      it's already having a [Config.Converting_db] instance. *)
+val make_converting :
+     hardfork_slot:Mina_numbers.Global_slot_since_genesis.t
+  -> t
+  -> t Async.Deferred.t
 
 (** View the root ledger as an unmasked [Any_ledger] so it can be used by code
       that does not need to know how the root is implemented *)

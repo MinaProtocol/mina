@@ -462,8 +462,8 @@ let load_and_initialize_config ~logger ~config_file =
   let proof_level = Genesis_constants.Compiled.proof_level in
   Genesis_ledger_helper.init_from_config_file ~genesis_constants
     ~constraint_constants ~logger ~proof_level ~cli_proof_level:None
-    ~genesis_dir:"genesis" ~genesis_backing_type:Stable_db runtime_config
-  >>| Or_error.ok_exn >>| fst
+    ~genesis_dir:"genesis" ~ledger_backing:Stable_db runtime_config
+  >>| Or_error.ok_exn
 
 let initialize_verifier_and_components ~logger
     ~(precomputed_values : Precomputed_values.t) =

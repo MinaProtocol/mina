@@ -1845,7 +1845,7 @@ let compile_time_constants =
                conf_dir ^/ "daemon.json"
          in
          let open Async in
-         let%map ({ consensus_constants; _ } as precomputed_values), _ =
+         let%map ({ consensus_constants; _ } as precomputed_values) =
            config_file |> Genesis_ledger_helper.load_config_json >>| Or_error.ok
            >>| Option.value
                  ~default:
@@ -1854,8 +1854,7 @@ let compile_time_constants =
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
                  ~constraint_constants ~logger:(Logger.null ()) ~proof_level
-                 ~cli_proof_level:None ~genesis_dir
-                 ~genesis_backing_type:Stable_db
+                 ~cli_proof_level:None ~genesis_dir ~ledger_backing:Stable_db
            >>| Or_error.ok_exn
          in
          let all_constants =

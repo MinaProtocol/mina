@@ -13,7 +13,10 @@ let%test_module "Persistent_root tests" =
           (* Alternate between Stable_db and Converting_db to test mixed configs *)
           List.iteri directory_names ~f:(fun i directory_name ->
               let backing_type =
-                if i % 2 = 0 then Config.Stable_db else Config.Converting_db
+                if i % 2 = 0 then Config.Stable_db
+                else
+                  Converting_db
+                    (Mina_numbers.Global_slot_since_genesis.random ())
               in
               Queue.enqueue original_queue
                 (Config.with_directory ~backing_type ~directory_name) ) ;
