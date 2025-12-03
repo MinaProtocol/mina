@@ -431,9 +431,7 @@ module Instance = struct
           ~root_ledger (E (New_node (Full breadcrumb)))
       in
       Full_frontier.lighten ?retain_application_data frontier state_hash ;
-      let breadcrumb = Breadcrumb.lighten breadcrumb in
       [%log internal] "Breadcrumb_integrated" ;
-      Gc.compact () ;
       breadcrumb
     in
     (* crawl through persistent frontier and load transitions into in memory frontier *)
