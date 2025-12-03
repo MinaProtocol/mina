@@ -3,13 +3,8 @@
 // Provides: caml_pasta_fp_plonk_verifier_index_create
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_pasta_fp_plonk_verifier_index_create = function (x) {
-  
-  console.log("creating caml_pasta_fp_plonk_verifier_index_create", x)
-  var bytes = plonk_wasm.prover_index_fp_to_bytes(x);
-  console.log("bytes", bytes)
-  var index = plonk_wasm.prover_index_fp_from_bytes(bytes);
-  console.log("index", index)
-  var vk = plonk_wasm.caml_pasta_fp_plonk_verifier_index_create(index);
+  console.log("jsoo caml_pasta_fp_plonk_verifier_index_create x", x);
+  var vk = plonk_wasm.caml_pasta_fp_plonk_verifier_index_create(x);
   console.log("vk", vk)
   return tsRustConversionNative.fp.verifierIndexFromRust(vk);
 };
