@@ -66,7 +66,7 @@ let Spec =
 
 let generateTarballsCommand =
           \(spec : Spec.Type)
-      ->  \(lowerNameCodename : Text)
+      ->  \(codename : DebianVersions.DebVersion)
       ->  \(key : Text)
       ->  \(depends_on : List Command.TaggedKey.Type)
       ->  let cacheArg =
@@ -88,9 +88,9 @@ let generateTarballsCommand =
                       (     "./buildkite/scripts/hardfork/generate-tarballs.sh "
                         ++  "--network ${Network.lowerName spec.network} "
                         ++  "--config-url ${spec.config_json_gz_url} "
-                        ++  "--codename ${lowerNameCodename} ${cacheArg}"
+                        ++  "--codename ${DebianVersions.lowerName codename} ${cacheArg}"
                       )
-                , label = "Generate hardfork tarballs for ${lowerNameCodename}"
+                , label = "Generate hardfork tarballs for ${DebianVersions.lowerName codename}"
                 , key = key
                 , depends_on = depends_on
                 , target = Size.Large
@@ -161,7 +161,7 @@ let generateDockerForCodename =
                           \(build : Text)
                       ->  [ generateTarballsCommand
                               spec
-                              lowerNameCodename
+                              codename
                               tarballGenKey
                               ([] : List Command.TaggedKey.Type)
                           ]
@@ -182,7 +182,7 @@ let generateDockerForCodename =
                         }
                     , generateTarballsCommand
                         spec
-                        lowerNameCodename
+                        codename
                         tarballGenKey
                         dependsOnArtifacts
                     ]
@@ -221,7 +221,7 @@ let generateDockerForCodename =
                           Toolchain.SelectionMode.ByDebianAndArch
                           codename
                           Arch.Type.Amd64
-                          ([]: List Text)
+                          ([] : List Text)
                           "./buildkite/scripts/hardfork/generate-tarballs-with-legacy-app.sh --network ${Network.lowerName
                                                                                                            spec.network} --version 3.2.0-f77c8c9  --codename ${lowerNameCodename} "
                     , label =
