@@ -1,5 +1,3 @@
-(include ../../../../dune.flags.inc)
-
 (library
  (name mina_cli_entrypoint)
  (public_name cli.mina_cli_entrypoint)

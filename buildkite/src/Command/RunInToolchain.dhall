@@ -73,11 +73,18 @@ let runInToolchainBullseye
     =     \(arch : Arch.Type)
       ->  \(environment : List Text)
       ->  \(innerScript : Text)
-      ->  runInToolchainImage
-            ContainerImages.minaToolchainBullseye.amd64
-            (Arch.platform arch)
-            environment
-            innerScript
+      ->  let image =
+                merge
+                  { Amd64 = ContainerImages.minaToolchainBullseye.amd64
+                  , Arm64 = ContainerImages.minaToolchainBullseye.arm64
+                  }
+                  arch
+
+          in  runInToolchainImage
+                image
+                (Arch.platform arch)
+                environment
+                innerScript
 
 let runInToolchain
     : List Text -> Text -> List Cmd.Type

@@ -20,6 +20,8 @@ let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let DockerRepo = ../../Constants/DockerRepo.dhall
+
 let Spec =
       { Type =
           { artifacts : List Artifact.Type
@@ -30,6 +32,7 @@ let Spec =
           , profile : Profiles.Type
           , archs : List Arch.Type
           , buildFlag : BuildFlags.Type
+          , repo : DockerRepo.Type
           }
       , default =
           { artifacts = [] : List Package.Type
@@ -42,6 +45,7 @@ let Spec =
           , profile = Profiles.Type.Devnet
           , buildFlag = BuildFlags.Type.None
           , archs = [ Arch.Type.Amd64 ]
+          , repo = DockerRepo.Type.InternalEurope
           }
       }
 
@@ -108,6 +112,7 @@ let verify
               ++  "--networks ${joinNetworks spec} "
               ++  "--version ${spec.version} "
               ++  "--codenames ${joinCodenames spec} "
+              ++  "--docker-repo ${DockerRepo.show spec.repo} "
               ++  profileFlag
               ++  archFlag
               ++  buildFlag

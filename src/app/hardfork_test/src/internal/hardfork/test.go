@@ -2,7 +2,6 @@ package hardfork
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -117,14 +116,6 @@ func (t *HardforkTest) Run() error {
 	// Calculate main network genesis timestamp
 	mainGenesisTs := time.Now().Unix() + int64(t.Config.MainDelay*60)
 
-	// Define all localnet file paths
-	if err := os.MkdirAll("fork_data/prefork", 0755); err != nil {
-		return err
-	}
-
-	// Define all fork_data file paths
-	preforkConfig := "fork_data/prefork/config.json"
-
 	// Phase 1: Run and validate main network
 	t.Logger.Info("Phase 1: Running main network...")
 	forkConfigBytes, analysis, err := t.RunMainNetworkPhase(mainGenesisTs)
@@ -132,44 +123,15 @@ func (t *HardforkTest) Run() error {
 		return err
 	}
 
-	t.Logger.Info("Phase 2: Validating extracted fork configuration...")
-	// Validate fork config data
-	if err := t.ValidateForkConfigData(analysis.LatestNonEmptyBlock, forkConfigBytes); err != nil {
-		return err
-	}
-	// Write fork config to file
-	if err := os.WriteFile(preforkConfig, forkConfigBytes, 0644); err != nil {
-		return err
-	}
-	{
-		preforkLedgersDir := "fork_data/prefork/hf_ledgers"
-		preforkHashesFile := "fork_data/prefork/hf_ledger_hashes.json"
-		if err := t.GenerateAndValidatePreforkLedgers(analysis, preforkConfig, preforkLedgersDir, preforkHashesFile); err != nil {
-			return err
-		}
-	}
+	t.Logger.Info("Phase 2: Forking the legacy way...")
 
-	if err = os.MkdirAll("fork_data/postfork", 0755); err != nil {
+	forkData, err := t.LegacyForkPhase(analysis, forkConfigBytes, mainGenesisTs)
+	if err != nil {
 		return err
 	}
 
-	postforkConfig := "fork_data/postfork/config.json"
-	forkLedgersDir := "fork_data/postfork/hf_ledgers"
-
-	// Calculate fork genesis timestamp relative to now (before starting fork network)
-	forkGenesisTs := time.Now().Unix() + int64(t.Config.ForkDelay*60)
-
-	t.Logger.Info("Phase 3: Generating fork configuration and ledgers...")
-	{
-		preforkGenesisConfigFile := fmt.Sprintf("%s/daemon.json", t.Config.Root)
-		forkHashesFile := "fork_data/hf_ledger_hashes.json"
-		if err := t.GenerateForkConfigAndLedgers(analysis, preforkConfig, forkLedgersDir, forkHashesFile, postforkConfig, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs); err != nil {
-			return err
-		}
-	}
-
-	t.Logger.Info("Phase 4: Running fork network...")
-	if err := t.RunForkNetworkPhase(analysis.LatestNonEmptyBlock.BlockHeight, postforkConfig, forkLedgersDir, forkGenesisTs, mainGenesisTs); err != nil {
+	t.Logger.Info("Phase 3: Running fork network...")
+	if err := t.RunForkNetworkPhase(analysis.LatestNonEmptyBlock.BlockHeight, *forkData, mainGenesisTs); err != nil {
 		return err
 	}
 

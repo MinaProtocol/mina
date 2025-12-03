@@ -16,7 +16,7 @@ in  { executeLocal =
               , commands =
                 [ Cmd.run
                     "MINA_DEB_CODENAME=bullseye ; source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive-local.sh ${testName} ${DockerRepo.show
-                                                                                                                                                                       DockerRepo.Type.Internal}"
+                                                                                                                                                                       DockerRepo.Type.InternalEurope}"
                 ]
               , artifact_paths =
                 [ SelectFiles.exactly "." "${testName}.local.test.log" ]
