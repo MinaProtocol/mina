@@ -36,6 +36,10 @@ let Network = ../Constants/Network.dhall
 
 let RunInToolchain = ../Command/RunInToolchain.dhall
 
+let Toolchain = ../Constants/Toolchain.dhall
+
+let Arch = ../Constants/Arch.dhall
+
 let Spec =
       { Type =
           { codenames : List DebianVersions.DebVersion
@@ -209,7 +213,10 @@ let generateDockerForCodename =
                 , Command.build
                     Command.Config::{
                     , commands =
-                        RunInToolchain.runInToolchain
+                        Toolchain.select
+                          Toolchain.SelectionMode.ByDebianAndArch
+                          codename
+                          Arch.Type.Amd64
                           ([] : List Text)
                           "./buildkite/scripts/hardfork/generate-tarballs-with-legacy-app.sh --network ${Network.lowerName
                                                                                                            spec.network} --version 3.2.0-f77c8c9  --codename ${lowerNameCodename} "
@@ -282,7 +289,10 @@ let generateDockerForCodename =
                 , Command.build
                     Command.Config::{
                     , commands =
-                          RunInToolchain.runInToolchain
+                          Toolchain.select
+                            Toolchain.SelectionMode.ByDebianAndArch
+                            codename
+                            Arch.Type.Amd64
                             ([] : List Text)
                             "./buildkite/scripts/cache/manager.sh read hardfork/legacy legacy-ledgers "
                         # [ Cmd.run
