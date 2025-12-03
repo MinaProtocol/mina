@@ -1473,6 +1473,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             let verification_key_perm_fallback_to_signature_with_older_version =
               Permissions.Auth_required.Checked
               .verification_key_perm_fallback_to_signature_with_older_version
+
+            let access_perm_fallback_to_signature_with_older_version =
+              Permissions.Auth_required.Checked
+              .access_perm_fallback_to_signature_with_older_version
           end
 
           module Txn_version = struct
