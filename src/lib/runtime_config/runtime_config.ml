@@ -654,7 +654,7 @@ module Accounts = struct
         ; permissions = Some (Permissions.of_permissions a.permissions)
         }
 
-    let to_account ?(ignore_missing_fields = false) ?(pad_app_state = false)
+    let to_account ?(ignore_missing_fields = false) ?(pad_app_state_delta = 0)
         (a : t) : Mina_base.Account.t =
       let open Signature_lib in
       let timing =
@@ -730,19 +730,18 @@ module Accounts = struct
         | true, _ ->
             Mina_base.Permissions.user_default
       in
+      let zeros_to_pad_on_app_state =
+        List.init pad_app_state_delta ~f:(const Snark_params.Tick.Field.zero)
+      in
       let pad_app_state_do app_state =
-        if pad_app_state then
-          let max = Mina_base.Zkapp_state.max_size_int in
-          let len = List.length app_state in
-          if len > max then
-            failwithf "zkapp app_state length (%d) exceeds max allowed (%d)" len
-              max ()
-          else
-            let zeros =
-              List.init (max - len) ~f:(const Snark_params.Tick.Field.zero)
-            in
-            app_state @ zeros
-        else app_state
+        let padded_app_state_size =
+          List.length app_state + pad_app_state_delta
+        in
+        if padded_app_state_size > Mina_base.Zkapp_state.max_size_int then
+          failwithf
+            "padded zkapp app_state length (%d) exceeds max allowed (%d)"
+            padded_app_state_size Mina_base.Zkapp_state.max_size_int ()
+        else app_state @ zeros_to_pad_on_app_state
       in
       let mk_zkapp (app : Zkapp_account.t) :
           ( Mina_base.Zkapp_state.Value.t

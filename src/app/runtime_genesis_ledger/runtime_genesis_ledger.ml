@@ -15,14 +15,14 @@ end
 
 let logger = Logger.create ()
 
-let load_ledger ~ignore_missing_fields ~pad_app_state
+let load_ledger ~ignore_missing_fields ~pad_app_state_delta
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     (accounts : Runtime_config.Accounts.t) =
   let accounts =
     List.map accounts ~f:(fun account ->
         ( None
         , Runtime_config.Accounts.Single.to_account ~ignore_missing_fields
-            ~pad_app_state account ) )
+            ?pad_app_state_delta account ) )
   in
   let packed =
     Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts ~logger
@@ -132,24 +132,26 @@ let load_config_exn config_file =
 
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
-    ~pad_app_state () =
+    ~pad_app_state_delta () =
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
   in
   let ledger =
-    load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
-      accounts
+    load_ledger ~ignore_missing_fields ~pad_app_state_delta
+      ~constraint_constants accounts
   in
   let staking_ledger : Ledger.t =
     Option.value_map ~default:ledger
       ~f:
-        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants)
+        (load_ledger ~ignore_missing_fields ~pad_app_state_delta
+           ~constraint_constants )
       staking_accounts_opt
   in
   let next_ledger =
     Option.value_map ~default:staking_ledger
       ~f:
-        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants)
+        (load_ledger ~ignore_missing_fields ~pad_app_state_delta
+           ~constraint_constants )
       next_accounts_opt
   in
   let%bind hash_json =
@@ -191,11 +193,11 @@ let () =
                 (and replace with default values)"
          (* TODO: at later stages replace with a flag to do all
             ledger transformations necessary for the hardfork *)
-         and pad_app_state =
-           flag "--pad-app-state" no_arg
+         and pad_app_state_delta =
+           flag "--pad-app-state-delta" (optional int)
              ~doc:
-               "BOOL whether to pad app_state to max allowed size (default: \
-                false)"
+               "INT the number of zero padding to apply for zkapp state. \
+                (default: 0)"
          in
          main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
-           ~ignore_missing_fields ~pad_app_state) )
+           ~ignore_missing_fields ~pad_app_state_delta) )
