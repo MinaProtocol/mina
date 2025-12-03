@@ -11,10 +11,12 @@ var plonk_wasm = (function() {
     // IS SET
     var overrides = [
       "prover_to_json",
-      "prover_index_fp_from_bytes",
-      "prover_index_fq_from_bytes",
-      "prover_index_fp_to_bytes",
-      "prover_index_fq_to_bytes",
+      "prover_index_fp_deserialize",
+      "prover_index_fq_deserialize",
+      "prover_index_fp_serialize",
+      "prover_index_fq_serialize",
+      "WasmPastaFpPlonkIndex",
+      "WasmPastaFqPlonkIndex",
       "caml_pasta_fp_poseidon_block_cipher",
       "caml_pasta_fq_poseidon_block_cipher",
       "caml_pasta_fp_plonk_proof_create",

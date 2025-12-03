@@ -4,7 +4,7 @@
 // Requires: plonk_wasm
 function caml_pasta_fp_plonk_index_max_degree(prover_index) {
   var bytes = prover_index.serialize()
-  var index = plonk_wasm.prover_index_fp_from_bytes(bytes);
+  var index = plonk_wasm.prover_index_fp_deserialize(bytes);
   // TODO: ^ remove the round trip when napi has direct access to the object
   
   return plonk_wasm.caml_pasta_fp_plonk_index_max_degree(index);
@@ -14,7 +14,7 @@ function caml_pasta_fp_plonk_index_max_degree(prover_index) {
 // Requires: plonk_wasm
 function caml_pasta_fp_plonk_index_public_inputs(prover_index) {
   var bytes = prover_index.serialize()
-  var index = plonk_wasm.prover_index_fp_from_bytes(bytes);
+  var index = plonk_wasm.prover_index_fp_deserialize(bytes);
   // TODO: ^ remove the round trip when napi has direct access to the object
 
   return plonk_wasm.caml_pasta_fp_plonk_index_public_inputs(index);
@@ -24,7 +24,7 @@ function caml_pasta_fp_plonk_index_public_inputs(prover_index) {
 // Requires: plonk_wasm
 function caml_pasta_fp_plonk_index_domain_d1_size(prover_index) {
   var bytes = prover_index.serialize()
-  var index = plonk_wasm.prover_index_fp_from_bytes(bytes);
+  var index = plonk_wasm.prover_index_fp_deserialize(bytes);
   // TODO: ^ remove the round trip when napi has direct access to the object
 
   return plonk_wasm.caml_pasta_fp_plonk_index_domain_d1_size(index);
@@ -34,7 +34,7 @@ function caml_pasta_fp_plonk_index_domain_d1_size(prover_index) {
 // Requires: plonk_wasm
 function caml_pasta_fp_plonk_index_domain_d4_size(prover_index) {
   var bytes = prover_index.serialize()
-  var index = plonk_wasm.prover_index_fp_from_bytes(bytes);
+  var index = plonk_wasm.prover_index_fp_deserialize(bytes);
   // TODO: ^ remove the round trip when napi has direct access to the object
 
   return plonk_wasm.caml_pasta_fp_plonk_index_domain_d4_size(index);
@@ -44,7 +44,7 @@ function caml_pasta_fp_plonk_index_domain_d4_size(prover_index) {
 // Requires: plonk_wasm
 function caml_pasta_fp_plonk_index_domain_d8_size(prover_index) {
   var bytes = prover_index.serialize()
-  var index = plonk_wasm.prover_index_fp_from_bytes(bytes);
+  var index = plonk_wasm.prover_index_fp_deserialize(bytes);
   // TODO: ^ remove the round trip when napi has direct access to the object
 
   return plonk_wasm.caml_pasta_fp_plonk_index_domain_d8_size(index);
@@ -58,7 +58,7 @@ function caml_pasta_fp_plonk_index_domain_d8_size(prover_index) {
 // Requires: plonk_wasm
 function caml_pasta_fq_plonk_index_max_degree(prover_index) {
   var bytes = prover_index.serialize()
-  var index = plonk_wasm.prover_index_fq_from_bytes(bytes);
+  var index = plonk_wasm.prover_index_fq_deserialize(bytes);
   // TODO: ^ remove the round trip when napi has direct access to the object
 
   return plonk_wasm.caml_pasta_fq_plonk_index_max_degree(index);
@@ -68,7 +68,7 @@ function caml_pasta_fq_plonk_index_max_degree(prover_index) {
 // Requires: plonk_wasm
 function caml_pasta_fq_plonk_index_public_inputs(prover_index) {
   var bytes = prover_index.serialize()
-  var index = plonk_wasm.prover_index_fq_from_bytes(bytes);
+  var index = plonk_wasm.prover_index_fq_deserialize(bytes);
   // TODO: ^ remove the round trip when napi has direct access to the object
 
   return plonk_wasm.caml_pasta_fq_plonk_index_public_inputs(index);
@@ -78,7 +78,7 @@ function caml_pasta_fq_plonk_index_public_inputs(prover_index) {
 // Requires: plonk_wasm
 function caml_pasta_fq_plonk_index_domain_d1_size(prover_index) {
   var bytes = prover_index.serialize()
-  var index = plonk_wasm.prover_index_fq_from_bytes(bytes);
+  var index = plonk_wasm.prover_index_fq_deserialize(bytes);
   // TODO: ^ remove the round trip when napi has direct access to the object
 
   return plonk_wasm.caml_pasta_fq_plonk_index_domain_d1_size(index);
@@ -88,7 +88,7 @@ function caml_pasta_fq_plonk_index_domain_d1_size(prover_index) {
 // Requires: plonk_wasm
 function caml_pasta_fq_plonk_index_domain_d4_size(prover_index) {
   var bytes = prover_index.serialize()
-  var index = plonk_wasm.prover_index_fq_from_bytes(bytes);
+  var index = plonk_wasm.prover_index_fq_deserialize(bytes);
   // TODO: ^ remove the round trip when napi has direct access to the object
 
   return plonk_wasm.caml_pasta_fq_plonk_index_domain_d4_size(index);
@@ -98,12 +98,32 @@ function caml_pasta_fq_plonk_index_domain_d4_size(prover_index) {
 // Requires: plonk_wasm
 function caml_pasta_fq_plonk_index_domain_d8_size(prover_index) {
   var bytes = prover_index.serialize()
-  var index = plonk_wasm.prover_index_fq_from_bytes(bytes);
+  var index = plonk_wasm.prover_index_fq_deserialize(bytes);
   // TODO: ^ remove the round trip when napi has direct access to the object
 
   return plonk_wasm.caml_pasta_fq_plonk_index_domain_d8_size(index);
 }
 
+
+// Provides: caml_pasta_fp_plonk_index_serialize
+// Requires: plonk_wasm
+var caml_pasta_fp_plonk_index_serialize = function (index) {
+  // Workaround for napi issue where methods on External objects are not accessible
+  if (typeof index.serialize === 'function') {
+    return index.serialize();
+  }
+  return plonk_wasm.prover_index_fp_serialize(index);
+};
+
+// Provides: caml_pasta_fp_plonk_index_deserialize
+// Requires: plonk_wasm
+var caml_pasta_fp_plonk_index_deserialize = function (index) {
+  // Workaround for napi issue where methods on External objects are not accessible
+  if (typeof index.deserialize === 'function') {
+    return index.deserialize();
+  }
+  return plonk_wasm.prover_index_fp_deserialize(index);
+};
 
 // Provides: caml_pasta_fp_plonk_index_create
 // Requires: plonk_wasm, tsRustConversionNative
@@ -138,7 +158,7 @@ var caml_pasta_fp_plonk_index_create = function (
   );
   console.timeEnd("index_create");
 
-  return plonk_wasm.prover_index_fp_to_bytes(t);
+  return t;
 };
 
 // Provides: caml_pasta_fp_plonk_index_create_bytecode
@@ -193,6 +213,26 @@ var caml_pasta_fp_plonk_index_write = function (append, t, path) {
   );
 };
 
+// Provides: caml_pasta_fq_plonk_index_serialize
+// Requires: plonk_wasm
+var caml_pasta_fq_plonk_index_serialize = function (index) {
+  // Workaround for napi issue where methods on External objects are not accessible
+  if (typeof index.serialize === 'function') {
+    return index.serialize();
+  }
+  return plonk_wasm.prover_index_fq_serialize(index);
+};
+
+// Provides: caml_pasta_fq_plonk_index_deserialize
+// Requires: plonk_wasm
+var caml_pasta_fq_plonk_index_deserialize = function (index) {
+  // Workaround for napi issue where methods on External objects are not accessible
+  if (typeof index.deserialize === 'function') {
+    return index.deserialize();
+  }
+  return plonk_wasm.prover_index_fq_deserialize(index);
+};
+
 // Provides: caml_pasta_fq_plonk_index_create
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_pasta_fq_plonk_index_create = function (
@@ -214,7 +254,7 @@ var caml_pasta_fq_plonk_index_create = function (
   console.log("anais: 3");
 
   console.time("conversion")
-  var gate_vec = plonk_wasm.caml_pasta_fq_plonk_gate_vector_from_bytes(gates.serialize());
+  var gate_vec = plonk_wasm.caml_pasta_fq_plonk_gate_vector_deserialize(gates.serialize());
   var urs_ser = plonk_wasm.caml_fq_srs_from_bytes_external(urs.serialize())
   console.timeEnd("conversion")
   console.log("anais: 4");
@@ -231,7 +271,7 @@ var caml_pasta_fq_plonk_index_create = function (
   );
   console.timeEnd("index_create");
 
-  return plonk_wasm.prover_index_fq_to_bytes(t);
+  return t;
 }; 
 
 // Provides: caml_pasta_fq_plonk_index_create_bytecode

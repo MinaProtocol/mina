@@ -20,14 +20,7 @@ var caml_pasta_fp_plonk_proof_create = function (
   var wasm_runtime_tables =
     tsRustConversionNative.fp.runtimeTablesToRust(caml_runtime_tables);
   prev_sgs = tsRustConversionNative.fp.pointsToRust(prev_sgs);
-    /*w.push(tsRustConversion.fp.vectorToRust(witness_cols[i]));
-  }
-  witness_cols = w;
-  prev_challenges = tsRustConversion.fp.vectorToRust(prev_challenges);
-  var wasm_runtime_tables =
-    tsRustConversion.fp.runtimeTablesToRust(caml_runtime_tables);
-  prev_sgs = tsRustConversion.fp.pointsToRust(prev_sgs);
-  */
+
   var proof = plonk_wasm.caml_pasta_fp_plonk_proof_create(
     index,
     witness_cols,
@@ -36,7 +29,6 @@ var caml_pasta_fp_plonk_proof_create = function (
     prev_sgs
   );
   return tsRustConversionNative.fp.proofFromRust(proof);
-  /*   return tsRustConversion.fp.proofFromRust(proof); */
 };
 
 // Provides: caml_pasta_fp_plonk_proof_verify
