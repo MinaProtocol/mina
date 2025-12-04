@@ -7,17 +7,6 @@ open Frontier_base
 module Database = Database
 module Root_ledger = Mina_ledger.Root
 
-(* TODO get rid of the hack, preserve block tag in database
-   instead of the full transition *)
-let temp_state_hash =
-  lazy
-    (Quickcheck.random_value
-       ~seed:
-         (`Deterministic
-           Blake2.(
-             digest_string "temporary state hash for root" |> to_raw_string) )
-       State_hash.gen )
-
 module type CONTEXT = sig
   val logger : Logger.t
 
