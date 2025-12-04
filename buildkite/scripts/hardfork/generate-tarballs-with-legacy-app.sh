@@ -40,7 +40,7 @@ if [ -z "$NETWORK" ] || [ -z "$CODENAME" ]; then
 fi
 
 if [[ -n "${CACHED_BUILDKITE_BUILD_ID:-}" ]]; then
-  MINA_DEB_CODENAME=$CODENAME ROOT="$CACHED_BUILDKITE_BUILD_ID" ./buildkite/scripts/debian/install.sh mina-logproc 1
+  MINA_DEB_CODENAME=$CODENAME FORCE_VERSION="*" ROOT="$CACHED_BUILDKITE_BUILD_ID" ./buildkite/scripts/debian/install.sh mina-logproc 1
 fi
 
 MINA_DEB_CODENAME=$CODENAME FORCE_VERSION=$FORCE_VERSION ROOT="legacy" ./buildkite/scripts/debian/install.sh mina-create-legacy-genesis 1

@@ -7,8 +7,8 @@ set -eox pipefail
 ./buildkite/scripts/cache/manager.sh read hardfork/ledgers/*.tar.gz hardfork_ledgers/
 ./buildkite/scripts/cache/manager.sh read hardfork/new_config.json .
 
-MINA_DEB_FILE=$(ls mina-daemon*.deb | head -n 1)
+MINA_DEB_FILE=$(ls mina-${NETWORK_NAME}_*.deb | head -n 1)
 
 ./scripts/hardfork/convert-debian-to-hf.sh -d "$MINA_DEB_FILE" -c "./new_config.json" -l "./hardfork_ledgers/"
 
-./buildkite/scripts/cache/manager.sh write ./mina-daemon-*.deb debians/${CODENAME}/
+./buildkite/scripts/cache/manager.sh write ./mina-${NETWORK_NAME}_*.deb debians/${CODENAME}/
