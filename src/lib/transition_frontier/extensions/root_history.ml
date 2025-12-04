@@ -82,7 +82,7 @@ let staged_ledger_aux_and_pending_coinbases_of_breadcrumb
     Breadcrumb.staged_ledger_hash breadcrumb |> Staged_ledger_hash.ledger_hash
   in
   let data =
-    ( scan_state
+    ( Staged_ledger.Scan_state.Stable.V2.of_latest_exn scan_state
     , staged_ledger_target_ledger_hash
     , pending_coinbase
     , scan_state_protocol_states )

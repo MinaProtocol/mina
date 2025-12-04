@@ -281,13 +281,13 @@ let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
 
 let handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
     ~temp_snarked_ledger ~verifier ~constraint_constants ~signature_kind t
-    (scan_state, expected_merkle_root, pending_coinbases, protocol_states) =
+    (scan_state_v2, expected_merkle_root, pending_coinbases, protocol_states) =
   let%map staged_ledger_construction_result =
     O1trace.thread "construct_root_staged_ledger" (fun () ->
         let open Deferred.Or_error.Let_syntax in
         let received_staged_ledger_hash =
           Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-            (Staged_ledger.Scan_state.Stable.Latest.hash scan_state)
+            (Staged_ledger.Scan_state.Stable.V2.hash scan_state_v2)
             expected_merkle_root pending_coinbases
         in
         [%log debug]
@@ -312,6 +312,9 @@ let handle_scan_state_and_aux ~logger ~expected_staged_ledger_hash
         let protocol_states =
           List.map protocol_states
             ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
+        in
+        let scan_state =
+          Staged_ledger.Scan_state.Stable.V2.to_latest scan_state_v2
         in
         let%bind protocol_states =
           Staged_ledger.Scan_state.check_required_protocol_states scan_state

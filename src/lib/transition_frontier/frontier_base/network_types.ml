@@ -63,8 +63,7 @@ module Staged_ledger_aux_and_pending_coinbases = struct
 
       module V1 = struct
         type t =
-          (* TODO replace with V2 to fix the incorrect serialization issue *)
-          Staged_ledger.Scan_state.Stable.V3.t
+          Staged_ledger.Scan_state.Stable.V2.t
           * Ledger_hash.Stable.V1.t
           * Pending_coinbase.Stable.V2.t
           * Mina_state.Protocol_state.Value.Stable.V2.t list
