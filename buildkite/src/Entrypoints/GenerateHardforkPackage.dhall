@@ -233,6 +233,7 @@ let generateDockerForCodename =
                         "Legacy hardfork tarballs for ${lowerNameCodename}"
                     , key = tarballGenKey ++ "-legacy"
                     , target = Size.Large
+                    , depends_on = dependsOnTarballs
                     }
                 , Command.build
                     Command.Config::{
