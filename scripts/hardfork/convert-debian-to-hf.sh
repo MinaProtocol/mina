@@ -19,10 +19,20 @@ while getopts "d:c:l:" opt; do
 	esac
 done
 
+
 if [[ -z "$DEB_FILE" || -z "$RUNTIME_CONFIG_JSON" || -z "$LEDGER_TARBALLS" ]]; then
-	usage
+    usage
+fi
+
+# Evaluate full path to LEDGER_TARBALLS
+LEDGER_TARBALLS_FULL=$(readlink -f "$LEDGER_TARBALLS")
+
+# Fail if LEDGER_TARBALLS_FULL does not exist
+if [[ ! -e "$LEDGER_TARBALLS_FULL" ]]; then
+	echo "Error: Ledger tarballs path '$LEDGER_TARBALLS_FULL' does not exist." >&2
+	exit 1
 fi
 
 ./scripts/debian/replace-entry.sh "$DEB_FILE" /var/lib/coda/config_*.json "$RUNTIME_CONFIG_JSON"
-./scripts/debian/insert-entries.sh "$DEB_FILE" /var/lib/coda/ "$LEDGER_TARBALLS"
+./scripts/debian/insert-entries.sh "$DEB_FILE" /var/lib/coda/ "$LEDGER_TARBALLS_FULL"
 ./scripts/debian/rename.sh "$DEB_FILE" "mina-daemon-hardfork"
