@@ -53,6 +53,7 @@ func (t *HardforkTest) AnyPortOfType(ty PortType) int {
 func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, extraArgs []string) (*exec.Cmd, error) {
 
 	t.Logger.Info("Starting network %s...", profile)
+
 	cmd := exec.Command(
 		filepath.Join(t.ScriptDir, "../mina-local-network/mina-local-network.sh"),
 		"--seed-start-port", strconv.Itoa(t.Config.SeedStartPort),
@@ -70,6 +71,16 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 		"--transaction-interval", strconv.Itoa(t.Config.PaymentInterval),
 		"--root", t.Config.Root,
 	)
+
+	if t.Config.ArchiveDB != nil {
+		extraArgs = append(extraArgs,
+			"--pg-host", t.Config.ArchiveDB.Host,
+			"--pg-port", strconv.Itoa(t.Config.ArchiveDB.Port),
+			"--pg-user", t.Config.ArchiveDB.User,
+			"--pg-passwd", t.Config.ArchiveDB.Password,
+			"--pg-db", t.Config.ArchiveDB.Database,
+		)
+	}
 
 	cmd.Args = append(cmd.Args, extraArgs...)
 	cmd.Env = append(os.Environ(), "MINA_EXE="+minaExecutable)

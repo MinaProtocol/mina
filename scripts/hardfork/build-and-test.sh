@@ -107,8 +107,10 @@ NETWORK_ROOT=$(mktemp -d --tmpdir hardfork-network.XXXXXXX)
 
 hardfork_test/bin/hardfork_test \
   --main-mina-exe prefork-devnet/bin/mina \
+  --main-archive-exe prefork-devnet/bin/mina-archive \
   --main-runtime-genesis-ledger prefork-devnet/bin/runtime_genesis_ledger \
   --fork-mina-exe postfork-devnet/bin/mina \
+  --fork-archive-exe postfork-devnet/bin/mina-archive \
   --fork-runtime-genesis-ledger postfork-devnet/bin/runtime_genesis_ledger \
   --slot-tx-end "$SLOT_TX_END" \
   --slot-chain-end "$SLOT_CHAIN_END" \

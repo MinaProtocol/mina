@@ -11,6 +11,7 @@ var (
 )
 
 // rootCmd represents the base command when called without any subcommands
+
 var rootCmd = &cobra.Command{
 	Use:          "hardfork_test",
 	Short:        "Test hardfork functionality for Mina Protocol",
@@ -29,7 +30,7 @@ to another through a hardfork mechanism by:
 
 Example:
   hardfork_test --main-mina-exe /path/to/mina --main-runtime-genesis-ledger /path/to/runtime_genesis_ledger \
-    --fork-mina-exe /path/to/mina-fork --fork-runtime-genesis-ledger /path/to/runtime_genesis_ledger-fork
+	--fork-mina-exe /path/to/mina-fork --fork-runtime-genesis-ledger /path/to/runtime_genesis_ledger-fork
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Validate required arguments
@@ -50,8 +51,11 @@ func Execute() error {
 func init() {
 	// Required executable paths
 	rootCmd.Flags().StringVar(&cfg.MainMinaExe, "main-mina-exe", "", "Path to the main Mina executable (required)")
+	rootCmd.Flags().StringVar(&cfg.MainArchiveExe, "main-archive-exe", "", "Path to the main Mina archive executable (required)")
+
 	rootCmd.Flags().StringVar(&cfg.MainRuntimeGenesisLedger, "main-runtime-genesis-ledger", "", "Path to the main runtime genesis ledger executable (required)")
 	rootCmd.Flags().StringVar(&cfg.ForkMinaExe, "fork-mina-exe", "", "Path to the fork Mina executable (required)")
+	rootCmd.Flags().StringVar(&cfg.ForkArchiveExe, "fork-archive-exe", "", "Path to the fork Mina archive executable (required)")
 	rootCmd.Flags().StringVar(&cfg.ForkRuntimeGenesisLedger, "fork-runtime-genesis-ledger", "", "Path to the fork runtime genesis ledger executable (required)")
 
 	// Test configuration
