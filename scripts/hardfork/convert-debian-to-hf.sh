@@ -40,32 +40,25 @@ fi
 PATCHED_DEB="${DEB_FILE%.deb}-patched.deb"
 ./scripts/debian/insert-entries.sh "$PATCHED_DEB" /var/lib/coda/ "$LEDGER_TARBALLS_FULL"
 
-# Step 3: Rename the package (operates on the patched deb from step 2)
-# insert-entries.sh creates another -patched.deb, so we have -patched-patched.deb
-PATCHED_DEB2="${PATCHED_DEB%.deb}-patched.deb"
-./scripts/debian/rename.sh "$PATCHED_DEB2" "mina-daemon-hardfork"
 
 # Step 4: Verify the final package
 echo ""
 echo "=== Verifying Final Package ==="
 
-FINAL_DEB="mina-daemon-hardfork.deb"
-
-if [[ ! -f "$FINAL_DEB" ]]; then
-	echo "ERROR: Final package '$FINAL_DEB' not found" >&2
+if [[ ! -f "$PATCHED_DEB" ]]; then
+	echo "ERROR: Final package '$PATCHED_DEB' not found" >&2
 	exit 1
 fi
 
 # Resolve absolute paths BEFORE changing directories
 ORIG_DIR=$(pwd)
-FINAL_DEB_ABS=$(readlink -f "$FINAL_DEB")
+PATCHED_DEB_ABS=$(readlink -f "$PATCHED_DEB")
 RUNTIME_CONFIG_ABS=$(readlink -f "$RUNTIME_CONFIG_JSON")
 LEDGER_TARBALLS_ABS=$(readlink -f "$LEDGER_TARBALLS_FULL")
 
-echo "Package size: $(ls -lh "$FINAL_DEB" | awk '{print $5}')"
-
+echo "Package size: $(ls -lh "$PATCHED_DEB" | awk '{print $5}')"
 # Quick file count check
-FILE_COUNT=$(dpkg-deb -c "$FINAL_DEB_ABS" | grep -E "(config_.*\.json|.*ledger.*\.tar\.gz)" | wc -l)
+FILE_COUNT=$(dpkg-deb -c "$PATCHED_DEB_ABS" | grep -E "(config_.*\.json|.*ledger.*\.tar\.gz)" | wc -l)
 echo "Files found (config + ledgers): $FILE_COUNT"
 
 # Count source ledger files
@@ -80,7 +73,7 @@ EXPECTED_MIN=$((SOURCE_LEDGER_COUNT + 1))  # ledgers + at least 1 config
 if [[ $FILE_COUNT -lt $EXPECTED_MIN ]]; then
 	echo "ERROR: Expected at least $EXPECTED_MIN files (${SOURCE_LEDGER_COUNT} ledgers + configs), but found $FILE_COUNT" >&2
 	echo "Listing package contents:" >&2
-	dpkg-deb -c "$FINAL_DEB_ABS" | grep -E "(config_|ledger)" >&2
+	dpkg-deb -c "$PATCHED_DEB_ABS" | grep -E "(config_|ledger)" >&2
 	exit 1
 fi
 
@@ -92,7 +85,7 @@ VERIFY_DIR=$(mktemp -d)
 trap 'rm -rf "$VERIFY_DIR"' EXIT
 
 cd "$VERIFY_DIR"
-ar x "$FINAL_DEB_ABS"
+ar x "$PATCHED_DEB_ABS"
 mkdir data
 tar -xzf data.tar.gz -C data
 
@@ -173,6 +166,6 @@ fi
 echo ""
 echo "=== Verification Complete ==="
 echo "All files verified successfully!"
-echo "Output: $FINAL_DEB"
+echo "Output: $PATCHED_DEB"
 
-mv "$FINAL_DEB" "$DEB_FILE"
+mv "$PATCHED_DEB" "$DEB_FILE"
