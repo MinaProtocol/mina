@@ -254,7 +254,7 @@ let generateDockerForCodename =
                                           ++  " --backend local --artifacts mina-logproc,mina-archive,mina-rosetta "
                                           ++  " --buildkite-build-id ${cached_build_id}"
                                           ++  " --codename ${lowerNameCodename} "
-                                          ++  " --target \\\${BUILDKITE_BUILD_ID}/${lowerNameCodename} "
+                                          ++  " --target \\\${BUILDKITE_BUILD_ID} "
                                   , None = ""
                                   }
                                   spec.use_artifacts_from_buildkite_build
