@@ -176,5 +176,3 @@ echo "All files verified successfully!"
 echo "Output: $FINAL_DEB"
 
 mv "$FINAL_DEB" "$DEB_FILE"
-
-./scripts/cache/manager.sh write "$DEB_FILE"
