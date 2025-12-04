@@ -49,9 +49,37 @@ let plugin_flag =
          times"
   else Command.Param.return []
 
+let make_ledger_backing ~constraint_constants ~runtime_config ~hardfork_handling
+    =
+  let current_genesis_global_slot =
+    let%map.Option { global_slot_since_genesis = current_genesis_global_slot
+                   ; _
+                   } =
+      constraint_constants.Genesis_constants.Constraint_constants.fork
+    in
+    current_genesis_global_slot
+  in
+  let hardfork_slot =
+    let%map.Option hardfork_slot_since_last_hf =
+      Runtime_config.scheduled_hard_fork_genesis_slot runtime_config
+    in
+    Mina_numbers.Global_slot_since_hard_fork.to_global_slot_since_genesis
+      ~current_genesis_global_slot hardfork_slot_since_last_hf
+  in
+
+  match (hardfork_handling, hardfork_slot) with
+  | Cli_lib.Arg_type.Hardfork_handling.Migrate_exit, Some hardfork_slot ->
+      Mina_ledger.Root.Config.Converting_db hardfork_slot
+  | Migrate_exit, _ ->
+      failwith
+        "No hardfork slot provided for Migrate_exit mode, \
+         `daemon.{slot_chain_end,hard_fork_genesis_slot_delta}` need to be \
+         configured for using this HF mode."
+  | Keep_running, _ ->
+      Stable_db
+
 let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
-    ~genesis_dir ~cli_proof_level ~proof_level ~genesis_backing_type
-    config_files =
+    ~genesis_dir ~cli_proof_level ~proof_level ~hardfork_handling config_files =
   let%bind config_jsons =
     let config_files_paths =
       List.map config_files ~f:(fun (config_file, _) -> `String config_file)
@@ -98,19 +126,23 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
                 ] ;
             failwithf "Could not parse configuration file: %s" err () )
   in
+  let ledger_backing =
+    make_ledger_backing ~constraint_constants ~runtime_config:config
+      ~hardfork_handling
+  in
   let chain_state_locations =
     Init.Chain_state_locations.of_config ~conf_dir config
   in
   let genesis_dir =
     Option.value ~default:chain_state_locations.genesis genesis_dir
   in
-  let%bind precomputed_values =
+  let%map precomputed_values =
     match%map
       Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
         ~logger ~genesis_constants ~constraint_constants ~proof_level
-        ~genesis_backing_type config
+        ~ledger_backing config
     with
-    | Ok (precomputed_values, _) ->
+    | Ok precomputed_values ->
         precomputed_values
     | Error err ->
         let ( json_config
@@ -143,7 +175,11 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
           ~metadata ;
         Error.raise err
   in
-  return (precomputed_values, config_jsons, config, chain_state_locations)
+  ( precomputed_values
+  , config_jsons
+  , config
+  , chain_state_locations
+  , ledger_backing )
 
 let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   let open Command.Let_syntax in
@@ -807,17 +843,15 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Genesis_constants.Compiled.constraint_constants
           in
           let compile_config = Mina_compile_config.Compiled.t in
-          let ledger_backing_type =
-            Mina_lib.Config.ledger_backing ~hardfork_handling
-          in
           let%bind ( precomputed_values
                    , config_jsons
                    , config
-                   , chain_state_locations ) =
+                   , chain_state_locations
+                   , ledger_backing ) =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
-              ~genesis_backing_type:ledger_backing_type
+              ~hardfork_handling
           in
           constraint_constants.block_window_duration_ms |> Float.of_int
           |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
@@ -1192,7 +1226,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               |> Option.to_list |> Public_key.Compressed.Set.of_list )
               ~genesis_state_hash:
                 precomputed_values.protocol_state_with_hashes.hash.state_hash
-              ~epoch_ledger_backing_type:ledger_backing_type
+              ~epoch_ledger_backing_type:ledger_backing
           in
           trace_database_initialization "epoch ledger" __LOC__
             epoch_ledger_location ;
@@ -1451,7 +1485,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~stop_time_interval ~node_status_url
                  ~graphql_control_port:itn_graphql_port ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
-                 ~itn_features ~compile_config ~hardfork_handling () )
+                 ~itn_features ~compile_config ~hardfork_handling
+                 ~ledger_backing () )
           in
           { mina
           ; client_trustlist
@@ -2005,10 +2040,11 @@ let internal_commands logger ~itn_features =
           let%bind ( precomputed_values
                    , _config_jsons
                    , _config
-                   , _chain_state_locations ) =
+                   , _chain_state_locations
+                   , _ ) =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
               ~constraint_constants ~proof_level ~cli_proof_level:None
-              ~genesis_backing_type:Stable_db config_files
+              ~hardfork_handling:Keep_running config_files
           in
           let pids = Child_processes.Termination.create_pid_table () in
           let%bind prover =

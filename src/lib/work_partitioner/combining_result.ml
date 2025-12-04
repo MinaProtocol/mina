@@ -6,17 +6,29 @@ type half = [ `First | `Second ] [@@deriving equal]
 
 type submitted_half = [ `First | `Second | `One ]
 
+(** Items inside the pairing pool. *)
 type t =
   | Spec_only of
       { spec : Snark_work_lib.Selector.Single.Spec.t One_or_two.t
       ; sok_message : Mina_base.Sok_message.t
       }
+      (** We only have a spec, we need to track spec here because SNARK worker
+          will not submit spec -- IDs are enough to identify them. [sok_message]
+          is just a tuple of [prover] and [fee], which are shared meta for the
+          one/two works *)
   | One_of_two of
       { other_spec : Snark_work_lib.Selector.Single.Spec.t
       ; sok_message : Mina_base.Sok_message.t
       ; in_pool_half : half
-      ; in_pool_result : Snark_work_lib.Result.Single.t
+      ; in_pool_result :
+          ( Snark_work_lib.Spec.Single.t
+          , Ledger_proof.t )
+          Snark_work_lib.Result.Single.Poly.t
       }
+      (** In additional to spec, we have one result [in_pool_result]
+      corresponding to [in_pool_half], waiting for the other half. *)
+
+let of_spec ~sok_message spec = Spec_only { spec; sok_message }
 
 type merge_outcome =
   | Pending of t
@@ -50,7 +62,7 @@ let finalize_two ~submitted_result ~other_spec ~in_pool_result ~submitted_half
 
 let merge_single_result
     ~(submitted_result :
-       (unit, Ledger_proof.Cached.t) Snark_work_lib.Result.Single.Poly.t )
+       (unit, Ledger_proof.t) Snark_work_lib.Result.Single.Poly.t )
     ~(submitted_half : submitted_half) (current : t) : merge_outcome =
   match (current, submitted_half) with
   | Spec_only { spec = `One spec; sok_message = { fee; prover } }, `One ->

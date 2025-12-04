@@ -83,9 +83,9 @@ let%test_module "Epoch ledger sync tests" =
             ~genesis_dir:(make_dirname "genesis_dir")
             ~constraint_constants ~genesis_constants ~logger
             ~proof_level:No_check runtime_config ~cli_proof_level:None
-            ~genesis_backing_type:Stable_db
+            ~ledger_backing:Stable_db
         with
-        | Ok (precomputed_values, _) ->
+        | Ok precomputed_values ->
             precomputed_values
         | Error err ->
             failwithf "Could not create precomputed values: %s"
@@ -627,7 +627,8 @@ let%test_module "Epoch ledger sync tests" =
                    with converting db" =
       Async.Thread_safe.block_on_async_exn
         (test_sync_current_next_staking_to_empty_ledger
-           ~backing_type:Converting_db )
+           ~backing_type:
+             (Converting_db (Mina_numbers.Global_slot_since_genesis.random ())) )
 
     let test_sync_current_next_staking_to_nonempty_ledger ~backing_type () =
       let%bind (module Context) = make_context () in
@@ -664,7 +665,8 @@ let%test_module "Epoch ledger sync tests" =
                    backed with converting db" =
       Async.Thread_safe.block_on_async_exn
         (test_sync_current_next_staking_to_nonempty_ledger
-           ~backing_type:Converting_db )
+           ~backing_type:
+             (Converting_db (Mina_numbers.Global_slot_since_genesis.random ())) )
 
     (* A `fetch` to sync a genesis ledger will just loop, because `get_ledger_by_hash`
        returns None for genesis ledgers

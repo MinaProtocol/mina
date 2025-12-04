@@ -2,7 +2,10 @@ open Core
 open Mina_base
 
 module Config = struct
-  type backing_type = Stable_db | Converting_db [@@deriving equal, yojson]
+  type backing_type =
+    | Stable_db
+    | Converting_db of Mina_numbers.Global_slot_since_genesis.t
+  [@@deriving equal, yojson]
 
   (* WARN: always construct Converting_db_config with
      [with_directory ~backing_type ~directory_name], instead of manual
@@ -11,14 +14,17 @@ module Config = struct
   type t =
     | Stable_db_config of string
     | Converting_db_config of
-        Merkle_ledger.Converting_merkle_tree.With_database_config.t
+        { db_config :
+            Merkle_ledger.Converting_merkle_tree.With_database_config.t
+        ; hardfork_slot : Mina_numbers.Global_slot_since_genesis.t
+        }
   [@@deriving yojson]
 
   let backing_of_config = function
     | Stable_db_config _ ->
         Stable_db
-    | Converting_db_config _ ->
-        Converting_db
+    | Converting_db_config { hardfork_slot; _ } ->
+        Converting_db hardfork_slot
 
   let file_exists path =
     Sys.file_exists path |> [%equal: [ `No | `Unknown | `Yes ]] `Yes
@@ -26,23 +32,27 @@ module Config = struct
   let exists_backing = function
     | Stable_db_config path ->
         file_exists path
-    | Converting_db_config { primary_directory; converting_directory } ->
+    | Converting_db_config
+        { db_config = { primary_directory; converting_directory }; _ } ->
         file_exists primary_directory && file_exists converting_directory
 
   let exists_any_backing = function
     | Stable_db_config path ->
         file_exists path
-    | Converting_db_config { primary_directory; converting_directory = _ } ->
+    | Converting_db_config { db_config = { primary_directory; _ }; _ } ->
         file_exists primary_directory
 
   let with_directory ~backing_type ~directory_name =
     match backing_type with
     | Stable_db ->
         Stable_db_config directory_name
-    | Converting_db ->
+    | Converting_db hardfork_slot ->
         Converting_db_config
-          (Merkle_ledger.Converting_merkle_tree.With_database_config
-           .with_primary ~directory_name )
+          { db_config =
+              Merkle_ledger.Converting_merkle_tree.With_database_config
+              .with_primary ~directory_name
+          ; hardfork_slot
+          }
 
   let delete_any_backing config =
     let primary, converting =
@@ -53,7 +63,8 @@ module Config = struct
             .default_converting_directory_name primary
           in
           (primary, converting)
-      | Converting_db_config { primary_directory; converting_directory } ->
+      | Converting_db_config
+          { db_config = { primary_directory; converting_directory }; _ } ->
           (primary_directory, converting_directory)
     in
     Mina_stdlib_unix.File_system.rmrf primary ;
@@ -62,7 +73,8 @@ module Config = struct
   let delete_backing = function
     | Stable_db_config primary ->
         Mina_stdlib_unix.File_system.rmrf primary
-    | Converting_db_config { primary_directory; converting_directory } ->
+    | Converting_db_config
+        { db_config = { primary_directory; converting_directory }; _ } ->
         Mina_stdlib_unix.File_system.rmrf primary_directory ;
         Mina_stdlib_unix.File_system.rmrf converting_directory
 
@@ -74,12 +86,18 @@ module Config = struct
     | Stable_db_config src, Stable_db_config dst ->
         Sys.rename src dst
     | ( Converting_db_config
-          { primary_directory = src_primary
-          ; converting_directory = src_converted
+          { db_config =
+              { primary_directory = src_primary
+              ; converting_directory = src_converted
+              }
+          ; _
           }
       , Converting_db_config
-          { primary_directory = dst_primary
-          ; converting_directory = dst_converted
+          { db_config =
+              { primary_directory = dst_primary
+              ; converting_directory = dst_converted
+              }
+          ; _
           } ) ->
         Sys.rename src_primary dst_primary ;
         Sys.rename src_converted dst_converted
@@ -94,13 +112,11 @@ module Config = struct
     match config with
     | Stable_db_config src ->
         src
-    | Converting_db_config { primary_directory; _ } ->
+    | Converting_db_config { db_config = { primary_directory; _ }; _ } ->
         primary_directory
 end
 
-module type Intf = sig
-  type t
-
+module T = struct
   type root_hash = Ledger_hash.t
 
   type hash = Ledger_hash.t
@@ -111,109 +127,108 @@ module type Intf = sig
 
   type path = Ledger.Db.path
 
-  val close : t -> unit
+  module type Converting_ledger =
+    Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
+      with module Location = Ledger.Location
+       and module Addr = Ledger.Location.Addr
+      with type root_hash := Ledger_hash.t
+       and type hash := Ledger_hash.t
+       and type account := Account.t
+       and type key := Signature_lib.Public_key.Compressed.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
+       and type converted_account := Account.Hardfork.t
+       and type primary_ledger = Ledger.Db.t
+       and type converting_ledger = Ledger.Hardfork_db.t
 
-  val merkle_root : t -> root_hash
-
-  val create_checkpoint : t -> config:Config.t -> unit -> t
-
-  val make_checkpoint : t -> config:Config.t -> unit
-
-  val create_checkpoint_with_directory : t -> directory_name:string -> t
-
-  val make_converting : t -> t Async.Deferred.t
-
-  val as_unmasked : t -> Ledger.Any_ledger.witness
-
-  val as_masked : t -> Ledger.t
-
-  val depth : t -> int
-
-  val num_accounts : t -> int
-
-  val merkle_path_at_addr_exn : t -> addr -> path
-
-  val get_inner_hash_at_addr_exn : t -> addr -> hash
-
-  val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
-
-  val set_batch_accounts : t -> (addr * account) list -> unit
-
-  val get_all_accounts_rooted_at_exn : t -> addr -> (addr * account) list
-
-  val unsafely_decompose_root : t -> Ledger.Db.t * Ledger.Hardfork_db.t option
-end
-
-(** An internal functor to create a converting root ledger implementation given
-    a (possibly runtime-determined) account conversion function. *)
-module Make (Inputs : sig
-  val convert : Account.t -> Account.Hardfork.t
-end) =
-struct
-  module Converting_ledger = Ledger.Make_converting (Inputs)
-
-  type root_hash = Ledger_hash.t
-
-  type hash = Ledger_hash.t
-
-  type account = Account.t
-
-  type addr = Ledger.Db.Addr.t
-
-  type path = Ledger.Db.path
-
-  type t = Stable_db of Ledger.Db.t | Converting_db of Converting_ledger.t
+  type t =
+    | Stable_db : Ledger.Db.t -> t
+    | Converting_db :
+        (module Converting_ledger with type t = 't)
+        * 't
+        * Mina_numbers.Global_slot_since_genesis.t
+        -> t
 
   let backing_of_t = function
     | Stable_db _ ->
         Config.Stable_db
-    | Converting_db _ ->
-        Converting_db
+    | Converting_db (_, _, hardfork_slot) ->
+        Converting_db hardfork_slot
 
   let close t =
     match t with
     | Stable_db db ->
         Ledger.Db.close db
-    | Converting_db db ->
+    | Converting_db ((module Converting_ledger), db, _) ->
         Converting_ledger.close db
 
   let merkle_root t =
     match t with
     | Stable_db db ->
         Ledger.Db.merkle_root db
-    | Converting_db db ->
+    | Converting_db ((module Converting_ledger), db, _) ->
         Converting_ledger.merkle_root db
 
   let create ~logger ~config ~depth ?(assert_synced = false) () =
     match config with
     | Config.Stable_db_config directory_name ->
         Stable_db (Ledger.Db.create ~directory_name ~depth ())
-    | Converting_db_config { primary_directory; converting_directory } ->
+    | Converting_db_config
+        { db_config = { primary_directory; converting_directory }
+        ; hardfork_slot
+        } ->
+        let module Converting_ledger = Ledger.Make_converting (struct
+          let convert =
+            Account.(
+              Fn.compose Hardfork.of_stable
+                (slot_reduction_update ~hardfork_slot))
+        end) in
         let config : Converting_ledger.Config.t =
           { primary_directory; converting_directory }
         in
         Converting_db
-          (Converting_ledger.create ~config:(In_directories config) ~logger
-             ~depth ~assert_synced () )
+          ( (module Converting_ledger)
+          , Converting_ledger.create ~config:(In_directories config) ~logger
+              ~depth ~assert_synced ()
+          , hardfork_slot )
 
   let create_temporary ~logger ~backing_type ~depth () =
     match backing_type with
     | Config.Stable_db ->
         Stable_db (Ledger.Db.create ~depth ())
-    | Converting_db ->
+    | Converting_db hardfork_slot ->
+        let module Converting_ledger = Ledger.Make_converting (struct
+          let convert =
+            Account.(
+              Fn.compose Hardfork.of_stable
+                (slot_reduction_update ~hardfork_slot))
+        end) in
         Converting_db
-          (Converting_ledger.create ~config:Temporary ~logger ~depth ())
+          ( (module Converting_ledger)
+          , Converting_ledger.create ~config:Temporary ~logger ~depth ()
+          , hardfork_slot )
 
   let create_checkpoint t ~config () =
     match (t, config) with
     | Stable_db db, Config.Stable_db_config directory_name ->
         Stable_db (Ledger.Db.create_checkpoint db ~directory_name ())
-    | ( Converting_db db
-      , Converting_db_config { primary_directory; converting_directory } ) ->
+    | ( Converting_db
+          (((module Converting_ledger) as m), db, hardfork_slot_from_instance)
+      , Converting_db_config
+          { db_config = { primary_directory; converting_directory }
+          ; hardfork_slot = hardfork_slot_from_config
+          } )
+      when Mina_numbers.Global_slot_since_genesis.equal
+             hardfork_slot_from_instance hardfork_slot_from_config ->
         let config : Converting_ledger.Config.t =
           { primary_directory; converting_directory }
         in
-        Converting_db (Converting_ledger.create_checkpoint db ~config ())
+        Converting_db
+          ( m
+          , Converting_ledger.create_checkpoint db ~config ()
+          , hardfork_slot_from_instance )
     | t, config ->
         raise
           (Config.Backing_mismatch
@@ -225,8 +240,14 @@ struct
     match (t, config) with
     | Stable_db db, Config.Stable_db_config directory_name ->
         Ledger.Db.make_checkpoint db ~directory_name
-    | ( Converting_db db
-      , Converting_db_config { primary_directory; converting_directory } ) ->
+    | ( Converting_db
+          ((module Converting_ledger), db, hardfork_slot_from_instance)
+      , Converting_db_config
+          { db_config = { primary_directory; converting_directory }
+          ; hardfork_slot = hardfork_slot_from_config
+          } )
+      when Mina_numbers.Global_slot_since_genesis.equal
+             hardfork_slot_from_instance hardfork_slot_from_config ->
         let config : Converting_ledger.Config.t =
           { primary_directory; converting_directory }
         in
@@ -241,10 +262,10 @@ struct
   let create_checkpoint_with_directory t ~directory_name =
     let backing_type =
       match t with
-      | Stable_db _db ->
+      | Stable_db _ ->
           Config.Stable_db
-      | Converting_db _db ->
-          Config.Converting_db
+      | Converting_db (_, _, hardfork_slot) ->
+          Converting_db hardfork_slot
     in
     let config = Config.with_directory ~backing_type ~directory_name in
     create_checkpoint t ~config ()
@@ -272,10 +293,14 @@ struct
     in
     set_chunks addrs_and_accounts
 
-  let make_converting t =
+  let make_converting ~hardfork_slot t =
     let open Async.Deferred.Let_syntax in
     match t with
-    | Converting_db _db ->
+    | Converting_db (_, _, hardfork_slot_from_instance) ->
+        (* TODO: rewrap as a Deferred.Or_error.t *)
+        assert (
+          Mina_numbers.Global_slot_since_genesis.equal hardfork_slot
+            hardfork_slot_from_instance ) ;
         return t
     | Stable_db db ->
         let directory_name =
@@ -283,6 +308,12 @@ struct
           |> Option.value_exn
                ~message:"Invariant: database must be in a directory"
         in
+        let module Converting_ledger = Ledger.Make_converting (struct
+          let convert =
+            Account.(
+              Fn.compose Hardfork.of_stable
+                (slot_reduction_update ~hardfork_slot))
+        end) in
         let converting_config =
           Converting_ledger.Config.with_primary ~directory_name
         in
@@ -294,13 +325,16 @@ struct
         let%map migrated_db =
           chunked_migration (Ledger.Db.to_list_sequential db) migrated_db
         in
-        Converting_db (Converting_ledger.of_ledgers db migrated_db)
+        Converting_db
+          ( (module Converting_ledger)
+          , Converting_ledger.of_ledgers db migrated_db
+          , hardfork_slot )
 
   let as_unmasked t =
     match t with
     | Stable_db db ->
         Ledger.Any_ledger.cast (module Ledger.Db) db
-    | Converting_db db ->
+    | Converting_db ((module Converting_ledger), db, _) ->
         Ledger.Any_ledger.cast (module Converting_ledger) db
 
   let as_masked t = as_unmasked t |> Ledger.of_any_ledger
@@ -309,147 +343,58 @@ struct
     match t with
     | Stable_db db ->
         Ledger.Db.depth db
-    | Converting_db db ->
+    | Converting_db ((module Converting_ledger), db, _) ->
         Converting_ledger.depth db
 
   let num_accounts t =
     match t with
     | Stable_db db ->
         Ledger.Db.num_accounts db
-    | Converting_db db ->
-        Converting_ledger.depth db
+    | Converting_db ((module Converting_ledger), db, _) ->
+        Converting_ledger.num_accounts db
 
   let merkle_path_at_addr_exn t =
     match t with
     | Stable_db db ->
         Ledger.Db.merkle_path_at_addr_exn db
-    | Converting_db db ->
+    | Converting_db ((module Converting_ledger), db, _) ->
         Converting_ledger.merkle_path_at_addr_exn db
 
   let get_inner_hash_at_addr_exn t =
     match t with
     | Stable_db db ->
         Ledger.Db.get_inner_hash_at_addr_exn db
-    | Converting_db db ->
+    | Converting_db ((module Converting_ledger), db, _) ->
         Converting_ledger.get_inner_hash_at_addr_exn db
 
   let set_all_accounts_rooted_at_exn t =
     match t with
     | Stable_db db ->
         Ledger.Db.set_all_accounts_rooted_at_exn db
-    | Converting_db db ->
+    | Converting_db ((module Converting_ledger), db, _) ->
         Converting_ledger.set_all_accounts_rooted_at_exn db
 
   let set_batch_accounts t =
     match t with
     | Stable_db db ->
         Ledger.Db.set_batch_accounts db
-    | Converting_db db ->
+    | Converting_db ((module Converting_ledger), db, _) ->
         Converting_ledger.set_batch_accounts db
 
   let get_all_accounts_rooted_at_exn t =
     match t with
     | Stable_db db ->
         Ledger.Db.get_all_accounts_rooted_at_exn db
-    | Converting_db db ->
+    | Converting_db ((module Converting_ledger), db, _) ->
         Converting_ledger.get_all_accounts_rooted_at_exn db
 
   let unsafely_decompose_root t =
     match t with
     | Stable_db db ->
         (db, None)
-    | Converting_db db ->
+    | Converting_db ((module Converting_ledger), db, _) ->
         ( Converting_ledger.primary_ledger db
         , Some (Converting_ledger.converting_ledger db) )
 end
 
-(** A temporary root ledger implementation that does not take the vesting
-    parameter adjustment into account. In future this will be removed, once the
-    account conversion method is modified to be dependent on the hard fork stop
-    slots and genesis delta. *)
-module Compat = Make (struct
-  let convert = Account.Hardfork.of_stable
-end)
-
-(** A wrapper for specific root ledger implementations, using the same technique
-    as [Ledger.Any_ledger] implementation. Concrete root ledgers can be cast to
-    an [Any_root.witness] and then passed to other components that do not need
-    to know how the root ledger is implemented.
-
-    The [Any_root] is exposed as the root ledger implementation because the
-    [Root.create] functions need the ability to select between one of a fixed
-    number of root implementations at runtime.
-*)
-module Any_root = struct
-  type witness = T : (module Intf with type t = 't) * 't -> witness
-
-  let cast (m : (module Intf with type t = 'a)) (t : 'a) = T (m, t)
-
-  module M : Intf with type t = witness = struct
-    type t = witness
-
-    type root_hash = Ledger_hash.t
-
-    type hash = Ledger_hash.t
-
-    type account = Account.t
-
-    type addr = Ledger.Db.Addr.t
-
-    type path = Ledger.Db.path
-
-    let close (T ((module Root), t)) = Root.close t
-
-    let merkle_root (T ((module Root), t)) = Root.merkle_root t
-
-    let create_checkpoint (T ((module Root), t)) ~config () =
-      T ((module Root), Root.create_checkpoint t ~config ())
-
-    let make_checkpoint (T ((module Root), t)) ~config =
-      Root.make_checkpoint t ~config
-
-    let create_checkpoint_with_directory (T ((module Root), t)) ~directory_name
-        =
-      T ((module Root), Root.create_checkpoint_with_directory t ~directory_name)
-
-    let make_converting (T ((module Root), t)) =
-      let open Async.Deferred.Let_syntax in
-      let%map t' = Root.make_converting t in
-      T ((module Root), t')
-
-    let as_unmasked (T ((module Root), t)) = Root.as_unmasked t
-
-    let as_masked (T ((module Root), t)) = Root.as_masked t
-
-    let depth (T ((module Root), t)) = Root.depth t
-
-    let num_accounts (T ((module Root), t)) = Root.num_accounts t
-
-    let merkle_path_at_addr_exn (T ((module Root), t)) =
-      Root.merkle_path_at_addr_exn t
-
-    let get_inner_hash_at_addr_exn (T ((module Root), t)) =
-      Root.get_inner_hash_at_addr_exn t
-
-    let set_all_accounts_rooted_at_exn (T ((module Root), t)) =
-      Root.set_all_accounts_rooted_at_exn t
-
-    let set_batch_accounts (T ((module Root), t)) = Root.set_batch_accounts t
-
-    let get_all_accounts_rooted_at_exn (T ((module Root), t)) =
-      Root.get_all_accounts_rooted_at_exn t
-
-    let unsafely_decompose_root (T ((module Root), t)) =
-      Root.unsafely_decompose_root t
-  end
-end
-
-include Any_root.M
-
-let create ~logger ~config ~depth ?(assert_synced = false) () =
-  let r = Compat.create ~logger ~config ~depth ~assert_synced () in
-  Any_root.cast (module Compat) r
-
-let create_temporary ~logger ~backing_type ~depth () =
-  let r = Compat.create_temporary ~logger ~backing_type ~depth () in
-  Any_root.cast (module Compat) r
+include T
