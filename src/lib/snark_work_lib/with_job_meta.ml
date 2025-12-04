@@ -5,7 +5,6 @@ module Stable = struct
       { spec : 'spec
       ; job_id : 'job_id
       ; sok_message : Mina_base.Sok_message.Stable.V1.t
-            (* ; work_spec_hash:   *)
       }
     [@@deriving sexp, yojson]
   end
