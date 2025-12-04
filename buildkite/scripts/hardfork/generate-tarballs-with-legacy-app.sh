@@ -7,6 +7,7 @@ CODENAME=""
 WORKDIR=$(pwd)
 FORCE_VERSION="*"
 CACHED_BUILDKITE_BUILD_ID="${CACHED_BUILDKITE_BUILD_ID:-}"
+CONFIG_JSON_GZ_URL=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -26,9 +27,13 @@ while [[ $# -gt 0 ]]; do
       CACHED_BUILDKITE_BUILD_ID="$2"
       shift 2
       ;;
+    --config-json-gz-url)
+      CONFIG_JSON_GZ_URL="$2"
+      shift 2
+      ;;
     *)
       echo "Unknown argument: $1"
-      echo "Usage: $0 --network <network> [--version <version>] --codename <codename> [--cached-buildkite-build-id <id>]"
+      echo "Usage: $0 --network <network> --config-json-gz-url <url> [--version <version>] --codename <codename> [--cached-buildkite-build-id <id>]"
       exit 1
       ;;
   esac
@@ -38,16 +43,15 @@ if [ -z "$NETWORK" ] || [ -z "$CODENAME" ]; then
   echo "Usage: $0 --network <network> [--version <version>] --codename <codename>"
   exit 1
 fi
-
 if [[ -n "${CACHED_BUILDKITE_BUILD_ID:-}" ]]; then
   MINA_DEB_CODENAME=$CODENAME FORCE_VERSION="*" ROOT="$CACHED_BUILDKITE_BUILD_ID" ./buildkite/scripts/debian/install.sh mina-logproc 1
 fi
 
 MINA_DEB_CODENAME=$CODENAME FORCE_VERSION=$FORCE_VERSION ROOT="legacy" ./buildkite/scripts/debian/install.sh mina-create-legacy-genesis 1
 
-./buildkite/scripts/cache/manager.sh read "hardfork/new_config.json" .
+curl "${CONFIG_JSON_GZ_URL}" > config.json.gz && gunzip config.json.gz
 
-"mina-create-legacy-genesis" --config-file "new_config.json" --genesis-dir "$WORKDIR/legacy_ledgers" --hash-output-file "$WORKDIR/legacy_hashes.json"
+"mina-create-legacy-genesis" --config-file "config.json" --genesis-dir "$WORKDIR/legacy_ledgers" --hash-output-file "$WORKDIR/legacy_hashes.json"
 
 echo "--- Caching legacy ledger tarballs and hashes"
 
