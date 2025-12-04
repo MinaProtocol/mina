@@ -31,11 +31,3 @@ type t =
       ; spec : Transaction_snark.Zkapp_command_segment.Basic.t
       }
   | Merge of { proof1 : Ledger_proof.Cached.t; proof2 : Ledger_proof.Cached.t }
-
-val read_all_proofs_from_disk : t -> Stable.Latest.t
-
-val write_all_proofs_to_disk :
-     signature_kind:Mina_signature_kind.t
-  -> proof_cache_db:Proof_cache_tag.cache_db
-  -> Stable.Latest.t
-  -> t

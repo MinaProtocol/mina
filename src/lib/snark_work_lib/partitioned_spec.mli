@@ -44,11 +44,3 @@ module Stable : sig
 end]
 
 type t = (Single_spec.t, Sub_zkapp_spec.t) Poly.t
-
-val read_all_proofs_from_disk : t -> Stable.Latest.t
-
-val write_all_proofs_to_disk :
-     signature_kind:Mina_signature_kind.t
-  -> proof_cache_db:Proof_cache_tag.cache_db
-  -> Stable.Latest.t
-  -> t
