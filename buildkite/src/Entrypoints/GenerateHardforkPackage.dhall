@@ -251,7 +251,7 @@ let generateDockerForCodename =
                                   { Some =
                                           \(cached_build_id : Text)
                                       ->      "&& ./buildkite/scripts/release/manager.sh persist "
-                                          ++  " --backend local --artifacts mina-logproc,mina-archive,mina-rosetta "
+                                          ++  " --backend local --artifacts mina-logproc,mina-archive-${Network.lowerName spec.network},mina-rosetta-${Network.lowerName spec.network} "
                                           ++  " --buildkite-build-id ${cached_build_id}"
                                           ++  " --codename ${lowerNameCodename} "
                                           ++  " --target \\\${BUILDKITE_BUILD_ID} "
