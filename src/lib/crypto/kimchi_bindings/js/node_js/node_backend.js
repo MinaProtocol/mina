@@ -10,6 +10,8 @@ var plonk_wasm = (function() {
     // IT WON'T CRASH UNLESS O1JS_REQUIRE_NATIVE_BINDINGS
     // IS SET
     var overrides = [
+      "WasmVecVecFp",
+      "WasmVecVecFq",
       "prover_to_json",
       "prover_index_fp_deserialize",
       "prover_index_fq_deserialize",
