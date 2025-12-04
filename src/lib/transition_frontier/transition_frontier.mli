@@ -137,13 +137,6 @@ module For_tests : sig
     -> unit
     -> Breadcrumb.t Quickcheck.Generator.t
 
-  val gen_persistence :
-       ?logger:Logger.t
-    -> verifier:Verifier.t
-    -> precomputed_values:Precomputed_values.t
-    -> unit
-    -> (Persistent_root.t * Persistent_frontier.t) Quickcheck.Generator.t
-
   val gen :
        ?logger:Logger.t
     -> verifier:Verifier.t

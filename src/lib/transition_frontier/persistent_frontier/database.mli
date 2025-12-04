@@ -45,7 +45,8 @@ module Error : sig
   val message : t -> string
 end
 
-val create : logger:Logger.t -> directory:string -> t
+val create :
+  logger:Logger.t -> directory:string -> root_history_capacity:int -> t
 
 val close : t -> unit
 

@@ -652,7 +652,7 @@ module For_tests = struct
           ~block_tag:genesis_block_tag )
 
   let gen_persistence ?(logger = Logger.null ()) ~verifier
-      ~(precomputed_values : Precomputed_values.t) () =
+      ~(precomputed_values : Precomputed_values.t) ~max_length () =
     let open Core in
     let root_dir = "/tmp/coda_unit_test" in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
@@ -687,6 +687,7 @@ module For_tests = struct
           Persistent_frontier.create ~logger ~verifier
             ~time_controller:(Block_time.Controller.basic ~logger)
             ~directory:frontier_dir ~signature_kind:Testnet
+            ~root_history_capacity:(max_length * 2)
         in
         Gc.Expert.add_finalizer_exn persistent_root clean_temp_dirs ;
         Gc.Expert.add_finalizer_exn persistent_frontier (fun x ->
@@ -780,7 +781,7 @@ module For_tests = struct
       }
     in
     let%map persistent_root, persistent_frontier =
-      gen_persistence ~logger ~precomputed_values ~verifier ()
+      gen_persistence ~logger ~precomputed_values ~verifier ~max_length ()
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
         Persistent_frontier.reset_database_exn persistent_frontier ~root_data

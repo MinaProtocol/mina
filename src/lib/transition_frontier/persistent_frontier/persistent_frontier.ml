@@ -77,6 +77,7 @@ and Factory_type : sig
     ; verifier : Verifier.t
     ; time_controller : Block_time.Controller.t
     ; signature_kind : Mina_signature_kind.t
+    ; root_history_capacity : int
     ; mutable instance : Instance_type.t option
     }
 end =
@@ -91,6 +92,7 @@ module Instance = struct
   let create factory =
     let db =
       Database.create ~logger:factory.logger ~directory:factory.directory
+        ~root_history_capacity:factory.root_history_capacity
     in
     { db; sync = None; factory }
 
@@ -453,12 +455,14 @@ end
 
 type t = Factory_type.t
 
-let create ~logger ~verifier ~time_controller ~directory ~signature_kind =
+let create ~logger ~verifier ~time_controller ~directory ~signature_kind
+    ~root_history_capacity =
   { logger
   ; verifier
   ; time_controller
   ; directory
   ; signature_kind
+  ; root_history_capacity
   ; instance = None
   }
 

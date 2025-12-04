@@ -309,12 +309,17 @@ end
 
 module Rocks = Rocksdb.Serializable.GADT.Make (Schema)
 
-type t = { directory : string; logger : Logger.t; db : Rocks.t }
+type t =
+  { directory : string
+  ; logger : Logger.t
+  ; db : Rocks.t
+  ; root_history_capacity : int
+  }
 
-let create ~logger ~directory =
+let create ~logger ~directory ~root_history_capacity =
   if not (Result.is_ok (Unix.access directory [ `Exists ])) then
     Unix.mkdir ~perm:0o766 directory ;
-  { directory; logger; db = Rocks.create directory }
+  { directory; logger; db = Rocks.create directory; root_history_capacity }
 
 let close t = Rocks.close t.db
 

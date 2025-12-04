@@ -173,6 +173,10 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       ~directory:chain_state_locations.frontier
       ~time_controller:(Block_time.Controller.basic ~logger)
       ~signature_kind
+      ~root_history_capacity:
+        ( 2
+        * Transition_frontier.global_max_length
+            precomputed_values.genesis_constants )
   in
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
   let%bind.Deferred.Result persistent_frontier_root_hash =
