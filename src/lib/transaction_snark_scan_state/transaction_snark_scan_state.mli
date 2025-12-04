@@ -71,14 +71,6 @@ module Transaction_with_witness : sig
         Mina_state.Protocol_state.Body.Value.t option
     }
 
-  val write_all_proofs_to_disk :
-       signature_kind:Mina_signature_kind.t
-    -> proof_cache_db:Proof_cache_tag.cache_db
-    -> Stable.Latest.t
-    -> t
-
-  val read_all_proofs_from_disk : t -> Stable.Latest.t
-
   val persist_many : t list -> State_hash.File_storage.writer_t -> Tagged.t list
 end
 
