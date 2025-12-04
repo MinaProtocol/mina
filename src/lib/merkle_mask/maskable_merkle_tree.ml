@@ -53,13 +53,20 @@ module Make (Inputs : Inputs_intf) = struct
     let display_attached_mask mask =
       let root_hash = Mask.Attached.merkle_root mask in
       let num_accounts = Mask.Attached.num_accounts mask in
-      let total_currency =
-        Mask.Attached.foldi mask ~init:0 ~f:(fun _ total_currency account ->
-            (* only default token matters for total currency *)
-            if Token_id.equal (Account.token account) Token_id.default then
-              total_currency + (Balance.to_int @@ Account.balance account)
-            else total_currency )
-      in
+      (* This total_currency computation is temporarily disabled - it causes the
+         frontier mask visualization that happens at shutdown to be
+         exceptionally slow. See #17501 and #18196, though if we decide we
+         really need this then we could also consider optionally caching the
+         total_currency in ledger masks, and then recomputing the currency
+         change each mask would cause in the ledger. *)
+      (* let total_currency =
+           Mask.Attached.foldi mask ~init:0 ~f:(fun _ total_currency account ->
+               (* only default token matters for total currency *)
+               if Token_id.equal (Account.token account) Token_id.default then
+                 total_currency + (Balance.to_int @@ Account.balance account)
+               else total_currency )
+         in *)
+      let total_currency = 0 in
       let uuid = format_uuid mask in
       { hash =
           Visualization.display_prefix_of_string
