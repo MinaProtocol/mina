@@ -24,8 +24,14 @@ if [[ -z "$DEB_FILE" || -z "$RUNTIME_CONFIG_JSON" || -z "$LEDGER_TARBALLS" ]]; t
     usage
 fi
 
-# Evaluate full path to LEDGER_TARBALLS
+# Resolve absolute paths
+DEB_FILE_ABS=$(readlink -f "$DEB_FILE")
+RUNTIME_CONFIG_JSON_ABS=$(readlink -f "$RUNTIME_CONFIG_JSON")
 LEDGER_TARBALLS_FULL=$(readlink -f "$LEDGER_TARBALLS")
+
+# Get directory and base name
+DEB_DIR=$(dirname "$DEB_FILE_ABS")
+DEB_BASE=$(basename "$DEB_FILE_ABS" .deb)
 
 # Fail if LEDGER_TARBALLS_FULL does not exist
 if [[ ! -e "$LEDGER_TARBALLS_FULL" ]]; then
@@ -34,11 +40,11 @@ if [[ ! -e "$LEDGER_TARBALLS_FULL" ]]; then
 fi
 
 # Step 1: Replace runtime config
-PATCHED_DEB="${DEB_FILE%.deb}-patched.deb"
-./scripts/debian/replace-entry.sh "$DEB_FILE" /var/lib/coda/config_*.json "$RUNTIME_CONFIG_JSON" "$PATCHED_DEB"
+PATCHED_DEB="${DEB_DIR}/${DEB_BASE}-patched.deb"
+./scripts/debian/replace-entry.sh "$DEB_FILE_ABS" /var/lib/coda/config_*.json "$RUNTIME_CONFIG_JSON_ABS" "$PATCHED_DEB"
 
 # Step 2: Insert ledger tarballs (operates on the patched deb from step 1)
-FINAL_DEB="${DEB_FILE%.deb}-final.deb"
+FINAL_DEB="${DEB_DIR}/${DEB_BASE}-final.deb"
 ./scripts/debian/insert-entries.sh "$PATCHED_DEB" /var/lib/coda/ "$LEDGER_TARBALLS_FULL" "$FINAL_DEB"
 
 
@@ -54,7 +60,6 @@ fi
 # Resolve absolute paths BEFORE changing directories
 ORIG_DIR=$(pwd)
 FINAL_DEB_ABS=$(readlink -f "$FINAL_DEB")
-RUNTIME_CONFIG_ABS=$(readlink -f "$RUNTIME_CONFIG_JSON")
 LEDGER_TARBALLS_ABS=$(readlink -f "$LEDGER_TARBALLS_FULL")
 
 echo "Package size: $(ls -lh "$FINAL_DEB" | awk '{print $5}')"
@@ -169,5 +174,5 @@ echo "=== Verification Complete ==="
 echo "All files verified successfully!"
 echo "Output: $FINAL_DEB"
 
-mv "$FINAL_DEB" "$DEB_FILE"
+mv "$FINAL_DEB" "$DEB_FILE_ABS"
 rm -f "$PATCHED_DEB"
