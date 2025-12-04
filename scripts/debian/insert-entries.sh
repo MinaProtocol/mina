@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -euox pipefail
 
 usage() {
   cat <<EOF
@@ -40,6 +40,11 @@ if [[ ! -f "$INPUT_DEB" ]]; then
 fi
 
 # Expand glob pattern
+# If SOURCE_GLOB is a directory, append /* to it
+if [[ -d "$SOURCE_GLOB" ]]; then
+  SOURCE_GLOB="${SOURCE_GLOB%/}/*"
+fi
+
 SOURCE_FILES=()
 for file in $SOURCE_GLOB; do
   if [[ -f "$file" ]]; then
@@ -134,7 +139,7 @@ done
 
 # 4. Create a new data.tar (uncompressed), normalizing owner to root
 echo "Repacking data archive..."
-rm -f data.tar
+rm -f data.tar data.tar.gz data.tar.xz data.tar.zst
 tar --numeric-owner --owner=0 --group=0 -cf data.tar -C data .
 
 # 5. Re-compress data.tar to original format
