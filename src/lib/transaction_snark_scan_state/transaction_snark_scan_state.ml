@@ -606,6 +606,12 @@ module Stable = struct
      fun { scan_state
          ; previous_incomplete_zkapp_updates = updates, continue_in_next_tree
          } ->
+      (* TODO: Although this trick will work, it is not the best way to do it.
+         Conversion logic is dependent upon the fact that it's safe to write to
+         location associated with `State_hash.dummy`.
+         Instead of having V3 for the same module, let's create a different module
+         equivalent to V3 and have `to_latest` accept writer as an argument.
+      *)
       State_hash.File_storage.write_values_exn State_hash.dummy
         ~f:(fun writer ->
           let f1

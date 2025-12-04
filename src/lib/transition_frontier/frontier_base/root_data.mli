@@ -90,6 +90,12 @@ module Minimal : sig
     module V3 : sig
       type t
     end
+
+    module V2 : sig
+      type t
+
+      val to_latest : t -> V3.t
+    end
   end]
 
   val common : t -> Common.t

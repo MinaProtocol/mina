@@ -103,7 +103,7 @@ module Schema = struct
        Most of the time, we just need the hash, but whole `Root` is being read;
        This combos with `bin_prot` being slow results in 90s bottleneck.
     *)
-    | Root : Root_data.Minimal.Stable.V3.t t
+    | Root : Root_data.Minimal.Stable.V2.t t
     | Root_hash : State_hash.Stable.V1.t t
     | Root_common : Root_data.Common.Stable.V2.t t
     | Root_new : Root_data.Common.Stable.V3.t t
@@ -145,7 +145,7 @@ module Schema = struct
     | Arcs _ ->
         [%bin_type_class: State_hash.Stable.Latest.t list]
     | Root ->
-        [%bin_type_class: Root_data.Minimal.Stable.Latest.t]
+        [%bin_type_class: Root_data.Minimal.Stable.V2.t]
     | Root_hash ->
         [%bin_type_class: State_hash.Stable.Latest.t]
     | Root_common ->
@@ -352,7 +352,8 @@ let get_root t =
            ~state_hash:hash )
   | _ -> (
       match get t.db ~key:Root ~error:(`Not_found `Root) with
-      | Ok root ->
+      | Ok root_old ->
+          let root = Root_data.Minimal.Stable.V2.to_latest root_old in
           (* automatically split Root into (Root_hash, Root_common) *)
           Batch.with_batch t.db ~f:(fun batch ->
               let hash = Root_data.Minimal.state_hash root in
