@@ -110,7 +110,7 @@ case "$COMPRESS" in
     NEW_DATA_TAR="data.tar"
     ;;
   gz)
-    gzip -n data.tar   # -n = no original name/time in header (more reproducible)
+    gzip -nf data.tar   # -n = no original name/time in header (more reproducible)
     NEW_DATA_TAR="data.tar.gz"
     ;;
   xz)
