@@ -55,20 +55,33 @@ let apply_root_transitions ~logger ~db diffs =
                     .message err ) ) )
       |> Result.ok_exn
     in
+    let initial_root_history =
+      Transition_frontier.Persistent_frontier.Database.get_root_history db
+    in
+    let root_history_capacity =
+      Transition_frontier.Persistent_frontier.Database.root_history_capacity db
+    in
     Transition_frontier.Persistent_frontier.Database.with_batch db
       ~f:(fun batch ->
-        ( List.fold diffs ~init:initial_root_hash ~f:(fun old_root_hash diff ->
+        ( List.fold diffs ~init:(initial_root_hash, initial_root_history)
+            ~f:(fun (old_root_hash, old_root_history) diff ->
               match diff with
               | Diff.Lite.E.E
                   (Diff.Root_transitioned
                     { new_root; garbage = Lite garbage; _ } ) ->
                   Transition_frontier.Persistent_frontier.Database.move_root
-                    ~old_root_hash ~new_root ~garbage batch ;
+                    ~old_root_hash ~new_root ~garbage ~old_root_history
+                    ~root_history_capacity batch ;
                   (* Return new root hash for next iteration *)
-                  new_root.state_hash
+                  let old_root_history' =
+                    if List.length old_root_history = root_history_capacity then
+                      List.drop_last_exn old_root_history
+                    else old_root_history
+                  in
+                  (new_root.state_hash, old_root_hash :: old_root_history')
               | _ ->
                   failwith "Expected Root_transitioned diff" )
-          : State_hash.t )
+          : State_hash.t * State_hash.t list )
         |> ignore ) ;
     [%log' info logger] "Successfully applied $count diffs"
       ~metadata:[ ("count", `Int (List.length diffs)) ] ;

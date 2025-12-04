@@ -48,6 +48,8 @@ end
 val create :
   logger:Logger.t -> directory:string -> root_history_capacity:int -> t
 
+val root_history_capacity : t -> int
+
 val close : t -> unit
 
 val check :
@@ -90,6 +92,8 @@ val add :
 
 val move_root :
      old_root_hash:State_hash.t
+  -> old_root_history:State_hash.t list
+  -> root_history_capacity:int
   -> new_root:Root_data.t
   -> garbage:State_hash.t list
   -> batch_t
@@ -103,6 +107,8 @@ val get_transition :
   -> ( Mina_block.Validated.t
      , [> `Not_found of [> `Transition of State_hash.t ] ] )
      Result.t
+
+val get_root_history : t -> State_hash.t list
 
 val set_transition :
      state_hash:State_hash.t

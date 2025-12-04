@@ -34,13 +34,14 @@ module Worker = struct
   (* nothing to close *)
   let close _ = Deferred.unit
 
-  let apply_diff (type mutant) ~old_root_hash ~arcs_cache
-      (diff : mutant Diff.Lite.t) : Database.batch_t -> unit =
+  let apply_diff (type mutant) ~old_root_hash ~arcs_cache ~root_history_capacity
+      ~old_root_history (diff : mutant Diff.Lite.t) : Database.batch_t -> unit =
     match diff with
     | New_node (Lite (state_hash, transition_data)) ->
         Database.add ~arcs_cache ~state_hash ~transition_data
     | Root_transitioned { new_root; garbage = Lite garbage; _ } ->
-        Database.move_root ~old_root_hash ~new_root ~garbage
+        Database.move_root ~old_root_hash ~old_root_history
+          ~root_history_capacity ~new_root ~garbage
     | Best_tip_changed best_tip_hash ->
         Database.set_best_tip best_tip_hash
 
@@ -109,8 +110,11 @@ module Worker = struct
           let%map.Result old_root_hash =
             Database.find_arcs_and_root t.db ~arcs_cache ~parent_hashes
           in
+          let old_root_history = Database.get_root_history t.db in
           List.map diffs_to_apply ~f:(fun (Diff.Lite.E.E diff) ->
-              apply_diff ~old_root_hash ~arcs_cache diff )
+              apply_diff
+                ~root_history_capacity:(Database.root_history_capacity t.db)
+                ~old_root_hash ~arcs_cache ~old_root_history diff )
         in
         let handle_emitted_proof = function
           | { Diff.Root_transition.just_emitted_a_proof = true; _ } ->
