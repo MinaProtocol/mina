@@ -42,7 +42,6 @@ module Transaction_with_witness = struct
           ; previous_protocol_state_body_opt :
               Mina_state.Protocol_state.Body.Value.Stable.V2.t option
           }
-        [@@deriving sexp, to_yojson]
 
         let transaction_type t =
           Transaction_type.of_transaction
@@ -71,7 +70,6 @@ module Transaction_with_witness = struct
           ; block_global_slot :
               Mina_numbers.Global_slot_since_genesis.Stable.V1.t
           }
-        [@@deriving sexp, to_yojson]
 
         let to_latest : t -> V3.t =
          fun { transaction_with_info
