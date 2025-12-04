@@ -326,10 +326,10 @@ function storage_upload() {
 
     case $backend in
         local)
-            cp "$local_path" "$remote_path"
+            cp $local_path "$remote_path"
             ;;
         gs)
-            gsutil cp "$local_path" "$remote_path"
+            gsutil cp $local_path "$remote_path"
             ;;
         hetzner)
            rsync -avz -e "ssh -p 23 -i $HETZNER_KEY" $local_path "$HETZNER_USER@$HETZNER_HOST:$remote_path"
