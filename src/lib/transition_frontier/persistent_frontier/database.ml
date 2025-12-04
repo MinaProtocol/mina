@@ -110,6 +110,7 @@ module Schema = struct
     | Best_tip : State_hash.Stable.V1.t t
     | Protocol_states_for_root_scan_state
         : Mina_state.Protocol_state.Value.Stable.V2.t list t
+    | Root_history : State_hash.Stable.V1.t list t
 
   [@@@warning "+22"]
 
@@ -134,6 +135,8 @@ module Schema = struct
         "Best_tip"
     | Protocol_states_for_root_scan_state ->
         "Protocol_states_for_root_scan_state"
+    | Root_history ->
+        "Root_history"
 
   let binable_data_type (type a) : a t -> a Bin_prot.Type_class.t = function
     | Db_version ->
@@ -156,6 +159,8 @@ module Schema = struct
         [%bin_type_class: State_hash.Stable.Latest.t]
     | Protocol_states_for_root_scan_state ->
         [%bin_type_class: Mina_state.Protocol_state.Value.Stable.Latest.t list]
+    | Root_history ->
+        [%bin_type_class: State_hash.Stable.Latest.t list]
 
   (* HACK: a simple way to derive Bin_prot.Type_class.t for each case of a GADT *)
   let gadt_input_type_class (type data a) :
@@ -237,6 +242,11 @@ module Schema = struct
           ~to_gadt:(fun _ -> Protocol_states_for_root_scan_state)
           ~of_gadt:(fun Protocol_states_for_root_scan_state ->
             "protocol_states_in_root_scan_state" )
+    | Root_history ->
+        gadt_input_type_class
+          (module Keys.String)
+          ~to_gadt:(fun _ -> Root_history)
+          ~of_gadt:(fun Root_history -> "root_history")
 end
 
 module Error = struct
@@ -290,6 +300,8 @@ module Error = struct
           ("arcs", Some hash)
       | `Protocol_states_for_root_scan_state ->
           ("protocol states in root scan state", None)
+      | `Root_history ->
+          ("root history", None)
     in
     let additional_context =
       Option.map member_id ~f:(fun id ->
@@ -315,6 +327,8 @@ type t =
   ; db : Rocks.t
   ; root_history_capacity : int
   }
+
+let root_history_capacity t = t.root_history_capacity
 
 let create ~logger ~directory ~root_history_capacity =
   if not (Result.is_ok (Unix.access directory [ `Exists ])) then
@@ -377,6 +391,13 @@ let get_root_hash t =
       Ok hash
   | Error _ ->
       Result.map ~f:Root_data.Minimal.state_hash (get_root t)
+
+let get_root_history t =
+  match get t.db ~key:Root_history ~error:(`Not_found `Root_history) with
+  | Ok history ->
+      history
+  | Error _ ->
+      []
 
 let get_transition_do t hash =
   let error = `Not_found (`Transition hash) in
@@ -515,23 +536,35 @@ let add ~arcs_cache ~state_hash ~transition_data =
     Batch.set batch ~key:(Arcs state_hash) ~data:[] ;
     Batch.set batch ~key:(Arcs parent_hash) ~data:(state_hash :: parent_arcs)
 
-let move_root ~old_root_hash ~new_root ~garbage =
+let move_root ~old_root_hash ~old_root_history ~root_history_capacity ~new_root
+    ~garbage =
   let new_root_hash = new_root.Root_data.state_hash in
+  let root_for_removal_opt, old_root_history' =
+    if List.length old_root_history = root_history_capacity then
+      (List.last old_root_history, List.drop_last_exn old_root_history)
+    else (None, old_root_history)
+  in
   fun batch ->
     Batch.remove batch ~key:Root ;
     Batch.set batch ~key:Root_hash ~data:new_root_hash ;
     Batch.set batch ~key:Root_new ~data:(Root_data.to_common new_root) ;
     Batch.set batch ~key:Protocol_states_for_root_scan_state
       ~data:(List.map ~f:With_hash.data new_root.protocol_states_for_scan_state) ;
-    List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
-        (* because we are removing entire forks of the tree, there is
-         * no need to have extra logic to any remove arcs to the node
-         * we are deleting since there we are deleting all of a node's
-         * parents as well
-         *)
-        Batch.remove batch ~key:(Transition_new node_hash) ;
-        Batch.remove batch ~key:(Transition node_hash) ;
-        Batch.remove batch ~key:(Arcs node_hash) )
+    Batch.set batch ~key:Root_history ~data:(old_root_hash :: old_root_history') ;
+    let remove node_hash =
+      (* because we are removing entire forks of the tree, there is
+       * no need to have extra logic to any remove arcs to the node
+       * we are deleting since there we are deleting all of a node's
+       * parents as well
+       *)
+      Batch.remove batch ~key:(Transition_new node_hash) ;
+      Batch.remove batch ~key:(Transition node_hash) ;
+      Batch.remove batch ~key:(Arcs node_hash) ;
+      (* TODO shouldn't be within DB batch *)
+      Core.Sys.remove @@ State_hash.File_storage_filename.filename node_hash
+    in
+    List.iter garbage ~f:remove ;
+    Option.iter root_for_removal_opt ~f:remove
 
 let get_transition_data ~signature_kind ~proof_cache_db t hash =
   match%map.Result get_transition_do t hash with

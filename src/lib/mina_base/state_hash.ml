@@ -84,9 +84,11 @@ module Tag = struct
   [%%define_locally Stable.Latest.(compare, equal, sexp_of_t, t_of_sexp)]
 end
 
-module File_storage = Multi_key_file_storage.Make_custom (struct
+module File_storage_filename = struct
   type filename_key = t
 
   (* TODO replace with hex string, pass directory parameter *)
   let filename h = T.to_decimal_string h ^ ".dat"
-end)
+end
+
+module File_storage = Multi_key_file_storage.Make_custom (File_storage_filename)
