@@ -177,4 +177,4 @@ echo "Output: $FINAL_DEB"
 
 mv "$FINAL_DEB" "$DEB_FILE"
 
-echo "Final output: $DEB_FILE"
+./scripts/cache/manager.sh write "$DEB_FILE"
