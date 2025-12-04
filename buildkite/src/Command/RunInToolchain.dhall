@@ -4,52 +4,87 @@ let Mina = ../Command/Mina.dhall
 
 let ContainerImages = ../Constants/ContainerImages.dhall
 
+let Arch = ../Constants/Arch.dhall
+
 let runInToolchainImage
-    : Text -> List Text -> Text -> List Cmd.Type
+    : Text -> Text -> List Text -> Text -> List Cmd.Type
     =     \(image : Text)
+      ->  \(platform : Text)
       ->  \(environment : List Text)
       ->  \(innerScript : Text)
       ->    [ Mina.fixPermissionsCommand ]
           # [ Cmd.runInDocker
-                Cmd.Docker::{ image = image, extraEnv = environment }
+                Cmd.Docker::{
+                , image = image
+                , extraEnv = environment
+                , platform = platform
+                }
                 innerScript
             ]
 
 let runInToolchainNoble
-    : List Text -> Text -> List Cmd.Type
-    =     \(environment : List Text)
+    : Arch.Type -> List Text -> Text -> List Cmd.Type
+    =     \(arch : Arch.Type)
+      ->  \(environment : List Text)
       ->  \(innerScript : Text)
-      ->  runInToolchainImage
-            ContainerImages.minaToolchainNoble
-            environment
-            innerScript
+      ->  let image =
+                merge
+                  { Amd64 = ContainerImages.minaToolchainNoble.amd64
+                  , Arm64 = ContainerImages.minaToolchainNoble.arm64
+                  }
+                  arch
+
+          in  runInToolchainImage
+                image
+                (Arch.platform arch)
+                environment
+                innerScript
 
 let runInToolchainJammy
     : List Text -> Text -> List Cmd.Type
     =     \(environment : List Text)
       ->  \(innerScript : Text)
       ->  runInToolchainImage
-            ContainerImages.minaToolchainJammy
+            ContainerImages.minaToolchainJammy.amd64
+            (Arch.platform Arch.Type.Amd64)
             environment
             innerScript
 
 let runInToolchainBookworm
-    : List Text -> Text -> List Cmd.Type
-    =     \(environment : List Text)
+    : Arch.Type -> List Text -> Text -> List Cmd.Type
+    =     \(arch : Arch.Type)
+      ->  \(environment : List Text)
       ->  \(innerScript : Text)
-      ->  runInToolchainImage
-            ContainerImages.minaToolchainBookworm
-            environment
-            innerScript
+      ->  let image =
+                merge
+                  { Amd64 = ContainerImages.minaToolchainBookworm.amd64
+                  , Arm64 = ContainerImages.minaToolchainBookworm.arm64
+                  }
+                  arch
+
+          in  runInToolchainImage
+                image
+                (Arch.platform arch)
+                environment
+                innerScript
 
 let runInToolchainBullseye
-    : List Text -> Text -> List Cmd.Type
-    =     \(environment : List Text)
+    : Arch.Type -> List Text -> Text -> List Cmd.Type
+    =     \(arch : Arch.Type)
+      ->  \(environment : List Text)
       ->  \(innerScript : Text)
-      ->  runInToolchainImage
-            ContainerImages.minaToolchainBullseye
-            environment
-            innerScript
+      ->  let image =
+                merge
+                  { Amd64 = ContainerImages.minaToolchainBullseye.amd64
+                  , Arm64 = ContainerImages.minaToolchainBullseye.arm64
+                  }
+                  arch
+
+          in  runInToolchainImage
+                image
+                (Arch.platform arch)
+                environment
+                innerScript
 
 let runInToolchain
     : List Text -> Text -> List Cmd.Type
@@ -57,6 +92,7 @@ let runInToolchain
       ->  \(innerScript : Text)
       ->  runInToolchainImage
             ContainerImages.minaToolchain
+            (Arch.platform Arch.Type.Amd64)
             environment
             innerScript
 

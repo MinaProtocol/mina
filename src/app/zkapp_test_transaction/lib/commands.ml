@@ -32,9 +32,8 @@ let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
     in
     Mina_ledger.Ledger.register_mask ledger new_mask
   in
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let _partial_stmt =
-    Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind
+    Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind:Testnet
       ~constraint_constants ~global_slot
       ~txn_state_view:(Mina_state.Protocol_state.Body.view state_body)
       second_pass_ledger
@@ -337,7 +336,7 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
     let packed =
       Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
         ~logger:(Logger.create ()) ~depth:constraint_constants.ledger_depth
-        accounts
+        ~genesis_backing_type:Stable_db accounts
     in
     Lazy.force (Genesis_ledger.Packed.t packed)
   in
@@ -368,7 +367,8 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
   in
   let%bind zkapp_command =
     Transaction_snark.For_tests.deploy_snapp
-      ~permissions:Permissions.user_default ~constraint_constants spec
+      ~permissions:Permissions.user_default ~constraint_constants
+      ~signature_kind:Testnet spec
   in
   let%map () =
     if debug then

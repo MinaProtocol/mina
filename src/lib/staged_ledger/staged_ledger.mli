@@ -110,6 +110,7 @@ module Scan_state : sig
           -> Mina_transaction.Transaction.t
           -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
              Or_error.t )
+    -> signature_kind:Mina_signature_kind.t
     -> t
     -> unit Or_error.t
 
@@ -141,11 +142,15 @@ module Scan_state : sig
           -> Mina_transaction.Transaction.t
           -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
              Or_error.t )
+    -> signature_kind:Mina_signature_kind.t
     -> t
     -> unit Deferred.Or_error.t
 
   val write_all_proofs_to_disk :
-    proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+       signature_kind:Mina_signature_kind.t
+    -> proof_cache_db:Proof_cache_tag.cache_db
+    -> Stable.Latest.t
+    -> t
 
   val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
@@ -223,15 +228,14 @@ val apply :
   -> ?transaction_pool_proxy:Check_commands.transaction_pool_proxy
   -> t
   -> Staged_ledger_diff.t
-  -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
-       * [ `Ledger_proof of
-           ( Ledger_proof.Cached.t
-           * ( Transaction.t With_status.t
-             * State_hash.t
-             * Mina_numbers.Global_slot_since_genesis.t )
-             Scan_state.Transactions_ordered.Poly.t
-             list )
-           option ]
+  -> ( [ `Ledger_proof of
+         ( Ledger_proof.Cached.t
+         * ( Transaction.t With_status.t
+           * State_hash.t
+           * Mina_numbers.Global_slot_since_genesis.t )
+           Scan_state.Transactions_ordered.Poly.t
+           list )
+         option ]
        * [ `Staged_ledger of t ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
      , Staged_ledger_error.t )
@@ -249,15 +253,14 @@ val apply_diff_unchecked :
   -> signature_kind:Mina_signature_kind.t
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
-  -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
-       * [ `Ledger_proof of
-           ( Ledger_proof.Cached.t
-           * ( Transaction.t With_status.t
-             * State_hash.t
-             * Mina_numbers.Global_slot_since_genesis.t )
-             Scan_state.Transactions_ordered.Poly.t
-             list )
-           option ]
+  -> ( [ `Ledger_proof of
+         ( Ledger_proof.Cached.t
+         * ( Transaction.t With_status.t
+           * State_hash.t
+           * Mina_numbers.Global_slot_since_genesis.t )
+           Scan_state.Transactions_ordered.Poly.t
+           list )
+         option ]
        * [ `Staged_ledger of t ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
      , Staged_ledger_error.t )

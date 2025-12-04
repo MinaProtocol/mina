@@ -30,6 +30,7 @@
   pickles
   mina_numbers
   signature_lib
+  mina_signature_kind
   currency
   rosetta_lib
   secrets

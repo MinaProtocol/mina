@@ -3,6 +3,7 @@ open Async
 open Signature_lib
 open Mina_base
 include Genesis_ledger_helper_lib
+module Root_ledger = Mina_ledger.Root
 
 type exn += Genesis_state_initialization_error
 
@@ -66,6 +67,8 @@ let assert_filehash_equal ~file ~hash ~logger =
   let%bind computed_hash = sha3_hash file in
   if String.equal computed_hash hash then Deferred.unit
   else
+    let%bind stats = Unix.stat file in
+    let file_size = stats.size in
     let%map () = Unix.rename ~src:file ~dst:(file ^ ".incorrect-hash") in
     [%log error]
       "Verification failure: downloaded $path and expected SHA3-256 = \
@@ -74,6 +77,7 @@ let assert_filehash_equal ~file ~hash ~logger =
         [ ("path", `String file)
         ; ("expected_hash", `String hash)
         ; ("computed_hash", `String computed_hash)
+        ; ("file_size", `String (Int64.to_string file_size))
         ] ;
     failwith "Tarball hash mismatch"
 
@@ -219,35 +223,28 @@ module Ledger = struct
         | _, Some name ->
             search_local_and_s3 name )
 
-  let generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger =
-    Mina_ledger.Ledger.commit ledger ;
-    let dirname = Option.value_exn (Mina_ledger.Ledger.get_directory ledger) in
-    let root_hash =
-      Ledger_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root ledger
-    in
-    let%bind () = Unix.mkdir ~p:() genesis_dir in
-    let tar_path = genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix in
+  let generate_tar ~logger ~target_dir ~ledger_name_prefix ~root_hash
+      ~ledger_dirname () =
+    let root_hash = Ledger_hash.to_base58_check root_hash in
+    let%bind () = Unix.mkdir ~p:() target_dir in
+    let tar_path = target_dir ^/ hash_filename root_hash ~ledger_name_prefix in
     [%log trace]
       "Creating $ledger tar file for $root_hash at $path from database at $dir"
       ~metadata:
         [ ("ledger", `String ledger_name_prefix)
         ; ("root_hash", `String root_hash)
         ; ("path", `String tar_path)
-        ; ("dir", `String dirname)
+        ; ("dir", `String ledger_dirname)
         ] ;
     (* This sleep for 5s is a hack for rocksdb. It seems like rocksdb would need some
        time to stablize *)
     let%bind () = after (Time.Span.of_int_sec 5) in
-    match%map Tar.create ~root:dirname ~file:tar_path ~directory:"." () with
+    match%map
+      Tar.create ~root:ledger_dirname ~file:tar_path ~directory:"." ()
+    with
     | Ok () ->
         Ok tar_path
     | Error err ->
-        let root_hash =
-          Ledger_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root ledger
-        in
-        let tar_path =
-          genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix
-        in
         [%log error] "Could not generate a $ledger file at $path: $error"
           ~metadata:
             [ ("ledger", `String ledger_name_prefix)
@@ -255,6 +252,13 @@ module Ledger = struct
             ; ("error", Error_json.error_to_yojson err)
             ] ;
         Error err
+
+  let generate_ledger_tar ~genesis_dir ~logger ~ledger_name_prefix ledger =
+    Mina_ledger.Ledger.commit ledger ;
+    let dirname = Option.value_exn (Mina_ledger.Ledger.get_directory ledger) in
+    let root_hash = Mina_ledger.Ledger.merkle_root ledger in
+    generate_tar ~logger ~target_dir:genesis_dir ~ledger_name_prefix ~root_hash
+      ~ledger_dirname:dirname ()
 
   let padded_accounts_from_runtime_config_opt ~logger ~proof_level
       ~ledger_name_prefix ?overwrite_version (config : Runtime_config.Ledger.t)
@@ -344,12 +348,12 @@ module Ledger = struct
       pad_with_rev_balances (List.rev config.balances) accounts
       |> pad_to (Option.value ~default:0 config.num_accounts))
 
-  let packed_genesis_ledger_of_accounts ~logger ~depth accounts :
-      Genesis_ledger.Packed.t =
+  let packed_genesis_ledger_of_accounts ~genesis_backing_type ~logger ~depth
+      accounts : Genesis_ledger.Packed.t =
     ( module Genesis_ledger.Make (struct
       let accounts = accounts
 
-      let directory = `New
+      let directory = `New genesis_backing_type
 
       let depth = depth
 
@@ -399,21 +403,19 @@ module Ledger = struct
 
   let load_extracted_ledger ~(config : Runtime_config.Ledger.t) ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~extracted_path : Genesis_ledger.Packed.t =
-    (* TODO: pass in from above *)
-    let genesis_backing_type = Mina_ledger.Ledger.Root.Config.Stable_db in
+      ~extracted_path ~genesis_backing_type : Genesis_ledger.Packed.t =
     let genesis_config =
-      Mina_ledger.Ledger.Root.Config.with_directory
-        ~backing_type:genesis_backing_type ~directory_name:extracted_path
+      Root_ledger.Config.with_directory ~backing_type:genesis_backing_type
+        ~directory_name:extracted_path
     in
     ( module Genesis_ledger.Of_ledger (struct
       let backing_ledger =
         lazy
           (let ledger =
-             Mina_ledger.Ledger.Root.create ~logger ~config:genesis_config
+             Root_ledger.create ~logger ~config:genesis_config
                ~depth:constraint_constants.ledger_depth ()
            in
-           let ledger_root = Mina_ledger.Ledger.Root.merkle_root ledger in
+           let ledger_root = Root_ledger.merkle_root ledger in
            let expected_merkle_root =
              Option.map config.hash ~f:Ledger_hash.of_base58_check_exn
            in
@@ -447,16 +449,16 @@ module Ledger = struct
   let load_ledger_by_spec ~genesis_dir ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~ledger_name_prefix ~(load_ledger_spec : load_ledger_spec)
-      ~(config : Runtime_config.Ledger.t) =
+      ~genesis_backing_type ~(config : Runtime_config.Ledger.t) =
     match load_ledger_spec with
     | AccountsOnly { accounts } -> (
         let packed =
-          packed_genesis_ledger_of_accounts ~logger
+          packed_genesis_ledger_of_accounts ~genesis_backing_type ~logger
             ~depth:constraint_constants.ledger_depth accounts
         in
         let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
         let%bind.Deferred.Or_error tar_path =
-          generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
+          generate_ledger_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
         in
         let config =
           { config with
@@ -518,7 +520,7 @@ module Ledger = struct
           ( module Genesis_ledger.Make (struct
             let accounts = accounts
 
-            let directory = `Path extracted_path
+            let directory = `Path (extracted_path, genesis_backing_type)
 
             let depth = constraint_constants.ledger_depth
 
@@ -529,11 +531,11 @@ module Ledger = struct
     | Extracted { extracted_path } ->
         let packed =
           load_extracted_ledger ~config ~logger ~constraint_constants
-            ~extracted_path
+            ~extracted_path ~genesis_backing_type
         in
         let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
         let%map.Deferred.Or_error tar_file =
-          generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
+          generate_ledger_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
         in
         (packed, config, tar_file)
     | Tar { tar_file; extracted_path } ->
@@ -551,13 +553,13 @@ module Ledger = struct
         in
         let packed =
           load_extracted_ledger ~config ~logger ~constraint_constants
-            ~extracted_path
+            ~extracted_path ~genesis_backing_type
         in
         (packed, config, extracted_path)
 
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      ?(ledger_name_prefix = "genesis_ledger") ?overwrite_version
-      (config : Runtime_config.Ledger.t) =
+      ~genesis_backing_type ?(ledger_name_prefix = "genesis_ledger")
+      ?overwrite_version (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
         let padded_accounts_opt =
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
@@ -591,12 +593,12 @@ module Ledger = struct
               Deferred.Or_error.return (Tar { tar_file; extracted_path })
         in
         load_ledger_by_spec ~genesis_dir ~logger ~constraint_constants
-          ~ledger_name_prefix ~config ~load_ledger_spec )
+          ~ledger_name_prefix ~config ~load_ledger_spec ~genesis_backing_type )
 end
 
 module Epoch_data = struct
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      (config : Runtime_config.Epoch_data.t option) =
+      ~genesis_backing_type (config : Runtime_config.Epoch_data.t option) =
     let open Deferred.Or_error.Let_syntax in
     match config with
     | None ->
@@ -609,7 +611,7 @@ module Epoch_data = struct
         in
         let%bind staking, staking_config =
           let%map staking_ledger, config', ledger_file =
-            load_ledger config.staking.ledger
+            load_ledger ~genesis_backing_type config.staking.ledger
           in
           [%log trace] "Loaded staking epoch ledger from $ledger_file"
             ~metadata:[ ("ledger_file", `String ledger_file) ] ;
@@ -626,15 +628,38 @@ module Epoch_data = struct
                  epoch ledger" ;
               Deferred.Or_error.return (None, None)
           | Some { ledger; seed } ->
-              let%map next_ledger, config'', ledger_file = load_ledger ledger in
-              [%log trace] "Loaded next epoch ledger from $ledger_file"
-                ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-              ( Some
-                  { Consensus.Genesis_epoch_data.Data.ledger = next_ledger
-                  ; seed = Epoch_seed.of_base58_check_exn seed
-                  }
-              , Some { Runtime_config.Epoch_data.Data.ledger = config''; seed }
-              )
+              (* Check if next ledger has the same hash as staking ledger to avoid
+                 loading the same ledger twice, which causes RocksDB LOCK conflicts *)
+              let staking_hash = config.staking.ledger.hash in
+              let next_hash = ledger.hash in
+              if Option.equal String.equal staking_hash next_hash then (
+                [%log trace]
+                  "Next epoch ledger has the same hash as staking ledger, \
+                   reusing staking ledger" ;
+                Deferred.Or_error.return
+                  ( Some
+                      { Consensus.Genesis_epoch_data.Data.ledger =
+                          staking.ledger
+                      ; seed = Epoch_seed.of_base58_check_exn seed
+                      }
+                  , Some
+                      { Runtime_config.Epoch_data.Data.ledger =
+                          staking_config.ledger
+                      ; seed
+                      } ) )
+              else
+                let%map next_ledger, config'', ledger_file =
+                  load_ledger ~genesis_backing_type ledger
+                in
+                [%log trace] "Loaded next epoch ledger from $ledger_file"
+                  ~metadata:[ ("ledger_file", `String ledger_file) ] ;
+                ( Some
+                    { Consensus.Genesis_epoch_data.Data.ledger = next_ledger
+                    ; seed = Epoch_seed.of_base58_check_exn seed
+                    }
+                , Some
+                    { Runtime_config.Epoch_data.Data.ledger = config''; seed }
+                )
         in
         (* the staking ledger and the next ledger, if it exists,
            should have the genesis winner account as the first account, under
@@ -818,7 +843,7 @@ let print_config ~logger config =
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~proof_level:compiled_proof_level ?overwrite_version
+    ~ledger_backing ~proof_level:compiled_proof_level ?overwrite_version
     (config : Runtime_config.t) =
   print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
@@ -878,7 +903,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     match config.ledger with
     | Some ledger ->
         Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-          ?overwrite_version ledger
+          ~genesis_backing_type:ledger_backing ?overwrite_version ledger
     | None ->
         [%log fatal] "No ledger was provided in the runtime configuration" ;
         Deferred.Or_error.errorf
@@ -888,7 +913,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~metadata:[ ("ledger_file", `String ledger_file) ] ;
   let%bind genesis_epoch_data, genesis_epoch_data_config =
     Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      config.epoch_data
+      ~genesis_backing_type:ledger_backing config.epoch_data
   in
   let config =
     { config with
@@ -900,24 +925,18 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     Deferred.return
     @@ make_genesis_constants ~logger ~default:genesis_constants config
   in
-  let proof_inputs =
-    Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
-      ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
-      ~blockchain_proof_system_id ~genesis_epoch_data
-  in
-  (proof_inputs, config)
+  Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
+    ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
+    ~blockchain_proof_system_id ~genesis_epoch_data
 
-let init_from_config_file ?genesis_dir ~cli_proof_level ~genesis_constants
-    ~constraint_constants ~logger ~proof_level ?overwrite_version
-    (config : Runtime_config.t) :
-    (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
-  let open Deferred.Or_error.Let_syntax in
-  let%map inputs, config =
-    inputs_from_config_file ?genesis_dir ~cli_proof_level ~genesis_constants
-      ~constraint_constants ~logger ~proof_level ?overwrite_version config
-  in
-  let values = Genesis_proof.create_values_no_proof inputs in
-  (values, config)
+let init_from_config_file ~cli_proof_level ~genesis_constants
+    ~constraint_constants ~logger ~proof_level ~ledger_backing
+    ?overwrite_version ?genesis_dir (config : Runtime_config.t) :
+    Precomputed_values.t Deferred.Or_error.t =
+  inputs_from_config_file ~cli_proof_level ~genesis_constants
+    ~constraint_constants ~logger ~proof_level ~ledger_backing
+    ?overwrite_version ?genesis_dir config
+  |> Deferred.Or_error.map ~f:Genesis_proof.create_values_no_proof
 
 let upgrade_old_config ~logger filename json =
   match json with

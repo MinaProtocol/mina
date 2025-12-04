@@ -17,6 +17,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -368,8 +370,8 @@ let try_to_connect_hash_chain t hashes ~frontier
       with
       | Some node, None ->
           f (`Node node)
-      | Some node, Some b ->
-          finish t node (Ok b) ;
+      | Some node, Some _ ->
+          finish t node ~is_error:false ;
           f (`Node node)
       | None, Some b ->
           f (`Breadcrumb b)
@@ -913,9 +915,21 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
               Gauge.set Catchup.initial_validation_time
                 Time.(Span.to_ms @@ diff (now ()) start_time)) ;
             match result with
-            | `In_frontier hash ->
-                finish t node (Ok (Transition_frontier.find_exn frontier hash)) ;
-                Deferred.return (Ok ())
+            | `In_frontier hash -> (
+                match Transition_frontier.find frontier hash with
+                | None ->
+                    [%log' error t.logger]
+                      "Failed to find transition in frontier despite \
+                       In_frontier result"
+                      ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
+                    failwithf
+                      "Failed to find transition %s in frontier despite \
+                       In_frontier result"
+                      (State_hash.to_base58_check hash)
+                      ()
+                | Some _ ->
+                    finish t node ~is_error:false ;
+                    Deferred.return (Ok ()) )
             | `Building_path tv ->
                 (* To_initial_validate may only occur for a downloaded block,
                    hence there is no validation callback *)
@@ -999,7 +1013,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                  ignore
                    ( Cached.invalidate_with_failure av
                      : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
-                 finish t node (Error ()) ;
+                 finish t node ~is_error:true ;
                  Error `Finished )
         in
         set_state t node (To_build_breadcrumb (`Parent parent, av, valid_cb)) ;
@@ -1166,7 +1180,9 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
         |> Deferred.Or_error.map
              ~f:
                (List.map
-                  ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db) ) )
+                  ~f:
+                    (Mina_block.write_all_proofs_to_disk ~signature_kind
+                       ~proof_cache_db ) ) )
       ~peers:(fun () -> Mina_networking.peers network)
       ~knowledge_context:
         (Broadcast_pipe.map best_tip_r
@@ -1482,6 +1498,8 @@ let%test_module "Ledger_catchup tests" =
       let consensus_constants = precomputed_values.consensus_constants
 
       let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
+      let signature_kind = Mina_signature_kind.Testnet
     end
 
     (* let mock_verifier =

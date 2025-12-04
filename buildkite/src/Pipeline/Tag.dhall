@@ -4,7 +4,11 @@
 
 let Prelude = ../External/Prelude.dhall
 
+let FilterMode = ./FilterMode.dhall
+
 let List/any = Prelude.List.any
+
+let List/all = Prelude.List.all
 
 let Tag
     : Type
@@ -21,6 +25,18 @@ let Tag
       | Debian
       | Hardfork
       | Promote
+      | Rosetta
+      | Devnet
+      | Lightnet
+      | Arm64
+      | Amd64
+      | Mainnet
+      | Bullseye
+      | Bookworm
+      | Noble
+      | Focal
+      | Jammy
+      | Archive
       >
 
 let toNatural
@@ -40,6 +56,18 @@ let toNatural
             , Promote = 11
             , Debian = 12
             , Docker = 13
+            , Rosetta = 14
+            , Devnet = 15
+            , Lightnet = 16
+            , Arm64 = 17
+            , Amd64 = 18
+            , Mainnet = 19
+            , Bullseye = 20
+            , Bookworm = 21
+            , Noble = 22
+            , Focal = 23
+            , Jammy = 24
+            , Archive = 25
             }
             tag
 
@@ -55,11 +83,30 @@ let hasAny
       ->  \(tags : List Tag)
       ->  List/any Tag (\(x : Tag) -> equal x input) tags
 
-let contains
+let hasAll
+    : List Tag -> List Tag -> Bool
+    =     \(input : List Tag)
+      ->  \(tags : List Tag)
+      ->  List/all Tag (\(x : Tag) -> hasAny x tags) input == True
+
+let containsAll
+    : List Tag -> List Tag -> Bool
+    = \(input : List Tag) -> \(tags : List Tag) -> hasAll input tags
+
+let containsAny
     : List Tag -> List Tag -> Bool
     =     \(input : List Tag)
       ->  \(tags : List Tag)
       ->  List/any Tag (\(x : Tag) -> hasAny x tags) input
+
+let contains
+    : List Tag -> List Tag -> FilterMode.Type -> Bool
+    =     \(input : List Tag)
+      ->  \(tags : List Tag)
+      ->  \(filterMode : FilterMode.Type)
+      ->  merge
+            { Any = containsAny input tags, All = containsAll input tags }
+            filterMode
 
 let capitalName =
           \(tag : Tag)
@@ -77,6 +124,18 @@ let capitalName =
             , Promote = "Promote"
             , Docker = "Docker"
             , Debian = "Debian"
+            , Rosetta = "Rosetta"
+            , Devnet = "Devnet"
+            , Lightnet = "Lightnet"
+            , Arm64 = "Arm64"
+            , Amd64 = "Amd64"
+            , Mainnet = "Mainnet"
+            , Bullseye = "Bullseye"
+            , Bookworm = "Bookworm"
+            , Noble = "Noble"
+            , Focal = "Focal"
+            , Jammy = "Jammy"
+            , Archive = "Archive"
             }
             tag
 
@@ -96,6 +155,18 @@ let lowerName =
             , Promote = "promote"
             , Docker = "docker"
             , Debian = "debian"
+            , Rosetta = "rosetta"
+            , Devnet = "devnet"
+            , Lightnet = "lightnet"
+            , Arm64 = "arm64"
+            , Amd64 = "amd64"
+            , Mainnet = "mainnet"
+            , Bullseye = "bullseye"
+            , Bookworm = "bookworm"
+            , Noble = "noble"
+            , Focal = "focal"
+            , Jammy = "jammy"
+            , Archive = "archive"
             }
             tag
 
@@ -105,5 +176,7 @@ in  { Type = Tag
     , toNatural = toNatural
     , equal = equal
     , hasAny = hasAny
+    , containsAny = containsAny
+    , containsAll = containsAll
     , contains = contains
     }

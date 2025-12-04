@@ -29,6 +29,10 @@ in  Pipeline.build
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Stable
+            , PipelineTag.Type.Rosetta
+            , PipelineTag.Type.Mainnet
+            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Bullseye
             ]
           , profile = Profiles.Type.Mainnet
           , scope =

@@ -26,39 +26,27 @@ type merge_outcome =
       { spec : Snark_work_lib.Selector.Single.Spec.t One_or_two.t }
 
 let finalize_one ~submitted_result ~spec ~fee ~prover =
+  let open Snark_work_lib in
   let submitted_result =
-    Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
-      ~f_proof:Ledger_proof.Cached.read_proof_from_disk submitted_result
+    Result.Single.Poly.map ~f_spec:(const spec) ~f_proof:Fn.id submitted_result
   in
-  let Snark_work_lib.Result.Single.Poly.{ proof; elapsed; _ } =
-    submitted_result
-  in
-  Done { spec_with_proof = `One (spec, proof, elapsed); fee; prover }
+  Done { results = `One submitted_result; fee; prover }
 
 let finalize_two ~submitted_result ~other_spec ~in_pool_result ~submitted_half
     ~fee ~prover =
+  let open Snark_work_lib in
   let submitted_result =
-    let Snark_work_lib.Result.Single.Poly.{ spec; proof; elapsed } =
-      Snark_work_lib.Result.Single.Poly.map ~f_spec:(const other_spec)
-        ~f_proof:Ledger_proof.Cached.read_proof_from_disk submitted_result
-    in
-    (spec, proof, elapsed)
+    Result.Single.Poly.map ~f_spec:(const other_spec) ~f_proof:Fn.id
+      submitted_result
   in
-  let in_pool_result =
-    let Snark_work_lib.Result.Single.Poly.{ spec; proof; elapsed } =
-      Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
-        ~f_proof:Ledger_proof.Cached.read_proof_from_disk in_pool_result
-    in
-    (spec, proof, elapsed)
-  in
-  let spec_with_proof =
+  let results =
     match submitted_half with
     | `First ->
         `Two (submitted_result, in_pool_result)
     | `Second ->
         `Two (in_pool_result, submitted_result)
   in
-  Done { spec_with_proof; fee; prover }
+  Done { results; fee; prover }
 
 let merge_single_result
     ~(submitted_result :

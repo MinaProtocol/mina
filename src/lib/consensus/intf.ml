@@ -4,6 +4,7 @@ open Async
 open Currency
 open Signature_lib
 open Mina_base
+module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -317,7 +318,7 @@ module type S = sig
         module Ledger_snapshot : sig
           type t =
             | Genesis_epoch_ledger of Genesis_ledger.Packed.t
-            | Ledger_root of Mina_ledger.Ledger.Root.t
+            | Ledger_root of Root_ledger.t
 
           val close : t -> unit
 
@@ -328,12 +329,13 @@ module type S = sig
       type t [@@deriving to_yojson]
 
       val create :
-           Signature_lib.Public_key.Compressed.Set.t
-        -> context:(module CONTEXT)
+           context:(module CONTEXT)
         -> genesis_ledger:Genesis_ledger.Packed.t
         -> genesis_epoch_data:Genesis_epoch_data.t
         -> epoch_ledger_location:string
         -> genesis_state_hash:State_hash.t
+        -> epoch_ledger_backing_type:Root_ledger.Config.backing_type
+        -> Signature_lib.Public_key.Compressed.Set.t
         -> t
 
       val current_block_production_keys :
@@ -718,7 +720,7 @@ module type S = sig
          Consensus_state.Value.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> snarked_ledger:Mina_ledger.Ledger.Root.t
+      -> snarked_ledger:Root_ledger.t
       -> genesis_ledger_hash:Mina_base.Frozen_ledger_hash.t
       -> unit
 

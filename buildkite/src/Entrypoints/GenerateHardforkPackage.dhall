@@ -1,6 +1,11 @@
 -- Autogenerates any pre-reqs for monorepo triage execution
 -- Keep these rules lean! They have to run unconditionally.
 
+
+let Prelude = ../External/Prelude.dhall
+
+let List/concatMap = Prelude.List.concatMap
+
 let SelectFiles = ../Lib/SelectFiles.dhall
 
 let Cmd = ../Lib/Cmds.dhall
@@ -37,6 +42,8 @@ let Spec =
           , config_json_gz_url : Text
           , version : Text
           , suffix : Text
+          , precomputed_block_prefix : Optional Text
+          , size : Size
           }
       , default =
           { codenames = [ DebianVersions.DebVersion.Bullseye ]
@@ -45,6 +52,9 @@ let Spec =
           , config_json_gz_url =
               "https://storage.googleapis.com/o1labs-gitops-infrastructure/devnet/devnet-state-dump-3NK4eDgbkCjKj9fFUXVkrJXsfpfXzJySoAvrFJVCropPW7LLF14F-676026c4d4d2c18a76b357d6422a06f932c3ef4667a8fd88717f68b53fd6b2d7.json.gz"
           , suffix = ""
+          , version = "\\\$MINA_DEB_VERSION"
+          , precomputed_block_prefix = None Text
+          , size = Size.XLarge
           }
       }
 
@@ -55,8 +65,6 @@ let generateDockerForCodename =
       ->  let image =
                 Artifacts.fullDockerTag
                   Artifacts.Tag::{
-                  , version =
-                      "${spec.version}-${DebianVersions.lowerName codename}"
                   , remove_profile_from_name = True
                   , network = spec.network
                   }
@@ -76,12 +84,24 @@ let generateDockerForCodename =
                 , deb_profile = profile
                 , deb_repo = DebianRepo.Type.Local
                 , deb_suffix = Some "hardfork"
+                , step_key_suffix =
+                    "-${DebianVersions.lowerName codename}-docker-image"
+                , size = spec.size
                 }
 
           let dockerDaemonStep = DockerImage.stepKey dockerDaemonSpec
 
           let dependsOnTest =
                 [ { name = pipelineName, key = dockerDaemonStep } ]
+
+          let precomputed_block_prefix_arg =
+                merge
+                  { Some =
+                          \(prefix : Text)
+                      ->  "--precomputed-block-prefix " ++ prefix
+                  , None = ""
+                  }
+                  spec.precomputed_block_prefix
 
           in  [ MinaArtifact.buildArtifacts
                   MinaArtifact.MinaBuildSpec::{
@@ -118,6 +138,9 @@ let generateDockerForCodename =
                   , deb_codename = codename
                   , deb_profile = profile
                   , deb_repo = DebianRepo.Type.Local
+                  , size = spec.size
+                  , step_key_suffix =
+                      "-${DebianVersions.lowerName codename}-docker-image"
                   }
               , DockerImage.generateStep
                   DockerImage.ReleaseSpec::{
@@ -133,6 +156,9 @@ let generateDockerForCodename =
                   , deb_repo = DebianRepo.Type.Local
                   , deb_codename = codename
                   , deb_suffix = Some "hardfork"
+                  , size = spec.size
+                  , step_key_suffix =
+                      "-${DebianVersions.lowerName codename}-docker-image"
                   }
               , Command.build
                   Command.Config::{
@@ -161,11 +187,13 @@ let generateDockerForCodename =
                                                       codename} && source ./buildkite/scripts/export-git-env-vars.sh"
                     , Cmd.runInDocker
                         Cmd.Docker::{ image = image }
-                        "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config ${Network.lowerName
-                                                                                                                                                                                spec.network} config.json /workdir/verification"
+                        "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config --network ${Network.lowerName
+                                                                                                                                                                                          spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg}"
                     ]
                   , label = "Verify packaged artifacts"
-                  , key = "verify-packaged-artifacts"
+                  , key =
+                      "verify-packaged-artifacts-${DebianVersions.lowerName
+                                                     codename}"
                   , target = Size.XLarge
                   , depends_on = dependsOnTest
                   }
@@ -188,10 +216,13 @@ let pipeline =
                     ]
                   }
                 , steps =
-                    generateDockerForCodename
-                      spec
-                      DebianVersions.DebVersion.Focal
-                      pipelineName
+                    List/concatMap
+                      DebianVersions.DebVersion
+                      Command.Type
+                      (     \(codename : DebianVersions.DebVersion)
+                        ->  generateDockerForCodename spec codename pipelineName
+                      )
+                      spec.codenames
                 }
 
 let generate_hardfork_package =
@@ -200,14 +231,20 @@ let generate_hardfork_package =
       ->  \(genesis_timestamp : Optional Text)
       ->  \(config_json_gz_url : Text)
       ->  \(suffix : Text)
+      ->  \(version : Optional Text)
+      ->  \(precomputed_block_prefix : Optional Text)
       ->  ( pipeline
               Spec::{
               , codenames = codenames
               , network = network
-              , version = "\\\$MINA_DEB_VERSION"
+              , version =
+                  merge
+                    { Some = \(v : Text) -> v, None = "\\\$MINA_DEB_VERSION" }
+                    version
               , genesis_timestamp = genesis_timestamp
               , config_json_gz_url = config_json_gz_url
               , suffix = suffix
+              , precomputed_block_prefix = precomputed_block_prefix
               }
           ).pipeline
 

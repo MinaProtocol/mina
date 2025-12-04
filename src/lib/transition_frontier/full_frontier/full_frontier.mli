@@ -12,6 +12,7 @@
 open Mina_base
 open Frontier_base
 open Mina_state
+module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -59,11 +60,33 @@ val protocol_states_for_root_scan_state :
 val apply_diffs :
      t
   -> Diff.Full.E.t list
-  -> enable_epoch_ledger_sync:
-       [ `Enabled of Mina_ledger.Ledger.Root.t | `Disabled ]
+  -> enable_epoch_ledger_sync:[ `Enabled of Root_ledger.t | `Disabled ]
   -> has_long_catchup_job:bool
   -> [ `New_root_and_diffs_with_mutants of
        Root_identifier.t option * Diff.Full.With_mutant.t list ]
+
+val common_ancestor :
+     t
+  -> Breadcrumb.t
+  -> Breadcrumb.t
+  -> ( State_hash.t
+     , [ `Parent_not_found of State_hash.t * [ `Parent of State_hash.t ] ] )
+     Result.t
+
+module Util : sig
+  (** given an heir, calculate the diff that will transition
+      the root to that heir (assuming parent is the root) *)
+  val calculate_root_transition_diff :
+       protocol_states_for_root_scan_state:Protocol_states_for_root_scan_state.t
+    -> parent:Breadcrumb.t
+    -> successors:(Breadcrumb.t -> Breadcrumb.t list)
+    -> Breadcrumb.t
+    -> Diff.full Diff.Root_transition.t
+
+  val to_protocol_states_map_exn :
+       Protocol_state.value State_hash.With_state_hashes.t list
+    -> Protocol_states_for_root_scan_state.t
+end
 
 module For_tests : sig
   val equal : t -> t -> bool
@@ -86,7 +109,10 @@ module For_tests : sig
         -> Frontier_base.Breadcrumb.t list Async_kernel.Deferred.t )
        Base_quickcheck.Generator.t
 
-  val create_frontier : unit -> t
+  val create_frontier :
+       epoch_ledger_backing_type:Mina_ledger.Root.Config.backing_type
+    -> unit
+    -> t Async_kernel.Deferred.t
 
   val clean_up_persistent_root : frontier:t -> unit
 

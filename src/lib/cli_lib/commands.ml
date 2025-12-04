@@ -71,7 +71,8 @@ let validate_keypair =
   Command.async ~summary:"Validate a public, private keypair"
     (let open Command.Let_syntax in
     let open Core_kernel in
-    let%map_open privkey_path = Flag.privkey_write_path in
+    let%map_open privkey_path = Flag.privkey_write_path
+    and signature_kind = Flag.signature_kind in
     Exceptions.handle_nicely
     @@ fun () ->
     let read_pk () =
@@ -106,7 +107,6 @@ let validate_keypair =
         exit 1 )
     in
     let validate_transaction keypair =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let dummy_payload = Mina_base.Signed_command_payload.dummy in
       let signature =
         Mina_base.Signed_command.sign_payload ~signature_kind
@@ -146,58 +146,58 @@ let validate_transaction =
     ~summary:
       "Validate the signature on one or more transactions, provided to stdin \
        in rosetta format"
-    ( Command.Param.return
-    @@ fun () ->
-    let num_fails = ref 0 in
-    (* TODO upgrade to yojson 2.0.0 when possible to use seq_from_channel
-     * instead of the deprecated stream interface *)
-    let jsons = Yojson.Safe.stream_from_channel In_channel.stdin in
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
-    ( match
-        Or_error.try_with (fun () ->
-            Streams.iter
-              (fun transaction_json ->
-                match
-                  Rosetta_lib.Transaction.to_mina_signed transaction_json
-                with
-                | Ok cmd ->
-                    if
-                      Mina_base.Signed_command.check_signature ~signature_kind
-                        cmd
-                    then Format.eprintf "Transaction was valid@."
-                    else (
+    (let open Command.Let_syntax in
+    let%map signature_kind = Flag.signature_kind in
+    fun () ->
+      let num_fails = ref 0 in
+      (* TODO upgrade to yojson 2.0.0 when possible to use seq_from_channel
+       * instead of the deprecated stream interface *)
+      let jsons = Yojson.Safe.stream_from_channel In_channel.stdin in
+      ( match
+          Or_error.try_with (fun () ->
+              Streams.iter
+                (fun transaction_json ->
+                  match
+                    Rosetta_lib.Transaction.to_mina_signed transaction_json
+                  with
+                  | Ok cmd ->
+                      if
+                        Mina_base.Signed_command.check_signature ~signature_kind
+                          cmd
+                      then Format.eprintf "Transaction was valid@."
+                      else (
+                        incr num_fails ;
+                        Format.eprintf "Transaction was invalid@." )
+                  | Error err ->
                       incr num_fails ;
-                      Format.eprintf "Transaction was invalid@." )
-                | Error err ->
-                    incr num_fails ;
-                    Format.eprintf
-                      "@[<v>Failed to validate transaction:@,\
-                       %s@,\
-                       Failed with error:%s@]@."
-                      (Yojson.Safe.pretty_to_string transaction_json)
-                      (Yojson.Safe.pretty_to_string
-                         (Error_json.error_to_yojson err) ) )
-              jsons )
-      with
-    | Ok () ->
-        ()
-    | Error err ->
-        Format.eprintf "@[<v>Error:@,%s@,@]@."
-          (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
-        Format.printf "Invalid transaction.@." ;
-        Core_kernel.exit 1 ) ;
-    if !num_fails > 0 then (
-      Format.printf "Some transactions failed to verify@." ;
-      exit 1 )
-    else
-      let first = Streams.peek jsons in
-      match first with
-      | None ->
-          Format.printf "Could not parse any transactions@." ;
-          exit 1
-      | _ ->
-          Format.printf "All transactions were valid@." ;
-          exit 0 )
+                      Format.eprintf
+                        "@[<v>Failed to validate transaction:@,\
+                         %s@,\
+                         Failed with error:%s@]@."
+                        (Yojson.Safe.pretty_to_string transaction_json)
+                        (Yojson.Safe.pretty_to_string
+                           (Error_json.error_to_yojson err) ) )
+                jsons )
+        with
+      | Ok () ->
+          ()
+      | Error err ->
+          Format.eprintf "@[<v>Error:@,%s@,@]@."
+            (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
+          Format.printf "Invalid transaction.@." ;
+          Core_kernel.exit 1 ) ;
+      if !num_fails > 0 then (
+        Format.printf "Some transactions failed to verify@." ;
+        exit 1 )
+      else
+        let first = Streams.peek jsons in
+        match first with
+        | None ->
+            Format.printf "Could not parse any transactions@." ;
+            exit 1
+        | _ ->
+            Format.printf "All transactions were valid@." ;
+            exit 0)
 
 module Vrf = struct
   let generate_witness =

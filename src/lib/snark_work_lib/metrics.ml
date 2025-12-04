@@ -27,7 +27,7 @@ let emit_single_metrics_impl ~logger
         ]
   in
   match single_spec with
-  | Single_spec.Poly.Merge (_, _, _) ->
+  | Single_spec.Poly.Merge _ ->
       Perf_histograms.add_span ~name:"snark_worker_merge_time" elapsed ;
       Mina_metrics.(
         Cryptography.Snark_work_histogram.observe
@@ -35,8 +35,6 @@ let emit_single_metrics_impl ~logger
       [%log info] "Merge SNARK generated in $elapsed seconds"
         ~metadata:[ ("elapsed", `Float (Time.Span.to_sec elapsed)) ]
   | Transition (_, `Zkapp_command) ->
-      (* WARN: with work partitioner, each metrics emission would reach both
-         this branch and [emit_partitioned_metrics] *)
       Perf_histograms.add_span ~name:"snark_worker_zkapp_transition_time"
         elapsed ;
       Mina_metrics.(

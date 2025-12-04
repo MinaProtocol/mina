@@ -14,6 +14,7 @@ module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Mina_subscriptions
+module Root_ledger = Mina_ledger.Root
 
 type t
 
@@ -52,6 +53,8 @@ module type CONTEXT = sig
   val ledger_sync_config : Syncable_ledger.daemon_config
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 exception Snark_worker_error of int
@@ -275,9 +278,6 @@ val best_chain_block_by_height :
 val best_chain_block_by_state_hash :
   t -> State_hash.t -> Transition_frontier.Breadcrumb.t Or_error.t
 
-val best_chain_block_before_stop_slot :
-  t -> Transition_frontier.Breadcrumb.t Deferred.Or_error.t
-
 module Hardfork_config : sig
   type mina_lib = t
 
@@ -291,28 +291,67 @@ module Hardfork_config : sig
     -> mina_lib
     -> Transition_frontier.Breadcrumb.t Deferred.Or_error.t
 
-  val epoch_ledgers :
+  (** The ledgers that will be used to compute the hard fork genesis ledgers.
+      Note that a [Mina_ledger.Ledger.t] here, like the [staged_ledger] or
+      (potentially) the [next_epoch_ledger], must have the [root_snarked_ledger]
+      as its root. *)
+  type genesis_source_ledgers =
+    { root_snarked_ledger : Root_ledger.t
+    ; staged_ledger : Mina_ledger.Ledger.t
+    ; staking_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t | `Root of Root_ledger.t ]
+    ; next_epoch_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t
+        | `Root of Root_ledger.t
+        | `Uncommitted of Mina_ledger.Ledger.t ]
+    }
+
+  val genesis_source_ledger_cast :
+       [< `Genesis of Genesis_ledger.Packed.t
+       | `Root of Root_ledger.t
+       | `Uncommitted of Mina_ledger.Ledger.t ]
+    -> Mina_ledger.Ledger.Any_ledger.witness
+
+  (** Retrieve the [genesis_source_ledgers] from the transition frontier,
+      starting at the given [breadcrumb]. *)
+  val source_ledgers :
        breadcrumb:Transition_frontier.Breadcrumb.t
     -> mina_lib
-    -> ( Mina_ledger.Ledger.Any_ledger.witness
-       * Mina_ledger.Ledger.Any_ledger.witness )
-       Deferred.Or_error.t
+    -> genesis_source_ledgers Deferred.Or_error.t
 
   type inputs =
-    { staged_ledger : Mina_ledger.Ledger.t
+    { source_ledgers : genesis_source_ledgers
     ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+    ; genesis_state_timestamp : string
     ; state_hash : State_hash.t
-    ; staking_ledger : Mina_ledger.Ledger.Any_ledger.witness
     ; staking_epoch_seed : Epoch_seed.t
-    ; next_epoch_ledger : Mina_ledger.Ledger.Any_ledger.witness
     ; next_epoch_seed : Epoch_seed.t
     ; blockchain_length : Mina_numbers.Length.t
     }
 
   val prepare_inputs :
     breadcrumb_spec:breadcrumb_spec -> mina_lib -> inputs Deferred.Or_error.t
+
+  (** Compute a full hard fork config (genesis ledger, genesis epoch ledgers,
+      and node config) both without hard fork ledger migrations applied (the
+      "legacy" format, compatible with the current daemon) and with the hard
+      fork ledger migrations applied (the actual hard fork format, compatible
+      with a hard fork daemon). The legacy format config will be saved in
+      [daemon.legacy.json] and [genesis_legacy/] in [directory_name], and the
+      hard fork format files will be saved in [daemon.json] and [genesis/] in
+      that same directory. An empty [activated] file will be created in
+      [directory_name] at the very end of this process to indicate that the
+      config was generated successfully. *)
+  val dump_reference_config :
+       breadcrumb_spec:breadcrumb_spec
+    -> config_dir:string
+    -> generate_fork_validation:bool
+    -> mina_lib
+    -> unit Deferred.Or_error.t
 end
 
 val zkapp_cmd_limit : t -> int option ref
 
 val proof_cache_db : t -> Proof_cache_tag.cache_db
+
+val signature_kind : t -> Mina_signature_kind.t

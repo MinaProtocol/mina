@@ -41,7 +41,7 @@ end)
 
 module Root = Syncable_ledger.Make (struct
   module Addr = Ledger.Location.Addr
-  module MT = Ledger.Root
+  module MT = Root
   module Account = Account.Stable.Latest
   module Hash = Hash
   module Root_hash = Root_hash

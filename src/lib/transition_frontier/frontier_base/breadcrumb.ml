@@ -338,8 +338,7 @@ module For_tests = struct
             ~nonce ~valid_until:None ~memo:Signed_command_memo.dummy
             ~body:(Payment { receiver_pk; amount = send_amount })
         in
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
-        Signed_command.sign ~signature_kind sender_keypair payload )
+        Signed_command.sign ~signature_kind:Testnet sender_keypair payload )
 
   let gen ?(logger = Logger.null ()) ?(send_to_random_pk = false)
       ~(precomputed_values : Precomputed_values.t) ~verifier
@@ -414,9 +413,8 @@ module For_tests = struct
       let body =
         Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff
       in
-      let%bind ( `Hash_after_applying staged_ledger_hash
-               , `Ledger_proof ledger_proof_opt
-               , `Staged_ledger _
+      let%bind ( `Ledger_proof ledger_proof_opt
+               , `Staged_ledger transitioned_staged_ledger
                , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
@@ -426,7 +424,7 @@ module For_tests = struct
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase
             ~zkapp_cmd_limit_hardcap:
               precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
-            ~signature_kind:Mina_signature_kind.t_DEPRECATED
+            ~signature_kind:Testnet
         with
         | Ok r ->
             return r
@@ -450,6 +448,7 @@ module For_tests = struct
         previous_protocol_state |> Protocol_state.blockchain_state
         |> Blockchain_state.genesis_ledger_hash
       in
+      let staged_ledger_hash = Staged_ledger.hash transitioned_staged_ledger in
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)

@@ -72,14 +72,10 @@ let get_daemon_address default =
   | `No | `Unknown ->
       return default
 
-let emit_metrics ~logger = function
-  | Spec.Partitioned.Poly.Single
-      { job = { spec = single_spec; _ }
-      ; data = { Proof_carrying_data.data = elapsed; _ }
-      } ->
+let emit_metrics ~elapsed ~logger = function
+  | Spec.Partitioned.Poly.Single { spec = single_spec; _ } ->
       Metrics.emit_single_metrics_stable ~logger ~single_spec ~elapsed
-  | Spec.Partitioned.Poly.Sub_zkapp_command
-      { job = { spec = sub_zkapp_spec; _ }; data = { data = elapsed; _ } } ->
+  | Spec.Partitioned.Poly.Sub_zkapp_command { spec = sub_zkapp_spec; _ } ->
       Metrics.emit_subzkapp_metrics ~logger ~sub_zkapp_spec ~elapsed
 
 (** Handle the `Result case - submits completed SNARK work to the daemon with retry logic.
@@ -168,20 +164,15 @@ let handle_spec ~logger ~state daemon_address partitioned_spec =
   [%log info]
     "SNARK work $work_ids received from $address. Starting proof generation"
     ~metadata ;
+
+  let id = Spec.Partitioned.Poly.get_id partitioned_spec in
   match%bind Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec with
   | Error e ->
-      let partitioned_id =
-        Spec.Partitioned.Poly.map ~f_single_spec:ignore ~f_subzkapp_spec:ignore
-          ~f_data:ignore partitioned_spec
-      in
-      return (`Failed (daemon_address, e, partitioned_id))
-  | Ok result ->
-      let result_without_spec =
-        Spec.Partitioned.Poly.map ~f_single_spec:ignore ~f_subzkapp_spec:ignore
-          ~f_data:Fn.id result
-      in
-      emit_metrics ~logger result ;
-      return (`Result (daemon_address, result_without_spec, metadata, 3, 10.))
+      return (`Failed (daemon_address, e, id))
+  | Ok ({ data = elapsed; _ } as data) ->
+      let wire_result = Result.Partitioned.Stable.Latest.{ id; data } in
+      emit_metrics ~elapsed ~logger partitioned_spec ;
+      return (`Result (daemon_address, wire_result, metadata, 3, 10.))
 
 (** Handle the `No_spec case - requests new SNARK work from the daemon.
     
@@ -287,7 +278,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
       handle_no_spec ~logger ~shutdown_on_disconnect default_daemon_address
 
 let command_from_rpcs ~commit_id ~proof_level:default_proof_level
-    ~constraint_constants ~signature_kind =
+    ~constraint_constants =
   Command.async ~summary:"Snark worker"
     (let open Command.Let_syntax in
     let%map_open daemon_port =
@@ -308,6 +299,7 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
     and file_log_level = Cli_lib.Flag.Log.file_log_level
     and conf_dir = Cli_lib.Flag.conf_dir in
     fun () ->
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let logger =
         Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
       in

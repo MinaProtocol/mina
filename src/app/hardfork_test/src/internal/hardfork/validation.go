@@ -1,0 +1,293 @@
+package hardfork
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/graphql"
+)
+
+// BlockAnalysisResult holds the results of analyzing blocks
+type BlockAnalysisResult struct {
+	LatestOccupiedSlot        int
+	LatestSnarkedHashPerEpoch map[int]string // map from epoch to snarked ledger hash
+	LatestNonEmptyBlock       graphql.BlockData
+	GenesisEpochStaking       string
+	GenesisEpochNext          string
+}
+
+// ValidateSlotOccupancy checks if block occupancy is above 50%
+func (t *HardforkTest) ValidateSlotOccupancy(startingHeight, blockHeight int) error {
+	if 2*blockHeight < t.Config.BestChainQueryFrom {
+		return fmt.Errorf("slot occupancy (%d/%d) is below 50%%", blockHeight, t.Config.BestChainQueryFrom)
+	}
+	return nil
+}
+
+// ValidateLatestOccupiedSlot checks that the max slot is not beyond the chain end
+func (t *HardforkTest) ValidateLatestOccupiedSlot(latestOccupiedSlot int) error {
+	t.Logger.Info("Last occupied slot of pre-fork chain: %d", latestOccupiedSlot)
+	if latestOccupiedSlot >= t.Config.SlotChainEnd {
+		t.Logger.Error("Assertion failed: block with slot %d created after slot chain end", latestOccupiedSlot)
+		return fmt.Errorf("block with slot %d created after slot chain end", latestOccupiedSlot)
+	}
+	return nil
+}
+
+// ValidateLatestNonEmptyBlockSlot checks that the latest non-empty block is before tx end slot
+func (t *HardforkTest) ValidateLatestNonEmptyBlockSlot(latestNonEmptyBlock graphql.BlockData) error {
+	t.Logger.Info("Latest non-empty block: %s, height: %d, slot: %d",
+		latestNonEmptyBlock.StateHash, latestNonEmptyBlock.BlockHeight, latestNonEmptyBlock.Slot)
+
+	if latestNonEmptyBlock.Slot >= t.Config.SlotTxEnd {
+		t.Logger.Error("Assertion failed: non-empty block with slot %d created after slot tx end", latestNonEmptyBlock.Slot)
+		return fmt.Errorf("non-empty block with slot %d created after slot tx end", latestNonEmptyBlock.Slot)
+	}
+	return nil
+}
+
+// ValidateNoNewBlocks verifies that no new blocks are created after chain end
+func (t *HardforkTest) ValidateNoNewBlocks(port int) error {
+	// Sleep three slots (TODO: consider removing in future,
+	// now it's for extra assurance that other waits were not slightly off)
+	time.Sleep(time.Duration(t.Config.MainSlot) * time.Second * 3)
+
+	t.Logger.Info("Waiting to verify no new blocks are created after chain end...")
+
+	height1, err := t.Client.GetHeight(port)
+	if err != nil {
+		return fmt.Errorf("failed to get height1: %w", err)
+	}
+
+	time.Sleep(time.Duration(t.Config.NoNewBlocksWaitSeconds) * time.Second)
+
+	height2, err := t.Client.GetHeight(port)
+	if err != nil {
+		return fmt.Errorf("failed to get height2: %w", err)
+	}
+
+	if height2 > height1 {
+		t.Logger.Error("Assertion failed: there should be no change in blockheight after slot chain end %s", "")
+		return fmt.Errorf("unexpected block height increase from %d to %d after chain end", height1, height2)
+	}
+
+	return nil
+}
+
+// CollectBlocks gathers blocks from multiple slots across different ports
+func (t *HardforkTest) CollectBlocks(startSlot, endSlot int) ([]graphql.BlockData, error) {
+	var allBlocks []graphql.BlockData
+
+	for i := startSlot; i <= endSlot; i++ {
+
+		portUsed := t.AnyPortOfType(PORT_REST)
+
+		blocksBatch, err := t.Client.GetBlocks(portUsed)
+		if err != nil {
+			t.Logger.Debug("Failed to get blocks for slot %d: %v from port %d", i, err, portUsed)
+		} else {
+			allBlocks = append(allBlocks, blocksBatch...)
+		}
+
+		time.Sleep(time.Duration(t.Config.MainSlot) * time.Second)
+	}
+
+	return allBlocks, nil
+}
+
+// AnalyzeBlocks performs comprehensive block analysis including finding genesis epoch hashes
+func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
+	// Get initial blocks to find genesis epoch hashes
+	portUsed := t.AnyPortOfType(PORT_REST)
+	blocks, err := t.Client.GetBlocks(portUsed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get blocks: %w from port %d", err, portUsed)
+	}
+
+	// Find the first non-empty block to get genesis epoch hashes
+	var firstEpochBlock graphql.BlockData
+	for _, block := range blocks {
+		if block.NonEmpty && block.Epoch == 0 {
+			firstEpochBlock = block
+			break
+		}
+	}
+
+	if firstEpochBlock.StateHash == "" {
+		return nil, fmt.Errorf("no non-empty epoch 0 blocks found in the first query")
+	}
+
+	genesisEpochStakingHash := firstEpochBlock.CurEpochHash
+	if genesisEpochStakingHash == "" {
+		return nil, fmt.Errorf("genesis epoch staking hash is empty")
+	}
+
+	genesisEpochNextHash := firstEpochBlock.NextEpochHash
+	if genesisEpochNextHash == "" {
+		return nil, fmt.Errorf("genesis next staking hash is empty")
+	}
+
+	t.Logger.Info("Genesis epoch staking/next hashes: %s, %s",
+		genesisEpochStakingHash, genesisEpochNextHash)
+
+	// Collect blocks from BestChainQueryFrom to SlotChainEnd
+	allBlocks, err := t.CollectBlocks(t.Config.BestChainQueryFrom, t.Config.SlotChainEnd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Process blocks to find latest non-empty block and other data
+	latestOccupiedSlot, latestSnarkedHashPerEpoch, latestNonEmptyBlock, err := t.FindLatestNonEmptyBlock(allBlocks)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find latest non-empty block: %w", err)
+	}
+
+	return &BlockAnalysisResult{
+		LatestOccupiedSlot:        latestOccupiedSlot,
+		LatestSnarkedHashPerEpoch: latestSnarkedHashPerEpoch,
+		LatestNonEmptyBlock:       latestNonEmptyBlock,
+		GenesisEpochStaking:       genesisEpochStakingHash,
+		GenesisEpochNext:          genesisEpochNextHash,
+	}, nil
+}
+
+// FindLatestNonEmptyBlock processes block data to find the latest non-empty block
+// and collects other important information
+// This function assumes that there is at least one block with non-zero slot
+func (t *HardforkTest) FindLatestNonEmptyBlock(blocks []graphql.BlockData) (
+	latestOccupiedSlot int,
+	latestSnarkedHashPerEpoch map[int]string, // map from epoch to snarked ledger hash
+	latestNonEmptyBlock graphql.BlockData,
+	err error) {
+
+	if len(blocks) == 0 {
+		err = fmt.Errorf("no blocks provided")
+		return
+	}
+
+	latestSnarkedHashPerEpoch = make(map[int]string)
+	latestSlotPerEpoch := make(map[int]int)
+
+	// Process each block
+	for _, block := range blocks {
+		// Update max slot
+		if block.Slot > latestOccupiedSlot {
+			latestOccupiedSlot = block.Slot
+		}
+
+		// Track snarked ledger hash per epoch
+		if block.Slot > latestSlotPerEpoch[block.Epoch] {
+			latestSnarkedHashPerEpoch[block.Epoch] = block.SnarkedHash
+			latestSlotPerEpoch[block.Epoch] = block.Slot
+		}
+
+		// Track latest non-empty block
+		if block.NonEmpty && block.Slot > latestNonEmptyBlock.Slot {
+			latestNonEmptyBlock = block
+		}
+	}
+
+	if latestNonEmptyBlock.Slot == 0 {
+		err = fmt.Errorf("no blocks with slot > 0")
+		return
+	}
+
+	return
+}
+
+// FindStakingHash finds the staking ledger hash for the given epoch
+func (t *HardforkTest) FindStakingHash(
+	epoch int,
+	genesisEpochStakingHash string,
+	genesisEpochNextHash string,
+	epochs map[int]string,
+) (string, error) {
+	// Handle special cases for genesis epochs
+	if epoch == 0 {
+		return genesisEpochStakingHash, nil
+	}
+
+	if epoch == 1 {
+		return genesisEpochNextHash, nil
+	}
+
+	// For other epochs, look up in the map
+	hash, exists := epochs[epoch-2]
+	if !exists {
+		return "", fmt.Errorf("last snarked ledger for epoch %d wasn't captured", epoch-2)
+	}
+
+	return hash, nil
+}
+
+// waitForEarliestBlock waits for the earliest block to appear in the fork network with retry mechanism
+// Returns the height and slot of the earliest block, or an error if max retries exceeded
+func (t *HardforkTest) waitForEarliestBlock(port int) (height int, slot int, err error) {
+	for attempt := 1; attempt <= t.Config.ForkEarliestBlockMaxRetries; attempt++ {
+		h, s, queryErr := t.Client.GetHeightAndSlotOfEarliest(port)
+		if queryErr == nil && h > 0 {
+			return h, s, nil
+		}
+
+		if attempt < t.Config.ForkEarliestBlockMaxRetries {
+			t.Logger.Debug("Waiting for earliest block (attempt %d/%d)...", attempt, t.Config.ForkEarliestBlockMaxRetries)
+			time.Sleep(time.Duration(t.Config.ForkSlot) * time.Second)
+		} else {
+			err = queryErr
+		}
+	}
+
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get earliest block after %d attempts: %w", t.Config.ForkEarliestBlockMaxRetries, err)
+	}
+	return 0, 0, fmt.Errorf("no blocks found after %d attempts", t.Config.ForkEarliestBlockMaxRetries)
+}
+
+// ValidateFirstBlockOfForkChain checks that the fork network is producing blocks
+func (t *HardforkTest) ValidateFirstBlockOfForkChain(port int, latestPreForkHeight int, expectedGenesisSlot int64) error {
+	// Wait for the earliest block to appear
+	earliestHeight, earliestSlot, err := t.waitForEarliestBlock(port)
+	if err != nil {
+		return err
+	}
+
+	// Check earliest height
+	if earliestHeight != latestPreForkHeight+1 {
+		t.Logger.Error("Assertion failed: unexpected block height %d at the beginning of the fork", earliestHeight)
+		return fmt.Errorf("unexpected block height %d at beginning of fork", earliestHeight)
+	}
+
+	// Check earliest slot
+	if earliestSlot < int(expectedGenesisSlot) {
+		t.Logger.Error("Assertion failed: unexpected slot %d at the beginning of the fork", earliestSlot)
+		return fmt.Errorf("unexpected slot %d at beginning of fork", earliestSlot)
+	}
+
+	return nil
+}
+
+// ValidateBlockWithUserCommandCreated checks that blocks contain user commands
+func (t *HardforkTest) ValidateBlockWithUserCommandCreated(port int) error {
+	allBlocksEmpty := true
+	for i := 0; i < t.Config.UserCommandCheckMaxIterations; i++ {
+		time.Sleep(time.Duration(t.Config.ForkSlot) * time.Second)
+
+		userCmds, err := t.Client.BlocksWithUserCommands(port)
+		if err != nil {
+			t.Logger.Debug("Failed to get blocks with user commands: %v", err)
+			continue
+		}
+
+		if userCmds > 0 {
+			allBlocksEmpty = false
+			break
+		}
+	}
+
+	if allBlocksEmpty {
+		t.Logger.Error("Assertion failed: all blocks in fork chain are empty %s", "")
+		return fmt.Errorf("all blocks in fork chain are empty")
+	}
+
+	return nil
+}

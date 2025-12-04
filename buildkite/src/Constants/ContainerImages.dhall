@@ -2,19 +2,33 @@
 -- NOTE: minaToolchain is the default image for various jobs, set to minaToolchainBullseye
 -- NOTE: minaToolchainBullseye is also used for building Ubuntu Focal packages in CI
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
-{ toolchainBase = "codaprotocol/ci-toolchain-base:v3"
+{ toolchainBase =
+    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/codaprotocol/ci-toolchain-base:v3"
 , minaToolchainBookworm =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:33275bbe44bb8e5b2678d1482705f964df3b37e2540a43ef9a1d92433b795f83"
+    { amd64 =
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:f92c6f2dde5d38f0c245e58c3c462fd17d311cf1020275e0a935175377c9bb82"
+    , arm64 =
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:87aacba132ae682e82f7f3edac7764a3fef0613e64e7f219e6f1085171643b91"
+    }
 , minaToolchainBullseye =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:3b17e388d8974fdbe4bbd5f77315519763c78148a4c91434d9add62de87ab792"
+    { amd64 =
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:f78963ea2e89e855f5e3b8de614a061e4c1ffc6c1c5c0b68d6c9e6329bf581c9"
+    , arm64 =
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:e52f6d919ed66aa94e3c9d5965ffc348be5082b1be4a34fcc85c6344f3c545a8"
+    }
 , minaToolchainNoble =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:4a2483e94a4bcf03b82e511a4f1ef926659b3c6c42e31e03c0b9765a12225ac1"
-, minaToolchainJammy =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:78486314cf93bafb7e5f8f8be92ade269ad94c311cb9a92fb4b0bcaf0348c385"
+    { amd64 =
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:967431a014fbdf0d9d0628c37536575c9d018a7cbf91fab0c8da178127b74093"
+    , arm64 =
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:e260ad8dc428e33aa677db1f81cc612f47922a754deee3706d96a62dae9d82dc"
+    }
+, minaToolchainJammy.amd64 =
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:e404a57828330a6f9ff673c6e76ebd1d2e9175c1b4b594399dd3b238ddf960a1"
 , minaToolchain =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:3b17e388d8974fdbe4bbd5f77315519763c78148a4c91434d9add62de87ab792"
-, postgres = "postgres:12.4-alpine"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:f78963ea2e89e855f5e3b8de614a061e4c1ffc6c1c5c0b68d6c9e6329bf581c9"
+, postgres =
+    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/postgres:12.4-alpine"
 , xrefcheck =
-    "dkhamsing/awesome_bot@sha256:a8adaeb3b3bd5745304743e4d8a6d512127646e420544a6d22d9f58a07f35884"
+    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/dkhamsing/awesome_bot:latest"
 , nixos = "gcr.io/o1labs-192920/nix-unstable:1.0.0"
 }

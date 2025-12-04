@@ -2,8 +2,8 @@
 # The "build-deps" stage
 # - Installs all compilers/interpreters, tools, and OS packages on the given debian or ubuntu image
 #################################################################################################
-# Supports debian:bullseye-slim, and ubuntu:focal
-ARG image=ubuntu:focal
+# Supports europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim, and europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
+ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
 # Use the image argument to select the base image for this stage
 # This allows us to use the same Dockerfile for different base images
 # This arg is defined here globally and does not need to be redefined in
@@ -11,6 +11,23 @@ ARG image=ubuntu:focal
 ARG deb_codename
 
 FROM ${image} AS build-deps
+
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
+# Unfortunately we cannot use the same naming convention for all architectures
+# for all tooling, therefore we need to define couple of naming conventions
+
+# Canonical style naming convention
+# : aarch/x86_64
+ARG CANONICAL_ARCH
+# Debian style naming convention
+# : arm64/amd64
+ARG DEBIAN_ARCH
+
+# We need to define the target architecture as it is still different from CANONICAL_ARCH
+# For example: Canonical names are aarch64/x86_64 while TARGETARCH: aarch64/amd64
+ARG TARGETARCH
 
 # OCaml Version
 # The version must be the same as the version used in:
@@ -28,6 +45,7 @@ ARG OPAM_VERSION=2.3.0
 #   `nix flake update opam-repository`).
 # - scripts/update_opam_switch.sh
 ARG OPAM_REPOSITORY_COMMIT=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
+ARG O1LABS_OPAM_REPOSITORY_COMMIT=dd90c5c72b7b7caeca3db3224b2503924deea08a
 
 # Golang version number used to detemine tarball name
 ARG GO_VERSION=1.19.11
@@ -76,6 +94,7 @@ RUN apt-get update --quiet \
   git-lfs \
   m4 \
   pkg-config \
+  rocksdb-tools \
   rsync \
   sudo \
   unzip \
@@ -100,13 +119,13 @@ RUN git config --global advice.detachedHead false
 
 # --- Opam install of a given OPAM_VERSION from github release
 RUN curl -sL \
-  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-x86_64-linux" \
+  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-${DEBIAN_ARCH}-linux" \
   -o /usr/bin/opam \
   && chmod +x /usr/bin/opam
 
 # --- Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
+RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" | tar -xz -C /usr/lib/
 
 # --- Rust install via rustup-init to a given RUST_VERSION
 # --- Additionally, install RUST_NIGHTLY via rustup
@@ -118,7 +137,7 @@ RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar 
 USER opam
 RUN curl --proto "=https" \
   --tlsv1.2 -sSf -o /tmp/rustup-init \
-  https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init \
+  https://static.rust-lang.org/rustup/dist/${CANONICAL_ARCH}-unknown-linux-gnu/rustup-init \
   && chmod +x /tmp/rustup-init \
   && /tmp/rustup-init -y --default-toolchain \
     "${RUST_VERSION}" \
@@ -172,10 +191,12 @@ RUN opam init --disable-sandboxing \
     -k git \
     -a /home/opam/opam-repository \
     --bare
+# We pin the opam-repo SHA so this step gets 
+# cache-busted when we update the opam repo
 RUN opam repository add --yes \
     --all \
     --set-default o1-labs \
-    https://github.com/o1-labs/opam-repository.git \
+    https://github.com/o1-labs/opam-repository.git#${O1LABS_OPAM_REPOSITORY_COMMIT} \
   && opam switch create "${OCAML_VERSION}${OCAML_REVISION}" \
     "${OCAML_PACKAGE}${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}" \
   && opam switch "${OCAML_VERSION}${OCAML_REVISION}"

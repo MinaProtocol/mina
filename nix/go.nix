@@ -5,6 +5,27 @@
 # in libp2p libraries, and we'd need to update these libraries in
 # order to use a higher version
 
+let
+  goHashes = final: name:
+    let
+      hashes = final.lib.importJSON ./go-hashes/${name}.json;
+      # sanity check, to make sure the fixed output drv doesn't keep working
+      # when the inputs change
+    in if builtins.hashFile "sha256" ../src/app/${name}/src/go.mod
+    == hashes."go.mod"
+    && builtins.hashFile "sha256" ../src/app/${name}/src/go.sum
+    == hashes."go.sum" then
+      hashes.vendorSha256
+    else
+      final.lib.warn ''
+        Below, you will find an error about a hash mismatch.
+        This is likely because you have updated go.mod and/or go.sum in ${name}.
+        Please, locate the "got: " hash in the aforementioned error. If it's in SRI format ([35;1msha256-<...>[31;1m), copy the entire hash, including the `[35;1msha256-[31;1m'. Otherwise (if it's in the base32 format, like `[35;1msha256:<...>[31;1m'), copy only the base32 part, without `[35;1msha256:[31;1m'.
+        Then, run [37;1m./nix/update-go-hashes.sh ${name} [35;1m"<got hash here>"[31;0m
+      '' final.lib.fakeHash;
+
+in
+
 final: prev: {
   vend = final.callPackage ./vend { };
 
@@ -43,22 +64,7 @@ final: prev: {
     version = "0.1";
     src = ../src/app/libp2p_helper/src;
     doCheck = false; # TODO: tests hang
-    vendorHash = let
-      hashes = final.lib.importJSON ./libp2p_helper.json;
-      # sanity check, to make sure the fixed output drv doesn't keep working
-      # when the inputs change
-    in if builtins.hashFile "sha256" ../src/app/libp2p_helper/src/go.mod
-    == hashes."go.mod"
-    && builtins.hashFile "sha256" ../src/app/libp2p_helper/src/go.sum
-    == hashes."go.sum" then
-      hashes.vendorSha256
-    else
-      final.lib.warn ''
-        Below, you will find an error about a hash mismatch.
-        This is likely because you have updated go.mod and/or go.sum in libp2p_helper.
-        Please, locate the "got: " hash in the aforementioned error. If it's in SRI format ([35;1msha256-<...>[31;1m), copy the entire hash, including the `[35;1msha256-[31;1m'. Otherwise (if it's in the base32 format, like `[35;1msha256:<...>[31;1m'), copy only the base32 part, without `[35;1msha256:[31;1m'.
-        Then, run [37;1m./nix/update-libp2p-hashes.sh [35;1m"<got hash here>"[31;0m
-      '' final.lib.fakeHash;
+    vendorHash = goHashes final "libp2p_helper";
     NO_MDNS_TEST = 1; # no multicast support inside the nix sandbox
     overrideModAttrs = n: {
       # Yo dawg
@@ -97,5 +103,18 @@ final: prev: {
       sha256 = "sha256-3Lk5pa6fAeHGCmDjhaUjUoASxN6ozTD9e2+0wDH7hGs=";
     };
     vendorHash = "sha256-lCBAsCNtorEu0WRZRLEMEaNyjtVIdJSAZg3icrpHIsQ=";
+  };
+  
+  # Hardfork test application
+  hardfork_test = final.buildGoModule {
+    pname = "hardfork_test";
+    version = "0.1.0";
+    src = ../src/app/hardfork_test/src;
+    # Completely skip vendoring and let go download dependencies
+    vendorHash = goHashes final "hardfork_test";
+    # Set the output binary name to hardfork_test
+    postInstall = ''
+      mv $out/bin/cmd $out/bin/hardfork_test
+    '';
   };
 }

@@ -3,6 +3,7 @@
 
 (package (name allocation_functor))
 (package (name archive))
+(package (name archive_hardfork_toolbox))
 (package (name archive_blocks))
 (package (name archive_lib))
 (package (name base58_check))
@@ -119,6 +120,7 @@
 (package (name mina_wire_types))
 (package (name missing_blocks_auditor))
 (package (name monad_lib))
+(package (name multi_key_file_storage))
 (package (name network_peer))
 (package (name network_pool))
 (package (name node_addrs_and_ports))
@@ -159,6 +161,7 @@
 (package (name random_oracle))
 (package (name replayer))
 (package (name rocksdb))
+(package (name rocksdb_scanner))
 (package (name rosetta_coding))
 (package (name rosetta_lib))
 (package (name rosetta_models))

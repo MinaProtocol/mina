@@ -81,6 +81,8 @@ let setup (type n) ~context:(module Context : CONTEXT)
       let consensus_local_state = consensus_local_state
 
       let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
+      let signature_kind = Mina_signature_kind.Testnet
     end )
   in
   let config rpc_mocks peer =
@@ -238,6 +240,7 @@ module Generator = struct
         ~epoch_ledger_location
         ~genesis_state_hash:
           precomputed_values.protocol_state_with_hashes.hash.state_hash
+        ~epoch_ledger_backing_type:Stable_db
     in
     let%map frontier =
       Transition_frontier.For_tests.gen ~precomputed_values ~verifier
@@ -280,6 +283,7 @@ module Generator = struct
         ~epoch_ledger_location
         ~genesis_state_hash:
           precomputed_values.protocol_state_with_hashes.hash.state_hash
+        ~epoch_ledger_backing_type:Stable_db
     in
     let%map frontier, branch =
       Transition_frontier.For_tests.gen_with_branch ~precomputed_values

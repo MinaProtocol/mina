@@ -32,6 +32,7 @@ function usage() {
   echo "      --deb-profile         The profile string for the debian package to install"
   echo "      --deb-build-flags     The build-flags string for the debian package to install"
   echo "      --deb-suffix          The debian suffix to use for the docker image"
+  echo "  -p, --platform            The target platform for the docker build (e.g. linux/amd64). Default=linux/amd64"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -45,6 +46,8 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -b|--branch) INPUT_BRANCH="$2"; shift;;
   -c|--cache-from) INPUT_CACHE="$2"; shift;;
   -r|--repo) MINA_REPO="$2"; shift;;
+  -p|--platform) INPUT_PLATFORM="$2"; shift;;
+  --docker-registry) export DOCKER_REGISTRY="$2"; shift;;
   --no-cache) NO_CACHE="--no-cache"; ;;
   --deb-codename) INPUT_CODENAME="$2"; shift;;
   --deb-release) INPUT_RELEASE="$2"; shift;;
@@ -53,10 +56,10 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
-  --deb-suffix) 
+  --deb-suffix)
       # shellcheck disable=SC2034
       DOCKER_DEB_SUFFIX="--build-arg deb_suffix=$2"; shift;;
-  --deb-repo-key) 
+  --deb-repo-key)
       # shellcheck disable=SC2034
       DEB_REPO_KEY="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
@@ -96,6 +99,35 @@ if [[ -z "$INPUT_CODENAME" ]]; then
   DEB_CODENAME="--build-arg deb_codename=bullseye"
 fi
 
+if [[ -z "$INPUT_PLATFORM" ]]; then
+  INPUT_PLATFORM="linux/amd64"
+fi
+
+PLATFORM="--platform ${INPUT_PLATFORM}"
+
+# Unfortunately we cannot use the same naming convention for all architectures
+# for all tooling in toolchain or mina docker
+# therefore we need to define couple of naming conventions
+
+# Canonical style naming convention : aarch/x86_64
+# Debian style naming convention : arm64/amd64
+case "${INPUT_PLATFORM}" in
+      linux/amd64)
+        CANONICAL_ARCH="x86_64"
+        DEBIAN_ARCH="x86_64"
+        ;;
+      linux/arm64)
+        CANONICAL_ARCH="aarch64"
+        DEBIAN_ARCH="arm64"
+        ;;
+      *)
+        echo "unsupported platform"; exit 1
+        ;;
+esac
+CANONICAL_ARCH_ARG="--build-arg CANONICAL_ARCH=$CANONICAL_ARCH"
+DEBIAN_ARCH_ARG="--build-arg DEBIAN_ARCH=$DEBIAN_ARCH"
+DOCKER_REPO_ARG="--build-arg DOCKER_REPO=$DOCKER_REGISTRY"
+
 DEB_RELEASE="--build-arg deb_release=$INPUT_RELEASE"
 if [[ -z "$INPUT_RELEASE" ]]; then
   echo "Debian release is not set. Using the default (unstable)"
@@ -123,9 +155,15 @@ if [[ -z "$INPUT_CACHE" ]]; then
 fi
 
 DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
+GW=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')
+LOCALHOST_REPLACEMENT=$GW
 if [[ -z "$INPUT_REPO" ]]; then
-  echo "Debian repository is not set. Using the default (http://localhost:8080)"
-  DEB_REPO="--build-arg deb_repo=http://localhost:8080"
+  echo "Debian repository is not set. Using the default (http://$LOCALHOST_REPLACEMENT:8080)"
+  DEB_REPO="--build-arg deb_repo=http://$LOCALHOST_REPLACEMENT:8080"
+else
+  echo "Converting localhost to $LOCALHOST_REPLACEMENT in repository URL"
+  CONVERTED_REPO=$(echo "$INPUT_REPO" | sed "s/localhost/$LOCALHOST_REPLACEMENT/g")
+  DEB_REPO="--build-arg deb_repo=$CONVERTED_REPO"
 fi
 
 if [[ $(echo "${VALID_SERVICES[@]}" | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
@@ -211,13 +249,14 @@ esac
 export_version
 export_docker_tag
 
-BUILD_NETWORK="--network=host"
+BUILD_NETWORK="--allow=network.host"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
+  cat $DOCKERFILE_PATH | docker buildx build  --network=host \
+  --load --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
 else
-  docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
+  docker buildx build --load --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."

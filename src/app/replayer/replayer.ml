@@ -671,7 +671,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
           Genesis_ledger_helper.Ledger.load ~proof_level
             ~genesis_dir:
               (Option.value ~default:Cache_dir.autogen_path genesis_dir_opt)
-            ~logger ~constraint_constants input.genesis_ledger
+            ~logger ~constraint_constants ~genesis_backing_type:Stable_db
+            input.genesis_ledger
         with
         | Error e ->
             [%log fatal]

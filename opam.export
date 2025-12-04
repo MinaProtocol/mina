@@ -1,17 +1,5 @@
 opam-version: "2.0"
-# The version must be the same as the version used in:
-# - dockerfiles/1-build-deps
-# - opam.export
-# - scripts/update_opam_switch.sh
-compiler: [
-  "base-bigarray.base"
-  "base-threads.base"
-  "base-unix.base"
-  "ocaml.4.14.2"
-  "ocaml-base-compiler.4.14.2"
-  "ocaml-config.2"
-  "ocaml-options-vanilla.1"
-]
+compiler: ["ocaml-base-compiler.4.14.2"]
 roots: [
   "alcotest.1.1.0"
   "alcotest-async.1.1.0"
@@ -48,8 +36,8 @@ roots: [
   "qcheck.0.20"
   "qcheck-alcotest.0.20"
   "re2.v0.14.0"
-  "rocks.0.1.1"
-  "rocksdb_stubs.5.17.2"
+  "rocks.0.2.0"
+  "rocksdb_stubs.10.5.1"
   "rpc_parallel.v0.14.0"
   "sexp_diff_kernel.v0.14.0"
   "sodium.dev"
@@ -65,7 +53,7 @@ installed: [
   "async.v0.14.0"
   "async_kernel.v0.14.0"
   "async_rpc_kernel.v0.14.0"
-  "async_ssl.v0.14.0"
+  "async_ssl.v0.14.0-o1labs"
   "async_unix.v0.14.0"
   "base.v0.14.3"
   "base-bigarray.base"
@@ -103,6 +91,7 @@ installed: [
   "conf-libffi.2.0.0"
   "conf-libssl.4"
   "conf-m4.1"
+  "conf-openssl.2"
   "conf-perl.2"
   "conf-pkg-config.4"
   "conf-postgresql.2"
@@ -180,7 +169,7 @@ installed: [
   "num.1.1"
   "ocaml.4.14.2"
   "ocaml-base-compiler.4.14.2"
-  "ocaml-compiler-libs.v0.12.3"
+  "ocaml-compiler-libs.v0.12.4"
   "ocaml-config.2"
   "ocaml-migrate-parsetree.2.3.0"
   "ocaml-options-vanilla.1"
@@ -249,8 +238,8 @@ installed: [
   "react.1.2.1"
   "res.5.0.1"
   "result.1.5"
-  "rocks.0.1.1"
-  "rocksdb_stubs.5.17.2"
+  "rocks.0.2.0"
+  "rocksdb_stubs.10.5.1"
   "rpc_parallel.v0.14.0"
   "rresult.0.6.0"
   "seq.base"
