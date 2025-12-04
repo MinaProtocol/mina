@@ -16,6 +16,8 @@ let command
                   }
                   arch
 
-          in  Cmd.runInDocker Cmd.Docker::{ image = image } fixPermissionsScript
+          in  Cmd.runInDocker
+                Cmd.Docker::{ image = image, platform = Arch.platform arch }
+                fixPermissionsScript
 
 in  { command = command }
