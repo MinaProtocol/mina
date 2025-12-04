@@ -78,6 +78,30 @@ module Transaction_with_witness = struct
               Mina_numbers.Global_slot_since_genesis.Stable.V1.t
           }
 
+        let of_latest_exn : V3.t -> t =
+         fun { state_hash
+             ; statement
+             ; init_stack
+             ; first_pass_ledger_witness
+             ; second_pass_ledger_witness
+             ; block_global_slot
+             ; transaction_applied_tag
+             ; _
+             } ->
+          { transaction_with_info =
+              State_hash.File_storage.read
+                (module Mina_transaction_logic.Transaction_applied.Stable.V2)
+                transaction_applied_tag
+              |> Or_error.tag ~tag:"of_latest_exn"
+              |> Or_error.ok_exn
+          ; state_hash
+          ; statement
+          ; init_stack = Base init_stack
+          ; first_pass_ledger_witness
+          ; second_pass_ledger_witness
+          ; block_global_slot
+          }
+
         let to_latest : State_hash.File_storage.writer_t -> t -> V3.t =
          fun writer
              { transaction_with_info
@@ -562,6 +586,22 @@ module Stable = struct
           * [ `Border_block_continued_in_the_next_tree of bool ]
       }
 
+    let of_latest_exn : V3.t -> t =
+      let f1 =
+        Ledger_proof_with_sok_message.read_tag_exn ~error_tag:"v3 -> v2"
+      in
+      let f2 w =
+        Transaction_with_witness.read_tag_exn ~error_tag:"v3 -> v2" w
+        |> Transaction_with_witness.Stable.V2.of_latest_exn
+      in
+      fun { scan_state
+          ; previous_incomplete_zkapp_updates = updates, continue_in_next_tree
+          } ->
+        { scan_state = Parallel_scan.State.map scan_state ~f1 ~f2
+        ; previous_incomplete_zkapp_updates =
+            (List.map updates ~f:f2, continue_in_next_tree)
+        }
+
     let to_latest : t -> V3.t =
      fun { scan_state
          ; previous_incomplete_zkapp_updates = updates, continue_in_next_tree
@@ -596,11 +636,33 @@ module Stable = struct
           ; previous_incomplete_zkapp_updates =
               (List.map updates ~f:f2, continue_in_next_tree)
           } )
+
+    let hash (t : t) =
+      hash_generic t.scan_state t.previous_incomplete_zkapp_updates
+        ~serialize_ledger_proof_with_sok_message:
+          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
+        ~serialize_transaction_with_witness:
+          (Binable.to_string (module Transaction_with_witness.Stable.V2))
+
+    let serialize_ledger_proof_with_sok_message_tagged =
+      Fn.compose
+        (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
+      @@ Ledger_proof_with_sok_message.read_tag_exn
+           ~error_tag:"scan state hashing"
+
+    let serialize_transaction_with_witness_tagged w =
+      Binable.to_string (module Transaction_with_witness.Stable.V2)
+      @@ Transaction_with_witness.Stable.V2.of_latest_exn
+      @@ Transaction_with_witness.read_tag_exn ~error_tag:"scan state hashing" w
   end
 end]
 
-(* Caution !!!: Don't merge to `compatible`, this is incompatible with the Berkeley network *)
-let hash : t -> _ = Stable.Latest.hash
+let hash t =
+  hash_generic t.scan_state t.previous_incomplete_zkapp_updates
+    ~serialize_ledger_proof_with_sok_message:
+      Stable.V2.serialize_ledger_proof_with_sok_message_tagged
+    ~serialize_transaction_with_witness:
+      Stable.V2.serialize_transaction_with_witness_tagged
 
 (**********Helpers*************)
 

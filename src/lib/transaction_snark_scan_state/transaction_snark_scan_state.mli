@@ -16,6 +16,10 @@ module Stable : sig
     type t
 
     val to_latest : t -> V3.t
+
+    val hash : t -> Staged_ledger_hash.Aux_hash.t
+
+    val of_latest_exn : V3.t -> t
   end
 end]
 
