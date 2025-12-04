@@ -50,7 +50,7 @@ func (t *HardforkTest) AnyPortOfType(ty PortType) int {
 	return candidates_ports[idx]
 }
 
-func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, extraArgs []string) (*exec.Cmd, error) {
+func (t *HardforkTest) startLocalNetwork(minaExecutable string, minaArchiveExecutable string, profile string, extraArgs []string) (*exec.Cmd, error) {
 
 	t.Logger.Info("Starting network %s...", profile)
 
@@ -84,6 +84,7 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 
 	cmd.Args = append(cmd.Args, extraArgs...)
 	cmd.Env = append(os.Environ(), "MINA_EXE="+minaExecutable)
+	cmd.Env = append(os.Environ(), "MINA_ARCHIVE_EXE="+minaArchiveExecutable)
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -105,7 +106,7 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 
 	mainGenesisTimestamp := config.FormatTimestamp(mainGenesisTs)
 
-	return t.startLocalNetwork(t.Config.MainMinaExe, "main", []string{
+	return t.startLocalNetwork(t.Config.MainMinaExe, t.Config.MainArchiveExe, "main", []string{
 		"--update-genesis-timestamp", fmt.Sprintf("fixed:%s", mainGenesisTimestamp),
 		"--config", "reset",
 		"--override-slot-time", strconv.Itoa(t.Config.MainSlot * 1000),
@@ -116,7 +117,7 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 
 // RunForkNetwork starts the fork network with hardfork configuration
 func (t *HardforkTest) RunForkNetwork(configFile, forkLedgersDir string) (*exec.Cmd, error) {
-	return t.startLocalNetwork(t.Config.ForkMinaExe, "fork", []string{
+	return t.startLocalNetwork(t.Config.ForkMinaExe, t.Config.ForkArchiveExe, "fork", []string{
 		"--update-genesis-timestamp", fmt.Sprintf("delay_sec:%d", t.Config.ForkDelay*60),
 		"--config", fmt.Sprintf("inherit_with:%s,%s", configFile, forkLedgersDir),
 		"--override-slot-time", strconv.Itoa(t.Config.ForkSlot * 1000)},
