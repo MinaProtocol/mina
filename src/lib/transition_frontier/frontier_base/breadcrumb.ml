@@ -386,7 +386,10 @@ let staged_ledger_aux_and_pending_coinbases_at_hash_compute
     ~f:(fun writer ->
       State_hash.File_storage.write_value writer
         (module Data)
-        (scan_state, merkle_root, pending_coinbase, protocol_states) )
+        ( Staged_ledger.Scan_state.Stable.V2.of_latest_exn scan_state
+        , merkle_root
+        , pending_coinbase
+        , protocol_states ) )
 
 let staged_ledger_aux_and_pending_coinbases ~scan_state_protocol_states
     breadcrumb :

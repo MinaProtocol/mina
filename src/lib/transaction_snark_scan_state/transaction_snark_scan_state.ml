@@ -36,13 +36,15 @@ module Transaction_with_witness = struct
           ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
           ; block_global_slot :
               Mina_numbers.Global_slot_since_genesis.Stable.V1.t
-                (* TODO: in Mesa remove the option, just have the value *)
           ; previous_protocol_state_body_opt :
               Mina_state.Protocol_state.Body.Value.Stable.V2.t option
+                (* TODO: in Mesa remove the option, just have the value *)
           ; transaction_applied_tag :
               ( State_hash.Stable.V1.t
               , Mina_transaction_logic.Transaction_applied.Stable.V2.t )
               Multi_key_file_storage.Tag.Stable.V1.t
+                (* TODO: in Mesa remove the field, after modifying
+                   network synchronization and hash computation *)
           }
 
         let transaction_type t =
@@ -545,7 +547,6 @@ let hash_generic ~serialize_ledger_proof_with_sok_message
    the snarked ledger*)
 [%%versioned
 module Stable = struct
-  (* Caution !!!: Don't merge to `compatible`, this is incompatible with the Berkeley network *)
   module V3 = struct
     type t =
       { scan_state :
@@ -556,21 +557,6 @@ module Stable = struct
           Transaction_with_witness.Tagged.Stable.V1.t list
           * [ `Border_block_continued_in_the_next_tree of bool ]
       }
-
-    (* Caution !!!: Don't merge to `compatible`, this is incompatible with the Berkeley network *)
-    let hash (t : t) =
-      hash_generic t.scan_state t.previous_incomplete_zkapp_updates
-        ~serialize_ledger_proof_with_sok_message:
-          ( Fn.compose
-              (Binable.to_string
-                 (module Ledger_proof_with_sok_message.Stable.V2) )
-          @@ Ledger_proof_with_sok_message.read_tag_exn
-               ~error_tag:"scan state hashing" )
-        ~serialize_transaction_with_witness:
-          ( Fn.compose
-              (Binable.to_string (module Transaction_with_witness.Stable.V3))
-          @@ Transaction_with_witness.read_tag_exn
-               ~error_tag:"scan state hashing" )
 
     let to_latest = Fn.id
   end
