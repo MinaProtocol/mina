@@ -96,15 +96,12 @@ let handle_result ~logger ~shutdown_on_disconnect daemon_address
       result_without_spec ()
   with
   | Error e when retry_count <= 0 ->
-      [%log error]
-        !"Work submission failed after all retries. Work rejected: \
-          %{sexp:Error.t}"
-        e ;
+      [%log error] "Work submission failed after all retries. Work rejected"
+        ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
       return `No_spec
   | Error e ->
-      [%log error]
-        !"Error submitting work (retries remaining: %d): %{sexp:Error.t}"
-        retry_count e ;
+      [%log error] "Error submitting work (retries remaining: %d)" retry_count
+        ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
       let%map () = after @@ Time.Span.of_sec @@ retry_pause retry_delay in
       let retry_delay = retry_delay *. 1.5 in
       `Result
@@ -139,7 +136,8 @@ let handle_failed ~logger ~shutdown_on_disconnect daemon_address e
     | Ok () ->
         ()
   in
-  [%log error] !"Error performing work: %{sexp:Error.t}" e ;
+  [%log error] "Error performing work"
+    ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
   after @@ Time.Span.of_sec @@ retry_pause 10. >>| const `No_spec
 
 (** Handle the `Spec case - processes new SNARK work specifications.
@@ -195,7 +193,8 @@ let handle_no_spec ~logger ~shutdown_on_disconnect default_daemon_address =
       daemon_address
   with
   | Error e ->
-      [%log error] !"Error getting work: %{sexp:Error.t}" e ;
+      [%log error] "Error getting work: "
+        ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
       after @@ Time.Span.of_sec @@ retry_pause 10. >>| const `No_spec
   | Ok None ->
       let random_delay =
