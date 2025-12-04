@@ -587,6 +587,7 @@ module T = struct
       ; statement
       ; block_global_slot = global_slot
       ; previous_protocol_state_body_opt = None
+      ; transaction_applied_or_tag = First applied_txn
       }
     , Mina_transaction_logic.Transaction_applied.new_accounts applied_txn )
 

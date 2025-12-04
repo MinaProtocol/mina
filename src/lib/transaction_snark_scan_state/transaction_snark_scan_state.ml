@@ -32,20 +32,29 @@ module Transaction_with_witness = struct
           ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
           ; statement : Transaction_snark.Statement.Stable.V2.t
           ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
-          ; first_pass_ledger_witness :
-              (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
-          ; second_pass_ledger_witness :
-              (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+          ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
+          ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
           ; block_global_slot :
               Mina_numbers.Global_slot_since_genesis.Stable.V1.t
                 (* TODO: in Mesa remove the option, just have the value *)
           ; previous_protocol_state_body_opt :
               Mina_state.Protocol_state.Body.Value.Stable.V2.t option
+          ; transaction_applied_tag :
+              ( State_hash.Stable.V1.t
+              , Mina_transaction_logic.Transaction_applied.Stable.V2.t )
+              Multi_key_file_storage.Tag.Stable.V1.t
           }
 
         let transaction_type t =
           Transaction_type.of_transaction
             (With_status.data t.transaction_with_status)
+
+        let mk_transaction_applied_tag writer
+            (transaction_applied :
+              Mina_transaction_logic.Transaction_applied.Stable.V2.t ) =
+          State_hash.File_storage.write_value writer
+            (module Mina_transaction_logic.Transaction_applied.Stable.V2)
+            transaction_applied
 
         let to_latest = Fn.id
       end
@@ -63,16 +72,15 @@ module Transaction_with_witness = struct
               Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable
               .V1
               .t
-          ; first_pass_ledger_witness :
-              (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
-          ; second_pass_ledger_witness :
-              (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+          ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
+          ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
           ; block_global_slot :
               Mina_numbers.Global_slot_since_genesis.Stable.V1.t
           }
 
-        let to_latest : t -> V3.t =
-         fun { transaction_with_info
+        let to_latest : State_hash.File_storage.writer_t -> t -> V3.t =
+         fun writer
+             { transaction_with_info
              ; state_hash
              ; statement
              ; init_stack
@@ -95,6 +103,10 @@ module Transaction_with_witness = struct
           ; second_pass_ledger_witness
           ; block_global_slot
           ; previous_protocol_state_body_opt = None
+          ; transaction_applied_tag =
+              State_hash.File_storage.write_value writer
+                (module Mina_transaction_logic.Transaction_applied.Stable.V2)
+                transaction_with_info
           }
       end
     end]
@@ -109,6 +121,11 @@ module Transaction_with_witness = struct
       ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
       ; previous_protocol_state_body_opt :
           Mina_state.Protocol_state.Body.Value.t option
+      ; transaction_applied_or_tag :
+          ( Mina_transaction_logic.Transaction_applied.t
+          , Mina_transaction_logic.Transaction_applied.Stable.V2.t
+            State_hash.File_storage.tag )
+          Either.t
       }
 
     let source_second_pass_ledger t = t.statement.source.second_pass_ledger
@@ -201,6 +218,7 @@ module Transaction_with_witness = struct
       ; second_pass_ledger_witness
       ; block_global_slot
       ; previous_protocol_state_body_opt
+      ; transaction_applied_tag
       } =
     { transaction_with_status =
         With_status.map
@@ -215,9 +233,10 @@ module Transaction_with_witness = struct
     ; second_pass_ledger_witness
     ; block_global_slot
     ; previous_protocol_state_body_opt
+    ; transaction_applied_or_tag = Either.Second transaction_applied_tag
     }
 
-  let read_all_proofs_from_disk
+  let read_all_proofs_from_disk writer
       { transaction_with_status
       ; state_hash
       ; statement
@@ -226,6 +245,7 @@ module Transaction_with_witness = struct
       ; second_pass_ledger_witness
       ; block_global_slot
       ; previous_protocol_state_body_opt
+      ; transaction_applied_or_tag
       } =
     { Stable.Latest.transaction_with_status =
         With_status.map ~f:Transaction.read_all_proofs_from_disk
@@ -237,6 +257,14 @@ module Transaction_with_witness = struct
     ; second_pass_ledger_witness
     ; block_global_slot
     ; previous_protocol_state_body_opt
+    ; transaction_applied_tag =
+        ( match transaction_applied_or_tag with
+        | First data ->
+            Stable.V3.mk_transaction_applied_tag writer
+            @@ Mina_transaction_logic.Transaction_applied
+               .read_all_proofs_from_disk data
+        | Second tag ->
+            tag )
     }
 
   let persist_many witnesses writer =
@@ -244,7 +272,7 @@ module Transaction_with_witness = struct
     let write_witness = FS.write_value writer (module Stable.Latest) in
     let write_witness' witness =
       (* TODO remove read_all_proofs_from_disk *)
-      let stable = read_all_proofs_from_disk witness in
+      let stable = read_all_proofs_from_disk writer witness in
       Tagged.create ~tag:(write_witness stable) stable
     in
     List.map ~f:write_witness' witnesses
@@ -351,6 +379,7 @@ module Available_job = struct
                           ; init_stack
                           ; block_global_slot
                           ; previous_protocol_state_body_opt
+                          ; transaction_applied_tag = _
                           } =
           Transaction_with_witness.read_tag tagged_witness
         in
@@ -553,7 +582,9 @@ module Stable = struct
               ~statement
           in
           let f2 witness =
-            let stable = Transaction_with_witness.Stable.V2.to_latest witness in
+            let stable =
+              Transaction_with_witness.Stable.V2.to_latest writer witness
+            in
             let tag =
               State_hash.File_storage.write_value writer
                 (module Transaction_with_witness.Stable.V3)
@@ -584,6 +615,7 @@ let create_expected_statement ~constraint_constants
     ; statement
     ; block_global_slot
     ; previous_protocol_state_body_opt
+    ; transaction_applied_or_tag = _
     } =
   let open Or_error.Let_syntax in
   let source_first_pass_merkle_root =

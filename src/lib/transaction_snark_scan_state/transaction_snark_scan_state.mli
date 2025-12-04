@@ -32,8 +32,6 @@ module Transaction_with_witness : sig
 
     module V2 : sig
       type t
-
-      val to_latest : t -> V3.t
     end
   end]
 
@@ -69,6 +67,11 @@ module Transaction_with_witness : sig
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     ; previous_protocol_state_body_opt :
         Mina_state.Protocol_state.Body.Value.t option
+    ; transaction_applied_or_tag :
+        ( Mina_transaction_logic.Transaction_applied.t
+        , Mina_transaction_logic.Transaction_applied.Stable.V2.t
+          State_hash.File_storage.tag )
+        Either.t
     }
 
   val persist_many : t list -> State_hash.File_storage.writer_t -> Tagged.t list

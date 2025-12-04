@@ -69,6 +69,7 @@ let verification_key =
 let applied = Mina_base.Transaction_status.Applied
 
 let mk_scan_state_base_node (transaction : Mina_transaction.Transaction.t)
+    (varying_applied : Mina_transaction_logic.Transaction_applied.Varying.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) :
     Transaction_snark_scan_state.Transaction_with_witness.t Parallel_scan.Base.t
     =
@@ -115,6 +116,7 @@ let mk_scan_state_base_node (transaction : Mina_transaction.Transaction.t)
                acct ) ) ;
       !ledger
     in
+    let previous_hash = get Mina_base.Ledger_hash.gen in
     let job : Transaction_snark_scan_state.Transaction_with_witness.t =
       { transaction_with_status = { status = applied; data = transaction }
       ; state_hash = (state_hash, state_body_hash)
@@ -125,6 +127,8 @@ let mk_scan_state_base_node (transaction : Mina_transaction.Transaction.t)
       ; block_global_slot =
           Mina_numbers.Global_slot_since_genesis.zero (* TODO: add a value *)
       ; previous_protocol_state_body_opt = None
+      ; transaction_applied_or_tag =
+          First { previous_hash; varying = varying_applied }
       }
     in
     let record : _ Parallel_scan.Base.Record.t =
@@ -140,7 +144,14 @@ let scan_state_base_node_coinbase =
       ~receiver:sample_pk_compressed ~fee_transfer:None
     |> Or_error.ok_exn
   in
-  mk_scan_state_base_node (Coinbase coinbase)
+  let applied =
+    Mina_transaction_logic.Transaction_applied.Varying.Coinbase
+      { coinbase = Mina_base.With_status.{ data = coinbase; status = Applied }
+      ; new_accounts = []
+      ; burned_tokens = Currency.Amount.zero
+      }
+  in
+  mk_scan_state_base_node (Coinbase coinbase) applied
 
 let scan_state_base_node_payment =
   let payload : Mina_base.Signed_command_payload.t =
@@ -165,9 +176,41 @@ let scan_state_base_node_payment =
     { payload; signer = sample_pk; signature = Mina_base.Signature.dummy }
   in
   mk_scan_state_base_node (Command (Signed_command user_command))
+    (Command
+       (Signed_command
+          { common =
+              { user_command = { data = user_command; status = Applied } }
+          ; body = Payment { new_accounts = [] }
+          } ) )
 
 let scan_state_base_node_zkapp ~zkapp_command =
-  mk_scan_state_base_node (Command (Zkapp_command zkapp_command))
+  let varying : Mina_transaction_logic.Transaction_applied.Varying.t =
+    let zkapp_command_applied :
+        Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.t =
+      let accounts =
+        (* fudge: the `accounts` calculation is more complex; see `apply_zkapp_command_unchecked_aux`
+           also, we're using the same account repeatedly
+        *)
+        let accessed =
+          Mina_base.Zkapp_command.account_access_statuses zkapp_command applied
+          |> List.filter_map ~f:(fun (acct_id, accessed) ->
+                 match accessed with
+                 | `Accessed ->
+                     Some acct_id
+                 | `Not_accessed ->
+                     None )
+        in
+        List.map accessed ~f:(fun acct_id -> (acct_id, Some account))
+      in
+      let command =
+        Mina_base.With_status.{ data = zkapp_command; status = applied }
+      in
+      let new_accounts = [] in
+      { accounts; command; new_accounts }
+    in
+    Command (Zkapp_command zkapp_command_applied)
+  in
+  mk_scan_state_base_node (Command (Zkapp_command zkapp_command)) varying
 
 let scan_state_merge_node :
     Transaction_snark_scan_state.Ledger_proof_with_sok_message.t
