@@ -34,31 +34,32 @@ if [[ ! -e "$LEDGER_TARBALLS_FULL" ]]; then
 fi
 
 # Step 1: Replace runtime config
-./scripts/debian/replace-entry.sh "$DEB_FILE" /var/lib/coda/config_*.json "$RUNTIME_CONFIG_JSON"
+PATCHED_DEB="${DEB_FILE%.deb}-patched.deb"
+./scripts/debian/replace-entry.sh "$DEB_FILE" /var/lib/coda/config_*.json "$RUNTIME_CONFIG_JSON" "$PATCHED_DEB"
 
 # Step 2: Insert ledger tarballs (operates on the patched deb from step 1)
-PATCHED_DEB="${DEB_FILE%.deb}-patched.deb"
-./scripts/debian/insert-entries.sh "$PATCHED_DEB" /var/lib/coda/ "$LEDGER_TARBALLS_FULL"
+FINAL_DEB="${DEB_FILE%.deb}-final.deb"
+./scripts/debian/insert-entries.sh "$PATCHED_DEB" /var/lib/coda/ "$LEDGER_TARBALLS_FULL" "$FINAL_DEB"
 
 
 # Step 4: Verify the final package
 echo ""
 echo "=== Verifying Final Package ==="
 
-if [[ ! -f "$PATCHED_DEB" ]]; then
-	echo "ERROR: Final package '$PATCHED_DEB' not found" >&2
+if [[ ! -f "$FINAL_DEB" ]]; then
+	echo "ERROR: Final package '$FINAL_DEB' not found" >&2
 	exit 1
 fi
 
 # Resolve absolute paths BEFORE changing directories
 ORIG_DIR=$(pwd)
-PATCHED_DEB_ABS=$(readlink -f "$PATCHED_DEB")
+FINAL_DEB_ABS=$(readlink -f "$FINAL_DEB")
 RUNTIME_CONFIG_ABS=$(readlink -f "$RUNTIME_CONFIG_JSON")
 LEDGER_TARBALLS_ABS=$(readlink -f "$LEDGER_TARBALLS_FULL")
 
-echo "Package size: $(ls -lh "$PATCHED_DEB" | awk '{print $5}')"
+echo "Package size: $(ls -lh "$FINAL_DEB" | awk '{print $5}')"
 # Quick file count check
-FILE_COUNT=$(dpkg-deb -c "$PATCHED_DEB_ABS" | grep -E "(config_.*\.json|.*ledger.*\.tar\.gz)" | wc -l)
+FILE_COUNT=$(dpkg-deb -c "$FINAL_DEB_ABS" | grep -E "(config_.*\.json|.*ledger.*\.tar\.gz)" | wc -l)
 echo "Files found (config + ledgers): $FILE_COUNT"
 
 # Count source ledger files
@@ -85,7 +86,7 @@ VERIFY_DIR=$(mktemp -d)
 trap 'rm -rf "$VERIFY_DIR"' EXIT
 
 cd "$VERIFY_DIR"
-ar x "$PATCHED_DEB_ABS"
+ar x "$FINAL_DEB_ABS"
 mkdir data
 tar -xzf data.tar.gz -C data
 
@@ -166,6 +167,7 @@ fi
 echo ""
 echo "=== Verification Complete ==="
 echo "All files verified successfully!"
-echo "Output: $PATCHED_DEB"
+echo "Output: $FINAL_DEB"
 
-mv "$PATCHED_DEB" "$DEB_FILE"
+mv "$FINAL_DEB" "$DEB_FILE"
+rm -f "$PATCHED_DEB"
