@@ -200,33 +200,6 @@ let read_all_proofs_for_work_single_spec =
     ~f_proof:Ledger_proof.Cached.read_proof_from_disk
     ~f_witness:Transaction_witness.read_all_proofs_from_disk
 
-let extract_terminal_zk_segment ~(m : (module Transaction_snark.S))
-    ~(witness : Transaction_witness.t) ~input ~zkapp_command ~staged_ledger_hash
-    =
-  let staged_ledger_hash = Staged_ledger_hash.ledger_hash staged_ledger_hash in
-  let witness = Transaction_witness.read_all_proofs_from_disk witness in
-  let%bind.Result final_segment =
-    Work_partitioner.Snark_worker_shared.extract_zkapp_segment_works ~m ~input
-      ~witness ~zkapp_command
-    |> Result.map_error
-         ~f:
-           Work_partitioner.Snark_worker_shared.Failed_to_generate_inputs
-           .error_of_t
-    |> Result.map ~f:(function x ->
-           Work_partitioner.Snark_worker_shared.Zkapp_command_inputs
-           .read_all_proofs_from_disk x
-           |> Mina_stdlib.Nonempty_list.find ~f:(function _, _, s ->
-                  Ledger_hash.(s.target.second_pass_ledger = staged_ledger_hash) ) )
-  in
-  match final_segment with
-  | Some (witness, spec, statement) ->
-      Ok (witness, statement, spec)
-  | _ ->
-      Error
-        ( Error.of_string
-        @@ sprintf "Failed to find zkapp segment with target hash %s"
-             (Ledger_hash0.to_base58_check staged_ledger_hash) )
-
 let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
     ~url ~snark_worker ~transition_frontier ~peer_id
     ~(submitter_keypair : Keypair.t) ~snark_work_fee ~graphql_control_port
@@ -366,12 +339,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                   | Transition (input, witness) -> (
                       match witness.transaction with
                       | Command (Zkapp_command zkapp_command) ->
-                          let%map.Result final_segment =
-                            extract_terminal_zk_segment
-                              ~m:(module T)
-                              ~witness ~input ~zkapp_command ~staged_ledger_hash
-                          in
-                          `Zk_app final_segment
+                          Ok (`Zk_app (input, witness, zkapp_command))
                       | Command (Signed_command _) | Fee_transfer _ | Coinbase _
                         ->
                           Ok (`Transaction single_spec) )
@@ -381,10 +349,16 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                 in
                 let work =
                   match s with
-                  | Ok (`Zk_app (witness, statement, spec)) ->
+                  | Ok (`Zk_app (input, witness, zkapp_command)) ->
+                      let zkapp_command =
+                        Zkapp_command.read_all_proofs_from_disk zkapp_command
+                      in
+                      let witness =
+                        Transaction_witness.read_all_proofs_from_disk witness
+                      in
                       make_interruptible
                       @@ Uptime_snark_worker.perform_partitioned snark_worker
-                           (witness, statement, spec)
+                           (witness, input, zkapp_command, staged_ledger_hash)
                   | Ok (`Transaction single_spec) ->
                       make_interruptible
                       @@ Uptime_snark_worker.perform_single snark_worker

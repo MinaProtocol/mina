@@ -8,6 +8,31 @@ open struct
   module Impl = Snark_worker.Impl
 end
 
+let extract_terminal_zk_segment ~(m : (module Transaction_snark.S)) ~witness
+    ~input ~zkapp_command ~staged_ledger_hash =
+  let staged_ledger_hash = Staged_ledger_hash.ledger_hash staged_ledger_hash in
+  let%bind.Result final_segment =
+    Work_partitioner.Snark_worker_shared.extract_zkapp_segment_works ~m ~input
+      ~witness ~zkapp_command
+    |> Result.map_error
+         ~f:
+           Work_partitioner.Snark_worker_shared.Failed_to_generate_inputs
+           .error_of_t
+    |> Result.map ~f:(function x ->
+           Work_partitioner.Snark_worker_shared.Zkapp_command_inputs
+           .read_all_proofs_from_disk x
+           |> Mina_stdlib.Nonempty_list.find ~f:(function _, _, s ->
+                  Ledger_hash.(s.target.second_pass_ledger = staged_ledger_hash) ) )
+  in
+  match final_segment with
+  | Some res ->
+      Ok res
+  | _ ->
+      Error
+        ( Error.of_string
+        @@ sprintf "Failed to find zkapp segment with target hash %s"
+             (Ledger_hash0.to_base58_check staged_ledger_hash) )
+
 module Worker = struct
   module T = struct
     module F = Rpc_parallel.Function
@@ -20,9 +45,10 @@ module Worker = struct
           F.t
       ; perform_partitioned :
           ( 'w
-          , Transaction_witness.Zkapp_command_segment_witness.Stable.Latest.t
-            * Mina_state.Snarked_ledger_state.With_sok.t
-            * Transaction_snark.Zkapp_command_segment.Basic.t
+          , Transaction_witness.Stable.Latest.t
+            * Mina_state.Snarked_ledger_state.Stable.Latest.t
+            * Zkapp_command.Stable.Latest.t
+            * Staged_ledger_hash.t
           , (Ledger_proof.t * Time.Span.t) Or_error.t )
           F.t
       }
@@ -50,15 +76,22 @@ module Worker = struct
       let perform_single (state : Worker_state.t) (message, single_spec) =
         Impl.perform_single ~message state single_spec
 
-      let perform_partitioned (state : Worker_state.t) (witness, statement, spec)
-          =
+      let perform_partitioned (state : Worker_state.t)
+          (witness, statement, zkapp_command, staged_ledger_hash) =
+        let zkapp_command =
+          Zkapp_command.write_all_proofs_to_disk
+            ~signature_kind:state.signature_kind
+            ~proof_cache_db:state.proof_cache_db zkapp_command
+        in
         match state.proof_level_snark with
         | Full (module S) ->
-            let witness =
-              Transaction_witness.Zkapp_command_segment_witness
-              .write_all_proofs_to_disk ~signature_kind:state.signature_kind
-                ~proof_cache_db:state.proof_cache_db witness
+            let%bind.Deferred.Or_error witness, spec, statement =
+              extract_terminal_zk_segment
+                ~m:(module S)
+                ~witness ~input:statement ~zkapp_command ~staged_ledger_hash
+              |> Deferred.return
             in
+
             Snark_worker.Impl.measure_runtime ~logger:state.logger
               ~spec_json:
                 ( lazy
@@ -66,6 +99,12 @@ module Worker = struct
                   , Transaction_snark.Zkapp_command_segment.Basic.Stable.Latest
                     .to_yojson spec ) )
               (fun () ->
+                let witness =
+                  Transaction_witness.Zkapp_command_segment_witness
+                  .write_all_proofs_to_disk witness
+                    ~proof_cache_db:state.proof_cache_db
+                    ~signature_kind:state.signature_kind
+                in
                 S.of_zkapp_command_segment_exn ~statement ~witness ~spec
                 |> Deferred.map ~f:(fun a -> Result.Ok a) )
         | _ ->
@@ -89,12 +128,10 @@ module Worker = struct
         ; perform_partitioned =
             f
               ( [%bin_type_class:
-                  Transaction_witness.Zkapp_command_segment_witness.Stable
-                  .Latest
-                  .t
-                  * Mina_state.Snarked_ledger_state.With_sok.Stable.Latest.t
-                  * Transaction_snark.Zkapp_command_segment.Basic.Stable.Latest
-                    .t]
+                  Transaction_witness.Stable.Latest.t
+                  * Mina_state.Snarked_ledger_state.Stable.Latest.t
+                  * Zkapp_command.Stable.Latest.t
+                  * Staged_ledger_hash.Stable.Latest.t]
               , [%bin_type_class:
                   (Ledger_proof.Stable.Latest.t * Time.Span.t) Or_error.t]
               , perform_partitioned )
