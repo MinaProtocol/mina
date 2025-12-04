@@ -209,9 +209,7 @@ let generateDockerForCodename =
                           Toolchain.SelectionMode.ByDebianAndArch
                           codename
                           Arch.Type.Amd64
-                          ["AWS_ACCESS_KEY_ID"
-                            , "AWS_SECRET_ACCESS_KEY"
-                          ]
+                          [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
                           "./buildkite/scripts/hardfork/upload-ledger-tarballs-to-s3.sh"
                     , label =
                         "Upload hardfork tarballs for ${lowerNameCodename}"
@@ -248,7 +246,19 @@ let generateDockerForCodename =
                               ]
                             # useArtifactsEnvVar
                           )
-                          "./buildkite/scripts/hardfork/prepare-hf-debian.sh"
+                          (     "./buildkite/scripts/hardfork/prepare-hf-debian.sh "
+                            ++  merge
+                                  { Some =
+                                          \(cached_build_id : Text)
+                                      ->      "&& ./buildkite/scripts/release/manager.sh persist "
+                                          ++  " --backend local --artifacts mina-logproc,mina-archive,mina-rosetta "
+                                          ++  " --build_id "
+                                          ++  cached_build_id
+                                          ++  " --target \\\${BUILDKITE_BUILD_ID}/${lowerNameCodename} "
+                                  , None = ""
+                                  }
+                                  spec.use_artifacts_from_buildkite_build
+                          )
                     , label =
                         "Create hardfork packages for ${lowerNameCodename}"
                     , key = buildHfDebian
