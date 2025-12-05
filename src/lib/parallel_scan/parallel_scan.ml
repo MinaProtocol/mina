@@ -1512,8 +1512,8 @@ let assert_job_count t t' ~completed_job_count ~base_job_count ~value_emitted =
       ~f:(fun acc tree -> Tree.jobs_records tree @ acc)
     |> List.filter ~f:(fun job ->
            match job with
-           | Job.Base { status = Job_status.Todo; _ }
-           | Job.Merge { status = Todo; _ } ->
+           | Job.Base { Base.Record.status = Job_status.Todo; _ }
+           | Job.Merge { Merge.Record.status = Todo; _ } ->
                true
            | _ ->
                false )

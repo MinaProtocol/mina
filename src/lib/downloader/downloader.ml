@@ -640,7 +640,7 @@ end = struct
     Set.length
       (Key.Set.union_list
          [ Q.to_list t.pending
-           |> List.map ~f:(fun j -> j.key)
+           |> List.map ~f:(fun (j : Job.t) -> j.key)
            |> Key.Set.of_list
          ; Key.Set.of_hashtbl_keys t.downloading
          ] )

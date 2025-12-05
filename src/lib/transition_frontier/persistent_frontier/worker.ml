@@ -66,7 +66,10 @@ module Worker = struct
         let extra_garbage =
           List.drop_last root_transition_diffs
           |> Option.value ~default:[]
-          |> List.bind ~f:(fun { new_root; garbage = Lite garbage; _ } ->
+          |> List.bind
+               ~f:(fun
+                    { Diff.Root_transition.new_root; garbage = Lite garbage; _ }
+                  ->
                  (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
                  :: garbage )
         in

@@ -585,7 +585,8 @@ module Verify_work_batcher = struct
         in
         List.concat_map xs ~f:(fun x ->
             works (input x)
-            |> List.concat_map ~f:(fun { fee; prover; proofs } ->
+            |> List.concat_map
+                 ~f:(fun { Transaction_snark_work.fee; prover; proofs } ->
                    let msg = Sok_message.create ~fee ~prover in
                    One_or_two.to_list
                      (One_or_two.map proofs ~f:(fun p ->

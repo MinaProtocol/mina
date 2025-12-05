@@ -315,7 +315,7 @@ struct
            ~f_opt:(function
              | Opt.Nothing ->
                  Opt.Nothing
-             | Opt.Maybe (b, x) ->
+             | Opt.Maybe ((b : Boolean.var), x) ->
                  Opt.Maybe
                    ( Boolean.Unsafe.of_cvar (Util.Wrap.seal (b :> t))
                    , Array.map ~f:(Double.map ~f:Util.Wrap.seal) x )
@@ -1597,7 +1597,7 @@ struct
               let a =
                 Evals.In_circuit.to_list e
                 |> List.map ~f:(function
-                     | Nothing ->
+                     | Plonkish_prelude.Opt.Nothing ->
                          [||]
                      | Just a ->
                          Array.map a ~f:Pickles_types.Opt.just

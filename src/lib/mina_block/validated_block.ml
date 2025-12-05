@@ -54,7 +54,7 @@ let delta_block_chain_proof (_, d) = d
 let valid_commands (block, _) =
   block |> With_hash.data |> Block.body
   |> Staged_ledger_diff.Body.staged_ledger_diff |> Staged_ledger_diff.commands
-  |> List.map ~f:(fun cmd ->
+  |> List.map ~f:(fun (cmd : User_command.t With_status.t) ->
          (* This is safe because at this point the stage ledger diff has been
               applied successfully. *)
          let (`If_this_is_used_it_should_have_a_comment_justifying_it data) =
