@@ -2220,7 +2220,7 @@ module Queries = struct
                             let actions =
                               c.Zkapp_command.Poly.account_updates
                               |> Zkapp_command.Call_forest.fold ~init:(0, [])
-                                   ~f:(fun acc au ->
+                                   ~f:(fun acc (au : Account_update.t) ->
                                      let action_seq, acc = acc in
                                      let account_id =
                                        Account_id.create au.body.public_key

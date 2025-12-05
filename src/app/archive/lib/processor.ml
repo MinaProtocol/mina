@@ -3844,7 +3844,7 @@ module Block = struct
       |> Staged.unstage (List.stable_dedup_staged ~compare:compare_by_hash)
       |> differential_insert
            (module String)
-           ~get_key:(fun { hash; _ } -> hash)
+           ~get_key:(fun { User_command.Signed_command.hash; _ } -> hash)
            ~get_value:Fn.id
            ~load_index:
              (load_index
@@ -3977,9 +3977,10 @@ module Block = struct
                (*
             not (State_hash.equal block.parent_hash genesis_block_hash))
             *)
-               Unsigned.UInt32.to_int block.height > 1 )
+               Unsigned.UInt32.to_int block.Extensional.Block.height > 1 )
         |> List.map ~f:(fun block ->
-               ( Int.to_string @@ Map.find_exn block_ids block.state_hash
+               ( Int.to_string
+                 @@ Map.find_exn block_ids block.Extensional.Block.state_hash
                , Int.to_string @@ Map.find_exn block_ids block.parent_hash ) )
         |> List.unzip
       in

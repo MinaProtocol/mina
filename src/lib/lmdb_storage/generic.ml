@@ -138,7 +138,7 @@ module Base (F_func : F) = struct
         db
 
   let get_impl ?txn ~env lazy_db key =
-    try Lmdb.Map.get ?txn (init_db ?txn ~env lazy_db) key |> Some
+    try Some (Lmdb.Map.get ?txn (init_db ?txn ~env lazy_db) key)
     with Lmdb.Not_found -> None
 
   let set_impl ?txn ~env lazy_db key value =
