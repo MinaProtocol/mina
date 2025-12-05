@@ -4,6 +4,7 @@ open Mina_base
 module Common = struct
   [%%versioned
   module Stable = struct
+    (* TODO: split out V3 as a new type, remove the "option" from [block_data_opt] *)
     module V3 = struct
       type t =
         { scan_state : Staged_ledger.Scan_state.Stable.V3.t
@@ -35,6 +36,9 @@ module Common = struct
   let scan_state t = t.scan_state
 
   let pending_coinbase t = t.pending_coinbase
+
+  let protocol_state t =
+    Option.map t.block_data_opt ~f:(fun t -> t.protocol_state)
 end
 
 module Historical = struct

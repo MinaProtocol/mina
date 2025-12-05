@@ -19,6 +19,8 @@ module Common : sig
     -> pending_coinbase:Pending_coinbase.t
     -> block_data_opt:Block_data.t option
     -> t
+
+  val protocol_state : t -> Mina_state.Protocol_state.Value.t option
 end
 
 (* Historical root data is similar to Limited root data, except that it also
