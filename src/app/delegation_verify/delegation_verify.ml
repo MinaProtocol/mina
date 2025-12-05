@@ -105,11 +105,30 @@ module Make_verifier (Source : Submission.Data_source) = struct
         | Some
             Uptime_service.Proof_data.{ proof; proof_time = _; snark_work_fee }
           ->
-            let message =
-              Mina_base.Sok_message.create ~fee:snark_work_fee
-                ~prover:(Source.submitter submission)
+            let expected_staged_ledger_hash =
+              Mina_block.Stable.Latest.header block
+              |> Mina_block.Header.protocol_state
+              |> Mina_state.Protocol_state.blockchain_state
+              |> Mina_state.Blockchain_state.staged_ledger_hash
+              |> Staged_ledger_hash.ledger_hash
             in
-            verify_snark_work ~verify_transaction_snarks ~proof ~message
+            let provided_ledger_hash : Ledger_hash.t =
+              (Ledger_proof.statement proof).target.second_pass_ledger
+            in
+            if Ledger_hash.(expected_staged_ledger_hash = provided_ledger_hash)
+            then
+              let message =
+                Mina_base.Sok_message.create ~fee:snark_work_fee
+                  ~prover:(Source.submitter submission)
+              in
+              verify_snark_work ~verify_transaction_snarks ~proof ~message
+            else
+              Deferred.Result.fail @@ Error.of_string
+              @@ sprintf
+                   "Snark statement target hash %s doesn't match expected \
+                    block hash %s"
+                   (Ledger_hash.to_base58_check provided_ledger_hash)
+                   (Ledger_hash.to_base58_check expected_staged_ledger_hash)
       else return ()
     in
     let header = Mina_block.Stable.Latest.header block in
