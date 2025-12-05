@@ -22,8 +22,3 @@ type t =
   { id : Id.Any.t
   ; data : (Core.Time.Span.t, Ledger_proof.Cached.t) Proof_carrying_data.t
   }
-
-val read_all_proofs_from_disk : t -> Stable.Latest.t
-
-val write_all_proofs_to_disk :
-  proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
