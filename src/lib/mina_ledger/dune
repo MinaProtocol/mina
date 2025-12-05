@@ -20,10 +20,8 @@
   rocks
   integers
   async_kernel
-  base.caml
   base
   core
-  core_kernel
   sexplib0
   bin_prot.shape
   base.base_internalhash_types

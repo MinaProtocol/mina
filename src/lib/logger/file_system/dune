@@ -4,9 +4,9 @@
  (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
- (libraries core yojson logger core_kernel)
+ (libraries core core_unix core_unix.time_float_unix yojson logger core_kernel)
  (preprocess
-  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
+  (pps ppx_compare ppx_enumerate ppx_deriving.show ppx_deriving_yojson ppx_mina ppx_sexp_conv ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Logging library"))

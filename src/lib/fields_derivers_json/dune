@@ -3,7 +3,6 @@
  (public_name fields_derivers.json)
  (libraries
   ;; opam libraries
-  core_kernel
   fieldslib
   ppx_inline_test.config
   result

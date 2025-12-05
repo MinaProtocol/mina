@@ -7,10 +7,8 @@
   ;; opam libraries
   async_kernel
   core
-  base.caml
   bin_prot.shape
   sexplib0
-  core_kernel
   ppx_inline_test.config
   async
   async_unix

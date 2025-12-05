@@ -9,11 +9,8 @@
   core_kernel.uuid
   async_unix
   async
-  core_kernel
   core
   async_kernel
-  core.uuid
-  base.caml
   sexplib0
   digestif
   ;; local libraries

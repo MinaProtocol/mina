@@ -5,7 +5,6 @@
  (libraries
   base
   bindings_js
-  core_kernel
   digestif.ocaml
   digestif
   integers_stubs_js

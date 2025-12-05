@@ -7,15 +7,12 @@
   integers
   bignum
   async_kernel
-  base.caml
   base.base_internalhash_types
   re2
   graphql-async
   core_kernel.uuid
   core
-  core.uuid
   async
-  core_kernel
   async_unix
   result
   sexplib0

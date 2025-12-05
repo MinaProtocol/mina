@@ -34,8 +34,8 @@ ARG TARGETARCH
 # - dockerfiles/1-build-deps
 # - opam.export
 # - scripts/update_opam_switch.sh
-ARG OCAML_VERSION=4.14
-ARG OCAML_REVISION=.2
+ARG OCAML_VERSION=5.2
+ARG OCAML_REVISION=.1
 ARG OCAML_VARIANT=
 ARG OCAML_PACKAGE=
 ARG OPAM_VERSION=2.3.0
@@ -44,8 +44,8 @@ ARG OPAM_VERSION=2.3.0
 # - flake.nix (and flake.lock after running
 #   `nix flake update opam-repository`).
 # - scripts/update_opam_switch.sh
-ARG OPAM_REPOSITORY_COMMIT=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
-ARG O1LABS_OPAM_REPOSITORY_COMMIT=dd90c5c72b7b7caeca3db3224b2503924deea08a
+ARG OPAM_REPOSITORY_COMMIT=2e72379851a4769911b11b7f85be197919fe4b82
+ARG O1LABS_OPAM_REPOSITORY_COMMIT=5a86178017864741537d7b1cac96a957b4ddcb88
 
 # Golang version number used to detemine tarball name
 ARG GO_VERSION=1.19.11

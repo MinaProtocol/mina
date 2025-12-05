@@ -9,11 +9,9 @@
   result
   async_kernel
   async_unix
-  core_kernel
   core
   base
   async
-  base.caml
   base.base_internalhash_types
   ;;local libraries
   mina_stdlib

@@ -8,10 +8,8 @@
   ;; opam libraries
   result
   core
-  core_kernel
   sexplib0
   bin_prot.shape
-  base.caml
   base.base_internalhash_types
   ;; local libraries
   itn_logger
@@ -19,7 +17,7 @@
   ppx_version.runtime
   mina_stdlib)
  (preprocess
-  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
+  (pps ppx_let ppx_compare ppx_enumerate ppx_deriving.show ppx_deriving_yojson ppx_mina ppx_sexp_conv ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (implements logger)

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 include module type of Deferred with module Result := Deferred.Result

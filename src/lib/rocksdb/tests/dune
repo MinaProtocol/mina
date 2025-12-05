@@ -6,10 +6,7 @@
   async
   async_unix
   base.base_internalhash_types
-  base.caml
   core
-  core.uuid
-  core_kernel
   core_kernel.uuid
   rocks
   ;; local libraries

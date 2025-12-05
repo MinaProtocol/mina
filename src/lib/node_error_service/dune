@@ -5,17 +5,14 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  core.uuid
   uri
   cohttp-async
   async
-  core_kernel
   core
   cohttp
   async_kernel
   core_kernel.uuid
   integers
-  base.caml
   ;; local libraries
   error_json
   transition_frontier_base

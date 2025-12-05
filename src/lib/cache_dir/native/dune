@@ -3,12 +3,10 @@
  (name cache_dir_native)
  (libraries
   ;; opam libraries
-  base.caml
   async_unix
   base
   core
   async
-  core_kernel
   stdio
   async_kernel
   ;; local libraries

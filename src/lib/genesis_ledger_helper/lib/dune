@@ -5,7 +5,6 @@
   ;; opam libraries
   splittable_random
   integers
-  core_kernel
   core
   sexplib0
   base64

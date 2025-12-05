@@ -5,20 +5,17 @@
   (flags -verbose -show-counts))
  (modules_without_implementation generic_set sigs)
  (flags
-  (:standard -w a -warn-error +a)
-  -open
-  Core_kernel)
+  (:standard -w a -warn-error +a))
  (libraries
   ; opam libraries
   async_kernel
-  base.caml
   bin_prot
   bin_prot.shape
-  core_kernel
   ppx_inline_test.config
   result
   sexplib0
   stdlib
+  core
   ; local libraries
   ppx_version.runtime)
  (instrumentation
@@ -28,8 +25,10 @@
    ppx_compare
    ppx_deriving.std
    ppx_deriving_yojson
+   ppx_hash
    ppx_inline_test
-   ppx_jane
+   ppx_let
+   ppx_sexp_conv
    ppx_mina
    ppx_version))
  (synopsis "Mina standard library"))

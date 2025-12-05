@@ -30,7 +30,6 @@
   ;; opam libraries
   result
   base.base_internalhash_types
-  base.caml
   base
   uri
   sexplib0
@@ -38,12 +37,10 @@
   async
   core
   lens
-  core_kernel
   async_kernel
   ppx_inline_test.config
   async_unix
   stdio
-  sexp_diff_kernel
   ;; local libraries
   key_gen
   visualization

@@ -3,7 +3,6 @@
  (public_name ledger_proof)
  (libraries
   ;; opam libraries
-  core_kernel
   ;; local libraries
   transaction_snark
   mina_base

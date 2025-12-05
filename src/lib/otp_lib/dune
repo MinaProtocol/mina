@@ -5,7 +5,6 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  core_kernel
   async_kernel
   ppx_inline_test.config
   ;; local libraries

@@ -8,7 +8,6 @@
   async_unix
   core
   base
-  core_kernel
   yojson
   ;; local libraries
   mina_base.import

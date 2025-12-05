@@ -4,7 +4,6 @@
  (libraries
   ;; opam libraries
   alcotest
-  core_kernel
   ;; local libraries
   mina_base
   rosetta_coding

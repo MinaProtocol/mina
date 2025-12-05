@@ -3,11 +3,11 @@
  (public_name reformat)
  (libraries
   core
+  core_unix.command_unix
   async
   async.async_command
   async_kernel
   async_unix
-  core_kernel
   sexplib0)
  (preprocess
   (pps ppx_jane))

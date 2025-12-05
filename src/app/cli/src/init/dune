@@ -21,17 +21,14 @@
   async_kernel
   async_unix
   uri
-  core_kernel
   core_kernel.uuid
   core
-  core.uuid
   base
   async
   cohttp
   graphql_parser
   async.async_command
   async_rpc_kernel
-  base.caml
   base.base_internalhash_types
   graphql-cohttp
   cohttp-async

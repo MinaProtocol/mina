@@ -8,9 +8,7 @@
  (libraries
   ;; opam libraries
   integers
-  base.caml
   async_kernel
-  core_kernel
   core
   async
   sexplib0

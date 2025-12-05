@@ -1,6 +1,6 @@
 (* versioned_types.ml -- deriver for versioned types *)
 
-open Core_kernel
+open Core
 open Ppxlib
 open Versioned_util
 
@@ -105,7 +105,7 @@ let ocaml_builtin_types =
 
 let ocaml_builtin_type_constructors = [ "list"; "array"; "option"; "ref" ]
 
-(* true iff module_path is of form M. ... .Stable.Vn, where M is Core or Core_kernel, and n is integer *)
+(* true iff module_path is of form M. ... .Stable.Vn, where M is Core, and n is integer *)
 let is_jane_street_stable_module module_path =
   let hd_elt = List.hd_exn module_path in
   List.mem jane_street_modules hd_elt ~equal:String.equal
@@ -163,7 +163,8 @@ let rec generate_core_type_version_decls type_name core_type =
           else if
             List.is_empty core_types
             && List.mem ocaml_builtin_types id ~equal:String.equal
-          then (* no versioning to worry about *)
+          then
+            (* no versioning to worry about *)
             []
           else if
             List.mem ocaml_builtin_type_constructors id ~equal:String.equal

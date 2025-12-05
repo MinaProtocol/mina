@@ -6,7 +6,6 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  core_kernel
   async_kernel
   bignum.bigint
   ;; local libraries

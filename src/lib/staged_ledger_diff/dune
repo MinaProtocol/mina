@@ -3,11 +3,9 @@
  (public_name staged_ledger_diff)
  (libraries
   ;; opam libraries
-  core_kernel
   sexplib0
   async
   bin_prot.shape
-  base.caml
   blake2
   stdint
   ppx_inline_test.config

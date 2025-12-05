@@ -2,7 +2,6 @@
  (name plugin_do_nothing)
  (libraries
   ;; opam libraries
-  core_kernel
   core
   ;; local libraries
   mina_plugins

@@ -13,10 +13,8 @@
   caqti
   cli_lib
   async
-  core_kernel
   caqti-async
   base
-  base.caml
   integers
   ;; local libraries
   logger
@@ -71,10 +69,8 @@
   caqti
   cli_lib
   async
-  core_kernel
   caqti-async
   base
-  base.caml
   async.async_command
   integers
   ;; local libraries

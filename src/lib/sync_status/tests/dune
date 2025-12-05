@@ -3,7 +3,6 @@
  (libraries
   ;; opam libraries
   alcotest
-  core_kernel
   ;; local libraries
   sync_status)
  (instrumentation

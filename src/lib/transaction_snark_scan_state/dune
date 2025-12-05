@@ -9,10 +9,8 @@
   core
   ppx_deriving_yojson.runtime
   sexplib0
-  base.caml
   digestif
   base
-  core_kernel
   async
   yojson
   bin_prot.shape

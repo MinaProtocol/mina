@@ -9,7 +9,6 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  core_kernel
   ;; local libraries
   snarky.backendless
   group_map))

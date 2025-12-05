@@ -5,10 +5,8 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  base.caml
   bin_prot.shape
   sexplib0
-  core_kernel
   core
   ;; local libraries
   currency

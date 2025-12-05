@@ -9,9 +9,7 @@
   async_kernel
   async_unix
   base
-  base.caml
   core
-  core_kernel
   sexplib0
   uri
   ;; local libraries

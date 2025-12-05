@@ -10,9 +10,7 @@
   async_kernel
   stdio
   async
-  core_kernel
   base
-  base.caml
   base.base_internalhash_types
   async.async_command
   yojson

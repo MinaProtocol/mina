@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* unused type *)
 [@@@warning "-34"]
@@ -35,33 +35,31 @@ let () =
   let x = 15 in
   let buf = Bigstring.create 10 in
   (* Test writing given version. *)
-  ignore (M1.Stable.V3.With_all_version_tags.bin_write_t buf ~pos:0 x : int) ;
+  ignore (M1.Stable.V3.With_all_version_tags.bin_write_t buf ~pos:0 x : int);
   (* Test that reads are compatible with [With_version]. *)
   let y : M1.Stable.V3.With_all_version_tags.t_tagged =
     M1.Stable.V3.With_all_version_tags.bin_read_t_tagged buf ~pos_ref:(ref 0)
   in
-  assert (y.version = 3) ;
-  assert (y.t = x) ;
+  assert (y.version = 3);
+  assert (y.t = x);
   (* Test that what was read is what was written. *)
   let z = M1.Stable.V3.With_all_version_tags.bin_read_t buf ~pos_ref:(ref 0) in
-  assert (z = x) ;
+  assert (z = x);
   (* Test that trying to read the wrong version results in an assertion
      failure.
   *)
-  ( try
-      ignore
-        ( M1.Stable.V2.With_all_version_tags.bin_read_t buf ~pos_ref:(ref 0)
-          : int ) ;
-      assert false
-    with Failure _ -> () ) ;
+  (try
+     ignore
+       (M1.Stable.V2.With_all_version_tags.bin_read_t buf ~pos_ref:(ref 0)
+         : int);
+     assert false
+   with Failure _ -> ());
   (* Test that [bin_read_all_tagged_to_latest] finds and uses the right
      deserialisation.
   *)
   match M1.Stable.bin_read_all_tagged_to_latest buf ~pos_ref:(ref 0) with
-  | Ok a ->
-      assert (a = x)
-  | Error _ ->
-      assert false
+  | Ok a -> assert (a = x)
+  | Error _ -> assert false
 
 module M2 = struct
   [%%versioned
@@ -112,15 +110,13 @@ end
 let () =
   let x : M3.Stable.V3.t = { a = false; b = 15 } in
   let buf = Bigstring.create 20 in
-  ignore (M3.Stable.V3.With_top_version_tag.bin_write_t buf ~pos:0 x : int) ;
+  ignore (M3.Stable.V3.With_top_version_tag.bin_write_t buf ~pos:0 x : int);
   let y = M3.Stable.V3.With_top_version_tag.bin_read_t buf ~pos_ref:(ref 0) in
-  assert (M3.Stable.V3.equal x y) ;
+  assert (M3.Stable.V3.equal x y);
   let z =
     match M3.Stable.bin_read_top_tagged_to_latest buf ~pos_ref:(ref 0) with
-    | Ok n ->
-        n
-    | Error _ ->
-        assert false
+    | Ok n -> n
+    | Error _ -> assert false
   in
   assert (M3.Stable.V3.equal x z)
 
@@ -131,7 +127,11 @@ module M4 = struct
     module V2 = struct
       [@@@with_all_version_tags]
 
-      type t = { a : int; b : Mina_stdlib.Bounded_types.String.Tagged.Stable.V1.t } [@@deriving equal]
+      type t = {
+        a : int;
+        b : Mina_stdlib.Bounded_types.String.Tagged.Stable.V1.t;
+      }
+      [@@deriving equal]
 
       let to_latest = Fn.id
     end
@@ -139,7 +139,10 @@ module M4 = struct
     module V1 = struct
       [@@@with_all_version_tags]
 
-      type t = { a : Mina_stdlib.Bounded_types.String.Tagged.Stable.V1.t; b : int }
+      type t = {
+        a : Mina_stdlib.Bounded_types.String.Tagged.Stable.V1.t;
+        b : int;
+      }
 
       let to_latest ({ a; b } : t) : Latest.t = { a = b; b = a }
     end
@@ -149,15 +152,13 @@ end
 let () =
   let x : M4.Stable.V2.t = { a = 42; b = "hello" } in
   let buf = Bigstring.create 20 in
-  ignore (M4.Stable.V2.With_all_version_tags.bin_write_t buf ~pos:0 x : int) ;
+  ignore (M4.Stable.V2.With_all_version_tags.bin_write_t buf ~pos:0 x : int);
   let y = M4.Stable.V2.With_all_version_tags.bin_read_t buf ~pos_ref:(ref 0) in
-  assert (M4.Stable.V2.equal x y) ;
+  assert (M4.Stable.V2.equal x y);
   let z =
     match M4.Stable.bin_read_all_tagged_to_latest buf ~pos_ref:(ref 0) with
-    | Ok n ->
-        n
-    | Error _ ->
-        assert false
+    | Ok n -> n
+    | Error _ -> assert false
   in
   assert (M4.Stable.V2.equal x z)
 
@@ -188,11 +189,10 @@ module M6 = struct
         type nonrec t = t
 
         let to_binable = Fn.id
-
         let of_binable = Fn.id
       end
 
-      include Binable.Of_binable_without_uuid (Core_kernel.Bool.Stable.V1) (Arg)
+      include Binable.Of_binable_without_uuid (Core.Bool.Stable.V1) (Arg)
     end
   end]
 end
@@ -205,13 +205,9 @@ module M7 = struct
       type t = int
 
       let some = 1
-
       let other = 2
-
       let things = 3
-
       let (_ : int * int * int) = (some, other, things)
-
       let to_latest = Fn.id
 
       module X = struct
@@ -233,7 +229,7 @@ module M7 = struct
           (X) :
             sig
               type y = t
-            end )
+            end)
     end
   end]
 

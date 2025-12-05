@@ -3,7 +3,6 @@
  (public_name quickcheck_lib)
  (libraries
   ;; opam libraries
-  core_kernel
   base
   ppx_inline_test.config
   ;; local libraries

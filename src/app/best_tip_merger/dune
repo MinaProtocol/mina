@@ -8,10 +8,8 @@
   async.async_command
   async_kernel
   stdio
-  base.caml
   yojson
   lib
-  core_kernel
   async
   ppx_deriving_yojson.runtime
   core
@@ -44,6 +42,5 @@
    ppx_mina
    ppx_deriving.show
    ppx_deriving_yojson
-   ppx_jane
    ppx_version
    ppx_compare)))

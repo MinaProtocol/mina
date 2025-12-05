@@ -8,7 +8,6 @@
  (libraries
   ;; opam libraries
   core
-  core_kernel
   async_kernel
   ;; local libraries
   genesis_constants

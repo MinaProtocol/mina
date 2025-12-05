@@ -6,7 +6,6 @@
   core
   async
   base
-  core_kernel
   async_unix
   ;; local libraries
   webkit_trace_event)

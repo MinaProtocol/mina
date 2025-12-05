@@ -5,7 +5,6 @@
   ;; opam libraries
   async_kernel
   base
-  core_kernel
   core
   async
   async_unix

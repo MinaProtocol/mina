@@ -6,7 +6,6 @@
   async_kernel
   async_unix
   base
-  core_kernel
   sexplib0
   yojson
   ;; local libraries

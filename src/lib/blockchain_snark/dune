@@ -8,11 +8,9 @@
   ;; opam libraries
   async
   async_kernel
-  base.caml
   base.md5
   bin_prot.shape
   core
-  core_kernel
   sexplib0
   ;; local libraries
   allocation_functor

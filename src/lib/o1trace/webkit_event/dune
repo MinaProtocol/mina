@@ -4,13 +4,10 @@
  (libraries
   ;; opam libraries
   base
-  base.caml
   async
   async_kernel
   async_unix
   core
-  core.time_stamp_counter
-  core_kernel
   sexplib0
   ;; local libraries
   webkit_trace_event.binary
@@ -19,4 +16,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane)))
+  (pps ppx_sexp_conv ppx_version)))

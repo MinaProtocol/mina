@@ -10,9 +10,7 @@
   sexplib0
   core
   async
-  core_kernel
   base
-  base.caml
   base.base_internalhash_types
   async_kernel
   ppx_inline_test.config

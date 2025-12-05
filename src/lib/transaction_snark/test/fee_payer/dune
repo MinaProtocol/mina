@@ -8,7 +8,6 @@
   async_kernel
   core
   base
-  core_kernel
   yojson
   sexplib0
   integers

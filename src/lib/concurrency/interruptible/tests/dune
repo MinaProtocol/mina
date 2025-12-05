@@ -7,7 +7,6 @@
   async_kernel
   async_unix
   core
-  core_kernel
   interruptible
   run_in_thread)
  (preprocess

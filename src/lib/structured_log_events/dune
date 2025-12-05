@@ -6,7 +6,6 @@
  (library_flags -linkall)
  (libraries
   ;; opam libraries
-  core_kernel
   yojson
   sexplib0
   ;; local libraries

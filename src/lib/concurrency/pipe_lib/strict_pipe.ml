@@ -1,5 +1,5 @@
+open Core
 open Async_kernel
-open Core_kernel
 
 exception Overflow of string
 
@@ -94,7 +94,9 @@ module Reader0 = struct
              return (`Eof b)
          | `Ok a -> (
              (* The async scheduler could yield here *)
-             match%bind f b a with
+             match%bind
+               f b a
+             with
              | `Stop x ->
                  return (`Terminated x)
              | `Continue b' ->
@@ -147,7 +149,7 @@ module Reader0 = struct
                 Deferred.choose
                   (List.map readers ~f:(fun r ->
                        Deferred.choice (Pipe.values_available r.reader)
-                         (fun _ -> ()) ) )
+                         (fun _ -> () ) ) )
               in
               List.find readers ~f:not_empty
         in
@@ -184,11 +186,15 @@ module Reader0 = struct
        * should still get the behavior we want. *)
       don't_wait_for
         (Pipe.iter reader.reader ~f:(fun x ->
-             Deferred.List.iter writers ~f:(fun writer ->
+             Deferred.List.iter writers
+               ~f:(fun writer ->
                  if not (Pipe.is_closed writer) then Pipe.write writer x
-                 else return () ) ) ) ;
+                 else return () )
+               ~how:`Sequential ) ) ;
       don't_wait_for
-        (let%map () = Deferred.List.iter readers ~f:Pipe.closed in
+        (let%map () =
+           Deferred.List.iter readers ~f:Pipe.closed ~how:`Sequential
+         in
          Pipe.close_read reader.reader ) ;
       let strict_readers =
         List.map readers ~f:(wrap_reader ?name:reader.name)
@@ -231,8 +237,7 @@ module Writer = struct
   (* TODO: See #1281 *)
   let to_linear_pipe { writer = pipe; _ } = pipe
 
-  let handle_buffered_write :
-      type type_ return.
+  let handle_buffered_write : type type_ return.
          ('t, type_, return) t
       -> 't
       -> capacity:int
@@ -248,14 +253,14 @@ module Writer = struct
   let write : type type_ return. ('t, type_, return) t -> 't -> return =
    fun writer data ->
     ( if Pipe.is_closed writer.writer then
-      let logger = Logger.create () in
-      [%log warn] "writing to closed pipe $name"
-        ~metadata:
-          [ ( "name"
-            , `String
-                (Sexplib.Sexp.to_string ([%sexp_of: string option] writer.name))
-            )
-          ] ) ;
+        let logger = Logger.create () in
+        [%log warn] "writing to closed pipe $name"
+          ~metadata:
+            [ ( "name"
+              , `String
+                  (Sexplib.Sexp.to_string
+                     ([%sexp_of: string option] writer.name) ) )
+            ] ) ;
     match writer.type_ with
     | Synchronous ->
         Pipe.write writer.writer data
@@ -391,8 +396,8 @@ let%test_module "Strict_pipe.close" =
       assert (Writer.is_closed input_writer) ;
       assert (Reader.is_closed output_reader)
 
-    let%test_unit "'close' would close the downstream pipes linked by \
-                   'filter_map'" =
+    let%test_unit
+        "'close' would close the downstream pipes linked by 'filter_map'" =
       let input_reader, input_writer = create Synchronous in
       assert (not (Writer.is_closed input_writer)) ;
       let output_reader =
@@ -414,8 +419,8 @@ let%test_module "Strict_pipe.close" =
       assert (Reader.is_closed output_reader1) ;
       assert (Reader.is_closed output_reader2)
 
-    let%test_unit "'close' would close the downstream pipes linked by \
-                   'partition_map3'" =
+    let%test_unit
+        "'close' would close the downstream pipes linked by 'partition_map3'" =
       let input_reader, input_writer = create Synchronous in
       assert (not (Writer.is_closed input_writer)) ;
       let output_reader1, output_reader2, output_reader3 =
@@ -430,8 +435,8 @@ let%test_module "Strict_pipe.close" =
       assert (Reader.is_closed output_reader2) ;
       assert (Reader.is_closed output_reader3)
 
-    let%test_unit "'close' would close the downstream pipes linked by \
-                   'transfer'" =
+    let%test_unit
+        "'close' would close the downstream pipes linked by 'transfer'" =
       let input_reader, input_writer = create Synchronous
       and _, output_writer = create Synchronous in
       assert (not (Writer.is_closed input_writer)) ;

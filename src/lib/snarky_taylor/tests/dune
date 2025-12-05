@@ -6,7 +6,6 @@
   base
   bignum
   bignum.bigint
-  core_kernel
   ;; local libraries
   bitstring_lib
   snark_params

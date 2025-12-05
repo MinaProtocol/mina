@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* (generated) deriving version and bin_io both appear; OK outside functor body *)
 
@@ -13,12 +13,17 @@ module M1 = struct
   end]
 end
 
+module IntV1 = struct
+  include Int.Stable.V1
+
+  let __versioned__ = ()
+end
+
 (* version with an argument *)
 module M = struct
   module V1 = struct
     module T = struct
-      type query = Core_kernel.Int.Stable.V1.t
-      [@@deriving bin_io, version { rpc }]
+      type query = IntV1.t [@@deriving bin_io, version { rpc }]
     end
   end
 end

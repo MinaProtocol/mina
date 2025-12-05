@@ -7,7 +7,6 @@
  (libraries
   ;; opam libraries
   core
-  core_kernel
   ppx_inline_test.config
   sexplib0
   ppx_deriving.runtime

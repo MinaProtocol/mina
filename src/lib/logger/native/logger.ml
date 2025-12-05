@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let max_log_line_length = 1 lsl 20
 
@@ -26,12 +26,14 @@ end
 
 (* Core modules extended with Yojson converters *)
 module Time = struct
-  include Time
+  include Time_float
 
-  let to_yojson t = `String (Time.to_string_abs t ~zone:Zone.utc)
+  let to_yojson t =
+    `String (Time_float.to_sec_string_with_zone ~zone:Zone.utc t)
 
   let of_yojson json =
-    json |> Yojson.Safe.Util.to_string |> fun s -> Ok (Time.of_string s)
+    json |> Yojson.Safe.Util.to_string
+    |> fun s -> Ok (Time_float.of_string_with_utc_offset s)
 
   let pp ppf timestamp =
     (* This used to be
@@ -41,9 +43,9 @@ module Time = struct
        don't want to load that just for the pretty printing. Instead,
        we simulate it here.
     *)
-    let zone = Time.Zone.utc in
-    let date, time = Time.to_date_ofday ~zone timestamp in
-    let time_parts = Time.Ofday.to_parts time in
+    let zone = Time_float.Zone.utc in
+    let date, time = Time_float.to_date_ofday ~zone timestamp in
+    let time_parts = Time_float.Ofday.to_parts time in
     Format.fprintf ppf "%i-%02d-%02d %02d:%02d:%02d UTC" (Date.year date)
       (Date.month date |> Month.to_int)
       (Date.day date) time_parts.hr time_parts.min time_parts.sec
@@ -72,7 +74,7 @@ module Metadata = struct
 
       let to_latest = Fn.id
 
-      let to_yojson t = `Assoc (String.Map.to_alist t)
+      let to_yojson t = `Assoc (Map.to_alist t)
 
       let of_yojson = function
         | `Assoc alist ->
@@ -101,13 +103,13 @@ module Metadata = struct
 
   let of_alist_exn = String.Map.of_alist_exn
 
-  let mem = String.Map.mem
+  let mem = Map.mem
 
   let extend (t : t) alist =
     List.fold_left alist ~init:t ~f:(fun acc (key, data) ->
-        String.Map.set acc ~key ~data )
+        Map.set acc ~key ~data )
 
-  let merge (a : t) (b : t) = extend a (String.Map.to_alist b)
+  let merge (a : t) (b : t) = extend a (Map.to_alist b)
 end
 
 let global_metadata = ref []
@@ -207,7 +209,7 @@ module Processor = struct
               Format.asprintf "@[<v 2>%a [%a] %s@,%a@]" Time.pp msg.timestamp
                 Level.pp msg.level str
                 (Format.pp_print_list ~pp_sep:Format.pp_print_cut
-                   (fun ppf (k, v) -> Format.fprintf ppf "%s: %s" k v) )
+                   (fun ppf (k, v) -> Format.fprintf ppf "%s: %s" k v ) )
                 extra
             in
             Some msg
@@ -277,7 +279,7 @@ module Consumer_registry = struct
   type id = string
 
   let register ?commit_id ~(id : id) ~processor ~transport () =
-    Consumer_tbl.add_multi t ~key:id ~data:{ processor; transport; commit_id }
+    Hashtbl.add_multi t ~key:id ~data:{ processor; transport; commit_id }
 
   let rec broadcast_log_message ~id msg =
     let consumers =
@@ -300,7 +302,7 @@ module Consumer_registry = struct
         let msg =
           Option.value_map ~default:msg commit_id' ~f:(fun cid ->
               let metadata =
-                String.Map.set ~key:"commit_id" ~data:(`String cid)
+                Map.set ~key:"commit_id" ~data:(`String cid)
                   msg.Message.metadata
               in
               { msg with metadata } )
@@ -376,11 +378,11 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
   ; message
   ; metadata =
       ( if skip_merge_global_metadata then
-        Metadata.extend Metadata.empty metadata
-      else
-        Metadata.extend
-          (Metadata.merge (Metadata.of_alist_exn global_metadata') t.metadata)
-          metadata )
+          Metadata.extend Metadata.empty metadata
+        else
+          Metadata.extend
+            (Metadata.merge (Metadata.of_alist_exn global_metadata') t.metadata)
+            metadata )
   ; event_id
   }
 

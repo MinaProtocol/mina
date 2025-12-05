@@ -3,7 +3,6 @@
  (public_name disk_cache.intf)
  (libraries
   ;; opam libraries
-  core_kernel
   async_kernel
   ;; local libraries
   logger)

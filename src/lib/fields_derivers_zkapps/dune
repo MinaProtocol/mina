@@ -4,8 +4,6 @@
  (libraries
   ;; opam libraries
   base
-  base.caml
-  core_kernel
   fieldslib
   graphql
   graphql_parser

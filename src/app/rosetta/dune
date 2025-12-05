@@ -7,7 +7,6 @@
  (libraries
   lib
   async
-  core_kernel
   base
   async.async_command
   core
@@ -28,7 +27,6 @@
   lib
   mina_signature_kind.testnet
   async
-  core_kernel
   base
   async.async_command
   core
@@ -49,7 +47,6 @@
   lib
   mina_signature_kind.mainnet
   async
-  core_kernel
   base
   async.async_command
   core

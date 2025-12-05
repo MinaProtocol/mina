@@ -11,10 +11,8 @@
   async_kernel
   async_rpc_kernel
   async_unix
-  base.caml
   bin_prot.shape
   core
-  core_kernel
   ppx_deriving_yojson.runtime
   sexplib0
   yojson

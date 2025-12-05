@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Pipe_lib.Choosable_synchronous_pipe
 

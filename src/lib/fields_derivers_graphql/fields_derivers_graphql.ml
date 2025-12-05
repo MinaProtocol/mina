@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Fieldslib
 
 module Graphql_raw = struct
@@ -138,7 +138,7 @@ module Graphql_raw = struct
                       obj ?doc:annotations.doc
                         (annotations.name ^ "Input")
                         ~fields:graphql_arg_fields ~coerce:graphql_arg_coerce
-                      |> non_null) ) ;
+                      |> non_null ) ) ;
         (acc#nullable_graphql_arg :=
            fun () ->
              match !(acc#graphql_arg_accumulator) with
@@ -150,7 +150,7 @@ module Graphql_raw = struct
                  @@ Schema.Arg.(
                       obj ?doc:annotations.doc
                         (annotations.name ^ "Input")
-                        ~fields:graphql_arg_fields ~coerce:graphql_arg_coerce)
+                        ~fields:graphql_arg_fields ~coerce:graphql_arg_coerce )
         ) ;
         acc
 
@@ -286,10 +286,10 @@ module Graphql_raw = struct
           { Input.T.run =
               (fun () ->
                 Schema.obj annotations.name ?doc:annotations.doc
-                  ~fields:(fun _ ->
-                    List.rev
+                  ~fields:
+                    ( List.rev
                     @@ List.filter_map graphql_fields_accumulator ~f:(fun g ->
-                           g.Accumulator.T.run () ) )
+                        g.Accumulator.T.run () ) )
                 |> Schema.non_null )
           }
         in
@@ -297,10 +297,10 @@ module Graphql_raw = struct
           { Input.T.run =
               (fun () ->
                 Schema.obj annotations.name ?doc:annotations.doc
-                  ~fields:(fun _ ->
-                    List.rev
+                  ~fields:
+                    ( List.rev
                     @@ List.filter_map graphql_fields_accumulator ~f:(fun g ->
-                           g.Accumulator.T.run () ) ) )
+                        g.Accumulator.T.run () ) ) )
           }
         in
         obj#graphql_fields := graphql_fields ;
@@ -436,11 +436,11 @@ module Graphql_query = struct
     let rest = !(acc_obj#graphql_query_accumulator) in
     acc_obj#graphql_query_accumulator :=
       ( if annotations.skip || !(t_field#skip) then None
-      else
-        Some
-          ( Option.value annotations.name
-              ~default:(Fields_derivers.name_under_to_camel field)
-          , !(t_field#graphql_query) ) )
+        else
+          Some
+            ( Option.value annotations.name
+                ~default:(Fields_derivers.name_under_to_camel field)
+            , !(t_field#graphql_query) ) )
       :: rest ;
     ((fun _ -> failwith "unused"), acc_obj)
 
@@ -492,7 +492,7 @@ module IO = struct
 
     let map t f =
       Async_kernel.Pipe.map' t ~f:(fun q ->
-          Async_kernel.Deferred.Queue.map q ~f )
+          Async_kernel.Deferred.Queue.map ~how:`Sequential q ~f )
 
     let iter t f = Async_kernel.Pipe.iter t ~f
 
@@ -620,7 +620,7 @@ let%test_module "Test" =
         field "query" ~typ:(non_null typ)
           ~args:Arg.[]
           ~doc:"sample query"
-          ~resolve:(fun _ _ -> v))
+          ~resolve:(fun _ _ -> v) )
 
     let query_for_all typ v str =
       raw_server (query_schema typ v) (Test.parse_query str)
@@ -636,7 +636,7 @@ let%test_module "Test" =
           field "args" ~typ:(non_null int)
             ~args:Arg.[ arg "input" ~typ:arg_typ ]
             ~doc:"sample args query"
-            ~resolve:(fun _ _ _ -> 0))
+            ~resolve:(fun _ _ _ -> 0) )
 
     module T1 = struct
       (** T1 is foo *)
@@ -653,7 +653,8 @@ let%test_module "Test" =
 
       let manual_typ =
         Schema.(
-          obj "T1" ~doc ~fields:(fun _ ->
+          obj "T1" ~doc
+            ~fields:
               [ field "fooHello"
                   ~args:Arg.[]
                   ~typ:int
@@ -662,7 +663,7 @@ let%test_module "Test" =
                   ~args:Arg.[]
                   ~typ:(non_null (list (non_null string)))
                   ~resolve:(fun _ t -> t.bar)
-              ] ))
+              ] )
 
       let derived init =
         let open Graphql_fields in
@@ -681,7 +682,7 @@ let%test_module "Test" =
                 [ arg "bar1" ~typ:(non_null (list (non_null string)))
                 ; arg "fooHello" ~typ:int
                 ]
-              ~coerce:(fun bar foo_hello -> { bar; skipped = 0; foo_hello }))
+              ~coerce:(fun bar foo_hello -> { bar; skipped = 0; foo_hello }) )
 
         let derived init =
           let open Graphql_args in
@@ -748,12 +749,13 @@ let%test_module "Test" =
 
       let manual_typ =
         Schema.(
-          obj "T2" ?doc:None ~fields:(fun _ ->
+          obj "T2" ?doc:None
+            ~fields:
               [ field "foo"
                   ~args:Arg.[]
                   ~typ:T1.manual_typ
                   ~resolve:(fun _ t -> Or_ignore_test.to_option t.foo)
-              ] ))
+              ] )
 
       let derived init =
         let open Graphql_fields in
@@ -767,7 +769,7 @@ let%test_module "Test" =
           Schema.Arg.(
             obj "T2Input" ?doc:None
               ~fields:[ arg "foo" ~typ:T1.Args.manual_typ ]
-              ~coerce:(fun foo -> Or_ignore_test.of_option foo))
+              ~coerce:(fun foo -> Or_ignore_test.of_option foo) )
 
         let derived init =
           let open Graphql_args in

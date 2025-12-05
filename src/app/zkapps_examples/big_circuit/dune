@@ -2,7 +2,6 @@
  (name zkapps_big_circuit)
  (libraries
   ;; opam libraries
-  core_kernel
   ;; local libraries
   crypto_params
   currency

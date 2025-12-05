@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 type 'data short_lived_pipe_t = 'data Choosable_synchronous_pipe.writer_t
@@ -60,7 +60,7 @@ let terminate state =
   Option.iter (Ivar.peek next_short_lived_pipe)
     ~f:(fun (writer, processed_signal) ->
       Choosable_synchronous_pipe.close writer ;
-      Ivar.fill processed_signal () ) ;
+      Ivar.fill_exn processed_signal () ) ;
   `Finished ()
 
 (** Returns a choice that terminates the pipe when the termination signal is filled.
@@ -77,7 +77,7 @@ let handle_next_short_lived_pipe state (new_sink, processed_signal) =
   (* TODO when rewriting to Ocaml 5.x, consider using
      an R/W mutex to protect the mutable field. *)
   t.next_short_lived_pipe <- Ivar.create () ;
-  Ivar.fill processed_signal () ;
+  Ivar.fill_exn processed_signal () ;
   Option.iter ~f:Choosable_synchronous_pipe.close state.short_lived_sink ;
   `Repeat { state with short_lived_sink = Some new_sink }
 
@@ -267,7 +267,7 @@ let swap_reader (Swappable t) : _ Choosable_synchronous_pipe.reader_t Deferred.t
       Choosable_synchronous_pipe.create ()
     in
     let processed_signal = Ivar.create () in
-    Ivar.fill t.next_short_lived_pipe (short_lived_writer, processed_signal) ;
+    Ivar.fill_exn t.next_short_lived_pipe (short_lived_writer, processed_signal) ;
     let%map () = Ivar.read processed_signal in
     short_lived_reader
 

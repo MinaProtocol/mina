@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Foo = struct
   module Bar = struct

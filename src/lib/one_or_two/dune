@@ -8,10 +8,8 @@
   bin_prot.shape
   base
   async_kernel
-  core_kernel
   ppx_hash.runtime-lib
   sexplib0
-  base.caml
   ppx_version.runtime)
  (preprocess
   (pps

@@ -7,7 +7,6 @@
   ;; opam libraries
   base
   base58
-  core_kernel
   digestif
   ppx_inline_test.config)
  (library_flags (-linkall))

@@ -1,5 +1,5 @@
+open Core
 open Async_kernel
-open Core_kernel
 
 (** The same type is used to represent both reader and writer.
     
@@ -19,7 +19,7 @@ exception Pipe_closed
 exception Pipe_handle_used
 
 let fill_inner_ivar inner_ivar value =
-  try Ivar.fill inner_ivar value
+  try Ivar.fill_exn inner_ivar value
   with _ -> (
     match Ivar.value_exn inner_ivar with
     | `Eof ->

@@ -5,12 +5,10 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  core_kernel
   base64
   cstruct
   mirage-crypto-ec
   mirage-crypto-rng
-  mirage-crypto-rng-async
   ;; local libraries
   codable)
  (instrumentation

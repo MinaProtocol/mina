@@ -12,7 +12,6 @@
   sexplib0
   core
   async
-  core_kernel
   async_kernel
   ;; local libraries
   with_hash

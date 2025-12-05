@@ -26,9 +26,7 @@
   async_unix
   base
   base.base_internalhash_types
-  base.caml
   core
-  core_kernel
   ctypes
   ctypes.foreign
   integers

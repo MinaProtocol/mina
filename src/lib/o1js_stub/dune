@@ -9,9 +9,7 @@
   ../crypto/kimchi_bindings/js/node_js/plonk_wasm_bg.wasm)
  (libraries
   ;; opam libraries ;;
-  core_kernel
   base
-  base.caml
   integers
   sexplib0
   yojson
@@ -73,6 +71,6 @@
   run_in_thread.fake)
  (instrumentation
   (backend bisect_ppx))
- (forbidden_libraries async core re2 ctypes)
+ (forbidden_libraries async core_unix re2 ctypes)
  (preprocess
   (pps ppx_custom_printf ppx_version js_of_ocaml-ppx)))

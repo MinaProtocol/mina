@@ -9,7 +9,6 @@
   ;; opam libraries
   base
   async_kernel
-  core_kernel
   core
   ;; local libraries
   transition_frontier

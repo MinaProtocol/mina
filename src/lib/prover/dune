@@ -9,9 +9,7 @@
   core
   async
   async_kernel
-  core_kernel
   bin_prot.shape
-  base.caml
   sexplib0
   ;; local libraries
   with_hash

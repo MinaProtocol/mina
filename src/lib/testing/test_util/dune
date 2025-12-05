@@ -4,8 +4,6 @@
  (library_flags -linkall)
  (libraries
   ;; opam libraries
-  core_kernel
-  base.caml
   bin_prot
   ;; local libraries
   snark_params

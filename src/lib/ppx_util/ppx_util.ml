@@ -1,5 +1,5 @@
 open Ppxlib
-open Core_kernel
+open Core
 
 let expr_of_sexp ~loc s =
   let module E = Ppxlib.Ast_builder.Make (struct

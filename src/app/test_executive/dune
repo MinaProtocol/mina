@@ -8,10 +8,8 @@
   async_kernel
   async_unix
   base.base_internalhash_types
-  base.caml
   cmdliner
   core
-  core_kernel
   sexplib0
   stdio
   uri

@@ -4,10 +4,8 @@
  (library_flags -linkall)
  (libraries
   ;; opam libraries
-  core_kernel
   sexplib0
   bin_prot.shape
-  base.caml
   base
   ppx_version.runtime
   ;; local libraries

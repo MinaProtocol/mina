@@ -12,10 +12,8 @@
    caqti-driver-postgresql
    caqti
    async
-   core_kernel
    caqti-async
    base
-   base.caml
    threads.posix
    ;; from parent dir
    archive_hardfork_toolbox_lib

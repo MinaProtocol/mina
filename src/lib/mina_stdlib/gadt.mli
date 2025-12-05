@@ -1,3 +1,5 @@
+open Core
+
 module Peano : sig
   type zero = unit
 
@@ -68,8 +70,8 @@ module Vect : sig
 
   module Quickcheck_generator : sig
     val map :
-         f:('a -> 'b Core_kernel.Quickcheck.Generator.t)
+         f:('a -> 'b Quickcheck.Generator.t)
       -> ('a, 'n) t
-      -> ('b, 'n) t Core_kernel.Quickcheck.Generator.t
+      -> ('b, 'n) t Quickcheck.Generator.t
   end
 end

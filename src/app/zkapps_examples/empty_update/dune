@@ -2,7 +2,6 @@
  (name zkapps_empty_update)
  (libraries
   ;; opam libraries
-  core_kernel
   ;; local libraries
   crypto_params
   currency

@@ -5,8 +5,6 @@
   ;;opam libraries
   integers
   core
-  base.caml
-  core_kernel
   sexplib0
   base.base_internalhash_types
   stdio
@@ -39,7 +37,6 @@
   async_unix
   child_processes
   coda_genesis_ledger
-  core.uuid
   core_kernel.uuid
   genesis_constants
   merkle_ledger

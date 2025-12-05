@@ -11,9 +11,7 @@
   ppx_deriving.api
   ppxlib
   ppx_bin_prot
-  core_kernel
   base
-  base.caml
   ;; local libraries
   ppx_representatives
   ppx_register_event

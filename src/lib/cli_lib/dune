@@ -9,11 +9,9 @@
   result
   sexplib0
   async.async_command
-  base.caml
   async_kernel
   async.async_rpc
   camlp-streams
-  core_kernel
   yojson
   sodium
   core

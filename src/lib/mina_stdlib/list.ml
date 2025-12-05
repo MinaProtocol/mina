@@ -1,20 +1,20 @@
-open Core_kernel
+open Core
 include List
 
 module Length = struct
   type 'a t = ('a list, int) Sigs.predicate2
 
-  let equal l len = Caml.List.compare_length_with l len = 0
+  let equal l len = Stdlib.List.compare_length_with l len = 0
 
-  let unequal l len = Caml.List.compare_length_with l len <> 0
+  let unequal l len = Stdlib.List.compare_length_with l len <> 0
 
-  let gte l len = Caml.List.compare_length_with l len >= 0
+  let gte l len = Stdlib.List.compare_length_with l len >= 0
 
-  let gt l len = Caml.List.compare_length_with l len > 0
+  let gt l len = Stdlib.List.compare_length_with l len > 0
 
-  let lte l len = Caml.List.compare_length_with l len <= 0
+  let lte l len = Stdlib.List.compare_length_with l len <= 0
 
-  let lt l len = Caml.List.compare_length_with l len < 0
+  let lt l len = Stdlib.List.compare_length_with l len < 0
 
   module Compare = struct
     let ( = ) = equal

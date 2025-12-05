@@ -4,7 +4,6 @@
  (libraries
   lib
   async
-  core_kernel
   base
   async.async_command
   core

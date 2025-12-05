@@ -9,7 +9,6 @@
   block_time
   mina_stdlib
   core
-  core_kernel
   core_unix.command_unix
   logger
   mina_base

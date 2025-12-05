@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (** immutable, serializable statistics derived from allocation data *)
 module Allocation_statistics = struct
@@ -33,7 +33,7 @@ module Allocation_data = struct
 
   (* indexed queue data structure would be more effecient here, but keeping this simple for now *)
   type t =
-    { allocation_times : (allocation_id * Time.t) Queue.t
+    { allocation_times : (allocation_id * Time_float.t) Queue.t
     ; mutable next_allocation_id : allocation_id
     }
 
@@ -44,7 +44,7 @@ module Allocation_data = struct
 
   let register_allocation data =
     let id = data.next_allocation_id in
-    Queue.enqueue data.allocation_times (id, Time.now ()) ;
+    Queue.enqueue data.allocation_times (id, Time_float.now ()) ;
     data.next_allocation_id <- data.next_allocation_id + 1 ;
     id
 
@@ -53,9 +53,11 @@ module Allocation_data = struct
     Queue.filter_inplace data.allocation_times ~f:(fun (id', _) -> id = id')
 
   let compute_statistics { allocation_times; _ } =
-    let now = Time.now () in
+    let now = Time_float.now () in
     let count = Queue.length allocation_times in
-    let lifetime_ms_of_time time = Time.Span.to_ms (Time.diff now time) in
+    let lifetime_ms_of_time time =
+      Time_float.Span.to_ms (Time_float.diff now time)
+    in
     let get_lifetime_ms i =
       lifetime_ms_of_time (snd @@ Queue.get allocation_times i)
     in
@@ -109,13 +111,13 @@ module Allocation_data = struct
 
       (* time_offsets passed in here should be ordered monotonically (to match real world behavior) *)
       let run_test time_offsets expected_quartiles =
-        let now = Time.now () in
+        let now = Time_float.now () in
         (* ids do not need to be unique in this test *)
         let data =
           { allocation_times =
               Queue.of_list
               @@ List.map (List.rev time_offsets) ~f:(fun offset ->
-                     (0, Time.sub now (Time.Span.of_ms offset)) )
+                  (0, Time_float.sub now (Time_float.Span.of_ms offset)) )
           ; next_allocation_id = 0
           }
         in
@@ -164,33 +166,33 @@ let table = String.Table.create ()
 
 let capture object_id =
   let open Allocation_info in
-  let info_opt = String.Table.find table object_id in
+  let info_opt = Hashtbl.find table object_id in
   let data_opt = Option.map info_opt ~f:(fun { data; _ } -> data) in
   let data =
     Lazy.(
       force
       @@ Option.value_map data_opt
            ~default:(lazy (Allocation_data.create ()))
-           ~f:Lazy.return)
+           ~f:Lazy.return )
   in
   let allocation_id = Allocation_data.register_allocation data in
   let statistics = Allocation_data.compute_statistics data in
-  String.Table.set table ~key:object_id ~data:{ data; statistics } ;
+  Hashtbl.set table ~key:object_id ~data:{ data; statistics } ;
   Allocation_statistics.write_metrics statistics object_id ;
   Mina_metrics.(
-    Counter.inc_one (Object_lifetime_statistics.allocated_count ~name:object_id)) ;
+    Counter.inc_one (Object_lifetime_statistics.allocated_count ~name:object_id) ) ;
   allocation_id
 
 (* release is currently O(n), where n = number of active allocations for this object type; this can be improved by implementing indexed queues (with decent random delete computational complexity) in ocaml *)
 let release ~object_id ~allocation_id =
   let open Allocation_info in
-  let info = String.Table.find_exn table object_id in
+  let info = Hashtbl.find_exn table object_id in
   Allocation_data.unregister_allocation info.data allocation_id ;
   let statistics = Allocation_data.compute_statistics info.data in
-  String.Table.set table ~key:object_id ~data:{ info with statistics } ;
+  Hashtbl.set table ~key:object_id ~data:{ info with statistics } ;
   Allocation_statistics.write_metrics statistics object_id ;
   Mina_metrics.(
-    Counter.inc_one (Object_lifetime_statistics.collected_count ~name:object_id))
+    Counter.inc_one (Object_lifetime_statistics.collected_count ~name:object_id) )
 
 let attach_finalizer object_id obj =
   let allocation_id = capture object_id in
@@ -200,8 +202,8 @@ let attach_finalizer object_id obj =
 let dump () =
   let open Allocation_info in
   let entries =
-    String.Table.to_alist table
+    Hashtbl.to_alist table
     |> List.Assoc.map ~f:(fun { statistics; _ } ->
-           Allocation_statistics.to_yojson statistics )
+        Allocation_statistics.to_yojson statistics )
   in
   `Assoc entries

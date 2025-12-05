@@ -4,7 +4,6 @@
  (libraries
   ;; opam libraries
   base
-  core_kernel
   base.md5
   core
   async

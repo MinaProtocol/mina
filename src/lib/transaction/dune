@@ -5,11 +5,9 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  base.caml
   base
   base.base_internalhash_types
   bin_prot.shape
-  core_kernel
   ppx_inline_test.config
   result
   sexplib0

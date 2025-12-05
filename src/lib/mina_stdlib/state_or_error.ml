@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Make3 (State : State_or_error_intf.State_intf2) :
   State_or_error_intf.S3 with type ('a, 'b) state = ('a, 'b) State.t = struct

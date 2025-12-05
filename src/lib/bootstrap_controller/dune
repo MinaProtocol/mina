@@ -13,7 +13,6 @@
   async_kernel
   async_unix
   core
-  core_kernel
   ppx_inline_test.config
   sexplib0
   ;; local libraries

@@ -6,15 +6,12 @@
  (libraries
   ;; opam libraries
   core
-  core.linux_ext
   cohttp-async
   async
-  core_kernel
   cohttp
   async_kernel
   uri
   integers
-  base.caml
   ;; local libraries
   network_peer
   mina_base

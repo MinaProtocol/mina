@@ -4,7 +4,6 @@
   ;; opam libraries
   alcotest
   base
-  core_kernel
   fieldslib
   graphql
   graphql_parser

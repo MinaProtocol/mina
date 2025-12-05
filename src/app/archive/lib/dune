@@ -9,14 +9,12 @@
   async_rpc_kernel
   async_unix
   base.base_internalhash_types
-  base.caml
   base64
   bin_prot.shape
   caqti
   caqti-async
   caqti-driver-postgresql
   core
-  core_kernel
   integers
   ppx_deriving_yojson.runtime
   ppx_inline_test.config

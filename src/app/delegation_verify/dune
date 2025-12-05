@@ -1,14 +1,12 @@
 (executable
  (name delegation_verify)
  (libraries
-  core_kernel
   async
   async_kernel
   async_unix
   core
   stdio
   base
-  base.caml
   ppx_deriving_yojson.runtime
   yojson
   base64

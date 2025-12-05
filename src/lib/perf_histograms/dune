@@ -13,10 +13,8 @@
   yojson
   async
   core
-  core_kernel
   ppx_deriving_yojson.runtime
   async.async_rpc
-  base.caml
   async_kernel
   ;; local libraries
   mina_metrics)

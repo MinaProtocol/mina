@@ -1,6 +1,7 @@
 (* peer.ml -- peer with libp2p port and peer id *)
 
 open Core
+open Core_unix
 
 (** A libp2p PeerID is more or less a hash of a public key. *)
 module Id = struct
@@ -25,23 +26,27 @@ module Inet_addr = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Unix.Inet_addr.t [@@deriving sexp, compare, hash]
+      type t = Inet_addr.t [@@deriving sexp, compare, hash]
 
       let to_latest = Fn.id
 
       let of_yojson = function
         | `String s ->
-            Ok (Unix.Inet_addr.of_string s)
+            Ok (Inet_addr.of_string s)
         | _ ->
             Error "expected string"
 
-      let to_yojson ip_addr = `String (Unix.Inet_addr.to_string ip_addr)
+      let to_yojson ip_addr = `String (Inet_addr.to_string ip_addr)
 
       include Mina_stdlib.Bounded_types.String.Of_stringable (struct
         type nonrec t = t
 
-        [%%define_locally Unix.Inet_addr.(to_string, of_string)]
+        [%%define_locally Inet_addr.(to_string, of_string)]
       end)
+
+      let to_string = Inet_addr.to_string
+
+      let of_string = Inet_addr.of_string
     end
   end]
 
@@ -72,7 +77,7 @@ module Stable = struct
 
     let to_yojson { host; peer_id; libp2p_port } =
       `Assoc
-        [ ("host", `String (Unix.Inet_addr.to_string host))
+        [ ("host", Inet_addr.to_yojson host)
         ; ("peer_id", `String peer_id)
         ; ("libp2p_port", `Int libp2p_port)
         ]
@@ -93,7 +98,7 @@ module Stable = struct
              let%map libp2p_port =
                List.Assoc.find ls "libp2p_port" ~equal:String.equal >>= lift_int
              in
-             let host = Unix.Inet_addr.of_string host_str in
+             let host = Core_unix.Inet_addr.of_string host_str in
              { host; peer_id; libp2p_port } )
       | _ ->
           Error "expected object"
@@ -101,7 +106,7 @@ module Stable = struct
 end]
 
 type t = Stable.Latest.t =
-  { host : Unix.Inet_addr.Blocking_sexp.t; libp2p_port : int; peer_id : string }
+  { host : Inet_addr.t; libp2p_port : int; peer_id : string }
 [@@deriving compare, sexp]
 
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
@@ -113,19 +118,18 @@ let create host ~libp2p_port ~peer_id = { host; libp2p_port; peer_id }
 
 let to_discovery_host_and_port t =
   Host_and_port.create
-    ~host:(Unix.Inet_addr.to_string t.host)
+    ~host:(Core_unix.Inet_addr.to_string t.host)
     ~port:t.libp2p_port
 
 let to_string { host; libp2p_port; peer_id } =
-  sprintf
-    !"[host : %s, libp2p_port : %s, peer_id : %s]"
-    (Unix.Inet_addr.to_string host)
+  sprintf "[host : %s, libp2p_port : %s, peer_id : %s]"
+    (Inet_addr.Stable.Latest.to_string host)
     (Int.to_string libp2p_port)
     peer_id
 
 let to_multiaddr_string { host; libp2p_port; peer_id } =
   sprintf "/ip4/%s/tcp/%d/p2p/%s"
-    (Unix.Inet_addr.to_string host)
+    (Inet_addr.Stable.Latest.to_string host)
     libp2p_port peer_id
 
 let pretty_list peers = String.concat ~sep:"," @@ List.map peers ~f:to_string
@@ -165,13 +169,13 @@ let ip { host; _ } = host
 
 let to_display { host; libp2p_port; peer_id } =
   Display.
-    { host = Unix.Inet_addr.to_string host
+    { host = Inet_addr.Stable.Latest.to_string host
     ; libp2p_port
     ; peer_id = Id.to_string peer_id
     }
 
 let of_display { Display.host; libp2p_port; peer_id } =
-  { host = Unix.Inet_addr.of_string host
+  { host = Inet_addr.Stable.Latest.of_string host
   ; libp2p_port
   ; peer_id = Id.unsafe_of_string peer_id
   }

@@ -7,7 +7,6 @@
   async
   core
   base
-  core_kernel
   yojson
   ppx_deriving_yojson.runtime
   result

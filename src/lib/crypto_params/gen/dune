@@ -3,16 +3,13 @@
  (libraries
   ;; opam libraries
   stdio
-  base.caml
   sexplib0
-  core_kernel
   compiler-libs
   ppxlib
   ppxlib.astlib
   digestif
   core
   async
-  ocaml-migrate-parsetree
   ppxlib.ast
   base
   bin_prot.shape

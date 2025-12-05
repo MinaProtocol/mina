@@ -7,10 +7,8 @@
  (libraries
   ;; opam libraries
   sexplib0
-  core_kernel
   core
   bin_prot.shape
-  base.caml
   ;; local libraries
   pickles
   genesis_constants

@@ -1,3 +1,4 @@
+open Core
 (** General interface of a Set *)
 module type S0 = sig
   type el

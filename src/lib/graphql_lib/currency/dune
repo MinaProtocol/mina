@@ -8,7 +8,6 @@
   graphql-async
   graphql
   yojson
-  core_kernel
   core
   sexplib0
   ppx_inline_test.config

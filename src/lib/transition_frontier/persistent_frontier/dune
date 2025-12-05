@@ -5,11 +5,9 @@
   ;;opam libraries
   result
   bin_prot.shape
-  core_kernel
   async
   core
   async_kernel
-  base.caml
   sexplib0
   async_unix
   ;;local libraries

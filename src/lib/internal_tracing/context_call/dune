@@ -7,7 +7,6 @@
  (libraries
   ;; opam libraries
   base.base_internalhash_types
-  core_kernel
   sexplib0
   async_kernel)
  (preprocess

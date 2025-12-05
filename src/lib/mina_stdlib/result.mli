@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 include module type of Result
 

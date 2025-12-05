@@ -13,9 +13,7 @@
   core
   async
   incremental
-  core_kernel
   async_kernel
-  base.caml
   base.base_internalhash_types
   uri
   stdio

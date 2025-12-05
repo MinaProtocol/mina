@@ -27,7 +27,6 @@
   ;; opam libraries
   async_unix
   async_kernel
-  core_kernel
   core
   async
   cmdliner
@@ -36,7 +35,6 @@
   sexplib0
   stdio
   result
-  base.caml
   integers
   re2
   ;; local libraries

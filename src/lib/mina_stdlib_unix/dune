@@ -8,7 +8,6 @@
   async_kernel
   async_unix
   core
-  core_kernel
   ptime
   ;; local libraries
   logger)

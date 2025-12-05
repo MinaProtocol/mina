@@ -5,7 +5,6 @@
   ;; opam libraries
   async
   core
-  core_kernel
   base
   stdio
   ;; local libraries

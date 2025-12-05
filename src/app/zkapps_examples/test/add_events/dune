@@ -7,7 +7,6 @@
   async_kernel
   async_unix
   core
-  core_kernel
   ;; local libraries
   cache_dir
   currency

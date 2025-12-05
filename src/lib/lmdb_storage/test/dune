@@ -5,7 +5,6 @@
   alcotest
   async_kernel
   base_quickcheck
-  core_kernel
   lmdb
   ;; local libraries
   blake2

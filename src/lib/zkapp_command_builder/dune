@@ -6,7 +6,6 @@
   ;; opam libraries
   async_kernel
   async_unix
-  core_kernel
   ;; local libraries
   mina_base
   currency

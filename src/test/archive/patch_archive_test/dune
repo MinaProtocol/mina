@@ -5,7 +5,6 @@
  (libraries
   async
   async.async_command
-  core_kernel
   caqti
   caqti-async
   caqti-driver-postgresql
@@ -21,7 +20,6 @@
   core
   async_unix
   stdio
-  base.caml
   result
   mina_automation
   mina_stdlib)

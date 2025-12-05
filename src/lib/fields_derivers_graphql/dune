@@ -4,7 +4,6 @@
  (libraries
   ;; opam libraries
   async_kernel
-  core_kernel
   fieldslib
   graphql
   graphql-async

@@ -4,10 +4,7 @@
  (libraries
   ;;opam libraries
   core_kernel.uuid
-  core_kernel
   core
-  core.uuid
-  base.caml
   ;;local libraries
   precomputed_values
   mina_stdlib_unix

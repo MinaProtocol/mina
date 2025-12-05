@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Interruptible
 
@@ -13,14 +13,14 @@ let test_monad_gets_interrupted () =
       let ivar = Ivar.create () in
       don't_wait_for
         (let open Let_syntax in
-        let%bind () = lift Deferred.unit (Ivar.read ivar) in
-        let%bind () = uninterruptible (wait 100.) in
-        incr r ;
-        let%map () = uninterruptible (wait 100.) in
-        incr r) ;
+         let%bind () = lift Deferred.unit (Ivar.read ivar) in
+         let%bind () = uninterruptible (wait 100.) in
+         incr r ;
+         let%map () = uninterruptible (wait 100.) in
+         incr r ) ;
       let open Deferred.Let_syntax in
       let%bind () = wait 130. in
-      Ivar.fill ivar () ;
+      Ivar.fill_exn ivar () ;
       let%map () = wait 100. in
       Alcotest.(check int) "Only first operation ran before interruption" 1 !r )
 
@@ -37,11 +37,11 @@ let test_monad_gets_interrupted_within_nested_binds () =
       in
       don't_wait_for
         (let open Let_syntax in
-        let%bind () = lift Deferred.unit (Ivar.read ivar) in
-        go ()) ;
+         let%bind () = lift Deferred.unit (Ivar.read ivar) in
+         go () ) ;
       let open Deferred.Let_syntax in
       let%bind () = wait 130. in
-      Ivar.fill ivar () ;
+      Ivar.fill_exn ivar () ;
       let%map () = wait 100. in
       Alcotest.(check int) "Only first operation ran in nested bind" 1 !r )
 
@@ -58,11 +58,11 @@ let test_interruptions_still_run_finally_blocks () =
       in
       don't_wait_for
         (let open Let_syntax in
-        let%bind () = lift Deferred.unit (Ivar.read ivar) in
-        finally (go ()) ~f:(fun () -> incr r)) ;
+         let%bind () = lift Deferred.unit (Ivar.read ivar) in
+         finally (go ()) ~f:(fun () -> incr r) ) ;
       let open Deferred.Let_syntax in
       let%bind () = wait 130. in
-      Ivar.fill ivar () ;
+      Ivar.fill_exn ivar () ;
       let%map () = wait 100. in
       Alcotest.(check int) "One operation ran plus finally block" 2 !r )
 
@@ -83,19 +83,19 @@ let test_interruptions_branches_do_not_cancel_each_other () =
       let start = uninterruptible Deferred.unit in
       don't_wait_for
         (let open Let_syntax in
-        let%bind () = start in
-        let%bind () = lift Deferred.unit (Ivar.read ivar_r) in
-        go r) ;
+         let%bind () = start in
+         let%bind () = lift Deferred.unit (Ivar.read ivar_r) in
+         go r ) ;
       don't_wait_for
         (let open Let_syntax in
-        let%bind () = start in
-        let%bind () = lift Deferred.unit (Ivar.read ivar_s) in
-        go s) ;
+         let%bind () = start in
+         let%bind () = lift Deferred.unit (Ivar.read ivar_s) in
+         go s ) ;
       let open Deferred.Let_syntax in
       let%bind () = wait 130. in
-      Ivar.fill ivar_r () ;
+      Ivar.fill_exn ivar_r () ;
       let%bind () = wait 100. in
-      Ivar.fill ivar_s () ;
+      Ivar.fill_exn ivar_s () ;
       let%map () = wait 100. in
       Alcotest.(check int) "First branch ran once" 1 !r ;
       Alcotest.(check int) "Second branch ran twice" 2 !s )

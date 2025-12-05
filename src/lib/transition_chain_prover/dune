@@ -8,7 +8,6 @@
  (libraries
   ;; opam libraries
   core
-  core_kernel
   ;; local libraries
   transition_frontier_extensions
   mina_block

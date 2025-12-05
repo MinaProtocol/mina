@@ -10,12 +10,10 @@
   async_unix
   rpc_parallel
   ptime
-  core_kernel
   async
   bin_prot.shape
   async_kernel
   core
-  base.caml
   cohttp
   uri
   ;; local libraries

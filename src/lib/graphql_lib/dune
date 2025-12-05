@@ -6,7 +6,6 @@
  (libraries
   ;; opam libraries
   uri
-  core_kernel
   integers
   async
   cohttp

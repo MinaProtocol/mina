@@ -4,7 +4,6 @@
   alcotest
   base
   blake2
-  core_kernel
   crypto_params
   digestif
   snark_params

@@ -1,5 +1,5 @@
 (tests
  (names test_snark_keys_header)
- (libraries alcotest core_kernel snark_keys_header)
+ (libraries alcotest core snark_keys_header)
  (preprocess
   (pps ppx_let)))

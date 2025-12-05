@@ -35,9 +35,7 @@
   bigarray-compat
   ; --
   core
-  core_kernel
   base
-  base.caml
   bin_prot
   splittable_random
   sexplib0)

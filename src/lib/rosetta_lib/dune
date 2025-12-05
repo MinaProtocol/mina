@@ -5,9 +5,7 @@
  (libraries
   ;; opam libraries
   result
-  base.caml
   caqti
-  core_kernel
   base
   async_kernel
   uri

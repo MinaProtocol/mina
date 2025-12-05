@@ -9,7 +9,6 @@
   async.async_command
   core
   base
-  core_kernel
   yojson
   splittable_random
   ;; local libraries
