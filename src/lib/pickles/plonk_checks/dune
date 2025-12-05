@@ -8,7 +8,7 @@
   -open
   Core_kernel)
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
+  (pps ppx_compare ppx_custom_printf ppx_deriving.eq ppx_deriving.std ppx_deriving_yojson ppx_hash ppx_mina ppx_sexp_conv ppx_version))
  (libraries
   ;; opam libraries
   sexplib0

@@ -11,6 +11,6 @@
   mina_stdlib_unix
   disk_cache.intf)
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane))
+  (pps ppx_assert ppx_let ppx_mina ppx_version))
  (instrumentation
   (backend bisect_ppx)))

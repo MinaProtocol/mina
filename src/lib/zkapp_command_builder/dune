@@ -23,7 +23,7 @@
   snark_params
   snarky.backendless)
  (preprocess
-  (pps ppx_jane ppx_annot ppx_snarky ppx_here ppx_mina ppx_version))
+  (pps ppx_annot ppx_here ppx_let ppx_mina ppx_snarky ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Builder Zkapp_command.t via combinators"))
