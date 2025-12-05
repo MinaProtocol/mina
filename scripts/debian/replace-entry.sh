@@ -39,6 +39,11 @@ fi
 
 if [[ -z "$OUTPUT_DEB" ]]; then
   OUTPUT_DEB="${INPUT_DEB%.deb}-patched.deb"
+else
+  # Ensure OUTPUT_DEB is an absolute path
+  if [[ "$OUTPUT_DEB" != /* ]]; then
+    OUTPUT_DEB="$(pwd)/$OUTPUT_DEB"
+  fi
 fi
 
 # Strip leading slash for inside-tar path

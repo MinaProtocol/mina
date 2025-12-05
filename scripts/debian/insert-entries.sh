@@ -64,6 +64,11 @@ done
 
 if [[ -z "$OUTPUT_DEB" ]]; then
   OUTPUT_DEB="${INPUT_DEB%.deb}-patched.deb"
+else
+  # Ensure OUTPUT_DEB is an absolute path
+  if [[ "$OUTPUT_DEB" != /* ]]; then
+    OUTPUT_DEB="$(pwd)/$OUTPUT_DEB"
+  fi
 fi
 
 WORKDIR=$(mktemp -d)

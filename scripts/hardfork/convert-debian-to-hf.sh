@@ -96,7 +96,7 @@ mkdir data
 tar -xzf data.tar.gz -C data
 
 # Verify config file
-RUNTIME_CONFIG_HASH=$(sha256sum "$RUNTIME_CONFIG_ABS" | awk '{print $1}')
+RUNTIME_CONFIG_HASH=$(sha256sum "$RUNTIME_CONFIG_JSON_ABS" | awk '{print $1}')
 
 # Find the config file in the package (it may have been renamed)
 PKG_CONFIG=$(ls data/var/lib/coda/config_*.json 2>/dev/null | head -1)
