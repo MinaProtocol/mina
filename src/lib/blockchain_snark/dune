@@ -42,7 +42,7 @@
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
-  (pps ppx_compare ppx_jane ppx_mina ppx_snarky ppx_version))
+  (pps ppx_compare ppx_fields_conv ppx_let ppx_mina ppx_sexp_conv ppx_snarky ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "blockchain state transition snarking library"))

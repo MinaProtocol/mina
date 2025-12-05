@@ -16,7 +16,7 @@
   internal_tracing.context_call
   logger.context_logger)
  (preprocess
-  (pps ppx_jane ppx_mina ppx_version ppx_deriving_yojson))
+  (pps ppx_compare ppx_deriving_yojson ppx_hash ppx_mina ppx_sexp_conv ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Internal tracing"))

@@ -25,11 +25,14 @@
   (backend bisect_ppx))
  (preprocess
   (pps
+   ppx_bin_prot
    ppx_compare
    ppx_deriving.std
    ppx_deriving_yojson
+   ppx_hash
    ppx_inline_test
-   ppx_jane
+   ppx_let
    ppx_mina
+   ppx_sexp_conv
    ppx_version))
  (synopsis "Mina standard library"))

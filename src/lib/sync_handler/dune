@@ -6,7 +6,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane))
+  (pps ppx_custom_printf ppx_let ppx_mina ppx_version))
  (libraries
   ;; opam libraries
   sexplib0

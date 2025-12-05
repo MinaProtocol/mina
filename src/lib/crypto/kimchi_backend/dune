@@ -7,7 +7,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_deriving.std ppx_deriving_yojson ppx_jane ppx_version))
+  (pps ppx_jane ppx_version))
  (libraries
   ;; opam libraries
   base.base_internalhash_types

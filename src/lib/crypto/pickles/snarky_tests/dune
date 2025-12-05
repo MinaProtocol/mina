@@ -6,12 +6,12 @@
   (source_tree examples))
  (preprocess
   (pps
-   ppx_version
-   ppx_mina
-   ppx_jane
+   h_list.ppx
    ppx_compare
    ppx_deriving_yojson
-   h_list.ppx))
+   ppx_let
+   ppx_mina
+   ppx_version))
  (libraries
   ;; opam libraries
   alcotest
