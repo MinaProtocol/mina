@@ -65,11 +65,11 @@
      kimchi-stubs
      --release
      --target-dir
-     %{read:../dune-build-root}/cargo_kimchi_stubs
+     %{workspace_root}/cargo_kimchi_stubs
      --offline))
    (run
     cp
-    %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.a
+    %{workspace_root}/cargo_kimchi_stubs/release/libkimchi_stubs.a
     .))))
 
 ;; this is used by nix
@@ -171,7 +171,7 @@
    (run rm -f ./Cargo.lock)
    (setenv
     CARGO_TARGET_DIR
-    "%{read:../dune-build-root}/cargo_kimchi_bindgen"
+    "%{workspace_root}/cargo_kimchi_bindgen"
     (run cargo run %{targets} --offline))
    (run ocamlformat -i %{targets}))))
 

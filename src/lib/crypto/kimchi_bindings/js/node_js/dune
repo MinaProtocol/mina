@@ -19,13 +19,12 @@
   flags.sexp)
  (deps
   build.sh
-  ../../dune-build-root
   (source_tree ../../../proof-systems))
  (locks /cargo-lock) ; lock for rustup
  (action
   (progn
    (setenv
     CARGO_TARGET_DIR
-    "%{read:../../dune-build-root}/cargo_kimchi_wasm"
+    "%{workspace_root}/cargo_kimchi_wasm"
     (run bash build.sh))
    (write-file flags.sexp "()"))))
