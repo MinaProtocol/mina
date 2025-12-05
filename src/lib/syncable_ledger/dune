@@ -25,12 +25,14 @@
   mina_compile_config)
  (preprocess
   (pps
-   ppx_mina
-   ppx_version
-   ppx_jane
    ppx_compare
    ppx_deriving_yojson
-   ppx_register_event))
+   ppx_hash
+   ppx_let
+   ppx_mina
+   ppx_register_event
+   ppx_sexp_conv
+   ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Synchronization of Merkle-tree backed ledgers"))

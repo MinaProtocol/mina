@@ -18,7 +18,6 @@
    ppx_mina
    ppx_version
    ppx_deriving_yojson
-   ppx_jane
    ppx_deriving.std
    h_list.ppx))
  (instrumentation
