@@ -354,7 +354,6 @@ let
         PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
 
         configurePhase = ''
-          export MINA_ROOT="$PWD"
           export -f patchShebangs isScript
           fd . --type executable -x bash -c "patchShebangs {}"
           export -n patchShebangs isScript
