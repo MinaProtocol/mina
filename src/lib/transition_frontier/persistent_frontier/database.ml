@@ -429,21 +429,39 @@ let check ?(check_arcs = true) t ~genesis_state_hash =
         let%bind best_tip =
           get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
         in
-        let%bind root_transition =
-          get_transition_do t root_hash
-          |> Result.map_error
-               ~f:(const @@ `Corrupt (`Not_found `Root_transition))
+        let%bind root_protocol_state =
+          match
+            get t.db ~key:Root_new ~error:()
+            |> Result.map ~f:Root_data.Common.protocol_state
+          with
+          | Ok (Some protocol_state) ->
+              Ok protocol_state
+          | Ok None | Error () ->
+              get_transition_do t root_hash
+              |> Result.map_error
+                   ~f:(const @@ `Corrupt (`Not_found `Root_transition))
+              |> Result.map
+                   ~f:
+                     (Fn.compose Mina_block.Header.protocol_state
+                        Transition.header )
         in
         let%bind _ =
           get t.db ~key:Protocol_states_for_root_scan_state
             ~error:(`Corrupt (`Not_found `Protocol_states_for_root_scan_state))
         in
         let%map _ =
-          get_transition_do t best_tip
-          |> Result.map_error
-               ~f:(const @@ `Corrupt (`Not_found `Best_tip_transition))
+          if Frozen_ledger_hash.equal best_tip root_hash then
+            (* in case best tip is the root, its data is fully
+               stored in the root data, nothing is stored as a separate
+               transition *)
+            Ok ()
+          else
+            get_transition_do t best_tip
+            |> Result.map_error
+                 ~f:(const @@ `Corrupt (`Not_found `Best_tip_transition))
+            |> Result.ignore_m
         in
-        (root_hash, root_transition)
+        (root_hash, root_protocol_state)
       in
       let rec check_arcs_do pred_hash =
         let%bind successors =
@@ -459,10 +477,7 @@ let check ?(check_arcs = true) t ~genesis_state_hash =
             check_arcs_do succ_hash )
       in
       let%bind () = check_version () in
-      let%bind root_hash, root_block = check_base () in
-      let root_protocol_state =
-        Transition.header root_block |> Mina_block.Header.protocol_state
-      in
+      let%bind root_hash, root_protocol_state = check_base () in
       let%bind () =
         let persisted_genesis_state_hash =
           Mina_state.Protocol_state.genesis_state_hash root_protocol_state
@@ -472,9 +487,7 @@ let check ?(check_arcs = true) t ~genesis_state_hash =
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
       let%map () = if check_arcs then check_arcs_do root_hash else Ok () in
-      Transition.header root_block
-      |> Mina_block.Header.protocol_state
-      |> Mina_state.Protocol_state.blockchain_state
+      Mina_state.Protocol_state.blockchain_state root_protocol_state
       |> Mina_state.Blockchain_state.snarked_ledger_hash )
   |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
   |> Result.join
