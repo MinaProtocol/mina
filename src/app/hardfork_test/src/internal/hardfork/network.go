@@ -50,7 +50,7 @@ func (t *HardforkTest) AnyPortOfType(ty PortType) int {
 	return candidates_ports[idx]
 }
 
-func (t *HardforkTest) startLocalNetwork(minaExecutable string, minaArchiveExecutable string, profile string, extraArgs []string) (*exec.Cmd, error) {
+func (t *HardforkTest) startLocalNetwork(minaExecutable string, minaArchiveExecutable *string, profile string, extraArgs []string) (*exec.Cmd, error) {
 
 	t.Logger.Info("Starting network %s...", profile)
 
@@ -72,7 +72,7 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, minaArchiveExecu
 		"--root", t.Config.Root,
 	)
 
-	if t.Config.ArchiveDB != nil {
+	if minaArchiveExecutable != nil {
 		extraArgs = append(extraArgs,
 			"--pg-host", t.Config.ArchiveDB.Host,
 			"--pg-port", strconv.Itoa(t.Config.ArchiveDB.Port),

@@ -50,9 +50,13 @@ func Execute() error {
 
 func init() {
 	// Required executable paths
-	rootCmd.Flags().StringVar(&cfg.MainMinaExe, "main-mina-exe", "", "Path to the main Mina executable (required)")
-	rootCmd.Flags().StringVar(&cfg.MainArchiveExe, "main-archive-exe", "", "Path to the main Mina archive executable (required)")
-
+	rootCmd.Flags().StringVar(&cfg.MainMinaExe, "main-mina-exe", "", "Path to the main Mina executable (optional)")
+	rootCmd.Flags().StringVar(&cfg.MainArchiveExe, "main-archive-exe", "", "Path to the main Mina archive executable (optional)")
+	rootCmd.Flags().IntVar(&cfg.ArchiveDB.Port, "archive-port", 5432, "Port for the main Mina archive database (optional)")
+	rootCmd.Flags().StringVar(&cfg.ArchiveDB.Database, "archive-database", "archive", "Database name for the main Mina archive database (optional)")
+	rootCmd.Flags().StringVar(&cfg.ArchiveDB.Password, "archive-password", "postgres", "Password for the main Mina archive database (optional)")
+	rootCmd.Flags().StringVar(&cfg.ArchiveDB.User, "archive-user", "postgres", "User for the main Mina archive database (optional)")
+	rootCmd.Flags().StringVar(&cfg.ArchiveDB.Host, "archive-host", "localhost", "Host for the main Mina archive database (optional)")
 	rootCmd.Flags().StringVar(&cfg.MainRuntimeGenesisLedger, "main-runtime-genesis-ledger", "", "Path to the main runtime genesis ledger executable (required)")
 	rootCmd.Flags().StringVar(&cfg.ForkMinaExe, "fork-mina-exe", "", "Path to the fork Mina executable (required)")
 	rootCmd.Flags().StringVar(&cfg.ForkArchiveExe, "fork-archive-exe", "", "Path to the fork Mina archive executable (required)")
