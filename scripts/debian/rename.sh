@@ -1,57 +1,32 @@
 #!/bin/bash
 
+# DEPRECATED: This script is deprecated and maintained only for backwards compatibility.
+# Please use rename-package.sh instead, which provides:
+#   - Proper compression format preservation (gz/xz/zst/tar)
+#   - SHA256 verification of package contents
+#   - Flexible output naming (auto-generated or custom)
+#   - Package name validation
+#   - Better error handling and reporting
+
 set -e
 
 if [ "$#" -ne 2 ]; then
 	echo "Usage: $0 <source-deb-file> <target-name>"
+	echo ""
+	echo "⚠️  DEPRECATION WARNING: This script is deprecated."
+	echo "   Please use 'scripts/debian/rename-package.sh' instead for better reliability."
 	exit 1
 fi
 
 SRC_DEB="$1"
 TARGET_NAME="$2"
 
-if [ ! -f "$SRC_DEB" ]; then
-	echo "Source file '$SRC_DEB' does not exist."
-	exit 2
-fi
+echo "⚠️  WARNING: rename.sh is deprecated. Forwarding to rename-package.sh..."
+echo ""
 
-# Get absolute path of source deb
-SRC_DEB_ABS=$(readlink -f "$SRC_DEB")
+# Get the directory where this script lives
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Extract the debian package
-WORKDIR=$(mktemp -d)
-cd "$WORKDIR"
-ar x "$SRC_DEB_ABS"
-
-# Extract control.tar.*
-CONTROL_TAR=$(ls control.tar.*)
-mkdir control
-tar -xf "$CONTROL_TAR" -C control
-
-# Update Package name in control file
-CONTROL_FILE="control/control"
-if grep -q '^Package:' "$CONTROL_FILE"; then
-	sed -i "s/^Package: .*/Package: $TARGET_NAME/" "$CONTROL_FILE"
-else
-	echo "No Package field found in control file."
-	cd /
-	rm -rf "$WORKDIR"
-	exit 3
-fi
-
-# Repack control.tar.gz
-rm -f control.tar.gz
-tar -czf control.tar.gz -C control .
-
-# Rebuild the deb file
-DATA_TAR=$(ls data.tar.*)
-NEW_DEB="${TARGET_NAME}.deb"
-
-# Return to original directory to write output
-cd - > /dev/null
-ar r "$NEW_DEB" "$WORKDIR/debian-binary" "$WORKDIR/control.tar.gz" "$WORKDIR/$DATA_TAR"
-
-echo "Renamed package created: $NEW_DEB"
-
-# Cleanup
-rm -rf "$WORKDIR"
+# Call the new script with the same arguments
+# Output will be ${TARGET_NAME}_${VERSION}_${ARCH}.deb instead of just ${TARGET_NAME}.deb
+exec "$SCRIPT_DIR/rename-package.sh" "$SRC_DEB" "$TARGET_NAME"

@@ -33,6 +33,34 @@ LEDGER_TARBALLS_FULL=$(readlink -f "$LEDGER_TARBALLS")
 DEB_DIR=$(dirname "$DEB_FILE_ABS")
 DEB_BASE=$(basename "$DEB_FILE_ABS" .deb)
 
+# Extract the original package name from the deb file
+ORIGINAL_PACKAGE_NAME=$(dpkg-deb --field "$DEB_FILE_ABS" Package)
+
+# Determine the output filename by inserting -hardfork before the version
+# Parse the input filename: <name>_<version>_<arch>.deb
+# Expected format: mina-devnet_3.3.0-beta1-xxx_amd64.deb
+# Desired output:  mina-devnet-hardfork_3.3.0-beta1-xxx_amd64.deb
+
+# Extract version and architecture from the filename
+VERSION=$(dpkg-deb --field "$DEB_FILE_ABS" Version)
+ARCH=$(dpkg-deb --field "$DEB_FILE_ABS" Architecture)
+
+# Get the base name without version and arch (everything before the first underscore)
+if [[ "$DEB_BASE" =~ ^(.+)_${VERSION}_${ARCH}$ ]]; then
+	FILE_BASE_NAME="${BASH_REMATCH[1]}"
+else
+	# Fallback if pattern doesn't match - just use the base
+	FILE_BASE_NAME="${DEB_BASE%%_*}"
+fi
+
+# Remove any existing -hardfork suffixes from the base name
+while [[ "$FILE_BASE_NAME" == *-hardfork ]]; do
+	FILE_BASE_NAME="${FILE_BASE_NAME%-hardfork}"
+done
+
+# Construct the output filename: <base-name>-hardfork_<version>_<arch>.deb
+OUTPUT_DEB_FILE="${DEB_DIR}/${FILE_BASE_NAME}-hardfork_${VERSION}_${ARCH}.deb"
+
 # Fail if LEDGER_TARBALLS_FULL does not exist
 if [[ ! -e "$LEDGER_TARBALLS_FULL" ]]; then
 	echo "Error: Ledger tarballs path '$LEDGER_TARBALLS_FULL' does not exist." >&2
@@ -172,7 +200,30 @@ fi
 echo ""
 echo "=== Verification Complete ==="
 echo "All files verified successfully!"
-echo "Output: $FINAL_DEB"
 
-mv "$FINAL_DEB" "$DEB_FILE_ABS"
-rm -f "$PATCHED_DEB"
+# Step 5: Rename the package to add -hardfork suffix
+echo ""
+echo "=== Renaming Package ==="
+
+# Remove all existing -hardfork suffixes to avoid duplication
+# This handles cases where the package was already processed multiple times
+BASE_PACKAGE_NAME="$ORIGINAL_PACKAGE_NAME"
+while [[ "$BASE_PACKAGE_NAME" == *-hardfork ]]; do
+	BASE_PACKAGE_NAME="${BASE_PACKAGE_NAME%-hardfork}"
+done
+
+NEW_PACKAGE_NAME="${BASE_PACKAGE_NAME}-hardfork"
+
+echo "Renaming package from '$ORIGINAL_PACKAGE_NAME' to '$NEW_PACKAGE_NAME'..."
+echo "Output file: $(basename "$OUTPUT_DEB_FILE")"
+
+# Use rename-package.sh to rename the final deb, outputting to the hardfork filename
+./scripts/debian/rename-package.sh "$FINAL_DEB" "$NEW_PACKAGE_NAME" "$OUTPUT_DEB_FILE"
+
+echo ""
+echo "=== Hardfork Package Creation Complete ==="
+echo "Output: $OUTPUT_DEB_FILE"
+echo "Package name: $NEW_PACKAGE_NAME"
+
+# Cleanup intermediate files
+rm -f "$PATCHED_DEB" "$FINAL_DEB"
