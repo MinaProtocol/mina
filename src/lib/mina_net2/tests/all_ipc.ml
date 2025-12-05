@@ -625,7 +625,7 @@ let%test_module "all-ipc test" =
         ; topic_a_msg_3 = random_msg ()
         ; topic_c_msg_1 = { a = Random.int 1073741824; b = None }
         ; topic_c_msg_2 =
-            { a = Random.int 1073741824; b = random_msg () |> Some }
+            { a = Random.int 1073741824; b = Some (random_msg ()) }
         ; stream_1_msg_1 = random_msg ()
         ; stream_1_msg_2 = random_msg ()
         ; stream_2_msg_1 = random_msg ()

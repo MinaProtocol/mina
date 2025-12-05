@@ -1091,7 +1091,7 @@ struct
           let a =
             Evals.In_circuit.to_list e
             |> List.map ~f:(function
-                 | Nothing ->
+                 | Opt.Nothing ->
                      [||]
                  | Just a ->
                      Array.map a ~f:Opt.just

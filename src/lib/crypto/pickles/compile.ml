@@ -1144,7 +1144,7 @@ let compile_with_wrap_main_override_promise :
           domains
           |> Vector.reduce_exn
                ~f:(fun
-                    { h = Pow_2_roots_of_unity d1 }
+                    Domains.{ h = Pow_2_roots_of_unity d1 }
                     { h = Pow_2_roots_of_unity d2 }
                   -> { h = Pow_2_roots_of_unity (Int.max d1 d2) } )
         in

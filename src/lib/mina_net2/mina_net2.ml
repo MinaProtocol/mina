@@ -185,7 +185,7 @@ let list_peers t =
       (* FIXME #4039: filter_map shouldn't be necessary *)
       peers
       |> List.map ~f:Libp2p_ipc.unsafe_parse_peer
-      |> List.filter ~f:(fun peer -> not (Int.equal peer.libp2p_port 0))
+      |> List.filter ~f:(fun peer -> not (Int.equal peer.Peer.libp2p_port 0))
   | Error error ->
       [%log' error t.logger]
         "Encountered $error while asking libp2p_helper for peers"

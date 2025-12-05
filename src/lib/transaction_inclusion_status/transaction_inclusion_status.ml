@@ -36,7 +36,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
       let in_breadcrumb breadcrumb =
         breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
         |> Mina_block.Validated.valid_commands
-        |> List.exists ~f:(fun { data = found; _ } ->
+        |> List.exists ~f:(fun { With_status.data = found; _ } ->
                let found' = User_command.forget_check found in
                User_command.equal_ignoring_proofs_and_hashes_and_aux cmd found' )
       in
