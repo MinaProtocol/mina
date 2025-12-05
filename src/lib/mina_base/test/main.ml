@@ -192,4 +192,31 @@ let () =
           ; test_case "No odd slot difference discrepancies" `Quick
               no_odd_vesting_discrepancies
           ] )
+    ; Zkapp_signature_test_vectors.
+        ( "zkApp signature test vectors"
+        , [ test_case "Commitments and signatures" `Quick
+              test_vectors_sign_commitments
+          ] )
+    ; Zkapp_signature_test_vectors.
+        ( "zkApp signature verification"
+        , [ test_case "Fee payer signatures (testnet & mainnet)" `Quick
+              test_fee_payer_signature_verification
+          ; test_case "Account update signature" `Quick
+              test_account_update_signature_verification
+          ; test_case "Production verifier accepts valid signatures" `Quick
+              test_production_signature_verification
+          ] )
+    ; Zkapp_signature_pbt.
+        ( "zkApp signature PBT"
+        , [ test_case "Nonce affects signature" `Quick
+              test_pbt_nonce_affects_signature
+          ; test_case "Fee payer affects signature" `Quick
+              test_pbt_fee_payer_affects_signature
+          ; test_case "Fee amount affects signature" `Quick
+              test_pbt_fee_amount_affects_signature
+          ; test_case "Valid_until affects signature" `Quick
+              test_pbt_valid_until_affects_signature
+          ; test_case "Wrong key signature fails" `Quick
+              test_pbt_wrong_key_signature_fails
+          ] )
     ]
