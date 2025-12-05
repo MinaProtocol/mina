@@ -251,7 +251,9 @@ let generateDockerForCodename =
                                   { Some =
                                           \(cached_build_id : Text)
                                       ->      "&& ./buildkite/scripts/release/manager.sh persist "
-                                          ++  " --backend local --artifacts mina-logproc,mina-archive-${Network.lowerName spec.network},mina-rosetta-${Network.lowerName spec.network} "
+                                          ++  " --backend local --artifacts mina-logproc,mina-archive-${Network.lowerName
+                                                                                                          spec.network},mina-rosetta-${Network.lowerName
+                                                                                                                                         spec.network} "
                                           ++  " --buildkite-build-id ${cached_build_id}"
                                           ++  " --codename ${lowerNameCodename} "
                                           ++  " --target \\\${BUILDKITE_BUILD_ID} "
@@ -274,6 +276,7 @@ let generateDockerForCodename =
                     , deb_codename = codename
                     , deb_profile = profile
                     , deb_repo = DebianRepo.Type.Local
+                    , deb_version = spec.version
                     , size = spec.size
                     , step_key_suffix =
                         "-${DebianVersions.lowerName codename}-docker-image"
@@ -286,6 +289,7 @@ let generateDockerForCodename =
                     , deb_profile = profile
                     , deb_repo = DebianRepo.Type.Local
                     , deb_codename = codename
+                    , deb_version = spec.version
                     , deb_suffix = Some "hardfork"
                     , size = spec.size
                     , step_key_suffix =
