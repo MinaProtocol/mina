@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 
 type 'a final_state = [ `Failed | `Success of 'a ] Ivar.t
 
