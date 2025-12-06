@@ -31,7 +31,7 @@
       [@@deriving register_event { msg = "n = $n, s = $s, and p = $p" } ]
 *)
 
-open Core_kernel
+open Core
 open Ppxlib
 
 let deriver = "register_event"
@@ -66,10 +66,11 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
   let ctor, label_decls =
     match ty_ext.ptyext_constructors with
     (* record argument *)
-    | [ { pext_name; pext_kind = Pext_decl (Pcstr_record labels, None); _ } ] ->
+    | [ { pext_name; pext_kind = Pext_decl (_, Pcstr_record labels, None); _ } ]
+      ->
         (pext_name.txt, labels)
     (* no arguments *)
-    | [ { pext_name; pext_kind = Pext_decl (Pcstr_tuple [], None); _ } ] ->
+    | [ { pext_name; pext_kind = Pext_decl (_, Pcstr_tuple [], None); _ } ] ->
         (pext_name.txt, [])
     | _ ->
         Location.raise_errorf ~loc:ty_ext.ptyext_path.loc
@@ -135,9 +136,6 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
   in
   let event_name = String.lowercase ctor in
   let event_path = path ^ "." ^ ctor in
-  let split_path = String.split path ~on:'.' in
-  let to_yojson = Ppx_deriving_yojson.ser_expr_of_typ in
-  let of_yojson = Ppx_deriving_yojson.desu_expr_of_typ in
   let elist ~f l = elist (List.map ~f l) in
   let record_pattern =
     let arg =
@@ -182,12 +180,11 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                     ( [%e msg]
                     , [%e
                         elist label_decls
-                          ~f:(fun { pld_name = { txt = name; _ }; pld_type; _ }
-                             ->
-                            Ppx_deriving_yojson.wrap_runtime
-                            @@ [%expr
-                                 [%e estring name]
-                                 , [%e to_yojson pld_type] [%e evar name]] )] )
+                          ~f:(fun
+                              { pld_name = { txt = name; _ }; pld_type; _ } ->
+                            [%expr
+                              [%e estring name]
+                            , [%to_yojson: [%t pld_type]] [%e evar name]] )] )
               | _ ->
                   None )
           ; parse =
@@ -198,27 +195,23 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                   ignore args_list ;
                   [%e
                     List.fold_right label_decls
-                      ~f:(fun { pld_name = { txt = name; _ }; pld_type; _ } acc ->
-                        Ppx_deriving_yojson.wrap_runtime
-                        @@ [%expr
-                             let module Result = Core_kernel.Result in
-                             match
-                               Core_kernel.Map.find args_list [%e estring name]
-                             with
-                             | Some [%p pvar name] ->
-                                 Result.bind
-                                   ([%e
-                                      of_yojson
-                                        ~path:(split_path @ [ ctor; name ])
-                                        pld_type]
-                                      [%e evar name] )
-                                   ~f:(fun [%p pvar name] -> [%e acc])
-                             | None ->
-                                 Result.fail
-                                   [%e
-                                     estring
-                                       (sprintf "%s, parse: missing argument %s"
-                                          event_path name )]] )
+                      ~f:(fun
+                          { pld_name = { txt = name; _ }; pld_type; _ } acc ->
+                        [%expr
+                          let module Result = Core_kernel.Result in
+                          match
+                            Core_kernel.Map.find args_list [%e estring name]
+                          with
+                          | Some [%p pvar name] ->
+                              Result.bind
+                                ([%of_yojson: [%t pld_type]] [%e evar name])
+                                ~f:(fun [%p pvar name] -> [%e acc])
+                          | None ->
+                              Result.fail
+                                [%e
+                                  estring
+                                    (sprintf "%s, parse: missing argument %s"
+                                       event_path name )]] )
                       ~init:[%expr Core_kernel.Result.return [%e record_expr]]]
                 in
                 match result with Ok ev -> Some ev | Error _ -> None )
