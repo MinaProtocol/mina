@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 [%%versioned
@@ -117,4 +117,4 @@ let gen inner_gen =
     union
       [ map inner_gen ~f:(fun x -> `One x)
       ; map (tuple2 inner_gen inner_gen) ~f:(fun pair -> `Two pair)
-      ])
+      ] )
