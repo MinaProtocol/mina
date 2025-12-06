@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let uint32_be =
   Lmdb.Conv.make ~flags:Lmdb.Conv.Flags.dup_fixed
@@ -25,7 +25,7 @@ let blake2 =
         let str = Blake2.to_raw_string x in
         serialise string alloc str )
       ~deserialise:(fun s -> deserialise string s |> Blake2.of_raw_string)
-      ())
+      () )
 
 let bin_prot_conv (t : 'a Bin_prot.Type_class.t) =
   Lmdb.Conv.(
@@ -36,4 +36,4 @@ let bin_prot_conv (t : 'a Bin_prot.Type_class.t) =
         let _pos : int = t.writer.write ~pos:0 res x in
         res )
       ~deserialise:(fun x -> t.reader.read ~pos_ref:(ref 0) x)
-      ())
+      () )
