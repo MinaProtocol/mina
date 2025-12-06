@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* Import the module we're testing *)
 module Header = Snark_keys_header
