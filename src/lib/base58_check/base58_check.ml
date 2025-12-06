@@ -5,7 +5,7 @@
    the algorithm is modified for long strings, to apply encoding on chunks of the input
 *)
 
-open Core_kernel
+open Core
 
 exception Invalid_base58_checksum of string
 
