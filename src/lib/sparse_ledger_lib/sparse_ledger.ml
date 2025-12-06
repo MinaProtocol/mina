@@ -40,7 +40,7 @@
     tracking, Merkle path reconstruction, and hash correctness.
 *)
 
-open Core_kernel
+open Core
 
 module Tree = struct
   [%%versioned
@@ -361,15 +361,15 @@ type ('hash, 'key, 'account) t = ('hash, 'key, 'account) T.t [@@deriving yojson]
 let%test_module "sparse-ledger-test" =
   ( module struct
     module Hash = struct
-      type t = Core_kernel.Md5.t [@@deriving sexp, compare]
+      type t = Md5.t [@@deriving sexp, compare]
 
       let equal h1 h2 = Int.equal (compare h1 h2) 0
 
-      let to_yojson md5 = `String (Core_kernel.Md5.to_hex md5)
+      let to_yojson md5 = `String (Md5.to_hex md5)
 
       let of_yojson = function
         | `String x ->
-            Or_error.try_with (fun () -> Core_kernel.Md5.of_hex_exn x)
+            Or_error.try_with (fun () -> Md5.of_hex_exn x)
             |> Result.map_error ~f:Error.to_string_hum
         | _ ->
             Error "Expected a hex-encoded MD5 hash"
@@ -461,7 +461,7 @@ let%test_module "sparse-ledger-test" =
                 ~message:
                   "Iteri index should be contained in the indexes auxillary \
                    structure"
-                ~expect:true (Int.Set.mem indexes i) ) )
+                ~expect:true (Set.mem indexes i) ) )
 
     let%test_unit "path_test" =
       Quickcheck.test gen ~f:(fun t ->
