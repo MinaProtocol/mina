@@ -21,7 +21,6 @@
   bin_prot.shape
   codable
   core
-  core.uuid
   core_kernel
   core_kernel.uuid
   currency
