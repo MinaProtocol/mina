@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 
 module type Time_intf = sig
   type t
@@ -92,7 +92,7 @@ module Make (Time : Time_intf) : Timeout_intf(Time).S = struct
     in
     Deferred.(
       choose
-        [ choice deferred (fun x -> `Ok x); choice timeout (Fn.const `Timeout) ])
+        [ choice deferred (fun x -> `Ok x); choice timeout (Fn.const `Timeout) ] )
 
   let await_exn ~timeout_duration time_controller deferred =
     match%map await ~timeout_duration time_controller deferred with
@@ -103,20 +103,16 @@ module Make (Time : Time_intf) : Timeout_intf(Time).S = struct
 end
 
 module Core_time = Make (struct
-  include (
-    Core_kernel.Time :
-      module type of Core_kernel.Time
-        with module Span := Core_kernel.Time.Span
-         and type underlying = float )
+  include Time_float
 
   module Controller = struct
     type t = unit
   end
 
   module Span = struct
-    include Core_kernel.Time.Span
+    include Time_float.Span
 
-    let to_time_ns_span = Fn.compose Core_kernel.Time_ns.Span.of_ns to_ns
+    let to_time_ns_span = Fn.compose Time_ns.Span.of_ns to_ns
   end
 
   let diff x y =
@@ -126,17 +122,14 @@ module Core_time = Make (struct
 end)
 
 module Core_time_ns = Make (struct
-  include (
-    Core_kernel.Time_ns :
-      module type of Core_kernel.Time_ns
-        with module Span := Core_kernel.Time_ns.Span )
+  include Time_ns
 
   module Controller = struct
     type t = unit
   end
 
   module Span = struct
-    include Core_kernel.Time_ns.Span
+    include Time_ns.Span
 
     let to_time_ns_span = Fn.id
   end
