@@ -56,7 +56,7 @@ let read spec { Disk_storable.to_string; read = r; write = w } k =
 
 let write spec { Disk_storable.to_string; read = r; write = w } k v =
   let%map errs =
-    Deferred.List.filter_map spec ~f:(fun s ->
+    Deferred.List.filter_map spec ~how:`Sequential ~f:(fun s ->
         let res =
           match s with
           | Spec.On_disk { directory; should_write } ->

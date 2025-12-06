@@ -6,14 +6,14 @@ let on_disk to_string read write prefix =
   let path k = prefix ^/ to_string k in
   let read k =
     let p = path k in
-    match Sys.file_exists p with
+    match Sys_unix.file_exists p with
     | `No | `Unknown ->
         Or_error.errorf "file %s does not exist or cannot be read" p
     | `Yes ->
         read k ~path:p
   in
   let write key v =
-    match Sys.is_directory prefix with
+    match Sys_unix.is_directory prefix with
     | `No | `Unknown ->
         Or_error.errorf "directory %s does not exist or cannot be read" prefix
     | `Yes ->
@@ -63,7 +63,7 @@ let write spec { Disk_storable.to_string; read = r; write = w } k v =
           match s with
           | Spec.On_disk { directory; should_write } ->
               if should_write then (
-                Unix.mkdir_p directory ;
+                Core_unix.mkdir_p directory ;
                 (on_disk to_string r w directory).write k v )
               else Or_error.return ()
           | S3 { bucket_prefix = _; install_path = _ } ->
