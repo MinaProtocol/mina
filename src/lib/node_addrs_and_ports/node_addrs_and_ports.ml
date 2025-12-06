@@ -3,8 +3,8 @@ open Network_peer
 
 (** Network information for speaking to this daemon. *)
 type t =
-  { external_ip : Unix.Inet_addr.Blocking_sexp.t
-  ; bind_ip : Unix.Inet_addr.Blocking_sexp.t
+  { external_ip : Core_unix.Inet_addr.Blocking_sexp.t
+  ; bind_ip : Core_unix.Inet_addr.Blocking_sexp.t
         (** When peer is [None], the peer_id will be auto-generated and this field
       replaced with [Some] after libp2p initialization. *)
   ; mutable peer : Peer.Stable.Latest.t option
@@ -33,16 +33,16 @@ end
 
 let to_display (t : t) =
   Display.
-    { external_ip = Unix.Inet_addr.to_string t.external_ip
-    ; bind_ip = Unix.Inet_addr.to_string t.bind_ip
+    { external_ip = Core_unix.Inet_addr.to_string t.external_ip
+    ; bind_ip = Core_unix.Inet_addr.to_string t.bind_ip
     ; peer = Option.map ~f:Peer.to_display t.peer
     ; libp2p_port = t.libp2p_port
     ; client_port = t.client_port
     }
 
 let of_display (d : Display.t) : t =
-  { external_ip = Unix.Inet_addr.of_string d.external_ip
-  ; bind_ip = Unix.Inet_addr.of_string d.bind_ip
+  { external_ip = Core_unix.Inet_addr.of_string d.external_ip
+  ; bind_ip = Core_unix.Inet_addr.of_string d.bind_ip
   ; peer = Option.map ~f:Peer.of_display d.peer
   ; libp2p_port = d.libp2p_port
   ; client_port = d.client_port
@@ -53,7 +53,7 @@ let to_multiaddr (t : t) =
   | Some peer ->
       Some
         (sprintf "/ip4/%s/tcp/%d/p2p/%s"
-           (Unix.Inet_addr.to_string t.external_ip)
+           (Core_unix.Inet_addr.to_string t.external_ip)
            t.libp2p_port peer.peer_id )
   | None ->
       None
