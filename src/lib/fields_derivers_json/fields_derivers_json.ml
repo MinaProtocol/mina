@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Fieldslib
 
 module To_yojson = struct
@@ -30,12 +30,12 @@ module To_yojson = struct
     let rest = !(acc#to_json_accumulator) in
     acc#to_json_accumulator :=
       ( if annotations.skip || !(t_field#skip) then None
-      else
-        ( Option.value annotations.name
-            ~default:(Fields_derivers.name_under_to_camel field)
-        , fun x -> !(t_field#to_json) (!(t_field#contramap) (Field.get field x))
-        )
-        |> Option.return )
+        else
+          ( Option.value annotations.name
+              ~default:(Fields_derivers.name_under_to_camel field)
+          , fun x ->
+              !(t_field#to_json) (!(t_field#contramap) (Field.get field x)) )
+          |> Option.return )
       :: rest ;
     ((fun _ -> failwith "Unused"), acc)
 
@@ -119,24 +119,25 @@ module Of_yojson = struct
       let map = !(finished_obj#of_json_creator) in
       !(t_field#map)
         ( if annotations.skip || !(t_field#skip) then
-          match skip_data with
-          | Some x ->
-              x
-          | None ->
-              failwith
-                "If you are skipping a field in of_json but intend on building \
-                 this field, you must provide skip_data to add_field!"
-        else
-          !(t_field#of_json)
-            (let name =
-               Option.value annotations.name
-                 ~default:(Fields_derivers.name_under_to_camel field)
-             in
-             match Map.find map name with
-             | None ->
-                 raise (Field_not_found name)
-             | Some x ->
-                 x ) )
+            match skip_data with
+            | Some x ->
+                x
+            | None ->
+                failwith
+                  "If you are skipping a field in of_json but intend on \
+                   building this field, you must provide skip_data to \
+                   add_field!"
+          else
+            !(t_field#of_json)
+              (let name =
+                 Option.value annotations.name
+                   ~default:(Fields_derivers.name_under_to_camel field)
+               in
+               match Map.find map name with
+               | None ->
+                   raise (Field_not_found name)
+               | Some x ->
+                   x ) )
     in
     (creator, acc_obj)
 
@@ -285,8 +286,8 @@ let%test_module "Test" =
 
     let full_derivers = both_json @@ o ()
 
-    let%test_unit "folding creates a yojson object we expect (modulo camel \
-                   casing)" =
+    let%test_unit
+        "folding creates a yojson object we expect (modulo camel casing)" =
       [%test_eq: string]
         (Yojson_version.to_yojson Yojson_version.v |> Yojson.Safe.to_string)
         (!(full_derivers#to_json) v |> Yojson.Safe.to_string)
