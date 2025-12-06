@@ -38,7 +38,7 @@ module Sender = struct
         Quickcheck.Generator.(
           variant2
             (list_with_length 4 (Int.gen_incl 0 255))
-            (list_with_length 8 (Int.gen_incl 0 65535)))
+            (list_with_length 8 (Int.gen_incl 0 65535)) )
       with
       | `A octets ->
           String.concat ~sep:"." (List.map ~f:Int.to_string octets)
@@ -46,7 +46,7 @@ module Sender = struct
           String.concat ~sep:":" (List.map ~f:(Printf.sprintf "%x") segments)
     in
     let remote =
-      let inet = Unix.Inet_addr.of_string ip in
+      let inet = Core_unix.Inet_addr.of_string ip in
       let%bind peer_id = String.gen_nonempty in
       let%map libp2p_port = Int.gen_uniform_incl 1025 49151 in
       Peer.create inet ~peer_id ~libp2p_port
@@ -59,18 +59,18 @@ module Sender = struct
 end
 
 module Incoming = struct
-  let time_to_yojson tm = `String (Time.to_string tm)
+  let time_to_yojson tm = `String (Time_float_unix.to_string tm)
 
   let time_of_yojson = function
     | `String s ->
-        Ok (Time.of_string s)
+        Ok (Time_float_unix.of_string s)
     | _ ->
         Error "time_of_yojson: Expected string"
 
   type 'a t =
     { data : 'a
     ; sender : Sender.t
-    ; received_at : Time.t
+    ; received_at : Time_float_unix.t
           [@to_yojson time_to_yojson] [@of_yojson time_of_yojson]
     }
   [@@deriving equal, sexp, yojson, compare]
@@ -82,11 +82,11 @@ module Incoming = struct
   let received_at t = t.received_at
 
   let wrap ~data ~sender =
-    let received_at = Time.now () in
+    let received_at = Time_float.now () in
     { data; sender; received_at }
 
   let wrap_peer ~data ~sender =
-    let received_at = Time.now () in
+    let received_at = Time_float.now () in
     { data; sender = Sender.of_peer sender; received_at }
 
   let map ~f t = { t with data = f t.data }
@@ -97,7 +97,7 @@ module Incoming = struct
     { t with data }
 
   let local data =
-    let received_at = Time.now () in
+    let received_at = Time_float.now () in
     let sender = Sender.Local in
     { data; sender; received_at }
 
@@ -112,6 +112,6 @@ module Incoming = struct
     let open Quickcheck.Generator.Let_syntax in
     let%bind data = gen_a in
     let%map sender = Sender.gen in
-    let received_at = Time.now () in
+    let received_at = Time_float.now () in
     { data; sender; received_at }
 end
