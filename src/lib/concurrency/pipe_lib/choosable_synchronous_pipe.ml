@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 
 (** The same type is used to represent both reader and writer.
     
