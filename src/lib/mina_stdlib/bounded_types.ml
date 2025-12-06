@@ -1,5 +1,5 @@
-open Core_kernel
-open Core_kernel.Hash.Builtin
+open Core
+open Core.Hash.Builtin
 
 module N16 = struct
   let max_array_len = 16

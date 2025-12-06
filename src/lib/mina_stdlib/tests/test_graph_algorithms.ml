@@ -5,7 +5,7 @@
     Subject:    Graph algorithms tests
 *)
 
-open Core_kernel
+open Core
 
 let test_tree_connectivity () =
   (*
