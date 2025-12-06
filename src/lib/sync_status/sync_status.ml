@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (** Sync_status represent states interacting with peers in the Mina protocol.
     When the protocol is starting, the node should be in the CONNECT state
