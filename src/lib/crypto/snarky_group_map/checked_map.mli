@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 val wrap :
      (module Snarky_backendless.Snark_intf.Run
@@ -9,7 +9,8 @@ val wrap :
   -> ('input -> 'v * 'v) Staged.t
 
 module Make
-    (M : Snarky_backendless.Snark_intf.Run) (Params : sig
+    (M : Snarky_backendless.Snark_intf.Run)
+    (Params : sig
       val params : M.field Group_map.Params.t
     end) : sig
   val to_group : M.Field.t -> M.Field.t * M.Field.t
