@@ -57,11 +57,11 @@ let keep_trying :
 let get_project_root () =
   let open Filename in
   let rec go dir =
-    if Core.Sys.file_exists_exn @@ dir ^/ "src/dune-project" then Some dir
+    if Sys_unix.file_exists_exn @@ dir ^/ "src/dune-project" then Some dir
     else if String.equal dir "/" then None
     else go @@ fst @@ split dir
   in
-  go @@ realpath current_dir_name
+  go @@ Filename_unix.realpath current_dir_name
 
 (* This snippet was taken from our fork of RPC Parallel. Would be nice to have a
    shared utility, but this is easiest for now. *)
@@ -140,7 +140,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
           [%log debug] "Found PID file for %s %s with contents %s" name lockpath
             pid_str ;
           let%bind () =
-            match Signal.send Signal.term (`Pid pid) with
+            match Signal_unix.send Signal.term (`Pid pid) with
             | `No_such_process ->
                 [%log debug] "Couldn't kill %s with PID %s, does not exist" name
                   pid_str ;
@@ -148,8 +148,8 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
             | `Ok -> (
                 [%log debug] "Successfully sent TERM signal to %s (%s)" name
                   pid_str ;
-                let%map () = after (Time.Span.of_sec 0.5) in
-                match Signal.send Signal.kill (`Pid pid) with
+                let%map () = after (Time_float.Span.of_sec 0.5) in
+                match Signal_unix.(send Signal.kill (`Pid pid)) with
                 | `No_such_process ->
                     ()
                 | `Ok ->
@@ -202,11 +202,10 @@ let start_custom :
   let%bind () =
     Sys.is_directory conf_dir
     |> Deferred.bind ~f:(function
-         | `Yes ->
-             Deferred.Or_error.return ()
-         | _ ->
-             Deferred.Or_error.errorf "Config directory %s does not exist"
-               conf_dir )
+      | `Yes ->
+          Deferred.Or_error.return ()
+      | _ ->
+          Deferred.Or_error.errorf "Config directory %s does not exist" conf_dir )
   in
   let lock_path = conf_dir ^/ name ^ ".lock" in
   let%bind.Deferred () =
@@ -269,36 +268,36 @@ let start_custom :
   in
   don't_wait_for
     (let open Deferred.Let_syntax in
-    let%bind termination_status =
-      Deferred.Or_error.try_with ~here:[%here] (fun () -> Process.wait process)
-    in
-    [%log trace] "child process %s died" name ;
-    don't_wait_for (Writer.close @@ Process.stdin process) ;
-    let%bind () = Sys.remove lock_path in
-    Ivar.fill terminated_ivar termination_status ;
-    let log_bad_termination () =
-      let exit_or_signal =
-        match termination_status with
-        | Ok termination_status ->
-            `String (Unix.Exit_or_signal.to_string_hum termination_status)
-        | Error err ->
-            Error_json.error_to_yojson err
-      in
-      [%log fatal] "Process died unexpectedly: $exit_or_signal"
-        ~metadata:[ ("exit_or_signal", exit_or_signal) ] ;
-      raise Child_died
-    in
-    match (t.termination_response, termination_status) with
-    | `Ignore, _ ->
-        Deferred.unit
-    | `Always_raise, _ ->
-        log_bad_termination ()
-    | `Raise_on_failure, (Error _ | Ok (Error _)) ->
-        log_bad_termination ()
-    | `Raise_on_failure, Ok (Ok ()) ->
-        Deferred.unit
-    | `Handler f, _ ->
-        f ~killed:t.killing process termination_status) ;
+     let%bind termination_status =
+       Deferred.Or_error.try_with ~here:[%here] (fun () -> Process.wait process)
+     in
+     [%log trace] "child process %s died" name ;
+     don't_wait_for (Writer.close @@ Process.stdin process) ;
+     let%bind () = Sys.remove lock_path in
+     Ivar.fill terminated_ivar termination_status ;
+     let log_bad_termination () =
+       let exit_or_signal =
+         match termination_status with
+         | Ok termination_status ->
+             `String (Unix.Exit_or_signal.to_string_hum termination_status)
+         | Error err ->
+             Error_json.error_to_yojson err
+       in
+       [%log fatal] "Process died unexpectedly: $exit_or_signal"
+         ~metadata:[ ("exit_or_signal", exit_or_signal) ] ;
+       raise Child_died
+     in
+     match (t.termination_response, termination_status) with
+     | `Ignore, _ ->
+         Deferred.unit
+     | `Always_raise, _ ->
+         log_bad_termination ()
+     | `Raise_on_failure, (Error _ | Ok (Error _)) ->
+         log_bad_termination ()
+     | `Raise_on_failure, Ok (Ok ()) ->
+         Deferred.unit
+     | `Handler f, _ ->
+         f ~killed:t.killing process termination_status ) ;
   Deferred.Or_error.return t
 
 let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
@@ -318,7 +317,7 @@ let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
             ()
         | _ ->
             t.termination_response <- `Ignore ) ;
-        match Signal.send Signal.term (`Pid (Process.pid t.process)) with
+        match Signal_unix.send Signal.term (`Pid (Process.pid t.process)) with
         | `Ok ->
             Ivar.read t.terminated_ivar
         | `No_such_process ->
@@ -344,7 +343,7 @@ let%test_module _ =
 
     let git_root_relative_path = "src/lib/child_processes/tester.sh"
 
-    let process_wait_timeout = Time.Span.of_sec 2.1
+    let process_wait_timeout = Time_float.Span.of_sec 2.1
 
     let expected_lines = 10
 
