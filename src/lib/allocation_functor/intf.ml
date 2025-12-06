@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Partial = struct
   module type Bin_io_intf = Binable.S
