@@ -15,7 +15,6 @@
   bin_prot.shape
   bitstring
   core
-  core.uuid
   core_kernel
   core_kernel.uuid
   integers

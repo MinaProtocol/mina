@@ -13,7 +13,6 @@
   graphql-async
   core_kernel.uuid
   core
-  core.uuid
   async
   core_kernel
   async_unix
