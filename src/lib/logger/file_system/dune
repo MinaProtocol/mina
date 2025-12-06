@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
- (libraries core yojson logger core_kernel)
+ (libraries core core_unix core_unix.time_float_unix yojson logger core_kernel)
  (preprocess
   (pps ppx_version ppx_mina ppx_deriving.std ppx_deriving_yojson))
  (instrumentation

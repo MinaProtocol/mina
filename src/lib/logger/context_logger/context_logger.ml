@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let key = Univ_map.Key.create ~name:"logger" sexp_of_opaque
 
