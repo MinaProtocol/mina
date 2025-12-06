@@ -26,7 +26,7 @@ let lookup_all_reversed ~lookup =
           Stop None )
 
 let protocol_states_for_scan_state ~protocol_states_for_root_scan_state ~history
-    required_state_hashes =
+    ~self required_state_hashes =
   let lookup_in_scan_states hash =
     let%map.Option state_with_hash =
       State_hash.Map.find protocol_states_for_root_scan_state hash
@@ -38,11 +38,14 @@ let protocol_states_for_scan_state ~protocol_states_for_root_scan_state ~history
       (Queue.lookup history hash)
   in
   let lookup hash =
-    match lookup_in_root_history hash with
-    | Some value ->
-        Some value
-    | None ->
-        lookup_in_scan_states hash
+    if State_hash.equal hash (Breadcrumb.state_hash self) then
+      Some (Breadcrumb.protocol_state self)
+    else
+      match lookup_in_root_history hash with
+      | Some value ->
+          Some value
+      | None ->
+          lookup_in_scan_states hash
   in
   lookup_all_reversed ~lookup required_state_hashes
 
@@ -73,7 +76,7 @@ let staged_ledger_aux_and_pending_coinbases_of_breadcrumb
   in
   let%map.Option scan_state_protocol_states =
     protocol_states_for_scan_state ~protocol_states_for_root_scan_state ~history
-      required_state_hashes
+      ~self:breadcrumb required_state_hashes
   in
   let pending_coinbase =
     Staged_ledger.pending_coinbase_collection staged_ledger
@@ -142,14 +145,12 @@ module T = struct
     in
     (t, t)
 
-  let enqueue t new_root =
+  let enqueue_current_root t =
     let open Root_data.Historical in
     ( if Queue.length t.history >= t.capacity then
       let oldest_root = Queue.dequeue_front_exn t.history in
-      (*Update the protocol states required for scan state at the new root*)
-      let _new_oldest_hash, new_oldest_root =
-        Queue.first_with_key t.history |> Option.value_exn
-      in
+      (* Update the protocol states required for scan state at the new root *)
+      let new_oldest_root = Queue.first t.history |> Option.value_exn in
       let new_protocol_states_map =
         Full_frontier.Protocol_states_for_root_scan_state
         .protocol_states_for_next_root_scan_state
@@ -167,8 +168,7 @@ module T = struct
         (Queue.enqueue_back t.history
            ( State_hash.With_state_hashes.state_hash
            @@ protocol_state_with_hashes t.current_root )
-           t.current_root ) ) ;
-    t.current_root <- new_root
+           t.current_root ) ) 
 
   let handle_diffs root_history frontier diffs_with_mutants =
     let open Diff.Full.With_mutant in
@@ -183,6 +183,11 @@ module T = struct
                      (sprintf "root_history: new root %s not found in frontier"
                         (State_hash.to_base58_check state_hash) )
             in
+            (* It's important that we enqueue the current root before we
+               compute the historical because this way [root_history]
+               will contain the new root's parent (before the call below)
+               it's stored in the [current_root] single-element buffer *)
+            enqueue_current_root root_history;
             let historical =
               historical_of_breadcrumb
                 ~protocol_states_for_root_scan_state:
@@ -194,7 +199,7 @@ module T = struct
                         "root_history: can't compute historical for new root %s"
                         (State_hash.to_base58_check state_hash) )
             in
-            enqueue root_history historical ;
+            root_history.current_root <- historical ;
             true
         | E _ ->
             false )
