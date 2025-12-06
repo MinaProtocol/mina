@@ -1,6 +1,6 @@
 (* Test for cache deadlock with finalizers - works with any disk_cache implementation *)
 
-open! Core_kernel
+open! Core
 open! Async_kernel
 
 (* Create a custom binable module that triggers GC during serialization *)
@@ -74,7 +74,7 @@ let run_test_with_cache (module Cache_impl : Cache_intf) ~timeout_seconds
     in
     match timeout_seconds with
     | Some timeout ->
-        let timeout_span = Core.Time.Span.of_sec timeout in
+        let timeout_span = Time_float.Span.of_sec timeout in
         Async.Clock.with_timeout timeout_span put_deferred
     | None ->
         let%map result = put_deferred in
@@ -97,7 +97,7 @@ let run_test_with_cache (module Cache_impl : Cache_intf) ~timeout_seconds
 let test_cache_deadlock (module Cache_impl : Cache_intf) =
   (* Read configuration from environment variables *)
   let timeout_seconds =
-    match Sys.getenv_opt "CACHE_DEADLOCK_TEST_TIMEOUT" with
+    match Sys.getenv "CACHE_DEADLOCK_TEST_TIMEOUT" with
     | Some "" ->
         None (* Empty string means no timeout *)
     | Some t ->
@@ -106,7 +106,7 @@ let test_cache_deadlock (module Cache_impl : Cache_intf) =
         Some 10.0
     (* Default 10 second timeout for CI *)
   in
-  let database_dir = Sys.getenv_opt "CACHE_DEADLOCK_TEST_DIR" in
+  let database_dir = Sys.getenv "CACHE_DEADLOCK_TEST_DIR" in
 
   Core.printf "\nCache deadlock test\n" ;
   Core.printf "===================\n" ;
