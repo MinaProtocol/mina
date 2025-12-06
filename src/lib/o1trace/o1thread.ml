@@ -53,7 +53,7 @@ let name { name; _ } = name
 let load_state thread id = Univ_map.find thread.state id
 
 let set_state thread id value =
-  thread.state <- Univ_map.set thread.state id value
+  thread.state <- Univ_map.set thread.state ~key:id ~data:value
 
 let iter_threads ~f = Hashtbl.iter threads ~f
 
@@ -94,9 +94,7 @@ module Fiber = struct
         Option.iter parent ~f:(fun p -> Graph.add_edge graph p.thread.name name) ;
         fiber
 
-  let apply_to_context t ctx =
-    let ctx = Execution_context.with_tid ctx t.id in
-    Execution_context.with_local ctx ctx_id (Some t)
+  let apply_to_context t ctx = Execution_context.with_local ctx ctx_id (Some t)
 
   let of_context ctx = Execution_context.find_local ctx ctx_id
 
