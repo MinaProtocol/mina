@@ -16,7 +16,7 @@
   (pps ppx_jane ppx_version))
  ;; Ignoring -22 because we use Binable.of_binable_without_uuid
  (flags
-  (:standard -w +a -w -22)))
+  (:standard -w -22)))
 
 (test
  (name test_lmdb_deadlock)
@@ -30,9 +30,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_version))
- (flags
-  (:standard -w +a)))
+  (pps ppx_jane ppx_version)))
 
 (test
  (name test_filesystem_deadlock)
@@ -46,6 +44,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_version))
- (flags
-  (:standard -w +a)))
+  (pps ppx_jane ppx_version)))

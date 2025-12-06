@@ -36,7 +36,8 @@ module type S_extended = sig
   val simple_write_with_iteration : unit -> unit
 end
 
-module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock) :
+module Make_impl
+    (Cache : Disk_cache_intf.S_with_count with module Data := Mock) :
   S with module Cache := Cache = struct
   let () =
     Core.Backtrace.elide := false ;
@@ -118,7 +119,7 @@ module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock)
     (* create a directory with 0x000 permissions and initialize from it *)
     let%bind () =
       let perm_denied_dir = tmp_dir ^/ "permission_denied" in
-      Core.Unix.mkdir ~perm:0o000 perm_denied_dir ;
+      Core_unix.mkdir ~perm:0o000 perm_denied_dir ;
       let unreachable = perm_denied_dir ^/ "some_unreachable_path" in
       initialize_and_expect_failure unreachable ~logger
     in
@@ -127,9 +128,9 @@ module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock)
     let%bind () =
       let some_dir_name = "some_dir" in
       let some_dir = tmp_dir ^/ some_dir_name in
-      Core.Unix.mkdir some_dir ;
+      Core_unix.mkdir some_dir ;
       let dir_symlink = tmp_dir ^/ "dir_link" in
-      Core.Unix.symlink ~target:some_dir_name ~link_name:dir_symlink ;
+      Core_unix.symlink ~target:some_dir_name ~link_name:dir_symlink ;
       Cache.initialize dir_symlink ~logger
       >>| function
       | Ok _ ->
@@ -141,7 +142,7 @@ module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock)
     (* create a symlink to a non-existent file, try to initialize from symlink *)
     let%bind () =
       let corrupt_symlink = tmp_dir ^/ "corrupt_link" in
-      Core.Unix.symlink ~target:"doesnt_exist" ~link_name:corrupt_symlink ;
+      Core_unix.symlink ~target:"doesnt_exist" ~link_name:corrupt_symlink ;
       initialize_and_expect_failure corrupt_symlink ~logger
     in
 
@@ -155,7 +156,7 @@ module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock)
 
     (* create a symlink to an existing file, try to initialize from symlink *)
     let symlink = tmp_dir ^/ "link" in
-    Core.Unix.symlink ~target:some_file_name ~link_name:symlink ;
+    Core_unix.symlink ~target:some_file_name ~link_name:symlink ;
     initialize_and_expect_failure symlink ~logger
 
   let initialization_special_cases () =
