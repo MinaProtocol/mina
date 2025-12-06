@@ -12,7 +12,7 @@ type t =
 
 (* log received from verifier or prover *)
 type remote_log =
-  { timestamp : Time.t
+  { timestamp : Time_float.t
   ; message : string
   ; metadata : (string * string) list
   ; process : string
@@ -81,7 +81,7 @@ let dispatch_remote_log log =
       let%map res =
         Async.Rpc.Connection.with_client
           ~handshake_timeout:
-            (Time.Span.of_sec
+            (Time_float.Span.of_sec
                Node_config_unconfigurable_constants.rpc_handshake_timeout_sec )
           ~heartbeat_config:
             (Async.Rpc.Connection.Heartbeat_config.create
@@ -145,7 +145,8 @@ let log ?process ~timestamp ~message ~metadata () =
       in
       let t =
         { sequence_no = get_counter ()
-        ; timestamp = Time.to_string_abs timestamp ~zone:Time.Zone.utc
+        ; timestamp =
+            Time_float.to_string_abs timestamp ~zone:Time_float.Zone.utc
         ; message
         ; metadata
         ; process
@@ -172,10 +173,10 @@ let flush_queue end_log_counter =
 (* Post-processing hook *)
 
 type message_postprocessor =
-     timestamp:Time.t
+     timestamp:Time_float.t
   -> message:string
   -> metadata:(string * Yojson.Safe.t) list
-  -> (Time.t * string * (string * Yojson.Safe.t) list) list
+  -> (Time_float.t * string * (string * Yojson.Safe.t) list) list
 
 let set_message_postprocessor, postprocess_message =
   let message_postprocessor : message_postprocessor ref =
