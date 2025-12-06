@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Ppxlib
 
 (** This is a ppx to flag code that will expire after a certain date
@@ -24,12 +24,12 @@ let expand ~loc ~path:_ str =
       if String.length str.txt > 8 then
         Location.raise_errorf ~loc:str.loc
           "Not a valid date, string too long; must be in form YYYYMMDD" ;
-      Core_kernel.Date.of_string_iso8601_basic ~pos:0 str.txt
+      Date.of_string_iso8601_basic ~pos:0 str.txt
     with _ ->
       Location.raise_errorf ~loc:str.loc
         "Not a valid date; must be in form YYYYMMDD"
   in
-  let today = Date.today ~zone:Time.Zone.utc in
+  let today = Date.today ~zone:Time_float.Zone.utc in
   if Date.( >= ) today date then
     Location.raise_errorf ~loc:str.loc "Code is expired" ;
   [%stri let () = ()]
@@ -37,7 +37,7 @@ let expand ~loc ~path:_ str =
 let ext =
   Extension.declare name Extension.Context.structure_item
     Ast_pattern.(
-      single_expr_payload (pexp_constant (pconst_string __' drop drop)))
+      single_expr_payload (pexp_constant (pconst_string __' drop drop)) )
     expand
 
 let () =
