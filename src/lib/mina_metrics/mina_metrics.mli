@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 val time_offset_sec : float
@@ -173,15 +173,15 @@ module Network : sig
     val received : Counter.t
 
     module Validation_time : sig
-      val update : Time.Span.t -> unit
+      val update : Time_float.Span.t -> unit
     end
 
     module Processing_time : sig
-      val update : Time.Span.t -> unit
+      val update : Time_float.Span.t -> unit
     end
 
     module Rejection_time : sig
-      val update : Time.Span.t -> unit
+      val update : Time_float.Span.t -> unit
     end
   end
 
@@ -195,15 +195,15 @@ module Network : sig
     val received : Counter.t
 
     module Validation_time : sig
-      val update : Time.Span.t -> unit
+      val update : Time_float.Span.t -> unit
     end
 
     module Processing_time : sig
-      val update : Time.Span.t -> unit
+      val update : Time_float.Span.t -> unit
     end
 
     module Rejection_time : sig
-      val update : Time.Span.t -> unit
+      val update : Time_float.Span.t -> unit
     end
   end
 
@@ -217,15 +217,15 @@ module Network : sig
     val received : Counter.t
 
     module Validation_time : sig
-      val update : Time.Span.t -> unit
+      val update : Time_float.Span.t -> unit
     end
 
     module Processing_time : sig
-      val update : Time.Span.t -> unit
+      val update : Time_float.Span.t -> unit
     end
 
     module Rejection_time : sig
-      val update : Time.Span.t -> unit
+      val update : Time_float.Span.t -> unit
     end
   end
 
@@ -478,7 +478,7 @@ module Transition_frontier : sig
 
     val clear : unit -> unit
 
-    val initialize : Core_kernel.Time.Span.t -> unit
+    val initialize : Time_float.Span.t -> unit
   end
 
   val recently_finalized_staged_txns : Gauge.t
@@ -542,37 +542,37 @@ module Block_latency : sig
 
     val clear : unit -> unit
 
-    val initialize : Core_kernel.Time.Span.t -> unit
+    val initialize : Time_float.Span.t -> unit
   end
 
   module Gossip_time : sig
     val v : Gauge.t
 
-    val update : Time.Span.t -> unit
+    val update : Time_float.Span.t -> unit
 
     val clear : unit -> unit
 
-    val initialize : Core_kernel.Time.Span.t -> unit
+    val initialize : Time_float.Span.t -> unit
   end
 
   module Inclusion_time : sig
     val v : Gauge.t
 
-    val update : Time.Span.t -> unit
+    val update : Time_float.Span.t -> unit
 
     val clear : unit -> unit
 
-    val initialize : Core_kernel.Time.Span.t -> unit
+    val initialize : Time_float.Span.t -> unit
   end
 
   module Validation_acceptance_time : sig
     val v : Gauge.t
 
-    val update : Time.Span.t -> unit
+    val update : Time_float.Span.t -> unit
 
     val clear : unit -> unit
 
-    val initialize : Core_kernel.Time.Span.t -> unit
+    val initialize : Time_float.Span.t -> unit
   end
 end
 
@@ -617,4 +617,4 @@ module Archive : sig
     ?forward_uri:Uri.t -> port:int -> logger:Logger.t -> unit -> t Deferred.t
 end
 
-val initialize_all : Time.Span.t -> unit
+val initialize_all : Time_float.Span.t -> unit

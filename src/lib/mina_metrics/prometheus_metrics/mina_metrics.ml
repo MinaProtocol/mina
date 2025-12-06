@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* We re-export a constrained subset of prometheus to keep consumers of this
    module abstract over implementation.
@@ -77,7 +77,7 @@ module TextFormat_0_0_4 = struct
       | None ->
           (label_names, label_values)
       | Some (label_name, label_value) ->
-          let label_value_str = Fmt.strf "%a" output_value label_value in
+          let label_value_str = Fmt.str "%a" output_value label_value in
           (label_name :: label_names, label_value_str :: label_values)
     in
     Fmt.pf f "%a%s%a %a@." MetricName.pp base ext
@@ -123,7 +123,7 @@ module Runtime = struct
     let help = "A histogram for long async jobs" in
     Long_job_histogram.v "long_async_job" ~help ~namespace ~subsystem
 
-  let start_time = Core.Time.now ()
+  let start_time = Time_float.now ()
 
   let current_gc = ref (Gc.stat ())
 
@@ -216,12 +216,15 @@ module Runtime = struct
       ~help:"Current stack size."
 
   let process_cpu_seconds_total =
-    simple_metric ~metric_type:Counter "process_cpu_seconds_total" Sys.time
+    simple_metric ~metric_type:Counter "process_cpu_seconds_total"
+      (fun () ->
+        let t = Core_unix.times () in
+        t.tms_utime +. t.tms_stime )
       ~help:"Total user and system CPU time spent in seconds."
 
   let process_uptime_ms_total =
     simple_metric ~metric_type:Counter "process_uptime_ms_total"
-      (fun () -> Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time))
+      (fun () -> Time_float.(Span.to_ms (diff (now ()) start_time)))
       ~help:"Total time the process has been running for in milliseconds."
 
   let metrics =
@@ -513,11 +516,8 @@ struct
   include Metric_name_map
 
   let add t ~name ~help : Metric.t =
-    if Metric_name_map.mem t name then Metric_name_map.find_exn t name
-    else
-      let metric = Metric.v ~help ~namespace ~subsystem:Metric.subsystem name in
-      Metric_name_map.add_exn t ~key:name ~data:metric ;
-      metric
+    Hashtbl.find_or_add t name ~default:(fun () ->
+        Metric.v ~help ~namespace ~subsystem:Metric.subsystem name )
 end
 
 module Network = struct
@@ -1396,13 +1396,13 @@ module Transition_frontier = struct
   end)
 
   module TPS_30min = Moving_bucketed_average (struct
-    let bucket_interval _ = Time.Span.of_min 3.0
+    let bucket_interval _ = Time_float.Span.of_min 3.0
 
     let num_buckets _ = 10
 
     let render_average buckets =
       let total = List.fold buckets ~init:0.0 ~f:(fun acc (n, _) -> acc +. n) in
-      total /. Time.Span.(of_min 30.0 |> to_sec)
+      total /. Time_float.Span.(of_min 30.0 |> to_sec)
 
     let subsystem = subsystem
 
@@ -1560,8 +1560,8 @@ module Block_latency = struct
   module Latency_time_spec = struct
     let intervals block_window_duration =
       Intervals.make
-        ~tick_interval:(Time.Span.scale block_window_duration 0.5)
-        ~rolling_interval:(Time.Span.scale block_window_duration 20.0)
+        ~tick_interval:(Time_float.Span.scale block_window_duration 0.5)
+        ~rolling_interval:(Time_float.Span.scale block_window_duration 20.0)
   end
 
   module Gauge_map = Metric_map (struct
@@ -1574,7 +1574,7 @@ module Block_latency = struct
 
   module Gossip_slots = Moving_bucketed_average (struct
     let bucket_interval block_window_duration =
-      Time.Span.scale block_window_duration 0.5
+      Time_float.Span.scale block_window_duration 0.5
 
     let num_buckets _ = 40
 
