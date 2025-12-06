@@ -1,6 +1,6 @@
 (* logger.ml : the fake one *)
 
-open Core_kernel
+open Core
 
 let not_implemented () = failwith "Not implemented"
 
@@ -26,7 +26,7 @@ end
 
 (* Core modules extended with Yojson converters *)
 module Time = struct
-  include Time
+  include Time_float
 
   let to_yojson _ = not_implemented ()
 
