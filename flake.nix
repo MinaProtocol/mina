@@ -31,7 +31,7 @@
   inputs.describe-dune.inputs.nixpkgs.follows = "nixpkgs";
   inputs.describe-dune.inputs.flake-utils.follows = "utils";
 
-  inputs.o1-opam-repository.url = "github:o1-labs/opam-repository/dd90c5c72b7b7caeca3db3224b2503924deea08a";
+  inputs.o1-opam-repository.url = "github:o1-labs/opam-repository/b4e598aaf1000efadda310efba4bde6ca6e7fdfa";
   inputs.o1-opam-repository.flake = false;
 
   # The version must be the same as the version used in:
