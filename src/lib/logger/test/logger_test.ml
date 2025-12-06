@@ -1,16 +1,19 @@
 open Core
 
 let test_dumb_logrotate_rotates_logs_when_expected () =
-  let max_size = 1024 * 2 (* 2KB *) in
+  let max_size =
+    1024 * 2
+    (* 2KB *)
+  in
   let num_rotate = 1 in
   let logger = Logger.create () ~id:"test" in
-  let directory = Filename.temp_dir ~in_dir:"/tmp" "coda_spun_test" "" in
+  let directory = Filename_unix.temp_dir ~in_dir:"/tmp" "coda_spun_test" "" in
   let log_filename = "mina.log" in
   let exists name =
-    Result.is_ok (Unix.access (Filename.concat directory name) [ `Exists ])
+    Result.is_ok (Core_unix.access (Filename.concat directory name) [ `Exists ])
   in
   let get_size name =
-    Int64.to_int_exn (Unix.stat (Filename.concat directory name)).st_size
+    Int64.to_int_exn (Core_unix.stat (Filename.concat directory name)).st_size
   in
   let rec run_test ~last_size ~rotations ~rotation_expected =
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "test" ;
@@ -37,7 +40,8 @@ let test_dumb_logrotate_rotates_logs_when_expected () =
       () ;
     run_test ~last_size:0 ~rotations:0 ~rotation_expected:false
   with exn ->
-    ignore (Unix.system ("rm -rf " ^ directory) : Unix.Exit_or_signal.t) ;
+    ignore
+      (Core_unix.system ("rm -rf " ^ directory) : Core_unix.Exit_or_signal.t) ;
     raise exn
 
 let () =
