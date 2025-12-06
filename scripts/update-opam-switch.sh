@@ -29,7 +29,7 @@ ocaml_version=4.14.2
 # - flake.nix (and flake.lock after running
 #   `nix flake update opam-repository`).
 # - scripts/update_opam_switch.sh
-OPAM_REPOSITORY_COMMIT=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
+OPAM_REPOSITORY_COMMIT=3e41859015888fe8240e84dfc5f31bfa12a557e8
 O1LABS_OPAM_REPOSITORY_COMMIT=b4e598aaf1000efadda310efba4bde6ca6e7fdfa
 
 if [[ -d _opam ]]; then
