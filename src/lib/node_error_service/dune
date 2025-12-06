@@ -5,7 +5,6 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  core.uuid
   uri
   cohttp-async
   async

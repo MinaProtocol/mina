@@ -6,7 +6,6 @@
   async
   async_unix
   core
-  core.uuid
   ;; local libraries
   block_time
   mina_stdlib
