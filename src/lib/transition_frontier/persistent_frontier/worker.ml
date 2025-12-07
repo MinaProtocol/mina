@@ -70,7 +70,7 @@ module Worker = struct
           |> List.bind ~f:(fun { new_root; garbage = Lite garbage; _ } ->
                  new_root.state_hash :: garbage )
         in
-        let total_root_transition_diff =
+        let _total_root_transition_diff =
           Option.map final_root_transition_diff
             ~f:(fun ({ garbage = Lite garbage; _ } as r) ->
               { r with garbage = Lite (extra_garbage @ garbage) } )
@@ -78,8 +78,9 @@ module Worker = struct
         let diffs_to_apply =
           List.concat
             [ other_diffs
-            ; Option.value_map total_root_transition_diff ~default:[]
-                ~f:(fun diff -> [ Diff.Lite.E.E (Root_transitioned diff) ])
+            ; List.map ~f:(fun x -> Diff.Lite.E.E (Root_transitioned x) )root_transition_diffs
+            (* ; Option.value_map total_root_transition_diff ~default:[]
+                ~f:(fun diff -> [ Diff.Lite.E.E (Root_transitioned diff) ]) *)
             ; Option.value_map final_best_tip_diff ~default:[] ~f:(fun diff ->
                   [ Diff.Lite.E.E (Best_tip_changed diff) ] )
             ]
