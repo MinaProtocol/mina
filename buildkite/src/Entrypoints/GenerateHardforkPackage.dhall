@@ -323,19 +323,64 @@ let generateDockerForCodename =
                             codename
                             Arch.Type.Amd64
                             ([] : List Text)
-                            "./buildkite/scripts/cache/manager.sh read hardfork/legacy legacy-ledgers "
+                            "./buildkite/scripts/cache/manager.sh read hardfork hardfork"
                         # [ Cmd.run
                               "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                             codename} && source ./buildkite/scripts/export-git-env-vars.sh"
-                          , Cmd.runInDocker
-                              Cmd.Docker::{ image = image }
+                          , Cmd.run
                               "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir ./legacy-ledgers "
+                                                                                                                                                                                                spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir ./hardfork/legacy --checks config"
                           ]
-                    , label = "Verify packaged artifacts"
+                    , label = "Verify packaged artifacts: Config check"
                     , key =
-                        "verify-packaged-artifacts-${DebianVersions.lowerName
-                                                       codename}"
+                        "verify-packaged-artifacts-config-${DebianVersions.lowerName
+                                                              codename}"
+                    , target = Size.Small
+                    , depends_on = dependsOnTest
+                    }
+                , Command.build
+                    Command.Config::{
+                    , commands =
+                          Toolchain.select
+                            Toolchain.SelectionMode.ByDebianAndArch
+                            codename
+                            Arch.Type.Amd64
+                            ([] : List Text)
+                            "./buildkite/scripts/cache/manager.sh read hardfork hardfork"
+                        # [ Cmd.run
+                              "export MINA_DEB_CODENAME=${DebianVersions.lowerName
+                                                            codename} && source ./buildkite/scripts/export-git-env-vars.sh"
+                          , Cmd.run
+                              "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config --network ${Network.lowerName
+                                                                                                                                                                                                spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir ./hardfork/legacy --checks ledgers"
+                          ]
+                    , label = "Verify packaged artifacts: Ledgers check"
+                    , key =
+                        "verify-packaged-artifacts-ledgers-${DebianVersions.lowerName
+                                                               codename}"
+                    , target = Size.XLarge
+                    , depends_on = dependsOnTest
+                    }
+                , Command.build
+                    Command.Config::{
+                    , commands =
+                          Toolchain.select
+                            Toolchain.SelectionMode.ByDebianAndArch
+                            codename
+                            Arch.Type.Amd64
+                            ([] : List Text)
+                            "./buildkite/scripts/cache/manager.sh read hardfork hardfork"
+                        # [ Cmd.run
+                              "export MINA_DEB_CODENAME=${DebianVersions.lowerName
+                                                            codename} && source ./buildkite/scripts/export-git-env-vars.sh"
+                          , Cmd.run
+                              "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config --network ${Network.lowerName
+                                                                                                                                                                                                spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir ./hardfork/legacy --checks tarballs"
+                          ]
+                    , label = "Verify packaged artifacts: Tarballs check"
+                    , key =
+                        "verify-packaged-artifacts-tarballs-${DebianVersions.lowerName
+                                                                codename}"
                     , target = Size.XLarge
                     , depends_on = dependsOnTest
                     }
