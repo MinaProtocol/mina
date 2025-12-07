@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Key = struct
   module type S = sig
