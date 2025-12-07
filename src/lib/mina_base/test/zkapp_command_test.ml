@@ -140,3 +140,8 @@ end = struct
       ( Zkapp_command.read_all_proofs_from_disk
       @@ Lazy.force (dummy ~signature_kind) )
 end
+
+(* Verify zkApp command version is as expected. *)
+let latest_zkapp_version () =
+  Alcotest.(check int)
+    "Stable.Latest.version is 1" 1 Zkapp_command.Stable.Latest.version
