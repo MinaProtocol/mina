@@ -12,31 +12,31 @@
   sexplib0
   yojson
   ;; local libraries
-  genesis_constants
   codable
   currency
-  fields_derivers.zkapps
-  fields_derivers.json
   fields_derivers.graphql
+  fields_derivers.json
+  fields_derivers.zkapps
+  genesis_constants
   kimchi_pasta
   kimchi_pasta.basic
   mina_base
-  mina_stdlib
   mina_numbers
+  mina_stdlib
   mina_wire_types
   pickles
   pickles.backend
   pickles_types
   ppx_deriving_yojson.runtime
   ppx_version.runtime
-  run_in_thread
-  signature_lib
   random_oracle
+  run_in_thread
   sgn
+  signature_lib
   snarky.backendless
   snark_params
   with_hash)
  (preprocess
-  (pps ppx_base ppx_let ppx_assert))
+  (pps ppx_assert ppx_base ppx_let))
  (instrumentation
   (backend bisect_ppx)))
