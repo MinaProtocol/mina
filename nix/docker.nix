@@ -8,18 +8,6 @@ let
   mkdir = name:
     runCommand "mkdir-${name}" { } "mkdir -p $out${lib.escapeShellArg name}";
 
-  mina-build-config = stdenv.mkDerivation {
-    pname = "mina-build-config";
-    version = "dev";
-    nativeBuildInputs = [ rsync ];
-
-    buildCommand = ''
-      mkdir -p $out/etc/coda/build_config
-      cp ${../src/config}/mainnet.mlh $out/etc/coda/build_config/BUILD.mlh
-      rsync -Huav ${../src/config}/* $out/etc/coda/build_config/.
-    '';
-  };
-
   mina-daemon-scripts = stdenv.mkDerivation {
     pname = "mina-daemon-scripts";
     version = "dev";
@@ -81,7 +69,6 @@ in {
   };
 
   mina-image-full = mkFullImage "mina" (with ocamlPackages_mina; [
-    mina-build-config
     mina-daemon-scripts
 
     mina.out
@@ -92,7 +79,6 @@ in {
   # Image with enhanced binary capable of generating coverage report on mina exit
   # For more details please visit: https://github.com/aantron/bisect_ppx/blob/master/doc/advanced.md#sigterm-handling
   mina-image-instr-full = mkFullImage "mina-instr" (with ocamlPackages_mina; [
-    mina-build-config
     mina-daemon-scripts
 
     with_instrumentation.out

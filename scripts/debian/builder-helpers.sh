@@ -177,13 +177,6 @@ copy_common_daemon_configs() {
   cp ./default/src/app/cli/src/mina_"${2}"_signatures.exe \
     "${BUILDDIR}/usr/local/bin/mina"
 
-  # Copy over Build Configs (based on $2)
-  mkdir -p "${BUILDDIR}/etc/coda/build_config"
-  # Use parameter expansion to either return "mainnet.mlh" or "devnet.mlh"
-  cp "../src/config/${2//test/dev}.mlh" \
-    "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
-  rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
-
   mkdir -p "${BUILDDIR}/var/lib/coda"
 
   # Include all useful genesis ledgers
