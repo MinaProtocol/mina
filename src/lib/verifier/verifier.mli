@@ -1,3 +1,42 @@
+(** Transaction and SNARK verification for the Mina protocol.
+
+    {2 Architecture}
+
+    The production verifier ([Prod]) runs as a separate child process spawned via
+    [Rpc_parallel] (Jane Street library). This isolates CPU-intensive SNARK
+    verification from the main daemon.
+
+    {b Process structure} (see [prod.ml]):
+    - [Worker.T]: Defines RPC functions and worker state
+    - [Rpc_parallel.Make(T)]: Generates spawn/connection machinery
+    - [Worker.spawn_in_foreground_exn]: Spawns verifier process
+    - [Worker.Connection.run]: Calls RPC functions on worker
+
+    {b Daemon integration} (see [Mina_lib.create]):
+    - Created at daemon startup with verification keys from prover
+    - Stored in [processes.verifier]
+    - Passed to: [Block_producer], [Transaction_pool], [Snark_pool], [Transition_frontier]
+
+    {2 Verification Types}
+
+    - {b Commands}: Verifies signatures and proofs on user commands
+    - {b Blockchain SNARKs}: Verifies protocol state transition proofs
+      (consensus layer)
+    - {b Transaction SNARKs}: Verifies ledger transition proofs (execution
+      layer)
+
+    {2 Implementations}
+
+    - {b Prod}: Separate process via [Rpc_parallel] (prod.ml)
+    - {b Dummy}: Accepts all inputs without verification (for tests)
+
+    {2 Common Module}
+
+    Core verification logic used outside the verifier process:
+    - [check_signatures_of_zkapp_command]: Verifies zkApp signatures
+    - [check_signed_command]: Verifies signed command signatures
+*)
+
 module Common : module type of Common
 
 module Failure = Verification_failure
