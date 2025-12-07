@@ -693,7 +693,7 @@ module For_tests = struct
           Persistent_frontier.create ~logger ~verifier
             ~time_controller:(Block_time.Controller.basic ~logger)
             ~directory:frontier_dir ~signature_kind:Testnet
-            ~root_history_capacity:(max_length * 2)
+            ~root_history_capacity:(max_length * 12)
         in
         Gc.Expert.add_finalizer_exn persistent_root clean_temp_dirs ;
         Gc.Expert.add_finalizer_exn persistent_frontier (fun x ->

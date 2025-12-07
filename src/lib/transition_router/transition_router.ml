@@ -619,7 +619,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~time_controller ~directory:persistent_frontier_location
           ~signature_kind
           ~root_history_capacity:
-            ( 2
+            ( 12
             * Transition_frontier.global_max_length
                 precomputed_values.genesis_constants )
       in
