@@ -79,6 +79,9 @@ module Make () = struct
         type nonrec t = t
 
         [%%define_locally T1.(to_string, of_string)]
+
+        let caller_identity =
+          Bin_prot.Shape.Uuid.of_string "9c63d313-dd19-40f3-ad94-aaee29599322"
       end
 
       include Mina_stdlib.Bounded_types.String.Of_stringable (Arg)

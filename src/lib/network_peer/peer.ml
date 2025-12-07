@@ -41,6 +41,9 @@ module Inet_addr = struct
         type nonrec t = t
 
         [%%define_locally Unix.Inet_addr.(to_string, of_string)]
+
+        let caller_identity =
+          Bin_prot.Shape.Uuid.of_string "734478a6-8b6f-4910-8c2f-25f1a9b0d3ae"
       end)
     end
   end]

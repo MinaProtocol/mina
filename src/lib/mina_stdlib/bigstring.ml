@@ -20,6 +20,9 @@ module Stable = struct
       let of_string s = Bigstring.of_string s
 
       let to_string s = Bigstring.to_string s
+
+      let caller_identity =
+        Bin_prot.Shape.Uuid.of_string "f721f4fa-3ad6-4831-b445-fb38c57b5577"
     end)
   end
 end]

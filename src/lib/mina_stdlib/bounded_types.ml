@@ -123,8 +123,12 @@ module String = struct
     include Stable.V1
   end
 
-  module Of_stringable (M : Stringable.S) =
-  Bin_prot.Utils.Make_binable_without_uuid (struct
+  module Of_stringable (M : sig
+    include Stringable.S
+
+    val caller_identity : Bin_prot.Shape.Uuid.t
+  end) =
+  Bin_prot.Utils.Make_binable_with_uuid (struct
     module Binable = Stable.V1
 
     type t = M.t
@@ -135,6 +139,8 @@ module String = struct
     exception Of_binable of string * exn [@@deriving sexp]
 
     let of_binable s = try M.of_string s with x -> raise (Of_binable (s, x))
+
+    let caller_identity = M.caller_identity
   end)
 end
 
@@ -155,6 +161,9 @@ module Wrapped_error = struct
 
         let of_string s =
           Core_kernel.Error.t_of_sexp (Core_kernel.Sexp.of_string s)
+
+        let caller_identity =
+          Bin_prot.Shape.Uuid.of_string "165dc5d5-46a6-4b98-b896-cbe3cf4f5869"
       end)
     end
   end
