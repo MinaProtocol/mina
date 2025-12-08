@@ -95,9 +95,7 @@ module Root_test = struct
 
   let check_converting_open ~primary_dir ~hardfork_slot =
     let module Converting_ledger = L.Make_converting (struct
-      let convert =
-        Account.(
-          Fn.compose Hardfork.of_stable (slot_reduction_update ~hardfork_slot))
+      let convert = Account.Hardfork.of_stable ~hardfork_slot
     end) in
     Converting_ledger.(
       create

@@ -99,22 +99,6 @@ module Maskable :
      and type t := Any_ledger.M.t
      and type maps_t := Mask_maps.t
 
-module Converting_ledger :
-  Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
-    with module Location = Location
-     and module Addr = Location.Addr
-    with type root_hash := Ledger_hash.t
-     and type hash := Ledger_hash.t
-     and type account := Account.t
-     and type key := Signature_lib.Public_key.Compressed.t
-     and type token_id := Token_id.t
-     and type token_id_set := Token_id.Set.t
-     and type account_id := Account_id.t
-     and type account_id_set := Account_id.Set.t
-     and type converted_account := Account.Hardfork.t
-     and type primary_ledger = Db.t
-     and type converting_ledger = Hardfork_db.t
-
 module Make_converting (Converting_inputs : sig
   val convert : Account.t -> Account.Hardfork.t
 end) :
