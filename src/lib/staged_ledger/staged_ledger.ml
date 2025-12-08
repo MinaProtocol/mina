@@ -3353,6 +3353,12 @@ let%test_module "staged ledger tests" =
 
     let%test_unit "Invalid diff test: check zero fee excess for partitions" =
       let signature_kind = Mina_signature_kind.Testnet in
+      let compute_hashes txns =
+        List.map txns ~f:(fun tx ->
+            Transaction_hash.hash_command
+            @@ User_command.read_all_proofs_from_disk
+            @@ User_command.forget_check tx )
+      in
       let create_diff_with_non_zero_fee_excess ~ledger ~coinbase_amount
           ~global_slot txns completed_works
           (partition : Sl.Scan_state.Space_partition.t) : Staged_ledger_diff.t =
@@ -3360,26 +3366,24 @@ let%test_module "staged ledger tests" =
         let slots, job_count1 = partition.first in
         match partition.second with
         | None ->
+            let commands = List.take txns slots in
             compute_statuses ~ledger ~coinbase_amount ~global_slot
             @@ ( { completed_works = List.take completed_works job_count1
-                 ; commands = List.take txns slots
+                 ; commands
                  ; coinbase = Zero
-                 ; internal_command_statuses =
-                     []
-                     (* Skipping hash computation, as they shouldn't affect status computation *)
-                 ; command_hashes = []
+                 ; internal_command_statuses = []
+                 ; command_hashes = compute_hashes commands
                  }
                , None )
         | Some (_, _) ->
+            let txns_in_first_diff = List.take txns slots in
             let txns_in_second_diff = List.drop txns slots in
             compute_statuses ~ledger ~coinbase_amount ~global_slot
               ( { completed_works = List.take completed_works job_count1
-                ; commands = List.take txns slots
+                ; commands = txns_in_first_diff
                 ; coinbase = Zero
-                ; internal_command_statuses =
-                    []
-                    (* Skipping hash computation, as they shouldn't affect status computation *)
-                ; command_hashes = []
+                ; internal_command_statuses = []
+                ; command_hashes = compute_hashes txns_in_first_diff
                 }
               , Some
                   { completed_works =
@@ -3387,10 +3391,8 @@ let%test_module "staged ledger tests" =
                       else List.drop completed_works job_count1 )
                   ; commands = txns_in_second_diff
                   ; coinbase = Zero
-                  ; internal_command_statuses =
-                      []
-                      (* Skipping hash computation, as they shouldn't affect status computation *)
-                  ; command_hashes = []
+                  ; internal_command_statuses = []
+                  ; command_hashes = compute_hashes txns_in_second_diff
                   } )
       in
       let empty_diff = Staged_ledger_diff.empty_diff in
