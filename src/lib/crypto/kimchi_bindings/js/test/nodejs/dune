@@ -16,6 +16,6 @@
  (link_deps ../../node_js/plonk_wasm.js ../../node_js/plonk_wasm_bg.wasm)
  (instrumentation
   (backend bisect_ppx))
- (forbidden_libraries core async)
+ (forbidden_libraries core_unix async)
  (preprocess
   (pps ppx_version js_of_ocaml-ppx)))

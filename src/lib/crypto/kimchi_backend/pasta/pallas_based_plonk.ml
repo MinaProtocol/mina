@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Kimchi_backend_common
 open Kimchi_pasta_basic
 module Field = Fq
@@ -148,8 +148,8 @@ module Proving_key = struct
   type t = Keypair.t
 
   include
-    Core_kernel.Binable.Of_binable_without_uuid
-      (Core_kernel.Unit)
+    Core.Binable.Of_binable_without_uuid
+      (Core.Unit)
       (struct
         type nonrec t = t
 

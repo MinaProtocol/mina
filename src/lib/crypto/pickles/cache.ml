@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* Check if circuit data dumping is enabled via environment variable *)
 let should_dump_circuit_data () =

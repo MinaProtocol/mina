@@ -5,7 +5,7 @@ module Branch_data = Branch_data
 module Digest = Digest
 module Spec = Spec
 module Opt = Opt
-open Core_kernel
+open Core
 module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
 

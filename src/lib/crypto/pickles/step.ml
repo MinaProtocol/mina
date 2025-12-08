@@ -19,7 +19,7 @@ module Make
 struct
   module Step_branch_data = Step_branch_data.Make (Inductive_rule)
 
-  let _double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
+  let _double_zip = Double.map2 ~f:Core.Tuple2.create
 
   module E = struct
     type t = Tock.Field.t array Double.t Plonk_types.Evals.t * Tock.Field.t

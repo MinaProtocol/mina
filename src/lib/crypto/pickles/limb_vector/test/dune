@@ -1,11 +1,7 @@
 (tests
  (names test_constant)
  (flags
-  (:standard -warn-error +a)
-  -open
-  Core_kernel
-  -open
-  Limb_vector)
+  (:standard -warn-error +a))
  (package pickles)
  (preprocess
   (pps ppx_jane))

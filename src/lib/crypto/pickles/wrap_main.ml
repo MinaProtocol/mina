@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 open Hlist
 open Common
@@ -118,15 +118,15 @@ let wrap_main
       Promise.t
       Lazy.t =
   Timer.clock __LOC__ ;
-  let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
-                                       with type n = max_proofs_verified )
+  let module Max_proofs_verified =
+    (val max_proofs_verified : Nat.Add.Intf with type n = max_proofs_verified)
   in
   let T = Max_proofs_verified.eq in
   let branches = Hlist.Length.to_nat pi_branches in
   Timer.clock __LOC__ ;
   let (module Req) =
     Requests.Wrap.(
-      (create () : (max_proofs_verified, max_local_max_proofs_verifieds) t))
+      (create () : (max_proofs_verified, max_local_max_proofs_verifieds) t) )
   in
   Timer.clock __LOC__ ;
   let { Full_signature.padded = _; maxes = (module Max_widths_by_slot) } =
@@ -163,13 +163,14 @@ let wrap_main
           , _
           , _
           , Field.t )
-          Types.Wrap.Statement.In_circuit.t ) ->
+          Types.Wrap.Statement.In_circuit.t )
+    ->
       let logger = Context_logger.get () in
       with_label __LOC__ (fun () ->
           let which_branch' =
             exists
               (Typ.transport Field.typ ~there:Field.Constant.of_int
-                 ~back:(fun _ -> failwith "unimplemented") )
+                 ~back:(fun _ -> failwith "unimplemented" ) )
               ~request:(fun () -> Req.Which_branch)
           in
           let which_branch =
@@ -224,7 +225,7 @@ let wrap_main
                          | None ->
                              Opt.nothing
                          | Some x ->
-                             Opt.just (Array.map ~f:Inner_curve.constant x) ) ) ) )
+                             Opt.just (Array.map ~f:Inner_curve.constant x) )) ) )
           in
           let () =
             (* Check consistency between index and feature flags. *)
@@ -266,12 +267,12 @@ let wrap_main
                 ; rot
                 ; lookup
                 ; runtime_tables
-                ; uses_lookups
+                ; uses_lookups = _
                 ; table_width_at_least_1
                 ; table_width_at_least_2
                 ; table_width_3
-                ; lookups_per_row_3
-                ; lookups_per_row_4
+                ; lookups_per_row_3 = _
+                ; lookups_per_row_4 = _
                 ; lookup_pattern_xor
                 ; lookup_pattern_range_check
                 } =
@@ -314,7 +315,7 @@ let wrap_main
           let prev_step_accs =
             with_label __LOC__ (fun () ->
                 exists (Vector.wrap_typ Inner_curve.typ Max_proofs_verified.n)
-                  ~request:(fun () -> Req.Step_accs) )
+                  ~request:(fun () -> Req.Step_accs ) )
           in
           let old_bp_chals =
             with_label __LOC__ (fun () ->
@@ -368,7 +369,7 @@ let wrap_main
                     in
                     let wrap_domain_indices =
                       exists (Vector.wrap_typ Field.typ Max_proofs_verified.n)
-                        ~request:(fun () -> Req.Wrap_domain_indices)
+                        ~request:(fun () -> Req.Wrap_domain_indices )
                     in
                     Vector.map wrap_domain_indices ~f:(fun index ->
                         let which_branch =
@@ -387,15 +388,15 @@ let wrap_main
                     ; wrap_domains
                     ]
                     ~f:(fun
-                         [ { deferred_values
-                           ; sponge_digest_before_evaluations
-                           ; should_finalize
-                           }
-                         ; old_bulletproof_challenges
-                         ; evals
-                         ; wrap_domain
-                         ]
-                       ->
+                        [ { deferred_values
+                          ; sponge_digest_before_evaluations
+                          ; should_finalize
+                          }
+                        ; old_bulletproof_challenges
+                        ; evals
+                        ; wrap_domain
+                        ]
+                      ->
                       let sponge =
                         let s = Sponge.create sponge_params in
                         Sponge.absorb s sponge_digest_before_evaluations ;
@@ -411,8 +412,8 @@ let wrap_main
                          Need to compute this value from the which_branch.
                       *)
                       let (T
-                            ( _max_local_max_proofs_verified
-                            , old_bulletproof_challenges ) ) =
+                             ( _max_local_max_proofs_verified
+                             , old_bulletproof_challenges ) ) =
                         old_bulletproof_challenges
                       in
                       let old_bulletproof_challenges =
@@ -503,7 +504,7 @@ let wrap_main
                         | `Field (Shifted_value x) ->
                             `Field (split_field x)
                         | `Packed_bits (x, n) ->
-                            `Packed_bits (x, n) ) )
+                            `Packed_bits (x, n) ))
                     ~sg_old:prev_step_accs
                     ~advice:{ b; combined_inner_product }
                     ~messages ~which_branch ~openings_proof ~plonk
@@ -528,10 +529,10 @@ let wrap_main
           Array.iter2_exn bulletproof_challenges_actual
             (Vector.to_array bulletproof_challenges)
             ~f:(fun
-                 { prechallenge = { inner = x1 } }
-                 ({ prechallenge = { inner = x2 } } :
-                   _ SC.t Bulletproof_challenge.t )
-               -> with_label __LOC__ (fun () -> Field.Assert.equal x1 x2) ) ;
+                { prechallenge = { inner = x1 } }
+                ({ prechallenge = { inner = x2 } } :
+                  _ SC.t Bulletproof_challenge.t )
+              -> with_label __LOC__ (fun () -> Field.Assert.equal x1 x2) ) ;
           () )
   in
   Timer.clock __LOC__ ;

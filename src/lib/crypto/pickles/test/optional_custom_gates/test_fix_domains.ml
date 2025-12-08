@@ -16,7 +16,7 @@ let add_plonk_constraint c = add_constraint c
 
 let etyp_unit =
   Composition_types.Spec.Step_etyp.T
-    (Pickles.Impls.Step.Typ.unit, Core_kernel.Fn.id, Core_kernel.Fn.id)
+    (Pickles.Impls.Step.Typ.unit, Core.Fn.id, Core.Fn.id)
 
 let log2_size ~feature_flags main =
   let main' () = main () ; Promise.return () in

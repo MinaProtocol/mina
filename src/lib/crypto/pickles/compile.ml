@@ -7,7 +7,7 @@ module type Statement_var_intf = Intf.Statement_var
 module type Statement_value_intf = Intf.Statement_value
 
 module SC = Scalar_challenge
-open Core_kernel
+open Core
 open Async_kernel
 open Import
 open Pickles_types

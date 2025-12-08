@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let l = ref ""
 

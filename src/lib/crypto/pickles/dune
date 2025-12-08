@@ -4,7 +4,6 @@
  (name pickles)
  (public_name pickles)
  (modules_without_implementation full_signature type intf pickles_intf)
- (flags -open Core_kernel)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

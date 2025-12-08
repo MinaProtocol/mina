@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 

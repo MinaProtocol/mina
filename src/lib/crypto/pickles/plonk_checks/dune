@@ -4,9 +4,7 @@
  (instrumentation
   (backend bisect_ppx))
  (flags
-  (:standard -w +a-40..42-44 -warn-error +a-4-70)
-  -open
-  Core_kernel)
+  (:standard -w +a-40..42-44 -warn-error +a-4-70))
  (preprocess
   (pps ppx_compare ppx_custom_printf ppx_deriving.eq ppx_deriving.std ppx_deriving_yojson ppx_hash ppx_mina ppx_sexp_conv ppx_version))
  (libraries
@@ -14,7 +12,6 @@
   sexplib0
   ppxlib.ast
   core_kernel
-  ocaml-migrate-parsetree
   base.base_internalhash_types
   ;; local libraries
   pickles_types

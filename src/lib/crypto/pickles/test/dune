@@ -13,11 +13,7 @@
   test_wrap
   test_wrap_hack)
  (flags
-  (:standard -warn-error +a)
-  -open
-  Core_kernel
-  -open
-  Pickles)
+  (:standard -warn-error +a))
  (preprocess
   (pps ppx_jane))
  (package pickles)

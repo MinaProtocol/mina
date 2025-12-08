@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
 

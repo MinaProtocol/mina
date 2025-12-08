@@ -60,7 +60,7 @@ module Metadata = struct
 
       include
         Binable.Of_binable_without_uuid
-          (Core_kernel.String.Stable.V1)
+          (Core.String.Stable.V1)
           (struct
             type nonrec t = t
 

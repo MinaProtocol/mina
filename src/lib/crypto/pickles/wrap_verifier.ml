@@ -1,5 +1,5 @@
 module S = Sponge
-open Core_kernel
+open Core
 open Util
 module SC = Scalar_challenge
 open Pickles_types
@@ -136,7 +136,7 @@ struct
   module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
 
   let _product m f =
-    Core_kernel.List.reduce_exn (Core_kernel.List.init m ~f) ~f:Field.( * )
+    Core.List.reduce_exn (Core.List.init m ~f) ~f:Field.( * )
 
   let absorb sponge ty t =
     absorb
