@@ -106,7 +106,6 @@
           nodejs = prev.nodejs.overrideAttrs (old: { doCheck = false; });
         };
       };
-      nixosModules.mina = import ./nix/modules/mina.nix inputs;
       # Mina Demo container
       # Use `nixos-container create --flake mina`
       # Taken from docs/demo.md
