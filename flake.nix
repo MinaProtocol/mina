@@ -16,7 +16,6 @@
   inputs.nixpkgs-old.url = "github:nixos/nixpkgs/nixos-23.05-small";
   inputs.nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
-  inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
   inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
   inputs.nix-npm-buildPackage.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.url = "github:tweag/opam-nix";
@@ -31,7 +30,8 @@
   inputs.describe-dune.inputs.nixpkgs.follows = "nixpkgs";
   inputs.describe-dune.inputs.flake-utils.follows = "utils";
 
-  inputs.o1-opam-repository.url = "github:o1-labs/opam-repository/dd90c5c72b7b7caeca3db3224b2503924deea08a";
+  inputs.o1-opam-repository.url =
+    "github:o1-labs/opam-repository/dd90c5c72b7b7caeca3db3224b2503924deea08a";
   inputs.o1-opam-repository.flake = false;
 
   # The version must be the same as the version used in:
@@ -60,9 +60,9 @@
 
   inputs.flockenzeit.url = "github:balsoft/Flockenzeit";
 
-  outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
-    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
-    , nix-utils, flockenzeit, nixpkgs-old, nixpkgs-unstable, ... }:
+  outputs = inputs@{ self, nixpkgs, utils, nix-npm-buildPackage, opam-nix
+    , opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline, nix-utils
+    , flockenzeit, nixpkgs-old, nixpkgs-unstable, ... }:
     let
       inherit (nixpkgs) lib;
 
@@ -107,168 +107,7 @@
           nodejs = prev.nodejs.overrideAttrs (old: { doCheck = false; });
         };
       };
-      # Mina Demo container
-      # Use `nixos-container create --flake mina`
-      # Taken from docs/demo.md
-      nixosConfigurations.container = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = let
-          PK = "B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p";
-          wallet = {
-            box_primitive = "xsalsa20poly1305";
-            ciphertext =
-              "Dmq1Qd8uNbZRT1NT7zVbn3eubpn9Myx9Je9ZQGTKDxUv4BoPNmZAGox18qVfbbEUSuhT4ZGDt";
-            nonce = "6pcvpWSLkMi393dT5VSLR6ft56AWKkCYRqJoYia";
-            pw_primitive = "argon2i";
-            pwdiff = [ 134217728 6 ];
-            pwsalt = "ASoBkV3NsY7ZRuxztyPJdmJCiz3R";
-          };
-          wallet-file = builtins.toFile "mina-wallet" (builtins.toJSON wallet);
-          wallet-file-pub = builtins.toFile "mina-wallet-pub" PK;
-        in [
-          self.nixosModules.mina
-          {
-            boot.isContainer = true;
-            networking.useDHCP = false;
-            networking.firewall.enable = false;
-
-            services.mina = {
-              enable = true;
-              config = {
-                "ledger" = {
-                  "name" = "mina-demo";
-                  "accounts" = [{
-                    "pk" = PK;
-                    "balance" = "66000";
-                    "sk" = null;
-                    "delegate" = null;
-                  }];
-                };
-              };
-              waitForRpc = false;
-              external-ip = "0.0.0.0";
-              generate-genesis-proof = true;
-              seed = true;
-              block-producer-key = "/var/lib/mina/wallets/store/${PK}";
-              extraArgs = [
-                "--demo-mode"
-                "--proof-level"
-                "none"
-                "--run-snark-worker"
-                "B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL"
-                "-insecure-rest-server"
-              ];
-            };
-
-            systemd.services.mina = {
-              preStart = ''
-                printf '{"genesis":{"genesis_state_timestamp":"%s"}}' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > /var/lib/mina/daemon.json
-              '';
-              environment = {
-                MINA_TIME_OFFSET = "0";
-                MINA_PRIVKEY_PASS = "";
-              };
-            };
-
-            systemd.tmpfiles.rules = [
-              "C /var/lib/mina/wallets/store/${PK}.pub 700 mina mina - ${wallet-file-pub}"
-              "C /var/lib/mina/wallets/store/${PK}     700 mina mina - ${wallet-file}"
-            ];
-          }
-        ];
-      };
       # Buildkite pipeline for the Nix CI
-      pipeline = with flake-buildkite-pipeline.lib;
-        let
-          inherit (nixpkgs) lib;
-          dockerUrl = package: tag:
-            "us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:${tag}";
-
-          pushToRegistry = package: {
-            command = runInEnv self.devShells.x86_64-linux.operations ''
-              ${self.packages.x86_64-linux.${package}} | gzip --fast | \
-                skopeo \
-                  copy \
-                  --insecure-policy \
-                  --dest-registry-token $(gcloud auth application-default print-access-token) \
-                  docker-archive:/dev/stdin \
-                  docker://${dockerUrl package "$BUILDKITE_COMMIT"}
-              if [[ develop == "$BUILDKITE_BRANCH" ]]; then
-                skopeo \
-                  copy \
-                  --insecure-policy \
-                  --dest-registry-token $(gcloud auth application-default print-access-token) \
-                  docker://${dockerUrl package "$BUILDKITE_COMMIT"} \
-                  docker://${dockerUrl package "$BUILDKITE_BRANCH"}
-              fi
-            '';
-            label =
-              "Assemble and upload ${package} to Google Artifact Registry";
-            depends_on = [ "packages_x86_64-linux_${package}" ];
-            plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
-            key = "push_${package}";
-          };
-          # Publish the documentation generated by ocamldoc to s3
-          publishDocs = {
-            command = runInEnv self.devShells.x86_64-linux.operations ''
-              gcloud auth activate-service-account --key-file "$GOOGLE_APPLICATION_CREDENTIALS"
-              gsutil -m rsync -rd ${self.packages.x86_64-linux.default}/share/doc/html gs://mina-docs
-            '';
-            label = "Publish documentation to Google Storage";
-            depends_on = [ "packages_x86_64-linux_default" ];
-            branches = [ "develop" ];
-            plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
-          };
-          runIntegrationTest = test:
-            { with-archive ? false }: {
-              command =
-                runInEnv self.devShells.x86_64-linux.integration-tests ''
-                  test_executive local ${test} \
-                  --mina-image=${
-                    dockerUrl "mina-image-full" "$BUILDKITE_COMMIT"
-                  } \
-                  ${lib.optionalString with-archive "--archive-image=${
-                    dockerUrl "mina-archive-image-full" "$BUILDKITE_COMMIT"
-                  }"}
-                '';
-              label = "Run ${test} integration test";
-              depends_on = [ "push_mina-image-full" ]
-                ++ lib.optional with-archive "push_mina-archive-image-full";
-              "if" =
-                ''build.pull_request.labels includes "nix-integration-tests"'';
-              retry = {
-                automatic = [{
-                  exit_status = "*";
-                  limit = 3;
-                }];
-              };
-            };
-        in {
-          steps = flakeSteps {
-            derivationCache = "https://storage.googleapis.com/mina-nix-cache";
-            reproduceRepo = "mina";
-            commonExtraStepConfig = {
-              agents = [ "nix" ];
-              plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
-            };
-          } self ++ [
-            (pushToRegistry "mina-image-slim")
-            (pushToRegistry "mina-image-full")
-            (pushToRegistry "mina-archive-image-full")
-            publishDocs
-            (runIntegrationTest "peers-reliability" { })
-            (runIntegrationTest "chain-reliability" { })
-            (runIntegrationTest "payment" { with-archive = true; })
-            (runIntegrationTest "delegation" { with-archive = true; })
-            (runIntegrationTest "gossip-consis" { })
-            # FIXME: opt-block-prod test fails.
-            # This has been disabled in the "old" CI for a while.
-            # (runIntegrationTest "opt-block-prod" { })
-            (runIntegrationTest "medium-bootstrap" { })
-            (runIntegrationTest "zkapps" { with-archive = true; })
-            (runIntegrationTest "zkapps-timing" { with-archive = true; })
-          ];
-        };
     } // utils.lib.eachDefaultSystem (system:
       let
         # Helper function to map dependencies to current nixpkgs equivalents
@@ -324,7 +163,6 @@
             nix-npm-buildPackage.overlays.default
             (final: prev: {
               rpmDebUtils = final.callPackage "${nix-utils}/utils/rpm-deb" { };
-              mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
               nix-npm-buildPackage =
                 pkgs.callPackage inputs.nix-npm-buildPackage {
                   nodejs = pkgs.nodejs-16_x;
