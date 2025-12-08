@@ -2,7 +2,15 @@
 
 set -eox pipefail
 
-./buildkite/scripts/cache/manager.sh read --root ${CACHED_BUILDKITE_BUILD_ID} debians/${CODENAME}/mina-${NETWORK_NAME}* ./
+
+## Check if CACHED_BUILDKITE_BUILD_ID is defined
+if [ "${CACHED_BUILDKITE_BUILD_ID+x}" ]; then
+	ROOT_ARG="--root ${CACHED_BUILDKITE_BUILD_ID}"
+else
+	ROOT_ARG=""
+fi
+
+./buildkite/scripts/cache/manager.sh read ${ROOT_ARG} debians/${CODENAME}/mina-${NETWORK_NAME}* ./
 
 ./buildkite/scripts/cache/manager.sh read hardfork/ledgers/*.tar.gz ./hardfork_ledgers/
 ./buildkite/scripts/cache/manager.sh read hardfork/new_config.json .
