@@ -84,7 +84,7 @@ let generateTarballsCommand =
                       Toolchain.SelectionMode.ByDebianAndArch
                       codename
                       Arch.Type.Amd64
-                      ([] : List Text)
+                      [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
                       (     "./buildkite/scripts/hardfork/generate-tarballs.sh "
                         ++  "--network ${Network.lowerName spec.network} "
                         ++  "--config-url ${spec.config_json_gz_url} "
