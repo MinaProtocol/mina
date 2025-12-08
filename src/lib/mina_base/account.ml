@@ -1,4 +1,59 @@
-(* account.ml *)
+(** Account representation in the Mina ledger.
+
+    This module defines the core account type used throughout the Mina
+    protocol. Each account stores the state of a participant in the network,
+    including their balance, permissions, and zkApp state.
+
+    {2 Account Structure}
+
+    An account contains:
+    - {b Identity}: Public key and token ID uniquely identify the account
+    - {b Balance}: Current token balance (MINA or custom token)
+    - {b Nonce}: Transaction sequence number, incremented on each send
+    - {b Timing}: Optional vesting schedule for locked tokens
+    - {b Permissions}: What operations are allowed on this account
+    - {b Delegate}: Who this account delegates to (for MINA accounts)
+    - {b zkApp state}: Optional smart contract state (8 field elements)
+
+    {2 Account Identity}
+
+    Accounts are identified by an {!Account_id.t} which combines:
+    - Public key (compressed)
+    - Token ID
+
+    This allows the same public key to have different accounts for different
+    tokens. The default MINA token uses {!Token_id.default}.
+
+    {2 Timed Accounts and Vesting}
+
+    Accounts can have a vesting schedule that locks tokens until they vest.
+    The schedule is defined by:
+    - [initial_minimum_balance]: Amount locked at account creation
+    - [cliff_time]: When the cliff amount becomes available
+    - [cliff_amount]: Amount that vests at the cliff
+    - [vesting_period]: How often tokens vest after the cliff
+    - [vesting_increment]: How much vests each period
+
+    The {!min_balance_at_slot} function computes how much is still locked.
+
+    {2 Permissions}
+
+    Account permissions control what operations can be performed:
+    - Send/Receive: Transfer tokens
+    - Set delegate: Change delegation
+    - Set permissions: Change permissions themselves
+    - Set verification key: Update zkApp code
+    - Set zkApp URI: Update metadata
+    - Edit state/actions: Modify zkApp state
+
+    See {!Permissions} for details on authorization requirements.
+
+    {2 zkApp Accounts}
+
+    Accounts with [zkapp = Some _] are zkApp accounts that can:
+    - Store 8 field elements of application state
+    - Emit events and actions
+    - Be authorized by zero-knowledge proofs *)
 
 open Core_kernel
 open Mina_base_util
@@ -9,6 +64,10 @@ open Mina_numbers
 open Fold_lib
 open Mina_base_import
 
+(** Index of an account in the ledger Merkle tree.
+
+    Accounts are stored at leaves of a binary Merkle tree. The index
+    determines the path from root to leaf. *)
 module Index = struct
   [%%versioned
   module Stable = struct
@@ -77,8 +136,15 @@ module Index = struct
   end
 end
 
+(** Account nonce for transaction ordering. Re-export of {!Account_nonce}. *)
 module Nonce = Account_nonce
 
+(** Token symbol for custom tokens.
+
+    A short string (max 6 characters) identifying a token owned by an
+    account. Note: This describes a token {i owned by} the account, not the
+    token {i used by} the account. The token used by an account is in
+    [token_id]. *)
 module Token_symbol = struct
   [%%versioned_binable
   module Stable = struct
@@ -191,9 +257,10 @@ module Token_symbol = struct
   let if_ = Tick.Run.Field.if_
 end
 
-(* the `token_symbol` describes a token id owned by the account id
-   from this account, not the token id used by this account
-*)
+(** Polymorphic account type.
+
+    Parameterized over all field types to support different representations
+    (value types, circuit variables, etc.). *)
 module Poly = struct
   [%%versioned
   module Stable = struct
@@ -229,6 +296,7 @@ module Poly = struct
   end]
 end
 
+(** Account key type (public key). *)
 module Key = struct
   [%%versioned
   module Stable = struct
@@ -241,10 +309,12 @@ module Key = struct
   end]
 end
 
+(** Account identifier (public key + token ID). *)
 module Identifier = Account_id
 
 type key = Key.t [@@deriving sexp, equal, hash, compare, yojson]
 
+(** Account timing for vesting schedules. Re-export of {!Account_timing}. *)
 module Timing = Account_timing
 
 module Binable_arg = struct
@@ -367,6 +437,7 @@ let of_poly
 
 [%%define_locally Stable.Latest.(public_key)]
 
+(** Get the unique identifier (public key + token) for an account. *)
 let identifier ({ public_key; token_id; _ } : t) =
   Account_id.create public_key token_id
 
@@ -374,6 +445,10 @@ type value = t [@@deriving sexp]
 
 let key_gen = Public_key.Compressed.gen
 
+(** Initialize a new account with zero balance and default settings.
+
+    The delegate is set to the account's own public key for MINA accounts,
+    and [None] for custom token accounts. *)
 let initialize account_id : t =
   let public_key = Account_id.public_key account_id in
   let token_id = Account_id.token_id account_id in
@@ -416,8 +491,12 @@ let to_input (t : t) =
     ~permissions:(f Permissions.to_input)
   |> List.reduce_exn ~f:append
 
+(** Hash prefix for account hashing. *)
 let crypto_hash_prefix = Hash_prefix.account
 
+(** Compute the cryptographic hash (digest) of an account.
+
+    This hash is used as the leaf value in the ledger Merkle tree. *)
 let crypto_hash t =
   Random_oracle.hash ~init:crypto_hash_prefix
     (Random_oracle.pack_input (to_input t))
@@ -502,7 +581,12 @@ let var_of_t
   ; zkapp = Field.Var.constant (hash_zkapp_account_opt zkapp)
   }
 
+(** SNARK circuit operations on accounts.
+
+    These functions operate on account values represented as circuit variables,
+    allowing account state to be computed and verified inside a zkSNARK. *)
 module Checked = struct
+  (** Account type with unhashed zkApp data (for full access to zkApp state). *)
   module Unhashed = struct
     type t =
       ( Public_key.Compressed.var
@@ -648,8 +732,10 @@ module Checked = struct
           account.permissions.access ~signature_verifies
 end
 
+(** Alias for {!crypto_hash}. *)
 let digest = crypto_hash
 
+(** The empty/default account used for unoccupied ledger positions. *)
 let empty =
   { public_key = Public_key.Compressed.empty
   ; token_id = Token_id.default
@@ -666,8 +752,12 @@ let empty =
   ; zkapp = None
   }
 
+(** Hash of the empty account. Computed lazily. *)
 let empty_digest = lazy (digest empty)
 
+(** Create a new account with the given balance.
+
+    Like {!initialize} but with a specified starting balance. *)
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
   let token_id = Account_id.token_id account_id in
@@ -688,6 +778,15 @@ let create account_id balance =
   ; zkapp = None
   }
 
+(** Create a timed account with a vesting schedule.
+
+    @param initial_minimum_balance Amount locked at creation
+    @param cliff_time Slot when cliff amount becomes available
+    @param cliff_amount Amount released at the cliff
+    @param vesting_period Slots between each vesting increment
+    @param vesting_increment Amount released each vesting period
+
+    @return [Error] if vesting_period is zero (would cause division by zero) *)
 let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     ~cliff_amount ~vesting_period ~vesting_increment =
   if Global_slot_span.(equal vesting_period zero) then
@@ -746,6 +845,13 @@ let vesting_increment Poly.{ timing; _ } =
 let vesting_period Poly.{ timing; _ } =
   match timing with Timing.Untimed -> None | Timed t -> Some t.vesting_period
 
+(** Compute the minimum balance (locked amount) at a given slot.
+
+    Before cliff_time: returns initial_minimum_balance
+    At cliff_time: cliff_amount is released
+    After cliff_time: vesting_increment is released each vesting_period
+
+    @return The amount that must remain locked in the account *)
 let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
     ~vesting_increment ~initial_minimum_balance =
   let open Unsigned in
@@ -792,6 +898,9 @@ let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
         | Some amt ->
             amt )
 
+(** Compute how much balance becomes available between two slots.
+
+    @return The amount that vests (becomes spendable) between start_slot and end_slot *)
 let incremental_balance_between_slots ~start_slot ~end_slot ~cliff_time
     ~cliff_amount ~vesting_period ~vesting_increment ~initial_minimum_balance :
     Unsigned.UInt64.t =
@@ -810,6 +919,7 @@ let incremental_balance_between_slots ~start_slot ~end_slot ~cliff_time
     in
     UInt64.Infix.(min_balance_at_start_slot - min_balance_at_end_slot)
 
+(** Check if an account has any locked (unvested) tokens at a given slot. *)
 let has_locked_tokens ~global_slot (account : t) =
   match account.timing with
   | Untimed ->
@@ -827,6 +937,9 @@ let has_locked_tokens ~global_slot (account : t) =
       in
       Balance.(curr_min_balance > zero)
 
+(** Compute the slot when all tokens will be fully vested.
+
+    @return The first slot where minimum_balance will be zero *)
 let final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
     ~vesting_period ~vesting_increment =
   let open Unsigned in
@@ -847,6 +960,7 @@ let final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
   @@ Global_slot_since_genesis.to_uint32 cliff_time
      + (UInt64.to_uint32 periods * Global_slot_span.to_uint32 vesting_period)
 
+(** Get the final vesting slot from an account's timing info. *)
 let timing_final_vesting_slot = function
   | Timing.Untimed ->
       Global_slot_since_genesis.zero
@@ -860,6 +974,10 @@ let timing_final_vesting_slot = function
       final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
         ~vesting_period ~vesting_increment
 
+(** Check if an account has permission to perform an operation.
+
+    @param control The authorization type being used
+    @param to_ The operation being performed *)
 let has_permission ~control ~to_ (account : t) =
   match to_ with
   | `Access ->
@@ -894,6 +1012,9 @@ let has_permission_to_increment_nonce account =
   has_permission ~control:Control.Tag.Signature ~to_:`Access account
   && has_permission ~control:Control.Tag.Signature ~to_:`Increment_nonce account
 
+(** Compute the liquid (spendable) balance at a given slot.
+
+    @return balance minus the minimum balance (locked amount) *)
 let liquid_balance_at_slot ~global_slot (account : t) =
   match account.timing with
   | Untimed ->
@@ -921,6 +1042,7 @@ let slot_reduction_update ~hardfork_slot (account : t) =
   in
   { account with timing }
 
+(** Quickcheck generator for random accounts. *)
 let gen : t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in
@@ -928,6 +1050,7 @@ let gen : t Quickcheck.Generator.t =
   let%map balance = Currency.Balance.gen in
   create (Account_id.create public_key token_id) balance
 
+(** Quickcheck generator for accounts with balance in a specific range. *)
 let gen_with_constrained_balance ~low ~high : t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in
@@ -1022,6 +1145,7 @@ let gen_timing_at_least_one_vesting_period (account_balance : Balance.t) =
   gen_vesting_details ~vesting_period ~cliff_time ~vesting_end
     initial_minimum_balance
 
+(** Quickcheck generator for timed (vesting) accounts. *)
 let gen_timed : t Quickcheck.Generator.t =
   let open Quickcheck in
   let open Generator.Let_syntax in
@@ -1031,6 +1155,7 @@ let gen_timed : t Quickcheck.Generator.t =
   let%map timing = gen_timing account.balance in
   { account with timing = Timing.of_record timing }
 
+(** GraphQL deriver for accounts. *)
 let deriver obj =
   let open Fields_derivers_zkapps in
   let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
@@ -1047,13 +1172,11 @@ let deriver obj =
        ~zkapp:!.(option ~js_type:Or_undefined (Zkapp_account.deriver @@ o ()))
        obj
 
-(** An account type that reflects the account format changes or other account
-    migrations that may occur during the next hard fork. The changes reflected
-    in this type are:
+(** Account type for the Mesa hardfork.
 
-    - The zkapp state size increase from 8 to 32 slots. Migration: padding the
-      zkapp state size with 24 zero field elements.
-*)
+    Reflects account format changes during the Mesa hardfork:
+    - The zkapp state size increase from 8 to 32 slots. Migration: padding
+      the zkapp state size with 24 zero field elements. *)
 module Hardfork = struct
   type t =
     { public_key : Public_key.Compressed.Stable.Latest.t
@@ -1121,9 +1244,12 @@ module Hardfork = struct
   let empty_digest = lazy (digest empty)
 end
 
-(* An unstable account is needed when we're doing ledger migration. The main
-   idea is we provide a function converting from Stable account to this type,
-   and storing all writes to the original ledger to the new ledger. *)
+(** Unstable account type for the Mesa hardfork ledger migration.
+
+    Used during the Mesa hardfork when the account format changes. The
+    unstable account type can differ from the stable type, allowing gradual
+    migration of the ledger. Provides conversion from stable accounts and
+    separate hashing logic. *)
 module Unstable = struct
   type t =
     { public_key : Public_key.Compressed.Stable.Latest.t
