@@ -122,8 +122,6 @@ var caml_pasta_fp_plonk_index_deserialize = function (index) {
   if (typeof index.deserialize === 'function') {
     return index.deserialize();
   }
-  // const deserialized = plonk_wasm.prover_index_fp_deserialize(index);
-  // console.log('deserialized index: ', dese)
   return plonk_wasm.prover_index_fp_deserialize(index);
 };
 
