@@ -35,21 +35,14 @@ let to_numbered_list = function
   | `Two (a, b) ->
       [ (0, a); (1, b) ]
 
-let group_list : 'a list -> 'a t list =
-  let f (el, acc) x =
-    match el with
-    | `One a ->
-        (`Two (a, x), acc)
-    | `Two (a, b) ->
-        (`One x, `Two (a, b) :: acc)
-  in
-  function
+let rec group_list (l : 'a list) : 'a t list =
+  match l with
+  | a :: b :: rest ->
+      `Two (a, b) :: group_list rest
+  | [ a ] ->
+      [ `One a ]
   | [] ->
       []
-  | fst_x :: xs ->
-      let init = (`One fst_x, []) in
-      let last, res = List.fold ~init ~f xs in
-      List.rev @@ (last :: res)
 
 let zip : 'a t -> 'b t -> ('a * 'b) t Or_error.t =
  fun a b ->
