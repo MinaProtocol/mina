@@ -29,7 +29,7 @@ module Protocol_states_for_root_scan_state : sig
 
   val protocol_states_for_next_root_scan_state :
        t
-    -> new_scan_state:Staged_ledger.Scan_state.t
+    -> next_root_required_hashes:State_hash.t list
     -> old_root_state:Protocol_state.value State_hash.With_state_hashes.t
     -> Protocol_state.value State_hash.With_state_hashes.t list
 end
@@ -46,6 +46,7 @@ val create :
   -> max_length:int
   -> persistent_root_instance:Persistent_root.Instance.t
   -> time_controller:Block_time.Controller.t
+  -> staged_ledger:Staged_ledger.t
   -> t
 
 val persistent_root_instance : t -> Persistent_root.Instance.t
@@ -64,6 +65,8 @@ val apply_diffs :
   -> [ `New_root_and_diffs_with_mutants of
        Root_identifier.t option * Diff.Full.With_mutant.t list ]
 
+val size : t -> int
+
 val common_ancestor :
      t
   -> Breadcrumb.t
@@ -71,6 +74,8 @@ val common_ancestor :
   -> ( State_hash.t
      , [ `Parent_not_found of State_hash.t * [ `Parent of State_hash.t ] ] )
      Result.t
+
+val lighten : ?retain_application_data:bool -> t -> State_hash.t -> unit
 
 module Util : sig
   (** given an heir, calculate the diff that will transition
@@ -88,8 +93,6 @@ module Util : sig
 end
 
 module For_tests : sig
-  val equal : t -> t -> bool
-
   val find_protocol_state_exn :
     t -> State_hash.t -> Mina_state.Protocol_state.value
 

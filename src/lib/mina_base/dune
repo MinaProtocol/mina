@@ -73,7 +73,8 @@
   snark_bits
   error_json
   ppx_version.runtime
-  proof_cache_tag)
+  proof_cache_tag
+  multi_key_file_storage)
  (preprocess
   (pps
    ppx_annot

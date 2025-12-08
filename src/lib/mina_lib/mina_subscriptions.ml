@@ -144,6 +144,9 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                           in
                           Mina_block.Precomputed.of_block ~logger
                             ~constraint_constants ~staged_ledger ~scheduled_time
+                            ~accounts_created:
+                              (Frontier_base.Breadcrumb.accounts_created
+                                 breadcrumb )
                             new_block
                         in
                         [%log debug] "Precomputed block generated in $time ms"

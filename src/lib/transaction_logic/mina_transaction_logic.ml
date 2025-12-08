@@ -11,11 +11,6 @@ module type S = sig
 
   type location
 
-  val transaction_of_applied :
-    Transaction_applied.t -> Transaction.t With_status.t
-
-  val status_of_applied : Transaction_applied.t -> Transaction_status.t
-
   module Global_state : sig
     type t =
       { first_pass_ledger : ledger
@@ -443,34 +438,6 @@ module Make (L : Ledger_intf.S) :
       !"Current global slot %{sexp: Global_slot_since_genesis.t} greater than \
         transaction expiry slot %{sexp: Global_slot_since_genesis.t}"
       current_global_slot valid_until
-
-  let transaction_of_applied :
-      Transaction_applied.t -> Transaction.t With_status.t =
-   fun { varying; _ } ->
-    match varying with
-    | Command (Signed_command uc) ->
-        With_status.map uc.common.user_command ~f:(fun cmd ->
-            Transaction.Command (User_command.Signed_command cmd) )
-    | Command (Zkapp_command s) ->
-        With_status.map s.command ~f:(fun c ->
-            Transaction.Command (User_command.Zkapp_command c) )
-    | Fee_transfer f ->
-        With_status.map f.fee_transfer ~f:(fun f -> Transaction.Fee_transfer f)
-    | Coinbase c ->
-        With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
-
-  let status_of_applied : Transaction_applied.t -> Transaction_status.t =
-   fun { varying; _ } ->
-    match varying with
-    | Command
-        (Signed_command { common = { user_command = { status; _ }; _ }; _ }) ->
-        status
-    | Command (Zkapp_command c) ->
-        c.command.status
-    | Fee_transfer f ->
-        f.fee_transfer.status
-    | Coinbase c ->
-        c.coinbase.status
 
   let get_new_accounts action pk =
     if Ledger_intf.equal_account_state action `Added then [ pk ] else []

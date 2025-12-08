@@ -53,10 +53,7 @@ module Rpcs : sig
     type query = State_hash.t
 
     type response =
-      ( Staged_ledger.Scan_state.Stable.Latest.t
-      * Ledger_hash.t
-      * Pending_coinbase.t
-      * Mina_state.Protocol_state.value list )
+      Frontier_base.Network_types.Staged_ledger_aux_and_pending_coinbases.t
       option
   end
 
@@ -72,7 +69,7 @@ module Rpcs : sig
   module Get_transition_chain : sig
     type query = State_hash.t list
 
-    type response = Mina_block.Stable.Latest.t list option
+    type response = Frontier_base.Network_types.Block.t list option
   end
 
   module Get_transition_chain_proof : sig
@@ -92,8 +89,8 @@ module Rpcs : sig
       (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
 
     type response =
-      ( Mina_block.Stable.Latest.t
-      , State_body_hash.t list * Mina_block.Stable.Latest.t )
+      ( Frontier_base.Network_types.Block.t
+      , State_body_hash.t list * Frontier_base.Network_types.Block.t )
       Proof_carrying_data.t
       option
   end
@@ -109,8 +106,8 @@ module Rpcs : sig
     type query = unit
 
     type response =
-      ( Mina_block.Stable.Latest.t
-      , State_body_hash.t list * Mina_block.Stable.Latest.t )
+      ( Frontier_base.Network_types.Block.t
+      , State_body_hash.t list * Frontier_base.Network_types.Block.t )
       Proof_carrying_data.t
       option
   end
@@ -229,10 +226,10 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
   -> Peer.Id.t
   -> State_hash.t
-  -> ( Staged_ledger.Scan_state.Stable.Latest.t
-     * Ledger_hash.t
-     * Pending_coinbase.t
-     * Mina_state.Protocol_state.value list )
+  -> Frontier_base.Network_types.Staged_ledger_aux_and_pending_coinbases.Data
+     .Stable
+     .Latest
+     .t
      Deferred.Or_error.t
 
 val get_completed_checked_snarks :

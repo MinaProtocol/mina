@@ -55,27 +55,33 @@ let apply_root_transitions ~logger ~db diffs =
                     .message err ) ) )
       |> Result.ok_exn
     in
+    let initial_root_history =
+      Transition_frontier.Persistent_frontier.Database.get_root_history db
+    in
+    let root_history_capacity =
+      Transition_frontier.Persistent_frontier.Database.root_history_capacity db
+    in
     Transition_frontier.Persistent_frontier.Database.with_batch db
       ~f:(fun batch ->
-        ( List.fold diffs ~init:initial_root_hash ~f:(fun old_root_hash diff ->
+        ( List.fold diffs ~init:(initial_root_hash, initial_root_history)
+            ~f:(fun (old_root_hash, old_root_history) diff ->
               match diff with
               | Diff.Lite.E.E
                   (Diff.Root_transitioned
                     { new_root; garbage = Lite garbage; _ } ) ->
-                  let parent_hash =
-                    Root_data.Limited.Stable.Latest.transition new_root
-                    |> Mina_block.Validated.Stable.Latest.header
-                    |> Mina_block.Header.protocol_state
-                    |> Mina_state.Protocol_state.previous_state_hash
-                  in
-                  assert (State_hash.equal parent_hash old_root_hash) ;
                   Transition_frontier.Persistent_frontier.Database.move_root
-                    ~old_root_hash ~new_root ~garbage batch ;
+                    ~old_root_hash ~new_root ~garbage ~old_root_history
+                    ~root_history_capacity batch ;
                   (* Return new root hash for next iteration *)
-                  (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
+                  let old_root_history' =
+                    if List.length old_root_history = root_history_capacity then
+                      List.drop_last_exn old_root_history
+                    else old_root_history
+                  in
+                  (new_root.state_hash, old_root_hash :: old_root_history')
               | _ ->
                   failwith "Expected Root_transitioned diff" )
-          : State_hash.t )
+          : State_hash.t * State_hash.t list )
         |> ignore ) ;
     [%log' info logger] "Successfully applied $count diffs"
       ~metadata:[ ("count", `Int (List.length diffs)) ] ;
@@ -85,8 +91,57 @@ let apply_root_transitions ~logger ~db diffs =
       ~metadata:[ ("error", `String (Exn.to_string exn)) ] ;
     Error ("Failed to apply root transitions: " ^ Exn.to_string exn)
 
+let persist_all_transitions ~logger ~db breadcrumbs =
+  [%log info] "Re-persisting %d transitions" (List.length breadcrumbs) ;
+  Transition_frontier.Persistent_frontier.Database.with_batch db
+    ~f:(fun batch ->
+      List.iter breadcrumbs ~f:(fun breadcrumb ->
+          Transition_frontier.Persistent_frontier.Database.set_transition
+            ~state_hash:(Breadcrumb.state_hash breadcrumb)
+            ~transition_data:(Breadcrumb.to_block_data_exn breadcrumb)
+            batch ) ) ;
+  [%log info] "Re-persisted %d transitions" (List.length breadcrumbs)
+
+let print_ram_usage ~logger frontier_length rss_before rss_after rss_after_gc
+    elapsed =
+  let gc_stats = Gc.stat () in
+  let float_opt_json = Option.value_map ~default:`Null ~f:(fun x -> `Float x) in
+  [%log info]
+    "Loaded transition frontier of %d breadcrumbs in $elapsed seconds with RSS \
+     $rss_after_gc (started with $rss_before, before GC: $rss_after), see \
+     $gc_stats (taken after GC)"
+    frontier_length
+    ~metadata:
+      [ ("elapsed", `Float (Time.Span.to_sec elapsed))
+      ; ("rss_after", float_opt_json rss_after)
+      ; ("rss_after_gc", float_opt_json rss_after_gc)
+      ; ("rss_before", float_opt_json rss_before)
+      ; ( "gc_stats"
+        , `Assoc
+            [ ("heap_words", `Int gc_stats.heap_words)
+            ; ("major_words", `Float gc_stats.major_words)
+            ; ("minor_words", `Float gc_stats.minor_words)
+            ; ( "forced_major_collections"
+              , `Int gc_stats.forced_major_collections )
+            ; ("major_collections", `Int gc_stats.major_collections)
+            ; ("minor_collections", `Int gc_stats.minor_collections)
+            ; ("compactions", `Int gc_stats.compactions)
+            ; ("promoted_words", `Float gc_stats.promoted_words)
+            ; ("heap_chunks", `Int gc_stats.heap_chunks)
+            ; ("live_words", `Int gc_stats.live_words)
+            ; ("free_words", `Int gc_stats.free_words)
+            ; ("largest_free", `Int gc_stats.largest_free)
+            ; ("fragments", `Int gc_stats.fragments)
+            ; ("live_blocks", `Int gc_stats.live_blocks)
+            ; ("free_blocks", `Int gc_stats.free_blocks)
+            ; ("top_heap_words", `Int gc_stats.top_heap_words)
+            ; ("stack_size", `Int gc_stats.stack_size)
+            ] )
+      ]
+
 let fix_persistent_frontier_root_do ~logger ~config_directory
-    ~chain_state_locations ~max_frontier_depth runtime_config =
+    ~chain_state_locations ~max_frontier_depth ~migrate_frontier runtime_config
+    =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
   (* Get compile-time constants *)
   let genesis_constants = Genesis_constants.Compiled.genesis_constants in
@@ -131,6 +186,10 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       ~directory:chain_state_locations.frontier
       ~time_controller:(Block_time.Controller.basic ~logger)
       ~signature_kind
+      ~root_history_capacity:
+        ( 2
+        * Transition_frontier.global_max_length
+            precomputed_values.genesis_constants )
   in
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
   let%bind.Deferred.Result persistent_frontier_root_hash =
@@ -170,6 +229,8 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       ~epoch_ledger_backing_type:Stable_db
       Signature_lib.Public_key.Compressed.Set.empty
   in
+  let rss_before = Mina_stdlib_unix.File_system.read_rss_kb None in
+  let start = Time.now () in
   (* TODO loading of frontier is redundant unless fixing is needed *)
   (* Load transition frontier using the standard API *)
   let%bind frontier =
@@ -178,7 +239,10 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
         ~context:(module Context)
         ~retry_with_fresh_db:false ~max_frontier_depth ~verifier
         ~consensus_local_state ~persistent_root ~persistent_frontier
-        ~catchup_mode:`Super ~set_best_tip:false ()
+        ~catchup_mode:`Super
+        ~set_best_tip:false
+          (* application data is used in frontier migration, so we need to retain it *)
+        ~retain_application_data:migrate_frontier ~check_arcs:false ()
     with
     | Error err ->
         let err_str =
@@ -198,6 +262,13 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
     | Ok f ->
         f
   in
+  let rss_after = Mina_stdlib_unix.File_system.read_rss_kb None in
+  Gc.compact () ;
+  let rss_after_gc = Mina_stdlib_unix.File_system.read_rss_kb None in
+  let elapsed = Time.diff (Time.now ()) start in
+  print_ram_usage ~logger
+    (Transition_frontier.all_breadcrumbs frontier |> List.length)
+    rss_before rss_after rss_after_gc elapsed ;
   let frontier_root_hash =
     Transition_frontier.root frontier |> Breadcrumb.state_hash
   in
@@ -205,7 +276,25 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
   let with_persistent_frontier_instance f =
     Persistent_frontier.with_instance_exn persistent_frontier ~f
   in
+  let migrate_frontier_do (instance : Persistent_frontier.Instance.t) =
+    if migrate_frontier then
+      let root_hash =
+        Transition_frontier.root frontier |> Breadcrumb.state_hash
+      in
+      let breadcrumbs =
+        (* Excluding root, because for it application data is not preserved,
+           and transition record isn't used. *)
+        Transition_frontier.all_breadcrumbs frontier
+        |> List.filter ~f:(fun breadcrumb ->
+               not @@ State_hash.equal root_hash
+               @@ Breadcrumb.state_hash breadcrumb )
+      in
+      persist_all_transitions ~logger ~db:instance.db breadcrumbs
+    else ()
+  in
   let clean_frontier () =
+    Transition_frontier.with_persistent_frontier_instance_exn frontier
+      ~f:migrate_frontier_do ;
     let%bind () = Transition_frontier.close ~loc:__LOC__ frontier in
     Mina_stdlib_unix.File_system.remove_dir tmp_root_location
   in
@@ -263,8 +352,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
             in
             ( ( breadcrumb
               , Transition_frontier.Util.to_protocol_states_map_exn
-                @@ Root_data.Limited.Stable.Latest.protocol_states
-                @@ root_transition.new_root )
+                  root_transition.new_root.protocol_states_for_scan_state )
             , res ) )
       in
       [%log info] "Generated $count transition diffs"
@@ -278,7 +366,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       [%log info] "Successfully moved frontier root to match persistent root"
 
 let fix_persistent_frontier_root ~config_directory ~config_file
-    ~max_frontier_depth =
+    ~max_frontier_depth ~migrate_frontier =
   Logger.Consumer_registry.register ~commit_id:"" ~id:Logger.Logger_id.mina
     ~processor:Internal_tracing.For_logger.processor
     ~transport:
@@ -322,7 +410,8 @@ let fix_persistent_frontier_root ~config_directory ~config_file
       Deferred.Result.return ()
   | `Both_exist ->
       fix_persistent_frontier_root_do ~logger ~config_directory
-        ~chain_state_locations ~max_frontier_depth runtime_config
+        ~chain_state_locations ~max_frontier_depth ~migrate_frontier
+        runtime_config
 
 let command =
   Command.async
@@ -337,6 +426,11 @@ let command =
     and max_frontier_depth =
       flag "--max-frontier-depth"
         ~doc:"INT maximum frontier depth (default: 10)" (optional int)
+    and migrate_frontier =
+      flag "--migrate-frontier"
+        ~doc:
+          "BOOL whether to migrate frontier to the new format (default: false)"
+        no_arg
     in
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
@@ -352,6 +446,7 @@ let command =
     match%bind
       fix_persistent_frontier_root ~config_directory:conf_dir ~config_file
         ~max_frontier_depth:(Option.value max_frontier_depth ~default:10)
+        ~migrate_frontier
     with
     | Ok () ->
         printf "Persistent frontier root fix completed successfully.\n" ;

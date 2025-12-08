@@ -64,4 +64,18 @@ module type S = sig
       -> proof:Proof_cache_tag.t
       -> t
   end
+
+  module Tagged : sig
+    type t
+
+    val read_proof_from_disk : t -> Stable.Latest.t Or_error.t
+
+    val statement : t -> Mina_state.Snarked_ledger_state.t
+
+    val create :
+         statement:Mina_state.Snarked_ledger_state.t
+      -> sok_digest:Sok_message.Digest.t
+      -> proof:Proof.t State_hash.File_storage.tag
+      -> t
+  end
 end

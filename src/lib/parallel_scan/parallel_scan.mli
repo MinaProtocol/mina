@@ -210,6 +210,12 @@ module State : sig
 
   val map : ('a1, 'a2) t -> f1:('a1 -> 'b1) -> f2:('a2 -> 'b2) -> ('b1, 'b2) t
 
+  val map_result :
+       ('a1, 'a2) t
+    -> f1:('a1 -> ('b1, 'e) Result.t)
+    -> f2:('a2 -> ('b2, 'e) Result.t)
+    -> (('b1, 'b2) t, 'e) Result.t
+
   module Hash : sig
     type t = Digestif.SHA256.t
   end
@@ -287,17 +293,6 @@ val view_jobs_with_position :
   -> ('merge -> 'c)
   -> ('base -> 'c)
   -> 'c Job_view.t list list
-
-(** All the base jobs that are part of the latest tree being filled
- * i.e., does not include base jobs that are part of previous trees not
- * promoted to the merge jobs yet*)
-val base_jobs_on_latest_tree : ('merge, 'base) State.t -> 'base list
-
-(** All the base jobs that are part of a tree before the latest tree
-    index is 0-based, 0 is the next-to-latest tree
-*)
-val base_jobs_on_earlier_tree :
-  ('merge, 'base) State.t -> index:int -> 'base list
 
 (** Returns true only if the next 'd that could be enqueued is
 on a new tree*)

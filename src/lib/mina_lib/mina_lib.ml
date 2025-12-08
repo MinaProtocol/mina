@@ -763,8 +763,7 @@ let get_snarked_ledger_full t state_hash_opt =
             else return () )
       in
       let snarked_ledger_hash =
-        Transition_frontier.Breadcrumb.block b
-        |> Mina_block.header |> Header.protocol_state
+        Transition_frontier.Breadcrumb.protocol_state b
         |> Mina_state.Protocol_state.blockchain_state
         |> Mina_state.Blockchain_state.snarked_ledger_hash
       in
@@ -853,11 +852,6 @@ let most_recent_valid_transition t = t.components.most_recent_valid_block
 
 let block_produced_bvar t = t.components.block_produced_bvar
 
-let staged_ledger_ledger_proof t =
-  let open Option.Let_syntax in
-  let%bind sl = best_staged_ledger_opt t in
-  Staged_ledger.current_ledger_proof sl
-
 let validated_transitions t = t.pipes.validated_transitions_reader
 
 let initialization_finish_signal t = t.initialization_finish_signal
@@ -896,14 +890,39 @@ let request_work t =
   let%bind.Option prover =
     Option.first_some (snark_worker_key t) (snark_coordinator_key t)
   in
+  let%bind.Option frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  let get_state hash =
+    Transition_frontier.find_protocol_state frontier hash
+    |> function
+    | Some state ->
+        Or_error.return state
+    | None ->
+        Or_error.error_string "Protocol state not found"
+  in
   let fee = snark_work_fee t in
   let sok_message = Sok_message.create ~fee ~prover in
   [%log' debug t.config.logger] "Received work request"
     ~metadata:[ ("sok_message", Sok_message.to_yojson sok_message) ] ;
   let work_from_selector =
     lazy
-      (Work_selection_method.work ~snark_pool:(snark_pool t) ~fee
-         ~logger:t.config.logger t.work_selector )
+      ( Work_selection_method.work ~snark_pool:(snark_pool t) ~fee
+          ~logger:t.config.logger t.work_selector
+      |> Option.map
+           ~f:
+             (Staged_ledger.Scan_state.Available_job.single_spec_one_or_two
+                ~get_state )
+      |> function
+      | Some (Error e) ->
+          [%log' fatal t.config.logger]
+            "Error occured when converting available work: $error"
+            ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+          None
+      | Some (Ok x) ->
+          Some x
+      | None ->
+          None )
   in
   Work_partitioner.request_partitioned_work ~work_from_selector ~sok_message
     ~partitioner:t.work_partitioner
@@ -913,7 +932,7 @@ let work_selection_method t = t.config.work_selection_method
 let add_complete_work ~logger ~fee ~prover
     ~(results :
        ( Snark_work_lib.Spec.Single.t
-       , Ledger_proof.Cached.t )
+       , Ledger_proof.t )
        Snark_work_lib.Result.Single.Poly.t
        One_or_two.t ) t =
   let update_metrics () =
@@ -948,12 +967,8 @@ let add_complete_work ~logger ~fee ~prover
     Local_sink.push t.pipes.snark_local_sink
       ( Add_solved_work
           ( stmts
-          , Network_pool.Priced_proof.
-              { proof =
-                  proofs
-                  |> One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
-              ; fee = fee_with_prover
-              } )
+          , Network_pool.Priced_proof.{ proof = proofs; fee = fee_with_prover }
+          )
       , Result.iter_error ~f:(fun err ->
             (* Possible reasons of failure: receiving pipe's capacity exceeded,
                 fee that isn't the lowest, failure in verification or application to the pool *)
@@ -1649,8 +1664,8 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
     | Some frontier ->
         let tip = Transition_frontier.best_tip frontier in
         let top_block =
-          Transition_frontier.Breadcrumb.validated_transition tip
-          |> Mina_block.Validated.header |> Mina_block.Header.blockchain_length
+          Transition_frontier.Breadcrumb.header tip
+          |> Mina_block.Header.blockchain_length
         in
         let delta =
           Unsigned.UInt32.(Infix.(received_block - top_block) |> to_int)
@@ -2167,7 +2182,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             Work_partitioner.create ~signature_kind
               ~reassignment_timeout:
                 (Time.Span.of_ms (Float.of_int config.work_reassignment_wait))
-              ~logger:config.logger ~proof_cache_db
+              ~logger:config.logger
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
           let%bind net =
@@ -2228,8 +2243,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             Broadcast_pipe.create
               ( Mina_block.genesis_header
                   ~precomputed_values:config.precomputed_values
-              |> Validation.reset_frontier_dependencies_validation
-              |> Validation.reset_staged_ledger_diff_validation )
+              |> Validation.reset_frontier_dependencies_validation )
           in
           let get_most_recent_valid_block () =
             Broadcast_pipe.Reader.peek most_recent_valid_block_reader
@@ -2661,14 +2675,8 @@ let best_chain_block_by_height (t : t) height =
   let%bind transition_frontier = get_transition_frontier t in
   Transition_frontier.best_tip_path transition_frontier
   |> List.find ~f:(fun bc ->
-         let validated_transition =
-           Transition_frontier.Breadcrumb.validated_transition bc
-         in
-         let block_height =
-           Mina_block.(
-             blockchain_length @@ With_hash.data
-             @@ Validated.forget validated_transition)
-         in
+         let header = Transition_frontier.Breadcrumb.header bc in
+         let block_height = Mina_block.Header.blockchain_length header in
          Unsigned.UInt32.equal block_height height )
   |> Result.of_option
        ~error:
@@ -2875,11 +2883,10 @@ module Hardfork_config = struct
       hard fork genesis slot delta in the runtime config, if those have been set
       and the [breadcrum_spec] was [`Stop_slot]. Otherwise, it will be the
       global slot since genesis of the hard fork block. *)
-  let hard_fork_global_slot ~breadcrumb_spec ~block mina :
+  let hard_fork_global_slot ~breadcrumb_spec ~consensus_state mina :
       Mina_numbers.Global_slot_since_hard_fork.t =
     let block_global_slot =
-      Mina_block.consensus_state block
-      |> Consensus.Data.Consensus_state.curr_global_slot
+      Consensus.Data.Consensus_state.curr_global_slot consensus_state
     in
     let configured_slot =
       match breadcrumb_spec with
@@ -2930,15 +2937,18 @@ module Hardfork_config = struct
   let prepare_inputs ~breadcrumb_spec mina =
     let open Deferred.Result.Let_syntax in
     let%bind breadcrumb = breadcrumb ~breadcrumb_spec mina in
-    let block = Transition_frontier.Breadcrumb.block breadcrumb in
-    let blockchain_length = Mina_block.blockchain_length block in
+    let consensus_state =
+      Transition_frontier.Breadcrumb.consensus_state breadcrumb
+    in
+    let blockchain_length =
+      Consensus.Data.Consensus_state.blockchain_length consensus_state
+    in
     let global_slot_since_hard_fork =
-      hard_fork_global_slot ~breadcrumb_spec ~block mina
+      hard_fork_global_slot ~breadcrumb_spec ~consensus_state mina
     in
     let global_slot_since_genesis =
       move_hard_fork_consensus_to_scheduled_genesis
-        ~hard_fork_consensus_data:(Mina_block.consensus_state block)
-        global_slot_since_hard_fork
+        ~hard_fork_consensus_data:consensus_state global_slot_since_hard_fork
     in
     let genesis_state_timestamp =
       genesis_timestamp_str

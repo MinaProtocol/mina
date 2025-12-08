@@ -618,6 +618,10 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
         Transition_frontier.Persistent_frontier.create ~logger ~verifier
           ~time_controller ~directory:persistent_frontier_location
           ~signature_kind
+          ~root_history_capacity:
+            ( 12
+            * Transition_frontier.global_max_length
+                precomputed_values.genesis_constants )
       in
       let persistent_root =
         Transition_frontier.Persistent_root.create ~logger

@@ -34,14 +34,15 @@ module Make_str (A : Wire_types.Concrete) = struct
     end]
   end
 
+  let compute_state_hash ~previous_state_hash ~state_body_hash =
+    Random_oracle.hash ~init:Hash_prefix.protocol_state
+      [| (previous_state_hash :> Field.t); (state_body_hash :> Field.t) |]
+    |> State_hash.of_hash
+
   let hashes_abstract ~hash_body
       ({ previous_state_hash; body } : (State_hash.t, _) Poly.t) =
     let state_body_hash : State_body_hash.t = hash_body body in
-    let state_hash =
-      Random_oracle.hash ~init:Hash_prefix.protocol_state
-        [| (previous_state_hash :> Field.t); (state_body_hash :> Field.t) |]
-      |> State_hash.of_hash
-    in
+    let state_hash = compute_state_hash ~previous_state_hash ~state_body_hash in
     { State_hash.State_hashes.state_hash
     ; state_body_hash = Some state_body_hash
     }

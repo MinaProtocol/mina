@@ -45,7 +45,31 @@ module type S = sig
       )
     ]}
 *)
-  val write_values_exn : f:(writer_t -> 'a) -> filename_key -> 'a
+  val write_values_exn :
+    ?buffer_size:int -> f:(writer_t -> 'a) -> filename_key -> 'a
+
+  (** Append multiple keys to an existing database file.
+    
+    The [filename] parameter specifies the target file.
+    The file must exist; values will be appended to the end of the file.
+    
+    The [f] parameter is a callback that receives a [write_value] function which can be
+    called multiple times to append different key-value pairs to the database.
+    
+    Each call to [write_value bin_prot_module value] serializes [value] using the
+    provided bin_prot serializer and returns a [tag] that can be used to read the value later.
+    Tags will have offsets adjusted to account for the existing file content.
+    
+    Example (assuming the default implementation with [type filename_key = string]):
+    {[
+      append_values_exn "my.db" ~f:(fun writer ->
+        let tag3 = write_value writer (module Int) 99 in
+        (* ... store tags for later use ... *)
+      )
+    ]}
+*)
+  val append_values_exn :
+    ?buffer_size:int -> f:(writer_t -> 'a) -> filename_key -> 'a
 
   (** Read a value from the database using a tag.
     
@@ -65,4 +89,15 @@ module type S = sig
        (module Bin_prot.Binable.S with type t = 'a)
     -> 'a tag
     -> 'a Core_kernel.Or_error.t
+
+  val read_many :
+       (module Bin_prot.Binable.S with type t = 'a)
+    -> 'a tag list
+    -> 'a list Core_kernel.Or_error.t
+
+  (** Read the bytes stored at the given tag *)
+  val read_bytes : 'a tag -> Bytes.t Core_kernel.Or_error.t
+
+  (** Get the size of the value stored at the given tag *)
+  val size : 'a tag -> int
 end

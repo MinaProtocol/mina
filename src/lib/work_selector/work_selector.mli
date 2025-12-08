@@ -1,7 +1,7 @@
 module State :
   Intf.State_intf with type transition_frontier := Transition_frontier.t
 
-type work = Snark_work_lib.Selector.Single.Spec.t
+type work = Staged_ledger.Scan_state.Available_job.t
 
 type in_memory_work = Snark_work_lib.Selector.Single.Spec.Stable.Latest.t
 

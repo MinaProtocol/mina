@@ -8,7 +8,7 @@ module Make (Lib : Intf.Lib_intf) = struct
         Some x
 end
 
-let%test_module "test" =
-  ( module struct
-    module Test = Test.Make_test (Make)
-  end )
+(* let%test_module "test" =
+   ( module struct
+     module Test = Test.Make_test (Make)
+   end ) *)

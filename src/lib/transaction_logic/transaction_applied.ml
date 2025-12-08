@@ -170,6 +170,9 @@ module Varying : sig
 
     module V2 : sig
       type t [@@deriving sexp, to_yojson]
+
+      val transaction_with_status :
+        t -> Transaction.Stable.V2.t With_status.Stable.V2.t
     end
   end]
 
@@ -198,6 +201,19 @@ end = struct
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
+
+      let transaction_with_status = function
+        | Command (Signed_command uc) ->
+            With_status.map uc.common.user_command ~f:(fun cmd ->
+                Transaction.Command (User_command.Signed_command cmd) )
+        | Command (Zkapp_command s) ->
+            With_status.map s.command ~f:(fun c ->
+                Transaction.Command (User_command.Zkapp_command c) )
+        | Fee_transfer f ->
+            With_status.map f.fee_transfer ~f:(fun f ->
+                Transaction.Fee_transfer f )
+        | Coinbase c ->
+            With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
     end
   end]
 
@@ -313,6 +329,22 @@ let supply_increase :
   in
   Option.value_map total ~default:(Or_error.error_string "overflow")
     ~f:(fun v -> Ok v)
+
+let transaction : t -> Transaction.t =
+ fun { varying; _ } ->
+  match varying with
+  | Command (Signed_command { common = { user_command = { data; _ }; _ }; _ })
+    ->
+      Transaction.Command (User_command.Signed_command data)
+  | Command (Zkapp_command { command = { data; _ }; _ }) ->
+      Transaction.Command (User_command.Zkapp_command data)
+  | Fee_transfer { fee_transfer = { data; _ }; _ } ->
+      Transaction.Fee_transfer data
+  | Coinbase { coinbase = { data; _ }; _ } ->
+      Transaction.Coinbase data
+
+let transaction_with_status_stable { Stable.Latest.varying; _ } =
+  Varying.Stable.Latest.transaction_with_status varying
 
 let transaction_with_status : t -> Transaction.t With_status.t =
  fun { varying; _ } ->

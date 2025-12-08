@@ -40,41 +40,8 @@ end]
 type t =
   | Segment of
       { statement : Transaction_snark.Statement.With_sok.t
-      ; witness : Transaction_snark.Zkapp_command_segment.Witness.t
+      ; witness :
+          Transaction_snark.Zkapp_command_segment.Witness.Stable.Latest.t
       ; spec : Transaction_snark.Zkapp_command_segment.Basic.t
       }
-  | Merge of { proof1 : Ledger_proof.Cached.t; proof2 : Ledger_proof.Cached.t }
-
-let read_all_proofs_from_disk : t -> Stable.Latest.t = function
-  | Segment { statement; witness; spec } ->
-      Segment
-        { statement
-        ; witness =
-            Transaction_snark.Zkapp_command_segment.Witness
-            .read_all_proofs_from_disk witness
-        ; spec
-        }
-  | Merge { proof1; proof2 } ->
-      Merge
-        { proof1 = Ledger_proof.Cached.read_proof_from_disk proof1
-        ; proof2 = Ledger_proof.Cached.read_proof_from_disk proof2
-        }
-
-let write_all_proofs_to_disk ~signature_kind
-    ~(proof_cache_db : Proof_cache_tag.cache_db) : Stable.Latest.t -> t =
-  function
-  | Segment { statement; witness; spec } ->
-      Segment
-        { statement
-        ; witness =
-            Transaction_snark.Zkapp_command_segment.Witness
-            .write_all_proofs_to_disk ~signature_kind ~proof_cache_db witness
-        ; spec
-        }
-  | Merge { proof1; proof2 } ->
-      Merge
-        { proof1 =
-            Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof1
-        ; proof2 =
-            Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof2
-        }
+  | Merge of { proof1 : Ledger_proof.t; proof2 : Ledger_proof.t }

@@ -341,8 +341,7 @@ let%test_module "Epoch ledger sync tests" =
         let most_recent_valid_block_reader, most_recent_valid_block_writer =
           Broadcast_pipe.create
             ( Mina_block.genesis_header ~precomputed_values
-            |> Mina_block.Validation.reset_frontier_dependencies_validation
-            |> Mina_block.Validation.reset_staged_ledger_diff_validation )
+            |> Mina_block.Validation.reset_frontier_dependencies_validation )
         in
         let get_current_frontier () =
           Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r

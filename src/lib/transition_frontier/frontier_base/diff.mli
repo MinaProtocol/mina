@@ -23,14 +23,12 @@ type lite = Lite
 module Node : sig
   type 'a t =
     | Full : Breadcrumb.t -> full t
-    | Lite : Mina_block.Validated.t -> lite t
+    | Lite : State_hash.t * Block_data.Full.t -> lite t
 end
 
 module Node_list : sig
   type full_node =
-    { transition : Mina_block.Validated.t
-    ; scan_state : Staged_ledger.Scan_state.t
-    }
+    { state_hash : State_hash.t; scan_state : Staged_ledger.Scan_state.t }
 
   type lite_node = State_hash.Stable.V1.t
 
@@ -62,7 +60,7 @@ module Root_transition : sig
     | Full : Staged_ledger.Scan_state.t -> full root_transition_scan_state
 
   type 'repr t =
-    { new_root : Root_data.Limited.Stable.Latest.t
+    { new_root : Root_data.t
     ; garbage : 'repr Node_list.t
     ; old_root_scan_state : 'repr root_transition_scan_state
     ; just_emitted_a_proof : bool
@@ -71,12 +69,7 @@ module Root_transition : sig
   type 'repr root_transition = 'repr t
 
   module Lite : sig
-    [%%versioned:
-    module Stable : sig
-      module V4 : sig
-        type t = lite root_transition
-      end
-    end]
+    type t = lite root_transition
   end
 end
 

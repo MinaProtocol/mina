@@ -101,6 +101,9 @@ module Block = struct
 
   let protocol_state t = Frontier_base.Breadcrumb.protocol_state t.breadcrumb
 
+  let consensus_state_with_hashes t =
+    Frontier_base.Breadcrumb.consensus_state_with_hashes t.breadcrumb
+
   let state_timestamp t =
     Blockchain_state.timestamp @@ Protocol_state.blockchain_state
     @@ protocol_state t
@@ -110,11 +113,8 @@ module Block = struct
   let compute_genesis ~logger ~precomputed_values (module Keys : Keys_S) =
     (* Generate genesis block, used in a bunch of other places
        (including block producer and tests) *)
-    let genesis_block_with_hash, genesis_validation =
+    let genesis_block, genesis_block_tag =
       Mina_block.genesis ~precomputed_values
-    in
-    let validated =
-      Mina_block.Validated.lift (genesis_block_with_hash, genesis_validation)
     in
     let constraint_constants = precomputed_values.constraint_constants in
     (* Create a staged ledger out of genesis ledger.
@@ -137,10 +137,11 @@ module Block = struct
     in
     [%log info] "Generating genesis breadcrumb" ;
     let breadcrumb =
-      Frontier_base.Breadcrumb.create ~validated_transition:validated
+      Frontier_base.Breadcrumb.create ~validated_transition:genesis_block
         ~staged_ledger
         ~transition_receipt_time:(Some (Time.now ()))
-        ~just_emitted_a_proof:false
+        ~just_emitted_a_proof:false ~accounts_created:[]
+        ~block_tag:genesis_block_tag
     in
     (* Block proof contained in genesis header is just a stub.
        Hence we need to generate the real proof here, in order to
@@ -365,7 +366,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
               ~state_hash:(Some previous_state_hash) previous_protocol_state )
     >>| V.skip_proof_validation `This_block_was_generated_internally
     >>= V.validate_frontier_dependencies ~to_header:Mina_block.header ~context
-          ~root_block:(Block.block_with_hash previous)
+          ~root_consensus_state:(Block.consensus_state_with_hashes previous)
           ~is_block_in_frontier:(State_hash.equal previous_state_hash)
     |> Result.map_error
          ~f:(const (Error.of_string "failed to validate just created block"))
@@ -415,7 +416,10 @@ let mk_payment ~(valid_until : Mina_numbers.Global_slot_since_genesis.t)
   { Signed_command.Poly.signer = signer_keypair.public_key; signature; payload }
 
 let generate_txs ~valid_until ~init_nonce ~n_zkapp_txs ~n_payments ~n_blocks
-    ~constraint_constants keypair : User_command.Valid.t Sequence.t list =
+    ~constraint_constants keypair :
+    Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
+    Sequence.t
+    list =
   let signer_pk = Public_key.compress keypair.Keypair.public_key in
   let event_elements = 12 in
   let action_elements = 12 in
@@ -444,7 +448,8 @@ let generate_txs ~valid_until ~init_nonce ~n_zkapp_txs ~n_payments ~n_blocks
               valid_command ) =
           User_command.to_valid_unsafe command
         in
-        valid_command )
+        Mina_transaction.Transaction_hash.User_command_with_valid_signature
+        .create valid_command )
   in
   List.init n_blocks ~f:generate_payments
 

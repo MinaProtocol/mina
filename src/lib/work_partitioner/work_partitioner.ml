@@ -27,11 +27,9 @@ type t =
       (Work.Spec.Single.t * Work.Id.Single.t * Mina_base.Sok_message.t) option
         (** When receving a `Two works from the underlying Work_selector, store
             one of them here, so we could schedule them to another worker. *)
-  ; proof_cache_db : Proof_cache_tag.cache_db
   }
 
 let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t)
-    ~(proof_cache_db : Proof_cache_tag.cache_db)
     ~(signature_kind : Mina_signature_kind.t) : t =
   let module T = Transaction_snark.Make (struct
     let constraint_constants = Genesis_constants.Compiled.constraint_constants
@@ -49,7 +47,6 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t)
   ; zkapp_jobs_sent_by_partitioner = Sent_zkapp_job_pool.create ()
   ; single_jobs_sent_by_partitioner = Sent_single_job_pool.create ()
   ; tmp_slot = None
-  ; proof_cache_db
   }
 
 (* TODO: Consider remove all works no longer relevant for current frontier,
@@ -157,20 +154,22 @@ let convert_single_work_from_selector ~(partitioner : t)
   | Transition (input, witness) -> (
       match witness.transaction with
       | Command (Zkapp_command zkapp_command) ->
+          (* TODO: remove this conversion *)
+          let zkapp_command =
+            Mina_base.Zkapp_command.write_all_proofs_to_disk
+              ~signature_kind:Mina_signature_kind.t_DEPRECATED
+              ~proof_cache_db:(Proof_cache_tag.create_identity_db ())
+              zkapp_command
+          in
           (* TODO: we have read from disk followed by write to disk in shared
              function followed by read from disk again. Should consider refactor
              this. *)
-          let witness = Transaction_witness.read_all_proofs_from_disk witness in
           Snark_worker_shared.extract_zkapp_segment_works
             ~m:partitioner.transaction_snark ~input ~witness ~zkapp_command
           |> Result.map
                ~f:
                  (convert_zkapp_command_from_selector ~partitioner ~job ~pairing)
       | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
-          let job =
-            Work.With_job_meta.map
-              ~f_spec:Work.Spec.Single.read_all_proofs_from_disk job
-          in
           Sent_single_job_pool.add_now_exn ~id:pairing ~job
             ~message:
               "Id generator generated a repeated Id that happens to be \
@@ -178,10 +177,6 @@ let convert_single_work_from_selector ~(partitioner : t)
             partitioner.single_jobs_sent_by_partitioner ;
           Ok (Single job) )
   | Merge _ ->
-      let job =
-        Work.With_job_meta.map
-          ~f_spec:Work.Spec.Single.read_all_proofs_from_disk job
-      in
       Sent_single_job_pool.add_now_exn ~id:pairing ~job
         ~message:
           "Id generator generated a repeated Id that happens to be occupied by \
@@ -208,7 +203,7 @@ let schedule_job_from_partitioner ~(partitioner : t) :
 (* WARN: this should only be called if [partitioner.tmp_slot] is None *)
 let consume_job_from_selector ~(partitioner : t)
     ~(sok_message : Mina_base.Sok_message.t)
-    ~(instances : Work.Spec.Single.t One_or_two.t) :
+    ~(instances : Work.Spec.Single.Stable.Latest.t One_or_two.t) :
     (Work.Spec.Partitioned.Stable.Latest.t, _) Result.t =
   let pairing_id = Id_generator.next_id partitioner.single_id_gen () in
   Hashtbl.add_exn partitioner.pairing_pool ~key:pairing_id
@@ -227,7 +222,8 @@ let consume_job_from_selector ~(partitioner : t)
       convert_single_work_from_selector ~partitioner ~single_spec:spec2
         ~sok_message ~pairing:pairing2
 
-type work_from_selector = Work.Spec.Single.t One_or_two.t option Lazy.t
+type work_from_selector =
+  Work.Spec.Single.Stable.Latest.t One_or_two.t option Lazy.t
 
 let request_from_selector_and_consume_by_partitioner ~(partitioner : t)
     ~(work_from_selector : work_from_selector)
@@ -252,16 +248,9 @@ type submit_result =
 
 let submit_into_combining_result ~submitted_result ~partitioner
     ~combining_result ~submitted_half =
-  let submitted_result_cached =
-    Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
-      ~f_proof:
-        (Ledger_proof.Cached.write_proof_to_disk
-           ~proof_cache_db:partitioner.proof_cache_db )
-      submitted_result
-  in
   match
-    Combining_result.merge_single_result
-      ~submitted_result:submitted_result_cached ~submitted_half combining_result
+    Combining_result.merge_single_result ~submitted_result ~submitted_half
+      combining_result
   with
   | Pending new_combining_result ->
       `Pending new_combining_result
@@ -289,10 +278,8 @@ let submit_into_combining_result ~submitted_result ~partitioner
          pool, ignoring"
         ~metadata:
           [ ( "spec"
-            , One_or_two.to_yojson
-                Work.Spec.Single.(
-                  Fn.compose Stable.Latest.to_yojson read_all_proofs_from_disk)
-                spec )
+            , One_or_two.to_yojson Work.Spec.Single.Stable.Latest.to_yojson spec
+            )
           ; ( "result"
             , Work.Result.Single.Poly.to_yojson
                 (fun () -> `Null)

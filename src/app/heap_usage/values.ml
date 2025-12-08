@@ -68,8 +68,8 @@ let verification_key =
 
 let applied = Mina_base.Transaction_status.Applied
 
-let mk_scan_state_base_node
-    (varying : Mina_transaction_logic.Transaction_applied.Varying.t)
+let mk_scan_state_base_node (transaction : Mina_transaction.Transaction.t)
+    (varying_applied : Mina_transaction_logic.Transaction_applied.Varying.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) :
     Transaction_snark_scan_state.Transaction_with_witness.t Parallel_scan.Base.t
     =
@@ -81,26 +81,20 @@ let mk_scan_state_base_node
     let state_hash = get Mina_base.State_hash.gen in
     let state_body_hash = get Mina_base.State_body_hash.gen in
     let statement = get Transaction_snark.Statement.gen in
-    let init_stack =
-      Transaction_snark.Pending_coinbase_stack_state.Init_stack.Merge
-    in
+    let init_stack = Mina_base.Pending_coinbase.Stack.empty in
     let ledger_witness =
       let depth = constraint_constants.ledger_depth in
       let account_access_statuses =
-        match varying with
+        match transaction with
         | Command (Signed_command signed_cmd) ->
-            let user_cmd = signed_cmd.common.user_command.data in
-            Mina_base.Signed_command.account_access_statuses user_cmd applied
+            Mina_base.Signed_command.account_access_statuses signed_cmd applied
         | Command (Zkapp_command zkapp_cmd) ->
-            let zkapp_cmd = zkapp_cmd.command.data in
             Mina_base.Zkapp_command.account_access_statuses zkapp_cmd applied
         | Fee_transfer ft ->
-            let fee_transfer = ft.fee_transfer.data in
-            List.map (Mina_base.Fee_transfer.receivers fee_transfer)
-              ~f:(fun acct_id -> (acct_id, `Accessed))
+            List.map (Mina_base.Fee_transfer.receivers ft) ~f:(fun acct_id ->
+                (acct_id, `Accessed) )
         | Coinbase cb ->
-            let coinbase = cb.coinbase.data in
-            Mina_base.Coinbase.account_access_statuses coinbase applied
+            Mina_base.Coinbase.account_access_statuses cb applied
       in
       let num_accounts_accessed =
         List.count account_access_statuses ~f:(fun (_acct_id, accessed) ->
@@ -122,18 +116,19 @@ let mk_scan_state_base_node
                acct ) ) ;
       !ledger
     in
-    let transaction_with_info : Mina_transaction_logic.Transaction_applied.t =
-      let previous_hash = get Mina_base.Ledger_hash.gen in
-      { previous_hash; varying }
-    in
+    let previous_hash = get Mina_base.Ledger_hash.gen in
     let job : Transaction_snark_scan_state.Transaction_with_witness.t =
-      { transaction_with_info
+      { transaction_with_status = { status = applied; data = transaction }
       ; state_hash = (state_hash, state_body_hash)
       ; statement
       ; init_stack
       ; first_pass_ledger_witness = ledger_witness
       ; second_pass_ledger_witness = ledger_witness
-      ; block_global_slot = Mina_numbers.Global_slot_since_genesis.zero
+      ; block_global_slot =
+          Mina_numbers.Global_slot_since_genesis.zero (* TODO: add a value *)
+      ; previous_protocol_state_body_opt = None
+      ; transaction_applied_or_tag =
+          First { previous_hash; varying = varying_applied }
       }
     in
     let record : _ Parallel_scan.Base.Record.t =
@@ -144,62 +139,51 @@ let mk_scan_state_base_node
   (weight, job)
 
 let scan_state_base_node_coinbase =
-  let varying : Mina_transaction_logic.Transaction_applied.Varying.t =
-    let coinbase =
-      Mina_base.Coinbase.create ~amount:Currency.Amount.zero
-        ~receiver:sample_pk_compressed ~fee_transfer:None
-      |> Or_error.ok_exn
-    in
-    Coinbase
+  let coinbase =
+    Mina_base.Coinbase.create ~amount:Currency.Amount.zero
+      ~receiver:sample_pk_compressed ~fee_transfer:None
+    |> Or_error.ok_exn
+  in
+  let applied =
+    Mina_transaction_logic.Transaction_applied.Varying.Coinbase
       { coinbase = Mina_base.With_status.{ data = coinbase; status = Applied }
       ; new_accounts = []
       ; burned_tokens = Currency.Amount.zero
       }
   in
-  mk_scan_state_base_node varying
+  mk_scan_state_base_node (Coinbase coinbase) applied
 
 let scan_state_base_node_payment =
-  let varying : Mina_transaction_logic.Transaction_applied.Varying.t =
-    let payload : Mina_base.Signed_command_payload.t =
-      let payment_payload =
-        Quickcheck.random_value
-          (Mina_base.Payment_payload.gen Currency.Amount.zero)
-      in
-      let body : Mina_base.Signed_command_payload.Body.t =
-        Payment payment_payload
-      in
-      let common : Mina_base.Signed_command_payload.Common.t =
-        { fee = Currency.Fee.zero
-        ; fee_payer_pk = sample_pk_compressed
-        ; nonce = Mina_numbers.Account_nonce.zero
-        ; valid_until = Mina_numbers.Global_slot_since_genesis.max_value
-        ; memo = Mina_base.Signed_command_memo.empty
-        }
-      in
-      { common; body }
+  let payload : Mina_base.Signed_command_payload.t =
+    let payment_payload =
+      Quickcheck.random_value
+        (Mina_base.Payment_payload.gen Currency.Amount.zero)
     in
-    let user_command : _ Mina_base.With_status.t =
-      let signer = sample_pk in
-      let data : Mina_base.Signed_command.t =
-        { payload; signer; signature = Mina_base.Signature.dummy }
-      in
-      { data; status = Applied }
+    let body : Mina_base.Signed_command_payload.Body.t =
+      Payment payment_payload
     in
-    let common :
-        Mina_transaction_logic.Transaction_applied.Signed_command_applied.Common
-        .t =
-      { user_command }
+    let common : Mina_base.Signed_command_payload.Common.t =
+      { fee = Currency.Fee.zero
+      ; fee_payer_pk = sample_pk_compressed
+      ; nonce = Mina_numbers.Account_nonce.zero
+      ; valid_until = Mina_numbers.Global_slot_since_genesis.max_value
+      ; memo = Mina_base.Signed_command_memo.empty
+      }
     in
-    let body :
-        Mina_transaction_logic.Transaction_applied.Signed_command_applied.Body.t
-        =
-      Payment { new_accounts = [] }
-    in
-    Command (Signed_command { common; body })
+    { common; body }
   in
-  mk_scan_state_base_node varying
+  let user_command : Mina_base.Signed_command.t =
+    { payload; signer = sample_pk; signature = Mina_base.Signature.dummy }
+  in
+  mk_scan_state_base_node (Command (Signed_command user_command))
+    (Command
+       (Signed_command
+          { common =
+              { user_command = { data = user_command; status = Applied } }
+          ; body = Payment { new_accounts = [] }
+          } ) )
 
-let scan_state_base_node_zkapp ~constraint_constants ~zkapp_command =
+let scan_state_base_node_zkapp ~zkapp_command =
   let varying : Mina_transaction_logic.Transaction_applied.Varying.t =
     let zkapp_command_applied :
         Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.t =
@@ -226,9 +210,9 @@ let scan_state_base_node_zkapp ~constraint_constants ~zkapp_command =
     in
     Command (Zkapp_command zkapp_command_applied)
   in
-  mk_scan_state_base_node varying ~constraint_constants
+  mk_scan_state_base_node (Command (Zkapp_command zkapp_command)) varying
 
-let scan_state_merge_node ~proof_cache_db :
+let scan_state_merge_node :
     Transaction_snark_scan_state.Ledger_proof_with_sok_message.t
     Parallel_scan.Merge.t =
   let weight1 : Parallel_scan.Weight.t = { base = 42; merge = 99 } in
@@ -249,8 +233,7 @@ let scan_state_merge_node ~proof_cache_db :
         { without_sok with sok_digest = Mina_base.Sok_message.digest sok_msg }
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
-      ( Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof
-      , sok_msg )
+      (ledger_proof, sok_msg)
     in
     let right =
       let sok_msg : Mina_base.Sok_message.t =
@@ -266,8 +249,7 @@ let scan_state_merge_node ~proof_cache_db :
         { without_sok with sok_digest = Mina_base.Sok_message.digest sok_msg }
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
-      ( Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof
-      , sok_msg )
+      (ledger_proof, sok_msg)
     in
     Full { left; right; seq_no = 1; status = Todo }
   in

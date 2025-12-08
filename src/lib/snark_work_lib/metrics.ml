@@ -1,20 +1,5 @@
 open Core_kernel
-
-module Transaction_type = struct
-  type t = [ `Zkapp_command | `Signed_command | `Coinbase | `Fee_transfer ]
-  [@@deriving to_yojson]
-
-  let of_transaction = function
-    | Mina_transaction.Transaction.Command
-        (Mina_base.User_command.Zkapp_command _) ->
-        `Zkapp_command
-    | Command (Signed_command _) ->
-        `Signed_command
-    | Coinbase _ ->
-        `Coinbase
-    | Fee_transfer _ ->
-        `Fee_transfer
-end
+module Transaction_type = Mina_transaction.Transaction_type
 
 let emit_single_metrics_impl ~logger
     ~(single_spec : (Transaction_type.t, _) Single_spec.Poly.t) ~elapsed =
@@ -54,8 +39,9 @@ let emit_single_metrics ~logger ~(single_spec : _ Single_spec.Poly.t) =
   emit_single_metrics_impl ~logger
     ~single_spec:
       (Single_spec.Poly.map ~f_proof:Fn.id
-         ~f_witness:(fun { Transaction_witness.transaction = tx; _ } ->
-           Transaction_type.of_transaction tx )
+         ~f_witness:(fun { Transaction_witness.Stable.Latest.transaction = tx
+                         ; _
+                         } -> Transaction_type.of_transaction tx )
          single_spec )
 
 let emit_single_metrics_stable ~logger ~(single_spec : _ Single_spec.Poly.t) =

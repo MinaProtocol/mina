@@ -1,8 +1,14 @@
 open Mina_base
 
 type view =
-  { new_commands : User_command.Valid.t With_status.t list
-  ; removed_commands : User_command.Valid.t With_status.t list
+  { new_commands :
+      Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
+      With_status.t
+      list
+  ; removed_commands :
+      Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
+      With_status.t
+      list
   ; reorg_best_tip : bool
   }
 

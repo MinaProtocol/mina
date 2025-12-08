@@ -48,8 +48,7 @@ let main ~genesis_constants ~constraint_constants conf_dir : unit Deferred.t =
     scan_state_base_node_zkapp ~constraint_constants ~zkapp_command
   in
   print_heap_usage "Parallel_scan.Base.t (zkApp)" scan_state_base_node_zkapp ;
-  print_heap_usage "Parallel_scan.Merge.t"
-    (scan_state_merge_node ~proof_cache_db) ;
+  print_heap_usage "Parallel_scan.Merge.t" scan_state_merge_node ;
   print_heap_usage "Transaction_snark.Statement.t" transaction_snark_statement
 
 let () =

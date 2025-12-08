@@ -34,13 +34,14 @@ module Worker = struct
   (* nothing to close *)
   let close _ = Deferred.unit
 
-  let apply_diff (type mutant) ~old_root_hash ~arcs_cache
-      (diff : mutant Diff.Lite.t) : Database.batch_t -> unit =
+  let apply_diff (type mutant) ~old_root_hash ~arcs_cache ~root_history_capacity
+      ~old_root_history (diff : mutant Diff.Lite.t) : Database.batch_t -> unit =
     match diff with
-    | New_node (Lite transition) ->
-        Database.add ~arcs_cache ~transition
+    | New_node (Lite (state_hash, transition_data)) ->
+        Database.add ~arcs_cache ~state_hash ~transition_data
     | Root_transitioned { new_root; garbage = Lite garbage; _ } ->
-        Database.move_root ~old_root_hash ~new_root ~garbage
+        Database.move_root ~old_root_hash ~old_root_history
+          ~root_history_capacity ~new_root ~garbage
     | Best_tip_changed best_tip_hash ->
         Database.set_best_tip best_tip_hash
 
@@ -67,10 +68,9 @@ module Worker = struct
           List.drop_last root_transition_diffs
           |> Option.value ~default:[]
           |> List.bind ~f:(fun { new_root; garbage = Lite garbage; _ } ->
-                 (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
-                 :: garbage )
+                 new_root.state_hash :: garbage )
         in
-        let total_root_transition_diff =
+        let _total_root_transition_diff =
           Option.map final_root_transition_diff
             ~f:(fun ({ garbage = Lite garbage; _ } as r) ->
               { r with garbage = Lite (extra_garbage @ garbage) } )
@@ -78,8 +78,9 @@ module Worker = struct
         let diffs_to_apply =
           List.concat
             [ other_diffs
-            ; Option.value_map total_root_transition_diff ~default:[]
-                ~f:(fun diff -> [ Diff.Lite.E.E (Root_transitioned diff) ])
+            ; List.map ~f:(fun x -> Diff.Lite.E.E (Root_transitioned x) )root_transition_diffs
+            (* ; Option.value_map total_root_transition_diff ~default:[]
+                ~f:(fun diff -> [ Diff.Lite.E.E (Root_transitioned diff) ]) *)
             ; Option.value_map final_best_tip_diff ~default:[] ~f:(fun diff ->
                   [ Diff.Lite.E.E (Best_tip_changed diff) ] )
             ]
@@ -87,17 +88,17 @@ module Worker = struct
         let apply_funcs =
           let state_hashes =
             List.filter_map input ~f:(function
-              | E (New_node (Lite transition)) ->
-                  Mina_block.Validated.state_hash transition |> Option.some
+              | E (New_node (Lite (state_hash, _))) ->
+                  Option.some state_hash
               | _ ->
                   None )
             |> State_hash.Set.of_list
           in
           let parent_hashes =
             List.filter_map input ~f:(function
-              | E (New_node (Lite transition)) ->
+              | E (New_node (Lite (_, transition))) ->
                   let parent_hash =
-                    Mina_block.Validated.header transition
+                    transition.Block_data.Full.Stable.Latest.header
                     |> Header.protocol_state
                     |> Mina_state.Protocol_state.previous_state_hash
                   in
@@ -110,8 +111,11 @@ module Worker = struct
           let%map.Result old_root_hash =
             Database.find_arcs_and_root t.db ~arcs_cache ~parent_hashes
           in
+          let old_root_history = Database.get_root_history t.db in
           List.map diffs_to_apply ~f:(fun (Diff.Lite.E.E diff) ->
-              apply_diff ~old_root_hash ~arcs_cache diff )
+              apply_diff
+                ~root_history_capacity:(Database.root_history_capacity t.db)
+                ~old_root_hash ~arcs_cache ~old_root_history diff )
         in
         let handle_emitted_proof = function
           | { Diff.Root_transition.just_emitted_a_proof = true; _ } ->

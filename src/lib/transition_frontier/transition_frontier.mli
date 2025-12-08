@@ -72,6 +72,8 @@ val load :
      ?retry_with_fresh_db:bool
   -> ?max_frontier_depth:int
   -> ?set_best_tip:bool
+  -> ?retain_application_data:bool
+  -> ?check_arcs:bool
   -> context:(module CONTEXT)
   -> verifier:Verifier.t
   -> consensus_local_state:Consensus.Data.Local_state.t
@@ -87,6 +89,9 @@ val load :
      Deferred.Result.t
 
 val close : loc:string -> t -> unit Deferred.t
+
+val with_persistent_frontier_instance_exn :
+  t -> f:(Persistent_frontier.Instance.t -> 'a) -> 'a
 
 val closed : t -> unit Deferred.t
 
@@ -118,11 +123,16 @@ val rejected_blocks :
 val validated_blocks :
   (State_hash.t * Network_peer.Envelope.Sender.t * Block_time.t) Core.Queue.t
 
+val staged_ledger_aux_and_pending_coinbases :
+     t
+  -> State_hash.t
+  -> ( Network_types.Staged_ledger_aux_and_pending_coinbases.data_tag
+     * Staged_ledger_hash.t )
+     option
+
 module For_tests : sig
   open Core_kernel
   open Signature_lib
-
-  val equal : t -> t -> bool
 
   val gen_genesis_breadcrumb :
        ?logger:Logger.t
@@ -130,13 +140,6 @@ module For_tests : sig
     -> precomputed_values:Precomputed_values.t
     -> unit
     -> Breadcrumb.t Quickcheck.Generator.t
-
-  val gen_persistence :
-       ?logger:Logger.t
-    -> verifier:Verifier.t
-    -> precomputed_values:Precomputed_values.t
-    -> unit
-    -> (Persistent_root.t * Persistent_frontier.t) Quickcheck.Generator.t
 
   val gen :
        ?logger:Logger.t
@@ -159,7 +162,7 @@ module For_tests : sig
     -> max_length:int
     -> size:int
     -> unit
-    -> t Quickcheck.Generator.t
+    -> (t * Breadcrumb.t list) Quickcheck.Generator.t
 
   val gen_with_branch :
        ?logger:Logger.t

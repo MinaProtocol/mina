@@ -1,4 +1,3 @@
-open Mina_block
 open Core_kernel
 open Mina_base
 module Breadcrumb = Transition_frontier.Breadcrumb
@@ -27,9 +26,6 @@ module Transition_frontier = struct
             (Account_id.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
             list
         }
-    | Root_transitioned of
-        Transition_frontier.Diff.Root_transition.Lite.Stable.Latest.t
-    | Bootstrap of { lost_blocks : State_hash.Stable.Latest.t list }
   [@@deriving bin_io_unversioned]
 end
 
@@ -101,13 +97,7 @@ module Builder = struct
       let account_creation_fee =
         precomputed_values.constraint_constants.account_creation_fee
       in
-      let previous_block_state_hash =
-        Mina_block.header block |> Header.protocol_state
-        |> Mina_state.Protocol_state.previous_state_hash
-      in
-      List.map
-        (Staged_ledger.latest_block_accounts_created staged_ledger
-           ~previous_block_state_hash ) ~f:(fun acct_id ->
+      List.map (Breadcrumb.accounts_created breadcrumb) ~f:(fun acct_id ->
           (acct_id, account_creation_fee) )
     in
     let tokens_used =

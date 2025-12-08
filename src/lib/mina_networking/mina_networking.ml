@@ -257,17 +257,31 @@ let make_rpc_request ?heartbeat_timeout ?timeout ~rpc ~label t peer input =
   | Failed_to_connect e ->
       Error (Error.tag e ~tag:"failed-to-connect")
 
-let get_transition_chain_proof ?heartbeat_timeout ?timeout t =
+let get_transition_chain_proof ?heartbeat_timeout ?timeout t peer =
   make_rpc_request ?heartbeat_timeout ?timeout
-    ~rpc:Rpcs.Get_transition_chain_proof ~label:"transition chain proof" t
+    ~rpc:Rpcs.Get_transition_chain_proof ~label:"transition chain proof" t peer
 
-let get_transition_chain ?heartbeat_timeout ?timeout t =
+let get_transition_chain ?heartbeat_timeout ?timeout t peer req =
+  let extract =
+    Fn.compose Or_error.all
+    @@ List.map ~f:Frontier_base.Network_types.Block.extract
+  in
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_transition_chain
-    ~label:"chain of transitions" t
+    ~label:"chain of transitions" t peer req
+  >>=? Fn.compose Deferred.return extract
+
+let extract_block_proof { Proof_carrying_data.data; proof = chain, proof_block }
+    =
+  let%bind.Or_error proof_block =
+    Frontier_base.Network_types.Block.extract proof_block
+  in
+  let%map.Or_error data = Frontier_base.Network_types.Block.extract data in
+  { Proof_carrying_data.data; proof = (chain, proof_block) }
 
 let get_best_tip ?heartbeat_timeout ?timeout t peer =
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_best_tip
     ~label:"best tip" t peer ()
+  >>=? Fn.compose Deferred.return extract_block_proof
 
 let get_completed_checked_snarks t peer =
   make_rpc_request ~rpc:Rpcs.Get_completed_snarks
@@ -367,9 +381,17 @@ let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
   rpc_peer_then_random t inet_addr input
     ~rpc:Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash
   >>|? Envelope.Incoming.data
+  >>=? Fn.compose Deferred.return
+         Frontier_base.Network_types.Staged_ledger_aux_and_pending_coinbases
+         .extract
 
 let get_ancestry t inet_addr input =
+  let extract_block_proof' env =
+    let%map.Or_error data' = extract_block_proof (Envelope.Incoming.data env) in
+    Envelope.Incoming.map env ~f:(const data')
+  in
   rpc_peer_then_random t inet_addr input ~rpc:Rpcs.Get_ancestry
+  >>=? Fn.compose Deferred.return extract_block_proof'
 
 module Sl_downloader = struct
   module Key = struct

@@ -344,7 +344,7 @@ module Internal_command = struct
       Caqti_type.[ string; int; int64; int; int64; int64; int; int ]
 
   (* the transaction global slot since genesis is taken from the internal command's current block, mirroring
-     the call to Staged_ledger.apply in Block_producer
+     the call to Staged_ledger.apply_diff in Block_producer
   *)
   let query =
     Mina_caqti.collect_req

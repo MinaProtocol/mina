@@ -364,7 +364,8 @@ module Values (S : Sample) = struct
 
   let base_work varying witness :
       Transaction_snark_scan_state.Transaction_with_witness.t =
-    { transaction_with_info = { previous_hash = field (); varying = varying () }
+    let transaction_with_status, tx_applied = varying () in
+    { transaction_with_status
     ; state_hash = (state_hash (), field ())
     ; statement =
         (*Transaction_snark.Statement.Stable.V2.t*)
@@ -387,46 +388,60 @@ module Values (S : Sample) = struct
         ; fee_excess = fee_excess ()
         ; sok_digest = ()
         }
-    ; init_stack = Base (pending_coinbase_stack ())
+    ; init_stack = pending_coinbase_stack ()
     ; first_pass_ledger_witness = witness ()
     ; second_pass_ledger_witness = witness ()
-    ; block_global_slot = global_slot_since_genesis ()
+    ; block_global_slot = global_slot_since_genesis () (* TODO: add a value *)
+    ; previous_protocol_state_body_opt = None
+    ; transaction_applied_or_tag = First tx_applied
     }
 
   let zkapp_command_base_work ~config () :
       Transaction_snark_scan_state.Transaction_with_witness.t =
     base_work
       (fun () ->
-        Command
-          (Zkapp_command
-             { accounts =
-                 List.init Params.max_accounts_modified_per_zkapp_command
-                   ~f:(fun _ ->
-                     let a = account () in
-                     (Mina_base.Account.identifier a, Some a) )
-             ; command =
-                 { status = Applied; data = zkapp_command' () }
-                 (* the worst case is that no new accounts are created and they are all cached, so we leave this empty *)
-             ; new_accounts = []
-             } ) )
+        let zkapp_command = zkapp_command' () in
+        ( { Mina_base.With_status.status = Applied
+          ; data = Command (Zkapp_command zkapp_command)
+          }
+        , { previous_hash = field ()
+          ; varying =
+              Command
+                (Zkapp_command
+                   { accounts =
+                       List.init Params.max_accounts_modified_per_zkapp_command
+                         ~f:(fun _ ->
+                           let a = account () in
+                           (Mina_base.Account.identifier a, Some a) )
+                   ; command = { status = Applied; data = zkapp_command }
+                   ; new_accounts = []
+                   } )
+          } ) )
       (zkapp_command_witness ~config)
 
   let signed_command_base_work ~config () :
       Transaction_snark_scan_state.Transaction_with_witness.t =
     base_work
       (fun () ->
-        Command
-          (Signed_command
-             { common =
-                 { user_command =
-                     { status = Applied; data = signed_command' () }
-                 }
-             ; body =
-                 Payment
-                   { new_accounts =
-                       [ Mina_base.Account.identifier (account ()) ]
-                   }
-             } ) )
+        let signed_command = signed_command' () in
+        ( { Mina_base.With_status.status = Applied
+          ; data = Command (Signed_command signed_command)
+          }
+        , { previous_hash = field ()
+          ; varying =
+              Command
+                (Signed_command
+                   { common =
+                       { user_command =
+                           { status = Applied; data = signed_command }
+                       }
+                   ; body =
+                       Payment
+                         { new_accounts =
+                             [ Mina_base.Account.identifier (account ()) ]
+                         }
+                   } )
+          } ) )
       (signed_command_witness ~config)
 
   let sok_message () : Mina_base.Sok_message.t =

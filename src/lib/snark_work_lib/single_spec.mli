@@ -44,12 +44,4 @@ module Stable : sig
   end
 end]
 
-type t = (Transaction_witness.t, Ledger_proof.Cached.t) Poly.t
-
-val read_all_proofs_from_disk : t -> Stable.Latest.t
-
-val write_all_proofs_to_disk :
-     signature_kind:Mina_signature_kind.t
-  -> proof_cache_db:Proof_cache_tag.cache_db
-  -> Stable.Latest.t
-  -> t
+type t = Stable.Latest.t

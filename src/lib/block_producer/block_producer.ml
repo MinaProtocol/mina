@@ -6,6 +6,27 @@ open Mina_transaction
 open Mina_state
 open Mina_block
 
+(** State hash that is temporarily used in block creation
+   to be able to write work/witness tags before passing them
+   on to scan state construction. It's safe to use hardcoded value, given
+   that block production is single threaded and state hash is not used
+   in any other place. *)
+let temp_state_hash =
+  (* TODO don't use quick check for generating this value:
+       1. Define min/max bounds for big number in state hash module (extract it out of
+          [State_hash.gen])
+       2. Compute hash the same way it's done now
+       3. Take necessary number of bits (use hash of the hash if more bits needed)
+
+     I.e. this value should be computed once but shouldn't be prone to manipulation
+  *)
+  lazy
+    (Quickcheck.random_value
+       ~seed:
+         (`Deterministic
+           Blake2.(digest_string "temporary state hash" |> to_raw_string) )
+       State_hash.gen )
+
 module type CONTEXT = sig
   val logger : Logger.t
 
@@ -152,7 +173,10 @@ let report_transaction_inclusion_failures ~commit_id ~logger failed_txns =
       | (txn, error) :: remaining_failures ->
           let element =
             `Assoc
-              [ ("transaction", User_command.Valid.to_yojson txn)
+              [ ( "transaction_hash"
+                , Transaction_hash.to_yojson
+                  @@ Transaction_hash.User_command_with_valid_signature
+                     .transaction_hash txn )
               ; ("error", Error_json.error_to_yojson error)
               ]
           in
@@ -199,9 +223,11 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
            ~body_hash:previous_protocol_state_body_hash previous_protocol_state )
           .state_hash
       in
-      let previous_state_view =
+      let previous_protocol_state_body =
         Protocol_state.body previous_protocol_state
-        |> Mina_state.Protocol_state.Body.view
+      in
+      let previous_state_view =
+        Protocol_state.Body.view previous_protocol_state_body
       in
       let global_slot =
         Consensus.Data.Block_data.global_slot_since_genesis block_data
@@ -278,26 +304,81 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                         diff_result )
           in
           [%log internal] "Apply_staged_ledger_diff" ;
-          match%map
+          let application_res =
             let%bind.Deferred.Result diff = return diff in
-            Staged_ledger.apply_diff_unchecked staged_ledger
-              ~constraint_constants ~global_slot diff ~logger
-              ~current_state_view:previous_state_view
-              ~state_and_body_hash:
-                (previous_protocol_state_hash, previous_protocol_state_body_hash)
-              ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
-              ~signature_kind
-          with
+            let state_and_body_hash =
+              (previous_protocol_state_hash, previous_protocol_state_body_hash)
+            in
+            let%bind.Deferred.Result ( `Ledger new_ledger
+                                     , `Accounts_created _
+                                     , `Stack_update stack_update
+                                     , `First_pass_ledger_end
+                                         first_pass_ledger_end
+                                     , `Witnesses witnesses
+                                     , `Works works
+                                     , `Pending_coinbase_update
+                                         (is_new_stack, pcu_action) ) =
+              Staged_ledger.apply_diff_unchecked staged_ledger
+                ~constraint_constants ~global_slot diff ~logger
+                ~parent_protocol_state_body:previous_protocol_state_body
+                ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
+                ~zkapp_cmd_limit_hardcap ~signature_kind
+            in
+            let tagged_witnesses, tagged_works =
+              State_hash.File_storage.write_values_exn
+                (Lazy.force temp_state_hash) ~f:(fun writer ->
+                  let witnesses' =
+                    Staged_ledger.Scan_state.Transaction_with_witness
+                    .persist_many witnesses writer
+                  in
+                  let works' =
+                    Staged_ledger.Scan_state.Ledger_proof_with_sok_message
+                    .persist_many works writer
+                  in
+                  (witnesses', works') )
+            in
+            let scan_state_application_data =
+              { Staged_ledger.Scan_state.Application_data.is_new_stack
+              ; stack_update
+              ; first_pass_ledger_end
+              ; tagged_works
+              ; tagged_witnesses
+              }
+            in
+            (* TODO consider skipping verification (i.e. ~skip_verification:true) *)
+            let%map.Deferred.Result new_staged_ledger, ledger_proof_opt =
+              Staged_ledger.apply_to_scan_state ~logger ~skip_verification:false
+                ~log_prefix:"apply_diff_unchecked" ~ledger:new_ledger
+                ~previous_pending_coinbase_collection:
+                  (Staged_ledger.pending_coinbase_collection staged_ledger)
+                ~previous_scan_state:(Staged_ledger.scan_state staged_ledger)
+                ~constraint_constants scan_state_application_data
+            in
+            (new_staged_ledger, ledger_proof_opt, is_new_stack, pcu_action)
+          in
+          match%map application_res with
           | Ok
-              ( `Ledger_proof ledger_proof_opt
-              , `Staged_ledger transitioned_staged_ledger
-              , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
-              ) ->
+              ( transitioned_staged_ledger
+              , ledger_proof_opt
+              , is_new_stack
+              , pending_coinbase_update ) ->
               [%log internal] "Hash_new_staged_ledger" ;
               let staged_ledger_hash =
                 Staged_ledger.hash transitioned_staged_ledger
               in
               [%log internal] "Hash_new_staged_ledger_done" ;
+              (* TODO instead of throwing the new staged ledger away:
+                  1. Construct new block
+                  2. Replace [temp_state_hash] with the new state hash by traversing
+                     the new scan state and checking equality of state hash against
+                     every entry
+                  3. Use the new staged ledger with fixed-up scan state in breadcrumb
+                     building
+                  4. Move the state hash file from [temp_state_hash]'s location to
+                     a new location
+                  5. Append necessary serializations (e.g. block's raw data) at the
+                     new location
+              *)
               (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
               ignore
               @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
@@ -344,7 +425,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
           , next_staged_ledger_hash
           , ledger_proof_opt
           , is_new_stack
-          , pending_coinbase_update ) ->
+          , pending_coinbase_update ) -> (
           let diff_unwrapped =
             Staged_ledger_diff.read_all_proofs_from_disk
             @@ Staged_ledger_diff.forget diff
@@ -357,8 +438,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 in
                 let ledger_proof_statement =
                   match ledger_proof_opt with
-                  | Some (proof, _) ->
-                      Ledger_proof.Cached.statement proof
+                  | Some proof ->
+                      Ledger_proof.Tagged.statement proof
                   | None ->
                       let state =
                         previous_protocol_state
@@ -372,8 +453,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 in
                 let supply_increase =
                   Option.value_map ledger_proof_opt
-                    ~f:(fun (proof, _) ->
-                      (Ledger_proof.Cached.statement proof).supply_increase )
+                    ~f:(fun proof ->
+                      (Ledger_proof.Tagged.statement proof).supply_increase )
                     ~default:Currency.Amount.Signed.zero
                 in
                 let body_reference =
@@ -407,32 +488,44 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                       ~genesis_ledger_hash ~supply_increase ~logger
                       ~constraint_constants ) )
           in
-          lift_sync (fun () ->
-              let snark_transition =
-                O1trace.sync_thread "generate_snark_transition" (fun () ->
-                    Snark_transition.create_value
-                      ~blockchain_state:
-                        (Protocol_state.blockchain_state protocol_state)
-                      ~consensus_transition:consensus_transition_data
-                      ~pending_coinbase_update () )
-              in
-              let internal_transition =
-                O1trace.sync_thread "generate_internal_transition" (fun () ->
-                    Internal_transition.create ~snark_transition
-                      ~prover_state:
-                        (Consensus.Data.Block_data.prover_state block_data)
-                      ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
-                      ~ledger_proof:
-                        (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
-                             Ledger_proof.Cached.read_proof_from_disk proof ) ) )
-              in
-              let witness =
-                { Pending_coinbase_witness.pending_coinbases =
-                    Staged_ledger.pending_coinbase_collection staged_ledger
-                ; is_new_stack
-                }
-              in
-              Some (protocol_state, internal_transition, witness) ) )
+          let finish ledger_proof =
+            lift_sync (fun () ->
+                let snark_transition =
+                  O1trace.sync_thread "generate_snark_transition" (fun () ->
+                      Snark_transition.create_value
+                        ~blockchain_state:
+                          (Protocol_state.blockchain_state protocol_state)
+                        ~consensus_transition:consensus_transition_data
+                        ~pending_coinbase_update () )
+                in
+                let internal_transition =
+                  O1trace.sync_thread "generate_internal_transition" (fun () ->
+                      Internal_transition.create ~snark_transition
+                        ~prover_state:
+                          (Consensus.Data.Block_data.prover_state block_data)
+                        ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
+                        ~ledger_proof )
+                in
+                let witness =
+                  { Pending_coinbase_witness.pending_coinbases =
+                      Staged_ledger.pending_coinbase_collection staged_ledger
+                  ; is_new_stack
+                  }
+                in
+                Some (protocol_state, internal_transition, witness) )
+          in
+          Option.map ledger_proof_opt
+            ~f:Ledger_proof.Tagged.read_proof_from_disk
+          |> function
+          | Some (Error e) ->
+              [%log error]
+                ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                "Failed to read ledger proof from disk" ;
+              Interruptible.return None
+          | Some (Ok ledger_proof) ->
+              finish (Some ledger_proof)
+          | None ->
+              finish None ) )
 
 let handle_block_production_errors ~logger ~rejected_blocks_logger
     ~time_taken:span ~previous_protocol_state ~protocol_state x =
@@ -754,15 +847,15 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
             )
           ]
         "Producing new block with parent $parent_hash%!" ;
-      let previous_transition = Breadcrumb.block_with_hash crumb in
-      let previous_protocol_state =
-        Header.protocol_state
-        @@ Mina_block.header (With_hash.data previous_transition)
+      let previous_header = Breadcrumb.header crumb in
+      let previous_consensus_state_with_hashes =
+        Breadcrumb.consensus_state_with_hashes crumb
       in
+      let previous_protocol_state = Breadcrumb.protocol_state crumb in
       let%bind previous_protocol_state_proof =
         if
           Consensus.Data.Consensus_state.is_genesis_state
-            (Protocol_state.consensus_state previous_protocol_state)
+            (With_hash.data previous_consensus_state_with_hashes)
           && Option.is_none precomputed_values.proof_data
         then (
           match%bind Interruptible.uninterruptible (genesis_breadcrumb ()) with
@@ -774,17 +867,12 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 "Aborting block production: cannot generate a genesis proof"
                 ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
               Interruptible.lift (Deferred.never ()) (Deferred.return ()) )
-        else
-          return
-            ( Header.protocol_state_proof
-            @@ Mina_block.header (With_hash.data previous_transition) )
+        else return (Header.protocol_state_proof previous_header)
       in
       [%log internal] "Get_transactions_from_pool" ;
       let transactions =
         Network_pool.Transaction_pool.Resource_pool.transactions
           transaction_resource_pool
-        |> Sequence.map
-             ~f:Transaction_hash.User_command_with_valid_signature.data
       in
       let%bind () = Interruptible.lift (Deferred.return ()) (Ivar.read ivar) in
       [%log internal] "Generate_next_state" ;
@@ -826,9 +914,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
             phys_equal
               (Consensus.Hooks.select
                  ~context:(module Context)
-                 ~existing:
-                   (With_hash.map ~f:Mina_block.consensus_state
-                      previous_transition )
+                 ~existing:previous_consensus_state_with_hashes
                  ~candidate:consensus_state_with_hashes )
               `Take
             || failwith
@@ -911,9 +997,9 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 >>= Validation.validate_frontier_dependencies
                       ~to_header:Mina_block.header
                       ~context:(module Context)
-                      ~root_block:
+                      ~root_consensus_state:
                         ( Transition_frontier.root frontier
-                        |> Breadcrumb.block_with_hash )
+                        |> Breadcrumb.consensus_state_with_hashes )
                       ~is_block_in_frontier:
                         (Fn.compose Option.is_some
                            (Transition_frontier.find frontier) )
@@ -958,8 +1044,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 ~metadata:
                   [ ( "blockchain_length"
                     , Mina_numbers.Length.to_yojson
-                      @@ Mina_block.blockchain_length
-                      @@ Breadcrumb.block breadcrumb )
+                      @@ Mina_block.Header.blockchain_length
+                      @@ Breadcrumb.header breadcrumb )
                   ; ("transactions", `List txs)
                   ] ;
               [%str_log info]
@@ -1420,18 +1506,15 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
         [%log trace]
           ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson crumb) ]
           "Emitting precomputed block with parent $breadcrumb%!" ;
-        let previous_transition = Breadcrumb.block_with_hash crumb in
-        let previous_protocol_state =
-          Header.protocol_state
-          @@ Mina_block.header (With_hash.data previous_transition)
+        let previous_consensus_state_with_hashes =
+          Breadcrumb.consensus_state_with_hashes crumb
         in
+        let previous_protocol_state = Breadcrumb.protocol_state crumb in
         assert (
           phys_equal
             (Consensus.Hooks.select
                ~context:(module Context)
-               ~existing:
-                 (With_hash.map ~f:Mina_block.consensus_state
-                    previous_transition )
+               ~existing:previous_consensus_state_with_hashes
                ~candidate:consensus_state_with_hashes )
             `Take
           || failwith
@@ -1454,7 +1537,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
         let emit_breadcrumb () =
           let open Deferred.Result.Let_syntax in
           let previous_protocol_state_hash =
-            State_hash.With_state_hashes.state_hash previous_transition
+            State_hash.With_state_hashes.state_hash
+              previous_consensus_state_with_hashes
           in
           let header =
             Header.create ~protocol_state ~protocol_state_proof
@@ -1486,9 +1570,9 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
             >>= Validation.validate_frontier_dependencies
                   ~to_header:Mina_block.header
                   ~context:(module Context)
-                  ~root_block:
+                  ~root_consensus_state:
                     ( Transition_frontier.root frontier
-                    |> Breadcrumb.block_with_hash )
+                    |> Breadcrumb.consensus_state_with_hashes )
                   ~is_block_in_frontier:
                     (Fn.compose Option.is_some
                        (Transition_frontier.find frontier) )

@@ -47,24 +47,23 @@ end
 
 type ctx = (module CONTEXT)
 
-let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender blocks =
+let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender headers =
   let version_errors =
     let invalid_current_versions =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block |> Mina_block.Header.current_protocol_version
+      List.filter headers ~f:(fun header ->
+          Mina_block.Header.current_protocol_version header
           |> Protocol_version.is_valid |> not )
     in
 
     let invalid_next_versions =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block
-          |> Mina_block.Header.proposed_protocol_version_opt
+      List.filter headers ~f:(fun header ->
+          Mina_block.Header.proposed_protocol_version_opt header
           |> Option.for_all ~f:Protocol_version.is_valid
           |> not )
     in
     let current_version_mismatches =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block |> Mina_block.Header.current_protocol_version
+      List.filter headers ~f:(fun header ->
+          Mina_block.Header.current_protocol_version header
           |> Protocol_version.compatible_with_daemon |> not )
     in
     List.map invalid_current_versions ~f:(fun x ->
@@ -77,8 +76,7 @@ let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender blocks =
     (* NB: these errors aren't always accurate... sometimes we are calling this when we were
            requested to serve an outdated block (requested vs sent) *)
     Deferred.List.iter version_errors ~how:`Parallel
-      ~f:(fun (version_error, block) ->
-        let header = Mina_block.header block in
+      ~f:(fun (version_error, header) ->
         let block_protocol_version =
           Mina_block.Header.current_protocol_version header
         in
@@ -215,10 +213,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type query = State_hash.t
 
       type response =
-        ( Staged_ledger.Scan_state.Stable.Latest.t
-        * Ledger_hash.t
-        * Pending_coinbase.t
-        * Mina_state.Protocol_state.value list )
+        Frontier_base.Network_types.Staged_ledger_aux_and_pending_coinbases.t
         option
     end
 
@@ -252,15 +247,15 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query = State_hash.Stable.V1.t
 
       type response =
-        ( Staged_ledger.Scan_state.Stable.V2.t
-        * Ledger_hash.Stable.V1.t
-        * Pending_coinbase.Stable.V2.t
-        * Mina_state.Protocol_state.Value.Stable.V2.t list )
+        Frontier_base.Network_types.Staged_ledger_aux_and_pending_coinbases
+        .Stable
+        .V1
+        .t
         option
 
       let query_of_caller_model = Fn.id
@@ -300,22 +295,16 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash ~logger
         ~frontier hash
     in
-    match result with
-    | None ->
+    let%map () =
+      if Option.is_none result then
         Trust_system.(
           record_envelope_sender trust_system logger
             (Envelope.Incoming.sender request)
             Actions.
               (Requested_unknown_item, Some (receipt_trust_action_message hash)))
-        >>| const None
-    | Some (scan_state, expected_merkle_root, pending_coinbases, protocol_states)
-      ->
-        return
-          (Some
-             ( Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
-             , expected_merkle_root
-             , pending_coinbases
-             , protocol_states ) )
+      else Deferred.unit
+    in
+    result
 
   let rate_limit_budget = (4, `Per Time.Span.minute)
 
@@ -506,7 +495,7 @@ module Get_transition_chain = struct
     module T = struct
       type query = State_hash.t list [@@deriving sexp, to_yojson]
 
-      type response = Mina_block.Stable.Latest.t list option
+      type response = Frontier_base.Network_types.Block.t list option
     end
 
     module Caller = T
@@ -537,7 +526,7 @@ module Get_transition_chain = struct
     module T = struct
       type query = State_hash.Stable.V1.t list [@@deriving sexp]
 
-      type response = Mina_block.Stable.V2.t list option
+      type response = Frontier_base.Network_types.Block.Stable.V1.t list option
 
       let query_of_caller_model = Fn.id
 
@@ -578,14 +567,7 @@ module Get_transition_chain = struct
     in
     match result with
     | Some blocks ->
-        let%map valid_versions =
-          validate_protocol_versions ~logger ~trust_system
-            ~rpc_name:"Get_transition_chain"
-            ~sender:(Envelope.Incoming.sender request)
-            blocks
-        in
-        Option.some_if valid_versions
-        @@ List.map ~f:Mina_block.read_all_proofs_from_disk blocks
+        Deferred.return @@ Option.some blocks
     | None ->
         let%map () =
           Trust_system.(
@@ -897,8 +879,8 @@ module Get_ancestry = struct
       [@@deriving sexp, to_yojson]
 
       type response =
-        ( Mina_block.Stable.Latest.t
-        , State_body_hash.t list * Mina_block.Stable.Latest.t )
+        ( Frontier_base.Network_types.Block.t
+        , State_body_hash.t list * Frontier_base.Network_types.Block.t )
         Proof_carrying_data.t
         option
     end
@@ -936,8 +918,9 @@ module Get_ancestry = struct
       [@@deriving sexp]
 
       type response =
-        ( Mina_block.Stable.V2.t
-        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
+        ( Frontier_base.Network_types.Block.Stable.V1.t
+        , State_body_hash.Stable.V1.t list
+          * Frontier_base.Network_types.Block.Stable.V1.t )
         Proof_carrying_data.Stable.V1.t
         option
 
@@ -994,17 +977,14 @@ module Get_ancestry = struct
         in
         None
     | Some { proof = chain, base_block; data = block } ->
-        let%map valid_versions =
-          validate_protocol_versions ~logger ~trust_system
-            ~rpc_name:"Get_ancestry"
-            ~sender:(Envelope.Incoming.sender request)
-            [ base_block ]
-        in
-        Option.some_if valid_versions
-          { Proof_carrying_data.proof =
-              (chain, Mina_block.read_all_proofs_from_disk base_block)
-          ; data = Mina_block.read_all_proofs_from_disk block
-          }
+        let block = Frontier_base.Breadcrumb.block_tag block in
+        let base_block = Frontier_base.Breadcrumb.block_tag base_block in
+        Deferred.return
+        @@ ( Some
+               { Proof_carrying_data.proof = (chain, Tag base_block)
+               ; data = Tag block
+               }
+             : response )
 
   let rate_limit_budget = (5, `Per Time.Span.minute)
 
@@ -1106,8 +1086,8 @@ module Get_best_tip = struct
       type query = unit [@@deriving sexp, to_yojson]
 
       type response =
-        ( Mina_block.Stable.Latest.t
-        , State_body_hash.t list * Mina_block.Stable.Latest.t )
+        ( Frontier_base.Network_types.Block.t
+        , State_body_hash.t list * Frontier_base.Network_types.Block.t )
         Proof_carrying_data.t
         option
     end
@@ -1141,8 +1121,9 @@ module Get_best_tip = struct
       type query = unit [@@deriving sexp]
 
       type response =
-        ( Mina_block.Stable.V2.t
-        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
+        ( Frontier_base.Network_types.Block.Stable.V1.t
+        , State_body_hash.Stable.V1.t list
+          * Frontier_base.Network_types.Block.Stable.V1.t )
         Proof_carrying_data.Stable.V1.t
         option
 
@@ -1180,11 +1161,7 @@ module Get_best_tip = struct
     let result =
       let open Option.Let_syntax in
       let%bind frontier = get_transition_frontier () in
-      let%map proof_with_data =
-        Best_tip_prover.prove ~context:(module Context) frontier
-      in
-      (* strip hash from proof data *)
-      Proof_carrying_data.map proof_with_data ~f:With_hash.data
+      Best_tip_prover.prove ~context:(module Context) frontier
     in
     match result with
     | None ->
@@ -1197,23 +1174,14 @@ module Get_best_tip = struct
         in
         None
     | Some { data = data_block; proof = chain, proof_block } ->
-        let%map data_valid_versions =
-          validate_protocol_versions ~logger ~trust_system
-            ~rpc_name:"Get_best_tip (data)"
-            ~sender:(Envelope.Incoming.sender request)
-            [ data_block ]
-        and proof_valid_versions =
-          validate_protocol_versions ~logger ~trust_system
-            ~rpc_name:"Get_best_tip (proof)"
-            ~sender:(Envelope.Incoming.sender request)
-            [ proof_block ]
-        in
-        Option.some_if
-          (data_valid_versions && proof_valid_versions)
-          { Proof_carrying_data.data =
-              Mina_block.read_all_proofs_from_disk data_block
-          ; proof = (chain, Mina_block.read_all_proofs_from_disk proof_block)
-          }
+        let data_block = Frontier_base.Breadcrumb.block_tag data_block in
+        let proof_block = Frontier_base.Breadcrumb.block_tag proof_block in
+        Deferred.return
+        @@ ( Some
+               { Proof_carrying_data.data = Tag data_block
+               ; proof = (chain, Tag proof_block)
+               }
+             : response )
 
   let rate_limit_budget = (3, `Per Time.Span.minute)
 

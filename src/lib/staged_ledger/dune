@@ -60,7 +60,8 @@
   transaction_witness
   verifier
   with_hash
-  zkapp_command_builder)
+  zkapp_command_builder
+  multi_key_file_storage)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
