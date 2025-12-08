@@ -68,7 +68,12 @@ module Base = struct
       -> Blockchain_snark.Blockchain.t list
       -> unit Or_error.t Or_error.t Deferred.t
 
-    (** Verify transaction SNARKs (ledger transition proofs). *)
+    (** Verify transaction SNARKs (ledger transition proofs).
+
+        @param proofs List of [(ledger_proof, sok_message)] pairs where:
+        - [ledger_proof]: The transaction SNARK proving valid ledger transition
+        - [sok_message]: "Statement of knowledge" containing the fee and prover's
+          public key, ensuring the SNARK worker gets credited for their work *)
     val verify_transaction_snarks :
          t
       -> (ledger_proof * Mina_base.Sok_message.t) list
