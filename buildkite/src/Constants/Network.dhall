@@ -33,10 +33,10 @@ let lowerName =
 let requiresMainnetBuild =
           \(network : Network)
       ->  merge
-            { Devnet = True
+            { Devnet = False
             , Mainnet = True
             , Berkeley = False
-            , DevnetLegacy = True
+            , DevnetLegacy = False
             , MainnetLegacy = True
             , PreMesa1 = False
             }
