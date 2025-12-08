@@ -63,12 +63,39 @@ var caml_fq_srs_lagrange_commitments_whole_domain =
 // Requires: tsSrs
 var caml_fp_srs_lagrange_commitment = tsSrs.fp.lagrangeCommitment;
   
+// Provides: caml_fp_srs_to_bytes_external
+// Requires: plonk_wasm
+var caml_fp_srs_to_bytes_external = function (srs) {
+  console.log("native caml_fp_srs_to_bytes_external");
+  return plonk_wasm.caml_fp_srs_to_bytes_external(srs);
+};
+
+// Provides: caml_fp_srs_from_bytes_external
+// Requires: plonk_wasm
+var caml_fp_srs_from_bytes_external = function (bytes) {
+  console.log("native caml_fp_srs_from_bytes_external");
+  return plonk_wasm.caml_fp_srs_from_bytes_external(bytes);
+};
+
 // Provides: caml_fp_srs_lagrange_commitment
 // Requires: tsSrs
 var caml_fp_srs_lagrange_commitment = function (srs, i) {
   console.log("native caml_fp_srs_lagrange_commitment");
   return tsSrs.fp.lagrangeCommitment(srs, i);
 }
+
+// Provides: caml_fp_srs_maybe_lagrange_commitment
+// Requires: plonk_wasm, tsRustConversionNative
+var caml_fp_srs_maybe_lagrange_commitment = function (srs, domain_size, i) {
+  console.log("native caml_fp_srs_maybe_lagrange_commitment");
+  var result = plonk_wasm.caml_fp_srs_maybe_lagrange_commitment(srs, domain_size, i);
+  console.log("result", result);
+  if (result == null) return 0; // None
+  var polyComm = tsRustConversionNative.fp.polyCommFromRust(result);
+  console.log("polyComm", polyComm);
+  if (polyComm == undefined) return 0; // None
+  return [0, polyComm]; // Some(...)
+};
 
 // Provides: caml_fp_srs_commit_evaluations
 // Requires: plonk_wasm, tsRustConversionNative
@@ -179,6 +206,17 @@ var caml_fq_srs_lagrange_commitment = tsSrs.fq.lagrangeCommitment;
 var caml_fq_srs_lagrange_commitment = function (srs, i) {
   console.log("native caml_fq_srs_lagrange_commitment");
   return tsSrs.fq.lagrangeCommitment(srs, i);
+};
+
+// Provides: caml_fq_srs_maybe_lagrange_commitment
+// Requires: plonk_wasm, tsRustConversionNative
+var caml_fq_srs_maybe_lagrange_commitment = function (srs, domain_size, i) {
+  console.log("native caml_fq_srs_maybe_lagrange_commitment");
+  var result = plonk_wasm.caml_fq_srs_maybe_lagrange_commitment(srs, domain_size, i);
+  if (result == null) return 0; // None
+  var polyComm = tsRustConversionNative.fq.polyCommFromRust(result);
+  if (polyComm == undefined) return 0; // None
+  return [0, polyComm]; // Some(...)
 };
 
 // Provides: caml_fq_srs_commit_evaluations
