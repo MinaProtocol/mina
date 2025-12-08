@@ -55,6 +55,9 @@ PRECOMPUTED_BLOCK_PREFIX=""
 CACHED_HARDFORK_DATA=""
 CHECKS="config,tarballs,ledgers"
 
+# Track if any errors occurred
+error=0
+
 # Parse named flags
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -283,7 +286,6 @@ if checks_contains ledgers; then
     extract_ledgers "$PACKAGED_DAEMON_CONFIG" "$GENESIS_LEDGER_DIR" "$WORKDIR/packaged"
 
     echo "Performing final comparisons..." >&2
-    error=0
 
     result=$(jq --slurpfile a "$WORKDIR/config-substituted.json" --slurpfile b "$PACKAGED_DAEMON_CONFIG" -n '
     ($a[0].epoch_data.staking.hash == $b[0].epoch_data.staking.hash and

@@ -328,8 +328,9 @@ let generateDockerForCodename =
                         # [ Cmd.run
                               "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                             codename} && source ./buildkite/scripts/export-git-env-vars.sh"
-                          , Cmd.run
-                              "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config --network ${Network.lowerName
+                          , Cmd.runInDocker
+                              Cmd.Docker::{ image = image }
+                               "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config --network ${Network.lowerName
                                                                                                                                                                                                 spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir ./hardfork/legacy --checks config"
                           ]
                     , label = "Verify packaged artifacts: Config check"
