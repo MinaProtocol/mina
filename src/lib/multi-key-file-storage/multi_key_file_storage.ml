@@ -94,26 +94,26 @@ end) :
           tag )
     }
 
+  let do_writing ~buffer_size ~filename_key ~init_offset ~f oc =
+    (* Buffer for accumulating writes *)
+    let buffer = Buffer.create buffer_size in
+    let writer =
+      make_writer ~buffer_size ~init_offset ~oc ~filename_key ~buffer
+    in
+
+    (* Call user function with write_value *)
+    let result = f writer in
+
+    (* Flush any remaining data *)
+    if Buffer.length buffer > 0 then flush_buffer oc buffer ;
+
+    result
+
   (** Write multiple keys to a database file with buffered I/O *)
   let write_values_exn ?(buffer_size = default_buffer_size) ~f filename_key =
-    let do_writing oc =
-      (* Buffer for accumulating writes *)
-      let buffer = Buffer.create buffer_size in
-      let writer =
-        make_writer ~buffer_size ~init_offset:0L ~oc ~filename_key ~buffer
-      in
-
-      (* Call user function with write_value *)
-      let result = f writer in
-
-      (* Flush any remaining data *)
-      if Buffer.length buffer > 0 then flush_buffer oc buffer ;
-
-      result
-    in
-    Out_channel.with_file
-      (Inputs.filename filename_key)
-      ~binary:true ~f:do_writing
+    let filename = Inputs.filename filename_key in
+    Out_channel.with_file filename ~binary:true
+      ~f:(do_writing ~buffer_size ~filename_key ~init_offset:0L ~f)
 
   (** Append multiple keys to an existing database file with buffered I/O *)
   let append_values_exn ?(buffer_size = default_buffer_size) ~f filename_key =
@@ -121,22 +121,7 @@ end) :
     let do_appending oc =
       (* Get current file size to calculate offset for new writes *)
       let init_offset = Out_channel.length oc in
-
-      (* Buffer for accumulating writes *)
-      let buffer = Buffer.create buffer_size in
-
-      (* Create a modified writer that accounts for the initial file offset *)
-      let writer =
-        make_writer ~buffer_size ~init_offset ~oc ~filename_key ~buffer
-      in
-
-      (* Call user function with write_value *)
-      let result = f writer in
-
-      (* Flush any remaining data *)
-      if Buffer.length buffer > 0 then flush_buffer oc buffer ;
-
-      result
+      do_writing ~buffer_size ~filename_key ~init_offset ~f oc
     in
     Out_channel.with_file filename ~binary:true ~append:true ~f:do_appending
 
