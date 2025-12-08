@@ -226,6 +226,10 @@ if [ -z "$REFERENCE_DATA_DIR" ]; then
     "$MINA_LEGACY_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$WORKDIR/legacy_ledgers" --hash-output-file "$WORKDIR/legacy_hashes.json"
     REFERENCE_DATA_DIR="$WORKDIR"
 else
+    if [[ ! -d "$REFERENCE_DATA_DIR" ]]; then
+        echo "Error: reference data dir $REFERENCE_DATA_DIR does not exist" >&2
+        exit 1
+    fi
     echo "using reference data dir: $REFERENCE_DATA_DIR. Skipping legacy ledger generation." >&2
 fi
 
