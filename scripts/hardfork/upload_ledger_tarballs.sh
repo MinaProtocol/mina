@@ -46,13 +46,11 @@ check_s3_permissions() {
   echo "✅ S3 bucket access verified"
 }
 
+INPUT_FOLDER=${1:-hardfork_ledgers}  # Folder to scan for ledger tarballs
+MINA_LEDGER_S3_BUCKET=${MINA_LEDGER_S3_BUCKET:-"s3://snark-keys.o1test.net"}
 
 check_aws_cli
 check_s3_permissions
-
-
-INPUT_FOLDER=${1:-hardfork_ledgers}  # Folder to scan for ledger tarballs
-MINA_LEDGER_S3_BUCKET=${MINA_LEDGER_S3_BUCKET:-"s3://snark-keys.o1test.net"}
 
 # Get list of existing files in the S3 bucket
 existing_files=$(aws s3 ls "$MINA_LEDGER_S3_BUCKET" | awk '{print $4}')
