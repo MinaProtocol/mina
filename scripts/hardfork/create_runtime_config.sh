@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -eo pipefail
+set -eox pipefail
 
 FORK_CONFIG_JSON=${FORK_CONFIG_JSON:=fork_config.json}
 LEDGER_HASHES_JSON=${LEDGER_HASHES_JSON:=ledger_hashes.json}
@@ -17,10 +17,15 @@ if [[ "$OFFSET" == null ]]; then
   OFFSET=0
 fi
 
-DIFFERENCE_IN_SECONDS=$(($(date -d "$GENESIS_TIMESTAMP" "+%s") - $(date -d "$ORIGINAL_GENESIS_TIMESTAMP" "+%s")))
-# Default: mainnet currently uses 180s per slot
-SECONDS_PER_SLOT=${SECONDS_PER_SLOT:=180}
-DIFFERENCE_IN_SLOTS=$(($DIFFERENCE_IN_SECONDS / $SECONDS_PER_SLOT))
+# If ORIGINAL_GENESIS_TIMESTAMP is null, calculate DIFFERENCE_IN_SLOTS based on OFFSET only
+if [[ "$ORIGINAL_GENESIS_TIMESTAMP" == "null" ]]; then
+  DIFFERENCE_IN_SLOTS=0
+else
+  DIFFERENCE_IN_SECONDS=$(($(date -d "$GENESIS_TIMESTAMP" "+%s") - $(date -d "$ORIGINAL_GENESIS_TIMESTAMP" "+%s")))
+  # Default: mainnet currently uses 180s per slot
+  SECONDS_PER_SLOT=${SECONDS_PER_SLOT:=180}
+  DIFFERENCE_IN_SLOTS=$(($DIFFERENCE_IN_SECONDS / $SECONDS_PER_SLOT))
+fi
 
 # TODO modify, this won't work in a hardfork with Berkeley as basis
 SLOT=$((DIFFERENCE_IN_SLOTS+OFFSET))
