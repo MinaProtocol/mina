@@ -250,20 +250,6 @@
           '';
         });
 
-        devShells.operations = pkgs.mkShell {
-          name = "mina-operations";
-          packages = with pkgs; [ skopeo gzip google-cloud-sdk ];
-        };
-
-        # TODO: think about rust toolchain in the dev shell
-        devShells.integration-tests = pkgs.mkShell {
-          name = "mina-integration-tests";
-          shellHook = ''
-            export MINA_BRANCH=$()
-          '';
-          buildInputs = [ self.packages.${system}.test_executive ];
-        };
-
         # An "impure" shell, giving you the system deps of Mina, opam, cargo and go.
         devShells.impure = import ./nix/impure-shell.nix pkgs;
 
