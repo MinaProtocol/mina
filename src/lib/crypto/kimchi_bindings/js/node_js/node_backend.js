@@ -28,6 +28,8 @@ var plonk_wasm = (function() {
       "WasmFqShifts",
       "WasmFpLookupSelectors",
       "WasmFqLookupSelectors",
+      "WasmFpLookupVerifierIndex",
+      "WasmFqLookupVerifierIndex",
       "WasmFpPlonkVerificationEvals",
       "WasmFqPlonkVerificationEvals",
       "WasmFpPlonkLookupVerifierIndex",
@@ -154,6 +156,10 @@ var plonk_wasm = (function() {
       "WasmFqProofEvaluations",
       "WasmFpProverCommitments",
       "WasmFqProverCommitments",
+      "WasmVecVecFp",
+      "WasmVecVecFq",
+      "WasmFpRuntimeTable",
+      "WasmFqRuntimeTable",
     ];
 
     overrides.forEach(function (override) {
