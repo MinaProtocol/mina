@@ -595,6 +595,9 @@ module Stable = struct
       (* TODO: Although this trick will work, it is not the best way to do it.
          Conversion logic is dependent upon the fact that it's safe to write to
          location associated with `State_hash.dummy`.
+         Which in turn is true only if this code is called once on
+         the first launch of the app after upgrade or on bootstrapping after
+         persistent frontier was fully reset.
          Instead of having V3 for the same module, let's create a different module
          equivalent to V3 and have `to_latest` accept writer as an argument.
       *)
