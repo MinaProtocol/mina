@@ -307,7 +307,7 @@ let generateDockerForCodename =
                             codename
                             Arch.Type.Amd64
                             ([] : List Text)
-                            "./buildkite/scripts/cache/manager.sh read hardfork hardfork && ls -al ./hardfork"
+                            "./buildkite/scripts/cache/manager.sh read hardfork . && ls -al ./hardfork"
                         # [ Cmd.run
                               "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                             codename} && source ./buildkite/scripts/export-git-env-vars.sh"
@@ -332,7 +332,7 @@ let generateDockerForCodename =
                             codename
                             Arch.Type.Amd64
                             ([] : List Text)
-                            "./buildkite/scripts/cache/manager.sh read hardfork hardfork && ls -al ./hardfork"
+                            "./buildkite/scripts/cache/manager.sh read hardfork . && ls -al ./hardfork"
                         # [ Cmd.run
                               "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                             codename} && source ./buildkite/scripts/export-git-env-vars.sh"
@@ -357,7 +357,7 @@ let generateDockerForCodename =
                             codename
                             Arch.Type.Amd64
                             ([] : List Text)
-                            "./buildkite/scripts/cache/manager.sh read hardfork hardfork"
+                            "./buildkite/scripts/cache/manager.sh read hardfork ."
                         # [ Cmd.run
                               "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                             codename} && source ./buildkite/scripts/export-git-env-vars.sh"
