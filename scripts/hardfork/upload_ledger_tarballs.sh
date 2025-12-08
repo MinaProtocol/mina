@@ -21,7 +21,7 @@
 #   - Handles only regular files in the input folder.
 #   - Designed for use in CI or manual upload workflows.
 
-set -euo pipefail
+set -euox pipefail
 
 check_aws_cli() {
   echo "--- Checking for AWS CLI installation"
