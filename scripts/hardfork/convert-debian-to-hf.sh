@@ -3,24 +3,25 @@
 set -e
 
 usage() {
-	echo "Usage: $0 -d <deb_file> -c <runtime_config_json> -l <ledger_tarballs>"
+	echo "Usage: $0 -d <deb_file> -c <runtime_config_json> -l <ledger_tarballs> -n <network_name>"
 	echo "  -d <deb_file>            Path to mina-daemon.deb file"
 	echo "  -c <runtime_config_json> Path to runtime config JSON file"
-	echo "  -l <ledger_tarballs>     Path to ledger tarballs"
+	echo "  -l <ledger_tarballs>     Path to ledger tarballs directory"
+	echo "  -n <network_name>        Network name (e.g., devnet, testnet, mainnet)"
 	exit 1
 }
 
-while getopts "d:c:l:" opt; do
+while getopts "d:c:l:n:" opt; do
 	case $opt in
 		d) DEB_FILE="$OPTARG" ;;
 		c) RUNTIME_CONFIG_JSON="$OPTARG" ;;
 		l) LEDGER_TARBALLS="$OPTARG" ;;
+		n) NETWORK_NAME="$OPTARG" ;;
 		*) usage ;;
 	esac
 done
 
-
-if [[ -z "$DEB_FILE" || -z "$RUNTIME_CONFIG_JSON" || -z "$LEDGER_TARBALLS" ]]; then
+if [[ -z "$DEB_FILE" || -z "$RUNTIME_CONFIG_JSON" || -z "$LEDGER_TARBALLS" || -z "$NETWORK_NAME" ]]; then
     usage
 fi
 
@@ -35,11 +36,6 @@ DEB_BASE=$(basename "$DEB_FILE_ABS" .deb)
 
 # Extract the original package name from the deb file
 ORIGINAL_PACKAGE_NAME=$(dpkg-deb --field "$DEB_FILE_ABS" Package)
-
-# Determine the output filename by inserting -hardfork before the version
-# Parse the input filename: <name>_<version>_<arch>.deb
-# Expected format: mina-devnet_3.3.0-beta1-xxx_amd64.deb
-# Desired output:  mina-devnet-hardfork_3.3.0-beta1-xxx_amd64.deb
 
 # Extract version and architecture from the filename
 VERSION=$(dpkg-deb --field "$DEB_FILE_ABS" Version)
@@ -67,47 +63,105 @@ if [[ ! -e "$LEDGER_TARBALLS_FULL" ]]; then
 	exit 1
 fi
 
-# Step 1: Replace runtime config
-PATCHED_DEB="${DEB_DIR}/${DEB_BASE}-patched.deb"
-./scripts/debian/replace-entry.sh "$DEB_FILE_ABS" /var/lib/coda/config_*.json "$RUNTIME_CONFIG_JSON_ABS" "$PATCHED_DEB"
+# Create temporary session directory
+SESSION_DIR=$(mktemp -d)
+trap 'rm -rf "$SESSION_DIR"' EXIT
 
-# Step 2: Insert ledger tarballs (operates on the patched deb from step 1)
-FINAL_DEB="${DEB_DIR}/${DEB_BASE}-final.deb"
-./scripts/debian/insert-entries.sh "$PATCHED_DEB" /var/lib/coda/ "$LEDGER_TARBALLS_FULL" "$FINAL_DEB"
-
-
-# Step 4: Verify the final package
 echo ""
-echo "=== Verifying Final Package ==="
+echo "=== Converting Debian Package to Hardfork Package ==="
+echo "Input:   $DEB_FILE_ABS"
+echo "Network: $NETWORK_NAME"
+echo "Output:  $OUTPUT_DEB_FILE"
+echo ""
 
-if [[ ! -f "$FINAL_DEB" ]]; then
-	echo "ERROR: Final package '$FINAL_DEB' not found" >&2
-	exit 1
+# Open the debian package for modifications
+echo "=== Step 1: Opening Debian Package ==="
+./scripts/debian/session/deb-session-open.sh "$DEB_FILE_ABS" "$SESSION_DIR"
+
+# Move existing network config to backup
+echo ""
+echo "=== Step 2: Backing up existing network config ==="
+./scripts/debian/session/deb-session-move.sh "$SESSION_DIR" \
+    "/var/lib/coda/${NETWORK_NAME}.json" \
+    "/var/lib/coda/${NETWORK_NAME}.old.json"
+
+# Insert new runtime config as the network config
+echo ""
+echo "=== Step 3: Inserting new runtime config ==="
+./scripts/debian/session/deb-session-insert.sh "$SESSION_DIR" \
+    "/var/lib/coda/${NETWORK_NAME}.json" \
+    "$RUNTIME_CONFIG_JSON_ABS"
+
+# Replace config_*.json with runtime config
+echo ""
+echo "=== Step 4: Replacing config_*.json ==="
+./scripts/debian/session/deb-session-replace.sh "$SESSION_DIR" \
+    "/var/lib/coda/config_*.json" \
+    "$RUNTIME_CONFIG_JSON_ABS"
+
+# Insert ledger tarballs
+echo ""
+echo "=== Step 5: Inserting ledger tarballs ==="
+if [[ -d "$LEDGER_TARBALLS_FULL" ]]; then
+    # Directory of tarballs
+    TARBALL_FILES=("$LEDGER_TARBALLS_FULL"/*.tar.gz)
+    if [[ ! -e "${TARBALL_FILES[0]}" ]]; then
+        echo "ERROR: No .tar.gz files found in $LEDGER_TARBALLS_FULL" >&2
+        exit 1
+    fi
+    ./scripts/debian/session/deb-session-insert.sh "$SESSION_DIR" \
+        "/var/lib/coda/" \
+        "${TARBALL_FILES[@]}"
+else
+    # Single tarball file
+    ./scripts/debian/session/deb-session-insert.sh "$SESSION_DIR" \
+        "/var/lib/coda/" \
+        "$LEDGER_TARBALLS_FULL"
 fi
 
-# Resolve absolute paths BEFORE changing directories
-ORIG_DIR=$(pwd)
-FINAL_DEB_ABS=$(readlink -f "$FINAL_DEB")
+# Rename package to add -hardfork suffix
+echo ""
+echo "=== Step 6: Renaming package ==="
+BASE_PACKAGE_NAME="$ORIGINAL_PACKAGE_NAME"
+while [[ "$BASE_PACKAGE_NAME" == *-hardfork ]]; do
+	BASE_PACKAGE_NAME="${BASE_PACKAGE_NAME%-hardfork}"
+done
+NEW_PACKAGE_NAME="${BASE_PACKAGE_NAME}-hardfork"
+
+./scripts/debian/session/deb-session-rename-package.sh "$SESSION_DIR" "$NEW_PACKAGE_NAME"
+
+# Save the modified package
+echo ""
+echo "=== Step 7: Saving modified package ==="
+./scripts/debian/session/deb-session-save.sh "$SESSION_DIR" "$OUTPUT_DEB_FILE" --verify
+
+# Verify the final package contents
+echo ""
+echo "=== Step 8: Final Verification ==="
+
+FINAL_DEB_ABS=$(readlink -f "$OUTPUT_DEB_FILE")
 LEDGER_TARBALLS_ABS=$(readlink -f "$LEDGER_TARBALLS_FULL")
 
-echo "Package size: $(ls -lh "$FINAL_DEB" | awk '{print $5}')"
+echo "Package size: $(ls -lh "$FINAL_DEB_ABS" | awk '{print $5}')"
+
 # Quick file count check
-FILE_COUNT=$(dpkg-deb -c "$FINAL_DEB_ABS" | grep -E "(config_.*\.json|.*ledger.*\.tar\.gz)" | wc -l)
-echo "Files found (config + ledgers): $FILE_COUNT"
+FILE_COUNT=$(dpkg-deb -c "$FINAL_DEB_ABS" | grep -E "(config_.*\.json|${NETWORK_NAME}|.*ledger.*\.tar\.gz)" | wc -l)
+echo "Files found (configs + network + ledgers): $FILE_COUNT"
 
 # Count source ledger files
 if [[ -d "$LEDGER_TARBALLS_ABS" ]]; then
 	SOURCE_LEDGER_COUNT=$(ls -1 "$LEDGER_TARBALLS_ABS"/*.tar.gz 2>/dev/null | wc -l)
 else
-	SOURCE_LEDGER_COUNT=$(ls -1 "$LEDGER_TARBALLS_ABS" 2>/dev/null | wc -l)
+	SOURCE_LEDGER_COUNT=1
 fi
 
-EXPECTED_MIN=$((SOURCE_LEDGER_COUNT + 1))  # ledgers + at least 1 config
+# Expected: ledgers + config_*.json + network.json + network.old.json = at least SOURCE_LEDGER_COUNT + 3
+EXPECTED_MIN=$((SOURCE_LEDGER_COUNT + 3))
 
 if [[ $FILE_COUNT -lt $EXPECTED_MIN ]]; then
-	echo "ERROR: Expected at least $EXPECTED_MIN files (${SOURCE_LEDGER_COUNT} ledgers + configs), but found $FILE_COUNT" >&2
+	echo "ERROR: Expected at least $EXPECTED_MIN files (${SOURCE_LEDGER_COUNT} ledgers + 3 configs), but found $FILE_COUNT" >&2
 	echo "Listing package contents:" >&2
-	dpkg-deb -c "$PATCHED_DEB_ABS" | grep -E "(config_|ledger)" >&2
+	dpkg-deb -c "$FINAL_DEB_ABS" | grep -E "(config_|ledger|${NETWORK_NAME})" >&2
 	exit 1
 fi
 
@@ -123,10 +177,9 @@ ar x "$FINAL_DEB_ABS"
 mkdir data
 tar -xzf data.tar.gz -C data
 
-# Verify config file
+# Verify runtime config file (config_*.json)
 RUNTIME_CONFIG_HASH=$(sha256sum "$RUNTIME_CONFIG_JSON_ABS" | awk '{print $1}')
 
-# Find the config file in the package (it may have been renamed)
 PKG_CONFIG=$(ls data/var/lib/coda/config_*.json 2>/dev/null | head -1)
 if [[ -n "$PKG_CONFIG" ]]; then
 	PKG_CONFIG_HASH=$(sha256sum "$PKG_CONFIG" | awk '{print $1}')
@@ -140,6 +193,32 @@ if [[ -n "$PKG_CONFIG" ]]; then
 	fi
 else
 	echo "ERROR: No config file found in package!" >&2
+	exit 1
+fi
+
+# Verify network config file
+PKG_NETWORK_CONFIG="data/var/lib/coda/${NETWORK_NAME}.json"
+if [[ -f "$PKG_NETWORK_CONFIG" ]]; then
+	PKG_NETWORK_HASH=$(sha256sum "$PKG_NETWORK_CONFIG" | awk '{print $1}')
+	if [[ "$PKG_NETWORK_HASH" == "$RUNTIME_CONFIG_HASH" ]]; then
+		echo "✓ Network config verified: ${NETWORK_NAME}.json"
+	else
+		echo "ERROR: Network config hash mismatch!" >&2
+		echo "  Expected: $RUNTIME_CONFIG_HASH" >&2
+		echo "  Got:      $PKG_NETWORK_HASH" >&2
+		exit 1
+	fi
+else
+	echo "ERROR: Network config file not found: ${NETWORK_NAME}.json" >&2
+	exit 1
+fi
+
+# Verify old network config exists
+PKG_OLD_NETWORK_CONFIG="data/var/lib/coda/${NETWORK_NAME}.old.json"
+if [[ -f "$PKG_OLD_NETWORK_CONFIG" ]]; then
+	echo "✓ Backup network config verified: ${NETWORK_NAME}.old.json"
+else
+	echo "ERROR: Backup network config file not found: ${NETWORK_NAME}.old.json" >&2
 	exit 1
 fi
 
@@ -191,7 +270,7 @@ else
 	fi
 fi
 
-cd "$ORIG_DIR"
+cd - > /dev/null
 
 if [[ $LEDGER_ERROR -ne 0 ]]; then
 	exit 1
@@ -201,29 +280,7 @@ echo ""
 echo "=== Verification Complete ==="
 echo "All files verified successfully!"
 
-# Step 5: Rename the package to add -hardfork suffix
-echo ""
-echo "=== Renaming Package ==="
-
-# Remove all existing -hardfork suffixes to avoid duplication
-# This handles cases where the package was already processed multiple times
-BASE_PACKAGE_NAME="$ORIGINAL_PACKAGE_NAME"
-while [[ "$BASE_PACKAGE_NAME" == *-hardfork ]]; do
-	BASE_PACKAGE_NAME="${BASE_PACKAGE_NAME%-hardfork}"
-done
-
-NEW_PACKAGE_NAME="${BASE_PACKAGE_NAME}-hardfork"
-
-echo "Renaming package from '$ORIGINAL_PACKAGE_NAME' to '$NEW_PACKAGE_NAME'..."
-echo "Output file: $(basename "$OUTPUT_DEB_FILE")"
-
-# Use rename-package.sh to rename the final deb, outputting to the hardfork filename
-./scripts/debian/rename-package.sh "$FINAL_DEB" "$NEW_PACKAGE_NAME" "$OUTPUT_DEB_FILE"
-
 echo ""
 echo "=== Hardfork Package Creation Complete ==="
 echo "Output: $OUTPUT_DEB_FILE"
 echo "Package name: $NEW_PACKAGE_NAME"
-
-# Cleanup intermediate files
-rm -f "$PATCHED_DEB" "$FINAL_DEB"
