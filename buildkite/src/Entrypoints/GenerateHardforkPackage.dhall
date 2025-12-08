@@ -177,6 +177,7 @@ let generateDockerForCodename =
                           , Artifacts.Type.Daemon
                           , Artifacts.Type.Archive
                           , Artifacts.Type.Rosetta
+                          , Artifacts.Type.ZkappTestTransaction
                           ]
                         , debVersion = codename
                         , profile = profile
@@ -350,7 +351,8 @@ let generateDockerForCodename =
                         # [ Cmd.run
                               "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                             codename} && source ./buildkite/scripts/export-git-env-vars.sh"
-                          , Cmd.run
+                          , Cmd.runInDocker
+                              Cmd.Docker::{ image = image }
                               "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config --network ${Network.lowerName
                                                                                                                                                                                                 spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir ./hardfork/legacy --checks ledgers"
                           ]
@@ -373,9 +375,10 @@ let generateDockerForCodename =
                         # [ Cmd.run
                               "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                             codename} && source ./buildkite/scripts/export-git-env-vars.sh"
-                          , Cmd.run
+                          , Cmd.runInDocker
+                              Cmd.Docker::{ image = image }
                               "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir ./hardfork/legacy --checks tarballs"
+                                                                                                                                                                                              spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir ./hardfork/legacy --checks tarballs"
                           ]
                     , label = "Verify packaged artifacts: Tarballs check"
                     , key =
