@@ -1,7 +1,7 @@
-{ lib, dockerTools, buildEnv, ocamlPackages_mina, runCommand, dumb-init
-, coreutils, findutils, bashInteractive, python3, libp2p_helper, procps
-, postgresql, curl, jq, stdenv, rsync, bash, gnutar, gzip, currentTime
-, flockenzeit, }:
+{ lib, dockerTools, buildEnv, ocamlPackages_mina, linkFarm, runCommand
+, dumb-init, tzdata, coreutils, findutils, bashInteractive, python3
+, libp2p_helper, procps, postgresql, curl, jq, stdenv, rsync, bash, gnutar, gzip
+, currentTime, flockenzeit, }:
 let
   created = flockenzeit.lib.ISO-8601 currentTime;
 
@@ -36,8 +36,28 @@ let
     '';
   };
 
-  basePkgs =
-    [ dumb-init coreutils findutils bashInteractive python3 procps curl jq ];
+  localtime = linkFarm "localtime" [{
+    name = "etc/localtime";
+    path = "${tzdata}/share/zoneinfo/UTC";
+  }];
+
+  zoneinfo = linkFarm "zoneinfo" [{
+    name = "usr/share/zoneinfo";
+    path = "${tzdata}/share/zoneinfo";
+  }];
+
+  basePkgs = [
+    dumb-init
+    coreutils
+    findutils
+    bashInteractive
+    python3
+    procps
+    curl
+    jq
+    localtime
+    zoneinfo
+  ];
 
   baseImage = name: pkgs:
     dockerTools.buildImage {
