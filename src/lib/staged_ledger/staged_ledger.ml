@@ -2410,7 +2410,13 @@ let%test_module "staged ledger tests" =
       (* For test it is not important which file to write to *)
       let state_hash = Quickcheck.random_value State_hash.gen in
       let tagged_witnesses, tagged_works =
-        State_hash.File_storage.write_values_exn state_hash ~f:(fun writer ->
+        (* TODO: use write_values_exn instead of append_values_exn,
+           after introducing directory parameter to all calls to
+           multi-key file storage, use tmp directory as a parameter,
+           and possibly generate multiple state hashes. As of now the code
+           below would use one and the same state hash, and won't remove
+           temporary files after the test is over. *)
+        State_hash.File_storage.append_values_exn state_hash ~f:(fun writer ->
             let witnesses' =
               Scan_state.Transaction_with_witness.persist_many witnesses writer
             in
