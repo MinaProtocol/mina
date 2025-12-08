@@ -23,6 +23,9 @@
 
 set -euox pipefail
 
+INPUT_FOLDER=${1:-hardfork_ledgers}  # Folder to scan for ledger tarballs
+LEDGER_S3_BUCKET=${LEDGER_S3_BUCKET:-"s3://snark-keys.o1test.net"}
+
 check_aws_cli() {
   echo "--- Checking for AWS CLI installation"
   if ! command -v aws &> /dev/null; then
@@ -38,22 +41,19 @@ check_aws_cli() {
 
 check_s3_permissions() {
   echo "--- Checking AWS S3 permissions for bucket access"
-  if ! aws s3 ls "$MINA_LEDGER_S3_BUCKET" > /dev/null 2>&1; then
-    echo "❌ Error: Unable to access S3 bucket '$MINA_LEDGER_S3_BUCKET'"
+  if ! aws s3 ls "$LEDGER_S3_BUCKET" > /dev/null 2>&1; then
+    echo "❌ Error: Unable to access S3 bucket '$LEDGER_S3_BUCKET'"
     echo "Please check your AWS credentials and permissions."
     exit 1
   fi
   echo "✅ S3 bucket access verified"
 }
 
-INPUT_FOLDER=${1:-hardfork_ledgers}  # Folder to scan for ledger tarballs
-MINA_LEDGER_S3_BUCKET=${MINA_LEDGER_S3_BUCKET:-"s3://snark-keys.o1test.net"}
-
 check_aws_cli
 check_s3_permissions
 
 # Get list of existing files in the S3 bucket
-existing_files=$(aws s3 ls "$MINA_LEDGER_S3_BUCKET" | awk '{print $4}')
+existing_files=$(aws s3 ls "$LEDGER_S3_BUCKET" | awk '{print $4}')
 
 for file in "$INPUT_FOLDER"/*; do
 filename=$(basename "$file")
@@ -63,7 +63,7 @@ filename=$(basename "$file")
     printf "Computing old hash for %s...\n" "$filename"
     oldhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
     printf "Downloading %s from S3...\n" "$filename"
-    aws s3 cp "$MINA_LEDGER_S3_BUCKET/$filename" "$file"
+    aws s3 cp "$LEDGER_S3_BUCKET/$filename" "$file"
     printf "Computing new hash for %s...\n" "$filename"
     newhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
     printf "Updating hash in new_config.json for %s...\n" "$filename"
@@ -71,7 +71,7 @@ filename=$(basename "$file")
     printf "Done updating %s.\n" "$filename"
   else
     printf "Uploading %s to S3...\n" "$filename"
-    aws s3 cp --acl public-read "$file" "$MINA_LEDGER_S3_BUCKET/"
-    printf "Done uploading %s.\n" "$filename"
+    aws s3 cp --acl public-read "$file" "$LEDGER_S3_BUCKET/"
+    printf "Done  uploading %s.\n" "$filename"
   fi
 done
