@@ -70,6 +70,8 @@ mkdir hardfork_ledgers
 echo "--- Create hardfork config"
 FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
 
+INPUT_FOLDER=hardfork_ledgers scripts/hardfork/upload_ledger_tarballs.sh
+
 echo "--- New genesis config"
 head new_config.json
 

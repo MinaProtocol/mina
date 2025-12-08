@@ -118,8 +118,6 @@ let generateDockerForCodename =
 
           let tarballGenKey = "generate-hardfork-tarballs-${lowerNameCodename}"
 
-          let tarballUploadKey = "upload-hardfork-tarballs-${lowerNameCodename}"
-
           let buildHfDebian = "build-hf-debian-${lowerNameCodename}"
 
           let dependsOnTarballs =
@@ -211,21 +209,6 @@ let generateDockerForCodename =
                           Toolchain.SelectionMode.ByDebianAndArch
                           codename
                           Arch.Type.Amd64
-                          [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
-                          "./buildkite/scripts/hardfork/upload-ledger-tarballs-to-s3.sh"
-                    , label =
-                        "Upload hardfork tarballs for ${lowerNameCodename}"
-                    , key = tarballUploadKey
-                    , target = Size.Large
-                    , depends_on = dependsOnTarballs
-                    }
-                , Command.build
-                    Command.Config::{
-                    , commands =
-                        Toolchain.select
-                          Toolchain.SelectionMode.ByDebianAndArch
-                          codename
-                          Arch.Type.Amd64
                           useArtifactsEnvVar
                           "./buildkite/scripts/hardfork/generate-tarballs-with-legacy-app.sh --network ${Network.lowerName
                                                                                                            spec.network} --version 3.2.0-f77c8c9  --codename ${lowerNameCodename} --config-json-gz-url ${spec.config_json_gz_url} "
@@ -233,7 +216,6 @@ let generateDockerForCodename =
                         "Legacy hardfork tarballs for ${lowerNameCodename}"
                     , key = tarballGenKey ++ "-legacy"
                     , target = Size.Large
-                    , depends_on = dependsOnTarballs
                     }
                 , Command.build
                     Command.Config::{
@@ -305,8 +287,9 @@ let generateDockerForCodename =
                                                         codename} && source ./buildkite/scripts/export-git-env-vars.sh"
                       , Cmd.runInDocker
                           Cmd.Docker::{ image = image }
-                          "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && ! (FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName spec.network}.json mina-verify-packaged-fork-config ${Network.lowerName
-                                                                                                                                                                                                                                                                                                                                 spec.network} config.json /workdir/verification)"
+                          "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && ! (FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
+                                                                                                                                                                                                                                                                                                  spec.network}.json mina-verify-packaged-fork-config ${Network.lowerName
+                                                                                                                                                                                                                                                                                                                                                          spec.network} config.json /workdir/verification)"
                       ]
                     , label =
                         "Assert corrupted packaged artifacts are unverifiable"
@@ -330,8 +313,9 @@ let generateDockerForCodename =
                                                             codename} && source ./buildkite/scripts/export-git-env-vars.sh"
                           , Cmd.runInDocker
                               Cmd.Docker::{ image = image }
-                               "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName spec.network}.json mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir /workdir/hardfork/legacy --checks config"
+                              "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
+                                                                                                                                                       spec.network}.json mina-verify-packaged-fork-config --network ${Network.lowerName
+                                                                                                                                                                                                                         spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir /workdir/hardfork/legacy --checks config"
                           ]
                     , label = "Verify packaged artifacts: Config check"
                     , key =
@@ -354,8 +338,9 @@ let generateDockerForCodename =
                                                             codename} && source ./buildkite/scripts/export-git-env-vars.sh"
                           , Cmd.runInDocker
                               Cmd.Docker::{ image = image }
-                              "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName spec.network}.json mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir /workdir/hardfork/legacy --checks ledgers"
+                              "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
+                                                                                                                                                       spec.network}.json mina-verify-packaged-fork-config --network ${Network.lowerName
+                                                                                                                                                                                                                         spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir /workdir/hardfork/legacy --checks ledgers"
                           ]
                     , label = "Verify packaged artifacts: Ledgers check"
                     , key =
@@ -379,7 +364,7 @@ let generateDockerForCodename =
                           , Cmd.runInDocker
                               Cmd.Docker::{ image = image }
                               "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                              spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir /workdir/hardfork/legacy --checks tarballs"
+                                                                                                                                                                                                spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir /workdir/hardfork/legacy --checks tarballs"
                           ]
                     , label = "Verify packaged artifacts: Tarballs check"
                     , key =

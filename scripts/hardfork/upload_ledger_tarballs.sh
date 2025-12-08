@@ -21,7 +21,7 @@
 #   - Handles only regular files in the input folder.
 #   - Designed for use in CI or manual upload workflows.
 
-
+set -euo pipefail
 
 check_aws_cli() {
   echo "--- Checking for AWS CLI installation"
@@ -38,8 +38,8 @@ check_aws_cli() {
 
 check_s3_permissions() {
   echo "--- Checking AWS S3 permissions for bucket access"
-  if ! aws s3 ls s3://snark-keys.o1test.net/ > /dev/null 2>&1; then
-    echo "❌ Error: Unable to access S3 bucket 's3://snark-keys.o1test.net/'"
+  if ! aws s3 ls "$MINA_LEDGER_S3_BUCKET" > /dev/null 2>&1; then
+    echo "❌ Error: Unable to access S3 bucket '$MINA_LEDGER_S3_BUCKET'"
     echo "Please check your AWS credentials and permissions."
     exit 1
   fi
@@ -52,24 +52,20 @@ check_s3_permissions
 
 
 INPUT_FOLDER=${1:-hardfork_ledgers}  # Folder to scan for ledger tarballs
-
-
-
+MINA_LEDGER_S3_BUCKET=${MINA_LEDGER_S3_BUCKET:-"s3://snark-keys.o1test.net"}
 
 # Get list of existing files in the S3 bucket
-existing_files=$(aws s3 ls s3://snark-keys.o1test.net/ | awk '{print $4}')
+existing_files=$(aws s3 ls "$MINA_LEDGER_S3_BUCKET" | awk '{print $4}')
 
-# Function to upload or update a file in the S3 bucket
-upload_file() {
-  file="$1"
-  filename=$(basename "$file")
+for file in "$INPUT_FOLDER"/*; do
+filename=$(basename "$file")
   printf "Processing: %s\n" "$filename"
   if echo "$existing_files" | grep -q "$filename"; then
     printf "Info: %s already exists in the bucket, packaging it instead.\n" "$filename"
     printf "Computing old hash for %s...\n" "$filename"
     oldhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
     printf "Downloading %s from S3...\n" "$filename"
-    aws s3 cp "s3://snark-keys.o1test.net/$filename" "$file"
+    aws s3 cp "$MINA_LEDGER_S3_BUCKET/$filename" "$file"
     printf "Computing new hash for %s...\n" "$filename"
     newhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
     printf "Updating hash in new_config.json for %s...\n" "$filename"
@@ -77,16 +73,7 @@ upload_file() {
     printf "Done updating %s.\n" "$filename"
   else
     printf "Uploading %s to S3...\n" "$filename"
-    aws s3 cp --acl public-read "$file" s3://snark-keys.o1test.net/
+    aws s3 cp --acl public-read "$file" "$MINA_LEDGER_S3_BUCKET/"
     printf "Done uploading %s.\n" "$filename"
   fi
-}
-
-
-export existing_files
-export -f upload_file
-
-
-# Find all files in the input folder and process them in parallel (8 at a time)
-# Note: For filenames with spaces or special characters, consider using -print0 and xargs -0.
-find "$INPUT_FOLDER" -type f -print0 | xargs -0 -n 1 -P 8 bash -c 'upload_file "$1"' _
+done
