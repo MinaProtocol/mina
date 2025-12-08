@@ -95,6 +95,60 @@ func (t *HardforkTest) CollectBlocks(startSlot, endSlot int) ([]client.BlockData
 	return allBlocks, nil
 }
 
+func (t *HardforkTest) ReportBlocksInfo(port int, blocks []client.BlockData) {
+	t.Logger.Info("================================================")
+	for _, block := range blocks {
+		t.Logger.Info("node at %d has block %v", port, block)
+	}
+}
+
+func (t *HardforkTest) EnsureConsensusOnSlotTxEnd() error {
+	blocksAtSlotTxEndByPort := make(map[int]string)
+	allRestPorts := t.AllPortOfType(PORT_REST)
+	for _, port := range allRestPorts {
+		blocks, err := t.Client.GetBlocks(port)
+		if err != nil {
+			return fmt.Errorf("failed to get blocks: %w from port %d", err, port)
+		}
+		for _, block := range blocks {
+			if block.Slot == t.Config.SlotTxEnd {
+				blocksAtSlotTxEndByPort[port] = block.StateHash
+			}
+		}
+		_, seenSlotTxEndBlock := blocksAtSlotTxEndByPort[port]
+		if !seenSlotTxEndBlock {
+			t.Logger.Info("node at %d haven't seen block at slot %d, which is slot_tx_end", port, t.Config.SlotTxEnd)
+			blocksAtSlotTxEndByPort[port] = "<none>"
+		}
+		t.ReportBlocksInfo(port, blocks)
+	}
+	counts := make(map[string]int)
+	maxCount := 0
+	majorityStateHashAtSlotTxEnd := ""
+	for _, hash := range blocksAtSlotTxEndByPort {
+		counts[hash]++
+		if counts[hash] > maxCount {
+			maxCount = counts[hash]
+			majorityStateHashAtSlotTxEnd = hash
+		}
+	}
+
+	if float64(maxCount)/float64(len(allRestPorts)) <= 0.5 {
+		return fmt.Errorf(
+			"The majority state hash at slot_tx_end %d is less than 50%%",
+			t.Config.SlotTxEnd)
+	}
+
+	if majorityStateHashAtSlotTxEnd == "<none>" {
+		return fmt.Errorf(
+			"majority nodes in the network haven't reached slot_tx_end at %d yet",
+			t.Config.SlotTxEnd,
+		)
+	}
+
+	return nil
+}
+
 // AnalyzeBlocks performs comprehensive block analysis including finding genesis epoch hashes
 func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 	// Get initial blocks to find genesis epoch hashes
@@ -133,6 +187,11 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 	// Collect blocks from BestChainQueryFrom to SlotChainEnd
 	allBlocks, err := t.CollectBlocks(t.Config.BestChainQueryFrom, t.Config.SlotChainEnd)
 	if err != nil {
+		return nil, err
+	}
+
+	// Query from all nodes and ensure they agree on slot txn end.
+	if err := t.EnsureConsensusOnSlotTxEnd(); err != nil {
 		return nil, err
 	}
 
