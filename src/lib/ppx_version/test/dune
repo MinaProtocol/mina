@@ -127,3 +127,9 @@
   (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
   (libraries base.caml core_kernel bin_prot.shape sexplib0 ppx_version.runtime)
   (modules versioned_module_bad_missing_to_latest))
+
+(executable
+  (name versioned_binable_good)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
+  (libraries base.caml core_kernel bin_prot.shape sexplib0 ppx_version.runtime)
+  (modules versioned_binable_good))

@@ -14,7 +14,6 @@
   sexplib0
   ppxlib.ast
   core_kernel
-  ocaml-migrate-parsetree
   base.base_internalhash_types
   ;; local libraries
   pickles_types
