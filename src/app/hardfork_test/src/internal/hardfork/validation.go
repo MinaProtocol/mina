@@ -175,6 +175,13 @@ func (t *HardforkTest) EnsureConsensusOnSlotTxEnd() error {
 
 // AnalyzeBlocks performs comprehensive block analysis including finding genesis epoch hashes
 func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
+
+	genesisBlock, err := t.Client.GenesisBlock(t.AnyPortOfType(PORT_REST))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get genesis block: %w", err)
+	}
+	t.Logger.Info("Genesis block: %v", genesisBlock)
+
 	// Get initial blocks to find genesis epoch hashes
 	portUsed := t.AnyPortOfType(PORT_REST)
 	blocks, err := t.Client.GetAllBlocks(portUsed)
