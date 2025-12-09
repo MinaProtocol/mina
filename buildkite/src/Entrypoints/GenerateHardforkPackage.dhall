@@ -85,7 +85,7 @@ let generateReferenceTarballsCommand =
                       codename
                       Arch.Type.Amd64
                       [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
-                      (     "./buildkite/scripts/hardfork/generate-reference-tarballs.sh "
+                      ("buildkite/scripts/hardfork/generate-tarballs-with-legacy-app.sh "
                         ++  "--network ${Network.lowerName spec.network} "
                         ++  "--config-url ${spec.config_json_gz_url} "
                         ++  "--codename ${DebianVersions.lowerName
