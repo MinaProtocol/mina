@@ -121,32 +121,13 @@ func (t *HardforkTest) RunForkNetwork(configFile, forkLedgersDir string) (*exec.
 	)
 }
 
-func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool, predDescription string, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
-
-	for time.Now().Before(deadline) {
-		bestTip, err := t.Client.BestTip(port)
-		if err != nil {
-			t.Logger.Debug("Failed to get best tip: %v", err)
-			time.Sleep(time.Duration(t.Config.PollingIntervalSeconds) * time.Second)
-			continue
-		}
-
-		if pred(*bestTip) {
-			return nil
-
-		}
-
-		time.Sleep(time.Duration(t.Config.PollingIntervalSeconds) * time.Second)
-	}
-	return fmt.Errorf("timed out waiting for condition: %s at port %d", predDescription, port)
-}
-
 // WaitUntilBestChainQuery calculates and waits until it's time to query the best chain
-func (t *HardforkTest) WaitUntilBestChainQuery(slotDurationSec int, chainStartDelayMin int) {
-	sleepDuration := time.Duration(slotDurationSec*t.Config.BestChainQueryFrom)*time.Second +
-		time.Duration(chainStartDelayMin*60)*time.Second
-
-	t.Logger.Info("Sleeping for %v until best chain query...", sleepDuration)
-	time.Sleep(sleepDuration)
+// TODO: refactor away chainStartDelayMin as it's not used at all, unify behavior of legacy/advanced mode
+// to use HfSlotDelta
+func (t *HardforkTest) WaitUntilBestChainQuery(slotDurationSec int, genesisSlot int) {
+	t.WaitForBestTip(t.AnyPortOfType(PORT_REST), func(block client.BlockData) bool {
+		return block.Slot >= t.Config.BestChainQueryFrom+genesisSlot
+	}, fmt.Sprintf("best tip reached slot %d", t.Config.BestChainQueryFrom),
+		time.Duration(2*t.Config.BestChainQueryFrom*slotDurationSec)*time.Second,
+	)
 }

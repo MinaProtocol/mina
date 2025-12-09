@@ -82,7 +82,7 @@ func DefaultConfig() *Config {
 		NumNodes:                      0,
 		PaymentInterval:               20,
 		ShutdownTimeoutMinutes:        10,
-		PollingIntervalSeconds:        5,
+		PollingIntervalSeconds:        8,
 		ForkConfigRetryDelaySeconds:   60,
 		ForkConfigMaxRetries:          15,
 		NoNewBlocksWaitSeconds:        300, // 5 minutes

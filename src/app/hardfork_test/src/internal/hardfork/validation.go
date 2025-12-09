@@ -16,6 +16,26 @@ type BlockAnalysisResult struct {
 	GenesisEpochNext          string
 }
 
+func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool, predDescription string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+
+	for time.Now().Before(deadline) {
+		bestTip, err := t.Client.BestTip(port)
+		if err != nil {
+			t.Logger.Debug("Failed to get best tip: %v", err)
+			time.Sleep(time.Duration(t.Config.PollingIntervalSeconds) * time.Second)
+			continue
+		}
+
+		if pred(*bestTip) {
+			return nil
+		}
+
+		time.Sleep(time.Duration(t.Config.PollingIntervalSeconds) * time.Second)
+	}
+	return fmt.Errorf("timed out waiting for condition: %s at port %d", predDescription, port)
+}
+
 // ValidateSlotOccupancy checks if block occupancy is above 50%
 func (t *HardforkTest) ValidateSlotOccupancy(startingHeight, blockHeight int) error {
 	if 2*blockHeight < t.Config.BestChainQueryFrom {
@@ -48,10 +68,6 @@ func (t *HardforkTest) ValidateLatestNonEmptyBlockSlot(latestNonEmptyBlock clien
 
 // ValidateNoNewBlocks verifies that no new blocks are created after chain end
 func (t *HardforkTest) ValidateNoNewBlocks(port int) error {
-	// Sleep three slots (TODO: consider removing in future,
-	// now it's for extra assurance that other waits were not slightly off)
-	time.Sleep(time.Duration(t.Config.MainSlot) * time.Second * 3)
-
 	t.Logger.Info("Waiting to verify no new blocks are created after chain end...")
 
 	bestTip1, err := t.Client.BestTip(port)
@@ -77,19 +93,29 @@ func (t *HardforkTest) ValidateNoNewBlocks(port int) error {
 // CollectBlocks gathers blocks from multiple slots across different ports
 func (t *HardforkTest) CollectBlocks(startSlot, endSlot int) ([]client.BlockData, error) {
 	var allBlocks []client.BlockData
+	collectedSlot := startSlot - 1
 
-	for i := startSlot; i <= endSlot; i++ {
+	portUsed := t.AnyPortOfType(PORT_REST)
 
-		portUsed := t.AnyPortOfType(PORT_REST)
+	for thisSlot := startSlot; thisSlot <= endSlot; thisSlot++ {
+		t.WaitForBestTip(portUsed, func(block client.BlockData) bool {
+			return block.Slot >= thisSlot
+		}, fmt.Sprintf("best tip reached slot %d", startSlot),
+			2*time.Duration(t.Config.MainSlot)*time.Second,
+		)
 
-		blocksBatch, err := t.Client.RecentBlocks(portUsed, 10)
+		// this query returns recent blocks(closer to best tip) in increasing order.
+		recentBlocks, err := t.Client.RecentBlocks(portUsed, 5)
 		if err != nil {
-			t.Logger.Debug("Failed to get blocks for slot %d: %v from port %d", i, err, portUsed)
+			t.Logger.Debug("Failed to get blocks at slot %d: %v from port %d", thisSlot, err, portUsed)
 		} else {
-			allBlocks = append(allBlocks, blocksBatch...)
+			for _, block := range recentBlocks {
+				if block.Slot > collectedSlot {
+					allBlocks = append(allBlocks, block)
+					collectedSlot = block.Slot
+				}
+			}
 		}
-
-		time.Sleep(time.Duration(t.Config.MainSlot) * time.Second)
 	}
 
 	return allBlocks, nil
@@ -281,7 +307,7 @@ func (t *HardforkTest) FindStakingHash(
 
 // waitForEarliestBlock waits for the earliest block to appear in the fork network with retry mechanism
 // Returns the height and slot of the earliest block, or an error if max retries exceeded
-func (t *HardforkTest) waitForEarliestBlock(port int) (height int, slot int, err error) {
+func (t *HardforkTest) waitForEarliestBlockInForkNetwork(port int) (height int, slot int, err error) {
 	for attempt := 1; attempt <= t.Config.ForkEarliestBlockMaxRetries; attempt++ {
 		genesisBlock, queryError := t.Client.GenesisBlock(port)
 		if queryError == nil && genesisBlock.BlockHeight > 0 {
@@ -305,7 +331,7 @@ func (t *HardforkTest) waitForEarliestBlock(port int) (height int, slot int, err
 // ValidateFirstBlockOfForkChain checks that the fork network is producing blocks
 func (t *HardforkTest) ValidateFirstBlockOfForkChain(port int, latestPreForkHeight int, expectedGenesisSlot int64) error {
 	// Wait for the earliest block to appear
-	earliestHeight, earliestSlot, err := t.waitForEarliestBlock(port)
+	earliestHeight, earliestSlot, err := t.waitForEarliestBlockInForkNetwork(port)
 	if err != nil {
 		return err
 	}
@@ -326,7 +352,7 @@ func (t *HardforkTest) ValidateFirstBlockOfForkChain(port int, latestPreForkHeig
 }
 
 // ValidateBlockWithUserCommandCreated checks that blocks contain user commands
-func (t *HardforkTest) ValidateBlockWithUserCommandCreated(port int) error {
+func (t *HardforkTest) ValidateBlockWithUserCommandCreatedForkNetwork(port int) error {
 	allBlocksEmpty := true
 	for i := 0; i < t.Config.UserCommandCheckMaxIterations; i++ {
 		time.Sleep(time.Duration(t.Config.ForkSlot) * time.Second)
