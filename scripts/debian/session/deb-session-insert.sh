@@ -130,7 +130,7 @@ for SOURCE_FILE in "${SOURCE_FILES_ABS[@]}"; do
     exit 1
   fi
 
-  ((INSERTED_COUNT++))
+  INSERTED_COUNT=$((INSERTED_COUNT + 1))
 done
 
 echo ""
