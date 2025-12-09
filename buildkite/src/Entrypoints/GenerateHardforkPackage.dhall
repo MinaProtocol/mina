@@ -64,6 +64,41 @@ let Spec =
           }
       }
 
+let generateReferenceTarballsCommand =
+          \(spec : Spec.Type)
+      ->  \(codename : DebianVersions.DebVersion)
+      ->  \(key : Text)
+      ->  \(depends_on : List Command.TaggedKey.Type)
+      ->  let cacheArg =
+                merge
+                  { Some =
+                      \(build : Text) -> "--cached-buildkite-build-id " ++ build
+                  , None = ""
+                  }
+                  spec.use_artifacts_from_buildkite_build
+
+          in  Command.build
+                Command.Config::{
+                , commands =
+                    Toolchain.select
+                      Toolchain.SelectionMode.ByDebianAndArch
+                      codename
+                      Arch.Type.Amd64
+                      [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
+                      (     "./buildkite/scripts/hardfork/generate-reference-tarballs.sh "
+                        ++  "--network ${Network.lowerName spec.network} "
+                        ++  "--config-url ${spec.config_json_gz_url} "
+                        ++  "--codename ${DebianVersions.lowerName
+                                            codename} ${cacheArg}"
+                      )
+                , label =
+                    "Generate hardfork reference tarballs for ${DebianVersions.lowerName
+                                                                  codename}"
+                , key = key
+                , depends_on = depends_on
+                , target = Size.Large
+                }
+
 let generateTarballsCommand =
           \(spec : Spec.Type)
       ->  \(codename : DebianVersions.DebVersion)
@@ -145,6 +180,9 @@ let generateDockerForCodename =
 
           let dockerDaemonStep = DockerImage.stepKey dockerDaemonSpec
 
+          let referencesTarballStepKey =
+                "generate-reference-tarballs-" ++ lowerNameCodename
+
           let dependsOnTest =
                 [ { name = pipelineName, key = dockerDaemonStep } ]
 
@@ -165,6 +203,11 @@ let generateDockerForCodename =
                               spec
                               codename
                               tarballGenKey
+                              ([] : List Command.TaggedKey.Type)
+                          , generateReferenceTarballsCommand
+                              spec
+                              codename
+                              referencesTarballStepKey
                               ([] : List Command.TaggedKey.Type)
                           ]
                   , None =
@@ -188,6 +231,11 @@ let generateDockerForCodename =
                         codename
                         tarballGenKey
                         dependsOnArtifacts
+                    , generateReferenceTarballsCommand
+                        spec
+                        codename
+                        referencesTarballStepKey
+                        dependsOnArtifacts
                     ]
                   }
                   spec.use_artifacts_from_buildkite_build
@@ -210,21 +258,6 @@ let generateDockerForCodename =
 
           in    buildOrGetArtifacts
               # [ Command.build
-                    Command.Config::{
-                    , commands =
-                        Toolchain.select
-                          Toolchain.SelectionMode.ByDebianAndArch
-                          codename
-                          Arch.Type.Amd64
-                          useArtifactsEnvVar
-                          "./buildkite/scripts/hardfork/generate-tarballs-with-legacy-app.sh --network ${Network.lowerName
-                                                                                                           spec.network} --version 3.2.0-f77c8c9  --codename ${lowerNameCodename} --config-json-gz-url ${spec.config_json_gz_url} "
-                    , label =
-                        "Legacy hardfork tarballs for ${lowerNameCodename}"
-                    , key = tarballGenKey ++ "-legacy"
-                    , target = Size.Large
-                    }
-                , Command.build
                     Command.Config::{
                     , commands =
                         Toolchain.select
