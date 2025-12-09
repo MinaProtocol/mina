@@ -23,15 +23,15 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 	t.WaitUntilBestChainQuery(t.Config.MainSlot, t.Config.MainDelay)
 
 	// Check block height at slot BestChainQueryFrom
-	blockHeight, err := t.Client.GetHeight(t.AnyPortOfType(PORT_REST))
+	bestTip, err := t.Client.BestTip(t.AnyPortOfType(PORT_REST))
 	if err != nil {
 		return nil, err
 	}
 
-	t.Logger.Info("Block height is %d at slot %d.", blockHeight, t.Config.BestChainQueryFrom)
+	t.Logger.Info("Block height is %d at slot %d.", bestTip.BlockHeight, bestTip.Slot)
 
 	// Validate slot occupancy
-	if err := t.ValidateSlotOccupancy(0, blockHeight); err != nil {
+	if err := t.ValidateSlotOccupancy(0, bestTip.BlockHeight); err != nil {
 		return nil, err
 	}
 
@@ -91,15 +91,15 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData For
 	t.WaitUntilBestChainQuery(t.Config.ForkSlot, t.Config.ForkDelay)
 
 	// Check block height at slot BestChainQueryFrom
-	blockHeight, err := t.Client.GetHeight(t.AnyPortOfType(PORT_REST))
+	bestTip, err := t.Client.BestTip(t.AnyPortOfType(PORT_REST))
 	if err != nil {
 		return err
 	}
 
-	t.Logger.Info("Block height is %d at estimated slot %d.", blockHeight, expectedGenesisSlot+int64(t.Config.BestChainQueryFrom))
+	t.Logger.Info("Block height is %d at slot %d.", bestTip.BlockHeight, bestTip.Slot)
 
 	// Validate slot occupancy
-	if err := t.ValidateSlotOccupancy(latestPreForkHeight+1, blockHeight); err != nil {
+	if err := t.ValidateSlotOccupancy(latestPreForkHeight+1, bestTip.BlockHeight); err != nil {
 		return err
 	}
 

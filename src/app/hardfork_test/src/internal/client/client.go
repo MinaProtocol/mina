@@ -97,60 +97,53 @@ func (c *Client) query(port int, query string) (gjson.Result, error) {
 	return gjson.Result{}, fmt.Errorf("query failed after %d attempts: %w", c.maxRetries, lastErr)
 }
 
-// GetHeight gets the current block height
-func (c *Client) GetHeight(port int) (int, error) {
-	result, err := c.query(port, "bestChain(maxLength: 1) { protocolState { consensusState { blockHeight } } }")
-	if err != nil {
-		return 0, err
-	}
-
-	height := result.Get("data.bestChain.0.protocolState.consensusState.blockHeight").Int()
-	return int(height), nil
+// BlockData represents the structured block data from GraphQL queries
+type BlockData struct {
+	StateHash     string
+	BlockHeight   int
+	Slot          int
+	NonEmpty      bool
+	CurEpochHash  string
+	CurEpochSeed  string
+	NextEpochHash string
+	NextEpochSeed string
+	StagedHash    string
+	SnarkedHash   string
+	Epoch         int
 }
 
-// GetHeightAndSlotOfEarliest gets the height and slot of the earliest block
-func (c *Client) GetHeightAndSlotOfEarliest(port int) (height, slot int, err error) {
-	result, err := c.query(port, "bestChain { protocolState { consensusState { blockHeight slotSinceGenesis } } }")
-	if err != nil {
-		return 0, 0, err
-	}
-
-	blockHeight := result.Get("data.bestChain.0.protocolState.consensusState.blockHeight").Int()
-	slotSinceGenesis := result.Get("data.bestChain.0.protocolState.consensusState.slotSinceGenesis").Int()
-
-	return int(blockHeight), int(slotSinceGenesis), nil
+const genesisBlockQuery = `
+genesisBlock {
+  commandTransactionCount
+  protocolState {
+    consensusState {
+      blockHeight
+      slotSinceGenesis
+      epoch
+      stakingEpochData {
+        ledger { hash }
+        seed
+      }
+      nextEpochData {
+        ledger { hash }
+        seed
+      }
+    }
+    blockchainState {
+      stagedLedgerHash
+      snarkedLedgerHash
+    }
+  }
+  transactions {
+    coinbase
+    feeTransfer { fee }
+  }
+  stateHash
 }
-
-// GetForkConfig gets the fork configuration
-func (c *Client) GetForkConfig(port int) (gjson.Result, error) {
-	result, err := c.query(port, "fork_config")
-	if err != nil {
-		return gjson.Result{}, err
-	}
-
-	return result.Get("data.fork_config"), nil
-}
-
-// BlocksWithUserCommands gets the number of blocks with user commands
-func (c *Client) BlocksWithUserCommands(port int) (int, error) {
-	result, err := c.query(port, "bestChain { commandTransactionCount }")
-	if err != nil {
-		return 0, err
-	}
-
-	count := 0
-	result.Get("data.bestChain").ForEach(func(_, value gjson.Result) bool {
-		if value.Get("commandTransactionCount").Int() > 0 {
-			count++
-		}
-		return true
-	})
-
-	return count, nil
-}
+`
 
 // Blocks gets blocks data as in the original shell script
-const Blocksquery = `
+const blocksQuery = `
 bestChain {
   commandTransactionCount
   protocolState {
@@ -180,24 +173,70 @@ bestChain {
 }
 `
 
-// BlockData represents the structured block data from GraphQL queries
-type BlockData struct {
-	StateHash     string
-	BlockHeight   int
-	Slot          int
-	NonEmpty      bool
-	CurEpochHash  string
-	CurEpochSeed  string
-	NextEpochHash string
-	NextEpochSeed string
-	StagedHash    string
-	SnarkedHash   string
-	Epoch         int
+const blocksQueryWithLimit = `
+bestChain (maxLength: %d){
+  commandTransactionCount
+  protocolState {
+    consensusState {
+      blockHeight
+      slotSinceGenesis
+      epoch
+      stakingEpochData {
+        ledger { hash }
+        seed
+      }
+      nextEpochData {
+        ledger { hash }
+        seed
+      }
+    }
+    blockchainState {
+      stagedLedgerHash
+      snarkedLedgerHash
+    }
+  }
+  transactions {
+    coinbase
+    feeTransfer { fee }
+  }
+  stateHash
+}
+`
+
+func parseBlock(value gjson.Result) *BlockData {
+	block := &BlockData{
+		StateHash:     value.Get("stateHash").String(),
+		BlockHeight:   int(value.Get("protocolState.consensusState.blockHeight").Int()),
+		Slot:          int(value.Get("protocolState.consensusState.slotSinceGenesis").Int()),
+		CurEpochHash:  value.Get("protocolState.consensusState.stakingEpochData.ledger.hash").String(),
+		CurEpochSeed:  value.Get("protocolState.consensusState.stakingEpochData.seed").String(),
+		NextEpochHash: value.Get("protocolState.consensusState.nextEpochData.ledger.hash").String(),
+		NextEpochSeed: value.Get("protocolState.consensusState.nextEpochData.seed").String(),
+		StagedHash:    value.Get("protocolState.blockchainState.stagedLedgerHash").String(),
+		SnarkedHash:   value.Get("protocolState.blockchainState.snarkedLedgerHash").String(),
+		Epoch:         int(value.Get("protocolState.consensusState.epoch").Int()),
+	}
+
+	// Calculate if the block is non-empty based on transactions
+	cmdCount := value.Get("commandTransactionCount").Int()
+	feeCount := value.Get("transactions.feeTransfer").Array()
+	coinbase := value.Get("transactions.coinbase").String() != "0"
+
+	block.NonEmpty = (cmdCount+int64(len(feeCount))) > 0 || coinbase
+
+	return block
 }
 
-// GetBlocks retrieves block data from the node
-func (c *Client) GetBlocks(port int) ([]BlockData, error) {
-	result, err := c.query(port, Blocksquery)
+func (c *Client) GenesisBlock(port int) (*BlockData, error) {
+	result, err := c.query(port, genesisBlockQuery)
+	if err != nil {
+		return nil, err
+	}
+	return parseBlock(result.Get("data.genesisBlock")), nil
+}
+
+func (c *Client) RecentBlocks(port int, limit int) ([]BlockData, error) {
+	result, err := c.query(port, fmt.Sprintf(blocksQueryWithLimit, limit))
 	if err != nil {
 		return nil, err
 	}
@@ -205,29 +244,63 @@ func (c *Client) GetBlocks(port int) ([]BlockData, error) {
 	var blocks []BlockData
 
 	result.Get("data.bestChain").ForEach(func(_, value gjson.Result) bool {
-		block := BlockData{
-			StateHash:     value.Get("stateHash").String(),
-			BlockHeight:   int(value.Get("protocolState.consensusState.blockHeight").Int()),
-			Slot:          int(value.Get("protocolState.consensusState.slotSinceGenesis").Int()),
-			CurEpochHash:  value.Get("protocolState.consensusState.stakingEpochData.ledger.hash").String(),
-			CurEpochSeed:  value.Get("protocolState.consensusState.stakingEpochData.seed").String(),
-			NextEpochHash: value.Get("protocolState.consensusState.nextEpochData.ledger.hash").String(),
-			NextEpochSeed: value.Get("protocolState.consensusState.nextEpochData.seed").String(),
-			StagedHash:    value.Get("protocolState.blockchainState.stagedLedgerHash").String(),
-			SnarkedHash:   value.Get("protocolState.blockchainState.snarkedLedgerHash").String(),
-			Epoch:         int(value.Get("protocolState.consensusState.epoch").Int()),
-		}
-
-		// Calculate if the block is non-empty based on transactions
-		cmdCount := value.Get("commandTransactionCount").Int()
-		feeCount := value.Get("transactions.feeTransfer").Array()
-		coinbase := value.Get("transactions.coinbase").String() != "0"
-
-		block.NonEmpty = (cmdCount+int64(len(feeCount))) > 0 || coinbase
-
-		blocks = append(blocks, block)
+		blocks = append(blocks, *parseBlock(value))
 		return true
 	})
 
 	return blocks, nil
+}
+
+func (c *Client) BestTip(port int) (*BlockData, error) {
+	blocks, err := c.RecentBlocks(port, 1)
+	if err != nil {
+		return nil, err
+	}
+	if len(blocks) == 0 {
+		return nil, fmt.Errorf("No best tip found! at port %d", port)
+	}
+
+	return &blocks[0], nil
+}
+
+func (c *Client) GetAllBlocks(port int) ([]BlockData, error) {
+	result, err := c.query(port, blocksQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	var blocks []BlockData
+
+	result.Get("data.bestChain").ForEach(func(_, value gjson.Result) bool {
+		blocks = append(blocks, *parseBlock(value))
+		return true
+	})
+
+	return blocks, nil
+}
+
+func (c *Client) ForkConfig(port int) (gjson.Result, error) {
+	result, err := c.query(port, "fork_config")
+	if err != nil {
+		return gjson.Result{}, err
+	}
+
+	return result.Get("data.fork_config"), nil
+}
+
+func (c *Client) NumUserCommandsInBestChain(port int) (int, error) {
+	result, err := c.query(port, "bestChain { commandTransactionCount }")
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	result.Get("data.bestChain").ForEach(func(_, value gjson.Result) bool {
+		if value.Get("commandTransactionCount").Int() > 0 {
+			count++
+		}
+		return true
+	})
+
+	return count, nil
 }
