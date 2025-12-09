@@ -192,7 +192,7 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 	// Find the first non-empty block to get genesis epoch hashes
 	var firstEpochBlock client.BlockData
 	for _, block := range blocks {
-		if block.NonEmpty && block.Epoch == 0 {
+		if block.NonEmpty() && block.Epoch == 0 {
 			firstEpochBlock = block
 			break
 		}
@@ -275,7 +275,7 @@ func (t *HardforkTest) FindLatestNonEmptyBlock(blocks []client.BlockData) (
 		}
 
 		// Track latest non-empty block
-		if block.NonEmpty && block.Slot > latestNonEmptyBlock.Slot {
+		if block.NonEmpty() && block.Slot > latestNonEmptyBlock.Slot {
 			latestNonEmptyBlock = block
 		}
 	}
