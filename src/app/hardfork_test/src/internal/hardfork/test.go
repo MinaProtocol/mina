@@ -162,7 +162,7 @@ func (t *HardforkTest) Run() error {
 	}
 
 	t.Logger.Info("Phase 3: Running fork network...")
-	if err := t.RunForkNetworkPhase(analysis.LatestNonEmptyBlock.BlockHeight, <-forkDataChan, mainGenesisTs); err != nil {
+	if err := t.RunForkNetworkPhase(analysis.LastNonEmptyBlock.BlockHeight, <-forkDataChan, mainGenesisTs); err != nil {
 		return err
 	}
 

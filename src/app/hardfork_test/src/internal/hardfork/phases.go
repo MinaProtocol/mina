@@ -42,12 +42,12 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 	}
 
 	// Validate max slot
-	if err := t.ValidateLatestOccupiedSlot(analysis.LatestOccupiedSlot); err != nil {
+	if err := t.ValidateLatestOccupiedSlot(analysis.LastOccupiedSlot); err != nil {
 		return nil, err
 	}
 
 	// Validate latest block slot
-	if err := t.ValidateLatestNonEmptyBlockSlot(analysis.LatestNonEmptyBlock); err != nil {
+	if err := t.ValidateLatestNonEmptyBlockSlot(analysis.LastNonEmptyBlock); err != nil {
 		return nil, err
 	}
 
@@ -123,7 +123,7 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, forkConfig
 	prepatchConfig := "fork_data/prepatch/config.json"
 
 	// Validate fork config data
-	if err := t.ValidateLegacyPrepatchForkConfig(analysis.LatestNonEmptyBlock, forkConfigBytes); err != nil {
+	if err := t.ValidateLegacyPrepatchForkConfig(analysis.LastNonEmptyBlock, forkConfigBytes); err != nil {
 		return nil, err
 	}
 	// Write fork config to file
@@ -154,7 +154,7 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, forkConfig
 	if err != nil {
 		return nil, err
 	}
-	err = t.ValidateFinalForkConfig(analysis.LatestNonEmptyBlock, patchedConfigBytes, forkGenesisTs, mainGenesisTs)
+	err = t.ValidateFinalForkConfig(analysis.LastNonEmptyBlock, patchedConfigBytes, forkGenesisTs, mainGenesisTs)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +188,7 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 	forkGenesisSlot := t.Config.SlotChainEnd + t.Config.HfSlotDelta()
 	forkGenesisTs := mainGenesisTs + int64(forkGenesisSlot*t.Config.MainSlot)
 
-	err = t.ValidateFinalForkConfig(analysis.LatestNonEmptyBlock, forkConfigBytes, forkGenesisTs, mainGenesisTs)
+	err = t.ValidateFinalForkConfig(analysis.LastNonEmptyBlock, forkConfigBytes, forkGenesisTs, mainGenesisTs)
 	if err != nil {
 		return nil, err
 	}
