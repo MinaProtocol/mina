@@ -239,44 +239,25 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, error) {
 // AnalyzeBlocks performs comprehensive block analysis including finding genesis epoch hashes
 func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 
-	genesisBlock, err := t.Client.GenesisBlock(t.AnyPortOfType(PORT_REST))
+	portUsed := t.AnyPortOfType(PORT_REST)
+	genesisBlock, err := t.Client.GenesisBlock(portUsed)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get genesis block: %w", err)
+		return nil, fmt.Errorf("failed to get genesis block on port %d: %w", portUsed, err)
 	}
 	t.Logger.Info("Genesis block: %v", genesisBlock)
 
-	// Get initial blocks to find genesis epoch hashes
-	portUsed := t.AnyPortOfType(PORT_REST)
-	blocks, err := t.Client.GetAllBlocks(portUsed)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get blocks: %w from port %d", err, portUsed)
-	}
-
-	// Find the first non-empty block to get genesis epoch hashes
-	var firstEpochBlock client.BlockData
-	for _, block := range blocks {
-		if block.NonEmpty() && block.Epoch == 0 {
-			firstEpochBlock = block
-			break
-		}
-	}
-
-	if firstEpochBlock.StateHash == "" {
-		return nil, fmt.Errorf("no non-empty epoch 0 blocks found in the first query")
-	}
-
-	genesisEpochStakingHash := firstEpochBlock.CurEpochHash
+	genesisEpochStakingHash := genesisBlock.CurEpochHash
 	if genesisEpochStakingHash == "" {
 		return nil, fmt.Errorf("genesis epoch staking hash is empty")
 	}
 
-	genesisEpochNextHash := firstEpochBlock.NextEpochHash
+	genesisEpochNextHash := genesisBlock.NextEpochHash
 	if genesisEpochNextHash == "" {
 		return nil, fmt.Errorf("genesis next staking hash is empty")
 	}
 
-	t.Logger.Info("Genesis epoch staking/next hashes: %s, %s, found in block %s on port %d",
-		genesisEpochStakingHash, genesisEpochNextHash, firstEpochBlock.StateHash, portUsed)
+	t.Logger.Info("Genesis epoch staking/next hashes: %s, %s, found in genesis block %s on port %d",
+		genesisEpochStakingHash, genesisEpochNextHash, genesisBlock.StateHash, portUsed)
 
 	consensus, err := t.ConsensusAcrossNodes()
 	if err != nil {
