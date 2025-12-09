@@ -1,0 +1,16 @@
+(executables
+ (names test_delegation_verify)
+ (libraries
+  alcotest
+  core
+  async
+  delegation_verify_lib
+  mina_base
+  signature_lib)
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane)))
+
+(rule
+ (alias runtest)
+ (action
+  (run ./test_delegation_verify.exe)))
