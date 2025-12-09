@@ -54,26 +54,26 @@ func (t *HardforkTest) ValidateNoNewBlocks(port int) error {
 
 	t.Logger.Info("Waiting to verify no new blocks are created after chain end...")
 
-	height1, err := t.Client.GetHeight(port)
+	bestTip1, err := t.Client.BestTip(port)
 	if err != nil {
-		return fmt.Errorf("failed to get height1: %w", err)
+		return fmt.Errorf("failed to get bestTip at port %d: %w", port, err)
 	}
 
 	time.Sleep(time.Duration(t.Config.NoNewBlocksWaitSeconds) * time.Second)
 
-	height2, err := t.Client.GetHeight(port)
+	bestTip2, err := t.Client.BestTip(port)
 	if err != nil {
-		return fmt.Errorf("failed to get height2: %w", err)
+		return fmt.Errorf("failed to get bestTip at port %d: %w", port, err)
 	}
 
-	if height2 > height1 {
-		t.Logger.Error("Assertion failed: there should be no change in blockheight after slot chain end %s", "")
-		return fmt.Errorf("unexpected block height increase from %d to %d after chain end", height1, height2)
+	if bestTip2.BlockHeight > bestTip1.BlockHeight {
+		return fmt.Errorf("unexpected block height increase from %d to %d after chain end", bestTip2.BlockHeight, bestTip1.BlockHeight)
 	}
 
 	return nil
 }
 
+// NOTE: this is a weird implementation.
 // CollectBlocks gathers blocks from multiple slots across different ports
 func (t *HardforkTest) CollectBlocks(startSlot, endSlot int) ([]client.BlockData, error) {
 	var allBlocks []client.BlockData
@@ -82,7 +82,7 @@ func (t *HardforkTest) CollectBlocks(startSlot, endSlot int) ([]client.BlockData
 
 		portUsed := t.AnyPortOfType(PORT_REST)
 
-		blocksBatch, err := t.Client.GetBlocks(portUsed)
+		blocksBatch, err := t.Client.RecentBlocks(portUsed, 10)
 		if err != nil {
 			t.Logger.Debug("Failed to get blocks for slot %d: %v from port %d", i, err, portUsed)
 		} else {
@@ -106,7 +106,7 @@ func (t *HardforkTest) EnsureConsensusOnSlotTxEnd() error {
 	blocksAtSlotTxEndByPort := make(map[int]string)
 	allRestPorts := t.AllPortOfType(PORT_REST)
 	for _, port := range allRestPorts {
-		blocks, err := t.Client.GetBlocks(port)
+		blocks, err := t.Client.GetAllBlocks(port)
 		if err != nil {
 			return fmt.Errorf("failed to get blocks: %w from port %d", err, port)
 		}
@@ -153,7 +153,7 @@ func (t *HardforkTest) EnsureConsensusOnSlotTxEnd() error {
 func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 	// Get initial blocks to find genesis epoch hashes
 	portUsed := t.AnyPortOfType(PORT_REST)
-	blocks, err := t.Client.GetBlocks(portUsed)
+	blocks, err := t.Client.GetAllBlocks(portUsed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blocks: %w from port %d", err, portUsed)
 	}
@@ -283,16 +283,16 @@ func (t *HardforkTest) FindStakingHash(
 // Returns the height and slot of the earliest block, or an error if max retries exceeded
 func (t *HardforkTest) waitForEarliestBlock(port int) (height int, slot int, err error) {
 	for attempt := 1; attempt <= t.Config.ForkEarliestBlockMaxRetries; attempt++ {
-		h, s, queryErr := t.Client.GetHeightAndSlotOfEarliest(port)
-		if queryErr == nil && h > 0 {
-			return h, s, nil
+		genesisBlock, queryError := t.Client.GenesisBlock(port)
+		if queryError == nil && genesisBlock.BlockHeight > 0 {
+			return genesisBlock.BlockHeight, genesisBlock.Slot, nil
 		}
 
 		if attempt < t.Config.ForkEarliestBlockMaxRetries {
 			t.Logger.Debug("Waiting for earliest block (attempt %d/%d)...", attempt, t.Config.ForkEarliestBlockMaxRetries)
 			time.Sleep(time.Duration(t.Config.ForkSlot) * time.Second)
 		} else {
-			err = queryErr
+			err = queryError
 		}
 	}
 
@@ -331,7 +331,7 @@ func (t *HardforkTest) ValidateBlockWithUserCommandCreated(port int) error {
 	for i := 0; i < t.Config.UserCommandCheckMaxIterations; i++ {
 		time.Sleep(time.Duration(t.Config.ForkSlot) * time.Second)
 
-		userCmds, err := t.Client.BlocksWithUserCommands(port)
+		userCmds, err := t.Client.NumUserCommandsInBestChain(port)
 		if err != nil {
 			t.Logger.Debug("Failed to get blocks with user commands: %v", err)
 			continue

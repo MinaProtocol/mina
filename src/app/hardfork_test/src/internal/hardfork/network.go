@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
 
@@ -120,32 +121,31 @@ func (t *HardforkTest) RunForkNetwork(configFile, forkLedgersDir string) (*exec.
 	)
 }
 
-// WaitForBlockHeight waits until the specified block height is reached
-func (t *HardforkTest) WaitForBlockHeight(port int, minHeight int, timeout time.Duration) error {
+func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool, predDescription string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 
 	for time.Now().Before(deadline) {
-		height, err := t.Client.GetHeight(port)
+		bestTip, err := t.Client.BestTip(port)
 		if err != nil {
-			t.Logger.Debug("Failed to get block height: %v", err)
+			t.Logger.Debug("Failed to get best tip: %v", err)
 			time.Sleep(time.Duration(t.Config.PollingIntervalSeconds) * time.Second)
 			continue
 		}
 
-		if height >= minHeight {
+		if pred(*bestTip) {
 			return nil
+
 		}
 
 		time.Sleep(time.Duration(t.Config.PollingIntervalSeconds) * time.Second)
 	}
-
-	return fmt.Errorf("timed out waiting for block height >= %d", minHeight)
+	return fmt.Errorf("timed out waiting for condition: %s at port %d", predDescription, port)
 }
 
 // WaitUntilBestChainQuery calculates and waits until it's time to query the best chain
-func (t *HardforkTest) WaitUntilBestChainQuery(slotDurationSec int, chainStartDelaySec int) {
+func (t *HardforkTest) WaitUntilBestChainQuery(slotDurationSec int, chainStartDelayMin int) {
 	sleepDuration := time.Duration(slotDurationSec*t.Config.BestChainQueryFrom)*time.Second +
-		time.Duration(chainStartDelaySec*60)*time.Second
+		time.Duration(chainStartDelayMin*60)*time.Second
 
 	t.Logger.Info("Sleeping for %v until best chain query...", sleepDuration)
 	time.Sleep(sleepDuration)

@@ -22,7 +22,7 @@ type ForkConfigData struct {
 // ExtractForkConfig extracts the fork configuration from the network
 func (t *HardforkTest) GetForkConfig(port int) ([]byte, error) {
 	for attempt := 1; attempt <= t.Config.ForkConfigMaxRetries; attempt++ {
-		forkConfig, err := t.Client.GetForkConfig(port)
+		forkConfig, err := t.Client.ForkConfig(port)
 		if err != nil {
 			t.Logger.Error("Failed to get fork config: %v", err)
 			continue
