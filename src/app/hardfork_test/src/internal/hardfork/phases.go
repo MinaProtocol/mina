@@ -2,6 +2,7 @@ package hardfork
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"time"
 )
@@ -174,7 +175,8 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 
 	forkDataPath := fmt.Sprintf("%s/fork_data", cwd)
 
-	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, t.AnyPortOfType(PORT_CLIENT)); err != nil {
+	idx := rand.Intn(len(analysis.CandidateRestPortsForFork))
+	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, analysis.CandidateRestPortsForFork[idx]); err != nil {
 		return nil, err
 	}
 
