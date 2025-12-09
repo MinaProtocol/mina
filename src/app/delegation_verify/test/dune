@@ -5,8 +5,12 @@
   core
   async
   delegation_verify_lib
+  uptime_service
   mina_base
-  signature_lib)
+  signature_lib
+  mina_wire_types
+  snark_params)
+ (flags (:standard -w -32-33-34))
  (preprocess
   (pps ppx_mina ppx_version ppx_jane)))
 
