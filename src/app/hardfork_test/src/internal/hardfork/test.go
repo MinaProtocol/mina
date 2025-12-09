@@ -2,6 +2,7 @@ package hardfork
 
 import (
 	"context"
+	"math/rand"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -130,7 +131,8 @@ func (t *HardforkTest) Run() error {
 			// 2. fork validation is agnostic to fork method and it's checked regardless of fork method
 			t.Logger.Info("Phase 2: Forking the legacy way...")
 
-			forkConfigBytes, err := t.GetForkConfig(t.AnyPortOfType(PORT_REST))
+			idx := rand.Intn(len(analysis.CandidateRestPortsForFork))
+			forkConfigBytes, err := t.GetForkConfig(analysis.CandidateRestPortsForFork[idx])
 			if err != nil {
 				return err
 			}
