@@ -1067,17 +1067,6 @@ module T = struct
     in
     let witnesses = List.map data ~f:fst in
     let accounts_created = List.concat_map data ~f:snd in
-    (*
-    let state_hash =
-      Mina_state.Protocol_state.compute_state_hash
-        ~previous_state_hash:(fst state_and_body_hash)
-        ~state_body_hash:(snd state_and_body_hash)
-    in
-    let _tagged_witnesses, _tagged_works =
-      State_hash.File_storage.write_values_exn state_hash
-        ~f:(persist_witnesses_and_works witnesses works)
-    in
-*)
     let slots = List.length data in
     let work_count = List.length works in
     let required_pairs = Scan_state.work_statements_for_new_diff t.scan_state in
