@@ -24,10 +24,10 @@ type RuntimeGenesisLedgerHashes struct {
 }
 
 func (t *HardforkTest) ValidateRuntimeGenesisLedgerHashes(
-	latestNonEmptyBlock client.BlockData,
+	lastBlockBeforeTxEnd client.BlockData,
 	genesisEpochStaking string,
 	genesisEpochNext string,
-	latestSnarkedHashPerEpoch map[int]string,
+	recentSnarkedHashPerEpoch map[int]string,
 	ledgerHashesFile string,
 ) error {
 
@@ -35,15 +35,15 @@ func (t *HardforkTest) ValidateRuntimeGenesisLedgerHashes(
 
 	// Calculate slot_tx_end_epoch
 	// 48 as specififed by mina-local-network.sh
-	slotTxEndEpoch := latestNonEmptyBlock.Slot / 48
+	slotTxEndEpoch := lastBlockBeforeTxEnd.Slot / 48
 
 	// Find expected staking and next hashes
-	expectedStakingHash, err := t.FindStakingHash(slotTxEndEpoch, genesisEpochStaking, genesisEpochNext, latestSnarkedHashPerEpoch)
+	expectedStakingHash, err := t.FindStakingHash(slotTxEndEpoch, genesisEpochStaking, genesisEpochNext, recentSnarkedHashPerEpoch)
 	if err != nil {
 		return fmt.Errorf("failed to find staking hash: %w", err)
 	}
 
-	expectedNextHash, err := t.FindStakingHash(slotTxEndEpoch+1, genesisEpochStaking, genesisEpochNext, latestSnarkedHashPerEpoch)
+	expectedNextHash, err := t.FindStakingHash(slotTxEndEpoch+1, genesisEpochStaking, genesisEpochNext, recentSnarkedHashPerEpoch)
 	if err != nil {
 		return fmt.Errorf("failed to find next hash: %w", err)
 	}
@@ -70,8 +70,8 @@ func (t *HardforkTest) ValidateRuntimeGenesisLedgerHashes(
 		return fmt.Errorf("Expected epoch_data.next.hash `%s`, got `%s`", expectedNextHash, hashes.EpochData.Next.Hash)
 	}
 
-	if hashes.Ledger.Hash != latestNonEmptyBlock.StagedHash {
-		return fmt.Errorf("Expected ledger.hash `%s`, got `%s`", latestNonEmptyBlock.StagedHash, hashes.Ledger.Hash)
+	if hashes.Ledger.Hash != lastBlockBeforeTxEnd.StagedHash {
+		return fmt.Errorf("Expected ledger.hash `%s`, got `%s`", lastBlockBeforeTxEnd.StagedHash, hashes.Ledger.Hash)
 	}
 
 	t.Logger.Info("Ledger hashes file validated successfully")
@@ -102,7 +102,7 @@ type LegacyPrepatchForkConfigView struct {
 	} `json:"ledger"`
 }
 
-func (t *HardforkTest) ValidateLegacyPrepatchForkConfig(latestNonEmptyBlock client.BlockData, forkConfigBytes []byte) error {
+func (t *HardforkTest) ValidateLegacyPrepatchForkConfig(lastBlockBeforeTxEnd client.BlockData, forkConfigBytes []byte) error {
 
 	t.Logger.Info("Validating legacy prepatch fork config")
 
@@ -114,28 +114,28 @@ func (t *HardforkTest) ValidateLegacyPrepatchForkConfig(latestNonEmptyBlock clie
 		return fmt.Errorf("failed to unmarshal legacy prepatch fork config: %w", err)
 	}
 
-	if config.Proof.Fork.BlockChainLength != latestNonEmptyBlock.BlockHeight {
-		return fmt.Errorf("Expected proof.fork.blockchain_length to be %d, got %d", latestNonEmptyBlock.BlockHeight, config.Proof.Fork.BlockChainLength)
+	if config.Proof.Fork.BlockChainLength != lastBlockBeforeTxEnd.BlockHeight {
+		return fmt.Errorf("Expected proof.fork.blockchain_length to be %d, got %d", lastBlockBeforeTxEnd.BlockHeight, config.Proof.Fork.BlockChainLength)
 	}
 
-	if config.Proof.Fork.GlobalSlotSinceGenesis != latestNonEmptyBlock.Slot {
-		return fmt.Errorf("Expected proof.fork.global_slot_since_genesis to be %d, got %d", latestNonEmptyBlock.Slot, config.Proof.Fork.GlobalSlotSinceGenesis)
+	if config.Proof.Fork.GlobalSlotSinceGenesis != lastBlockBeforeTxEnd.Slot {
+		return fmt.Errorf("Expected proof.fork.global_slot_since_genesis to be %d, got %d", lastBlockBeforeTxEnd.Slot, config.Proof.Fork.GlobalSlotSinceGenesis)
 	}
 
-	if config.Proof.Fork.StateHash != latestNonEmptyBlock.StateHash {
-		return fmt.Errorf("Expected proof.fork.state_hash to be `%s`, got `%s`", latestNonEmptyBlock.StateHash, config.Proof.Fork.StateHash)
+	if config.Proof.Fork.StateHash != lastBlockBeforeTxEnd.StateHash {
+		return fmt.Errorf("Expected proof.fork.state_hash to be `%s`, got `%s`", lastBlockBeforeTxEnd.StateHash, config.Proof.Fork.StateHash)
 	}
 
-	if config.EpochData.Staking.Seed != latestNonEmptyBlock.CurEpochSeed {
-		return fmt.Errorf("Expected proof.epoch_data.staking.seed to be `%s`, got `%s`", latestNonEmptyBlock.CurEpochSeed, config.EpochData.Staking.Seed)
+	if config.EpochData.Staking.Seed != lastBlockBeforeTxEnd.CurEpochSeed {
+		return fmt.Errorf("Expected proof.epoch_data.staking.seed to be `%s`, got `%s`", lastBlockBeforeTxEnd.CurEpochSeed, config.EpochData.Staking.Seed)
 	}
 
-	if config.EpochData.Next.Seed != latestNonEmptyBlock.NextEpochSeed {
-		return fmt.Errorf("Expected proof.epoch_data.next.seed to be `%s`, got `%s`", latestNonEmptyBlock.NextEpochSeed, config.EpochData.Next.Seed)
+	if config.EpochData.Next.Seed != lastBlockBeforeTxEnd.NextEpochSeed {
+		return fmt.Errorf("Expected proof.epoch_data.next.seed to be `%s`, got `%s`", lastBlockBeforeTxEnd.NextEpochSeed, config.EpochData.Next.Seed)
 	}
 
-	if config.Ledger.Hash != latestNonEmptyBlock.StagedHash {
-		return fmt.Errorf("Expected ledger.hash to be `%s`, got `%s`", latestNonEmptyBlock.StagedHash, config.Ledger.Hash)
+	if config.Ledger.Hash != lastBlockBeforeTxEnd.StagedHash {
+		return fmt.Errorf("Expected ledger.hash to be `%s`, got `%s`", lastBlockBeforeTxEnd.StagedHash, config.Ledger.Hash)
 	}
 
 	if config.Ledger.AddGenesisWinner != false {
@@ -174,7 +174,7 @@ type FinalForkConfigView struct {
 	} `json:"ledger"`
 }
 
-func (t *HardforkTest) ValidateFinalForkConfig(latestNonEmptyBlock client.BlockData, forkConfigBytes []byte, forkGenesisTs, mainGenesisTs int64) error {
+func (t *HardforkTest) ValidateFinalForkConfig(lastBlockBeforeTxEnd client.BlockData, forkConfigBytes []byte, forkGenesisTs, mainGenesisTs int64) error {
 
 	t.Logger.Info("Validating final fork config")
 	// Calculate expected genesis slot
@@ -188,16 +188,16 @@ func (t *HardforkTest) ValidateFinalForkConfig(latestNonEmptyBlock client.BlockD
 		return fmt.Errorf("failed to unmarshal fork config: %w", err)
 	}
 
-	if config.Proof.Fork.BlockChainLength != latestNonEmptyBlock.BlockHeight {
-		return fmt.Errorf("Expected proof.fork.blockchain_length to be %d, got %d", latestNonEmptyBlock.BlockHeight, config.Proof.Fork.BlockChainLength)
+	if config.Proof.Fork.BlockChainLength != lastBlockBeforeTxEnd.BlockHeight {
+		return fmt.Errorf("Expected proof.fork.blockchain_length to be %d, got %d", lastBlockBeforeTxEnd.BlockHeight, config.Proof.Fork.BlockChainLength)
 	}
 
 	if config.Proof.Fork.GlobalSlotSinceGenesis != expectedGenesisSlot {
 		return fmt.Errorf("Expected proof.fork.global_slot_since_genesis to be %d, got %d", expectedGenesisSlot, config.Proof.Fork.GlobalSlotSinceGenesis)
 	}
 
-	if config.Proof.Fork.StateHash != latestNonEmptyBlock.StateHash {
-		return fmt.Errorf("Expected proof.fork.state_hash to be `%s`, got `%s`", latestNonEmptyBlock.StateHash, config.Proof.Fork.StateHash)
+	if config.Proof.Fork.StateHash != lastBlockBeforeTxEnd.StateHash {
+		return fmt.Errorf("Expected proof.fork.state_hash to be `%s`, got `%s`", lastBlockBeforeTxEnd.StateHash, config.Proof.Fork.StateHash)
 	}
 
 	if config.Genesis.GenesisStateTimeStamp.Unix() != forkGenesisTs {
