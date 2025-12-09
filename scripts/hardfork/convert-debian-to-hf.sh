@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -ex
 
 usage() {
 	echo "Usage: $0 -d <deb_file> -c <runtime_config_json> -l <ledger_tarballs> -n <network_name>"
