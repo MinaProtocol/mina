@@ -2,6 +2,9 @@ open Alcotest
 open Async
 open Core
 open Delegation_verify_lib
+open Frontier_base
+open Transition_frontier
+module State_hash = Mina_base.State_hash
 
 (* Pure Data_source implementation for testing *)
 module Pure = struct
@@ -64,41 +67,62 @@ module Verifier = Delegation_verify_lib.Verifier.Make (Pure)
 (* Focused integration test *)
 
 let test_uptime_to_verifier_integration () =
-  (* Test: create uptime payload -> run through delegation verifier *)
-  let keypair = Signature_lib.Keypair.create () in
+  let open Async.Let_syntax in
+  (* Create verifier using same pattern as full_frontier_tests.ml *)
+  let verifier = Full_frontier.For_tests.verifier () in
 
-  (* Create uptime payload *)
-  let payload_request =
-    Uptime_service.Payload.
-      { version = 1
-      ; data =
-          { block = "dGVzdF9ibG9ja19kYXRh"
-          ; (* "test_block_data" base64 *)
-            created_at = "2023-12-09T10:00:00Z"
-          ; peer_id = "test_peer"
-          ; snark_work = None
-          ; graphql_control_port = Some 3085
-          ; built_with_commit_sha = Some "abc123"
-          }
-      ; signature = (Snark_params.Tick.Field.zero, Snark_params.Tock.Field.zero)
-      ; submitter = keypair.public_key
-      }
+  (* Generate a real breadcrumb using existing test infrastructure *)
+  let make_breadcrumb =
+    Quickcheck.Generator.generate
+      (Full_frontier.For_tests.gen_breadcrumb ~verifier ())
+      ~size:1
+      ~random:
+        (Splittable_random.State.create (Base.Random.State.make_self_init ()))
   in
 
-  (* Run through verifier using Pure data source *)
-  let submission : Pure.submission =
-    { block_hash = "test_hash"; request = payload_request }
+  let%bind frontier =
+    Full_frontier.For_tests.create_frontier ~epoch_ledger_backing_type:Stable_db
+      ()
   in
-  let%bind loaded = Pure.load_submissions [ submission ] in
 
-  match loaded with
-  | Ok [ s ] ->
-      Alcotest.(check string)
-        "uptime->verifier integration" "2023-12-09T10:00:00Z"
-        (Pure.submitted_at s) ;
-      Deferred.return ()
-  | _ ->
-      failwith "Integration test failed"
+  let root = Full_frontier.root frontier in
+  let%bind real_breadcrumb = make_breadcrumb root in
+
+  (* Create uptime service payload using the real breadcrumb *)
+  let peer_id = "test_peer" in
+  let submitter_keypair = Signature_lib.Keypair.create () in
+  let graphql_control_port = Some 8080 in
+  let built_with_commit_sha = Some "test_commit" in
+
+  let real_payload =
+    Uptime_service.generate_block_submission_data ~peer_id ~submitter_keypair
+      ~graphql_control_port ~built_with_commit_sha real_breadcrumb
+  in
+
+  (* Create test submission using real payload *)
+  let test_submission =
+    { Pure.block_hash =
+        Breadcrumb.state_hash real_breadcrumb |> State_hash.to_base58_check
+    ; request = real_payload
+    }
+  in
+
+  (* Run the verification on single submission *)
+  let%bind verification_result =
+    Verifier.verify ~validate:true test_submission
+  in
+
+  (* Clean up *)
+  Full_frontier.For_tests.clean_up_persistent_root ~frontier ;
+
+  (* Assert verification succeeded *)
+  return
+  @@
+  match verification_result with
+  | Ok _ ->
+      ()
+  | Error err ->
+      failwith ("Verification failed: " ^ Base.Error.to_string_hum err)
 
 (* Test suite configuration *)
 let () =

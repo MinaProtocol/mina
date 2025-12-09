@@ -9,7 +9,22 @@
   mina_base
   signature_lib
   mina_wire_types
-  snark_params)
+  snark_params
+  transition_frontier
+ transition_frontier_full_frontier
+  frontier_base
+  verifier
+  precomputed_values
+  genesis_ledger_helper
+  child_processes
+  logger
+  base64
+  mina_block
+  yojson
+  genesis_ledger
+  currency
+  mina_numbers
+  with_hash)
  (flags (:standard -w -32-33-34))
  (preprocess
   (pps ppx_mina ppx_version ppx_jane)))
