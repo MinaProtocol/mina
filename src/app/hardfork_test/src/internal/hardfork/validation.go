@@ -91,11 +91,9 @@ func (t *HardforkTest) ValidateNoNewBlocks(port int) error {
 
 // NOTE: this is a weird implementation.
 // CollectBlocks gathers blocks from multiple slots across different ports
-func (t *HardforkTest) CollectBlocks(startSlot, endSlot int) ([]client.BlockData, error) {
+func (t *HardforkTest) CollectBlocks(portUsed int, startSlot, endSlot int) ([]client.BlockData, error) {
 	var allBlocks []client.BlockData
 	collectedSlot := startSlot - 1
-
-	portUsed := t.AnyPortOfType(PORT_REST)
 
 	for thisSlot := startSlot; thisSlot <= endSlot; thisSlot++ {
 		t.WaitForBestTip(portUsed, func(block client.BlockData) bool {
@@ -207,14 +205,17 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 		return nil, fmt.Errorf("genesis next staking hash is empty")
 	}
 
-	t.Logger.Info("Genesis epoch staking/next hashes: %s, %s",
-		genesisEpochStakingHash, genesisEpochNextHash)
+	t.Logger.Info("Genesis epoch staking/next hashes: %s, %s, found in block %s on port %d",
+		genesisEpochStakingHash, genesisEpochNextHash, firstEpochBlock.StateHash, portUsed)
 
 	// Collect blocks from BestChainQueryFrom to SlotChainEnd
-	allBlocks, err := t.CollectBlocks(t.Config.BestChainQueryFrom, t.Config.SlotChainEnd)
+
+	portUsed = t.AnyPortOfType(PORT_REST)
+	allBlocks, err := t.CollectBlocks(portUsed, t.Config.BestChainQueryFrom, t.Config.SlotChainEnd)
 	if err != nil {
 		return nil, err
 	}
+	t.Logger.Info("All blocks in history of port %d: %v", portUsed, allBlocks)
 
 	// Query from all nodes and ensure they agree on slot txn end.
 	if err := t.EnsureConsensusOnSlotTxEnd(); err != nil {
