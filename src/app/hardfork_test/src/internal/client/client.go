@@ -99,17 +99,23 @@ func (c *Client) query(port int, query string) (gjson.Result, error) {
 
 // BlockData represents the structured block data from GraphQL queries
 type BlockData struct {
-	StateHash     string
-	BlockHeight   int
-	Slot          int
-	NonEmpty      bool
-	CurEpochHash  string
-	CurEpochSeed  string
-	NextEpochHash string
-	NextEpochSeed string
-	StagedHash    string
-	SnarkedHash   string
-	Epoch         int
+	StateHash       string
+	BlockHeight     int
+	Slot            int
+	CurEpochHash    string
+	CurEpochSeed    string
+	NextEpochHash   string
+	NextEpochSeed   string
+	StagedHash      string
+	SnarkedHash     string
+	Epoch           int
+	NumUserCommands int
+	NumFeeTransfers int
+	Coinbase        string
+}
+
+func (block *BlockData) NonEmpty() bool {
+	return block.NumUserCommands > 0 || block.NumFeeTransfers > 0 || block.Coinbase != "0"
 }
 
 const genesisBlockQuery = `
@@ -205,24 +211,20 @@ bestChain (maxLength: %d){
 
 func parseBlock(value gjson.Result) *BlockData {
 	block := &BlockData{
-		StateHash:     value.Get("stateHash").String(),
-		BlockHeight:   int(value.Get("protocolState.consensusState.blockHeight").Int()),
-		Slot:          int(value.Get("protocolState.consensusState.slotSinceGenesis").Int()),
-		CurEpochHash:  value.Get("protocolState.consensusState.stakingEpochData.ledger.hash").String(),
-		CurEpochSeed:  value.Get("protocolState.consensusState.stakingEpochData.seed").String(),
-		NextEpochHash: value.Get("protocolState.consensusState.nextEpochData.ledger.hash").String(),
-		NextEpochSeed: value.Get("protocolState.consensusState.nextEpochData.seed").String(),
-		StagedHash:    value.Get("protocolState.blockchainState.stagedLedgerHash").String(),
-		SnarkedHash:   value.Get("protocolState.blockchainState.snarkedLedgerHash").String(),
-		Epoch:         int(value.Get("protocolState.consensusState.epoch").Int()),
+		StateHash:       value.Get("stateHash").String(),
+		BlockHeight:     int(value.Get("protocolState.consensusState.blockHeight").Int()),
+		Slot:            int(value.Get("protocolState.consensusState.slotSinceGenesis").Int()),
+		CurEpochHash:    value.Get("protocolState.consensusState.stakingEpochData.ledger.hash").String(),
+		CurEpochSeed:    value.Get("protocolState.consensusState.stakingEpochData.seed").String(),
+		NextEpochHash:   value.Get("protocolState.consensusState.nextEpochData.ledger.hash").String(),
+		NextEpochSeed:   value.Get("protocolState.consensusState.nextEpochData.seed").String(),
+		StagedHash:      value.Get("protocolState.blockchainState.stagedLedgerHash").String(),
+		SnarkedHash:     value.Get("protocolState.blockchainState.snarkedLedgerHash").String(),
+		Epoch:           int(value.Get("protocolState.consensusState.epoch").Int()),
+		NumUserCommands: int(value.Get("commandTransactionCount").Int()),
+		NumFeeTransfers: len(value.Get("transactions.feeTransfer").Array()),
+		Coinbase:        value.Get("transactions.coinbase").String(),
 	}
-
-	// Calculate if the block is non-empty based on transactions
-	cmdCount := value.Get("commandTransactionCount").Int()
-	feeCount := value.Get("transactions.feeTransfer").Array()
-	coinbase := value.Get("transactions.coinbase").String() != "0"
-
-	block.NonEmpty = (cmdCount+int64(len(feeCount))) > 0 || coinbase
 
 	return block
 }
