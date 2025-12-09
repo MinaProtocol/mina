@@ -1,3 +1,6 @@
+open Mina_base
+open Signature_lib
+
 type block_data =
   { block : string
   ; created_at : string
@@ -8,6 +11,12 @@ type block_data =
   }
 [@@deriving to_yojson]
 
-type request [@@deriving to_yojson]
+type request =
+  { version : int
+  ; data : block_data
+  ; signature : Signature.t
+  ; submitter : Public_key.t
+  }
+[@@deriving to_yojson]
 
 val create_request : block_data -> Signature_lib.Keypair.t -> request
