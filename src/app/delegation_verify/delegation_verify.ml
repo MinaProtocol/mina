@@ -1,6 +1,7 @@
 open Mina_base
 open Core
 open Async
+open Delegation_verify_lib
 
 let get_filenames =
   let open In_channel in

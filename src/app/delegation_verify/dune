@@ -1,5 +1,6 @@
-(executable
- (name delegation_verify)
+(library
+ (name delegation_verify_lib)
+ (modules submission verifier known_blocks output cassandra json)
  (libraries
   core_kernel
   async
@@ -13,7 +14,6 @@
   yojson
   base64
   integers
-  async.async_command
   sexplib0
   sexplib
   hex
@@ -44,6 +44,17 @@
   mina_runtime_config
   precomputed_values
   logger)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx)))
+
+(executable
+ (name delegation_verify)
+ (modules delegation_verify)
+ (libraries
+  delegation_verify_lib
+  async.async_command)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
