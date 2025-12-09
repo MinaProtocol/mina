@@ -46,6 +46,7 @@ let ReleaseSpec =
           , deb_codename : DebianVersions.DebVersion
           , deb_release : Text
           , deb_version : Text
+          , deb_root_folder : Text
           , deb_legacy_version : Text
           , deb_suffix : Optional Text
           , deb_profile : Profiles.Type
@@ -66,6 +67,7 @@ let ReleaseSpec =
           , service = Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"
           , repo = "\\\${BUILDKITE_REPO}"
+          , deb_root_folder = "\\\${BUILDKITE_BUILD_ID}"
           , deb_codename = DebianVersions.DebVersion.Bullseye
           , deb_release = "unstable"
           , deb_version = "\\\${MINA_DEB_VERSION}"
@@ -114,7 +116,7 @@ let generateStep =
                 then  " && echo Skipping local debian repo setup "
 
                 else      " && ./buildkite/scripts/debian/update.sh --verbose"
-                      ++  " && apt-get install aptly -y && ./buildkite/scripts/debian/start_local_repo.sh --arch ${Arch.lowerName
+                      ++  " && apt-get install aptly -y && ./buildkite/scripts/debian/start_local_repo.sh --root ${spec.deb_root_folder} --arch ${Arch.lowerName
                                                                                                                      spec.arch}"
 
           let maybeStopDebianRepo =
