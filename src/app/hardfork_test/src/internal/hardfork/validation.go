@@ -1,7 +1,9 @@
 package hardfork
 
 import (
+	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
@@ -9,9 +11,9 @@ import (
 
 // BlockAnalysisResult holds the results of analyzing blocks
 type BlockAnalysisResult struct {
-	LatestOccupiedSlot        int
-	LatestSnarkedHashPerEpoch map[int]string // map from epoch to snarked ledger hash
-	LatestNonEmptyBlock       client.BlockData
+	LastOccupiedSlot          int
+	RecentSnarkedHashPerEpoch map[int]string // map from epoch to snarked ledger hash
+	LastNonEmptyBlock         client.BlockData
 	GenesisEpochStaking       string
 	GenesisEpochNext          string
 }
@@ -126,51 +128,113 @@ func (t *HardforkTest) ReportBlocksInfo(port int, blocks []client.BlockData) {
 	}
 }
 
-func (t *HardforkTest) EnsureConsensusOnSlotTxEnd() error {
-	blocksAtSlotTxEndByPort := make(map[int]string)
+func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
+
+	state := new(ConsensusState)
+
+	blocks, err := t.CollectBlocks(port, t.Config.BestChainQueryFrom, t.Config.SlotChainEnd)
+
+	t.ReportBlocksInfo(port, blocks)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect blocks at port %d: %w", port, err)
+	}
+
+	if len(blocks) == 0 {
+		return nil, fmt.Errorf("no blocks is tracked at port %d!", port)
+	}
+
+	state.RecentSnarkedHashPerEpoch = make(map[int]string)
+	latestSlotPerEpoch := make(map[int]int)
+
+	// Process each block
+	for _, block := range blocks {
+		// Update max slot
+		if block.Slot > state.LastOccupiedSlot {
+			state.LastOccupiedSlot = block.Slot
+		}
+
+		// Track snarked ledger hash per epoch
+		if block.Slot > latestSlotPerEpoch[block.Epoch] {
+			state.RecentSnarkedHashPerEpoch[block.Epoch] = block.SnarkedHash
+			latestSlotPerEpoch[block.Epoch] = block.Slot
+		}
+
+		// Track latest non-empty block
+		if block.NonEmpty() && block.Slot > state.LastNonEmptyBlock.Slot {
+			state.LastNonEmptyBlock = block
+		}
+	}
+
+	if state.LastNonEmptyBlock.Slot == 0 {
+		return nil, fmt.Errorf("no blocks with slot > 0 at port %d", port)
+	}
+
+	return state, nil
+}
+
+func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, error) {
 	allRestPorts := t.AllPortOfType(PORT_REST)
-	for _, port := range allRestPorts {
-		blocks, err := t.Client.GetAllBlocks(port)
+	consensusStateVote := make(map[string][]int)
+	majorityKey := "<none>"
+	majorityCount := 0
+	var wg sync.WaitGroup
+
+	states := make([]*ConsensusState, len(allRestPorts)) // store results
+	errors := make([]error, len(allRestPorts))
+
+	for i, port := range allRestPorts {
+		wg.Add(1)
+		go func(i, port int) {
+			defer wg.Done()
+			state, err := t.ConsensusStateOnNode(port)
+			states[i] = state
+			errors[i] = err
+		}(i, port)
+	}
+
+	wg.Wait()
+
+	for i, port := range allRestPorts {
+		if errors[i] != nil {
+			return nil, fmt.Errorf("Failed to query consensus state on port %d: %w", port, errors[i])
+		}
+	}
+
+	for i, port := range allRestPorts {
+		state := states[i]
+
+		keyBytes, err := json.Marshal(state)
+		key := string(keyBytes)
+
 		if err != nil {
-			return fmt.Errorf("failed to get blocks: %w from port %d", err, port)
+			return nil, fmt.Errorf("Failed to marshal consensus state on port %d: %w", port, err)
 		}
-		for _, block := range blocks {
-			if block.Slot == t.Config.SlotTxEnd {
-				blocksAtSlotTxEndByPort[port] = block.StateHash
-			}
-		}
-		_, seenSlotTxEndBlock := blocksAtSlotTxEndByPort[port]
-		if !seenSlotTxEndBlock {
-			t.Logger.Info("node at %d haven't seen block at slot %d, which is slot_tx_end", port, t.Config.SlotTxEnd)
-			blocksAtSlotTxEndByPort[port] = "<none>"
-		}
-		t.ReportBlocksInfo(port, blocks)
-	}
-	counts := make(map[string]int)
-	maxCount := 0
-	majorityStateHashAtSlotTxEnd := ""
-	for _, hash := range blocksAtSlotTxEndByPort {
-		counts[hash]++
-		if counts[hash] > maxCount {
-			maxCount = counts[hash]
-			majorityStateHashAtSlotTxEnd = hash
+
+		consensusStateVote[key] = append(consensusStateVote[key], port)
+
+		if len(consensusStateVote[key]) > majorityCount {
+			majorityCount = len(consensusStateVote[key])
+			majorityKey = key
 		}
 	}
 
-	if float64(maxCount)/float64(len(allRestPorts)) <= 0.5 {
-		return fmt.Errorf(
-			"The majority state hash at slot_tx_end %d is less than 50%%",
-			t.Config.SlotTxEnd)
+	if len(allRestPorts) == 0 {
+		return nil, fmt.Errorf("Unreachable: no nodes are running!")
 	}
 
-	if majorityStateHashAtSlotTxEnd == "<none>" {
-		return fmt.Errorf(
-			"majority nodes in the network haven't reached slot_tx_end at %d yet",
-			t.Config.SlotTxEnd,
-		)
+	if float64(majorityCount)/float64(len(allRestPorts)) <= 0.5 {
+		return nil, fmt.Errorf(
+			"The majority state hash at slot_tx_end %d is less than 50%%: %v",
+			t.Config.SlotTxEnd, consensusStateVote)
 	}
+	var majorityConsensusState ConsensusState
+	err := json.Unmarshal([]byte(majorityKey), &majorityConsensusState)
 
-	return nil
+	if err != nil {
+		return nil, fmt.Errorf("Unreachable: failed to unmarshal majorityKey %s: %w", majorityKey, err)
+	}
+	return &majorityConsensusState, nil
 }
 
 // AnalyzeBlocks performs comprehensive block analysis including finding genesis epoch hashes
@@ -215,78 +279,29 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 	t.Logger.Info("Genesis epoch staking/next hashes: %s, %s, found in block %s on port %d",
 		genesisEpochStakingHash, genesisEpochNextHash, firstEpochBlock.StateHash, portUsed)
 
-	// Collect blocks from BestChainQueryFrom to SlotChainEnd
-
-	portUsed = t.AnyPortOfType(PORT_REST)
-	allBlocks, err := t.CollectBlocks(portUsed, t.Config.BestChainQueryFrom, t.Config.SlotChainEnd)
+	consensus, err := t.ConsensusAcrossNodes()
 	if err != nil {
 		return nil, err
-	}
-	t.Logger.Info("All blocks in history of port %d: %v", portUsed, allBlocks)
-
-	// Query from all nodes and ensure they agree on slot txn end.
-	if err := t.EnsureConsensusOnSlotTxEnd(); err != nil {
-		return nil, err
-	}
-
-	// Process blocks to find latest non-empty block and other data
-	latestOccupiedSlot, latestSnarkedHashPerEpoch, latestNonEmptyBlock, err := t.FindLatestNonEmptyBlock(allBlocks)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find latest non-empty block: %w", err)
 	}
 
 	return &BlockAnalysisResult{
-		LatestOccupiedSlot:        latestOccupiedSlot,
-		LatestSnarkedHashPerEpoch: latestSnarkedHashPerEpoch,
-		LatestNonEmptyBlock:       latestNonEmptyBlock,
+		LastOccupiedSlot:          consensus.LastOccupiedSlot,
+		RecentSnarkedHashPerEpoch: consensus.RecentSnarkedHashPerEpoch,
+		LastNonEmptyBlock:         consensus.LastNonEmptyBlock,
 		GenesisEpochStaking:       genesisEpochStakingHash,
 		GenesisEpochNext:          genesisEpochNextHash,
 	}, nil
 }
 
+type ConsensusState struct {
+	LastOccupiedSlot          int              `json:"last_occupied_slot"`
+	RecentSnarkedHashPerEpoch map[int]string   `json:"recent_snarked_hash_per_epoch"`
+	LastNonEmptyBlock         client.BlockData `json:"last_nonempty_block"`
+}
+
 // FindLatestNonEmptyBlock processes block data to find the latest non-empty block
 // and collects other important information
 // This function assumes that there is at least one block with non-zero slot
-func (t *HardforkTest) FindLatestNonEmptyBlock(blocks []client.BlockData) (
-	latestOccupiedSlot int,
-	latestSnarkedHashPerEpoch map[int]string, // map from epoch to snarked ledger hash
-	latestNonEmptyBlock client.BlockData,
-	err error) {
-
-	if len(blocks) == 0 {
-		err = fmt.Errorf("no blocks provided")
-		return
-	}
-
-	latestSnarkedHashPerEpoch = make(map[int]string)
-	latestSlotPerEpoch := make(map[int]int)
-
-	// Process each block
-	for _, block := range blocks {
-		// Update max slot
-		if block.Slot > latestOccupiedSlot {
-			latestOccupiedSlot = block.Slot
-		}
-
-		// Track snarked ledger hash per epoch
-		if block.Slot > latestSlotPerEpoch[block.Epoch] {
-			latestSnarkedHashPerEpoch[block.Epoch] = block.SnarkedHash
-			latestSlotPerEpoch[block.Epoch] = block.Slot
-		}
-
-		// Track latest non-empty block
-		if block.NonEmpty() && block.Slot > latestNonEmptyBlock.Slot {
-			latestNonEmptyBlock = block
-		}
-	}
-
-	if latestNonEmptyBlock.Slot == 0 {
-		err = fmt.Errorf("no blocks with slot > 0")
-		return
-	}
-
-	return
-}
 
 // FindStakingHash finds the staking ledger hash for the given epoch
 func (t *HardforkTest) FindStakingHash(

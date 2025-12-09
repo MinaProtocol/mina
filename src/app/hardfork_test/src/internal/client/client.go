@@ -99,19 +99,19 @@ func (c *Client) query(port int, query string) (gjson.Result, error) {
 
 // BlockData represents the structured block data from GraphQL queries
 type BlockData struct {
-	StateHash       string
-	BlockHeight     int
-	Slot            int
-	CurEpochHash    string
-	CurEpochSeed    string
-	NextEpochHash   string
-	NextEpochSeed   string
-	StagedHash      string
-	SnarkedHash     string
-	Epoch           int
-	NumUserCommands int
-	NumFeeTransfers int
-	Coinbase        string
+	StateHash       string `json:"state_hash"`
+	BlockHeight     int    `json:"block_height"`
+	Slot            int    `json:"slot"`
+	CurEpochHash    string `json:"cur_epoch_hash"`
+	CurEpochSeed    string `json:"cur_epoch_seed"`
+	NextEpochHash   string `json:"next_epoch_hash"`
+	NextEpochSeed   string `json:"next_epoch_seed"`
+	StagedHash      string `json:"staged_hash"`
+	SnarkedHash     string `json:"snarked_hash"`
+	Epoch           int    `json:"epoch"`
+	NumUserCommands int    `json:"num_user_commands"`
+	NumFeeTransfers int    `json:"num_fee_transfers"`
+	Coinbase        string `json:"coinbase"`
 }
 
 func (block *BlockData) NonEmpty() bool {
@@ -265,6 +265,8 @@ func (c *Client) BestTip(port int) (*BlockData, error) {
 	return &blocks[0], nil
 }
 
+// NOTE: This only returns the block in a node's best chain, if a node has age
+// over k-slot it won't be present.
 func (c *Client) GetAllBlocks(port int) ([]BlockData, error) {
 	result, err := c.query(port, blocksQuery)
 	if err != nil {

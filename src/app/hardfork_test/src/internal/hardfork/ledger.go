@@ -50,10 +50,10 @@ func (t *HardforkTest) GenerateAndValidateHashesAndLedgers(analysis *BlockAnalys
 	}
 
 	return t.ValidateRuntimeGenesisLedgerHashes(
-		analysis.LatestNonEmptyBlock,
+		analysis.LastNonEmptyBlock,
 		analysis.GenesisEpochStaking,
 		analysis.GenesisEpochNext,
-		analysis.LatestSnarkedHashPerEpoch,
+		analysis.RecentSnarkedHashPerEpoch,
 		prepatchForkConfig,
 	)
 }
