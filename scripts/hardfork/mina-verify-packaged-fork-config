@@ -323,6 +323,9 @@ fi
 
 if checks_contains tarballs; then
     echo "Validating tarballs..." >&2
+    declare -A scanner_pids
+
+    echo "Scanning ledgers..." >&2
     for file in "$WORKDIR"/ledgers/*.tar.gz; do
         tarname=$(basename "$file")
         tarname=${tarname%.tar.gz}
@@ -334,22 +337,28 @@ if checks_contains tarballs; then
         base_s3_url="${MINA_LEDGER_S3_BUCKET:-https://s3-us-west-2.amazonaws.com/snark-keys-ro.o1test.net}"
         curl "$base_s3_url/$tarname.tar.gz" | tar -xz -C "$tardir/web"
 
-        declare -A scanner_pids
         for kind in packaged web generated; do
-            $MINA_ROCKSDB_SCANNER --db-path "$tardir/$kind" --output-file "$WORKDIR/$kind.scan" &
+            $MINA_ROCKSDB_SCANNER --db-path "$tardir/$kind" --output-file "$WORKDIR/$tarname-$kind.scan" &
             scanner_pids[$kind]=$!
         done
+    done
 
-        # Wait for all scanner jobs to finish
+    echo "Waiting for scans to complete..." >&2
+    for kind in packaged web generated; do
+        wait ${scanner_pids[$kind]}
+    done
+
+    echo "Comparing scans to reference..." >&2
+    for file in "$WORKDIR"/ledgers/*.tar.gz; do
+        tarname=$(basename "$file")
+        tarname=${tarname%.tar.gz}
+
         for kind in packaged web generated; do
-            wait ${scanner_pids[$kind]}
+            if ! cmp "$WORKDIR/$tarname-$kind.scan" "$REFERENCE_DATA_DIR/$tarname-$kind.scan"; then
+                echo "Error: $tarname $kind scan does not match reference" >&2
+                error=1
+            fi
         done
-
-        if ! ( cmp -s "$WORKDIR/generated.scan" "$WORKDIR/packaged.scan" && \
-            cmp -s "$WORKDIR/packaged.scan" "$WORKDIR/web.scan" ); then
-            echo "Error: kvdb contents mismatch for $tarname" >&2
-            error=1
-        fi
     done
 else
     echo "Skipping tarballs validation as per --checks option" >&2

@@ -117,7 +117,7 @@ let generateStep =
 
                 else      " && ./buildkite/scripts/debian/update.sh --verbose"
                       ++  " && apt-get install aptly -y && ./buildkite/scripts/debian/start_local_repo.sh --root ${spec.deb_root_folder} --arch ${Arch.lowerName
-                                                                                                                     spec.arch}"
+                                                                                                                                                    spec.arch}"
 
           let maybeStopDebianRepo =
                       if spec.no_debian

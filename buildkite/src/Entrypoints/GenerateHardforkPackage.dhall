@@ -129,13 +129,6 @@ let generateDockerForCodename =
           let dependsOnArtifacts =
                 [ { name = pipelineName, key = artifactsGenKey } ]
 
-          let deb_root_folder = merge
-                { Some =
-                    \(build : Text) -> build
-                , None = "\\\${BUILDKITE_BUILD_ID}"
-                }
-                spec.use_artifacts_from_buildkite_build
-
           let dockerDaemonSpec =
                 DockerImage.ReleaseSpec::{
                 , deps = dependsOnBuildHfDebian
@@ -143,7 +136,6 @@ let generateDockerForCodename =
                 , network = spec.network
                 , deb_codename = codename
                 , deb_profile = profile
-                , deb_root_folder = deb_root_folder
                 , deb_repo = DebianRepo.Type.Local
                 , deb_version = spec.version
                 , deb_suffix = Some "hardfork"
@@ -211,9 +203,7 @@ let generateDockerForCodename =
 
           let cached_tarball_ledgers =
                 merge
-                  { Some =
-                          \(build : Text)
-                      ->  "--cached-hardfork-data ${build} "
+                  { Some = \(build : Text) -> "--cached-hardfork-data ${build} "
                   , None = ""
                   }
                   spec.use_artifacts_from_buildkite_build
@@ -277,7 +267,6 @@ let generateDockerForCodename =
                     , deb_codename = codename
                     , deb_profile = profile
                     , deb_repo = DebianRepo.Type.Local
-                    , deb_root_folder = deb_root_folder
                     , deb_version = spec.version
                     , size = spec.size
                     , step_key_suffix =
@@ -289,7 +278,6 @@ let generateDockerForCodename =
                     , service = Artifacts.Type.Rosetta
                     , network = spec.network
                     , deb_profile = profile
-                    , deb_root_folder = deb_root_folder
                     , deb_repo = DebianRepo.Type.Local
                     , deb_codename = codename
                     , deb_version = spec.version
