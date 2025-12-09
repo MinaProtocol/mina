@@ -1845,7 +1845,7 @@ let compile_time_constants =
                conf_dir ^/ "daemon.json"
          in
          let open Async in
-         let%map ({ consensus_constants; _ } as precomputed_values), _ =
+         let%map ({ consensus_constants; _ } as precomputed_values) =
            config_file |> Genesis_ledger_helper.load_config_json >>| Or_error.ok
            >>| Option.value
                  ~default:
@@ -1854,8 +1854,7 @@ let compile_time_constants =
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
                  ~constraint_constants ~logger:(Logger.null ()) ~proof_level
-                 ~cli_proof_level:None ~genesis_dir
-                 ~genesis_backing_type:Stable_db
+                 ~cli_proof_level:None ~genesis_dir ~ledger_backing:Stable_db
            >>| Or_error.ok_exn
          in
          let all_constants =
@@ -2298,12 +2297,24 @@ let generate_hardfork_config =
          daemon working directory"
       (required string)
   in
+  let generate_fork_validation =
+    flag "--generate-fork-validation"
+      ~doc:
+        "BOOL whether generating the fork validation folder. Defaults to true"
+      (optional_with_default true bool)
+  in
+  let args =
+    Command.Param.map2 hardfork_config_dir_flag generate_fork_validation
+      ~f:(fun config_dir generate_fork_validation ->
+        Daemon_rpcs.Generate_hardfork_config.
+          { config_dir; generate_fork_validation } )
+  in
+
   Command.async ~summary:"Generate reference hardfork configuration"
-    (Cli_lib.Background_daemon.rpc_init hardfork_config_dir_flag
-       ~f:(fun port directory_name ->
+    (Cli_lib.Background_daemon.rpc_init args ~f:(fun port args ->
          match%bind
            Daemon_rpcs.Client.dispatch_join_errors
-             Daemon_rpcs.Generate_hardfork_config.rpc directory_name port
+             Daemon_rpcs.Generate_hardfork_config.rpc args port
          with
          | Ok () ->
              printf "Hardfork configuration successfully generated\n" ;

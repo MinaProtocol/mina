@@ -4637,9 +4637,9 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
           Genesis_ledger_helper.init_from_config_file ~logger
             ~proof_level:Genesis_constants.Compiled.proof_level
             ~genesis_constants ~constraint_constants runtime_config
-            ~cli_proof_level:None ~genesis_backing_type:Stable_db
+            ~cli_proof_level:None ~ledger_backing:Stable_db
         with
-        | Ok (precomputed_values, _) ->
+        | Ok precomputed_values ->
             precomputed_values
         | Error err ->
             failwithf "Could not get precomputed values, error: %s"
@@ -4897,6 +4897,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
         ~block_window_duration_ms:constraint_constants.block_window_duration_ms
         pool
       |> don't_wait_for ;
+      (* NOTE: this is depended on by archive fixture, so whenever updating this message, consider updating the fixture as well *)
       [%log info] "Archive process ready. Clients can now connect" ;
       Async.never ()
 

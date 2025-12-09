@@ -69,3 +69,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
+
+let to_global_slot_since_genesis ~current_genesis_global_slot t =
+  let current_genesis_global_slot =
+    Option.value ~default:Global_slot_since_genesis.zero
+      current_genesis_global_slot
+  in
+  (* Convert the global slot to a span of slots since the current hard fork *)
+  let global_slot_span = t |> to_uint32 |> Global_slot_span.of_uint32 in
+  (* Add the slot span to the current chain's genesis slot to get the desired quantity *)
+  Global_slot_since_genesis.add current_genesis_global_slot global_slot_span

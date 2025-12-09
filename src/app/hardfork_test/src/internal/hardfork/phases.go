@@ -1,5 +1,11 @@
 package hardfork
 
+import (
+	"fmt"
+	"os"
+	"time"
+)
+
 // RunMainNetworkPhase runs the main network and validates its operation
 // and returns the fork config bytes and block analysis result
 func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) ([]byte, *BlockAnalysisResult, error) {
@@ -57,10 +63,16 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) ([]byte, *BlockA
 	return forkConfigBytes, analysis, nil
 }
 
+type ForkData struct {
+	config     string
+	ledgersDir string
+	genesis    int64
+}
+
 // RunForkNetworkPhase runs the fork network and validates its operation
-func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, configFile, forkLedgersDir string, forkGenesisTs, mainGenesisTs int64) error {
+func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData ForkData, mainGenesisTs int64) error {
 	// Start fork network
-	forkCmd, err := t.RunForkNetwork(configFile, forkLedgersDir)
+	forkCmd, err := t.RunForkNetwork(forkData.config, forkData.ledgersDir)
 	if err != nil {
 		return err
 	}
@@ -68,7 +80,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, configFile, 
 	defer t.gracefulShutdown(forkCmd, "Fork network")
 
 	// Calculate expected genesis slot
-	expectedGenesisSlot := (forkGenesisTs - mainGenesisTs) / int64(t.Config.MainSlot)
+	expectedGenesisSlot := (forkData.genesis - mainGenesisTs) / int64(t.Config.MainSlot)
 
 	// Validate fork network blocks
 	if err := t.ValidateFirstBlockOfForkChain(t.AnyPortOfType(PORT_REST), latestPreForkHeight, expectedGenesisSlot); err != nil {
@@ -97,4 +109,53 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, configFile, 
 	}
 
 	return nil
+}
+
+func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, forkConfigBytes []byte, mainGenesisTs int64) (*ForkData, error) {
+
+	// Define all localnet file paths
+	if err := os.MkdirAll("fork_data/prefork", 0755); err != nil {
+		return nil, err
+	}
+
+	// Define all fork_data file paths
+	preforkConfig := "fork_data/prefork/config.json"
+
+	// Validate fork config data
+	if err := t.ValidateForkConfigData(analysis.LatestNonEmptyBlock, forkConfigBytes); err != nil {
+		return nil, err
+	}
+	// Write fork config to file
+	if err := os.WriteFile(preforkConfig, forkConfigBytes, 0644); err != nil {
+		return nil, err
+	}
+	{
+		preforkLedgersDir := "fork_data/prefork/hf_ledgers"
+		preforkHashesFile := "fork_data/prefork/hf_ledger_hashes.json"
+		if err := t.GenerateAndValidatePreforkLedgers(analysis, preforkConfig, preforkLedgersDir, preforkHashesFile); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := os.MkdirAll("fork_data/postfork", 0755); err != nil {
+		return nil, err
+	}
+
+	postforkConfig := "fork_data/postfork/config.json"
+	forkLedgersDir := "fork_data/postfork/hf_ledgers"
+
+	// Calculate fork genesis timestamp relative to now (before starting fork network)
+	forkGenesisTs := time.Now().Unix() + int64(t.Config.ForkDelay*60)
+
+	t.Logger.Info("Phase 3: Generating fork configuration and ledgers...")
+	{
+		preforkGenesisConfigFile := fmt.Sprintf("%s/daemon.json", t.Config.Root)
+		forkHashesFile := "fork_data/hf_ledger_hashes.json"
+		if err := t.GenerateForkConfigAndLedgers(analysis, preforkConfig, forkLedgersDir, forkHashesFile, postforkConfig, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs); err != nil {
+			return nil, err
+		}
+	}
+
+	return &ForkData{config: postforkConfig, ledgersDir: forkLedgersDir, genesis: forkGenesisTs}, nil
+
 }

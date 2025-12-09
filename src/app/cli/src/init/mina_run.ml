@@ -371,9 +371,10 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
           return
             (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ()) )
     ; implement Daemon_rpcs.Generate_hardfork_config.rpc
-        (fun () directory_name ->
+        (fun () { config_dir; generate_fork_validation } ->
           Mina_lib.Hardfork_config.dump_reference_config
-            ~breadcrumb_spec:`Stop_slot ~directory_name mina )
+            ~breadcrumb_spec:`Stop_slot ~config_dir ~generate_fork_validation
+            mina )
     ; implement Daemon_rpcs.Submit_internal_log.rpc
         (fun () { timestamp; message; metadata; process } ->
           let metadata =

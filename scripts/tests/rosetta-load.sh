@@ -376,7 +376,7 @@ function print_memory_usage() {
     
     # PostgreSQL memory usage (sum of all postgres processes)
     local postgres_memory
-    postgres_memory=$(ps -p $(pgrep -d, -f postgres) -o rss= 2>/dev/null | awk '{sum+=$1} END {print sum/1024}' 2>/dev/null)
+    postgres_memory=$(ps -u postgres -o rss= | awk '{sum+=$1} END {print sum/1024}')
     if [[ -n "$postgres_memory" ]]; then
         echo "   - 🐘 PostgreSQL: ${postgres_memory} MB"
     else
@@ -385,7 +385,7 @@ function print_memory_usage() {
     
     # Mina-archive memory usage
     local archive_memory
-    archive_memory=$(ps -p $(pgrep -f mina-archive) -o rss= 2>/dev/null | awk '{print $1/1024}' 2>/dev/null)
+    archive_memory=$(ps -p $(pgrep -f mina-archive) -o rss= | awk '{print $1/1024}')
     if [[ -n "$archive_memory" ]]; then
         echo "   - 📦 Mina-archive: ${archive_memory} MB"
     else
@@ -394,7 +394,7 @@ function print_memory_usage() {
     
     # Mina-rosetta memory usage (sum of all mina-rosetta processes)
     local rosetta_memory
-    rosetta_memory=$(ps -p $(pgrep -d, -f mina-rosetta) -o rss= 2>/dev/null | awk '{sum+=$1} END {print sum/1024}' 2>/dev/null)
+    rosetta_memory=$(ps -p $(pgrep -d, -f mina-rosetta) -o rss= | awk '{sum+=$1} END {print sum/1024}' )
     if [[ -n "$rosetta_memory" ]]; then
         echo "   - 🌹 Mina-rosetta: ${rosetta_memory} MB"
     else
@@ -485,7 +485,7 @@ function assert_memory_usage_within_thresholds() {
     
     # Check PostgreSQL memory usage
     local postgres_memory
-    postgres_memory=$(ps -p $(pgrep -d, -f postgres) -o rss= 2>/dev/null | awk '{sum+=$1} END {print sum/1024}' 2>/dev/null)
+    postgres_memory=$(ps -u postgres -o rss= | awk '{sum+=$1} END {print sum/1024}')
     if [[ -n "$postgres_memory" ]]; then
         if (( $(echo "$postgres_memory > $postgres_threshold" | bc -l) )); then
             echo "❌ MEMORY THRESHOLD EXCEEDED: PostgreSQL using ${postgres_memory} MB (threshold: ${postgres_threshold} MB)"
@@ -496,7 +496,7 @@ function assert_memory_usage_within_thresholds() {
     
     # Check Rosetta memory usage
     local rosetta_memory
-    rosetta_memory=$(ps -p $(pgrep -d, -f mina-rosetta) -o rss= 2>/dev/null | awk '{sum+=$1} END {print sum/1024}' 2>/dev/null)
+    rosetta_memory=$(ps -p $(pgrep -d, -f mina-rosetta) -o rss= | awk '{sum+=$1} END {print sum/1024}')
     if [[ -n "$rosetta_memory" ]]; then
         if (( $(echo "$rosetta_memory > $rosetta_threshold" | bc -l) )); then
             echo "❌ MEMORY THRESHOLD EXCEEDED: Mina-rosetta using ${rosetta_memory} MB (threshold: ${rosetta_threshold} MB)"
