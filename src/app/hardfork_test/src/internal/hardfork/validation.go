@@ -13,7 +13,7 @@ import (
 type BlockAnalysisResult struct {
 	LastOccupiedSlot          int
 	RecentSnarkedHashPerEpoch map[int]string // map from epoch to snarked ledger hash
-	LastNonEmptyBlock         client.BlockData
+	LastBlockBeforeTxEnd      client.BlockData
 	GenesisEpochStaking       string
 	GenesisEpochNext          string
 }
@@ -56,14 +56,13 @@ func (t *HardforkTest) ValidateLatestOccupiedSlot(latestOccupiedSlot int) error 
 	return nil
 }
 
-// ValidateLatestNonEmptyBlockSlot checks that the latest non-empty block is before tx end slot
-func (t *HardforkTest) ValidateLatestNonEmptyBlockSlot(latestNonEmptyBlock client.BlockData) error {
-	t.Logger.Info("Latest non-empty block: %s, height: %d, slot: %d",
-		latestNonEmptyBlock.StateHash, latestNonEmptyBlock.BlockHeight, latestNonEmptyBlock.Slot)
+func (t *HardforkTest) ValidateLatestLastBlockBeforeTxEndSlot(lastBlockBeforeTxEnd client.BlockData) error {
+	t.Logger.Info("Last block before slot-tx-end: %s, height: %d, slot: %d",
+		lastBlockBeforeTxEnd.StateHash, lastBlockBeforeTxEnd.BlockHeight, lastBlockBeforeTxEnd.Slot)
 
-	if latestNonEmptyBlock.Slot >= t.Config.SlotTxEnd {
-		t.Logger.Error("Assertion failed: non-empty block with slot %d created after slot tx end", latestNonEmptyBlock.Slot)
-		return fmt.Errorf("non-empty block with slot %d created after slot tx end", latestNonEmptyBlock.Slot)
+	if lastBlockBeforeTxEnd.Slot >= t.Config.SlotTxEnd {
+		t.Logger.Error("Assertion failed: non-empty block with slot %d created after slot tx end", lastBlockBeforeTxEnd.Slot)
+		return fmt.Errorf("non-empty block with slot %d created after slot tx end", lastBlockBeforeTxEnd.Slot)
 	}
 	return nil
 }
@@ -161,12 +160,12 @@ func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
 		}
 
 		// Track latest non-empty block
-		if block.NonEmpty() && block.Slot > state.LastNonEmptyBlock.Slot {
-			state.LastNonEmptyBlock = block
+		if block.Slot > state.LastBlockBeforeTxEnd.Slot && block.Slot < t.Config.SlotTxEnd {
+			state.LastBlockBeforeTxEnd = block
 		}
 	}
 
-	if state.LastNonEmptyBlock.Slot == 0 {
+	if state.LastBlockBeforeTxEnd.Slot == 0 {
 		return nil, fmt.Errorf("no blocks with slot > 0 at port %d", port)
 	}
 
@@ -287,7 +286,7 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 	return &BlockAnalysisResult{
 		LastOccupiedSlot:          consensus.LastOccupiedSlot,
 		RecentSnarkedHashPerEpoch: consensus.RecentSnarkedHashPerEpoch,
-		LastNonEmptyBlock:         consensus.LastNonEmptyBlock,
+		LastBlockBeforeTxEnd:      consensus.LastBlockBeforeTxEnd,
 		GenesisEpochStaking:       genesisEpochStakingHash,
 		GenesisEpochNext:          genesisEpochNextHash,
 	}, nil
@@ -296,12 +295,8 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 type ConsensusState struct {
 	LastOccupiedSlot          int              `json:"last_occupied_slot"`
 	RecentSnarkedHashPerEpoch map[int]string   `json:"recent_snarked_hash_per_epoch"`
-	LastNonEmptyBlock         client.BlockData `json:"last_nonempty_block"`
+	LastBlockBeforeTxEnd      client.BlockData `json:"last_block_before_tx_end"`
 }
-
-// FindLatestNonEmptyBlock processes block data to find the latest non-empty block
-// and collects other important information
-// This function assumes that there is at least one block with non-zero slot
 
 // FindStakingHash finds the staking ledger hash for the given epoch
 func (t *HardforkTest) FindStakingHash(
