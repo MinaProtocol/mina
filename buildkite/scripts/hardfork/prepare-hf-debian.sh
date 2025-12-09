@@ -22,4 +22,3 @@ ls -al
 ./scripts/hardfork/convert-debian-to-hf.sh -d "$MINA_DEB_FILE" -c "./new_config.json" -l "./hardfork_ledgers/"
 
 ./buildkite/scripts/cache/manager.sh write ./mina-${NETWORK_NAME}-hardfork_*.deb debians/${CODENAME}/
-./buildkite/scripts/cache/manager.sh write ./mina-zkapp*.deb debians/${CODENAME}/
