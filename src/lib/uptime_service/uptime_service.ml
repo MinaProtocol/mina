@@ -22,11 +22,10 @@ module Proof_data = struct
   [@@deriving bin_io_unversioned]
 end
 
-let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
-    ~state_hash ~produced block_data =
+let submit_uptime_data ~logger ~interruptor ~url ~state_hash ~produced
+    (request : Payload.request) =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
-  let request = Payload.create_request block_data submitter_keypair in
   let json = Payload.request_to_yojson request in
   let headers =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
@@ -70,7 +69,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                 [ ("state_hash", State_hash.to_yojson state_hash)
                 ; ("url", `String (Uri.to_string url))
                 ; ( "includes_snark_work"
-                  , `Bool (Option.is_some block_data.snark_work) )
+                  , `Bool (Option.is_some request.data.snark_work) )
                 ; ("is_produced_block", `Bool produced)
                 ]
           else if unretriable then
@@ -150,6 +149,11 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
   in
   make_interruptible (go 1)
 
+let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
+    ~state_hash ~produced block_data =
+  let request = Payload.create_request block_data submitter_keypair in
+  submit_uptime_data ~logger ~interruptor ~url ~state_hash ~produced request
+
 let block_base64_of_breadcrumb breadcrumb =
   let external_transition =
     breadcrumb |> Transition_frontier.Breadcrumb.block
@@ -160,6 +164,20 @@ let block_base64_of_breadcrumb breadcrumb =
   in
   (* raises only on errors from invalid optional arguments *)
   Base64.encode_exn block_string
+
+let generate_block_submission_data ~peer_id ~(submitter_keypair : Keypair.t)
+    ~graphql_control_port ~built_with_commit_sha ?snark_work breadcrumb =
+  let block_base64 = block_base64_of_breadcrumb breadcrumb in
+  let block_data =
+    { Payload.block = block_base64
+    ; created_at = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
+    ; peer_id
+    ; snark_work
+    ; graphql_control_port
+    ; built_with_commit_sha
+    }
+  in
+  Payload.create_request block_data submitter_keypair
 
 let send_produced_block_at ~logger ~interruptor ~url ~peer_id
     ~(submitter_keypair : Keypair.t) ~graphql_control_port ~block_produced_bvar
@@ -181,19 +199,13 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
         timeout_min ;
       return ()
   | `Result breadcrumb ->
-      let block_base64 = block_base64_of_breadcrumb breadcrumb in
       let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
-      let block_data =
-        { Payload.block = block_base64
-        ; created_at = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
-        ; peer_id
-        ; snark_work = None
-        ; graphql_control_port
-        ; built_with_commit_sha
-        }
+      let request =
+        generate_block_submission_data ~peer_id ~submitter_keypair
+          ~graphql_control_port ~built_with_commit_sha breadcrumb
       in
-      send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
-        ~produced:true block_data
+      submit_uptime_data ~logger ~interruptor ~url ~state_hash ~produced:true
+        request
 
 let read_all_proofs_for_work_single_spec =
   Snark_work_lib.Work.Single.Spec.map
