@@ -8,6 +8,7 @@ open Signature_lib
 
 module Blake2 = Blake2.Make ()
 
+module Payload = Payload
 module Uptime_snark_worker = Uptime_snark_worker
 
 module Proof_data = struct
