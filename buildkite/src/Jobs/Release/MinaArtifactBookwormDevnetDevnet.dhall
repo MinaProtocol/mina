@@ -22,6 +22,7 @@ in  Pipeline.build
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreateLegacyGenesis
+            , Artifacts.Type.DelegationVerifier
             ]
           , network = Network.Type.Devnet
           , tags =
