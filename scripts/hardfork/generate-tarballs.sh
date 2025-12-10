@@ -65,10 +65,10 @@ gunzip config.json.gz
 echo "--- Generate hardfork ledger tarballs"
 mkdir hardfork_ledgers
 
-"$RUNTIME_GENESIS_LEDGER" --config-file config.json --genesis-dir hardfork_ledgers/ --hash-output-file hardfork_ledger_hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
+"$RUNTIME_GENESIS_LEDGER" --config-file config.json --genesis-dir hardfork_ledgers/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
 
 echo "--- Create hardfork config"
-FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
+FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
 
 INPUT_FOLDER=hardfork_ledgers scripts/hardfork/upload_ledger_tarballs.sh
 
