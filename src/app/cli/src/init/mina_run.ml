@@ -112,13 +112,7 @@ let start_auto_hardfork_config_generation ~logger mina =
             (Mina_numbers.Global_slot_since_hard_fork.to_string slot_tx_end) ;
           let%bind () = wait_for_best_tip ~logger ~slot_tx_end mina in
           let network_id =
-            match Mina_lib.signature_kind mina with
-            | Mainnet ->
-                "mainnet"
-            | Testnet ->
-                "devnet"
-            | Other_network s ->
-                "other-network-" ^ s
+            Mina_signature_kind.to_directory_name (Mina_lib.signature_kind mina)
           in
           let config_dir =
             config.conf_dir ^/ sprintf "auto-fork-mesa-%s" network_id
