@@ -1671,6 +1671,21 @@ let hard_fork_genesis_slot_delta t =
   let%map delta = daemon.hard_fork_genesis_slot_delta in
   Mina_numbers.Global_slot_span.of_int delta
 
+(** Compute the hard fork genesis slot from the runtime config, if all the stop
+    slots and the genesis slot delta have been set. Note that this is the hard
+    fork genesis slot expressed as a
+    [Mina_numbers.Global_slot_since_hard_fork.t] of the current chain/hard
+    fork. *)
+let scheduled_hard_fork_genesis_slot runtime_config :
+    Mina_numbers.Global_slot_since_hard_fork.t option =
+  let open Option.Let_syntax in
+  let%bind slot_chain_end_since_hard_fork = slot_chain_end runtime_config in
+  let%map hard_fork_genesis_slot_delta =
+    hard_fork_genesis_slot_delta runtime_config
+  in
+  Mina_numbers.Global_slot_since_hard_fork.add slot_chain_end_since_hard_fork
+    hard_fork_genesis_slot_delta
+
 (** This method creates a runtime daemon config for a hard fork, containing the
     data that can't necessarily be computed in advance of the hard fork. This
     ends up being data that's computed based on the last block produced before
