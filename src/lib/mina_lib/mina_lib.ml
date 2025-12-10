@@ -835,11 +835,6 @@ let most_recent_valid_transition t = t.components.most_recent_valid_block
 
 let block_produced_bvar t = t.components.block_produced_bvar
 
-let staged_ledger_ledger_proof t =
-  let open Option.Let_syntax in
-  let%bind sl = best_staged_ledger_opt t in
-  Staged_ledger.current_ledger_proof sl
-
 let validated_transitions t = t.pipes.validated_transitions_reader
 
 let initialization_finish_signal t = t.initialization_finish_signal
@@ -1506,7 +1501,8 @@ let start t =
     ~graphql_control_port:t.config.graphql_control_port ~built_with_commit_sha
     ~get_next_producer_timing:(fun () -> t.next_producer_timing)
     ~get_snark_work_fee:(fun () -> snark_work_fee t)
-    ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer) ;
+    ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer)
+    ~signature_kind:t.signature_kind ;
   stop_long_running_daemon t ;
   Snark_worker.start t
 

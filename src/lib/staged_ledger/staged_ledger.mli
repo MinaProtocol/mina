@@ -228,15 +228,9 @@ val apply :
   -> ?transaction_pool_proxy:Check_commands.transaction_pool_proxy
   -> t
   -> Staged_ledger_diff.t
-  -> ( [ `Ledger_proof of
-         ( Ledger_proof.Cached.t
-         * ( Transaction.t With_status.t
-           * State_hash.t
-           * Mina_numbers.Global_slot_since_genesis.t )
-           Scan_state.Transactions_ordered.Poly.t
-           list )
-         option ]
+  -> ( [ `Ledger_proof of Ledger_proof.Cached.t option ]
        * [ `Staged_ledger of t ]
+       * [ `Accounts_created of Account_id.t list ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
      , Staged_ledger_error.t )
      Deferred.Result.t
@@ -253,21 +247,12 @@ val apply_diff_unchecked :
   -> signature_kind:Mina_signature_kind.t
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
-  -> ( [ `Ledger_proof of
-         ( Ledger_proof.Cached.t
-         * ( Transaction.t With_status.t
-           * State_hash.t
-           * Mina_numbers.Global_slot_since_genesis.t )
-           Scan_state.Transactions_ordered.Poly.t
-           list )
-         option ]
+  -> ( [ `Ledger_proof of Ledger_proof.Cached.t option ]
        * [ `Staged_ledger of t ]
+       * [ `Accounts_created of Account_id.t list ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
      , Staged_ledger_error.t )
      Deferred.Result.t
-
-(** Most recent ledger proof in t *)
-val current_ledger_proof : t -> Ledger_proof.Cached.t option
 
 (* Internals of the txn application. This is only exposed to facilitate
    writing unit tests. *)
@@ -363,12 +348,6 @@ val all_work_pairs :
 (** Statements of all the pending work in t*)
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 
-(** Account ids created in the latest block, taken from the new_accounts
-    in the latest and next-to-latest trees of the scan state
-*)
-val latest_block_accounts_created :
-  t -> previous_block_state_hash:State_hash.t -> Account_id.t list
-
 (** Go through all masks until reach root, convert all accounts accumulated 
     along the way, and commit them to a HF database
 *)
@@ -401,7 +380,9 @@ module Test_helpers : sig
     -> Zkapp_precondition.Protocol_state.View.t
     -> Frozen_ledger_hash.t * Frozen_ledger_hash.t
     -> ( bool
-         * Transaction_snark_scan_state.Transaction_with_witness.t list
+         * ( Transaction_snark_scan_state.Transaction_with_witness.t
+           * Account_id.t list )
+           list
          * Pending_coinbase.Update.Action.t
          * [> `Update_none
            | `Update_one of Pending_coinbase.Stack_versioned.t

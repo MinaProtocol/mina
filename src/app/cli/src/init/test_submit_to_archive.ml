@@ -135,12 +135,17 @@ module Block = struct
       (* [create_exn] is only safe to use for initial genesis block. *)
       Staged_ledger.create_exn ~constraint_constants ~ledger
     in
+    let accounts_created =
+      Precomputed_values.accounts precomputed_values
+      |> Lazy.force
+      |> List.map ~f:Precomputed_values.id_of_account_record
+    in
     [%log info] "Generating genesis breadcrumb" ;
     let breadcrumb =
       Frontier_base.Breadcrumb.create ~validated_transition:validated
         ~staged_ledger
         ~transition_receipt_time:(Some (Time.now ()))
-        ~just_emitted_a_proof:false
+        ~just_emitted_a_proof:false ~accounts_created
     in
     (* Block proof contained in genesis header is just a stub.
        Hence we need to generate the real proof here, in order to
