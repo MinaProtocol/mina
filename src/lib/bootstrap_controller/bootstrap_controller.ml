@@ -430,6 +430,17 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
                 time_deferred
                   (let open Deferred.Let_syntax in
                   let temp_mask = Root_ledger.as_masked temp_snarked_ledger in
+                  (* [of_scan_state_pending_coinbases_and_snarked_ledger] is called here
+                   * to verify the scan state we received. We ignore the resulting staged
+                   * ledger (from [temp_mask]). Later we call [Transition_frontier.load]
+                   * which will indirectly invoke
+                   * [of_scan_state_pending_coinbases_and_snarked_ledger_unchecked]
+                   * repeating the same computation (except for proof verification
+                   * which is skipped). Chain of calls:
+                   * [Transition_frontier.load] -> .. -> [load_from_persistence_and_start]
+                   * -> [load_full_frontier] -> [construct_staged_ledger_at_root] ->
+                   * -> [of_scan_state_pending_coinbases_and_snarked_ledger_unchecked]
+                   *)
                   let%map result =
                     Staged_ledger
                     .of_scan_state_pending_coinbases_and_snarked_ledger ~logger
