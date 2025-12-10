@@ -101,13 +101,7 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 		"--override-slot-time", strconv.Itoa(t.Config.MainSlot * 1000),
 		"--slot-transaction-end", strconv.Itoa(t.Config.SlotTxEnd),
 		"--slot-chain-end", strconv.Itoa(t.Config.SlotChainEnd),
-	}
-
-	switch t.Config.ForkMethod {
-	case config.Advanced:
-		args = append(args, "--hardfork-genesis-slot-delta", strconv.Itoa(t.Config.HfSlotDelta))
-	case config.Legacy:
-		// Do nothing as we'll patch the slot at the end of main network
+		"--hardfork-genesis-slot-delta", strconv.Itoa(t.Config.HfSlotDelta),
 	}
 
 	return t.startLocalNetwork(t.Config.MainMinaExe, "main", args)
