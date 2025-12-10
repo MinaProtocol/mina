@@ -24,6 +24,7 @@ let snark_pool_list t =
 (** Poll until best tip reaches the target slot *)
 let wait_for_best_tip ~logger ~slot_tx_end mina =
   let open Deferred.Let_syntax in
+  let open Mina_numbers in
   Deferred.repeat_until_finished () (fun () ->
       match Mina_lib.best_tip mina with
       | `Bootstrapping ->
@@ -46,16 +47,13 @@ let wait_for_best_tip ~logger ~slot_tx_end mina =
           let state_hash =
             Transition_frontier.Breadcrumb.state_hash breadcrumb
           in
-          if
-            Mina_numbers.Global_slot_since_hard_fork.(
-              current_slot >= slot_tx_end)
-          then (
+          if Global_slot_since_hard_fork.(current_slot >= slot_tx_end) then (
             [%log debug]
               "Best tip has reached slot_tx_end. Current slot: %s, target \
                slot: %s, blockchain_length: %s, state_hash: %s"
-              (Mina_numbers.Global_slot_since_hard_fork.to_string current_slot)
-              (Mina_numbers.Global_slot_since_hard_fork.to_string slot_tx_end)
-              (Mina_numbers.Length.to_string blockchain_length)
+              (Global_slot_since_hard_fork.to_string current_slot)
+              (Global_slot_since_hard_fork.to_string slot_tx_end)
+              (Length.to_string blockchain_length)
               (Mina_base.State_hash.to_base58_check state_hash) ;
             return (`Finished ()) )
           else (
@@ -63,9 +61,9 @@ let wait_for_best_tip ~logger ~slot_tx_end mina =
               "Best tip not yet at slot_tx_end. Current slot: %s, target slot: \
                %s, blockchain_length: %s, state_hash: %s. Waiting 15s before \
                retry"
-              (Mina_numbers.Global_slot_since_hard_fork.to_string current_slot)
-              (Mina_numbers.Global_slot_since_hard_fork.to_string slot_tx_end)
-              (Mina_numbers.Length.to_string blockchain_length)
+              (Global_slot_since_hard_fork.to_string current_slot)
+              (Global_slot_since_hard_fork.to_string slot_tx_end)
+              (Length.to_string blockchain_length)
               (Mina_base.State_hash.to_base58_check state_hash) ;
             let%map () = after (Time.Span.of_sec 15.0) in
             `Repeat () ) )
