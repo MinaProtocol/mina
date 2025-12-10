@@ -255,7 +255,7 @@ fi
 if [ -n "$CACHED_HARDFORK_DATA" ]; then
     echo "Restoring cached hardfork data from $CACHED_HARDFORK_DATA" >&2
     cp -r "$CACHED_HARDFORK_DATA"/ledgers/*.tar.gz "$WORKDIR/ledgers"/
-    cp "$CACHED_HARDFORK_DATA"/hashes.json "$WORKDIR/"
+    cp -r "$CACHED_HARDFORK_DATA"/hashes.json "$WORKDIR/"
 else
     "$MINA_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$WORKDIR/ledgers" --hash-output-file "$WORKDIR/hashes.json"
 fi
