@@ -51,6 +51,9 @@ echo "--- Generating ledger tarballs for hardfork network: $NETWORK_NAME"
 
 ./scripts/hardfork/generate-tarballs.sh --network "$NETWORK_NAME" --config-url "$CONFIG_JSON_GZ_URL" --runtime-ledger mina-create-genesis --logproc mina-logproc
 
+# Copy hashes file with the correct name for caching
+cp hardfork_ledger_hashes.json hashes.json
+
 ./buildkite/scripts/cache/manager.sh write hardfork_ledgers/*.tar.gz hardfork/ledgers/
-./buildkite/scripts/cache/manager.sh write hardfork_ledger_hashes.json hardfork/hashes.json
+./buildkite/scripts/cache/manager.sh write hashes.json hardfork/
 ./buildkite/scripts/cache/manager.sh write new_config.json hardfork/

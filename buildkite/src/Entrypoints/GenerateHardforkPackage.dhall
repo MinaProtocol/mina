@@ -401,7 +401,7 @@ let generateDockerForCodename =
                           , Cmd.runInDocker
                               Cmd.Docker::{ image = image }
                               "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir /workdir/hardfork/legacy --checks tarballs"
+                                                                                                                                                                                                spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir /workdir/hardfork/legacy --checks tarballs ${cached_tarball_ledgers} "
                           ]
                     , label = "Verify packaged artifacts: Tarballs check"
                     , key =
