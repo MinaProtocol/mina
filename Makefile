@@ -247,6 +247,14 @@ build-test-utils: ocaml_checks reformat-diff ## Build test utilities
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
+.PHONY: build-delegation-verify
+build-delegation-verify: ocaml_checks reformat-diff ## Build delegation verify tool
+	$(info 🏗️  Building delegation verify tool with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/delegation_verify/delegation_verify.exe \
+		--profile=$(DUNE_PROFILE) \
+		&& echo "✅ Build complete"
 
 .PHONY: build-rosetta
 build-rosetta: ocaml_checks ## Build Rosetta API components
