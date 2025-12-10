@@ -105,7 +105,7 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 
 	switch t.Config.ForkMethod {
 	case config.Advanced:
-		args = append(args, "--hardfork-genesis-slot-delta", strconv.Itoa(t.Config.HfSlotDelta()))
+		args = append(args, "--hardfork-genesis-slot-delta", strconv.Itoa(t.Config.HfSlotDelta))
 	case config.Legacy:
 		// Do nothing as we'll patch the slot at the end of main network
 	}

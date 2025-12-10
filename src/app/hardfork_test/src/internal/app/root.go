@@ -64,8 +64,8 @@ func init() {
 	rootCmd.Flags().IntVar(&cfg.ForkSlot, "fork-slot", cfg.ForkSlot, "Slot duration in seconds for fork version")
 
 	// Delay configuration
-	rootCmd.Flags().IntVar(&cfg.MainDelay, "main-delay", cfg.MainDelay, "Delay before genesis slot in minutes for main version")
-	rootCmd.Flags().IntVar(&cfg.ForkDelay, "fork-delay", cfg.ForkDelay, "Delay before genesis slot in minutes for fork version")
+	rootCmd.Flags().IntVar(&cfg.MainDelayMin, "main-delay", cfg.MainDelayMin, "Delay before genesis slot in minutes for main version")
+	rootCmd.Flags().IntVar(&cfg.HfSlotDelta, "hf-slot-delta", cfg.HfSlotDelta, "Difference in slot between slot-chain-end and genesis of new network")
 
 	// Script directory configuration
 	rootCmd.Flags().StringVar(&cfg.ScriptDir, "script-dir", cfg.ScriptDir, "Path to the hardfork script directory")

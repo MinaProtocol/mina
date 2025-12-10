@@ -14,8 +14,7 @@ type BlockAnalysisResult struct {
 	LastOccupiedSlot          int
 	RecentSnarkedHashPerEpoch map[int]string // map from epoch to snarked ledger hash
 	LastBlockBeforeTxEnd      client.BlockData
-	GenesisEpochStaking       string
-	GenesisEpochNext          string
+	GenesisBlock              client.BlockData
 	CandidateRestPortsForFork []int
 }
 
@@ -248,19 +247,6 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 	}
 	t.Logger.Info("Genesis block: %v", genesisBlock)
 
-	genesisEpochStakingHash := genesisBlock.CurEpochHash
-	if genesisEpochStakingHash == "" {
-		return nil, fmt.Errorf("genesis epoch staking hash is empty")
-	}
-
-	genesisEpochNextHash := genesisBlock.NextEpochHash
-	if genesisEpochNextHash == "" {
-		return nil, fmt.Errorf("genesis next staking hash is empty")
-	}
-
-	t.Logger.Info("Genesis epoch staking/next hashes: %s, %s, found in genesis block %s on port %d",
-		genesisEpochStakingHash, genesisEpochNextHash, genesisBlock.StateHash, portUsed)
-
 	consensus, candidateRestPortsForFork, err := t.ConsensusAcrossNodes()
 	if err != nil {
 		return nil, err
@@ -270,8 +256,7 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 		LastOccupiedSlot:          consensus.LastOccupiedSlot,
 		RecentSnarkedHashPerEpoch: consensus.RecentSnarkedHashPerEpoch,
 		LastBlockBeforeTxEnd:      consensus.LastBlockBeforeTxEnd,
-		GenesisEpochStaking:       genesisEpochStakingHash,
-		GenesisEpochNext:          genesisEpochNextHash,
+		GenesisBlock:              *genesisBlock,
 		CandidateRestPortsForFork: candidateRestPortsForFork,
 	}, nil
 }

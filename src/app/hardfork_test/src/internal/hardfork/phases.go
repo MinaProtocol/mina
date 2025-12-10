@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"time"
 )
 
 type HFHandler func(*HardforkTest, *BlockAnalysisResult) error
@@ -41,6 +40,8 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 	if err != nil {
 		return nil, err
 	}
+
+	t.Logger.Info("Network analayze result: %v", analysis)
 
 	// Validate max slot
 	if err := t.ValidateLatestOccupiedSlot(analysis.LastOccupiedSlot); err != nil {
@@ -145,8 +146,7 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, forkConfig
 	postpatchConfig := "fork_data/postpatch/config.json"
 	postpatchLedgersDir := "fork_data/postpatch/hf_ledgers"
 
-	// Calculate fork genesis timestamp relative to now (before starting fork network)
-	forkGenesisTs := time.Now().Unix() + int64(t.Config.ForkDelay*60)
+	forkGenesisTs := t.Config.ForkGenesisTsGivenMainGenesisTs(mainGenesisTs)
 
 	preforkGenesisConfigFile := fmt.Sprintf("%s/daemon.json", t.Config.Root)
 	forkHashesFile := "fork_data/hf_ledger_hashes.json"
@@ -187,8 +187,7 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 		return nil, err
 	}
 
-	forkGenesisSlot := t.Config.SlotChainEnd + t.Config.HfSlotDelta()
-	forkGenesisTs := mainGenesisTs + int64(forkGenesisSlot*t.Config.MainSlot)
+	forkGenesisTs := t.Config.ForkGenesisTsGivenMainGenesisTs(mainGenesisTs)
 
 	err = t.ValidateFinalForkConfig(analysis.LastBlockBeforeTxEnd, forkConfigBytes, forkGenesisTs, mainGenesisTs)
 	if err != nil {
