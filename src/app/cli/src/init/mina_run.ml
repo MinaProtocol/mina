@@ -21,6 +21,55 @@ let snark_pool_list t =
   |> Network_pool.Snark_pool.Resource_pool.snark_pool_json
   |> Yojson.Safe.to_string
 
+(** Poll until best tip reaches the target slot *)
+let wait_for_best_tip ~logger ~slot_tx_end mina =
+  let open Deferred.Let_syntax in
+  Deferred.repeat_until_finished () (fun () ->
+      match Mina_lib.best_tip mina with
+      | `Bootstrapping ->
+          [%log debug] "Node is bootstrapping, waiting 15s before retry" ;
+          let%map () = after (Time.Span.of_sec 15.0) in
+          `Repeat ()
+      | `Active breadcrumb ->
+          let protocol_state =
+            Transition_frontier.Breadcrumb.protocol_state breadcrumb
+          in
+          let consensus_state =
+            Mina_state.Protocol_state.consensus_state protocol_state
+          in
+          let current_slot =
+            Consensus.Data.Consensus_state.curr_global_slot consensus_state
+          in
+          let blockchain_length =
+            Consensus.Data.Consensus_state.blockchain_length consensus_state
+          in
+          let state_hash =
+            Transition_frontier.Breadcrumb.state_hash breadcrumb
+          in
+          if
+            Mina_numbers.Global_slot_since_hard_fork.(
+              current_slot >= slot_tx_end)
+          then (
+            [%log debug]
+              "Best tip has reached slot_tx_end. Current slot: %s, target \
+               slot: %s, blockchain_length: %s, state_hash: %s"
+              (Mina_numbers.Global_slot_since_hard_fork.to_string current_slot)
+              (Mina_numbers.Global_slot_since_hard_fork.to_string slot_tx_end)
+              (Mina_numbers.Length.to_string blockchain_length)
+              (Mina_base.State_hash.to_base58_check state_hash) ;
+            return (`Finished ()) )
+          else (
+            [%log debug]
+              "Best tip not yet at slot_tx_end. Current slot: %s, target slot: \
+               %s, blockchain_length: %s, state_hash: %s. Waiting 15s before \
+               retry"
+              (Mina_numbers.Global_slot_since_hard_fork.to_string current_slot)
+              (Mina_numbers.Global_slot_since_hard_fork.to_string slot_tx_end)
+              (Mina_numbers.Length.to_string blockchain_length)
+              (Mina_base.State_hash.to_base58_check state_hash) ;
+            let%map () = after (Time.Span.of_sec 15.0) in
+            `Repeat () ) )
+
 let start_auto_hardfork_config_generation ~logger mina =
   let open Deferred.Let_syntax in
   let config = Mina_lib.config mina in
@@ -63,63 +112,7 @@ let start_auto_hardfork_config_generation ~logger mina =
             "Reached slot_chain_end time, now waiting for best tip to reach \
              slot_tx_end: %s"
             (Mina_numbers.Global_slot_since_hard_fork.to_string slot_tx_end) ;
-          (* Poll until best tip >= slot_tx_end *)
-          let wait_for_best_tip () =
-            Deferred.repeat_until_finished () (fun () ->
-                match Mina_lib.best_tip mina with
-                | `Bootstrapping ->
-                    [%log debug]
-                      "Node is bootstrapping, waiting 15s before retry" ;
-                    let%map () = after (Time.Span.of_sec 15.0) in
-                    `Repeat ()
-                | `Active breadcrumb ->
-                    let protocol_state =
-                      Transition_frontier.Breadcrumb.protocol_state breadcrumb
-                    in
-                    let consensus_state =
-                      Mina_state.Protocol_state.consensus_state protocol_state
-                    in
-                    let current_slot =
-                      Consensus.Data.Consensus_state.curr_global_slot
-                        consensus_state
-                    in
-                    let blockchain_length =
-                      Consensus.Data.Consensus_state.blockchain_length
-                        consensus_state
-                    in
-                    let state_hash =
-                      Transition_frontier.Breadcrumb.state_hash breadcrumb
-                    in
-                    if
-                      Mina_numbers.Global_slot_since_hard_fork.(
-                        current_slot >= slot_tx_end)
-                    then (
-                      [%log debug]
-                        "Best tip has reached slot_tx_end. Current slot: %s, \
-                         target slot: %s, blockchain_length: %s, state_hash: \
-                         %s"
-                        (Mina_numbers.Global_slot_since_hard_fork.to_string
-                           current_slot )
-                        (Mina_numbers.Global_slot_since_hard_fork.to_string
-                           slot_tx_end )
-                        (Mina_numbers.Length.to_string blockchain_length)
-                        (Mina_base.State_hash.to_base58_check state_hash) ;
-                      return (`Finished ()) )
-                    else (
-                      [%log debug]
-                        "Best tip not yet at slot_tx_end. Current slot: %s, \
-                         target slot: %s, blockchain_length: %s, state_hash: \
-                         %s. Waiting 15s before retry"
-                        (Mina_numbers.Global_slot_since_hard_fork.to_string
-                           current_slot )
-                        (Mina_numbers.Global_slot_since_hard_fork.to_string
-                           slot_tx_end )
-                        (Mina_numbers.Length.to_string blockchain_length)
-                        (Mina_base.State_hash.to_base58_check state_hash) ;
-                      let%map () = after (Time.Span.of_sec 15.0) in
-                      `Repeat () ) )
-          in
-          let%bind () = wait_for_best_tip () in
+          let%bind () = wait_for_best_tip ~logger ~slot_tx_end mina in
           let network_id =
             match Mina_lib.signature_kind mina with
             | Mainnet ->
