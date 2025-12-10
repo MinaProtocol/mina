@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"time"
 )
@@ -35,9 +34,8 @@ type Config struct {
 	MainSlot int
 	ForkSlot int
 
-	// Delay before genesis slot in minutes
-	MainDelay int
-	ForkDelay int
+	MainDelayMin int
+	HfSlotDelta  int
 
 	// Configuration for network sizes
 	NumWhales int
@@ -75,8 +73,8 @@ func DefaultConfig() *Config {
 		BestChainQueryFrom:            25,
 		MainSlot:                      30,
 		ForkSlot:                      30,
-		MainDelay:                     7,
-		ForkDelay:                     9,
+		MainDelayMin:                  7,
+		HfSlotDelta:                   30,
 		NumWhales:                     2,
 		NumFish:                       1,
 		NumNodes:                      0,
@@ -100,6 +98,11 @@ func DefaultConfig() *Config {
 
 		ForkMethod: Legacy,
 	}
+}
+
+func (c *Config) ForkGenesisTsGivenMainGenesisTs(mainGenesisTs int64) int64 {
+	forkGenesisSlot := c.SlotChainEnd + c.HfSlotDelta
+	return mainGenesisTs + int64(forkGenesisSlot*c.MainSlot)
 }
 
 // Validate checks if the configuration is valid
@@ -143,11 +146,6 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
-}
-func (c *Config) HfSlotDelta() int {
-
-	forkDelayDuration := time.Duration(c.ForkDelay) * time.Minute
-	return int(math.Ceil(forkDelayDuration.Seconds() / float64(c.MainSlot)))
 }
 
 // FormatTimestamp formats a UNIX timestamp into the format used by the shell script

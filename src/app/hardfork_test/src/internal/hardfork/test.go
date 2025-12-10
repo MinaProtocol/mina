@@ -115,7 +115,7 @@ func (t *HardforkTest) Run() error {
 	t.Logger.Info("===== Starting Hardfork Test =====")
 
 	// Calculate main network genesis timestamp
-	mainGenesisTs := time.Now().Unix() + int64(t.Config.MainDelay*60)
+	mainGenesisTs := time.Now().Unix() + int64(t.Config.MainDelayMin*60)
 
 	// Phase 1: Run and validate main network
 	t.Logger.Info("Phase 1: Running main network...")
