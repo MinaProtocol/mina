@@ -74,7 +74,7 @@ func DefaultConfig() *Config {
 		MainSlot:                      30,
 		ForkSlot:                      30,
 		MainDelayMin:                  7,
-		HfSlotDelta:                   30,
+		HfSlotDelta:                   30, // if this is too small and fork network is spawned after fork genesis, it'll fail to create any block
 		NumWhales:                     2,
 		NumFish:                       1,
 		NumNodes:                      0,
