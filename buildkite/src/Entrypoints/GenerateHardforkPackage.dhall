@@ -248,7 +248,7 @@ let generateDockerForCodename =
 
           let cached_tarball_ledgers =
                 merge
-                  { Some = \(build : Text) -> "--cached-hardfork-data ${build} "
+                  { Some = \(build : Text) -> "--cached-hardfork-data /var/storagebox/${build}/hardfork/ "
                   , None = ""
                   }
                   spec.use_artifacts_from_buildkite_build
@@ -274,7 +274,7 @@ let generateDockerForCodename =
                                       ->      "&& ./buildkite/scripts/release/manager.sh persist "
                                           ++  " --backend local --artifacts mina-logproc,mina-archive-${Network.lowerName
                                                                                                           spec.network},mina-rosetta-${Network.lowerName
-                                                                                                                                         spec.network} "
+                                                                                                                                         spec.network},mina-zkapp-test-transaction "
                                           ++  " --buildkite-build-id ${cached_build_id}"
                                           ++  " --codename ${lowerNameCodename} "
                                           ++  " --target \\\${BUILDKITE_BUILD_ID} "

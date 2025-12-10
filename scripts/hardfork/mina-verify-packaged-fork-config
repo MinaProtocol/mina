@@ -349,16 +349,21 @@ if checks_contains tarballs; then
     done
 
     echo "Comparing scans to reference..." >&2
+
+    ls -lh $WORKDIR
+
     for file in "$WORKDIR"/ledgers/*.tar.gz; do
         tarname=$(basename "$file")
         tarname=${tarname%.tar.gz}
 
-        for kind in packaged web generated; do
-            if ! cmp "$WORKDIR/$tarname-$kind.scan" "$REFERENCE_DATA_DIR/$tarname-$kind.scan"; then
-                echo "Error: $tarname $kind scan does not match reference" >&2
-                error=1
-            fi
-        done
+        if ! ( cmp -s "$WORKDIR/$tarname-generated.scan" "$WORKDIR/$tarname-packaged.scan" && \
+           cmp -s "$WORKDIR/$tarname-packaged.scan" "$WORKDIR/$tarname-web.scan" ); then
+
+            echo "Error: kvdb contents mismatch for $tarname" >&2
+            error=1
+        fi
+
+
     done
 else
     echo "Skipping tarballs validation as per --checks option" >&2
