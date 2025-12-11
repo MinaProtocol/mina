@@ -78,9 +78,11 @@ module Worker = struct
         let diffs_to_apply =
           List.concat
             [ other_diffs
-            ; List.map ~f:(fun x -> Diff.Lite.E.E (Root_transitioned x) )root_transition_diffs
-            (* ; Option.value_map total_root_transition_diff ~default:[]
-                ~f:(fun diff -> [ Diff.Lite.E.E (Root_transitioned diff) ]) *)
+            ; List.map
+                ~f:(fun x -> Diff.Lite.E.E (Root_transitioned x))
+                root_transition_diffs
+              (* ; Option.value_map total_root_transition_diff ~default:[]
+                  ~f:(fun diff -> [ Diff.Lite.E.E (Root_transitioned diff) ]) *)
             ; Option.value_map final_best_tip_diff ~default:[] ~f:(fun diff ->
                   [ Diff.Lite.E.E (Best_tip_changed diff) ] )
             ]
