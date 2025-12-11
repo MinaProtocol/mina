@@ -63,4 +63,4 @@ ls -lh $WORKDIR/legacy_ledgers/
 
 head -n 10 "$WORKDIR/legacy_hashes.json"
 
-./buildkite/scripts/cache/manager.sh write "$WORKDIR/legacy_hashes.json" "$WORKDIR/legacy_ledgers/*.tar.gz" "hardfork/legacy"
+./buildkite/scripts/cache/manager.sh write "$WORKDIR/legacy_hashes.json" "$WORKDIR/legacy_ledgers/*.tar.gz" "hardfork/legacy/"

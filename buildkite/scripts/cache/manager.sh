@@ -158,7 +158,7 @@ function read(){
 
     for input_path in "${__inputs[@]}"; do
         echo "..Copying $input_path -> $__to"
-        if ! cp -R ${EXTRA_FLAGS} $input_path "$__to"; then
+        if ! cp -R ${EXTRA_FLAGS} "$input_path" "$__to"; then
             echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
             exit 2
         fi
@@ -245,11 +245,17 @@ function write(){
         EXTRA_FLAGS="-f"
     fi
 
-    mkdir -p "$__to"
+    # If destination ends with /, treat as directory and create it
+    # Otherwise, only create parent directory (allows file destinations)
+    if [[ "$__to" == */ ]]; then
+        mkdir -p "$__to"
+    else
+        mkdir -p "$(dirname "$__to")"
+    fi
 
     for input_path in "${__inputs[@]}"; do
         echo "..Copying $input_path -> $__to"
-        if ! cp -R ${EXTRA_FLAGS} $input_path "$__to"; then
+        if ! cp -R ${EXTRA_FLAGS} "$input_path" "$__to"; then
             echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
             exit 2
         fi
