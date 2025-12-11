@@ -1,5 +1,30 @@
 #!/bin/bash
 
+# ------------------------------------------------------------------------------
+# monorepo.sh
+#
+#   This script is used to determine whether a specific job should be triggered
+#   based on the current selection mode, job filters, scope, and changes detected in the repository.
+#   It supports conditional triggering for both triaged and full buildkite runs, using
+#   parameters such as job name, tag inclusion, scope inclusion, and file change
+#   patterns. If the conditions are met, it uploads the corresponding pipeline
+#   for the job to Buildkite.
+#
+#   Glossary of Arguments:
+#     1. selection       (Triaged or Full) - Determines the mode of selection for triggering jobs.
+#                                            Triaged mode checks for relevant changes,
+#                                            while Full mode triggers all jobs, which falls under scope and filter.
+#     5. jobs-filter     STRING            - A filter is a group of job tags, those tags can be any string.
+#     6. scope-filter    STRING            - A filter string to determine if the job falls under a specific scope.
+#                                            Scope is a gate level in mina like :
+#                                             - PR - for pull requests
+#                                             - Nightly - for builds that run extended scope of tests including heavy tests
+#                                                         which might take longer time to execute
+#                                             - Release - full builds with all known jobs, including all supported networks/codenames
+#                                             - Mainline Nightly - like above but for mainline branch on nightly basis
+#     7. dirty-when      STRING            - A pattern used to check for relevant changes in the repository.
+
+
 show_help() {
   cat << EOF
 Usage: $(basename "$0") [OPTIONS]
