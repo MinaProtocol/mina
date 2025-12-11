@@ -363,15 +363,23 @@ ensure_binary "RUNTIME_GENESIS_LEDGER_BINARY" "devnet.genesis" "runtime_genesis_
 # Generate block producer keys
 echo "Generating $BP_KEYS block producer keys..."
 for ((i=1; i<=BP_KEYS; i++)); do
-    echo "  Generating ${PREFIX}-bp${i}..."
-    "$MINA_BINARY" advanced generate-keypair --privkey-path "${PREFIX}-bp${i}"
+    if [[ -f "${PREFIX}-bp${i}" ]] && [[ -f "${PREFIX}-bp${i}.pub" ]]; then
+        echo "  Skipping ${PREFIX}-bp${i} (already exists)..."
+    else
+        echo "  Generating ${PREFIX}-bp${i}..."
+        "$MINA_BINARY" advanced generate-keypair --privkey-path "${PREFIX}-bp${i}"
+    fi
 done
 
 # Generate plain keys
 echo "Generating $PLAIN_KEYS plain keys..."
 for ((i=1; i<=PLAIN_KEYS; i++)); do
-    echo "  Generating ${PREFIX}-plain${i}..."
-    "$MINA_BINARY" advanced generate-keypair --privkey-path "${PREFIX}-plain${i}"
+    if [[ -f "${PREFIX}-plain${i}" ]] && [[ -f "${PREFIX}-plain${i}.pub" ]]; then
+        echo "  Skipping ${PREFIX}-plain${i} (already exists)..."
+    else
+        echo "  Generating ${PREFIX}-plain${i}..."
+        "$MINA_BINARY" advanced generate-keypair --privkey-path "${PREFIX}-plain${i}"
+    fi
 done
 
 # Build key arguments for prepare-test-ledger script
