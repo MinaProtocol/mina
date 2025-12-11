@@ -31,7 +31,8 @@ module type S = sig
     ]}
     See the tests for a full usage example.
 *)
-  val write_values_exn : 'tags. ?buffer_size:int -> f:(writer_t -> 'tags) -> filename_key -> 'tags
+  val write_values_exn :
+    'tags. ?buffer_size:int -> f:(writer_t -> 'tags) -> filename_key -> 'tags
 
   (** Append multiple keys to an existing database file.
     
