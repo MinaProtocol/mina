@@ -85,9 +85,9 @@ let generateReferenceTarballsCommand =
                       codename
                       Arch.Type.Amd64
                       [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
-                      ("./buildkite/scripts/hardfork/generate-tarballs-with-legacy-app.sh --network ${Network.lowerName
-                                                                                                           spec.network} --version 3.2.0-f77c8c9  --codename ${DebianVersions.lowerName codename} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg}"
-                      )
+                      "./buildkite/scripts/hardfork/generate-tarballs-with-legacy-app.sh --network ${Network.lowerName
+                                                                                                       spec.network} --version 3.2.0-f77c8c9  --codename ${DebianVersions.lowerName
+                                                                                                                                                             codename} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg}"
                 , label =
                     "Generate hardfork reference tarballs for ${DebianVersions.lowerName
                                                                   codename}"
@@ -247,11 +247,7 @@ let generateDockerForCodename =
                   spec.use_artifacts_from_buildkite_build
 
           let cached_tarball_ledgers =
-                merge
-                  { Some = \(build : Text) -> "--cached-hardfork-data /var/storagebox/${build}/hardfork/ "
-                  , None = ""
-                  }
-                  spec.use_artifacts_from_buildkite_build
+                "--cached-hardfork-data /var/storagebox/\\\${BUILDKITE_BUILD_ID}/hardfork/ "
 
           in    buildOrGetArtifacts
               # [ Command.build
@@ -326,7 +322,7 @@ let generateDockerForCodename =
                           Cmd.Docker::{ image = image }
                           "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && ! (FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
                                                                                                                                                                                                                                                                                                   spec.network}.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config ${Network.lowerName
-                                                                                                                                                                                                                                                                                                                                                          spec.network} config.json /workdir/verification)"
+                                                                                                                                                                                                                                                                                                                                                                                    spec.network} config.json /workdir/verification)"
                       ]
                     , label =
                         "Assert corrupted packaged artifacts are unverifiable"
@@ -352,7 +348,7 @@ let generateDockerForCodename =
                               Cmd.Docker::{ image = image }
                               "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
                                                                                                                                                        spec.network}.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                                         spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir /workdir/hardfork/legacy --checks config"
+                                                                                                                                                                                                                                                   spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir /workdir/hardfork/legacy --checks config"
                           ]
                     , label = "Verify packaged artifacts: Config check"
                     , key =
@@ -377,7 +373,7 @@ let generateDockerForCodename =
                               Cmd.Docker::{ image = image }
                               "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
                                                                                                                                                        spec.network}.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                                         spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir /workdir/hardfork/legacy --checks ledgers  ${cached_tarball_ledgers}"
+                                                                                                                                                                                                                                                   spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir /workdir/hardfork/legacy --checks ledgers  ${cached_tarball_ledgers}"
                           ]
                     , label = "Verify packaged artifacts: Ledgers check"
                     , key =
@@ -401,7 +397,7 @@ let generateDockerForCodename =
                           , Cmd.runInDocker
                               Cmd.Docker::{ image = image }
                               "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json /workdir/scripts/hardfork/mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                                spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir /workdir/hardfork/legacy --checks tarballs ${cached_tarball_ledgers} "
+                                                                                                                                                                                                                          spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg} --reference-data-dir /workdir/hardfork/legacy --checks tarballs ${cached_tarball_ledgers} "
                           ]
                     , label = "Verify packaged artifacts: Tarballs check"
                     , key =
