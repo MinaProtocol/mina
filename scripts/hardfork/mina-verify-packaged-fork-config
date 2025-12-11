@@ -221,6 +221,36 @@ function extract_ledgers() {
     "$MINA_EXE" client stop
 }
 
+already_restored=0
+function restore_or_generate_hardfork_data() {
+    if [ $already_restored -eq 1 ]; then
+        return
+    fi
+    already_restored=1
+
+    if [ -n "$CACHED_HARDFORK_DATA" ]; then
+        echo "Restoring cached hardfork data from $CACHED_HARDFORK_DATA" >&2
+
+        # Check if cached files exist
+        if [ ! -d "$CACHED_HARDFORK_DATA/ledgers" ]; then
+            echo "Warning: Cached ledgers directory not found at $CACHED_HARDFORK_DATA/ledgers" >&2
+            echo "Falling back to generating ledgers..." >&2
+            "$MINA_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$WORKDIR/ledgers" --hash-output-file "$WORKDIR/hashes.json"
+        elif [ ! -f "$CACHED_HARDFORK_DATA/hashes.json" ]; then
+            echo "Warning: Cached hashes.json file not found at $CACHED_HARDFORK_DATA/hashes.json" >&2
+            echo "Falling back to generating ledgers..." >&2
+            "$MINA_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$WORKDIR/ledgers" --hash-output-file "$WORKDIR/hashes.json"
+        else
+            # Copy cached files
+            cp -r "$CACHED_HARDFORK_DATA"/ledgers/*.tar.gz "$WORKDIR/ledgers"/
+            cp "$CACHED_HARDFORK_DATA/hashes.json" "$WORKDIR/hashes.json"
+            echo "Successfully restored cached hardfork data" >&2
+        fi
+    else
+        "$MINA_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$WORKDIR/ledgers" --hash-output-file "$WORKDIR/hashes.json"
+    fi
+}
+
 if [ -z "$REFERENCE_DATA_DIR" ]; then
     echo "generating genesis ledgers ... (this may take a while)" >&2
     "$MINA_LEGACY_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$WORKDIR/legacy_ledgers" --hash-output-file "$WORKDIR/legacy_hashes.json"
@@ -252,34 +282,13 @@ else
     echo "Skipping config validation as per --checks option" >&2
 fi
 
-if [ -n "$CACHED_HARDFORK_DATA" ]; then
-    echo "Restoring cached hardfork data from $CACHED_HARDFORK_DATA" >&2
-
-    # Check if cached files exist
-    if [ ! -d "$CACHED_HARDFORK_DATA/ledgers" ]; then
-        echo "Warning: Cached ledgers directory not found at $CACHED_HARDFORK_DATA/ledgers" >&2
-        echo "Falling back to generating ledgers..." >&2
-        "$MINA_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$WORKDIR/ledgers" --hash-output-file "$WORKDIR/hashes.json"
-    elif [ ! -f "$CACHED_HARDFORK_DATA/hashes.json" ]; then
-        echo "Warning: Cached hashes.json file not found at $CACHED_HARDFORK_DATA/hashes.json" >&2
-        echo "Falling back to generating ledgers..." >&2
-        "$MINA_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$WORKDIR/ledgers" --hash-output-file "$WORKDIR/hashes.json"
-    else
-        # Copy cached files
-        cp -r "$CACHED_HARDFORK_DATA"/ledgers/*.tar.gz "$WORKDIR/ledgers"/
-        cp "$CACHED_HARDFORK_DATA/hashes.json" "$WORKDIR/hashes.json"
-        echo "Successfully restored cached hardfork data" >&2
-    fi
-else
-    "$MINA_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$WORKDIR/ledgers" --hash-output-file "$WORKDIR/hashes.json"
-fi
-
 FORK_CONFIG_JSON="$FORK_CONFIG" \
 LEDGER_HASHES_JSON="$WORKDIR/hashes.json" \
 GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$PACKAGED_DAEMON_CONFIG") \
 "$CREATE_RUNTIME_CONFIG" > "$WORKDIR/config-substituted.json"
 
 if checks_contains ledgers; then
+    restore_or_generate_hardfork_data
 
     echo "exporting ledgers from running node ... (this may take a while)" >&2
 
@@ -336,6 +345,9 @@ else
 fi
 
 if checks_contains tarballs; then
+
+    restore_or_generate_hardfork_data
+
     echo "Validating tarballs..." >&2
     for file in "$WORKDIR"/ledgers/*.tar.gz; do
         tarname=$(basename "$file")
