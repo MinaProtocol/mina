@@ -283,7 +283,8 @@ val skip_delta_block_chain_validation :
 val validate_frontier_dependencies :
      to_header:('a -> Header.t)
   -> context:(module CONTEXT)
-  -> root_block:Block.with_hash
+  -> root_consensus_state:
+       Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
   -> is_block_in_frontier:(Frozen_ledger_hash.t -> bool)
   -> ('a, State_hash.State_hashes.t) With_hash.t
      * ( 'b
@@ -379,6 +380,9 @@ val validate_staged_ledger_diff :
            with_block ]
        * [ `Staged_ledger of Staged_ledger.t ]
        * [ `Accounts_created of Account_id.t list ]
+       * [ `Block_serialized of Block.Stable.V2.t State_hash.File_storage.tag ]
+       * [ `Scan_state_application_data of
+           Staged_ledger.Scan_state.Application_data.t ]
      , [> `Staged_ledger_application_failed of
           Staged_ledger.Staged_ledger_error.t
        | `Invalid_body_reference

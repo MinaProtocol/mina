@@ -3,16 +3,24 @@ open Mina_base
 module Common : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
+    module V3 : sig
+      type t
+    end
 
     module V2 : sig
       type t
+
+      val to_latest : t -> V3.t
     end
   end]
 
-  type t
+  val create :
+       scan_state:Staged_ledger.Scan_state.t
+    -> pending_coinbase:Pending_coinbase.t
+    -> block_data_opt:Block_data.t option
+    -> t
 
-  val read_all_proofs_from_disk : t -> Stable.V2.t
+  val protocol_state : t -> Mina_state.Protocol_state.Value.t option
 end
 
 (* Historical root data is similar to Limited root data, except that it also
@@ -22,71 +30,55 @@ end
 module Historical : sig
   type t
 
-  val transition : t -> Mina_block.Validated.t
+  val staged_ledger_aux_and_pending_coinbases :
+    t -> Network_types.Staged_ledger_aux_and_pending_coinbases.data_tag
 
-  val scan_state : t -> Staged_ledger.Scan_state.t
+  val required_state_hashes : t -> State_hash.Set.t
 
-  val pending_coinbase : t -> Pending_coinbase.t
+  val protocol_state : t -> Mina_state.Protocol_state.Value.t
 
-  val staged_ledger_target_ledger_hash : t -> Ledger_hash.t
+  val protocol_state_with_hashes :
+    t -> Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t
 
-  val of_breadcrumb : Breadcrumb.t -> t
+  val block_tag : t -> Network_types.Block.data_tag
+
+  val create :
+       block_tag:Network_types.Block.data_tag
+    -> staged_ledger_aux_and_pending_coinbases:
+         Network_types.Staged_ledger_aux_and_pending_coinbases.data_tag
+    -> required_state_hashes:State_hash.Set.t
+    -> protocol_state_with_hashes:
+         Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t
+    -> t
 end
 
 (* Limited root data is similar to Minimal root data, except that it contains
  * the full validated transition at a root instead of just a pointer to one and protocol states for the root scan state *)
 module Limited : sig
-  [%%versioned:
-  module Stable : sig
-    [@@@no_toplevel_latest_type]
+  type t [@@deriving to_yojson, bin_io]
 
-    module V3 : sig
-      type t
+  val block_tag : t -> Mina_block.Stable.Latest.t State_hash.File_storage.tag
 
-      val hashes : t -> State_hash.State_hashes.Stable.V1.t
-
-      val common : t -> Common.Stable.V2.t
-
-      val protocol_states :
-           t
-        -> Mina_state.Protocol_state.Value.Stable.V2.t
-           Mina_base.State_hash.With_state_hashes.Stable.V1.t
-           list
-
-      val create :
-           transition:Mina_block.Validated.Stable.V2.t
-        -> scan_state:Staged_ledger.Scan_state.Stable.V2.t
-        -> pending_coinbase:Pending_coinbase.Stable.V2.t
-        -> protocol_states:
-             Mina_state.Protocol_state.value
-             State_hash.With_state_hashes.Stable.V1.t
-             list
-        -> t
-    end
-  end]
-
-  type t [@@deriving to_yojson]
-
-  val transition : t -> Mina_block.Validated.t
-
-  val hashes : t -> State_hash.State_hashes.t
+  val state_hash : t -> State_hash.t
 
   val scan_state : t -> Staged_ledger.Scan_state.t
 
   val pending_coinbase : t -> Pending_coinbase.t
 
-  val protocol_states :
+  val protocol_states_for_scan_state :
     t -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
 
+  val protocol_state : t -> Mina_state.Protocol_state.value
+
   val create :
-       transition:Mina_block.Validated.t
+       block_tag:Mina_block.Stable.Latest.t State_hash.File_storage.tag
+    -> state_hash:State_hash.t
     -> scan_state:Staged_ledger.Scan_state.t
     -> pending_coinbase:Pending_coinbase.t
-    -> protocol_states:
+    -> protocol_states_for_scan_state:
          Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
+    -> protocol_state:Mina_state.Protocol_state.value
     -> t
-
-  val common : t -> Common.t
 end
 
 (* Minimal root data contains the smallest amount of information about a root.
@@ -97,57 +89,61 @@ end
 module Minimal : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
+    module V3 : sig
+      type t
+    end
 
     module V2 : sig
       type t
 
-      val hash : t -> State_hash.t
-
-      val of_limited : common:Common.Stable.V2.t -> State_hash.Stable.V1.t -> t
-
-      val common : t -> Common.Stable.V2.t
-
-      val scan_state : t -> Staged_ledger.Scan_state.Stable.V2.t
-
-      val pending_coinbase : t -> Pending_coinbase.Stable.V2.t
+      val to_latest : t -> V3.t
     end
   end]
 
-  type t
+  val common : t -> Common.t
 
-  val hash : t -> State_hash.t
+  val state_hash : t -> State_hash.t
 
   val scan_state : t -> Staged_ledger.Scan_state.t
 
   val pending_coinbase : t -> Pending_coinbase.t
 
-  val of_limited : common:Common.t -> State_hash.t -> t
+  val of_common : state_hash:State_hash.t -> Common.t -> t
+
+  val block_data_opt : t -> Block_data.t option
 
   val upgrade :
        t
-    -> transition:Mina_block.Validated.t
-    -> protocol_states:
-         (Mina_base.State_hash.t * Mina_state.Protocol_state.Value.t) list
+    -> protocol_states_for_scan_state:
+         (State_hash.t * Mina_state.Protocol_state.value) list
+    -> protocol_state:Mina_state.Protocol_state.Value.t
+    -> block_tag:Mina_block.Stable.Latest.t State_hash.File_storage.tag
     -> Limited.t
 
   val create :
-       hash:State_hash.t
+       state_hash:State_hash.t
     -> scan_state:Staged_ledger.Scan_state.t
     -> pending_coinbase:Pending_coinbase.t
+    -> block_tag:Mina_block.Stable.Latest.t State_hash.File_storage.tag
+    -> protocol_state:Mina_state.Protocol_state.Value.t
+    -> delta_block_chain_proof:State_hash.t Mina_stdlib.Nonempty_list.t
     -> t
-
-  val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
 
 type t =
-  { transition : Mina_block.Validated.t
-  ; staged_ledger : Staged_ledger.t
-  ; protocol_states :
+  { block_tag : Mina_block.Stable.Latest.t Mina_base.State_hash.File_storage.tag
+  ; state_hash : State_hash.t
+  ; protocol_state : Mina_state.Protocol_state.Value.t
+  ; scan_state : Staged_ledger.Scan_state.t
+  ; pending_coinbase : Pending_coinbase.t
+  ; protocol_states_for_scan_state :
       Mina_state.Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
       list
+  ; delta_block_chain_proof : State_hash.t Mina_stdlib.Nonempty_list.t
   }
 
 val minimize : t -> Minimal.t
 
 val limit : t -> Limited.t
+
+val to_common : t -> Common.t

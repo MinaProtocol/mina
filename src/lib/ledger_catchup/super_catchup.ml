@@ -381,10 +381,7 @@ let try_to_connect_hash_chain t hashes ~frontier
       let module T = struct
         type t = State_hash.t list [@@deriving to_yojson]
       end in
-      let all_hashes =
-        List.map (Transition_frontier.all_breadcrumbs frontier) ~f:(fun b ->
-            Frontier_base.Breadcrumb.state_hash b )
-      in
+      let all_hashes = Transition_frontier.all_state_hashes frontier in
       [%log debug]
         ~metadata:
           [ ("n", `Int (List.length acc))
@@ -695,7 +692,7 @@ let create_node ~logger ~downloader t x =
     match x with
     | `Root root ->
         let blockchain_length =
-          Breadcrumb.block root |> Mina_block.blockchain_length
+          Breadcrumb.header root |> Mina_block.Header.blockchain_length
         in
         Internal_tracing.with_state_hash (Breadcrumb.state_hash root)
         @@ fun () ->

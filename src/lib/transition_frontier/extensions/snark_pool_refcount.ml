@@ -15,7 +15,7 @@ module T = struct
           *)
     ; mutable best_tip_table : Work.Set.t
           (** The set of all snark work statements present in the scan state
-              for the last 10 blocks in the best chain.
+              for the last 3 blocks in the best chain.
           *)
     }
 

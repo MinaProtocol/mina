@@ -45,12 +45,16 @@ module Error : sig
   val message : t -> string
 end
 
-val create : logger:Logger.t -> directory:string -> t
+val create :
+  logger:Logger.t -> directory:string -> root_history_capacity:int -> t
+
+val root_history_capacity : t -> int
 
 val close : t -> unit
 
 val check :
-     t
+     ?check_arcs:bool
+  -> t
   -> genesis_state_hash:State_hash.t
   -> ( Frozen_ledger_hash.t
      , [> `Not_initialized
@@ -69,7 +73,7 @@ val check :
          | `Raised of Core_kernel.Error.t ] ] )
      Result.t
 
-val initialize : t -> root_data:Root_data.Limited.t -> unit
+val initialize : t -> root_data:Root_data.t -> unit
 
 val find_arcs_and_root :
      t
@@ -81,13 +85,16 @@ val find_arcs_and_root :
 
 val add :
      arcs_cache:State_hash.t list State_hash.Table.t
-  -> transition:Mina_block.Validated.t
+  -> state_hash:State_hash.t
+  -> transition_data:Block_data.Full.t
   -> batch_t
   -> unit
 
 val move_root :
      old_root_hash:State_hash.t
-  -> new_root:Root_data.Limited.Stable.Latest.t
+  -> old_root_history:State_hash.t list
+  -> root_history_capacity:int
+  -> new_root:Root_data.t
   -> garbage:State_hash.t list
   -> batch_t
   -> unit
@@ -100,6 +107,14 @@ val get_transition :
   -> ( Mina_block.Validated.t
      , [> `Not_found of [> `Transition of State_hash.t ] ] )
      Result.t
+
+val get_root_history : t -> State_hash.t list
+
+val set_transition :
+     state_hash:State_hash.t
+  -> transition_data:Block_data.Full.t
+  -> batch_t
+  -> unit
 
 val get_arcs :
      t
@@ -128,7 +143,11 @@ val crawl_successors :
   -> signature_kind:Mina_signature_kind.t
   -> proof_cache_db:Proof_cache_tag.cache_db
   -> init:'a
-  -> f:('a -> Mina_block.Validated.t -> ('a, 'b) Deferred.Result.t)
+  -> f:
+       (   state_hash:State_hash.t
+        -> 'a
+        -> (Mina_block.Validated.t, Block_data.Full.t) Either.t
+        -> ('a, 'b) Deferred.Result.t )
   -> t
   -> State_hash.t
   -> ( unit

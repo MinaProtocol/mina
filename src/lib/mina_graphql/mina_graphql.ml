@@ -2070,7 +2070,7 @@ module Queries = struct
         let transaction_pool = Mina_lib.transaction_pool mina in
         (* TODO: do not compute hashes to just get the status *)
         Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
-          ~transaction_pool txn.data )
+          ~transaction_pool txn.hash )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
@@ -2210,8 +2210,8 @@ module Queries = struct
                     |> Staged_ledger_diff.commands
                   in
                   let block_number =
-                    bc |> Transition_frontier.Breadcrumb.block
-                    |> Mina_block.header |> Mina_block.Header.blockchain_length
+                    bc |> Transition_frontier.Breadcrumb.header
+                    |> Mina_block.Header.blockchain_length
                   in
                   let transaction_seq = ref 0 in
                   let action_list_list =
@@ -2381,38 +2381,40 @@ module Queries = struct
               ~typ:Types.Input.UInt32.arg_typ
           ]
       ~typ:(non_null @@ list @@ non_null Types.pending_work_spec)
-      ~resolve:(fun { ctx = mina; _ } () start_idx end_idx ->
+      ~resolve:(fun { ctx = mina; _ } () _start_idx _end_idx ->
         let snark_job_state = Mina_lib.work_selector mina in
         let snark_pool = Mina_lib.snark_pool mina in
-        let all_work = Work_selector.all_work ~snark_pool snark_job_state in
-        let work_size = all_work |> List.length |> Unsigned.UInt32.of_int in
-        let less_than uint1 uint2 = Unsigned.UInt32.compare uint1 uint2 < 0 in
-        let to_bundle_specs =
-          List.map ~f:(fun (spec, fee_prover) ->
-              let spec =
-                One_or_two.map spec
-                  ~f:
-                    (Snark_work_lib.Work.Single.Spec.map
-                       ~f_proof:Ledger_proof.Cached.read_proof_from_disk
-                       ~f_witness:Transaction_witness.read_all_proofs_from_disk )
-              in
-              { Types.Snark_work_bundle.spec; fee_prover } )
-        in
-        match end_idx with
-        | None when less_than start_idx work_size ->
-            (* drop handles case when start_idx is greater than pending work and is O(start_idx)*)
-            let start = Unsigned.UInt32.to_int start_idx in
-            List.drop all_work start |> to_bundle_specs
-        | Some end_idx
-          when less_than start_idx end_idx && less_than start_idx work_size ->
-            let pos = Unsigned.UInt32.to_int start_idx in
-            let len =
-              Unsigned.UInt32.(
-                min (sub end_idx start_idx) (sub work_size start_idx) |> to_int)
-            in
-            List.sub ~pos ~len all_work |> to_bundle_specs
-        | _ ->
-            [] )
+        let _all_work = Work_selector.all_work ~snark_pool snark_job_state in
+        (* TODO uncomment *)
+        (* let work_size = all_work |> List.length |> Unsigned.UInt32.of_int in
+           let less_than uint1 uint2 = Unsigned.UInt32.compare uint1 uint2 < 0 in
+              let to_bundle_specs =
+             List.map ~f:(fun (spec, fee_prover) ->
+                 let spec =
+                   One_or_two.map spec
+                     ~f:
+                       (Snark_work_lib.Work.Single.Spec.map
+                          ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+                          ~f_witness:Transaction_witness.read_all_proofs_from_disk )
+                 in
+                 { Types.Snark_work_bundle.spec; fee_prover } )
+           in
+           match end_idx with
+           | None when less_than start_idx work_size ->
+               (* drop handles case when start_idx is greater than pending work and is O(start_idx)*)
+               let start = Unsigned.UInt32.to_int start_idx in
+               List.drop all_work start |> to_bundle_specs
+           | Some end_idx
+             when less_than start_idx end_idx && less_than start_idx work_size ->
+               let pos = Unsigned.UInt32.to_int start_idx in
+               let len =
+                 Unsigned.UInt32.(
+                   min (sub end_idx start_idx) (sub work_size start_idx) |> to_int)
+               in
+               List.sub ~pos ~len all_work |> to_bundle_specs
+           | _ ->
+               [] *)
+        [] )
 
   module SnarkedLedgerMembership = struct
     let resolve_membership :

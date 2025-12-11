@@ -57,6 +57,26 @@ module Cached = struct
     { Proof_carrying_data.proof; data = { statement with sok_digest } }
 end
 
+module Tagged = struct
+  type t =
+    ( Mina_state.Snarked_ledger_state.With_sok.t
+    , Proof.t State_hash.File_storage.tag )
+    Proof_carrying_data.t
+
+  let read_proof_from_disk ({ Proof_carrying_data.data = statement; proof } : t)
+      : Stable.Latest.t Or_error.t =
+    let%map.Or_error proof =
+      State_hash.File_storage.read (module Proof.Stable.Latest) proof
+    in
+    Transaction_snark.create ~statement ~proof
+
+  let statement (t : t) = { t.data with sok_digest = () }
+
+  let create ~(statement : Mina_state.Snarked_ledger_state.t) ~sok_digest ~proof
+      : t =
+    { Proof_carrying_data.proof; data = { statement with sok_digest } }
+end
+
 module For_tests = struct
   let mk_dummy_proof statement =
     create ~statement ~sok_digest:Sok_message.Digest.default

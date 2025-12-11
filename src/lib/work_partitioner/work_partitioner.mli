@@ -25,12 +25,11 @@ type t
 val create :
      reassignment_timeout:Time.Span.t
   -> logger:Logger.t
-  -> proof_cache_db:Proof_cache_tag.cache_db
   -> signature_kind:Mina_signature_kind.t
   -> t
 
 type work_from_selector =
-  Snark_work_lib.Spec.Single.t One_or_two.t option Lazy.t
+  Snark_work_lib.Spec.Single.Stable.Latest.t One_or_two.t option Lazy.t
 
 (** [request_partitioned_work ~sok_message ~work_from_selector ~partitioner]
     returns a partitioned job from [partitioner], if there is one available.

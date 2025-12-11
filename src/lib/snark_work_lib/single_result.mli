@@ -28,4 +28,4 @@ module Stable : sig
   end
 end]
 
-type t = (Single_spec.t, Ledger_proof.Cached.t) Poly.t
+type t = (Single_spec.t, Ledger_proof.t) Poly.t

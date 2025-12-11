@@ -4590,39 +4590,38 @@ let add_block_aux_extensional ~proof_cache_db ~logger ~signature_kind ?retries
 let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
     ~logger ~delete_older_than : unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
-    | Diff.Transition_frontier
-        (Breadcrumb_added
-          { block; accounts_accessed; accounts_created; tokens_used; _ } ) -> (
-        let add_block =
-          Block.add_if_doesn't_exist ~logger ~constraint_constants
-            ~accounts_accessed ~accounts_created
-        in
-        let hash = State_hash.With_state_hashes.state_hash in
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
-        let block =
-          With_hash.map
-            ~f:
-              (Mina_block.write_all_proofs_to_disk ~signature_kind
-                 ~proof_cache_db )
-            block
-        in
-        match%bind
-          add_block_aux ~logger ~genesis_constants ~pool ~delete_older_than
-            ~hash ~add_block ~tokens_used block
-        with
-        | Error e ->
-            let state_hash = hash block in
-            [%log warn]
-              ~metadata:
-                [ ("state_hash", State_hash.to_yojson state_hash)
-                ; ("error", `String (Caqti_error.show e))
-                ]
-              "Failed to archive block with state hash $state_hash, see $error" ;
-            Deferred.unit
-        | Ok () ->
-            Deferred.unit )
-    | Transition_frontier _ ->
-        Deferred.unit )
+      | Diff.Transition_frontier
+          (Breadcrumb_added
+            { block; accounts_accessed; accounts_created; tokens_used; _ } )
+      ->
+      (let add_block =
+         Block.add_if_doesn't_exist ~logger ~constraint_constants
+           ~accounts_accessed ~accounts_created
+       in
+       let hash = State_hash.With_state_hashes.state_hash in
+       let signature_kind = Mina_signature_kind.t_DEPRECATED in
+       let block =
+         With_hash.map
+           ~f:
+             (Mina_block.write_all_proofs_to_disk ~signature_kind
+                ~proof_cache_db )
+           block
+       in
+       match%bind
+         add_block_aux ~logger ~genesis_constants ~pool ~delete_older_than ~hash
+           ~add_block ~tokens_used block
+       with
+       | Error e ->
+           let state_hash = hash block in
+           [%log warn]
+             ~metadata:
+               [ ("state_hash", State_hash.to_yojson state_hash)
+               ; ("error", `String (Caqti_error.show e))
+               ]
+             "Failed to archive block with state hash $state_hash, see $error" ;
+           Deferred.unit
+       | Ok () ->
+           Deferred.unit ) )
 
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
@@ -4653,8 +4652,9 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
         Account_id.Set.to_list account_id_set
       in
       let genesis_block =
-        let With_hash.{ data = block; hash = the_hash }, _ =
+        let With_hash.{ data = block; hash = the_hash } =
           Mina_block.genesis ~precomputed_values
+          |> fst |> Mina_block.Validated.forget
         in
         With_hash.{ data = block; hash = the_hash }
       in

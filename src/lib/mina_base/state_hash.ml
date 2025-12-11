@@ -60,3 +60,35 @@ module With_state_hashes = struct
     State_hashes.state_body_hash hash ~compute_hashes:(fun () ->
         compute_hashes data )
 end
+
+module Tag = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'a t = (Stable.V1.t, 'a) Multi_key_file_storage.Tag.Stable.V1.t
+
+      let compare a b = Multi_key_file_storage.Tag.compare Stable.V1.compare a b
+
+      let equal a b = Multi_key_file_storage.Tag.equal Stable.V1.equal a b
+
+      let sexp_of_t a =
+        Multi_key_file_storage.Tag.sexp_of_t Stable.V1.sexp_of_t a
+
+      let t_of_sexp sexp =
+        Multi_key_file_storage.Tag.t_of_sexp Stable.V1.t_of_sexp sexp
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  [%%define_locally Stable.Latest.(compare, equal, sexp_of_t, t_of_sexp)]
+end
+
+module File_storage_filename = struct
+  type filename_key = t
+
+  (* TODO replace with hex string, pass directory parameter *)
+  let filename h = T.to_decimal_string h ^ ".dat"
+end
+
+module File_storage = Multi_key_file_storage.Make_custom (File_storage_filename)

@@ -72,16 +72,36 @@ module type Inputs_intf = sig
   module Staged_ledger : sig
     type t
 
-    val all_work_pairs :
-         t
-      -> get_state:
-           (Mina_base.State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-      -> ( Transaction_witness.t
-         , Ledger_proof.Cached.t )
-         Snark_work_lib.Work.Single.Spec.t
-         One_or_two.t
-         list
-         Or_error.t
+    module Scan_state : sig
+      module Available_job : sig
+        type t
+
+        (* val single_spec :
+                get_state:
+                  (   Mina_base.State_hash.t
+                   -> Mina_state.Protocol_state.Value.t Or_error.t )
+             -> t
+             -> ( Transaction_witness.Stable.Latest.t
+                , Ledger_proof.Stable.Latest.t )
+                Snark_work_lib.Spec.Single.Poly.t
+                Or_error.t
+
+           val single_spec_one_or_two :
+                get_state:
+                  (   Mina_base.State_hash.t
+                   -> Mina_state.Protocol_state.Value.t Or_error.t )
+             -> t One_or_two.t
+             -> ( Transaction_witness.Stable.Latest.t
+                , Ledger_proof.t )
+                Snark_work_lib.Spec.Single.Poly.t
+                One_or_two.t
+                Or_error.t
+        *)
+        val statement : t -> Transaction_snark.Statement.t option
+      end
+    end
+
+    val all_work_pairs : t -> Scan_state.Available_job.t One_or_two.t list
   end
 
   module Transition_frontier : sig
@@ -123,10 +143,7 @@ module type Lib_intf = sig
     val mark_scheduled :
          logger:Logger.t
       -> t
-      -> ( Transaction_witness.t
-         , Ledger_proof.Cached.t )
-         Snark_work_lib.Work.Single.Spec.t
-         One_or_two.t
+      -> Staged_ledger.Scan_state.Available_job.t One_or_two.t
       -> unit
 
     (** [all_unscheduled_expensive_works ~snark_pool ~fee t] filters out all
@@ -137,11 +154,7 @@ module type Lib_intf = sig
          snark_pool:Snark_pool.t
       -> fee:Fee.t
       -> t
-      -> ( Transaction_witness.t
-         , Ledger_proof.Cached.t )
-         Snark_work_lib.Work.Single.Spec.t
-         One_or_two.t
-         list
+      -> Staged_ledger.Scan_state.Available_job.t One_or_two.t list
   end
 
   (**jobs that are not in the snark pool yet*)
@@ -187,10 +200,7 @@ end
 module type Make_selection_method_intf = functor (Lib : Lib_intf) ->
   Selection_method_intf
     with type staged_ledger := Lib.Inputs.Staged_ledger.t
-     and type work :=
-      ( Lib.Inputs.Transaction_witness.t
-      , Lib.Inputs.Ledger_proof.Cached.t )
-      Snark_work_lib.Work.Single.Spec.t
+     and type work := Lib.Inputs.Staged_ledger.Scan_state.Available_job.t
      and type snark_pool := Lib.Inputs.Snark_pool.t
      and type transition_frontier := Lib.Inputs.Transition_frontier.t
      and module State := Lib.State

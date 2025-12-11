@@ -46,6 +46,10 @@ val tail_opt : 'a t -> 'a t option
 (** Apply a function to each element of the non empty list *)
 val map : 'a t -> f:('a -> 'b) -> 'b t
 
+(** Apply a function to each element of the non empty list, returning [Error] if
+ * any of the function applications return [Error] *)
+val map_result : 'a t -> f:('a -> ('b, 'e) Result.t) -> ('b t, 'e) Result.t
+
 (** Apply a function to each element of the non empty list, along with its index
     starting from 0 *)
 val mapi : 'a t -> f:(int -> 'a -> 'b) -> 'b t

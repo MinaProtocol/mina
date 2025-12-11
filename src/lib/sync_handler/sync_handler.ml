@@ -43,13 +43,6 @@ module Make (Inputs : Inputs_intf) :
     in
     Root_history.lookup root_history state_hash
 
-  let protocol_states_in_root_history frontier state_hash =
-    let open Transition_frontier.Extensions in
-    let root_history =
-      get_extension (Transition_frontier.extensions frontier) Root_history
-    in
-    Root_history.protocol_states_for_scan_state root_history state_hash
-
   let get_ledger_by_hash ~frontier ledger_hash =
     let root_ledger =
       Root_ledger.as_unmasked
@@ -116,55 +109,31 @@ module Make (Inputs : Inputs_intf) :
 
   let get_staged_ledger_aux_and_pending_coinbases_at_hash ~logger ~frontier
       state_hash =
-    let open Option.Let_syntax in
-    let protocol_states scan_state =
-      Staged_ledger.Scan_state.required_state_hashes scan_state
-      |> State_hash.Set.to_list
-      |> List.fold_until ~init:(Some [])
-           ~f:(fun acc hash ->
-             match
-               Option.map2
-                 (Transition_frontier.find_protocol_state frontier hash)
-                 acc ~f:List.cons
-             with
-             | None ->
-                 Stop None
-             | Some acc' ->
-                 Continue (Some acc') )
-           ~finish:Fn.id
-    in
+    (* TODO: CAUTION we don't convert the scan state to serialized format *)
     match
-      let%bind breadcrumb = Transition_frontier.find frontier state_hash in
-      let staged_ledger =
-        Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-      in
-      let scan_state = Staged_ledger.scan_state staged_ledger in
-      let staged_ledger_hash = Breadcrumb.staged_ledger_hash breadcrumb in
-      let merkle_root = Staged_ledger_hash.ledger_hash staged_ledger_hash in
-      let%map scan_state_protocol_states = protocol_states scan_state in
-      let pending_coinbase =
-        Staged_ledger.pending_coinbase_collection staged_ledger
-      in
-      [%log debug]
-        ~metadata:
-          [ ( "staged_ledger_hash"
-            , Staged_ledger_hash.to_yojson staged_ledger_hash )
-          ]
-        "sending scan state and pending coinbase" ;
-      (scan_state, merkle_root, pending_coinbase, scan_state_protocol_states)
+      Transition_frontier.staged_ledger_aux_and_pending_coinbases frontier
+        state_hash
     with
-    | Some res ->
-        Some res
     | None ->
-        let open Root_data.Historical in
-        let%bind root = find_in_root_history frontier state_hash in
-        let%map scan_state_protocol_states =
-          protocol_states_in_root_history frontier state_hash
+        let open Transition_frontier.Extensions in
+        let root_history =
+          get_extension (Transition_frontier.extensions frontier) Root_history
         in
-        ( scan_state root
-        , staged_ledger_target_ledger_hash root
-        , pending_coinbase root
-        , scan_state_protocol_states )
+        let%map.Option historical =
+          Root_history.lookup root_history state_hash
+        in
+        Frontier_base.Network_types.Tag_or_data.Tag
+          (Root_data.Historical.staged_ledger_aux_and_pending_coinbases
+             historical )
+    | Some (res, staged_ledger_hash) ->
+        [%log debug]
+          ~metadata:
+            [ ( "staged_ledger_hash"
+              , Staged_ledger_hash.to_yojson staged_ledger_hash )
+            ; ("state_hash", State_hash.to_yojson state_hash)
+            ]
+          "sending scan state and pending coinbase generated from frontier" ;
+        Some (Tag res)
 
   let get_transition_chain ~frontier hashes =
     let open Option.Let_syntax in
@@ -179,15 +148,10 @@ module Make (Inputs : Inputs_intf) :
         None )
     in
     let get hash =
-      let%map validated_transition =
-        Option.merge
-          Transition_frontier.(
-            find frontier hash >>| Breadcrumb.validated_transition)
-          ( find_in_root_history frontier hash
-          >>| Root_data.Historical.transition )
-          ~f:Fn.const
-      in
-      With_hash.data @@ Mina_block.Validated.forget validated_transition
+      Option.first_some
+        Transition_frontier.(find frontier hash >>| Breadcrumb.block_tag)
+        (find_in_root_history frontier hash >>| Root_data.Historical.block_tag)
+      |> Option.map ~f:(fun x -> Frontier_base.Network_types.Tag_or_data.Tag x)
     in
     match Transition_frontier.catchup_state frontier with
     | Full _ ->
@@ -223,15 +187,13 @@ module Make (Inputs : Inputs_intf) :
           (Consensus.Hooks.select
              ~context:(module Context)
              ~existing:
-               (With_hash.map ~f:Mina_block.consensus_state
+               (Breadcrumb.consensus_state_with_hashes
                   best_tip_with_witness.data )
              ~candidate:seen_consensus_state )
           `Keep
       in
       let%map () = Option.some_if is_tip_better () in
-      { best_tip_with_witness with
-        data = With_hash.data best_tip_with_witness.data
-      }
+      best_tip_with_witness
 
     let verify ~context:(module Context : CONTEXT) ~verifier observed_state
         peer_root =

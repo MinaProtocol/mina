@@ -399,8 +399,8 @@ let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
       (Mina_stdlib.Nonempty_list.singleton previous_protocol_state_hash) )
 
 let validate_frontier_dependencies ~to_header
-    ~context:(module Context : CONTEXT) ~root_block ~is_block_in_frontier
-    (t, validation) =
+    ~context:(module Context : CONTEXT) ~root_consensus_state
+    ~is_block_in_frontier (t, validation) =
   let module Context = struct
     include Context
 
@@ -413,13 +413,6 @@ let validate_frontier_dependencies ~to_header
   let open Result.Let_syntax in
   let hash = State_hash.With_state_hashes.state_hash t in
   let protocol_state = Fn.compose Header.protocol_state to_header in
-  let root_consensus_state =
-    With_hash.map
-      ~f:
-        (Fn.compose Protocol_state.consensus_state
-           (Fn.compose Header.protocol_state Block.header) )
-      root_block
-  in
   let parent_hash =
     Protocol_state.previous_state_hash (protocol_state @@ With_hash.data t)
   in
@@ -486,47 +479,112 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   let consensus_state = Protocol_state.consensus_state protocol_state in
   let global_slot = Consensus_state.global_slot_since_genesis consensus_state in
   let body = Block.body block in
+  let state_hash = State_hash.With_state_hashes.state_hash t in
   let apply_start_time = Core.Time.now () in
   let body_ref_from_header = Blockchain_state.body_reference blockchain_state in
+  let body_stable = Staged_ledger_diff.Body.read_all_proofs_from_disk body in
+  let block_stable = Block.Stable.Latest.create ~header ~body:body_stable in
   let body_ref_computed =
     Staged_ledger_diff.Body.compute_reference
       ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-    @@ Staged_ledger_diff.Body.read_all_proofs_from_disk body
+      body_stable
   in
   let%bind.Deferred.Result () =
     if Blake2.equal body_ref_computed body_ref_from_header then
       Deferred.Result.return ()
     else Deferred.Result.fail `Invalid_body_reference
   in
-  let%bind.Deferred.Result ( `Ledger_proof proof_opt
-                           , `Staged_ledger transitioned_staged_ledger
-                           , `Accounts_created accounts_created
-                           , `Pending_coinbase_update _ ) =
-    Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
-      ~get_completed_work
-      ~constraint_constants:
-        precomputed_values.Precomputed_values.constraint_constants ~global_slot
-      ~logger ~verifier parent_staged_ledger
-      (Staged_ledger_diff.Body.staged_ledger_diff body)
-      ~current_state_view:
-        Mina_state.Protocol_state.(Body.view @@ body parent_protocol_state)
-      ~state_and_body_hash:
-        (let body_hash =
-           Protocol_state.(Body.hash @@ body parent_protocol_state)
-         in
-         ( (Protocol_state.hashes_with_body parent_protocol_state ~body_hash)
-             .state_hash
-         , body_hash ) )
-      ~coinbase_receiver:(Consensus_state.coinbase_receiver consensus_state)
-      ~supercharge_coinbase:
-        (Consensus_state.supercharge_coinbase consensus_state)
-      ~zkapp_cmd_limit_hardcap:
-        precomputed_values.Precomputed_values.genesis_constants
-          .zkapp_cmd_limit_hardcap
-      ~signature_kind:Mina_signature_kind.t_DEPRECATED ?transaction_pool_proxy
-    |> Deferred.Result.map_error ~f:(fun e ->
-           `Staged_ledger_application_failed e )
+  let parent_protocol_state_body = Protocol_state.body parent_protocol_state in
+  [%log internal] "Apply_diff" ;
+  let state_and_body_hash =
+    let body_hash = Protocol_state.(Body.hash @@ body parent_protocol_state) in
+    ( (Protocol_state.hashes_with_body parent_protocol_state ~body_hash)
+        .state_hash
+    , body_hash )
   in
+  let constraint_constants =
+    precomputed_values.Precomputed_values.constraint_constants
+  in
+  let%bind.Deferred.Result ( transitioned_staged_ledger
+                           , proof_opt
+                           , accounts_created
+                           , tagged_block
+                           , scan_state_application_data ) =
+    Deferred.Result.map_error ~f:(fun e -> `Staged_ledger_application_failed e)
+    @@ let%bind.Deferred.Result ( `Ledger new_ledger
+                                , `Accounts_created accounts_created
+                                , `Stack_update stack_update
+                                , `First_pass_ledger_end first_pass_ledger_end
+                                , `Witnesses witnesses
+                                , `Works works
+                                , `Pending_coinbase_update (is_new_stack, _) ) =
+         Staged_ledger.apply_diff
+           ?skip_verification:skip_staged_ledger_verification
+           ~get_completed_work ~constraint_constants ~global_slot ~logger
+           ~verifier parent_staged_ledger
+           (Staged_ledger_diff.Body.staged_ledger_diff body)
+           ~parent_protocol_state_body ~state_and_body_hash
+           ~coinbase_receiver:
+             (Consensus_state.coinbase_receiver consensus_state)
+           ~supercharge_coinbase:
+             (Consensus_state.supercharge_coinbase consensus_state)
+           ~zkapp_cmd_limit_hardcap:
+             precomputed_values.Precomputed_values.genesis_constants
+               .zkapp_cmd_limit_hardcap
+           ~signature_kind:Mina_signature_kind.t_DEPRECATED
+           ?transaction_pool_proxy
+       in
+       let tagged_witnesses, tagged_works, tagged_block =
+         State_hash.File_storage.write_values_exn state_hash ~f:(fun writer ->
+             let witnesses' =
+               Staged_ledger.Scan_state.Transaction_with_witness.persist_many
+                 witnesses writer
+             in
+             let works' =
+               Staged_ledger.Scan_state.Ledger_proof_with_sok_message
+               .persist_many works writer
+             in
+             let block' =
+               State_hash.File_storage.write_value writer
+                 (module Block.Stable.Latest)
+                 block_stable
+             in
+             (witnesses', works', block') )
+       in
+       let scan_state_application_data =
+         { Staged_ledger.Scan_state.Application_data.is_new_stack
+         ; stack_update
+         ; first_pass_ledger_end
+         ; tagged_works
+         ; tagged_witnesses
+         }
+       in
+       let%map.Deferred.Result new_staged_ledger, res_opt =
+         let skip_verification =
+           [%equal: [ `All | `Proofs ] option] skip_staged_ledger_verification
+             (Some `All)
+         in
+         Staged_ledger.apply_to_scan_state ~logger ~skip_verification
+           ~log_prefix:"apply_diff" ~ledger:new_ledger
+           ~previous_pending_coinbase_collection:
+             (Staged_ledger.pending_coinbase_collection parent_staged_ledger)
+           ~previous_scan_state:(Staged_ledger.scan_state parent_staged_ledger)
+           ~constraint_constants scan_state_application_data
+       in
+       Or_error.iter_error
+         ( Staged_ledger.update_scan_state_metrics
+         @@ Staged_ledger.scan_state new_staged_ledger )
+         ~f:(fun e ->
+           [%log error]
+             ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+             !"Error updating metrics after applying scan state: $error" ) ;
+       ( new_staged_ledger
+       , res_opt
+       , accounts_created
+       , tagged_block
+       , scan_state_application_data )
+  in
+  [%log internal] "Diff_applied" ;
   let staged_ledger_hash_opt =
     match skip_staged_ledger_verification with
     | Some `All ->
@@ -542,7 +600,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
       [ ( "time_elapsed"
         , `Float Core.Time.(Span.to_ms @@ diff (now ()) apply_start_time) )
       ]
-    "Staged_ledger.apply takes $time_elapsed" ;
+    "Staged ledger diff application (diffs + scan state) takes $time_elapsed" ;
   let snarked_ledger_hash =
     match proof_opt with
     | None ->
@@ -550,7 +608,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
         Protocol_state.snarked_ledger_hash parent_protocol_state
     | Some proof ->
         Mina_state.Snarked_ledger_state.snarked_ledger_hash
-        @@ Ledger_proof.Cached.statement proof
+        @@ Ledger_proof.Tagged.statement proof
   in
   let staged_ledger_hash_check staged_ledger_hash =
     if
@@ -582,7 +640,9 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
         , `Block_with_validation
             (t, Unsafe.set_valid_staged_ledger_diff validation)
         , `Staged_ledger transitioned_staged_ledger
-        , `Accounts_created accounts_created )
+        , `Accounts_created accounts_created
+        , `Block_serialized tagged_block
+        , `Scan_state_application_data scan_state_application_data )
   | Error errors ->
       Error (`Invalid_staged_ledger_diff errors)
 
