@@ -440,10 +440,7 @@ let gen_uri =
 let gen : t Quickcheck.Generator.t =
   let open Quickcheck in
   let open Generator.Let_syntax in
-  let app_state =
-    Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
-        F.random () )
-  in
+  let%bind app_state = Zkapp_state.Value.gen in
   let%bind zkapp_version = Mina_numbers.Zkapp_version.gen in
   let%bind seq_state = Generator.list_with_length 5 Field.gen in
   let%map zkapp_uri = gen_uri in
