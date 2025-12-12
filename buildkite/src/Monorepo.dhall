@@ -49,7 +49,7 @@ let commands
 
           in  Cmd.run
                 (     "./buildkite/scripts/monorepo.sh"
-                  ++  " --scopes ${PipelineScope.join requestedScopes} "
+                  ++  " --scope ${PipelineScope.join requestedScopes} "
                   ++  " --tags ${PipelineTag.join requestedTags} "
                   ++  " --filter-mode ${PipelineFilterMode.show filterMode} "
                   ++  " --selection ${PipelineJobSelection.show selection} "

@@ -14,15 +14,17 @@
 #     1. selection       (Triaged or Full) - Determines the mode of selection for triggering jobs.
 #                                            Triaged mode checks for relevant changes,
 #                                            while Full mode triggers all jobs, which falls under scope and filter.
-#     5. jobs-filter     STRING            - A filter is a group of job tags, those tags can be any string.
-#     6. scope-filter    STRING            - A filter string to determine if the job falls under a specific scope.
+#     2. tags            STRING            - A filter is a group of job tags, those tags can be any string.
+#     3. scope           STRING            - A filter string to determine if the job falls under a specific scope.
 #                                            Scope is a gate level in mina like :
 #                                             - PR - for pull requests
 #                                             - Nightly - for builds that run extended scope of tests including heavy tests
 #                                                         which might take longer time to execute
 #                                             - Release - full builds with all known jobs, including all supported networks/codenames
 #                                             - Mainline Nightly - like above but for mainline branch on nightly basis
-#     7. dirty-when      STRING            - A pattern used to check for relevant changes in the repository.
+#     4. dirty-when      STRING            - A pattern used to check for relevant changes in the repository.
+#
+# ------------------------------------------------------------------------------
 
 set -euo pipefail
 
@@ -35,8 +37,8 @@ Options:
   --is-included-in-tag   BOOL      Is included in tag (True/False)
   --is-included-in-scope BOOL      Is included in scope (True/False)
   --job-name NAME        STRING    Job name
-  --jobs-filter FILTER   STRING    Jobs filter
-  --scope-filter FILTER  STRING    Scope filter
+  --tags FILTER          STRING    Jobs filter (tags separated by commas)
+  --scope FILTER         STRING    Scope filter (PR, Nightly, Release, Mainline Nightly)
   --dirty-when PATTERN   STRING    Pattern for dirty check
   --trigger CMD          STRING    Trigger command
   -h, --help             Show this help message
@@ -48,9 +50,8 @@ SELECTION_MODE=""
 IS_INCLUDED_IN_TAG=""
 IS_INCLUDED_IN_SCOPE=""
 JOB_NAME=""
-JOB_PATH=""
-JOBS_FILTER=""
-SCOPE_FILTER=""
+TAGS=""
+SCOPES=""
 DIRTY_WHEN=""
 GIT_DIFF_FILE=""
 DRY_RUN=false
@@ -66,12 +67,10 @@ while [[ $# -gt 0 ]]; do
       IS_INCLUDED_IN_SCOPE="$2"; shift 2;;
     --job-name)
       JOB_NAME="$2"; shift 2;;
-    --job-path)
-      JOB_PATH="$2"; shift 2;;
-    --jobs-filter)
-      JOBS_FILTER="$2"; shift 2;;
-    --scope-filter)
-      SCOPE_FILTER="$2"; shift 2;;
+    --tags)
+      TAGS="$2"; shift 2;;
+    --scopes)
+      SCOPES="$2"; shift 2;;
     --dirty-when)
       DIRTY_WHEN="$2"; shift 2;;
     -h|--help)
@@ -82,8 +81,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Require all arguments
-if [[ -z "$SELECTION_MODE" || -z "$IS_INCLUDED_IN_TAG" || -z "$IS_INCLUDED_IN_SCOPE" || -z "$JOB_NAME" || -z "$JOBS_FILTER" || -z "$SCOPE_FILTER" || -z "$DIRTY_WHEN" ]]; then
-  echo "Error: All arguments --selection-mode, --is-included-in-tag, --is-included-in-scope, --job-name, --jobs-filter, --scope-filter, and --dirty-when are required."
+if [[ -z "$SELECTION_MODE" || -z "$IS_INCLUDED_IN_TAG" || -z "$IS_INCLUDED_IN_SCOPE" || -z "$JOB_NAME" || -z "$TAGS" || -z "$SCOPES" || -z "$DIRTY_WHEN" ]]; then
+  echo "Error: All arguments --selection-mode, --is-included-in-tag, --is-included-in-scope, --job-name, --tags, --scopes, and --dirty-when are required."
   exit 1
 fi
 
