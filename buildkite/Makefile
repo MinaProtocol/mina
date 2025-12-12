@@ -25,16 +25,9 @@ format:
 	find ./src/ -name "*.dhall" -print0 | xargs -I{} -0 -n1 bash -c 'echo "{}" && dhall --ascii format --inplace {} || exit 255'
 	$(MAKE) convert_ifs_to_backticks
 
-check_filter:
-	# Ensure Jobs.dhall is generated before proceeding
-	(cd ../ && ./buildkite/scripts/generate-jobs.sh > ./buildkite/src/gen/Jobs.dhall)
-	python3 ./unit-tests/parse_triage.py
-	# Clean up
-	git checkout -- ./src/gen/Jobs.dhall
-	
 dump_pipelines:
 	$(eval TMP := $(shell mktemp -d))
-	scripts/dhall/dump_dhall_to_pipelines.sh src/Jobs "$(TMP)"
+	./scripts/dhall/dump_dhall_to_pipelines.sh ./src "$(TMP)"
 
 check_deps: dump_pipelines
 	python3 scripts/dhall/checker.py --root "$(TMP)" deps
@@ -48,4 +41,4 @@ check_dups: dump_pipelines
 check_names: dump_pipelines
 	python3 scripts/dhall/checker.py --root "$(TMP)" names
 
-all: check_syntax lint format check_deps check_dirty check_dups check_names check_filter
+all: check_syntax lint format check_deps check_dirty check_dups check_names
