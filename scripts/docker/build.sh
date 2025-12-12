@@ -126,7 +126,7 @@ case "${INPUT_PLATFORM}" in
 esac
 CANONICAL_ARCH_ARG="--build-arg CANONICAL_ARCH=$CANONICAL_ARCH"
 DEBIAN_ARCH_ARG="--build-arg DEBIAN_ARCH=$DEBIAN_ARCH"
-DOCKER_REPO_ARG="--build-arg DOCKER_REPO=$DOCKER_REGISTRY"
+DOCKER_REPO_ARG="--build-arg docker_repo=$DOCKER_REGISTRY"
 
 DEB_RELEASE="--build-arg deb_release=$INPUT_RELEASE"
 if [[ -z "$INPUT_RELEASE" ]]; then
@@ -235,6 +235,9 @@ case "${SERVICE}" in
     delegation-backend)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend"
         DOCKER_CONTEXT="src/app/delegation_backend"
+        ;;
+    mina-delegation-verifier)
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-stateless-verifier"
         ;;
     delegation-backend-toolchain)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
