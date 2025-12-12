@@ -1,17 +1,15 @@
 // Provides: plonk_wasm
-var plonk_wasm = (function() {
+var plonk_wasm = (function () {
   var wasm = require('./plonk_wasm.js');
 
   try {
-    var native =  require('@o1js/native-' + process.platform + '-' + process.arch)
+    var native = require('@o1js/native-' + process.platform + '-' + process.arch)
 
     // THIS IS A RUNTIME OVERRIDE
     // YOU HAVE TO RUN IT TO SEE IF IT BREAKS
     // IT WON'T CRASH UNLESS O1JS_REQUIRE_NATIVE_BINDINGS
     // IS SET
     var overrides = [
-      "WasmVecVecFp",
-      "WasmVecVecFq",
       "prover_to_json",
       "prover_index_fp_deserialize",
       "prover_index_fq_deserialize",
@@ -158,12 +156,26 @@ var plonk_wasm = (function() {
       "WasmFqProverCommitments",
     ];
 
+    // These are constructor overrides, meant for full napi classes.
+    // Otherwise, if treated as a normal override, it would return the whole
+    // object itself, not an instance.
+    var ctorOverrides = new Set([
+      "WasmVecVecFp",
+      "WasmVecVecFq",
+    ]);
+
     overrides.forEach(function (override) {
-      wasm[override] = function(x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12) {
+      wasm[override] = function (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12) {
         console.log("calling native override:", override);
         return native[override](x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12);
       }
-    })
+    });
+    ctorOverrides.forEach(function (override) {
+      wasm[override] = function (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12) {
+        console.log("calling class native override:", override);
+        return new native[override](x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12);
+      }
+    });
     wasm.native = true;
   } catch (e) {
     if (process.env.O1JS_REQUIRE_NATIVE_BINDINGS) {
