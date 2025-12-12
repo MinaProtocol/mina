@@ -90,5 +90,11 @@ module Hardfork = struct
 
     let of_stable (value : Value.Stable.Latest.t) : t =
       Vector.extend_exn value Nat.N32.n Zkapp_basic.F.zero
+
+    let stable_size_lte : (Nat.N8.n, Nat.N32.n) Nat.Lte.t =
+      Nat.lte_exn Nat.N8.n Nat.N32.n
+
+    let unsafe_to_stable (value : t) : Value.Stable.Latest.t =
+      Vector.trim value stable_size_lte
   end
 end
