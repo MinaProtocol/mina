@@ -17,8 +17,7 @@ type mina_initialization =
 (* keep this code in sync with Client.chain_id_inputs, Mina_commands.chain_id_inputs, and
    Daemon_rpcs.Chain_id_inputs
 *)
-let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
-    ~protocol_transaction_version ~protocol_network_version =
+let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants =
   (* if this changes, also change Mina_commands.chain_id_inputs *)
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
@@ -28,10 +27,10 @@ let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
   in
   let version_digest v = Int.to_string v |> Md5.digest_string |> Md5.to_hex in
   let protocol_transaction_version_digest =
-    version_digest protocol_transaction_version
+    version_digest Protocol_version.(transaction current)
   in
   let protocol_network_version_digest =
-    version_digest protocol_network_version
+    version_digest Protocol_version.(network current)
   in
   let b2 =
     Blake2.digest_string
@@ -1326,17 +1325,10 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
 
 Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let chain_id =
-            let protocol_transaction_version =
-              Protocol_version.(transaction current)
-            in
-            let protocol_network_version =
-              Protocol_version.(transaction current)
-            in
             chain_id ~genesis_state_hash
               ~genesis_constants:precomputed_values.genesis_constants
               ~constraint_system_digests:
                 (Lazy.force precomputed_values.constraint_system_digests)
-              ~protocol_transaction_version ~protocol_network_version
           in
           [%log info] "Daemon will use chain id %s" chain_id ;
           [%log info] "Daemon running protocol version %s"
