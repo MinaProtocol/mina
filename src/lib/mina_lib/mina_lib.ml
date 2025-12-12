@@ -1756,6 +1756,38 @@ let initialize_zkapp_vk_cache_db (config : Config.t) =
     config.zkapp_vk_cache_location
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
+let make_genesis_ledger_converting_if_needed (m : (module CONTEXT))
+    ~get_current_frontier =
+  let module Context = (val m) in
+  let hardfork_slot =
+    let current_genesis_global_slot =
+      let%map.Option { global_slot_since_genesis = current_genesis_global_slot
+                     ; _
+                     } =
+        Context.constraint_constants.Genesis_constants.Constraint_constants.fork
+      in
+      current_genesis_global_slot
+    in
+    let%map.Option hardfork_slot_since_last_hf =
+      Runtime_config.scheduled_hard_fork_genesis_slot
+        Context.precomputed_values.runtime_config
+    in
+    Mina_numbers.Global_slot_since_hard_fork.to_global_slot_since_genesis
+      ~current_genesis_global_slot hardfork_slot_since_last_hf
+  in
+  let (frontier : Transition_frontier.t option) = get_current_frontier () in
+  match (hardfork_slot, frontier) with
+  | Some hardfork_slot, Some frontier ->
+      [%log' debug Context.logger]
+        "Synced, starting to create converting copies of the genesis ledger" ;
+      let root = Transition_frontier.root_snarked_ledger frontier in
+      let%bind (_ : Root_ledger.t) =
+        Mina_ledger.Root.make_converting ~hardfork_slot root
+      in
+      Deferred.return ()
+  | _ ->
+      Deferred.unit
+
 let create ~commit_id ?wallets (config : Config.t) =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
   [%log' info config.logger] "Creating daemon with commit id: %s" commit_id ;
@@ -2531,9 +2563,14 @@ let create ~commit_id ?wallets (config : Config.t) =
                         |> Validation.header
                         |> Mina_block.Header.blockchain_length
                       in
-                      fetch_completed_snarks
+                      let%bind () =
+                        fetch_completed_snarks
+                          (module Context)
+                          snark_pool net received_block get_current_frontier
+                      in
+                      make_genesis_ledger_converting_if_needed
                         (module Context)
-                        snark_pool net received_block get_current_frontier
+                        ~get_current_frontier
                   | Ok (`Catchup as s)
                   | Ok (`Listening as s)
                   | Ok (`Connecting as s)
