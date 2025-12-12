@@ -122,7 +122,7 @@ let runInDockerWithPostgresConn
                             , OnlineTarGzDump =
                                     \(url : Text)
                                 ->  [ "curl -sSL ${url} | tar -xz"
-                                    , "docker exec ${postgresDockerName} find /workdir -name \"*.sql\" -exec psql ${pg_conn} -f {} \\;"
+                                    , "docker exec ${postgresDockerName} find /workdir -maxdepth 1 -name \"*.sql\" -exec psql ${pg_conn} -f {} \\;"
                                     ]
                             }
                             script
