@@ -104,5 +104,11 @@ module Hardfork = struct
 
     let unsafe_to_stable (value : t) : Value.Stable.Latest.t =
       Vector.trim value stable_size_lte
+
+    let%test_unit "of_stable followed by unsafe_to_stable is identity" =
+      Quickcheck.test Value.gen ~f:(fun original ->
+          let extended = of_stable original in
+          let roundtripped = unsafe_to_stable extended in
+          [%test_eq: Value.Stable.Latest.t] original roundtripped )
   end
 end
