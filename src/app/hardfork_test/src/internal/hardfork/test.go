@@ -131,8 +131,8 @@ func (t *HardforkTest) Run() error {
 			// 2. fork validation is agnostic to fork method and it's checked regardless of fork method
 			t.Logger.Info("Phase 2: Forking the legacy way...")
 
-			idx := rand.Intn(len(analysis.CandidateRestPortsForFork))
-			forkConfigBytes, err := t.GetForkConfig(analysis.CandidateRestPortsForFork[idx])
+			idx := rand.Intn(len(analysis.CandidatePortBasesForFork))
+			forkConfigBytes, err := t.GetForkConfig(analysis.CandidatePortBasesForFork[idx] + int(PORT_REST))
 			if err != nil {
 				return err
 			}

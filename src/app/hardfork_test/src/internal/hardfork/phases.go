@@ -175,8 +175,8 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 
 	forkDataPath := fmt.Sprintf("%s/fork_data", cwd)
 
-	idx := rand.Intn(len(analysis.CandidateRestPortsForFork))
-	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, analysis.CandidateRestPortsForFork[idx]); err != nil {
+	idx := rand.Intn(len(analysis.CandidatePortBasesForFork))
+	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, analysis.CandidatePortBasesForFork[idx]+int(PORT_CLIENT)); err != nil {
 		return nil, err
 	}
 
