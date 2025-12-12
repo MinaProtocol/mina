@@ -15,12 +15,26 @@ var caml_pasta_fp_plonk_proof_create = function (
   for (var i = 1; i < witness_cols.length; i++) {
     w.push(tsRustConversionNative.fp.vectorToRust(witness_cols[i]));
   }
+
   witness_cols = w;
   prev_challenges = tsRustConversionNative.fp.vectorToRust(prev_challenges);
   var wasm_runtime_tables =
     tsRustConversionNative.fp.runtimeTablesToRust(caml_runtime_tables);
   prev_sgs = tsRustConversionNative.fp.pointsToRust(prev_sgs);
 
+  /* 
+  index: &External<$NapiIndex>,
+  witness: $NapiVecVec,
+  runtime_tables: NapiVector<JsRuntimeTableF>,
+  prev_challenges: NapiFlatVector<$NapiF>,
+  prev_sgs: NapiVector<$NapiG>,
+  */
+
+  console.log('index: ', index);
+  console.log('witness cols: ', witness_cols)
+  console.log("wasm_runtime_tables: ", wasm_runtime_tables)
+  console.log('prev challenges: ', prev_challenges)
+  console.log('prev_sgs: ', prev_sgs)
   var proof = plonk_wasm.caml_pasta_fp_plonk_proof_create(
     index,
     witness_cols,
@@ -28,6 +42,7 @@ var caml_pasta_fp_plonk_proof_create = function (
     prev_challenges,
     prev_sgs
   );
+  console.log('proof?')
   return tsRustConversionNative.fp.proofFromRust(proof);
 };
 
@@ -112,7 +127,7 @@ var caml_pasta_fq_plonk_proof_verify = function (index, proof) {
 var caml_pasta_fq_plonk_proof_batch_verify = function (indexes, proofs) {
   indexes = tsRustConversionNative.mapMlArrayToRustVector(
     indexes,
-    tsRustConversionNatsRustConversionNativetive.fq.verifierIndexToRust
+    tsRustConversionNative.fq.verifierIndexToRust
   );
   proofs = tsRustConversionNative.mapMlArrayToRustVector(
     proofs,

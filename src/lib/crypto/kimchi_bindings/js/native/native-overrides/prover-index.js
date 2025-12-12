@@ -136,6 +136,7 @@ var caml_pasta_fp_plonk_index_create = function (
   urs,
   lazy_mode
 ) {
+  console.log('passing through wasm lookup tables')
   var wasm_lookup_tables =
     tsRustConversionNative.fp.lookupTablesToRust(caml_lookup_tables);
   var wasm_runtime_table_cfgs = tsRustConversionNative.fp.runtimeTableCfgsToRust(

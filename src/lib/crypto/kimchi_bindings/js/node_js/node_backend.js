@@ -28,6 +28,8 @@ var plonk_wasm = (function () {
       "WasmFqShifts",
       "WasmFpLookupSelectors",
       "WasmFqLookupSelectors",
+      "WasmFpLookupVerifierIndex",
+      "WasmFqLookupVerifierIndex",
       "WasmFpPlonkVerificationEvals",
       "WasmFqPlonkVerificationEvals",
       "WasmFpPlonkLookupVerifierIndex",
@@ -154,6 +156,8 @@ var plonk_wasm = (function () {
       "WasmFqProofEvaluations",
       "WasmFpProverCommitments",
       "WasmFqProverCommitments",
+      "WasmFpRuntimeTable",
+      "WasmFqRuntimeTable",
     ];
 
     // These are constructor overrides, meant for full napi classes.
