@@ -30,6 +30,12 @@ let for_unit_tests =
         ~consensus_constants:(Lazy.force Consensus.Constants.for_unit_tests)
         ~genesis_body_reference
     in
+    let chain_id =
+      Genesis_proof.chain_id
+        ~genesis_constants:Genesis_constants.For_unit_tests.t
+        ~constraint_system_digests:(Lazy.force hashes_for_unit_tests)
+        ~genesis_state_hash:protocol_state_with_hashes.hash.state_hash
+    in
     { runtime_config = Runtime_config.default
     ; constraint_constants =
         Genesis_constants.For_unit_tests.Constraint_constants.t
@@ -43,4 +49,5 @@ let for_unit_tests =
     ; constraint_system_digests = hashes_for_unit_tests
     ; proof_data = None
     ; signature_kind = Mina_signature_kind.Testnet
+    ; chain_id
     })

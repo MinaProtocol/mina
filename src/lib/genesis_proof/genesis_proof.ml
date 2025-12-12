@@ -95,6 +95,7 @@ module T = struct
     ; constraint_system_digests : (string * Md5_lib.t) list Lazy.t
     ; proof_data : Proof_data.t option
     ; signature_kind : Mina_signature_kind.t
+    ; chain_id : string
     }
 
   let runtime_config { runtime_config; _ } = runtime_config
@@ -160,26 +161,68 @@ let digests (module T : Transaction_snark.S)
   let%map blockchain_digests = B.constraint_system_digests in
   txn_digests @ blockchain_digests
 
-let blockchain_snark_state (inputs : Inputs.t) :
+let blockchain_snark_state ~signature_kind ~constraint_constants ~proof_level :
     (module Transaction_snark.S)
     * (module Blockchain_snark.Blockchain_snark_state.S) =
   let module T = Transaction_snark.Make (struct
-    let signature_kind = inputs.signature_kind
+    let signature_kind = signature_kind
 
-    let constraint_constants = inputs.constraint_constants
+    let constraint_constants = constraint_constants
 
-    let proof_level = inputs.proof_level
+    let proof_level = proof_level
   end) in
   let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
     let tag = T.tag
 
-    let constraint_constants = inputs.constraint_constants
+    let constraint_constants = constraint_constants
 
-    let proof_level = inputs.proof_level
+    let proof_level = proof_level
   end) in
   ((module T), (module B))
 
+let constraint_system_digests ~signature_kind ~constraint_constants ~proof_level
+    =
+  lazy
+    (let txn, b =
+       blockchain_snark_state ~signature_kind ~constraint_constants ~proof_level
+     in
+     Lazy.force (digests txn b) )
+
+(* keep this code in sync with Client.chain_id_inputs, Mina_commands.chain_id_inputs, and
+   Daemon_rpcs.Chain_id_inputs
+*)
+let chain_id ~genesis_constants ~constraint_system_digests ~genesis_state_hash =
+  (* if this changes, also change Mina_commands.chain_id_inputs *)
+  let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
+  let genesis_constants_hash = Genesis_constants.hash genesis_constants in
+  let all_snark_keys =
+    List.map constraint_system_digests ~f:(fun (_, digest) -> Md5.to_hex digest)
+    |> String.concat ~sep:""
+  in
+  let version_digest v = Int.to_string v |> Md5.digest_string |> Md5.to_hex in
+  let protocol_transaction_version_digest =
+    version_digest Protocol_version.(transaction current)
+  in
+  let protocol_network_version_digest =
+    version_digest Protocol_version.(network current)
+  in
+  let b2 =
+    Blake2.digest_string
+      ( genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash
+      ^ protocol_transaction_version_digest ^ protocol_network_version_digest )
+  in
+  Blake2.to_hex b2
+
 let create_values_no_proof (t : Inputs.t) =
+  let constraint_system_digests =
+    constraint_system_digests ~signature_kind:t.signature_kind
+      ~constraint_constants:t.constraint_constants ~proof_level:t.proof_level
+  in
+  let chain_id =
+    chain_id ~genesis_constants:t.genesis_constants
+      ~constraint_system_digests:(Lazy.force constraint_system_digests)
+      ~genesis_state_hash:t.protocol_state_with_hashes.hash.state_hash
+  in
   { runtime_config = t.runtime_config
   ; constraint_constants = t.constraint_constants
   ; proof_level = t.proof_level
@@ -189,12 +232,10 @@ let create_values_no_proof (t : Inputs.t) =
   ; genesis_body_reference = t.genesis_body_reference
   ; consensus_constants = t.consensus_constants
   ; protocol_state_with_hashes = t.protocol_state_with_hashes
-  ; constraint_system_digests =
-      lazy
-        (let txn, b = blockchain_snark_state t in
-         Lazy.force (digests txn b) )
+  ; constraint_system_digests
   ; proof_data = None
   ; signature_kind = t.signature_kind
+  ; chain_id
   }
 
 let to_inputs (t : t) : Inputs.t =

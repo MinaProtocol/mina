@@ -14,31 +14,6 @@ type mina_initialization =
   ; itn_graphql_port : int option
   }
 
-(* keep this code in sync with Client.chain_id_inputs, Mina_commands.chain_id_inputs, and
-   Daemon_rpcs.Chain_id_inputs
-*)
-let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants =
-  (* if this changes, also change Mina_commands.chain_id_inputs *)
-  let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
-  let genesis_constants_hash = Genesis_constants.hash genesis_constants in
-  let all_snark_keys =
-    List.map constraint_system_digests ~f:(fun (_, digest) -> Md5.to_hex digest)
-    |> String.concat ~sep:""
-  in
-  let version_digest v = Int.to_string v |> Md5.digest_string |> Md5.to_hex in
-  let protocol_transaction_version_digest =
-    version_digest Protocol_version.(transaction current)
-  in
-  let protocol_network_version_digest =
-    version_digest Protocol_version.(network current)
-  in
-  let b2 =
-    Blake2.digest_string
-      ( genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash
-      ^ protocol_transaction_version_digest ^ protocol_network_version_digest )
-  in
-  Blake2.to_hex b2
-
 let plugin_flag =
   if Node_config.plugins then
     let open Command.Param in
@@ -1189,10 +1164,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let%bind () = Async.Unix.mkdir ~p:() trust_dir in
           let%bind trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
-          let genesis_state_hash =
-            (Precomputed_values.genesis_state_hashes precomputed_values)
-              .state_hash
-          in
           let genesis_ledger_hash =
             Precomputed_values.genesis_ledger precomputed_values
             |> Lazy.force |> Mina_ledger.Ledger.merkle_root
@@ -1324,12 +1295,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               {|No peers were given.
 
 Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
-          let chain_id =
-            chain_id ~genesis_state_hash
-              ~genesis_constants:precomputed_values.genesis_constants
-              ~constraint_system_digests:
-                (Lazy.force precomputed_values.constraint_system_digests)
-          in
+          let chain_id = precomputed_values.chain_id in
           [%log info] "Daemon will use chain id %s" chain_id ;
           [%log info] "Daemon running protocol version %s"
             Protocol_version.(to_string current) ;
