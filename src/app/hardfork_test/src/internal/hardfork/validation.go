@@ -15,7 +15,7 @@ type BlockAnalysisResult struct {
 	RecentSnarkedHashPerEpoch map[int]string // map from epoch to snarked ledger hash
 	LastBlockBeforeTxEnd      client.BlockData
 	GenesisBlock              client.BlockData
-	CandidateRestPortsForFork []int
+	CandidatePortBasesForFork []int
 }
 
 func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool, predDescription string, timeout time.Duration) error {
@@ -210,7 +210,7 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, []int, error) {
 			return nil, nil, fmt.Errorf("Failed to marshal consensus state on port %d: %w", port, err)
 		}
 
-		consensusStateVote[key] = append(consensusStateVote[key], port)
+		consensusStateVote[key] = append(consensusStateVote[key], port-int(PORT_REST))
 
 		if len(consensusStateVote[key]) > majorityCount {
 			majorityCount = len(consensusStateVote[key])
@@ -247,7 +247,7 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 	}
 	t.Logger.Info("Genesis block: %v", genesisBlock)
 
-	consensus, candidateRestPortsForFork, err := t.ConsensusAcrossNodes()
+	consensus, candidatePortBasesForFork, err := t.ConsensusAcrossNodes()
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +257,7 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 		RecentSnarkedHashPerEpoch: consensus.RecentSnarkedHashPerEpoch,
 		LastBlockBeforeTxEnd:      consensus.LastBlockBeforeTxEnd,
 		GenesisBlock:              *genesisBlock,
-		CandidateRestPortsForFork: candidateRestPortsForFork,
+		CandidatePortBasesForFork: candidatePortBasesForFork,
 	}, nil
 }
 
