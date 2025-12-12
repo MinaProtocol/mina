@@ -89,6 +89,6 @@ module Hardfork = struct
     [@@deriving sexp, equal, hash, compare, yojson, bin_io_unversioned]
 
     let of_stable (value : Value.Stable.Latest.t) : t =
-      Vector.extend_front_exn value Nat.N32.n Zkapp_basic.F.zero
+      Vector.extend_exn value Nat.N32.n Zkapp_basic.F.zero
   end
 end
