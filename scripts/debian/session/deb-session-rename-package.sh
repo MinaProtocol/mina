@@ -83,7 +83,7 @@ if [[ "$OLD_PACKAGE_NAME" == "$NEW_PACKAGE_NAME" ]]; then
 fi
 
 # Update the Package field
-sed -i "s/^Package: .*/Package: $NEW_PACKAGE_NAME/" "$CONTROL_FILE"
+sed -i "s/^Package: .*$/Package: $NEW_PACKAGE_NAME/" "$CONTROL_FILE"
 
 # Verify the change
 UPDATED_PACKAGE_NAME=$(grep '^Package:' "$CONTROL_FILE" | awk '{print $2}' || true)

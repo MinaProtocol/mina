@@ -2,6 +2,10 @@
 
 set -euox pipefail
 
+# Source common functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/deb-session-common.sh"
+
 usage() {
   cat <<EOF
 Usage: $0 <session-dir> <path-in-package> <replacement-file>
@@ -53,13 +57,13 @@ fi
 REPLACEMENT_ABS=$(readlink -f "$REPLACEMENT")
 
 # Validate session
-if [[ ! -d "$SESSION_DIR_ABS/data" ]]; then
-  echo "ERROR: Session data directory not found. Invalid session?" >&2
-  exit 1
-fi
+validate_session_dir "$SESSION_DIR_ABS"
+
+# Validate path for directory traversal
+validate_path_no_traversal "$PKG_PATH" "Package path"
 
 # Strip leading slash for path inside data/
-PKG_PATH_STRIPPED="${PKG_PATH#/}"
+PKG_PATH_STRIPPED=$(strip_leading_slash "$PKG_PATH")
 
 echo "=== Replacing File(s) in Package ==="
 echo "Session: $SESSION_DIR_ABS"

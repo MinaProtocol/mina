@@ -2,6 +2,10 @@
 
 set -euox pipefail
 
+# Source common functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/deb-session-common.sh"
+
 usage() {
   cat <<EOF
 Usage: $0 <session-dir> <source-path> <dest-path>
@@ -46,14 +50,15 @@ fi
 SESSION_DIR_ABS=$(readlink -f "$SESSION_DIR")
 
 # Validate session
-if [[ ! -d "$SESSION_DIR_ABS/data" ]]; then
-  echo "ERROR: Session data directory not found. Invalid session?" >&2
-  exit 1
-fi
+validate_session_dir "$SESSION_DIR_ABS"
+
+# Validate paths for directory traversal
+validate_path_no_traversal "$SOURCE_PATH" "Source path"
+validate_path_no_traversal "$DEST_PATH" "Destination path"
 
 # Strip leading slashes
-SOURCE_PATH_STRIPPED="${SOURCE_PATH#/}"
-DEST_PATH_STRIPPED="${DEST_PATH#/}"
+SOURCE_PATH_STRIPPED=$(strip_leading_slash "$SOURCE_PATH")
+DEST_PATH_STRIPPED=$(strip_leading_slash "$DEST_PATH")
 
 echo "=== Moving File in Package ==="
 echo "Session: $SESSION_DIR_ABS"

@@ -2,6 +2,10 @@
 
 set -euox pipefail
 
+# Source common functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/deb-session-common.sh"
+
 usage() {
   cat <<EOF
 Usage: $0 <session-dir> <dest-path> <source-file> [<source-file2> ...]
@@ -51,10 +55,10 @@ fi
 SESSION_DIR_ABS=$(readlink -f "$SESSION_DIR")
 
 # Validate session
-if [[ ! -d "$SESSION_DIR_ABS/data" ]]; then
-  echo "ERROR: Session data directory not found. Invalid session?" >&2
-  exit 1
-fi
+validate_session_dir "$SESSION_DIR_ABS"
+
+# Validate destination path for directory traversal
+validate_path_no_traversal "$DEST_PATH" "Destination path"
 
 # Resolve source files to absolute paths and validate
 SOURCE_FILES_ABS=()
@@ -72,9 +76,9 @@ if [[ ${#SOURCE_FILES_ABS[@]} -eq 0 ]]; then
 fi
 
 # Determine if destination is a directory or file
-IS_DIR=false
+DEST_IS_DIR=false
 if [[ "$DEST_PATH" == */ ]]; then
-  IS_DIR=true
+  DEST_IS_DIR=true
 else
   # If not ending with /, check if we have only one source file
   if [[ ${#SOURCE_FILES_ABS[@]} -ne 1 ]]; then
@@ -90,7 +94,7 @@ echo "Destination: $DEST_PATH"
 echo "Files to insert: ${#SOURCE_FILES_ABS[@]}"
 
 # Strip leading slash
-DEST_PATH_STRIPPED="${DEST_PATH#/}"
+DEST_PATH_STRIPPED=$(strip_leading_slash "$DEST_PATH")
 
 cd "$SESSION_DIR_ABS/data"
 
@@ -99,7 +103,7 @@ INSERTED_COUNT=0
 for SOURCE_FILE in "${SOURCE_FILES_ABS[@]}"; do
   SOURCE_BASENAME=$(basename "$SOURCE_FILE")
 
-  if [[ "$IS_DIR" == true ]]; then
+  if [[ "$DEST_IS_DIR" == true ]]; then
     # Destination is a directory
     TARGET_PATH="${DEST_PATH_STRIPPED}${SOURCE_BASENAME}"
   else
