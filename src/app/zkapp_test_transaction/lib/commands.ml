@@ -336,7 +336,7 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
     let packed =
       Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
         ~logger:(Logger.create ()) ~depth:constraint_constants.ledger_depth
-        ~genesis_backing_type:Stable_db accounts
+        accounts
     in
     Lazy.force (Genesis_ledger.Packed.t packed)
   in

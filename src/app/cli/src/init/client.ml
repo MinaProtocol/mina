@@ -853,7 +853,7 @@ let hash_ledger =
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
              ~logger:(Logger.create ()) ~depth:constraint_constants.ledger_depth
-             ~genesis_backing_type:Stable_db accounts
+             accounts
          in
          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
          Format.printf "%s@."
