@@ -1,6 +1,9 @@
 open Core
 open Mina_base
 
+let file_exists path =
+  Sys.file_exists path |> [%equal: [ `No | `Unknown | `Yes ]] `Yes
+
 module Config = struct
   type backing_type =
     | Stable_db
@@ -25,9 +28,6 @@ module Config = struct
         Stable_db
     | Converting_db_config { hardfork_slot; _ } ->
         Converting_db hardfork_slot
-
-  let file_exists path =
-    Sys.file_exists path |> [%equal: [ `No | `Unknown | `Yes ]] `Yes
 
   let exists_backing = function
     | Stable_db_config path ->
@@ -114,6 +114,15 @@ module Config = struct
         src
     | Converting_db_config { db_config = { primary_directory; _ }; _ } ->
         primary_directory
+
+  let infer_actual_config expected_config =
+    match expected_config with
+    | Converting_db_config { db_config = { converting_directory; _ }; _ }
+      when file_exists converting_directory ->
+        expected_config
+    | Converting_db_config { db_config = { primary_directory; _ }; _ }
+    | Stable_db_config primary_directory ->
+        Stable_db_config primary_directory
 end
 
 module T = struct
@@ -194,26 +203,32 @@ module T = struct
               ~depth ~assert_synced ()
           , hardfork_slot )
 
-  let create_temporary ~logger ~backing_type ~depth () =
-    match backing_type with
-    | Config.Stable_db ->
-        Stable_db (Ledger.Db.create ~depth ())
-    | Converting_db hardfork_slot ->
+  let create_temporary ~depth () = Stable_db (Ledger.Db.create ~depth ())
+
+  let create_checkpoint t ~config () =
+    match (t, config) with
+    | Stable_db db, Config.Stable_db_config directory_name ->
+        Stable_db (Ledger.Db.create_checkpoint db ~directory_name ())
+    | Stable_db db, Converting_db_config { db_config; hardfork_slot } ->
         let module Converting_ledger = Ledger.Make_converting (struct
           let convert =
             Account.(
               Fn.compose Hardfork.of_stable
                 (slot_reduction_update ~hardfork_slot))
         end) in
+        let migrated_db =
+          Ledger.Hardfork_db.create
+            ~directory_name:db_config.converting_directory
+            ~depth:(Ledger.Db.depth db) ()
+        in
         Converting_db
           ( (module Converting_ledger)
-          , Converting_ledger.create ~config:Temporary ~logger ~depth ()
+          , Converting_ledger.of_ledgers_with_migration db migrated_db
           , hardfork_slot )
-
-  let create_checkpoint t ~config () =
-    match (t, config) with
-    | Stable_db db, Config.Stable_db_config directory_name ->
-        Stable_db (Ledger.Db.create_checkpoint db ~directory_name ())
+    | ( Converting_db ((module Converting_ledger), db, _)
+      , Stable_db_config directory_name ) ->
+        let stable_db = Converting_ledger.primary_ledger db in
+        Stable_db (Ledger.Db.create_checkpoint stable_db ~directory_name ())
     | ( Converting_db
           (((module Converting_ledger) as m), db, hardfork_slot_from_instance)
       , Converting_db_config
@@ -229,7 +244,7 @@ module T = struct
           ( m
           , Converting_ledger.create_checkpoint db ~config ()
           , hardfork_slot_from_instance )
-    | t, config ->
+    | _ ->
         raise
           (Config.Backing_mismatch
              { backing_1 = backing_of_t t
@@ -240,6 +255,25 @@ module T = struct
     match (t, config) with
     | Stable_db db, Config.Stable_db_config directory_name ->
         Ledger.Db.make_checkpoint db ~directory_name
+    | Stable_db db, Converting_db_config { db_config; hardfork_slot } ->
+        let module Converting_ledger = Ledger.Make_converting (struct
+          let convert =
+            Account.(
+              Fn.compose Hardfork.of_stable
+                (slot_reduction_update ~hardfork_slot))
+        end) in
+        let migrated_db =
+          Ledger.Hardfork_db.create
+            ~directory_name:db_config.converting_directory
+            ~depth:(Ledger.Db.depth db) ()
+        in
+        Ledger.Db.make_checkpoint db ~directory_name:db_config.primary_directory ;
+        (* Creating this converting ledger only for side effect *)
+        ignore @@ Converting_ledger.of_ledgers_with_migration db migrated_db
+    | ( Converting_db ((module Converting_ledger), db, _)
+      , Stable_db_config directory_name ) ->
+        let stable_db = Converting_ledger.primary_ledger db in
+        Ledger.Db.make_checkpoint stable_db ~directory_name
     | ( Converting_db
           ((module Converting_ledger), db, hardfork_slot_from_instance)
       , Converting_db_config
@@ -328,6 +362,39 @@ module T = struct
         Converting_db
           ( (module Converting_ledger)
           , Converting_ledger.of_ledgers db migrated_db
+          , hardfork_slot )
+
+  let make_converting_sync ~hardfork_slot t =
+    match t with
+    | Converting_db (_, _, hardfork_slot_from_instance) ->
+        (* TODO: rewrap as an Or_error.t *)
+        assert (
+          Mina_numbers.Global_slot_since_genesis.equal hardfork_slot
+            hardfork_slot_from_instance ) ;
+        t
+    | Stable_db db ->
+        let directory_name =
+          Ledger.Db.get_directory db
+          |> Option.value_exn
+               ~message:"Invariant: database must be in a directory"
+        in
+        let module Converting_ledger = Ledger.Make_converting (struct
+          let convert =
+            Account.(
+              Fn.compose Hardfork.of_stable
+                (slot_reduction_update ~hardfork_slot))
+        end) in
+        let converting_config =
+          Converting_ledger.Config.with_primary ~directory_name
+        in
+        let migrated_db =
+          Ledger.Hardfork_db.create
+            ~directory_name:converting_config.converting_directory
+            ~depth:(Ledger.Db.depth db) ()
+        in
+        Converting_db
+          ( (module Converting_ledger)
+          , Converting_ledger.of_ledgers_with_migration db migrated_db
           , hardfork_slot )
 
   let as_unmasked t =
