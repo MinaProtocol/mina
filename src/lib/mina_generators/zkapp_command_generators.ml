@@ -1843,4 +1843,59 @@ let%test_module _ =
             ~random:(Splittable_random.State.create Random.State.default))
       in
       ()
+
+    let%test_unit "generate max cost zkapp command" =
+      let keypair = Keypair.create () in
+      let public_key_compressed =
+        Signature_lib.Public_key.compress keypair.public_key
+      in
+
+      let account_state_tbl = Account_id.Table.create () in
+      let fee_payer_account_id =
+        Account_id.create public_key_compressed Token_id.default
+      in
+      let fee_payer_account =
+        Account.create fee_payer_account_id
+          (Currency.Balance.of_mina_int_exn 1000)
+      in
+      Account_id.Table.set account_state_tbl ~key:fee_payer_account_id
+        ~data:(fee_payer_account, `Fee_payer) ;
+
+      for _i = 1 to 10 do
+        let zkapp_keypair = Signature_lib.Keypair.create () in
+        let zkapp_pk =
+          Signature_lib.Public_key.compress zkapp_keypair.public_key
+        in
+        let zkapp_account_id = Account_id.create zkapp_pk Token_id.default in
+        let zkapp_account_base =
+          Account.create zkapp_account_id (Currency.Balance.of_mina_int_exn 100)
+        in
+        let zkapp_account =
+          { zkapp_account_base with zkapp = Some Zkapp_account.default }
+        in
+        Account_id.Table.set account_state_tbl ~key:zkapp_account_id
+          ~data:(zkapp_account, `Ordinary_participant)
+      done ;
+
+      let max_cost_cmd_gen =
+        gen_max_cost_zkapp_command_from ~fee_payer_keypair:keypair
+          ~account_state_tbl ~vk ~genesis_constants ()
+      in
+
+      let max_cost_cmd =
+        Quickcheck.Generator.generate max_cost_cmd_gen ~size:1
+          ~random:(Splittable_random.State.create Random.State.default)
+      in
+
+      let account_updates =
+        Zkapp_command.Call_forest.to_list max_cost_cmd.account_updates
+      in
+      assert (List.length account_updates = 5) ;
+
+      let first_update = List.hd_exn account_updates in
+      let events = first_update.body.events in
+      let actions = first_update.body.actions in
+
+      assert (List.length events = genesis_constants.max_event_elements) ;
+      assert (List.length actions = genesis_constants.max_action_elements)
   end )
