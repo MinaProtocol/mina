@@ -493,9 +493,7 @@ module Ledger_inner = struct
         (struct
           type converted_account = Account.Hardfork.t
 
-          let convert =
-            Account.Hardfork.of_stable
-              ~hardfork_slot:Mina_numbers.Global_slot_since_genesis.zero
+          let convert = Account.Hardfork.of_stable
 
           let converted_equal = Account.Hardfork.equal
 
@@ -967,11 +965,7 @@ let%test_unit "user_command application on converting ledger" =
               let account_converted = Hardfork_db.get_at_index_exn cl index in
               assert (
                 Mina_base.Account.Hardfork.(
-                  equal
-                    (of_stable
-                       ~hardfork_slot:
-                         Mina_numbers.Global_slot_since_genesis.zero account )
-                    account_converted) ) ) ;
+                  equal (of_stable account) account_converted) ) ) ;
           (* Assert that the converted ledger doesn't have anything "extra" compared to the primary ledger *)
           Hardfork_db.iteri cl ~f:(fun index account_converted ->
               let account = L.get_at_index_exn l index in

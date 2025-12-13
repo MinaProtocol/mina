@@ -1072,9 +1072,7 @@ module Hardfork = struct
   [@@deriving
     sexp, equal, hash, compare, yojson, hlist, fields, bin_io_unversioned]
 
-  (* This function converts Berkeley account to Mesa account *)
-  let of_stable ~hardfork_slot (account : Stable.Latest.t) : t =
-    let account = slot_reduction_update ~hardfork_slot account in
+  let of_stable (account : Stable.Latest.t) : t =
     { public_key = account.public_key
     ; token_id = account.token_id
     ; token_symbol = account.token_symbol
@@ -1088,10 +1086,13 @@ module Hardfork = struct
     ; zkapp = Option.map ~f:Zkapp_account.Hardfork.of_stable account.zkapp
     }
 
+  (* This function converts Berkeley account to Mesa account *)
+  let migrate_from_berkeley ~hardfork_slot (account : Stable.Latest.t) : t =
+    slot_reduction_update ~hardfork_slot account |> of_stable
+
   let balance { balance; _ } = balance
 
-  (* NOTE: empty account is untimed so setting HF slot to 0 would be fine here. *)
-  let empty = of_stable ~hardfork_slot:Global_slot_since_genesis.zero empty
+  let empty = of_stable empty
 
   let identifier ({ public_key; token_id; _ } : t) =
     Account_id.create public_key token_id
