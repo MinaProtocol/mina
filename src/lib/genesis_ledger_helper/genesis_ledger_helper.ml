@@ -348,12 +348,12 @@ module Ledger = struct
       pad_with_rev_balances (List.rev config.balances) accounts
       |> pad_to (Option.value ~default:0 config.num_accounts))
 
-  let packed_genesis_ledger_of_accounts ~genesis_backing_type ~logger ~depth
-      accounts : Genesis_ledger.Packed.t =
+  let packed_genesis_ledger_of_accounts ~logger ~depth accounts :
+      Genesis_ledger.Packed.t =
     ( module Genesis_ledger.Make (struct
       let accounts = accounts
 
-      let directory = `New genesis_backing_type
+      let directory = `New
 
       let depth = depth
 
@@ -405,8 +405,10 @@ module Ledger = struct
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~extracted_path ~genesis_backing_type : Genesis_ledger.Packed.t =
     let genesis_config =
-      Root_ledger.Config.with_directory ~backing_type:genesis_backing_type
-        ~directory_name:extracted_path
+      Root_ledger.Config.(
+        with_directory ~backing_type:genesis_backing_type
+          ~directory_name:extracted_path
+        |> infer_actual_config)
     in
     ( module Genesis_ledger.Of_ledger (struct
       let backing_ledger =
@@ -453,7 +455,7 @@ module Ledger = struct
     match load_ledger_spec with
     | AccountsOnly { accounts } -> (
         let packed =
-          packed_genesis_ledger_of_accounts ~genesis_backing_type ~logger
+          packed_genesis_ledger_of_accounts ~logger
             ~depth:constraint_constants.ledger_depth accounts
         in
         let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in

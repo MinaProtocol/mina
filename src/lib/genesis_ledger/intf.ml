@@ -63,9 +63,7 @@ module type Ledger_input_intf = sig
   include Accounts_intf
 
   val directory :
-    [ `Ephemeral
-    | `New of Root_ledger.Config.backing_type
-    | `Path of string * Root_ledger.Config.backing_type ]
+    [ `Ephemeral | `New | `Path of string * Root_ledger.Config.backing_type ]
 
   val depth : int
 

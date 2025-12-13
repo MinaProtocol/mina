@@ -141,20 +141,15 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
       match directory with
       | `Ephemeral ->
           lazy (`Ephemeral (Ledger.create_ephemeral ~depth ()), true)
-      | `New backing_type ->
-          lazy
-            ( `Root
-                (Root_ledger.create_temporary ~logger ~backing_type ~depth ())
-            , true )
+      | `New ->
+          lazy (`Root (Root_ledger.create_temporary ~depth ()), true)
       | `Path (directory_name, backing_type) ->
-          lazy
-            ( `Root
-                (Root_ledger.create ~logger
-                   ~config:
-                     (Root_ledger.Config.with_directory ~backing_type
-                        ~directory_name )
-                   ~depth () )
-            , false )
+          let config =
+            Root_ledger.Config.(
+              with_directory ~backing_type ~directory_name
+              |> infer_actual_config)
+          in
+          lazy (`Root (Root_ledger.create ~logger ~config ~depth ()), false)
     in
     let masked =
       match ledger with
@@ -180,6 +175,7 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
     match backing_ledger with
     | `Ephemeral ledger ->
         let open Or_error.Let_syntax in
+        let config = Root_ledger.Config.infer_actual_config config in
         let root = Root_ledger.create ~logger ~config ~depth () in
         (* We are transferring to an unmasked view of the root, so this is
            used solely for the transfer side effect *)
@@ -199,8 +195,9 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
            and transfer accounts to it *)
         let open Or_error.Let_syntax in
         let config =
-          Root_ledger.Config.with_directory ~backing_type:Stable_db
-            ~directory_name:directory
+          Root_ledger.Config.(
+            with_directory ~backing_type:Stable_db ~directory_name:directory
+            |> infer_actual_config)
         in
         let root = Root_ledger.create ~logger ~config ~depth () in
         (* We are transferring to an unmasked view of the root, so this is
