@@ -19,4 +19,4 @@ sudo apt-get install -y python3
                       --archive-exe /usr/local/bin/mina-archive \
                       --rosetta-exe /usr/local/bin/mina-rosetta \
                       --postgres-uri ${PG_CONN} \
-                      --ledger ${LEDGER_DIR}
+                      --ledger /workdir/${LEDGER_DIR}
