@@ -58,7 +58,10 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 
 let ScriptOrArchive
     : Type
-    = < Script : Text | Archive : { Script : Text, Archive : Text } >
+    = < Script : Text
+      | Archive : { Script : Text, Archive : Text }
+      | OnlineTarGzDump : Text
+      >
 
 let runInDockerWithPostgresConn
     : List Text -> Optional ScriptOrArchive -> Text -> Text -> Cmd.Type
@@ -115,6 +118,11 @@ let runInDockerWithPostgresConn
                                       )
                                 ->  [ "tar -xzf ${archive.Archive}"
                                     , "docker exec ${postgresDockerName} find /workdir -name \"${archive.Script}\" -exec psql ${pg_conn} -f {} \\;"
+                                    ]
+                            , OnlineTarGzDump =
+                                    \(url : Text)
+                                ->  [ "curl -sSL ${url} | tar -xz"
+                                    , "docker exec ${postgresDockerName} find /workdir -maxdepth 1 -name \"*.sql\" -exec psql ${pg_conn} -f {} \\;"
                                     ]
                             }
                             script
