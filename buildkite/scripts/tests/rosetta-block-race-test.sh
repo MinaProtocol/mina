@@ -6,6 +6,8 @@
 LEDGER_URL="https://storage.googleapis.com/o1labs-ci-test-data/ledgers/single-bp-ledger.tar"
 LEDGER_DIR="ledger"
 
+mkdir -p "$LEDGER_DIR"
+
 echo "Downloading&extracting ledger archive from $LEDGER_URL ..."
 curl -L "$LEDGER_URL" | tar -x -C "$LEDGER_DIR"
 
