@@ -164,7 +164,14 @@ module Make = struct
   let execute_query ctx schema variables operation_name query =
     match Graphql_parser.parse query with
     | Ok doc ->
-        Schema.execute schema ctx ?variables ?operation_name doc
+        let open Async in
+        Monitor.try_with (fun () ->
+            Schema.execute schema ctx ?variables ?operation_name doc )
+        |> Deferred.map ~f:(function
+             | Ok resp ->
+                 resp
+             | Error exn ->
+                 Error (`String (Core.Exn.to_string exn)) )
     | Error e ->
         Io.return (Error (`String e))
 
