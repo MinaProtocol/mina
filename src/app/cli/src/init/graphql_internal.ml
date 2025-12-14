@@ -133,13 +133,14 @@ module Params = struct
     with Yojson.Json_error msg -> Error msg
 end
 
-module Make
-    (Schema : Graphql_intf.Schema)
-    (Io : Cohttp.S.IO with type 'a t = 'a Schema.Io.t)
-    (Body : HttpBody with type +'a io := 'a Schema.Io.t) =
-struct
-  module Ws = Websocket.Connection.Make (Io)
-  module Websocket_transport = Websocket_handler.Make (Schema.Io) (Ws)
+module Make = struct
+  open struct
+    module Schema = Graphql_async.Schema
+    module Io = Cohttp_async.Io
+    module Body = Cohttp_async.Body
+    module Ws = Websocket.Connection.Make (Io)
+    module Websocket_transport = Websocket_handler.Make (Schema.Io) (Ws)
+  end
 
   let ( >>= ) = Io.( >>= )
 
