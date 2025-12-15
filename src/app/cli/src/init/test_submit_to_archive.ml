@@ -512,7 +512,7 @@ let generate_txs ~valid_until ~nonce_ref ~n_zkapp_txs ~n_payments ~n_blocks
   in
   List.init n_blocks ~f:(fun _ -> generate_payments ())
 
-let load_and_initialize_config ~logger ~config_file =
+let load_and_initialize_config ~genesis_dir ~logger ~config_file =
   let%bind runtime_config_json =
     Genesis_ledger_helper.load_config_json config_file >>| Or_error.ok_exn
   in
@@ -526,7 +526,7 @@ let load_and_initialize_config ~logger ~config_file =
   let proof_level = Genesis_constants.Compiled.proof_level in
   Genesis_ledger_helper.init_from_config_file ~genesis_constants
     ~constraint_constants ~logger ~proof_level ~cli_proof_level:None
-    ~genesis_dir:"genesis" ~ledger_backing:Stable_db runtime_config
+    ~genesis_dir ~ledger_backing:Stable_db runtime_config
   >>| Or_error.ok_exn
 
 let initialize_verifier_and_components ~logger
@@ -607,20 +607,18 @@ let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
     { With_hash.data; hash }
   in
 
+  (* Always generate zkApp accounts in the first block *)
   let%map gen_zk_apps_tx =
-    if max_cost then
-      let%map tx =
-        create_zkapp_accounts_tx ?fee:None ?initial_balance:None
-          ~constraint_constants:precomputed_values.constraint_constants
-          ~sender:keypair ~nonce_ref ~n_accounts:10 ~account_state_tbl
-      in
-      let () = nonce_ref := Unsigned.UInt32.succ !nonce_ref in
-      let (`If_this_is_used_it_should_have_a_comment_justifying_it valid_command)
-          =
-        User_command.to_valid_unsafe (Zkapp_command tx)
-      in
-      Some valid_command
-    else Deferred.return None
+    let%map tx =
+      create_zkapp_accounts_tx ?fee:None ?initial_balance:None
+        ~constraint_constants:precomputed_values.constraint_constants
+        ~sender:keypair ~nonce_ref ~n_accounts:10 ~account_state_tbl
+    in
+    let (`If_this_is_used_it_should_have_a_comment_justifying_it valid_command)
+        =
+      User_command.to_valid_unsafe (Zkapp_command tx)
+    in
+    valid_command
   in
 
   let rest_txs =
@@ -629,9 +627,7 @@ let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
       ~account_state_tbl ~vk
       ~genesis_constants:precomputed_values.genesis_constants keypair
   in
-  Option.fold ~init:rest_txs
-    ~f:(fun acc tx -> List.cons (Sequence.singleton tx) acc)
-    gen_zk_apps_tx
+  List.cons (Sequence.singleton gen_zk_apps_tx) rest_txs
 
 let create_blocks_with_diffs ~logger
     ~(precomputed_values : Precomputed_values.t) ~verifier ~context ~keys_module
@@ -654,10 +650,10 @@ let create_blocks_with_diffs ~logger
   List.rev diffs_rev
 
 let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
-    ~n_payments ~n_blocks ~max_cost ~output_file =
+    ~n_payments ~n_blocks ~max_cost ~output_file ~genesis_dir =
   (* Section 1: Load and initialize precomputed values from config *)
   let%bind precomputed_values =
-    load_and_initialize_config ~logger ~config_file
+    load_and_initialize_config ~logger ~config_file ~genesis_dir
   in
 
   (* Section 2: Initialize verifier and other components *)
@@ -671,16 +667,19 @@ let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
     Block.compute_genesis keys_module ~precomputed_values ~logger
   in
 
-  (* Section 4: Compute VRF to find n_blocks winning slots *)
-  [%log info] "Computing VRF to find %d winning slots" n_blocks ;
+  (* Section 4: Compute VRF to find n_blocks+1 winning slots (including zkApp deployment block) *)
+  [%log info] "Computing VRF to find %d winning slots" (n_blocks + 1) ;
   let%bind winning_slots =
-    find_winning_slots ~context ~precomputed_values ~n_blocks ~keypair genesis
+    find_winning_slots ~context ~precomputed_values ~n_blocks:(n_blocks + 1)
+      ~keypair genesis
   in
   [%log info] "Found %d winning slots" (List.length winning_slots) ;
 
   (* Section 5: Generate zkApp transactions and payments *)
-  [%log info] "Generate %d blocks with %d zkApp transactions and %d payments"
-    n_blocks n_zkapp_txs n_payments ;
+  [%log info]
+    "Generate %d blocks (1 zkApp deployment + %d user blocks) with %d zkApp \
+     transactions and %d payments"
+    (n_blocks + 1) n_blocks n_zkapp_txs n_payments ;
   let%bind all_transactions =
     generate_all_transactions ~precomputed_values ~n_blocks ~n_zkapp_txs
       ~n_payments ~max_cost ~keypair genesis
@@ -721,10 +720,10 @@ let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
                     Archive_lib.Diff.Transition_frontier diff
                   in
                   let serialized =
-                    Bin_prot.Writer.to_string Archive_lib.Diff.bin_writer_t
+                    Bin_prot.Writer.to_bytes Archive_lib.Diff.bin_writer_t
                       archive_diff
                   in
-                  Async.Writer.write writer serialized ) ;
+                  Async.Writer.write_bytes writer serialized ) ;
               Async.Writer.flushed writer )
         in
         [%log info] "Successfully wrote %d blocks to %s" (List.length diffs)
@@ -750,6 +749,9 @@ let command =
     and config_file =
       flag "--config-file" ~doc:"FILE Path to the runtime configuration file"
         (required string)
+    and genesis_dir =
+      flag "--genesis-dir" ~doc:"FILE Path to the genesis ledger directory"
+        (optional string)
     and privkey_path = Flag.privkey_read_path
     and n_zkapp_txs =
       flag "--num-zkapp-txs"
@@ -813,6 +815,7 @@ let command =
       ~transport:(Logger.Transport.stdout ())
       () ;
     let%bind () = Internal_tracing.toggle ~commit_id:"" ~logger `Enabled in
+    let genesis_dir = Option.value ~default:"genesis" genesis_dir in
 
     run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
-      ~n_payments ~n_blocks ~max_cost ~output_file)
+      ~n_payments ~n_blocks ~max_cost ~output_file ~genesis_dir)
