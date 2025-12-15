@@ -1906,10 +1906,11 @@ let%test_module _ =
       assert (List.length events = genesis_constants.max_event_elements) ;
       assert (List.length actions = genesis_constants.max_action_elements) ;
 
-      let (_ : Zkapp_command.t) =
+      let (max_cost_cmd_final : Zkapp_command.t) =
         Async.Thread_safe.block_on_async_exn (fun () ->
             Zkapp_command_builder.replace_authorizations ~prover ~keymap
               max_cost_cmd )
       in
-      ()
+      Zkapp_command.valid_size ~genesis_constants max_cost_cmd_final
+      |> Or_error.ok_exn
   end )
