@@ -1701,9 +1701,11 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range
   let%bind pks =
     Quickcheck.Generator.(of_list zkapp_pks |> list_with_length 15)
   in
-  let[@warning "-8"] (head :: tail) =
+  (* Create proof-based account updates with no events/actions *)
+  let proof_based_updates =
     List.map pks ~f:(fun pk -> mk_account_update ~pk ~vk)
   in
+  (* Generate events and actions *)
   let%bind events =
     Snark_params.Tick.Field.gen
     |> Quickcheck.Generator.map ~f:(fun x -> [| x |])
@@ -1716,9 +1718,34 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range
     |> Quickcheck.Generator.list_with_length
          genesis_constants.max_action_elements
   in
-  let account_updates =
-    { head with body = { head.body with events; actions } } :: tail
+  (* Pick a zkapp account for the signature-based update that will hold events/actions *)
+  let%bind sig_update_pk = Quickcheck.Generator.of_list zkapp_pks in
+  (* Create signature-based account update with events and actions, zero balance change *)
+  let sig_based_update_body : Account_update.Body.Simple.t =
+    { public_key = sig_update_pk
+    ; token_id = Token_id.default
+    ; update = Account_update.Update.noop
+    ; balance_change = { magnitude = Currency.Amount.zero; sgn = Sgn.Pos }
+    ; increment_nonce = false
+    ; events
+    ; actions
+    ; call_data = Pickles.Backend.Tick.Field.zero
+    ; call_depth = 0
+    ; preconditions = Account_update.Preconditions.accept
+    ; use_full_commitment = true
+    ; implicit_account_creation_fee = false
+    ; may_use_token = Account_update.May_use_token.No
+    ; authorization_kind = Account_update.Authorization_kind.Signature
+    }
   in
+  let sig_based_update =
+    Account_update.with_no_aux ~body:sig_based_update_body
+      ~authorization:Control.(dummy_of_tag Signature)
+  in
+  (* Put signature-based update at the beginning to pair with fee payer
+     Total: pair of (1 fee payer + 1 signature-based) + 15 proof-based = 16 segments *)
+  (* let account_updates = proof_based_updates @ [ sig_based_update ] in *)
+  let account_updates = sig_based_update :: proof_based_updates in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
   in
@@ -1854,14 +1881,21 @@ let%test_module _ =
       let account_updates =
         Zkapp_command.Call_forest.to_list command.account_updates
       in
-      assert (List.length account_updates = 15) ;
+      (* 1 signature-based update + 15 proof-based updates = 16 total account updates *)
+      assert (List.length account_updates = 16) ;
 
-      let first_update = List.hd_exn account_updates in
-      let events = first_update.body.events in
-      let actions = first_update.body.actions in
+      (* Events and actions should be on the first update (signature-based) *)
+      let sig_update = List.hd_exn account_updates in
+      let events = sig_update.body.events in
+      let actions = sig_update.body.actions in
 
       assert (List.length events = genesis_constants.max_event_elements) ;
       assert (List.length actions = genesis_constants.max_action_elements) ;
+
+      (* Remaining 15 updates should be proof-based with no events/actions *)
+      List.iteri (List.drop account_updates 1) ~f:(fun _i upd ->
+          assert (List.is_empty upd.body.events) ;
+          assert (List.is_empty upd.body.actions) ) ;
       let _ =
         Zkapp_command.Call_forest.mapi_with_trees command.account_updates
           ~f:(fun _ndx acc tree ->
