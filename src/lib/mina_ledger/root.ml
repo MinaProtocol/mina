@@ -1,3 +1,4 @@
+open Async
 open Core
 open Mina_base
 
@@ -395,6 +396,33 @@ module T = struct
     | Converting_db ((module Converting_ledger), db, _) ->
         ( Converting_ledger.primary_ledger db
         , Some (Converting_ledger.converting_ledger db) )
+
+  let copy_reconfigured t ~config () =
+    let open Deferred.Let_syntax in
+    (* We must handle the transformation
+       (stable|converting)->(stable|converting). Rather than handle all four
+       separately, it ends up being simpler to start by asking if the two
+       backings are equal or not. *)
+    if
+      Config.equal_backing_type (backing_of_t t)
+        (Config.backing_of_config config)
+    then
+      (* If the src/dest backings are equal, simply checkpoint *)
+      create_checkpoint t ~config () |> return
+    else
+      (* Otherwise, copy the stable database and then migrate if necessary *)
+      let dest_root =
+        Stable_db
+          (Ledger.Db.create_checkpoint
+             (fst (unsafely_decompose_root t))
+             ~directory_name:(Config.primary_directory config)
+             () )
+      in
+      match Config.backing_of_config config with
+      | Stable_db ->
+          return dest_root
+      | Converting_db hardfork_slot ->
+          make_converting ~hardfork_slot dest_root
 end
 
 include T
