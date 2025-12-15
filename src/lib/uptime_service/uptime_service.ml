@@ -203,7 +203,7 @@ let read_all_proofs_for_work_single_spec =
 let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
     ~url ~snark_worker ~transition_frontier ~peer_id
     ~(submitter_keypair : Keypair.t) ~snark_work_fee ~graphql_control_port
-    ~built_with_commit_sha ~signature_kind =
+    ~built_with_commit_sha =
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       (* expected during daemon boot, so not logging as error *)
@@ -327,13 +327,6 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                 send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
                   ~state_hash ~produced:false block_data
             | Some single_spec -> (
-                let module T = Transaction_snark.Make (struct
-                  let signature_kind = signature_kind
-
-                  let constraint_constants = constraint_constants
-
-                  let proof_level = Genesis_constants.Proof_level.Full
-                end) in
                 let s =
                   match single_spec with
                   | Transition (input, witness) -> (
@@ -409,8 +402,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
 let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
     ~protocol_constants ~transition_frontier ~time_controller
     ~block_produced_bvar ~uptime_submitter_keypair ~get_next_producer_timing
-    ~get_snark_work_fee ~get_peer ~graphql_control_port ~built_with_commit_sha
-    ~signature_kind =
+    ~get_snark_work_fee ~get_peer ~graphql_control_port ~built_with_commit_sha =
   match uptime_url with
   | None ->
       [%log info] "Not running uptime service, no URL given" ;
@@ -512,7 +504,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
                   send_block_and_transaction_snark ~logger ~interruptor ~url
                     ~constraint_constants ~snark_worker ~transition_frontier
                     ~peer_id ~submitter_keypair ~snark_work_fee
-                    ~graphql_control_port ~built_with_commit_sha ~signature_kind
+                    ~graphql_control_port ~built_with_commit_sha
                 in
                 match get_next_producer_time_opt () with
                 | None ->

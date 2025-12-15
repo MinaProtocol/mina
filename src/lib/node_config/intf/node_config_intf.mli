@@ -8,13 +8,7 @@ end
 
 (* It's stupid that this exists. TODO: Remove and make configurable. *)
 module type Unconfigurable_constants = sig
-  val zkapp_proof_update_cost : float
-
-  val zkapp_signed_pair_update_cost : float
-
-  val zkapp_signed_single_update_cost : float
-
-  val zkapp_transaction_cost_limit : float
+  val max_zkapp_segment_per_transaction : int
 
   val max_event_elements : int
 
