@@ -419,24 +419,67 @@ let mk_payment ~(valid_until : Mina_numbers.Global_slot_since_genesis.t)
   in
   { Signed_command.Poly.signer = signer_keypair.public_key; signature; payload }
 
-let generate_txs ~valid_until ~init_nonce ~n_zkapp_txs ~n_payments ~n_blocks
+(** Create a transaction to create [n_accounts] many zkapp accounts and insert them into 
+    the accounts table.
+*)
+let create_zkapp_accounts_tx ?(fee = 20_000_000) ?(initial_balance = 10)
+    ~constraint_constants ~sender ~nonce_ref ~n_accounts ~account_state_tbl =
+  let zkapp_keypairs =
+    List.init n_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
+  in
+  let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t) =
+    { sender = (sender, !nonce_ref)
+    ; fee = Currency.Fee.of_nanomina_int_exn fee
+    ; fee_payer = None
+    ; amount = Currency.Amount.of_mina_int_exn initial_balance
+    ; zkapp_account_keypairs = zkapp_keypairs
+    ; memo = Signed_command_memo.create_from_string_exn "Zkapp create accounts"
+    ; new_zkapp_account = true
+    ; snapp_update = Account_update.Update.dummy
+    ; preconditions = None
+    ; authorization_kind = Signature
+    }
+  in
+  let%map tx =
+    Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+      ~signature_kind:Testnet zkapp_command_spec
+  in
+  let () = nonce_ref := Unsigned.UInt32.succ !nonce_ref in
+  let () =
+    List.iter zkapp_keypairs ~f:(fun zkapp_keypair ->
+        let zkapp_pk =
+          Signature_lib.Public_key.compress zkapp_keypair.public_key
+        in
+        let zkapp_account_id = Account_id.create zkapp_pk Token_id.default in
+        let zkapp_account_base =
+          Account.create zkapp_account_id
+            (Currency.Balance.of_mina_int_exn initial_balance)
+        in
+        let zkapp_account =
+          { zkapp_account_base with zkapp = Some Zkapp_account.default }
+        in
+        Account_id.Table.set account_state_tbl ~key:zkapp_account_id
+          ~data:(zkapp_account, `Ordinary_participant) )
+  in
+  tx
+
+let generate_txs ~valid_until ~nonce_ref ~n_zkapp_txs ~n_payments ~n_blocks
     ~constraint_constants ~max_cost ~account_state_tbl ~vk ~genesis_constants
     keypair : User_command.Valid.t Sequence.t list =
   let signer_pk = Public_key.compress keypair.Keypair.public_key in
   let event_elements = 12 in
   let action_elements = 12 in
-  let generate_payments block_i =
+  let generate_payments () =
     Sequence.init (n_payments + n_zkapp_txs) ~f:(fun i ->
-        let nonce =
-          Mina_numbers.Account_nonce.(
-            add init_nonce @@ of_int
-            @@ ((block_i * (n_payments + n_zkapp_txs)) + i))
-        in
         let command =
           if i < n_payments then
             (* Creates a simple payment that initializes a new account *)
-            User_command.Signed_command
-              (mk_payment ~valid_until ~nonce ~signer_pk keypair)
+            let res =
+              User_command.Signed_command
+                (mk_payment ~valid_until ~nonce:!nonce_ref ~signer_pk keypair)
+            in
+            let () = nonce_ref := Unsigned.UInt32.succ !nonce_ref in
+            res
           else if max_cost then
             let max_cost_cmd =
               Quickcheck.Generator.generate
@@ -446,14 +489,19 @@ let generate_txs ~valid_until ~init_nonce ~n_zkapp_txs ~n_payments ~n_blocks
                 ~size:1
                 ~random:(Splittable_random.State.create Random.State.default)
             in
+            let () = nonce_ref := Unsigned.UInt32.succ !nonce_ref in
             Zkapp_command max_cost_cmd
           else
             (* Generates a 9-account-update zkapp transaction
                creating 8 new accounts with 0 balance each *)
-            Zkapp_command
-              (Test_ledger_application.mk_tx
-                 ~transfer_parties_get_actions_events:true ~event_elements
-                 ~action_elements ~constraint_constants keypair nonce )
+            let res =
+              User_command.Zkapp_command
+                (Test_ledger_application.mk_tx
+                   ~transfer_parties_get_actions_events:true ~event_elements
+                   ~action_elements ~constraint_constants keypair !nonce_ref )
+            in
+            let () = nonce_ref := Unsigned.UInt32.succ !nonce_ref in
+            res
         in
         (* This is used in the context of a test, and we know that the command is valid *)
         let (`If_this_is_used_it_should_have_a_comment_justifying_it
@@ -462,7 +510,7 @@ let generate_txs ~valid_until ~init_nonce ~n_zkapp_txs ~n_payments ~n_blocks
         in
         valid_command )
   in
-  List.init n_blocks ~f:generate_payments
+  List.init n_blocks ~f:(fun _ -> generate_payments ())
 
 let load_and_initialize_config ~logger ~config_file =
   let%bind runtime_config_json =
@@ -531,14 +579,14 @@ let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
   in
   let signer_account_id = Account_id.of_public_key keypair.Keypair.public_key in
   let genesis_ledger = Staged_ledger.ledger genesis.staged_ledger in
-  let init_nonce =
+  let nonce_ref =
     (* Retrieve the nonce of the signer's account from genesis ledger. *)
     Mina_ledger.Ledger.location_of_account genesis_ledger signer_account_id
     |> Option.value_exn ~message:"Sender's account not found in ledger"
     |> Mina_ledger.Ledger.get genesis_ledger
     |> Option.value_exn
          ~message:"Sender's account not found in ledger by location"
-    |> Account.nonce
+    |> Account.nonce |> ref
   in
   let account_state_tbl = Account_id.Table.create () in
   let genesis_accounts = Mina_ledger.Ledger.to_list_sequential genesis_ledger in
@@ -550,13 +598,6 @@ let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
       in
       Account_id.Table.set account_state_tbl ~key:account_id
         ~data:(account, role) ) ;
-
-  (* TODO: Figure out how to create zkApp accounts for max cost generation *)
-  let account_state_tbl =
-    if max_cost then failwith "TODO: Figure out how to create zkApp accounts"
-    else account_state_tbl
-  in
-
   let vk =
     let data =
       Pickles.Side_loaded.Verification_key.(
@@ -566,10 +607,31 @@ let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
     { With_hash.data; hash }
   in
 
-  generate_txs ~init_nonce ~valid_until ~n_payments ~n_zkapp_txs ~n_blocks
-    ~constraint_constants:precomputed_values.constraint_constants ~max_cost
-    ~account_state_tbl ~vk
-    ~genesis_constants:precomputed_values.genesis_constants keypair
+  let%map gen_zk_apps_tx =
+    if max_cost then
+      let%map tx =
+        create_zkapp_accounts_tx ?fee:None ?initial_balance:None
+          ~constraint_constants:precomputed_values.constraint_constants
+          ~sender:keypair ~nonce_ref ~n_accounts:10 ~account_state_tbl
+      in
+      let () = nonce_ref := Unsigned.UInt32.succ !nonce_ref in
+      let (`If_this_is_used_it_should_have_a_comment_justifying_it valid_command)
+          =
+        User_command.to_valid_unsafe (Zkapp_command tx)
+      in
+      Some valid_command
+    else Deferred.return None
+  in
+
+  let rest_txs =
+    generate_txs ~nonce_ref ~valid_until ~n_payments ~n_zkapp_txs ~n_blocks
+      ~constraint_constants:precomputed_values.constraint_constants ~max_cost
+      ~account_state_tbl ~vk
+      ~genesis_constants:precomputed_values.genesis_constants keypair
+  in
+  Option.fold ~init:rest_txs
+    ~f:(fun acc tx -> List.cons (Sequence.singleton tx) acc)
+    gen_zk_apps_tx
 
 let create_blocks_with_diffs ~logger
     ~(precomputed_values : Precomputed_values.t) ~verifier ~context ~keys_module
@@ -619,7 +681,7 @@ let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
   (* Section 5: Generate zkApp transactions and payments *)
   [%log info] "Generate %d blocks with %d zkApp transactions and %d payments"
     n_blocks n_zkapp_txs n_payments ;
-  let all_transactions =
+  let%bind all_transactions =
     generate_all_transactions ~precomputed_values ~n_blocks ~n_zkapp_txs
       ~n_payments ~max_cost ~keypair genesis
   in
