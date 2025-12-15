@@ -75,7 +75,10 @@ end
 module type S = sig
   val t : Mina_ledger.Ledger.t Lazy.t
 
-  (** Create a new root ledger that is equal in state to the genesis ledger *)
+  (** Create a new root ledger that is equal in state to the genesis ledger. The
+      resulting backing will match what is requested in [config]; this may
+      require the primary genesis ledger database to be migrated at the
+      destination. *)
   val create_root :
        config:Root_ledger.Config.t
     -> depth:int

@@ -80,7 +80,8 @@ module Utils = struct
         (Ledger.merkle_root genesis_mask)
         (Root_ledger.merkle_root root) ) ;
     assert (Root_ledger.depth root = depth) ;
-    Root_ledger.create_checkpoint ~config root () |> Deferred.Or_error.return
+    Root_ledger.copy_reconfigured ~config root ()
+    |> Deferred.map ~f:Or_error.return
 
   let create_root_from_backing_root_with_directory genesis_mask root ~directory
       ~depth () =
