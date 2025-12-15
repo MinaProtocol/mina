@@ -1752,7 +1752,8 @@ let%test_module _ =
     let constraint_constants =
       Genesis_constants.For_unit_tests.Constraint_constants.t
 
-    let `VK vk, `Prover _ = Transaction_snark.For_tests.create_trivial_snapp ()
+    let `VK vk, `Prover prover =
+      Transaction_snark.For_tests.create_trivial_snapp ()
 
     let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
@@ -1861,7 +1862,7 @@ let%test_module _ =
       Account_id.Table.set account_state_tbl ~key:fee_payer_account_id
         ~data:(fee_payer_account, `Fee_payer) ;
 
-      for _i = 1 to 10 do
+      let gen_account _ =
         let zkapp_keypair = Signature_lib.Keypair.create () in
         let zkapp_pk =
           Signature_lib.Public_key.compress zkapp_keypair.public_key
@@ -1874,8 +1875,14 @@ let%test_module _ =
           { zkapp_account_base with zkapp = Some Zkapp_account.default }
         in
         Account_id.Table.set account_state_tbl ~key:zkapp_account_id
-          ~data:(zkapp_account, `Ordinary_participant)
-      done ;
+          ~data:(zkapp_account, `Ordinary_participant) ;
+        (zkapp_pk, zkapp_keypair.private_key)
+      in
+      let keymap =
+        (public_key_compressed, keypair.private_key)
+        :: List.init 10 ~f:gen_account
+        |> Public_key.Compressed.Map.of_alist_exn
+      in
 
       let max_cost_cmd_gen =
         gen_max_cost_zkapp_command_from ~fee_payer_keypair:keypair
@@ -1897,5 +1904,12 @@ let%test_module _ =
       let actions = first_update.body.actions in
 
       assert (List.length events = genesis_constants.max_event_elements) ;
-      assert (List.length actions = genesis_constants.max_action_elements)
+      assert (List.length actions = genesis_constants.max_action_elements) ;
+
+      let (_ : Zkapp_command.t) =
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            Zkapp_command_builder.replace_authorizations ~prover ~keymap
+              max_cost_cmd )
+      in
+      ()
   end )
