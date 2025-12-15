@@ -1845,6 +1845,36 @@ let%test_module _ =
       in
       ()
 
+    let gen_and_test_tx ~keymap
+        (generator : Zkapp_command.t Quickcheck.Generator.t) =
+      let command =
+        Quickcheck.Generator.generate generator ~size:1
+          ~random:(Splittable_random.State.create Random.State.default)
+      in
+      let account_updates =
+        Zkapp_command.Call_forest.to_list command.account_updates
+      in
+      assert (List.length account_updates = 15) ;
+
+      let first_update = List.hd_exn account_updates in
+      let events = first_update.body.events in
+      let actions = first_update.body.actions in
+
+      assert (List.length events = genesis_constants.max_event_elements) ;
+      assert (List.length actions = genesis_constants.max_action_elements) ;
+      let _ =
+        Zkapp_command.Call_forest.mapi_with_trees command.account_updates
+          ~f:(fun _ndx acc tree ->
+            assert (List.is_empty tree.calls) ;
+            acc )
+      in
+      let (command_final : Zkapp_command.t) =
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            Zkapp_command_builder.replace_authorizations ~prover ~keymap command )
+      in
+      Zkapp_command.valid_size ~genesis_constants command_final
+      |> Or_error.ok_exn
+
     let%test_unit "generate max cost zkapp command" =
       let keypair = Keypair.create () in
       let public_key_compressed =
@@ -1888,29 +1918,5 @@ let%test_module _ =
         gen_max_cost_zkapp_command_from ~fee_payer_keypair:keypair
           ~account_state_tbl ~vk ~genesis_constants ()
       in
-
-      let max_cost_cmd =
-        Quickcheck.Generator.generate max_cost_cmd_gen ~size:1
-          ~random:(Splittable_random.State.create Random.State.default)
-      in
-
-      let account_updates =
-        Zkapp_command.Call_forest.to_list max_cost_cmd.account_updates
-      in
-      assert (List.length account_updates = 15) ;
-
-      let first_update = List.hd_exn account_updates in
-      let events = first_update.body.events in
-      let actions = first_update.body.actions in
-
-      assert (List.length events = genesis_constants.max_event_elements) ;
-      assert (List.length actions = genesis_constants.max_action_elements) ;
-
-      let (max_cost_cmd_final : Zkapp_command.t) =
-        Async.Thread_safe.block_on_async_exn (fun () ->
-            Zkapp_command_builder.replace_authorizations ~prover ~keymap
-              max_cost_cmd )
-      in
-      Zkapp_command.valid_size ~genesis_constants max_cost_cmd_final
-      |> Or_error.ok_exn
+      gen_and_test_tx ~keymap max_cost_cmd_gen
   end )
