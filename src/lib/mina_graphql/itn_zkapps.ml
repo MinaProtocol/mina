@@ -187,6 +187,8 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
     Transaction_snark.For_tests.create_trivial_snapp ()
   in
   let%bind.Deferred vk = vk in
+  (* Cache for max cost zkapp proof reuse *)
+  let cache = ref Signature_lib.Public_key.Compressed.Map.empty in
   let account_queue = Queue.create () in
   let num_fee_payers = Array.length fee_payer_array in
   Deferred.repeat_until_finished (init_tm_next, init_counter)
@@ -282,8 +284,15 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
         let%bind zkapp_command =
           O1trace.thread "itn_replace_zkapp_auth"
           @@ fun () ->
-          Zkapp_command_builder.replace_authorizations ~prover ~keymap
-            zkapp_dummy
+          (* Use cache for max cost zkapp commands *)
+          if zkapp_command_details.max_cost then
+            Mina_generators.Zkapp_command_generators
+            .replace_proof_authorizations_for_max_cost ~cache ~prover ~keymap
+              zkapp_dummy
+            >>= Zkapp_command_builder.replace_authorizations ~keymap
+          else
+            Zkapp_command_builder.replace_authorizations ~prover ~keymap
+              zkapp_dummy
         in
         let%bind () =
           O1trace.thread "itn_send_zkapp"

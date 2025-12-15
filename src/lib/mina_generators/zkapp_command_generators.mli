@@ -111,3 +111,25 @@ val gen_max_cost_zkapp_command_from :
   -> genesis_constants:Genesis_constants.t
   -> unit
   -> Zkapp_command.t Quickcheck.Generator.t
+
+(** Replace proof authorizations for max cost zkapp commands using a cache.
+    For each proof-based account update, check if we have a cached proof for that public key.
+    If yes, reuse it. If no, generate a new proof and cache it.
+    
+    This function is designed for max cost zkapp commands where each account update
+    is a pure function of the public key (and verification key), allowing us to cache
+    proofs by public key and reuse them across multiple transactions.
+*)
+val replace_proof_authorizations_for_max_cost :
+     cache:Proof_cache_tag.t Signature_lib.Public_key.Compressed.Map.t ref
+  -> prover:
+       (   ?handler:
+             (   Snarky_backendless.Request.request
+              -> Snarky_backendless.Request.response )
+        -> Zkapp_statement.t
+        -> (unit * unit * Pickles.Side_loaded.Proof.Stable.Latest.t)
+           Async_kernel.Deferred.t )
+  -> keymap:
+       Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t
+  -> Zkapp_command.t
+  -> Zkapp_command.t Async_kernel.Deferred.t
