@@ -77,7 +77,10 @@ module type S = sig
 
   (** Create a new root ledger that is equal in state to the genesis ledger *)
   val create_root :
-    config:Root_ledger.Config.t -> depth:int -> unit -> Root_ledger.t Or_error.t
+       config:Root_ledger.Config.t
+    -> depth:int
+    -> unit
+    -> Root_ledger.t Async.Deferred.Or_error.t
 
   (** Create a new root ledger that is equal in state to the genesis ledger,
       using a directory path instead of a config *)
