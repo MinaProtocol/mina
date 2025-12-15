@@ -72,6 +72,13 @@ SNARK_WORKERS_PIDS=()
 FISH_PIDS=()
 NODE_PIDS=()
 OVERRIDE_GENSIS_LEDGER=""
+REDIRECT_LOGS=false
+
+
+# =================================================
+# ITN features flags
+
+ITN_KEYS=""
 
 # ================================================
 # Helper functions
@@ -140,8 +147,12 @@ help() {
                                          |   Default: None
 -sce |--slot-chain-end                   | When set, stop producing blocks from this chain on.
                                          |   Default: None
+--itn-keys <keys>                        | Use ITN keys for nodes authentication
+                                         |   Default: not set
 -r   |--root                             | When set, override the root working folder (i.e. the value of ROOT) for this script. WARN: this script will clean up anything inside that folder when initializing any run!
                                          |   Default: ${ROOT}
+--redirect-logs                          | When set, redirect snark worker logs to file instead of console output
+                                         |   Default: ${REDIRECT_LOGS}
 -h   |--help                             | Displays this help message
 
 Available logging levels:
@@ -258,6 +269,19 @@ exec-daemon() {
     extra_opts+=( --genesis-ledger-dir "$copied_override_genesis_ledger")
   fi
 
+  if $ITN_FEATURES; then
+    if [ -z "$ITN_KEYS" ]; then
+      echo "❌ ITN features enabled but no ITN keys provided." >&2
+      exit 1
+    fi
+
+    ITN_GRAPHQL_PORT=$((BASE_PORT + 5))
+
+    extra_opts+=( "--itn-keys $ITN_KEYS" )
+    extra_opts+=( "--itn-graphql-port ${ITN_GRAPHQL_PORT}" )
+
+  fi
+
   # shellcheck disable=SC2068
   exec ${MINA_EXE} daemon \
     --client-port "${CLIENT_PORT}" \
@@ -307,15 +331,25 @@ spawn-node() {
   FOLDER=${1}
   shift
   # shellcheck disable=SC2068
-  exec-daemon $@ -config-directory "${FOLDER}" &
+
+  if [ "${REDIRECT_LOGS}" = true ]; then
+    exec-daemon $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
+  else
+    exec-daemon $@ -config-directory "${FOLDER}" &
+  fi
 }
 
 # Spawns worker in background
+# Optionally redirect worker logs to file if REDIRECT_WORKER_LOGS is true
 spawn-worker() {
   FOLDER=${1}
   shift
   # shellcheck disable=SC2068
-  exec-worker-daemon $@ -config-directory "${FOLDER}" &
+  if [ "${REDIRECT_LOGS}" = true ]; then
+    exec-worker-daemon $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
+  else
+    exec-worker-daemon $@ -config-directory "${FOLDER}" &
+  fi
 }
 
 # Spawns the Archive Node in background
@@ -323,7 +357,11 @@ spawn-archive-node() {
   FOLDER=${1}
   shift
   # shellcheck disable=SC2068
-  exec-archive-node $@ &
+  if [ "${REDIRECT_LOGS}" = true ]; then
+    exec-archive-node $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
+  else
+    exec-archive-node $@ -config-directory "${FOLDER}" &
+  fi
 }
 
 # Resets genesis ledger
@@ -389,6 +427,8 @@ is_process_running() {
   kill -0 "$1" 2>/dev/null
 }
 
+REDIRECT_WORKER_LOGS=true
+
 # ================================================
 # Parse inputs from arguments
 
@@ -400,6 +440,9 @@ done
 
 while [[ "$#" -gt 0 ]]; do
   case ${1} in
+    --no-worker-log-redirect)
+      REDIRECT_WORKER_LOGS=false
+      ;;
   -w | --whales)
     WHALES="${2}"
     shift
@@ -505,9 +548,17 @@ while [[ "$#" -gt 0 ]]; do
     SLOT_CHAIN_END="${2}"
     shift
     ;;
+  --itn-keys)
+    export ITN_FEATURES=true
+    ITN_KEYS="${2}"
+    shift
+    ;;
   -r | --root)
     ROOT="${2}"
     shift
+    ;;
+  --redirect-logs)
+    REDIRECT_LOGS=true
     ;;
   *)
     echo "Unknown parameter passed: ${1}"
@@ -889,7 +940,7 @@ for ((i = 0; i < WHALES; i++)); do
   FOLDER=${NODES_FOLDER}/whale_${i}
   KEY_FILE=${ROOT}/online_whale_keys/online_whale_account_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((WHALE_START_PORT + i * 5)) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
+  spawn-node "${FOLDER}" $((WHALE_START_PORT + i * 6)) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
     -libp2p-keypair "${ROOT}"/libp2p_keys/whale_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   WHALE_PIDS[${i}]=$!
 done
@@ -900,7 +951,7 @@ for ((i = 0; i < FISH; i++)); do
   FOLDER=${NODES_FOLDER}/fish_${i}
   KEY_FILE=${ROOT}/online_fish_keys/online_fish_account_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((FISH_START_PORT + i * 5)) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
+  spawn-node "${FOLDER}" $((FISH_START_PORT + i * 6)) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
     -libp2p-keypair "${ROOT}"/libp2p_keys/fish_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   FISH_PIDS[${i}]=$!
 done
@@ -910,7 +961,7 @@ done
 for ((i = 0; i < NODES; i++)); do
   FOLDER=${NODES_FOLDER}/node_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((NODE_START_PORT + i * 5)) -peer ${SEED_PEER_ID} \
+  spawn-node "${FOLDER}" $((NODE_START_PORT + i * 6)) -peer ${SEED_PEER_ID} \
     -libp2p-keypair "${ROOT}"/libp2p_keys/node_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   NODE_PIDS[${i}]=$!
 done
@@ -966,7 +1017,7 @@ EOF
     cat <<EOF
 		Instance #${i}:
 		  pid ${WHALE_PIDS[${i}]}
-		  status: ${MINA_EXE} client status -daemon-port $((WHALE_START_PORT + i * 5))
+		  status: ${MINA_EXE} client status -daemon-port $((WHALE_START_PORT + i * 6))
 		  data dir: ${NODES_FOLDER}/whale_${i}
 EOF
   done
@@ -980,7 +1031,7 @@ EOF
     cat <<EOF
 		Instance #${i}:
 		  pid ${FISH_PIDS[${i}]}
-		  status: ${MINA_EXE} client status -daemon-port $((FISH_START_PORT + i * 5))
+		  status: ${MINA_EXE} client status -daemon-port $((FISH_START_PORT + i * 6))
 		  data dir: ${NODES_FOLDER}/fish_${i}
 EOF
   done
@@ -994,7 +1045,7 @@ EOF
     cat <<EOF
 		Instance #${i}:
 		  pid ${NODE_PIDS[${i}]}
-		  status: ${MINA_EXE} client status -daemon-port $((NODE_START_PORT + i * 5))
+		  status: ${MINA_EXE} client status -daemon-port $((NODE_START_PORT + i * 6))
 		  data dir: ${NODES_FOLDER}/node_${i}
 EOF
   done
