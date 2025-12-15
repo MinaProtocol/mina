@@ -148,7 +148,6 @@
 (package (name ppx_register_event))
 (package (name ppx_representatives))
 (package (name ppx_to_enum))
-(package (name ppx_util))
 (package (name ppx_version))
 (package (name precomputed_values))
 (package (name promise))
