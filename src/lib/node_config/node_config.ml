@@ -27,26 +27,13 @@ include Node_config_unconfigurable_constants
 
 [%%inject "grace_period_slots", grace_period_slots]
 
-[%%inject "scan_state_with_tps_goal", scan_state_with_tps_goal]
-
 [%%inject "sync_ledger_max_subtree_depth", sync_ledger_max_subtree_depth]
 
 [%%inject
 "sync_ledger_default_subtree_depth", sync_ledger_default_subtree_depth]
 
-[%%ifndef scan_state_transaction_capacity_log_2]
-
-let scan_state_transaction_capacity_log_2 : int option = None
-
-[%%else]
-
 [%%inject
 "scan_state_transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
-
-let scan_state_transaction_capacity_log_2 =
-  Some scan_state_transaction_capacity_log_2
-
-[%%endif]
 
 [%%inject "scan_state_work_delay", scan_state_work_delay]
 
@@ -95,17 +82,5 @@ let zkapp_cmd_limit = None
 [%%inject "zkapp_cmd_limit", zkapp_cmd_limit]
 
 let zkapp_cmd_limit = Some zkapp_cmd_limit
-
-[%%endif]
-
-[%%ifndef scan_state_tps_goal_x10]
-
-let scan_state_tps_goal_x10 : int option = None
-
-[%%else]
-
-[%%inject "scan_state_tps_goal_x10", scan_state_tps_goal_x10]
-
-let scan_state_tps_goal_x10 = Some scan_state_tps_goal_x10
 
 [%%endif]
