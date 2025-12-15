@@ -2222,7 +2222,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             Transition_router.run
               ~context:(module Context)
               ~trust_system:config.trust_system ~verifier ~network:net
-              ~is_seed:config.is_seed ~is_demo_mode:config.demo_mode
+              ~is_seed:config.net_config.is_seed ~is_demo_mode:config.demo_mode
               ~time_controller:config.time_controller
               ~consensus_local_state:config.consensus_local_state
               ~persistent_root_location:config.persistent_root_location
@@ -2447,7 +2447,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~genesis_timestamp:
                 config.precomputed_values.genesis_constants.protocol
                   .genesis_state_timestamp
-              ~net ~is_seed:config.is_seed ~demo_mode:config.demo_mode
+              ~net ~is_seed:config.net_config.is_seed
+              ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:(Var.watch @@ of_broadcast_pipe online_status)
               ~first_connection_incr:
