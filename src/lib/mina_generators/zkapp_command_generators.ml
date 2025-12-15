@@ -1699,7 +1699,7 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range
   in
   let zkapp_pks = List.map zkapp_accounts ~f:(fun a -> a.public_key) in
   let%bind pks =
-    Quickcheck.Generator.(of_list zkapp_pks |> list_with_length 5)
+    Quickcheck.Generator.(of_list zkapp_pks |> list_with_length 15)
   in
   let[@warning "-8"] (head :: tail) =
     List.map pks ~f:(fun pk -> mk_account_update ~pk ~vk)
@@ -1890,7 +1890,7 @@ let%test_module _ =
       let account_updates =
         Zkapp_command.Call_forest.to_list max_cost_cmd.account_updates
       in
-      assert (List.length account_updates = 5) ;
+      assert (List.length account_updates = 15) ;
 
       let first_update = List.hd_exn account_updates in
       let events = first_update.body.events in
