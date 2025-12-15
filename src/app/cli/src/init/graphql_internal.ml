@@ -195,7 +195,7 @@ module Make = struct
             respond_string ~status:`Bad_request ~body ()
         | Error err ->
             let body = Yojson.Basic.to_string err in
-            respond_string ~status:`OK ~body () )
+            respond_string ~status:`Internal_server_error ~body () )
 
   let make_callback :
          ?auth_keys:Itn_crypto.pubkey list
