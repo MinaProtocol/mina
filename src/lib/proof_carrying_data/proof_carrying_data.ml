@@ -1,6 +1,6 @@
 (* A convenient data structure to bundle statements along with their proofs together *)
 
-open Core_kernel
+open Core
 
 [%%versioned
 module Stable = struct
