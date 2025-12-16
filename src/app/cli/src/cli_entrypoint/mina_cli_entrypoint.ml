@@ -2069,6 +2069,66 @@ let internal_commands logger ~itn_features =
               Format.eprintf "Failed to generate block@.%s@."
                 (Yojson.Safe.to_string @@ Error_json.error_to_yojson err) ;
               exit 1) )
+  ; ( "chain-id"
+    , Command.async ~summary:"Generate a genesis proof"
+        (let open Command.Let_syntax in
+        let%map_open config_files =
+          flag "--config-file" ~aliases:[ "config-file" ]
+            ~doc:
+              "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
+               default: <config_dir>/daemon.json). Pass multiple times to \
+               override fields from earlier config files"
+            (listed string)
+        and conf_dir = Cli_lib.Flag.conf_dir
+        and genesis_dir =
+          flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
+            ~doc:
+              "DIR Directory that contains the genesis ledger and the genesis \
+               blockchain proof (default: <config-dir>)"
+            (optional string)
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          Parallel.init_master () ;
+          let logger = Logger.create () in
+          let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
+          let genesis_constants =
+            Genesis_constants.Compiled.genesis_constants
+          in
+          let constraint_constants =
+            Genesis_constants.Compiled.constraint_constants
+          in
+          let proof_level = Genesis_constants.Proof_level.Full in
+          let config_files =
+            List.map config_files ~f:(fun config_file ->
+                (config_file, `Must_exist) )
+          in
+          let%bind ( precomputed_values
+                   , _config_jsons
+                   , _config
+                   , _chain_state_locations
+                   , _ ) =
+            load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
+              ~constraint_constants ~proof_level ~cli_proof_level:None
+              ~hardfork_handling:Keep_running config_files
+          in
+          let chain_id =
+            let protocol_transaction_version =
+              Protocol_version.(transaction current)
+            in
+            let protocol_network_version = Protocol_version.(network current) in
+            let genesis_state_hash =
+              (Precomputed_values.genesis_state_hashes precomputed_values)
+                .state_hash
+            in
+            chain_id ~genesis_state_hash
+              ~genesis_constants:precomputed_values.genesis_constants
+              ~constraint_system_digests:
+                (Lazy.force precomputed_values.constraint_system_digests)
+              ~protocol_transaction_version ~protocol_network_version
+          in
+          let () = printf "%s" chain_id in
+          exit 0) )
   ]
 
 let mina_commands logger ~itn_features =
