@@ -3,7 +3,7 @@
 -- NOTE: minaToolchainBullseye is also used for building Ubuntu Focal packages in CI
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
 { toolchainBase =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/codaprotocol/ci-toolchain-base:v3"
+    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
 , minaToolchainBookworm =
     { amd64 =
         "gcr.io/o1labs-192920/mina-toolchain@sha256:f92c6f2dde5d38f0c245e58c3c462fd17d311cf1020275e0a935175377c9bb82"

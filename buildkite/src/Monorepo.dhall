@@ -52,7 +52,8 @@ let commands
                   ++  " --scopes ${PipelineScope.join requestedScopes} "
                   ++  " --tags ${PipelineTag.join requestedTags} "
                   ++  " --filter-mode ${PipelineFilterMode.show filterMode} "
-                  ++  " --selection-mode ${PipelineJobSelection.show selection} "
+                  ++  " --selection-mode ${PipelineJobSelection.show
+                                             selection} "
                   ++  " --jobs ./buildkite/src/gen"
                   ++  " --git-diff-file _computed_diff.txt "
                 )
