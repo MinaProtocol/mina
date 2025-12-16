@@ -31,11 +31,7 @@ module type Unconfigurable_constants = sig
   val rpc_heartbeat_send_every_sec : float
 end
 
-module type S = sig
-  include Version
-
-  include Unconfigurable_constants
-
+module type Profiled = sig
   val ledger_depth : int
 
   val curve_size : int
@@ -89,4 +85,12 @@ module type S = sig
   val sync_ledger_max_subtree_depth : int
 
   val sync_ledger_default_subtree_depth : int
+end
+
+module type S = sig
+  include Version
+
+  include Unconfigurable_constants
+
+  include Profiled
 end
