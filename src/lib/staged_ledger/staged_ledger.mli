@@ -254,32 +254,6 @@ val apply_diff_unchecked :
      , Staged_ledger_error.t )
      Deferred.Result.t
 
-(* Internals of the txn application. This is only exposed to facilitate
-   writing unit tests. *)
-module Application_state : sig
-  type txn =
-    ( Signed_command.With_valid_signature.t
-    , Zkapp_command.Valid.t )
-    User_command.t_
-
-  type t =
-    { valid_seq : txn Sequence.t
-    ; invalid : (txn * Error.t) list
-    ; skipped_by_fee_payer : txn list Account_id.Map.t
-    ; zkapp_space_remaining : int option
-    ; total_space_remaining : int
-    }
-
-  val init : ?zkapp_limit:int -> total_limit:int -> t
-
-  val try_applying_txn :
-       ?logger:Logger.t
-    -> apply:(User_command.t Transaction.t_ -> ('a, Error.t) Result.t)
-    -> t
-    -> txn
-    -> (t, txn Sequence.t * (txn * Error.t) list) Continue_or_stop.t
-end
-
 (* This should memoize the snark verifications *)
 
 val create_diff :
@@ -353,6 +327,10 @@ val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 *)
 val convert_and_apply_all_masks_to_ledger :
   hardfork_db:Ledger.Hardfork_db.t -> t -> unit
+
+module For_tests : sig
+  module Application_state = Application_state
+end
 
 module Test_helpers : sig
   val dummy_state_and_view :

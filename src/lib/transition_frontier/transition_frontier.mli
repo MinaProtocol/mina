@@ -118,8 +118,6 @@ module For_tests : sig
   open Core_kernel
   open Signature_lib
 
-  val equal : t -> t -> bool
-
   val gen_genesis_breadcrumb :
        ?logger:Logger.t
     -> verifier:Verifier.t
@@ -155,7 +153,7 @@ module For_tests : sig
     -> max_length:int
     -> size:int
     -> unit
-    -> t Quickcheck.Generator.t
+    -> (t * Breadcrumb.t list) Quickcheck.Generator.t
 
   val gen_with_branch :
        ?logger:Logger.t

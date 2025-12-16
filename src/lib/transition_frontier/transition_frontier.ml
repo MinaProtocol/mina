@@ -449,8 +449,7 @@ let add_breadcrumb_exn t breadcrumb =
       [ ( "state_hash"
         , State_hash.to_yojson
             (Breadcrumb.state_hash (Full_frontier.best_tip t.full_frontier)) )
-      ; ( "n"
-        , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier) )
+      ; ("n", `Int (Full_frontier.size t.full_frontier))
       ]
     "PRE: ($state_hash, $n)" ;
   [%str_log' trace t.logger]
@@ -475,8 +474,7 @@ let add_breadcrumb_exn t breadcrumb =
       [ ( "state_hash"
         , State_hash.to_yojson
             (Breadcrumb.state_hash @@ Full_frontier.best_tip t.full_frontier) )
-      ; ( "n"
-        , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier) )
+      ; ("n", `Int (Full_frontier.size t.full_frontier))
       ]
     "POST: ($state_hash, $n)" ;
   let user_cmds =
@@ -531,11 +529,11 @@ include struct
 
   let all_breadcrumbs = proxy1 all_breadcrumbs
 
+  let all_state_hashes = proxy1 all_state_hashes
+
   let visualize ~filename = proxy1 (visualize ~filename)
 
   let visualize_to_string = proxy1 visualize_to_string
-
-  let iter = proxy1 iter
 
   let successors = proxy1 successors
 
@@ -572,15 +570,6 @@ module For_tests = struct
     Mina_ledger.Ledger_transfer.Make
       (Mina_ledger.Ledger)
       (Mina_ledger.Ledger.Db)
-  open Full_frontier.For_tests
-
-  let proxy2 f { full_frontier = x; _ } { full_frontier = y; _ } = f x y
-
-  let equal = proxy2 equal
-
-  let rec deferred_rose_tree_iter (Mina_stdlib.Rose_tree.T (root, trees)) ~f =
-    let%bind () = f root in
-    Deferred.List.iter trees ~f:(deferred_rose_tree_iter ~f)
 
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
   let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~verifier
@@ -784,8 +773,10 @@ module For_tests = struct
           frontier
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
-        Deferred.List.iter ~how:`Sequential branches
-          ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) ) ;
+        Deferred.List.iter branches ~how:`Sequential
+          ~f:
+            (Mina_stdlib.Rose_tree.Deferred.iter
+               ~f:(add_breadcrumb_exn frontier) ) ) ;
     Core.Gc.Expert.add_finalizer_exn consensus_local_state
       (fun consensus_local_state ->
         Consensus.Data.Local_state.(
@@ -794,7 +785,12 @@ module For_tests = struct
         Consensus.Data.Local_state.(
           Snapshot.Ledger_snapshot.close
           @@ next_epoch_ledger consensus_local_state) ) ;
-    frontier
+    let all_breadcrumbs = ref [] in
+    List.iter branches
+      ~f:
+        (Mina_stdlib.Rose_tree.iter ~f:(fun b ->
+             all_breadcrumbs := b :: !all_breadcrumbs ) ) ;
+    (frontier, !all_breadcrumbs)
 
   let gen_with_branch ?logger ~verifier ?trust_system ?consensus_local_state
       ~precomputed_values
@@ -804,7 +800,7 @@ module For_tests = struct
       ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
       ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
-    let%bind frontier =
+    let%bind frontier, _ =
       gen ?logger ~verifier ?trust_system ?consensus_local_state
         ~precomputed_values ?gen_root_breadcrumb ~create_root_and_accounts
         ~max_length ~size:frontier_size ()
