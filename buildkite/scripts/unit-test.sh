@@ -7,7 +7,7 @@ if [[ $# -ne 2 ]]; then
     exit 1
 fi
 
-profile=$1
+export DUNE_PROFILE=$1
 path=$2
 
 # shellcheck disable=SC1090
@@ -19,7 +19,7 @@ export LAGRANGE_CACHE_DIR="/tmp/lagrange-cache"
 
 echo "--- Make libp2p helper"
 export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go
-time DUNE_PROFILE="${profile}" make libp2p_helper
+time make libp2p_helper
 
 # Turn on the proof-cache assertion, so that CI will fail if the proofs need to
 # be updated.
@@ -30,8 +30,8 @@ export ERROR_ON_PROOF=true
 # skip running all of the tests that have already succeeded, since dune will
 # only retry those tests that failed.
 echo "--- Run unit tests"
-time dune runtest "${path}" --profile="${profile}" || \
+time dune runtest "${path}" || \
 (./scripts/link-coredumps.sh && \
  echo "--- Retrying failed unit tests" && \
- time dune runtest "${path}" --profile="${profile}" || \
+ time dune runtest "${path}" || \
  (./scripts/link-coredumps.sh && false))
