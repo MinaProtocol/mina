@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 [%%versioned
 module Stable = struct
@@ -30,33 +30,37 @@ module Set (Hash : Comparable.S) = struct
 
   let empty = Hash.Map.empty
 
-  let is_empty = Hash.Map.is_empty
+  let is_empty = Map.is_empty
 
   let add t { data; hash } =
-    match Hash.Map.add t ~key:hash ~data with `Ok t' -> t' | `Duplicate -> t
+    match Map.add t ~key:hash ~data with `Ok t' -> t' | `Duplicate -> t
 
   let union =
-    Hash.Map.merge ~f:(fun ~key:_ -> function
-      | `Both (_, b) -> Some b | `Left a -> Some a | `Right b -> Some b )
+    Map.merge ~f:(fun ~key:_ -> function
+      | `Both (_, b) ->
+          Some b
+      | `Left a ->
+          Some a
+      | `Right b ->
+          Some b )
 
-  let iter t ~f = Hash.Map.iteri t ~f:(fun ~key ~data -> f { data; hash = key })
+  let iter t ~f = Map.iteri t ~f:(fun ~key ~data -> f { data; hash = key })
 
   (* Ignoring values, comparing just on keys *)
   let equal a b = Hash.Map.equal (fun _ _ -> true) a b
 
   let of_list = List.fold ~init:empty ~f:add
 
-  let length = Hash.Map.length
+  let length = Map.length
 
   let singleton { data; hash } = Hash.Map.singleton hash data
 
-  let remove t { hash; _ } = Hash.Map.remove t hash
+  let remove t { hash; _ } = Map.remove t hash
 
   let min_elt_exn t =
-    let hash, data = Hash.Map.min_elt_exn t in
+    let hash, data = Map.min_elt_exn t in
     { data; hash }
 
   let to_sequence t =
-    Hash.Map.to_sequence t
-    |> Sequence.map ~f:(fun (hash, data) -> { data; hash })
+    Map.to_sequence t |> Sequence.map ~f:(fun (hash, data) -> { data; hash })
 end
