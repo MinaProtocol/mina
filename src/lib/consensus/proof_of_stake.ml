@@ -43,8 +43,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let name = "proof_of_stake"
 
-  let genesis_ledger_total_currency ~ledger =
-    Mina_ledger.Ledger.foldi ~init:Amount.zero (Lazy.force ledger)
+  let genesis_ledger_total_currency ledger =
+    Mina_ledger.Ledger.foldi ~init:Amount.zero ledger
       ~f:(fun _addr sum (account : Mina_base.Account.t) ->
         (* only default token matters for total currency used to determine stake *)
         if Mina_base.(Token_id.equal account.token_id Token_id.default) then
@@ -53,7 +53,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                ~message:"failed to calculate total currency in genesis ledger"
         else sum )
 
-  let genesis_ledger_hash ~ledger =
+  let genesis_ledger_hash ledger =
     Mina_ledger.Ledger.merkle_root (Lazy.force ledger)
     |> Mina_base.Frozen_ledger_hash.of_ledger_hash
 
@@ -674,10 +674,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Epoch_ledger = struct
       include Mina_base.Epoch_ledger
 
-      let genesis ~ledger =
-        { Poly.hash = genesis_ledger_hash ~ledger
-        ; total_currency = genesis_ledger_total_currency ~ledger
-        }
+      let genesis ~ledger_hash ~total_currency =
+        { Poly.hash = ledger_hash; total_currency }
     end
 
     module Vrf = struct
@@ -978,9 +976,13 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; field (Mina_base.State_hash.var_to_hash_packed lock_checkpoint)
             ]
 
-        let genesis ~(genesis_epoch_data : Genesis_epoch_data.Data.t) =
-          let ledger = Genesis_ledger.Packed.t genesis_epoch_data.ledger in
-          { Poly.ledger = Epoch_ledger.genesis ~ledger
+        let genesis
+            ~(genesis_epoch_data :
+               Genesis_epoch_data.field Genesis_epoch_data.Data.t )
+            ~total_currency =
+          { Poly.ledger =
+              Epoch_ledger.genesis ~ledger_hash:genesis_epoch_data.ledger
+                ~total_currency
           ; seed = genesis_epoch_data.seed
           ; start_checkpoint = Mina_base.State_hash.(of_hash zero)
           ; lock_checkpoint = Lock_checkpoint.null
@@ -1727,6 +1729,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         , Public_key.Compressed.var )
         Poly.t
 
+      type field = Snark_params.Tick.field
+
       let typ ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           : (var, Value.t) Typ.t =
         let sub_windows_per_window =
@@ -1976,10 +1980,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       let same_checkpoint_window ~constants ~prev ~next =
         same_checkpoint_window ~constants ~prev ~next
 
-      let negative_one ~genesis_ledger
-          ~(genesis_epoch_data : Genesis_epoch_data.t)
+      let negative_one ~genesis_ledger_hash
+          ~(genesis_epoch_data : Genesis_epoch_data.field Genesis_epoch_data.t)
           ~(constants : Constants.t)
-          ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
+          ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+          ~total_currency : Value.t =
         let max_sub_window_density = constants.slots_per_sub_window in
         let max_window_density = constants.slots_per_window in
         let blockchain_length, global_slot_since_genesis =
@@ -1993,7 +1998,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let default_epoch_data =
           Genesis_epoch_data.Data.
-            { ledger = genesis_ledger; seed = Epoch_seed.initial }
+            { ledger = genesis_ledger_hash; seed = Epoch_seed.initial }
         in
         let genesis_epoch_data_staking, genesis_epoch_data_next =
           Option.value_map genesis_epoch_data
@@ -2010,16 +2015,15 @@ module Make_str (A : Wire_types.Concrete) = struct
                  (Length.to_int constants.sub_windows_per_window - 1)
                  ~f:(Fn.const max_sub_window_density)
         ; last_vrf_output = Vrf.Output.Truncated.dummy
-        ; total_currency =
-            genesis_ledger_total_currency
-              ~ledger:(Genesis_ledger.Packed.t genesis_ledger)
+        ; total_currency
         ; curr_global_slot_since_hard_fork = Global_slot.zero ~constants
         ; global_slot_since_genesis
         ; staking_epoch_data =
             Epoch_data.Staking.genesis
-              ~genesis_epoch_data:genesis_epoch_data_staking
+              ~genesis_epoch_data:genesis_epoch_data_staking ~total_currency
         ; next_epoch_data =
             Epoch_data.Next.genesis ~genesis_epoch_data:genesis_epoch_data_next
+              ~total_currency
         ; has_ancestor_in_same_checkpoint_window = false
         ; block_stake_winner = genesis_winner_pk
         ; block_creator = genesis_winner_pk
@@ -2028,9 +2032,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
 
       let create_genesis_from_transition ~negative_one_protocol_state_hash
-          ~consensus_transition ~genesis_ledger
-          ~(genesis_epoch_data : Genesis_epoch_data.t) ~constraint_constants
-          ~constants : Value.t =
+          ~consensus_transition ~genesis_ledger_hash
+          ~(genesis_epoch_data : Genesis_epoch_data.field Genesis_epoch_data.t)
+          ~constraint_constants ~constants ~total_currency : Value.t =
         let staking_seed =
           Option.value_map genesis_epoch_data ~default:Epoch_seed.initial
             ~f:(fun data -> data.staking.seed)
@@ -2044,9 +2048,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
         in
         let snarked_ledger_hash =
-          Genesis_ledger.Packed.t genesis_ledger
-          |> Lazy.force |> Mina_ledger.Ledger.merkle_root
-          |> Mina_base.Frozen_ledger_hash.of_ledger_hash
+          Mina_base.Frozen_ledger_hash.of_ledger_hash genesis_ledger_hash
         in
         let genesis_winner_pk = fst Vrf.Precomputed.genesis_winner in
         (* no coinbases for genesis block, so CLI flag for coinbase receiver
@@ -2055,8 +2057,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         Or_error.ok_exn
           (update ~constants ~producer_vrf_result
              ~previous_consensus_state:
-               (negative_one ~genesis_ledger ~genesis_epoch_data ~constants
-                  ~constraint_constants )
+               (negative_one ~genesis_ledger_hash:snarked_ledger_hash
+                  ~genesis_epoch_data ~constants ~constraint_constants
+                  ~total_currency )
              ~previous_protocol_state_hash:negative_one_protocol_state_hash
              ~consensus_transition ~supply_increase:Currency.Amount.Signed.zero
              ~snarked_ledger_hash ~genesis_ledger_hash:snarked_ledger_hash
@@ -2064,11 +2067,13 @@ module Make_str (A : Wire_types.Concrete) = struct
              ~block_creator:genesis_winner_pk
              ~coinbase_receiver:genesis_winner_pk ~supercharge_coinbase:true )
 
-      let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger
-          ~genesis_epoch_data ~constraint_constants ~constants : Value.t =
+      let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger_hash
+          ~genesis_epoch_data ~constraint_constants ~constants ~total_currency :
+          Value.t =
         create_genesis_from_transition ~negative_one_protocol_state_hash
-          ~consensus_transition:Consensus_transition.genesis ~genesis_ledger
-          ~genesis_epoch_data ~constraint_constants ~constants
+          ~consensus_transition:Consensus_transition.genesis
+          ~genesis_ledger_hash ~genesis_epoch_data ~constraint_constants
+          ~constants ~total_currency
 
       (* ??? do these mean, genesis-of-all-time, or genesis-at-hard-fork? *)
       (* Check that both epoch and slot are zero. *)
@@ -3106,12 +3111,22 @@ module Make_str (A : Wire_types.Concrete) = struct
     let%test "Receive a valid consensus_state with a bit of delay" =
       let constants = Lazy.force Constants.for_unit_tests in
       let genesis_ledger = Genesis_ledger.for_unit_tests in
-      let genesis_epoch_data = Genesis_epoch_data.for_unit_tests in
+      let total_currency =
+        Genesis_ledger.Packed.t genesis_ledger
+        |> Lazy.force |> genesis_ledger_total_currency
+      in
+      let genesis_ledger_hash =
+        Genesis_ledger.Packed.t genesis_ledger |> genesis_ledger_hash
+      in
+      let genesis_epoch_data =
+        Genesis_epoch_data.for_unit_tests |> Genesis_epoch_data.hashed_of_full
+      in
       let negative_one =
-        Consensus_state.negative_one ~genesis_ledger ~genesis_epoch_data
+        Consensus_state.negative_one ~genesis_ledger_hash ~genesis_epoch_data
           ~constants
           ~constraint_constants:
             Genesis_constants.For_unit_tests.Constraint_constants.t
+          ~total_currency
       in
       let curr_epoch, curr_slot =
         Consensus_state.curr_epoch_and_slot negative_one
@@ -3129,12 +3144,22 @@ module Make_str (A : Wire_types.Concrete) = struct
       let epoch = Epoch.of_int 5 in
       let constants = Lazy.force Constants.for_unit_tests in
       let genesis_ledger = Genesis_ledger.for_unit_tests in
-      let genesis_epoch_data = Genesis_epoch_data.for_unit_tests in
+      let total_currency =
+        Genesis_ledger.Packed.t genesis_ledger
+        |> Lazy.force |> genesis_ledger_total_currency
+      in
+      let genesis_ledger_hash =
+        Genesis_ledger.Packed.t genesis_ledger |> genesis_ledger_hash
+      in
+      let genesis_epoch_data =
+        Genesis_epoch_data.for_unit_tests |> Genesis_epoch_data.hashed_of_full
+      in
       let negative_one =
-        Consensus_state.negative_one ~genesis_ledger ~genesis_epoch_data
+        Consensus_state.negative_one ~genesis_ledger_hash ~genesis_epoch_data
           ~constants
           ~constraint_constants:
             Genesis_constants.For_unit_tests.Constraint_constants.t
+          ~total_currency
       in
       let start_time = Epoch.start_time ~constants epoch in
       let ((curr_epoch, curr_slot) as curr) =
@@ -3408,8 +3433,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let constants = Lazy.force Constants.for_unit_tests
 
-      let genesis_epoch_data = Genesis_epoch_data.for_unit_tests
-
       module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
       module Context : CONTEXT = struct
@@ -3420,6 +3443,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         let consensus_constants = constants
       end
 
+      let total_currency =
+        Genesis_ledger.t |> Lazy.force |> genesis_ledger_total_currency
+
+      let genesis_epoch_data =
+        Genesis_epoch_data.for_unit_tests |> Genesis_epoch_data.hashed_of_full
+
       let test_update constraint_constants =
         (* build pieces needed to apply "update" *)
         let snarked_ledger_hash =
@@ -3427,11 +3456,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             (Ledger.merkle_root (Lazy.force Genesis_ledger.t))
         in
         let previous_protocol_state_hash = State_hash.(of_hash zero) in
+        let genesis_ledger_hash = genesis_ledger_hash Genesis_ledger.t in
         let previous_consensus_state =
           Consensus_state.create_genesis
             ~negative_one_protocol_state_hash:previous_protocol_state_hash
-            ~genesis_ledger:(module Genesis_ledger)
-            ~genesis_epoch_data ~constraint_constants ~constants
+            ~genesis_ledger_hash ~genesis_epoch_data ~constraint_constants
+            ~constants ~total_currency
         in
         (*If this is a fork then check blockchain length and global_slot_since_genesis have been set correctly*)
         ( match constraint_constants.fork with
@@ -3645,19 +3675,19 @@ module Make_str (A : Wire_types.Concrete) = struct
         let previous_protocol_state_hash =
           Mina_base.State_hash.(of_hash zero)
         in
+
+        let genesis_ledger_hash = genesis_ledger_hash Genesis_ledger.t in
         let previous_consensus_state =
           Consensus_state.create_genesis
             ~negative_one_protocol_state_hash:previous_protocol_state_hash
-            ~genesis_ledger:(module Genesis_ledger)
-            ~genesis_epoch_data ~constraint_constants ~constants
+            ~genesis_ledger_hash ~genesis_epoch_data ~constraint_constants
+            ~constants ~total_currency
         in
         let seed = previous_consensus_state.staking_epoch_data.seed in
         let maybe_sk, account = Genesis_ledger.largest_account_exn () in
         let private_key = Option.value_exn maybe_sk in
         let public_key_compressed = Account.public_key account in
-        let total_stake =
-          genesis_ledger_total_currency ~ledger:Genesis_ledger.t
-        in
+        let total_stake = total_currency in
         let block_producer_pubkeys =
           Public_key.Compressed.Set.of_list [ public_key_compressed ]
         in

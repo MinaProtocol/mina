@@ -263,6 +263,9 @@ end
 module type S = sig
   val name : string
 
+  val genesis_ledger_total_currency :
+    Mina_ledger.Ledger.Mask.Attached.t -> Amount.t
+
   (** Return a string that tells a human what the consensus view of an instant
       in time is.
       This is mostly useful for PoStake and other consensus mechanisms that have
@@ -297,17 +300,20 @@ module type S = sig
 
   module Genesis_epoch_data : sig
     module Data : sig
-      type t =
-        { ledger : Genesis_ledger.Packed.t; seed : Mina_base.Epoch_seed.t }
+      type 'ledger t = { ledger : 'ledger; seed : Mina_base.Epoch_seed.t }
     end
 
-    type tt = { staking : Data.t; next : Data.t option }
+    type 'ledger tt = { staking : 'ledger Data.t; next : 'ledger Data.t option }
 
-    type t = tt option
+    type 'ledger t = 'ledger tt option
 
-    val for_unit_tests : t
+    val for_unit_tests : Genesis_ledger.Packed.t t
 
-    val compiled : t
+    val compiled : Genesis_ledger.Packed.t t
+
+    type field = Snark_params.Tick.field
+
+    val hashed_of_full : Genesis_ledger.Packed.t t -> field t
   end
 
   module Data : sig
@@ -331,7 +337,7 @@ module type S = sig
       val create :
            context:(module CONTEXT)
         -> genesis_ledger:Genesis_ledger.Packed.t
-        -> genesis_epoch_data:Genesis_epoch_data.t
+        -> genesis_epoch_data:Genesis_ledger.Packed.t Genesis_epoch_data.t
         -> epoch_ledger_location:string
         -> genesis_state_hash:State_hash.t
         -> epoch_ledger_backing_type:Root_ledger.Config.backing_type
@@ -504,32 +510,37 @@ module type S = sig
 
       type var
 
+      type field = Snark_params.Tick.field
+
       val typ :
            constraint_constants:Genesis_constants.Constraint_constants.t
         -> (var, Value.t) Snark_params.Tick.Typ.t
 
       val negative_one :
-           genesis_ledger:Genesis_ledger.Packed.t
-        -> genesis_epoch_data:Genesis_epoch_data.t
+           genesis_ledger_hash:field
+        -> genesis_epoch_data:field Genesis_epoch_data.t
         -> constants:Constants.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
+        -> total_currency:Amount.t
         -> Value.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Mina_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
-        -> genesis_ledger:Genesis_ledger.Packed.t
-        -> genesis_epoch_data:Genesis_epoch_data.t
+        -> genesis_ledger_hash:field
+        -> genesis_epoch_data:field Genesis_epoch_data.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> constants:Constants.t
+        -> total_currency:Amount.t
         -> Value.t
 
       val create_genesis :
            negative_one_protocol_state_hash:Mina_base.State_hash.t
-        -> genesis_ledger:Genesis_ledger.Packed.t
-        -> genesis_epoch_data:Genesis_epoch_data.t
+        -> genesis_ledger_hash:field
+        -> genesis_epoch_data:field Genesis_epoch_data.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> constants:Constants.t
+        -> total_currency:Amount.t
         -> Value.t
 
       open Snark_params.Tick
