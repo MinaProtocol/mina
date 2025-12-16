@@ -1,10 +1,10 @@
 open Core_kernel
 open Pickles_types
-module Max_state_size = Nat.N8
+module Max_state_size = Nat.N32
 
 module State_length_vec :
   Vector.VECTOR with type 'a t = ('a, Max_state_size.n) Vector.vec =
-  Vector.Vector_8
+  Vector.Vector_32
 
 module V = struct
   (* Think about versioning here! These vector types *will* change
@@ -17,7 +17,7 @@ module V = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type 'a t = 'a State_length_vec.Stable.V1.t
       [@@deriving compare, yojson, sexp, hash, equal]
     end
@@ -50,8 +50,8 @@ module Value = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
-      type t = Zkapp_basic.F.Stable.V1.t V.Stable.V1.t
+    module V2 = struct
+      type t = Zkapp_basic.F.Stable.V1.t V.Stable.V2.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id

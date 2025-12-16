@@ -71,38 +71,6 @@ module Answer = struct
                 contains all non-empty nodes has this hash. *)
       [@@deriving sexp, yojson]
     end
-
-    module V1 = struct
-      type ('hash, 'account) t =
-        | Child_hashes_are of 'hash * 'hash
-            (** The requested address's children have these hashes **)
-        | Contents_are of 'account list
-            (** The requested address has these accounts *)
-        | Num_accounts of int * 'hash
-            (** There are this many accounts and the smallest subtree that
-                contains all non-empty nodes has this hash. *)
-      [@@deriving sexp, yojson]
-
-      let to_latest acct_to_latest = function
-        | Child_hashes_are (h1, h2) ->
-            V2.Child_hashes_are [| h1; h2 |]
-        | Contents_are accts ->
-            V2.Contents_are (List.map ~f:acct_to_latest accts)
-        | Num_accounts (i, h) ->
-            V2.Num_accounts (i, h)
-
-      (* Not a standard versioning function *)
-
-      (** Attempts to downgrade v2 -> v1 *)
-      let from_v2 : ('a, 'b) V2.t -> ('a, 'b) t Or_error.t = function
-        | Child_hashes_are h ->
-            if Array.length h = 2 then Ok (Child_hashes_are (h.(0), h.(1)))
-            else Or_error.error_string "can't downgrade wide query"
-        | Contents_are accs ->
-            Ok (Contents_are accs)
-        | Num_accounts (n, h) ->
-            Ok (Num_accounts (n, h))
-    end
   end]
 end
 

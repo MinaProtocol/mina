@@ -1993,7 +1993,7 @@ let%test_module _ =
         :: List.init 3 ~f:gen_account
         |> Public_key.Compressed.Map.of_alist_exn
       in
-      let n_updates = 5 in
+      let n_updates = 15 in
       let max_cost_cmd_gen =
         gen_max_cost_zkapp_command_from ~n_updates ~fee_payer_keypair:keypair
           ~account_state_tbl ~vk ~genesis_constants ()
