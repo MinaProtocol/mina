@@ -186,7 +186,7 @@ module Make (F : Input_intf) :
       let to_latest = Fn.id
 
       include
-        Binable.Of_binable
+        Binable.Of_binable_without_uuid
           (Bigint)
           (struct
             type nonrec t = t
