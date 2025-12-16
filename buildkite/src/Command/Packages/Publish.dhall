@@ -34,7 +34,7 @@ let Command = ../Base.dhall
 
 let Cmd = ../../Lib/Cmds.dhall
 
-let Mina = ../Mina.dhall
+let FixPermissions = ../FixPermissions.dhall
 
 let Artifact = ../../Constants/Artifacts.dhall
 
@@ -223,7 +223,9 @@ let publish
 
           in    [ Command.build
                     Command.Config::{
-                    , commands = [ Mina.fixPermissionsCommand ] # commands
+                    , commands =
+                          [ FixPermissions.command Architecture.Type.Amd64 ]
+                        # commands
                     , label = "Debian Packages Publishing"
                     , key =
                         "publish-debians-${DebianChannel.lowerName

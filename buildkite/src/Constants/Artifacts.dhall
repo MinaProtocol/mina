@@ -24,6 +24,7 @@ let Artifact
       | FunctionalTestSuite
       | Toolchain
       | CreateLegacyGenesis
+      | DelegationVerifier
       >
 
 let AllButTests =
@@ -38,6 +39,7 @@ let AllButTests =
       , Artifact.ZkappTestTransaction
       , Artifact.Toolchain
       , Artifact.CreateLegacyGenesis
+      , Artifact.DelegationVerifier
       ]
 
 let Main =
@@ -57,6 +59,7 @@ let capitalName =
             , BatchTxn = "BatchTxn"
             , Rosetta = "Rosetta"
             , ZkappTestTransaction = "ZkappTestTransaction"
+            , DelegationVerifier = "DelegationVerifier"
             , FunctionalTestSuite = "FunctionalTestSuite"
             , Toolchain = "Toolchain"
             , CreateLegacyGenesis = "CreateLegacyGenesis"
@@ -78,6 +81,7 @@ let lowerName =
             , FunctionalTestSuite = "functional_test_suite"
             , CreateLegacyGenesis = "create_legacy_genesis"
             , Toolchain = "toolchain"
+            , DelegationVerifier = "delegation_verifier"
             }
             artifact
 
@@ -96,6 +100,7 @@ let dockerName =
             , FunctionalTestSuite = "mina-test-suite"
             , Toolchain = "mina-toolchain"
             , CreateLegacyGenesis = "mina-create-legacy-genesis"
+            , DelegationVerifier = "mina-delegation-verifier"
             }
             artifact
 
@@ -123,6 +128,7 @@ let toDebianName =
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = ""
+            , DelegationVerifier = "delegation_verifier"
             , CreateLegacyGenesis = "create_legacy_genesis"
             }
             artifact
@@ -147,6 +153,7 @@ let toDebianNames =
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
                           , CreateLegacyGenesis = [ "create_legacy_genesis" ]
+                          , DelegationVerifier = [ "delegation_verify" ]
                           , Toolchain = [] : List Text
                           }
                           a
@@ -218,14 +225,16 @@ let dockerTag =
                 , ZkappTestTransaction = "${spec.version}"
                 , FunctionalTestSuite = "${spec.version}${build_flags_part}"
                 , Toolchain = "${spec.version}"
+                , DelegationVerifier = "${spec.version}"
                 , CreateLegacyGenesis = "${spec.version}"
                 }
                 spec.artifact
 
 let fullDockerTag =
           \(spec : Tag.Type)
-      ->  "${Repo.show Repo.Type.Internal}/${dockerName
-                                               spec.artifact}:${dockerTag spec}"
+      ->  "${Repo.show Repo.Type.InternalEurope}/${dockerName
+                                                     spec.artifact}:${dockerTag
+                                                                        spec}"
 
 in  { Type = Artifact
     , Tag = Tag

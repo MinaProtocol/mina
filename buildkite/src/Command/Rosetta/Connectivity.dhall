@@ -47,10 +47,10 @@ let Spec =
           , network = Network.Type.Devnet
           , additionalDirtyWhen = [] : List S.Type
           , softFail = B/SoftFail.Boolean False
-          , timeout = 1000
+          , timeout = 1500
           , profile = Profiles.Type.Devnet
           , scope = PipelineScope.Full
-          , repo = DockerRepo.Type.Internal
+          , repo = DockerRepo.Type.InternalEurope
           , if_ =
               "build.pull_request.base_branch != \"develop\" && build.branch != \"develop\""
           }

@@ -63,6 +63,7 @@ let MinaBuildSpec =
           , buildScript : Text
           , arch : Arch.Type
           , deb_legacy_version : Text
+          , docker_publish : DockerPublish.Type
           , suffix : Optional Text
           , if_ : Optional B/If
           }
@@ -83,6 +84,7 @@ let MinaBuildSpec =
           , suffix = None Text
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
           , arch = Arch.Type.Amd64
+          , docker_publish = DockerPublish.Type.Essential
           , if_ = None B/If
           }
       }
@@ -118,8 +120,7 @@ let build_artifacts
       ->  Command.build
             Command.Config::{
             , commands =
-                  [ Cmd.run "./scripts/docker/setup_buildx.sh" ]
-                # Toolchain.select
+                  Toolchain.select
                     spec.toolchainSelectMode
                     spec.debVersion
                     spec.arch
@@ -142,6 +143,9 @@ let build_artifacts
                 # [ Cmd.run
                       "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                         spec.debVersion}"
+                  , Cmd.run
+                      "./buildkite/scripts/apps/write_to_cache.sh ${DebianVersions.lowerName
+                                                                      spec.debVersion}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
@@ -174,8 +178,6 @@ let docker_step
                   , arch = spec.arch
                   }
 
-          let docker_publish = DockerPublish.Type.Essential
-
           let size = sizeFromArch spec.arch
 
           in  merge
@@ -187,7 +189,7 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
-                    , docker_publish = docker_publish
+                    , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , verify = True
@@ -212,7 +214,7 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
-                    , docker_publish = docker_publish
+                    , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , size = size
@@ -234,7 +236,7 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
-                    , docker_publish = docker_publish
+                    , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
@@ -252,7 +254,23 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
-                    , docker_publish = docker_publish
+                    , docker_publish = spec.docker_publish
+                    , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
+                    , arch = spec.arch
+                    , if_ = spec.if_
+                    , size = size
+                    }
+                  ]
+                , DelegationVerifier =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps = deps
+                    , service = Artifacts.Type.DelegationVerifier
+                    , network = spec.network
+                    , deb_codename = spec.debVersion
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
@@ -268,7 +286,7 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
-                    , docker_publish = docker_publish
+                    , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , verify = True
@@ -284,7 +302,7 @@ let docker_step
                     , network = spec.network
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
-                    , docker_publish = docker_publish
+                    , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , verify = True
@@ -298,7 +316,7 @@ let docker_step
                     , deps = deps
                     , service = Artifacts.Type.ZkappTestTransaction
                     , build_flags = spec.buildFlags
-                    , docker_publish = docker_publish
+                    , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
                     , deb_codename = spec.debVersion
@@ -315,7 +333,7 @@ let docker_step
                     , network = Network.Type.TestnetGeneric
                     , deb_codename = spec.debVersion
                     , build_flags = spec.buildFlags
-                    , docker_publish = docker_publish
+                    , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
                     , deb_legacy_version = spec.deb_legacy_version

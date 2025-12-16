@@ -76,7 +76,7 @@ let ReleaseSpec =
           , docker_publish = DockerPublish.Type.Essential
           , no_cache = False
           , no_debian = False
-          , docker_repo = DockerRepo.Type.Internal
+          , docker_repo = DockerRepo.Type.InternalEurope
           , step_key_suffix = "-docker-image"
           , verify = False
           , deb_suffix = None Text
@@ -100,9 +100,7 @@ let stepLabel =
 
 let generateStep =
           \(spec : ReleaseSpec.Type)
-      ->  let installBuildx = "./scripts/docker/setup_buildx.sh"
-
-          let exportMinaDebCmd =
+      ->  let exportMinaDebCmd =
                 "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                               spec.deb_codename}"
 
@@ -145,6 +143,7 @@ let generateStep =
                             , profile = spec.deb_profile
                             , buildFlag = spec.build_flags
                             , archs = [ spec.arch ]
+                            , repo = spec.docker_repo
                             }
 
                 else  ""
@@ -163,6 +162,15 @@ let generateStep =
                       , Perf = "--filter until=24h"
                       }
                       spec.size
+
+          let loadOnlyArg =
+                      if DockerPublish.shouldPublish
+                           spec.docker_publish
+                           spec.service
+
+                then  ""
+
+                else  " --load-only "
 
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
@@ -184,29 +192,7 @@ let generateStep =
                 ++  " --repo ${spec.repo}"
                 ++  " --platform ${Arch.platform spec.arch}"
                 ++  " --docker-registry ${DockerRepo.show spec.docker_repo}"
-
-          let releaseDockerCmd =
-                      if DockerPublish.shouldPublish
-                           spec.docker_publish
-                           spec.service
-
-                then      "./scripts/docker/release.sh"
-                      ++  " --service ${Artifacts.dockerName spec.service}"
-                      ++  " --version ${spec.version}"
-                      ++  " --network ${Network.debianSuffix spec.network}"
-                      ++  " --deb-codename ${DebianVersions.lowerName
-                                               spec.deb_codename}"
-                      ++  " --deb-version ${spec.deb_version}"
-                      ++  " --deb-profile ${Profiles.lowerName
-                                              spec.deb_profile}"
-                      ++  " --deb-build-flags ${BuildFlags.lowerName
-                                                  spec.build_flags}"
-                      ++  " --platform ${Arch.platform spec.arch}"
-                      ++  " --docker-registry ${DockerRepo.show
-                                                  spec.docker_repo}"
-
-                else  " echo In order to ensure storage optimization, skipping publishing docker as this is not essential one or publishing is disabled . Docker publish setting is set to  ${DockerPublish.show
-                                                                                                                                                                                                spec.docker_publish}."
+                ++  loadOnlyArg
 
           let remoteRepoCmds =
                 [ Cmd.run
@@ -214,8 +200,6 @@ let generateStep =
                       ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                       ++  " && "
                       ++  buildDockerCmd
-                      ++  " && "
-                      ++  releaseDockerCmd
                       ++  maybeVerify
                     )
                 ]
@@ -227,17 +211,13 @@ let generateStep =
                   , Stable = remoteRepoCmds
                   , Local =
                     [ Cmd.run
-                        (     installBuildx
-                          ++  " && "
-                          ++  exportMinaDebCmd
+                        (     exportMinaDebCmd
                           ++  " && "
                           ++  pruneDockerImages
                           ++  maybeStartDebianRepo
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "
                           ++  buildDockerCmd
-                          ++  " && "
-                          ++  releaseDockerCmd
                           ++  maybeStopDebianRepo
                           ++  maybeVerify
                         )

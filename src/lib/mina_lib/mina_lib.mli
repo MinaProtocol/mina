@@ -227,8 +227,6 @@ val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 val create :
   commit_id:string -> ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
-val staged_ledger_ledger_proof : t -> Ledger_proof.Cached.t option
-
 val transition_frontier :
   t -> Transition_frontier.t option Broadcast_pipe.Reader.t
 
@@ -344,7 +342,8 @@ module Hardfork_config : sig
       config was generated successfully. *)
   val dump_reference_config :
        breadcrumb_spec:breadcrumb_spec
-    -> directory_name:string
+    -> config_dir:string
+    -> generate_fork_validation:bool
     -> mina_lib
     -> unit Deferred.Or_error.t
 end

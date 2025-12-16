@@ -456,24 +456,6 @@ let get_node_state t =
   ; uptime_of_node
   }
 
-(** Compute the hard fork genesis slot from the runtime config, if all the stop
-    slots and the genesis slot delta have been set. Note that this is the hard
-    fork genesis slot expressed as a
-    [Mina_numbers.Global_slot_since_hard_fork.t] of the current chain/hard
-    fork. *)
-let scheduled_hard_fork_genesis_slot t :
-    Mina_numbers.Global_slot_since_hard_fork.t option =
-  let open Option.Let_syntax in
-  let runtime_config = t.config.precomputed_values.runtime_config in
-  let%bind slot_chain_end_since_hard_fork =
-    Runtime_config.slot_chain_end runtime_config
-  in
-  let%map hard_fork_genesis_slot_delta =
-    Runtime_config.hard_fork_genesis_slot_delta runtime_config
-  in
-  Mina_numbers.Global_slot_since_hard_fork.add slot_chain_end_since_hard_fork
-    hard_fork_genesis_slot_delta
-
 (* This is a hack put in place to deal with nodes getting stuck
    in Offline states, that is, not receiving blocks for an extended period,
    or stuck in Bootstrap for too long
@@ -853,11 +835,6 @@ let most_recent_valid_transition t = t.components.most_recent_valid_block
 
 let block_produced_bvar t = t.components.block_produced_bvar
 
-let staged_ledger_ledger_proof t =
-  let open Option.Let_syntax in
-  let%bind sl = best_staged_ledger_opt t in
-  Staged_ledger.current_ledger_proof sl
-
 let validated_transitions t = t.pipes.validated_transitions_reader
 
 let initialization_finish_signal t = t.initialization_finish_signal
@@ -913,7 +890,7 @@ let work_selection_method t = t.config.work_selection_method
 let add_complete_work ~logger ~fee ~prover
     ~(results :
        ( Snark_work_lib.Spec.Single.t
-       , Ledger_proof.Cached.t )
+       , Ledger_proof.t )
        Snark_work_lib.Result.Single.Poly.t
        One_or_two.t ) t =
   let update_metrics () =
@@ -948,12 +925,8 @@ let add_complete_work ~logger ~fee ~prover
     Local_sink.push t.pipes.snark_local_sink
       ( Add_solved_work
           ( stmts
-          , Network_pool.Priced_proof.
-              { proof =
-                  proofs
-                  |> One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
-              ; fee = fee_with_prover
-              } )
+          , Network_pool.Priced_proof.{ proof = proofs; fee = fee_with_prover }
+          )
       , Result.iter_error ~f:(fun err ->
             (* Possible reasons of failure: receiving pipe's capacity exceeded,
                 fee that isn't the lowest, failure in verification or application to the pool *)
@@ -2245,9 +2218,6 @@ let create ~commit_id ?wallets (config : Config.t) =
             }
           in
 
-          let ledger_backing =
-            Config.ledger_backing ~hardfork_handling:config.hardfork_handling
-          in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
@@ -2264,7 +2234,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ~transaction_pool_proxy ~ledger_backing ()
+              ~notify_online ~transaction_pool_proxy
+              ~ledger_backing:config.ledger_backing ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -2884,7 +2855,8 @@ module Hardfork_config = struct
     let configured_slot =
       match breadcrumb_spec with
       | `Stop_slot ->
-          scheduled_hard_fork_genesis_slot mina
+          Runtime_config.scheduled_hard_fork_genesis_slot
+            mina.config.precomputed_values.runtime_config
       | `State_hash _state_hash_base58 ->
           None
       | `Block_height _block_height ->
@@ -2984,10 +2956,15 @@ module Hardfork_config = struct
     let genesis_staking_ledger_data =
       let directory_name = parent_directory ^/ "staking_ledger" in
       match source_ledgers.staking_ledger with
-      | `Genesis _l ->
-          failwith
-            "Daemon has genesis staking ledger - hard fork dump currently \
-             unsupported"
+      | `Genesis l ->
+          let depth = Genesis_ledger.Packed.depth l in
+          let root =
+            Genesis_ledger.Packed.create_root_with_directory l
+              ~directory:directory_name ~depth ()
+            |> Or_error.ok_exn
+          in
+          let diff = Ledger.Location.Map.empty in
+          (root, diff)
       | `Root l ->
           let root =
             Root_ledger.create_checkpoint_with_directory l ~directory_name
@@ -2998,10 +2975,15 @@ module Hardfork_config = struct
     let genesis_next_epoch_ledger_data =
       let directory_name = parent_directory ^/ "next_epoch_ledger" in
       match source_ledgers.next_epoch_ledger with
-      | `Genesis _l ->
-          failwith
-            "Daemon has genesis epoch ledger - hard fork dump currently \
-             unsupported"
+      | `Genesis l ->
+          let depth = Genesis_ledger.Packed.depth l in
+          let root =
+            Genesis_ledger.Packed.create_root_with_directory l
+              ~directory:directory_name ~depth ()
+            |> Or_error.ok_exn
+          in
+          let diff = Ledger.Location.Map.empty in
+          (root, diff)
       | `Root l ->
           let root =
             Root_ledger.create_checkpoint_with_directory l ~directory_name
@@ -3140,7 +3122,7 @@ module Hardfork_config = struct
          ~state_hash ~blockchain_length ~staking_epoch_seed ~next_epoch_seed
          genesis_config )
 
-  let generate_hardfork_configs ~logger
+  let generate_hardfork_configs ~logger ~generate_fork_validation
       ~inputs:
         { source_ledgers
         ; global_slot_since_genesis
@@ -3152,7 +3134,10 @@ module Hardfork_config = struct
         } ~build_dir directory_name =
     let open Deferred.Or_error.Let_syntax in
     let migrate_and_apply (root, diff) =
-      let%map.Deferred root = Root_ledger.make_converting root in
+      let%map.Deferred root =
+        Root_ledger.make_converting ~hardfork_slot:global_slot_since_genesis
+          root
+      in
       Ledger.Any_ledger.M.set_batch
         (Root_ledger.as_unmasked root)
         (Map.to_alist diff) ;
@@ -3190,12 +3175,14 @@ module Hardfork_config = struct
     in
     [%log debug] "Writing hard fork config directories" ;
     let%bind () =
-      write_stable_config_directory ~logger ~genesis_state_timestamp
-        ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
-        ~next_epoch_seed ~blockchain_length
-        ~config_dir:(directory_name ^/ "fork_validation" ^/ "legacy")
-        genesis_ledger_legacy genesis_staking_ledger_legacy
-        genesis_next_epoch_ledger_legacy
+      if generate_fork_validation then
+        write_stable_config_directory ~logger ~genesis_state_timestamp
+          ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
+          ~next_epoch_seed ~blockchain_length
+          ~config_dir:(directory_name ^/ "fork_validation" ^/ "legacy")
+          genesis_ledger_legacy genesis_staking_ledger_legacy
+          genesis_next_epoch_ledger_legacy
+      else Deferred.Or_error.ok_unit
     in
     let%bind () =
       write_migrated_config_directory ~logger ~genesis_state_timestamp
@@ -3212,13 +3199,14 @@ module Hardfork_config = struct
     [%log debug]
       "Successfully generated and activated reference hard fork config"
 
-  let dump_reference_config ~breadcrumb_spec ~directory_name mina =
+  let dump_reference_config ~breadcrumb_spec ~config_dir
+      ~generate_fork_validation mina =
     let open Deferred.Or_error.Let_syntax in
     let logger = mina.config.logger in
     Deferred.Or_error.try_with_join ~here:[%here]
     @@ fun () ->
     let%bind.Deferred dir_exists =
-      Mina_stdlib_unix.File_system.dir_exists directory_name
+      Mina_stdlib_unix.File_system.dir_exists config_dir
     in
     let%bind () =
       if dir_exists then
@@ -3227,14 +3215,13 @@ module Hardfork_config = struct
       else return ()
     in
     [%log debug] "Creating reference hard fork config in $directory_name"
-      ~metadata:[ ("directory_name", `String directory_name) ] ;
-    let%bind.Deferred () =
-      Mina_stdlib_unix.File_system.create_dir directory_name
-    in
+      ~metadata:[ ("directory_name", `String config_dir) ] ;
+    let%bind.Deferred () = Mina_stdlib_unix.File_system.create_dir config_dir in
     let%bind inputs = prepare_inputs ~breadcrumb_spec mina in
-    Mina_stdlib_unix.File_system.with_temp_dir (directory_name ^/ "_build")
+    Mina_stdlib_unix.File_system.with_temp_dir (config_dir ^/ "_build")
       ~f:(fun build_dir ->
-        generate_hardfork_configs ~logger ~inputs ~build_dir directory_name )
+        generate_hardfork_configs ~logger ~inputs ~build_dir
+          ~generate_fork_validation config_dir )
 end
 
 let zkapp_cmd_limit t = t.config.zkapp_cmd_limit

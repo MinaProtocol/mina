@@ -48,7 +48,7 @@ if [ $# -eq 0 ]
     build_test_executive_deb
     build_functional_test_suite_deb
     build_zkapp_test_transaction_deb
-
+    build_delegation_verify_deb
   else
     for i in "$@"; do
       if [[ $(type -t "build_${i}_deb") == function ]]

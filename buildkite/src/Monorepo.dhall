@@ -28,8 +28,6 @@ let PipelineScopeFilter = ./Pipeline/ScopeFilter.dhall
 
 let Size = ./Command/Size.dhall
 
-let triggerCommand = ./Pipeline/TriggerCommand.dhall
-
 let jobs
     : List JobSpec.Type
     = List/map
@@ -77,38 +75,18 @@ let commands
 
                   let dirtyWhen = SelectFiles.compile job.dirtyWhen
 
-                  let trigger =
-                        triggerCommand "src/Jobs/${job.path}/${job.name}.dhall"
-
-                  let pipelineHandlers =
-                        { Triaged =
-                            ''
-                              if [ "${isIncludedInTag}" == "False" ]; then
-                                echo "Skipping ${job.name} because this job is not falling under ${jobsFilter} filter "
-                              elif [ "${isIncludedInScope}" == "False" ]; then
-                                echo "Skipping ${job.name} because this is job is not falling under ${scopeFilter} stage"
-                              elif (cat _computed_diff.txt | egrep -q '${dirtyWhen}'); then
-                                echo "Triggering ${job.name} for reason:"
-                                cat _computed_diff.txt | egrep '${dirtyWhen}'
-                                ${Cmd.format trigger}
-                              else
-                                echo "Skipping ${job.name} because is irrelevant to PR changes"
-                              fi
-                            ''
-                        , Full =
-                            ''
-                              if [ "${isIncludedInTag}" == "False" ]; then
-                                echo "Skipping ${job.name} because this job is not falling under ${jobsFilter} filter "
-                              elif [ "${isIncludedInScope}" == "False" ]; then
-                                echo "Skipping ${job.name} because this is job is not falling under ${scopeFilter} stage"
-                              else
-                                echo "Triggering ${job.name} because this is a stable buildkite run"
-                                ${Cmd.format trigger}
-                              fi
-                            ''
-                        }
-
-                  in  Cmd.quietly (merge pipelineHandlers selection)
+                  in  Cmd.run
+                        (     "./buildkite/scripts/monorepo.sh "
+                          ++  "--selection-mode ${PipelineJobSelection.capitalName
+                                                    selection} "
+                          ++  "--job-name ${job.name} "
+                          ++  "--job-path ${job.path} "
+                          ++  "--jobs-filter \"${jobsFilter}\" "
+                          ++  "--is-included-in-tag ${isIncludedInTag} "
+                          ++  "--scope-filter \"${scopeFilter}\" "
+                          ++  "--is-included-in-scope ${isIncludedInScope} "
+                          ++  "--dirty-when '${dirtyWhen}' "
+                        )
             )
             jobs
 
