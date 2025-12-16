@@ -1552,12 +1552,19 @@ let daemon logger ~itn_features =
        (setup_daemon logger ~itn_features
           ~default_snark_worker_fee:compile_config.default_snark_worker_fee )
        ~f:(fun setup_daemon () ->
-         (* Immediately disable updating the time offset. *)
-         Block_time.Controller.disable_setting_offset () ;
-         let%bind mina = setup_daemon () in
-         let%bind () = Mina_lib.start mina in
-         [%log info] "Daemon ready. Clients can now connect" ;
-         Async.never () ) )
+         match%bind
+           Monitor.try_with (fun () ->
+               (* Immediately disable updating the time offset. *)
+               Block_time.Controller.disable_setting_offset () ;
+               let%bind mina = setup_daemon () in
+               let%map () = Mina_lib.start mina in
+               [%log info] "Daemon ready. Clients can now connect" )
+         with
+         | Ok _ ->
+             Async.never ()
+         | Error exn ->
+             [%log fatal] "Unhandled Async exception %s" (Exn.to_string exn) ;
+             exit 1 ) )
 
 let replay_blocks logger ~itn_features =
   let replay_flag =
@@ -2103,25 +2110,29 @@ let print_version_help coda_exe version =
 let print_version_info () = Core.printf "Commit %s\n" Mina_version.commit_id
 
 let () =
-  Random.self_init () ;
-  let itn_features = Sys.getenv "ITN_FEATURES" |> Option.is_some in
-  let logger = Logger.create ~itn_features () in
-  don't_wait_for (ensure_testnet_id_still_good logger) ;
-  (* Turn on snark debugging in prod for now *)
-  Snarky_backendless.Snark.set_eval_constraints true ;
-  (* intercept command-line processing for "version", because we don't
-     use the Jane Street scripts that generate their version information
-  *)
-  (let is_version_cmd s =
-     List.mem [ "version"; "-version"; "--version" ] s ~equal:String.equal
-   in
-   match Sys.get_argv () with
-   | [| _mina_exe; version |] when is_version_cmd version ->
-       Mina_version.print_version ()
-   | _ ->
-       Command.run
-         (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
-            (mina_commands logger ~itn_features) ) ) ;
-  Core.exit 0
+  try
+    Random.self_init () ;
+    let itn_features = Sys.getenv "ITN_FEATURES" |> Option.is_some in
+    let logger = Logger.create ~itn_features () in
+    don't_wait_for (ensure_testnet_id_still_good logger) ;
+    (* Turn on snark debugging in prod for now *)
+    Snarky_backendless.Snark.set_eval_constraints true ;
+    (* intercept command-line processing for "version", because we don't
+       use the Jane Street scripts that generate their version information
+    *)
+    (let is_version_cmd s =
+       List.mem [ "version"; "-version"; "--version" ] s ~equal:String.equal
+     in
+     match Sys.get_argv () with
+     | [| _mina_exe; version |] when is_version_cmd version ->
+         Mina_version.print_version ()
+     | _ ->
+         Command.run
+           (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
+              (mina_commands logger ~itn_features) ) ) ;
+    Core.exit 0
+  with exn ->
+    let logger = Logger.create () in
+    [%log fatal] "Unhandled top level exception: %s" (Exn.to_string exn)
 
 let linkme = ()
