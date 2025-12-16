@@ -148,7 +148,7 @@ module Proving_key = struct
   type t = Keypair.t
 
   include
-    Core_kernel.Binable.Of_binable
+    Core_kernel.Binable.Of_binable_without_uuid
       (Core_kernel.Unit)
       (struct
         type nonrec t = t

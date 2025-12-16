@@ -35,8 +35,61 @@ let less_than_bits ?(bits = 12) (value : Circuit.Field.t) : unit =
      (because moving shift to the right hand side that gives value < 2^x) *)
   let shift =
     exists Field.typ ~compute:(fun () ->
-        let power = Core_kernel.Int.pow 2 (12 - bits) in
+        let power = Core.Int.pow 2 (12 - bits) in
         Field.Constant.of_int power )
   in
   three_12bit value Field.(value * shift) Field.zero ;
+  ()
+
+(*********)
+(* Tests *)
+(*********)
+
+let%test_unit "lookup gadget" =
+  if tests_enabled then (
+    let (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Helper to test lookup less than gadget for both variables and constants
+     *   Inputs value to be checked and number of bits
+     *   Returns true if constraints are satisfied, false otherwise.
+     *)
+    let test_lookup ?cs ~bits value =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            (* Set up snarky constant *)
+            let const = Field.constant @@ Field.Constant.of_int value in
+            (* Set up snarky variable *)
+            let value =
+              exists Field.typ ~compute:(fun () -> Field.Constant.of_int value)
+            in
+            (* Use the lookup gadget *)
+            less_than_bits ~bits value ;
+            less_than_bits ~bits const ;
+            (* Use a dummy range check to load the table *)
+            Range_check.bits64 Field.zero ;
+            () )
+      in
+      cs
+    in
+
+    (* TEST generic mul gadget *)
+    (* Positive tests *)
+    let cs12 = test_lookup ~bits:12 4095 in
+    let cs8 = test_lookup ~bits:8 255 in
+    let cs1 = test_lookup ~bits:1 0 in
+    let _cs = test_lookup ~cs:cs1 ~bits:1 1 in
+    (* Negatve tests *)
+    assert (Common.is_error (fun () -> test_lookup ~cs:cs12 ~bits:12 4096)) ;
+    assert (Common.is_error (fun () -> test_lookup ~cs:cs12 ~bits:12 (-1))) ;
+    assert (Common.is_error (fun () -> test_lookup ~cs:cs8 ~bits:8 256)) ;
+    assert (Common.is_error (fun () -> test_lookup ~cs:cs1 ~bits:1 2)) ;
+    () ) ;
+
   ()
