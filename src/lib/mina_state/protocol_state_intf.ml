@@ -149,7 +149,7 @@ module type Full = sig
 
   val negative_one :
        genesis_ledger:Genesis_ledger.Packed.t
-    -> genesis_epoch_data:Consensus.Genesis_epoch_data.t
+    -> genesis_epoch_data:Genesis_ledger.Packed.t Consensus.Genesis_epoch_data.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> genesis_body_reference:Consensus.Body_reference.t

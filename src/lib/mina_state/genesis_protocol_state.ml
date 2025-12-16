@@ -18,10 +18,17 @@ let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
            ~consensus_constants ~genesis_body_reference ))
       .state_hash
   in
+  let genesis_epoch_data =
+    Consensus.Genesis_epoch_data.hashed_of_full genesis_epoch_data
+  in
+  let total_currency =
+    Genesis_ledger.Packed.t genesis_ledger
+    |> Lazy.force |> Consensus.genesis_ledger_total_currency
+  in
   let genesis_consensus_state =
     Consensus.Data.Consensus_state.create_genesis
-      ~negative_one_protocol_state_hash ~genesis_ledger ~genesis_epoch_data
-      ~constraint_constants ~constants:consensus_constants
+      ~negative_one_protocol_state_hash ~genesis_ledger_hash ~genesis_epoch_data
+      ~constraint_constants ~constants:consensus_constants ~total_currency
   in
   let state =
     Protocol_state.create_value

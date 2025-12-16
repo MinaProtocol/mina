@@ -295,21 +295,28 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
       ~consensus_constants ~genesis_body_reference =
+    let genesis_ledger_hash =
+      Mina_ledger.Ledger.merkle_root
+        (Lazy.force (Genesis_ledger.Packed.t genesis_ledger))
+    in
+    let genesis_epoch_data =
+      Consensus.Genesis_epoch_data.hashed_of_full genesis_epoch_data
+    in
+    let total_currency =
+      Genesis_ledger.Packed.t genesis_ledger
+      |> Lazy.force |> Consensus.genesis_ledger_total_currency
+    in
     { Poly.Stable.Latest.previous_state_hash =
         State_hash.of_hash Outside_hash_image.t
     ; body =
         { Body.Poly.blockchain_state =
             Blockchain_state.negative_one ~constraint_constants
-              ~consensus_constants
-              ~genesis_ledger_hash:
-                (Mina_ledger.Ledger.merkle_root
-                   (Lazy.force (Genesis_ledger.Packed.t genesis_ledger)) )
-              ~genesis_body_reference
+              ~consensus_constants ~genesis_ledger_hash ~genesis_body_reference
         ; genesis_state_hash = State_hash.of_hash Outside_hash_image.t
         ; consensus_state =
-            Consensus.Data.Consensus_state.negative_one ~genesis_ledger
+            Consensus.Data.Consensus_state.negative_one ~genesis_ledger_hash
               ~genesis_epoch_data ~constants:consensus_constants
-              ~constraint_constants
+              ~constraint_constants ~total_currency
         ; constants =
             Consensus.Constants.to_protocol_constants consensus_constants
         }
