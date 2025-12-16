@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let profile_to_use =
   match Comptime.dune_profile |> Option.value ~default:"dev" with
