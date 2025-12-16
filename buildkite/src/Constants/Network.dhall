@@ -24,18 +24,6 @@ let capitalName =
             }
             network
 
-let lowerName =
-          \(network : Network)
-      ->  merge
-            { Devnet = "devnet"
-            , Mainnet = "mainnet"
-            , TestnetGeneric = "testnet_generic"
-            , DevnetLegacy = "devnet_legacy"
-            , MainnetLegacy = "mainnet_legacy"
-            , PreMesa1 = "hetzner-pre-mesa-1"
-            }
-            network
-
 let debianSuffix =
           \(network : Network)
       ->  merge
@@ -53,7 +41,7 @@ let requiresMainnetBuild =
       ->  merge
             { Devnet = True
             , Mainnet = True
-            , TestnetGeneric = True
+            , TestnetGeneric = False
             , DevnetLegacy = True
             , MainnetLegacy = True
             , PreMesa1 = False
@@ -78,7 +66,6 @@ let foldMinaBuildMainnetEnv =
 
 in  { Type = Network
     , capitalName = capitalName
-    , lowerName = lowerName
     , debianSuffix = debianSuffix
     , requiresMainnetBuild = requiresMainnetBuild
     , foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv

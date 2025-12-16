@@ -40,8 +40,8 @@ in  Pipeline.build
       , steps =
         [ ConnectToNetwork.step
             dependsOn
-            "${Network.lowerName network}"
-            "${Network.lowerName network}"
+            "${Network.debianSuffix network}"
+            "${Network.debianSuffix network}"
             "40s"
             "2m"
             (B/SoftFail.Boolean False)

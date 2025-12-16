@@ -66,16 +66,17 @@ let command
                   [ "export MINA_DEB_CODENAME=${Dockers.lowerName
                                                   spec.dockerType}"
                   , "source ./buildkite/scripts/export-git-env-vars.sh"
-                  , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
+                  , "scripts/tests/rosetta-connectivity.sh --network ${Network.debianSuffix
                                                                          spec.network} --tag \\\${MINA_DOCKER_TAG} --timeout ${Natural/show
                                                                                                                                  spec.timeout} --repo ${DockerRepo.show
                                                                                                                                                           spec.repo} --run-compatibility-test develop --run-load-test "
                   ]
               ]
             , label =
-                "Rosetta ${Network.lowerName spec.network} connectivity test "
+                "Rosetta ${Network.debianSuffix
+                             spec.network} connectivity test "
             , key =
-                "rosetta-${Network.lowerName spec.network}-connectivity-test"
+                "rosetta-${Network.debianSuffix spec.network}-connectivity-test"
             , target = Size.XLarge
             , soft_fail = Some spec.softFail
             , if_ = Some spec.if_

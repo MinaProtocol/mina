@@ -58,10 +58,10 @@ let debianName =
       ->  \(network : Network.Type)
       ->  merge
             { Daemon =
-                "mina-${Network.lowerName network}${Profile.toLabelSegment
-                                                      profile}"
+                "mina-${Network.debianSuffix network}${Profile.toLabelSegment
+                                                         profile}"
             , Rosetta =
-                "mina--rosetta-${Network.lowerName
+                "mina--rosetta-${Network.debianSuffix
                                    network}${Profile.toLabelSegment profile}"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"

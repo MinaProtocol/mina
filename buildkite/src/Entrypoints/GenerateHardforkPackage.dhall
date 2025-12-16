@@ -118,7 +118,7 @@ let generateDockerForCodename =
                   , prefix = pipelineName
                   , suffix = Some "-${DebianVersions.lowerName codename}"
                   , extraBuildEnvs =
-                    [ "NETWORK_NAME=${Network.lowerName spec.network}"
+                    [ "NETWORK_NAME=${Network.debianSuffix spec.network}"
                     , "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
                     ]
                   , buildScript =
@@ -168,7 +168,7 @@ let generateDockerForCodename =
                                                       codename} && source ./buildkite/scripts/export-git-env-vars.sh"
                     , Cmd.runInDocker
                         Cmd.Docker::{ image = image }
-                        "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && ! (FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config ${Network.lowerName
+                        "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && ! (FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config ${Network.debianSuffix
                                                                                                                                                                                                                                                                                                                                spec.network} config.json /workdir/verification)"
                     ]
                   , label =
@@ -187,7 +187,7 @@ let generateDockerForCodename =
                                                       codename} && source ./buildkite/scripts/export-git-env-vars.sh"
                     , Cmd.runInDocker
                         Cmd.Docker::{ image = image }
-                        "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config --network ${Network.lowerName
+                        "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config --network ${Network.debianSuffix
                                                                                                                                                                                           spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg}"
                     ]
                   , label = "Verify packaged artifacts"
