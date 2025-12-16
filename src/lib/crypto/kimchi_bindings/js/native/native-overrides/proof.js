@@ -17,12 +17,10 @@ var caml_pasta_fp_plonk_proof_create = function (
   }
 
   witness_cols = w;
-  // Convert flat bytes into an array of Buffers, as NapiFlatVector expects.
-  var flat_prev = tsRustConversionNative.fp.vectorToRust(prev_challenges);
-  var prev_challenges_array = [];
-  for (var i = 0; i < (flat_prev ? flat_prev.length : 0); i += 32) {
-    prev_challenges_array.push(Buffer.from(flat_prev.slice(i, i + 32)));
-  }
+  // NapiFlatVector expects a plain JS array of bytes (Vec<u8> on the Rust side).
+  var flat_prev = Array.from(
+    tsRustConversionNative.fp.vectorToRust(prev_challenges) || []
+  );
   console.log('index: ', index);
   console.log('witness cols: ', witness_cols)
   var runtime_tables =
@@ -34,10 +32,11 @@ var caml_pasta_fp_plonk_proof_create = function (
     index,
     witness_cols,
     runtime_tables,
-    prev_challenges_array,
+    flat_prev,
     prev_sgs
   );
   console.log('proof?')
+  console.log(proof.proof);
   return tsRustConversionNative.fp.proofFromRust(proof);
 };
 
@@ -95,11 +94,9 @@ var caml_pasta_fq_plonk_proof_create = function (
     w.push(tsRustConversionNative.fq.vectorToRust(witness_cols[i]));
   }
   witness_cols = w;
-  var flat_prev = tsRustConversionNative.fq.vectorToRust(prev_challenges);
-  var prev_challenges_array = [];
-  for (var i = 0; i < (flat_prev ? flat_prev.length : 0); i += 32) {
-    prev_challenges_array.push(Buffer.from(flat_prev.slice(i, i + 32)));
-  }
+  var flat_prev = Array.from(
+    tsRustConversionNative.fq.vectorToRust(prev_challenges) || []
+  );
   var runtime_tables =
     tsRustConversionNative.fq.runtimeTablesToRust(caml_runtime_tables);
   runtime_tables = runtime_tables ? Array.from(runtime_tables) : [];
@@ -108,8 +105,8 @@ var caml_pasta_fq_plonk_proof_create = function (
   var proof = plonk_wasm.caml_pasta_fq_plonk_proof_create(
     index,
     witness_cols,
-    wasm_runtime_tables,
-    prev_challenges_array,
+    runtime_tables,
+    flat_prev,
     prev_sgs
   );
   return tsRustConversionNative.fq.proofFromRust(proof);
