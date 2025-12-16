@@ -39,7 +39,6 @@ Options:
   --jobs PATH            STRING    Path to jobs directory
   --tags FILTER          STRING    Jobs filter (tags separated by commas)
   --scopes FILTER        STRING    Scope filter (PR, Nightly, Release, Mainline Nightly)
-  --dirty-when PATTERN   STRING    Pattern for dirty check
   --git-diff-file FILE   STRING    File containing git diff output
   --dry-run              BOOL      Dry run mode (True/False)
   --filter-mode MODE     STRING    Filter mode (any or all)
@@ -53,7 +52,6 @@ SELECTION_MODE=""
 JOBS=""
 TAGS=""
 SCOPES=""
-DIRTY_WHEN=""
 GIT_DIFF_FILE=""
 DRY_RUN=false
 
@@ -68,8 +66,6 @@ while [[ $# -gt 0 ]]; do
       TAGS="$2"; shift 2;;
     --scopes)
       SCOPES="$2"; shift 2;;
-    --dirty-when)
-      DIRTY_WHEN="$2"; shift 2;;
     --git-diff-file)
       GIT_DIFF_FILE="$2"; shift 2;;
     --dry-run)
@@ -84,8 +80,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Require all arguments
-if [[ -z "$SELECTION_MODE" || -z "$JOBS" || -z "$TAGS" || -z "$SCOPES" || -z "$DIRTY_WHEN" ]]; then
-  echo "Error: All arguments --selection-mode, --jobs, --tags, --scopes, and --dirty-when are required."
+if [[ -z "$SELECTION_MODE" || -z "$JOBS" || -z "$TAGS" || -z "$SCOPES" ]]; then
+  echo "Error: All arguments --selection-mode, --jobs, --tags, and --scopes are required."
   exit 1
 fi
 
