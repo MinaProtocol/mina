@@ -1086,6 +1086,10 @@ module Hardfork = struct
     ; zkapp = Option.map ~f:Zkapp_account.Hardfork.of_stable account.zkapp
     }
 
+  (** Convert a Mesa account to a stable Berkeley account. This method only
+      preserves information for Mesa accounts that are equal to [of_stable a]
+      for some stable Berkeley account [a]; it is otherwise unsafe because it
+      silently drops data. *)
   let unsafe_to_stable (account : t) : Stable.Latest.t =
     { public_key = account.public_key
     ; token_id = account.token_id

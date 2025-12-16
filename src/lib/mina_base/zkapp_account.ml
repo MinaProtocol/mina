@@ -476,6 +476,10 @@ module Hardfork = struct
     ; zkapp_uri = account.zkapp_uri
     }
 
+  (** Convert a Mesa zkApp account to a stable Berkeley zkApp account. This
+      method only preserves information for Mesa zkApp accounts that are equal
+      to [of_stable a] for some stable Berkeley zkApp account [a]; it is
+      otherwise unsafe because it silently drops data. *)
   let unsafe_to_stable (account : t) : Stable.Latest.t =
     { app_state = Zkapp_state.Hardfork.Value.unsafe_to_stable account.app_state
     ; verification_key = account.verification_key

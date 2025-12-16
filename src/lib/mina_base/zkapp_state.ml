@@ -102,6 +102,11 @@ module Hardfork = struct
     let stable_size_lte : (Nat.N8.n, Nat.N32.n) Nat.Lte.t =
       Nat.lte_exn Nat.N8.n Nat.N32.n
 
+    (** Convert a Mesa zkApp state vector to a stable Berkeley zkApp state
+        vector by dropping zkApp state elements from the end. This method only
+        preserves information for Mesa state vectors that are equal to
+        [of_stable v] for some stable Berkeley state vector [v]; it is
+        otherwise unsafe because it silently drops data. *)
     let unsafe_to_stable (value : t) : Value.Stable.Latest.t =
       Vector.trim value stable_size_lte
 
