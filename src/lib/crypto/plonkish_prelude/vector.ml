@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module type Nat_intf = Nat.Intf
 
@@ -42,10 +42,10 @@ let rec length : type a n. (a, n) t -> n Nat.t = function
 let nth v i =
   let rec loop : type a n. int -> (a, n) t -> a option =
    fun j -> function
-    | [] ->
-        None
-    | x :: xs ->
-        if Int.equal i j then Some x else loop (j + 1) xs
+     | [] ->
+         None
+     | x :: xs ->
+         if Int.equal i j then Some x else loop (j + 1) xs
   in
   loop 0 v
 
@@ -75,8 +75,7 @@ let rec map2 : type a b c n. (a, n) t -> (b, n) t -> f:(a -> b -> c) -> (c, n) t
   | x :: xs, y :: ys ->
       f x y :: map2 xs ys ~f
 
-let rec hhead_off :
-    type xs n.
+let rec hhead_off : type xs n.
     (xs, n s) Hlist0.H1_1(T).t -> xs Hlist0.HlistId.t * (xs, n) Hlist0.H1_1(T).t
     =
  fun xss ->
@@ -87,8 +86,7 @@ let rec hhead_off :
       let hds, tls = hhead_off xss in
       (x :: hds, xs :: tls)
 
-let rec mapn :
-    type xs y n.
+let rec mapn : type xs y n.
     (xs, n) Hlist0.H1_1(T).t -> f:(xs Hlist0.HlistId.t -> y) -> (y, n) t =
  fun xss ~f ->
   match xss with
@@ -126,8 +124,7 @@ let rec init : type a n. int -> n Nat.t -> f:(int -> a) -> (a, n) t =
 
 let init n ~f = init 0 n ~f
 
-let rec _fold_map :
-    type acc a b n.
+let rec _fold_map : type acc a b n.
     (a, n) t -> f:(acc -> a -> acc * b) -> init:acc -> acc * (b, n) t =
  fun t ~f ~init ->
   match t with
@@ -370,8 +367,7 @@ module With_length (N : Nat.Intf) = struct
 end
 
 module Make_typ (Impl : Snarky_backendless.Snark_intf.Run) = struct
-  let rec typ' :
-      type var value n.
+  let rec typ' : type var value n.
       ((var, value) Impl.Typ.t, n) t -> ((var, n) t, (value, n) t) Impl.Typ.t =
     let open Impl.Typ in
     fun elts ->
@@ -397,9 +393,8 @@ let wrap_typ' = Wrap_typ.typ'
 
 let wrap_typ = Wrap_typ.typ
 
-let rec append :
-    type n m n_m a. (a, n) t -> (a, m) t -> (n, m, n_m) Nat.Adds.t -> (a, n_m) t
-    =
+let rec append : type n m n_m a.
+    (a, n) t -> (a, m) t -> (n, m, n_m) Nat.Adds.t -> (a, n_m) t =
  fun t1 t2 adds ->
   match (t1, adds) with
   | [], Z ->
@@ -419,9 +414,8 @@ let rec _last : type a n. (a, n s) t -> a = function
   | _ :: (_ :: _ as xs) ->
       _last xs
 
-let rec split :
-    type n m n_m a. (a, n_m) t -> (n, m, n_m) Nat.Adds.t -> (a, n) t * (a, m) t
-    =
+let rec split : type n m n_m a.
+    (a, n_m) t -> (n, m, n_m) Nat.Adds.t -> (a, n) t * (a, m) t =
  fun t adds ->
   match (t, adds) with
   | [], Z ->
@@ -471,8 +465,8 @@ let rec extend_exn : type n m a. (a, n) t -> m Nat.t -> a -> (a, m) t =
       let extended = extend_exn xs m default in
       x :: extended
 
-let rec extend :
-    type a n m. (a, n) t -> (n, m) Nat.Lte.t -> m Nat.t -> a -> (a, m) t =
+let rec extend : type a n m.
+    (a, n) t -> (n, m) Nat.Lte.t -> m Nat.t -> a -> (a, m) t =
  fun v p m default ->
   match (v, p, m) with
   | _, Z, Z ->
@@ -482,8 +476,8 @@ let rec extend :
   | x :: xs, S p, S m ->
       x :: extend xs p m default
 
-let extend_front :
-    type a n m. (a, n) t -> (n, m) Nat.Lte.t -> m Nat.t -> a -> (a, m) t =
+let extend_front : type a n m.
+    (a, n) t -> (n, m) Nat.Lte.t -> m Nat.t -> a -> (a, m) t =
  fun v _p m default -> extend_front_exn v m default
 
 module type S = sig

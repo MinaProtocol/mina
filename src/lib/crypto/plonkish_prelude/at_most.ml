@@ -74,13 +74,13 @@ module Make = struct
     let to_yojson f t = Vector.L.to_yojson f (to_list t)
 
     let of_yojson f s =
-      Core_kernel.Result.map (Vector.L.of_yojson f s)
+      Core.Result.map (Vector.L.of_yojson f s)
         ~f:(Base.Fn.flip of_list_and_length_exn N.n)
   end
 
   module Sexpable (N : Nat.Intf) :
-    Core_kernel.Sexpable.S1 with type 'a t := ('a, N.n) t =
-    Core_kernel.Sexpable.Of_sexpable1
+    Core.Sexpable.S1 with type 'a t := ('a, N.n) t =
+    Core.Sexpable.Of_sexpable1
       (Base.List)
       (struct
         type nonrec 'a t = ('a, N.n) t
@@ -116,8 +116,8 @@ module At_most_2 = struct
       type 'a t = ('a, Nat.N2.n) at_most
 
       include
-        Core_kernel.Binable.Of_binable1_without_uuid
-          (Core_kernel.List.Stable.V1)
+        Core.Binable.Of_binable1_without_uuid
+          (Core.List.Stable.V1)
           (struct
             type nonrec 'a t = 'a t
 
@@ -147,8 +147,8 @@ module At_most_8 = struct
       type 'a t = ('a, Nat.N8.n) at_most
 
       include
-        Core_kernel.Binable.Of_binable1_without_uuid
-          (Core_kernel.List.Stable.V1)
+        Core.Binable.Of_binable1_without_uuid
+          (Core.List.Stable.V1)
           (struct
             type nonrec 'a t = 'a t
 
