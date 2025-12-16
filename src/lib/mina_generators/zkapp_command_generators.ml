@@ -1676,7 +1676,7 @@ let mk_fee_payer ~fee ~pk ~nonce : Account_update.Fee_payer.t =
     ~body:{ public_key = pk; fee; valid_until = None; nonce }
     ~authorization:Signature.dummy
 
-let gen_max_cost_zkapp_command_from ?memo ?fee_range
+let gen_max_cost_zkapp_command_from ?memo ?fee_range ?(n_updates : int = 5)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(account_state_tbl : (Account.t * role) Account_id.Table.t) ~vk
     ~(genesis_constants : Genesis_constants.t) () =
@@ -1699,7 +1699,7 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range
   in
   let zkapp_pks = List.map zkapp_accounts ~f:(fun a -> a.public_key) in
   let%bind pks =
-    Quickcheck.Generator.(of_list zkapp_pks |> list_with_length 15)
+    Quickcheck.Generator.(of_list zkapp_pks |> list_with_length n_updates)
   in
   let[@warning "-8"] (head :: tail) =
     List.map pks ~f:(fun pk -> mk_account_update ~pk ~vk)
@@ -1754,25 +1754,26 @@ let replace_proof_authorizations_for_max_cost
     ~(cache : Proof_cache_tag.t Signature_lib.Public_key.Compressed.Map.t ref)
     ~prover ~keymap (zkapp_command : Zkapp_command.t) :
     Zkapp_command.t Async_kernel.Deferred.t =
-  let signature_kind = Mina_signature_kind.Testnet in
-  let txn_commitment, full_txn_commitment =
-    Zkapp_command.get_transaction_commitments ~signature_kind zkapp_command
-  in
-  let sign_for_account_update ~use_full_commitment sk =
-    let commitment =
-      if use_full_commitment then full_txn_commitment else txn_commitment
-    in
-    Signature_lib.Schnorr.Chunked.sign ~signature_kind sk
-      (Random_oracle.Input.Chunked.field commitment)
-  in
-  let fee_payer_sk =
-    Signature_lib.Public_key.Compressed.Map.find_exn keymap
-      zkapp_command.fee_payer.body.public_key
-  in
-  let fee_payer_signature =
-    sign_for_account_update ~use_full_commitment:true fee_payer_sk
-  in
   let fee_payer_with_valid_signature =
+    let fee_payer_signature =
+      let sign_for_account_update ~use_full_commitment sk =
+        let signature_kind = Mina_signature_kind.Testnet in
+        let txn_commitment, full_txn_commitment =
+          Zkapp_command.get_transaction_commitments ~signature_kind
+            zkapp_command
+        in
+        let commitment =
+          if use_full_commitment then full_txn_commitment else txn_commitment
+        in
+        Signature_lib.Schnorr.Chunked.sign ~signature_kind sk
+          (Random_oracle.Input.Chunked.field commitment)
+      in
+      let fee_payer_sk =
+        Signature_lib.Public_key.Compressed.Map.find_exn keymap
+          zkapp_command.fee_payer.body.public_key
+      in
+      sign_for_account_update ~use_full_commitment:true fee_payer_sk
+    in
     { zkapp_command.fee_payer with authorization = fee_payer_signature }
   in
   let open Async_kernel.Deferred.Let_syntax in
@@ -1918,7 +1919,7 @@ let%test_module _ =
       in
       ()
 
-    let gen_and_test_tx ~keymap
+    let gen_and_test_tx ?(n_expected_updates = 5) ~keymap
         (generator : Zkapp_command.t Quickcheck.Generator.t) =
       let command =
         Quickcheck.Generator.generate generator ~size:1
@@ -1927,7 +1928,7 @@ let%test_module _ =
       let account_updates =
         Zkapp_command.Call_forest.to_list command.account_updates
       in
-      assert (List.length account_updates = 15) ;
+      assert (List.length account_updates = n_expected_updates) ;
 
       let first_update = List.hd_exn account_updates in
       let events = first_update.body.events in
@@ -1992,9 +1993,10 @@ let%test_module _ =
         :: List.init 3 ~f:gen_account
         |> Public_key.Compressed.Map.of_alist_exn
       in
+      let n_updates = 5 in
       let max_cost_cmd_gen =
-        gen_max_cost_zkapp_command_from ~fee_payer_keypair:keypair
+        gen_max_cost_zkapp_command_from ~n_updates ~fee_payer_keypair:keypair
           ~account_state_tbl ~vk ~genesis_constants ()
       in
-      gen_and_test_tx ~keymap max_cost_cmd_gen
+      gen_and_test_tx ~n_expected_updates:n_updates ~keymap max_cost_cmd_gen
   end )
