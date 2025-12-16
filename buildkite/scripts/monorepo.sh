@@ -36,10 +36,13 @@ Options:
   --selection-mode       MODE      Selection mode (Triaged or Full)
   --is-included-in-tag   BOOL      Is included in tag (True/False)
   --is-included-in-scope BOOL      Is included in scope (True/False)
-  --job-name NAME        STRING    Job name
+  --jobs PATH            STRING    Path to jobs directory
   --tags FILTER          STRING    Jobs filter (tags separated by commas)
-  --scope FILTER         STRING    Scope filter (PR, Nightly, Release, Mainline Nightly)
+  --scopes FILTER        STRING    Scope filter (PR, Nightly, Release, Mainline Nightly)
   --dirty-when PATTERN   STRING    Pattern for dirty check
+  --git-diff-file FILE   STRING    File containing git diff output
+  --dry-run              BOOL      Dry run mode (True/False)
+  --filter-mode MODE     STRING    Filter mode (any or all)
   --trigger CMD          STRING    Trigger command
   -h, --help             Show this help message
 EOF
@@ -47,9 +50,7 @@ EOF
 
 # Default values
 SELECTION_MODE=""
-IS_INCLUDED_IN_TAG=""
-IS_INCLUDED_IN_SCOPE=""
-JOB_NAME=""
+JOBS=""
 TAGS=""
 SCOPES=""
 DIRTY_WHEN=""
@@ -61,18 +62,20 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --selection-mode)
       SELECTION_MODE="$2"; shift 2;;
-    --is-included-in-tag)
-      IS_INCLUDED_IN_TAG="$2"; shift 2;;
-    --is-included-in-scope)
-      IS_INCLUDED_IN_SCOPE="$2"; shift 2;;
-    --job-name)
-      JOB_NAME="$2"; shift 2;;
+    --jobs)
+      JOBS="$2"; shift 2;;
     --tags)
       TAGS="$2"; shift 2;;
     --scopes)
       SCOPES="$2"; shift 2;;
     --dirty-when)
       DIRTY_WHEN="$2"; shift 2;;
+    --git-diff-file)
+      GIT_DIFF_FILE="$2"; shift 2;;
+    --dry-run)
+      DRY_RUN=true; shift 1;;
+    --filter-mode)
+      FILTER_MODE="$2"; shift 2;;
     -h|--help)
       show_help; exit 0;;
     *)
@@ -81,8 +84,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Require all arguments
-if [[ -z "$SELECTION_MODE" || -z "$IS_INCLUDED_IN_TAG" || -z "$IS_INCLUDED_IN_SCOPE" || -z "$JOB_NAME" || -z "$TAGS" || -z "$SCOPES" || -z "$DIRTY_WHEN" ]]; then
-  echo "Error: All arguments --selection-mode, --is-included-in-tag, --is-included-in-scope, --job-name, --tags, --scopes, and --dirty-when are required."
+if [[ -z "$SELECTION_MODE" || -z "$JOBS" || -z "$TAGS" || -z "$SCOPES" || -z "$DIRTY_WHEN" ]]; then
+  echo "Error: All arguments --selection-mode, --jobs, --tags, --scopes, and --dirty-when are required."
   exit 1
 fi
 
@@ -127,7 +130,6 @@ else
   echo "Error: --selection-mode must be 'triaged' or 'full'."
   exit 1
 fi
-# Find all files in jobs and use yq to get .pipeline.spec.tags
 
 has_matching_tags() {
   local tags="$1"
@@ -137,9 +139,6 @@ has_matching_tags() {
   local desired_tags=("$@")
 
   local match_count=0
-
-
-
 
   for want in "${desired_tags[@]}"; do
 

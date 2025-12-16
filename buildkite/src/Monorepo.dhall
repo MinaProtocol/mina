@@ -49,10 +49,10 @@ let commands
 
           in  Cmd.run
                 (     "./buildkite/scripts/monorepo.sh"
-                  ++  " --scope ${PipelineScope.join requestedScopes} "
+                  ++  " --scopes ${PipelineScope.join requestedScopes} "
                   ++  " --tags ${PipelineTag.join requestedTags} "
                   ++  " --filter-mode ${PipelineFilterMode.show filterMode} "
-                  ++  " --selection ${PipelineJobSelection.show selection} "
+                  ++  " --selection-mode ${PipelineJobSelection.show selection} "
                   ++  " --jobs ./buildkite/src/gen"
                   ++  " --git-diff-file _computed_diff.txt "
                 )
