@@ -60,16 +60,19 @@ module type Field_intf = sig
 end
 
 module Make
-    (BaseField : Field_intf) (ScalarField : sig
+    (BaseField : Field_intf)
+    (ScalarField : sig
       type t
-    end) (Params : sig
+    end)
+    (Params : sig
       val a : BaseField.t
 
       val b : BaseField.t
     end)
-    (C : Input_intf
-           with module BaseField := BaseField
-            and module ScalarField := ScalarField) =
+    (C :
+      Input_intf
+        with module BaseField := BaseField
+         and module ScalarField := ScalarField) =
 struct
   include (C : module type of C with type t = C.t with module Affine := C.Affine)
 
@@ -110,7 +113,7 @@ struct
         exception Invalid_curve_point of t
 
         include
-          Binable.Of_binable
+          Binable.Of_binable_without_uuid
             (T)
             (struct
               let on_curve (x, y) =
@@ -188,7 +191,7 @@ struct
   let of_affine (x, y) = C.of_affine_coordinates x y
 
   include
-    Binable.Of_binable
+    Binable.Of_binable_without_uuid
       (Affine)
       (struct
         type nonrec t = t
