@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let num_bits n = Int.floor_log2 n + 1
 
