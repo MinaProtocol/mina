@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* Helper functions for property testing *)
 let check_property name predicate =

@@ -689,18 +689,18 @@ module Plonk_constraint = struct
           Format.(
             asprintf "Equal %s %s"
               (Fp.to_string (get_value var1))
-              (Fp.to_string (get_value var2)))
+              (Fp.to_string (get_value var2)) )
       | Square (var1, var2) ->
           Format.(
             asprintf "Square %s %s"
               (Fp.to_string (get_value var1))
-              (Fp.to_string (get_value var2)))
+              (Fp.to_string (get_value var2)) )
       | R1CS (var1, var2, var3) ->
           Format.(
             asprintf "R1CS %s %s %s"
               (Fp.to_string (get_value var1))
               (Fp.to_string (get_value var2))
-              (Fp.to_string (get_value var3)))
+              (Fp.to_string (get_value var3)) )
       | _ ->
           Format.asprintf !"%{sexp:(Fp.t, Fp.t) basic}" (map basic ~f:get_value)
 
@@ -924,7 +924,8 @@ module Make
        FFI boundary, where then it gets converted to a `Vec<Gate>`; it's more
        efficient to just create the `Vec<Gate>` directly.
     *)
-    (Gates : Gate_vector_intf with type field := Fp.t)
+     (Gates :
+      Gate_vector_intf with type field := Fp.t)
     (Params : sig
       val params : Fp.t Params.t
     end) : sig
@@ -1133,7 +1134,7 @@ end = struct
                        This handles the case that the first column has
                        duplicated index values.
                     *)
-                    @@ MapRuntimeTable.Table.add map_runtime_tables ~key:(id, v)
+                    @@ Hashtbl.add map_runtime_tables ~key:(id, v)
                          ~data:(i, rt_idx) ;
                     (* default padding value for lookup *)
                     Fp.zero )
@@ -1159,9 +1160,7 @@ end = struct
            same ID, the lookups in fixed lookup tables will return None.
            See https://github.com/MinaProtocol/mina/issues/14016
         *)
-        let v =
-          MapRuntimeTable.Table.find map_runtime_tables (id_int32, vidx)
-        in
+        let v = Hashtbl.find map_runtime_tables (id_int32, vidx) in
         if Option.is_some v then
           let i, rt_idx = Option.value_exn v in
           let rt = runtime_tables.(rt_idx) in
@@ -1246,7 +1245,7 @@ end = struct
       (so at the start of the public-input rows). *)
   let wire' sys key row (col : int) =
     ignore (union_find sys key : V.t Union_find.t) ;
-    V.Table.add_multi sys.equivalence_classes ~key ~data:{ row; col }
+    Hashtbl.add_multi sys.equivalence_classes ~key ~data:{ row; col }
 
   (* TODO: rename to wire_abs and wire_rel? or wire_public and
      wire_after_public? or force a single use function that takes a Row.t? *)
@@ -1430,7 +1429,7 @@ end = struct
     let c, terms =
       Fp.(
         Snarky_backendless.Cvar.to_constant_and_terms ~add ~mul ~zero:(of_int 0)
-          ~equal ~one:(of_int 1))
+          ~equal ~one:(of_int 1) )
         x
     in
     (* Note: [(c, 0)] represents the field element [c] multiplied by the 0th
@@ -1502,7 +1501,7 @@ end = struct
     let constant, terms =
       Fp.(
         Snarky_backendless.Cvar.to_constant_and_terms ~add ~mul ~zero ~equal
-          ~one)
+          ~one )
         x
     in
     let terms = accumulate_terms terms in
@@ -1654,9 +1653,11 @@ end = struct
             if Fp.equal s1 s2 then (
               if not (Fp.equal s1 Fp.zero) then
                 Union_find.union (union_find sys x1) (union_find sys x2) )
-            else if (* s1 x1 - s2 x2 = 0
+            else if
+              (* s1 x1 - s2 x2 = 0
           *)
-                    not (Fp.equal s1 s2) then
+              not (Fp.equal s1 s2)
+            then
               add_generic_constraint ~l:x1 ~r:x2
                 [| s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero |]
                 sys
@@ -2456,24 +2457,30 @@ end = struct
     let rows_rev_name = base_path ^ "_rows_rev.bin" in
     let internal_vars_name = base_path ^ "_internal_vars.bin" in
     let gates_json_name = base_path ^ "_gates.json" in
-    if Sys.file_exists rows_rev_name then Sys.remove rows_rev_name ;
-    if Sys.file_exists internal_vars_name then Sys.remove internal_vars_name ;
-    if Sys.file_exists gates_json_name then Sys.remove gates_json_name ;
+    let remove_if_exist file =
+      match Sys_unix.file_exists file with
+      | `Yes ->
+          Sys_unix.remove file
+      | _ ->
+          ()
+    in
+    remove_if_exist rows_rev_name ;
+    remove_if_exist internal_vars_name ;
+    remove_if_exist gates_json_name ;
 
     let table : concrete_rows_rev = sys.rows_rev in
     let size = bin_size_concrete_rows_rev table in
     let buf = Bigstring.create size in
     ignore (bin_write_concrete_rows_rev buf ~pos:0 table : int) ;
-    Core_kernel.Out_channel.write_all rows_rev_name
-      ~data:(Bigstring.to_string buf) ;
+    Core.Out_channel.write_all rows_rev_name ~data:(Bigstring.to_string buf) ;
 
     let table : concrete_table = sys.internal_vars in
     let size = bin_size_concrete_table table in
     let buf = Bigstring.create size in
     ignore (bin_write_concrete_table buf ~pos:0 table : int) ;
-    Core_kernel.Out_channel.write_all internal_vars_name
+    Core.Out_channel.write_all internal_vars_name
       ~data:(Bigstring.to_string buf) ;
 
     let gates_json = to_json sys in
-    Core_kernel.Out_channel.write_all gates_json_name ~data:gates_json
+    Core.Out_channel.write_all gates_json_name ~data:gates_json
 end
