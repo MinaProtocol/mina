@@ -6,8 +6,6 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
-let Command = ../../Command/Base.dhall
-
 let DebianModifications = ../../Command/DebianModifications.dhall
 
 in  Pipeline.build
@@ -28,5 +26,5 @@ in  Pipeline.build
           , PipelineTag.Type.Debian
           ]
         }
-      , steps = [ DebianModifications.step ([] : List Command.TaggedKey.Type) ]
+      , steps = [ DebianModifications.step ]
       }
