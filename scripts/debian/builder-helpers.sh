@@ -309,9 +309,20 @@ copy_common_daemon_configs() {
 
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_configs inputs:"
-  echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
+  echo "Network Name: ${1} (like mainnet, devnet)"
 
   local NETWORK_NAME="${1}"
+
+  # Store node config hint (based on NETWORK_NAME)
+  mkdir -p "${BUILDDIR}/etc/coda/build_config"
+  case "${NETWORK_NAME}" in
+    mainnet)
+      printf "mainnet" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
+      ;;
+    devnet)
+      printf "devnet" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
+      ;;
+  esac
 
   mkdir -p "${BUILDDIR}/var/lib/coda"
 
