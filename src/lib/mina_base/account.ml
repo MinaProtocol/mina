@@ -1095,6 +1095,11 @@ module Hardfork = struct
 
   let balance { balance; _ } = balance
 
+  (** An empty Mesa account. Note that this is not [of_stable] on the empty
+      Berkeley account, because [of_stable] deliberately avoids changing the
+      permissions of accounts. For that reason we use the anticipated Mesa
+      [Permissions.Hardfork.user_default] permissions explicitly.
+  *)
   let empty : t =
     { public_key = Public_key.Compressed.empty
     ; token_id = Token_id.default
