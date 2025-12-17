@@ -29,6 +29,9 @@ const (
 	colorYellow = "\033[93m"
 	colorBlue   = "\033[94m"
 	colorGray   = "\033[90m"
+
+	gcsPrefixGS    = "gs://"
+	gcsPrefixHTTPS = "https://storage.googleapis.com/"
 )
 
 // BuildkiteClient wraps the Buildkite SDK client with org/pipeline context
@@ -398,22 +401,22 @@ func findLatestConfigFromGCS(ctx context.Context, urlPrefix string) (string, err
 	// Parse the URL to extract bucket and prefix
 	var bucketName, objectPrefix string
 
-	if strings.HasPrefix(urlPrefix, "gs://") {
+	if strings.HasPrefix(urlPrefix, gcsPrefixGS) {
 		// Handle gs:// URLs
-		parts := strings.SplitN(strings.TrimPrefix(urlPrefix, "gs://"), "/", 2)
+		parts := strings.SplitN(strings.TrimPrefix(urlPrefix, gcsPrefixGS), "/", 2)
 		bucketName = parts[0]
 		if len(parts) > 1 {
 			objectPrefix = parts[1]
 		}
-	} else if strings.HasPrefix(urlPrefix, "https://storage.googleapis.com/") {
+	} else if strings.HasPrefix(urlPrefix, gcsPrefixHTTPS) {
 		// Handle https://storage.googleapis.com URLs
-		parts := strings.SplitN(strings.TrimPrefix(urlPrefix, "https://storage.googleapis.com/"), "/", 2)
+		parts := strings.SplitN(strings.TrimPrefix(urlPrefix, gcsPrefixHTTPS), "/", 2)
 		bucketName = parts[0]
 		if len(parts) > 1 {
 			objectPrefix = parts[1]
 		}
 	} else {
-		return "", fmt.Errorf("invalid GCS URL format, expected gs:// or https://storage.googleapis.com/")
+		return "", fmt.Errorf("invalid GCS URL format, expected %s or %s", gcsPrefixGS, gcsPrefixHTTPS)
 	}
 
 	fmt.Printf("Searching for latest config in bucket '%s' with prefix '%s'...\n", bucketName, objectPrefix)
