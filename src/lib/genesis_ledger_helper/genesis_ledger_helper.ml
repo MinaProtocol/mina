@@ -82,22 +82,22 @@ let assert_filehash_equal ~file ~hash ~logger =
     failwith "Tarball hash mismatch"
 
 module Ledger = struct
-  let hash_filename hash ~ledger_name_prefix =
-    let str =
-      (* Consider the serialization of accounts as well as the hash. In
-         particular, adding fields that are
-         * hashed as a bit string
-         * default to an all-zero bit representation
-         may result in the same hash, but the accounts in the ledger will not
-         match the account record format.
-      *)
-      hash
-      ^ Bin_prot.Writer.to_string Mina_base.Account.Stable.Latest.bin_writer_t
-          Mina_base.Account.empty
-    in
+  (* Consider the serialization of accounts as well as the hash. In
+     particular, adding fields that are
+     * hashed as a bit string
+     * default to an all-zero bit representation
+     may result in the same hash, but the accounts in the ledger will not
+     match the account record format.
+  *)
+  let hash_filename hash ~ledger_name_prefix ~account_hash =
+    let str = hash ^ account_hash in
     ledger_name_prefix ^ "_"
     ^ Blake2.to_hex (Blake2.digest_string str)
     ^ ".tar.gz"
+
+  let hash_filename_stable hash ~ledger_name_prefix =
+    let account_hash = Mina_base.Account.empty_account_string () in
+    hash_filename hash ~ledger_name_prefix ~account_hash
 
   let named_filename
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -190,7 +190,7 @@ module Ledger = struct
     let%bind hash_filename =
       match config.hash with
       | Some hash ->
-          let hash_filename = hash_filename hash ~ledger_name_prefix in
+          let hash_filename = hash_filename_stable hash ~ledger_name_prefix in
           search_local_and_s3 hash_filename
       | None ->
           return None
@@ -227,7 +227,9 @@ module Ledger = struct
       ~ledger_dirname () =
     let root_hash = Ledger_hash.to_base58_check root_hash in
     let%bind () = Unix.mkdir ~p:() target_dir in
-    let tar_path = target_dir ^/ hash_filename root_hash ~ledger_name_prefix in
+    let tar_path =
+      target_dir ^/ hash_filename_stable root_hash ~ledger_name_prefix
+    in
     [%log trace]
       "Creating $ledger tar file for $root_hash at $path from database at $dir"
       ~metadata:

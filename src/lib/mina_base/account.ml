@@ -668,6 +668,9 @@ let empty =
 
 let empty_digest = lazy (digest empty)
 
+let empty_account_string () =
+  Bin_prot.Writer.to_string Stable.Latest.bin_writer_t empty
+
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
   let token_id = Account_id.token_id account_id in
