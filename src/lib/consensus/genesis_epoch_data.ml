@@ -14,23 +14,23 @@ type field = Snark_params.Tick.field
 
 let hashed_of_full (ledger : Genesis_ledger.Packed.t t) : field t =
   Option.map
-    (fun { staking; next } ->
-      let next =
-        Option.map
-          (fun { Data.ledger; seed } ->
-            { Data.ledger =
-                Genesis_ledger.Packed.t ledger
-                |> Lazy.force |> Mina_ledger.Ledger.merkle_root
-            ; seed
-            } )
-          next
-      in
+    (fun l ->
       let staking : field Data.t =
         { Data.ledger =
-            Genesis_ledger.Packed.t staking.ledger
+            Genesis_ledger.Packed.t l.staking.ledger
             |> Lazy.force |> Mina_ledger.Ledger.merkle_root
-        ; seed = staking.seed
+        ; seed = l.staking.seed
         }
+      in
+      let next =
+        Option.map
+          (fun (n : Genesis_ledger.Packed.t Data.t) ->
+            { Data.ledger =
+                Genesis_ledger.Packed.t n.ledger
+                |> Lazy.force |> Mina_ledger.Ledger.merkle_root
+            ; seed = n.seed
+            } )
+          l.next
       in
       { staking; next } )
     ledger
