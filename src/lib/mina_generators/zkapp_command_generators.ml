@@ -1677,7 +1677,7 @@ let mk_fee_payer ~fee ~pk ~nonce : Account_update.Fee_payer.t =
     ~authorization:Signature.dummy
 
 let gen_max_cost_zkapp_command_from ?memo ?fee_range ?(n_updates : int = 5)
-    ~(fee_payer_keypair : Signature_lib.Keypair.t)
+    ~(fee_payer_pk : Signature_lib.Public_key.Compressed.t)
     ~(account_state_tbl : (Account.t * role) Account_id.Table.t) ~vk
     ~(genesis_constants : Genesis_constants.t) () =
   let open Quickcheck.Generator.Let_syntax in
@@ -1718,9 +1718,6 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range ?(n_updates : int = 5)
   in
   let account_updates =
     { head with body = { head.body with events; actions } } :: tail
-  in
-  let fee_payer_pk =
-    Signature_lib.Public_key.compress fee_payer_keypair.public_key
   in
   let fee_payer_id = Account_id.create fee_payer_pk Token_id.default in
   let fee_payer_account, _ =
@@ -1944,10 +1941,9 @@ let%test_module _ =
       in
       (* Use cache for proof generation *)
       let cache = ref Signature_lib.Public_key.Compressed.Map.empty in
-      let (command_final : Zkapp_command.t) =
-        Async.(
-          Thread_safe.block_on_async_exn
-          @@ fun () ->
+      let open Async.Deferred.Let_syntax in
+      let%map (command_final : Zkapp_command.t) =
+        Async.Deferred.(
           replace_proof_authorizations_for_max_cost ~cache ~prover ~keymap
             command
           >>= Zkapp_command_builder.replace_authorizations ~keymap)
@@ -1956,47 +1952,41 @@ let%test_module _ =
       |> Or_error.ok_exn
 
     let%test_unit "generate max cost zkapp command" =
-      let keypair = Keypair.create () in
-      let public_key_compressed =
-        Signature_lib.Public_key.compress keypair.public_key
-      in
+      Async.(
+        Thread_safe.block_on_async_exn
+        @@ fun () ->
+        let account_state_tbl = Account_id.Table.create () in
+        let fee_payer_sk, fee_payer_account =
+          Quickcheck.random_value
+          @@ Account.gen_with_private_key ~token_id:Token_id.default
+               ~balance:(Currency.Balance.of_mina_int_exn 1000)
+        in
+        Account_id.Table.set account_state_tbl
+          ~key:(Account.identifier fee_payer_account)
+          ~data:(fee_payer_account, `Fee_payer) ;
 
-      let account_state_tbl = Account_id.Table.create () in
-      let fee_payer_account_id =
-        Account_id.create public_key_compressed Token_id.default
-      in
-      let fee_payer_account =
-        Account.create fee_payer_account_id
-          (Currency.Balance.of_mina_int_exn 1000)
-      in
-      Account_id.Table.set account_state_tbl ~key:fee_payer_account_id
-        ~data:(fee_payer_account, `Fee_payer) ;
-
-      let gen_account _ =
-        let zkapp_keypair = Signature_lib.Keypair.create () in
-        let zkapp_pk =
-          Signature_lib.Public_key.compress zkapp_keypair.public_key
+        let gen_account _ =
+          let sk, zkapp_account =
+            Quickcheck.random_value
+            @@ Account.gen_zkapp_account_with_private_key
+                 ~token_id:Token_id.default
+                 ~balance:(Currency.Balance.of_mina_int_exn 100)
+          in
+          Account_id.Table.set account_state_tbl
+            ~key:(Account.identifier zkapp_account)
+            ~data:(zkapp_account, `Ordinary_participant) ;
+          (zkapp_account.public_key, sk)
         in
-        let zkapp_account_id = Account_id.create zkapp_pk Token_id.default in
-        let zkapp_account_base =
-          Account.create zkapp_account_id (Currency.Balance.of_mina_int_exn 100)
+        let keymap =
+          (fee_payer_account.public_key, fee_payer_sk)
+          :: List.init 3 ~f:gen_account
+          |> Public_key.Compressed.Map.of_alist_exn
         in
-        let zkapp_account =
-          { zkapp_account_base with zkapp = Some Zkapp_account.default }
+        let n_updates = 5 in
+        let max_cost_cmd_gen =
+          gen_max_cost_zkapp_command_from ~n_updates
+            ~fee_payer_pk:fee_payer_account.public_key ~account_state_tbl ~vk
+            ~genesis_constants ()
         in
-        Account_id.Table.set account_state_tbl ~key:zkapp_account_id
-          ~data:(zkapp_account, `Ordinary_participant) ;
-        (zkapp_pk, zkapp_keypair.private_key)
-      in
-      let keymap =
-        (public_key_compressed, keypair.private_key)
-        :: List.init 3 ~f:gen_account
-        |> Public_key.Compressed.Map.of_alist_exn
-      in
-      let n_updates = 5 in
-      let max_cost_cmd_gen =
-        gen_max_cost_zkapp_command_from ~n_updates ~fee_payer_keypair:keypair
-          ~account_state_tbl ~vk ~genesis_constants ()
-      in
-      gen_and_test_tx ~n_expected_updates:n_updates ~keymap max_cost_cmd_gen
+        gen_and_test_tx ~n_expected_updates:n_updates ~keymap max_cost_cmd_gen)
   end )
