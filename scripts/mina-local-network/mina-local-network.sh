@@ -151,7 +151,7 @@ help() {
                                          |   Default: not set
 -r   |--root                             | When set, override the root working folder (i.e. the value of ROOT) for this script. WARN: this script will clean up anything inside that folder when initializing any run!
                                          |   Default: ${ROOT}
---redirect-logs                          | When set, redirect all logs (daemons, workers, archive) to file instead of console output
+--redirect-logs                          | When set, redirect logs for nodes (excluding workers) and archive to file instead of console output
                                          |   Default: ${REDIRECT_LOGS}
 -h   |--help                             | Displays this help message
 
