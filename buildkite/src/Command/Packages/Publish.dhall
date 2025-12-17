@@ -126,9 +126,7 @@ let publish
                   ( Prelude.List.map
                       Network.Type
                       Text
-                      (     \(network : Network.Type)
-                        ->  Network.debianSuffix network
-                      )
+                      (\(network : Network.Type) -> Network.lowerName network)
                       spec.networks
                   )
 

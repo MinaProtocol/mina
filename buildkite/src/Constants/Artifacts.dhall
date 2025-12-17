@@ -116,15 +116,15 @@ let toDebianName =
           \(artifact : Artifact)
       ->  \(network : Network.Type)
       ->  merge
-            { Daemon = "daemon_${Network.debianSuffix network}"
+            { Daemon = "daemon_${Network.lowerName network}"
             , DaemonLegacyHardfork =
-                "daemon_${Network.debianSuffix network}_hardfork"
+                "daemon_${Network.lowerName network}_hardfork"
             , DaemonAutoHardfork = ""
             , LogProc = "logproc"
-            , Archive = "archive_${Network.debianSuffix network}"
+            , Archive = "archive_${Network.lowerName network}"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
-            , Rosetta = "rosetta_${Network.debianSuffix network}"
+            , Rosetta = "rosetta_${Network.lowerName network}"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = ""
