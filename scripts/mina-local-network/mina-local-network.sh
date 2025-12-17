@@ -151,7 +151,7 @@ help() {
                                          |   Default: not set
 -r   |--root                             | When set, override the root working folder (i.e. the value of ROOT) for this script. WARN: this script will clean up anything inside that folder when initializing any run!
                                          |   Default: ${ROOT}
---redirect-logs                          | When set, redirect snark worker logs to file instead of console output
+--redirect-logs                          | When set, redirect all logs (daemons, workers, archive) to file instead of console output
                                          |   Default: ${REDIRECT_LOGS}
 -h   |--help                             | Displays this help message
 
@@ -204,19 +204,19 @@ on-exit() {
   job_pids+=("$!")
 
   for ((i=0; i<FISH; i++)); do
-    port=$((FISH_START_PORT + i*5))
+    port=$((FISH_START_PORT + i*6))
     stop-node "fish_${i}" "$port" &
     job_pids+=("$!")
   done
 
   for ((i=0; i<NODES; i++)); do
-    port=$((NODE_START_PORT + i*5))
+    port=$((NODE_START_PORT + i*6))
     stop-node "node_${i}" "$port" &
     job_pids+=("$!")
   done
 
   for ((i=0; i<WHALES; i++)); do
-    port=$((WHALE_START_PORT + i*5))
+    port=$((WHALE_START_PORT + i*6))
     stop-node "whale_${i}" "$port" &
     job_pids+=("$!")
   done
@@ -269,17 +269,13 @@ exec-daemon() {
     extra_opts+=( --genesis-ledger-dir "$copied_override_genesis_ledger")
   fi
 
-  if $ITN_FEATURES; then
-    if [ -z "$ITN_KEYS" ]; then
-      echo "❌ ITN features enabled but no ITN keys provided." >&2
-      exit 1
-    fi
-
+  # ITN features: only enabled when ITN_KEYS is provided
+  # This only takes effect for daemons
+  if [ -n "$ITN_KEYS" ]; then
     ITN_GRAPHQL_PORT=$((BASE_PORT + 5))
 
     extra_opts+=( "--itn-keys $ITN_KEYS" )
     extra_opts+=( "--itn-graphql-port ${ITN_GRAPHQL_PORT}" )
-
   fi
 
   # shellcheck disable=SC2068
@@ -345,7 +341,7 @@ spawn-worker() {
   FOLDER=${1}
   shift
   # shellcheck disable=SC2068
-  if [ "${REDIRECT_LOGS}" = true ]; then
+  if [ "${REDIRECT_WORKER_LOGS}" = true ]; then
     exec-worker-daemon $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
   else
     exec-worker-daemon $@ -config-directory "${FOLDER}" &
@@ -549,7 +545,6 @@ while [[ "$#" -gt 0 ]]; do
     shift
     ;;
   --itn-keys)
-    export ITN_FEATURES=true
     ITN_KEYS="${2}"
     shift
     ;;
