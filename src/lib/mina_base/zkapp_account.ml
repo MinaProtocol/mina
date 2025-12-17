@@ -476,6 +476,16 @@ module Hardfork = struct
     ; zkapp_uri = account.zkapp_uri
     }
 
+  let unsafe_to_stable (account : t) : Stable.Latest.t =
+    { app_state = Zkapp_state.Hardfork.Value.unsafe_to_stable account.app_state
+    ; verification_key = account.verification_key
+    ; zkapp_version = account.zkapp_version
+    ; action_state = account.action_state
+    ; last_action_slot = account.last_action_slot
+    ; proved_state = account.proved_state
+    ; zkapp_uri = account.zkapp_uri
+    }
+
   let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
     let open Random_oracle.Input.Chunked in
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in

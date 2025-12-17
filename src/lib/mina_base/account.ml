@@ -1086,6 +1086,21 @@ module Hardfork = struct
     ; zkapp = Option.map ~f:Zkapp_account.Hardfork.of_stable account.zkapp
     }
 
+  let unsafe_to_stable (account : t) : Stable.Latest.t =
+    { public_key = account.public_key
+    ; token_id = account.token_id
+    ; token_symbol = account.token_symbol
+    ; balance = account.balance
+    ; nonce = account.nonce
+    ; receipt_chain_hash = account.receipt_chain_hash
+    ; delegate = account.delegate
+    ; voting_for = account.voting_for
+    ; timing = account.timing
+    ; permissions = account.permissions
+    ; zkapp =
+        Option.map ~f:Zkapp_account.Hardfork.unsafe_to_stable account.zkapp
+    }
+
   (* This function converts Berkeley account to Mesa account *)
   let migrate_from_berkeley ~hardfork_slot (account : Stable.Latest.t) : t =
     slot_reduction_update ~hardfork_slot account |> of_stable
@@ -1124,6 +1139,18 @@ module Hardfork = struct
       (Random_oracle.pack_input (to_input t))
 
   let empty_digest = lazy (digest empty)
+
+  let%test_unit "of_stable followed by unsafe_to_stable is identity" =
+    let gen_with_optional_zkapp : Stable.Latest.t Quickcheck.Generator.t =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind base_account = gen in
+      let%map zkapp = Option.quickcheck_generator Zkapp_account.gen in
+      { base_account with zkapp }
+    in
+    Quickcheck.test gen_with_optional_zkapp ~f:(fun original ->
+        let converted = of_stable original in
+        let roundtripped = unsafe_to_stable converted in
+        [%test_eq: Stable.Latest.t] original roundtripped )
 end
 
 (* An unstable account is needed when we're doing ledger migration. The main
