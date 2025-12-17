@@ -9,7 +9,8 @@ module Inputs = struct
     ; proof_level : Genesis_constants.Proof_level.t
     ; genesis_constants : Genesis_constants.t
     ; genesis_ledger : Genesis_ledger.Packed.t
-    ; genesis_epoch_data : Consensus.Genesis_epoch_data.t
+    ; genesis_epoch_data :
+        Genesis_ledger.Packed.t Consensus.Genesis_epoch_data.t
     ; genesis_body_reference : Consensus.Body_reference.t
     ; consensus_constants : Consensus.Constants.t
     ; protocol_state_with_hashes :
@@ -87,7 +88,8 @@ module T = struct
     ; genesis_constants : Genesis_constants.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; genesis_ledger : Genesis_ledger.Packed.t
-    ; genesis_epoch_data : Consensus.Genesis_epoch_data.t
+    ; genesis_epoch_data :
+        Genesis_ledger.Packed.t Consensus.Genesis_epoch_data.t
     ; genesis_body_reference : Consensus.Body_reference.t
     ; consensus_constants : Consensus.Constants.t
     ; protocol_state_with_hashes :
