@@ -23,7 +23,7 @@ let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
   in
   let total_currency =
     Genesis_ledger.Packed.t genesis_ledger
-    |> Lazy.force |> Consensus.genesis_ledger_total_currency
+    |> Consensus.genesis_ledger_total_currency
   in
   let genesis_consensus_state =
     Consensus.Data.Consensus_state.create_genesis

@@ -304,7 +304,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     in
     let total_currency =
       Genesis_ledger.Packed.t genesis_ledger
-      |> Lazy.force |> Consensus.genesis_ledger_total_currency
+      |> Consensus.genesis_ledger_total_currency
     in
     { Poly.Stable.Latest.previous_state_hash =
         State_hash.of_hash Outside_hash_image.t

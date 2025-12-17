@@ -44,7 +44,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   let name = "proof_of_stake"
 
   let genesis_ledger_total_currency ledger =
-    Mina_ledger.Ledger.foldi ~init:Amount.zero ledger
+    Mina_ledger.Ledger.foldi ~init:Amount.zero (Lazy.force ledger)
       ~f:(fun _addr sum (account : Mina_base.Account.t) ->
         (* only default token matters for total currency used to determine stake *)
         if Mina_base.(Token_id.equal account.token_id Token_id.default) then
@@ -3112,8 +3112,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let constants = Lazy.force Constants.for_unit_tests in
       let genesis_ledger = Genesis_ledger.for_unit_tests in
       let total_currency =
-        Genesis_ledger.Packed.t genesis_ledger
-        |> Lazy.force |> genesis_ledger_total_currency
+        Genesis_ledger.Packed.t genesis_ledger |> genesis_ledger_total_currency
       in
       let genesis_ledger_hash =
         Genesis_ledger.Packed.t genesis_ledger |> genesis_ledger_hash
@@ -3145,8 +3144,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let constants = Lazy.force Constants.for_unit_tests in
       let genesis_ledger = Genesis_ledger.for_unit_tests in
       let total_currency =
-        Genesis_ledger.Packed.t genesis_ledger
-        |> Lazy.force |> genesis_ledger_total_currency
+        Genesis_ledger.Packed.t genesis_ledger |> genesis_ledger_total_currency
       in
       let genesis_ledger_hash =
         Genesis_ledger.Packed.t genesis_ledger |> genesis_ledger_hash
@@ -3443,8 +3441,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let consensus_constants = constants
       end
 
-      let total_currency =
-        Genesis_ledger.t |> Lazy.force |> genesis_ledger_total_currency
+      let total_currency = genesis_ledger_total_currency Genesis_ledger.t
 
       let genesis_epoch_data =
         Genesis_epoch_data.for_unit_tests |> Genesis_epoch_data.hashed_of_full

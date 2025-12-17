@@ -264,7 +264,7 @@ module type S = sig
   val name : string
 
   val genesis_ledger_total_currency :
-    Mina_ledger.Ledger.Mask.Attached.t -> Amount.t
+    Mina_ledger.Ledger.Mask.Attached.t Lazy.t -> Amount.t
 
   (** Return a string that tells a human what the consensus view of an instant
       in time is.
