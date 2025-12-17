@@ -168,8 +168,9 @@ let generateDockerForCodename =
                                                       codename} && source ./buildkite/scripts/export-git-env-vars.sh"
                     , Cmd.runInDocker
                         Cmd.Docker::{ image = image }
-                        "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && ! (FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config ${Network.lowerName
-                                                                                                                                                                                                                                                                                                                               spec.network} config.json /workdir/verification)"
+                        "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && ! (FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
+                                                                                                                                                                                                                                                                                                spec.network}.json mina-verify-packaged-fork-config ${Network.lowerName
+                                                                                                                                                                                                                                                                                                                                                        spec.network} config.json /workdir/verification)"
                     ]
                   , label =
                       "Assert corrupted packaged artifacts are unverifiable"
@@ -187,8 +188,9 @@ let generateDockerForCodename =
                                                       codename} && source ./buildkite/scripts/export-git-env-vars.sh"
                     , Cmd.runInDocker
                         Cmd.Docker::{ image = image }
-                        "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config --network ${Network.lowerName
-                                                                                                                                                                                          spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg}"
+                        "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=/var/lib/coda/${Network.lowerName
+                                                                                                                                                 spec.network}.json mina-verify-packaged-fork-config --network ${Network.lowerName
+                                                                                                                                                                                                                   spec.network} --fork-config config.json --working-dir /workdir/verification ${precomputed_block_prefix_arg}"
                     ]
                   , label = "Verify packaged artifacts"
                   , key =
