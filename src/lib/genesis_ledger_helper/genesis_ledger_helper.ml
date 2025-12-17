@@ -99,6 +99,10 @@ module Ledger = struct
     let account_hash = Mina_base.Account.empty_account_string () in
     hash_filename hash ~ledger_name_prefix ~account_hash
 
+  let hash_filename_hardfork hash ~ledger_name_prefix =
+    let account_hash = Mina_base.Account.Hardfork.empty_account_string () in
+    hash_filename hash ~ledger_name_prefix ~account_hash
+
   let named_filename
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~num_accounts ~balances ~ledger_name_prefix ?other_data name =
@@ -223,13 +227,11 @@ module Ledger = struct
         | _, Some name ->
             search_local_and_s3 name )
 
-  let generate_tar ~logger ~target_dir ~ledger_name_prefix ~root_hash
-      ~ledger_dirname () =
+  let generate_tar_with_hash_filename ~hash_filename ~logger ~target_dir
+      ~ledger_name_prefix ~root_hash ~ledger_dirname () =
     let root_hash = Ledger_hash.to_base58_check root_hash in
     let%bind () = Unix.mkdir ~p:() target_dir in
-    let tar_path =
-      target_dir ^/ hash_filename_stable root_hash ~ledger_name_prefix
-    in
+    let tar_path = target_dir ^/ hash_filename root_hash ~ledger_name_prefix in
     [%log trace]
       "Creating $ledger tar file for $root_hash at $path from database at $dir"
       ~metadata:
@@ -255,12 +257,22 @@ module Ledger = struct
             ] ;
         Error err
 
+  let generate_tar_stable ~logger ~target_dir ~ledger_name_prefix ~root_hash
+      ~ledger_dirname () =
+    generate_tar_with_hash_filename ~hash_filename:hash_filename_stable ~logger
+      ~target_dir ~ledger_name_prefix ~root_hash ~ledger_dirname ()
+
+  let generate_tar_hardfork ~logger ~target_dir ~ledger_name_prefix ~root_hash
+      ~ledger_dirname () =
+    generate_tar_with_hash_filename ~hash_filename:hash_filename_hardfork
+      ~logger ~target_dir ~ledger_name_prefix ~root_hash ~ledger_dirname ()
+
   let generate_ledger_tar ~genesis_dir ~logger ~ledger_name_prefix ledger =
     Mina_ledger.Ledger.commit ledger ;
     let dirname = Option.value_exn (Mina_ledger.Ledger.get_directory ledger) in
     let root_hash = Mina_ledger.Ledger.merkle_root ledger in
-    generate_tar ~logger ~target_dir:genesis_dir ~ledger_name_prefix ~root_hash
-      ~ledger_dirname:dirname ()
+    generate_tar_stable ~logger ~target_dir:genesis_dir ~ledger_name_prefix
+      ~root_hash ~ledger_dirname:dirname ()
 
   let padded_accounts_from_runtime_config_opt ~logger ~proof_level
       ~ledger_name_prefix ?overwrite_version (config : Runtime_config.Ledger.t)

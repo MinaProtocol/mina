@@ -1095,7 +1095,19 @@ module Hardfork = struct
 
   let balance { balance; _ } = balance
 
-  let empty = of_stable empty
+  let empty : t =
+    { public_key = Public_key.Compressed.empty
+    ; token_id = Token_id.default
+    ; token_symbol = Token_symbol.default
+    ; balance = Balance.zero
+    ; nonce = Nonce.zero
+    ; receipt_chain_hash = Receipt.Chain_hash.empty
+    ; delegate = None
+    ; voting_for = State_hash.dummy
+    ; timing = Timing.Untimed
+    ; permissions = Permissions.Hardfork.user_default
+    ; zkapp = None
+    }
 
   let identifier ({ public_key; token_id; _ } : t) =
     Account_id.create public_key token_id
@@ -1127,6 +1139,8 @@ module Hardfork = struct
       (Random_oracle.pack_input (to_input t))
 
   let empty_digest = lazy (digest empty)
+
+  let empty_account_string () = Bin_prot.Writer.to_string bin_writer_t empty
 end
 
 (* An unstable account is needed when we're doing ledger migration. The main
