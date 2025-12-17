@@ -11,20 +11,22 @@
 #   for the job to Buildkite.
 #
 #   Glossary of Arguments:
-#     1. selection       (Triaged or Full) - Determines the mode of selection for triggering jobs.
-#                                            Triaged mode checks for relevant changes,
-#                                            while Full mode triggers all jobs, which falls under scope and filter.
-#     2. tags            STRING            - A filter is a group of job tags, those tags can be any string.
-#     3. scope           STRING            - A filter string to determine if the job falls under a specific scope.
-#                                            Scope is a gate level in mina like :
-#                                             - PR - for pull requests
-#                                             - Nightly - for builds that run extended scope of tests including heavy tests
-#                                                         which might take longer time to execute
-#                                             - Release - full builds with all known jobs, including all supported networks/codenames
-#                                             - Mainline Nightly - like above but for mainline branch on nightly basis
-#     4. dirty-when      STRING            - A pattern used to check for relevant changes in the repository.
-#
-# ------------------------------------------------------------------------------
+#     1. selection           (triaged or full) - Determines the mode of selection for triggering jobs.
+#                                                Triaged mode checks for relevant changes,
+#                                                while Full mode triggers all jobs, which falls under scope and filter.
+#     2. tags                STRING            - Comma-separated list of job tags to filter by.
+#     3. scopes              STRING            - Comma-separated list of scopes to filter by.
+#                                                Scope is a gate level in mina like:
+#                                                 - PR - for pull requests
+#                                                 - Nightly - for builds that run extended scope of tests including heavy tests
+#                                                           which might take longer time to execute
+#                                                 - Release - full builds with all known jobs, including all supported networks/codenames
+#                                                 - Mainline Nightly - like above but for mainline branch on nightly basis
+#     4. filter-mode         (any or all)      - Determines if any or all tags must match.
+#     5. jobs                PATH              - Path to the jobs directory containing .yml files.
+#     6. git-diff-file       PATH              - Path to the git diff file for dirty-when checks.
+#     7. mainline-branches   STRING            - Comma-separated list of mainline branches for ancestor detection.
+#     8. debug               FLAG              - Optional flag to enable debug output.
 
 set -euo pipefail
 
@@ -42,8 +44,9 @@ Options:
   --git-diff-file FILE   STRING    File containing git diff output
   --dry-run              BOOL      Dry run mode (True/False)
   --filter-mode MODE     STRING    Filter mode (any or all)
-  --trigger CMD          STRING    Trigger command
-  -h, --help             Show this help message
+  --mainline-branches    STRING    Comma-separated list of mainline branches
+  --debug                          Enable debug mode
+  --h, --help             Show this help message
 EOF
 }
 
@@ -53,6 +56,8 @@ JOBS=""
 TAGS=""
 SCOPES=""
 GIT_DIFF_FILE=""
+MAINLINE_BRANCHES=()
+DEBUG=false
 DRY_RUN=false
 
 # Parse
@@ -66,12 +71,17 @@ while [[ $# -gt 0 ]]; do
       TAGS="$2"; shift 2;;
     --scopes)
       SCOPES="$2"; shift 2;;
-    --git-diff-file)
-      GIT_DIFF_FILE="$2"; shift 2;;
-    --dry-run)
-      DRY_RUN=true; shift 1;;
     --filter-mode)
       FILTER_MODE="$2"; shift 2;;
+    --git-diff-file)
+      GIT_DIFF_FILE="$2"; shift 2;;
+    --mainline-branches)
+      IFS=',' read -r -a MAINLINE_BRANCHES <<< "$2"
+      shift; shift;;
+    --debug)
+      DEBUG=true; shift;;
+    --dry-run)
+      DRY_RUN=true; shift 1;;
     -h|--help)
       show_help; exit 0;;
     *)
@@ -80,9 +90,26 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Require all arguments
-if [[ -z "$SELECTION_MODE" || -z "$JOBS" || -z "$TAGS" || -z "$SCOPES" ]]; then
-  echo "Error: All arguments --selection-mode, --jobs, --tags, and --scopes are required."
+if [[ -z "$SELECTION_MODE" || -z "$JOBS" || -z "$TAGS" || -z "$SCOPES" || -z "$FILTER_MODE" ]]; then
+  echo "Error: All arguments --selection-mode, --jobs, --tags, --scopes, and --filter-mode are required."
   exit 1
+fi
+
+# Check if mainline branches were provided
+if [[ ${#MAINLINE_BRANCHES[@]} -eq 0 ]]; then
+  echo "Error: --mainline-branches is required."
+  exit 1
+fi
+
+# Debug output
+if [[ "$DEBUG" == true ]]; then
+  echo "Debug: SELECTION_MODE=$SELECTION_MODE"
+  echo "Debug: TAGS=$TAGS"
+  echo "Debug: SCOPES=$SCOPES"
+  echo "Debug: FILTER_MODE=$FILTER_MODE"
+  echo "Debug: JOBS=$JOBS"
+  echo "Debug: GIT_DIFF_FILE=$GIT_DIFF_FILE"
+  echo "Debug: MAINLINE_BRANCHES=${MAINLINE_BRANCHES[*]}"
 fi
 
 # Check if yq is installed, if not install it
@@ -127,6 +154,23 @@ else
   exit 1
 fi
 
+find_closest_ancestor() {
+  CURRENT_COMMIT=$(git rev-parse HEAD)
+  closest_branch=""
+  min_distance=""
+  for branch in "${MAINLINE_BRANCHES[@]}"; do
+    ancestor=$(git merge-base "$CURRENT_COMMIT" "origin/$branch")
+    distance=$(git rev-list --count "${ancestor}..${CURRENT_COMMIT}")
+    echo "Branch $branch: $distance commits from current commit ($CURRENT_COMMIT) via ancestor $ancestor" >&2
+    if [[ -z "$min_distance" || $distance -lt $min_distance ]]; then
+      min_distance=$distance
+      closest_branch=$branch
+    fi
+  done
+  echo "$closest_branch"
+}
+
+
 has_matching_tags() {
   local tags="$1"
   local filter_any="$2"
@@ -163,7 +207,7 @@ scope_matches() {
   local match_count=0
 
  for want in "${desired_scopes[@]}"; do
-    # yq v4 NIE ma --arg, więc używamy env(WANT)
+    # yq v4 doesn't have --arg, so we use env(WANT)
     if WANT="$want" \
        yq -e '.[] | select((downcase) == (env(WANT) | downcase))' \
        <<< "$scope" \
@@ -175,6 +219,105 @@ scope_matches() {
   done
 
   echo $(( match_count == 1 ? 1 : 0 ))
+}
+
+check_exclude_if() {
+  local file="$1"
+  local job_name="$2"
+  local closest_ancestor="$3"
+
+  # Check if excludeIf exists
+  local exclude_if_count
+  exclude_if_count=$(yq -r '.spec.excludeIf | length' "$file")
+
+  if [[ "$exclude_if_count" == "null" || "$exclude_if_count" -eq 0 ]]; then
+    echo 0
+    return
+  fi
+
+  # Check each excludeIf condition
+  for ((i=0; i<exclude_if_count; i++)); do
+    # Safely read ancestor and reason fields - they may not exist
+    local ancestor reason
+    ancestor=$(yq -r ".spec.excludeIf[$i].ancestor // \"\"" "$file")
+    reason=$(yq -r ".spec.excludeIf[$i].reason // \"\"" "$file")
+
+    # Skip this item if it doesn't have ancestor field (not an ancestor-based exclusion)
+    if [[ -z "$ancestor" || "$ancestor" == "null" ]]; then
+      echo "⚠️  Skipping excludeIf[$i] for $job_name: no 'ancestor' field found (possibly different exclusion type)" >&2
+      continue
+    fi
+
+    echo "Evaluating excludeIf[$i]: ancestor=$ancestor, reason=$reason, closest_ancestor=$closest_ancestor" >&2
+
+    # Case-insensitive comparison
+    local ancestor_lower closest_ancestor_lower
+    ancestor_lower=$(echo "$ancestor" | tr '[:upper:]' '[:lower:]')
+    closest_ancestor_lower=$(echo "$closest_ancestor" | tr '[:upper:]' '[:lower:]')
+
+    if [[ "$ancestor_lower" == "$closest_ancestor_lower" ]]; then
+      if [[ -n "$reason" && "$reason" != "null" ]]; then
+        echo "❌🚫 $job_name excluded based on excludeIf condition: $reason" >&2
+      else
+        echo "❌🚫 $job_name excluded based on excludeIf condition (ancestor: $ancestor)" >&2
+      fi
+      echo 1
+      return
+    fi
+  done
+
+  echo 0
+}
+
+check_include_if() {
+  local file="$1"
+  local job_name="$2"
+  local closest_ancestor="$3"
+
+  # Check if includeIf exists
+  local include_if_count
+  include_if_count=$(yq -r '.spec.includeIf | length' "$file")
+
+  # If no includeIf conditions, include by default
+  if [[ "$include_if_count" == "null" || "$include_if_count" -eq 0 ]]; then
+    echo 1
+    return
+  fi
+
+  # Check each includeIf condition
+  for ((i=0; i<include_if_count; i++)); do
+    # Safely read ancestor and reason fields - they may not exist
+    local ancestor reason
+    ancestor=$(yq -r ".spec.includeIf[$i].ancestor // \"\"" "$file")
+    reason=$(yq -r ".spec.includeIf[$i].reason // \"\"" "$file")
+
+    # Skip this item if it doesn't have ancestor field (not an ancestor-based inclusion)
+    if [[ -z "$ancestor" || "$ancestor" == "null" ]]; then
+      echo "⚠️  Skipping includeIf[$i] for $job_name: no 'ancestor' field found (possibly different inclusion type)" >&2
+      continue
+    fi
+
+    echo "Evaluating includeIf[$i]: ancestor=$ancestor, reason=$reason, closest_ancestor=$closest_ancestor" >&2
+
+    # Case-insensitive comparison
+    local ancestor_lower closest_ancestor_lower
+    ancestor_lower=$(echo "$ancestor" | tr '[:upper:]' '[:lower:]')
+    closest_ancestor_lower=$(echo "$closest_ancestor" | tr '[:upper:]' '[:lower:]')
+
+    if [[ "$ancestor_lower" == "$closest_ancestor_lower" ]]; then
+      if [[ -n "$reason" && "$reason" != "null" ]]; then
+        echo "✅ $job_name included based on includeIf condition: $reason" >&2
+      else
+        echo "✅ $job_name included based on includeIf condition (ancestor: $ancestor)" >&2
+      fi
+      echo 1
+      return
+    fi
+  done
+
+  # If we have includeIf conditions but none matched, exclude the job
+  echo "❌🚫 $job_name excluded: none of the includeIf conditions matched" >&2
+  echo 0
 }
 
 select_job() {
@@ -199,6 +342,11 @@ select_job() {
   fi
 }
 
+
+# Find the closest ancestor branch
+# which will be used for excludeIf evaluations
+closest_ancestor=$(find_closest_ancestor)
+
 find "$JOBS" -type f -name "*.yml" | while read -r file; do
   tags=$(yq .spec.tags "$file")
   scope=$(yq .spec.scope "$file")
@@ -221,6 +369,18 @@ find "$JOBS" -type f -name "*.yml" | while read -r file; do
 
   if [[ $job_selected -ne 1 ]]; then
     echo "🧹🚫 $job_name rejected job as it does not fall into dirty when: $file" >&2
+    continue
+  fi
+
+  is_excluded=$(check_exclude_if "$file" "$job_name" "$closest_ancestor")
+
+  if [[ $is_excluded -eq 1 ]]; then
+    continue
+  fi
+
+  is_included=$(check_include_if "$file" "$job_name" "$closest_ancestor")
+
+  if [[ $is_included -ne 1 ]]; then
     continue
   fi
 
