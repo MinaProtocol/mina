@@ -260,6 +260,9 @@ val all_work_pairs :
      list
      Or_error.t
 
+val hash_by_reading_all_proofs_from_disk_incrementally :
+  t -> Staged_ledger_hash.Aux_hash.t
+
 val write_all_proofs_to_disk :
      signature_kind:Mina_signature_kind.t
   -> proof_cache_db:Proof_cache_tag.cache_db

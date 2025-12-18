@@ -214,6 +214,9 @@ module Stable = struct
 
     let to_latest = Fn.id
 
+    (* NOTE: This must be kept in sync with
+       [hash_by_reading_all_proofs_from_disk_incrementally] below!
+    *)
     let hash (t : t) =
       let state_hash =
         Parallel_scan.State.hash t.scan_state
@@ -1476,6 +1479,42 @@ let check_required_protocol_states t ~protocol_states =
   in
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc
+
+(* NOTE: This must be kept in sync with [Stable.Latest.hash] above! *)
+let hash_by_reading_all_proofs_from_disk_incrementally (t : t) =
+  let state_hash =
+    Parallel_scan.State.hash t.scan_state
+      (fun (ledger_proof, sok_message) ->
+        let module S = Ledger_proof_with_sok_message.Stable in
+        Binable.to_string (module S.V2)
+        @@ (Ledger_proof.Cached.read_proof_from_disk ledger_proof, sok_message)
+        )
+      (fun transaction_with_witness ->
+        let module S = Transaction_with_witness.Stable in
+        Binable.to_string (module S.V2)
+        @@ Transaction_with_witness.read_all_proofs_from_disk
+             transaction_with_witness )
+  in
+  let ( previous_incomplete_zkapp_updates
+      , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
+    t.previous_incomplete_zkapp_updates
+  in
+  let incomplete_updates =
+    List.fold ~init:(Digestif.SHA256.init ()) previous_incomplete_zkapp_updates
+      ~f:(fun h t ->
+        let module S = Transaction_with_witness.Stable in
+        Digestif.SHA256.feed_string h
+        @@ Binable.to_string (module S.V2)
+        @@ Transaction_with_witness.read_all_proofs_from_disk t )
+    |> Digestif.SHA256.get
+  in
+  let continue_in_next_tree =
+    Digestif.SHA256.digest_string (Bool.to_string continue_in_next_tree)
+  in
+  [ state_hash; incomplete_updates; continue_in_next_tree ]
+  |> List.fold ~init:(Digestif.SHA256.init ()) ~f:(fun h t ->
+         Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string t) )
+  |> Digestif.SHA256.get |> Staged_ledger_hash.Aux_hash.of_sha256
 
 let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
     { Stable.Latest.scan_state = uncached
