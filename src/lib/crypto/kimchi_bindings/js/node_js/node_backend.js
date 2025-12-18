@@ -146,6 +146,14 @@ var plonk_wasm = (function () {
       "fq_oracles_create_no_public",
       "fq_oracles_dummy",
       "fq_oracles_deep_copy",
+    ];
+
+    // These are constructor overrides, meant for full napi classes.
+    // Otherwise, if treated as a normal override, it would return the whole
+    // object itself, not an instance.
+    var ctorOverrides = new Set([
+      "WasmVecVecFp",
+      "WasmVecVecFq",
       "WasmFpOpeningProof",
       "WasmFqOpeningProof",
       "WasmFpLookupCommitments",
@@ -158,14 +166,6 @@ var plonk_wasm = (function () {
       "WasmFqProverCommitments",
       "WasmFpRuntimeTable",
       "WasmFqRuntimeTable",
-    ];
-
-    // These are constructor overrides, meant for full napi classes.
-    // Otherwise, if treated as a normal override, it would return the whole
-    // object itself, not an instance.
-    var ctorOverrides = new Set([
-      "WasmVecVecFp",
-      "WasmVecVecFq",
     ]);
 
     overrides.forEach(function (override) {
