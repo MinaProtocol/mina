@@ -19,11 +19,11 @@
 # will exit with an error if any assertion fails.
 # ------------------------------------------------------------------------------
 
-set -euo pipefail
+set -eux -o pipefail
 
 # Determine the directory of this test script and the session scripts directory
-TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SESSION_SCRIPTS_DIR="$(cd "$TEST_DIR/.." && pwd)"
+TEST_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
+SESSION_SCRIPTS_DIR="$(realpath "$TEST_DIR/..")"
 
 # Log a message with a test prefix
 log() {
@@ -76,7 +76,7 @@ trap cleanup EXIT
 # ------------------------------------------------------------------------------
 log "Creating sample Debian package"
 PKG_DIR="$WORKDIR/sample"
-mkdir -p "$PKG_DIR/DEBIAN" "$PKG_DIR/var/lib/coda" "$PKG_DIR/etc/mina"
+mkdir -p "$PKG_DIR"/{DEBIAN,var/lib/coda,etc/mina}
 
 cat > "$PKG_DIR/DEBIAN/control" <<'EOF'
 Package: mina-devnet
@@ -97,7 +97,7 @@ echo "node-config" > "$PKG_DIR/etc/mina/node.json"
 
 # Build the .deb package
 INPUT_DEB="$WORKDIR/input.deb"
-dpkg-deb --build "$PKG_DIR" "$INPUT_DEB" >/dev/null
+dpkg-deb --build "$PKG_DIR" "$INPUT_DEB"
 
 # ------------------------------------------------------------------------------
 # Open the package into a session directory
@@ -190,8 +190,10 @@ log "Testing deb-session-rename-package.sh"
   "mina-devnet-hardfork"
 
 # Verify the control file was updated
-grep -q '^Package: mina-devnet-hardfork$' "$SESSION_DIR/control/control" \
-  || fail "control file not updated with new package name"
+PACKAGE_NAME=$(awk '/^Package:/ {print $2}' "$SESSION_DIR/control/control")
+if [[ "$PACKAGE_NAME" != "mina-devnet-hardfork" ]]; then
+  fail "control file not updated with new package name (got: $PACKAGE_NAME)"
+fi
 
 # ------------------------------------------------------------------------------
 # Test saving the session back to a .deb and verifying contents
@@ -208,7 +210,7 @@ fi
 # Extract the resulting .deb and verify its contents
 EXTRACT_DIR="$WORKDIR/extracted"
 mkdir -p "$EXTRACT_DIR"
-dpkg-deb -x "$OUTPUT_DEB" "$EXTRACT_DIR" >/dev/null
+dpkg-deb -x "$OUTPUT_DEB" "$EXTRACT_DIR"
 
 assert_file_equals "$EXTRACT_DIR/var/lib/coda/config_1.json" 'replaced'
 assert_file_equals "$EXTRACT_DIR/etc/mina/override.json" '{"inserted":true}'

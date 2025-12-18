@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euox pipefail
+set -eux -o pipefail
 
 # Source common functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,30 +8,34 @@ source "$SCRIPT_DIR/deb-session-common.sh"
 
 usage() {
   cat <<EOF
-Usage: $0 <session-dir> <dest-path> <source-file> [<source-file2> ...]
+Usage: $0 [-d] <session-dir> <dest-path> <source-file> [<source-file2> ...]
 
 Inserts one or more files into the package.
 
+Options:
+  -d, --directory  Treat dest-path as a directory (files keep their names)
+
 Arguments:
   <session-dir>    Session directory created by deb-session-open.sh
-  <dest-path>      Destination path in package (directory or file path)
+  <dest-path>      Destination path in package
   <source-file>    Local file(s) to insert (supports multiple files)
 
 Example:
-  # Insert multiple ledger tarballs into /var/lib/coda/
-  $0 ./my-session /var/lib/coda/ ledger1.tar.gz ledger2.tar.gz
+  # Insert multiple ledger tarballs into /var/lib/coda/ (explicit directory mode)
+  $0 -d ./my-session /var/lib/coda ledger1.tar.gz ledger2.tar.gz
 
   # Insert a single file with specific name
   $0 ./my-session /var/lib/coda/devnet.json ./new_config.json
 
-  # Insert all tarballs from a directory
+  # Insert all tarballs from a directory (trailing / also works)
   $0 ./my-session /var/lib/coda/ ./ledgers/*.tar.gz
 
 Notes:
-  - If dest-path ends with /, it's treated as a directory (files keep their names)
-  - If dest-path doesn't end with /, it's treated as a file (only one source allowed)
+  - Use -d flag to explicitly treat destination as a directory
+  - Without -d: trailing / indicates directory, otherwise file path
+  - For file destination without -d, only one source file allowed
   - Destination directories are created automatically
-  - File permissions are set to 0644
+  - File permissions and attributes are preserved from source
   - Supports glob patterns in source files (e.g., *.tar.gz)
 EOF
 }
@@ -39,6 +43,13 @@ EOF
 if [[ $# -lt 3 ]]; then
   usage
   exit 1
+fi
+
+# Parse optional -d flag
+EXPLICIT_DIR_MODE=false
+if [[ "$1" == "-d" || "$1" == "--directory" ]]; then
+  EXPLICIT_DIR_MODE=true
+  shift
 fi
 
 SESSION_DIR="$1"
@@ -52,13 +63,7 @@ if [[ ! -d "$SESSION_DIR" ]]; then
   exit 1
 fi
 
-SESSION_DIR_ABS=$(readlink -f "$SESSION_DIR")
-
-# Validate session
-validate_session_dir "$SESSION_DIR_ABS"
-
-# Validate destination path for directory traversal
-validate_path_no_traversal "$DEST_PATH" "Destination path"
+SESSION_DIR_ABS=$(realpath "$SESSION_DIR")
 
 # Resolve source files to absolute paths and validate
 SOURCE_FILES_ABS=()
@@ -67,7 +72,7 @@ for file in "${SOURCE_FILES[@]}"; do
     echo "ERROR: Source file not found: $file" >&2
     exit 1
   fi
-  SOURCE_FILES_ABS+=("$(readlink -f "$file")")
+  SOURCE_FILES_ABS+=("$(realpath "$file")")
 done
 
 if [[ ${#SOURCE_FILES_ABS[@]} -eq 0 ]]; then
@@ -77,13 +82,18 @@ fi
 
 # Determine if destination is a directory or file
 DEST_IS_DIR=false
-if [[ "$DEST_PATH" == */ ]]; then
+if [[ "$EXPLICIT_DIR_MODE" == true ]]; then
+  # Explicit -d flag provided
+  DEST_IS_DIR=true
+elif [[ "$DEST_PATH" == */ ]]; then
+  # Trailing slash indicates directory
   DEST_IS_DIR=true
 else
-  # If not ending with /, check if we have only one source file
+  # No directory indicator - treat as file path
+  # If not ending with / and no -d flag, check if we have only one source file
   if [[ ${#SOURCE_FILES_ABS[@]} -ne 1 ]]; then
     echo "ERROR: Destination is a file path but multiple source files provided" >&2
-    echo "HINT: Add trailing / to destination to insert as directory" >&2
+    echo "HINT: Add trailing / to destination or use -d flag to insert as directory" >&2
     exit 1
   fi
 fi
@@ -104,8 +114,8 @@ for SOURCE_FILE in "${SOURCE_FILES_ABS[@]}"; do
   SOURCE_BASENAME=$(basename "$SOURCE_FILE")
 
   if [[ "$DEST_IS_DIR" == true ]]; then
-    # Destination is a directory
-    TARGET_PATH="${DEST_PATH_STRIPPED}${SOURCE_BASENAME}"
+    # Destination is a directory - ensure trailing slash for proper concatenation
+    TARGET_PATH="${DEST_PATH_STRIPPED%/}/${SOURCE_BASENAME}"
   else
     # Destination is a file path
     TARGET_PATH="$DEST_PATH_STRIPPED"
@@ -118,7 +128,7 @@ for SOURCE_FILE in "${SOURCE_FILES_ABS[@]}"; do
   fi
 
   echo "  → Inserting: $(basename "$SOURCE_FILE") -> /$TARGET_PATH"
-  install -m 0644 "$SOURCE_FILE" "$TARGET_PATH"
+  cp -p "$SOURCE_FILE" "$TARGET_PATH"
 
   # Verify insertion
   if [[ ! -f "$TARGET_PATH" ]]; then

@@ -13,7 +13,6 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "scripts/debian/session")
-          , S.exactly "scripts/debian/session/tests/run-deb-session-tests" "sh"
           , S.exactly "buildkite/src/Jobs/Test/DebianModifications" "dhall"
           , S.exactly "buildkite/src/Command/DebianModifications" "dhall"
           ]

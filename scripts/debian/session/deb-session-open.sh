@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-set -euox pipefail
+set -eux -o pipefail
 
 # Source common functions
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 source "$SCRIPT_DIR/deb-session-common.sh"
 
 usage() {
@@ -116,13 +116,11 @@ esac
 # Extract control.tar.* into control/
 mkdir -p control
 echo "Extracting control archive..."
-validate_tar_archive "$CONTROL_TAR"
 tar -xf "$CONTROL_TAR" -C control
 
 # Extract data.tar.* into data/
 mkdir -p data
 echo "Extracting data archive..."
-validate_tar_archive "$DATA_TAR"
 tar -xf "$DATA_TAR" -C data
 
 # Create metadata file

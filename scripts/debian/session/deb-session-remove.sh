@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euox pipefail
+set -eux -o pipefail
 
 # Source common functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -53,12 +53,6 @@ if [[ ! -d "$SESSION_DIR" ]]; then
 fi
 
 SESSION_DIR_ABS=$(readlink -f "$SESSION_DIR")
-
-# Validate session
-validate_session_dir "$SESSION_DIR_ABS"
-
-# Validate path pattern for directory traversal
-validate_path_no_traversal "$PATH_PATTERN" "Path pattern"
 
 # Strip leading slash for path inside data/
 PATH_PATTERN_STRIPPED=$(strip_leading_slash "$PATH_PATTERN")

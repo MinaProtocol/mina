@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euox pipefail
+set -eux -o pipefail
 
 # Source common functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,12 +55,6 @@ if [[ ! -f "$REPLACEMENT" ]]; then
 fi
 
 REPLACEMENT_ABS=$(readlink -f "$REPLACEMENT")
-
-# Validate session
-validate_session_dir "$SESSION_DIR_ABS"
-
-# Validate path for directory traversal
-validate_path_no_traversal "$PKG_PATH" "Package path"
 
 # Strip leading slash for path inside data/
 PKG_PATH_STRIPPED=$(strip_leading_slash "$PKG_PATH")
