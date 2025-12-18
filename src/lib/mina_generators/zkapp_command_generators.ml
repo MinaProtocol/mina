@@ -1957,7 +1957,7 @@ let%test_module _ =
         @@ fun () ->
         let account_state_tbl = Account_id.Table.create () in
         let fee_payer_sk, fee_payer_account =
-          Quickcheck.random_value
+          Quickcheck.random_value ~seed:(`Deterministic "fee_payer")
           @@ Account.gen_with_private_key ~token_id:Token_id.default
                ~balance:(Currency.Balance.of_mina_int_exn 1000)
         in
@@ -1965,9 +1965,9 @@ let%test_module _ =
           ~key:(Account.identifier fee_payer_account)
           ~data:(fee_payer_account, `Fee_payer) ;
 
-        let gen_account _ =
+        let gen_account i =
           let sk, zkapp_account =
-            Quickcheck.random_value
+            Quickcheck.random_value ~seed:(`Deterministic (string_of_int i))
             @@ Account.gen_zkapp_account_with_private_key
                  ~token_id:Token_id.default
                  ~balance:(Currency.Balance.of_mina_int_exn 100)
