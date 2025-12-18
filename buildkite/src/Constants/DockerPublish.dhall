@@ -19,6 +19,7 @@ let isEssential =
             , DaemonAutoHardfork = True
             , DaemonLegacyHardfork = True
             , CreateLegacyGenesis = False
+            , DelegationVerifier = True
             }
             service
 

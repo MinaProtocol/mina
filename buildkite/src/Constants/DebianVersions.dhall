@@ -83,6 +83,9 @@ let minimalDirtyWhen =
       , S.strictlyStart (S.contains "scripts/docker")
       , S.exactly "buildkite/scripts/build-artifact" "sh"
       , S.exactly "buildkite/scripts/version-linter" "sh"
+      , S.strictlyStart (S.contains "buildkite/scripts/tests")
+      , S.strictlyStart (S.contains "scripts/rosetta")
+      , S.exactly "scripts/rosetta/test-block-race" "sh"
       , S.exactly "scripts/version-linter" "py"
       , S.exactly
           "buildkite/scripts/version-linter-patch-missing-type-shapes"

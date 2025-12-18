@@ -226,9 +226,9 @@ let default () = { config = Config.default (); executor = Executor.AutoDetect }
 
 let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
-let start t =
+let start ?hardfork_handling ?block_producer_key t =
   let open Deferred.Let_syntax in
-  let args =
+  let base_args =
     [ "daemon"
     ; "--seed"
     ; "--demo-mode"
@@ -249,7 +249,14 @@ let start t =
     ; Config.libp2p_keypair_folder t.config
     ]
   in
-
+  let opt_arg key value_opt =
+    match value_opt with None -> [] | Some value -> [ key; value ]
+  in
+  let args =
+    base_args
+    @ opt_arg "--hardfork-handling" hardfork_handling
+    @ opt_arg "--block-producer-key" block_producer_key
+  in
   [%log debug] "Starting daemon" ;
 
   let%bind _, process = Executor.run_in_background t.executor ~args () in

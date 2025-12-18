@@ -177,13 +177,6 @@ copy_common_daemon_configs() {
   cp ./default/src/app/cli/src/mina_"${2}"_signatures.exe \
     "${BUILDDIR}/usr/local/bin/mina"
 
-  # Copy over Build Configs (based on $2)
-  mkdir -p "${BUILDDIR}/etc/coda/build_config"
-  # Use parameter expansion to either return "mainnet.mlh" or "devnet.mlh"
-  cp "../src/config/${2//test/dev}.mlh" \
-    "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
-  rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
-
   mkdir -p "${BUILDDIR}/var/lib/coda"
 
   # Include all useful genesis ledgers
@@ -838,6 +831,36 @@ build_zkapp_test_transaction_deb () {
   build_deb mina-zkapp-test-transaction
 }
 ## END ZKAPP TEST TXN PACKAGE ##
+
+#
+# Builds mina-delegation-verify package for delegation verification
+#
+# Output: mina-delegation-verify_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Utility for verifying delegation in Mina GraphQL format.
+#
+build_delegation_verify_deb () {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Berkeley delegation verify tool:"
+
+  create_control_file mina-delegation-verify \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Utility to verify delegation in Mina GraphQL format'
+
+  # Binaries
+  cp ./default/src/app/delegation_verify/delegation_verify.exe \
+    "${BUILDDIR}/usr/local/bin/mina-delegation-verify"
+
+  mkdir -p "${BUILDDIR}/etc/mina/aws"
+
+  cp ./../src/app/delegation_verify/scripts/authenticate.sh \
+    "${BUILDDIR}/etc/mina/aws/authenticate.sh"
+
+  build_deb mina-delegation-verify
+}
+## END DELEGATION VERIFY PACKAGE ##
+
 
 ## CREATE LEGACY GENESIS PACKAGE ##
 

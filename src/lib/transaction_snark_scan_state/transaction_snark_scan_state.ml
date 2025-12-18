@@ -273,8 +273,8 @@ let create_expected_statement ~constraint_constants
     Frozen_ledger_hash.of_ledger_hash
     @@ Sparse_ledger.merkle_root second_pass_ledger_witness
   in
-  let { With_status.data = transaction; status = _ } =
-    Ledger.transaction_of_applied transaction_with_info
+  let transaction =
+    Mina_transaction_logic.Transaction_applied.transaction transaction_with_info
   in
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
@@ -735,13 +735,13 @@ module Transactions_ordered = struct
                      (txn_with_witness : Transaction_with_witness.t)
                    ->
                   let txn =
-                    Ledger.transaction_of_applied
+                    Mina_transaction_logic.Transaction_applied.transaction
                       txn_with_witness.transaction_with_info
                   in
                   let target_first_pass_ledger =
                     txn_with_witness.statement.target.first_pass_ledger
                   in
-                  match txn.data with
+                  match txn with
                   | Transaction.Coinbase _
                   | Fee_transfer _
                   | Command (User_command.Signed_command _) ->
@@ -804,13 +804,20 @@ end
 let extract_txn_and_global_slot (txn_with_witness : Transaction_with_witness.t)
     =
   let txn =
-    Ledger.transaction_of_applied txn_with_witness.transaction_with_info
+    Mina_transaction_logic.Transaction_applied.transaction_with_status
+      txn_with_witness.transaction_with_info
   in
   let state_hash = fst txn_with_witness.state_hash in
   let global_slot = txn_with_witness.block_global_slot in
   (txn, state_hash, global_slot)
 
-let latest_ledger_proof' t =
+let latest_ledger_proof t =
+  let%map.Option (proof, _), _ =
+    Parallel_scan.last_emitted_value t.scan_state
+  in
+  proof
+
+let latest_ledger_proof_and_txs' t =
   let open Option.Let_syntax in
   let%map proof, txns_with_witnesses =
     Parallel_scan.last_emitted_value t.scan_state
@@ -839,15 +846,13 @@ let latest_ledger_proof' t =
   in
   (proof, txns)
 
-let latest_ledger_proof t =
-  Option.map (latest_ledger_proof' t) ~f:(fun (p, txns) ->
-      ( p
-      , List.map txns
-          ~f:(Transactions_ordered.map ~f:extract_txn_and_global_slot) ) )
+let latest_ledger_proof_txs t =
+  Option.map (latest_ledger_proof_and_txs' t) ~f:(fun (_, txns) ->
+      List.map txns ~f:(Transactions_ordered.map ~f:extract_txn_and_global_slot) )
 
 let incomplete_txns_from_recent_proof_tree t =
   let open Option.Let_syntax in
-  let%map proof, txns_per_block = latest_ledger_proof' t in
+  let%map proof, txns_per_block = latest_ledger_proof_and_txs' t in
   let txns =
     match List.last txns_per_block with
     | None ->
@@ -1076,8 +1081,8 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
           Previous_incomplete_txns.Unapplied
             (List.filter txns ~f:(fun txn ->
                  match
-                   (Ledger.transaction_of_applied txn.transaction_with_info)
-                     .data
+                   Mina_transaction_logic.Transaction_applied.transaction
+                     txn.transaction_with_info
                  with
                  | Command (Zkapp_command _) ->
                      true
@@ -1189,7 +1194,7 @@ let apply_ordered_txns_async ?stop_at_first_pass ordered_txns
 
 let get_snarked_ledger_sync ~ledger ~get_protocol_state ~apply_first_pass
     ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind t =
-  match latest_ledger_proof' t with
+  match latest_ledger_proof_and_txs' t with
   | None ->
       Or_error.errorf "No transactions found"
   | Some (_, txns_per_block) ->
@@ -1201,7 +1206,7 @@ let get_snarked_ledger_sync ~ledger ~get_protocol_state ~apply_first_pass
 let get_snarked_ledger_async ?async_batch_size ~ledger ~get_protocol_state
     ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger
     ~signature_kind t =
-  match latest_ledger_proof' t with
+  match latest_ledger_proof_and_txs' t with
   | None ->
       Deferred.Or_error.errorf "No transactions found"
   | Some (_, txns_per_block) ->
@@ -1241,20 +1246,6 @@ let partition_if_overflowing t =
       Option.map second ~f:(fun (slots, job_count) ->
           (slots, bundle_count job_count) )
   }
-
-let extract_from_job (job : job) =
-  match job with
-  | Parallel_scan.Available_job.Base d ->
-      First
-        ( d.transaction_with_info
-        , d.statement
-        , d.state_hash
-        , d.first_pass_ledger_witness
-        , d.second_pass_ledger_witness
-        , d.init_stack
-        , d.block_global_slot )
-  | Merge ((p1, _), (p2, _)) ->
-      Second (p1, p2)
 
 let snark_job_list_json t =
   let all_jobs : Job_view.t list list =
@@ -1302,70 +1293,67 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
              | Some stmt ->
                  stmt ) ) )
 
+let single_spec_of_job ~get_state :
+    job -> Snark_work_lib.Spec.Single.t Or_error.t = function
+  | Parallel_scan.Available_job.Base
+      { transaction_with_info
+      ; statement
+      ; state_hash
+      ; first_pass_ledger_witness
+      ; second_pass_ledger_witness
+      ; init_stack
+      ; block_global_slot
+      } ->
+      let%map.Or_error witness =
+        let { With_status.data = transaction; status } =
+          Mina_transaction_logic.Transaction_applied.transaction_with_status
+            transaction_with_info
+        in
+        let%bind.Or_error protocol_state_body =
+          get_state (fst state_hash)
+          |> Or_error.map ~f:Mina_state.Protocol_state.body
+        in
+        let%map.Or_error init_stack =
+          match init_stack with
+          | Base x ->
+              Ok x
+          | Merge ->
+              Or_error.error_string "init_stack was Merge"
+        in
+        { Transaction_witness.first_pass_ledger = first_pass_ledger_witness
+        ; second_pass_ledger = second_pass_ledger_witness
+        ; transaction
+        ; protocol_state_body
+        ; init_stack
+        ; status
+        ; block_global_slot
+        }
+      in
+      Snark_work_lib.Work.Single.Spec.Transition (statement, witness)
+  | Merge ((p1, _), (p2, _)) ->
+      let%map.Or_error merged =
+        Transaction_snark.Statement.merge
+          (Ledger_proof.Cached.statement p1)
+          (Ledger_proof.Cached.statement p2)
+      in
+      Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
+
+let single_spec_one_or_twos_rev_of_job_list ~get_state jobs =
+  List.fold_result ~init:[] (One_or_two.group_list jobs) ~f:(fun acc' pair ->
+      let%map.Or_error spec =
+        One_or_two.Or_error.map ~f:(single_spec_of_job ~get_state) pair
+      in
+      spec :: acc' )
+
 let all_work_pairs t
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
-    ( Transaction_witness.t
-    , Ledger_proof.Cached.t )
-    Snark_work_lib.Work.Single.Spec.t
-    One_or_two.t
-    list
-    Or_error.t =
+    Snark_work_lib.Spec.Single.t One_or_two.t list Or_error.t =
   let all_jobs = all_jobs t in
-  let module A = Available_job in
-  let open Or_error.Let_syntax in
-  let single_spec (job : job) =
-    match extract_from_job job with
-    | First
-        ( transaction_with_info
-        , statement
-        , state_hash
-        , first_pass_ledger_witness
-        , second_pass_ledger_witness
-        , init_stack
-        , block_global_slot ) ->
-        let%map witness =
-          let { With_status.data = transaction; status } =
-            Mina_transaction_logic.Transaction_applied.transaction_with_status
-              transaction_with_info
-          in
-          let%bind protocol_state_body =
-            let%map state = get_state (fst state_hash) in
-            Mina_state.Protocol_state.body state
-          in
-          let%map init_stack =
-            match init_stack with
-            | Base x ->
-                Ok x
-            | Merge ->
-                Or_error.error_string "init_stack was Merge"
-          in
-          { Transaction_witness.first_pass_ledger = first_pass_ledger_witness
-          ; second_pass_ledger = second_pass_ledger_witness
-          ; transaction
-          ; protocol_state_body
-          ; init_stack
-          ; status
-          ; block_global_slot
-          }
-        in
-        Snark_work_lib.Work.Single.Spec.Transition (statement, witness)
-    | Second (p1, p2) ->
-        let%map merged =
-          Transaction_snark.Statement.merge
-            (Ledger_proof.Cached.statement p1)
-            (Ledger_proof.Cached.statement p2)
-        in
-        Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
-  in
   List.fold_until all_jobs ~init:[]
     ~finish:(fun lst -> Ok lst)
     ~f:(fun acc jobs ->
-      let specs_list : 'a One_or_two.t list Or_error.t =
-        List.fold ~init:(Ok []) (One_or_two.group_list jobs)
-          ~f:(fun acc' pair ->
-            let%bind acc' = acc' in
-            let%map spec = One_or_two.Or_error.map ~f:single_spec pair in
-            spec :: acc' )
+      let specs_list =
+        single_spec_one_or_twos_rev_of_job_list ~get_state jobs
       in
       match specs_list with
       | Ok list ->
@@ -1443,10 +1431,7 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
               value_exn is safe here
               [latest_ledger_proof] generates ordered transactions
               appropriately*)
-            let (proof, _), txns =
-              Option.value_exn (latest_ledger_proof scan_state')
-            in
-            Ok (Some (proof, txns), scan_state')
+            Ok (latest_ledger_proof scan_state', scan_state')
         | Error e ->
             Or_error.errorf
               "The new final statement does not connect to the previous \

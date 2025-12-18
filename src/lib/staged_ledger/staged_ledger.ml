@@ -242,8 +242,8 @@ module T = struct
     }
 
   let proof_txns_with_state_hashes t =
-    Scan_state.latest_ledger_proof t.scan_state
-    |> Option.bind ~f:(Fn.compose Mina_stdlib.Nonempty_list.of_list_opt snd)
+    Scan_state.latest_ledger_proof_txs t.scan_state
+    |> Option.bind ~f:Mina_stdlib.Nonempty_list.of_list_opt
 
   let scan_state { scan_state; _ } = scan_state
 
@@ -273,17 +273,12 @@ module T = struct
     in
     let statement_check = `Partial in
     let last_proof_statement =
-      Option.map
-        ~f:(fun ((p, _), _) -> Ledger_proof.Cached.statement p)
+      Option.map ~f:Ledger_proof.Cached.statement
         (Scan_state.latest_ledger_proof scan_state)
     in
     Statement_scanner.check_invariants ~constraint_constants scan_state
       ~statement_check ~verifier:() ~error_prefix ~registers_end
       ~last_proof_statement
-
-  let of_scan_state_and_ledger_unchecked ~ledger ~scan_state
-      ~constraint_constants ~pending_coinbase_collection =
-    { ledger; scan_state; constraint_constants; pending_coinbase_collection }
 
   let of_scan_state_and_ledger ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -291,8 +286,7 @@ module T = struct
       ~pending_coinbase_collection ~get_state ~first_pass_ledger_target =
     let open Deferred.Or_error.Let_syntax in
     let t =
-      of_scan_state_and_ledger_unchecked ~ledger ~scan_state
-        ~constraint_constants ~pending_coinbase_collection
+      { ledger; scan_state; constraint_constants; pending_coinbase_collection }
     in
     let%bind pending_coinbase_stack =
       Pending_coinbase.latest_stack ~is_new_stack:false
@@ -320,6 +314,7 @@ module T = struct
       ~last_proof_statement ~ledger ~scan_state ~pending_coinbase_collection
       ~first_pass_ledger_target =
     let open Deferred.Or_error.Let_syntax in
+    (* TODO consider removing the invariants check *)
     let%bind pending_coinbase_stack =
       Pending_coinbase.latest_stack ~is_new_stack:false
         pending_coinbase_collection
@@ -378,12 +373,15 @@ module T = struct
     in
     let last_proof_statement =
       Scan_state.latest_ledger_proof scan_state
-      |> Option.map ~f:(fun ((p, _), _) -> Ledger_proof.Cached.statement p)
+      |> Option.map ~f:Ledger_proof.Cached.statement
     in
     f ~constraint_constants ~last_proof_statement ~ledger:snarked_ledger
       ~scan_state ~pending_coinbase_collection:pending_coinbases
       ~first_pass_ledger_target
 
+  (* Used in bootstrap (to verify data received from network)
+     Consider changing types to work on stable scan state
+  *)
   let of_scan_state_pending_coinbases_and_snarked_ledger ~logger
       ~constraint_constants ~verifier ~scan_state ~snarked_ledger
       ~snarked_local_state ~expected_merkle_root ~pending_coinbases ~get_state
@@ -393,6 +391,7 @@ module T = struct
       ~expected_merkle_root ~get_state ~signature_kind
       (of_scan_state_and_ledger ~logger ~get_state ~verifier)
 
+  (* Used in loading the root from disk *)
   let of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
       ~constraint_constants ~logger ~scan_state ~snarked_ledger
       ~snarked_local_state ~expected_merkle_root ~pending_coinbases ~get_state
@@ -434,11 +433,6 @@ module T = struct
           ~depth:constraint_constants.pending_coinbase_depth ()
         |> Or_error.ok_exn
     }
-
-  let current_ledger_proof t =
-    Option.map
-      (Scan_state.latest_ledger_proof t.scan_state)
-      ~f:(Fn.compose fst fst)
 
   let replace_ledger_exn t ledger =
     [%test_result: Ledger_hash.t]
@@ -565,7 +559,7 @@ module T = struct
       else
         let txn_with_expected_status =
           { With_status.data =
-              With_status.data (Ledger.transaction_of_applied applied_txn)
+              Mina_transaction_logic.Transaction_applied.transaction applied_txn
           ; status = pre_stmt.expected_status
           }
         in
@@ -593,14 +587,15 @@ module T = struct
       ; sok_digest = ()
       }
     in
-    { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn
-    ; state_hash = state_and_body_hash
-    ; first_pass_ledger_witness = pre_stmt.first_pass_ledger_witness
-    ; second_pass_ledger_witness = ledger_witness
-    ; init_stack = pre_stmt.init_stack
-    ; statement
-    ; block_global_slot = global_slot
-    }
+    ( { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn
+      ; state_hash = state_and_body_hash
+      ; first_pass_ledger_witness = pre_stmt.first_pass_ledger_witness
+      ; second_pass_ledger_witness = ledger_witness
+      ; init_stack = pre_stmt.init_stack
+      ; statement
+      ; block_global_slot = global_slot
+      }
+    , Mina_transaction_logic.Transaction_applied.new_accounts applied_txn )
 
   let apply_transactions_first_pass ~yield ~constraint_constants ~global_slot
       ~signature_kind ledger init_pending_coinbase_stack_state ts
@@ -780,7 +775,11 @@ module T = struct
       List.fold_right ~init:(Ok []) data
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
           let%map.Or_error acc = acc in
-          let t = d.transaction_with_info |> Ledger.transaction_of_applied in
+          let t =
+            d.transaction_with_info
+            |> Mina_transaction_logic.Transaction_applied
+               .transaction_with_status
+          in
           t :: acc )
     in
     let total_fee_excess txns =
@@ -946,7 +945,7 @@ module T = struct
     (* Deleting oldest stack if proof emitted *)
     let%bind pending_coinbase_collection_updated1 =
       match ledger_proof with
-      | Some (proof, _) ->
+      | Some proof ->
           let%bind oldest_stack, pending_coinbase_collection_updated1 =
             Pending_coinbase.remove_coinbase_stack ~depth
               pending_coinbase_collection
@@ -1066,6 +1065,8 @@ module T = struct
             t.pending_coinbase_collection transactions current_state_view
             state_and_body_hash )
     in
+    let witnesses = List.map data ~f:fst in
+    let accounts_created = List.concat_map data ~f:snd in
     let slots = List.length data in
     let work_count = List.length works in
     let required_pairs = Scan_state.work_statements_for_new_diff t.scan_state in
@@ -1093,18 +1094,20 @@ module T = struct
           else Deferred.Result.return () )
     in
     [%log internal] "Check_zero_fee_excess" ;
-    let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
+    let%bind () =
+      Deferred.return (check_zero_fee_excess t.scan_state witnesses)
+    in
     [%log internal] "Fill_work_and_enqueue_transactions" ;
     let%bind res_opt, scan_state' =
       O1trace.thread "fill_work_and_enqueue_transactions" (fun () ->
           let r =
             Scan_state.fill_work_and_enqueue_transactions t.scan_state ~logger
-              data works
+              witnesses works
           in
           Or_error.iter_error r ~f:(fun e ->
               let data_json =
                 `List
-                  (List.map data
+                  (List.map witnesses
                      ~f:(fun
                           { Scan_state.Transaction_with_witness.statement; _ }
                         -> Transaction_snark.Statement.to_yojson statement ) )
@@ -1179,6 +1182,7 @@ module T = struct
     in
     ( `Ledger_proof res_opt
     , `Staged_ledger new_staged_ledger
+    , `Accounts_created accounts_created
     , `Pending_coinbase_update
         ( is_new_stack
         , { Pending_coinbase.Update.Poly.action = stack_update_in_snark
@@ -1245,7 +1249,7 @@ module T = struct
     in
     let apply_diff_start_time = Core.Time.now () in
     [%log internal] "Apply_diff" ;
-    let%map ((_, `Staged_ledger new_staged_ledger, _) as res) =
+    let%map ((_, `Staged_ledger new_staged_ledger, _, _) as res) =
       apply_diff
         ~skip_verification:
           ([%equal: [ `All | `Proofs ] option] skip_verification (Some `All))
@@ -2259,48 +2263,6 @@ module T = struct
                   ] ;
             ( { Staged_ledger_diff.With_valid_signatures_and_proofs.diff }
             , invalid_on_this_ledger ) ) )
-
-  let latest_block_accounts_created t ~previous_block_state_hash =
-    let scan_state = scan_state t in
-    (* filter leaves by state hash from previous block *)
-    let block_transactions_applied =
-      let f
-          ({ state_hash = leaf_block_hash, _; transaction_with_info; _ } :
-            Scan_state.Transaction_with_witness.t ) =
-        if State_hash.equal leaf_block_hash previous_block_state_hash then
-          Some transaction_with_info.varying
-        else None
-      in
-      List.filter_map (Scan_state.base_jobs_on_latest_tree scan_state) ~f
-      @ List.filter_map
-          (Scan_state.base_jobs_on_earlier_tree ~index:0 scan_state)
-          ~f
-    in
-    List.map block_transactions_applied ~f:(function
-      | Command (Signed_command cmd) -> (
-          match cmd.body with
-          | Payment { new_accounts } ->
-              new_accounts
-          | Stake_delegation _ ->
-              []
-          | Failed ->
-              [] )
-      | Command (Zkapp_command { new_accounts; _ }) ->
-          new_accounts
-      | Fee_transfer { new_accounts; _ } ->
-          new_accounts
-      | Coinbase { new_accounts; _ } ->
-          new_accounts )
-    |> List.concat
-
-  let convert_and_apply_all_masks_to_ledger ~hardfork_db ({ ledger; _ } : t) =
-    let accounts =
-      Ledger.all_accounts_on_masks ledger
-      |> Map.to_alist
-      |> List.map ~f:(fun (loc, account) ->
-             (loc, Account.Hardfork.of_stable account) )
-    in
-    Ledger.Hardfork_db.set_batch hardfork_db accounts
 end
 
 include T
@@ -2444,6 +2406,7 @@ let%test_module "staged ledger tests" =
       let diff' = Staged_ledger_diff.forget diff in
       let%map ( `Ledger_proof ledger_proof
               , `Staged_ledger sl'
+              , `Accounts_created _
               , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
           Sl.apply ~constraint_constants ~global_slot !sl diff' ~logger
@@ -2687,17 +2650,10 @@ let%test_module "staged ledger tests" =
       |> Sequence.to_list
 
     (* Fee excess at top level ledger proofs should always be zero *)
-    let assert_fee_excess :
-           ( Ledger_proof.Cached.t
-           * (Transaction.t With_status.t * _ * _)
-             Sl.Scan_state.Transactions_ordered.Poly.t
-             list )
-           option
-        -> unit =
+    let assert_fee_excess : Ledger_proof.Cached.t option -> unit =
      fun proof_opt ->
       let fee_excess =
-        Option.value_map ~default:Fee_excess.zero proof_opt
-          ~f:(fun (proof, _txns) ->
+        Option.value_map ~default:Fee_excess.zero proof_opt ~f:(fun proof ->
             (Ledger_proof.Cached.statement proof).fee_excess )
       in
       assert (Fee_excess.is_zero fee_excess)
@@ -2825,7 +2781,7 @@ let%test_module "staged ledger tests" =
               in
               let%bind () =
                 match proof_opt with
-                | Some (proof, _transactions) ->
+                | Some proof ->
                     (*update snarked ledger with the transactions in the most recently emitted proof*)
                     let%map res =
                       Sl.Scan_state.get_snarked_ledger_async
@@ -3430,6 +3386,7 @@ let%test_module "staged ledger tests" =
                       | Ok
                           ( `Ledger_proof _ledger_proof
                           , `Staged_ledger sl'
+                          , `Accounts_created _
                           , `Pending_coinbase_update _ ) ->
                           sl := sl' ;
                           (false, diff)

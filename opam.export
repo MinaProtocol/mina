@@ -31,7 +31,6 @@ roots: [
   "ppx_bitstring.4.1.0"
   "ppx_deriving.5.2.1"
   "ppx_deriving_yojson.3.6.1"
-  "ppx_optcomp.v0.14.3"
   "prometheus.1.1"
   "qcheck.0.20"
   "qcheck-alcotest.0.20"

@@ -3,7 +3,7 @@
 /dockerfiles/ @MinaProtocol/infra-eng-reviewers
 /scripts/ @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
 /Makefile @MinaProtocol/infra-eng-reviewers
-/src/config/dev.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
+/src/lib/node_config/profiled/ @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
 /CODE_OF_CONDUCT.md @deepthiskumar
 /CONTRIBUTING.md @MinaProtocol/product-eng-reviewers
 /LICENSE @deepthiskumar
