@@ -238,6 +238,8 @@ val unsingleton : ('a, Nat.z Nat.s) t -> 'a
 
 val trim : 'a 'n 'm. ('a, 'm) vec -> ('n, 'm) Nat.Lte.t -> ('a, 'n) vec
 
+(** [trim_assert] is like trim except it runs assertion on all the vector 
+    elements that's trimed *)
 val trim_assert :
   'a 'n 'm. ('a, 'm) vec -> ('n, 'm) Nat.Lte.t -> f:('a -> bool) -> ('a, 'n) vec
 
