@@ -13,7 +13,7 @@ let
       rustc = rustWithTargetPlatforms;
     };
   toolchainHashes = {
-    "1.92.0" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    "1.92.0" = "sha256-sqSWJDUxc+zaz1nBWMAJKTAGBuGWP25GCftIOlCEAtA=";
     "nightly-2024-09-05" =
       "sha256-3aoA7PuH09g8F+60uTUQhnHrb/ARDLueSOD08ZVsWe0=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
