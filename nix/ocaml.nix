@@ -35,6 +35,7 @@ let
     ppx_yojson_conv_lib = "v0.15.0";
     stdune = "3.5.0";
     xdg = dune;
+    memtrace = "0.2.3";
   };
 
   implicit-deps-overlay = self: super:
