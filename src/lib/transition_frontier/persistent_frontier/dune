@@ -38,7 +38,6 @@
   genesis_constants
   verifier
   with_hash
-  debug_assert
   ppx_version.runtime
   pickles.backend
   snark_params

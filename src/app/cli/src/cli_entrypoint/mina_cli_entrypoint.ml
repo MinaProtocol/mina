@@ -50,7 +50,8 @@ let plugin_flag =
   else Command.Param.return []
 
 let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
-    ~genesis_dir ~cli_proof_level ~proof_level config_files =
+    ~genesis_dir ~cli_proof_level ~proof_level ~genesis_backing_type
+    config_files =
   let%bind config_jsons =
     let config_files_paths =
       List.map config_files ~f:(fun (config_file, _) -> `String config_file)
@@ -101,7 +102,8 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
   let%bind precomputed_values =
     match%map
       Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
-        ~logger ~genesis_constants ~constraint_constants ~proof_level config
+        ~logger ~genesis_constants ~constraint_constants ~proof_level
+        ~genesis_backing_type config
     with
     | Ok (precomputed_values, _) ->
         precomputed_values
@@ -566,6 +568,20 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         "true|false Whether to send the commit SHA used to build the node to \
          the uptime service. (default: false)"
       no_arg
+  and hardfork_mode =
+    (*
+      There's 2 hardfork mode, namely Legacy and Auto. Reference:
+        - https://www.notion.so/o1labs/HF-Mina-node-changes-specification-216e79b1f910805d9865e44f2f4baf0e 
+        - https://www.notion.so/o1labs/V2-MIP-draft-HF-automation-250e79b1f9108010b0c5f2b1f416640b
+        *)
+    flag "--hardfork-mode" ~aliases:[ "hardfork-mode" ]
+      ~doc:
+        "auto|legacy Mode of hardfork. Under auto mode, the daemon would back \
+         all ledgers that are needed for post-hardfork node to bootstrap with \
+         2 databases, one for before, and one for after the hardfork. Under \
+         legacy mode, all databased backed ledgers are backed by one database. \
+         THIS FLAG IS INTERNAL USE ONLY AND WOULD BE REMOVED WITHOUT NOTICE"
+      (optional_with_default Hardfork_mode.Legacy Hardfork_mode.arg)
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -725,9 +741,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         in
         Parallel.init_master () ;
         let monitor = Async.Monitor.create ~name:"coda" () in
-        let time_controller =
-          Block_time.Controller.create @@ Block_time.Controller.basic ~logger
-        in
+        let time_controller = Block_time.Controller.basic ~logger in
         let pids = Child_processes.Termination.create_pid_table () in
         let mina_initialization_deferred () =
           let config_file_installed =
@@ -776,10 +790,14 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Genesis_constants.Compiled.constraint_constants
           in
           let compile_config = Mina_compile_config.Compiled.t in
+          let ledger_backing_type =
+            Mina_lib.Config.ledger_backing ~hardfork_mode
+          in
           let%bind precomputed_values, config_jsons, config =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
+              ~genesis_backing_type:ledger_backing_type
           in
 
           constraint_constants.block_window_duration_ms |> Float.of_int
@@ -1144,8 +1162,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let consensus_local_state =
             Consensus.Data.Local_state.create
               ~context:(module Context)
-              ~genesis_ledger:
-                (Precomputed_values.genesis_ledger precomputed_values)
+              ~genesis_ledger:precomputed_values.genesis_ledger
               ~genesis_epoch_data:precomputed_values.genesis_epoch_data
               ~epoch_ledger_location
               ( Option.map block_production_keypair ~f:(fun keypair ->
@@ -1154,6 +1171,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               |> Option.to_list |> Public_key.Compressed.Set.of_list )
               ~genesis_state_hash:
                 precomputed_values.protocol_state_with_hashes.hash.state_hash
+              ~epoch_ledger_backing_type:ledger_backing_type
           in
           trace_database_initialization "epoch ledger" __LOC__
             epoch_ledger_location ;
@@ -1405,7 +1423,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~uptime_send_node_commit ~stop_time ~node_status_url
                  ~graphql_control_port:itn_graphql_port ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
-                 ~itn_features ~compile_config () )
+                 ~itn_features ~compile_config ~hardfork_mode () )
           in
           { mina
           ; client_trustlist
@@ -1689,7 +1707,8 @@ let internal_commands logger ~itn_features =
   [ ( Snark_worker.Intf.command_name
     , Snark_worker.command ~proof_level:Genesis_constants.Compiled.proof_level
         ~constraint_constants:Genesis_constants.Compiled.constraint_constants
-        ~commit_id:Mina_version.commit_id )
+        ~commit_id:Mina_version.commit_id
+        ~signature_kind:Mina_signature_kind.t_DEPRECATED )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
     , Command.async
@@ -1708,7 +1727,8 @@ let internal_commands logger ~itn_features =
                  let%bind prover =
                    Prover.create ~commit_id:Mina_version.commit_id ~logger
                      ~proof_level ~constraint_constants
-                     ~pids:(Pid.Table.create ()) ~conf_dir ()
+                     ~pids:(Pid.Table.create ()) ~conf_dir
+                     ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
@@ -1957,8 +1977,8 @@ let internal_commands logger ~itn_features =
           in
           let%bind precomputed_values, _config_jsons, _config =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
-              ~constraint_constants ~proof_level config_files
-              ~cli_proof_level:None
+              ~constraint_constants ~proof_level ~cli_proof_level:None
+              ~genesis_backing_type:Stable_db config_files
           in
           let pids = Child_processes.Termination.create_pid_table () in
           let%bind prover =
@@ -1967,7 +1987,8 @@ let internal_commands logger ~itn_features =
             *)
             Prover.create ~commit_id:Mina_version.commit_id ~logger ~pids
               ~conf_dir ~proof_level
-              ~constraint_constants:precomputed_values.constraint_constants ()
+              ~constraint_constants:precomputed_values.constraint_constants
+              ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
           in
           match%bind
             Prover.create_genesis_block prover

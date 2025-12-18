@@ -22,7 +22,6 @@
   block_time
   currency
   data_hash_lib
-  debug_assert
   genesis_constants
   kimchi_bindings
   kimchi_types

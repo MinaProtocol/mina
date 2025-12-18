@@ -17,11 +17,13 @@ in  Pipeline.build
             , Artifacts.Type.TestExecutive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
+            , Artifacts.Type.CreateLegacyGenesis
             ]
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
+            , PipelineTag.Type.Rosetta
             ]
           }
       )

@@ -680,4 +680,6 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
     merkle_path_at_addr_exn t addr
+
+  let all_accounts_on_masks _ = Location.Map.empty
 end

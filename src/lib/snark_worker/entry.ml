@@ -1,6 +1,5 @@
 open Core
 open Async
-open Events
 open Snark_work_lib
 
 let command_name = "snark-worker"
@@ -37,81 +36,9 @@ let dispatch rpc shutdown_on_disconnect query address =
   | Ok res ->
       res
 
-let emit_proof_metrics metrics instances logger =
-  One_or_two.iter (One_or_two.zip_exn metrics instances)
-    ~f:(fun ((time, tag), single) ->
-      match tag with
-      | `Merge ->
-          Mina_metrics.(
-            Cryptography.Snark_work_histogram.observe
-              Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
-          [%str_log info] (Merge_snark_generated { time })
-      | `Transition ->
-          let transaction_type, zkapp_command_count, proof_zkapp_command_count =
-            (*should be Some in the case of `Transition*)
-            match Option.value_exn single with
-            | Mina_transaction.Transaction.Command
-                (Mina_base.User_command.Zkapp_command zkapp_command) ->
-                let init =
-                  match
-                    (Mina_base.Account_update.of_fee_payer
-                       zkapp_command.Mina_base.Zkapp_command.Poly.fee_payer )
-                      .authorization
-                  with
-                  | Proof _ ->
-                      (1, 1)
-                  | _ ->
-                      (1, 0)
-                in
-                let c, p =
-                  Mina_base.Zkapp_command.Call_forest.fold
-                    zkapp_command.account_updates ~init
-                    ~f:(fun (count, proof_updates_count) account_update ->
-                      ( count + 1
-                      , if
-                          Mina_base.Control.(
-                            Tag.equal Proof
-                              (tag
-                                 account_update
-                                   .Mina_base.Account_update.Poly.authorization ))
-                        then proof_updates_count + 1
-                        else proof_updates_count ) )
-                in
-                Mina_metrics.(
-                  Cryptography.(
-                    Counter.inc snark_work_zkapp_base_time_sec
-                      (Time.Span.to_sec time) ;
-                    Counter.inc_one snark_work_zkapp_base_submissions ;
-                    Counter.inc zkapp_transaction_length (Float.of_int c) ;
-                    Counter.inc zkapp_proof_updates (Float.of_int p))) ;
-                ("zkapp_command", c, p)
-            | Command (Signed_command _) ->
-                Mina_metrics.(
-                  Counter.inc Cryptography.snark_work_base_time_sec
-                    (Time.Span.to_sec time)) ;
-                ("signed command", 1, 0)
-            | Coinbase _ ->
-                Mina_metrics.(
-                  Counter.inc Cryptography.snark_work_base_time_sec
-                    (Time.Span.to_sec time)) ;
-                ("coinbase", 1, 0)
-            | Fee_transfer _ ->
-                Mina_metrics.(
-                  Counter.inc Cryptography.snark_work_base_time_sec
-                    (Time.Span.to_sec time)) ;
-                ("fee_transfer", 1, 0)
-          in
-          [%str_log info]
-            (Base_snark_generated
-               { time
-               ; transaction_type
-               ; zkapp_command_count
-               ; proof_zkapp_command_count
-               } ) )
-
-let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
-    ~constraint_constants daemon_address shutdown_on_disconnect =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let main ~logger ~proof_level ~constraint_constants ~signature_kind
+    (module Rpcs_versioned : Intf.Rpcs_versioned_S) daemon_address
+    shutdown_on_disconnect =
   let%bind state =
     Prod.Impl.Worker_state.create ~constraint_constants ~proof_level
       ~signature_kind ()
@@ -198,9 +125,12 @@ let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
             in
             log_and_retry "performing work" e (retry_pause 10.) go
         | Ok result ->
-            emit_proof_metrics result.metrics
-              (Selector.Result.Stable.Latest.transactions result)
-              logger ;
+            One_or_two.zip_exn work.instances result.metrics
+            |> One_or_two.iter ~f:(fun (single_spec, (elapsed, _tag)) ->
+                   (* [_tag]'s purpose is replaced by the whole single spec *)
+                   Metrics.emit_single_metrics ~logger ~single_spec
+                     ~data:{ data = elapsed; proof = () }
+                     ~on_zkapp_command:Metrics.emit_zkapp_metrics_legacy () ) ;
             [%log info] "Submitted completed SNARK work $work_ids to $address"
               ~metadata:
                 [ ("address", `String (Host_and_port.to_string daemon_address))
@@ -225,7 +155,8 @@ let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
   go ()
 
 let command_from_rpcs ~commit_id ~proof_level:default_proof_level
-    ~constraint_constants (module Rpcs_versioned : Intf.Rpcs_versioned_S) =
+    ~constraint_constants ~signature_kind
+    (module Rpcs_versioned : Intf.Rpcs_versioned_S) =
   Command.async ~summary:"Snark worker"
     (let open Command.Let_syntax in
     let%map_open daemon_port =
@@ -266,9 +197,9 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
           [%log info]
             !"Received signal to terminate. Aborting snark worker process" ;
           Core.exit 0 ) ;
-      main
+      main ~logger ~proof_level ~constraint_constants ~signature_kind
         (module Rpcs_versioned)
-        ~logger ~proof_level ~constraint_constants daemon_port
+        daemon_port
         (Option.value ~default:true shutdown_on_disconnect))
 
 let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect ~conf_dir

@@ -6,9 +6,9 @@ let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
-
 let PipelineTag = ../../Pipeline/Tag.dhall
+
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
@@ -30,20 +30,20 @@ let Spec =
       { Type =
           { dockerType : Dockers.Type
           , network : Network.Type
-          , mode : PipelineMode.Type
           , additionalDirtyWhen : List S.Type
           , softFail : B/SoftFail
           , timeout : Natural
           , profile : Profiles.Type
+          , scope : List PipelineScope.Type
           }
       , default =
           { dockerType = Dockers.Type.Bullseye
           , network = Network.Type.Devnet
-          , mode = PipelineMode.Type.Stable
           , additionalDirtyWhen = [] : List S.Type
           , softFail = B/SoftFail.Boolean False
           , timeout = 1000
           , profile = Profiles.Type.Devnet
+          , scope = PipelineScope.Full
           }
       }
 
@@ -59,7 +59,7 @@ let command
                   , "source ./buildkite/scripts/export-git-env-vars.sh"
                   , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
                                                                          spec.network} --tag \\\${MINA_DOCKER_TAG} --timeout ${Natural/show
-                                                                                                                                 spec.timeout}"
+                                                                                                                                 spec.timeout} --run-load-test"
                   ]
               ]
             , label =
@@ -96,19 +96,19 @@ let pipeline
                       "buildkite/src/Command/Rosetta/Connectivity"
                       "dhall"
                   , S.exactly "scripts/tests/rosetta-connectivity" "sh"
-                  , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
                   , S.exactly
-                      "buildkite/scripts/rosetta-integration-tests-full"
+                      "buildkite/scripts/tests/rosetta-integration-tests"
                       "sh"
                   ]
                 # spec.additionalDirtyWhen
             , path = "Test"
             , name = "Rosetta${Network.capitalName spec.network}Connect"
-            , mode = spec.mode
+            , scope = spec.scope
             , tags =
               [ PipelineTag.Type.Long
               , PipelineTag.Type.Test
               , PipelineTag.Type.Stable
+              , PipelineTag.Type.Rosetta
               ]
             }
           , steps = [ command spec ]

@@ -8,7 +8,7 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let Network = ../../Constants/Network.dhall
 
@@ -21,6 +21,7 @@ in  Pipeline.build
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
+            , Artifacts.Type.CreateLegacyGenesis
             ]
           , network = Network.Type.Devnet
           , tags =
@@ -29,6 +30,7 @@ in  Pipeline.build
             , PipelineTag.Type.Docker
             ]
           , debVersion = DebianVersions.DebVersion.Bookworm
-          , mode = PipelineMode.Type.Stable
+          , scope =
+            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }
       )

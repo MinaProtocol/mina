@@ -25,8 +25,8 @@ let network = Network.Type.Berkeley
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
       , S.exactly "buildkite/src/Jobs/Test/RosettaIntegrationTests" "dhall"
-      , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
-      , S.exactly "buildkite/scripts/rosetta-integration-tests-fast" "sh"
+      , S.exactly "buildkite/scripts/tests/rosetta-integration-tests" "sh"
+      , S.exactly "dockerfiles/Dockerfile-mina-rosetta" ""
       ]
 
 let rosettaDocker =
@@ -43,6 +43,7 @@ in  Pipeline.build
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
+          , PipelineTag.Type.Rosetta
           ]
         }
       , steps =
@@ -58,7 +59,7 @@ in  Pipeline.build
                   "./buildkite/scripts/rosetta-indexer-test.sh"
               , Cmd.runInDocker
                   Cmd.Docker::{ image = rosettaDocker }
-                  "buildkite/scripts/rosetta-integration-tests-fast.sh"
+                  "buildkite/scripts/tests/rosetta-integration-tests.sh"
               ]
             , label = "Rosetta integration tests Bullseye"
             , key = "rosetta-integration-tests-bullseye"
