@@ -49,7 +49,7 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
-MINA_DEB_NAME="mina-berkeley"
+MINA_DEB_NAME="mina-testnet-generic"
 MINA_DEVNET_DEB_NAME="mina-devnet"
 DUNE_PROFILE="${DUNE_PROFILE}"
 DEB_SUFFIX=""
@@ -154,9 +154,9 @@ copy_common_daemon_configs() {
 
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_configs inputs:"
-  echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
+  echo "Network Name: ${1} (like mainnet, devnet, testnet-generic)"
   echo "Signature Type: ${2} (mainnet or testnet)"
-  echo "Seed List URL path: ${3} (like seed-lists/berkeley_seeds.txt)"
+  echo "Seed List URL path: ${3} (like seed-lists/devnet_seeds.txt)"
 
   # Copy shared binaries
   cp ../src/app/libp2p_helper/result/bin/libp2p_helper \
@@ -179,13 +179,26 @@ copy_common_daemon_configs() {
 
   mkdir -p "${BUILDDIR}/var/lib/coda"
 
-  # Include all useful genesis ledgers
-  cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/mainnet.json"
-  cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
-  cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
-  # Set the default configuration based on Network name ($1)
-  cp ../genesis_ledgers/"${1}".json \
-    "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+  # Include genesis ledgers for the network.
+  # We want to copy the genesis ledger for the network ($1) and in case of
+  # devnet/mainnet also copy the magic config (config_$GITHASH_CONFIG.json).
+  # This config is automatically picked up by the daemon on startup.
+  # In case of testnet-generic we only copy the devnet ledger without magic one
+  # as testnet-generic should be testnet agnostic.
+  case "${1}" in
+    devnet|mainnet)
+      cp ../genesis_ledgers/"${1}".json \
+        "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+      cp ../genesis_ledgers/${1}.json "${BUILDDIR}/var/lib/coda/${1}.json"
+      ;;
+    testnet-generic)
+      cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
+      ;;
+    *)
+      echo "Unknown network name provided: ${1}"; exit 1
+      ;;
+  esac
+
   cp ../scripts/hardfork/create_runtime_config.sh \
     "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
   cp ../scripts/hardfork/mina-verify-packaged-fork-config \
@@ -398,29 +411,29 @@ build_rosetta_devnet_deb() {
 }
 ## END ROSETTA DEVNET PACKAGE ##
 
-## ROSETTA BERKELEY PACKAGE ##
+## ROSETTA GENERIC TESTNET PACKAGE ##
 
 #
-# Builds mina-rosetta-berkeley package for Berkeley testnet Rosetta API
+# Builds mina-rosetta-testnet-generic package for Generic testnet Rosetta API
 #
-# Output: mina-rosetta-berkeley_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-rosetta-testnet-generic_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}
 #
-# Rosetta API implementation for Berkeley testnet with testnet signature binaries.
+# Rosetta API implementation for testnet-generic testnet with testnet signature binaries.
 #
-build_rosetta_berkeley_deb() {
+build_rosetta_testnet_generic_deb() {
 
   echo "------------------------------------------------------------"
-  echo "--- Building berkeley rosetta deb"
+  echo "--- Building testnet-generic rosetta deb"
 
-  create_control_file mina-rosetta-berkeley "${SHARED_DEPS}" \
+  create_control_file mina-rosetta-testnet-generic "${SHARED_DEPS}" \
     'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
 
   copy_common_rosetta_configs "testnet"
 
-  build_deb mina-rosetta-berkeley
+  build_deb mina-rosetta-testnet-generic
 }
-## END BERKELEY PACKAGE ##
+## END GENERIC TESTNET PACKAGE ##
 
 ## MAINNET PACKAGE ##
 
@@ -532,44 +545,43 @@ build_daemon_devnet_legacy_deb() {
 }
 ## END DEVNET LEGACY PACKAGE ##
 
-## BERKELEY PACKAGE ##
+## TESTNET GENERIC PACKAGE ##
 
 #
-# Builds Berkeley testnet daemon package with profile-aware naming
+# Builds Testnet Generic testnet daemon package with profile-aware naming
 #
 # Output: ${MINA_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Where MINA_DEB_NAME can be:
-#   - "mina-berkeley" (default)
-#   - "mina-berkeley-lightnet" (if DUNE_PROFILE=lightnet)
-#   - "mina-berkeley-instrumented" (if DUNE_INSTRUMENT_WITH is set)
-#   - "mina-berkeley-lightnet-instrumented" (both conditions)
+#   - "mina-testnet-generic" (default)
+#   - "mina-testnet-generic-lightnet" (if DUNE_PROFILE=lightnet)
+#   - "mina-testnet-generic-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#   - "mina-testnet-generic-lightnet-instrumented" (both conditions)
 #
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Berkeley testnet daemon with testnet signatures and berkeley genesis ledger
+# Testnet Generic testnet daemon with testnet signatures and testnet generic genesis ledger
 # as default. Package name includes suffixes for different profiles.
 #
-build_daemon_berkeley_deb() {
+build_daemon_testnet_generic_deb() {
 
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Berkeley testnet signatures deb without keys:"
+  echo "--- Building Mina Testnet Generic testnet signatures deb without keys:"
 
   create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon for the Berkeley Network' \
+    'Mina Protocol Client and Daemon for the Testnet Generic Network' \
     "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
-
+  copy_common_daemon_configs testnet-generic testnet 'seed-lists/devnet_seeds.txt'
   build_deb "${MINA_DEB_NAME}"
 
 }
-## END BERKELEY PACKAGE ##
+## END TESTNET GENERIC PACKAGE ##
 
 #
 # Replaces runtime config and genesis ledgers with hardfork versions
 #
 # Parameters:
-#   $1 - Network name (mainnet, devnet, berkeley)
+#   $1 - Network name (mainnet, devnet, testnet-generic)
 #
 # Environment variables required:
 #   RUNTIME_CONFIG_JSON - path to hardfork runtime configuration
@@ -631,35 +643,33 @@ build_daemon_devnet_hardfork_deb() {
 
 ## END DEVNET HARDFORK PACKAGE ##
 
-## BERKELEY HARDFORK PACKAGE ##
+## TESTNET GENERIC  HARDFORK PACKAGE ##
 
 #
-# Builds mina-berkeley-hardfork package for Berkeley hardfork
+# Builds mina-testnet-generic-hardfork package for Testnet Generic hardfork
 #
-# Output: mina-berkeley-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-testnet-generic-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Berkeley daemon package with hardfork-specific runtime config and ledgers.
+# Testnet Generic daemon package with hardfork-specific runtime config and ledgers.
 # Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
 #
-build_daemon_berkeley_hardfork_deb() {
-  local __deb_name=mina-berkeley-hardfork
-
+build_daemon_testnet_generic_hardfork_deb() {
+  local __deb_name=mina-testnet-generic-hardfork
   echo "------------------------------------------------------------"
-  echo "--- Building hardfork berkeley signatures deb without keys:"
+  echo "--- Building hardfork testnet generic signatures deb without keys:"
 
   create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon for the Berkeley Network' "${SUGGESTED_DEPS}"
+    'Mina Protocol Client and Daemon for the Testnet Generic Network' "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
+  copy_common_daemon_configs testnet-generic testnet 'seed-lists/devnet_seeds.txt'
 
-  replace_runtime_config_and_ledgers_with_hardforked_ones berkeley
-
+  replace_runtime_config_and_ledgers_with_hardforked_ones testnet-generic
   build_deb "${__deb_name}"
 
 }
 
-## END BERKELEY HARDFORK PACKAGE ##
+## END TESTNET GENERIC HARDFORK PACKAGE ##
 
 ## MAINNET HARDFORK PACKAGE ##
 
@@ -751,12 +761,12 @@ build_archive_devnet_deb () {
 }
 ## END ARCHIVE DEVNET PACKAGE ##
 
-## ARCHIVE BERKELEY PACKAGE ##
+## ARCHIVE GENERIC TESTNET PACKAGE ##
 
 #
-# Builds Berkeley archive package with profile-aware naming
+# Builds Generic testnet archive package with profile-aware naming
 #
-# Output: mina-archive-berkeley${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-archive-testnet-generic${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Where DEB_SUFFIX can be:
 #   - "" (empty, default)
 #   - "-lightnet" (if DUNE_PROFILE=lightnet)
@@ -765,13 +775,13 @@ build_archive_devnet_deb () {
 #
 # Dependencies: ${ARCHIVE_DEPS}
 #
-# Archive node package for Berkeley with suffix-aware naming for different profiles.
+# Archive node package for Generic testnet with suffix-aware naming for different profiles.
 #
-build_archive_berkeley_deb () {
-  ARCHIVE_DEB=mina-archive-berkeley${DEB_SUFFIX}
+build_archive_testnet_generic_deb () {
+  ARCHIVE_DEB=mina-archive-testnet-generic${DEB_SUFFIX}
 
   echo "------------------------------------------------------------"
-  echo "--- Building archive berkeley deb"
+  echo "--- Building archive testnet-generic deb"
 
 
   create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
@@ -806,19 +816,20 @@ build_archive_mainnet_deb () {
 }
 ## END ARCHIVE MAINNET PACKAGE ##
 
+
 ## ZKAPP TEST TXN ##
 
 #
 # Builds mina-zkapp-test-transaction package for zkApp testing
 #
 # Output: mina-zkapp-test-transaction_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEBS}
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Utility for generating zkApp transactions in Mina GraphQL format for testing.
 #
 build_zkapp_test_transaction_deb () {
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Berkeley ZkApp test transaction tool:"
+  echo "--- Building Mina Generic testnet ZkApp test transaction tool:"
 
   create_control_file mina-zkapp-test-transaction \
     "${SHARED_DEPS}${DAEMON_DEPS}" \
@@ -868,14 +879,14 @@ build_delegation_verify_deb () {
 # Builds mina-create-legacy-genesis package for legacy genesis creation
 #
 # Output: mina-create-legacy-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEBS}
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Utility for creating legacy genesis ledgers for post-hardfork verification.
 # Contains the runtime_genesis_ledger tool for Mina protocol.
 #
 build_create_legacy_genesis_deb() {
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Berkeley create legacy genesis tool:"
+  echo "--- Building Mina Generic testnet create legacy genesis tool:"
 
   create_control_file mina-create-legacy-genesis \
     "${SHARED_DEPS}${DAEMON_DEPS}" \
