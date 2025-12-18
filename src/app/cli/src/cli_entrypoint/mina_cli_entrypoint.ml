@@ -1521,6 +1521,9 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           mina_initialization_deferred ()
         in
         mina_ref := Some mina ;
+        (* Start auto hardfork config generation if conditions are met *)
+        O1trace.background_thread "auto_hardfork_config_generation" (fun () ->
+            Mina_run.start_auto_hardfork_config_generation ~logger mina ) ;
         (*This pipe is consumed only by integration tests*)
         don't_wait_for
           (Pipe_lib.Strict_pipe.Reader.iter_without_pushback

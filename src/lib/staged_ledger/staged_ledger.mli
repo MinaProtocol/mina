@@ -348,12 +348,6 @@ val all_work_pairs :
 (** Statements of all the pending work in t*)
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 
-(** Go through all masks until reach root, convert all accounts accumulated 
-    along the way, and commit them to a HF database
-*)
-val convert_and_apply_all_masks_to_ledger :
-  hardfork_db:Ledger.Hardfork_db.t -> t -> unit
-
 module Test_helpers : sig
   val dummy_state_and_view :
        ?global_slot:Mina_numbers.Global_slot_since_genesis.t

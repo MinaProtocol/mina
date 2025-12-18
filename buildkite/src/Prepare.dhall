@@ -41,8 +41,6 @@ let config
               , Cmd.run "export BUILDKITE_PIPELINE_FILTER=${tagFilter}"
               , Cmd.run "export BUILDKITE_PIPELINE_SCOPE=${scopeFilter}"
               , Cmd.run "export BUILDKITE_PIPELINE_FILTER_MODE=${filterMode}"
-              , Cmd.run
-                  "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall"
               , Cmd.quietly
                   "dhall-to-yaml --quoted <<< '(./buildkite/src/Monorepo.dhall) { selection=(./buildkite/src/Pipeline/JobSelection.dhall).Type.${selection}, tagFilter=(./buildkite/src/Pipeline/TagFilter.dhall).Type.${tagFilter}, scopeFilter=(./buildkite/src/Pipeline/ScopeFilter.dhall).Type.${scopeFilter}, filterMode=(./buildkite/src/Pipeline/FilterMode.dhall).Type.${filterMode} }' | buildkite-agent pipeline upload"
               ]

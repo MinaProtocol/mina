@@ -42,7 +42,6 @@
   unsigned_extended
   with_hash)
  (modules logic sql)
- (preprocessor_deps ../../config.mlh)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -102,7 +101,6 @@
   unsigned_extended
   with_hash)
  (modules archive_hardfork_toolbox)
- (preprocessor_deps ../../config.mlh)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

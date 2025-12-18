@@ -1078,6 +1078,7 @@ let deriver obj =
 
     - The zkapp state size increase from 8 to 32 slots. Migration: padding the
       zkapp state size with 24 zero field elements.
+    - Applied slot reduction update, fixing vesting parameters
 *)
 module Hardfork = struct
   type t =
@@ -1109,6 +1110,10 @@ module Hardfork = struct
     ; permissions = account.permissions
     ; zkapp = Option.map ~f:Zkapp_account.Hardfork.of_stable account.zkapp
     }
+
+  (* This function converts Berkeley account to Mesa account *)
+  let migrate_from_berkeley ~hardfork_slot (account : Stable.Latest.t) : t =
+    slot_reduction_update ~hardfork_slot account |> of_stable
 
   let balance { balance; _ } = balance
 
