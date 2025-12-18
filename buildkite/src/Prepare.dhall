@@ -7,6 +7,8 @@ let Cmd = ./Lib/Cmds.dhall
 
 let Command = ./Command/Base.dhall
 
+let Docker = ./Command/Docker/Type.dhall
+
 let JobSpec = ./Pipeline/JobSpec.dhall
 
 let Pipeline = ./Pipeline/Dsl.dhall
@@ -44,7 +46,11 @@ let config
               ]
             , label = "Prepare monorepo triage"
             , key = "monorepo-${selection}-${tagFilter}-${scopeFilter}"
-            , target = Size.Small
+            , target = Size.Multi
+            , docker = Some Docker::{
+              , image = (./Constants/ContainerImages.dhall).toolchainBase
+              , environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
+              }
             }
         ]
       }
