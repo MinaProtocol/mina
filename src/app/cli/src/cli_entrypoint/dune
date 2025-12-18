@@ -4,6 +4,7 @@
  (modes native)
  (libraries
   ;;opam libraries
+  memtrace
   stdio
   async_kernel
   async_unix

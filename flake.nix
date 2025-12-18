@@ -415,6 +415,18 @@
           '';
         });
 
+        # Shell with LSP and memtrace for memory profiling.
+        devShells.with-lsp-memtrace = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina-with-lsp-memtrace";
+          buildInputs = oa.buildInputs ++ devShellPackages;
+          nativeBuildInputs = oa.nativeBuildInputs
+            ++ [ ocamlPackages.ocaml-lsp-server ocamlPackages.memtrace ];
+          shellHook = ''
+            ${oa.shellHook}
+            unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
+          '';
+        });
+
         devShells.operations = pkgs.mkShell {
           name = "mina-operations";
           packages = with pkgs; [ skopeo gzip google-cloud-sdk ];

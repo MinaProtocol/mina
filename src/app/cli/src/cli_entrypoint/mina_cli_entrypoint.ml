@@ -6,6 +6,8 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
+let () = Memtrace.trace_if_requested ~context:"mina" ()
+
 type mina_initialization =
   { mina : Mina_lib.t
   ; client_trustlist : Unix.Cidr.t list option
