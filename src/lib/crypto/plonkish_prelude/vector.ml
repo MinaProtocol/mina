@@ -446,6 +446,16 @@ let rec transpose : type a n m. ((a, n) t, m) t -> ((a, m) t, n) t =
 let rec trim : type a n m. (a, m) t -> (n, m) Nat.Lte.t -> (a, n) t =
  fun v p -> match (v, p) with _, Z -> [] | x :: xs, S p -> x :: trim xs p
 
+let rec trim_assert :
+    type a n m. (a, m) t -> (n, m) Nat.Lte.t -> f:(a -> bool) -> (a, n) t =
+ fun v p ~f ->
+  match (v, p) with
+  | rest, Z ->
+      assert (for_all rest ~f) ;
+      []
+  | x :: xs, S p ->
+      x :: trim_assert xs p ~f
+
 let trim_front (type a n m) (v : (a, m) t) (p : (n, m) Nat.Lte.t) : (a, n) t =
   rev (trim (rev v) p)
 

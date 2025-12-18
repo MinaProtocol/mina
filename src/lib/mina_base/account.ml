@@ -1086,11 +1086,9 @@ module Hardfork = struct
     ; zkapp = Option.map ~f:Zkapp_account.Hardfork.of_stable account.zkapp
     }
 
-  (** Convert a Mesa account to a stable Berkeley account. This method only
-      preserves information for Mesa accounts that are equal to [of_stable a]
-      for some stable Berkeley account [a]; it is otherwise unsafe because it
-      silently drops data. *)
-  let unsafe_to_stable (account : t) : Stable.Latest.t =
+  (** Convert a Mesa account to a stable Berkeley account. Raises if we can't 
+      convert. *)
+  let to_stable_exn (account : t) : Stable.Latest.t =
     { public_key = account.public_key
     ; token_id = account.token_id
     ; token_symbol = account.token_symbol
@@ -1101,8 +1099,7 @@ module Hardfork = struct
     ; voting_for = account.voting_for
     ; timing = account.timing
     ; permissions = account.permissions
-    ; zkapp =
-        Option.map ~f:Zkapp_account.Hardfork.unsafe_to_stable account.zkapp
+    ; zkapp = Option.map ~f:Zkapp_account.Hardfork.to_stable_exn account.zkapp
     }
 
   (* This function converts Berkeley account to Mesa account *)
@@ -1152,8 +1149,7 @@ module Hardfork = struct
       { base_account with zkapp }
     in
     Quickcheck.test gen_with_optional_zkapp ~f:(fun original ->
-        let converted = of_stable original in
-        let roundtripped = unsafe_to_stable converted in
+        let roundtripped = to_stable_exn @@ of_stable original in
         [%test_eq: Stable.Latest.t] original roundtripped )
 end
 

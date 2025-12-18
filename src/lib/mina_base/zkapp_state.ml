@@ -103,17 +103,20 @@ module Hardfork = struct
       Nat.lte_exn Nat.N8.n Nat.N32.n
 
     (** Convert a Mesa zkApp state vector to a stable Berkeley zkApp state
-        vector by dropping zkApp state elements from the end. This method only
-        preserves information for Mesa state vectors that are equal to
-        [of_stable v] for some stable Berkeley state vector [v]; it is
-        otherwise unsafe because it silently drops data. *)
-    let unsafe_to_stable (value : t) : Value.Stable.Latest.t =
-      Vector.trim value stable_size_lte
+        vector by dropping zkApp state elements from the end. Raises if element 
+        8~31 is not zero *)
+    let to_stable_exn (value : t) : Value.Stable.Latest.t =
+      let zero = Pasta_bindings.Fp.of_int 0 in
+      try
+        Vector.trim_assert value stable_size_lte
+          ~f:(Pasta_bindings.Fp.equal zero)
+      with Assert_failure _ ->
+        failwith "element 8~31 of zkApp state has non-zero values!"
 
     let%test_unit "of_stable followed by unsafe_to_stable is identity" =
       Quickcheck.test Value.gen ~f:(fun original ->
           let extended = of_stable original in
-          let roundtripped = unsafe_to_stable extended in
+          let roundtripped = to_stable_exn extended in
           [%test_eq: Value.Stable.Latest.t] original roundtripped )
   end
 end
