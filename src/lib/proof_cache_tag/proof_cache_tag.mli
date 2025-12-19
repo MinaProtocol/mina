@@ -17,6 +17,15 @@ val write_proof_to_disk :
 
 val create_identity_db : unit -> cache_db
 
+module Serializable_type : sig
+  [%%versioned:
+  module Stable : sig
+    module V2 : sig
+      type t
+    end
+  end]
+end
+
 module For_tests : sig
   val create_db : unit -> cache_db
 end
