@@ -142,6 +142,10 @@ module Serializable_type = struct
 
     module Latest = V2
   end
+
+  let of_cache_tag = Fn.id
+
+  let to_proof = read_proof_from_disk
 end
 
 module For_tests = struct
