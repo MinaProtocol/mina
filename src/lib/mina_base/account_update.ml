@@ -1764,6 +1764,30 @@ module T = struct
     end
   end]
 
+  module Serializable_type = struct
+    type raw_serializable = Stable.Latest.t
+
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        (** A account_update to a zkApp transaction *)
+        type t =
+          ( Body.Stable.V1.t
+          , Control.Serializable_type.Stable.V2.t )
+          Without_aux.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let to_raw_serializable (w : t) : raw_serializable =
+      { body = w.body
+      ; authorization =
+          Control.Serializable_type.to_raw_serializable w.authorization
+      ; aux = w.aux
+      }
+  end
+
   (** Auxiliary data in an [Account_update.t], not intended for serialization.
       The [to_yojson] and [sexp_of_t] instances here are written to be
       compatible with [Account_update.Poly.Without_aux.t], so that types of the
@@ -1787,6 +1811,12 @@ module T = struct
   end
 
   type t = (Body.t, Control.t) With_aux.t [@@deriving sexp_of, to_yojson]
+
+  let to_serializable_type (w : t) : Serializable_type.t =
+    { body = w.body
+    ; authorization = Control.to_serializable_type w.authorization
+    ; aux = ()
+    }
 
   let of_graphql_repr ({ Poly.body; authorization; aux = () } : Graphql_repr.t)
       : Stable.Latest.t =

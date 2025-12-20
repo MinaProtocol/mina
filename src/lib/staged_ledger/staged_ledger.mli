@@ -19,6 +19,21 @@ module Scan_state : sig
     end
   end]
 
+  module Serializable_type : sig
+    type raw_serializable := Stable.Latest.t
+
+    [%%versioned:
+    module Stable : sig
+      [@@@no_toplevel_latest_type]
+
+      module V2 : sig
+        type t
+      end
+    end]
+
+    val to_raw_serializable : Stable.Latest.t -> raw_serializable
+  end
+
   type t
 
   module Job_view : sig
@@ -153,6 +168,8 @@ module Scan_state : sig
     -> t
 
   val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+  val to_serializable_type : t -> Serializable_type.Stable.Latest.t
 end
 
 module Pre_diff_info : Pre_diff_info.S
