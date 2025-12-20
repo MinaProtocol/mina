@@ -202,9 +202,10 @@ let handle_incoming_message t msg ~handle_push_message =
                     [%log' error t.logger]
                       "Attempted fill outstanding libp2p_helper RPC request \
                        more than once"
-                  else
+                  else (
                     Ivar.fill ivar
-                      (Libp2p_ipc.rpc_response_to_or_error rpc_response)
+                      (Libp2p_ipc.rpc_response_to_or_error rpc_response) ;
+                    Hashtbl.remove t.outstanding_requests sequence_number )
               | None ->
                   [%log' error t.logger]
                     "Attempted to fill outstanding libp2p_helper RPC request, \
