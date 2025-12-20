@@ -215,7 +215,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type query = State_hash.t
 
       type response =
-        ( Staged_ledger.Scan_state.Stable.Latest.t
+        ( Staged_ledger.Scan_state.Serializable_type.Stable.Latest.t
         * Ledger_hash.t
         * Pending_coinbase.t
         * Mina_state.Protocol_state.value list )
@@ -257,7 +257,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type query = State_hash.Stable.V1.t
 
       type response =
-        ( Staged_ledger.Scan_state.Stable.V2.t
+        ( Staged_ledger.Scan_state.Serializable_type.Stable.V2.t
         * Ledger_hash.Stable.V1.t
         * Pending_coinbase.Stable.V2.t
         * Mina_state.Protocol_state.Value.Stable.V2.t list )
@@ -312,7 +312,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       ->
         return
           (Some
-             ( Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
+             ( Staged_ledger.Scan_state.to_serializable_type scan_state
              , expected_merkle_root
              , pending_coinbases
              , protocol_states ) )

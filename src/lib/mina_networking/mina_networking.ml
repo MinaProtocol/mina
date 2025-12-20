@@ -367,6 +367,14 @@ let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
   rpc_peer_then_random t inet_addr input
     ~rpc:Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash
   >>|? Envelope.Incoming.data
+  >>|? fun (scan_state, hash, pending_coinbase, protocol_states) ->
+  (* NB: This is essentially a no-op, because we didn't write to disk as we
+     were deserializing proofs.
+  *)
+  ( Staged_ledger.Scan_state.Serializable_type.to_raw_serializable scan_state
+  , hash
+  , pending_coinbase
+  , protocol_states )
 
 let get_ancestry t inet_addr input =
   rpc_peer_then_random t inet_addr input ~rpc:Rpcs.Get_ancestry
