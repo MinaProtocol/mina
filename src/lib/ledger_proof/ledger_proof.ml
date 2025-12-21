@@ -25,6 +25,8 @@ module Serializable_type = struct
 
   let to_raw_serializable =
     Transaction_snark.Serializable_type.to_raw_serializable
+
+  let statement (t : t) = Transaction_snark.Serializable_type.statement t
 end
 
 let statement (t : t) = Transaction_snark.statement t

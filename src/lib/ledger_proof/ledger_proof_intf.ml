@@ -26,6 +26,8 @@ module type S = sig
     end]
 
     val to_raw_serializable : Stable.Latest.t -> raw_serializable
+
+    val statement : t -> Mina_state.Snarked_ledger_state.t
   end
 
   val create :

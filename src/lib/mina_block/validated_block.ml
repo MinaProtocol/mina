@@ -17,6 +17,22 @@ module Stable = struct
   end
 end]
 
+module Serializable_type = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t =
+        Block.Serializable_type.Stable.V2.t
+        State_hash.With_state_hashes.Stable.V1.t
+        * State_hash.Stable.V1.t Mina_stdlib.Nonempty_list.Stable.V1.t
+
+      let to_latest = ident
+
+      let hashes (t, _) = With_hash.hash t
+    end
+  end]
+end
+
 type t =
   Block.t State_hash.With_state_hashes.t
   * State_hash.t Mina_stdlib.Nonempty_list.t
@@ -84,3 +100,6 @@ let is_genesis t =
 
 let read_all_proofs_from_disk ((b, v) : t) : Stable.Latest.t =
   (With_hash.map ~f:Block.read_all_proofs_from_disk b, v)
+
+let to_serializable_type ((b, v) : t) : Serializable_type.t =
+  (With_hash.map ~f:Block.to_serializable_type b, v)

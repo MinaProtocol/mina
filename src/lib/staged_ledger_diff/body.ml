@@ -31,6 +31,17 @@ module Stable = struct
   end
 end]
 
+module Serializable_type = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = { staged_ledger_diff : Diff.Serializable_type.Stable.V2.t }
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 type t = { staged_ledger_diff : Diff.t } [@@deriving fields]
 
 let create staged_ledger_diff = { staged_ledger_diff }
@@ -64,4 +75,9 @@ let write_all_proofs_to_disk ~signature_kind ~proof_cache_db t =
 let read_all_proofs_from_disk t =
   { Stable.Latest.staged_ledger_diff =
       Diff.read_all_proofs_from_disk t.staged_ledger_diff
+  }
+
+let to_serializable_type t =
+  { Serializable_type.staged_ledger_diff =
+      Diff.to_serializable_type t.staged_ledger_diff
   }

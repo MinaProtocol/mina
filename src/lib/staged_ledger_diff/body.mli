@@ -11,6 +11,15 @@ module Stable : sig
   end
 end]
 
+module Serializable_type : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = { staged_ledger_diff : Diff.Serializable_type.Stable.V2.t }
+    end
+  end]
+end
+
 type t
 
 val create : Diff.t -> t
@@ -28,3 +37,5 @@ val write_all_proofs_to_disk :
   -> t
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+val to_serializable_type : t -> Serializable_type.t

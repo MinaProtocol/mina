@@ -89,6 +89,20 @@ module Stable = struct
   end
 end]
 
+module Serializable_type = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t =
+        ( Signed_command.Stable.V2.t
+        , Zkapp_command.Serializable_type.Stable.V1.t )
+        Poly.Stable.V2.t
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 type t = (Signed_command.t, Zkapp_command.t) Poly.t
 [@@deriving sexp_of, to_yojson]
 
@@ -106,6 +120,12 @@ let read_all_proofs_from_disk : t -> Stable.Latest.t = function
       Signed_command sc
   | Zkapp_command zc ->
       Zkapp_command (Zkapp_command.read_all_proofs_from_disk zc)
+
+let to_serializable_type : t -> Serializable_type.t = function
+  | Signed_command sc ->
+      Signed_command sc
+  | Zkapp_command zc ->
+      Zkapp_command (Zkapp_command.to_serializable_type zc)
 
 type ('u, 'a, 'b) with_forest =
   (Signed_command.t, ('u, 'a, 'b) Zkapp_command.with_forest) Poly.t

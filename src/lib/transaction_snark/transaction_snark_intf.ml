@@ -36,6 +36,8 @@ module type Full = sig
       -> proof:Proof_cache_tag.Serializable_type.Stable.Latest.t
       -> t
 
+    val statement : t -> Statement.t
+
     val to_raw_serializable : t -> raw_serializable
   end
 

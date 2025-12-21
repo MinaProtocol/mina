@@ -103,6 +103,26 @@ module T = struct
     end
   end]
 
+  module Serializable_type = struct
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          { fee : Fee.Stable.V1.t
+          ; proofs :
+              Ledger_proof.Serializable_type.Stable.V2.t One_or_two.Stable.V1.t
+          ; prover : Public_key.Compressed.Stable.V1.t
+          }
+        [@@deriving fields]
+
+        let statement t =
+          One_or_two.map t.proofs ~f:Ledger_proof.Serializable_type.statement
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
   type t =
     { fee : Fee.t
     ; proofs : Ledger_proof.Cached.t One_or_two.t
@@ -131,6 +151,12 @@ module T = struct
   let read_all_proofs_from_disk { fee; proofs; prover } =
     { Stable.Latest.fee
     ; proofs = One_or_two.map proofs ~f:Ledger_proof.Cached.read_proof_from_disk
+    ; prover
+    }
+
+  let to_serializable_type { fee; proofs; prover } =
+    { Serializable_type.fee
+    ; proofs = One_or_two.map proofs ~f:Ledger_proof.Cached.to_serializable_type
     ; prover
     }
 end

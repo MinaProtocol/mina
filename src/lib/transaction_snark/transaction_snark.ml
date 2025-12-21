@@ -103,6 +103,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     let create ~statement ~proof : t =
       { Proof_carrying_data.data = statement; proof }
 
+    let statement (t : t) = { t.data with sok_digest = () }
+
     let to_raw_serializable =
       Proof_carrying_data.map_proof
         ~f:Proof_cache_tag.Serializable_type.to_proof
