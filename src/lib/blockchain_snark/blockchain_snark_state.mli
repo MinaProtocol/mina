@@ -72,3 +72,10 @@ val constraint_system_digests :
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> unit
   -> (string * Md5.t) list
+
+(** Return the number of constraints (rows) in the blockchain SNARK circuit. *)
+val constraint_counts :
+     proof_level:Genesis_constants.Proof_level.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> unit
+  -> (string * int) list

@@ -1035,6 +1035,31 @@ let constraint_system_digests ~proof_level ~constraint_constants () =
            ~return_typ:Tick.Typ.unit main ) )
   ]
 
+(** Return the number of constraints (rows) in the blockchain SNARK circuit.
+
+    This is useful for:
+    - Tracking constraint count changes over time
+    - Comparing with other implementations
+    - Performance analysis
+
+    @return List of (circuit_name, constraint_count) pairs
+*)
+let constraint_counts ~proof_level ~constraint_constants () =
+  let count cs = Tick.R1CS_constraint_system.get_rows_len cs in
+  [ ( "blockchain-step"
+    , count
+        (let main x =
+           let open Tick in
+           let%map _ =
+             step ~proof_level ~constraint_constants ~logger:(Logger.create ())
+               x
+           in
+           ()
+         in
+         Tick.constraint_system ~input_typ:Statement.typ
+           ~return_typ:Tick.Typ.unit main ) )
+  ]
+
 (** {1 Make Functor}
 
     Functor to compile the blockchain SNARK circuit into a concrete
