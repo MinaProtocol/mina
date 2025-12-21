@@ -1,3 +1,47 @@
+(** {0 Transaction SNARK}
+
+    This module implements the transaction SNARK for Mina Protocol.
+    The transaction SNARK proves that transactions (payments, delegations,
+    coinbases, fee transfers, and zkApp commands) are applied correctly
+    to the ledger.
+
+    {1 Architecture Overview}
+
+    The transaction SNARK has 5 Pickles rules (branches):
+
+    1. {b Base Rule} ("transaction"): Verifies a single non-zkApp transaction
+       - Payments, stake delegations, coinbases, fee transfers
+       - No recursive proof verification (base case)
+
+    2. {b Merge Rule} ("merge"): Combines two transaction proofs
+       - Verifies two previous transaction proofs
+       - Combines fee excesses and supply increases
+       - Creates a single proof for a sequence of transactions
+
+    3. {b Opt_signed_opt_signed}: ZkApp with 2 optional signatures
+       - No external proof verification
+
+    4. {b Opt_signed}: ZkApp with 1 optional signature
+       - No external proof verification
+
+    5. {b Proved}: ZkApp with side-loaded proof
+       - Verifies 1 side-loaded zkApp proof
+
+    {1 Statement Structure}
+
+    The transaction SNARK statement ([Snarked_ledger_state.With_sok.t]) contains:
+    - source/target: Ledger state before/after transactions
+      - first_pass_ledger: Hash after fee account updates
+      - second_pass_ledger: Hash after all account updates
+      - pending_coinbase_stack: Coinbase stack state
+      - local_state: ZkApp execution local state
+    - fee_excess: Net fee excess (must be zero for valid blocks)
+    - supply_increase: Net change in total currency
+    - connecting_ledger_left/right: For merge continuity
+    - sok_digest: Statement of Knowledge message digest
+
+*)
+
 open Core
 open Signature_lib
 open Mina_base
@@ -15,7 +59,13 @@ module Make_sig (A : Wire_types.Types.S) = struct
   module type S = Transaction_snark_intf.Full with type Stable.V2.t = A.V2.t
 end
 
+(** {1 Main Transaction SNARK Implementation}
+
+    The [Make_str] functor creates the transaction SNARK module with
+    all rules, provers, and verification functions.
+*)
 module Make_str (A : Wire_types.Concrete) = struct
+  (** Pickles Step implementation - uses Pallas curve *)
   module Impl = Pickles.Impls.Step
   module Ledger = Mina_ledger.Ledger
   module Sparse_ledger = Mina_ledger.Sparse_ledger
@@ -545,6 +595,24 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ~fee_payer_account ~source_account ~receiver_account txn)
     end
 
+    (** {2 Signature Verification}
+
+        Verify that the transaction signature is valid using Schnorr signatures.
+
+        For user commands (payments, delegations), the signature MUST verify.
+        For non-user commands (coinbases, fee transfers), signature is ignored.
+
+        Uses legacy Schnorr signature verification with the payload as input.
+
+        @param signature_kind The signature scheme variant (mainnet/testnet)
+        @param shifted Shifted generator for efficient EC operations
+        @param payload The transaction payload being signed
+        @param is_user_command Boolean indicating if this is a user command
+        @param signer The public key of the signer
+        @param signature The Schnorr signature
+
+        Constraint: [NOT is_user_command OR signature_verifies]
+    *)
     let%snarkydef_ check_signature ~signature_kind shifted ~payload
         ~is_user_command ~signer ~signature =
       let%bind input =
@@ -557,6 +625,31 @@ module Make_str (A : Wire_types.Concrete) = struct
       [%with_label_ "check signature"] (fun () ->
           Boolean.Assert.any [ Boolean.not is_user_command; verifies ] )
 
+    (** {2 Account Timing Verification}
+
+        Verify that the account's vesting schedule allows the transaction.
+
+        Mina accounts can have time-locked balances that vest over time.
+        This function ensures that:
+        1. The account has sufficient unlocked balance for the transaction
+        2. The minimum balance constraint is respected
+        3. The timing is updated if fully vested
+
+        Timing parameters:
+        - initial_minimum_balance: Starting locked amount
+        - cliff_time: Slot when vesting begins
+        - cliff_amount: Amount unlocked at cliff
+        - vesting_period: Slots between vesting increments
+        - vesting_increment: Amount unlocked each period
+
+        @param balance_check Callback for balance verification
+        @param timed_balance_check Callback for timed balance verification
+        @param account The account to check
+        @param txn_amount Amount being deducted (None for receives)
+        @param txn_global_slot Current global slot
+
+        @return (min_balance, updated_timing) tuple
+    *)
     let check_timing ~balance_check ~timed_balance_check ~account ~txn_amount
         ~txn_global_slot =
       (* calculations should track Mina_transaction_logic.validate_timing *)
@@ -571,11 +664,13 @@ module Make_str (A : Wire_types.Concrete) = struct
           } =
         account.timing
       in
+      (* Calculate minimum balance at current slot based on vesting schedule *)
       let%bind curr_min_balance =
         Account.Checked.min_balance_at_slot ~global_slot:txn_global_slot
           ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
           ~initial_minimum_balance
       in
+      (* Calculate proposed balance after transaction *)
       let%bind proposed_balance =
         match txn_amount with
         | Some txn_amount ->
@@ -588,6 +683,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         | None ->
             return account.balance
       in
+      (* Verify proposed balance >= minimum balance (for timed accounts) *)
       let%bind sufficient_timed_balance =
         Balance.Checked.( >= ) proposed_balance curr_min_balance
       in
@@ -642,10 +738,48 @@ module Make_str (A : Wire_types.Concrete) = struct
       Schnorr.Chunked.Checked.verifies ~signature_kind shifted signature pk
         (Random_oracle.Input.Chunked.field payload_digest)
 
+    (** {1 ZkApp Command SNARK Module}
+
+        This module handles verification of zkApp (smart contract) transactions.
+        ZkApp commands are sequences of account updates that can include:
+        - Custom verification logic (via side-loaded proofs)
+        - State mutations (app_state fields)
+        - Permission changes
+        - Token operations
+
+        {2 Account Update Authorization Types}
+
+        Each account update can be authorized by:
+        - {b Signature}: Schnorr signature from account owner
+        - {b Proof}: Side-loaded zkApp proof (custom circuit)
+        - {b None}: No authorization (for receives, etc.)
+
+        {2 Rule Variants}
+
+        - {b Opt_signed_opt_signed}: 2 updates with optional signatures
+        - {b Opt_signed}: 1 update with optional signature
+        - {b Proved}: 1 update with side-loaded proof verification
+
+        {2 Execution Model}
+
+        ZkApp execution follows a call stack model:
+        - Account updates can call other account updates
+        - Local state tracks the call stack and execution status
+        - First pass updates fee accounts, second pass executes logic
+
+        {2 Key Verifications}
+
+        - Protocol state preconditions (block constraints)
+        - Account preconditions (balance, state, nonce)
+        - Authorization (signature or proof verification)
+        - State transitions (app_state mutations)
+        - Balance updates and token operations
+    *)
     module Zkapp_command_snark = struct
       open Zkapp_command_segment
       open Spec
 
+      (** Global state during zkApp execution *)
       module Global_state = struct
         type t =
           { first_pass_ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
@@ -1864,11 +1998,46 @@ module Make_str (A : Wire_types.Concrete) = struct
                 Boolean.Assert.all
                   [ correct_coinbase_target_stack; valid_init_state ] ) )
 
+      (** {2 ZkApp Command Main Circuit}
+
+          Verifies a sequence of account updates (zkApp transactions).
+
+          {3 Verification Flow}
+
+          1. {b Protocol State Verification}
+             - Load and verify protocol state body
+             - Verify pending coinbase stack transitions
+             - Check global slot
+
+          2. {b Initialize Global and Local State}
+             - Global: ledger roots, fee excess, supply increase
+             - Local: stack frame, call stack, transaction commitment
+
+          3. {b Process Account Updates}
+             - For each account update spec in the sequence:
+               - Apply authorization (signature/proof/none)
+               - Verify preconditions
+               - Execute state transitions
+               - Update ledger
+
+          4. {b Final Assertions}
+             - Local state matches target
+             - Ledger hashes match target
+             - Fee excess matches statement
+             - Supply increase matches statement
+
+          @param signature_kind Signature scheme variant
+          @param witness Optional witness data
+          @param spec List of account update specifications
+          @param constraint_constants Genesis constraint constants
+          @param statement The statement being verified
+      *)
       let main ~signature_kind ?(witness : Witness.t option) (spec : Spec.t)
           ~constraint_constants (statement : Statement.With_sok.var) =
         let open Impl in
         run_checked (dummy_constraints ()) ;
         let ( ! ) x = Option.value_exn x in
+        (* Load protocol state body from witness *)
         let state_body =
           exists (Mina_state.Protocol_state.Body.typ ~constraint_constants)
             ~compute:(fun () -> !witness.state_body)
@@ -2195,6 +2364,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       | Global_slot :
           Mina_numbers.Global_slot_since_genesis.t Snarky_backendless.Request.t
 
+    (** Helper to accumulate burned tokens when accounts can't receive *)
     let%snarkydef_ add_burned_tokens acc_burned_tokens amount
         ~is_coinbase_or_fee_transfer ~update_account =
       let%bind accumulate_burned_tokens =
@@ -2209,6 +2379,78 @@ module Make_str (A : Wire_types.Concrete) = struct
       Amount.Checked.if_ accumulate_burned_tokens ~then_:amt
         ~else_:acc_burned_tokens
 
+    (** {1 Base Transaction Verification - apply_tagged_transaction}
+
+        This is the CORE verification function for non-zkApp transactions.
+        It applies a single transaction to the ledger and verifies all
+        constraints are satisfied.
+
+        {2 Transaction Types Handled}
+
+        - {b Payment}: Transfer MINA between accounts
+        - {b Stake Delegation}: Delegate staking rights
+        - {b Coinbase}: Block reward to producer
+        - {b Fee Transfer}: Pay SNARK workers
+
+        {2 Verification Steps}
+
+        1. {b Signature Verification}
+           - User commands MUST have valid Schnorr signature
+           - Coinbases/fee transfers: signature ignored
+
+        2. {b Fee Payer Validation}
+           - Fee payer must equal signer
+           - Fee payer must equal source (no multi-sig yet)
+
+        3. {b Token Validation}
+           - Only default MINA token supported currently
+           - Fee must be in default token
+
+        4. {b Slot Validity}
+           - global_slot <= valid_until (transaction not expired)
+
+        5. {b Pending Coinbase Stack}
+           - Push protocol state body hash
+           - Push coinbase if coinbase transaction
+           - Verify source/target stack transitions
+
+        6. {b Account Updates}
+           - Fee payer account: Update balance, nonce, receipt chain
+           - Receiver account: Update balance, maybe create account
+           - Source account: Update balance, timing, delegate
+
+        7. {b Permission Checks}
+           - Access permission on all touched accounts
+           - Send permission for debits
+           - Receive permission for credits
+           - Increment_nonce permission for user commands
+           - Set_delegate permission for delegations
+
+        8. {b Timing/Vesting}
+           - Verify minimum balance constraints
+           - Update timing if fully vested
+
+        9. {b Account Creation Fees}
+           - New accounts pay creation fee
+           - Deducted from transfer amount
+
+        10. {b Fee Excess & Supply Increase}
+            - Compute net fee excess
+            - Compute net supply increase (coinbases add, nothing removes)
+
+        @param signature_kind Signature scheme variant
+        @param constraint_constants Genesis constraint constants
+        @param shifted EC shifted generator
+        @param fee_payment_root First pass ledger root
+        @param global_slot Current global slot
+        @param pending_coinbase_stack_init Initial coinbase stack
+        @param pending_coinbase_stack_before Source coinbase stack
+        @param pending_coinbase_after Target coinbase stack
+        @param state_body Protocol state body (for coinbase)
+        @param txn The transaction to apply
+
+        @return (final_root, fee_excess, supply_increase)
+    *)
     let%snarkydef_ apply_tagged_transaction ~signature_kind
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         (type shifted)
@@ -3063,20 +3305,39 @@ module Make_str (A : Wire_types.Concrete) = struct
        - apply a transaction and stuff in the wrong target hash
     *)
 
-    (* spec for [main statement]:
-       constraints pass iff there exists
-          t : Tagged_transaction.t
-       such that
-       - applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2].
-       - applying [t] to [pc.source] with results in pending coinbase stack [pc.target]
-       - t has fee excess equal to [fee_excess]
-       - t has supply increase equal to [supply_increase]
-         where statement includes
-          l1 : Frozen_ledger_hash.t,
-          l2 : Frozen_ledger_hash.t,
-          fee_excess : Amount.Signed.t,
-          supply_increase : Amount.Signed.t
-          pc: Pending_coinbase_stack_state.t
+    (** {1 Base Rule Main Circuit}
+
+        This is the main circuit for the Base rule (single transaction).
+
+        {2 Specification}
+
+        The constraints pass if and only if there exists a transaction [t]
+        such that:
+        - Applying [t] to ledger with hash [source.first_pass_ledger]
+          results in ledger with hash [target.first_pass_ledger]
+        - Applying [t] to [source.pending_coinbase_stack] results in
+          [target.pending_coinbase_stack]
+        - The transaction has fee excess equal to [statement.fee_excess]
+        - The transaction has supply increase equal to [statement.supply_increase]
+        - The second_pass_ledger remains unchanged (no zkApp execution)
+        - The local_state remains unchanged (no zkApp execution)
+        - The connecting_ledger_left equals connecting_ledger_right
+
+        {2 Witness Data Requested}
+
+        - [Transaction]: The transaction to apply
+        - [State_body]: Protocol state body (for coinbase hashing)
+        - [Init_stack]: Initial pending coinbase stack
+        - [Global_slot]: Current global slot number
+
+        {2 Constraints Asserted}
+
+        1. [first_pass_ledger] transitions correctly after transaction
+        2. [second_pass_ledger] remains unchanged
+        3. [connecting_ledger_left = connecting_ledger_right]
+        4. [supply_increase] matches computed value
+        5. [fee_excess] matches computed value
+        6. [local_state.source = local_state.target]
     *)
     let%snarkydef_ main ~signature_kind ~constraint_constants
         (statement : Statement.With_sok.var) =
@@ -3151,6 +3412,15 @@ module Make_str (A : Wire_types.Concrete) = struct
               Fee_excess.assert_equal_checked fee_excess statement.fee_excess )
         ]
 
+    (** {2 Base Rule Definition}
+
+        Pickles inductive rule for single transaction verification.
+
+        - {b Identifier}: "transaction"
+        - {b Previous proofs}: None (this is a base case)
+        - {b Public input}: Statement.With_sok.t
+        - {b Feature flags}: None
+    *)
     let rule ~signature_kind ~constraint_constants : _ Pickles.Inductive_rule.t
         =
       { identifier = "transaction"
@@ -3165,6 +3435,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
       }
 
+    (** Handler for providing witness data to the Base circuit *)
     let transaction_union_handler handler (transaction : Transaction_union.t)
         (state_body : Mina_state.Protocol_state.Body.Value.t)
         (global_slot : Mina_numbers.Global_slot_since_genesis.t)
@@ -3195,17 +3466,57 @@ module Make_str (A : Wire_types.Concrete) = struct
     [@@deriving fields]
   end
 
+  (** {1 Merge Rule Module}
+
+      The Merge rule combines two transaction SNARK proofs into a single proof.
+      This enables efficient proof aggregation - instead of verifying N proofs,
+      we can recursively merge them into a single proof.
+
+      {2 Purpose}
+
+      Given two adjacent transaction proofs (s1 and s2), the merge rule:
+      1. Verifies both proofs are valid
+      2. Checks that s1's target state matches s2's source state (continuity)
+      3. Combines fee excesses and supply increases
+      4. Produces a single proof covering both transitions
+
+      {2 Diagram}
+
+      {v
+        s1: source_1 --[txns]--> target_1
+        s2: source_2 --[txns]--> target_2
+
+        Merge requires: target_1 = source_2 (continuity)
+
+        Result: source_1 --[combined]--> target_2
+      v}
+
+      {2 Recursive Structure}
+
+      This enables binary-tree-like proof aggregation:
+      {v
+                    [Merge]
+                   /       \
+              [Merge]     [Merge]
+              /    \      /    \
+           [Base] [Base] [Base] [Base]
+      v}
+  *)
   module Merge = struct
     open Tick
 
+    (** Request types for merge witness data *)
     type _ Snarky_backendless.Request.t +=
       | Statements_to_merge :
           (Statement.With_sok.t * Statement.With_sok.t)
           Snarky_backendless.Request.t
+          (** The two statements being merged *)
       | Proofs_to_merge :
           (Nat.N2.n Pickles.Proof.t * Nat.N2.n Pickles.Proof.t)
           Snarky_backendless.Request.t
+          (** The two proofs to verify *)
 
+    (** Handler for providing merge witness data *)
     let handle
         ((left_stmt, right_stmt) : Statement.With_sok.t * Statement.With_sok.t)
         ((left_proof, right_proof) : _ Pickles.Proof.t * _ Pickles.Proof.t)
@@ -3218,12 +3529,33 @@ module Make_str (A : Wire_types.Concrete) = struct
       | _ ->
           respond Unhandled
 
-    (* spec for [main top_hash]:
-       constraints pass iff
-       there exist digest, s1, s3, fee_excess, supply_increase pending_coinbase_stack12.source, pending_coinbase_stack23.target, tock_vk such that
-       H(digest,s1, s3, pending_coinbase_stack12.source, pending_coinbase_stack23.target, fee_excess, supply_increase, tock_vk) = top_hash,
-       verify_transition tock_vk _ s1 s2 pending_coinbase_stack12.source, pending_coinbase_stack12.target is true
-       verify_transition tock_vk _ s2 s3 pending_coinbase_stack23.source, pending_coinbase_stack23.target is true
+    (** {2 Merge Main Circuit}
+
+        Verifies that two transaction proofs can be merged.
+
+        {3 Specification}
+
+        The constraints pass if and only if there exist statements s1, s2 such that:
+        - fee_excess(s) = fee_excess(s1) + fee_excess(s2)
+        - supply_increase(s) = supply_increase(s1) + supply_increase(s2)
+        - Pending coinbase stacks transition correctly
+        - Ledger hashes chain correctly:
+          - s.source.first_pass_ledger = s1.source.first_pass_ledger
+          - s2.target.first_pass_ledger = s.target.first_pass_ledger
+          - s.source.second_pass_ledger = s1.source.second_pass_ledger
+          - s2.target.second_pass_ledger = s.target.second_pass_ledger
+        - Local states chain correctly:
+          - s.source.local_state = s1.source.local_state
+          - s.target.local_state = s2.target.local_state
+        - Connecting ledgers are consistent
+
+        {3 Constraints}
+
+        1. Fee excesses combine correctly (with overflow check)
+        2. Pending coinbase stack transitions are valid (check_merge)
+        3. Supply increases sum correctly
+        4. Source/target ledger hashes match (9 equality checks)
+        5. Local state continuity (source=s1.source, target=s2.target)
     *)
     let%snarkydef_ main (s : Statement.With_sok.var) =
       let%bind s1, s2 =
@@ -3295,6 +3627,19 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       (s1, s2)
 
+    (** {2 Merge Rule Definition}
+
+        Pickles inductive rule for merging two transaction proofs.
+
+        - {b Identifier}: "merge"
+        - {b Previous proofs}: 2 (both are transaction SNARK proofs)
+        - {b Public input}: Statement.With_sok.t (merged statement)
+        - {b Proof verification}: Based on proof_level (Full = verify)
+
+        The rule requests two statements (s1, s2) and two proofs (p1, p2)
+        from the witness, verifies the merge constraints, then returns
+        the previous proof statements for Pickles to verify recursively.
+    *)
     let rule ~proof_level self : _ Pickles.Inductive_rule.t =
       let prev_must_verify =
         match proof_level with
@@ -3327,6 +3672,14 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   open Pickles_types
 
+  (** {1 Pickles Tag Type}
+
+      The tag uniquely identifies this SNARK in Pickles compilation.
+      - Public input: [Statement.With_sok.var]
+      - Statement: [Statement.With_sok.t]
+      - Max proofs verified: N2 (merge verifies 2 proofs)
+      - Branches: N5 (5 rules: base, merge, 3 zkapp variants)
+  *)
   type tag =
     ( Statement.With_sok.var
     , Statement.With_sok.t
@@ -3334,6 +3687,31 @@ module Make_str (A : Wire_types.Concrete) = struct
     , Nat.N5.n )
     Pickles.Tag.t
 
+  (** {1 Transaction SNARK System Compilation}
+
+      Compile the transaction SNARK using Pickles.
+
+      {2 Rules Compiled (5 total)}
+
+      1. {b Base.rule} ("transaction") - Single non-zkApp transaction
+      2. {b Merge.rule} ("merge") - Merge two proofs
+      3. {b zkapp_command Opt_signed_opt_signed} - ZkApp with 2 optional sigs
+      4. {b zkapp_command Opt_signed} - ZkApp with 1 optional sig
+      5. {b zkapp_command Proved} - ZkApp with side-loaded proof
+
+      {2 Compilation Parameters}
+
+      - cache: Cache_dir.cache (for storing proving/verification keys)
+      - override_wrap_domain: N1 (wrap with single proof)
+      - public_input: Statement.With_sok.typ
+      - auxiliary_typ: Unit
+      - max_proofs_verified: N2 (at most 2 proofs per rule)
+      - name: "transaction-snark"
+
+      @param signature_kind Signature scheme variant (mainnet/testnet)
+      @param proof_level Full/Check/No_check
+      @param constraint_constants Genesis constraint constants
+  *)
   let system ~signature_kind ~proof_level ~constraint_constants =
     Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
