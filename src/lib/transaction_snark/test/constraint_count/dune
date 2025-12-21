@@ -1,0 +1,8 @@
+(tests
+ (names test_constraint_count)
+ (libraries
+  alcotest
+  core_kernel
+  genesis_constants
+  mina_signature_kind
+  transaction_snark))

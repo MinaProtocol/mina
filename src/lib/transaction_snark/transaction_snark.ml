@@ -3949,6 +3949,32 @@ module Make_str (A : Wire_types.Concrete) = struct
               (main ~signature_kind ~constraint_constants)) )
     ]
 
+  (** Return the number of constraints (rows) in each transaction SNARK circuit.
+
+      This is useful for:
+      - Tracking constraint count changes over time
+      - Comparing with other implementations
+      - Performance analysis
+
+      @return List of (circuit_name, constraint_count) pairs
+  *)
+  let constraint_counts ~signature_kind ~constraint_constants () =
+    let count cs = Tick.R1CS_constraint_system.get_rows_len cs in
+    [ ( "transaction-merge"
+      , count
+          Merge.(
+            Tick.constraint_system ~input_typ:Statement.With_sok.typ
+              ~return_typ:Tick.Typ.unit (fun x ->
+                let open Tick in
+                Checked.map ~f:ignore @@ main x )) )
+    ; ( "transaction-base"
+      , count
+          Base.(
+            Tick.constraint_system ~input_typ:Statement.With_sok.typ
+              ~return_typ:Tick.Typ.unit
+              (main ~signature_kind ~constraint_constants)) )
+    ]
+
   module Account_update_group = Zkapp_command.Make_update_group (struct
     type local_state =
       ( Stack_frame.value

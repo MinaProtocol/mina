@@ -222,6 +222,13 @@ module type Full = sig
     -> unit
     -> (string * Md5.t) list
 
+  (** Return the number of constraints (rows) in each transaction SNARK circuit. *)
+  val constraint_counts :
+       signature_kind:Mina_signature_kind.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> unit
+    -> (string * int) list
+
   (* Every circuit must have at least 1 of each type of constraint.
      This function can be used to add the missing constraints *)
   val dummy_constraints : unit -> unit Tick.Checked.t
