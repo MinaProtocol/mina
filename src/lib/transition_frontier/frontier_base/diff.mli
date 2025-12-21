@@ -62,7 +62,7 @@ module Root_transition : sig
     | Full : Staged_ledger.Scan_state.t -> full root_transition_scan_state
 
   type 'repr t =
-    { new_root : Root_data.Limited.Stable.Latest.t
+    { new_root : Root_data.Limited.Serializable_type.Stable.Latest.t
     ; garbage : 'repr Node_list.t
     ; old_root_scan_state : 'repr root_transition_scan_state
     ; just_emitted_a_proof : bool

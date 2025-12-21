@@ -25,7 +25,7 @@ exception Invalid_genesis_state_hash of Mina_block.Validated.t
 
 let construct_staged_ledger_at_root ~proof_cache_db
     ~(precomputed_values : Precomputed_values.t) ~root_ledger ~root_transition
-    ~(root : Root_data.Minimal.Stable.Latest.t) ~protocol_states ~logger
+    ~(root : Root_data.Minimal.Serializable_type.t) ~protocol_states ~logger
     ~signature_kind =
   let blockchain_state =
     root_transition |> Mina_block.Validated.forget |> With_hash.data
@@ -33,7 +33,8 @@ let construct_staged_ledger_at_root ~proof_cache_db
     |> Protocol_state.blockchain_state
   in
   let pending_coinbases, scan_state_unwrapped =
-    Root_data.Minimal.Stable.Latest.(pending_coinbase root, scan_state root)
+    Root_data.Minimal.Serializable_type.Stable.Latest.
+      (pending_coinbase root, scan_state root)
   in
   let protocol_states_map =
     List.fold protocol_states ~init:State_hash.Map.empty
@@ -63,7 +64,9 @@ let construct_staged_ledger_at_root ~proof_cache_db
   in
   let scan_state =
     Staged_ledger.Scan_state.write_all_proofs_to_disk ~signature_kind
-      ~proof_cache_db scan_state_unwrapped
+      ~proof_cache_db
+    @@ Staged_ledger.Scan_state.Serializable_type.to_raw_serializable
+         scan_state_unwrapped
   in
   Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
     ~snarked_local_state:local_state ~snarked_ledger:mask ~scan_state
@@ -262,7 +265,9 @@ module Instance = struct
     let%bind root, root_transition, best_tip, protocol_states, root_hash =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
-      let root_hash = Root_data.Minimal.Stable.Latest.hash root in
+      let root_hash =
+        Root_data.Minimal.Serializable_type.Stable.Latest.hash root
+      in
       let%bind root_transition =
         Database.get_transition t.db ~signature_kind ~proof_cache_db root_hash
       in
