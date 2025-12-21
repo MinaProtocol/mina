@@ -16,6 +16,30 @@ module Common = struct
     end
   end]
 
+  module Serializable_type = struct
+    type raw_serializable = Stable.Latest.t
+
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          { scan_state : Staged_ledger.Scan_state.Serializable_type.Stable.V2.t
+          ; pending_coinbase : Pending_coinbase.Stable.V2.t
+          }
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let to_raw_serializable : t -> raw_serializable =
+     fun { scan_state; pending_coinbase } ->
+      { scan_state =
+          Staged_ledger.Scan_state.Serializable_type.to_raw_serializable
+            scan_state
+      ; pending_coinbase
+      }
+  end
+
   type t =
     { scan_state : Staged_ledger.Scan_state.t
     ; pending_coinbase : Pending_coinbase.t
@@ -37,6 +61,12 @@ module Common = struct
   let read_all_proofs_from_disk { scan_state; pending_coinbase } =
     { Stable.Latest.pending_coinbase
     ; scan_state = Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
+    }
+
+  let to_serializable_type : t -> Serializable_type.t =
+   fun { scan_state; pending_coinbase } ->
+    { scan_state = Staged_ledger.Scan_state.to_serializable_type scan_state
+    ; pending_coinbase
     }
 end
 

@@ -185,8 +185,6 @@ module Ledger_proof_with_sok_message = struct
   module Serializable_type = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type t =
           Ledger_proof.Serializable_type.Stable.V2.t * Sok_message.Stable.V1.t
@@ -331,8 +329,6 @@ module Serializable_type = struct
 
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         { scan_state :

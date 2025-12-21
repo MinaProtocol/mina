@@ -10,9 +10,24 @@ module Common : sig
     end
   end]
 
+  module Serializable_type : sig
+    type raw_serializable := Stable.Latest.t
+
+    [%%versioned:
+    module Stable : sig
+      module V2 : sig
+        type t
+      end
+    end]
+
+    val to_raw_serializable : t -> raw_serializable
+  end
+
   type t
 
   val read_all_proofs_from_disk : t -> Stable.V2.t
+
+  val to_serializable_type : t -> Serializable_type.t
 end
 
 (* Historical root data is similar to Limited root data, except that it also
