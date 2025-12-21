@@ -454,20 +454,21 @@ end
 
 let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
 
+(** Return the constraint system for the blockchain-step circuit. *)
+let step_constraint_system ~proof_level ~constraint_constants =
+  let main x =
+    let open Tick in
+    let%map _ =
+      step ~proof_level ~constraint_constants ~logger:(Logger.create ()) x
+    in
+    ()
+  in
+  Tick.constraint_system ~input_typ:Statement.typ ~return_typ:Tick.Typ.unit main
+
 let constraint_system_digests ~proof_level ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
   [ ( "blockchain-step"
-    , digest
-        (let main x =
-           let open Tick in
-           let%map _ =
-             step ~proof_level ~constraint_constants ~logger:(Logger.create ())
-               x
-           in
-           ()
-         in
-         Tick.constraint_system ~input_typ:Statement.typ
-           ~return_typ:Tick.Typ.unit main ) )
+    , digest (step_constraint_system ~proof_level ~constraint_constants) )
   ]
 
 module Make (T : sig
