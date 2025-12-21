@@ -370,6 +370,16 @@ module Serializable_type = struct
       let to_latest = Fn.id
     end
   end]
+
+  let empty_diff : t =
+    { diff =
+        ( { completed_works = []
+          ; commands = []
+          ; coinbase = At_most_two.Zero
+          ; internal_command_statuses = []
+          }
+        , None )
+    }
 end
 
 type t = { diff : Diff.t } [@@deriving fields]

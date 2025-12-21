@@ -18,6 +18,8 @@ module Serializable_type : sig
       type t = { staged_ledger_diff : Diff.Serializable_type.Stable.V2.t }
     end
   end]
+
+  val create : Diff.Serializable_type.t -> t
 end
 
 type t
@@ -28,7 +30,8 @@ val staged_ledger_diff : t -> Diff.t
 
 val to_binio_bigstring : Stable.V1.t -> Core_kernel.Bigstring.t
 
-val compute_reference : tag:int -> Stable.V1.t -> Consensus.Body_reference.t
+val compute_reference :
+  tag:int -> Serializable_type.t -> Consensus.Body_reference.t
 
 val write_all_proofs_to_disk :
      signature_kind:Mina_signature_kind.t

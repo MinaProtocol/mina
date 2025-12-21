@@ -40,6 +40,25 @@ module Serializable_type = struct
       let to_latest = Fn.id
     end
   end]
+
+  module Creatable = struct
+    let id = "block_body"
+
+    type nonrec t = t
+
+    type 'a creator = Diff.Serializable_type.t -> 'a
+
+    let map_creator c ~f staged_ledger_diff = f (c staged_ledger_diff)
+
+    let create staged_ledger_diff = { staged_ledger_diff }
+  end
+
+  include (
+    Allocation_functor.Make.Basic
+      (Creatable) :
+        Allocation_functor.Intf.Output.Basic_intf
+          with type t := t
+           and type 'a creator := 'a Creatable.creator )
 end
 
 type t = { staged_ledger_diff : Diff.t } [@@deriving fields]
@@ -53,9 +72,9 @@ let to_binio_bigstring b =
   buf
 
 let serialize_with_len_and_tag ~tag b =
-  let len = Stable.V1.bin_size_t b in
+  let len = Serializable_type.Stable.V1.bin_size_t b in
   let bs' = Bigstring.create (len + 5) in
-  ignore (Stable.V1.bin_write_t bs' ~pos:5 b : int) ;
+  ignore (Serializable_type.Stable.V1.bin_write_t bs' ~pos:5 b : int) ;
   Bigstring.set_uint8_exn ~pos:4 bs' tag ;
   Bigstring.set_uint32_le_exn ~pos:0 bs' (len + 1) ;
   bs'

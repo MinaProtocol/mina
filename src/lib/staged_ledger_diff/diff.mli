@@ -201,6 +201,8 @@ module Serializable_type : sig
       type t = { diff : Diff.Serializable_type.Stable.V2.t }
     end
   end]
+
+  val empty_diff : t
 end
 
 val write_all_proofs_to_disk :
