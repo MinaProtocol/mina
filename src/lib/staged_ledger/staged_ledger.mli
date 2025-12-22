@@ -37,35 +37,11 @@ module Scan_state : sig
     [@@deriving sexp]
   end
 
-  module Transactions_categorized : sig
-    module Poly : sig
-      type 'a t =
-        { first_pass : 'a list
-        ; second_pass : 'a list
-        ; previous_incomplete : 'a list
-        ; current_incomplete : 'a list
-        }
-      [@@deriving sexp, to_yojson]
-    end
-
-    type t = Transaction_snark_scan_state.Transaction_with_witness.t Poly.t
-  end
-
   val empty :
     constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
   (** Statements of the required snark work *)
   val snark_job_list_json : t -> string
-
-  (** All the transactions with hash of the parent block in which they were
-      included in the order in which they were applied *)
-  val staged_transactions_with_state_hash :
-       t
-    -> ( Transaction.t With_status.t
-       * State_hash.t
-       * Mina_numbers.Global_slot_since_genesis.t )
-       Transactions_categorized.Poly.t
-       list
 
   (** Statements of all the pending work. Fails if there are any invalid
       statements in the scan state [t] *)
@@ -193,16 +169,6 @@ val create_exn :
   -> t
 
 val replace_ledger_exn : t -> Ledger.t -> t
-
-(** Transactions corresponding to the most recent ledger proof in t *)
-val proof_txns_with_state_hashes :
-     t
-  -> ( Transaction.t With_status.t
-     * State_hash.t
-     * Mina_numbers.Global_slot_since_genesis.t )
-     Scan_state.Transactions_categorized.Poly.t
-     Mina_stdlib.Nonempty_list.t
-     option
 
 val copy : t -> t
 
