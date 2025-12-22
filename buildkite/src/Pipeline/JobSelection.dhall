@@ -15,4 +15,12 @@ let isFull =
           \(selection : Selection)
       ->  merge { Triaged = False, Full = True } selection
 
-in  { Type = Selection, capitalName = capitalName, isFull = isFull }
+let show =
+          \(selection : Selection)
+      ->  merge { Triaged = "triaged", Full = "full" } selection
+
+in  { Type = Selection
+    , capitalName = capitalName
+    , isFull = isFull
+    , show = show
+    }

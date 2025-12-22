@@ -8,7 +8,7 @@ let Filter
     : Type
     = < PullRequestOnly | StableOnly | Nightly | MainlineNightly | All >
 
-let tags
+let scopes
     : Filter -> List Scope.Type
     =     \(filter : Filter)
       ->  merge
@@ -29,12 +29,12 @@ let show
     : Filter -> Text
     =     \(filter : Filter)
       ->  merge
-            { PullRequestOnly = "PullRequestOnly"
-            , StableOnly = "StableOnly"
-            , Nightly = "Nightly"
-            , MainlineNightly = "MainlineNightly"
-            , All = "All"
+            { PullRequestOnly = "pullrequestonly"
+            , StableOnly = "stableonly"
+            , Nightly = "nightly"
+            , MainlineNightly = "mainlinenightly"
+            , All = "all"
             }
             filter
 
-in  { Type = Filter, tags = tags, show = show }
+in  { Type = Filter, scopes = scopes, show = show }

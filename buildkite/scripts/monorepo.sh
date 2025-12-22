@@ -14,16 +14,19 @@
 #     1. selection       (Triaged or Full) - Determines the mode of selection for triggering jobs.
 #                                            Triaged mode checks for relevant changes,
 #                                            while Full mode triggers all jobs, which falls under scope and filter.
-#     5. jobs-filter     STRING            - A filter is a group of job tags, those tags can be any string.
-#     6. scope-filter    STRING            - A filter string to determine if the job falls under a specific scope.
+#     2. tags            STRING            - A filter is a group of job tags, those tags can be any string.
+#     3. scope           STRING            - A filter string to determine if the job falls under a specific scope.
 #                                            Scope is a gate level in mina like :
 #                                             - PR - for pull requests
 #                                             - Nightly - for builds that run extended scope of tests including heavy tests
 #                                                         which might take longer time to execute
 #                                             - Release - full builds with all known jobs, including all supported networks/codenames
 #                                             - Mainline Nightly - like above but for mainline branch on nightly basis
-#     7. dirty-when      STRING            - A pattern used to check for relevant changes in the repository.
+#     4. dirty-when      STRING            - A pattern used to check for relevant changes in the repository.
+#
+# ------------------------------------------------------------------------------
 
+set -euo pipefail
 
 show_help() {
   cat << EOF
@@ -33,10 +36,12 @@ Options:
   --selection-mode       MODE      Selection mode (Triaged or Full)
   --is-included-in-tag   BOOL      Is included in tag (True/False)
   --is-included-in-scope BOOL      Is included in scope (True/False)
-  --job-name NAME        STRING    Job name
-  --jobs-filter FILTER   STRING    Jobs filter
-  --scope-filter FILTER  STRING    Scope filter
-  --dirty-when PATTERN   STRING    Pattern for dirty check
+  --jobs PATH            STRING    Path to jobs directory
+  --tags FILTER          STRING    Jobs filter (tags separated by commas)
+  --scopes FILTER        STRING    Scope filter (PR, Nightly, Release, Mainline Nightly)
+  --git-diff-file FILE   STRING    File containing git diff output
+  --dry-run              BOOL      Dry run mode (True/False)
+  --filter-mode MODE     STRING    Filter mode (any or all)
   --trigger CMD          STRING    Trigger command
   -h, --help             Show this help message
 EOF
@@ -44,33 +49,29 @@ EOF
 
 # Default values
 SELECTION_MODE=""
-IS_INCLUDED_IN_TAG=""
-IS_INCLUDED_IN_SCOPE=""
-JOB_NAME=""
-JOBS_FILTER=""
-SCOPE_FILTER=""
-DIRTY_WHEN=""
-
+JOBS=""
+TAGS=""
+SCOPES=""
+GIT_DIFF_FILE=""
+DRY_RUN=false
 
 # Parse
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --selection-mode)
       SELECTION_MODE="$2"; shift 2;;
-    --is-included-in-tag)
-      IS_INCLUDED_IN_TAG="$2"; shift 2;;
-    --is-included-in-scope)
-      IS_INCLUDED_IN_SCOPE="$2"; shift 2;;
-    --job-name)
-      JOB_NAME="$2"; shift 2;;
-    --job-path)
-      JOB_PATH="$2"; shift 2;;
-    --jobs-filter)
-      JOBS_FILTER="$2"; shift 2;;
-    --scope-filter)
-      SCOPE_FILTER="$2"; shift 2;;
-    --dirty-when)
-      DIRTY_WHEN="$2"; shift 2;;
+    --jobs)
+      JOBS="$2"; shift 2;;
+    --tags)
+      TAGS="$2"; shift 2;;
+    --scopes)
+      SCOPES="$2"; shift 2;;
+    --git-diff-file)
+      GIT_DIFF_FILE="$2"; shift 2;;
+    --dry-run)
+      DRY_RUN=true; shift 1;;
+    --filter-mode)
+      FILTER_MODE="$2"; shift 2;;
     -h|--help)
       show_help; exit 0;;
     *)
@@ -78,37 +79,161 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$SELECTION_MODE" ]]; then
-  echo "Error: --selection-mode is required"; show_help; exit 1
+# Require all arguments
+if [[ -z "$SELECTION_MODE" || -z "$JOBS" || -z "$TAGS" || -z "$SCOPES" ]]; then
+  echo "Error: All arguments --selection-mode, --jobs, --tags, and --scopes are required."
+  exit 1
 fi
 
-should_trigger=false
+# Check if yq is installed, if not install it
+if ! command -v yq &> /dev/null; then
+  echo "yq not found, installing..."
+  if command -v apt-get &> /dev/null; then
+    sudo apt-get update && sudo apt-get install -y wget
+    sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+    sudo chmod +x /usr/local/bin/yq
+  else
+    echo "Error: yq is not installed and automatic installation is not supported on this system. Please install yq manually."
+    exit 1
+  fi
+fi
 
-if [[ "$SELECTION_MODE" == "Triaged" ]]; then
-  if [[ "$IS_INCLUDED_IN_TAG" == "False" ]]; then
-    echo "Skipping $JOB_NAME because this job is not falling under $JOBS_FILTER filter "
-  elif [[ "$IS_INCLUDED_IN_SCOPE" == "False" ]]; then
-    echo "Skipping $JOB_NAME because this job is not falling under $SCOPE_FILTER stage"
-  elif grep -E -q "$DIRTY_WHEN" _computed_diff.txt; then
-    echo "Triggering $JOB_NAME for reason:"
-    grep -E "$DIRTY_WHEN" _computed_diff.txt
-    should_trigger=true
-  else
-    echo "Skipping $JOB_NAME because is irrelevant to PR changes"
-  fi
-elif [[ "$SELECTION_MODE" == "Full" ]]; then
-  if [[ "$IS_INCLUDED_IN_TAG" == "False" ]]; then
-    echo "Skipping $JOB_NAME because this job is not falling under $JOBS_FILTER filter "
-  elif [[ "$IS_INCLUDED_IN_SCOPE" == "False" ]]; then
-    echo "Skipping $JOB_NAME because this job is not falling under $SCOPE_FILTER stage"
-  else
-    echo "Triggering $JOB_NAME because this is a stable buildkite run"
-    should_trigger=true
-  fi
+IFS=',' read -r -a DESIRED_TAGS <<< "$TAGS"
+IFS=',' read -r -a DESIRED_SCOPES <<< "$SCOPES"
+
+# Set filter flag based on FILTER_MODE
+FILTER_ANY=false
+FILTER_ALL=false
+if [[ "$FILTER_MODE" == "any" ]]; then
+  FILTER_ANY=true
+elif [[ "$FILTER_MODE" == "all" ]]; then
+  FILTER_ALL=true
 else
-  echo "Unknown selection mode: $SELECTION_MODE"; show_help; exit 1
+  echo "Error: --filter-mode must be 'any' or 'all'."
+  exit 1
 fi
 
-if [[ "$should_trigger" == "true" ]]; then
-  dhall-to-yaml --quoted <<< "(./buildkite/src/Jobs/${JOB_PATH}/${JOB_NAME}.dhall).pipeline" | buildkite-agent pipeline upload
+# Validate SELECTION value
+
+# Set selection flags
+SELECTION_TRIAGED=false
+SELECTION_FULL=false
+if [[ "$SELECTION_MODE" == "triaged" ]]; then
+  SELECTION_TRIAGED=true
+elif [[ "$SELECTION_MODE" == "full" ]]; then
+  SELECTION_FULL=true
+else
+  echo "Error: --selection-mode must be 'triaged' or 'full'."
+  exit 1
 fi
+
+has_matching_tags() {
+  local tags="$1"
+  local filter_any="$2"
+  local filter_all="$3"
+  shift 3
+  local desired_tags=("$@")
+
+  local match_count=0
+
+  for want in "${desired_tags[@]}"; do
+
+    if WANT="$want" \
+       yq -e '.[] | select((downcase) == (env(WANT) | downcase))' \
+       <<< "$tags" \
+       >/dev/null 2>&1
+    then
+      match_count=$((match_count+1))
+    fi
+  done
+
+  if $filter_any && [[ $match_count -ge 1 ]]; then
+    echo 1
+  elif $filter_all && [[ $match_count -eq ${#desired_tags[@]} ]]; then
+    echo 1
+  else
+    echo 0
+  fi
+}
+
+scope_matches() {
+  local scope="$1"
+  shift
+  local desired_scopes=("$@")
+  local match_count=0
+
+ for want in "${desired_scopes[@]}"; do
+    # yq v4 NIE ma --arg, więc używamy env(WANT)
+    if WANT="$want" \
+       yq -e '.[] | select((downcase) == (env(WANT) | downcase))' \
+       <<< "$scope" \
+         >/dev/null 2>&1
+    then
+      match_count=$((match_count+1))
+      break
+    fi
+  done
+
+  echo $(( match_count == 1 ? 1 : 0 ))
+}
+
+select_job() {
+  local selection_full="$1"
+  local selection_triaged="$2"
+  local file="$3"
+  local job_name="$4"
+  local git_diff_file="$5"
+
+  if [[ "$selection_full" == true ]]; then
+    echo 1
+  elif [[ "$selection_triaged" == true ]]; then
+    dirtyWhen=$(cat "${file%.yml}.dirtywhen")
+    # Remove quotes from beginning and end of string
+    dirtyWhen="${dirtyWhen%\"}"
+    dirtyWhen="${dirtyWhen#\"}"
+    if cat "$git_diff_file" | grep -E "$dirtyWhen" > /dev/null; then
+      echo 1
+    else
+      echo 0
+    fi
+  fi
+}
+
+find "$JOBS" -type f -name "*.yml" | while read -r file; do
+  tags=$(yq .spec.tags "$file")
+  scope=$(yq .spec.scope "$file")
+  job_name=$(yq -r .spec.name "$file")
+
+  tag_match=$(has_matching_tags "$tags" "$FILTER_ANY" "$FILTER_ALL" "${DESIRED_TAGS[@]}")
+
+  scope_match=$(scope_matches "$scope" "${DESIRED_SCOPES[@]}")
+
+  if [[ $tag_match -ne 1 ]]; then
+    echo "🏷️🚫 $job_name rejected job due to tags mismatch: $file" >&2
+    continue
+  fi
+  if [[ $scope_match -ne 1 ]]; then
+    echo "🔭🚫 $job_name rejected job due to scope mismatch: $file" >&2
+    continue
+  fi
+
+  job_selected=$(select_job "$SELECTION_FULL" "$SELECTION_TRIAGED" "$file" "$job_name" "$GIT_DIFF_FILE")
+
+  if [[ $job_selected -ne 1 ]]; then
+    echo "🧹🚫 $job_name rejected job as it does not fall into dirty when: $file" >&2
+    continue
+  fi
+
+  echo "✅ Including job $job_name in build "
+
+  if [[ "$DRY_RUN" == true ]]; then
+      printf " -> 🛑 Dry run enabled, skipping upload for job: %s\n" "$job_name"
+  else
+    job_path=$(yq -r .spec.path "$file")
+
+    dhall-to-yaml --quoted <<< "(./buildkite/src/Jobs/$job_path/$job_name.dhall).pipeline" | buildkite-agent pipeline upload
+    printf " -> ✅ Uploaded job: %s\n" "$job_name"
+  fi
+
+done
+
