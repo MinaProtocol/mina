@@ -139,13 +139,13 @@ func (t *HardforkTest) Run() error {
 		return nil
 	}
 
-	analysis, err := t.RunMainNetworkPhase(mainGenesisTs, beforeShutdown)
+	analysis, forkData, err := t.RunMainNetworkPhase(mainGenesisTs)
 	if err != nil {
 		return err
 	}
 
 	t.Logger.Info("Phase 3: Running fork network...")
-	if err := t.RunForkNetworkPhase(analysis.LastBlockBeforeTxEnd.BlockHeight, <-forkDataChan, mainGenesisTs); err != nil {
+	if err := t.RunForkNetworkPhase(analysis.LastBlockBeforeTxEnd.BlockHeight, *forkData, mainGenesisTs); err != nil {
 		return err
 	}
 
