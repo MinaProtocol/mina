@@ -91,7 +91,7 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 }
 
 // RunMainNetwork starts the main network
-func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
+func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64, isAutoHFMode bool) (*exec.Cmd, error) {
 
 	mainGenesisTimestamp := config.FormatTimestamp(mainGenesisTs)
 
@@ -102,6 +102,10 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 		"--slot-transaction-end", strconv.Itoa(t.Config.SlotTxEnd),
 		"--slot-chain-end", strconv.Itoa(t.Config.SlotChainEnd),
 		"--hardfork-genesis-slot-delta", strconv.Itoa(t.Config.HfSlotDelta),
+	}
+
+	if isAutoHFMode {
+		args = append(args, "--hardfork-handling", "migrate-exit")
 	}
 
 	return t.startLocalNetwork(t.Config.MainMinaExe, "main", args)
