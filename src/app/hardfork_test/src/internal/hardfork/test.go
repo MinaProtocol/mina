@@ -2,7 +2,6 @@ package hardfork
 
 import (
 	"context"
-	"math/rand"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -121,41 +120,23 @@ func (t *HardforkTest) Run() error {
 	t.Logger.Info("Phase 1: Running main network...")
 	forkDataChan := make(chan ForkData, 1)
 
-	var beforeShutdown HFHandler
-	switch t.Config.ForkMethod {
-	case config.Legacy:
+	beforeShutdown := func(t *HardforkTest, analysis *BlockAnalysisResult) error {
+		t.Logger.Info("Phase 2: Forking with fork method `%s`...", t.Config.ForkMethod.String())
 
-		beforeShutdown = func(t *HardforkTest, analysis *BlockAnalysisResult) error {
-			// TODO: refactor so that:
-			// 1. stuff here go into LegacyForkPhase
-			// 2. fork validation is agnostic to fork method and it's checked regardless of fork method
-			t.Logger.Info("Phase 2: Forking the legacy way...")
-
-			idx := rand.Intn(len(analysis.CandidatePortBasesForFork))
-			forkConfigBytes, err := t.GetForkConfig(analysis.CandidatePortBasesForFork[idx] + int(PORT_REST))
-			if err != nil {
-				return err
-			}
-			var forkData *ForkData
-			forkData, err = t.LegacyForkPhase(analysis, forkConfigBytes, mainGenesisTs)
-			if err != nil {
-				return err
-			}
-			forkDataChan <- *forkData
-			return nil
+		var forkData *ForkData
+		var err error
+		switch t.Config.ForkMethod {
+		case config.Legacy:
+			forkData, err = t.LegacyForkPhase(analysis, mainGenesisTs)
+		case config.Advanced:
+			forkData, err = t.AdvancedForkPhase(analysis, mainGenesisTs)
 		}
 
-	case config.Advanced:
-		beforeShutdown = func(t *HardforkTest, analysis *BlockAnalysisResult) error {
-			t.Logger.Info("Phase 2: Forking with `mina advanced generate-hardfork-config`...")
-
-			forkData, err := t.AdvancedForkPhase(analysis, mainGenesisTs)
-			if err != nil {
-				return err
-			}
-			forkDataChan <- *forkData
-			return nil
+		if err != nil {
+			return err
 		}
+		forkDataChan <- *forkData
+		return nil
 	}
 
 	analysis, err := t.RunMainNetworkPhase(mainGenesisTs, beforeShutdown)
