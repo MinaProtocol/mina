@@ -43,20 +43,28 @@ if [[ -d _opam ]]; then
     fi
 fi
 
+opam-repo-upsert() {
+    local name="$1"
+    local url="$2"
+
+    if opam repository list --short | grep -qx "$name"; then
+        opam repository set-url "$name" "$url"
+    else
+        opam repository add "$name" "$url"
+    fi
+}
+
 if [[ ! -d "${switch_dir}" ]]; then
     opam switch create ./ ${ocaml_version} --no-install --yes
     eval "$(opam env)"
-    # We add o1-labs opam repository and make it default
-    # (if it's repeated, it's a no-op)
-    opam repository add --yes --set-default o1-labs \
-         "https://github.com/o1-labs/opam-repository.git#${O1LABS_OPAM_REPOSITORY_COMMIT}"
+
+    opam-repo-upsert o1-labs "https://github.com/o1-labs/opam-repository.git#${O1LABS_OPAM_REPOSITORY_COMMIT}"
+
     # The default opam repository is set to a specific commit as some of our
     # dependencies have been archived.
     # See https://github.com/MinaProtocol/mina/pull/17450
-    opam repository \
-         set-url \
-         default \
-         "git+https://github.com/ocaml/opam-repository.git#${OPAM_REPOSITORY_COMMIT}"
+    opam-repo-upsert default "git+https://github.com/ocaml/opam-repository.git#${OPAM_REPOSITORY_COMMIT}"
+
     opam update
     opam switch import -y --switch . opam.export
     mkdir -p opam_switches

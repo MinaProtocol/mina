@@ -39,6 +39,7 @@ in  Pipeline.build
           [ PipelineTag.Type.Fast
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
+          , PipelineTag.Type.Archive
           ]
         }
       , steps =

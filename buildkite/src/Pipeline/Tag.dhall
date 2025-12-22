@@ -4,11 +4,7 @@
 
 let Prelude = ../External/Prelude.dhall
 
-let FilterMode = ./FilterMode.dhall
-
-let List/any = Prelude.List.any
-
-let List/all = Prelude.List.all
+let Extensions = ../Lib/Extensions.dhall
 
 let Tag
     : Type
@@ -36,75 +32,8 @@ let Tag
       | Noble
       | Focal
       | Jammy
+      | Archive
       >
-
-let toNatural
-    : Tag -> Natural
-    =     \(tag : Tag)
-      ->  merge
-            { Fast = 1
-            , Long = 2
-            , VeryLong = 3
-            , TearDown = 4
-            , Lint = 5
-            , Release = 6
-            , Test = 7
-            , Toolchain = 8
-            , Hardfork = 9
-            , Stable = 10
-            , Promote = 11
-            , Debian = 12
-            , Docker = 13
-            , Rosetta = 14
-            , Devnet = 15
-            , Lightnet = 16
-            , Arm64 = 17
-            , Amd64 = 18
-            , Mainnet = 19
-            , Bullseye = 20
-            , Bookworm = 21
-            , Noble = 22
-            , Focal = 23
-            , Jammy = 24
-            }
-            tag
-
-let equal
-    : Tag -> Tag -> Bool
-    =     \(left : Tag)
-      ->  \(right : Tag)
-      ->  Prelude.Natural.equal (toNatural left) (toNatural right)
-
-let hasAny
-    : Tag -> List Tag -> Bool
-    =     \(input : Tag)
-      ->  \(tags : List Tag)
-      ->  List/any Tag (\(x : Tag) -> equal x input) tags
-
-let hasAll
-    : List Tag -> List Tag -> Bool
-    =     \(input : List Tag)
-      ->  \(tags : List Tag)
-      ->  List/all Tag (\(x : Tag) -> hasAny x tags) input == True
-
-let containsAll
-    : List Tag -> List Tag -> Bool
-    = \(input : List Tag) -> \(tags : List Tag) -> hasAll input tags
-
-let containsAny
-    : List Tag -> List Tag -> Bool
-    =     \(input : List Tag)
-      ->  \(tags : List Tag)
-      ->  List/any Tag (\(x : Tag) -> hasAny x tags) input
-
-let contains
-    : List Tag -> List Tag -> FilterMode.Type -> Bool
-    =     \(input : List Tag)
-      ->  \(tags : List Tag)
-      ->  \(filterMode : FilterMode.Type)
-      ->  merge
-            { Any = containsAny input tags, All = containsAll input tags }
-            filterMode
 
 let capitalName =
           \(tag : Tag)
@@ -133,6 +62,7 @@ let capitalName =
             , Noble = "Noble"
             , Focal = "Focal"
             , Jammy = "Jammy"
+            , Archive = "Archive"
             }
             tag
 
@@ -163,16 +93,16 @@ let lowerName =
             , Noble = "noble"
             , Focal = "focal"
             , Jammy = "jammy"
+            , Archive = "archive"
             }
             tag
+
+let join =
+          \(tags : List Tag)
+      ->  Extensions.join "," (Prelude.List.map Tag Text lowerName tags)
 
 in  { Type = Tag
     , capitalName = capitalName
     , lowerName = lowerName
-    , toNatural = toNatural
-    , equal = equal
-    , hasAny = hasAny
-    , containsAny = containsAny
-    , containsAll = containsAll
-    , contains = contains
+    , join = join
     }

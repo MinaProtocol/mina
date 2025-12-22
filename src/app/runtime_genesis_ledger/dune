@@ -13,17 +13,18 @@
   yojson
   async_unix
   ;;local libraries
-  genesis_constants
-  mina_runtime_config
-  mina_ledger
-  genesis_ledger_helper
-  mina_stdlib
-  logger
   cache_dir
-  precomputed_values
+  cli_lib
   coda_genesis_ledger
   consensus
-  mina_base)
+  genesis_constants
+  genesis_ledger_helper
+  logger
+  mina_base
+  mina_runtime_config
+  mina_ledger
+  mina_stdlib
+  precomputed_values)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

@@ -78,6 +78,10 @@ let global_slot =
   Command.Arg_type.map Command.Param.int
     ~f:Mina_numbers.Global_slot_since_genesis.of_int
 
+let hardfork_slot =
+  Command.Arg_type.map Command.Param.int
+    ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
+
 let txn_fee =
   Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_mina_string_exn
 

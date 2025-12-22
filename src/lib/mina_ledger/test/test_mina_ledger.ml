@@ -15,9 +15,9 @@ let num_accounts = 200
 let () = assert (num_accounts <= Int.shift_left 1 ledger_depth)
 
 module Root_test = struct
-  (** populate a root with at most [num] accounts. This is because generated 
+  (** populate a root with at most [num] untimed accounts. This is because generated 
       accounts might duplicate *)
-  let populate_with_random_accounts ~num ~root ~random =
+  let populate_with_random_untimed_accounts ~num ~root ~random =
     let unmasked = Root_ledger.as_unmasked root in
     let module LocMap = L.Any_ledger.Location.Map in
     Quickcheck.Generator.(
@@ -53,6 +53,10 @@ module Root_test = struct
              Account.equal expected actual_account
              || failwith "Inserted account didn't match actual account" ) )
 
+  let converting_config_with_random_hf_slot () =
+    Root_ledger.Config.Converting_db
+      (Mina_numbers.Global_slot_since_genesis.random ())
+
   (* When a node restarts, we should be able to replace the backing type of it
      with converting without any other change. This corresponds to setting HF
      mode to auto on a new release *)
@@ -73,13 +77,14 @@ module Root_test = struct
             ~depth:ledger_depth ()
         in
         let loc_with_accounts =
-          populate_with_random_accounts ~num:num_accounts ~root:stable_root
-            ~random
+          populate_with_random_untimed_accounts ~num:num_accounts
+            ~root:stable_root ~random
         in
         Root_ledger.close stable_root ;
         let converting_root =
           Root_ledger.create ~logger
-            ~config:(cfg ~backing_type:Converting_db)
+            ~config:
+              (cfg ~backing_type:(converting_config_with_random_hf_slot ()))
             ~depth:ledger_depth ()
         in
         (* STEP 2: reopening the root now as converting, check accounts are
@@ -88,6 +93,17 @@ module Root_test = struct
         Root_ledger.close converting_root ;
         Deferred.unit )
 
+  let check_converting_open ~primary_dir ~hardfork_slot =
+    let module Converting_ledger = L.Make_converting (struct
+      let convert = Account.Hardfork.migrate_from_berkeley ~hardfork_slot
+    end) in
+    Converting_ledger.(
+      create
+        ~config:
+          (In_directories (Config.with_primary ~directory_name:primary_dir))
+        ~logger ~depth:ledger_depth ~assert_synced:true ()
+      |> close)
+
   let test_root_moving ~random () =
     Mina_stdlib_unix.File_system.with_temp_dir "root_moving" ~f:(fun cwd ->
         (* NOTE: The converting ledger would be created as siblings of the
@@ -95,9 +111,13 @@ module Root_test = struct
            up the garbages correctly after the test*)
         (* STEP 1: create a root, fill with some accounts, get the locs and
            closing *)
+        (* TODO: consider design a proper generator for Root_ledger.Config.t
+           later. *)
         let backing_type =
           Quickcheck.Generator.of_list
-            [ Root_ledger.Config.Stable_db; Converting_db ]
+            [ Root_ledger.Config.Stable_db
+            ; converting_config_with_random_hf_slot ()
+            ]
           |> Quickcheck.Generator.generate ~size:quickcheck_size ~random
         in
         let config =
@@ -106,7 +126,7 @@ module Root_test = struct
         in
         let root = Root_ledger.create ~logger ~config ~depth:ledger_depth () in
         let loc_with_accounts =
-          populate_with_random_accounts ~num:num_accounts ~root ~random
+          populate_with_random_untimed_accounts ~num:num_accounts ~root ~random
         in
         Root_ledger.close root ;
         let moved_primary_dir = cwd ^/ "ledger_moved" in
@@ -127,14 +147,11 @@ module Root_test = struct
            matched up. *)
         assert_accounts ~loc_with_accounts ~root:root_moved ;
         Root_ledger.close root_moved ;
-        ( if phys_equal backing_type Converting_db then
-          L.Converting_ledger.(
-            create
-              ~config:
-                (In_directories
-                   (Config.with_primary ~directory_name:moved_primary_dir) )
-              ~logger ~depth:ledger_depth ~assert_synced:true ()
-            |> close) ) ;
+        ( match backing_type with
+        | Converting_db hardfork_slot ->
+            check_converting_open ~primary_dir:moved_primary_dir ~hardfork_slot
+        | _ ->
+            () ) ;
         Deferred.unit )
 
   let test_root_make_checkpointing ~random () =
@@ -147,7 +164,9 @@ module Root_test = struct
            closing *)
         let backing_type =
           Quickcheck.Generator.of_list
-            [ Root_ledger.Config.Stable_db; Converting_db ]
+            [ Root_ledger.Config.Stable_db
+            ; converting_config_with_random_hf_slot ()
+            ]
           |> Quickcheck.Generator.generate ~size:quickcheck_size ~random
         in
         let config =
@@ -156,7 +175,7 @@ module Root_test = struct
         in
         let root = Root_ledger.create ~logger ~config ~depth:ledger_depth () in
         let loc_with_accounts =
-          populate_with_random_accounts ~num:num_accounts ~root ~random
+          populate_with_random_untimed_accounts ~num:num_accounts ~root ~random
         in
         let checkpointed_primary_dir = cwd ^/ "ledger_checkpointed" in
         let config_checkpoint =
@@ -172,15 +191,12 @@ module Root_test = struct
         (* STEP 2: opening the checkpointed root, check accounts are matched up. *)
         assert_accounts ~loc_with_accounts ~root:root_checkpointed ;
         Root_ledger.close root_checkpointed ;
-        ( if phys_equal backing_type Converting_db then
-          L.Converting_ledger.(
-            create
-              ~config:
-                (In_directories
-                   (Config.with_primary ~directory_name:checkpointed_primary_dir)
-                )
-              ~logger ~depth:ledger_depth ~assert_synced:true ()
-            |> close) ) ;
+        ( match backing_type with
+        | Converting_db hardfork_slot ->
+            check_converting_open ~primary_dir:checkpointed_primary_dir
+              ~hardfork_slot
+        | _ ->
+            () ) ;
         Deferred.unit )
 
   (** Test that a root created with a stable backing and then made converting
@@ -197,9 +213,13 @@ module Root_test = struct
             ~depth:ledger_depth ()
         in
         let loc_with_accounts =
-          populate_with_random_accounts ~num:num_accounts ~root ~random
+          populate_with_random_untimed_accounts ~num:num_accounts ~root ~random
         in
-        let%bind root = Root_ledger.make_converting root in
+        let%bind root =
+          Root_ledger.make_converting
+            ~hardfork_slot:(Mina_numbers.Global_slot_since_genesis.random ())
+            root
+        in
         (* Make sure the stable accounts are all still present *)
         assert_accounts ~loc_with_accounts ~root ;
         Root_ledger.close root ;
@@ -207,7 +227,8 @@ module Root_test = struct
            sync *)
         let converting_root =
           Root_ledger.create ~logger
-            ~config:(cfg ~backing_type:Converting_db)
+            ~config:
+              (cfg ~backing_type:(converting_config_with_random_hf_slot ()))
             ~depth:ledger_depth ~assert_synced:true ()
         in
         Root_ledger.close converting_root ;
