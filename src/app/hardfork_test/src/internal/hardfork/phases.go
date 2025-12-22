@@ -115,7 +115,13 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData For
 	return nil
 }
 
-func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, forkConfigBytes []byte, mainGenesisTs int64) (*ForkData, error) {
+func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) (*ForkData, error) {
+
+	idx := rand.Intn(len(analysis.CandidatePortBasesForFork))
+	forkConfigBytes, err := t.GetForkConfig(analysis.CandidatePortBasesForFork[idx] + int(PORT_REST))
+	if err != nil {
+		return nil, err
+	}
 
 	if err := os.MkdirAll("fork_data/prepatch", 0755); err != nil {
 		return nil, err
