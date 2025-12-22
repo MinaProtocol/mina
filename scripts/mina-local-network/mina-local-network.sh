@@ -56,6 +56,7 @@ DEMO_MODE=false
 SLOT_TX_END=
 SLOT_CHAIN_END=
 HARDFORK_GENESIS_SLOT_DELTA=
+HARDFORK_HANDLING=
 
 # ================================================
 # Globals (assigned during execution of script)
@@ -151,6 +152,8 @@ help() {
 --itn-keys <keys>                        | Use ITN keys for nodes authentication
                                          |   Default: not set
 -hfd |--hardfork-genesis-slot-delta      | When set override the value `hard_fork_genesis_slot_delta` in daemon config. 
+--hardfork-handling                      | When set, passed to daemons participating the network.
+                                         |   Default: not set
 -r   |--root                             | When set, override the root working folder (i.e. the value of ROOT) for this script. WARN: this script will clean up anything inside that folder when initializing any run!
                                          |   Default: ${ROOT}
 --redirect-logs                          | When set, redirect logs for nodes (excluding workers) and archive to file instead of console output
@@ -276,8 +279,12 @@ exec-daemon() {
   if [ -n "$ITN_KEYS" ]; then
     ITN_GRAPHQL_PORT=$((BASE_PORT + 5))
 
-    extra_opts+=( "--itn-keys $ITN_KEYS" )
-    extra_opts+=( "--itn-graphql-port ${ITN_GRAPHQL_PORT}" )
+    extra_opts+=( --itn-keys "$ITN_KEYS" )
+    extra_opts+=( --itn-graphql-port "${ITN_GRAPHQL_PORT}" )
+  fi
+
+  if [ -n "$HARDFORK_HANDLING" ]; then
+    extra_opts+=( --hardfork-handling "$HARDFORK_HANDLING" )
   fi
 
   # shellcheck disable=SC2068
@@ -552,6 +559,10 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   -hfd |--hardfork-genesis-slot-delta)
     HARDFORK_GENESIS_SLOT_DELTA="${2}"
+    shift
+    ;;
+  --hardfork-handling)
+    HARDFORK_HANDLING="${2}"
     shift
     ;;
   -r | --root)
