@@ -6,17 +6,19 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
 
 type HFHandler func(*HardforkTest, *BlockAnalysisResult) error
 
 // RunMainNetworkPhase runs the main network and validates its operation
 // and returns the fork config bytes and block analysis result
-func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown HFHandler) (*BlockAnalysisResult, error) {
+func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) (*BlockAnalysisResult, *ForkData, error) {
 	// Start the main network
-	mainNetCmd, err := t.RunMainNetwork(mainGenesisTs)
+	mainNetCmd, err := t.RunMainNetwork(mainGenesisTs, t.Config.ForkMethod == config.Auto)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	defer t.gracefulShutdown(mainNetCmd, "Main network")
@@ -27,44 +29,54 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 	// Check block height at slot BestChainQueryFrom
 	bestTip, err := t.Client.BestTip(t.AnyPortOfType(PORT_REST))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	t.Logger.Info("Block height is %d at slot %d.", bestTip.BlockHeight, bestTip.Slot)
 
 	// Validate slot occupancy
 	if err := t.ValidateSlotOccupancy(0, bestTip.BlockHeight); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Analyze blocks and get genesis epoch data
 	analysis, err := t.AnalyzeBlocks()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	t.Logger.Info("Network analayze result: %v", analysis)
 
 	// Validate max slot
 	if err := t.ValidateLatestOccupiedSlot(analysis.LastOccupiedSlot); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Validate latest block slot
 	if err := t.ValidateLatestLastBlockBeforeTxEndSlot(analysis.LastBlockBeforeTxEnd); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Validate no new blocks are created after chain end
 	if err := t.ValidateNoNewBlocks(t.AnyPortOfType(PORT_REST)); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	if err := beforeShutdown(t, analysis); err != nil {
-		return nil, err
-	}
+	t.Logger.Info("Phase 2: Forking with fork method `%s`...", t.Config.ForkMethod.String())
 
-	return analysis, nil
+	var forkData *ForkData
+	switch t.Config.ForkMethod {
+	case config.Legacy:
+		forkData, err = t.LegacyForkPhase(analysis, mainGenesisTs)
+	case config.Advanced:
+		forkData, err = t.AdvancedForkPhase(analysis, mainGenesisTs)
+	case config.Auto:
+		panic("TODO: implement auto mode fork config generation")
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	return analysis, forkData, nil
 }
 
 type ForkData struct {
