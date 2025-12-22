@@ -47,7 +47,7 @@
   ;; local libraries
   key_gen
   visualization
-  timeout_lib
+  mina_stdlib
   pipe_lib
   mina_networking
   logger
