@@ -814,6 +814,11 @@ load_config() {
 
 load_config "${CONFIG_MODE}" "${CONFIG}"
 
+if [ -n "$OVERRIDE_GENSIS_LEDGER" ]; then
+  echo "Inherited genesis ledgers: "
+  ls -1 "$OVERRIDE_GENSIS_LEDGER"
+fi
+
 update_genesis_timestamp() {
   case "$1" in
     fixed:*)
