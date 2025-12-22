@@ -34,95 +34,85 @@ chmod -R 0700 /home/opam/libp2p-keys/
 mina daemon \
   --peer-list-url "https://storage.googleapis.com/seed-lists/${NETWORK_NAME}_seeds.txt" \
   --libp2p-keypair "/home/opam/libp2p-keys/key" \
-& # -background
+&
 
-# Attempt to connect to the GraphQL client every 10s for up to 8 minutes
-num_status_retries=24
-for ((i=1;i<=$num_status_retries;i++)); do
-  sleep $WAIT_BETWEEN_POLLING_GRAPHQL
+graphql_query() {
+  local query_string="$1"
+  local jq_selector="$2"
+  curl -f --show-error 'http://localhost:3085/graphql' \
+   -H 'accept: application/json' \
+   -H 'content-type: application/json' \
+   --data-raw "$query_string" \
+  | jq -r "$jq_selector"
+}
+
+graphql_query_returns_failed_http_code() {
+  local query_string="$1"
+  curl -o /dev/null -s -w "%{http_code}" 'http://localhost:3085/graphql' \
+   -H 'accept: application/json' \
+   -H 'content-type: application/json' \
+   --data-raw "$query_string" || true
+}
+
+num_status_retries=48
+node_status=""
+node_status_exit_code=1
+
+for ((i=1; i<=num_status_retries; i++)); do
+  sleep "$WAIT_BETWEEN_POLLING_GRAPHQL"
+
   set +e
-  mina client status
-  status_exit_code=$?
+  node_status=$(graphql_query '{"query":"query { syncStatus }"}' '.data.syncStatus')
+  node_status_exit_code=$?
   set -e
-  if [ $status_exit_code -eq 0 ]; then
+
+  if [[ "$node_status" == "SYNCED" ]]; then
     break
-  elif [ $i -eq $num_status_retries ]; then
-    exit $status_exit_code
   fi
 done
 
-# Check that the daemon has connected to peers and is still up after 2 mins
+if [[ "$node_status" != "SYNCED" ]]; then
+  exit "$node_status_exit_code"
+fi
+
 sleep "$WAIT_AFTER_FINAL_CHECK"
-mina client status
-if [ "$(mina advanced get-peers | wc -l)" -gt 0 ]; then
-    echo "Found some peers"
-else
+
+all_peers=$(graphql_query '{"query":"query { getPeers { peerId } }"}' '.data.getPeers[].peerId')
+echo "Connected peers\n ${all_peers}"
+
+if [[ $(printf "${all_peers}" | wc -l) == 0 ]]; then
     echo "No peers found"
-    exit 1
-fi
+fi 
 
-# Check network id
-NETWORK_ID=$(curl -f --show-error 'http://localhost:3085/graphql' \
-   -H 'accept: application/json' \
-   -H 'content-type: application/json' \
-   --data-raw '{"query":"query MyQuery {\n  networkID\n}\n","variables":null,"operationName":"MyQuery"}' \
-  | jq -r '.data.networkID')
+ACTUAL_NETWORK_ID=$(graphql_query '{"query":"query { networkID }"}' '.data.networkID')
+EXPECTED_NETWORK_ID=mina:$NETWORK_NAME
 
-if [ $? -ne 0 ]; then
-    echo "GraphQL query 'networkID' failed!" >&2
-    exit 1
-fi
-
-EXPECTED_NETWORK=mina:$NETWORK_NAME
-
-if [[ "$NETWORK_ID" == "$EXPECTED_NETWORK" ]]; then
-    echo "Network id correct ($NETWORK_ID)"
+if [[ "$ACTUAL_NETWORK_ID" == "$EXPECTED_NETWORK_ID" ]]; then
+    echo "Network id correct ($ACTUAL_NETWORK_ID)"
 else
-    echo "Network id incorrect (expected: $EXPECTED_NETWORK got: $NETWORK_ID)"
+    echo "Network id incorrect (expected: $EXPECTED_NETWORK_ID got: $ACTUAL_NETWORK_ID)"
     exit 1
 fi
 
 # Check bestTip 
-BEST_TIP_STATE_HASH=$(curl -f --show-error 'http://localhost:3085/graphql' \
-   -H 'accept: application/json' \
-   -H 'content-type: application/json' \
-   --data-raw '{"query":"query MyQuery {\n bestChain(maxLength: 1) {\n stateHash \n}\n}\n","variables":null,"operationName":"MyQuery"}' \
-  | jq -r '.data.bestChain[0].stateHash')
-
-if [ $? -ne 0 ]; then
-    echo "GraphQL query 'bestChain' failed!" >&2
-    exit 1
-fi
+BEST_TIP_STATE_HASH=$(graphql_query '{"query":"query { bestChain(maxLength: 1) { stateHash } }"}' '.data.bestChain[0].stateHash')
 
 echo "Found best tip state hash ${BEST_TIP_STATE_HASH}"
 
-SNARKED_LEDGER_HASH=$(curl -f --show-error 'http://localhost:3085/graphql' \
-   -H 'accept: application/json' \
-   -H 'content-type: application/json' \
-   --data-raw '{
+SNARKED_LEDGER_HASH=$(graphql_query '{
      "query": "query MyBlock($stateHash: String!) { block(stateHash: $stateHash) { protocolState { blockchainState { snarkedLedgerHash } } } }",
      "variables": { "stateHash": "'"${BEST_TIP_STATE_HASH}"'" },
      "operationName": "MyBlock"
-   }' \
-  | jq -r '.data.block.protocolState.blockchainState.snarkedLedgerHash')
-
-if [ $? -ne 0 ]; then
-    echo "GraphQL query 'block' failed!" >&2
-    exit 1
-fi
+   }' '.data.block.protocolState.blockchainState.snarkedLedgerHash')
 
 echo "Best tip's Snarked Ledger Hash: ${SNARKED_LEDGER_HASH}"
 
 ANCIENT_STATE_HASH_DEVNET="3NL5hv4ysELXF2Tg5UZDMgBFcQLTM1tGtRRzMhgyLa5EzvbeDQhq"
-HTTP_CODE=$(curl -o /dev/null -s -w "%{http_code}" 'http://localhost:3085/graphql' \
-   -H 'accept: application/json' \
-   -H 'content-type: application/json' \
-   --data-raw '{
-     "query": "query MyBlock($stateHash: String!) { block(stateHash: $stateHash) { protocolState { blockchainState { snarkedLedgerHash } } } }",
+HTTP_CODE=$(graphql_query_returns_failed_http_code '{
+     "query": "query MyBlock($stateHash: String!) { block(stateHash: $stateHash) }",
      "variables": { "stateHash": "'"${ANCIENT_STATE_HASH_DEVNET}"'" },
      "operationName": "MyBlock"
-     }' || true)
-  
+   }')
 
 if [[ "$HTTP_CODE" == "500" ]]; then
     echo "OK: Querying ancient state hash on node, got HTTP CODE 500"
