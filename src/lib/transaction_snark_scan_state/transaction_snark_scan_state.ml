@@ -709,7 +709,7 @@ module Transactions_categorized = struct
       { first_pass : 'a list
       ; second_pass : 'a list
       ; previous_incomplete : 'a list
-      ; current_incomplete : 'a list
+      ; continued_in_the_next_tree : bool
       }
     [@@deriving sexp, to_yojson]
   end
@@ -719,8 +719,7 @@ module Transactions_categorized = struct
   let fold (t : 'a Poly.t) ~f ~init =
     let init = List.fold ~init t.first_pass ~f in
     let init = List.fold ~init t.previous_incomplete ~f in
-    let init = List.fold ~init t.second_pass ~f in
-    List.fold ~init t.current_incomplete ~f
+    List.fold ~init t.second_pass ~f
 end
 
 module Make_transaction_categorizer (Tx : sig
@@ -776,18 +775,14 @@ struct
       , List.rev second_pass_txns_rev
       , target_first_pass_ledger )
     in
-    let second_pass_txns, incomplete_txns =
-      match List.hd second_pass_txns with
-      | None ->
-          ([], [])
-      | Some txn ->
-          if
-            Frozen_ledger_hash.equal
-              (Tx.source_second_pass_ledger txn)
-              target_first_pass_ledger
-          then (*second pass completed in the same tree*)
-            (second_pass_txns, [])
-          else ([], second_pass_txns)
+    (* determine whether second pass completed in the same tree *)
+    let continued_in_the_next_tree =
+      Option.value_map ~default:false ~f:(fun txn ->
+          not
+          @@ Frozen_ledger_hash.equal
+               (Tx.source_second_pass_ledger txn)
+               target_first_pass_ledger )
+      @@ List.hd second_pass_txns
     in
     let previous_incomplete =
       match previous_incomplete with
@@ -798,16 +793,22 @@ struct
     in
     { Transactions_categorized.Poly.first_pass = first_pass_txns
     ; second_pass = second_pass_txns
-    ; current_incomplete = incomplete_txns
     ; previous_incomplete
+    ; continued_in_the_next_tree
     }
 
   let second_pass_last_block txns_per_tree =
     let%map.Option last_group = List.last (txns_by_block txns_per_tree) in
-    let { Transactions_categorized.Poly.second_pass; current_incomplete; _ } =
+    let { Transactions_categorized.Poly.second_pass
+        ; continued_in_the_next_tree
+        ; _
+        } =
+      (* [previous_incomplete] is ok to be set empty because it affects
+         only the [previous_incomplete] field of the result *)
       categorize_transactions ~previous_incomplete:[] last_group
     in
-    (`Second_pass second_pass, `Current_incomplete current_incomplete)
+    ( second_pass
+    , `Border_block_continued_in_the_next_tree continued_in_the_next_tree )
 
   let categorize_transactions_per_tree ~previous_incomplete txns_per_tree =
     List.map
@@ -853,30 +854,25 @@ let latest_ledger_proof t =
   in
   proof
 
-let latest_ledger_proof_and_txs' t =
-  let open Option.Let_syntax in
-  let%map proof, txns_with_witnesses =
+let latest_recent_proof_txs t =
+  let%map.Option _, txns_with_witnesses =
     Parallel_scan.last_emitted_value t.scan_state
   in
   let ( previous_incomplete
       , `Border_block_continued_in_the_next_tree continued_in_next_tree ) =
     t.previous_incomplete_zkapp_updates
   in
-  let txns =
-    if continued_in_next_tree || List.is_empty previous_incomplete then
-      Witness_categorizer.categorize_transactions_per_tree txns_with_witnesses
-        ~previous_incomplete
-    else
-      { Transactions_categorized.Poly.first_pass = []
-      ; second_pass = []
-      ; previous_incomplete
-      ; current_incomplete = []
-      }
-      :: Witness_categorizer.categorize_transactions_per_tree
-           txns_with_witnesses ~previous_incomplete:[]
-  in
-
-  (proof, txns)
+  if continued_in_next_tree || List.is_empty previous_incomplete then
+    Witness_categorizer.categorize_transactions_per_tree txns_with_witnesses
+      ~previous_incomplete
+  else
+    { Transactions_categorized.Poly.first_pass = []
+    ; second_pass = []
+    ; previous_incomplete
+    ; continued_in_the_next_tree = false
+    }
+    :: Witness_categorizer.categorize_transactions_per_tree txns_with_witnesses
+         ~previous_incomplete:[]
 
 let incomplete_txns_from_recent_proof_tree t =
   let%map.Option (proof, _), txns_with_witnesses =
@@ -885,17 +881,11 @@ let incomplete_txns_from_recent_proof_tree t =
   match Witness_categorizer.second_pass_last_block txns_with_witnesses with
   | None ->
       (proof, ([], `Border_block_continued_in_the_next_tree false))
-  | Some (`Second_pass second_pass, `Current_incomplete current_incomplete) ->
+  | Some res ->
       (* First pass ledger is considered as the snarked ledger,
          so any account update whether completed in the same tree
          or not should be included in the next tree *)
-      let second_pass_is_empty = List.is_empty second_pass in
-      let incomplete =
-        if second_pass_is_empty then current_incomplete else second_pass
-      in
-      ( proof
-      , ( incomplete
-        , `Border_block_continued_in_the_next_tree second_pass_is_empty ) )
+      (proof, res)
 
 let staged_transactions t =
   let ( previous_incomplete
@@ -921,7 +911,7 @@ let staged_transactions t =
         [ { Transactions_categorized.Poly.first_pass = []
           ; second_pass = []
           ; previous_incomplete
-          ; current_incomplete = []
+          ; continued_in_the_next_tree = false
           }
         ]
         :: txns
@@ -1147,11 +1137,13 @@ let apply_categorized_txns_stepwise ?(stop_at_first_pass = false)
                         not (List.is_empty txns)
                   in
                   previous_not_empty
-                  && not (List.is_empty txns_per_block.current_incomplete)
+                  && txns_per_block.continued_in_the_next_tree
                 in
                 let do_second_pass =
                   (*if transactions completed in the same tree; do second pass now*)
-                  (not (List.is_empty txns_per_block.second_pass))
+                  (not
+                     ( txns_per_block.continued_in_the_next_tree
+                     || List.is_empty txns_per_block.second_pass ) )
                   || continue_previous_tree's_txns
                 in
                 if do_second_pass then
@@ -1217,10 +1209,10 @@ let apply_categorized_txns_async ?stop_at_first_pass categorized_txns
 
 let get_snarked_ledger_sync ~ledger ~get_protocol_state ~apply_first_pass
     ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind t =
-  match latest_ledger_proof_and_txs' t with
+  match latest_recent_proof_txs t with
   | None ->
       Or_error.errorf "No transactions found"
-  | Some (_, txns_per_block) ->
+  | Some txns_per_block ->
       apply_categorized_txns_sync ~stop_at_first_pass:true txns_per_block
         ~ledger ~get_protocol_state ~apply_first_pass ~apply_second_pass
         ~apply_first_pass_sparse_ledger ~signature_kind
@@ -1229,10 +1221,10 @@ let get_snarked_ledger_sync ~ledger ~get_protocol_state ~apply_first_pass
 let get_snarked_ledger_async ?async_batch_size ~ledger ~get_protocol_state
     ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger
     ~signature_kind t =
-  match latest_ledger_proof_and_txs' t with
+  match latest_recent_proof_txs t with
   | None ->
       Deferred.Or_error.errorf "No transactions found"
-  | Some (_, txns_per_block) ->
+  | Some txns_per_block ->
       apply_categorized_txns_async ~stop_at_first_pass:true txns_per_block
         ?async_batch_size ~ledger ~get_protocol_state ~apply_first_pass
         ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind
