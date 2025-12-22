@@ -1141,7 +1141,7 @@ module Hardfork = struct
 
   let empty_digest = lazy (digest empty)
 
-  let%test_unit "of_stable followed by unsafe_to_stable is identity" =
+  let%test_unit "of_stable followed by to_stable_exn is identity" =
     let gen_with_optional_zkapp : Stable.Latest.t Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind base_account = gen in

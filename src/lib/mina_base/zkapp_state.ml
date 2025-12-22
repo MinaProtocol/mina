@@ -113,7 +113,7 @@ module Hardfork = struct
       with Assert_failure _ ->
         failwith "element 8~31 of zkApp state has non-zero values!"
 
-    let%test_unit "of_stable followed by unsafe_to_stable is identity" =
+    let%test_unit "of_stable followed by to_stable_exn is identity" =
       Quickcheck.test Value.gen ~f:(fun original ->
           let extended = of_stable original in
           let roundtripped = to_stable_exn extended in
