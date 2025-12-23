@@ -127,14 +127,12 @@ let mk_scan_state_base_node
       { previous_hash; varying }
     in
     let job : Transaction_snark_scan_state.Transaction_with_witness.t =
-      { transaction_with_info
-      ; state_hash = (state_hash, state_body_hash)
-      ; statement
-      ; init_stack
-      ; first_pass_ledger_witness = ledger_witness
-      ; second_pass_ledger_witness = ledger_witness
-      ; block_global_slot = Mina_numbers.Global_slot_since_genesis.zero
-      }
+      Transaction_snark_scan_state.Transaction_with_witness.create
+        ~transaction_with_info
+        ~state_hash:(state_hash, state_body_hash)
+        ~statement ~init_stack ~first_pass_ledger_witness:ledger_witness
+        ~second_pass_ledger_witness:ledger_witness
+        ~block_global_slot:Mina_numbers.Global_slot_since_genesis.zero
     in
     let record : _ Parallel_scan.Base.Record.t =
       { job; seq_no = 1; status = Todo }
@@ -249,8 +247,10 @@ let scan_state_merge_node ~proof_cache_db :
         { without_sok with sok_digest = Mina_base.Sok_message.digest sok_msg }
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
-      ( Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof
-      , sok_msg )
+      Transaction_snark_scan_state.Ledger_proof_with_sok_message.create
+        ~proof:
+          (Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof)
+        ~sok_msg
     in
     let right =
       let sok_msg : Mina_base.Sok_message.t =
@@ -266,8 +266,10 @@ let scan_state_merge_node ~proof_cache_db :
         { without_sok with sok_digest = Mina_base.Sok_message.digest sok_msg }
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
-      ( Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof
-      , sok_msg )
+      Transaction_snark_scan_state.Ledger_proof_with_sok_message.create
+        ~proof:
+          (Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof)
+        ~sok_msg
     in
     Full { left; right; seq_no = 1; status = Todo }
   in

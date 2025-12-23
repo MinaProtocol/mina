@@ -364,11 +364,12 @@ module Values (S : Sample) = struct
 
   let base_work varying witness :
       Transaction_snark_scan_state.Transaction_with_witness.t =
-    { transaction_with_info = { previous_hash = field (); varying = varying () }
-    ; state_hash = (state_hash (), field ())
-    ; statement =
-        (*Transaction_snark.Statement.Stable.V2.t*)
-        { source =
+    Transaction_snark_scan_state.Transaction_with_witness.create
+      ~transaction_with_info:{ previous_hash = field (); varying = varying () }
+      ~state_hash:(state_hash (), field ())
+      ~statement:
+        { (*Transaction_snark.Statement.Stable.V2.t*)
+          source =
             { first_pass_ledger = field ()
             ; second_pass_ledger = field ()
             ; pending_coinbase_stack = pending_coinbase_stack ()
@@ -387,11 +388,10 @@ module Values (S : Sample) = struct
         ; fee_excess = fee_excess ()
         ; sok_digest = ()
         }
-    ; init_stack = Base (pending_coinbase_stack ())
-    ; first_pass_ledger_witness = witness ()
-    ; second_pass_ledger_witness = witness ()
-    ; block_global_slot = global_slot_since_genesis ()
-    }
+      ~init_stack:(Base (pending_coinbase_stack ()))
+      ~first_pass_ledger_witness:(witness ())
+      ~second_pass_ledger_witness:(witness ())
+      ~block_global_slot:(global_slot_since_genesis ())
 
   let zkapp_command_base_work ~config () :
       Transaction_snark_scan_state.Transaction_with_witness.t =
