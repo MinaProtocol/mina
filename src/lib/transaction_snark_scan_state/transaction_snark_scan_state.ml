@@ -145,15 +145,37 @@ module Ledger_proof_with_sok_message = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
-      type t = Ledger_proof.Stable.V2.t * Sok_message.Stable.V1.t
+    module V3 = struct
+      type t =
+        { proof : Ledger_proof.Stable.V2.t
+        ; sok_msg : Sok_message.Stable.V1.t
+        ; hash : Aux_hash.Stable.V1.t
+        }
       [@@deriving sexp]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Ledger_proof.Cached.t * Sok_message.t
+  type t =
+    { proof : Ledger_proof.Cached.t
+    ; sok_msg : Sok_message.t
+    ; hash : Aux_hash.t
+    }
+
+  let create ~(proof : Ledger_proof.Cached.t) ~(sok_msg : Sok_message.t) =
+    let v =
+      { Stable.Latest.proof = Ledger_proof.Cached.read_proof_from_disk proof
+      ; sok_msg
+      ; hash = Aux_hash.of_bytes ""
+      }
+    in
+    let h = Digestif.SHA256.init () in
+    let h =
+      Binable.to_string (module Stable.Latest) v
+      |> Digestif.SHA256.feed_string h
+    in
+    { proof; sok_msg; hash = Digestif.SHA256.get h |> Aux_hash.of_sha256 }
 end
 
 module Available_job = struct
@@ -246,7 +268,7 @@ module Stable = struct
   module V4 = struct
     type t =
       { scan_state :
-          ( Ledger_proof_with_sok_message.Stable.V2.t
+          ( Ledger_proof_with_sok_message.Stable.V3.t
           , Transaction_with_witness.Stable.V4.t )
           Parallel_scan.State.Stable.V1.t
       ; previous_incomplete_zkapp_updates :
@@ -258,9 +280,7 @@ module Stable = struct
 
     let hash (t : t) =
       let state_hash =
-        Parallel_scan.State.hash t.scan_state
-          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
-          (fun x -> x.hash)
+        Parallel_scan.State.hash t.scan_state (fun x -> x.hash) (fun x -> x.hash)
       in
       let ( previous_incomplete_zkapp_updates
           , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
@@ -709,14 +729,16 @@ struct
 
   let check_invariants (t : t) ~verifier =
     check_invariants_impl t.scan_state
-      ~merge_to_statement:(Fn.compose Ledger_proof.Cached.statement fst)
+      ~merge_to_statement:
+        (Fn.compose Ledger_proof.Cached.statement
+           (fun (x : Ledger_proof_with_sok_message.t) -> x.proof) )
       ~verify:(Verifier.verify ~verifier)
 end
 
 let statement_of_job : job -> Transaction_snark.Statement.t option = function
   | Base { statement; _ } ->
       Some statement
-  | Merge ((p1, _), (p2, _)) ->
+  | Merge ({ proof = p1; _ }, { proof = p2; _ }) ->
       Transaction_snark.Statement.merge
         (Ledger_proof.Cached.statement p1)
         (Ledger_proof.Cached.statement p2)
@@ -854,7 +876,7 @@ let extract_txn_and_global_slot (txn_with_witness : Transaction_with_witness.t)
   (txn, state_hash, global_slot)
 
 let latest_ledger_proof t =
-  let%map.Option (proof, _), _ =
+  let%map.Option { proof; _ }, _ =
     Parallel_scan.last_emitted_value t.scan_state
   in
   proof
@@ -1292,7 +1314,7 @@ let partition_if_overflowing t =
 let snark_job_list_json t =
   let all_jobs : Job_view.t list list =
     let fa (a : Ledger_proof_with_sok_message.t) =
-      Ledger_proof.Cached.statement (fst a)
+      Ledger_proof.Cached.statement a.proof
     in
     let fd (d : Transaction_with_witness.t) = d.statement in
     Parallel_scan.view_jobs_with_position t.scan_state fa fd
@@ -1373,7 +1395,7 @@ let single_spec_of_job ~get_state :
         }
       in
       Snark_work_lib.Work.Single.Spec.Transition (statement, witness)
-  | Merge ((p1, _), (p2, _)) ->
+  | Merge ({ proof = p1; _ }, { proof = p2; _ }) ->
       let%map.Or_error merged =
         Transaction_snark.Statement.merge
           (Ledger_proof.Cached.statement p1)
@@ -1413,7 +1435,8 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
     let fee = Transaction_snark_work.fee w in
     let prover = Transaction_snark_work.prover w in
     One_or_two.map (Transaction_snark_work.proofs w) ~f:(fun proof ->
-        (proof, Sok_message.create ~fee ~prover) )
+        Ledger_proof_with_sok_message.create ~proof
+          ~sok_msg:(Sok_message.create ~fee ~prover) )
     |> One_or_two.to_list
   in
   (*get incomplete transactions from previous proof which will be completed in
@@ -1443,14 +1466,14 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
                  t.previous_incomplete_zkapp_updates
              } ) )
       proof_opt
-      ~f:(fun ((proof, _), _txns_with_witnesses) ->
+      ~f:(fun ({ proof; _ }, _txns_with_witnesses) ->
         let curr_stmt = Ledger_proof.Cached.statement proof in
         let prev_stmt, incomplete_zkapp_updates_from_old_proof =
           Option.value_map
             ~default:
               (curr_stmt, ([], `Border_block_continued_in_the_next_tree false))
             old_proof_and_incomplete_zkapp_updates
-            ~f:(fun ((p', _), incomplete_zkapp_updates_from_old_proof) ->
+            ~f:(fun ({ proof = p'; _ }, incomplete_zkapp_updates_from_old_proof) ->
               ( Ledger_proof.Cached.statement p'
               , incomplete_zkapp_updates_from_old_proof ) )
         in
@@ -1524,8 +1547,12 @@ let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
     { Stable.Latest.scan_state = uncached
     ; previous_incomplete_zkapp_updates = tx_list, border_status
     } =
-  let f1 (p, v) =
-    (Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db p, v)
+  let f1 { Ledger_proof_with_sok_message.Stable.Latest.proof; sok_msg; hash } =
+    { Ledger_proof_with_sok_message.proof =
+        Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
+    ; sok_msg
+    ; hash
+    }
   in
   { scan_state =
       Parallel_scan.State.map uncached ~f1
@@ -1545,7 +1572,13 @@ let read_all_proofs_from_disk
     { scan_state = cached
     ; previous_incomplete_zkapp_updates = tx_list, border_status
     } =
-  let f1 (p, v) = (Ledger_proof.Cached.read_proof_from_disk p, v) in
+  let f1 { Ledger_proof_with_sok_message.proof; sok_msg; hash } =
+    { Ledger_proof_with_sok_message.Stable.Latest.proof =
+        Ledger_proof.Cached.read_proof_from_disk proof
+    ; sok_msg
+    ; hash
+    }
+  in
   let scan_state =
     Parallel_scan.State.map ~f1
       ~f2:Transaction_with_witness.read_all_proofs_from_disk cached

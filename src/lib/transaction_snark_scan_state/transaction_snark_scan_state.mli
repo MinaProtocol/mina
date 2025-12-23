@@ -42,7 +42,13 @@ module Transaction_with_witness : sig
 end
 
 module Ledger_proof_with_sok_message : sig
-  type t = Ledger_proof.Cached.t * Sok_message.t
+  type t =
+    { proof : Ledger_proof.Cached.t
+    ; sok_msg : Sok_message.t
+    ; hash : Aux_hash.t
+    }
+
+  val create : proof:Ledger_proof.Cached.t -> sok_msg:Sok_message.t -> t
 end
 
 module Available_job : sig

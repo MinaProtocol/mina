@@ -222,10 +222,14 @@ module T = struct
 
     let verify ~verifier:{ logger; verifier } ts =
       verify_proofs ~logger ~verifier
-        (List.map ts ~f:(fun (p, m) ->
-             ( Ledger_proof.Cached.read_proof_from_disk p
-             , Ledger_proof.Cached.statement p
-             , m ) ) )
+        (List.map ts
+           ~f:(fun
+                ({ proof; sok_msg; _ } :
+                  Scan_state.Ledger_proof_with_sok_message.t )
+              ->
+             ( Ledger_proof.Cached.read_proof_from_disk proof
+             , Ledger_proof.Cached.statement proof
+             , sok_msg ) ) )
   end
 
   module Statement_scanner_with_proofs =
