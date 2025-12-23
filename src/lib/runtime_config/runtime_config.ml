@@ -87,7 +87,7 @@ module Json_layout = struct
       module Permissions = struct
         module Auth_required = struct
           type t = None | Either | Proof | Signature | Impossible
-          [@@deriving sexp, bin_io_unversioned]
+          [@@deriving sexp, bin_io_unversioned, compare]
 
           let to_yojson = function
             | None ->
@@ -156,7 +156,7 @@ module Json_layout = struct
 
         module Verification_key_perm = struct
           type t = { auth : Auth_required.t; txn_version : Txn_version.t }
-          [@@deriving sexp, yojson, bin_io_unversioned]
+          [@@deriving sexp, yojson, bin_io_unversioned, compare]
         end
 
         type t =
@@ -220,7 +220,7 @@ module Json_layout = struct
                   Auth_required.of_account_perm
                     Mina_base.Permissions.user_default.set_timing]
           }
-        [@@deriving yojson, fields, sexp, bin_io_unversioned]
+        [@@deriving yojson, fields, sexp, bin_io_unversioned, compare]
 
         let fields = Fields.names |> Array.of_list
 
@@ -268,7 +268,7 @@ module Json_layout = struct
       module Zkapp_account = struct
         module Field = struct
           type t = Snark_params.Tick.Field.t
-          [@@deriving sexp, bin_io_unversioned]
+          [@@deriving sexp, bin_io_unversioned, compare]
 
           let to_yojson t = `String (Snark_params.Tick.Field.to_string t)
 
@@ -283,7 +283,7 @@ module Json_layout = struct
 
         module Verification_key = struct
           type t = Pickles.Side_loaded.Verification_key.Stable.Latest.t
-          [@@deriving sexp, bin_io_unversioned]
+          [@@deriving sexp, bin_io_unversioned, compare]
 
           let to_yojson t =
             `String (Pickles.Side_loaded.Verification_key.to_base64 t)
@@ -318,7 +318,7 @@ module Json_layout = struct
           ; proved_state : bool
           ; zkapp_uri : string
           }
-        [@@deriving sexp, fields, yojson, bin_io_unversioned]
+        [@@deriving sexp, fields, yojson, bin_io_unversioned, compare]
 
         let fields = Fields.names |> Array.of_list
 
@@ -586,7 +586,7 @@ module Accounts = struct
         ; vesting_period : Mina_numbers.Global_slot_span.Stable.Latest.t
         ; vesting_increment : Currency.Amount.Stable.Latest.t
         }
-      [@@deriving bin_io_unversioned, sexp]
+      [@@deriving bin_io_unversioned, sexp, compare]
     end
 
     module Permissions = Json_layout.Accounts.Single.Permissions
@@ -823,6 +823,7 @@ module Accounts = struct
     ; permissions : Single.Permissions.t option
     ; token_symbol : string option
     }
+  [@@deriving compare]
 
   type t = Single.t list [@@deriving bin_io_unversioned]
 
@@ -1647,17 +1648,33 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     | Some l ->
         ledger_accounts l >>| Option.return
   in
+  let staking_accounts_ordered =
+    List.sort ~compare:Accounts.compare_single staking_ledger_accounts
+  in
+  let next_ledger next_epoch_ledger_accounts =
+    let%bind.Option next_accounts = next_epoch_ledger_accounts in
+    let next_accounts_ordered =
+      List.sort ~compare:Accounts.compare_single next_accounts
+    in
+    if
+      List.equal
+        (fun lhs rhs -> 0 = Accounts.compare_single lhs rhs)
+        staking_accounts_ordered next_accounts_ordered
+    then None
+    else
+      Some
+        Epoch_data.Data.
+          { ledger = ledger_of_accounts next_accounts; seed = next_epoch_seed }
+  in
   let epoch_data =
-    let open Epoch_data in
-    let open Data in
-    { staking =
-        { ledger = ledger_of_accounts staking_ledger_accounts
-        ; seed = staking_epoch_seed
-        }
-    ; next =
-        Option.map next_epoch_ledger_accounts ~f:(fun accounts ->
-            { ledger = ledger_of_accounts accounts; seed = next_epoch_seed } )
-    }
+    Epoch_data.
+      { staking =
+          Data.
+            { ledger = ledger_of_accounts staking_ledger_accounts
+            ; seed = staking_epoch_seed
+            }
+      ; next = next_ledger next_epoch_ledger_accounts
+      }
   in
   make
   (* add_genesis_winner must be set to false, because this
