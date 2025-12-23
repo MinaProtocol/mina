@@ -252,12 +252,12 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     include Master
   end)
 
-  module V4 = struct
+  module V3 = struct
     module T = struct
       type query = State_hash.Stable.V1.t
 
       type response =
-        ( Staged_ledger.Scan_state.Stable.V4.t
+        ( Staged_ledger.Scan_state.Stable.V3.t
         * Ledger_hash.Stable.V1.t
         * Pending_coinbase.Stable.V2.t
         * Mina_state.Protocol_state.Value.Stable.V3.t list )

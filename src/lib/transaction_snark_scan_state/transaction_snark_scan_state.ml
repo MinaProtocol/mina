@@ -23,7 +23,7 @@ module Transaction_with_witness = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V4 = struct
+    module V3 = struct
       (* TODO: The statement is redundant here - it can be computed from the
          witness and the transaction
       *)
@@ -145,7 +145,7 @@ module Ledger_proof_with_sok_message = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V3 = struct
+    module V2 = struct
       type t =
         { proof : Ledger_proof.Stable.V2.t
         ; sok_msg : Sok_message.Stable.V1.t
@@ -296,14 +296,14 @@ let hash :
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V4 = struct
+  module V3 = struct
     type t =
       { scan_state :
-          ( Ledger_proof_with_sok_message.Stable.V3.t
-          , Transaction_with_witness.Stable.V4.t )
+          ( Ledger_proof_with_sok_message.Stable.V2.t
+          , Transaction_with_witness.Stable.V3.t )
           Parallel_scan.State.Stable.V1.t
       ; previous_incomplete_zkapp_updates :
-          Transaction_with_witness.Stable.V4.t list
+          Transaction_with_witness.Stable.V3.t list
           * [ `Border_block_continued_in_the_next_tree of bool ]
       }
 
