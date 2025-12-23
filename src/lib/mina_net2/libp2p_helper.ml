@@ -213,16 +213,13 @@ let handle_incoming_message t msg ~handle_push_message =
                 RpcMessageHeader.sequence_number_get rpc_header
               in
               record_message_delay (RpcMessageHeader.time_sent_get rpc_header) ;
-              match Hashtbl.find t.outstanding_requests sequence_number with
+              match
+                Hashtbl.find_and_remove t.outstanding_requests sequence_number
+              with
               | Some ivar ->
-                  if Ivar.is_full ivar then
-                    [%log' error t.logger]
-                      "Attempted fill outstanding libp2p_helper RPC request \
-                       more than once"
-                  else (
-                    Ivar.fill ivar
-                      (Libp2p_ipc.rpc_response_to_or_error rpc_response) ;
-                    Hashtbl.remove t.outstanding_requests sequence_number )
+                  (* Invariant: no ivar is filled when they're in [t.outstanding_requests] *)
+                  Ivar.fill ivar
+                    (Libp2p_ipc.rpc_response_to_or_error rpc_response)
               | None ->
                   [%log' error t.logger]
                     "Attempted to fill outstanding libp2p_helper RPC request, \
