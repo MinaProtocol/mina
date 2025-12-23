@@ -752,9 +752,8 @@ struct
 
   let check_invariants (t : t) ~verifier =
     check_invariants_impl t.scan_state
-      ~merge_to_statement:
-        (Fn.compose Ledger_proof.Cached.statement
-           (fun (x : Ledger_proof_with_sok_message.t) -> x.proof) )
+      ~merge_to_statement:(fun (x : Ledger_proof_with_sok_message.t) ->
+        x.proof |> Ledger_proof.Cached.statement )
       ~verify:(Verifier.verify ~verifier)
 end
 

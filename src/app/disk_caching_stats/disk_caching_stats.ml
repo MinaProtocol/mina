@@ -368,8 +368,7 @@ module Values (S : Sample) = struct
       ~transaction_with_info:{ previous_hash = field (); varying = varying () }
       ~state_hash:(state_hash (), field ())
       ~statement:
-        { (*Transaction_snark.Statement.Stable.V2.t*)
-          source =
+        { source =
             { first_pass_ledger = field ()
             ; second_pass_ledger = field ()
             ; pending_coinbase_stack = pending_coinbase_stack ()
