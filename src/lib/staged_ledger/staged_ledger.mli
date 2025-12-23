@@ -20,6 +20,8 @@ module Scan_state : sig
   end]
 
   type t
+  
+  val hash : t -> Staged_ledger_hash.Aux_hash.t
 
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]

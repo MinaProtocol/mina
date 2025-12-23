@@ -258,6 +258,37 @@ end
 
 type job = Available_job.t
 
+let hash :
+    type a b.
+       ledger_proof_hash:(a -> string)
+    -> tx_witness_hash:(b -> string)
+    -> (a, b) Parallel_scan.State.t
+       * (b list * [ `Border_block_continued_in_the_next_tree of bool ])
+    -> Staged_ledger_hash.Aux_hash.t =
+ fun ~ledger_proof_hash ~tx_witness_hash
+     (parallel_scan_state, previous_incomplete_zkapp_updates) ->
+  let state_hash =
+    Parallel_scan.State.hash parallel_scan_state
+      (fun x -> ledger_proof_hash x)
+      (fun x -> tx_witness_hash x)
+  in
+  let ( previous_incomplete_zkapp_updates
+      , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
+    previous_incomplete_zkapp_updates
+  in
+  let incomplete_updates =
+    List.fold ~init:(Digestif.SHA256.init ()) previous_incomplete_zkapp_updates
+      ~f:(fun h t -> Digestif.SHA256.feed_string h (tx_witness_hash t))
+    |> Digestif.SHA256.get
+  in
+  let continue_in_next_tree =
+    Digestif.SHA256.digest_string (Bool.to_string continue_in_next_tree)
+  in
+  [ state_hash; incomplete_updates; continue_in_next_tree ]
+  |> List.fold ~init:(Digestif.SHA256.init ()) ~f:(fun h t ->
+         Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string t) )
+  |> Digestif.SHA256.get |> Staged_ledger_hash.Aux_hash.of_sha256
+
 (*Scan state and any zkapp updates that were applied to the to the most recent
    snarked ledger but are from the tree just before the tree corresponding to
    the snarked ledger*)
@@ -279,26 +310,12 @@ module Stable = struct
     let to_latest = Fn.id
 
     let hash (t : t) =
-      let state_hash =
-        Parallel_scan.State.hash t.scan_state (fun x -> x.hash) (fun x -> x.hash)
-      in
-      let ( previous_incomplete_zkapp_updates
-          , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
-        t.previous_incomplete_zkapp_updates
-      in
-      let incomplete_updates =
-        List.fold ~init:(Digestif.SHA256.init ())
-          previous_incomplete_zkapp_updates ~f:(fun h t ->
-            Digestif.SHA256.feed_string h t.hash )
-        |> Digestif.SHA256.get
-      in
-      let continue_in_next_tree =
-        Digestif.SHA256.digest_string (Bool.to_string continue_in_next_tree)
-      in
-      [ state_hash; incomplete_updates; continue_in_next_tree ]
-      |> List.fold ~init:(Digestif.SHA256.init ()) ~f:(fun h t ->
-             Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string t) )
-      |> Digestif.SHA256.get |> Staged_ledger_hash.Aux_hash.of_sha256
+      hash
+        ~ledger_proof_hash:(fun (x : Ledger_proof_with_sok_message.Stable.V2.t) ->
+          x.hash )
+        ~tx_witness_hash:(fun (x : Transaction_with_witness.Stable.V3.t) ->
+          x.hash )
+        (t.scan_state, t.previous_incomplete_zkapp_updates)
   end
 end]
 
@@ -311,6 +328,12 @@ type t =
       Transaction_with_witness.t list
       * [ `Border_block_continued_in_the_next_tree of bool ]
   }
+
+let hash (t : t) =
+  hash
+    ~ledger_proof_hash:(fun (x : Ledger_proof_with_sok_message.t) -> x.hash)
+    ~tx_witness_hash:(fun (x : Transaction_with_witness.t) -> x.hash)
+    (t.scan_state, t.previous_incomplete_zkapp_updates)
 
 (**********Helpers*************)
 
