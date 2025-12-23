@@ -587,14 +587,12 @@ module T = struct
       ; sok_digest = ()
       }
     in
-    ( { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn
-      ; state_hash = state_and_body_hash
-      ; first_pass_ledger_witness = pre_stmt.first_pass_ledger_witness
-      ; second_pass_ledger_witness = ledger_witness
-      ; init_stack = pre_stmt.init_stack
-      ; statement
-      ; block_global_slot = global_slot
-      }
+    ( Scan_state.Transaction_with_witness.create
+        ~transaction_with_info:applied_txn ~state_hash:state_and_body_hash
+        ~first_pass_ledger_witness:pre_stmt.first_pass_ledger_witness
+        ~second_pass_ledger_witness:ledger_witness
+        ~init_stack:pre_stmt.init_stack ~statement
+        ~block_global_slot:global_slot
     , Mina_transaction_logic.Transaction_applied.new_accounts applied_txn )
 
   let apply_transactions_first_pass ~yield ~constraint_constants ~global_slot

@@ -23,7 +23,7 @@ module Transaction_with_witness = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V3 = struct
+    module V4 = struct
       (* TODO: The statement is redundant here - it can be computed from the
          witness and the transaction
       *)
@@ -40,6 +40,7 @@ module Transaction_with_witness = struct
         ; second_pass_ledger_witness :
             (Mina_ledger.Sparse_ledger.Stable.V3.t[@sexp.opaque])
         ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+        ; hash : Aux_hash.Stable.V1.t
         }
       [@@deriving sexp, to_yojson]
 
@@ -55,6 +56,43 @@ module Transaction_with_witness = struct
     ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
+    ; hash : Aux_hash.t
+    }
+
+  let create
+      ~(transaction_with_info : Mina_transaction_logic.Transaction_applied.t)
+      ~(state_hash : State_hash.t * State_body_hash.t)
+      ~(statement : Transaction_snark.Statement.t)
+      ~(init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t)
+      ~(first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t)
+      ~(second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t)
+      ~(block_global_slot : Mina_numbers.Global_slot_since_genesis.t) : t =
+    let (v : Stable.Latest.t) =
+      { Stable.Latest.transaction_with_info =
+          Mina_transaction_logic.Transaction_applied.read_all_proofs_from_disk
+            transaction_with_info
+      ; Stable.Latest.state_hash
+      ; statement
+      ; init_stack
+      ; first_pass_ledger_witness
+      ; second_pass_ledger_witness
+      ; block_global_slot
+      ; hash = Aux_hash.of_bytes ""
+      }
+    in
+    let h = Digestif.SHA256.init () in
+    let h =
+      Binable.to_string (module Stable.Latest) v
+      |> Digestif.SHA256.feed_string h
+    in
+    { transaction_with_info
+    ; state_hash
+    ; statement
+    ; init_stack
+    ; first_pass_ledger_witness
+    ; second_pass_ledger_witness
+    ; block_global_slot
+    ; hash = Digestif.SHA256.get h |> Aux_hash.of_sha256
     }
 
   let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
@@ -65,6 +103,7 @@ module Transaction_with_witness = struct
       ; first_pass_ledger_witness
       ; second_pass_ledger_witness
       ; block_global_slot
+      ; hash
       } =
     { transaction_with_info =
         Mina_transaction_logic.Transaction_applied.write_all_proofs_to_disk
@@ -75,6 +114,7 @@ module Transaction_with_witness = struct
     ; first_pass_ledger_witness
     ; second_pass_ledger_witness
     ; block_global_slot
+    ; hash
     }
 
   let read_all_proofs_from_disk
@@ -85,6 +125,7 @@ module Transaction_with_witness = struct
       ; first_pass_ledger_witness
       ; second_pass_ledger_witness
       ; block_global_slot
+      ; hash
       } =
     { Stable.Latest.transaction_with_info =
         Mina_transaction_logic.Transaction_applied.read_all_proofs_from_disk
@@ -95,6 +136,7 @@ module Transaction_with_witness = struct
     ; first_pass_ledger_witness
     ; second_pass_ledger_witness
     ; block_global_slot
+    ; hash
     }
 end
 
@@ -201,14 +243,14 @@ type job = Available_job.t
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V3 = struct
+  module V4 = struct
     type t =
       { scan_state :
           ( Ledger_proof_with_sok_message.Stable.V2.t
-          , Transaction_with_witness.Stable.V3.t )
+          , Transaction_with_witness.Stable.V4.t )
           Parallel_scan.State.Stable.V1.t
       ; previous_incomplete_zkapp_updates :
-          Transaction_with_witness.Stable.V3.t list
+          Transaction_with_witness.Stable.V4.t list
           * [ `Border_block_continued_in_the_next_tree of bool ]
       }
 
@@ -218,7 +260,7 @@ module Stable = struct
       let state_hash =
         Parallel_scan.State.hash t.scan_state
           (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
-          (Binable.to_string (module Transaction_with_witness.Stable.V3))
+          (fun x -> x.hash)
       in
       let ( previous_incomplete_zkapp_updates
           , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
@@ -227,8 +269,7 @@ module Stable = struct
       let incomplete_updates =
         List.fold ~init:(Digestif.SHA256.init ())
           previous_incomplete_zkapp_updates ~f:(fun h t ->
-            Digestif.SHA256.feed_string h
-            @@ Binable.to_string (module Transaction_with_witness.Stable.V3) t )
+            Digestif.SHA256.feed_string h t.hash )
         |> Digestif.SHA256.get
       in
       let continue_in_next_tree =
@@ -263,6 +304,7 @@ let create_expected_statement ~constraint_constants
     ; init_stack
     ; statement
     ; block_global_slot
+    ; _
     } =
   let open Or_error.Let_syntax in
   let source_first_pass_merkle_root =
@@ -1303,6 +1345,7 @@ let single_spec_of_job ~get_state :
       ; second_pass_ledger_witness
       ; init_stack
       ; block_global_slot
+      ; _
       } ->
       let%map.Or_error witness =
         let { With_status.data = transaction; status } =
