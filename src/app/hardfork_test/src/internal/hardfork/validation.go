@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/graphql"
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 )
 
 // BlockAnalysisResult holds the results of analyzing blocks
 type BlockAnalysisResult struct {
 	LatestOccupiedSlot        int
 	LatestSnarkedHashPerEpoch map[int]string // map from epoch to snarked ledger hash
-	LatestNonEmptyBlock       graphql.BlockData
+	LatestNonEmptyBlock       client.BlockData
 	GenesisEpochStaking       string
 	GenesisEpochNext          string
 }
@@ -35,7 +35,7 @@ func (t *HardforkTest) ValidateLatestOccupiedSlot(latestOccupiedSlot int) error 
 }
 
 // ValidateLatestNonEmptyBlockSlot checks that the latest non-empty block is before tx end slot
-func (t *HardforkTest) ValidateLatestNonEmptyBlockSlot(latestNonEmptyBlock graphql.BlockData) error {
+func (t *HardforkTest) ValidateLatestNonEmptyBlockSlot(latestNonEmptyBlock client.BlockData) error {
 	t.Logger.Info("Latest non-empty block: %s, height: %d, slot: %d",
 		latestNonEmptyBlock.StateHash, latestNonEmptyBlock.BlockHeight, latestNonEmptyBlock.Slot)
 
@@ -75,8 +75,8 @@ func (t *HardforkTest) ValidateNoNewBlocks(port int) error {
 }
 
 // CollectBlocks gathers blocks from multiple slots across different ports
-func (t *HardforkTest) CollectBlocks(startSlot, endSlot int) ([]graphql.BlockData, error) {
-	var allBlocks []graphql.BlockData
+func (t *HardforkTest) CollectBlocks(startSlot, endSlot int) ([]client.BlockData, error) {
+	var allBlocks []client.BlockData
 
 	for i := startSlot; i <= endSlot; i++ {
 
@@ -105,7 +105,7 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 	}
 
 	// Find the first non-empty block to get genesis epoch hashes
-	var firstEpochBlock graphql.BlockData
+	var firstEpochBlock client.BlockData
 	for _, block := range blocks {
 		if block.NonEmpty && block.Epoch == 0 {
 			firstEpochBlock = block
@@ -154,10 +154,10 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 // FindLatestNonEmptyBlock processes block data to find the latest non-empty block
 // and collects other important information
 // This function assumes that there is at least one block with non-zero slot
-func (t *HardforkTest) FindLatestNonEmptyBlock(blocks []graphql.BlockData) (
+func (t *HardforkTest) FindLatestNonEmptyBlock(blocks []client.BlockData) (
 	latestOccupiedSlot int,
 	latestSnarkedHashPerEpoch map[int]string, // map from epoch to snarked ledger hash
-	latestNonEmptyBlock graphql.BlockData,
+	latestNonEmptyBlock client.BlockData,
 	err error) {
 
 	if len(blocks) == 0 {
