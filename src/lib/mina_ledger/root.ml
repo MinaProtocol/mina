@@ -138,6 +138,13 @@ struct
                { backing_1 = backing_of_config cfg1
                ; backing_2 = backing_of_config cfg2
                } )
+
+    let primary_directory config =
+      match config with
+      | Stable_db_config src ->
+          src
+      | Converting_db_config { primary_directory; _ } ->
+          primary_directory
   end
 
   type root_hash = Ledger_hash.t
