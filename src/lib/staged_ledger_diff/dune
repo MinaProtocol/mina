@@ -3,36 +3,35 @@
  (public_name staged_ledger_diff)
  (libraries
   ;; opam libraries
+  async
+  async_kernel
+  async_unix
+  base.caml
+  bin_prot.shape
+  blake2
   core_kernel
   sexplib0
-  async
-  bin_prot.shape
-  base.caml
-  blake2
-  stdint
-  ppx_inline_test.config
   splittable_random
+  stdint
   stdio
-  async_unix
-  async_kernel
   ;; local libraries
-  mina_base
-  transaction_snark_work
-  genesis_constants
-  currency
   allocation_functor
   consensus
-  logger
-  ppx_version.runtime
-  mina_wire_types
-  mina_base.import
-  signature_lib
-  pickles.backend
-  snark_params
-  pickles
+  currency
+  genesis_constants
   kimchi_pasta
   kimchi_pasta.basic
-  mina_numbers)
+  logger
+  mina_base
+  mina_base.import
+  mina_numbers
+  mina_wire_types
+  pickles
+  pickles.backend
+  ppx_version.runtime
+  signature_lib
+  snark_params
+  transaction_snark_work)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
