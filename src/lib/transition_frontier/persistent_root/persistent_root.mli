@@ -58,6 +58,11 @@ module Instance : sig
 
   val dequeue_snarked_ledger : t -> unit
 
+  val potential_snarked_ledgers_to_yojson :
+    Root.Config.t Queue.t -> Yojson.Safe.t
+
+  val potential_snarked_ledgers_of_yojson : Yojson.Safe.t -> Root.Config.t list
+
   val destroy : t -> unit
 
   val close : t -> unit
