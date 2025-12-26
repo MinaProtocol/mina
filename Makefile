@@ -53,32 +53,6 @@ LIBP2P_HELPER_SIG := $(shell cd src/app/libp2p_helper ; find . -type f -print0  
 help: ## Display this help information
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-
-########################################
-.PHONY: add-o1labs-opam-repo
-add-o1labs-opam-repo:
-	opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git
-
-.PHONY: prepare
-prepare: add-o1labs-opam-repo
-	@echo "Preparing the environment and installing dependencies..."
-	@# Check Go installation and version
-	@command -v go >/dev/null 2>&1 || { echo >&2 "Error: Go is not installed. Please install Go before continuing. You can use gvm to install the appropriate Go environment."; exit 1; }
-	@GO_VERSION=$$(go version | awk '{print $$3}' | sed 's/go//'); \
-	GO_MOD_PATH="src/app/libp2p_helper/src/go.mod"; \
-	REQUIRED_GO_VERSION=$$(grep -E "^go [0-9]+\.[0-9]" $$GO_MOD_PATH | awk '{print $$2}'); \
-	if ! printf '%s\n%s\n' "$$REQUIRED_GO_VERSION" "$$GO_VERSION" | sort -V | head -n1 | grep -q "^$$REQUIRED_GO_VERSION$$"; then \
-		echo "Error: Go version $$GO_VERSION is not compatible. Required version is $$REQUIRED_GO_VERSION or newer (only minor)."; \
-		exit 1; \
-	fi; \
-	echo "Go version $$GO_VERSION detected (requirement: $$REQUIRED_GO_VERSION or newer (only minor))"
-	opam switch import --switch mina --yes opam.export
-	eval $(opam env --switch=mina --set-switch)
-	chmod +x scripts/pin-external-packages.sh
-	./scripts/pin-external-packages.sh
-	@echo "Environment prepared. You can now run 'make build' to build the project."
-
-
 ########################################
 ## Code
 

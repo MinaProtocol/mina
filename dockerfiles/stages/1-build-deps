@@ -45,7 +45,7 @@ ARG OPAM_VERSION=2.3.0
 #   `nix flake update opam-repository`).
 # - scripts/update_opam_switch.sh
 ARG OPAM_REPOSITORY_COMMIT=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
-ARG O1LABS_OPAM_REPOSITORY_COMMIT=dd90c5c72b7b7caeca3db3224b2503924deea08a
+ARG O1LABS_OPAM_REPOSITORY_COMMIT=da14ce5463751e5b5b9ac565d8d37e04b4c1edc5
 
 # Golang version number used to detemine tarball name
 ARG GO_VERSION=1.19.11
