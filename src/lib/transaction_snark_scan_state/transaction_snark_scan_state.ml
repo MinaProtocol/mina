@@ -341,6 +341,35 @@ module Serializable_type = struct
         }
 
       let to_latest = Fn.id
+
+      let hash (t : t) =
+        let state_hash =
+          Parallel_scan.State.hash t.scan_state
+            (Binable.to_string
+               (module Ledger_proof_with_sok_message.Serializable_type.Stable.V2) )
+            (Binable.to_string
+               (module Transaction_with_witness.Serializable_type.Stable.V2) )
+        in
+        let ( previous_incomplete_zkapp_updates
+            , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
+          t.previous_incomplete_zkapp_updates
+        in
+        let incomplete_updates =
+          List.fold ~init:(Digestif.SHA256.init ())
+            previous_incomplete_zkapp_updates ~f:(fun h t ->
+              Digestif.SHA256.feed_string h
+              @@ Binable.to_string
+                   (module Transaction_with_witness.Serializable_type.Stable.V2)
+                   t )
+          |> Digestif.SHA256.get
+        in
+        let continue_in_next_tree =
+          Digestif.SHA256.digest_string (Bool.to_string continue_in_next_tree)
+        in
+        [ state_hash; incomplete_updates; continue_in_next_tree ]
+        |> List.fold ~init:(Digestif.SHA256.init ()) ~f:(fun h t ->
+               Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string t) )
+        |> Digestif.SHA256.get |> Staged_ledger_hash.Aux_hash.of_sha256
     end
   end]
 
