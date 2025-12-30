@@ -8,8 +8,8 @@ module Make (Engine : Intf.Engine.S) () :
 
   module Event_handler_id = Unique_id.Int ()
 
-  type ('a, 'b) handler_func =
-    Node.t -> 'a -> [ `Stop of 'b | `Continue ] Deferred.t
+  type ('data, 'result) handler_func =
+    Node.t -> 'data -> [ `Stop of 'result | `Continue ] Deferred.t
 
   type event_handler =
     | Event_handler :
@@ -19,8 +19,8 @@ module Make (Engine : Intf.Engine.S) () :
   (* event subscriptions surface information from the handler (as type witnesses), but do not existentially hide the result parameter *)
   type _ event_subscription =
     | Event_subscription :
-        Event_handler_id.t * 'b Ivar.t * 'a Event_type.t
-        -> 'b event_subscription
+        Event_handler_id.t * 'result Ivar.t * 'data Event_type.t
+        -> 'result event_subscription
 
   type handler_map = event_handler list Event_type.Map.t
 
@@ -46,10 +46,7 @@ module Make (Engine : Intf.Engine.S) () :
           (* assuming the dispatch for `f` is already parallel, and not the execution of the deferred it returns *)
           let (Event (event_type, event_data)) = event in
           let (Event_handler
-                ( handler_id
-                , handler_finished_ivar
-                , handler_type
-                , handler_callback ) ) =
+                (handler_id, handler_result, handler_type, handler_callback) ) =
             handler
           in
           match%map
@@ -59,7 +56,7 @@ module Make (Engine : Intf.Engine.S) () :
           | `Continue ->
               None
           | `Stop result ->
-              Ivar.fill handler_finished_ivar result ;
+              Ivar.fill handler_result result ;
               Some handler_id )
     in
     unregister_event_handlers_by_id handlers
@@ -73,7 +70,7 @@ module Make (Engine : Intf.Engine.S) () :
            [%log debug] "Dispatching event $event for $node"
              ~metadata:
                [ ("event", Event_type.event_to_yojson event)
-               ; ("node", `String (Node.infra_id node))
+               ; ("node", `String (Node.id node))
                ] ;
            dispatch_event handlers node event ) ) ;
     { logger; handlers }
@@ -81,11 +78,11 @@ module Make (Engine : Intf.Engine.S) () :
   let on t event_type ~f =
     let event_type_ex = Event_type.Event_type event_type in
     let handler_id = Event_handler_id.create () in
-    let finished_ivar = Ivar.create () in
-    let handler = Event_handler (handler_id, finished_ivar, event_type, f) in
+    let result = Ivar.create () in
+    let handler = Event_handler (handler_id, result, event_type, f) in
     t.handlers :=
       Event_type.Map.add_multi !(t.handlers) ~key:event_type_ex ~data:handler ;
-    Event_subscription (handler_id, finished_ivar, event_type)
+    Event_subscription (handler_id, result, event_type)
 
   (* TODO: On cancellation, should we notify active subscriptions? Would involve changing await type to option or result. *)
   let cancel t event_subscription cancellation =

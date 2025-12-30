@@ -49,8 +49,6 @@ module Engine = struct
 
       val id : t -> string
 
-      val infra_id : t -> string
-
       val network_keypair : t -> Network_keypair.t option
 
       val start : fresh_state:bool -> t -> unit Malleable_error.t
@@ -62,8 +60,11 @@ module Engine = struct
       *)
       val should_be_running : t -> bool
 
+      (** Returns the GraphQL endpoint of this node that's reachable from host 
+          environment. *)
       val get_ingress_uri : t -> Uri.t
 
+      (** Dump archive data of an archive node to host at [data_file]. *)
       val dump_archive_data :
         logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
 
@@ -73,9 +74,12 @@ module Engine = struct
         -> t
         -> string Malleable_error.t
 
+      (** Dump JSON logs of the node to host at [data_file]. *)
       val dump_mina_logs :
         logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t
 
+      (** Dump a bunch of precomputed block json files with name formatted as 
+          state_hash.json in CWD. *)
       val dump_precomputed_blocks :
         logger:Logger.t -> t -> unit Malleable_error.t
     end
@@ -102,7 +106,7 @@ module Engine = struct
 
     val archive_nodes : t -> Node.t Core.String.Map.t
 
-    val all_mina_nodes : t -> Node.t Core.String.Map.t
+    val all_daemon_nodes : t -> Node.t Core.String.Map.t
 
     val all_nodes : t -> Node.t Core.String.Map.t
 
@@ -111,8 +115,6 @@ module Engine = struct
     val genesis_keypairs : t -> Network_keypair.t Core.String.Map.t
 
     val genesis_keypair_exn : t -> String.t -> Network_keypair.t
-
-    val initialize_infra : logger:Logger.t -> t -> unit Malleable_error.t
   end
 
   module type Network_manager_intf = sig
@@ -220,10 +222,19 @@ module Dsl = struct
           State_hash.Set.t Mina_transaction.Transaction_hash.Map.t
       }
 
-    val listen :
-         logger:Logger.t
-      -> Event_router.t
-      -> t Broadcast_pipe.Reader.t * t Broadcast_pipe.Writer.t
+    module Generator : sig
+      (* HACK: I can't name it `gen` due to name collision *)
+      type gen
+
+      (* Create a network state generator that could be broadcast-consumed from
+         event router. Under the hood, it's aggregating on events interesting to
+         the network state *)
+      val from_router : logger:Logger.t -> Event_router.t -> gen
+
+      val reader : gen -> t Broadcast_pipe.Reader.t
+
+      val close : gen -> unit
+    end
   end
 
   module type Wait_condition_intf = sig

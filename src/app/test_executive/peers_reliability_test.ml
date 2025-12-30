@@ -38,13 +38,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let all_mina_nodes = Network.all_mina_nodes network in
+    let all_daemon_nodes = Network.all_daemon_nodes network in
     [%log info] "peers_list"
       ~metadata:
         [ ( "peers"
           , `List
-              (List.map (Core.String.Map.data all_mina_nodes) ~f:(fun n ->
-                   `String (Node.infra_id n) ) ) )
+              (List.map (Core.String.Map.data all_daemon_nodes) ~f:(fun n ->
+                   `String (Node.id n) ) ) )
         ] ;
     let node_a =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
@@ -71,10 +71,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       wait_for t
         (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
+           (Core.String.Map.data all_daemon_nodes) )
     in
     let%bind initial_connectivity_data =
-      fetch_connectivity_data ~logger (Core.String.Map.data all_mina_nodes)
+      fetch_connectivity_data ~logger (Core.String.Map.data all_daemon_nodes)
     in
     let%bind () =
       section "network is fully connected upon initialization"
@@ -176,7 +176,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "short bootstrap"
         (let%bind () = Node.stop node_c in
          [%log info] "%s stopped, will now wait for blocks to be produced"
-           (Node.infra_id node_c) ;
+           (Node.id node_c) ;
          let%bind () =
            wait_for t
              ( Wait_condition.blocks_to_be_produced 1
@@ -188,7 +188,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind () = Node.start ~fresh_state:true node_c in
          [%log info]
            "%s started again, will now wait for this node to initialize"
-           (Node.infra_id node_c) ;
+           (Node.id node_c) ;
          (* we've witnessed the loading of the node_c frontier on initialization
             so the event here must be the frontier loading on the node_c restart
          *)
@@ -206,7 +206,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section "network is fully connected after one node was restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
        let%bind final_connectivity_data =
-         fetch_connectivity_data ~logger (Core.String.Map.data all_mina_nodes)
+         fetch_connectivity_data ~logger (Core.String.Map.data all_daemon_nodes)
        in
        assert_peers_completely_connected final_connectivity_data )
 end

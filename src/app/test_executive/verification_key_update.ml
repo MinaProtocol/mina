@@ -103,7 +103,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Wait for nodes to initialize"
         (wait_for t
            (Wait_condition.nodes_to_initialize
-              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
+              (Core.String.Map.data (Network.all_daemon_nodes network)) ) )
     in
     let whale1 = Network.block_producer_exn network "whale1" in
     let%bind whale1_pk = pub_key_of_node whale1 in

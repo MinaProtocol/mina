@@ -1,7 +1,6 @@
 open Core
 open Async
 open Cmdliner
-open Pipe_lib
 open Integration_test_lib
 
 type test = string * (module Intf.Test.Functor_intf)
@@ -203,16 +202,17 @@ let report_test_errors ~log_error_set ~internal_error_set =
 
 let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
     ~log_engine_cleanup_func ~lift_accumulated_errors_func ~net_manager_ref
-    ~log_engine_ref ~network_state_writer_ref ~cleanup_deferred_ref ~exit_reason
-    ~test_result : unit Deferred.t =
+    ~log_engine_ref ~network_state_generator_ref ~cleanup_deferred_ref
+    ~exit_reason ~test_result ~cleanup_state_generator : unit Deferred.t =
   let cleanup () : unit Deferred.t =
     let%bind log_engine_cleanup_result =
       Option.value_map !log_engine_ref
         ~default:(Deferred.Or_error.return ())
         ~f:log_engine_cleanup_func
     in
-    Option.value_map !network_state_writer_ref ~default:()
-      ~f:Broadcast_pipe.Writer.close ;
+    Option.value_map
+      !network_state_generator_ref
+      ~default:() ~f:cleanup_state_generator ;
     let%bind test_error_set = Malleable_error.lift_error_set_unit test_result in
     let log_error_set = lift_accumulated_errors_func () in
     let internal_error_set =
@@ -272,8 +272,6 @@ let main inputs =
     { Test_config.Container_images.mina = inputs.mina_image
     ; archive_node =
         Option.value inputs.archive_image ~default:"archive_image_unused"
-    ; user_agent = "codaprotocol/coda-user-agent:0.1.5"
-    ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in
   let test_config = T.config ~constants in
@@ -287,7 +285,7 @@ let main inputs =
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
   let log_engine_ref : Engine.Log_engine.t option ref = ref None in
   let error_accumulator_ref = ref None in
-  let network_state_writer_ref = ref None in
+  let network_state_generator_ref = ref None in
   let cleanup_deferred_ref = ref None in
   [%log trace] "preparing up cleanup phase" ;
   let f_dispatch_cleanup =
@@ -304,7 +302,8 @@ let main inputs =
       ~network_cleanup_func:Engine.Network_manager.cleanup
       ~log_engine_cleanup_func:Engine.Log_engine.destroy
       ~lift_accumulated_errors_func ~net_manager_ref ~log_engine_ref
-      ~network_state_writer_ref ~cleanup_deferred_ref
+      ~network_state_generator_ref ~cleanup_deferred_ref
+      ~cleanup_state_generator:Dsl.Network_state.Generator.close
   in
   (* run test while gracefully recovering handling exceptions and interrupts *)
   [%log trace] "attaching signal handler" ;
@@ -352,25 +351,25 @@ let main inputs =
           error_accumulator_ref :=
             Some (Dsl.watch_log_errors ~logger ~event_router ~on_fatal_error) ;
           [%log trace] "beginning to process network events" ;
-          let network_state_reader, network_state_writer =
-            Dsl.Network_state.listen ~logger event_router
+          let network_state_generator =
+            Dsl.Network_state.Generator.from_router ~logger event_router
           in
-          network_state_writer_ref := Some network_state_writer ;
+          network_state_generator_ref := Some network_state_generator ;
           [%log trace] "initializing dsl" ;
           let (`Don't_call_in_tests dsl) =
-            Dsl.create ~logger ~network ~event_router ~network_state_reader
+            Dsl.create ~logger ~network ~event_router
+              ~network_state_reader:
+                (Dsl.Network_state.Generator.reader network_state_generator)
           in
           (network, dsl)
         in
-        [%log trace] "initializing network abstraction" ;
-        let%bind () = Engine.Network.initialize_infra ~logger network in
 
         [%log info] "Starting the daemons within the pods" ;
         let start_print (node : Engine.Network.Node.t) =
           let open Malleable_error.Let_syntax in
-          [%log info] "starting %s ..." (Engine.Network.Node.infra_id node) ;
+          [%log info] "starting %s ..." (Engine.Network.Node.id node) ;
           let%bind res = Engine.Network.Node.start ~fresh_state:false node in
-          [%log info] "%s started" (Engine.Network.Node.infra_id node) ;
+          [%log info] "%s started" (Engine.Network.Node.id node) ;
           Malleable_error.return res
         in
         let seed_nodes =
@@ -385,7 +384,7 @@ let main inputs =
           *)
           Dsl.Event_router.on (Dsl.event_router dsl) Node_offline
             ~f:(fun offline_node () ->
-              let node_name = Engine.Network.Node.infra_id offline_node in
+              let node_name = Engine.Network.Node.id offline_node in
               [%log info] "Detected node offline $node"
                 ~metadata:[ ("node", `String node_name) ] ;
               if Engine.Network.Node.should_be_running offline_node then (

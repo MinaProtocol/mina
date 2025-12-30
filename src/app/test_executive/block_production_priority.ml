@@ -107,11 +107,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
-    let all_mina_nodes = Network.all_mina_nodes network in
+    let all_daemon_nodes = Network.all_daemon_nodes network in
     let%bind () =
       wait_for t
         (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
+           (Core.String.Map.data all_daemon_nodes) )
     in
     let%bind () =
       section_hard "wait for 3 blocks to be produced (warm-up)"

@@ -63,11 +63,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let run ~config:_ network t =
     let open Malleable_error.Let_syntax in
-    let all_mina_nodes = Network.all_mina_nodes network in
+    let all_daemon_nodes = Network.all_daemon_nodes network in
     let%bind () =
       wait_for t
         (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
+           (Core.String.Map.data all_daemon_nodes) )
     in
     (* Since I made the balances of block producers in genesis ledger and next
        epoch ledgers to be 0, then blocks would only be produced, if the
