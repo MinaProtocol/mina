@@ -135,7 +135,7 @@ let convert_zkapp_command_from_selector ~partitioner ~job ~pairing
     Snark_worker_shared.Zkapp_command_inputs.read_all_proofs_from_disk
       unscheduled_segments
     |> Mina_stdlib.Nonempty_list.map ~f:(fun (witness, spec, statement) ->
-           Work.Spec.Sub_zkapp.Stable.Latest.Segment
+           Work.Spec.Sub_zkapp.SegmentSpec.Stable.Latest.
              { statement; witness; spec } )
   in
   let pending_zkapp_command, first_segment, first_range =
@@ -380,7 +380,7 @@ let submit_into_pending_zkapp_command ~partitioner
           Work.Metrics.emit_subzkapp_metrics ~logger:partitioner.logger
             ~sub_zkapp_spec:job.spec ~elapsed ;
           finalize_zkapp_proof pending
-      | Error exn ->
+      | Error (`No_such_range range) ->
           [%log' debug partitioner.logger]
             "Worker submit a work that's rejected by the pending zkapp \
              command, this probably means a same subzkapp work has been \
@@ -389,7 +389,7 @@ let submit_into_pending_zkapp_command ~partitioner
               [ ("job_id", Work.Id.Sub_zkapp.to_yojson job_id)
               ; ("proof", Ledger_proof.to_yojson proof)
               ; ("elapsed", Mina_stdlib.Time.Span.to_yojson elapsed)
-              ; ("reason", `String (Error.to_string_hum exn))
+              ; ("proposed_range", Work.Id.Range.to_yojson range)
               ] ;
           SpecUnmatched )
   | None, _ | _, None ->
