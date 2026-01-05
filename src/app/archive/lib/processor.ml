@@ -4632,12 +4632,12 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
   | None ->
       Deferred.unit
   | Some runtime_config -> (
+      let (module G) = Genesis_constants.profiled () in
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger
-            ~proof_level:Genesis_constants.Compiled.proof_level
-            ~genesis_constants ~constraint_constants runtime_config
-            ~cli_proof_level:None
+            ~proof_level:G.proof_level ~genesis_constants ~constraint_constants
+            runtime_config ~cli_proof_level:None
         with
         | Ok precomputed_values ->
             precomputed_values

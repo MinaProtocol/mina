@@ -53,10 +53,10 @@ let command_run =
      in
      fun () ->
        let logger = Logger.create () in
-       let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
+
+       let (module G) = Genesis_constants.profiled () in
+       let genesis_constants = G.genesis_constants in
+       let constraint_constants = G.constraint_constants in
        Stdout_log.setup log_json log_level ;
        let proof_cache_db = Proof_cache_tag.create_identity_db () in
        [%log info] "Starting archive process; built with commit $commit"

@@ -534,8 +534,11 @@ let send_payment_graphql =
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let compile_config = Mina_compile_config.Compiled.t in
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let compile_config =
+    Mina_compile_config.of_node_config (module Node_config)
+  in
   let args =
     Args.zip3
       (Cli_lib.Flag.signed_command_common
@@ -569,8 +572,11 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let compile_config = Mina_compile_config.Compiled.t in
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let compile_config =
+    Mina_compile_config.of_node_config (module Node_config)
+  in
   let args =
     Args.zip2
       (Cli_lib.Flag.signed_command_common
@@ -846,9 +852,8 @@ let hash_ledger =
            (required string))
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
+       let (module G) = Genesis_constants.profiled () in
+       let constraint_constants = G.constraint_constants in
        let process_accounts accounts =
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
@@ -953,10 +958,9 @@ let constraint_system_digests =
     (let open Command.Let_syntax in
     let%map signature_kind = Cli_lib.Flag.signature_kind in
     fun () ->
-      let constraint_constants =
-        Genesis_constants.Compiled.constraint_constants
-      in
-      let proof_level = Genesis_constants.Compiled.proof_level in
+      let (module G) = Genesis_constants.profiled () in
+      let constraint_constants = G.constraint_constants in
+      let proof_level = G.proof_level in
       let all =
         Transaction_snark.constraint_system_digests ~signature_kind
           ~constraint_constants ()
@@ -1825,9 +1829,10 @@ let add_peers_graphql =
                   } ) ) ) )
 
 let compile_time_constants =
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  let proof_level = Genesis_constants.Compiled.proof_level in
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let constraint_constants = G.constraint_constants in
+  let proof_level = G.proof_level in
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
     (Command.Param.return (fun () ->
@@ -2403,10 +2408,11 @@ let test_ledger_application =
      let num_txs_per_round = Option.value ~default:3 num_txs_per_round in
      let rounds = Option.value ~default:580 rounds in
      let max_depth = Option.value ~default:290 max_depth in
-     let constraint_constants =
-       Genesis_constants.Compiled.constraint_constants
-     in
-     let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+
+     let (module G) = Genesis_constants.profiled () in
+
+     let constraint_constants = G.constraint_constants in
+     let genesis_constants = G.genesis_constants in
      Test_ledger_application.test ~privkey_path
        ~ledger_path:(ledger_path, Stable_db) ?prev_block_path
        ~first_partition_slots ~no_new_stack ~has_second_partition
@@ -2415,7 +2421,9 @@ let test_ledger_application =
        ~genesis_constants ~benchmark )
 
 let itn_create_accounts =
-  let compile_config = Mina_compile_config.Compiled.t in
+  let compile_config =
+    Mina_compile_config.of_node_config (module Node_config)
+  in
   Command.async ~summary:"Fund new accounts for incentivized testnet"
     (let open Command.Param in
     let privkey_path = Cli_lib.Flag.privkey_read_path in
@@ -2438,10 +2446,10 @@ let itn_create_accounts =
         (required int)
     in
     let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
-    let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-    let constraint_constants =
-      Genesis_constants.Compiled.constraint_constants
-    in
+
+    let (module G) = Genesis_constants.profiled () in
+    let genesis_constants = G.genesis_constants in
+    let constraint_constants = G.constraint_constants in
     Cli_lib.Background_daemon.rpc_init args
       ~f:(Itn.create_accounts ~genesis_constants ~constraint_constants))
 

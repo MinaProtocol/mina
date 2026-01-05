@@ -310,8 +310,11 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   return ()
 
 let output_there_and_back_cmds =
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-  let compile_config = Mina_compile_config.Compiled.t in
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
+  let compile_config =
+    Mina_compile_config.of_node_config (module Node_config)
+  in
   let open Command.Let_syntax in
   Command.async
     ~summary:
