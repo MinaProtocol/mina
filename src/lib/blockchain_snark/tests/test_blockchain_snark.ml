@@ -69,7 +69,8 @@ let expected_values =
 
 (** Test blockchain-step circuit stats *)
 let test_blockchain_step () =
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let (module G) = Genesis_constants.profiled () in
+  let constraint_constants = G.constraint_constants in
   let proof_level = Genesis_constants.Proof_level.Full in
   let cs =
     Blockchain_snark.Blockchain_snark_state.step_constraint_system ~proof_level

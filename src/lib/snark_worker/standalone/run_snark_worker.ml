@@ -100,9 +100,8 @@ let command =
      in
      fun () ->
        let open Async in
-       let constraint_constants =
-         Genesis_constants.Compiled.constraint_constants
-       in
+       let (module G) = Genesis_constants.profiled () in
+       let constraint_constants = G.constraint_constants in
 
        let signature_kind = Mina_signature_kind.t_DEPRECATED in
        let%bind worker_state =
