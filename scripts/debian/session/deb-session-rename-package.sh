@@ -2,6 +2,10 @@
 
 set -eux -o pipefail
 
+# Source common functions
+SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
+source "$SCRIPT_DIR/deb-session-common.sh"
+
 usage() {
   cat <<EOF
 Usage: $0 <session-dir> <new-package-name>
@@ -34,20 +38,16 @@ SESSION_DIR="$1"
 NEW_PACKAGE_NAME="$2"
 
 # Validate session directory
-if [[ ! -d "$SESSION_DIR" ]]; then
-  echo "ERROR: Session directory not found: $SESSION_DIR" >&2
+validate_session "$SESSION_DIR"
+
+# Validate control directory
+CONTROL_DIR=$(get_session_control_dir "$SESSION_DIR_ABS")
+if [[ ! -d "$CONTROL_DIR" ]]; then
+  echo "ERROR: Session control directory not found. Session corrupted?" >&2
   exit 1
 fi
 
-SESSION_DIR_ABS=$(readlink -f "$SESSION_DIR")
-
-# Validate session
-if [[ ! -d "$SESSION_DIR_ABS/control" ]]; then
-  echo "ERROR: Session control directory not found. Invalid session?" >&2
-  exit 1
-fi
-
-CONTROL_FILE="$SESSION_DIR_ABS/control/control"
+CONTROL_FILE="$CONTROL_DIR/control"
 if [[ ! -f "$CONTROL_FILE" ]]; then
   echo "ERROR: Control file not found: $CONTROL_FILE" >&2
   exit 1

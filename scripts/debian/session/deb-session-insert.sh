@@ -3,7 +3,7 @@
 set -eux -o pipefail
 
 # Source common functions
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 source "$SCRIPT_DIR/deb-session-common.sh"
 
 usage() {
@@ -58,12 +58,10 @@ shift 2
 SOURCE_FILES=("$@")
 
 # Validate session directory
-if [[ ! -d "$SESSION_DIR" ]]; then
-  echo "ERROR: Session directory not found: $SESSION_DIR" >&2
-  exit 1
-fi
+validate_session "$SESSION_DIR"
 
-SESSION_DIR_ABS=$(realpath "$SESSION_DIR")
+# Validate destination path doesn't escape session
+validate_path_in_session "$SESSION_DIR_ABS" "$DEST_PATH" "Destination path"
 
 # Resolve source files to absolute paths and validate
 SOURCE_FILES_ABS=()
@@ -103,10 +101,11 @@ echo "Session: $SESSION_DIR_ABS"
 echo "Destination: $DEST_PATH"
 echo "Files to insert: ${#SOURCE_FILES_ABS[@]}"
 
-# Strip leading slash
-DEST_PATH_STRIPPED=$(strip_leading_slash "$DEST_PATH")
+# Navigate to session data directory
+cd "$(get_session_data_dir "$SESSION_DIR_ABS")"
 
-cd "$SESSION_DIR_ABS/data"
+# Strip leading slash from destination
+DEST_PATH_STRIPPED=$(strip_leading_slash "$DEST_PATH")
 
 # Insert each file
 INSERTED_COUNT=0

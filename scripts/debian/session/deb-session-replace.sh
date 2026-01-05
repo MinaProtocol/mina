@@ -3,7 +3,7 @@
 set -eux -o pipefail
 
 # Source common functions
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 source "$SCRIPT_DIR/deb-session-common.sh"
 
 usage() {
@@ -41,13 +41,11 @@ SESSION_DIR="$1"
 PKG_PATH="$2"
 REPLACEMENT="$3"
 
-# Validate inputs
-if [[ ! -d "$SESSION_DIR" ]]; then
-  echo "ERROR: Session directory not found: $SESSION_DIR" >&2
-  exit 1
-fi
+# Validate session directory
+validate_session "$SESSION_DIR"
 
-SESSION_DIR_ABS=$(readlink -f "$SESSION_DIR")
+# Validate package path doesn't escape session (handles wildcards)
+validate_path_in_session "$SESSION_DIR_ABS" "${PKG_PATH%%\**}" "Package path"
 
 if [[ ! -f "$REPLACEMENT" ]]; then
   echo "ERROR: Replacement file not found: $REPLACEMENT" >&2
@@ -56,15 +54,16 @@ fi
 
 REPLACEMENT_ABS=$(readlink -f "$REPLACEMENT")
 
-# Strip leading slash for path inside data/
-PKG_PATH_STRIPPED=$(strip_leading_slash "$PKG_PATH")
-
 echo "=== Replacing File(s) in Package ==="
 echo "Session: $SESSION_DIR_ABS"
 echo "Target:  $PKG_PATH"
 echo "Source:  $REPLACEMENT_ABS"
 
-cd "$SESSION_DIR_ABS/data"
+# Navigate to session data directory
+cd "$(get_session_data_dir "$SESSION_DIR_ABS")"
+
+# Strip leading slash for path inside data/
+PKG_PATH_STRIPPED=$(strip_leading_slash "$PKG_PATH")
 
 # Find matching files
 TARGET_PATHS=()

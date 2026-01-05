@@ -3,7 +3,7 @@
 set -eux -o pipefail
 
 # Source common functions
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 source "$SCRIPT_DIR/deb-session-common.sh"
 
 usage() {
@@ -41,24 +41,24 @@ SESSION_DIR="$1"
 SOURCE_PATH="$2"
 DEST_PATH="$3"
 
-# Validate inputs
-if [[ ! -d "$SESSION_DIR" ]]; then
-  echo "ERROR: Session directory not found: $SESSION_DIR" >&2
-  exit 1
-fi
+# Validate session directory
+validate_session "$SESSION_DIR"
 
-SESSION_DIR_ABS=$(readlink -f "$SESSION_DIR")
-
-# Strip leading slashes
-SOURCE_PATH_STRIPPED=$(strip_leading_slash "$SOURCE_PATH")
-DEST_PATH_STRIPPED=$(strip_leading_slash "$DEST_PATH")
+# Validate paths don't escape session
+validate_path_in_session "$SESSION_DIR_ABS" "$SOURCE_PATH" "Source path"
+validate_path_in_session "$SESSION_DIR_ABS" "$DEST_PATH" "Destination path"
 
 echo "=== Moving File in Package ==="
 echo "Session: $SESSION_DIR_ABS"
 echo "From:    $SOURCE_PATH"
 echo "To:      $DEST_PATH"
 
-cd "$SESSION_DIR_ABS/data"
+# Navigate to session data directory
+cd "$(get_session_data_dir "$SESSION_DIR_ABS")"
+
+# Strip leading slashes
+SOURCE_PATH_STRIPPED=$(strip_leading_slash "$SOURCE_PATH")
+DEST_PATH_STRIPPED=$(strip_leading_slash "$DEST_PATH")
 
 # Check if source exists
 if [[ ! -e "$SOURCE_PATH_STRIPPED" ]]; then

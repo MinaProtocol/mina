@@ -3,7 +3,7 @@
 set -eux -o pipefail
 
 # Source common functions
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 source "$SCRIPT_DIR/deb-session-common.sh"
 
 usage() {
@@ -46,22 +46,21 @@ fi
 SESSION_DIR="$1"
 PATH_PATTERN="$2"
 
-# Validate inputs
-if [[ ! -d "$SESSION_DIR" ]]; then
-  echo "ERROR: Session directory not found: $SESSION_DIR" >&2
-  exit 1
-fi
+# Validate session directory
+validate_session "$SESSION_DIR"
 
-SESSION_DIR_ABS=$(readlink -f "$SESSION_DIR")
-
-# Strip leading slash for path inside data/
-PATH_PATTERN_STRIPPED=$(strip_leading_slash "$PATH_PATTERN")
+# Validate path pattern doesn't escape session (handles wildcards)
+validate_path_in_session "$SESSION_DIR_ABS" "${PATH_PATTERN%%\**}" "Path pattern"
 
 echo "=== Removing File(s) from Package ==="
 echo "Session: $SESSION_DIR_ABS"
 echo "Pattern: $PATH_PATTERN"
 
-cd "$SESSION_DIR_ABS/data"
+# Navigate to session data directory
+cd "$(get_session_data_dir "$SESSION_DIR_ABS")"
+
+# Strip leading slash for path inside data/
+PATH_PATTERN_STRIPPED=$(strip_leading_slash "$PATH_PATTERN")
 
 # Find matching files
 MATCHED_FILES=()

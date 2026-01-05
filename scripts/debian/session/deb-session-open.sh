@@ -60,7 +60,7 @@ if [[ -d "$SESSION_DIR" ]]; then
     exit 1
   fi
   echo "Cleaning existing session directory: $SESSION_DIR"
-  rm -rf "$SESSION_DIR"/*
+  rm -rf "${SESSION_DIR:?}"/*
 else
   mkdir -p "$SESSION_DIR"
 fi
