@@ -2073,7 +2073,8 @@ let internal_commands logger ~itn_features =
                 (Yojson.Safe.to_string @@ Error_json.error_to_yojson err) ;
               exit 1) )
   ; ( "chain-id"
-    , Command.async ~summary:"Generate a genesis proof"
+    , Command.async
+        ~summary:"Print the chain_id that uniquely identifies the network"
         (let open Command.Let_syntax in
         let%map_open config_files =
           flag "--config-file" ~aliases:[ "config-file" ]
@@ -2085,9 +2086,7 @@ let internal_commands logger ~itn_features =
         and conf_dir = Cli_lib.Flag.conf_dir
         and genesis_dir =
           flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
-            ~doc:
-              "DIR Directory that contains the genesis ledger and the genesis \
-               blockchain proof (default: <config-dir>)"
+            ~doc:"DIR Directory that contains the genesis ledger"
             (optional string)
         in
         fun () ->
@@ -2119,7 +2118,13 @@ let internal_commands logger ~itn_features =
             let protocol_transaction_version =
               Protocol_version.(transaction current)
             in
-            let protocol_network_version = Protocol_version.(network current) in
+            (*TODO: this is wrong, should be `Protocol_version.network current`, but is
+              consistent with the computation made by the daemon's entrypoint. Fix this in
+              the PR for develop.
+            *)
+            let protocol_network_version =
+              Protocol_version.(transaction current)
+            in
             let genesis_state_hash =
               (Precomputed_values.genesis_state_hashes precomputed_values)
                 .state_hash
