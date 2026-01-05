@@ -51,10 +51,10 @@ let mainnetDeps =
         }
 
 let devnetExpectedChainId =
-      "b00df7e2823d671b0cf1aeadce7dcfe907b6fc65062c531a10f7d4db446b2b9f"
+      "29936104443aaf264a7f0192ac64b1c7173198c1ed404c1bcff5e562e05eb7f6"
 
 let mainnetExpectedChainId =
-      "cfb2d9ba2e5c9a59b559853c2bd8dff6b5eb4809c39fb68842a8d4853d88b9c6"
+      "a7351abc7ddf2ea92d1b38cc8e636c271c1dfd2c081c637f62ebc2af34eb7cc1"
 
 in  Pipeline.build
       Pipeline.Config::{
