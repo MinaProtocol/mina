@@ -162,7 +162,9 @@ find_closest_ancestor() {
     ancestor=$(git merge-base "$CURRENT_COMMIT" "origin/$branch")
     distance=$(git rev-list --count "${ancestor}..${CURRENT_COMMIT}")
     echo "Branch $branch: $distance commits from current commit ($CURRENT_COMMIT) via ancestor $ancestor" >&2
-    if [[ -z "$min_distance" || $distance -lt $min_distance ]]; then
+    # Use <= so that branches later in MAINLINE_BRANCHES array win ties
+    # This makes the order in --mainline-branches meaningful for priority
+    if [[ -z "$min_distance" || $distance -le $min_distance ]]; then
       min_distance=$distance
       closest_branch=$branch
     fi

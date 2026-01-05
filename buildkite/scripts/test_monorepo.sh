@@ -573,7 +573,7 @@ EOF
     --selection-mode full \
     --jobs "$TEST_DIR/jobs" \
     --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches mesa,master,develop \
+    --mainline-branches mesa,develop,master \
     --dry-run 2>&1 || true)
 
   assert_contains "$output" "included based on includeIf condition" "Should show includeIf inclusion message"
