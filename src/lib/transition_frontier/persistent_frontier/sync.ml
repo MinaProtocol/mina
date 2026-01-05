@@ -10,8 +10,9 @@ let buffer t = Diff_buffer.Rev_dyn_array.to_list t.buffer.diff_array
 let create ~constraint_constants ~logger ~time_controller ~db
     ~dequeue_snarked_ledger =
   let worker = Worker.create { db; logger; dequeue_snarked_ledger } in
+  let capacity = Diff_buffer.Capacity.make () in
   let buffer =
-    Diff_buffer.create ~constraint_constants ~time_controller ~worker
+    Diff_buffer.create ~constraint_constants ~time_controller ~worker ~capacity
   in
   { worker; buffer }
 
