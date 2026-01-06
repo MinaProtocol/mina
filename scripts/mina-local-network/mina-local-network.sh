@@ -234,7 +234,7 @@ on-exit() {
   fi
 }
 
-trap on-exit TERM INT
+trap "jobs -p | xargs -r kill" EXIT
 
 clean-dir() {
   rm -rf "${1}"
