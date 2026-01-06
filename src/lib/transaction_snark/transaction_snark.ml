@@ -3959,20 +3959,20 @@ module Make_str (A : Wire_types.Concrete) = struct
       @return List of (circuit_name, constraint_count) pairs
   *)
   let constraint_counts ~signature_kind ~constraint_constants () =
-    let count cs = Tick.R1CS_constraint_system.get_rows_len cs in
+    let count cs = Tick.Run.R1CS_constraint_system.get_rows_len cs in
     [ ( "transaction-merge"
       , count
-          Merge.(
-            Tick.constraint_system ~input_typ:Statement.With_sok.typ
-              ~return_typ:Tick.Typ.unit (fun x ->
-                let open Tick in
-                Checked.map ~f:ignore @@ main x )) )
+          (Tick.Run.constraint_system ~input_typ:Statement.With_sok.typ
+             ~return_typ:Tick.Typ.unit (fun x () ->
+               Tick.Run.run_checked
+                 Merge.(
+                   let open Tick in
+                   Checked.map ~f:ignore @@ main x ) ) ) )
     ; ( "transaction-base"
       , count
-          Base.(
-            Tick.constraint_system ~input_typ:Statement.With_sok.typ
-              ~return_typ:Tick.Typ.unit
-              (main ~signature_kind ~constraint_constants)) )
+          (Tick.Run.constraint_system ~input_typ:Statement.With_sok.typ
+             ~return_typ:Tick.Typ.unit (fun x () ->
+               Tick.Run.run_checked Base.(main ~signature_kind ~constraint_constants x) ) ) )
     ]
 
   module Account_update_group = Zkapp_command.Make_update_group (struct

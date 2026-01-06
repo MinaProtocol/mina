@@ -1045,19 +1045,18 @@ let constraint_system_digests ~proof_level ~constraint_constants () =
     @return List of (circuit_name, constraint_count) pairs
 *)
 let constraint_counts ~proof_level ~constraint_constants () =
-  let count cs = Tick.R1CS_constraint_system.get_rows_len cs in
+  let count cs = Tick.Run.R1CS_constraint_system.get_rows_len cs in
   [ ( "blockchain-step"
     , count
-        (let main x =
-           let open Tick in
-           let%map _ =
-             step ~proof_level ~constraint_constants ~logger:(Logger.create ())
-               x
-           in
-           ()
-         in
-         Tick.constraint_system ~input_typ:Statement.typ
-           ~return_typ:Tick.Typ.unit main ) )
+        (Tick.Run.constraint_system ~input_typ:Statement.typ
+           ~return_typ:Tick.Typ.unit (fun x () ->
+             Tick.Run.run_checked
+               (let open Tick in
+                let%map _ =
+                  step ~proof_level ~constraint_constants
+                    ~logger:(Logger.create ()) x
+                in
+                () ) ) ) )
   ]
 
 (** {1 Make Functor}

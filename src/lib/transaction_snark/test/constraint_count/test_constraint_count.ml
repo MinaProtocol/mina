@@ -23,7 +23,7 @@ open Core_kernel
 
 (** Count constraints in all transaction SNARK circuits *)
 let count_transaction_snark_constraints () =
-  let signature_kind = Mina_signature_kind.for_unit_tests in
+  let signature_kind = Mina_signature_kind.Testnet in
   let constraint_constants = Genesis_constants.Compiled.constraint_constants in
   let counts =
     Transaction_snark.constraint_counts ~signature_kind ~constraint_constants ()

@@ -1,3 +1,5 @@
 (tests
  (names test_blockchain_snark)
- (libraries alcotest blockchain_snark core_kernel genesis_constants))
+ (libraries alcotest blockchain_snark core_kernel genesis_constants)
+ (preprocess
+  (pps ppx_jane ppx_version)))
