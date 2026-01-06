@@ -96,11 +96,13 @@ module Ledger = struct
     ^ ".tar.gz"
 
   let hash_filename_stable hash ~ledger_name_prefix =
-    let account_hash = Mina_base.Account.empty_account_string () in
+    let account_hash = Lazy.force Mina_base.Account.empty_account_string in
     hash_filename hash ~ledger_name_prefix ~account_hash
 
   let hash_filename_hardfork hash ~ledger_name_prefix =
-    let account_hash = Mina_base.Account.Hardfork.empty_account_string () in
+    let account_hash =
+      Lazy.force Mina_base.Account.Hardfork.empty_account_string
+    in
     hash_filename hash ~ledger_name_prefix ~account_hash
 
   let named_filename

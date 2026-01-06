@@ -668,8 +668,8 @@ let empty =
 
 let empty_digest = lazy (digest empty)
 
-let empty_account_string () =
-  Bin_prot.Writer.to_string Stable.Latest.bin_writer_t empty
+let empty_account_string =
+  lazy (Bin_prot.Writer.to_string Stable.Latest.bin_writer_t empty)
 
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
@@ -1145,7 +1145,7 @@ module Hardfork = struct
 
   let empty_digest = lazy (digest empty)
 
-  let empty_account_string () = Bin_prot.Writer.to_string bin_writer_t empty
+  let empty_account_string = lazy (Bin_prot.Writer.to_string bin_writer_t empty)
 end
 
 (* An unstable account is needed when we're doing ledger migration. The main
