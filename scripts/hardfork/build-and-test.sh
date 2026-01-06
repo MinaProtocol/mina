@@ -12,6 +12,8 @@
 # Step 0. Prepare environment if needed
 set -eux -o pipefail
 
+export MINA_PROFILE="devnet"
+
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
 if [[ -n "${NIX_CACHE_NAR_SECRET:-}" ]]; then

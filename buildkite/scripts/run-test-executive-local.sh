@@ -44,6 +44,7 @@ source buildkite/scripts/debian/update.sh --verbose
 
 source buildkite/scripts/debian/install.sh "mina-test-executive"
 
+export MINA_PROFILE="devnet"
 mina-test-executive local "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
