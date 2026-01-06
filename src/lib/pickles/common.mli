@@ -134,7 +134,7 @@ module Ipa : sig
   end
 end
 
-val hash_messages_for_next_step_proof :
+val hash_message_inputs_for_next_step_proof :
      app_state:('a -> Kimchi_pasta.Basic.Fp.Stable.Latest.t Core_kernel.Array.t)
   -> ( Backend.Tock.Curve.Affine.t array
      (* the type for the verification key *)
@@ -153,7 +153,10 @@ val hash_messages_for_next_step_proof :
        Pickles_types.Vector.t
      (* bulletproof challenges *) )
      Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
-  -> Import.Types.Digest.Constant.t
+  -> Pasta_bindings.Fp.t array
+
+val hash_messages_for_next_step_proof :
+  Pasta_bindings.Fp.t array -> Import.Types.Digest.Constant.t
 
 val tick_public_input_of_statement :
      max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t

@@ -869,12 +869,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                  old_buletproof_challenges inside the messages_for_next_wrap_proof
                                  might not be correct *)
                               Common.hash_messages_for_next_step_proof
-                                ~app_state:to_field_elements
-                                (P.Base.Messages_for_next_proof_over_same_field
-                                 .Step
-                                 .prepare ~dlog_plonk_index
-                                   prev_statement.proof_state
-                                     .messages_for_next_step_proof )
+                                (Common.hash_message_inputs_for_next_step_proof
+                                   ~app_state:to_field_elements
+                                   (P.Base
+                                    .Messages_for_next_proof_over_same_field
+                                    .Step
+                                    .prepare ~dlog_plonk_index
+                                      prev_statement.proof_state
+                                        .messages_for_next_step_proof ) )
                           }
                       ; messages_for_next_wrap_proof =
                           (let module M =
@@ -897,7 +899,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                        (Vector.length
                                           m.old_bulletproof_challenges )
                                    in
-                                   Wrap_hack.hash_messages_for_next_wrap_proof m
+                                   Wrap_hack.hash_messages_for_next_wrap_proof
+                                   @@ Wrap_hack
+                                      .hash_message_inputs_for_next_wrap_proof m
                                end)
                            in
                           let module V = H1.To_vector (Digest.Constant) in
@@ -1250,7 +1254,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 { next_statement.proof_state with
                                   messages_for_next_wrap_proof =
                                     Wrap_hack.hash_messages_for_next_wrap_proof
-                                      messages_for_next_wrap_proof_prepared
+                                    @@ Wrap_hack
+                                       .hash_message_inputs_for_next_wrap_proof
+                                         messages_for_next_wrap_proof_prepared
                                 ; deferred_values =
                                     { next_statement.proof_state.deferred_values with
                                       plonk =
