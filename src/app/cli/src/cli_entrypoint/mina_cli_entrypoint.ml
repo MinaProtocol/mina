@@ -2123,7 +2123,7 @@ let internal_commands logger ~itn_features =
               the PR for develop.
             *)
             let protocol_network_version =
-              Protocol_version.(transaction current)
+              Protocol_version.(network current)
             in
             let genesis_state_hash =
               (Precomputed_values.genesis_state_hashes precomputed_values)
