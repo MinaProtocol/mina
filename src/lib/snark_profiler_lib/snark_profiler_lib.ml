@@ -459,7 +459,7 @@ let rec pair_up = function
 let state_body ~logger ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
   lazy
-    (let genesis_epoch_data = Consensus.Genesis_epoch_data.compiled in
+    (let genesis_epoch_data = Consensus.Genesis_data.Epoch.compiled in
      let consensus_constants =
        Consensus.Constants.create ~constraint_constants
          ~protocol_constants:genesis_constants.protocol
