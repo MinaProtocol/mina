@@ -41,4 +41,7 @@ check_dups: dump_pipelines
 check_names: dump_pipelines
 	python3 scripts/dhall/checker.py --root "$(TMP)" names
 
-all: check_syntax lint format check_deps check_dirty check_dups check_names
+test_monorepo:
+	./scripts/test_monorepo.sh
+
+all: check_syntax lint format check_deps check_dirty check_dups check_names test_monorepo
