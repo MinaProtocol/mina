@@ -25,6 +25,7 @@
 (package (name codable))
 (package (name coda_genesis_ledger))
 (package (name coda_genesis_proof))
+(package (name comptime))
 (package (name consensus))
 (package (name crypto_params))
 (package (name currency))

@@ -5,4 +5,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_base ppx_optcomp)))
+  (pps ppx_version ppx_base)))

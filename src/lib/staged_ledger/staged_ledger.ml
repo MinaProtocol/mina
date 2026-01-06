@@ -2263,15 +2263,6 @@ module T = struct
                   ] ;
             ( { Staged_ledger_diff.With_valid_signatures_and_proofs.diff }
             , invalid_on_this_ledger ) ) )
-
-  let convert_and_apply_all_masks_to_ledger ~hardfork_db ({ ledger; _ } : t) =
-    let accounts =
-      Ledger.all_accounts_on_masks ledger
-      |> Map.to_alist
-      |> List.map ~f:(fun (loc, account) ->
-             (loc, Account.Hardfork.of_stable account) )
-    in
-    Ledger.Hardfork_db.set_batch hardfork_db accounts
 end
 
 include T

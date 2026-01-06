@@ -2643,7 +2643,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   O1trace.sync_thread "root_ledger_of_snapshot" (fun () ->
                       match snapshot.ledger with
                       | Ledger_snapshot.Ledger_root ledger ->
-                          Ok ledger
+                          ledger |> Deferred.Or_error.return
                       | Ledger_snapshot.Genesis_epoch_ledger packed ->
                           Genesis_ledger.Packed.create_root packed
                             ~config:snapshot_config
@@ -2651,14 +2651,11 @@ module Make_str (A : Wire_types.Concrete) = struct
                 in
                 match snapshot_id with
                 | Staking_epoch_snapshot ->
-                    return
-                    @@ root_ledger_of_snapshot
-                         !local_state.staking_epoch_snapshot
-                         (staking_epoch_ledger_config local_state)
+                    root_ledger_of_snapshot !local_state.staking_epoch_snapshot
+                      (staking_epoch_ledger_config local_state)
                 | Next_epoch_snapshot ->
-                    return
-                    @@ root_ledger_of_snapshot !local_state.next_epoch_snapshot
-                         (next_epoch_ledger_config local_state)
+                    root_ledger_of_snapshot !local_state.next_epoch_snapshot
+                      (next_epoch_ledger_config local_state)
               in
               let sync_ledger =
                 Mina_ledger.Sync_ledger.Root.create

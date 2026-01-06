@@ -277,13 +277,13 @@ The script loads realistic test data from the archive database:
 **Example Usage**:
 ```bash
 # Basic connectivity test for devnet
-./rosetta-connectivity.sh --tag 3.0.3-bullseye-berkeley --network devnet
+./rosetta-connectivity.sh --tag 3.0.3-bullseye-devnet --network devnet
 
 # Mainnet connectivity with load testing  
-./rosetta-connectivity.sh --tag 3.0.3-bullseye-berkeley --network mainnet --run-load-test
+./rosetta-connectivity.sh --tag 3.0.3-bullseye-mainnet --network mainnet --run-load-test
 
 # Custom timeout for slow environments
-./rosetta-connectivity.sh --tag 3.0.3-bullseye-berkeley --timeout 1800
+./rosetta-connectivity.sh --tag 3.0.3-bullseye-testnet-generic --timeout 1800
 ```
 
 ## Integration and Dependencies

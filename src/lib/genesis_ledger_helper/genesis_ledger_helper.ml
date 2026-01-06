@@ -843,7 +843,7 @@ let print_config ~logger config =
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~ledger_backing ~proof_level:compiled_proof_level ?overwrite_version
+    ~proof_level:compiled_proof_level ?overwrite_version
     (config : Runtime_config.t) =
   print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
@@ -899,11 +899,26 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           "Proof level %s is not compatible with compile-time proof level %s"
           (str proof_level) (str compiled)
   in
+  (* If the backing type were set to Converting_db here, then the daemon would
+     be forced to keep a migrated copy of the genesis ledgers around on disk the
+     entire time it operated. This is a waste of disk space; the daemon only
+     ever uses the genesis ledgers to populate Root ledgers when bootstrapping
+     from genesis, which should happen quite infrequently (usually only once
+     during startup, and only if the transition frontier on disk is too far
+     behind the network).
+
+     To avoid keeping migrated genesis ledgers around on disk, the backing here
+     is set to [Stable_db] even if the daemon is configured to maintain synced
+     ledgers for an upcoming hard fork. As a result, if the daemon does need to
+     bootstrap from genesis, it will migrate its genesis ledgers on-demand while
+     executing one of the implementations of [create_root] from
+     genesis_ledger/intf.ml. *)
+  let genesis_backing_type = Mina_ledger.Root.Config.Stable_db in
   let%bind genesis_ledger, ledger_config, ledger_file =
     match config.ledger with
     | Some ledger ->
         Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-          ~genesis_backing_type:ledger_backing ?overwrite_version ledger
+          ~genesis_backing_type ?overwrite_version ledger
     | None ->
         [%log fatal] "No ledger was provided in the runtime configuration" ;
         Deferred.Or_error.errorf
@@ -913,7 +928,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~metadata:[ ("ledger_file", `String ledger_file) ] ;
   let%bind genesis_epoch_data, genesis_epoch_data_config =
     Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      ~genesis_backing_type:ledger_backing config.epoch_data
+      ~genesis_backing_type config.epoch_data
   in
   let config =
     { config with
@@ -930,12 +945,11 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~blockchain_proof_system_id ~genesis_epoch_data
 
 let init_from_config_file ~cli_proof_level ~genesis_constants
-    ~constraint_constants ~logger ~proof_level ~ledger_backing
-    ?overwrite_version ?genesis_dir (config : Runtime_config.t) :
-    Precomputed_values.t Deferred.Or_error.t =
+    ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
+    (config : Runtime_config.t) : Precomputed_values.t Deferred.Or_error.t =
   inputs_from_config_file ~cli_proof_level ~genesis_constants
-    ~constraint_constants ~logger ~proof_level ~ledger_backing
-    ?overwrite_version ?genesis_dir config
+    ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
+    config
   |> Deferred.Or_error.map ~f:Genesis_proof.create_values_no_proof
 
 let upgrade_old_config ~logger filename json =
