@@ -133,14 +133,13 @@ module Params = struct
     with Yojson.Json_error msg -> Error msg
 end
 
-module Make = struct
-  open struct
-    module Schema = Graphql_async.Schema
-    module Io = Cohttp_async.Io
-    module Body = Cohttp_async.Body
-    module Ws = Websocket.Connection.Make (Io)
-    module Websocket_transport = Websocket_handler.Make (Schema.Io) (Ws)
-  end
+module Make
+    (Schema : Graphql_intf.Schema)
+    (Io : Cohttp.S.IO with type 'a t = 'a Schema.Io.t)
+    (Body : HttpBody with type +'a io := 'a Schema.Io.t) =
+struct
+  module Ws = Websocket.Connection.Make (Io)
+  module Websocket_transport = Websocket_handler.Make (Schema.Io) (Ws)
 
   let ( >>= ) = Io.( >>= )
 
@@ -164,14 +163,7 @@ module Make = struct
   let execute_query ctx schema variables operation_name query =
     match Graphql_parser.parse query with
     | Ok doc ->
-        let open Async in
-        Monitor.try_with (fun () ->
-            Schema.execute schema ctx ?variables ?operation_name doc )
-        |> Deferred.map ~f:(function
-             | Ok resp ->
-                 resp
-             | Error exn ->
-                 Error (`String (Core.Exn.to_string exn)) )
+        Schema.execute schema ctx ?variables ?operation_name doc
     | Error e ->
         Io.return (Error (`String e))
 
@@ -195,7 +187,7 @@ module Make = struct
             respond_string ~status:`Bad_request ~body ()
         | Error err ->
             let body = Yojson.Basic.to_string err in
-            respond_string ~status:`Internal_server_error ~body () )
+            respond_string ~status:`OK ~body () )
 
   let make_callback :
          ?auth_keys:Itn_crypto.pubkey list

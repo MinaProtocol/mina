@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eux -o pipefail
+set -eo pipefail
 
 if [[ $# -ne 4 ]]; then
     echo "Usage: $0 '<mina-debian-network>''<testnet-name>' '<wait-between-polling-graphql>''<wait-after-final-check>' "
@@ -34,89 +34,46 @@ chmod -R 0700 /home/opam/libp2p-keys/
 mina daemon \
   --peer-list-url "https://storage.googleapis.com/seed-lists/${NETWORK_NAME}_seeds.txt" \
   --libp2p-keypair "/home/opam/libp2p-keys/key" \
-&
+& # -background
 
-graphql_query() {
-  local query_string="$1"
-  local jq_selector="$2"
-  curl -f --show-error 'http://localhost:3085/graphql' \
-   -H 'accept: application/json' \
-   -H 'content-type: application/json' \
-   --data-raw "$query_string" \
-  | jq -r "$jq_selector"
-}
-
-graphql_query_returns_failed_http_code() {
-  local query_string="$1"
-  curl -o /dev/null -s -w "%{http_code}" 'http://localhost:3085/graphql' \
-   -H 'accept: application/json' \
-   -H 'content-type: application/json' \
-   --data-raw "$query_string" || true
-}
-
-num_status_retries=48
-node_status=""
-node_status_exit_code=1
-
-for ((i=1; i<=num_status_retries; i++)); do
-  sleep "$WAIT_BETWEEN_POLLING_GRAPHQL"
-
+# Attempt to connect to the GraphQL client every 10s for up to 8 minutes
+num_status_retries=24
+for ((i=1;i<=$num_status_retries;i++)); do
+  sleep $WAIT_BETWEEN_POLLING_GRAPHQL
   set +e
-  node_status=$(graphql_query '{"query":"query { syncStatus }"}' '.data.syncStatus')
-  node_status_exit_code=$?
+  mina client status
+  status_exit_code=$?
   set -e
-
-  if [[ "$node_status" == "SYNCED" ]]; then
+  if [ $status_exit_code -eq 0 ]; then
     break
+  elif [ $i -eq $num_status_retries ]; then
+    exit $status_exit_code
   fi
 done
 
-if [[ "$node_status" != "SYNCED" ]]; then
-  exit "$node_status_exit_code"
-fi
-
+# Check that the daemon has connected to peers and is still up after 2 mins
 sleep "$WAIT_AFTER_FINAL_CHECK"
-
-all_peers=$(graphql_query '{"query":"query { getPeers { peerId } }"}' '.data.getPeers[].peerId')
-echo "Connected peers\n ${all_peers}"
-
-if [[ $(printf "${all_peers}" | wc -l) == 0 ]]; then
+mina client status
+if [ "$(mina advanced get-peers | wc -l)" -gt 0 ]; then
+    echo "Found some peers"
+else
     echo "No peers found"
-fi 
-
-ACTUAL_NETWORK_ID=$(graphql_query '{"query":"query { networkID }"}' '.data.networkID')
-EXPECTED_NETWORK_ID=mina:$NETWORK_NAME
-
-if [[ "$ACTUAL_NETWORK_ID" == "$EXPECTED_NETWORK_ID" ]]; then
-    echo "Network id correct ($ACTUAL_NETWORK_ID)"
-else
-    echo "Network id incorrect (expected: $EXPECTED_NETWORK_ID got: $ACTUAL_NETWORK_ID)"
     exit 1
 fi
 
-# Check bestTip 
-BEST_TIP_STATE_HASH=$(graphql_query '{"query":"query { bestChain(maxLength: 1) { stateHash } }"}' '.data.bestChain[0].stateHash')
+# Check network id
+NETWORK_ID=$(curl 'http://localhost:3085/graphql' \
+   -H 'accept: application/json' \
+   -H 'content-type: application/json' \
+   --data-raw '{"query":"query MyQuery {\n  networkID\n}\n","variables":null,"operationName":"MyQuery"}' \
+  | jq -r .data.networkID)
 
-echo "Found best tip state hash ${BEST_TIP_STATE_HASH}"
+EXPECTED_NETWORK=mina:$NETWORK_NAME
 
-SNARKED_LEDGER_HASH=$(graphql_query '{
-     "query": "query MyBlock($stateHash: String!) { block(stateHash: $stateHash) { protocolState { blockchainState { snarkedLedgerHash } } } }",
-     "variables": { "stateHash": "'"${BEST_TIP_STATE_HASH}"'" },
-     "operationName": "MyBlock"
-   }' '.data.block.protocolState.blockchainState.snarkedLedgerHash')
-
-echo "Best tip's Snarked Ledger Hash: ${SNARKED_LEDGER_HASH}"
-
-ANCIENT_STATE_HASH_DEVNET="3NL5hv4ysELXF2Tg5UZDMgBFcQLTM1tGtRRzMhgyLa5EzvbeDQhq"
-HTTP_CODE=$(graphql_query_returns_failed_http_code '{
-     "query": "query MyBlock($stateHash: String!) { block(stateHash: $stateHash) }",
-     "variables": { "stateHash": "'"${ANCIENT_STATE_HASH_DEVNET}"'" },
-     "operationName": "MyBlock"
-   }')
-
-if [[ "$HTTP_CODE" == "500" ]]; then
-    echo "OK: Querying ancient state hash on node, got HTTP CODE 500"
+if [[ "$NETWORK_ID" == "$EXPECTED_NETWORK" ]]; then
+    echo "Network id correct ($NETWORK_ID)"
 else
-    echo "FAIL: Querying ancient state hash on node, got HTTP CODE ${HTTP_CODE}, expected 500"
+    echo "Network id incorrect (expected: $EXPECTED_NETWORK got: $NETWORK_ID)"
     exit 1
 fi
+
