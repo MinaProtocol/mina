@@ -10,6 +10,7 @@ POLL_INTERVAL=10s
 
 MINA_EXE=${MINA_EXE:-_build/default/src/app/cli/src/mina.exe}
 ARCHIVE_EXE=${ARCHIVE_EXE:-_build/default/src/app/archive/archive.exe}
+ROSETTA_EXE=${ROSETTA_EXE:-_build/default/src/app/rosetta/rosetta.exe}
 ZKAPP_EXE=${ZKAPP_EXE:-_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe}
 
 export MINA_PRIVKEY_PASS='naughty blue worm'
@@ -23,6 +24,7 @@ SNARK_COORDINATOR_PEER_KEY="CAESQFjWdR18zKuCssN+Fi33fah9f5QGebOCc9xTITR8cdoyC+bk
 WHALES=2
 FISH=1
 NODES=1
+ROSETTA=false
 LOG_LEVEL="Trace"
 FILE_LOG_LEVEL=${LOG_LEVEL}
 VALUE_TRANSFERS=false
@@ -43,6 +45,9 @@ SNARK_COORDINATOR_PORT=7000
 WHALE_START_PORT=4000
 FISH_START_PORT=5000
 NODE_START_PORT=6000
+ROSETTA_PORT=3100
+
+MINA_ROSETTA_MAX_DB_POOL_SIZE=64
 
 PG_HOST="localhost"
 PG_PORT="5432"
@@ -107,6 +112,12 @@ help() {
                                          |   Default: ${NODE_START_PORT}
 -ap  |--archive-server-port <#>          | Archive Node server port. Set to empty to disable archive node.
                                          |   Default: ${ARCHIVE_SERVER_PORT}
+--rosetta                                | Whether to run the Rosetta server (presence of argument)
+                                         |   Default: ${ROSETTA}
+-rp  |--rosetta-port <#>                 | Rosetta server port
+                                         |   Default: ${ROSETTA_PORT}
+-rmps|--rosetta-max-pool-size <#>        | Rosetta Db max pool size
+                                         |   Default: ${MINA_ROSETTA_MAX_DB_POOL_SIZE}
 -ll  |--log-level <level>                | Console output logging level
                                          |   Default: ${LOG_LEVEL}
 -fll |--file-log-level <level>           | File output logging level
@@ -228,6 +239,11 @@ on-exit() {
     wait "$jpid"
   done
 
+  if ${ROSETTA}; then
+    kill "$ROSETTA_PID"
+    wait "$ROSETTA_PID"
+  fi
+  
   # 3. stop the seed node, if we've spawned it.
   if [[ -n "${SEED_PID}" ]]; then
     stop-node "seed" "$SEED_START_PORT"
@@ -331,6 +347,16 @@ exec-archive-node() {
     $@
 }
 
+exec-rosetta-node() {
+  # shellcheck disable=SC2068
+  MINA_ROSETTA_MAX_DB_POOL_SIZE=${MINA_ROSETTA_MAX_DB_POOL_SIZE} exec ${ROSETTA_EXE} \
+    --archive-uri postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" \
+    --graphql-uri $((SEED_START_PORT + 1)) \
+    --port "${ROSETTA_PORT}" \
+    --log-level "${LOG_LEVEL}" \
+    $@ &
+}
+
 # Spawns the Node in background
 spawn-node() {
   FOLDER=${1}
@@ -363,9 +389,20 @@ spawn-archive-node() {
   shift
   # shellcheck disable=SC2068
   if [ "${REDIRECT_LOGS}" = true ]; then
-    exec-archive-node $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
+    exec-archive-node $@ &>"${FOLDER}"/log.txt &
   else
-    exec-archive-node $@ -config-directory "${FOLDER}" &
+    exec-archive-node $@ &
+  fi
+}
+
+spawn-rosetta-server() {
+  FOLDER=${1}
+  shift
+  # shellcheck disable=SC2068
+  if [ "${REDIRECT_LOGS}" = true ]; then
+    exec-rosetta-node $@ &>"${FOLDER}"/log.txt &
+  else
+    exec-rosetta-node $@ &
   fi
 }
 
@@ -462,6 +499,15 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   -s | --seed)
     SEED="${2}"
+    shift
+    ;;
+  --rosetta) ROSETTA=true ;;
+  -rmps | --rosetta-max-pool-size)
+    MINA_ROSETTA_MAX_DB_POOL_SIZE="${2}"
+    shift
+    ;;
+  -rp | --rosetta-port)
+    ROSETTA_PORT="${2}"
     shift
     ;;
   -d | --demo)
@@ -761,6 +807,7 @@ Starting the Network with:
     1 snark coordinator
     ${SNARK_WORKERS_COUNT} snark worker(s)
     $([[ -n "$ARCHIVE_SERVER_PORT" ]] && echo 1 || echo 0) archive
+    $( ${ROSETTA} && echo 1 || echo 0) rosetta
     ${WHALES} whales
     ${FISH} fish
     ${NODES} non block-producing nodes
@@ -897,6 +944,23 @@ if [[ -n "${ARCHIVE_SERVER_PORT}" ]]; then
 
   spawn-archive-node "${NODES_FOLDER}"/archive
   ARCHIVE_PID=$!
+fi
+
+if ${ROSETTA}; then
+  if ! ${ARCHIVE_SERVER_PORT}; then
+    echo "Rosetta server requires Archive node to be running!"
+    printf "\n"
+
+    exit 1
+  fi
+
+  echo 'Starting the Rosetta server...'
+  printf "\n"
+
+  mkdir -p "${NODES_FOLDER}"/rosetta
+
+  spawn-rosetta-server "${NODES_FOLDER}"/rosetta
+  ROSETTA_PID=$!
 fi
 
 # ----------
@@ -1053,6 +1117,16 @@ if [[ -n "${ARCHIVE_SERVER_PORT}" ]]; then
 EOF
 fi
 
+if ${ROSETTA}; then
+  cat <<EOF
+  Rosetta:
+    Instance #0:
+      pid ${ROSETTA_PID}
+      port: ${ROSETTA_PORT}
+      data dir: "${NODES_FOLDER}"/rosetta
+EOF
+fi
+
 if [ "${WHALES}" -gt 0 ]; then
   cat <<EOF
 	Whales:
@@ -1156,7 +1230,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   sender_nonce=1
   state=0
 
-  # TODO: simulate scripts/hardfork/run-localnet.sh to send txns to everyone in the ledger. 
+  # TODO: simulate scripts/hardfork/prepare-hf-debian.sh to send txns to everyone in the ledger.
   value_txn_id=0
   while is_process_running "${FISH_PIDS[0]}"; do
     sleep ${TRANSACTION_INTERVAL}
