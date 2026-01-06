@@ -28,4 +28,6 @@ fi
 export MINA_LIBP2P_PASS="naughty blue worm"
 export MINA_PRIVKEY_PASS="naughty blue worm"
 
+export MINA_PROFILE=lightnet
+
 mina-command-line-tests test -v

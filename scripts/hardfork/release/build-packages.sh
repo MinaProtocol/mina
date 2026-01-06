@@ -23,6 +23,7 @@ LEDGER_TARBALLS=${LEDGER_TARBALLS:-"$(echo $PWD/hardfork_ledgers/*.tar.gz)"}
 
 DEFAULT_LEDGER_TARBALLS_DIR=${DEFAULT_LEDGER_TARBALLS_DIR:-"$PWD/hardfork_ledgers"}
 
+export MINA_PROFILE="$DUNE_PROFILE"
 
 build_packages() {
   if [ "${NETWORK_NAME}" = "mainnet" ]; then
