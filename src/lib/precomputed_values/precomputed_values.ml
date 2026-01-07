@@ -23,8 +23,11 @@ let for_unit_tests =
     (let open Staged_ledger_diff in
     let protocol_state_with_hashes =
       Mina_state.Genesis_protocol_state.t
-        ~genesis_ledger:Genesis_ledger.for_unit_tests
-        ~genesis_epoch_data:Consensus.Genesis_data.Epoch.for_unit_tests
+        ~genesis_ledger:
+          (Consensus.Genesis_data.Ledger.to_hashed Genesis_ledger.for_unit_tests)
+        ~genesis_epoch_data:
+          (Consensus.Genesis_data.Epoch.to_hashed
+             Consensus.Genesis_data.Epoch.for_unit_tests )
         ~constraint_constants:
           Genesis_constants.For_unit_tests.Constraint_constants.t
         ~consensus_constants:(Lazy.force Consensus.Constants.for_unit_tests)

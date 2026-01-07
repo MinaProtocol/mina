@@ -755,9 +755,12 @@ module Genesis_proof = struct
     in
     let open Staged_ledger_diff in
     let protocol_state_with_hashes =
-      Mina_state.Genesis_protocol_state.t ~genesis_ledger:ledger
-        ~genesis_epoch_data ~constraint_constants ~consensus_constants
-        ~genesis_body_reference
+      let genesis_ledger = Consensus.Genesis_data.Ledger.to_hashed ledger in
+      let genesis_epoch_data =
+        Consensus.Genesis_data.Epoch.to_hashed genesis_epoch_data
+      in
+      Mina_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_epoch_data
+        ~constraint_constants ~consensus_constants ~genesis_body_reference
     in
     { Genesis_proof.Inputs.runtime_config
     ; constraint_constants
