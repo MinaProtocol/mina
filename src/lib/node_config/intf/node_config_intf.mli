@@ -80,6 +80,8 @@ module type Profiled = sig
 
   val network : string
 
+  val profile : string
+
   val zkapp_cmd_limit : int option
 
   val sync_ledger_max_subtree_depth : int
