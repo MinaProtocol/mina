@@ -538,8 +538,7 @@ copy_common_daemon_automode_configs() {
 # Contains only the legacy mainnet binaries places in "/usr/lib/mina/berkeley" without
 # configuration files or genesis ledgers.
 #
-build_daemon_pre_hardfork_mainnet_deb() {
-
+build_daemon_mainnet_pre_hardfork_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building mainnet berkeley deb for hardfork automode :"
 
@@ -565,7 +564,7 @@ build_daemon_pre_hardfork_mainnet_deb() {
 # Contains only the legacy mainnet binaries places in "/usr/lib/mina/berkeley" without
 # configuration files or genesis ledgers.
 #
-build_daemon_pre_hardfork_devnet_deb() {
+build_daemon_devnet_pre_hardfork_deb() {
 
   echo "------------------------------------------------------------"
   echo "--- Building testnet berkeley legacy deb for hardfork automode :"
