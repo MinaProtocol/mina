@@ -1,23 +1,87 @@
 (executable
  (name print_blockchain_snark_vk)
- (libraries blockchain_snark genesis_constants)
+ (libraries blockchain_snark genesis_constants mina_node_config)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version)))
 
+; Rules for dev profile
+
 (rule
  (deps print_blockchain_snark_vk.exe)
- (targets blockchain_snark_vk.json.computed)
+ (targets dev_blockchain_snark_vk.json.computed)
+ (enabled_if
+  (= %{profile} dev))
  (action
-  (with-stdout-to
-   %{targets}
-   (run %{deps}))))
+  (run %{deps})))
 
 (rule
  (deps
-  (:orig blockchain_snark_vk.json)
-  (:computed blockchain_snark_vk.json.computed))
+  (:orig dev_blockchain_snark_vk.json)
+  (:computed dev_blockchain_snark_vk.json.computed))
+ (enabled_if
+  (= %{profile} dev))
+ (alias runtest)
+ (action
+  (diff %{orig} %{computed})))
+
+; Rules for devnet profile
+
+(rule
+ (deps print_blockchain_snark_vk.exe)
+ (targets devnet_blockchain_snark_vk.json.computed)
+ (enabled_if
+  (= %{profile} devnet))
+ (action
+  (run %{deps})))
+
+(rule
+ (deps
+  (:orig devnet_blockchain_snark_vk.json)
+  (:computed devnet_blockchain_snark_vk.json.computed))
+ (enabled_if
+  (= %{profile} devnet))
+ (alias runtest)
+ (action
+  (diff %{orig} %{computed})))
+
+; Rules for lightnet profile
+
+(rule
+ (deps print_blockchain_snark_vk.exe)
+ (targets lightnet_blockchain_snark_vk.json.computed)
+ (enabled_if
+  (= %{profile} lightnet))
+ (action
+  (run %{deps})))
+
+(rule
+ (deps
+  (:orig lightnet_blockchain_snark_vk.json)
+  (:computed lightnet_blockchain_snark_vk.json.computed))
+ (enabled_if
+  (= %{profile} lightnet))
+ (alias runtest)
+ (action
+  (diff %{orig} %{computed})))
+
+; Rules for mainnet profile
+
+(rule
+ (deps print_blockchain_snark_vk.exe)
+ (targets mainnet_blockchain_snark_vk.json.computed)
+ (enabled_if
+  (= %{profile} mainnet))
+ (action
+  (run %{deps})))
+
+(rule
+ (deps
+  (:orig mainnet_blockchain_snark_vk.json)
+  (:computed mainnet_blockchain_snark_vk.json.computed))
+ (enabled_if
+  (= %{profile} mainnet))
  (alias runtest)
  (action
   (diff %{orig} %{computed})))

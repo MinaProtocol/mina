@@ -1,7 +1,17 @@
 open Core_kernel
 
 let regtest_digest_blockchain_snark () =
-  let expected_digest = "36786c300e37c2a2f1341ad6374aa113" in
+  let expected_digest =
+    match Node_config.profile with
+    | "mainnet" | "devnet" ->
+        "bb70c6cd1767f3a723cf7edd4cc77355"
+    | "dev" ->
+        "36786c300e37c2a2f1341ad6374aa113"
+    | "lightnet" ->
+        "c480c7b16d46d52d439c93a9a84a5848"
+    | _ ->
+        failwith "Unknown profile"
+  in
   let constraint_constants = Genesis_constants.Compiled.constraint_constants in
   let proof_levels =
     [ Genesis_constants.Proof_level.Full
