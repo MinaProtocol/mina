@@ -6,7 +6,6 @@
   node_config_version
   node_config_unconfigurable_constants
   node_config_profiled)
-  
  (instrumentation
   (backend bisect_ppx))
  (preprocess
