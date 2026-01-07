@@ -2,14 +2,9 @@ open Core_kernel
 
 let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
     ~consensus_constants ~genesis_body_reference =
-  let genesis_ledger = Consensus.Genesis_data.Ledger.to_hashed genesis_ledger in
   let protocol_constants =
     Consensus.Constants.to_protocol_constants consensus_constants
   in
-  let genesis_epoch_data =
-    Consensus.Genesis_data.Epoch.to_hashed genesis_epoch_data
-  in
-
   let negative_one_protocol_state_hash =
     Protocol_state.(
       hashes
