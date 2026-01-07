@@ -19,4 +19,9 @@ let deps =
 let expectedChainId =
       "a7351abc7ddf2ea92d1b38cc8e636c271c1dfd2c081c637f62ebc2af34eb7cc1"
 
-in  ChainIdTest.makeTest scopes deps network expectedChainId
+in  ChainIdTest.makeTest
+      "ChainIdTestMainnet"
+      scopes
+      deps
+      network
+      expectedChainId

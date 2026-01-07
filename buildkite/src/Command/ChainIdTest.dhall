@@ -35,7 +35,8 @@ let buildTestStep =
                 }
 
 let makeTest =
-          \(scope : List PipelineScope.Type)
+          \(name : Text)
+      ->  \(scope : List PipelineScope.Type)
       ->  \(deps : List Command.TaggedKey.Type)
       ->  \(network : Network.Type)
       ->  \(expectedChainId : Text)
@@ -50,7 +51,7 @@ let makeTest =
                 , S.exactly "buildkite/src/Jobs/Test/ChainIdTestDevnet" "dhall"
                 ]
               , path = "Test"
-              , name = "ChainIdTest"
+              , name = name
               , tags =
                 [ PipelineTag.Type.Fast
                 , PipelineTag.Type.Test
