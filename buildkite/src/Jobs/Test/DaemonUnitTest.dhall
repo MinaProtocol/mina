@@ -56,5 +56,10 @@ in  Pipeline.build
                 , PipelineTag.Type.Stable
                 ]
               }
-      , steps = [ buildTestCmd "dev" "src/lib" Size.XLarge ]
+      , steps =
+        [ buildTestCmd "dev" "src/lib" Size.XLarge
+        , buildTestCmd "devnet" "src/lib" Size.XLarge
+        , buildTestCmd "lightnet" "src/lib" Size.XLarge
+        , buildTestCmd "mainnet" "src/lib" Size.XLarge
+        ]
       }
