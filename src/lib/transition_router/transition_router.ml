@@ -327,46 +327,39 @@ let load_frontier ~context:(module Context : CONTEXT) ~verifier
       None
 
 let wait_for_high_connectivity ~logger ~network ~is_seed =
-  let connectivity_time_upperbound = 60.0 in
-  let high_connectivity =
-    Mina_networking.on_first_high_connectivity network ~f:Fn.id
-  in
-  Deferred.any
-    [ ( high_connectivity
-      >>| fun () ->
-      [%log info] "Already connected to enough peers, start initialization" )
-    ; ( if is_seed then (
-        [%log info]
-          "We are seed, not waiting for peers to show up, start initialization" ;
-        Deferred.unit )
-      else Deferred.never () )
-    ; ( after (Time_ns.Span.of_sec connectivity_time_upperbound)
-      >>= fun () ->
-      Mina_networking.peers network
-      >>| fun peers ->
-      if not @@ Deferred.is_determined high_connectivity then
-        if List.is_empty peers then
-          if is_seed then
-            [%log info]
-              ~metadata:
-                [ ( "max seconds to wait for high connectivity"
-                  , `Float connectivity_time_upperbound )
-                ]
-              "Will start initialization without connecting to any peers"
-          else (
-            [%log error]
-              "Failed to find any peers during initialization (crashing \
-               because this is not a seed node)" ;
-            exit 1 )
-        else
-          [%log info]
+  if is_seed then (
+    [%log info]
+      "We are seed, not waiting for peers to show up, start initialization" ;
+    Deferred.unit )
+  else
+    let connectivity_time_upperbound = 60.0 in
+    let high_connectivity =
+      Mina_networking.on_first_high_connectivity network ~f:Fn.id
+    in
+    match%bind
+      Timeout_lib.Core_time_ns.await
+        ~timeout_duration:(Time_ns.Span.of_sec connectivity_time_upperbound)
+        () high_connectivity
+    with
+    | `Ok () ->
+        [%log info] "Already connected to enough peers, start initialization" ;
+        Deferred.unit
+    | `Timeout ->
+        let%bind peers = Mina_networking.peers network in
+        if List.is_empty peers then (
+          [%log error]
+            "Failed to find any peers during initialization (crashing because \
+             this is not a seed node)" ;
+          exit 1 )
+        else (
+          [%log warn]
             ~metadata:
               [ ("num peers", `Int (List.length peers))
               ; ( "max seconds to wait for high connectivity"
                 , `Float connectivity_time_upperbound )
               ]
-            "Will start initialization without connecting to too many peers" )
-    ]
+            "Will start initialization without connecting to too many peers" ;
+          Deferred.unit )
 
 let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
     ~sync_local_state ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
