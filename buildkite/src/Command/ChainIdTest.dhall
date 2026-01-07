@@ -17,48 +17,48 @@ let Size = ../Command/Size.dhall
 let Network = ../Constants/Network.dhall
 
 let buildTestStep =
-      \(network : Network.Type) ->
-      \(expectedChainId : Text) ->
-      \(dependsOn : List Command.TaggedKey.Type) ->
-        let networkName = Network.lowerName network
+          \(network : Network.Type)
+      ->  \(expectedChainId : Text)
+      ->  \(dependsOn : List Command.TaggedKey.Type)
+      ->  let networkName = Network.lowerName network
 
-        in  Command.build
-              Command.Config::{
-              , commands =
-                  RunInToolchain.runInToolchain
-                    ([] : List Text)
-                    "buildkite/scripts/test-chain-id.sh ${networkName} ${expectedChainId}"
-              , label = "Test chain-id for ${networkName}"
-              , key = "test-chain-id-${networkName}"
-              , target = Size.Small
-              , depends_on = dependsOn
-              }
+          in  Command.build
+                Command.Config::{
+                , commands =
+                    RunInToolchain.runInToolchain
+                      ([] : List Text)
+                      "buildkite/scripts/test-chain-id.sh ${networkName} ${expectedChainId}"
+                , label = "Test chain-id for ${networkName}"
+                , key = "test-chain-id-${networkName}"
+                , target = Size.Small
+                , depends_on = dependsOn
+                }
 
 let makeTest =
-      \(scope : List PipelineScope.Type) ->
-      \(deps : List { key : Text, name : Text }) ->
-      \(network : Network.Type) ->
-      \(expectedChainId : Text) ->
-        Pipeline.build
-          Pipeline.Config::{
-          , spec = JobSpec::{
-            , dirtyWhen =
-              [ S.strictlyStart (S.contains "src")
-              , S.exactly "buildkite/scripts/test-chain-id" "sh"
-              , S.exactly "buildkite/src/Command/ChainIdTest" "dhall"
-              , S.exactly "buildkite/src/Jobs/Test/ChainIdTestMainnet" "dhall"
-              , S.exactly "buildkite/src/Jobs/Test/ChainIdTestDevnet" "dhall"
-              ]
-            , path = "Test"
-            , name = "ChainIdTest"
-            , tags =
-              [ PipelineTag.Type.Fast
-              , PipelineTag.Type.Test
-              , PipelineTag.Type.Stable
-              ]
-            , scope
+          \(scope : List PipelineScope.Type)
+      ->  \(deps : List Command.TaggedKey.Type)
+      ->  \(network : Network.Type)
+      ->  \(expectedChainId : Text)
+      ->  Pipeline.build
+            Pipeline.Config::{
+            , spec = JobSpec::{
+              , dirtyWhen =
+                [ S.strictlyStart (S.contains "src")
+                , S.exactly "buildkite/scripts/test-chain-id" "sh"
+                , S.exactly "buildkite/src/Command/ChainIdTest" "dhall"
+                , S.exactly "buildkite/src/Jobs/Test/ChainIdTestMainnet" "dhall"
+                , S.exactly "buildkite/src/Jobs/Test/ChainIdTestDevnet" "dhall"
+                ]
+              , path = "Test"
+              , name = "ChainIdTest"
+              , tags =
+                [ PipelineTag.Type.Fast
+                , PipelineTag.Type.Test
+                , PipelineTag.Type.Stable
+                ]
+              , scope = scope
+              }
+            , steps = [ buildTestStep network expectedChainId deps ]
             }
-          , steps = [ buildTestStep network expectedChainId deps ]
-          }
 
-in  { makeTest }
+in  { makeTest = makeTest }
