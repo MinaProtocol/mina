@@ -1031,28 +1031,20 @@ let add_zkapp_transactions t
     |> Deferred.don't_wait_for ;
     Ivar.read result_ivar
   in
-  let well_formed_errors =
-    List.find_map zkapp_commands ~f:(fun cmd ->
-        match
-          User_command.check_well_formedness
-            ~genesis_constants:t.config.precomputed_values.genesis_constants
-            (Zkapp_command cmd)
-        with
-        | Ok () ->
-            None
-        | Error errs ->
-            Some errs )
-  in
-  match well_formed_errors with
-  | None ->
+  let all_errs = Queue.create () in
+  List.iteri zkapp_commands ~f:(fun idx cmd ->
+      User_command.check_well_formedness
+        ~genesis_constants:t.config.precomputed_values.genesis_constants
+        (Zkapp_command cmd)
+      |> Result.iter_error ~f:(fun this_errs ->
+             Queue.enqueue all_errs (idx, this_errs) ) ) ;
+  match Queue.to_list all_errs with
+  | [] ->
       add_all_txns ()
-  | Some errs ->
-      let error =
-        Error.of_string
-          ( List.map errs ~f:User_command.Well_formedness_error.to_string
-          |> String.concat ~sep:"," )
-      in
-      Deferred.Result.fail error
+  | errs ->
+      Error.create ~here:[%here] "zkapp transaction invalid" errs
+        [%sexp_of: (int * User_command.Well_formedness_error.t list) list]
+      |> Deferred.Result.fail
 
 let next_producer_timing t = t.next_producer_timing
 
