@@ -310,6 +310,12 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
         >>| const None
     | Some (scan_state, expected_merkle_root, pending_coinbases, protocol_states)
       ->
+        let delay_seconds =
+          Option.value ~default:0.0
+            (Option.bind (Sys.getenv "MINA_DEBUG_STAGED_LEDGER_RESPONSE_DELAY")
+               ~f:(fun s -> Option.try_with (fun () -> Float.of_string s)) )
+        in
+        let%bind () = after (Time.Span.of_sec delay_seconds) in
         return
           (Some
              ( Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
@@ -1220,6 +1226,100 @@ module Get_best_tip = struct
   let rate_limit_cost = Fn.const 1
 end]
 
+(* Debug RPC for testing peer communication delays and failures *)
+[%%versioned_rpc
+module Debug_ping = struct
+  type nonrec ctx = ctx
+
+  module Master = struct
+    let name = "debug_ping"
+
+    module T = struct
+      type query = unit [@@deriving sexp, yojson]
+
+      type response = unit option [@@deriving sexp, yojson]
+    end
+
+    module Caller = T
+    module Callee = T
+  end
+
+  include Master.T
+
+  (* Reuse metrics from get_some_initial_peers for simplicity *)
+  let sent_counter = Mina_metrics.Network.get_some_initial_peers_rpcs_sent
+
+  let received_counter =
+    Mina_metrics.Network.get_some_initial_peers_rpcs_received
+
+  let failed_request_counter =
+    Mina_metrics.Network.get_some_initial_peers_rpc_requests_failed
+
+  let failed_response_counter =
+    Mina_metrics.Network.get_some_initial_peers_rpc_responses_failed
+
+  module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+  include M
+
+  include Perf_histograms.Rpc.Plain.Extend (struct
+    include M
+    include Master
+  end)
+
+  module V1 = struct
+    module T = struct
+      type query = unit
+
+      type response = unit option
+
+      let query_of_caller_model = Fn.id
+
+      let callee_model_of_query = Fn.id
+
+      let response_of_callee_model = Fn.id
+
+      let caller_model_of_response = Fn.id
+    end
+
+    module T' =
+      Perf_histograms.Rpc.Plain.Decorate_bin_io
+        (struct
+          include M
+          include Master
+        end)
+        (T)
+
+    include T'
+    include Register (T')
+  end
+
+  let receipt_trust_action_message _ = ("Debug_ping query", [])
+
+  let log_request_received ~logger ~sender () =
+    [%log debug] "Received debug_ping from $peer"
+      ~metadata:[ ("peer", Peer.to_yojson sender) ]
+
+  let response_is_successful = Option.is_some
+
+  let handle_request (module Context : CONTEXT) ~version:_ _request =
+    let open Context in
+    let delay_seconds =
+      Option.value ~default:0.0
+        (Option.bind (Sys.getenv "MINA_DEBUG_PING_RESPONSE_DELAY")
+           ~f:(fun s -> Option.try_with (fun () -> Float.of_string s)) )
+    in
+    [%log debug] "Debug_ping: delaying response by $delay seconds"
+      ~metadata:[ ("delay", `Float delay_seconds) ] ;
+    let%bind () = after (Time.Span.of_sec delay_seconds) in
+    [%log debug] "Debug_ping: sending response" ;
+    return (Some ())
+
+  (* Same rate limiting as get_staged_ledger_aux_and_pending_coinbases_at_hash *)
+  let rate_limit_budget = (4, `Per Time.Span.minute)
+
+  let rate_limit_cost = Fn.const 1
+end]
+
 type ('query, 'response) rpc =
   | Get_some_initial_peers
       : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
@@ -1242,6 +1342,7 @@ type ('query, 'response) rpc =
   | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
   | Get_completed_snarks
       : (Get_completed_snarks.query, Get_completed_snarks.response) rpc
+  | Debug_ping : (Debug_ping.query, Debug_ping.response) rpc
 
 type any_rpc = Rpc : ('q, 'r) rpc -> any_rpc
 
@@ -1256,6 +1357,7 @@ let all_rpcs =
   ; Rpc Get_transition_chain_proof
   ; Rpc Ban_notify
   ; Rpc Get_completed_snarks
+  ; Rpc Debug_ping
   ]
 
 let rpc_name : type q r. (q, r) rpc -> string = function
@@ -1279,6 +1381,8 @@ let rpc_name : type q r. (q, r) rpc -> string = function
       Get_best_tip.name
   | Get_completed_snarks ->
       Get_completed_snarks.name
+  | Debug_ping ->
+      Debug_ping.name
 
 let implementation :
     type q r. (q, r) rpc -> (ctx, q, r) Gossip_net.rpc_implementation = function
@@ -1302,3 +1406,5 @@ let implementation :
       (module Get_best_tip)
   | Get_completed_snarks ->
       (module Get_completed_snarks)
+  | Debug_ping ->
+      (module Debug_ping)

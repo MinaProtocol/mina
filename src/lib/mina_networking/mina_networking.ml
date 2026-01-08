@@ -393,6 +393,28 @@ let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
 let get_ancestry t inet_addr input =
   rpc_peer_then_random t inet_addr input ~rpc:Rpcs.Get_ancestry
 
+let debug_ping t peer_id =
+  [%log' debug t.logger] "Sending debug_ping to peer $peer_id"
+    ~metadata:[ ("peer_id", `String (Peer.Id.to_string peer_id)) ] ;
+  let start_time = Time.now () in
+  match%map query_peer t peer_id Rpcs.Debug_ping () with
+  | Connected { data = Ok (Some ()); _ } ->
+      let elapsed = Time.diff (Time.now ()) start_time in
+      [%log' info t.logger] "debug_ping succeeded in $elapsed_ms ms"
+        ~metadata:[ ("elapsed_ms", `Float (Time.Span.to_ms elapsed)) ] ;
+      Ok elapsed
+  | Connected { data = Ok None; _ } ->
+      [%log' warn t.logger] "debug_ping returned None" ;
+      Or_error.error_string "debug_ping returned None"
+  | Connected { data = Error e; _ } ->
+      [%log' warn t.logger] "debug_ping returned error: $error"
+        ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+      Error e
+  | Failed_to_connect e ->
+      [%log' warn t.logger] "debug_ping failed to connect: $error"
+        ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+      Error e
+
 module Sl_downloader = struct
   module Key = struct
     module T = struct

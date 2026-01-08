@@ -121,6 +121,12 @@ module Rpcs : sig
     type response = Transaction_snark_work.Stable.Latest.t list option
   end
 
+  module Debug_ping : sig
+    type query = unit
+
+    type response = unit option
+  end
+
   type ('query, 'response) rpc = ('query, 'response) Rpcs.rpc =
     | Get_some_initial_peers
         : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
@@ -147,6 +153,7 @@ module Rpcs : sig
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
     | Get_completed_snarks
         : (Get_completed_snarks.query, Get_completed_snarks.response) rpc
+    | Debug_ping : (Debug_ping.query, Debug_ping.response) rpc
 end
 
 module Config : sig
@@ -198,6 +205,8 @@ val get_ancestry :
      Proof_carrying_data.t
      Envelope.Incoming.t
      Deferred.Or_error.t
+
+val debug_ping : t -> Peer.Id.t -> Time.Span.t Deferred.Or_error.t
 
 val get_best_tip :
      ?heartbeat_timeout:Time_ns.Span.t
