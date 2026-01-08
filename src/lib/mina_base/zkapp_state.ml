@@ -99,19 +99,19 @@ module Hardfork = struct
     let of_stable (value : Value.Stable.Latest.t) : t =
       Vector.extend_exn value Nat.N32.n Zkapp_basic.F.zero
 
-    let stable_size_lte : (Nat.N8.n, Nat.N32.n) Nat.Lte.t =
-      Nat.lte_exn Nat.N8.n Nat.N32.n
-
     (** Convert a Mesa zkApp state vector to a stable Berkeley zkApp state
         vector by dropping zkApp state elements from the end. Raises if element 
         8~31 is not zero *)
     let to_stable_exn (value : t) : Value.Stable.Latest.t =
       let zero = Pasta_bindings.Fp.of_int 0 in
-      try
-        Vector.trim_assert value stable_size_lte
-          ~f:(Pasta_bindings.Fp.equal zero)
-      with Assert_failure _ ->
-        failwith "element 8~31 of zkApp state has non-zero values!"
+      let adds_proof =
+        (* 8 + 24 = 32 *)
+        Nat.Adds.(S (S (S (S (S (S (S (S Z))))))))
+      in
+      let retained, dropped = Vector.split value adds_proof in
+      if not @@ Vector.for_all dropped ~f:(Pasta_bindings.Fp.equal zero) then
+        failwith "element 8~31 of zkApp state has non-zero values!" ;
+      retained
 
     let%test_unit "of_stable followed by to_stable_exn is identity" =
       Quickcheck.test Value.gen ~f:(fun original ->
