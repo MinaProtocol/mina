@@ -17,7 +17,7 @@ module T = struct
   let name = "root_registry"
 
   let create ~logger:_ frontier =
-    let capacity = 2 * Full_frontier.max_length frontier in
+    let capacity = Full_frontier.max_length frontier in
     let history = Queue.create () in
     let current_root =
       Root_data.Historical.of_breadcrumb (Full_frontier.root frontier)
