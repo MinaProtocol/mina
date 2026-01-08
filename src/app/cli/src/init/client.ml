@@ -417,6 +417,29 @@ let get_nonce_cmd =
              printf "%s\n" (Account.Nonce.to_string nonce) ;
              exit 0 ) )
 
+let debug_ping_cmd =
+  let open Command.Param in
+  let peer_id_flag =
+    flag "--peer-id" ~aliases:[ "peer-id" ]
+      ~doc:"PEER_ID The peer ID to send the debug ping to" (required string)
+  in
+  Command.async ~summary:"Send a debug ping RPC to a specific peer"
+    (Cli_lib.Background_daemon.rpc_init peer_id_flag ~f:(fun port peer_id ->
+         match%bind
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Debug_ping_peer.rpc peer_id
+             port
+         with
+         | Error e ->
+             eprintf "Failed to dispatch debug_ping RPC: %s\n"
+               (Error.to_string_hum e) ;
+             exit 2
+         | Ok (Error e) ->
+             eprintf "debug_ping failed: %s\n" (Error.to_string_hum e) ;
+             exit 1
+         | Ok (Ok elapsed) ->
+             printf "debug_ping succeeded in %s\n" (Time.Span.to_string elapsed) ;
+             exit 0 ) )
+
 let status =
   let open Daemon_rpcs in
   let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
@@ -2528,6 +2551,7 @@ let client_trustlist_group =
 let advanced ~itn_features =
   let cmds0 =
     [ ("get-nonce", get_nonce_cmd)
+    ; ("debug-ping", debug_ping_cmd)
     ; ("client-trustlist", client_trustlist_group)
     ; ("get-trust-status", get_trust_status)
     ; ("get-trust-status-all", get_trust_status_all)

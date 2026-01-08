@@ -399,6 +399,9 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
             ( Mina_lib.get_inferred_nonce_from_transaction_pool_and_ledger mina
                 aid
             |> Participating_state.active_error ) )
+    ; implement Daemon_rpcs.Debug_ping_peer.rpc (fun () peer_id_str ->
+          let peer_id = Network_peer.Peer.Id.unsafe_of_string peer_id_str in
+          Mina_lib.debug_ping_peer mina peer_id )
     ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
           Mina_commands.get_status ~flag mina )
     ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->

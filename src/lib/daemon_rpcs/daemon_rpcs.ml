@@ -171,6 +171,15 @@ module Get_nonce = struct
     Rpc.Rpc.create ~name:"Get_nonce" ~version:0 ~bin_query ~bin_response
 end
 
+module Debug_ping_peer = struct
+  type query = string (* peer_id *) [@@deriving bin_io_unversioned]
+
+  type response = Core.Time.Span.t Or_error.t [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Debug_ping_peer" ~version:0 ~bin_query ~bin_response
+end
+
 module Get_status = struct
   type query = [ `Performance | `None ] [@@deriving bin_io_unversioned]
 

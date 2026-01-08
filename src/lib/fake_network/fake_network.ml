@@ -205,6 +205,8 @@ include struct
             get_best_tip
         | Get_completed_snarks ->
             get_completed_snarks
+        | Debug_ping ->
+            None
       in
       { get_mock }
     in

@@ -200,6 +200,8 @@ val peers : t -> Network_peer.Peer.t list Deferred.t
 
 val initial_peers : t -> Mina_net2.Multiaddr.t list
 
+val debug_ping_peer : t -> Network_peer.Peer.Id.t -> Time.Span.t Deferred.Or_error.t
+
 val client_port : t -> int
 
 val validated_transitions : t -> Mina_block.Validated.t Strict_pipe.Reader.t

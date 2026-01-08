@@ -818,6 +818,8 @@ let peers t = Mina_networking.peers t.components.net
 
 let initial_peers t = Mina_networking.initial_peers t.components.net
 
+let debug_ping_peer t peer_id = Mina_networking.debug_ping t.components.net peer_id
+
 let snark_work_fee t =
   match t.processes.snark_worker with `On (_, fee) -> fee | `Off fee -> fee
 
