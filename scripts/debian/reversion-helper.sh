@@ -2,6 +2,9 @@
 
 set -eo pipefail
 
+# Get the directory of this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 function reversion() {
     local __deb
     local __package
@@ -60,8 +63,10 @@ function reversion() {
     local __new_deb="${__new_name}_${__new_version}_${__arch}"
     local __parent_dir
     __parent_dir=$(dirname "${__deb}_${__source_version}_${__arch}.deb")
-    
-    rm -rf "${__new_deb}"
+
+    local __session_dir="${__new_deb}_session"
+
+    rm -rf "${__session_dir}"
     # shellcheck disable=SC2140
     rm -rf "${__parent_dir}"/"${__new_deb}.deb"
 
@@ -71,15 +76,33 @@ function reversion() {
         ls -la "${__parent_dir}"
         exit 1
     fi
-    dpkg-deb -R "${__deb}_${__source_version}_${__arch}.deb" "${__new_deb}"
-    # shellcheck disable=SC2140
-    sed -i 's/Version: '"${__source_version}"'/Version: '"${__new_version}"'/g' "${__new_deb}/DEBIAN/control"
-    # shellcheck disable=SC2140
-    sed -i 's/Package: '"${__package}"'/Package: '"${__new_name}"'/g' "${__new_deb}/DEBIAN/control"
-    # shellcheck disable=SC2140
-    sed -i 's/Suite: '"${__suite}"'/Suite: '"${__new_suite}"'/g' "${__new_deb}/DEBIAN/control"
-    # shellcheck disable=SC2140
-    dpkg-deb --build "${__new_name}_${__new_version}_${__arch}" "${__parent_dir}"/"${__new_deb}.deb"
 
-    rm -rf "${__new_deb}"
+    # Open session using deb-session-open.sh
+    "${SCRIPT_DIR}/session/deb-session-open.sh" \
+        "${__deb}_${__source_version}_${__arch}.deb" \
+        "${__session_dir}"
+
+    # Update control file fields using deb-session-update-control.sh
+    "${SCRIPT_DIR}/session/deb-session-update-control.sh" \
+        "${__session_dir}" \
+        "Version" \
+        "${__new_version}"
+
+    "${SCRIPT_DIR}/session/deb-session-update-control.sh" \
+        "${__session_dir}" \
+        "Package" \
+        "${__new_name}"
+
+    "${SCRIPT_DIR}/session/deb-session-update-control.sh" \
+        "${__session_dir}" \
+        "Suite" \
+        "${__new_suite}"
+
+    # Save the modified package using deb-session-save.sh
+    "${SCRIPT_DIR}/session/deb-session-save.sh" \
+        "${__session_dir}" \
+        "${__parent_dir}/${__new_deb}.deb"
+
+    # Clean up session directory
+    rm -rf "${__session_dir}"
 }

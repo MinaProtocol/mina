@@ -230,6 +230,47 @@ Renames the Debian package by updating the Package field in the control file.
 
 ---
 
+### deb-session-update-control.sh
+
+Updates any field in the Debian control file within a session.
+
+**Usage:**
+```bash
+./deb-session-update-control.sh <session-dir> <field-name> <new-value>
+```
+
+**Examples:**
+```bash
+# Update package version
+./deb-session-update-control.sh ./my-session Version 2.0.0-rc1
+
+# Update package name
+./deb-session-update-control.sh ./my-session Package mina-devnet-hardfork
+
+# Update suite
+./deb-session-update-control.sh ./my-session Suite unstable
+
+# Update maintainer
+./deb-session-update-control.sh ./my-session Maintainer "New Maintainer <email@example.com>"
+
+# Update architecture
+./deb-session-update-control.sh ./my-session Architecture arm64
+
+# Add or update custom field
+./deb-session-update-control.sh ./my-session Custom-Field "custom value"
+```
+
+**Notes:**
+- Field names are case-sensitive (use `Version`, not `version`)
+- If the field exists, it will be updated with the new value
+- If the field doesn't exist, it will be added at the end of the control file
+- This is a general-purpose tool for modifying any control file field
+- For simple package renaming, consider using `deb-session-rename-package.sh` instead
+- Multi-line fields (like Description) are not fully supported by this script
+- For complex control file modifications, edit the control file directly
+
+---
+
 ## Manual Modifications (Advanced)
 
 For advanced users who prefer direct control, you can work directly with the unpacked files using standard shell utilities instead of the helper scripts.
