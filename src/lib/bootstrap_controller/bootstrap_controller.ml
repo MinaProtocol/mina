@@ -334,12 +334,40 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
   let%bind ( staged_ledger_data_download_time
            , staged_ledger_construction_time
            , staged_ledger_aux_result ) =
+    [%log debug]
+      "Starting get_staged_ledger_aux_and_pending_coinbases_at_hash RPC"
+      ~metadata:
+        [ ("peer_id", `String (Peer.Id.to_string sender.peer_id))
+        ; ("peer_host", `String (Unix.Inet_addr.to_string sender.host))
+        ; ("peer_port", `Int sender.libp2p_port)
+        ; ("hash", State_hash.to_yojson hash)
+        ] ;
     let%bind ( staged_ledger_data_download_time
              , staged_ledger_data_download_result ) =
       time_deferred
         (Mina_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
            t.network sender.peer_id hash )
     in
+    ( match staged_ledger_data_download_result with
+    | Error err ->
+        [%log warn]
+          "get_staged_ledger_aux_and_pending_coinbases_at_hash RPC failed"
+          ~metadata:
+            [ ("peer_id", `String (Peer.Id.to_string sender.peer_id))
+            ; ("hash", State_hash.to_yojson hash)
+            ; ("error", Error_json.error_to_yojson err)
+            ; ( "download_time_ms"
+              , `Float (Time.Span.to_ms staged_ledger_data_download_time) )
+            ]
+    | Ok _ ->
+        [%log debug]
+          "get_staged_ledger_aux_and_pending_coinbases_at_hash RPC succeeded"
+          ~metadata:
+            [ ("peer_id", `String (Peer.Id.to_string sender.peer_id))
+            ; ("hash", State_hash.to_yojson hash)
+            ; ( "download_time_ms"
+              , `Float (Time.Span.to_ms staged_ledger_data_download_time) )
+            ] ) ;
     match staged_ledger_data_download_result with
     | Error err ->
         Deferred.return (staged_ledger_data_download_time, None, Error err)

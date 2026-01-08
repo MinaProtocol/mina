@@ -311,12 +311,22 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
 
 let rpc_peer_then_random (type b) t peer_id input ~rpc :
     b Envelope.Incoming.t Deferred.Or_error.t =
+  let rpc_name = Rpcs.rpc_name rpc in
   let retry () =
+    [%log' debug t.logger] "RPC $rpc_name: preferred peer failed, retrying with random peers"
+      ~metadata:[ ("rpc_name", `String rpc_name) ] ;
     let%bind peers = random_peers t 8 in
     try_non_preferred_peers t input peers ~rpc
   in
+  [%log' debug t.logger] "RPC $rpc_name: querying preferred peer $peer_id"
+    ~metadata:
+      [ ("rpc_name", `String rpc_name)
+      ; ("peer_id", `String (Peer.Id.to_string peer_id))
+      ] ;
   match%bind query_peer t peer_id rpc input with
   | Connected { data = Ok (Some response); sender; _ } ->
+      [%log' debug t.logger] "RPC $rpc_name: preferred peer returned valid response"
+        ~metadata:[ ("rpc_name", `String rpc_name) ] ;
       let%bind () =
         match sender with
         | Local ->
@@ -330,6 +340,8 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
       in
       return (Ok (Envelope.Incoming.wrap ~data:response ~sender))
   | Connected { data = Ok None; sender; _ } ->
+      [%log' debug t.logger] "RPC $rpc_name: preferred peer returned no response"
+        ~metadata:[ ("rpc_name", `String rpc_name) ] ;
       let%bind () =
         match sender with
         | Remote peer ->
@@ -344,6 +356,11 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
       in
       retry ()
   | Connected { data = Error e; sender; _ } ->
+      [%log' debug t.logger] "RPC $rpc_name: preferred peer returned error"
+        ~metadata:
+          [ ("rpc_name", `String rpc_name)
+          ; ("error", Error_json.error_to_yojson e)
+          ] ;
       (* FIXME #4094: determine if more specific actions apply here *)
       let%bind () =
         match sender with
@@ -359,7 +376,12 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
             return ()
       in
       retry ()
-  | Failed_to_connect _ ->
+  | Failed_to_connect e ->
+      [%log' debug t.logger] "RPC $rpc_name: failed to connect to preferred peer"
+        ~metadata:
+          [ ("rpc_name", `String rpc_name)
+          ; ("error", Error_json.error_to_yojson e)
+          ] ;
       (* Since we couldn't connect, we have no IP to ban. *)
       retry ()
 

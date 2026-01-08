@@ -1258,6 +1258,28 @@ let all_rpcs =
   ; Rpc Get_completed_snarks
   ]
 
+let rpc_name : type q r. (q, r) rpc -> string = function
+  | Get_some_initial_peers ->
+      Get_some_initial_peers.name
+  | Get_staged_ledger_aux_and_pending_coinbases_at_hash ->
+      Get_staged_ledger_aux_and_pending_coinbases_at_hash.name
+  | Answer_sync_ledger_query ->
+      Answer_sync_ledger_query.name
+  | Get_transition_chain ->
+      Get_transition_chain.name
+  | Get_transition_knowledge ->
+      Get_transition_knowledge.name
+  | Get_transition_chain_proof ->
+      Get_transition_chain_proof.name
+  | Get_ancestry ->
+      Get_ancestry.name
+  | Ban_notify ->
+      Ban_notify.name
+  | Get_best_tip ->
+      Get_best_tip.name
+  | Get_completed_snarks ->
+      Get_completed_snarks.name
+
 let implementation :
     type q r. (q, r) rpc -> (ctx, q, r) Gossip_net.rpc_implementation = function
   | Get_some_initial_peers ->
