@@ -5,7 +5,7 @@ set -eo pipefail
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
 
-TESTNET_NAME="berkeley"
+TESTNET_NAME="testnet-generic"
 
 git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh

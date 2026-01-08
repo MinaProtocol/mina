@@ -139,8 +139,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
   let%map precomputed_values =
     match%map
       Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
-        ~logger ~genesis_constants ~constraint_constants ~proof_level
-        ~ledger_backing config
+        ~logger ~genesis_constants ~constraint_constants ~proof_level config
     with
     | Ok precomputed_values ->
         precomputed_values
@@ -1454,7 +1453,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let%map mina =
             Mina_lib.create ~commit_id:Mina_version.commit_id ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~file_log_level ~log_level ~log_json ~chain_id ~is_seed
+                 ~file_log_level ~log_level ~log_json ~chain_id
                  ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
                  ~gossip_net_params ~proposed_protocol_version_opt
                  ~work_selection_method:
