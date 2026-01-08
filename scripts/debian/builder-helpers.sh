@@ -530,9 +530,9 @@ copy_common_daemon_automode_configs() {
 ## MAINNET LEGACY PACKAGE ##
 
 #
-# Builds mina-mainnet-pre-hardfork-berkeley tailored package for automode package
+# Builds mina-mainnet-pre-hardfork-mesa tailored package for automode package
 #
-# Output: mina-mainnet-pre-hardfork-berkeley_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-mainnet-pre-hardfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Contains only the legacy mainnet binaries places in "/usr/lib/mina/berkeley" without
@@ -542,23 +542,23 @@ build_daemon_mainnet_pre_hardfork_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building mainnet berkeley deb for hardfork automode :"
 
-  create_control_file mina-mainnet-berkeley "${SHARED_DEPS}${DAEMON_DEPS}" \
+  create_control_file mina-mainnet-pre-hardfork-mesa "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
   # Copy legacy binaries
 
   copy_common_daemon_automode_configs berkeley mainnet 'seed-lists/mainnet_seeds.txt'
 
-  build_deb mina-mainnet-pre-hardfork-berkeley
+  build_deb mina-mainnet-pre-hardfork-mesa
 }
 ## END MAINNET LEGACY PACKAGE ##
 
 ## DEVNET LEGACY PACKAGE ##
 
 #
-# Builds mina-devnet-pre-hardfork-berkeley tailored package for automode package
+# Builds mina-devnet-pre-hardfork-mesa tailored package for automode package
 #
-# Output: mina-devnet-pre-hardfork-berkeley_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-devnet-pre-hardfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Contains only the legacy mainnet binaries places in "/usr/lib/mina/berkeley" without
@@ -569,13 +569,13 @@ build_daemon_devnet_pre_hardfork_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building testnet berkeley legacy deb for hardfork automode :"
 
-  create_control_file mina-devnet-berkeley "${SHARED_DEPS}${DAEMON_DEPS}" \
+  create_control_file mina-devnet-pre-hardfork-mesa "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
   # Copy legacy binaries
   copy_common_daemon_automode_configs berkeley testnet 'seed-lists/devnet_seeds.txt'
 
-  build_deb mina-devnet-pre-hardfork-berkeley
+  build_deb mina-devnet-pre-hardfork-mesa
 }
 ## END DEVNET LEGACY PACKAGE ##
 
