@@ -2,9 +2,10 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 module Circuit = Kimchi_pasta_snarky_backend.Step_impl
 
-(* Looks up three values (at most 12 bits each) 
- * BEWARE: it needs in the circuit at least one gate (even if dummy) that uses the 12-bit lookup table for it to work 
- *)
+(** Looks up three values (at most 12 bits each).
+
+    BEWARE: it needs in the circuit at least one gate (even if dummy) that uses
+    the 12-bit lookup table for it to work. *)
 let three_12bit (v0 : Circuit.Field.t) (v1 : Circuit.Field.t)
     (v2 : Circuit.Field.t) : unit =
   let open Circuit in
@@ -21,9 +22,10 @@ let three_12bit (v0 : Circuit.Field.t) (v1 : Circuit.Field.t)
            } ) ) ;
   ()
 
-(* Check that one value is at most X bits (at most 12), default is 12.
- * BEWARE: it needs in the circuit at least one gate (even if dummy) that uses the 12-bit lookup table for it to work 
- *)
+(** Check that one value is at most X bits (at most 12), default is 12.
+
+    BEWARE: it needs in the circuit at least one gate (even if dummy) that uses
+    the 12-bit lookup table for it to work. *)
 let less_than_bits ?(bits = 12) (value : Circuit.Field.t) : unit =
   let open Circuit in
   assert (bits > 0 && bits <= 12) ;

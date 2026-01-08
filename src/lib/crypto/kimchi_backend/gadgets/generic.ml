@@ -2,7 +2,8 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 module Circuit = Kimchi_pasta_snarky_backend.Step_impl
 
-(* Generic addition gate gadget *)
+(** Generic addition gate gadget. Constrains left_input + right_input = sum.
+    Returns the sum. *)
 let add (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
     Circuit.Field.t =
   let open Circuit in
@@ -27,7 +28,8 @@ let add (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
            } ) ;
       sum )
 
-(* Generic subtraction gate gadget *)
+(** Generic subtraction gate gadget. Constrains left_input - right_input =
+    difference. Returns the difference. *)
 let sub (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
     Circuit.Field.t =
   let open Circuit in
@@ -54,7 +56,8 @@ let sub (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
            } ) ;
       difference )
 
-(* Generic multiplication gate gadget *)
+(** Generic multiplication gate gadget. Constrains left_input * right_input =
+    product. Returns the product. *)
 let mul (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
     Circuit.Field.t =
   let open Circuit in

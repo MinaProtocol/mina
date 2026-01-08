@@ -2,10 +2,13 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 module Circuit = Kimchi_pasta_snarky_backend.Step_impl
 
-(* Helper to create RangeCheck0 gate, configured in various ways
- *     - is_64bit   : create 64-bit range check
- *     - is_compact : compact limbs mode (only used by compact multi-range-check)
- *)
+(** Helper to create RangeCheck0 gate, configured in various ways.
+
+    @param label label for the gate
+    @param is_compact compact limbs mode (only used by compact multi-range-check)
+    @param v0 value to range-check
+    @param v0p0 bits 76-88 of v0
+    @param v0p1 bits 64-76 of v0 *)
 let range_check0 ~(label : string) ?(is_compact : bool = false)
     (v0 : Circuit.Field.t) (v0p0 : Circuit.Field.t) (v0p1 : Circuit.Field.t) =
   let open Circuit in
@@ -63,7 +66,7 @@ let range_check0 ~(label : string) ?(is_compact : bool = false)
              compact
            } ) )
 
-(* Helper to create RangeCheck1 gate *)
+(** Helper to create RangeCheck1 gate. *)
 let range_check1 ~(label : string) (v0p0 : Circuit.Field.t)
     (v0p1 : Circuit.Field.t) (v1p0 : Circuit.Field.t) (v1p1 : Circuit.Field.t)
     (v2 : Circuit.Field.t) (v12 : Circuit.Field.t) =
@@ -135,12 +138,12 @@ let range_check1 ~(label : string) (v0p0 : Circuit.Field.t)
            ; v2c19
            } ) )
 
-(* 64-bit range-check gadget - checks v0 \in [0, 2^64) *)
+(** 64-bit range-check gadget - checks v0 is in [0, 2^64). *)
 let bits64 (v0 : Circuit.Field.t) =
   range_check0 ~label:"range_check64" ~is_compact:false v0 Circuit.Field.zero
     Circuit.Field.zero
 
-(* multi-range-check gadget - checks v0,v1,v2 \in [0, 2^88) *)
+(** Multi-range-check gadget - checks v0, v1, v2 are in [0, 2^88). *)
 let multi (v0 : Circuit.Field.t) (v1 : Circuit.Field.t) (v2 : Circuit.Field.t) =
   let open Circuit in
   let of_bits = Common.as_prover_cvar_field_bits_le_to_cvar_field in
@@ -153,10 +156,9 @@ let multi (v0 : Circuit.Field.t) (v1 : Circuit.Field.t) (v2 : Circuit.Field.t) =
   let zero = exists Field.typ ~compute:(fun () -> Field.Constant.zero) in
   range_check1 ~label:"multi_range_check" v0p0 v0p1 v1p0 v1p1 v2 zero
 
-(* compact multi-range-check gadget - checks
- *     - v0,v1,v2 \in [0, 2^88)
- *     - v01 = v0 + 2^88 * v1
- *)
+(** Compact multi-range-check gadget. Checks:
+    - v0, v1, v2 are in [0, 2^88)
+    - v01 = v0 + 2^88 * v1 *)
 let compact_multi (v01 : Circuit.Field.t) (v2 : Circuit.Field.t) =
   let open Circuit in
   (* Set up helper *)

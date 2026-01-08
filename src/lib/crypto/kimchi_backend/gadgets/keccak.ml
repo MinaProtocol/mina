@@ -3,38 +3,41 @@ module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 module Circuit = Kimchi_pasta_snarky_backend.Step_impl
 
-(* Endianness type *)
+(** Endianness type. *)
 type endianness = Big | Little
 
-(* DEFINITIONS OF CONSTANTS FOR KECCAK *)
-
-(* Length of the square matrix side of Keccak states *)
+(** Length of the square matrix side of Keccak states. *)
 let keccak_dim = 5
 
-(* value `l` in Keccak, ranges from 0 to 6 (7 possible values) *)
+(** Value [l] in Keccak, ranges from 0 to 6 (7 possible values). *)
 let keccak_ell = 6
 
-(* width of the lane of the state, meaning the length of each word in bits (64) *)
+(** Width of the lane of the state, meaning the length of each word in bits
+    (64). *)
 let keccak_word = Int.pow 2 keccak_ell
 
-(* number of bytes that fit in a word (8) *)
+(** Number of bytes that fit in a word (8). *)
 let bytes_per_word = keccak_word / 8
 
-(* length of the state in bits, meaning the 5x5 matrix of words in bits (1600) *)
+(** Length of the state in bits, meaning the 5x5 matrix of words in bits
+    (1600). *)
 let keccak_state_length = Int.pow keccak_dim 2 * keccak_word
 
-(* number of rounds of the Keccak permutation function depending on the value `l` (24) *)
+(** Number of rounds of the Keccak permutation function depending on the value
+    [l] (24). *)
 let keccak_rounds = 12 + (2 * keccak_ell)
 
-(* Creates the 5x5 table of rotation offset for Keccak modulo 64
-   * | x \ y |  0 |  1 |  2 |  3 |  4 |
-   * | ----- | -- | -- | -- | -- | -- |
-   * | 0     |  0 | 36 |  3 | 41 | 18 |
-   * | 1     |  1 | 44 | 10 | 45 |  2 |
-   * | 2     | 62 |  6 | 43 | 15 | 61 |
-   * | 3     | 28 | 55 | 25 | 21 | 56 |
-   * | 4     | 27 | 20 | 39 |  8 | 14 |
-*)
+(** Creates the 5x5 table of rotation offset for Keccak modulo 64.
+
+    {v
+    | x \ y |  0 |  1 |  2 |  3 |  4 |
+    | ----- | -- | -- | -- | -- | -- |
+    | 0     |  0 | 36 |  3 | 41 | 18 |
+    | 1     |  1 | 44 | 10 | 45 |  2 |
+    | 2     | 62 |  6 | 43 | 15 | 61 |
+    | 3     | 28 | 55 | 25 | 21 | 56 |
+    | 4     | 27 | 20 | 39 |  8 | 14 |
+    v} *)
 let rot_table =
   [| [| 0; 36; 3; 41; 18 |]
    ; [| 1; 44; 10; 45; 2 |]
@@ -70,7 +73,7 @@ let round_consts =
    ; "8000000080008008"
   |]
 
-(* Auxiliary function to check composition of 8 bytes into a 64-bit word *)
+(** Auxiliary function to check composition of 8 bytes into a 64-bit word. *)
 let check_bytes_to_word (word : Circuit.Field.t)
     (word_bytes : Circuit.Field.t array) =
   let open Circuit in
@@ -81,12 +84,12 @@ let check_bytes_to_word (word : Circuit.Field.t)
   in
   Field.Assert.equal word composition
 
-(* Internal struct for Keccak State *)
+(** Internal struct for Keccak State. *)
 
 module State = struct
   type 'a matrix = 'a array array
 
-  (* Creates a state formed by a matrix of 5x5 Cvar zeros *)
+  (** Creates a state formed by a matrix of 5x5 Cvar zeros. *)
   let zeros () : Circuit.Field.t matrix =
     let open Circuit in
     let state =
@@ -94,13 +97,13 @@ module State = struct
     in
     state
 
-  (* Updates the cells of a state with new values *)
+  (** Updates the cells of a state with new values. *)
   let update ~(prev : Circuit.Field.t matrix) ~(next : Circuit.Field.t matrix) =
     for x = 0 to keccak_dim - 1 do
       prev.(x) <- next.(x)
     done
 
-  (* Converts a list of bytes to a matrix of Field elements *)
+  (** Converts a list of bytes to a matrix of Field elements. *)
   let of_bytes (bytestring : Circuit.Field.t list) : Circuit.Field.t matrix =
     let open Circuit in
     assert (List.length bytestring = 200) ;
@@ -127,7 +130,8 @@ module State = struct
 
     state
 
-  (* Converts a state of cvars to a list of bytes as cvars and creates constraints for it *)
+  (** Converts a state of cvars to a list of bytes as cvars and creates
+      constraints for it. *)
   let as_prover_to_bytes (state : Circuit.Field.t matrix) : Circuit.Field.t list
       =
     let open Circuit in
@@ -181,19 +185,17 @@ module State = struct
     Array.map2_exn input1 input2 ~f:(Array.map2_exn ~f:Bitwise.bxor64)
 end
 
-(* KECCAK HASH FUNCTION IMPLEMENTATION *)
-
-(* Computes the number of required extra bytes to pad a message of length bytes *)
+(** Computes the number of required extra bytes to pad a message of length
+    bytes. *)
 let bytes_to_pad (rate : int) (length : int) =
   (rate / 8) - (length mod (rate / 8))
 
-(* Pads a message M as:
- * M || pad[x](|M|)
- * Padding rule 0x06 ..0*..1.
- * The padded message vector will start with the message vector
- * followed by the 0*1 rule to fulfil a length that is a multiple of rate (in bytes)
- * (This means a 0110 sequence, followed with as many 0s as needed, and a final 1 bit)
- *)
+(** Pads a message M as: M || pad[x](|M|)
+
+    Padding rule 0x06 ..0*..1. The padded message vector will start with the
+    message vector followed by the 0*1 rule to fulfil a length that is a
+    multiple of rate (in bytes). This means a 0110 sequence, followed with as
+    many 0s as needed, and a final 1 bit. *)
 let pad_nist (message : Circuit.Field.t list) (rate : int) :
     Circuit.Field.t list =
   let open Circuit in
@@ -212,13 +214,12 @@ let pad_nist (message : Circuit.Field.t list) (rate : int) :
   (* Return the padded message *)
   message @ pad
 
-(* Pads a message M as:
-   * M || pad[x](|M|)
-   * Padding rule 10*1.
-   * The padded message vector will start with the message vector
-   * followed by the 10*1 rule to fulfil a length that is a multiple of rate (in bytes)
-   * (This means a 1 bit, followed with as many 0s as needed, and a final 1 bit)
-*)
+(** Pads a message M as: M || pad[x](|M|)
+
+    Padding rule 10*1. The padded message vector will start with the message
+    vector followed by the 10*1 rule to fulfil a length that is a multiple of
+    rate (in bytes). This means a 1 bit, followed with as many 0s as needed,
+    and a final 1 bit. *)
 let pad_101 (message : Circuit.Field.t list) (rate : int) : Circuit.Field.t list
     =
   let open Circuit in
@@ -236,14 +237,15 @@ let pad_101 (message : Circuit.Field.t list) (rate : int) : Circuit.Field.t list
   (* Return the padded message *)
   message @ Array.to_list pad
 
-(* 
- * First algrithm in the compression step of Keccak for 64-bit words.
- * C[x] = A[x,0] xor A[x,1] xor A[x,2] xor A[x,3] xor A[x,4]
- * D[x] = C[x-1] xor ROT(C[x+1], 1)
- * E[x,y] = A[x,y] xor D[x]
- * In the Keccak reference, it corresponds to the `theta` algorithm.
- * We use the first index of the state array as the x coordinate and the second index as the y coordinate.
- *)
+(** First algorithm in the compression step of Keccak for 64-bit words.
+
+    - C[x] = A[x,0] xor A[x,1] xor A[x,2] xor A[x,3] xor A[x,4]
+    - D[x] = C[x-1] xor ROT(C[x+1], 1)
+    - E[x,y] = A[x,y] xor D[x]
+
+    In the Keccak reference, this corresponds to the [theta] algorithm. We use
+    the first index of the state array as the x coordinate and the second index
+    as the y coordinate. *)
 let theta (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix
     =
   let state_a = state in
@@ -264,31 +266,13 @@ let theta (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix
   Array.map2_exn state_a state_d ~f:(fun state_a state_d ->
       Array.map state_a ~f:(Bitwise.bxor64 state_d) )
 
-(*
- * Second and third steps in the compression step of Keccak for 64-bit words.
- * B[y,2x+3y] = ROT(E[x,y], r[x,y])
- * which is equivalent to the `rho` algorithm followed by the `pi` algorithm in the Keccak reference as follows:
- * rho:
- * A[0,0] = a[0,0]
- * | x |  =  | 1 |
- * | y |  =  | 0 |
- * for t = 0 to 23 do
- *   A[x,y] = ROT(a[x,y], (t+1)(t+2)/2 mod 64)))
- *   | x |  =  | 0  1 |   | x |
- *   |   |  =  |      | * |   |
- *   | y |  =  | 2  3 |   | y |
- * end for
- * pi:
- * for x = 0 to 4 do
- *   for y = 0 to 4 do
- *     | X |  =  | 0  1 |   | x |
- *     |   |  =  |      | * |   |
- *     | Y |  =  | 2  3 |   | y |
- *     A[X,Y] = a[x,y]
- *   end for
- * end for
- * We use the first index of the state array as the x coordinate and the second index as the y coordinate. 
- *)
+(** Second and third steps in the compression step of Keccak for 64-bit words.
+
+    B[y,2x+3y] = ROT(E[x,y], r[x,y])
+
+    This is equivalent to the [rho] algorithm followed by the [pi] algorithm in
+    the Keccak reference. We use the first index of the state array as the x
+    coordinate and the second index as the y coordinate. *)
 let pi_rho (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix
     =
   let state_e = state in
@@ -303,16 +287,11 @@ let pi_rho (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix
   done ;
   state_b
 
-(* 
- * Fourth step of the compression function of Keccak for 64-bit words.
- * F[x,y] = B[x,y] xor ((not B[x+1,y]) and B[x+2,y])
- * It corresponds to the chi algorithm in the Keccak reference.
- * for y = 0 to 4 do
- *   for x = 0 to 4 do
- *     A[x,y] = a[x,y] xor ((not a[x+1,y]) and a[x+2,y])
- *   end for
- * end for   
- *)
+(** Fourth step of the compression function of Keccak for 64-bit words.
+
+    F[x,y] = B[x,y] xor ((not B[x+1,y]) and B[x+2,y])
+
+    This corresponds to the [chi] algorithm in the Keccak reference. *)
 let chi (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix =
   let state_b = state in
   let state_f = State.zeros () in
@@ -332,10 +311,9 @@ let chi (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix =
      64 bits thanks to the fact that it is the output of a previous Xor64 *)
   state_f
 
-(*
- * Fifth step of the permutation function of Keccak for 64-bit words.
- * It takes the word located at the position (0,0) of the state and XORs it with the round constant.
- *)
+(** Fifth step of the permutation function of Keccak for 64-bit words. Takes
+    the word located at position (0,0) of the state and XORs it with the round
+    constant. *)
 let iota (state : Circuit.Field.t State.matrix) (rc : Circuit.Field.t) :
     Circuit.Field.t State.matrix =
   (* Round constants for this round for the iota algorithm *)
@@ -344,12 +322,9 @@ let iota (state : Circuit.Field.t State.matrix) (rc : Circuit.Field.t) :
   (* Check it is the right round constant is implicit from reusing the right cvar *)
   state_g
 
-(* The round applies the lambda function and then chi and iota
- * It consists of the concatenation of the theta, rho, and pi algorithms.
- * lambda = pi o rho o theta
- * Thus:
- * iota o chi o pi o rho o theta
- *)
+(** The round applies the lambda function and then chi and iota. It consists of
+    the concatenation of the theta, rho, and pi algorithms:
+    lambda = pi o rho o theta, thus: iota o chi o pi o rho o theta. *)
 let round (state : Circuit.Field.t State.matrix) (rc : Circuit.Field.t) :
     Circuit.Field.t State.matrix =
   let state_a = state in
@@ -359,7 +334,7 @@ let round (state : Circuit.Field.t State.matrix) (rc : Circuit.Field.t) :
   let state_d = iota state_f rc in
   state_d
 
-(* Keccak permutation function with a constant number of rounds *)
+(** Keccak permutation function with a constant number of rounds. *)
 let permutation (state : Circuit.Field.t State.matrix)
     (rc : Circuit.Field.t array) : Circuit.Field.t State.matrix =
   for i = 0 to keccak_rounds - 1 do
@@ -369,7 +344,7 @@ let permutation (state : Circuit.Field.t State.matrix)
   done ;
   state
 
-(* Absorb padded message into a keccak state with given rate and capacity *)
+(** Absorbs padded message into a keccak state with given rate and capacity. *)
 let absorb (padded_message : Circuit.Field.t list) ~(capacity : int)
     ~(rate : int) ~(rc : Circuit.Field.t array) : Circuit.Field.t State.matrix =
   let open Circuit in
@@ -397,7 +372,7 @@ let absorb (padded_message : Circuit.Field.t list) ~(capacity : int)
 
   state
 
-(* Squeeze state until it has a desired length in bits *)
+(** Squeezes state until it has a desired length in bits. *)
 let squeeze (state : Circuit.Field.t State.matrix) ~(length : int) ~(rate : int)
     ~(rc : Circuit.Field.t array) : Circuit.Field.t list =
   let copy (bytestring : Circuit.Field.t list)
@@ -438,9 +413,8 @@ let squeeze (state : Circuit.Field.t State.matrix) ~(length : int) ~(rate : int)
 
   Array.to_list hashed
 
-(* Keccak sponge function for 1600 bits of state width
- * Need to split the message into blocks of 1088 bits. 
- *)
+(** Keccak sponge function for 1600 bits of state width. Splits the message
+    into blocks of 1088 bits. *)
 let sponge (padded_message : Circuit.Field.t list) ~(length : int)
     ~(capacity : int) ~(rate : int) : Circuit.Field.t list =
   let open Circuit in
@@ -457,7 +431,7 @@ let sponge (padded_message : Circuit.Field.t list) ~(length : int)
   let hashed = squeeze state ~length ~rate ~rc in
   hashed
 
-(* Checks in the circuit that a list of cvars are at most 8 bits each *)
+(** Checks in the circuit that a list of cvars are at most 8 bits each. *)
 let check_bytes (inputs : Circuit.Field.t list) : unit =
   let open Circuit in
   (* Create a second list of shifted inputs with 4 more bits*)
@@ -487,13 +461,13 @@ let check_bytes (inputs : Circuit.Field.t list) : unit =
   done ;
   ()
 
-(*
-* Keccak hash function with input message passed as list of Cvar bytes.
-* The message will be parsed as follows:
-* - the first byte of the message will be the least significant byte of the first word of the state (A[0][0])
-* - the 10*1 pad will take place after the message, until reaching the bit length rate.
-* - then, {0} pad will take place to finish the 1600 bits of the state.
-*)
+(** Keccak hash function with input message passed as list of Cvar bytes. The
+    message will be parsed as follows:
+    - the first byte of the message will be the least significant byte of the
+      first word of the state (A[0][0])
+    - the 10*1 pad will take place after the message, until reaching the bit
+      length rate
+    - then, \{0\} pad will take place to finish the 1600 bits of the state *)
 let hash ?(inp_endian = Big) ?(out_endian = Big) ?(byte_checks = false)
     (message : Circuit.Field.t list) ~(length : int) ~(capacity : int)
     (nist_version : bool) : Circuit.Field.t list =
@@ -523,9 +497,8 @@ let hash ?(inp_endian = Big) ?(out_endian = Big) ?(byte_checks = false)
   (* Check each cvar output is 8 bits at most *)
   hash
 
-(* Gagdet for NIST SHA-3 function for output lengths 224/256/384/512.
- * Input and output endianness can be specified. Default is big endian.
- *)
+(** Gadget for NIST SHA-3 function for output lengths 224/256/384/512. Input
+    and output endianness can be specified. Default is big endian. *)
 let nist_sha3 ?(inp_endian = Big) ?(out_endian = Big) ?(byte_checks = false)
     (len : int) (message : Circuit.Field.t list) : Circuit.Field.t list =
   let hash =
@@ -547,18 +520,17 @@ let nist_sha3 ?(inp_endian = Big) ?(out_endian = Big) ?(byte_checks = false)
   in
   hash
 
-(* Gadget for Keccak hash function for the parameters used in Ethereum.
- * Input and output endianness can be specified. Default is big endian.
- *)
+(** Gadget for Keccak hash function for the parameters used in Ethereum. Input
+    and output endianness can be specified. Default is big endian. *)
 let ethereum ?(inp_endian = Big) ?(out_endian = Big) ?(byte_checks = false)
     (message : Circuit.Field.t list) : Circuit.Field.t list =
   hash message ~length:256 ~capacity:512 false ~inp_endian ~out_endian
     ~byte_checks
 
-(* Gagdet for pre-NIST SHA-3 function for output lengths 224/256/384/512.
- * Input and output endianness can be specified. Default is big endian.
- * Note that when calling with output length 256 this is equivalent to the ethereum function 
- *)
+(** Gadget for pre-NIST SHA-3 function for output lengths 224/256/384/512.
+    Input and output endianness can be specified. Default is big endian. Note
+    that when calling with output length 256 this is equivalent to the
+    [ethereum] function. *)
 let pre_nist ?(inp_endian = Big) ?(out_endian = Big) ?(byte_checks = false)
     (len : int) (message : Circuit.Field.t list) : Circuit.Field.t list =
   match len with

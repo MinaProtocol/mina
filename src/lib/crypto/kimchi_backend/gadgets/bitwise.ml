@@ -5,9 +5,7 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Circuit = Kimchi_pasta_snarky_backend.Step_impl
 
-(* Auxiliary functions *)
-
-(* returns a field containing the all one word of length bits *)
+(** Returns a field containing the all one word of length bits. *)
 let all_ones_field (length : int) =
   Common.bignum_bigint_to_field
   @@ Bignum_bigint.(pow (of_int 2) (of_int length) - one)
@@ -19,12 +17,11 @@ let fits_in_bits_as_prover (word : Circuit.Field.t) (length : int) =
       field_to_bignum_bigint (cvar_field_to_field_as_prover word)
       < pow (of_int 2) (of_int length)) )
 
-(* ROT64 *)
-
-(* Side of rotation *)
+(** Side of rotation. *)
 type rot_mode = Left | Right
 
-(* Performs the 64bit rotation and returns rotated word, excess, and shifted *)
+(** Performs the 64-bit rotation and returns rotated word, excess, and
+    shifted. *)
 let rot_aux ?(check64 = false) (word : Circuit.Field.t) (bits : int)
     (mode : rot_mode) : Circuit.Field.t * Circuit.Field.t * Circuit.Field.t =
   let open Circuit in
@@ -116,53 +113,53 @@ let rot_aux ?(check64 = false) (word : Circuit.Field.t) (bits : int)
 
   (rotated, excess, shifted)
 
-(* 64-bit Rotation of rot_bits to the `mode` side
- *   Inputs
- *     - check: whether to check the input word is at most 64 bits (default is false)
- *     - word of maximum 64 bits to be rotated
- *     - rot_bits: number of bits to be rotated
- *     - mode: Left or Right
- * Output: rotated word
- *)
+(** 64-bit rotation of [rot_bits] to the [mode] side.
+
+    @param check64 whether to check the input word is at most 64 bits
+                   (default is false)
+    @param word word of maximum 64 bits to be rotated
+    @param rot_bits number of bits to be rotated
+    @param mode Left or Right
+    @return rotated word *)
 let rot64 ?(check64 : bool = false) (word : Circuit.Field.t) (rot_bits : int)
     (mode : rot_mode) : Circuit.Field.t =
   let rotated, _excess, _shifted = rot_aux ~check64 word rot_bits mode in
 
   rotated
 
-(* 64-bit bitwise logical shift of bits to the left side
- * Inputs
- *  - check64: whether to check the input word is at most 64 bits (default is false)
- *  - word of maximum 64 bits to be shifted
- *  - bits: number of bits to be shifted
- * Output: left shifted word (with bits 0s at the least significant positions)
- *)
+(** 64-bit bitwise logical shift of bits to the left side.
+
+    @param check64 whether to check the input word is at most 64 bits
+                   (default is false)
+    @param word word of maximum 64 bits to be shifted
+    @param bits number of bits to be shifted
+    @return left shifted word (with 0s at the least significant positions) *)
 let lsl64 ?(check64 : bool = false) (word : Circuit.Field.t) (bits : int) :
     Circuit.Field.t =
   let _rotated, _excess, shifted = rot_aux ~check64 word bits Left in
 
   shifted
 
-(* 64-bit bitwise logical shift of bits to the right side
-   * Inputs
-   *  - check64: whether to check the input word is at most 64 bits (default is false)
-   *  - word of maximum 64 bits to be shifted
-   *  - bits: number of bits to be shifted
-   * Output: right shifted word (with bits 0s at the most significant positions)
-*)
+(** 64-bit bitwise logical shift of bits to the right side.
+
+    @param check64 whether to check the input word is at most 64 bits
+                   (default is false)
+    @param word word of maximum 64 bits to be shifted
+    @param bits number of bits to be shifted
+    @return right shifted word (with 0s at the most significant positions) *)
 let lsr64 ?(check64 : bool = false) (word : Circuit.Field.t) (bits : int) :
     Circuit.Field.t =
   let _rotated, excess, _shifted = rot_aux ~check64 word bits Right in
 
   excess
 
-(* XOR *)
+(** Boolean XOR of [length] bits.
 
-(* Boolean Xor of length bits
- * input1 and input2 are the inputs to the Xor gate
- * length is the number of bits to Xor
- * len_xor is the number of bits of the lookup table (default is 4)
- *)
+    @param len_xor number of bits of the lookup table (default is 4)
+    @param input1 first input to the XOR gate
+    @param input2 second input to the XOR gate
+    @param length number of bits to XOR
+    @return XOR of input1 and input2 *)
 let bxor ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
     (length : int) : Circuit.Field.t =
   (* Auxiliar function to compute the next variable for the chain of Xors *)
@@ -341,31 +338,27 @@ let bxor ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
   (* Convert back to field *)
   output_xor
 
-(* Boolean Xor of 16 bits
- * This is a special case of Xor for 16 bits for Xor lookup table of 4 bits of inputs.
- * Receives two input words to Xor together, of maximum 16 bits each.
- * Returns the Xor of the two words.
- *)
+(** Boolean XOR of 16 bits. This is a special case of XOR for 16 bits using a
+    4-bit lookup table. Receives two input words of maximum 16 bits each.
+    Returns the XOR of the two words. *)
 let bxor16 (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) :
     Circuit.Field.t =
   bxor input1 input2 16 ~len_xor:4
 
-(* Boolean Xor of 64 bits
- * This is a special case of Xor for 64 bits for Xor lookup table of 4 bits of inputs.
- * Receives two input words to Xor together, of maximum 64 bits each.
- * Returns the Xor of the two words.
- *)
+(** Boolean XOR of 64 bits. This is a special case of XOR for 64 bits using a
+    4-bit lookup table. Receives two input words of maximum 64 bits each.
+    Returns the XOR of the two words. *)
 let bxor64 (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) :
     Circuit.Field.t =
   bxor input1 input2 64 ~len_xor:4
 
-(* AND *)
+(** Boolean AND of [length] bits.
 
-(* Boolean And of length bits
- *  input1 and input2 are the two inputs to AND
- *  length is the number of bits to AND
- *  len_xor is the number of bits of the inputs of the Xor lookup table (default is 4)
- *)
+    @param len_xor number of bits of the XOR lookup table (default is 4)
+    @param input1 first input to AND
+    @param input2 second input to AND
+    @param length number of bits to AND
+    @return AND of input1 and input2 *)
 let band ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
     (length : int) : Circuit.Field.t =
   let open Circuit in
@@ -397,23 +390,22 @@ let band ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
 
   and_output
 
-(* Boolean And of 64 bits
- * This is a special case of And for 64 bits for Xor lookup table of 4 bits of inputs.
- * Receives two input words to And together, of maximum 64 bits each.
- * Returns the And of the two words.
- *)
+(** Boolean AND of 64 bits. This is a special case of AND for 64 bits using a
+    4-bit XOR lookup table. Receives two input words of maximum 64 bits each.
+    Returns the AND of the two words. *)
 let band64 (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) :
     Circuit.Field.t =
   band input1 input2 64
 
-(* NOT *)
+(** Boolean NOT of [length] bits with checked length (uses XOR gadgets inside
+    to constrain the length).
 
-(* Boolean Not of length bits for checked length (uses Xor gadgets inside to constrain the length)
- *   - input of word to negate
- *   - length of word to negate
- *   - len_xor is the length of the Xor lookup table to use beneath (default 4)
- * Note that the length needs to be less than the bit length of the field.
- *)
+    Note: the length must be less than the bit length of the field.
+
+    @param len_xor length of the XOR lookup table to use (default 4)
+    @param input word to negate
+    @param length number of bits
+    @return negated word *)
 let bnot_checked ?(len_xor = 4) (input : Circuit.Field.t) (length : int) :
     Circuit.Field.t =
   let open Circuit in
@@ -431,17 +423,21 @@ let bnot_checked ?(len_xor = 4) (input : Circuit.Field.t) (length : int) :
 
   out_not
 
-(* Negates a word of 64 bits with checked length of 64 bits.
- * This means that the bound in lenght is constrained in the circuit. *)
+(** Negates a word of 64 bits with checked length of 64 bits. This means that
+    the bound in length is constrained in the circuit. *)
 let bnot64_checked (input : Circuit.Field.t) : Circuit.Field.t =
   bnot_checked input 64
 
-(* Boolean Not of length bits for unchecked length (uses Generic subtractions inside)
- *  - input of word to negate
- *  - length of word to negate
- * (Note that this can negate two words per row, but it inputs need to be a copy of another
- * variable with a correct length in order to make sure that the length is correct)
- *)
+(** Boolean NOT of [length] bits with unchecked length (uses Generic
+    subtractions inside).
+
+    Note: this can negate two words per row, but inputs need to be a copy of
+    another variable with a correct length in order to ensure the length is
+    correct.
+
+    @param input word to negate
+    @param length number of bits
+    @return negated word *)
 let bnot_unchecked (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
   let open Circuit in
   (* Check it is not 255 or else 2^255-1 will not fit in Pallas *)
@@ -462,7 +458,7 @@ let bnot_unchecked (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
   (* [2^len - 1] - input = not (input) *)
   Generic.sub all_ones_var input
 
-(* Negates a word of 64 bits, but its length goes unconstrained in the circuit
-   (unless it is copied from a checked length value) *)
+(** Negates a word of 64 bits, but its length goes unconstrained in the circuit
+    (unless it is copied from a checked length value). *)
 let bnot64_unchecked (input : Circuit.Field.t) : Circuit.Field.t =
   bnot_unchecked input 64
