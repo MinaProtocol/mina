@@ -61,6 +61,14 @@ module Value = struct
   type t = Zkapp_basic.F.t V.t [@@deriving sexp, equal, yojson, hash, compare]
 
   let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
+
+  let gen : t Quickcheck.Generator.t =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map fields =
+      Quickcheck.Generator.list_with_length max_size_int
+        Snark_params.Tick.Field.gen
+    in
+    V.of_list_exn fields
 end
 
 let to_input (t : _ V.t) ~f =
@@ -89,6 +97,26 @@ module Hardfork = struct
     [@@deriving sexp, equal, hash, compare, yojson, bin_io_unversioned]
 
     let of_stable (value : Value.Stable.Latest.t) : t =
-      Vector.extend_front_exn value Nat.N32.n Zkapp_basic.F.zero
+      Vector.extend_exn value Nat.N32.n Zkapp_basic.F.zero
+
+    (** Convert a Mesa zkApp state vector to a stable Berkeley zkApp state
+        vector by dropping zkApp state elements from the end. Raises if element 
+        8~31 is not zero *)
+    let to_stable_exn (value : t) : Value.Stable.Latest.t =
+      let zero = Pasta_bindings.Fp.of_int 0 in
+      let adds_proof =
+        (* 8 + 24 = 32 *)
+        Nat.Adds.(S (S (S (S (S (S (S (S Z))))))))
+      in
+      let retained, dropped = Vector.split value adds_proof in
+      if not @@ Vector.for_all dropped ~f:(Pasta_bindings.Fp.equal zero) then
+        failwith "element 8~31 of zkApp state has non-zero values!" ;
+      retained
+
+    let%test_unit "of_stable followed by to_stable_exn is identity" =
+      Quickcheck.test Value.gen ~f:(fun original ->
+          let extended = of_stable original in
+          let roundtripped = to_stable_exn extended in
+          [%test_eq: Value.Stable.Latest.t] original roundtripped )
   end
 end
