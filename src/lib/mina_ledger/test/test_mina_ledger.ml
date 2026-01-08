@@ -1,6 +1,7 @@
 open Core
 open Async
 open Mina_base
+open Mina_transaction_logic.For_tests
 module L = Mina_ledger.Ledger
 module Root_ledger = Mina_ledger.Root
 
@@ -235,6 +236,398 @@ module Root_test = struct
         Deferred.unit )
 end
 
+module Ledger_test = struct
+  open Zkapp_command_builder
+
+  let constraint_constants =
+    Genesis_constants.For_unit_tests.Constraint_constants.t
+
+  let ledger_get_exn ledger pk token =
+    match
+      L.Ledger_inner.get_or_create ledger (Account_id.create pk token)
+      |> Or_error.ok_exn
+    with
+    | `Added, _, _ ->
+        failwith "Account did not exist"
+    | `Existed, acct, _ ->
+        acct
+
+  let test_tokens () =
+    let keypair_and_amounts = Quickcheck.random_value (Init_ledger.gen ()) in
+    let pk =
+      let kp, _ = keypair_and_amounts.(0) in
+      Signature_lib.Public_key.compress kp.public_key
+    in
+    let main (ledger : L.t) =
+      let execute_zkapp_command_transaction
+          (account_updates :
+            ( Account_update.Body.Simple.t
+            , unit
+            , unit )
+            Zkapp_command.Call_forest.t ) : unit =
+        let _, ({ nonce; _ } : Account.t), _ =
+          L.Ledger_inner.get_or_create ledger
+            (Account_id.create pk Token_id.default)
+          |> Or_error.ok_exn
+        in
+        let zkapp_command =
+          mk_zkapp_command ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
+            account_updates
+        in
+        match
+          L.apply_zkapp_command_unchecked ~signature_kind ~constraint_constants
+            ~global_slot:
+              (Mina_numbers.Global_slot_since_genesis.succ
+                 view.global_slot_since_genesis )
+            ~state_view:view ledger zkapp_command
+        with
+        | Ok ({ command = { status; _ }; _ }, _) -> (
+            match status with
+            | Transaction_status.Applied ->
+                ()
+            | Failed failures ->
+                let indexed_failures :
+                    (int * Transaction_status.Failure.t list) list =
+                  Transaction_status.Failure.Collection.to_display failures
+                in
+                let formatted_failures =
+                  List.map indexed_failures ~f:(fun (ndx, fails) ->
+                      sprintf "Index: %d  Failures: %s" ndx
+                        ( List.map fails ~f:Transaction_status.Failure.to_string
+                        |> String.concat ~sep:"," ) )
+                  |> String.concat ~sep:"; "
+                in
+                failwithf "Transaction failed: %s" formatted_failures () )
+        | Error err ->
+            failwithf "Error executing transaction: %s"
+              (Error.to_string_hum err) ()
+      in
+      let token_funder, _ = keypair_and_amounts.(1) in
+      let token_funder_pk =
+        token_funder.public_key |> Signature_lib.Public_key.compress
+      in
+      let token_owner = Signature_lib.Keypair.create () in
+      let token_owner_pk =
+        token_owner.public_key |> Signature_lib.Public_key.compress
+      in
+      let token_account1 = Signature_lib.Keypair.create () in
+      let token_account2 = Signature_lib.Keypair.create () in
+      (* patch ledger so that token funder account has Proof send permission and a
+         zkapp acount dummy verification key
+
+         allows use of Proof authorization in `create_token` zkApp, below
+      *)
+      L.iteri ledger ~f:(fun _n acct ->
+          if
+            Signature_lib.Public_key.Compressed.equal acct.public_key
+              token_funder_pk
+          then
+            let acct_id = Account_id.create token_funder_pk Token_id.default in
+            let loc =
+              Option.value_exn @@ L.location_of_account ledger acct_id
+            in
+            let acct_with_zkapp =
+              { acct with
+                permissions =
+                  { acct.permissions with
+                    send = Permissions.Auth_required.Proof
+                  }
+              ; zkapp =
+                  Some
+                    { Zkapp_account.default with
+                      verification_key =
+                        Some
+                          With_hash.
+                            { data = Side_loaded_verification_key.dummy
+                            ; hash = Zkapp_account.dummy_vk_hash ()
+                            }
+                    }
+              }
+            in
+            L.set ledger loc acct_with_zkapp ) ;
+      let account_creation_fee =
+        Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
+      in
+      let create_token :
+          (Account_update.Body.Simple.t, unit, unit) Zkapp_command.Call_forest.t
+          =
+        mk_forest
+          [ mk_node
+              (mk_account_update_body
+                 (Proof (Zkapp_account.dummy_vk_hash ()))
+                 No token_funder Token_id.default
+                 (-(4 * account_creation_fee)) )
+              []
+          ; mk_node
+              (mk_account_update_body Signature No token_owner Token_id.default
+                 (3 * account_creation_fee) )
+              []
+          ]
+      in
+      let custom_token_id =
+        Account_id.derive_token_id
+          ~owner:(Account_id.create token_owner_pk Token_id.default)
+      in
+      let token_minting =
+        mk_forest
+          [ mk_node
+              (mk_account_update_body Signature No token_owner Token_id.default
+                 (-account_creation_fee) )
+              [ mk_node
+                  (mk_account_update_body None_given Parents_own_token
+                     token_account1 custom_token_id 100 )
+                  []
+              ]
+          ]
+      in
+      let token_transfers =
+        mk_forest
+          [ mk_node
+              (mk_account_update_body Signature No token_owner Token_id.default
+                 (-account_creation_fee) )
+              [ mk_node
+                  (mk_account_update_body Signature Parents_own_token
+                     token_account1 custom_token_id (-30) )
+                  []
+              ; mk_node
+                  (mk_account_update_body None_given Parents_own_token
+                     token_account2 custom_token_id 30 )
+                  []
+              ; mk_node
+                  (mk_account_update_body Signature Parents_own_token
+                     token_account1 custom_token_id (-10) )
+                  []
+              ; mk_node
+                  (mk_account_update_body None_given Parents_own_token
+                     token_account2 custom_token_id 10 )
+                  []
+              ; mk_node
+                  (mk_account_update_body Signature Parents_own_token
+                     token_account2 custom_token_id (-5) )
+                  []
+              ; mk_node
+                  (mk_account_update_body None_given Parents_own_token
+                     token_account1 custom_token_id 5 )
+                  []
+              ]
+          ]
+      in
+      let check_token_balance k balance =
+        [%test_eq: Currency.Balance.t]
+          (ledger_get_exn ledger
+             (Signature_lib.Public_key.compress
+                k.Signature_lib.Keypair.public_key )
+             custom_token_id )
+            .balance
+          (Currency.Balance.of_nanomina_int_exn balance)
+      in
+      execute_zkapp_command_transaction create_token ;
+      (* Check that token_owner exists *)
+      let (_ : Account.t) =
+        ledger_get_exn ledger token_owner_pk Token_id.default
+      in
+      execute_zkapp_command_transaction token_minting ;
+      check_token_balance token_account1 100 ;
+      execute_zkapp_command_transaction token_transfers ;
+      check_token_balance token_account1 65 ;
+      check_token_balance token_account2 35
+    in
+    L.with_ledger ~depth ~f:(fun ledger ->
+        Init_ledger.init
+          (module L.Ledger_inner)
+          [| keypair_and_amounts.(0); keypair_and_amounts.(1) |]
+          ledger ;
+        main ledger )
+
+  let test_zkapp_command_payment () =
+    let constraint_constants =
+      { Genesis_constants.For_unit_tests.Constraint_constants.t with
+        account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
+      }
+    in
+    Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+        let ts1 : Signed_command.t list = List.map specs ~f:command_send in
+        let ts2 : Zkapp_command.t list =
+          List.map specs ~f:(fun s ->
+              let use_full_commitment =
+                Quickcheck.random_value Bool.quickcheck_generator
+              in
+              account_update_send ~use_full_commitment s )
+        in
+        L.with_ledger ~depth ~f:(fun l1 ->
+            L.with_ledger ~depth ~f:(fun l2 ->
+                Init_ledger.init (module L.Ledger_inner) init_ledger l1 ;
+                Init_ledger.init (module L.Ledger_inner) init_ledger l2 ;
+                let open Result.Let_syntax in
+                let%bind () =
+                  iter_err ts1 ~f:(fun t ->
+                      L.apply_user_command_unchecked l1 t ~constraint_constants
+                        ~txn_global_slot )
+                in
+                let%bind () =
+                  iter_err ts2 ~f:(fun t ->
+                      let%bind res, _ =
+                        L.apply_zkapp_command_unchecked ~signature_kind l2 t
+                          ~constraint_constants ~global_slot:txn_global_slot
+                          ~state_view:view
+                      in
+                      match res.command.status with
+                      | Transaction_status.Applied ->
+                          Ok ()
+                      | Transaction_status.Failed failure ->
+                          Or_error.error_string
+                            (Yojson.Safe.pretty_to_string
+                               (Transaction_status.Failure.Collection.to_yojson
+                                  failure ) ) )
+                in
+                let accounts =
+                  List.concat_map ~f:Zkapp_command.accounts_referenced ts2
+                in
+                (* TODO: Hack. The nonces are inconsistent between the 2
+                   versions. See the comment in
+                   [Mina_transaction_logic.For_tests.account_update_send] for more info.
+                *)
+                L.iteri l1 ~f:(fun index account ->
+                    L.set_at_index_exn l1 index
+                      { account with
+                        nonce =
+                          account.nonce |> Mina_numbers.Account_nonce.to_uint32
+                          |> Unsigned.UInt32.(mul (of_int 2))
+                          |> Mina_numbers.Account_nonce.to_uint32
+                      } ) ;
+                test_eq (module L.Ledger_inner) accounts l1 l2 ) )
+        |> Or_error.ok_exn )
+
+  let test_user_command_on_masked_ledger () =
+    let constraint_constants =
+      { Genesis_constants.For_unit_tests.Constraint_constants.t with
+        account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
+      }
+    in
+    Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+        let cmds = List.map specs ~f:command_send in
+        L.with_ledger ~depth ~f:(fun l ->
+            Init_ledger.init (module L.Ledger_inner) init_ledger l ;
+            let init_merkle_root = L.merkle_root l in
+            let m =
+              L.Maskable.register_mask
+                (L.Any_ledger.cast (module L) l)
+                (L.Mask.create ~depth:(L.depth l) ())
+            in
+            let () =
+              iter_err cmds
+                ~f:
+                  (L.apply_user_command_unchecked ~constraint_constants
+                     ~txn_global_slot l )
+              |> Or_error.ok_exn
+            in
+            assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
+            (*Parent updates reflected in child masks*)
+            assert (Ledger_hash.equal (L.merkle_root l) (L.merkle_root m)) ) )
+
+  let test_zkapp_command_on_masked_ledger () =
+    let constraint_constants =
+      { Genesis_constants.For_unit_tests.Constraint_constants.t with
+        account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
+      }
+    in
+    Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+        let cmds =
+          List.map specs ~f:(fun spec ->
+              let use_full_commitment =
+                Quickcheck.random_value Bool.quickcheck_generator
+              in
+              account_update_send ~use_full_commitment
+                ~double_sender_nonce:false spec )
+        in
+        L.with_ledger ~depth ~f:(fun l ->
+            Init_ledger.init (module L.Ledger_inner) init_ledger l ;
+            let init_merkle_root = L.merkle_root l in
+            let m =
+              L.Maskable.register_mask
+                (L.Any_ledger.cast (module L) l)
+                (L.Mask.create ~depth:(L.depth l) ())
+            in
+            let () =
+              iter_err cmds
+                ~f:
+                  (L.apply_zkapp_command_unchecked ~signature_kind
+                     ~constraint_constants ~global_slot:txn_global_slot
+                     ~state_view:view l )
+              |> Or_error.ok_exn
+            in
+            assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
+            (*Parent updates reflected in child masks*)
+            assert (Ledger_hash.equal (L.merkle_root l) (L.merkle_root m)) ) )
+
+  let test_user_command_on_converting_ledger () =
+    let constraint_constants =
+      { Genesis_constants.For_unit_tests.Constraint_constants.t with
+        account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
+      }
+    in
+    let logger = Logger.create () in
+    Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+        let cmds = List.map specs ~f:command_send in
+        L.Ledger_inner.Converting_for_tests.with_converting_ledger_exn ~logger
+          ~depth ~f:(fun (l, cl) ->
+            Init_ledger.init (module L.Ledger_inner) init_ledger l ;
+            let init_merkle_root = L.merkle_root l in
+            let init_cl_merkle_root = L.Hardfork_db.merkle_root cl in
+            let () =
+              iter_err cmds
+                ~f:
+                  (L.apply_user_command_unchecked ~constraint_constants
+                     ~txn_global_slot l )
+              |> Or_error.ok_exn
+            in
+            (* Assert that the ledger and the converting ledger are non-empty *)
+            assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
+            L.commit l ;
+            assert (
+              not
+                (Ledger_hash.equal init_cl_merkle_root
+                   (L.Hardfork_db.merkle_root cl) ) ) ;
+            (* Assert that the converted ledger has the same accounts as the first one, up to conversion *)
+            L.iteri l ~f:(fun index account ->
+                let account_converted =
+                  L.Hardfork_db.get_at_index_exn cl index
+                in
+                assert (
+                  Mina_base.Account.Hardfork.(
+                    equal (of_stable account) account_converted) ) ) ;
+            (* Assert that the converted ledger doesn't have anything "extra" compared to the primary ledger *)
+            L.Hardfork_db.iteri cl ~f:(fun index account_converted ->
+                let account = L.get_at_index_exn l index in
+                assert (
+                  Mina_base.Account.Key.(
+                    equal account.public_key account_converted.public_key) ) ) ) )
+end
+
+module Sparse_ledger_test = struct
+  let test_of_ledger_subset_exn_with_nonexistent_keys () =
+    let keygen () =
+      let privkey = Signature_lib.Private_key.create () in
+      ( privkey
+      , Signature_lib.Public_key.of_private_key_exn privkey
+        |> Signature_lib.Public_key.compress )
+    in
+    L.with_ledger
+      ~depth:
+        Genesis_constants.For_unit_tests.Constraint_constants.t.ledger_depth
+      ~f:(fun ledger ->
+        let _, pub1 = keygen () in
+        let _, pub2 = keygen () in
+        let aid1 = Account_id.create pub1 Token_id.default in
+        let aid2 = Account_id.create pub2 Token_id.default in
+        let sl =
+          Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger [ aid1; aid2 ]
+        in
+        [%test_eq: Ledger_hash.t] (L.merkle_root ledger)
+          ( (Mina_ledger.Sparse_ledger.merkle_root sl :> Random_oracle.Digest.t)
+          |> Ledger_hash.of_hash ) )
+end
+
 let () =
   let random = Splittable_random.State.create Random.State.default in
   Async.Thread_safe.block_on_async_exn (fun () ->
@@ -250,5 +643,26 @@ let () =
                 (Root_test.test_root_make_checkpointing ~random)
             ; Alcotest_async.test_case "make converting a root" `Quick
                 (Root_test.test_root_make_converting ~random)
+            ] )
+        ; ( "Ledger"
+          , [ Alcotest_async.test_case_sync "tokens test" `Quick
+                Ledger_test.test_tokens
+            ; Alcotest_async.test_case_sync "zkapp_command payment test" `Quick
+                Ledger_test.test_zkapp_command_payment
+            ; Alcotest_async.test_case_sync
+                "user_command application on masked ledger" `Quick
+                Ledger_test.test_user_command_on_masked_ledger
+            ; Alcotest_async.test_case_sync
+                "zkapp_command application on masked ledger" `Quick
+                Ledger_test.test_zkapp_command_on_masked_ledger
+            ; Alcotest_async.test_case_sync
+                "user_command application on converting ledger" `Quick
+                Ledger_test.test_user_command_on_converting_ledger
+            ] )
+        ; ( "Sparse_ledger"
+          , [ Alcotest_async.test_case_sync
+                "of_ledger_subset_exn with keys that don't exist works" `Quick
+                Sparse_ledger_test
+                .test_of_ledger_subset_exn_with_nonexistent_keys
             ] )
         ] )
