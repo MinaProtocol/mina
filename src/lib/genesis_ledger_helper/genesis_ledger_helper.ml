@@ -631,7 +631,7 @@ module Epoch_data = struct
           in
           [%log trace] "Loaded staking epoch ledger from $ledger_file"
             ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-          ( { Consensus.Genesis_epoch_data.Data.ledger = staking_ledger
+          ( { Consensus.Genesis_data.Epoch.Data.ledger = staking_ledger
             ; seed = Epoch_seed.of_base58_check_exn config.staking.seed
             }
           , { config.staking with ledger = config' } )
@@ -654,7 +654,7 @@ module Epoch_data = struct
                    reusing staking ledger" ;
                 Deferred.Or_error.return
                   ( Some
-                      { Consensus.Genesis_epoch_data.Data.ledger =
+                      { Consensus.Genesis_data.Epoch.Data.ledger =
                           staking.ledger
                       ; seed = Epoch_seed.of_base58_check_exn seed
                       }
@@ -670,7 +670,7 @@ module Epoch_data = struct
                 [%log trace] "Loaded next epoch ledger from $ledger_file"
                   ~metadata:[ ("ledger_file", `String ledger_file) ] ;
                 ( Some
-                    { Consensus.Genesis_epoch_data.Data.ledger = next_ledger
+                    { Consensus.Genesis_data.Epoch.Data.ledger = next_ledger
                     ; seed = Epoch_seed.of_base58_check_exn seed
                     }
                 , Some
@@ -685,7 +685,7 @@ module Epoch_data = struct
            because the ledger is lazy, we don't want to force it in order to
            check that invariant
         *)
-        ( Some { Consensus.Genesis_epoch_data.staking; next }
+        ( Some { Consensus.Genesis_data.Epoch.staking; next }
         , Some
             { Runtime_config.Epoch_data.staking = staking_config
             ; next = next_config
