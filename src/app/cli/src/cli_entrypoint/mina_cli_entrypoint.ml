@@ -1313,7 +1313,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; protocol_transaction_version
               ; protocol_network_version
               }
-            |> Chain_id.to_string
           in
           [%log info] "Daemon will use chain id %s" chain_id ;
           [%log info] "Daemon running protocol version %s"
@@ -2114,7 +2113,6 @@ let internal_commands logger ~itn_features =
               ; protocol_transaction_version
               ; protocol_network_version
               }
-            |> Chain_id.to_string
           in
           let () = printf "%s" chain_id in
           exit 0) )
