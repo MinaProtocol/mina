@@ -1308,9 +1308,23 @@ module Debug_ping = struct
         (Option.bind (Sys.getenv "MINA_DEBUG_PING_RESPONSE_DELAY")
            ~f:(fun s -> Option.try_with (fun () -> Float.of_string s)) )
     in
-    [%log debug] "Debug_ping: delaying response by $delay seconds"
-      ~metadata:[ ("delay", `Float delay_seconds) ] ;
-    let%bind () = after (Time.Span.of_sec delay_seconds) in
+    let delay_type =
+      Option.value ~default:"after" (Sys.getenv "MINA_DEBUG_PING_DELAY_TYPE")
+    in
+    [%log debug]
+      "Debug_ping: delaying response by $delay seconds using $delay_type"
+      ~metadata:
+        [ ("delay", `Float delay_seconds); ("delay_type", `String delay_type) ] ;
+    let%bind () =
+      match delay_type with
+      | "sleep" ->
+          (* Blocking sleep - blocks the Async scheduler, simulating blocking I/O *)
+          Core.Unix.sleep (Float.to_int delay_seconds) ;
+          return ()
+      | "after" | _ ->
+          (* Cooperative delay - yields to Async scheduler, allows heartbeats *)
+          after (Time.Span.of_sec delay_seconds)
+    in
     [%log debug] "Debug_ping: sending response" ;
     return (Some ())
 
