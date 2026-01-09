@@ -250,7 +250,7 @@ on-exit() {
   fi
 }
 
-trap "jobs -p | xargs -r kill" EXIT
+trap on-exit TERM INT
 
 clean-dir() {
   rm -rf "${1}"
@@ -1230,7 +1230,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   sender_nonce=1
   state=0
 
-  # TODO: simulate scripts/hardfork/prepare-hf-debian.sh to send txns to everyone in the ledger.
+  # TODO: simulate scripts/hardfork/run-localnet.sh to send txns to everyone in the ledger.
   value_txn_id=0
   while is_process_running "${FISH_PIDS[0]}"; do
     sleep ${TRANSACTION_INTERVAL}
