@@ -1,31 +1,27 @@
-(executable
- (name example)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
+(tests
+ (names
+  test_keccak
+  test_generic
+  test_bitwise
+  test_common
+  test_range_check
+  test_lookup)
  (libraries
   ;; opam libraries
-  stdio
-  integers
-  result
-  base.caml
+  alcotest
   bignum.bigint
   core_kernel
-  base64
+  base
   digestif
   ppx_inline_test.config
-  sexplib0
-  base
-  async_kernel
-  bin_prot.shape
+  zarith
   ;; local libraries
-  mina_wire_types
   kimchi_bindings
   kimchi_types
   pasta_bindings
   kimchi_pasta
   kimchi_pasta.basic
+  kimchi_backend.gadgets_test_runner
   kimchi_pasta.constraint_system
   bitstring_lib
   snarky.intf
@@ -33,6 +29,7 @@
   snarky_group_map
   sponge
   kimchi_backend
+  kimchi_backend.gadgets
   base58_check
   codable
   random_oracle_input
@@ -44,5 +41,4 @@
   tuple_lib
   promise
   kimchi_backend_common
-  ppx_version.runtime
-  kimchi_backend.gadgets_test_runner))
+  ppx_version.runtime))
