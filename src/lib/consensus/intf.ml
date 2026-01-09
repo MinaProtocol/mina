@@ -295,19 +295,37 @@ module type S = sig
       -> t
   end
 
-  module Genesis_epoch_data : sig
-    module Data : sig
-      type t =
-        { ledger : Genesis_ledger.Packed.t; seed : Mina_base.Epoch_seed.t }
+  module Genesis_data : sig
+    module Hashed : sig
+      type t
+
+      val hash : t -> Mina_base.Frozen_ledger_hash.t
     end
 
-    type tt = { staking : Data.t; next : Data.t option }
+    module Epoch : sig
+      module Data : sig
+        type 'ledger t = { ledger : 'ledger; seed : Mina_base.Epoch_seed.t }
 
-    type t = tt option
+        val to_hashed : Genesis_ledger.Packed.t t -> Hashed.t t
+      end
 
-    val for_unit_tests : t
+      type 'ledger tt =
+        { staking : 'ledger Data.t; next : 'ledger Data.t option }
 
-    val compiled : t
+      type 'ledger t = 'ledger tt option
+
+      val for_unit_tests : Genesis_ledger.Packed.t t
+
+      val compiled : Genesis_ledger.Packed.t t
+
+      val to_hashed : Genesis_ledger.Packed.t t -> Hashed.t t
+    end
+
+    module Ledger : sig
+      type t = Genesis_ledger.Packed.t
+
+      val to_hashed : t -> Hashed.t
+    end
   end
 
   module Data : sig
@@ -331,7 +349,7 @@ module type S = sig
       val create :
            context:(module CONTEXT)
         -> genesis_ledger:Genesis_ledger.Packed.t
-        -> genesis_epoch_data:Genesis_epoch_data.t
+        -> genesis_epoch_data:Genesis_ledger.Packed.t Genesis_data.Epoch.t
         -> epoch_ledger_location:string
         -> genesis_state_hash:State_hash.t
         -> epoch_ledger_backing_type:Root_ledger.Config.backing_type
@@ -509,8 +527,8 @@ module type S = sig
         -> (var, Value.t) Snark_params.Tick.Typ.t
 
       val negative_one :
-           genesis_ledger:Genesis_ledger.Packed.t
-        -> genesis_epoch_data:Genesis_epoch_data.t
+           genesis_ledger:Genesis_data.Hashed.t
+        -> genesis_epoch_data:Genesis_data.Hashed.t Genesis_data.Epoch.t
         -> constants:Constants.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> Value.t
@@ -518,16 +536,16 @@ module type S = sig
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Mina_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
-        -> genesis_ledger:Genesis_ledger.Packed.t
-        -> genesis_epoch_data:Genesis_epoch_data.t
+        -> genesis_ledger:Genesis_data.Hashed.t
+        -> genesis_epoch_data:Genesis_data.Hashed.t Genesis_data.Epoch.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> constants:Constants.t
         -> Value.t
 
       val create_genesis :
            negative_one_protocol_state_hash:Mina_base.State_hash.t
-        -> genesis_ledger:Genesis_ledger.Packed.t
-        -> genesis_epoch_data:Genesis_epoch_data.t
+        -> genesis_ledger:Genesis_data.Hashed.t
+        -> genesis_epoch_data:Genesis_data.Hashed.t Genesis_data.Epoch.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> constants:Constants.t
         -> Value.t
