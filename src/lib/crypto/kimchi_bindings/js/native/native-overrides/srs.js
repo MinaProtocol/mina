@@ -11,8 +11,15 @@ var tsSrs = tsBindings.srsNative(plonk_wasm);
 // Provides: caml_fp_srs_create
 // Requires: tsSrs
 var caml_fp_srs_create = function (log_size) {
-  console.log("native caml_fp_srs_create");
-  return tsSrs.fp.create(log_size);
+  console.log("native caml_fp_srs_create logsize", log_size);
+  var srs = tsSrs.fp.create(log_size);
+  try {
+    var points = plonk_wasm.caml_fp_srs_get(srs);
+    console.log("native fp srs points length", points ? points.length : points);
+  } catch (err) {
+    console.error("native fp srs get failed", err);
+  }
+  return srs;
 }
 
 // Provides: caml_fp_srs_write
@@ -38,6 +45,8 @@ var caml_fp_srs_read = function (offset, path) {
   }
   var res = plonk_wasm.caml_fp_srs_read(offset, caml_jsstring_of_string(path));
   if (res) {
+    var points = plonk_wasm.caml_fp_srs_get(res);
+    if (points == null || points.length <= 1) return 0; // None
     return [0, res]; // Some(res)
   } else {
     return 0; // None
@@ -53,11 +62,10 @@ var caml_fp_srs_lagrange_commitments_whole_domain = function (srs, domain_size) 
 
 // Provides: caml_fq_srs_lagrange_commitments_whole_domain
 // Requires: tsSrs
-var caml_fq_srs_lagrange_commitments_whole_domain =
-  function (srs, domain_size) {
-    console.log("native caml_fq_srs_lagrange_commitments_whole_domain");
-    return tsSrs.fq.lagrangeCommitmentsWholeDomain(srs, domain_size);
-  }
+var caml_fq_srs_lagrange_commitments_whole_domain = function (srs, domain_size) {
+  console.log("native caml_fq_srs_lagrange_commitments_whole_domain");
+  return tsSrs.fq.lagrangeCommitmentsWholeDomain(srs, domain_size);
+}
 
 // Provides: caml_fp_srs_lagrange_commitment
 // Requires: tsSrs
@@ -157,8 +165,15 @@ var caml_fp_srs_add_lagrange_basis = function (srs, domain_size) {
 // Provides: caml_fq_srs_create
 // Requires: tsSrs
 var caml_fq_srs_create = function (log_size) {
-  console.log("native caml_fq_srs_create");
-  return tsSrs.fq.create(log_size);
+  console.log("native caml_fq_srs_create logsize", log_size);
+  var srs = tsSrs.fq.create(log_size);
+  try {
+    var points = plonk_wasm.caml_fq_srs_get(srs);
+    console.log("native fq srs points length", points ? points.length : points);
+  } catch (err) {
+    console.error("native fq srs get failed", err);
+  }
+  return srs;
 }
 
 // Provides: caml_fq_srs_write
@@ -184,6 +199,8 @@ var caml_fq_srs_read = function (offset, path) {
   }
   var res = plonk_wasm.caml_fq_srs_read(offset, caml_jsstring_of_string(path));
   if (res) {
+    var points = plonk_wasm.caml_fq_srs_get(res);
+    if (points == null || points.length <= 1) return 0; // None
     return [0, res]; // Some(res)
   } else {
     return 0; // None

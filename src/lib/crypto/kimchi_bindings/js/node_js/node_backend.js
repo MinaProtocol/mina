@@ -22,8 +22,6 @@ var plonk_wasm = (function () {
       "caml_pasta_fp_plonk_proof_create",
       "WasmFpPlonkVerifierIndex",
       "WasmFqPlonkVerifierIndex",
-      "WasmFpDomain",
-      "WasmFqDomain",
       "WasmFpShifts",
       "WasmFqShifts",
       "WasmFpLookupSelectors",
@@ -126,15 +124,15 @@ var plonk_wasm = (function () {
       "caml_fq_srs_batch_accumulator_check",
       "caml_fq_srs_batch_accumulator_generate",
       "caml_fq_srs_h",
-      "WasmFpPolyComm",
-      "WasmFqPolyComm",
       "WasmGPallas",
       "WasmGVesta",
       "WasmPastaFp",
       "WasmPastaFq",
       "caml_pasta_fp_plonk_proof_create",
+      "caml_pasta_fp_plonk_proof_batch_verify",
       "caml_pasta_fp_plonk_proof_verify",
       "caml_pasta_fq_plonk_proof_create",
+      "caml_pasta_fq_plonk_proof_batch_verify",
       "caml_pasta_fq_plonk_proof_verify",
       "fp_oracles_create",
       "fp_oracles_create_no_public",
@@ -166,17 +164,19 @@ var plonk_wasm = (function () {
       "WasmFqProverCommitments",
       "WasmFpRuntimeTable",
       "WasmFqRuntimeTable",
+      "WasmFpPolyComm",
+      "WasmFqPolyComm",
     ]);
 
     overrides.forEach(function (override) {
       wasm[override] = function (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12) {
-        console.log("calling native override:", override);
+        console.log("overriding fun for ", override);
         return native[override](x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12);
       }
     });
     ctorOverrides.forEach(function (override) {
       wasm[override] = function (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12) {
-        console.log("calling class native override:", override);
+        console.log("overriding ctor for ", override);
         return new native[override](x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12);
       }
     });
