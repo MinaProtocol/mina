@@ -593,10 +593,23 @@ debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
 debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devnet hardfork
 	$(call build_debian_package,daemon_devnet_hardfork)
 
+.PHONY: debian-build-daemon-devnet-hardfork
+debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devnet hardfork
+	$(call build_debian_package,daemon_devnet_hardfork)
+
+.PHONY: debian-build-daemon-devnet-pre-hardfork
+debian-build-daemon-devnet-pre-hardfork: ## Build the Debian daemon package for automote devnet pre hardfork
+	$(call build_debian_package,daemon_pre_hardfork_devnet)
+
+.PHONY: debian-build-daemon-mainnet-pre-hardfork
+debian-build-daemon-mainnet-pre-hardfork: ## Build the Debian daemon package for automote mainnet pre hardfork
+	$(call build_debian_package,daemon_pre_hardfork_mainnet)
+
 .PHONY: debian-download-create-legacy-hardfork
 debian-download-create-legacy-hardfork: ## Download and create legacy hardfork Debian packages
 	$(info 📦 Downloading legacy hardfork Debian packages for debian $(CODENAME))
 	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-legacy-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend hetzner --target _build
+
 ########################################
 # Docker images
 
