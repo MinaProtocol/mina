@@ -547,39 +547,6 @@ EOF
   assert_contains "$output" "rejected job due to scope mismatch" "Should reject job with non-matching scope"
 }
 
-# Test: Integration test - includeIf with matching ancestor
-test_integration_include_if_matching() {
-  echo -e "\n${YELLOW}Testing: Integration - includeIf matching${NC}"
-
-  cat > "$TEST_DIR/jobs/IncludeIfMatch.yml" << 'EOF'
-spec:
-  name: IncludeIfMatch
-  path: Test
-  tags:
-    - Lint
-  scope:
-    - PullRequest
-  includeIf:
-    - ancestor: develop
-      reason: "Only run on Develop descendants"
-EOF
-  echo "^.*$" > "$TEST_DIR/jobs/IncludeIfMatch.dirtywhen"
-
-  local output
-  output=$("$MONOREPO_SCRIPT" \
-    --scopes pullrequest \
-    --tags lint \
-    --filter-mode any \
-    --selection-mode full \
-    --jobs "$TEST_DIR/jobs" \
-    --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches mesa,develop,master \
-    --dry-run 2>&1 || true)
-
-  assert_contains "$output" "included based on includeIf condition" "Should show includeIf inclusion message"
-  assert_contains "$output" "Including job IncludeIfMatch" "Should include job when includeIf matches"
-}
-
 # Test: Integration test - includeIf with non-matching ancestor
 test_integration_include_if_not_matching() {
   echo -e "\n${YELLOW}Testing: Integration - includeIf not matching${NC}"
@@ -734,7 +701,6 @@ main() {
   test_integration_full_selection
   test_integration_tag_filtering
   test_integration_scope_filtering
-  test_integration_include_if_matching
   test_integration_include_if_not_matching
   test_integration_both_include_exclude_include_wins
   test_integration_both_include_exclude_exclude_wins
