@@ -14,6 +14,10 @@ let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let RosettaBlockRaceTest = ../../Command/RosettaBlockRaceTest.dhall
 
+let Expr = ../../Pipeline/Expr.dhall
+
+let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
+
 let dependsOn =
       Dockers.dependsOn
         Dockers.DepsSpec::{
@@ -34,6 +38,12 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "RosettaBlockRaceTest"
+        , excludeIf =
+          [ Expr.Type.DescendantOf
+              { ancestor = MainlineBranch.Type.Mesa
+              , reason = "Mesa does not support devnet network yet"
+              }
+          ]
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test

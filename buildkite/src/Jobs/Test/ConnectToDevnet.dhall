@@ -16,6 +16,10 @@ let Network = ../../Constants/Network.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let Expr = ../../Pipeline/Expr.dhall
+
+let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
+
 let network = Network.Type.Devnet
 
 let dependsOn = Dockers.dependsOn Dockers.DepsSpec::{ network = network }
@@ -35,6 +39,12 @@ in  Pipeline.build
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
+          ]
+        , excludeIf =
+          [ Expr.Type.DescendantOf
+              { ancestor = MainlineBranch.Type.Mesa
+              , reason = "Mesa does not have devnet network yet"
+              }
           ]
         }
       , steps =
