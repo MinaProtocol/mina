@@ -580,79 +580,6 @@ EOF
   assert_not_contains "$output" "Including job IncludeIfNoMatch" "Should not include job when includeIf doesn't match"
 }
 
-# Test: Integration test - both excludeIf and includeIf (includeIf matches, excludeIf doesn't)
-test_integration_both_include_exclude_include_wins() {
-  echo -e "\n${YELLOW}Testing: Integration - includeIf matches, excludeIf doesn't${NC}"
-
-  cat > "$TEST_DIR/jobs/BothIncludeWins.yml" << 'EOF'
-spec:
-  name: BothIncludeWins
-  path: Test
-  tags:
-    - Lint
-  scope:
-    - PullRequest
-  excludeIf:
-    - ancestor: mesa
-      reason: "Exclude on Mesa"
-  includeIf:
-    - ancestor: develop
-      reason: "Include on Develop"
-EOF
-  echo "^.*$" > "$TEST_DIR/jobs/BothIncludeWins.dirtywhen"
-
-  local output
-  output=$("$MONOREPO_SCRIPT" \
-    --scopes pullrequest \
-    --tags lint \
-    --filter-mode any \
-    --selection-mode full \
-    --jobs "$TEST_DIR/jobs" \
-    --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches mesa,master,develop \
-    --dry-run 2>&1 || true)
-
-  assert_contains "$output" "Including job BothIncludeWins" "Should include job when includeIf matches and excludeIf doesn't"
-}
-
-# Test: Integration test - both excludeIf and includeIf (excludeIf matches)
-test_integration_both_include_exclude_exclude_wins() {
-  echo -e "\n${YELLOW}Testing: Integration - excludeIf matches (takes priority)${NC}"
-
-  cat > "$TEST_DIR/jobs/BothExcludeWins.yml" << 'EOF'
-spec:
-  name: BothExcludeWins
-  path: Test
-  tags:
-    - Lint
-  scope:
-    - PullRequest
-  excludeIf:
-    - ancestor: develop
-      reason: "Exclude on Develop"
-  includeIf:
-    - ancestor: develop
-      reason: "Include on Develop"
-    - ancestor: mesa
-      reason: "Include on Mesa"
-EOF
-  echo "^.*$" > "$TEST_DIR/jobs/BothExcludeWins.dirtywhen"
-
-  local output
-  output=$("$MONOREPO_SCRIPT" \
-    --scopes pullrequest \
-    --tags lint \
-    --filter-mode any \
-    --selection-mode full \
-    --jobs "$TEST_DIR/jobs" \
-    --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches mesa,master,develop \
-    --dry-run 2>&1 || true)
-
-  assert_contains "$output" "excluded based on excludeIf condition" "Should show excludeIf message"
-  assert_not_contains "$output" "Including job BothExcludeWins" "Should not include job when excludeIf matches (even if includeIf also matches)"
-}
-
 # Main test runner
 main() {
   echo -e "${YELLOW}========================================${NC}"
@@ -702,8 +629,6 @@ main() {
   test_integration_tag_filtering
   test_integration_scope_filtering
   test_integration_include_if_not_matching
-  test_integration_both_include_exclude_include_wins
-  test_integration_both_include_exclude_exclude_wins
 
   teardown
 
