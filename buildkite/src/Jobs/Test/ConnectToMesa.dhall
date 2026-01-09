@@ -23,7 +23,7 @@ let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
 let network = Network.Type.Mesa
 
 let dependsOn =
-      Dockers.dependsOn Dockers.DepsSpec::{ network = Network.Type.Devnet }
+      Dockers.dependsOn Dockers.DepsSpec::{ network = Network.Type.Mesa }
 
 in  Pipeline.build
       Pipeline.Config::{
