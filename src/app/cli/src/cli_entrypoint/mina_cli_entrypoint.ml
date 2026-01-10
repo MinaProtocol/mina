@@ -14,32 +14,6 @@ type mina_initialization =
   ; itn_graphql_port : int option
   }
 
-(* keep this code in sync with Client.chain_id_inputs, Mina_commands.chain_id_inputs, and
-   Daemon_rpcs.Chain_id_inputs
-*)
-let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
-    ~protocol_transaction_version ~protocol_network_version =
-  (* if this changes, also change Mina_commands.chain_id_inputs *)
-  let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
-  let genesis_constants_hash = Genesis_constants.hash genesis_constants in
-  let all_snark_keys =
-    List.map constraint_system_digests ~f:(fun (_, digest) -> Md5.to_hex digest)
-    |> String.concat ~sep:""
-  in
-  let version_digest v = Int.to_string v |> Md5.digest_string |> Md5.to_hex in
-  let protocol_transaction_version_digest =
-    version_digest protocol_transaction_version
-  in
-  let protocol_network_version_digest =
-    version_digest protocol_network_version
-  in
-  let b2 =
-    Blake2.digest_string
-      ( genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash
-      ^ protocol_transaction_version_digest ^ protocol_network_version_digest )
-  in
-  Blake2.to_hex b2
-
 let plugin_flag =
   if Node_config.plugins then
     let open Command.Param in
@@ -1331,11 +1305,14 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             let protocol_network_version =
               Protocol_version.(transaction current)
             in
-            chain_id ~genesis_state_hash
-              ~genesis_constants:precomputed_values.genesis_constants
-              ~constraint_system_digests:
-                (Lazy.force precomputed_values.constraint_system_digests)
-              ~protocol_transaction_version ~protocol_network_version
+            Chain_id.make
+              { genesis_state_hash
+              ; genesis_constants = precomputed_values.genesis_constants
+              ; constraint_system_digests =
+                  Lazy.force precomputed_values.constraint_system_digests
+              ; protocol_transaction_version
+              ; protocol_network_version
+              }
           in
           [%log info] "Daemon will use chain id %s" chain_id ;
           [%log info] "Daemon running protocol version %s"
@@ -2128,11 +2105,14 @@ let internal_commands logger ~itn_features =
               (Precomputed_values.genesis_state_hashes precomputed_values)
                 .state_hash
             in
-            chain_id ~genesis_state_hash
-              ~genesis_constants:precomputed_values.genesis_constants
-              ~constraint_system_digests:
-                (Lazy.force precomputed_values.constraint_system_digests)
-              ~protocol_transaction_version ~protocol_network_version
+            Chain_id.make
+              { genesis_state_hash
+              ; genesis_constants = precomputed_values.genesis_constants
+              ; constraint_system_digests =
+                  Lazy.force precomputed_values.constraint_system_digests
+              ; protocol_transaction_version
+              ; protocol_network_version
+              }
           in
           let () = printf "%s" chain_id in
           exit 0) )

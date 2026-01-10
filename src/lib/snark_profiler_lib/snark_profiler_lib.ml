@@ -477,8 +477,11 @@ let state_body ~logger ~(genesis_constants : Genesis_constants.t)
        let logger = logger
      end) in
      Mina_state.Genesis_protocol_state.t
-       ~genesis_ledger:(module Test_genesis_ledger)
-       ~genesis_epoch_data ~constraint_constants ~consensus_constants
+       ~genesis_ledger:
+         (Consensus.Genesis_data.Ledger.to_hashed (module Test_genesis_ledger))
+       ~genesis_epoch_data:
+         (Consensus.Genesis_data.Epoch.to_hashed genesis_epoch_data)
+       ~constraint_constants ~consensus_constants
        ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
      |> With_hash.data |> Mina_state.Protocol_state.body )
 
