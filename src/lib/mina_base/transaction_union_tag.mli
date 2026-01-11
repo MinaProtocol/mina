@@ -17,13 +17,19 @@ module Bits : sig
   (** Bits-only representation. To be used for hashing, where the actual value
       is not relevant to the computation.
   *)
+  type t = bool * bool * bool
+
   type var
+
+  val typ : (var, t) Typ.t
 
   val to_bits : var -> Boolean.var list
 
   val to_input_legacy :
     var -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
 end
+
+val bits_t_of_t : t -> Bits.t
 
 val bits_of_t : t -> Bits.var
 
@@ -46,6 +52,8 @@ module Unpacked : sig
   val is_user_command : var -> Boolean.var
 
   val to_bits : var -> Boolean.var list
+
+  val to_bits_var : var -> Bits.var
 
   val to_input_legacy :
     var -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t

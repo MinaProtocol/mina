@@ -192,4 +192,14 @@ let () =
           ; test_case "No odd slot difference discrepancies" `Quick
               no_odd_vesting_discrepancies
           ] )
+    ; Transaction_union_tag_test.
+        ( "transaction union tag predicates"
+        , [ test_case "is_payment" `Quick is_payment
+          ; test_case "is_stake_delegation" `Quick is_stake_delegation
+          ; test_case "is_fee_transfer" `Quick is_fee_transfer
+          ; test_case "is_coinbase" `Quick is_coinbase
+          ; test_case "is_user_command" `Quick is_user_command
+          ; test_case "not_user_command" `Quick not_user_command
+          ; test_case "bit_representation" `Quick bit_representation
+          ] )
     ]

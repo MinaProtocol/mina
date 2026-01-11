@@ -35,6 +35,7 @@
   signature_lib
   snarky.backendless
   snark_params
+  test_util
   with_hash)
  (preprocess
   (pps ppx_assert ppx_base ppx_let))

@@ -71,7 +71,6 @@
   snark_params
   snarky.backendless
   sparse_ledger_lib
-  test_util
   unsigned_extended
   with_hash)
  (preprocess
