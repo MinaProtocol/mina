@@ -63,6 +63,27 @@ exact instructions on how to do it), it is necessary to pass an additional
 option to it: `--archive-address 3086`. The daemon will the try to feed
 blocks it receives to the Archive for storage.
 
+Compilation
+-----------
+
+To compile the Archive, use the following command:
+
+```shell
+$ make build_archive
+```
+
+This will build the archive executable in the _build directory. For mainnet signatures, use:
+
+```shell
+$ dune build src/app/archive/archive_mainnet_signatures.exe --profile=mainnet
+```
+
+For testnet signatures:
+
+```shell
+$ dune build src/app/archive/archive_testnet_signatures.exe --profile=dev
+```
+
 Running the Archive
 -------------------
 
@@ -81,6 +102,54 @@ to the daemon itself. Also `--server-port` should be the same as
 `--archive-address` passed to the daemon. The `--postgres-uri` should have
 the form:
 `--archive-uri postgres://<username>:<password>@<host>:<port>/<dbname>`.
+
+Available Commands
+-----------------
+
+The archive executable supports the following commands:
+
+### Run
+
+Run an archive process that stores all the data of Mina.
+
+```shell
+$ archive run \
+    --config-file <PATH> \
+    --postgres-uri <URI> \
+    --server-port <PORT> \
+    [--metrics-port <PORT>] \
+    [--missing-blocks-width <INT>] \
+    [--delete-older-than <INT>]
+```
+
+Parameters:
+- `--config-file`: Path to the configuration file containing the genesis ledger
+- `--postgres-uri`: PostgreSQL connection URI
+- `--server-port`: Port for the archive server (default: 3086)
+- `--metrics-port`: Optional port for Prometheus metrics server
+- `--missing-blocks-width`: Optional width of block heights to report missing blocks
+- `--delete-older-than`: Optional parameter to delete blocks older than N blocks
+  from the maximum height
+
+### Prune
+
+Prune old blocks and their transactions from the archive database.
+
+```shell
+$ archive prune \
+    --postgres-uri <URI> \
+    [--height <INT>] \
+    [--num-blocks <INT>] \
+    [--timestamp <TIMESTAMP>]
+```
+
+Parameters:
+- `--postgres-uri`: PostgreSQL connection URI
+- `--height`: Delete blocks with height lower than the given height
+- `--num-blocks`: Delete blocks that are more than N blocks lower than the
+  maximum seen block
+- `--timestamp`: Delete blocks older than the given timestamp (format:
+  YYYY-MM-DD HH:MM:SS+ZZZZ)
 
 The Archive does not have its own interface for retrieving its data – for
 that one can use Rosetta (see `src/app/rosetta`) or query the Postgres
