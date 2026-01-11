@@ -191,15 +191,6 @@ copy_common_daemon_configs() {
   sed "s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/${SEED_LIST_URL_PATH}%" \
     ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
 
-  # Copy the genesis ledgers and proofs as these are fairly small and very \
-  # valuable to have
-  # Genesis Ledger/proof/epoch ledger Copy
-  for f in /tmp/coda_cache_dir/genesis*; do
-      if [ -e "$f" ]; then
-          mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
-      fi
-  done
-
   # Support bash completion
   # NOTE: We do not list bash-completion as a required package,
   #       but it needs to be present for this to be effective
