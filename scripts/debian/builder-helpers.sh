@@ -154,7 +154,7 @@ copy_common_daemon_configs() {
 
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_configs inputs:"
-  echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
+  echo "Network Name: ${1} (like mainnet, devnet, berkeley, mesa)"
   echo "Signature Type: ${2} (mainnet or testnet)"
   echo "Seed List URL path: ${3} (like seed-lists/berkeley_seeds.txt)"
 
@@ -183,6 +183,8 @@ copy_common_daemon_configs() {
   cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/mainnet.json"
   cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
   cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
+  cp ../genesis_ledgers/mesa.json "${BUILDDIR}/var/lib/coda/mesa.json"
+
   # Set the default configuration based on Network name ($1)
   cp ../genesis_ledgers/"${1}".json \
     "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
@@ -473,6 +475,37 @@ build_daemon_devnet_deb() {
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
+
+  build_deb "${MINA_DEVNET_DEB_NAME}"
+}
+## END DEVNET PACKAGE ##
+
+## MESA PACKAGE ##
+
+#
+# Builds mesa daemon package with profile-aware naming
+#
+# Output: ${MINA_DEVNET_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Where MINA_DEVNET_DEB_NAME can be:
+#   - "mina-mesa" (default)
+#   - "mina-mesa-lightnet" (if DUNE_PROFILE=lightnet)
+#   - "mina-mesa-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#   - "mina-mesa-lightnet-instrumented" (both conditions)
+#
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Mesa daemon with testnet signatures and devnet genesis ledger as default.
+# Package name includes suffixes for different profiles and instrumentation.
+#
+build_daemon_mesa_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building testnet signatures deb without keys:"
+
+  create_control_file "${MINA_DEVNET_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_configs mesa testnet 'o1labs-gitops-infrastructure/pre-mesa/pre-mesa-seeds.txt'
 
   build_deb "${MINA_DEVNET_DEB_NAME}"
 }
