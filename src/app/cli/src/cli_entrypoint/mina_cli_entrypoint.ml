@@ -105,7 +105,9 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
       ~hardfork_handling
   in
   let chain_state_locations =
-    Init.Chain_state_locations.of_config ~conf_dir config
+    Init.Chain_state_locations.of_config
+      ~signature_kind:Mina_signature_kind.t_DEPRECATED ~proof_level
+      ~genesis_constants ~constraint_constants ~conf_dir config
   in
   let genesis_dir =
     Option.value ~default:chain_state_locations.genesis genesis_dir

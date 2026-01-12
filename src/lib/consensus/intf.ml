@@ -297,7 +297,10 @@ module type S = sig
 
   module Genesis_data : sig
     module Hashed : sig
-      type t
+      type t =
+        { total_currency : Currency.Amount.t
+        ; hash : Mina_base.Frozen_ledger_hash.t
+        }
 
       val hash : t -> Mina_base.Frozen_ledger_hash.t
     end
