@@ -24,7 +24,6 @@ SNARK_COORDINATOR_PEER_KEY="CAESQFjWdR18zKuCssN+Fi33fah9f5QGebOCc9xTITR8cdoyC+bk
 WHALES=2
 FISH=1
 NODES=1
-ROSETTA=false
 LOG_LEVEL="Trace"
 FILE_LOG_LEVEL=${LOG_LEVEL}
 VALUE_TRANSFERS=false
@@ -45,7 +44,7 @@ SNARK_COORDINATOR_PORT=7000
 WHALE_START_PORT=4000
 FISH_START_PORT=5000
 NODE_START_PORT=6000
-ROSETTA_PORT=3100
+ROSETTA_PORT=
 
 MINA_ROSETTA_MAX_DB_POOL_SIZE=64
 
@@ -112,9 +111,7 @@ help() {
                                          |   Default: ${NODE_START_PORT}
 -ap  |--archive-server-port <#>          | Archive Node server port. Set to empty to disable archive node.
                                          |   Default: ${ARCHIVE_SERVER_PORT}
---rosetta                                | Whether to run the Rosetta server (presence of argument)
-                                         |   Default: ${ROSETTA}
--rp  |--rosetta-port <#>                 | Rosetta server port
+-rp  |--rosetta-port <#>                 | Rosetta server port. Set to empty to disable Rosetta server.
                                          |   Default: ${ROSETTA_PORT}
 -rmps|--rosetta-max-pool-size <#>        | Rosetta Db max pool size
                                          |   Default: ${MINA_ROSETTA_MAX_DB_POOL_SIZE}
@@ -239,11 +236,11 @@ on-exit() {
     wait "$jpid"
   done
 
-  if ${ROSETTA}; then
+  if [[ -n "${ROSETTA_PORT}" ]]; then
     kill "$ROSETTA_PID"
     wait "$ROSETTA_PID"
   fi
-  
+
   # 3. stop the seed node, if we've spawned it.
   if [[ -n "${SEED_PID}" ]]; then
     stop-node "seed" "$SEED_START_PORT"
@@ -501,7 +498,6 @@ while [[ "$#" -gt 0 ]]; do
     SEED="${2}"
     shift
     ;;
-  --rosetta) ROSETTA=true ;;
   -rmps | --rosetta-max-pool-size)
     MINA_ROSETTA_MAX_DB_POOL_SIZE="${2}"
     shift
@@ -807,7 +803,7 @@ Starting the Network with:
     1 snark coordinator
     ${SNARK_WORKERS_COUNT} snark worker(s)
     $([[ -n "$ARCHIVE_SERVER_PORT" ]] && echo 1 || echo 0) archive
-    $( ${ROSETTA} && echo 1 || echo 0) rosetta
+    $([[ -n "$ROSETTA_PORT" ]] && echo 1 || echo 0) rosetta
     ${WHALES} whales
     ${FISH} fish
     ${NODES} non block-producing nodes
@@ -946,8 +942,8 @@ if [[ -n "${ARCHIVE_SERVER_PORT}" ]]; then
   ARCHIVE_PID=$!
 fi
 
-if ${ROSETTA}; then
-  if ! ${ARCHIVE_SERVER_PORT}; then
+if [[ -n "${ROSETTA_PORT}" ]]; then
+  if [[ -z "${ARCHIVE_SERVER_PORT}" ]]; then
     echo "Rosetta server requires Archive node to be running!"
     printf "\n"
 
@@ -1117,7 +1113,7 @@ if [[ -n "${ARCHIVE_SERVER_PORT}" ]]; then
 EOF
 fi
 
-if ${ROSETTA}; then
+if [[ -n "${ROSETTA_PORT}" ]]; then
   cat <<EOF
   Rosetta:
     Instance #0:
