@@ -3559,16 +3559,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let constraint_system_digests ~signature_kind ~constraint_constants () =
     let digest = Tick.R1CS_constraint_system.digest in
-    let zkapp_cs spec =
-      Tick.constraint_system ~input_typ:Statement.With_sok.typ
-        ~return_typ:Tick.Typ.unit (fun stmt ->
-          let open Tick in
-          let (_ : Zkapp_statement.Checked.t option * _) =
-            Base.Zkapp_command_snark.main ~signature_kind spec
-              ~constraint_constants stmt
-          in
-          Checked.return () )
-    in
     [ ( "transaction-merge"
       , digest
           Merge.(
@@ -3582,13 +3572,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             Tick.constraint_system ~input_typ:Statement.With_sok.typ
               ~return_typ:Tick.Typ.unit
               (main ~signature_kind ~constraint_constants)) )
-    ; ( "zkapp-opt_signed-opt_signed"
-      , digest
-          (zkapp_cs (Zkapp_command_segment.Basic.spec Opt_signed_opt_signed)) )
-    ; ( "zkapp-opt_signed"
-      , digest (zkapp_cs (Zkapp_command_segment.Basic.spec Opt_signed)) )
-    ; ( "zkapp-proved"
-      , digest (zkapp_cs (Zkapp_command_segment.Basic.spec Proved)) )
     ]
 
   (** Return the constraint system for the transaction-merge circuit. *)
