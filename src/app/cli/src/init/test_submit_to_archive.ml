@@ -555,7 +555,7 @@ let create_blocks_with_diffs ~logger
 let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
     ~n_payments ~n_blocks =
   (* Section 1: Load and initialize precomputed values from config *)
-  let%bind precomputed_values =
+  let%bind precomputed_values, _ =
     load_and_initialize_config ~logger ~config_file
   in
 

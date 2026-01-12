@@ -162,28 +162,38 @@ let digests (module T : Transaction_snark.S)
   let%map blockchain_digests = B.constraint_system_digests in
   txn_digests @ blockchain_digests
 
+let cached_constraint_system_digests :
+    (string * Md5_lib.t) list Lazy.t Set_once.t =
+  Set_once.create ()
+
 let constraint_system_digests ~signature_kind ~constraint_constants ~proof_level
     =
-  let (tx, b)
-        : (module Transaction_snark.S)
-          * (module Blockchain_snark.Blockchain_snark_state.S) =
-    let module T = Transaction_snark.Make (struct
-      let signature_kind = signature_kind
+  match Set_once.get cached_constraint_system_digests with
+  | Some v ->
+      v
+  | None ->
+      let (tx, b)
+            : (module Transaction_snark.S)
+              * (module Blockchain_snark.Blockchain_snark_state.S) =
+        let module T = Transaction_snark.Make (struct
+          let signature_kind = signature_kind
 
-      let constraint_constants = constraint_constants
+          let constraint_constants = constraint_constants
 
-      let proof_level = proof_level
-    end) in
-    let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
-      let tag = T.tag
+          let proof_level = proof_level
+        end) in
+        let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
+          let tag = T.tag
 
-      let constraint_constants = constraint_constants
+          let constraint_constants = constraint_constants
 
-      let proof_level = proof_level
-    end) in
-    ((module T), (module B))
-  in
-  digests tx b
+          let proof_level = proof_level
+        end) in
+        ((module T), (module B))
+      in
+      let res = digests tx b in
+      Set_once.set_exn cached_constraint_system_digests [%here] res ;
+      res
 
 let create_values_no_proof (t : Inputs.t) =
   { runtime_config = t.runtime_config

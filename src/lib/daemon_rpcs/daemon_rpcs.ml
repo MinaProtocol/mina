@@ -136,8 +136,8 @@ module Chain_id_inputs = struct
   let of_inputs (inputs : Chain_id.Inputs.t) : response =
     ( inputs.genesis_state_hash
     , inputs.genesis_constants
-    , List.map inputs.constraint_system_digests ~f:(fun (_, digest) ->
-          Md5.to_hex digest )
+    , List.map (Lazy.force inputs.constraint_system_digests)
+        ~f:(fun (_, digest) -> Md5.to_hex digest)
     , inputs.protocol_transaction_version
     , inputs.protocol_network_version )
 

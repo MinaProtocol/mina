@@ -84,51 +84,43 @@ let make_hashed_ledgers (config : Runtime_config.t) :
 
 (** Determine the locations of the chain state components based on the daemon
       runtime config *)
-let of_config ~signature_kind ~(genesis_constants : Genesis_constants.t)
-    ~constraint_constants ~proof_level ~conf_dir (config : Runtime_config.t) : t
-    =
+let of_config ~logger ~signature_kind ~(genesis_constants : Genesis_constants.t)
+    ~constraint_constants ~proof_level ~conf_dir (config : Runtime_config.t) :
+    t * string Option.t =
   let chain_state = conf_dir in
-  let config_modifier =
-    Option.value_map
-      (make_hashed_ledgers config)
-      ~default:(fun x -> chain_state ^/ x)
-      ~f:(fun (genesis, epoch) ->
-        let chain_id =
-          let consensus_constants =
-            Consensus.Constants.create ~constraint_constants
-              ~protocol_constants:genesis_constants.protocol
-          in
-          let protocol_state_with_hashes =
-            Mina_state.Genesis_protocol_state.t ~genesis_ledger:genesis
-              ~genesis_epoch_data:epoch ~constraint_constants
-              ~consensus_constants
-              ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
-          in
-          let inputs =
-            { Mina_base.Chain_id.Inputs.genesis_state_hash =
-                protocol_state_with_hashes.hash.state_hash
-            ; genesis_constants
-            ; constraint_system_digests =
-                Lazy.force
-                @@ Genesis_proof.constraint_system_digests ~signature_kind
-                     ~proof_level ~constraint_constants
-            ; protocol_transaction_version =
-                Protocol_version.(transaction current)
-            ; protocol_network_version = Protocol_version.(network current)
-            }
-          in
-          Mina_base.Chain_id.make inputs
-        in
-        fun x -> chain_state ^/ chain_id ^/ x )
+  let chain_id_opt =
+    let open Option.Let_syntax in
+    let%bind genesis_constants =
+      Genesis_ledger_helper.make_genesis_constants ~logger
+        ~default:genesis_constants config
+      |> Result.ok
+    in
+    let%bind constraint_constants =
+      Option.map
+        ~f:
+          (Genesis_ledger_helper.make_constraint_constants
+             ~default:constraint_constants )
+        config.proof
+    in
+    let%map genesis_ledger, genesis_epoch_data = make_hashed_ledgers config in
+    Genesis_ledger_helper.make_chain_id ~signature_kind ~genesis_constants
+      ~constraint_constants ~proof_level ~genesis_ledger ~genesis_epoch_data
   in
-  { chain_state
-  ; mina_net = config_modifier "mina_net2"
-  ; trust = config_modifier "trust"
-  ; root = config_modifier "root"
-  ; genesis = config_modifier "genesis"
-  ; frontier = config_modifier "frontier"
-  ; epoch_ledger = chain_state
-  ; proof_cache = config_modifier "proof_cache"
-  ; zkapp_vk_cache = config_modifier "zkapp_vk_cache"
-  ; snark_pool = config_modifier "snark_pool"
-  }
+  let config_modifier : string -> string =
+    Option.value_map
+      ~default:(ident : string -> string)
+      ~f:(fun x s -> chain_state ^/ x ^/ s)
+      chain_id_opt
+  in
+  ( { chain_state
+    ; mina_net = config_modifier "mina_net2"
+    ; trust = config_modifier "trust"
+    ; root = config_modifier "root"
+    ; genesis = config_modifier "genesis"
+    ; frontier = config_modifier "frontier"
+    ; epoch_ledger = chain_state
+    ; proof_cache = config_modifier "proof_cache"
+    ; zkapp_vk_cache = config_modifier "zkapp_vk_cache"
+    ; snark_pool = config_modifier "snark_pool"
+    }
+  , chain_id_opt )

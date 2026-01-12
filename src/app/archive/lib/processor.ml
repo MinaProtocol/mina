@@ -4632,7 +4632,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
   | None ->
       Deferred.unit
   | Some runtime_config -> (
-      let%bind precomputed_values =
+      let%bind precomputed_values, _ =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger
             ~proof_level:Genesis_constants.Compiled.proof_level
