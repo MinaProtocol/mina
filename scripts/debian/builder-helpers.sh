@@ -526,12 +526,12 @@ build_daemon_mesa_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building testnet signatures deb without keys:"
 
-  create_control_file "${MINA_DEVNET_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
+  create_control_file mina-mesa "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs mesa testnet 'o1labs-gitops-infrastructure/pre-mesa/pre-mesa-seeds.txt'
 
-  build_deb "${MINA_DEVNET_DEB_NAME}"
+  build_deb "mina-mesa"
 }
 ## END DEVNET PACKAGE ##
 
