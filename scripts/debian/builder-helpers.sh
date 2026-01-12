@@ -422,7 +422,31 @@ build_rosetta_berkeley_deb() {
 
   build_deb mina-rosetta-berkeley
 }
-## END BERKELEY PACKAGE ##
+## END ROSETTA BERKELEY PACKAGE ##
+
+## ROSETTA MESA PACKAGE ##
+
+#
+# Builds mina-rosetta-mesa package for Mesa testnet Rosetta API
+#
+# Output: mina-rosetta-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}
+#
+# Rosetta API implementation for Mesa testnet with testnet signature binaries.
+#
+build_rosetta_mesa_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building mesa rosetta deb"
+
+  create_control_file mina-rosetta-mesa "${SHARED_DEPS}" \
+    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_configs "testnet"
+
+  build_deb mina-rosetta-mesa
+}
+## END ROSETTA MESA PACKAGE ##
 
 ## MAINNET PACKAGE ##
 
@@ -813,7 +837,38 @@ build_archive_berkeley_deb () {
   copy_common_archive_configs "$ARCHIVE_DEB"
 
 }
-## END ARCHIVE PACKAGE ##
+## END ARCHIVE BERKELEY PACKAGE ##
+
+## ARCHIVE MESA PACKAGE ##
+
+#
+# Builds Mesa archive package with profile-aware naming
+#
+# Output: mina-archive-mesa${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Where DEB_SUFFIX can be:
+#   - "" (empty, default)
+#   - "-lightnet" (if DUNE_PROFILE=lightnet)
+#   - "-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#   - "-lightnet-instrumented" (both conditions)
+#
+# Dependencies: ${ARCHIVE_DEPS}
+#
+# Archive node package for Mesa with suffix-aware naming for different profiles.
+#
+build_archive_mesa_deb () {
+  ARCHIVE_DEB=mina-archive-mesa${DEB_SUFFIX}
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive mesa deb"
+
+
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
+ Compatible with Mina Daemon'
+
+  copy_common_archive_configs "$ARCHIVE_DEB"
+
+}
+## END ARCHIVE MESA PACKAGE ##
 
 ## ARCHIVE MAINNET PACKAGE ##
 
