@@ -25,4 +25,5 @@ echo "--- Run profile-dependent tests"
 # Tests are ordered alphabetically.
 time dune runtest \
     src/lib/blockchain_snark/tests \
-    src/lib/transaction_snark/test/constraint_count
+    src/lib/transaction_snark/test/constraint_count \
+    src/lib/transaction_snark/test/print_transaction_snark_vk
