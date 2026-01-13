@@ -55,7 +55,7 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 	t.Logger.Info("Starting network %s...", profile)
 	cmd := exec.Command(
 		filepath.Join(t.ScriptDir, "../mina-local-network/mina-local-network.sh"),
-		"--seed-start-port", strconv.Itoa(t.Config.SeedStartPort),
+		"--seed", fmt.Sprintf("spawn:%d", t.Config.SeedStartPort),
 		"--snark-coordinator-start-port", strconv.Itoa(t.Config.SnarkCoordinatorPort),
 
 		"--whale-start-port", strconv.Itoa(t.Config.WhaleStartPort),

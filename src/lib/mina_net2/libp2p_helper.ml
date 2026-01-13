@@ -118,6 +118,21 @@ let%test "record_of_yojson 1" =
        lines )
     [ true; false ]
 
+(** State for managing a libp2p_helper child process and interactions with it.
+    Push messages (which do not need direct responses) between libp2p_helper and
+    the parent ocaml process do not need tracking here. RPC requests sent from
+    the parent to the libp2p_helper do need responses; these are coordinated
+    through the [outstanding_requests] table.
+
+    1. Before sending a request to the libp2p_helper in [do_rpc], an empty
+    [Ivar.t] is added to the [outstanding_requests] table. The request will then
+    be sent, and the requester will wait on the [Ivar.t].
+
+    2. When processing a response from the libp2p_helper in
+    [handle_incoming_message], the entry in the [outstanding_requests] table for
+    the associated request will be removed. The [Ivar.t] will then be filled
+    with the response.
+*)
 type t =
   { process : Child_processes.t
   ; logger : Logger.t
@@ -126,6 +141,8 @@ type t =
   ; outstanding_requests :
       Libp2p_ipc.rpc_response_body Or_error.t Ivar.t
       Libp2p_ipc.Sequence_number.Table.t
+        (** A table tracking requests to the libp2p helper that need
+            responses *)
   }
 
 let handle_libp2p_helper_termination t ~pids ~killed result =
@@ -196,15 +213,13 @@ let handle_incoming_message t msg ~handle_push_message =
                 RpcMessageHeader.sequence_number_get rpc_header
               in
               record_message_delay (RpcMessageHeader.time_sent_get rpc_header) ;
-              match Hashtbl.find t.outstanding_requests sequence_number with
+              match
+                Hashtbl.find_and_remove t.outstanding_requests sequence_number
+              with
               | Some ivar ->
-                  if Ivar.is_full ivar then
-                    [%log' error t.logger]
-                      "Attempted fill outstanding libp2p_helper RPC request \
-                       more than once"
-                  else
-                    Ivar.fill ivar
-                      (Libp2p_ipc.rpc_response_to_or_error rpc_response)
+                  (* Invariant: no ivar is filled when they're in [t.outstanding_requests] *)
+                  Ivar.fill ivar
+                    (Libp2p_ipc.rpc_response_to_or_error rpc_response)
               | None ->
                   [%log' error t.logger]
                     "Attempted to fill outstanding libp2p_helper RPC request, \

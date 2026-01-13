@@ -30,8 +30,8 @@ let lowerName =
             { Devnet = "devnet"
             , Mainnet = "mainnet"
             , TestnetGeneric = "testnet_generic"
-            , DevnetLegacy = "devnet_legacy"
-            , MainnetLegacy = "mainnet_legacy"
+            , DevnetLegacy = "devnet_pre_hardfork"
+            , MainnetLegacy = "mainnet_pre_hardfork"
             , PreMesa1 = "hetzner-pre-mesa-1"
             }
             network
@@ -42,8 +42,8 @@ let debianSuffix =
             { Devnet = "devnet"
             , Mainnet = "mainnet"
             , TestnetGeneric = "testnet-generic"
-            , DevnetLegacy = "devnet-legacy"
-            , MainnetLegacy = "mainnet-legacy"
+            , DevnetLegacy = "devnet-pre-hardfork"
+            , MainnetLegacy = "mainnet-pre-hardfork"
             , PreMesa1 = "hetzner-pre-mesa-1"
             }
             network

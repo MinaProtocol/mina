@@ -132,8 +132,9 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
   let parent_hash =
     Protocol_state.previous_state_hash (Header.protocol_state header)
   in
-  let root_block =
-    Transition_frontier.(Breadcrumb.block_with_hash @@ root frontier)
+  let root_consensus_state =
+    Transition_frontier.(
+      Breadcrumb.consensus_state_with_hashes @@ root frontier)
   in
   let metadata = [ ("state_hash", State_hash.to_yojson transition_hash) ] in
   let state_hash = transition_hash in
@@ -162,7 +163,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       match
         Mina_block.Validation.validate_frontier_dependencies
           ~context:(module Context)
-          ~root_block ~is_block_in_frontier ~to_header:ident
+          ~root_consensus_state ~is_block_in_frontier ~to_header:ident
           (Envelope.Incoming.data env)
       with
       | Ok _ | Error `Parent_missing_from_frontier ->
@@ -193,8 +194,8 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         match
           Mina_block.Validation.validate_frontier_dependencies
             ~context:(module Context)
-            ~root_block ~is_block_in_frontier ~to_header:Mina_block.header
-            initially_validated_transition
+            ~root_consensus_state ~is_block_in_frontier
+            ~to_header:Mina_block.header initially_validated_transition
         with
         | Ok t ->
             return (Ok t)

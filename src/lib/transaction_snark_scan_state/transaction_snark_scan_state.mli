@@ -68,31 +68,6 @@ end) : sig
     -> (unit, Error.t) Deferred.Result.t
 end
 
-module Transactions_categorized : sig
-  module Poly : sig
-    (** Represents sequence of transactions extracted from scan state
-        when it emitted a proof, split into:
-
-        * [first_pass] - transactions that went through first pass
-        * [second_pass] - transactions that went through second pass and correspond
-          to the current ledger proof (subset of first pass group)
-        * [current_incomplete] - transactions that went through second pass and correspond
-          to the the next ledger proof (subset of first pass group)
-        * [previous_incomplete] - leftover from previous ledger proof emitted with
-          the current ledger proof (not intersecting with other groups)
-     *)
-    type 'a t =
-      { first_pass : 'a list
-      ; second_pass : 'a list
-      ; previous_incomplete : 'a list
-      ; current_incomplete : 'a list
-      }
-    [@@deriving sexp, to_yojson]
-  end
-
-  type t = Transaction_with_witness.t Poly.t
-end
-
 val empty :
   constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
@@ -104,15 +79,6 @@ val fill_work_and_enqueue_transactions :
   -> (Ledger_proof.Cached.t option * t) Or_error.t
 
 val latest_ledger_proof : t -> Ledger_proof.Cached.t option
-
-val latest_ledger_proof_txs :
-     t
-  -> ( Transaction.t With_status.t
-     * State_hash.t
-     * Mina_numbers.Global_slot_since_genesis.t )
-     Transactions_categorized.Poly.t
-     list
-     option
 
 (** Apply transactions coorresponding to the last emitted proof based on the
     two-pass system- first pass includes legacy transactions and zkapp payments
@@ -206,21 +172,6 @@ val get_staged_ledger_async :
   -> [ `First_pass_ledger_hash of Ledger_hash.t ] Deferred.Or_error.t
 
 val free_space : t -> int
-
-val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
-
-(* a 0 index means next-to-latest tree *)
-val base_jobs_on_earlier_tree :
-  t -> index:int -> Transaction_with_witness.t list
-
-(** All the transactions with hash of the parent block in which they were included in the order in which they were applied*)
-val staged_transactions_with_state_hash :
-     t
-  -> ( Transaction.t With_status.t
-     * State_hash.t
-     * Mina_numbers.Global_slot_since_genesis.t )
-     Transactions_categorized.Poly.t
-     list
 
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
 val partition_if_overflowing : t -> Space_partition.t

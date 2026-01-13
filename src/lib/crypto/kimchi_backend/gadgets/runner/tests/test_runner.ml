@@ -1,3 +1,11 @@
+(** Testing
+    -------
+    Component: Kimchi gadgets test runner
+    Subject: Testing proof generation and verification with valid/invalid witnesses
+    Invocation: dune exec \
+      src/lib/crypto/kimchi_backend/gadgets/runner/tests/test_runner.exe
+*)
+
 open Kimchi_gadgets_test_runner.Runner
 
 (* Initialize the SRS cache. Normally Mina does this for us, but we're not
@@ -38,15 +46,25 @@ let example ?cs ~valid_witness () =
   in
   cs
 
-(* Generate a proof with a valid witness. *)
-let _cs = example ~valid_witness:true ()
+let test_proof_with_valid_witness () =
+  let _cs = example ~valid_witness:true () in
+  ()
 
-(* Sanity-check: ensure that the proof with an invalid witness fails. *)
+let test_proof_with_invalid_witness_fails () =
+  Alcotest.check_raises "Proof with invalid witness should fail"
+    (Failure "Proof verification failed") (fun () ->
+      try
+        let _cs = example ~valid_witness:false () in
+        ()
+      with _ -> raise (Failure "Proof verification failed") )
+
 let () =
-  let test_failed =
-    try
-      let _cs = example ~valid_witness:false () in
-      false
-    with _ -> true
-  in
-  assert test_failed
+  let open Alcotest in
+  run "Kimchi gadgets test runner"
+    [ ( "Proof generation and verification"
+      , [ test_case "Proof with valid witness succeeds" `Quick
+            test_proof_with_valid_witness
+        ; test_case "Proof with invalid witness fails" `Quick
+            test_proof_with_invalid_witness_fails
+        ] )
+    ]

@@ -1,3 +1,4 @@
+open Async
 open Core
 open Mina_base
 module Ledger = Mina_ledger.Ledger
@@ -327,10 +328,10 @@ let reset_factory_root_exn t ~create_root ~root_state_hash =
      depend on the parent directory existing and the target directory _not_
      existing. *)
   let%bind () = Mina_stdlib_unix.File_system.remove_dir t.directory in
-  let%map () = Mina_stdlib_unix.File_system.create_dir t.directory in
-  let root =
+  let%bind () = Mina_stdlib_unix.File_system.create_dir t.directory in
+  let%map root =
     create_root ~config:(Config.snarked_ledger t) ~depth:t.ledger_depth ()
-    |> Or_error.ok_exn
+    |> Deferred.map ~f:Or_error.ok_exn
   in
   Root_ledger.close root ;
   set_root_state_hash t root_state_hash
