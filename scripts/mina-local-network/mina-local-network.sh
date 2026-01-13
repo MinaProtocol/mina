@@ -281,9 +281,13 @@ exec-daemon() {
 
 
   local extra_opts=()
+  local copied_override_genesis_ledger="${FOLDER}/override_genesis_ledger"
+
   if [ -d "$OVERRIDE_GENSIS_LEDGER" ]; then
-    local copied_override_genesis_ledger="${FOLDER}/override_genesis_ledger"
     cp -r "$OVERRIDE_GENSIS_LEDGER" "$copied_override_genesis_ledger"
+  fi
+
+  if [ -d "$copied_override_genesis_ledger" ]; then
     extra_opts+=( --genesis-ledger-dir "$copied_override_genesis_ledger")
   fi
 
