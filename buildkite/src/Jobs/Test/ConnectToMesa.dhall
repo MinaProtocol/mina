@@ -53,7 +53,7 @@ in  Pipeline.build
         [ ConnectToNetwork.step
             dependsOn
             "${Network.lowerName network}"
-            "${Network.lowerName network}"
+            "testnet"
             "40s"
             "2m"
             (B/SoftFail.Boolean False)
