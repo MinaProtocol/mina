@@ -535,8 +535,6 @@ include struct
 
   let visualize_to_string = proxy1 visualize_to_string
 
-  let iter = proxy1 iter
-
   let successors = proxy1 successors
 
   let hash_path = proxy1 hash_path
@@ -572,11 +570,6 @@ module For_tests = struct
     Mina_ledger.Ledger_transfer.Make
       (Mina_ledger.Ledger)
       (Mina_ledger.Ledger.Db)
-  open Full_frontier.For_tests
-
-  let proxy2 f { full_frontier = x; _ } { full_frontier = y; _ } = f x y
-
-  let equal = proxy2 equal
 
   let rec deferred_rose_tree_iter (Mina_stdlib.Rose_tree.T (root, trees)) ~f =
     let%bind () = f root in
