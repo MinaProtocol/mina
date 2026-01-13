@@ -62,7 +62,7 @@ ARG RUST_VERSION=1.92.0
 # This should stay in line with the value of the variable
 # $NIGHTLY_RUST_VERSION defined in:
 # - src/lib/crypto/proof-systems/Makefile
-ARG RUST_NIGHTLY=2024-09-05
+ARG RUST_NIGHTLY=2025-12-11
 
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
