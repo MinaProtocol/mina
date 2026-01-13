@@ -73,12 +73,12 @@ let command
                       , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
                                                                              spec.network} --tag \\\${MINA_DOCKER_TAG} --timeout ${Natural/show
                                                                                                                                      spec.timeout} --repo ${DockerRepo.show
-                                                                                                                                                              spec.repo} --run-compatibility-test develop --run-load-test --branch \\\${BUILDKITE_BRANCH} --metrics-mode"
+                                                                                                                                                              spec.repo} --run-compatibility-test develop --run-load-test --branch \\\${BUILDKITE_BRANCH} --metrics-mode --perf-output-file /workdir/rosetta.perf"
                       ]
                   ]
                 # RunInToolchain.runInToolchain
                     (Benchmarks.toEnvList Benchmarks.Type::{=})
-                    "ls -al && cat rosetta.perf | influx write"
+                    "ls /workdir && cat /workdir/rosetta.perf | influx write"
             , label =
                 "Rosetta ${Network.lowerName spec.network} connectivity test "
             , key =

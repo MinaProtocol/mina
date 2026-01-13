@@ -54,6 +54,7 @@ LOAD_TEST_DURATION=600
 RUN_LOAD_TEST=false
 METRICS_MODE=""
 BRANCH=""
+PERF_OUTPUT_FILE="rosetta.perf"
 
 USAGE="Usage: $0 [-t docker-tag] [-n network]
   -t, --version             The version to be used in the docker image tag
@@ -85,6 +86,7 @@ function usage() {
 while [[ "$#" -gt 0 ]]; do case $1 in
     -n|--network) NETWORK="$2"; shift;;
     --run-load-test) RUN_LOAD_TEST=true ;;
+    --perf-output-file) PERF_OUTPUT_FILE="$2"; shift;;
     --run-compatibility-test) COMPATIBILITY_BRANCH="$2"; shift;;
     -t|--tag) TAG="$2"; shift;;
     -r|--repo) REPO="$2"; shift;;
@@ -170,7 +172,7 @@ if [[ "$RUN_LOAD_TEST" == true ]]; then
         echo "Running load test for $LOAD_TEST_DURATION seconds..."
 
         # Build the command with optional parameters
-        load_test_cmd="/workdir/scripts/tests/rosetta-load.sh --address \"http://localhost:3087\" --db-conn-str $DB_CONN_STR --duration $LOAD_TEST_DURATION --network $NETWORK"
+        load_test_cmd="/workdir/scripts/tests/rosetta-load.sh --address \"http://localhost:3087\" --db-conn-str $DB_CONN_STR --duration $LOAD_TEST_DURATION --network $NETWORK --perf-output-file $PERF_OUTPUT_FILE"
 
         # Add metrics mode if specified
         if [[ -n "$METRICS_MODE" ]]; then
