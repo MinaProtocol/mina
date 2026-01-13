@@ -802,6 +802,13 @@ struct
     ; previous_incomplete
     }
 
+  let second_pass_last_block txns_per_tree =
+    let%map.Option last_group = List.last (txns_by_block txns_per_tree) in
+    let { Transactions_categorized.Poly.second_pass; current_incomplete; _ } =
+      categorize_transactions ~previous_incomplete:[] last_group
+    in
+    (`Second_pass second_pass, `Current_incomplete current_incomplete)
+
   let categorize_transactions_per_tree ~previous_incomplete txns_per_tree =
     List.map
       (txns_by_block txns_per_tree)
@@ -856,44 +863,39 @@ let latest_ledger_proof_and_txs' t =
     t.previous_incomplete_zkapp_updates
   in
   let txns =
-    if continued_in_next_tree then
+    if continued_in_next_tree || List.is_empty previous_incomplete then
       Witness_categorizer.categorize_transactions_per_tree txns_with_witnesses
         ~previous_incomplete
     else
-      let txns =
-        Witness_categorizer.categorize_transactions_per_tree txns_with_witnesses
-          ~previous_incomplete:[]
-      in
-      if List.is_empty previous_incomplete then txns
-      else
-        { Transactions_categorized.Poly.first_pass = []
-        ; second_pass = []
-        ; previous_incomplete
-        ; current_incomplete = []
-        }
-        :: txns
+      { Transactions_categorized.Poly.first_pass = []
+      ; second_pass = []
+      ; previous_incomplete
+      ; current_incomplete = []
+      }
+      :: Witness_categorizer.categorize_transactions_per_tree
+           txns_with_witnesses ~previous_incomplete:[]
   in
+
   (proof, txns)
 
 let incomplete_txns_from_recent_proof_tree t =
-  let open Option.Let_syntax in
-  let%map proof, txns_per_block = latest_ledger_proof_and_txs' t in
-  let txns =
-    match List.last txns_per_block with
-    | None ->
-        ([], `Border_block_continued_in_the_next_tree false)
-    | Some txns_in_last_block ->
-        (* First pass ledger is considered as the snarked ledger,
-           so any account update whether completed in the same tree
-           or not should be included in the next tree *)
-        if not (List.is_empty txns_in_last_block.second_pass) then
-          ( txns_in_last_block.second_pass
-          , `Border_block_continued_in_the_next_tree false )
-        else
-          ( txns_in_last_block.current_incomplete
-          , `Border_block_continued_in_the_next_tree true )
+  let%map.Option (proof, _), txns_with_witnesses =
+    Parallel_scan.last_emitted_value t.scan_state
   in
-  (proof, txns)
+  match Witness_categorizer.second_pass_last_block txns_with_witnesses with
+  | None ->
+      (proof, ([], `Border_block_continued_in_the_next_tree false))
+  | Some (`Second_pass second_pass, `Current_incomplete current_incomplete) ->
+      (* First pass ledger is considered as the snarked ledger,
+         so any account update whether completed in the same tree
+         or not should be included in the next tree *)
+      let second_pass_is_empty = List.is_empty second_pass in
+      let incomplete =
+        if second_pass_is_empty then current_incomplete else second_pass
+      in
+      ( proof
+      , ( incomplete
+        , `Border_block_continued_in_the_next_tree second_pass_is_empty ) )
 
 let staged_transactions t =
   let ( previous_incomplete
@@ -1422,7 +1424,7 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
             ~default:
               (curr_stmt, ([], `Border_block_continued_in_the_next_tree false))
             old_proof_and_incomplete_zkapp_updates
-            ~f:(fun ((p', _), incomplete_zkapp_updates_from_old_proof) ->
+            ~f:(fun (p', incomplete_zkapp_updates_from_old_proof) ->
               ( Ledger_proof.Cached.statement p'
               , incomplete_zkapp_updates_from_old_proof ) )
         in
