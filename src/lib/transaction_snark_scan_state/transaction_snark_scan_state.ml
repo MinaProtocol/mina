@@ -742,16 +742,16 @@ struct
     |> List.filter_map ~f:Mina_stdlib.Nonempty_list.of_list_opt
 
   let fold_tx (first_pass_txns, second_pass_txns, _old_root) txn =
-    let target_first_pass_ledger = Tx.target_first_pass_ledger txn in
-    match Tx.transaction_type txn with
-    | `Coinbase | `Fee_transfer | `Signed_command ->
-        (txn :: first_pass_txns, second_pass_txns, target_first_pass_ledger)
-    | `Zkapp_command ->
-        ( txn :: first_pass_txns
-        , txn :: second_pass_txns
-        , target_first_pass_ledger )
+    let second_pass_txns =
+      match Tx.transaction_type txn with
+      | `Zkapp_command ->
+          txn :: second_pass_txns
+      | _ ->
+          second_pass_txns
+    in
+    (txn :: first_pass_txns, second_pass_txns, Tx.target_first_pass_ledger txn)
 
-  (** Compoutes representation for the sequence of transactions extracted from scan state
+  (** Computes representation for the sequence of transactions extracted from scan state
       when it emitted a proof, split into:
 
       * [first_pass] - transactions that went through first pass
