@@ -753,11 +753,14 @@ function print_influxdb_line() {
     echo "$influx_line" > "$PERF_OUTPUT_FILE"
 
     # Print confirmation
+    local absolute_path
+    absolute_path=$(cd "$(dirname "$PERF_OUTPUT_FILE")" && pwd)/$(basename "$PERF_OUTPUT_FILE")
     echo ""
     echo "================================================================================"
     echo "📈 INFLUXDB LINE PROTOCOL OUTPUT"
     echo "================================================================================"
     echo "Performance metrics written to: ${PERF_OUTPUT_FILE}"
+    echo "Absolute location: ${absolute_path}"
     echo ""
     echo "Content:"
     echo "$influx_line"

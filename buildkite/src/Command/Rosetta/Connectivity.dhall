@@ -78,7 +78,7 @@ let command
                   ]
                 # RunInToolchain.runInToolchain
                     (Benchmarks.toEnvList Benchmarks.Type::{=})
-                    "cat rosetta.perf | influx write"
+                    "ls -al && cat rosetta.perf | influx write"
             , label =
                 "Rosetta ${Network.lowerName spec.network} connectivity test "
             , key =
