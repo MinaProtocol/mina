@@ -637,12 +637,14 @@ function analyze_metric_array() {
     local max="${sorted[$((count-1))]}"
 
     # Calculate p95 (95th percentile)
-    local p95_index=$(echo "scale=0; ($count * 0.95) / 1" | bc)
+    local p95_index
+    p95_index=$(echo "scale=0; ($count * 0.95) / 1" | bc)
     p95_index=${p95_index%.*}
     local p95="${sorted[$p95_index]}"
 
     # Calculate p99 (99th percentile)
-    local p99_index=$(echo "scale=0; ($count * 0.99) / 1" | bc)
+    local p99_index
+    p99_index=$(echo "scale=0; ($count * 0.99) / 1" | bc)
     p99_index=${p99_index%.*}
     local p99="${sorted[$p99_index]}"
 
@@ -678,19 +680,19 @@ function analyze_and_print_metrics() {
     # Analyze PostgreSQL metrics
     local postgres_stats
     postgres_stats=$(analyze_metric_array "postgres" POSTGRES_METRICS)
-    IFS=',' read -r app max p95 p99 median <<< "$postgres_stats"
+    IFS=',' read -r _app max p95 p99 median <<< "$postgres_stats"
     printf "%-16s | %8.2f | %8.2f | %8.2f | %11.2f\n" "PostgreSQL" "$max" "$p95" "$p99" "$median"
 
     # Analyze Archive metrics
     local archive_stats
     archive_stats=$(analyze_metric_array "archive" ARCHIVE_METRICS)
-    IFS=',' read -r app max p95 p99 median <<< "$archive_stats"
+    IFS=',' read -r _app max p95 p99 median <<< "$archive_stats"
     printf "%-16s | %8.2f | %8.2f | %8.2f | %11.2f\n" "Mina-Archive" "$max" "$p95" "$p99" "$median"
 
     # Analyze Rosetta metrics
     local rosetta_stats
     rosetta_stats=$(analyze_metric_array "rosetta" ROSETTA_METRICS)
-    IFS=',' read -r app max p95 p99 median <<< "$rosetta_stats"
+    IFS=',' read -r _app max p95 p99 median <<< "$rosetta_stats"
     printf "%-16s | %8.2f | %8.2f | %8.2f | %11.2f\n" "Mina-Rosetta" "$max" "$p95" "$p99" "$median"
 
     echo "================================================================================"
@@ -719,15 +721,15 @@ function print_influxdb_line() {
     # Analyze metrics to get p95 values
     local postgres_stats
     postgres_stats=$(analyze_metric_array "postgres" POSTGRES_METRICS)
-    IFS=',' read -r app postgres_max postgres_p95 postgres_p99 postgres_median <<< "$postgres_stats"
+    IFS=',' read -r _app postgres_max postgres_p95 postgres_p99 postgres_median <<< "$postgres_stats"
 
     local archive_stats
     archive_stats=$(analyze_metric_array "archive" ARCHIVE_METRICS)
-    IFS=',' read -r app archive_max archive_p95 archive_p99 archive_median <<< "$archive_stats"
+    IFS=',' read -r _app archive_max archive_p95 archive_p99 archive_median <<< "$archive_stats"
 
     local rosetta_stats
     rosetta_stats=$(analyze_metric_array "rosetta" ROSETTA_METRICS)
-    IFS=',' read -r app rosetta_max rosetta_p95 rosetta_p99 rosetta_median <<< "$rosetta_stats"
+    IFS=',' read -r _app rosetta_max rosetta_p95 rosetta_p99 rosetta_median <<< "$rosetta_stats"
 
     # Get git branch and commit information
     local git_branch
