@@ -55,6 +55,10 @@ func newTestAppWithMaxConnsAndCtxAndGrace(t *testing.T, privkey crypto.PrivKey, 
 	dir, err := ioutil.TempDir("", "mina_test_*")
 	require.NoError(t, err)
 
+	t.Cleanup(func() {
+		panicOnErr(os.RemoveAll(dir))
+	})
+
 	addr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port))
 	require.NoError(t, err)
 
@@ -74,13 +78,13 @@ func newTestAppWithMaxConnsAndCtxAndGrace(t *testing.T, privkey crypto.PrivKey, 
 	)
 	require.NoError(t, err)
 
+	t.Cleanup(func() {
+		panicOnErr(helper.Host.Close())
+	})
+
 	helper.SetTrustedAddrFilters(ma.NewFilters())
 	helper.Host.SetStreamHandler(testProtocol, testStreamHandler)
 
-	t.Cleanup(func() {
-		panicOnErr(os.RemoveAll(dir))
-		panicOnErr(helper.Host.Close())
-	})
 	outChan := make(chan *capnp.Message, 64)
 	bitswapCtx := NewBitswapCtxWithMaxBlockSize(1<<9, ctx, outChan)
 	bitswapCtx.engine = helper.Bitswap
