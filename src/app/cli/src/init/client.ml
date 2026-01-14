@@ -2569,6 +2569,7 @@ let advanced ~itn_features =
     ; ("thread-graph", thread_graph)
     ; ("print-signature-kind", signature_kind)
     ; ("generate-hardfork-config", generate_hardfork_config)
+    ; ("fix-persistent-frontier", Fix_persistent_frontier.command)
     ; ( "test"
       , Command.group ~summary:"Testing-only commands"
           [ ("create-genesis", test_genesis_creation)
