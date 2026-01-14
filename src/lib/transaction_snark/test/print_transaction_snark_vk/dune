@@ -1,6 +1,6 @@
 (executable
- (name print_blockchain_snark_vk)
- (libraries blockchain_snark genesis_constants mina_node_config)
+ (name print_transaction_snark_vk)
+ (libraries genesis_constants mina_node_config transaction_snark)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -10,8 +10,8 @@
 ; The output file name includes the profile to allow profile-specific regression testing.
 
 (rule
- (deps print_blockchain_snark_vk.exe)
- (targets %{profile}_blockchain_snark_vk.json.computed)
+ (deps print_transaction_snark_vk.exe)
+ (targets %{profile}_transaction_snark_vk.json.computed)
  (action
   (with-stdout-to
    %{targets}
@@ -19,8 +19,8 @@
 
 (rule
  (deps
-  (:orig %{profile}_blockchain_snark_vk.json)
-  (:computed %{profile}_blockchain_snark_vk.json.computed))
+  (:orig %{profile}_transaction_snark_vk.json)
+  (:computed %{profile}_transaction_snark_vk.json.computed))
  (alias runtest)
  (action
   (diff %{orig} %{computed})))
