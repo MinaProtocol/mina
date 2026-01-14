@@ -37,4 +37,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_let)))
+  (pps ppx_version ppx_let ppx_here)))
