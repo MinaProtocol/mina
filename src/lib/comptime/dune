@@ -1,0 +1,16 @@
+(library
+ (name comptime)
+ (public_name comptime)
+ (libraries core_kernel base)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
+
+(rule
+ (target comptime.ml)
+ (deps
+  (:< gen.sh)
+  (universe))
+ (action
+  (run bash %{<} %{target})))

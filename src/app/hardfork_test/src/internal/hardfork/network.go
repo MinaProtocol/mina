@@ -28,14 +28,14 @@ func (t *HardforkTest) AllPortOfType(ty PortType) []int {
 	all_ports := []int{t.Config.SeedStartPort, t.Config.SnarkCoordinatorPort}
 
 	for i := 0; i < t.Config.NumWhales; i++ {
-		all_ports = append(all_ports, t.Config.WhaleStartPort+i*5)
+		all_ports = append(all_ports, t.Config.WhaleStartPort+i*6)
 	}
 	for i := 0; i < t.Config.NumFish; i++ {
-		all_ports = append(all_ports, t.Config.FishStartPort+i*5)
+		all_ports = append(all_ports, t.Config.FishStartPort+i*6)
 	}
 
 	for i := 0; i < t.Config.NumNodes; i++ {
-		all_ports = append(all_ports, t.Config.NodeStartPort+i*5)
+		all_ports = append(all_ports, t.Config.NodeStartPort+i*6)
 	}
 	for i := range all_ports {
 		all_ports[i] += int(ty)
@@ -55,7 +55,7 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 	t.Logger.Info("Starting network %s...", profile)
 	cmd := exec.Command(
 		filepath.Join(t.ScriptDir, "../mina-local-network/mina-local-network.sh"),
-		"--seed-start-port", strconv.Itoa(t.Config.SeedStartPort),
+		"--seed", fmt.Sprintf("spawn:%d", t.Config.SeedStartPort),
 		"--snark-coordinator-start-port", strconv.Itoa(t.Config.SnarkCoordinatorPort),
 
 		"--whale-start-port", strconv.Itoa(t.Config.WhaleStartPort),

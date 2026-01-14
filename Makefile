@@ -549,9 +549,9 @@ define build_debian_package
 		&& echo "✅ Build complete"
 endef
 
-.PHONY: debian-build-archive-berkeley
-debian-build-archive-berkeley: ## Build the Debian archive package
-	$(call build_debian_package,archive_berkeley)
+.PHONY: debian-build-archive-testnet-generic
+debian-build-archive-testnet-generic: ## Build the Debian archive package
+	$(call build_debian_package,archive_testnet_generic)
 
 .PHONY: debian-build-archive-devnet
 debian-build-archive-devnet: ## Build the Debian archive package for devnet
@@ -561,9 +561,9 @@ debian-build-archive-devnet: ## Build the Debian archive package for devnet
 debian-build-archive-mainnet: ## Build the Debian archive package for mainnet
 	$(call build_debian_package,archive_mainnet)
 
-.PHONY: debian-build-daemon-berkeley
-debian-build-daemon-berkeley: ## Build the Debian daemon package for berkeley
-	$(call build_debian_package,daemon_berkeley)
+.PHONY: debian-build-daemon-testnet-generic
+debian-build-daemon-testnet-generic: ## Build the Debian daemon package for testnet-generic
+	$(call build_debian_package,daemon_testnet_generic)
 
 .PHONY: debian-build-daemon-devnet
 debian-build-daemon-devnet: ## Build the Debian daemon package for devnet
@@ -577,9 +577,9 @@ debian-build-daemon-mainnet: ## Build the Debian daemon package for mainnet
 debian-build-logproc: ## Build the Debian logproc package
 	$(call build_debian_package,logproc)
 
-.PHONY: debian-build-rosetta-berkeley
-debian-build-rosetta-berkeley: ## Build the Debian Rosetta package
-	$(call build_debian_package,rosetta_berkeley)
+.PHONY: debian-build-rosetta-testnet-generic
+debian-build-rosetta-testnet-generic: ## Build the Debian Rosetta package
+	$(call build_debian_package,rosetta_testnet_generic)
 
 .PHONY: debian-build-rosetta-devnet
 debian-build-rosetta-devnet: ## Build the Debian Rosetta package for devnet
@@ -593,10 +593,23 @@ debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
 debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devnet hardfork
 	$(call build_debian_package,daemon_devnet_hardfork)
 
+.PHONY: debian-build-daemon-devnet-hardfork
+debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devnet hardfork
+	$(call build_debian_package,daemon_devnet_hardfork)
+
+.PHONY: debian-build-daemon-devnet-pre-hardfork
+debian-build-daemon-devnet-pre-hardfork: ## Build the Debian daemon package for automote devnet pre hardfork
+	$(call build_debian_package,daemon_pre_hardfork_devnet)
+
+.PHONY: debian-build-daemon-mainnet-pre-hardfork
+debian-build-daemon-mainnet-pre-hardfork: ## Build the Debian daemon package for automote mainnet pre hardfork
+	$(call build_debian_package,daemon_pre_hardfork_mainnet)
+
 .PHONY: debian-download-create-legacy-hardfork
 debian-download-create-legacy-hardfork: ## Download and create legacy hardfork Debian packages
 	$(info 📦 Downloading legacy hardfork Debian packages for debian $(CODENAME))
 	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-legacy-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend hetzner --target _build
+
 ########################################
 # Docker images
 
@@ -648,10 +661,10 @@ docker-build-toolchain: ## Build the toolchain to be used in CI
 		--service mina-toolchain \
 		--version mina-toolchain-$(CODENAME)-$(GITHASH)
 
-.PHONY: docker-build-archive-berkeley
-docker-build-archive-berkeley: SHELL := /bin/bash
-docker-build-archive-berkeley: start-local-debian-repo ## Build the archive Docker image
-	$(call build_docker_image,mina-archive,berkeley)
+.PHONY: docker-build-archive-testnet-generic
+docker-build-archive-testnet-generic: SHELL := /bin/bash
+docker-build-archive-testnet-generic: start-local-debian-repo ## Build the archive Docker image
+	$(call build_docker_image,mina-archive,testnet-generic)
 
 .PHONY: docker-build-archive-devnet
 docker-build-archive-devnet: SHELL := /bin/bash
@@ -663,10 +676,10 @@ docker-build-archive-mainnet: SHELL := /bin/bash
 docker-build-archive-mainnet: start-local-debian-repo ## Build the archive Docker image for mainnet
 	$(call build_docker_image,mina-archive,mainnet)
 
-.PHONY: docker-build-daemon-berkeley
-docker-build-daemon-berkeley: SHELL := /bin/bash
-docker-build-daemon-berkeley: start-local-debian-repo ## Build the daemon Docker image
-	$(call build_docker_image,mina-daemon,berkeley)
+.PHONY: docker-build-daemon-testnet-generic
+docker-build-daemon-testnet-generic: SHELL := /bin/bash
+docker-build-daemon-testnet-generic: start-local-debian-repo ## Build the daemon Docker image
+	$(call build_docker_image,mina-daemon,testnet-generic)
 
 .PHONY: docker-build-daemon-devnet
 docker-build-daemon-devnet: SHELL := /bin/bash
@@ -679,9 +692,9 @@ docker-build-daemon-mainnet: start-local-debian-repo ## Build the daemon Docker 
 	$(call build_docker_image,mina-daemon,mainnet)
 
 .PHONY: docker-build-rosetta
-docker-build-rosetta-berkeley: SHELL := /bin/bash
-docker-build-rosetta-berkeley: start-local-debian-repo ## Build the Rosetta Docker image
-	$(call build_docker_image,mina-rosetta,berkeley)
+docker-build-rosetta-testnet-generic: SHELL := /bin/bash
+docker-build-rosetta-testnet-generic: start-local-debian-repo ## Build the Rosetta Docker image
+	$(call build_docker_image,mina-rosetta,testnet-generic)
 
 .PHONY: docker-build-rosetta-devnet
 docker-build-rosetta-devnet: SHELL := /bin/bash

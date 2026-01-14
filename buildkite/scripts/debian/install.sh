@@ -37,7 +37,7 @@ else
   debs=(${DEBS//,/ })
   for i in "${debs[@]}"; do
     case $i in
-      mina-berkeley*|mina-devnet|mina-mainnet)
+      mina-testnet-generic*|mina-devnet|mina-mainnet)
         # Downaload mina-logproc too
         ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
       ;;

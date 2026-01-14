@@ -571,8 +571,12 @@ let create_genesis_block_inputs (genesis_inputs : Genesis_proof.Inputs.t) =
   let consensus_constants = genesis_inputs.consensus_constants in
   let prev_state =
     let open Staged_ledger_diff in
-    Protocol_state.negative_one ~genesis_ledger:genesis_inputs.genesis_ledger
-      ~genesis_epoch_data:genesis_inputs.genesis_epoch_data
+    Protocol_state.negative_one
+      ~genesis_ledger:
+        (Consensus.Genesis_data.Ledger.to_hashed genesis_inputs.genesis_ledger)
+      ~genesis_epoch_data:
+        (Consensus.Genesis_data.Epoch.to_hashed
+           genesis_inputs.genesis_epoch_data )
       ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   let genesis_epoch_ledger =

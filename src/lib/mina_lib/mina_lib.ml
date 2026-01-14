@@ -2222,7 +2222,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             Transition_router.run
               ~context:(module Context)
               ~trust_system:config.trust_system ~verifier ~network:net
-              ~is_seed:config.is_seed ~is_demo_mode:config.demo_mode
+              ~is_seed:config.net_config.is_seed ~is_demo_mode:config.demo_mode
               ~time_controller:config.time_controller
               ~consensus_local_state:config.consensus_local_state
               ~persistent_root_location:config.persistent_root_location
@@ -2447,7 +2447,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~genesis_timestamp:
                 config.precomputed_values.genesis_constants.protocol
                   .genesis_state_timestamp
-              ~net ~is_seed:config.is_seed ~demo_mode:config.demo_mode
+              ~net ~is_seed:config.net_config.is_seed
+              ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:(Var.watch @@ of_broadcast_pipe online_status)
               ~first_connection_incr:
@@ -3004,8 +3005,8 @@ module Hardfork_config = struct
 
   (** Generate the tar file and runtime ledger config for the given root
       database, and close and delete the database *)
-  let generate_tar_and_config ~get_directory ~get_root_hash ~logger ~target_dir
-      ~ledger_name_prefix root =
+  let generate_tar_and_config ~generate_tar ~get_directory ~get_root_hash
+      ~logger ~target_dir ~ledger_name_prefix root =
     let open Deferred.Or_error.Let_syntax in
     let root_hash = get_root_hash root in
     let ledger_dirname =
@@ -3013,8 +3014,8 @@ module Hardfork_config = struct
       |> Option.value_exn ~message:"Root ledger must have a directory"
     in
     let%bind tar_path =
-      Genesis_ledger_helper.Ledger.generate_tar ~logger ~target_dir
-        ~ledger_name_prefix ~root_hash ~ledger_dirname ()
+      generate_tar ~logger ~target_dir ~ledger_name_prefix ~root_hash
+        ~ledger_dirname ()
     in
     let%map s3_data_hash =
       Genesis_ledger_helper.sha3_hash tar_path
@@ -3043,22 +3044,24 @@ module Hardfork_config = struct
       close () ; result
     with exn -> close () ; raise exn
 
-  let generate_tars_and_configs ~get_directory ~get_root_hash ~logger
-      ~target_dir genesis_ledger genesis_staking_ledger
+  let generate_tars_and_configs ~generate_tar ~get_directory ~get_root_hash
+      ~logger ~target_dir genesis_ledger genesis_staking_ledger
       genesis_next_epoch_ledger =
     let open Deferred.Or_error.Let_syntax in
     Core.Unix.mkdir_p target_dir ;
     let%bind genesis_ledger_config =
-      generate_tar_and_config ~get_directory ~get_root_hash ~logger ~target_dir
-        ~ledger_name_prefix:"genesis_ledger" genesis_ledger
+      generate_tar_and_config ~generate_tar ~get_directory ~get_root_hash
+        ~logger ~target_dir ~ledger_name_prefix:"genesis_ledger" genesis_ledger
     in
     let%bind genesis_staking_ledger_config =
-      generate_tar_and_config ~get_directory ~get_root_hash ~logger ~target_dir
-        ~ledger_name_prefix:"epoch_ledger" genesis_staking_ledger
+      generate_tar_and_config ~generate_tar ~get_directory ~get_root_hash
+        ~logger ~target_dir ~ledger_name_prefix:"epoch_ledger"
+        genesis_staking_ledger
     in
     let%map genesis_next_epoch_ledger_config =
-      generate_tar_and_config ~get_directory ~get_root_hash ~logger ~target_dir
-        ~ledger_name_prefix:"epoch_ledger" genesis_next_epoch_ledger
+      generate_tar_and_config ~generate_tar ~get_directory ~get_root_hash
+        ~logger ~target_dir ~ledger_name_prefix:"epoch_ledger"
+        genesis_next_epoch_ledger
     in
     ( genesis_ledger_config
     , genesis_staking_ledger_config
@@ -3091,7 +3094,9 @@ module Hardfork_config = struct
     Core.Unix.mkdir_p config_dir ;
     let genesis_dir = config_dir ^/ "genesis" in
     let%bind genesis_config =
-      generate_tars_and_configs ~get_directory:Ledger.Db.get_directory
+      generate_tars_and_configs
+        ~generate_tar:Genesis_ledger_helper.Ledger.generate_tar_stable
+        ~get_directory:Ledger.Db.get_directory
         ~get_root_hash:Ledger.Db.merkle_root ~logger ~target_dir:genesis_dir
         genesis_ledger genesis_staking_ledger genesis_next_epoch_ledger
     in
@@ -3111,7 +3116,9 @@ module Hardfork_config = struct
     Core.Unix.mkdir_p config_dir ;
     let genesis_dir = config_dir ^/ "genesis" in
     let%bind genesis_config =
-      generate_tars_and_configs ~get_directory:Ledger.Hardfork_db.get_directory
+      generate_tars_and_configs
+        ~generate_tar:Genesis_ledger_helper.Ledger.generate_tar_hardfork
+        ~get_directory:Ledger.Hardfork_db.get_directory
         ~get_root_hash:Ledger.Hardfork_db.merkle_root ~logger
         ~target_dir:genesis_dir genesis_ledger genesis_staking_ledger
         genesis_next_epoch_ledger

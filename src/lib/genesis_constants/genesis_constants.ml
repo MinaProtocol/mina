@@ -339,38 +339,7 @@ module Make (Node_config : Node_config_intf.S) : S = struct
         *)
 
         let transaction_capacity_log_2 =
-          match
-            ( Node_config.scan_state_with_tps_goal
-            , Node_config.scan_state_tps_goal_x10 )
-          with
-          | true, Some tps_goal_x10 ->
-              let max_coinbases = 2 in
-
-              (* block_window_duration is in milliseconds, so divide by 1000 divide
-                 by 10 again because we have tps * 10
-              *)
-              let max_user_commands_per_block =
-                tps_goal_x10 * Node_config.block_window_duration / (1000 * 10)
-              in
-
-              (* Log of the capacity of transactions per transition.
-                    - 1 will only work if we don't have prover fees.
-                    - 2 will work with prover fees, but not if we want a transaction
-                      included in every block.
-                    - At least 3 ensures a transaction per block and the staged-ledger
-                      unit tests pass.
-              *)
-              1
-              + Core_kernel.Int.ceil_log2
-                  (max_user_commands_per_block + max_coinbases)
-          | _ -> (
-              match Node_config.scan_state_transaction_capacity_log_2 with
-              | Some a ->
-                  a
-              | None ->
-                  failwith
-                    "scan_state_transaction_capacity_log_2 must be set if \
-                     scan_state_with_tps_goal is false" )
+          Node_config.scan_state_transaction_capacity_log_2
 
         let supercharged_coinbase_factor =
           Node_config.supercharged_coinbase_factor
