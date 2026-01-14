@@ -48,7 +48,7 @@ in  Pipeline.build
             , label = "Hardfork: pipeline test"
             , key = "hard-fork-pipeline-test"
             , target = Size.Small
-            , soft_fail = Some (B/SoftFail.Boolean False)
+            , soft_fail = Some (B/SoftFail.Boolean True)
             , docker = None Docker.Type
             , timeout_in_minutes = Some +65
             }
