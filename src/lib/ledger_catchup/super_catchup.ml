@@ -582,11 +582,10 @@ module Verify_work_batcher = struct
         in
         List.concat_map xs ~f:(fun x ->
             works (input x)
-            |> List.concat_map ~f:(fun { fee; prover; proofs } ->
-                   let msg = Sok_message.create ~fee ~prover in
+            |> List.concat_map ~f:(fun { fee = _; prover = _; proofs } ->
                    One_or_two.to_list
                      (One_or_two.map proofs ~f:(fun p ->
-                          (Ledger_proof.Cached.read_proof_from_disk p, msg) ) ) ) )
+                          Ledger_proof.Cached.read_proof_from_disk p ) ) ) )
         |> Verifier.verify_transaction_snarks verifier
         >>| function
         | Ok (Ok ()) ->

@@ -10,8 +10,8 @@ let get_filenames =
   | filenames ->
       filenames
 
-let verify_snark_work ~verify_transaction_snarks ~proof ~message =
-  verify_transaction_snarks [ (proof, message) ]
+let verify_snark_work ~verify_transaction_snarks ~proof ~message:_ =
+  verify_transaction_snarks [ proof ]
 
 let config_flag =
   let open Command.Param in
