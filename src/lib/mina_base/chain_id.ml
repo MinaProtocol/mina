@@ -4,7 +4,7 @@ module Inputs = struct
   type t =
     { genesis_state_hash : Data_hash_lib.State_hash.t
     ; genesis_constants : Genesis_constants.t
-    ; constraint_system_digests : (string * Md5_lib.t) list
+    ; constraint_system_digests : (string * Md5_lib.t) list Lazy.t
     ; protocol_transaction_version : int
     ; protocol_network_version : int
     }
@@ -19,8 +19,8 @@ let make (inputs : Inputs.t) =
     Genesis_constants.hash inputs.genesis_constants
   in
   let all_snark_keys =
-    List.map inputs.constraint_system_digests ~f:(fun (_, digest) ->
-        Md5.to_hex digest )
+    List.map (Lazy.force inputs.constraint_system_digests)
+      ~f:(fun (_, digest) -> Md5.to_hex digest)
     |> String.concat ~sep:""
   in
   let version_digest v = Int.to_string v |> Md5.digest_string |> Md5.to_hex in

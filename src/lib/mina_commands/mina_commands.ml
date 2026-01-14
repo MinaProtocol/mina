@@ -221,8 +221,7 @@ let chain_id_inputs (t : Mina_lib.t) : Chain_id.Inputs.t =
   let protocol_network_version = Protocol_version.network protocol_version in
   { Chain_id.Inputs.genesis_state_hash
   ; genesis_constants
-  ; constraint_system_digests =
-      Lazy.force precomputed_values.constraint_system_digests
+  ; constraint_system_digests = precomputed_values.constraint_system_digests
   ; protocol_transaction_version
   ; protocol_network_version
   }
