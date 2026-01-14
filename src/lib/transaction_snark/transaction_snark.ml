@@ -3355,7 +3355,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     module type S = sig
       val tag : tag
 
-      val verify : (t * Sok_message.t) list -> unit Or_error.t Async.Deferred.t
+      val verify : t list -> unit Or_error.t Async.Deferred.t
 
       val id : Pickles.Verification_key.Id.t Async.Deferred.t Lazy.t
 
@@ -3538,17 +3538,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           init_stack pending_coinbase_stack_state handler
 
   let verify_impl ~f ts =
-    if
-      List.for_all ts ~f:(fun ((p : Stable.Latest.t), m) ->
-          Sok_message.Digest.equal (Sok_message.digest m) p.data.sok_digest )
-    then
-      f
-        (List.map ts ~f:(fun ({ Proof_carrying_data.data; proof }, _) ->
-             (data, proof) ) )
-    else
-      Async.return
-        (Or_error.error_string
-           "Transaction_snark.verify: Mismatched sok_message" )
+    f
+      (List.map ts
+         ~f:(fun ({ Proof_carrying_data.data; proof } : Stable.Latest.t) ->
+           (data, proof) ) )
 
   let verify ~key =
     verify_impl

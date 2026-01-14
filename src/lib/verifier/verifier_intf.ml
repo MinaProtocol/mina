@@ -41,9 +41,7 @@ module Base = struct
       -> unit Or_error.t Or_error.t Deferred.t
 
     val verify_transaction_snarks :
-         t
-      -> (ledger_proof * Mina_base.Sok_message.t) list
-      -> unit Or_error.t Or_error.t Deferred.t
+      t -> ledger_proof list -> unit Or_error.t Or_error.t Deferred.t
 
     val toggle_internal_tracing : t -> bool -> unit Or_error.t Deferred.t
 

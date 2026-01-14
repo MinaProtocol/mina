@@ -348,7 +348,7 @@ struct
               , Some ("Error verifying transaction snark: $error", metadata) )
           else Deferred.return ()
         in
-        let message = Mina_base.Sok_message.create ~fee ~prover in
+        let _message = Mina_base.Sok_message.create ~fee ~prover in
         let verify proofs =
           let open Deferred.Let_syntax in
           let statement_check () =
@@ -430,7 +430,7 @@ struct
             in
             let proof_env =
               Envelope.Incoming.wrap
-                ~data:(One_or_two.map ~f:fst proofs, message)
+                ~data:(One_or_two.map ~f:fst proofs)
                 ~sender
             in
             match Signature_lib.Public_key.decompress prover with

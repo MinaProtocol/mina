@@ -155,7 +155,7 @@ module T = struct
       let start = Time.now () in
       match%map
         Verifier.verify_transaction_snarks verifier
-          (List.map proofs ~f:(fun (proof, _, msg) -> (proof, msg)))
+          (List.map proofs ~f:(fun (proof, _, _msg) -> proof))
       with
       | Ok b ->
           let time_ms = Time.abs_diff (Time.now ()) start |> Time.Span.to_ms in
