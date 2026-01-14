@@ -103,15 +103,17 @@ module Hardfork = struct
         vector by dropping zkApp state elements from the end. Raises if element 
         8~31 is not zero *)
     let to_stable_exn (value : t) : Value.Stable.Latest.t =
-      let zero = Pasta_bindings.Fp.of_int 0 in
-      let adds_proof =
-        (* 8 + 24 = 32 *)
-        Nat.Adds.(S (S (S (S (S (S (S (S Z))))))))
-      in
-      let retained, dropped = Vector.split value adds_proof in
-      if not @@ Vector.for_all dropped ~f:(Pasta_bindings.Fp.equal zero) then
-        failwith "element 8~31 of zkApp state has non-zero values!" ;
-      retained
+      (* Use this code in the next HF that extends the zkApp state size *)
+      (* let zero = Pasta_bindings.Fp.of_int 0 in
+         let adds_proof =
+           (* 8 + 24 = 32 *)
+           Nat.Adds.(S (S (S (S (S (S (S (S Z))))))))
+         in
+         let retained, dropped = Vector.split value adds_proof in
+         if not @@ Vector.for_all dropped ~f:(Pasta_bindings.Fp.equal zero) then
+           failwith "element 8~31 of zkApp state has non-zero values!" ;
+         retained *)
+      value
 
     let%test_unit "of_stable followed by to_stable_exn is identity" =
       Quickcheck.test Value.gen ~f:(fun original ->
