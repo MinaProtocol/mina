@@ -40,7 +40,6 @@ module Transaction_with_witness = struct
         ; second_pass_ledger_witness :
             (Mina_ledger.Sparse_ledger.Stable.V3.t[@sexp.opaque])
         ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
-        ; hash : Aux_hash.Stable.V1.t
         }
       [@@deriving sexp, to_yojson]
 
@@ -58,6 +57,14 @@ module Transaction_with_witness = struct
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     ; hash : Aux_hash.t
     }
+
+  let hash (v : Stable.Latest.t) : string =
+    let h = Digestif.SHA256.init () in
+    let h =
+      Binable.to_string (module Stable.Latest) v
+      |> Digestif.SHA256.feed_string h
+    in
+    Digestif.SHA256.get h |> Aux_hash.of_sha256
 
   let create
       ~(transaction_with_info : Mina_transaction_logic.Transaction_applied.t)
@@ -77,13 +84,7 @@ module Transaction_with_witness = struct
       ; first_pass_ledger_witness
       ; second_pass_ledger_witness
       ; block_global_slot
-      ; hash = Aux_hash.of_bytes ""
       }
-    in
-    let h = Digestif.SHA256.init () in
-    let h =
-      Binable.to_string (module Stable.Latest) v
-      |> Digestif.SHA256.feed_string h
     in
     { transaction_with_info
     ; state_hash
@@ -92,19 +93,18 @@ module Transaction_with_witness = struct
     ; first_pass_ledger_witness
     ; second_pass_ledger_witness
     ; block_global_slot
-    ; hash = Digestif.SHA256.get h |> Aux_hash.of_sha256
+    ; hash = hash v
     }
 
   let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
-      { Stable.Latest.transaction_with_info
-      ; state_hash
-      ; statement
-      ; init_stack
-      ; first_pass_ledger_witness
-      ; second_pass_ledger_witness
-      ; block_global_slot
-      ; hash
-      } =
+      ( { Stable.Latest.transaction_with_info
+        ; state_hash
+        ; statement
+        ; init_stack
+        ; first_pass_ledger_witness
+        ; second_pass_ledger_witness
+        ; block_global_slot
+        } as v ) =
     { transaction_with_info =
         Mina_transaction_logic.Transaction_applied.write_all_proofs_to_disk
           ~signature_kind ~proof_cache_db transaction_with_info
@@ -114,7 +114,7 @@ module Transaction_with_witness = struct
     ; first_pass_ledger_witness
     ; second_pass_ledger_witness
     ; block_global_slot
-    ; hash
+    ; hash = hash v
     }
 
   let read_all_proofs_from_disk
@@ -125,7 +125,7 @@ module Transaction_with_witness = struct
       ; first_pass_ledger_witness
       ; second_pass_ledger_witness
       ; block_global_slot
-      ; hash
+      ; _
       } =
     { Stable.Latest.transaction_with_info =
         Mina_transaction_logic.Transaction_applied.read_all_proofs_from_disk
@@ -136,7 +136,6 @@ module Transaction_with_witness = struct
     ; first_pass_ledger_witness
     ; second_pass_ledger_witness
     ; block_global_slot
-    ; hash
     }
 end
 
@@ -147,15 +146,20 @@ module Ledger_proof_with_sok_message = struct
 
     module V2 = struct
       type t =
-        { proof : Ledger_proof.Stable.V2.t
-        ; sok_msg : Sok_message.Stable.V1.t
-        ; hash : Aux_hash.Stable.V1.t
-        }
+        { proof : Ledger_proof.Stable.V2.t; sok_msg : Sok_message.Stable.V1.t }
       [@@deriving sexp]
 
       let to_latest = Fn.id
     end
   end]
+
+  let hash (v : Stable.Latest.t) =
+    let h = Digestif.SHA256.init () in
+    let h =
+      Binable.to_string (module Ledger_proof.Stable.Latest) v.proof
+      |> Digestif.SHA256.feed_string h
+    in
+    Digestif.SHA256.get h |> Aux_hash.of_sha256
 
   type t =
     { proof : Ledger_proof.Cached.t
@@ -164,18 +168,12 @@ module Ledger_proof_with_sok_message = struct
     }
 
   let create ~(proof : Ledger_proof.Cached.t) ~(sok_msg : Sok_message.t) =
-    let v =
-      { Stable.Latest.proof = Ledger_proof.Cached.read_proof_from_disk proof
-      ; sok_msg
-      ; hash = Aux_hash.of_bytes ""
-      }
+    let hash =
+      let proof = Ledger_proof.Cached.read_proof_from_disk proof in
+      let v = { Stable.Latest.proof; sok_msg } in
+      hash v
     in
-    let h = Digestif.SHA256.init () in
-    let h =
-      Binable.to_string (module Stable.Latest) v
-      |> Digestif.SHA256.feed_string h
-    in
-    { proof; sok_msg; hash = Digestif.SHA256.get h |> Aux_hash.of_sha256 }
+    { proof; sok_msg; hash }
 end
 
 module Available_job = struct
@@ -258,7 +256,7 @@ end
 
 type job = Available_job.t
 
-let hash :
+let hash_generic :
     type a b.
        ledger_proof_hash:(a -> string)
     -> tx_witness_hash:(b -> string)
@@ -310,11 +308,11 @@ module Stable = struct
     let to_latest = Fn.id
 
     let hash (t : t) =
-      hash
+      hash_generic
         ~ledger_proof_hash:(fun (x : Ledger_proof_with_sok_message.Stable.V2.t) ->
-          x.hash )
+          Ledger_proof_with_sok_message.hash x )
         ~tx_witness_hash:(fun (x : Transaction_with_witness.Stable.V3.t) ->
-          x.hash )
+          Transaction_with_witness.hash x )
         (t.scan_state, t.previous_incomplete_zkapp_updates)
   end
 end]
@@ -330,7 +328,7 @@ type t =
   }
 
 let hash (t : t) =
-  hash
+  hash_generic
     ~ledger_proof_hash:(fun (x : Ledger_proof_with_sok_message.t) -> x.hash)
     ~tx_witness_hash:(fun (x : Transaction_with_witness.t) -> x.hash)
     (t.scan_state, t.previous_incomplete_zkapp_updates)
@@ -1569,7 +1567,8 @@ let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
     { Stable.Latest.scan_state = uncached
     ; previous_incomplete_zkapp_updates = tx_list, border_status
     } =
-  let f1 { Ledger_proof_with_sok_message.Stable.Latest.proof; sok_msg; hash } =
+  let f1 ({ Ledger_proof_with_sok_message.Stable.Latest.proof; sok_msg } as v) =
+    let hash = Ledger_proof_with_sok_message.hash v in
     { Ledger_proof_with_sok_message.proof =
         Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
     ; sok_msg
@@ -1594,11 +1593,10 @@ let read_all_proofs_from_disk
     { scan_state = cached
     ; previous_incomplete_zkapp_updates = tx_list, border_status
     } =
-  let f1 { Ledger_proof_with_sok_message.proof; sok_msg; hash } =
+  let f1 { Ledger_proof_with_sok_message.proof; sok_msg; _ } =
     { Ledger_proof_with_sok_message.Stable.Latest.proof =
         Ledger_proof.Cached.read_proof_from_disk proof
     ; sok_msg
-    ; hash
     }
   in
   let scan_state =
