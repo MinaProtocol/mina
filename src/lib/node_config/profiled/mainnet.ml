@@ -2,7 +2,7 @@ let ledger_depth = 35
 
 let curve_size = 255
 
-let coinbase = "720"
+let coinbase = "360"
 
 let k = 290
 
@@ -40,7 +40,7 @@ let plugins = false
 
 let genesis_state_timestamp = "2020-09-16 03:15:00-07:00"
 
-let block_window_duration = 180000
+let block_window_duration = 90000
 
 let network = "mainnet"
 
@@ -50,7 +50,7 @@ let compaction_interval = Some (2 * block_window_duration)
 
 let vrf_poll_interval = 5000
 
-let zkapp_cmd_limit = Some 24
+let zkapp_cmd_limit = None
 
 let sync_ledger_max_subtree_depth = 8
 

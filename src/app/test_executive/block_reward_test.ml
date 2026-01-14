@@ -36,12 +36,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Wait_condition.nodes_to_initialize
            (Core.String.Map.data all_mina_nodes) )
     in
+    let constraint_constants = Network.constraint_constants network in
     let node = Network.block_producer_exn network "node" in
     let bp_keypair = (Network.genesis_keypair_exn network "node-key").keypair in
     let bp_pk = bp_keypair.public_key |> Signature_lib.Public_key.compress in
     let bp_pk_account_id = Account_id.create bp_pk Token_id.default in
     let bp_original_balance = Currency.Amount.of_mina_string_exn "1000" in
-    let coinbase_reward = Currency.Amount.of_mina_string_exn "720" in
     let%bind () =
       section_hard "wait for 1 block to be produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
@@ -58,7 +58,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           test_constants.coinbase_amount for whatever reason, so hardcoding this
           until that is fixed *)
        let bp_expected =
-         Currency.Amount.add bp_original_balance coinbase_reward
+         Currency.Amount.add bp_original_balance
+           constraint_constants.coinbase_amount
          |> Option.value_exn
        in
        [%log info] "bp_expected: %s"
