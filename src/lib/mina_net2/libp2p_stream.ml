@@ -126,7 +126,7 @@ let stream_closed ~logger ~who_closed t =
         [ ("who_closed", `String (name_of_participant who_closed))
         ; ("old_stream_state", `String (show_state old_state))
         ] ;
-  `Stream_should_be_released (equal_state FullyOpen t.state)
+  `Stream_should_be_released (equal_state FullyClosed t.state)
 
 let max_chunk_size = 16777216 (* 16 MiB *)
 
