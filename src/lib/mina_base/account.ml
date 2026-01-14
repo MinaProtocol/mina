@@ -668,6 +668,9 @@ let empty =
 
 let empty_digest = lazy (digest empty)
 
+let empty_account_string =
+  lazy (Bin_prot.Writer.to_string Stable.Latest.bin_writer_t empty)
+
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
   let token_id = Account_id.token_id account_id in
@@ -1086,13 +1089,46 @@ module Hardfork = struct
     ; zkapp = Option.map ~f:Zkapp_account.Hardfork.of_stable account.zkapp
     }
 
+  (** Convert a Mesa account to a stable Berkeley account. Raises if we can't 
+      convert. *)
+  let to_stable_exn (account : t) : Stable.Latest.t =
+    { public_key = account.public_key
+    ; token_id = account.token_id
+    ; token_symbol = account.token_symbol
+    ; balance = account.balance
+    ; nonce = account.nonce
+    ; receipt_chain_hash = account.receipt_chain_hash
+    ; delegate = account.delegate
+    ; voting_for = account.voting_for
+    ; timing = account.timing
+    ; permissions = account.permissions
+    ; zkapp = Option.map ~f:Zkapp_account.Hardfork.to_stable_exn account.zkapp
+    }
+
   (* This function converts Berkeley account to Mesa account *)
   let migrate_from_berkeley ~hardfork_slot (account : Stable.Latest.t) : t =
     slot_reduction_update ~hardfork_slot account |> of_stable
 
   let balance { balance; _ } = balance
 
-  let empty = of_stable empty
+  (** An empty Mesa account. Note that this is not [of_stable] on the empty
+      Berkeley account, because [of_stable] deliberately avoids changing the
+      permissions of accounts. For that reason we use the anticipated Mesa
+      [Permissions.Hardfork.user_default] permissions explicitly.
+  *)
+  let empty : t =
+    { public_key = Public_key.Compressed.empty
+    ; token_id = Token_id.default
+    ; token_symbol = Token_symbol.default
+    ; balance = Balance.zero
+    ; nonce = Nonce.zero
+    ; receipt_chain_hash = Receipt.Chain_hash.empty
+    ; delegate = None
+    ; voting_for = State_hash.dummy
+    ; timing = Timing.Untimed
+    ; permissions = Permissions.Hardfork.user_default
+    ; zkapp = None
+    }
 
   let identifier ({ public_key; token_id; _ } : t) =
     Account_id.create public_key token_id
@@ -1124,6 +1160,19 @@ module Hardfork = struct
       (Random_oracle.pack_input (to_input t))
 
   let empty_digest = lazy (digest empty)
+
+  let empty_account_string = lazy (Bin_prot.Writer.to_string bin_writer_t empty)
+
+  let%test_unit "of_stable followed by to_stable_exn is identity" =
+    let gen_with_optional_zkapp : Stable.Latest.t Quickcheck.Generator.t =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind base_account = gen in
+      let%map zkapp = Option.quickcheck_generator Zkapp_account.gen in
+      { base_account with zkapp }
+    in
+    Quickcheck.test gen_with_optional_zkapp ~f:(fun original ->
+        let roundtripped = to_stable_exn @@ of_stable original in
+        [%test_eq: Stable.Latest.t] original roundtripped )
 end
 
 (* An unstable account is needed when we're doing ledger migration. The main

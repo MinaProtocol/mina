@@ -20,7 +20,7 @@ let Network = ../../Constants/Network.dhall
 
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
-let network = Network.Type.Berkeley
+let network = Network.Type.TestnetGeneric
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")

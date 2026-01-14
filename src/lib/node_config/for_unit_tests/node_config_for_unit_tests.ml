@@ -52,6 +52,8 @@ let compaction_interval = None
 
 let (network : string) = ("testnet" : string)
 
+let (profile : string) = ("dev" : string)
+
 let (vrf_poll_interval : int) = (0 : int)
 
 let zkapp_cmd_limit = None
