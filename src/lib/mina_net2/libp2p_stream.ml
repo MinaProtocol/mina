@@ -34,6 +34,8 @@ let protocol { protocol; _ } = protocol
 
 let remote_peer { peer; _ } = peer
 
+let state { state; _ } = state
+
 let pipes { incoming_r; outgoing_w; _ } = (incoming_r, outgoing_w)
 
 let data_received { incoming_w; _ } data =
