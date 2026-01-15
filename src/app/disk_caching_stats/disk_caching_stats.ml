@@ -364,8 +364,13 @@ module Values (S : Sample) = struct
 
   let base_work varying witness :
       Transaction_snark_scan_state.Transaction_with_witness.t =
+    let transaction_with_info : Mina_transaction_logic.Transaction_applied.t =
+      { previous_hash = field (); varying = varying () }
+    in
     Transaction_snark_scan_state.Transaction_with_witness.create
-      ~transaction_with_info:{ previous_hash = field (); varying = varying () }
+      ~transaction_with_status:
+        (Mina_transaction_logic.Transaction_applied.transaction_with_status
+           transaction_with_info )
       ~state_hash:(state_hash (), field ())
       ~statement:
         { source =

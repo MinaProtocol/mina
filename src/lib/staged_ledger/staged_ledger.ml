@@ -568,7 +568,10 @@ module T = struct
       }
     in
     ( Scan_state.Transaction_with_witness.create
-        ~transaction_with_info:applied_txn ~state_hash:state_and_body_hash
+        ~transaction_with_status:
+          (Mina_transaction_logic.Transaction_applied.transaction_with_status
+             applied_txn )
+        ~state_hash:state_and_body_hash
         ~first_pass_ledger_witness:pre_stmt.first_pass_ledger_witness
         ~second_pass_ledger_witness:ledger_witness
         ~init_stack:pre_stmt.init_stack ~statement
@@ -753,11 +756,7 @@ module T = struct
       List.fold_right ~init:(Ok []) data
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
           let%map.Or_error acc = acc in
-          let t =
-            d.transaction_with_info
-            |> Mina_transaction_logic.Transaction_applied
-               .transaction_with_status
-          in
+          let t = d.transaction_with_status in
           t :: acc )
     in
     let total_fee_excess txns =
