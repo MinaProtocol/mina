@@ -348,7 +348,6 @@ struct
               , Some ("Error verifying transaction snark: $error", metadata) )
           else Deferred.return ()
         in
-        let _message = Mina_base.Sok_message.create ~fee ~prover in
         let verify proofs =
           let open Deferred.Let_syntax in
           let statement_check () =
