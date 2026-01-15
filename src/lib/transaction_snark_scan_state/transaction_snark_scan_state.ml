@@ -32,9 +32,7 @@ module Transaction_with_witness = struct
             Mina_transaction_logic.Transaction_applied.Stable.V3.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
         ; statement : Transaction_snark.Statement.Stable.V2.t
-        ; init_stack :
-            Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
-            .t
+        ; init_stack : Pending_coinbase.Stack_versioned.Stable.V1.t
         ; first_pass_ledger_witness :
             (Mina_ledger.Sparse_ledger.Stable.V3.t[@sexp.opaque])
         ; second_pass_ledger_witness :
@@ -51,7 +49,7 @@ module Transaction_with_witness = struct
     { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
     ; state_hash : State_hash.t * State_body_hash.t
     ; statement : Transaction_snark.Statement.t
-    ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
+    ; init_stack : Pending_coinbase.Stack_versioned.t
     ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
@@ -70,7 +68,7 @@ module Transaction_with_witness = struct
       ~(transaction_with_info : Mina_transaction_logic.Transaction_applied.t)
       ~(state_hash : State_hash.t * State_body_hash.t)
       ~(statement : Transaction_snark.Statement.t)
-      ~(init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t)
+      ~(init_stack : Pending_coinbase.Stack_versioned.t)
       ~(first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t)
       ~(second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t)
       ~(block_global_slot : Mina_numbers.Global_slot_since_genesis.t) : t =
@@ -321,7 +319,7 @@ let create_expected_statement ~constraint_constants
     ; state_hash
     ; first_pass_ledger_witness
     ; second_pass_ledger_witness
-    ; init_stack
+    ; init_stack = pending_coinbase_before
     ; statement
     ; block_global_slot
     ; _
@@ -368,15 +366,6 @@ let create_expected_statement ~constraint_constants
     ( target_first_pass_merkle_root
     , target_second_pass_merkle_root
     , supply_increase )
-  in
-  let%bind pending_coinbase_before =
-    match init_stack with
-    | Base source ->
-        Ok source
-    | Merge ->
-        Or_error.errorf
-          !"Invalid init stack in Pending coinbase stack state . Expected Base \
-            found Merge"
   in
   let pending_coinbase_after =
     let state_body_hash = snd state_hash in
@@ -1360,16 +1349,9 @@ let single_spec_of_job ~get_state :
           Mina_transaction_logic.Transaction_applied.transaction_with_status
             transaction_with_info
         in
-        let%bind.Or_error protocol_state_body =
+        let%map.Or_error protocol_state_body =
           get_state (fst state_hash)
           |> Or_error.map ~f:Mina_state.Protocol_state.body
-        in
-        let%map.Or_error init_stack =
-          match init_stack with
-          | Base x ->
-              Ok x
-          | Merge ->
-              Or_error.error_string "init_stack was Merge"
         in
         { Transaction_witness.first_pass_ledger = first_pass_ledger_witness
         ; second_pass_ledger = second_pass_ledger_witness
