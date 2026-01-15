@@ -140,11 +140,7 @@ module Staged_ledger_error : sig
     | Non_zero_fee_excess of
         Scan_state.Space_partition.t * Transaction.t With_status.t list
     | Invalid_proofs of
-        ( Ledger_proof.t
-        * Transaction_snark.Statement.t
-        * Mina_base.Sok_message.t )
-        list
-        * Error.t
+        (Ledger_proof.t * Transaction_snark.Statement.t) list * Error.t
     | Couldn't_reach_verifier of Error.t
     | Pre_diff of Pre_diff_info.Error.t
     | Insufficient_work of string
