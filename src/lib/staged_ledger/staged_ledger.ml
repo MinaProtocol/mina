@@ -44,11 +44,7 @@ module T = struct
       | Non_zero_fee_excess of
           Scan_state.Space_partition.t * Transaction.t With_status.t list
       | Invalid_proofs of
-          ( Ledger_proof.t
-          * Transaction_snark.Statement.t
-          * Mina_base.Sok_message.t )
-          list
-          * Error.t
+          (Ledger_proof.t * Transaction_snark.Statement.t) list * Error.t
       | Couldn't_reach_verifier of Error.t
       | Pre_diff of Pre_diff_info.Error.t
       | Insufficient_work of string
@@ -76,16 +72,12 @@ module T = struct
             pre_diff_error
       | Invalid_proofs (ts, err) ->
           Format.asprintf
-            !"Verification failed for proofs with (statement, work_id, \
-              prover): %{sexp: (Transaction_snark.Statement.t * int * string) \
-              list}\n\
+            !"Verification failed for proofs with (statement, work_id): \
+              %{sexp: (Transaction_snark.Statement.t * int) list}\n\
               Error:\n\
               %s"
-            (List.map ts ~f:(fun (_p, s, m) ->
-                 ( s
-                 , Transaction_snark.Statement.hash s
-                 , Yojson.Safe.to_string
-                   @@ Public_key.Compressed.to_yojson m.prover ) ) )
+            (List.map ts ~f:(fun (_p, s) ->
+                 (s, Transaction_snark.Statement.hash s) ) )
             (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err))
       | Insufficient_work str ->
           str
@@ -119,25 +111,19 @@ module T = struct
   let verify_proofs ~logger ~verifier proofs =
     let statements () =
       `List
-        (List.map proofs ~f:(fun (_, s, _) ->
+        (List.map proofs ~f:(fun (_, s) ->
              Transaction_snark.Statement.to_yojson s ) )
     in
     let log_error err_str ~metadata =
       [%log warn]
         ~metadata:
-          ( [ ("statements", statements ())
-            ; ("error", `String err_str)
-            ; ( "sok_messages"
-              , `List
-                  (List.map proofs ~f:(fun (_, _, m) -> Sok_message.to_yojson m))
-              )
-            ]
+          ( [ ("statements", statements ()); ("error", `String err_str) ]
           @ metadata )
         "Invalid transaction snark for statement $statement: $error" ;
       Deferred.return (Or_error.error_string err_str)
     in
     if
-      List.exists proofs ~f:(fun (proof, statement, _msg) ->
+      List.exists proofs ~f:(fun (proof, statement) ->
           not
             (Transaction_snark.Statement.equal
                (Ledger_proof.statement proof)
@@ -147,7 +133,7 @@ module T = struct
         ~metadata:
           [ ( "statements_from_proof"
             , `List
-                (List.map proofs ~f:(fun (p, _, _) ->
+                (List.map proofs ~f:(fun (p, _) ->
                      Transaction_snark.Statement.to_yojson
                        (Ledger_proof.statement p) ) ) )
           ]
@@ -155,7 +141,7 @@ module T = struct
       let start = Time.now () in
       match%map
         Verifier.verify_transaction_snarks verifier
-          (List.map proofs ~f:(fun (proof, _, _msg) -> proof))
+          (List.map proofs ~f:(fun (proof, _) -> proof))
       with
       | Ok b ->
           let time_ms = Time.abs_diff (Time.now ()) start |> Time.Span.to_ms in
@@ -163,7 +149,7 @@ module T = struct
             ~metadata:
               [ ( "work_id"
                 , `List
-                    (List.map proofs ~f:(fun (_, s, _) ->
+                    (List.map proofs ~f:(fun (_, s) ->
                          `Int (Transaction_snark.Statement.hash s) ) ) )
               ; ("time", `Float time_ms)
               ]
@@ -174,7 +160,7 @@ module T = struct
             ~metadata:
               [ ( "statement"
                 , `List
-                    (List.map proofs ~f:(fun (_, s, _) ->
+                    (List.map proofs ~f:(fun (_, s) ->
                          Transaction_snark.Statement.to_yojson s ) ) )
               ; ("error", Error_json.error_to_yojson e)
               ]
@@ -191,9 +177,8 @@ module T = struct
   let verify ~logger ~verifier job_msg_proofs =
     let open Deferred.Let_syntax in
     match
-      map_opt job_msg_proofs ~f:(fun (job, msg, proof) ->
-          Option.map (Scan_state.statement_of_job job) ~f:(fun s ->
-              (proof, s, msg) ) )
+      map_opt job_msg_proofs ~f:(fun (job, _msg, proof) ->
+          Option.map (Scan_state.statement_of_job job) ~f:(fun s -> (proof, s)) )
     with
     | None ->
         Deferred.return
@@ -224,12 +209,11 @@ module T = struct
       verify_proofs ~logger ~verifier
         (List.map ts
            ~f:(fun
-                ({ proof; sok_msg; _ } :
+                ({ proof; sok_msg = _; _ } :
                   Scan_state.Ledger_proof_with_sok_message.t )
               ->
              ( Ledger_proof.Cached.read_proof_from_disk proof
-             , Ledger_proof.Cached.statement proof
-             , sok_msg ) ) )
+             , Ledger_proof.Cached.statement proof ) ) )
   end
 
   module Statement_scanner_with_proofs =
