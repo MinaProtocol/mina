@@ -416,7 +416,8 @@ module Transaction_pool = struct
 end
 
 module Snark_pool = struct
-  type proof_envelope = Ledger_proof.t One_or_two.t Envelope.Incoming.t
+  type proof_envelope =
+    (Ledger_proof.t One_or_two.t * Mina_base.Sok_message.t) Envelope.Incoming.t
   [@@deriving sexp]
 
   (* We don't use partial verification here. *)
@@ -436,6 +437,26 @@ module Snark_pool = struct
     | Error e ->
         Error (`Crash e)
 
+  (* This check is placed in batcher in order to
+     have both positive and negative tests defined for the component.
+
+     If the check would be performed outside of batcher,
+     tests need would have to be moved to another place as well. *)
+  let sok_digest_check (proof, message) =
+    Mina_base.Sok_message.Digest.equal
+      (Mina_base.Sok_message.digest message)
+      (Ledger_proof.sok_digest proof)
+
+  let verify_batch ~verifier ps =
+    if List.for_all ps ~f:sok_digest_check then
+      Verifier.verify_transaction_snarks verifier (List.map ~f:fst ps)
+    else
+      let e =
+        Error.of_string
+          "proof's sok message digest does not match the sok message"
+      in
+      Deferred.Or_error.return (Error e)
+
   let create ~proof_cache_db ~logger verifier : t =
     create
       ~proof_cache_db
@@ -452,11 +473,11 @@ module Snark_pool = struct
         let ps =
           List.concat_map ps0 ~f:(function
               | `Partially_validated env | `Init env ->
-              let ps = env.data in
-              One_or_two.to_list ps )
+              let ps, message = env.data in
+              One_or_two.map ps ~f:(fun p -> (p, message)) |> One_or_two.to_list )
         in
         let open Deferred.Or_error.Let_syntax in
-        let%map result = Verifier.verify_transaction_snarks verifier ps in
+        let%map result = verify_batch ~verifier ps in
         match result with
         | Ok () ->
             List.map ps0 ~f:(fun _ -> `Valid ())
@@ -466,13 +487,15 @@ module Snark_pool = struct
 
   module Work_key = struct
     module T = struct
-      type t = Transaction_snark.Statement.t One_or_two.t Envelope.Incoming.t
+      type t =
+        (Transaction_snark.Statement.t One_or_two.t * Mina_base.Sok_message.t)
+        Envelope.Incoming.t
       [@@deriving sexp, compare]
     end
 
     let of_proof_envelope t =
-      Envelope.Incoming.map t ~f:(fun ps ->
-          One_or_two.map ~f:Ledger_proof.statement ps )
+      Envelope.Incoming.map t ~f:(fun (ps, message) ->
+          (One_or_two.map ~f:Ledger_proof.statement ps, message) )
 
     include T
     include Comparable.Make (T)
@@ -515,8 +538,10 @@ module Snark_pool = struct
           let%bind statements =
             One_or_two.gen Transaction_snark.Statement.gen
           in
-          let%map { fee = _; prover = _ } = Fee_with_prover.gen in
-          One_or_two.map statements ~f:Ledger_proof.For_tests.mk_dummy_proof
+          let%map { fee; prover } = Fee_with_prover.gen in
+          let message = Mina_base.Sok_message.create ~fee ~prover in
+          ( One_or_two.map statements ~f:Ledger_proof.For_tests.mk_dummy_proof
+          , message )
         in
         Envelope.Incoming.gen data_gen
 
@@ -534,9 +559,11 @@ module Snark_pool = struct
           let sok_digest =
             Mina_base.Sok_message.(digest (create ~fee ~prover:invalid_prover))
           in
-          One_or_two.map statements ~f:(fun statement ->
-              Ledger_proof.create ~statement ~sok_digest
-                ~proof:(Lazy.force Proof.transaction_dummy) )
+          let message = Mina_base.Sok_message.create ~fee ~prover in
+          ( One_or_two.map statements ~f:(fun statement ->
+                Ledger_proof.create ~statement ~sok_digest
+                  ~proof:(Lazy.force Proof.transaction_dummy) )
+          , message )
         in
         Envelope.Incoming.gen data_gen
 
