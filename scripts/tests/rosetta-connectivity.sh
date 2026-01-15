@@ -27,7 +27,7 @@
 #   -h, --help          Display usage information
 #
 # EXAMPLES:
-#   ./rosetta-connectivity.sh --tag 3.0.3-bullseye-berkeley --network devnet
+#   ./rosetta-connectivity.sh --tag 3.0.3-bullseye-devnet --network devnet
 #   ./rosetta-connectivity.sh --tag 3.0.3 --network mainnet --run-load-test --timeout 1200
 #   ./rosetta-connectivity.sh --tag 3.0.3 --run-compatibility-test develop
 #   ./rosetta-connectivity.sh --tag 3.0.3 --run-compatibility-test develop --upgrade-scripts-workdir /custom/path
@@ -61,7 +61,7 @@ USAGE="Usage: $0 [-t docker-tag] [-n network]
   --upgrade-scripts-workdir Working directory for upgrade/downgrade scripts. Default=$UPGRADE_SCRIPTS_WORKDIR
   -h, --help                Show help
 
-Example: $0 --network devnet --tag 3.0.3-bullseye-berkeley
+Example: $0 --network devnet --tag 3.0.3-bullseye-devnet
 Example: $0 --network devnet --tag 3.0.3 --run-compatibility-test develop
 Example: $0 --network devnet --tag 3.0.3 --run-compatibility-test develop --upgrade-scripts-workdir /custom/path
 
@@ -88,9 +88,9 @@ while [[ "$#" -gt 0 ]]; do case $1 in
     *) echo "Unknown parameter passed: $1"; usage; exit 1;;
 esac; shift; done
 
-if [[ "$NETWORK" != "devnet" && "$NETWORK" != "mainnet" && "$NETWORK" != "berkeley" ]]; then
+if [[ "$NETWORK" != "devnet" && "$NETWORK" != "mainnet" ]]; then
     echo "❌  Invalid network: $NETWORK"
-    echo "❌  Network must be either 'devnet' or 'mainnet' or 'berkeley'"
+    echo "❌  Network must be either 'devnet' or 'mainnet'"
     echo ""
     usage; exit 1;
 fi

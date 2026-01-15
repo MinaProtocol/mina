@@ -89,7 +89,7 @@ let dockerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "mina-daemon"
-            , DaemonLegacyHardfork = "mina-daemon-hardfork"
+            , DaemonLegacyHardfork = "mina-daemon-pre-hardfork"
             , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
@@ -184,7 +184,7 @@ let Tag =
           , version = "\\\${MINA_DOCKER_TAG}"
           , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
-          , network = Network.Type.Berkeley
+          , network = Network.Type.TestnetGeneric
           , remove_profile_from_name = False
           }
       }
@@ -208,19 +208,20 @@ let dockerTag =
 
           in  merge
                 { Daemon =
-                    "${spec.version}-${Network.lowerName
+                    "${spec.version}-${Network.debianSuffix
                                          spec.network}${profile_part}${build_flags_part}"
                 , DaemonLegacyHardfork =
-                    "${spec.version}-${Network.lowerName
+                    "${spec.version}-${Network.debianSuffix
                                          spec.network}${profile_part}"
                 , DaemonAutoHardfork =
-                    "${spec.version}-${Network.lowerName
+                    "${spec.version}-${Network.debianSuffix
                                          spec.network}${profile_part}"
                 , Archive = "${spec.version}${build_flags_part}"
                 , LogProc = "${spec.version}"
                 , TestExecutive = "${spec.version}"
                 , BatchTxn = "${spec.version}"
-                , Rosetta = "${spec.version}-${Network.lowerName spec.network}"
+                , Rosetta =
+                    "${spec.version}-${Network.debianSuffix spec.network}"
                 , ZkappTestTransaction = "${spec.version}"
                 , FunctionalTestSuite = "${spec.version}${build_flags_part}"
                 , Toolchain = "${spec.version}"

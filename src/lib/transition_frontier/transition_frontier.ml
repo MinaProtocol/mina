@@ -449,8 +449,7 @@ let add_breadcrumb_exn t breadcrumb =
       [ ( "state_hash"
         , State_hash.to_yojson
             (Breadcrumb.state_hash (Full_frontier.best_tip t.full_frontier)) )
-      ; ( "n"
-        , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier) )
+      ; ("n", `Int (Full_frontier.size t.full_frontier))
       ]
     "PRE: ($state_hash, $n)" ;
   [%str_log' trace t.logger]
@@ -475,8 +474,7 @@ let add_breadcrumb_exn t breadcrumb =
       [ ( "state_hash"
         , State_hash.to_yojson
             (Breadcrumb.state_hash @@ Full_frontier.best_tip t.full_frontier) )
-      ; ( "n"
-        , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier) )
+      ; ("n", `Int (Full_frontier.size t.full_frontier))
       ]
     "POST: ($state_hash, $n)" ;
   let user_cmds =
@@ -531,11 +529,11 @@ include struct
 
   let all_breadcrumbs = proxy1 all_breadcrumbs
 
+  let all_state_hashes = proxy1 all_state_hashes
+
   let visualize ~filename = proxy1 (visualize ~filename)
 
   let visualize_to_string = proxy1 visualize_to_string
-
-  let iter = proxy1 iter
 
   let successors = proxy1 successors
 
@@ -572,11 +570,6 @@ module For_tests = struct
     Mina_ledger.Ledger_transfer.Make
       (Mina_ledger.Ledger)
       (Mina_ledger.Ledger.Db)
-  open Full_frontier.For_tests
-
-  let proxy2 f { full_frontier = x; _ } { full_frontier = y; _ } = f x y
-
-  let equal = proxy2 equal
 
   let rec deferred_rose_tree_iter (Mina_stdlib.Rose_tree.T (root, trees)) ~f =
     let%bind () = f root in

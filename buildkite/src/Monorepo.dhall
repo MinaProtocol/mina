@@ -24,6 +24,8 @@ let PipelineScopeFilter = ./Pipeline/ScopeFilter.dhall
 
 let Size = ./Command/Size.dhall
 
+let MainlineBranch = ./Pipeline/MainlineBranch.dhall
+
 let prefixCommands =
       [ Cmd.run
           "git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt"
@@ -54,8 +56,11 @@ let commands
                   ++  " --filter-mode ${PipelineFilterMode.show filterMode} "
                   ++  " --selection-mode ${PipelineJobSelection.show
                                              selection} "
+                  ++  " --mainline-branches ${MainlineBranch.join
+                                                MainlineBranch.Full}"
                   ++  " --jobs ./buildkite/src/gen"
                   ++  " --git-diff-file _computed_diff.txt "
+                  ++  " --debug "
                 )
 
 in      \ ( args

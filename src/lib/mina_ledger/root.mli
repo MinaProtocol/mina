@@ -82,9 +82,9 @@ val create_temporary :
 (** Retrieve the hash of the merkle root of the root ledger *)
 val merkle_root : t -> root_hash
 
-(** Make a checkpoint of the root ledger and return a new root ledger backed
-      by that checkpoint. Throws an exception if the config does not match the
-      backing type of the root.  *)
+(** Make a checkpoint of the root ledger and return a new root ledger backed by
+    that checkpoint. Throws an exception if the config does not match the
+    backing type of the root. *)
 val create_checkpoint : t -> config:Config.t -> unit -> t
 
 (** Make a checkpoint of the root ledger. Throws an exception if the config
@@ -104,6 +104,11 @@ val make_converting :
      hardfork_slot:Mina_numbers.Global_slot_since_genesis.t
   -> t
   -> t Async.Deferred.t
+
+(** Create a copy of the given root ledger. The resulting root will have a
+    backing that matches the one given in [config]; the stable database will be
+    migrated at the destination if necessary. *)
+val copy_reconfigured : t -> config:Config.t -> unit -> t Async.Deferred.t
 
 (** View the root ledger as an unmasked [Any_ledger] so it can be used by code
       that does not need to know how the root is implemented *)
