@@ -44,9 +44,9 @@ module Transaction_with_witness : sig
 end
 
 module Ledger_proof_with_hash : sig
-  type t = { proof : Ledger_proof.Cached.t; hash : Aux_hash.t }
+  type t = (Ledger_proof.Cached.t, Aux_hash.t) With_hash.t
 
-  val create : proof:Ledger_proof.Cached.t -> t
+  val create : Ledger_proof.Cached.t -> t
 end
 
 module Available_job : sig

@@ -248,8 +248,7 @@ let scan_state_merge_node ~proof_cache_db :
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
       Transaction_snark_scan_state.Ledger_proof_with_hash.create
-        ~proof:
-          (Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof)
+        (Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof)
     in
     let right =
       let sok_msg : Mina_base.Sok_message.t =
@@ -266,8 +265,7 @@ let scan_state_merge_node ~proof_cache_db :
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
       Transaction_snark_scan_state.Ledger_proof_with_hash.create
-        ~proof:
-          (Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof)
+        (Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof)
     in
     Full { left; right; seq_no = 1; status = Todo }
   in

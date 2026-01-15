@@ -208,7 +208,8 @@ module T = struct
     let verify ~verifier:{ logger; verifier } ts =
       verify_proofs ~logger ~verifier
         (List.map ts
-           ~f:(fun ({ proof; _ } : Scan_state.Ledger_proof_with_hash.t) ->
+           ~f:(fun ({ data = proof; _ } : Scan_state.Ledger_proof_with_hash.t)
+              ->
              ( Ledger_proof.Cached.read_proof_from_disk proof
              , Ledger_proof.Cached.statement proof ) ) )
   end
