@@ -145,9 +145,7 @@ module Ledger_proof_with_sok_message = struct
     [@@@no_toplevel_latest_type]
 
     module V2 = struct
-      type t =
-        { proof : Ledger_proof.Stable.V2.t; sok_msg : Sok_message.Stable.V1.t }
-      [@@deriving sexp]
+      type t = { proof : Ledger_proof.Stable.V2.t } [@@deriving sexp]
 
       let to_latest = Fn.id
     end
@@ -161,19 +159,15 @@ module Ledger_proof_with_sok_message = struct
     in
     Digestif.SHA256.get h |> Aux_hash.of_sha256
 
-  type t =
-    { proof : Ledger_proof.Cached.t
-    ; sok_msg : Sok_message.t
-    ; hash : Aux_hash.t
-    }
+  type t = { proof : Ledger_proof.Cached.t; hash : Aux_hash.t }
 
-  let create ~(proof : Ledger_proof.Cached.t) ~(sok_msg : Sok_message.t) =
+  let create ~(proof : Ledger_proof.Cached.t) =
     let hash =
       let proof = Ledger_proof.Cached.read_proof_from_disk proof in
-      let v = { Stable.Latest.proof; sok_msg } in
+      let v = { Stable.Latest.proof } in
       hash v
     in
-    { proof; sok_msg; hash }
+    { proof; hash }
 end
 
 module Available_job = struct
@@ -1439,11 +1433,8 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in
   let deconstruct_work (w : Transaction_snark_work.t) :
       Ledger_proof_with_sok_message.t list =
-    let fee = Transaction_snark_work.fee w in
-    let prover = Transaction_snark_work.prover w in
     One_or_two.map (Transaction_snark_work.proofs w) ~f:(fun proof ->
-        Ledger_proof_with_sok_message.create ~proof
-          ~sok_msg:(Sok_message.create ~fee ~prover) )
+        Ledger_proof_with_sok_message.create ~proof )
     |> One_or_two.to_list
   in
   (*get incomplete transactions from previous proof which will be completed in
@@ -1554,11 +1545,10 @@ let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
     { Stable.Latest.scan_state = uncached
     ; previous_incomplete_zkapp_updates = tx_list, border_status
     } =
-  let f1 ({ Ledger_proof_with_sok_message.Stable.Latest.proof; sok_msg } as v) =
+  let f1 ({ Ledger_proof_with_sok_message.Stable.Latest.proof } as v) =
     let hash = Ledger_proof_with_sok_message.hash v in
     { Ledger_proof_with_sok_message.proof =
         Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
-    ; sok_msg
     ; hash
     }
   in
@@ -1580,10 +1570,9 @@ let read_all_proofs_from_disk
     { scan_state = cached
     ; previous_incomplete_zkapp_updates = tx_list, border_status
     } =
-  let f1 { Ledger_proof_with_sok_message.proof; sok_msg; _ } =
+  let f1 { Ledger_proof_with_sok_message.proof; _ } =
     { Ledger_proof_with_sok_message.Stable.Latest.proof =
         Ledger_proof.Cached.read_proof_from_disk proof
-    ; sok_msg
     }
   in
   let scan_state =
