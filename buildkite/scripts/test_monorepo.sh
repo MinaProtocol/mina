@@ -99,20 +99,9 @@ assert_not_contains() {
   fi
 }
 
-# Source the functions from monorepo.sh for unit testing
+# Source the functions from monorepo_lib.sh for unit testing
 source_monorepo_functions() {
-  # Extract and source only the functions we want to test
-  # We'll create a temporary file with just the functions
-
-  # Extract functions from monorepo.sh
-  sed -n '/^find_closest_ancestor()/,/^}/p' "$MONOREPO_SCRIPT" > "$TEST_DIR/functions.sh"
-  sed -n '/^has_matching_tags()/,/^}/p' "$MONOREPO_SCRIPT" >> "$TEST_DIR/functions.sh"
-  sed -n '/^scope_matches()/,/^}/p' "$MONOREPO_SCRIPT" >> "$TEST_DIR/functions.sh"
-  sed -n '/^check_exclude_if()/,/^}/p' "$MONOREPO_SCRIPT" >> "$TEST_DIR/functions.sh"
-  sed -n '/^check_include_if()/,/^}/p' "$MONOREPO_SCRIPT" >> "$TEST_DIR/functions.sh"
-  sed -n '/^select_job()/,/^}/p' "$MONOREPO_SCRIPT" >> "$TEST_DIR/functions.sh"
-
-  source "$TEST_DIR/functions.sh"
+  source "$SCRIPT_DIR/monorepo_lib.sh"
 }
 
 # Test: has_matching_tags with filter_any mode
@@ -238,7 +227,7 @@ spec:
   tags: [Lint]
   scope: [PullRequest]
   excludeIf:
-    - ancestor: Mesa
+    - ancestor: mesa
       reason: "Test exclusion"
 EOF
 
@@ -293,9 +282,9 @@ EOF
   assert_contains "$output" "Skipping excludeIf" "Should show skip messages for non-ancestor items"
 }
 
-# Test: check_exclude_if case-insensitive matching
-test_check_exclude_if_case_insensitive() {
-  echo -e "\n${YELLOW}Testing: check_exclude_if (case-insensitive)${NC}"
+# Test: check_exclude_if exact case matching
+test_check_exclude_if_exact_case() {
+  echo -e "\n${YELLOW}Testing: check_exclude_if (exact case matching)${NC}"
 
   cat > "$TEST_DIR/ExcludeCase.yml" << 'EOF'
 spec:
@@ -303,13 +292,17 @@ spec:
   tags: [Lint]
   scope: [PullRequest]
   excludeIf:
-    - ancestor: MESA
-      reason: "Test case insensitive"
+    - ancestor: mesa
+      reason: "Test exact case"
 EOF
 
   local result
   result=$(check_exclude_if "$TEST_DIR/ExcludeCase.yml" "ExcludeCase" "mesa" 2>/dev/null)
-  assert_equals "1" "$result" "Should exclude with case-insensitive matching"
+  assert_equals "1" "$result" "Should exclude with exact case matching"
+
+  # Test that different case does NOT match
+  result=$(check_exclude_if "$TEST_DIR/ExcludeCase.yml" "ExcludeCase" "MESA" 2>/dev/null)
+  assert_equals "0" "$result" "Should NOT exclude when case differs"
 }
 
 # Test: check_include_if with no includeIf
@@ -338,8 +331,8 @@ spec:
   tags: [Lint]
   scope: [PullRequest]
   includeIf:
-    - ancestor: Mesa
-      reason: "Only run on Mesa descendants"
+    - ancestor: mesa
+      reason: "Only run on mesa descendants"
 EOF
 
   local result output
@@ -382,12 +375,12 @@ spec:
   tags: [Lint]
   scope: [PullRequest]
   includeIf:
-    - ancestor: Develop
-      reason: "Run on Develop"
-    - ancestor: Mesa
-      reason: "Run on Mesa"
-    - ancestor: Master
-      reason: "Run on Master"
+    - ancestor: develop
+      reason: "Run on develop"
+    - ancestor: mesa
+      reason: "Run on mesa"
+    - ancestor: master
+      reason: "Run on master"
 EOF
 
   local result
@@ -405,10 +398,10 @@ spec:
   tags: [Lint]
   scope: [PullRequest]
   includeIf:
-    - ancestor: Develop
-      reason: "Run on Develop"
-    - ancestor: Master
-      reason: "Run on Master"
+    - ancestor: develop
+      reason: "Run on develop"
+    - ancestor: master
+      reason: "Run on master"
 EOF
 
   local result
@@ -416,9 +409,9 @@ EOF
   assert_equals "0" "$result" "Should exclude when no includeIf conditions match"
 }
 
-# Test: check_include_if case-insensitive matching
-test_check_include_if_case_insensitive() {
-  echo -e "\n${YELLOW}Testing: check_include_if (case-insensitive)${NC}"
+# Test: check_include_if exact case matching
+test_check_include_if_exact_case() {
+  echo -e "\n${YELLOW}Testing: check_include_if (exact case matching)${NC}"
 
   cat > "$TEST_DIR/IncludeCase.yml" << 'EOF'
 spec:
@@ -426,13 +419,17 @@ spec:
   tags: [Lint]
   scope: [PullRequest]
   includeIf:
-    - ancestor: MESA
-      reason: "Test case insensitive"
+    - ancestor: mesa
+      reason: "Test exact case"
 EOF
 
   local result
   result=$(check_include_if "$TEST_DIR/IncludeCase.yml" "IncludeCase" "mesa" 2>/dev/null)
-  assert_equals "1" "$result" "Should include with case-insensitive matching"
+  assert_equals "1" "$result" "Should include with exact case matching"
+
+  # Test that different case does NOT match
+  result=$(check_include_if "$TEST_DIR/IncludeCase.yml" "IncludeCase" "MESA" 2>/dev/null)
+  assert_equals "0" "$result" "Should NOT include when case differs"
 }
 
 # Test: check_include_if with non-ancestor includeIf items
@@ -446,8 +443,8 @@ spec:
   scope: [PullRequest]
   includeIf:
     - someOtherField: value
-    - ancestor: Mesa
-      reason: "Run on Mesa"
+    - ancestor: mesa
+      reason: "Run on mesa"
     - futureType: something
 EOF
 
@@ -615,13 +612,13 @@ main() {
   test_check_exclude_if_matching
   test_check_exclude_if_not_matching
   test_check_exclude_if_skip_non_ancestor
-  test_check_exclude_if_case_insensitive
+  test_check_exclude_if_exact_case
   test_check_include_if_no_conditions
   test_check_include_if_matching
   test_check_include_if_not_matching
   test_check_include_if_multiple_one_matches
   test_check_include_if_multiple_none_match
-  test_check_include_if_case_insensitive
+  test_check_include_if_exact_case
   test_check_include_if_skip_non_ancestor
 
   # Run integration tests
