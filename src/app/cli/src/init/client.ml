@@ -1855,7 +1855,7 @@ let compile_time_constants =
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
                  ~constraint_constants ~logger:(Logger.null ()) ~proof_level
                  ~cli_proof_level:None ~genesis_dir
-           >>| Or_error.ok_exn
+           >>| Or_error.ok_exn >>| fst
          in
          let all_constants =
            `Assoc
