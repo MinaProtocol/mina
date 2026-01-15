@@ -228,6 +228,9 @@ module T = struct
                 ({ proof; sok_msg = _; _ } :
                   Scan_state.Ledger_proof_with_sok_message.t )
               ->
+             (* Digest check is deliberately removed, in anticipation
+                of forthcoming removal of sok message from the
+                scan state's merge nodes. *)
              ( Ledger_proof.Cached.read_proof_from_disk proof
              , Ledger_proof.Cached.statement proof ) ) )
   end
