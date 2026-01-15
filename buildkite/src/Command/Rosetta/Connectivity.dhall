@@ -78,7 +78,7 @@ let command
                   ]
                 # RunInToolchain.runInToolchain
                     (Benchmarks.toEnvList Benchmarks.Type::{=})
-                    "ls /workdir && cat /workdir/rosetta.perf && /workdir/rosetta.perf | influx write"
+                    "./buildkite/scripts/bench/send.sh"
             , label =
                 "Rosetta ${Network.lowerName spec.network} connectivity test "
             , key =
