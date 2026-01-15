@@ -348,9 +348,25 @@ struct
               , Some ("Error verifying transaction snark: $error", metadata) )
           else Deferred.return ()
         in
-        let _message = Mina_base.Sok_message.create ~fee ~prover in
+        let message = Mina_base.Sok_message.create ~fee ~prover in
         let verify proofs =
           let open Deferred.Let_syntax in
+          let sok_digest_check () =
+            One_or_two.Deferred_result.map proofs ~f:(fun (proof, stmt) ->
+                if
+                  Mina_base.Sok_message.Digest.equal
+                    (Mina_base.Sok_message.digest message)
+                    (Ledger_proof.sok_digest proof)
+                then Deferred.Result.return ()
+                else
+                  let e =
+                    Error.of_string
+                      "proof's sok message digest does not match the sok \
+                       message"
+                  in
+                  let%map () = log_and_punish stmt e in
+                  Error (Invalid e) )
+          in
           let statement_check () =
             One_or_two.Deferred_result.map proofs ~f:(fun (p, s) ->
                 let proof_statement = Ledger_proof.statement p in
@@ -424,6 +440,7 @@ struct
             invalid "work not referenced" )
           else
             let%bind.Deferred.Result _ = statement_check () in
+            let%bind.Deferred.Result _ = sok_digest_check () in
             let log ?punish e =
               Deferred.List.iter (One_or_two.to_list proofs) ~f:(fun (_, s) ->
                   log_and_punish ?punish s e )

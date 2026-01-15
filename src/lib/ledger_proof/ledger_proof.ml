@@ -17,6 +17,8 @@ let statement (t : t) = Transaction_snark.statement t
 
 let statement_with_sok (t : t) = Transaction_snark.statement_with_sok t
 
+let sok_digest (t : t) = Transaction_snark.sok_digest t
+
 let statement_target (t : Mina_state.Snarked_ledger_state.t) = t.target
 
 let statement_with_sok_target (t : Mina_state.Snarked_ledger_state.With_sok.t) =

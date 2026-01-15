@@ -175,24 +175,40 @@ module T = struct
                match f x with Some y -> y | None -> return None ) ) )
 
   let verify ~logger ~verifier job_msg_proofs =
-    let open Deferred.Let_syntax in
-    match
+    let%bind.Deferred.Result proof_statement_msgs =
       map_opt job_msg_proofs ~f:(fun (job, _msg, proof) ->
           Option.map (Scan_state.statement_of_job job) ~f:(fun s -> (proof, s)) )
-    with
-    | None ->
-        Deferred.return
-          ( Or_error.error_string "Error creating statement from job"
-          |> to_staged_ledger_or_error )
-    | Some proof_statement_msgs -> (
-        match%map verify_proofs ~logger ~verifier proof_statement_msgs with
-        | Ok (Ok ()) ->
-            Ok ()
-        | Ok (Error err) ->
-            Error
-              (Staged_ledger_error.Invalid_proofs (proof_statement_msgs, err))
-        | Error e ->
-            Error (Couldn't_reach_verifier e) )
+      |> function
+      | None ->
+          Deferred.return
+            ( Or_error.error_string "Error creating statement from job"
+            |> to_staged_ledger_or_error )
+      | Some proof_statement_msgs ->
+          Deferred.Result.return proof_statement_msgs
+    in
+    let%bind.Deferred.Result () =
+      Deferred.return @@ Result.all_unit
+      @@ List.map job_msg_proofs ~f:(fun (_, msg, proof) ->
+             if
+               Sok_message.Digest.equal
+                 (Ledger_proof.sok_digest proof)
+                 (Sok_message.digest msg)
+             then Ok ()
+             else
+               Error
+                 (Staged_ledger_error.Invalid_proofs
+                    ( proof_statement_msgs
+                    , Error.of_string
+                        "proof's sok message digest does not match the sok \
+                         message" ) ) )
+    in
+    match%map verify_proofs ~logger ~verifier proof_statement_msgs with
+    | Ok (Ok ()) ->
+        Ok ()
+    | Ok (Error err) ->
+        Error (Staged_ledger_error.Invalid_proofs (proof_statement_msgs, err))
+    | Error e ->
+        Error (Couldn't_reach_verifier e)
 
   module Statement_scanner = struct
     include Scan_state.Make_statement_scanner (struct
