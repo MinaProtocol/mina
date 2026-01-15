@@ -140,21 +140,10 @@ module Transaction_with_witness = struct
 end
 
 module Ledger_proof_with_sok_message = struct
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V2 = struct
-      type t = { proof : Ledger_proof.Stable.V2.t } [@@deriving sexp]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let hash (v : Stable.Latest.t) =
+  let hash (v : Ledger_proof.Stable.Latest.t) =
     let h = Digestif.SHA256.init () in
     let h =
-      Binable.to_string (module Ledger_proof.Stable.Latest) v.proof
+      Binable.to_string (module Ledger_proof.Stable.Latest) v
       |> Digestif.SHA256.feed_string h
     in
     Digestif.SHA256.get h |> Aux_hash.of_sha256
@@ -162,12 +151,8 @@ module Ledger_proof_with_sok_message = struct
   type t = { proof : Ledger_proof.Cached.t; hash : Aux_hash.t }
 
   let create ~(proof : Ledger_proof.Cached.t) =
-    let hash =
-      let proof = Ledger_proof.Cached.read_proof_from_disk proof in
-      let v = { Stable.Latest.proof } in
-      hash v
-    in
-    { proof; hash }
+    let proof_stable = Ledger_proof.Cached.read_proof_from_disk proof in
+    { proof; hash = hash proof_stable }
 end
 
 module Available_job = struct
@@ -291,7 +276,7 @@ module Stable = struct
   module V3 = struct
     type t =
       { scan_state :
-          ( Ledger_proof_with_sok_message.Stable.V2.t
+          ( Ledger_proof.Stable.V2.t
           , Transaction_with_witness.Stable.V3.t )
           Parallel_scan.State.Stable.V1.t
       ; previous_incomplete_zkapp_updates :
@@ -303,7 +288,7 @@ module Stable = struct
 
     let hash (t : t) =
       hash_generic
-        ~ledger_proof_hash:(fun (x : Ledger_proof_with_sok_message.Stable.V2.t) ->
+        ~ledger_proof_hash:(fun (x : Ledger_proof.Stable.V2.t) ->
           Ledger_proof_with_sok_message.hash x )
         ~tx_witness_hash:(fun (x : Transaction_with_witness.Stable.V3.t) ->
           Transaction_with_witness.hash x )
@@ -1545,11 +1530,10 @@ let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
     { Stable.Latest.scan_state = uncached
     ; previous_incomplete_zkapp_updates = tx_list, border_status
     } =
-  let f1 ({ Ledger_proof_with_sok_message.Stable.Latest.proof } as v) =
-    let hash = Ledger_proof_with_sok_message.hash v in
+  let f1 proof =
     { Ledger_proof_with_sok_message.proof =
         Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
-    ; hash
+    ; hash = Ledger_proof_with_sok_message.hash proof
     }
   in
   { scan_state =
@@ -1570,10 +1554,8 @@ let read_all_proofs_from_disk
     { scan_state = cached
     ; previous_incomplete_zkapp_updates = tx_list, border_status
     } =
-  let f1 { Ledger_proof_with_sok_message.proof; _ } =
-    { Ledger_proof_with_sok_message.Stable.Latest.proof =
-        Ledger_proof.Cached.read_proof_from_disk proof
-    }
+  let f1 { Ledger_proof_with_sok_message.proof; hash = _ } =
+    Ledger_proof.Cached.read_proof_from_disk proof
   in
   let scan_state =
     Parallel_scan.State.map ~f1
