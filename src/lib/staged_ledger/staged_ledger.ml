@@ -31,7 +31,7 @@ module Pre_statement = struct
     ; first_pass_ledger_target_hash : Ledger_hash.t
     ; pending_coinbase_stack_source : Pending_coinbase.Stack_versioned.t
     ; pending_coinbase_stack_target : Pending_coinbase.Stack_versioned.t
-    ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
+    ; init_stack : Pending_coinbase.Stack_versioned.t
     }
 end
 
@@ -503,9 +503,7 @@ module T = struct
       ; first_pass_ledger_target_hash = target_ledger_hash
       ; pending_coinbase_stack_source = pending_coinbase_stack_state.pc.source
       ; pending_coinbase_stack_target = pending_coinbase_target
-      ; init_stack =
-          Transaction_snark.Pending_coinbase_stack_state.Init_stack.Base
-            pending_coinbase_stack_state.init_stack
+      ; init_stack = pending_coinbase_stack_state.init_stack
       }
     , { Stack_state_with_init_stack.pc =
           { source = pending_coinbase_target; target = pending_coinbase_target }
