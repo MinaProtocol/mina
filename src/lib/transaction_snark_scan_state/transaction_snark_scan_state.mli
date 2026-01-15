@@ -22,7 +22,7 @@ val hash : t -> Staged_ledger_hash.Aux_hash.t
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
+    { transaction_with_status : Mina_transaction.Transaction.t With_status.t
     ; state_hash : State_hash.t * State_body_hash.t
     ; statement : Transaction_snark.Statement.t
     ; init_stack : Pending_coinbase.Stack_versioned.t
@@ -33,7 +33,7 @@ module Transaction_with_witness : sig
     }
 
   val create :
-       transaction_with_info:Mina_transaction_logic.Transaction_applied.t
+       transaction_with_status:Mina_transaction.Transaction.t With_status.t
     -> state_hash:State_hash.t * State_body_hash.t
     -> statement:Transaction_snark.Statement.t
     -> init_stack:Pending_coinbase.Stack_versioned.t

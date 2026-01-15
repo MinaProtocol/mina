@@ -28,8 +28,8 @@ module Transaction_with_witness = struct
          witness and the transaction
       *)
       type t =
-        { transaction_with_info :
-            Mina_transaction_logic.Transaction_applied.Stable.V3.t
+        { transaction_with_status :
+            Mina_transaction.Transaction.Stable.V3.t With_status.Stable.V2.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
         ; statement : Transaction_snark.Statement.Stable.V2.t
         ; init_stack : Pending_coinbase.Stack_versioned.Stable.V1.t
@@ -46,7 +46,7 @@ module Transaction_with_witness = struct
   end]
 
   type t =
-    { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
+    { transaction_with_status : Mina_transaction.Transaction.t With_status.t
     ; state_hash : State_hash.t * State_body_hash.t
     ; statement : Transaction_snark.Statement.t
     ; init_stack : Pending_coinbase.Stack_versioned.t
@@ -65,7 +65,7 @@ module Transaction_with_witness = struct
     Digestif.SHA256.get h |> Aux_hash.of_sha256
 
   let create
-      ~(transaction_with_info : Mina_transaction_logic.Transaction_applied.t)
+      ~(transaction_with_status : Mina_transaction.Transaction.t With_status.t)
       ~(state_hash : State_hash.t * State_body_hash.t)
       ~(statement : Transaction_snark.Statement.t)
       ~(init_stack : Pending_coinbase.Stack_versioned.t)
@@ -73,9 +73,9 @@ module Transaction_with_witness = struct
       ~(second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t)
       ~(block_global_slot : Mina_numbers.Global_slot_since_genesis.t) : t =
     let (v : Stable.Latest.t) =
-      { Stable.Latest.transaction_with_info =
-          Mina_transaction_logic.Transaction_applied.read_all_proofs_from_disk
-            transaction_with_info
+      { Stable.Latest.transaction_with_status =
+          With_status.map transaction_with_status
+            ~f:Mina_transaction.Transaction.read_all_proofs_from_disk
       ; Stable.Latest.state_hash
       ; statement
       ; init_stack
@@ -84,7 +84,7 @@ module Transaction_with_witness = struct
       ; block_global_slot
       }
     in
-    { transaction_with_info
+    { transaction_with_status
     ; state_hash
     ; statement
     ; init_stack
@@ -95,7 +95,7 @@ module Transaction_with_witness = struct
     }
 
   let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
-      ( { Stable.Latest.transaction_with_info
+      ( { Stable.Latest.transaction_with_status
         ; state_hash
         ; statement
         ; init_stack
@@ -103,9 +103,11 @@ module Transaction_with_witness = struct
         ; second_pass_ledger_witness
         ; block_global_slot
         } as v ) =
-    { transaction_with_info =
-        Mina_transaction_logic.Transaction_applied.write_all_proofs_to_disk
-          ~signature_kind ~proof_cache_db transaction_with_info
+    { transaction_with_status =
+        With_status.map transaction_with_status
+          ~f:
+            (Mina_transaction.Transaction.write_all_proofs_to_disk
+               ~signature_kind ~proof_cache_db )
     ; state_hash
     ; statement
     ; init_stack
@@ -116,7 +118,7 @@ module Transaction_with_witness = struct
     }
 
   let read_all_proofs_from_disk
-      { transaction_with_info
+      { transaction_with_status
       ; state_hash
       ; statement
       ; init_stack
@@ -125,9 +127,9 @@ module Transaction_with_witness = struct
       ; block_global_slot
       ; _
       } =
-    { Stable.Latest.transaction_with_info =
-        Mina_transaction_logic.Transaction_applied.read_all_proofs_from_disk
-          transaction_with_info
+    { Stable.Latest.transaction_with_status =
+        With_status.map transaction_with_status
+          ~f:Mina_transaction.Transaction.read_all_proofs_from_disk
     ; state_hash
     ; statement
     ; init_stack
@@ -315,7 +317,7 @@ let hash (t : t) =
 let create_expected_statement ~constraint_constants
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
     ~connecting_merkle_root
-    { Transaction_with_witness.transaction_with_info
+    { Transaction_with_witness.transaction_with_status
     ; state_hash
     ; first_pass_ledger_witness
     ; second_pass_ledger_witness
@@ -333,9 +335,7 @@ let create_expected_statement ~constraint_constants
     Frozen_ledger_hash.of_ledger_hash
     @@ Sparse_ledger.merkle_root second_pass_ledger_witness
   in
-  let transaction =
-    Mina_transaction_logic.Transaction_applied.transaction transaction_with_info
-  in
+  let transaction = transaction_with_status.data in
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
   let empty_local_state = Mina_state.Local_state.empty () in
@@ -789,10 +789,7 @@ module Transactions_ordered = struct
                      (first_pass_txns, second_pass_txns, _old_root)
                      (txn_with_witness : Transaction_with_witness.t)
                    ->
-                  let txn =
-                    Mina_transaction_logic.Transaction_applied.transaction
-                      txn_with_witness.transaction_with_info
-                  in
+                  let txn = txn_with_witness.transaction_with_status.data in
                   let target_first_pass_ledger =
                     txn_with_witness.statement.target.first_pass_ledger
                   in
@@ -858,10 +855,7 @@ end
 
 let extract_txn_and_global_slot (txn_with_witness : Transaction_with_witness.t)
     =
-  let txn =
-    Mina_transaction_logic.Transaction_applied.transaction_with_status
-      txn_with_witness.transaction_with_info
-  in
+  let txn = txn_with_witness.transaction_with_status in
   let state_hash = fst txn_with_witness.state_hash in
   let global_slot = txn_with_witness.block_global_slot in
   (txn, state_hash, global_slot)
@@ -1125,10 +1119,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
       | Previous_incomplete_txns.Unapplied txns ->
           Previous_incomplete_txns.Unapplied
             (List.filter txns ~f:(fun txn ->
-                 match
-                   Mina_transaction_logic.Transaction_applied.transaction
-                     txn.transaction_with_info
-                 with
+                 match txn.transaction_with_status.data with
                  | Command (Zkapp_command _) ->
                      true
                  | _ ->
@@ -1335,7 +1326,7 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
 let single_spec_of_job ~get_state :
     job -> Snark_work_lib.Spec.Single.t Or_error.t = function
   | Parallel_scan.Available_job.Base
-      { transaction_with_info
+      { transaction_with_status
       ; statement
       ; state_hash
       ; first_pass_ledger_witness
@@ -1346,8 +1337,7 @@ let single_spec_of_job ~get_state :
       } ->
       let%map.Or_error witness =
         let { With_status.data = transaction; status } =
-          Mina_transaction_logic.Transaction_applied.transaction_with_status
-            transaction_with_info
+          transaction_with_status
         in
         let%map.Or_error protocol_state_body =
           get_state (fst state_hash)

@@ -126,7 +126,9 @@ let mk_scan_state_base_node
     in
     let job : Transaction_snark_scan_state.Transaction_with_witness.t =
       Transaction_snark_scan_state.Transaction_with_witness.create
-        ~transaction_with_info
+        ~transaction_with_status:
+          (Mina_transaction_logic.Transaction_applied.transaction_with_status
+             transaction_with_info )
         ~state_hash:(state_hash, state_body_hash)
         ~statement ~init_stack ~first_pass_ledger_witness:ledger_witness
         ~second_pass_ledger_witness:ledger_witness
