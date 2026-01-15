@@ -60,7 +60,7 @@ let%test_module "Epoch ledger sync tests" =
       dir_prefix ^/ sprintf "%s_%s" s uuid
 
     let make_context () : (module CONTEXT) Deferred.t =
-      let%bind precomputed_values =
+      let%bind precomputed_values, _ =
         let runtime_config : Runtime_config.t =
           { daemon = None
           ; genesis = None
