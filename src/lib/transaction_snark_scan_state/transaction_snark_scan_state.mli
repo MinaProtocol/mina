@@ -43,7 +43,7 @@ module Transaction_with_witness : sig
     -> t
 end
 
-module Ledger_proof_with_sok_message : sig
+module Ledger_proof_with_hash : sig
   type t = { proof : Ledger_proof.Cached.t; hash : Aux_hash.t }
 
   val create : proof:Ledger_proof.Cached.t -> t
@@ -66,7 +66,7 @@ module Make_statement_scanner (Verifier : sig
 
   val verify :
        verifier:t
-    -> Ledger_proof_with_sok_message.t list
+    -> Ledger_proof_with_hash.t list
     -> unit Or_error.t Deferred.Or_error.t
 end) : sig
   val check_invariants :

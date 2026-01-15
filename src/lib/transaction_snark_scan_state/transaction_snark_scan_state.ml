@@ -139,7 +139,7 @@ module Transaction_with_witness = struct
     }
 end
 
-module Ledger_proof_with_sok_message = struct
+module Ledger_proof_with_hash = struct
   let hash (v : Ledger_proof.Stable.Latest.t) =
     let h = Digestif.SHA256.init () in
     let h =
@@ -157,7 +157,7 @@ end
 
 module Available_job = struct
   type t =
-    ( Ledger_proof_with_sok_message.t
+    ( Ledger_proof_with_hash.t
     , Transaction_with_witness.t )
     Parallel_scan.Available_job.t
 end
@@ -289,7 +289,7 @@ module Stable = struct
     let hash (t : t) =
       hash_generic
         ~ledger_proof_hash:(fun (x : Ledger_proof.Stable.V2.t) ->
-          Ledger_proof_with_sok_message.hash x )
+          Ledger_proof_with_hash.hash x )
         ~tx_witness_hash:(fun (x : Transaction_with_witness.Stable.V3.t) ->
           Transaction_with_witness.hash x )
         (t.scan_state, t.previous_incomplete_zkapp_updates)
@@ -298,7 +298,7 @@ end]
 
 type t =
   { scan_state :
-      ( Ledger_proof_with_sok_message.t
+      ( Ledger_proof_with_hash.t
       , Transaction_with_witness.t )
       Parallel_scan.State.t
   ; previous_incomplete_zkapp_updates :
@@ -308,7 +308,7 @@ type t =
 
 let hash (t : t) =
   hash_generic
-    ~ledger_proof_hash:(fun (x : Ledger_proof_with_sok_message.t) -> x.hash)
+    ~ledger_proof_hash:(fun (x : Ledger_proof_with_hash.t) -> x.hash)
     ~tx_witness_hash:(fun (x : Transaction_with_witness.t) -> x.hash)
     (t.scan_state, t.previous_incomplete_zkapp_updates)
 
@@ -420,7 +420,7 @@ module Make_statement_scanner (Verifier : sig
 
   val verify :
        verifier:t
-    -> Ledger_proof_with_sok_message.t list
+    -> Ledger_proof_with_hash.t list
     -> unit Or_error.t Deferred.Or_error.t
 end) =
 struct
@@ -729,7 +729,7 @@ struct
 
   let check_invariants (t : t) ~verifier =
     check_invariants_impl t.scan_state
-      ~merge_to_statement:(fun (x : Ledger_proof_with_sok_message.t) ->
+      ~merge_to_statement:(fun (x : Ledger_proof_with_hash.t) ->
         x.proof |> Ledger_proof.Cached.statement )
       ~verify:(Verifier.verify ~verifier)
 end
@@ -1299,7 +1299,7 @@ let partition_if_overflowing t =
 
 let snark_job_list_json t =
   let all_jobs : Job_view.t list list =
-    let fa (a : Ledger_proof_with_sok_message.t) =
+    let fa (a : Ledger_proof_with_hash.t) =
       Ledger_proof.Cached.statement a.proof
     in
     let fd (d : Transaction_with_witness.t) = d.statement in
@@ -1417,9 +1417,9 @@ let update_metrics t = Parallel_scan.update_metrics t.scan_state
 let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in
   let deconstruct_work (w : Transaction_snark_work.t) :
-      Ledger_proof_with_sok_message.t list =
+      Ledger_proof_with_hash.t list =
     One_or_two.map (Transaction_snark_work.proofs w) ~f:(fun proof ->
-        Ledger_proof_with_sok_message.create ~proof )
+        Ledger_proof_with_hash.create ~proof )
     |> One_or_two.to_list
   in
   (*get incomplete transactions from previous proof which will be completed in
@@ -1531,9 +1531,9 @@ let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
     ; previous_incomplete_zkapp_updates = tx_list, border_status
     } =
   let f1 proof =
-    { Ledger_proof_with_sok_message.proof =
+    { Ledger_proof_with_hash.proof =
         Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
-    ; hash = Ledger_proof_with_sok_message.hash proof
+    ; hash = Ledger_proof_with_hash.hash proof
     }
   in
   { scan_state =
@@ -1554,7 +1554,7 @@ let read_all_proofs_from_disk
     { scan_state = cached
     ; previous_incomplete_zkapp_updates = tx_list, border_status
     } =
-  let f1 { Ledger_proof_with_sok_message.proof; hash = _ } =
+  let f1 { Ledger_proof_with_hash.proof; hash = _ } =
     Ledger_proof.Cached.read_proof_from_disk proof
   in
   let scan_state =
