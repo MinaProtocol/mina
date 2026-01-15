@@ -1,5 +1,51 @@
+(** {1 Step - Step Circuit Prover Generation}
+
+    This module generates provers for step circuits. Step circuits run on
+    the Tick (Vesta) curve and execute application logic while verifying
+    predecessor wrap proofs.
+
+    {2 Overview}
+
+    The [Make] functor creates a step prover function [f] that:
+    1. Executes the inductive rule's main function
+    2. Verifies predecessor wrap proofs (if any)
+    3. Produces a step proof ready for wrapping
+
+    {2 Relationship to Wrap}
+
+    {v
+    Step Proof                   Wrap Proof
+    ┌─────────────────┐         ┌─────────────────┐
+    │ Application     │         │ Verifies step   │
+    │ logic           │   ───►  │ proof           │
+    │                 │         │                 │
+    │ Verifies wrap   │         │ Uniform format  │
+    │ proofs          │         │ for recursion   │
+    └─────────────────┘         └─────────────────┘
+    v}
+
+    {2 Output Type}
+
+    The step prover returns a tuple containing:
+    - Base step proof with statement and underlying kimchi proof
+    - Return value from the rule's main function
+    - Auxiliary value (prover-only data)
+    - Predecessor proof widths vector
+
+    {2 Implementation Notes for Rust Port}
+
+    - The [Make] functor is parameterized by the inductive rule interface
+    - [A] and [A_value] are the circuit/constant public input types
+    - [Max_proofs_verified] is a type-level natural (N0, N1, or N2)
+    - The result is wrapped in [Promise.t] for async computation
+
+    @see {!Step_main} for the step circuit logic
+    @see {!Wrap} for wrapping step proofs
+*)
+
 open Pickles_types
 
+(** [Make] creates a step prover from an inductive rule and type parameters. *)
 module Make
     (Inductive_rule : Inductive_rule.Intf with type 'a proof = 'a Proof.t)
     (A : Pickles_types.Poly_types.T0) (A_value : sig

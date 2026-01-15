@@ -1,5 +1,46 @@
+(** {1 Common - Shared Utilities for Pickles}
+
+    This module provides shared utilities, constants, and helper functions
+    used across Pickles modules for both step and wrap circuits.
+
+    {2 Domain Configuration}
+
+    Functions for computing circuit domain sizes and shifts:
+    - [wrap_domains]: Determines domain for wrap circuits
+    - [tick_shifts], [tock_shifts]: Coset shifts for FFT domains
+
+    {2 IPA (Inner Product Argument)}
+
+    The [Ipa] module contains challenge computation and accumulator functions:
+    - [compute_challenge]: Convert scalar challenge to field element
+    - [compute_sg]: Compute challenge polynomial commitment
+    - [accumulator_check]: Verify IPA accumulators
+
+    {2 Shifted Values}
+
+    The [Shifts] module provides constants for field element shifting:
+    - [tick1]: Type1 shift for Tick field elements in Wrap
+    - [tock2]: Type2 shift for Tock field elements in Step
+
+    {2 Lookup Parameters}
+
+    Zero values used when lookup arguments are disabled or at boundaries.
+
+    {2 Public Input Conversion}
+
+    Functions to convert statements to field element vectors for circuits:
+    - [tick_public_input_of_statement]: For step circuit public inputs
+    - [tock_public_input_of_statement]: For wrap circuit public inputs
+
+    @see {!Impls} for the Tick/Tock implementation modules
+    @see {!Composition_types} for the statement types being converted
+*)
+
+(** Compute wrap circuit domain configuration for given proofs_verified count.
+    Larger proofs_verified requires larger domains. *)
 val wrap_domains : proofs_verified:int -> Import.Domains.Stable.V2.t
 
+(** Convert domain log2 size to a Proofs_verified enum value. *)
 val actual_wrap_domain_size :
   log_2_domain_size:int -> Pickles_base.Proofs_verified.t
 

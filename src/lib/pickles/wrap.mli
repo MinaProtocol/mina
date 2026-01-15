@@ -1,5 +1,73 @@
+(** {1 Wrap - Wrap Circuit Prover Generation}
+
+    This module generates provers for wrap circuits. Wrap circuits run on
+    the Tock (Pallas) curve and transform step proofs into a uniform format
+    suitable for recursive verification.
+
+    {2 Overview}
+
+    The [wrap] function takes a step proof and produces a wrap proof by:
+    1. Computing deferred values (scalar-field operations native to Tock)
+    2. Running the wrap circuit to verify the step proof
+    3. Generating a wrap proof in uniform format
+
+    {2 Deferred Value Computation}
+
+    The wrap prover computes values that were deferred from the step circuit:
+
+    - [combined_inner_product]: Batches polynomial evaluations using xi and r
+    - [b]: Evaluates the challenge polynomial at zeta
+    - PLONK linearization: Computes alpha powers, permutation scalars, etc.
+
+    These computations are native in wrap (Tock base field = Tick scalar field)
+    but would be expensive non-native operations in step.
+
+    {2 Challenge Verification}
+
+    The wrap circuit:
+    1. Reconstructs the Fiat-Shamir transcript from step's messages
+    2. Squeezes challenges and verifies they match the step statement
+    3. Verifies the sponge_digest_before_evaluations checkpoint
+    4. Completes IPA verification with native scalar operations
+
+    {2 For_tests_only Module}
+
+    Exposes [deferred_values] function for testing the deferred value
+    computation independently of the full wrap proof generation.
+
+    {2 Implementation Notes for Rust Port}
+
+    - The [wrap] function is async (returns [Promise.t])
+    - [tweak_statement] parameter enables adversarial testing
+    - [Type1] module handles shifted value arithmetic
+    - [challenge_polynomial] computes b(X) = prod_i (1 + u_i * X^{2^{n-1-i}})
+
+    @see {!Wrap_main} for the wrap circuit logic
+    @see {!Step} for generating step proofs to wrap
+    @see {!Unfinalized} for the deferred proof structure
+*)
+
 open Pickles_types
 
+(** [wrap] transforms a step proof into a wrap proof.
+
+    @param proof_cache Optional cache for proof reuse
+    @param max_proofs_verified Type-level witness for max proofs
+    @param maxes Maximum proofs verified structure
+    @param requests Snarky request handlers for wrap circuit
+    @param dlog_plonk_index Verification key commitments
+    @param wrap_main The wrap circuit main function
+    @param typ Public input type
+    @param step_vk Step circuit verification key
+    @param actual_wrap_domains Domain indices for predecessors
+    @param step_plonk_indices Step circuit PLONK indices
+    @param feature_flags PLONK features (lookups, etc.)
+    @param actual_feature_flags Runtime feature flag values
+    @param tweak_statement Optional statement modification for testing
+    @param keypair Wrap circuit proving/verification key pair
+    @param step_proof The step proof to wrap
+    @return A wrap proof wrapping the step proof
+*)
 val wrap :
      proof_cache:Proof_cache.t option
   -> max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t

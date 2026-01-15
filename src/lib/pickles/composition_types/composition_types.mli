@@ -1,3 +1,78 @@
+(** {1 Composition Types - Core Data Structures for Recursive Proofs}
+
+    This module defines the fundamental data structures used throughout
+    Pickles for composing recursive proofs. These types encode:
+
+    - Proof states at various stages of verification
+    - Messages passed between step and wrap circuits
+    - Deferred values that cross the curve boundary
+    - Bulletproof (IPA) challenges and commitments
+
+    {2 Architecture Overview}
+
+    Pickles uses a two-curve cycle (Tick/Tock, corresponding to Vesta/Pallas)
+    for recursive proof composition. Types are organized into {!module:Wrap}
+    and {!module:Step} submodules reflecting this structure:
+
+    - {!module:Wrap} types: Used in/produced by wrap circuits (Tock/Pallas)
+    - {!module:Step} types: Used in/produced by step circuits (Tick/Vesta)
+
+    {2 Type Naming Conventions}
+
+    - ['foo] type parameters: Polymorphic placeholders for field elements,
+      challenges, digests, etc.
+    - [Minimal] submodule: Compact serialization format with only raw
+      challenges
+    - [In_circuit] submodule: Expanded format with all derived values
+      computed (zeta powers, linearization scalars, etc.)
+    - [Stable] submodule: Versioned types for wire protocol compatibility
+
+    {2 Key Concepts}
+
+    {b Deferred Values}: Scalar-field computations that cannot be efficiently
+    performed in one curve's circuit. They are exposed as public inputs so
+    the next circuit (on the other curve) can verify them. See
+    {!module:Wrap.Proof_state.Deferred_values}.
+
+    {b Messages for Next Proof}: Data passed between recursion layers,
+    hashed to minimize public input size:
+    - {!module:Wrap.Proof_state.Messages_for_next_wrap_proof}: Contains
+      the challenge polynomial commitment (sg) and old bulletproof challenges
+    - {!module:Wrap.Messages_for_next_step_proof}: Contains app state,
+      verification key, and accumulated challenges
+
+    {b Bulletproof Challenges}: Challenges from the Inner Product Argument
+    (IPA). These accumulate across recursive proof steps and are used to
+    compute the challenge polynomial.
+
+    {2 Data Flow}
+
+    {v
+    ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+    │  Step Circuit   │ ──► │   Wrap Circuit   │ ──► │  Step Circuit   │
+    │  (Tick/Vesta)   │     │  (Tock/Pallas)   │     │  (Tick/Vesta)   │
+    └─────────────────┘     └──────────────────┘     └─────────────────┘
+           │                        │                        │
+           ▼                        ▼                        ▼
+    Step.Statement            Wrap.Statement           Step.Statement
+    - unfinalized_proofs      - deferred_values       - unfinalized_proofs
+    - messages_for_next_step  - messages_for_next_*   - messages_for_next_step
+    - messages_for_next_wrap                          - messages_for_next_wrap
+    v}
+
+    {2 Implementation Notes for Rust Port}
+
+    - The Minimal/In_circuit pattern maps to Rust enums or separate structs
+    - Type parameters can use Rust generics with trait bounds
+    - The [Opt.t] type is similar to Rust's Option but with a flag for
+      circuit-level optionality
+    - Vector types with length parameters map to const generics in Rust
+    - The spec system ({!module:Spec}) defines circuit layouts and can be
+      implemented as a trait-based system in Rust
+
+    @see <../GLOSSARY.md> for terminology definitions
+*)
+
 open Pickles_types
 module Opt = Opt
 

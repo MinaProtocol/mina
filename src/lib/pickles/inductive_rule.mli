@@ -1,3 +1,66 @@
+(** {1 Inductive Rule - Defining Recursive Proof System Rules}
+
+    This module defines the structure of inductive rules that form the basis
+    of recursive proof systems in Pickles.
+
+    {2 Overview}
+
+    An inductive rule specifies:
+    - What predecessor proofs it depends on (0, 1, or 2)
+    - A main function that executes the rule's logic
+    - Whether each predecessor proof must verify
+
+    {2 Rule Structure}
+
+    Each rule has:
+    - {b identifier}: A unique string name for the rule
+    - {b prevs}: List of predecessor proof system tags (using {!Tag})
+    - {b main}: The circuit logic that executes when the rule is invoked
+    - {b feature_flags}: PLONK features required by this rule
+
+    {2 Type Parameters}
+
+    The extensive type parameters encode at compile time:
+    - ['prev_vars]: Tuple-list of predecessor public input circuit types
+    - ['prev_values]: Tuple-list of predecessor public input constant types
+    - ['widths]: Max proofs verified by each predecessor
+    - ['heights]: Number of rules in each predecessor proof system
+    - ['a_var], ['a_value]: This rule's public input types
+    - ['ret_var], ['ret_value]: This rule's public output types
+    - ['auxiliary_var], ['auxiliary_value]: Prover-only auxiliary data types
+
+    {2 Example}
+
+    A simple recursive counter rule:
+    {[
+      let increment_rule ~self =
+        { identifier = "increment"
+        ; prevs = [ self ]  (* Depends on previous proof of same system *)
+        ; main = fun { public_input = prev_counter } ->
+            let new_counter = prev_counter + 1 in
+            { previous_proof_statements =
+                [ { public_input = prev_counter
+                  ; proof = ...
+                  ; proof_must_verify = Boolean.true_
+                  } ]
+            ; public_output = new_counter
+            ; auxiliary_output = ()
+            }
+        ; feature_flags = Plonk_types.Features.none_bool
+        }
+    ]}
+
+    {2 Implementation Notes for Rust Port}
+
+    - The [M.t] wrapper enables Promise/Deferred/Id variants
+    - [Hlist.H4.T(Tag).t] encodes heterogeneous lists of tags
+    - [Previous_proof_statement] carries both the public input and proof
+    - [proof_must_verify] allows conditional verification (for dummy proofs)
+
+    @see {!Compile} for compiling rules into a proof system
+    @see {!Tag} for referencing other proof systems
+*)
+
 module type Intf = sig
   module B : sig
     type t = Impls.Step.Boolean.var

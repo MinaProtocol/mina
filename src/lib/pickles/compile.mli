@@ -1,10 +1,88 @@
-(** Compile the inductive rules *)
+(** {1 Compile - Recursive Proof System Compilation}
+
+    This module compiles inductive rules into a complete recursive proof system.
+    It is the main entry point for creating Pickles circuits.
+
+    {2 Overview}
+
+    The compilation process transforms a set of inductive rules (defined using
+    {!Inductive_rule}) into:
+    - Step circuits for each rule (running on Tick/Vesta)
+    - A wrap circuit that produces uniform proofs (running on Tock/Pallas)
+    - Provers for generating proofs
+    - Verifiers for checking proofs
+
+    {2 Compilation Flow}
+
+    {v
+    Inductive Rules          Compilation            Proof System
+    ┌──────────────┐        ┌──────────┐          ┌─────────────┐
+    │ Rule 1       │        │          │          │ Step Prover │
+    │ Rule 2       │  ───►  │ compile  │  ───►    │ Wrap Prover │
+    │ ...          │        │          │          │ Verifier    │
+    │ Rule N       │        │          │          │ Vkey        │
+    └──────────────┘        └──────────┘          └─────────────┘
+    v}
+
+    {2 Key Concepts}
+
+    - {b Tag}: A unique identifier for a proof system, enabling rules to
+      reference each other (including self-references for recursion)
+    - {b Branches}: The number of inductive rules in the system
+    - {b Max proofs verified}: Maximum number of predecessor proofs any rule
+      verifies (0, 1, or 2)
+    - {b Public input}: The statement type exposed to verifiers
+    - {b Auxiliary output}: Data returned to provers but not exposed publicly
+
+    {2 Side-Loaded Proofs}
+
+    The {!Side_loaded} submodule supports dynamic verification keys, where the
+    verification key is not known at compile time. This enables:
+    - Verifying proofs from different proof systems
+    - Hot-swapping verification keys
+    - Generic proof aggregation
+
+    {2 Usage Example}
+
+    A typical compilation looks like:
+    {[
+      let tag, _cache, proof_module, provers =
+        compile
+          ~public_input:(Input statement_typ)
+          ~auxiliary_typ:Typ.unit
+          ~max_proofs_verified:(module Nat.N2)
+          ~name:"my_proof_system"
+          ~choices:(fun ~self ->
+            [ rule1 ~self
+            ; rule2 ~self
+            ])
+          ()
+    ]}
+
+    {2 Implementation Notes for Rust Port}
+
+    - The [choices] function receives [~self] for recursive references
+    - Compilation is lazy; circuits are generated when first used
+    - The [Promise.t] types indicate asynchronous/deferred computation
+    - [Hlist] types encode heterogeneous lists at the type level
+    - Cache handles enable persistent storage of proving/verification keys
+
+    @see {!Inductive_rule} for defining rules
+    @see {!Tag} for proof system identifiers
+    @see {!Proof} for the generated proof type
+*)
 
 open Core_kernel
 open Async_kernel
 open Pickles_types
 open Hlist
 
+(** [pad_messages_for_next_wrap_proof maxes messages] pads the messages for
+    next wrap proof to the maximum length required by the proof system.
+
+    This is necessary because different rules may verify different numbers of
+    predecessor proofs, but the wrap circuit needs a fixed-size input.
+*)
 val pad_messages_for_next_wrap_proof :
      (module Pickles_types.Hlist.Maxes.S
         with type length = 'max_proofs_verified
@@ -14,6 +92,8 @@ val pad_messages_for_next_wrap_proof :
   -> 'max_local_max_proofs_verifieds
      Hlist.H1.T(Proof.Base.Messages_for_next_proof_over_same_field.Wrap).t
 
+(** Interface for public statement types. Statements must be convertible
+    to field elements for use as circuit public inputs. *)
 module type Statement_intf = sig
   type field
 
@@ -22,12 +102,16 @@ module type Statement_intf = sig
   val to_field_elements : t -> field array
 end
 
+(** Statement interface for in-circuit (variable) values. *)
 module type Statement_var_intf =
   Statement_intf with type field := Impls.Step.Field.t
 
+(** Statement interface for out-of-circuit (constant) values. *)
 module type Statement_value_intf =
   Statement_intf with type field := Impls.Step.field
 
+(** Interface for generated proof modules. Provides verification key access
+    and proof verification functions. *)
 module type Proof_intf = sig
   type statement
 
@@ -46,9 +130,24 @@ module type Proof_intf = sig
   val verify_promise : (statement * t) list -> unit Or_error.t Promise.t
 end
 
+(** Configuration for chunked polynomial evaluation. Used when circuits
+    exceed the maximum supported degree and must be split into chunks. *)
 type chunking_data = Verify.Instance.chunking_data =
-  { num_chunks : int; domain_size : int; zk_rows : int }
+  { num_chunks : int  (** Number of polynomial chunks *)
+  ; domain_size : int (** Domain size for each chunk *)
+  ; zk_rows : int     (** Number of zero-knowledge rows *)
+  }
 
+(** [verify_promise ?chunking_data nat_module statement_module vk proofs]
+    verifies a list of statement-proof pairs against a verification key.
+
+    @param chunking_data Optional chunking configuration for large circuits
+    @param nat_module Witness for the max_proofs_verified type-level natural
+    @param statement_module Statement type with field conversion
+    @param vk The verification key to verify against
+    @param proofs List of (statement, proof) pairs to verify
+    @return [Ok ()] if all proofs verify, [Error _] otherwise
+*)
 val verify_promise :
      ?chunking_data:chunking_data
   -> (module Nat.Intf with type n = 'n)
@@ -57,6 +156,15 @@ val verify_promise :
   -> ('a * 'n Proof.t) list
   -> unit Or_error.t Promise.t
 
+(** The prover function type generated by compilation.
+
+    Each inductive rule produces a prover that takes:
+    - An optional handler for snarky requests (witness generation)
+    - The public input value
+    - And returns the proof along with any auxiliary outputs
+
+    The type parameters encode predecessor proof information at the type level.
+*)
 module Prover : sig
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
        ?handler:
@@ -66,7 +174,25 @@ module Prover : sig
     -> 'proof
 end
 
+(** {2 Side-Loaded Verification Keys}
+
+    Side-loaded proofs allow verification with a dynamically-provided
+    verification key, rather than one fixed at compile time. This enables:
+
+    - Verifying proofs from multiple different proof systems
+    - Updating verification keys without recompiling
+    - Generic proof aggregation across different circuits
+
+    {3 Usage}
+
+    1. Create a side-loaded tag with {!create}
+    2. In the circuit, call {!in_circuit} with the verification key
+    3. Before proving, call {!in_prover} with the verification key
+    4. The step circuit will verify against the provided key
+*)
 module Side_loaded : sig
+  (** A verification key that can be provided at proving time rather than
+      being fixed at compilation. Supports serialization for storage. *)
   module Verification_key : sig
     [%%versioned:
     module Stable : sig
@@ -281,9 +407,48 @@ module Storables : sig
   val default : t
 end
 
-(** This compiles a series of inductive rules defining a set into a proof
-      system for proving membership in that set, with a prover corresponding
-      to each inductive rule. *)
+(** [compile_with_wrap_main_override_promise] compiles inductive rules into
+    a complete recursive proof system.
+
+    This is the main entry point for creating Pickles circuits. It transforms
+    a set of inductive rules into step circuits, a wrap circuit, provers,
+    and verification infrastructure.
+
+    {3 Parameters}
+
+    @param self Optional pre-existing tag for the proof system
+    @param cache Key cache specification for persistent storage
+    @param storables Storage configuration for keys
+    @param proof_cache Cache for generated proofs
+    @param disk_keys Pre-computed keys to load from disk
+    @param override_wrap_domain Override the wrap circuit domain size
+    @param override_wrap_main Override wrap circuit for testing
+    @param num_chunks Number of polynomial chunks for large circuits
+    @param lazy_mode If true, defer circuit generation until first use
+    @param public_input Specification of the public input/output types
+    @param auxiliary_typ Type for auxiliary prover-only data
+    @param max_proofs_verified Maximum proofs verified by any rule (N0/N1/N2)
+    @param name Unique name for this proof system
+    @param constraint_constants SNARK constraint configuration
+    @param choices Function returning the list of inductive rules
+
+    {3 Return Value}
+
+    Returns a 4-tuple:
+    - {b Tag}: Unique identifier for referencing this proof system
+    - {b Cache_handle}: Handle for managing cached keys
+    - {b Proof module}: Module with verification functions
+    - {b Provers}: Heterogeneous list of prover functions, one per rule
+
+    {3 Type Parameters}
+
+    The complex type signature encodes at the type level:
+    - ['var], ['value]: Public input circuit/constant types
+    - ['max_proofs_verified]: Maximum predecessor proofs (Nat.N0/N1/N2)
+    - ['branches]: Number of inductive rules
+    - ['prev_varss], ['prev_valuess]: Predecessor input types per rule
+    - ['widthss], ['heightss]: Predecessor proof configuration per rule
+*)
 val compile_with_wrap_main_override_promise :
      ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list

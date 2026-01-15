@@ -1,5 +1,58 @@
+(** {1 Impls - Snarky Implementation Modules for Step and Wrap}
+
+    This module provides the snarky implementation modules for both step
+    (Tick/Vesta) and wrap (Tock/Pallas) circuits. These modules define the
+    field types, constraint systems, and circuit building primitives.
+
+    {2 Overview}
+
+    Pickles uses two curves in a 2-cycle:
+    - {b Step (Tick/Vesta)}: Application logic, verifies wrap proofs
+    - {b Wrap (Tock/Pallas)}: Uniform format, verifies step proofs
+
+    Each has its own snarky implementation with different field types.
+
+    {2 Field Relationships}
+
+    {v
+    Step (Tick/Vesta)              Wrap (Tock/Pallas)
+    ┌────────────────────┐         ┌────────────────────┐
+    │ Base field: Fp     │ ═══════ │ Scalar field: Fp   │
+    │ Scalar field: Fq   │ ═══════ │ Base field: Fq     │
+    └────────────────────┘         └────────────────────┘
+    v}
+
+    This relationship enables efficient recursion: Tick's scalar operations
+    are native in Wrap, and vice versa.
+
+    {2 Key Types}
+
+    - [Step.Impl]: Snarky module for step circuits
+    - [Wrap.Impl]: Snarky module for wrap circuits
+    - [Step.Other_field]: Tock base field in step circuits (non-native)
+    - [Wrap.Other_field]: Tick base field in wrap circuits (native!)
+    - [Step.unfinalized_proof]: Deferred data for wrap
+    - [Step.statement]: Step circuit public input type
+
+    {2 Shifted Values}
+
+    Non-native field elements use shifted representations:
+    - [Type1]: For Tick elements in Wrap (simple shift)
+    - [Type2]: For Tock elements in Step (split high/low)
+
+    {2 Keypairs}
+
+    Both modules provide [Keypair] modules for generating proving/verification
+    key pairs from constraint systems.
+
+    @see {!Step_main} for step circuit logic
+    @see {!Wrap_main} for wrap circuit logic
+    @see {!Snarky_backendless} for the underlying snarky implementation
+*)
+
 open Pickles_types
 
+(** Wrap circuit implementation (Tock/Pallas based). *)
 module Wrap_impl :
     module type of
       Snarky_backendless.Snark.Run.Make

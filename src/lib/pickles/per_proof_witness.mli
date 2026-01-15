@@ -1,4 +1,46 @@
-(** The information required to recursively verify a Pickles proof. *)
+(** {1 Per-Proof Witness - Witness Data for Recursive Verification}
+
+    This module defines the witness data structure that encapsulates all
+    information needed to recursively verify a Pickles proof within a circuit.
+
+    {2 Overview}
+
+    When a step circuit verifies a wrap proof, it needs:
+    - The application state being proven
+    - The wrap proof itself (commitments + opening)
+    - Accumulator state from the previous proof
+    - Challenge polynomial data for IPA verification
+
+    {2 Structure}
+
+    Each [Per_proof_witness.t] contains:
+
+    - {b app_state}: The user-level statement (application public input)
+    - {b wrap_proof}: Polynomial commitments and opening proof
+    - {b proof_state}: Accumulator state including:
+      - Deferred values (scalar-field computations)
+      - Sponge digest checkpoint
+      - Messages for next wrap proof
+    - {b prev_proof_evals}: Polynomial evaluations from the step proof
+    - {b prev_challenges}: IPA challenges c_0, ..., c_{k-1}
+    - {b prev_challenge_polynomial_commitments}: Commitments to b(X)
+
+    {2 Challenge Polynomial}
+
+    The challenge polynomial is:
+    {v b(X) = prod_{i=0}^{k-1} (1 + c_{k-1-i} * X^{2^i}) v}
+
+    where c_i are the IPA challenges. This polynomial is used to verify the
+    IPA opening without re-running the full protocol.
+
+    {2 Constant vs Circuit Types}
+
+    - [t]: Circuit variables (in-circuit representation)
+    - [Constant.t]: Concrete values (prover's witness)
+
+    @see {!Step_verifier.verify} for how this witness is used
+    @see {!Wrap_proof} for the wrap proof structure
+*)
 
 open Pickles_types
 module Impl = Impls.Step

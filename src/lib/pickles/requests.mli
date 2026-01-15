@@ -1,5 +1,50 @@
-(** The snarky request types that the step and wrap circuits use to get
-    non-deterministic witness data from the prover.
+(** {1 Requests - Snarky Witness Request Types}
+
+    This module defines the snarky request types that step and wrap circuits
+    use to obtain non-deterministic witness data from the prover.
+
+    {2 Overview}
+
+    Snarky circuits operate in two phases:
+    1. {b Circuit generation}: Defines constraints, requests witness data
+    2. {b Proving}: Prover responds to requests with actual values
+
+    Requests are the mechanism for circuits to ask for witness data.
+
+    {2 Step Requests}
+
+    Step circuits request:
+    - [Compute_prev_proof_parts]: Predecessor proof data
+    - [Proof_with_datas]: Full predecessor proof witnesses
+    - [Wrap_index]: Wrap circuit verification key
+    - [App_state]: Application-specific public input
+    - [Return_value]: Output value to return
+    - [Auxiliary_value]: Prover-only auxiliary data
+    - [Unfinalized_proofs]: Deferred proof data
+    - [Messages_for_next_wrap_proof]: Data for next wrap proof
+    - [Wrap_domain_indices]: Domain configuration
+
+    {2 Wrap Requests}
+
+    Wrap circuits request:
+    - [Evals]: Polynomial evaluation vectors
+    - [Which_branch]: Index of active branch
+    - [Step_accs]: Challenge polynomial commitments
+    - [Old_bulletproof_challenges]: Previous IPA challenges
+    - [Proof_state]: Step proof state data
+    - [Messages]: Prover messages (commitments)
+    - [Openings_proof]: IPA opening proof data
+    - [Wrap_domain_indices]: Domain configuration
+
+    {2 Implementation Notes for Rust Port}
+
+    - Requests use OCaml's extensible variant type mechanism
+    - Each request type includes its expected response type
+    - The [create] functions generate fresh request modules
+    - Request handling is done via pattern matching in the prover
+
+    @see {!Step_main} for step circuit request handling
+    @see {!Wrap_main} for wrap circuit request handling
 *)
 
 open Pickles_types

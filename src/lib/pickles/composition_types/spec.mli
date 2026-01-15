@@ -1,3 +1,65 @@
+(** {1 Spec - Type Specification DSL for Circuit Data Layouts}
+
+    This module provides a domain-specific language (DSL) for specifying
+    the layout of data structures in circuits. It bridges the gap between
+    high-level structured types and their low-level circuit representations.
+
+    {2 Purpose}
+
+    Pickles needs to convert between:
+    - Structured data (records, nested types) used in application logic
+    - Flat data layouts (vectors of field elements) used in circuits
+    - Packed representations for public inputs
+
+    The [Spec] DSL describes this mapping declaratively.
+
+    {2 Type System}
+
+    The specification uses a dual-type system:
+    - Type 1 (e.g., ['field1], ['challenge1]): Native/constant values
+    - Type 2 (e.g., ['field2], ['challenge2]): Circuit variable values
+
+    An "environment" type (the ['env] parameter) tracks which type names
+    correspond to which actual types, using OCaml's row polymorphism.
+
+    {2 Basic Types}
+
+    - [Unit]: No data
+    - [Field]: A field element
+    - [Bool]: A boolean
+    - [Digest]: A hash digest (typically a field element)
+    - [Challenge]: A Fiat-Shamir challenge
+    - [Bulletproof_challenge]: An IPA challenge
+    - [Branch_data]: Encoded branch/domain information
+
+    {2 Compound Types}
+
+    - [B]: Wraps a basic type
+    - [Scalar]: A basic type wrapped as a scalar challenge
+    - [Vector]: Fixed-length vector of elements
+    - [Array]: Variable-length array
+    - [Struct]: Heterogeneous list (HList) of different types
+    - [Opt]: Optional value with flag for circuit optionality
+    - [Constant]: Value known at compile time
+
+    {2 Key Functions}
+
+    - {!val:typ}: Convert spec to snarky Typ.t for Step circuits
+    - {!val:wrap_typ}: Convert spec to snarky Typ.t for Wrap circuits
+    - {!val:pack}: Pack structured data into flat circuit representation
+    - {!val:packed_typ}: Type with packed representation
+
+    {2 Implementation Notes for Rust Port}
+
+    - The dual-type system maps to Rust generics with trait bounds
+    - Row polymorphism (< field1: ..; ..>) can use associated types
+    - Consider using a proc macro to generate the type mappings
+    - The [Opt] handling needs special care for circuit optionality
+
+    @see {!Composition_types} for types that use this spec system
+*)
+
+(** Implementation module type for snarky backends. *)
 type ('f, 'v) impl =
   (module Snarky_backendless.Snark_intf.Run
      with type field = 'f
