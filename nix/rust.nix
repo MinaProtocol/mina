@@ -15,7 +15,7 @@ let
   toolchainHashes = {
     "1.92.0" = "sha256-sqSWJDUxc+zaz1nBWMAJKTAGBuGWP25GCftIOlCEAtA=";
     "nightly-2025-12-11" =
-      "sha256-3aoA7PuH09g8F+60uTUQhnHrb/ARDLueSOD08ZVsWe0=";
+      "sha256-Z8PetnKGSZjqRtodJ20XqBoTe2qNG0RaklrVW7AQ3JE=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
     # That is,
     # 1. Put the correct version name;

@@ -383,6 +383,63 @@ networking inside the Nix sandbox (in order to vendor all the dependencies using
 specified explicitly. This is the hash you're updating by running
 `./nix/update-libp2p-hashes.sh`.
 
+### Updating Rust toolchain
+
+To update the Rust toolchain, you will have to follow these steps.
+Note that nix shell may continue working without hashes updated because the hashed build might be used, referred by the sha256 hash.
+
+1. Update the Rust version in `src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml`.
+2. Update the Rust version in `src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml`.
+3. Update the Rust versions in `nix/rust.nix` with placeholder values `sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=` (see diff below for an example of this change)
+4. Run `nix develop mina` for the first time to get the error message, it will contain the correct hash value for the first toolchain (see example below)
+5. Use the hash from the first error message to update the first toolchain in `nix/rust.nix`
+6. Run `nix develop mina` for the second time to get the error message, it will contain the correct hash value for the second toolchain (see example below)
+7. Use the hash from the second error message to update the second toolchain in `nix/rust.nix`
+8. Run `nix develop mina` for the third time to confirm that the toolchains are updated
+
+#### Example diff
+
+Here is an example of the diff you should expect to see after updating the toolchains with the placeholder values:
+
+```
+diff --git a/nix/rust.nix b/nix/rust.nix
+index a5ff7ce490..358a295406 100644
+--- a/nix/rust.nix
++++ b/nix/rust.nix
+@@ -13,9 +13,9 @@ let
+       rustc = rustWithTargetPlatforms;
+     };
+   toolchainHashes = {
+-    "1.92.0" = "sha256-sqSWJDUxc+zaz1nBWMAJKTAGBuGWP25GCftIOlCEAtA=";
++    "1.92.0" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+     "nightly-2025-12-11" =
+-      "sha256-3aoA7PuH09g8F+60uTUQhnHrb/ARDLueSOD08ZVsWe0=";
++      "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+     # copy the placeholder line with the correct toolchain name when adding a new toolchain
+     # That is,
+     # 1. Put the correct version name;
+```
+
+#### Example error message (first message)
+
+Note the `rust-1.92.0` part, it informs you on which toolchain the printed hash corresponds to.
+
+```
+error: hash mismatch in fixed-output derivation '/nix/store/46pnj19vjy1ffx4k2a0gqafprn60ym28-channel-rust-1.92.0.toml.drv':
+specified: sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+got:    sha256-sqSWJDUxc+zaz1nBWMAJKTAGBuGWP25GCftIOlCEAtA=
+```
+
+#### Example error message (second message)
+
+Note the `rust-nightly` part, it informs you on which toolchain the printed hash corresponds to.
+
+```
+error: hash mismatch in fixed-output derivation '/nix/store/91mdiflvw4wr2l82yvf44yrgq03kzivm-channel-rust-nightly.toml.drv':
+specified: sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+got:    sha256-Z8PetnKGSZjqRtodJ20XqBoTe2qNG0RaklrVW7AQ3JE=
+```
+
 ### Notes on instrumenation package
 
 `nix build mina#mina_with_instrumentation` allows to build a special version on mina
