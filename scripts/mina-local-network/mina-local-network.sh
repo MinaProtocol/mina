@@ -76,6 +76,7 @@ SNARK_WORKERS_PIDS=()
 FISH_PIDS=()
 NODE_PIDS=()
 OVERRIDE_GENSIS_LEDGER=""
+ON_EXIT="grace_exit_all"
 REDIRECT_LOGS=false
 
 
@@ -155,13 +156,15 @@ help() {
                                          |   Default: None
 --itn-keys <keys>                        | Use ITN keys for nodes authentication
                                          |   Default: not set
--hfd |--hardfork-genesis-slot-delta      | When set override the value `hard_fork_genesis_slot_delta` in daemon config. 
+-hfd |--hardfork-genesis-slot-delta      | When set override the value 'hard_fork_genesis_slot_delta' in daemon config. 
 --hardfork-handling                      | When set, passed to daemons participating the network.
                                          |   Default: not set
 -r   |--root                             | When set, override the root working folder (i.e. the value of ROOT) for this script. WARN: this script will clean up anything inside that folder when initializing any run!
                                          |   Default: ${ROOT}
 --redirect-logs                          | When set, redirect logs for nodes (excluding workers) and archive to file instead of console output
                                          |   Default: ${REDIRECT_LOGS}
+--on-exit                                | How is exit handled. Set to 'grace_exit_all' to use mina CLI to stop all daemon  nodes, and kill SNARK workers; Set to 'kill_snark_workers' to only kill SNARK workers but ignoring everything else. 
+                                         |   Default: ${ON_EXIT}
 -h   |--help                             | Displays this help message
 
 Available logging levels:
@@ -208,43 +211,52 @@ on-exit() {
 
   job_pids=()
 
-  # 2. stop every non-seed nodes
-  if [[ -n "${SNARK_COORDINATOR_PORT}" ]]; then
-    stop-node "snark-coordinator" "$SNARK_COORDINATOR_PORT" &
-    job_pids+=("$!")
-  fi
+  case "$ON_EXIT" in
+    grace_exit_all)
+      # 2. stop every non-seed nodes
+      if [[ -n "${SNARK_COORDINATOR_PORT}" ]]; then
+        stop-node "snark-coordinator" "$SNARK_COORDINATOR_PORT" &
+        job_pids+=("$!")
+      fi
 
-  for ((i=0; i<FISH; i++)); do
-    port=$((FISH_START_PORT + i*6))
-    stop-node "fish_${i}" "$port" &
-    job_pids+=("$!")
-  done
+      for ((i=0; i<FISH; i++)); do
+        port=$((FISH_START_PORT + i*6))
+        stop-node "fish_${i}" "$port" &
+        job_pids+=("$!")
+      done
 
-  for ((i=0; i<NODES; i++)); do
-    port=$((NODE_START_PORT + i*6))
-    stop-node "node_${i}" "$port" &
-    job_pids+=("$!")
-  done
+      for ((i=0; i<NODES; i++)); do
+        port=$((NODE_START_PORT + i*6))
+        stop-node "node_${i}" "$port" &
+        job_pids+=("$!")
+      done
 
-  for ((i=0; i<WHALES; i++)); do
-    port=$((WHALE_START_PORT + i*6))
-    stop-node "whale_${i}" "$port" &
-    job_pids+=("$!")
-  done
+      for ((i=0; i<WHALES; i++)); do
+        port=$((WHALE_START_PORT + i*6))
+        stop-node "whale_${i}" "$port" &
+        job_pids+=("$!")
+      done
 
-  for jpid in "${job_pids[@]}"; do
-    wait "$jpid"
-  done
+      for jpid in "${job_pids[@]}"; do
+        wait "$jpid"
+      done
 
-  if [[ -n "${ROSETTA_PORT}" ]]; then
-    kill "$ROSETTA_PID"
-    wait "$ROSETTA_PID"
-  fi
+      if [[ -n "${ROSETTA_PORT}" ]]; then
+        kill "$ROSETTA_PID"
+        wait "$ROSETTA_PID"
+      fi
 
-  # 3. stop the seed node, if we've spawned it.
-  if [[ -n "${SEED_PID}" ]]; then
-    stop-node "seed" "$SEED_START_PORT"
-  fi
+      # 3. stop the seed node, if we've spawned it.
+      if [[ -n "${SEED_PID}" ]]; then
+        stop-node "seed" "$SEED_START_PORT"
+      fi
+      ;;
+    kill_snark_workers)
+      : ;;
+    *)
+      echo "Unknown ON_EXIT value: $1" >&2
+      return 1 ;;
+  esac
 }
 
 trap on-exit TERM INT
@@ -618,6 +630,10 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --redirect-logs)
     REDIRECT_LOGS=true
+    ;;
+  --on-exit)
+    ON_EXIT="${2}"
+    shift
     ;;
   *)
     echo "Unknown parameter passed: ${1}"
