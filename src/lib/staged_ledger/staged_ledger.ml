@@ -224,9 +224,7 @@ module T = struct
     let verify ~verifier:{ logger; verifier } ts =
       verify_proofs ~logger ~verifier
         (List.map ts
-           ~f:(fun
-                ({ proof; sok_msg = _; _ } :
-                  Scan_state.Ledger_proof_with_sok_message.t )
+           ~f:(fun ({ proof; _ } : Scan_state.Ledger_proof_with_sok_message.t)
               ->
              (* Digest check is deliberately removed, in anticipation
                 of forthcoming removal of sok message from the
