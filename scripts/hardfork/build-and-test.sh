@@ -44,11 +44,11 @@ while [[ $# -gt 0 ]]; do
         usage "Error: $1 requires an argument."
       fi
       case "$2" in
-        legacy|advanced)
+        legacy|advanced|auto)
           FORK_METHOD="$2"
           ;;
         *)
-          usage "Error: $1 must be either 'legacy' or 'advanced'."
+          usage "Error: $1 must be one of 'legacy', 'advanced' or 'auto'."
           ;;
       esac
       shift 2
