@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
@@ -79,16 +80,38 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) (*BlockAnalysisR
 	return analysis, forkData, nil
 }
 
-type ForkData struct {
+type ForkDataAndUsage interface {
+	generateLocalNetworkParam() string
+	// config     string
+	// ledgersDir string
+}
+
+type ConfigWithLedgers struct {
 	config     string
 	ledgersDir string
-	genesis    int64
+}
+
+func (c ConfigWithLedgers) generateLocalNetworkParam() string {
+	return fmt.Sprintf("inherit_with:%s,%s", c.config, c.ledgersDir)
+}
+
+type ConfigOnly struct {
+	config string
+}
+
+func (c ConfigOnly) generateLocalNetworkParam() string {
+	return fmt.Sprintf("inherit:%s", c.config)
+}
+
+type ForkData struct {
+	data    ForkDataAndUsage
+	genesis int64
 }
 
 // RunForkNetworkPhase runs the fork network and validates its operation
 func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData ForkData, mainGenesisTs int64) error {
 	// Start fork network
-	forkCmd, err := t.RunForkNetwork(forkData.config, forkData.ledgersDir)
+	forkCmd, err := t.RunForkNetwork(forkData.data)
 	if err != nil {
 		return err
 	}
@@ -197,7 +220,10 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, mainGenesi
 		return nil, err
 	}
 
-	return &ForkData{config: patchedConfigFile, ledgersDir: patchedLedgersDir, genesis: forkGenesisTs}, nil
+	return &ForkData{
+			data:    ConfigWithLedgers{config: patchedConfigFile, ledgersDir: patchedLedgersDir},
+			genesis: forkGenesisTs},
+		nil
 
 }
 
@@ -240,5 +266,93 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 	}
 
 	forkLedgersDir := fmt.Sprintf("%s/genesis", forkDataPath)
-	return &ForkData{config: forkConfig, ledgersDir: forkLedgersDir, genesis: forkGenesisTs}, nil
+	return &ForkData{
+		data:    ConfigWithLedgers{config: forkConfig, ledgersDir: forkLedgersDir},
+		genesis: forkGenesisTs,
+	}, nil
+}
+
+func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) (*ForkData, error) {
+
+	// NOTE: Auto mode differs from either Legacy/Advanced fork mode in that each
+	// node tries to generate their own fork config, and we try to boot each node
+	// with the data they generated on their own. This is more decentralized
+	// compared to the other methods
+
+	nodesDir := "~/.mina-network/nodes"
+
+	var err error = nil
+
+	seenForkConfig := false
+	forkConfig := ""
+
+	err = filepath.WalkDir(nodesDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			return fmt.Errorf("Unexpected file %s in node directory %s", path, nodesDir)
+		}
+		if d.Name() == "snark_workers" {
+			// SNARK workers doesn't participate in fork
+			return nil
+		}
+
+		_, err = os.Stat(path + "/auto-fork-mesa-devnet/activated")
+		if err != nil {
+			return err
+		}
+
+		currentForkConfig, err := os.ReadFile(path + "/auto-fork-mesa-devnet/daemon.json")
+		if err != nil {
+			return err
+		}
+
+		if !seenForkConfig {
+			seenForkConfig = true
+			forkConfig = string(currentForkConfig)
+		} else if string(currentForkConfig) != forkConfig {
+			return fmt.Errorf("Node at %s generated fork config '%s' not same as the commonly agreed one '%s'",
+				path, currentForkConfig, forkConfig)
+		}
+
+		err = os.Rename(path+"/auto-fork-mesa-devnet/genesis", path+"/override_genesis_ledger")
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if !seenForkConfig {
+		return nil, fmt.Errorf("No fork config has been found after auto mode has been used!")
+	}
+
+	forkGenesisTs := t.Config.ForkGenesisTsGivenMainGenesisTs(mainGenesisTs)
+
+	var configUnmarshalled FinalForkConfigView
+	dec := json.NewDecoder(bytes.NewReader([]byte(forkConfig)))
+	dec.DisallowUnknownFields()
+
+	if err := dec.Decode(&configUnmarshalled); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal fork config: %w", err)
+	}
+
+	err = t.ValidateFinalForkConfig(analysis.LastBlockBeforeTxEnd, configUnmarshalled, forkGenesisTs, mainGenesisTs)
+
+	forkConfigFile := "/tmp/fork_config.json"
+	os.WriteFile(forkConfigFile, []byte(forkConfig), 0644)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// genesis ledgers has been overriden and each node will use a different one generated during auto fork phase
+	return &ForkData{
+			data: ConfigOnly{
+				config: forkConfigFile,
+			},
+			genesis: forkGenesisTs,
+		},
+		nil
 }
