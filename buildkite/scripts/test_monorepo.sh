@@ -282,9 +282,11 @@ EOF
   assert_contains "$output" "Skipping excludeIf" "Should show skip messages for non-ancestor items"
 }
 
-# Test: check_exclude_if exact case matching
+# Test: check_exclude_if case-insensitive matching
+# Note: dhall produces branch names with capital letters (e.g., "Mesa")
+# while git branch names may be lowercase (e.g., "mesa"), so comparison must be case-insensitive
 test_check_exclude_if_exact_case() {
-  echo -e "\n${YELLOW}Testing: check_exclude_if (exact case matching)${NC}"
+  echo -e "\n${YELLOW}Testing: check_exclude_if (case-insensitive matching)${NC}"
 
   cat > "$TEST_DIR/ExcludeCase.yml" << 'EOF'
 spec:
@@ -293,16 +295,19 @@ spec:
   scope: [PullRequest]
   excludeIf:
     - ancestor: mesa
-      reason: "Test exact case"
+      reason: "Test case-insensitive"
 EOF
 
   local result
   result=$(check_exclude_if "$TEST_DIR/ExcludeCase.yml" "ExcludeCase" "mesa" 2>/dev/null)
   assert_equals "1" "$result" "Should exclude with exact case matching"
 
-  # Test that different case does NOT match
+  # Test that different case DOES match (case-insensitive)
   result=$(check_exclude_if "$TEST_DIR/ExcludeCase.yml" "ExcludeCase" "MESA" 2>/dev/null)
-  assert_equals "0" "$result" "Should NOT exclude when case differs"
+  assert_equals "1" "$result" "Should exclude even when case differs (case-insensitive)"
+
+  result=$(check_exclude_if "$TEST_DIR/ExcludeCase.yml" "ExcludeCase" "Mesa" 2>/dev/null)
+  assert_equals "1" "$result" "Should exclude with mixed case (case-insensitive)"
 }
 
 # Test: check_include_if with no includeIf
@@ -409,9 +414,11 @@ EOF
   assert_equals "0" "$result" "Should exclude when no includeIf conditions match"
 }
 
-# Test: check_include_if exact case matching
+# Test: check_include_if case-insensitive matching
+# Note: dhall produces branch names with capital letters (e.g., "Mesa")
+# while git branch names may be lowercase (e.g., "mesa"), so comparison must be case-insensitive
 test_check_include_if_exact_case() {
-  echo -e "\n${YELLOW}Testing: check_include_if (exact case matching)${NC}"
+  echo -e "\n${YELLOW}Testing: check_include_if (case-insensitive matching)${NC}"
 
   cat > "$TEST_DIR/IncludeCase.yml" << 'EOF'
 spec:
@@ -420,16 +427,19 @@ spec:
   scope: [PullRequest]
   includeIf:
     - ancestor: mesa
-      reason: "Test exact case"
+      reason: "Test case-insensitive"
 EOF
 
   local result
   result=$(check_include_if "$TEST_DIR/IncludeCase.yml" "IncludeCase" "mesa" 2>/dev/null)
   assert_equals "1" "$result" "Should include with exact case matching"
 
-  # Test that different case does NOT match
+  # Test that different case DOES match (case-insensitive)
   result=$(check_include_if "$TEST_DIR/IncludeCase.yml" "IncludeCase" "MESA" 2>/dev/null)
-  assert_equals "0" "$result" "Should NOT include when case differs"
+  assert_equals "1" "$result" "Should include even when case differs (case-insensitive)"
+
+  result=$(check_include_if "$TEST_DIR/IncludeCase.yml" "IncludeCase" "Mesa" 2>/dev/null)
+  assert_equals "1" "$result" "Should include with mixed case (case-insensitive)"
 }
 
 # Test: check_include_if with non-ancestor includeIf items

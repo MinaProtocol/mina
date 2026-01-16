@@ -27,9 +27,7 @@ in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
-          [ S.contains "buildkite/src"
-          , S.exactly "buildkite/Makefile" ""
-          ]
+          [ S.contains "buildkite/src", S.exactly "buildkite/Makefile" "" ]
         , path = "Lint"
         , name = "Dhall"
         , tags =

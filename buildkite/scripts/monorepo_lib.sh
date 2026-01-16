@@ -105,7 +105,9 @@ check_exclude_if() {
 
     echo "Evaluating excludeIf[$i]: ancestor=$ancestor, reason=$reason, closest_ancestor=$closest_ancestor" >&2
 
-    if [[ "$ancestor" == "$closest_ancestor" ]]; then
+    # Case-insensitive comparison: dhall produces branch names with capital letters
+    # (e.g., "Mesa") while git branch names may be lowercase (e.g., "mesa")
+    if [[ "${ancestor,,}" == "${closest_ancestor,,}" ]]; then
       if [[ -n "$reason" && "$reason" != "null" ]]; then
         echo "❌🚫 $job_name excluded based on excludeIf condition: $reason" >&2
       else
@@ -155,7 +157,9 @@ check_include_if() {
 
     echo "Evaluating includeIf[$i]: ancestor=$ancestor, reason=$reason, closest_ancestor=$closest_ancestor" >&2
 
-    if [[ "$ancestor" == "$closest_ancestor" ]]; then
+    # Case-insensitive comparison: dhall produces branch names with capital letters
+    # (e.g., "Mesa") while git branch names may be lowercase (e.g., "mesa")
+    if [[ "${ancestor,,}" == "${closest_ancestor,,}" ]]; then
       if [[ -n "$reason" && "$reason" != "null" ]]; then
         echo "✅ $job_name included based on includeIf condition: $reason" >&2
       else
