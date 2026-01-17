@@ -89,8 +89,8 @@ let dockerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "mina-daemon"
-            , DaemonLegacyHardfork = "mina-daemon-hardfork"
-            , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
+            , DaemonLegacyHardfork = "mina-daemon-pre-hardfork"
+            , DaemonAutoHardfork = "mina-daemon-post-hardfork"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
             , LogProc = "mina-logproc"
@@ -119,7 +119,8 @@ let toDebianName =
             { Daemon = "daemon_${Network.lowerName network}"
             , DaemonLegacyHardfork =
                 "daemon_${Network.lowerName network}_hardfork"
-            , DaemonAutoHardfork = ""
+            , DaemonAutoHardfork =
+                "daemon_${Network.lowerName network}_post_hardfork"
             , LogProc = "logproc"
             , Archive = "archive_${Network.lowerName network}"
             , TestExecutive = "test_executive"

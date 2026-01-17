@@ -81,10 +81,10 @@ if [[ -z "$INPUT_NETWORK" ]]; then
   NETWORK="--build-arg network=devnet"
 fi
 
-LEGACY_VERSION="--build-arg deb_legacy_version=$INPUT_LEGACY_VERSION"
-
 if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
   LEGACY_VERSION=""
+else
+  LEGACY_VERSION="--build-arg deb_legacy_version=$INPUT_LEGACY_VERSION"
 fi
 
 BRANCH="--build-arg MINA_BRANCH=$INPUT_BRANCH"
@@ -189,7 +189,7 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
         DOCKER_CONTEXT="dockerfiles/"
         ;;
-    mina-daemon-auto-hardfork)
+    mina-daemon-post-hardfork)
         if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
           echo "Legacy version is not set for mina-daemon-auto-hardfork."
           echo "Please provide the --deb-legacy-version argument."
