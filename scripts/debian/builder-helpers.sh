@@ -631,6 +631,31 @@ copy_common_daemon_post_automode_configs() {
   create_auxiliary_config_files "${3}" "${TARGET_ROOT_DIR}"
 }
 
+## MAINNET AUTOHF PACKAGE ##
+
+#
+# Builds mina-mainnet-post-hardfork-berkeley tailored package for automode package
+#
+# Output: mina-mainnet-post-hardfork-berkeley_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Contains only the legacy mainnet binaries places in "/usr/lib/mina/berkeley" without
+# configuration files or genesis ledgers.
+#
+build_daemon_mesa_post_hardfork_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building mesa testnet deb for hardfork automode :"
+
+  create_control_file mina-mesa-post-hardfork-mesa "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_post_automode_configs mesa testnet 'gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
+
+  build_deb mina-mesa-post-hardfork-mesa
+}
+## END MAINNET AUTOHF PACKAGE ##
+
 
 ## MAINNET AUTOHF PACKAGE ##
 

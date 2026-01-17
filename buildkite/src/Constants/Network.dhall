@@ -32,8 +32,8 @@ let lowerName =
             { Devnet = "devnet"
             , Mainnet = "mainnet"
             , Berkeley = "berkeley"
-            , DevnetLegacy = "devnet_legacy"
-            , MainnetLegacy = "mainnet_legacy"
+            , DevnetLegacy = "devnet_pre_hardfork"
+            , MainnetLegacy = "mainnet_pre_hardfork"
             , PreMesa1 = "hetzner-pre-mesa-1"
             , Mesa = "mesa"
             }
