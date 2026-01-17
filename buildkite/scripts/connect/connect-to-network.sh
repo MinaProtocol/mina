@@ -30,9 +30,12 @@ mina libp2p generate-keypair --privkey-path /home/opam/libp2p-keys/key
 # Set permissions on the keypair so the daemon doesn't complain
 chmod -R 0700 /home/opam/libp2p-keys/
 
+# Read PEERS_LIST_URL from mina.service
+PEERS_LIST_URL=$(grep -oP 'Environment="PEERS_LIST_URL=\K[^"]+' /usr/lib/systemd/user/mina.service)
+
 # Restart in the background
 mina daemon \
-  --peer-list-url "https://storage.googleapis.com/seed-lists/${NETWORK_NAME}_seeds.txt" \
+  --peer-list-url "$PEERS_LIST_URL" \
   --libp2p-keypair "/home/opam/libp2p-keys/key" \
 & # -background
 

@@ -11,22 +11,30 @@
 #   for the job to Buildkite.
 #
 #   Glossary of Arguments:
-#     1. selection       (Triaged or Full) - Determines the mode of selection for triggering jobs.
-#                                            Triaged mode checks for relevant changes,
-#                                            while Full mode triggers all jobs, which falls under scope and filter.
-#     2. tags            STRING            - A filter is a group of job tags, those tags can be any string.
-#     3. scope           STRING            - A filter string to determine if the job falls under a specific scope.
-#                                            Scope is a gate level in mina like :
-#                                             - PR - for pull requests
-#                                             - Nightly - for builds that run extended scope of tests including heavy tests
-#                                                         which might take longer time to execute
-#                                             - Release - full builds with all known jobs, including all supported networks/codenames
-#                                             - Mainline Nightly - like above but for mainline branch on nightly basis
-#     4. dirty-when      STRING            - A pattern used to check for relevant changes in the repository.
-#
-# ------------------------------------------------------------------------------
+#     1. selection           (triaged or full) - Determines the mode of selection for triggering jobs.
+#                                                Triaged mode checks for relevant changes,
+#                                                while Full mode triggers all jobs, which falls under scope and filter.
+#     2. tags                STRING            - Comma-separated list of job tags to filter by.
+#     3. scopes              STRING            - Comma-separated list of scopes to filter by.
+#                                                Scope is a gate level in mina like:
+#                                                 - PR - for pull requests
+#                                                 - Nightly - for builds that run extended scope of tests including heavy tests
+#                                                           which might take longer time to execute
+#                                                 - Release - full builds with all known jobs, including all supported networks/codenames
+#                                                 - Mainline Nightly - like above but for mainline branch on nightly basis
+#     4. filter-mode         (any or all)      - Determines if any or all tags must match.
+#     5. jobs                PATH              - Path to the jobs directory containing .yml files.
+#     6. git-diff-file       PATH              - Path to the git diff file for dirty-when checks.
+#     7. mainline-branches   STRING            - Comma-separated list of mainline branches for ancestor detection.
+#     8. debug               FLAG              - Optional flag to enable debug output.
 
 set -euo pipefail
+
+# Get the directory of this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source the library functions
+source "$SCRIPT_DIR/monorepo_lib.sh"
 
 show_help() {
   cat << EOF
@@ -42,8 +50,9 @@ Options:
   --git-diff-file FILE   STRING    File containing git diff output
   --dry-run              BOOL      Dry run mode (True/False)
   --filter-mode MODE     STRING    Filter mode (any or all)
-  --trigger CMD          STRING    Trigger command
-  -h, --help             Show this help message
+  --mainline-branches    STRING    Comma-separated list of mainline branches
+  --debug                          Enable debug mode
+  --h, --help             Show this help message
 EOF
 }
 
@@ -53,6 +62,8 @@ JOBS=""
 TAGS=""
 SCOPES=""
 GIT_DIFF_FILE=""
+MAINLINE_BRANCHES=()
+DEBUG=false
 DRY_RUN=false
 
 # Parse
@@ -66,12 +77,17 @@ while [[ $# -gt 0 ]]; do
       TAGS="$2"; shift 2;;
     --scopes)
       SCOPES="$2"; shift 2;;
-    --git-diff-file)
-      GIT_DIFF_FILE="$2"; shift 2;;
-    --dry-run)
-      DRY_RUN=true; shift 1;;
     --filter-mode)
       FILTER_MODE="$2"; shift 2;;
+    --git-diff-file)
+      GIT_DIFF_FILE="$2"; shift 2;;
+    --mainline-branches)
+      IFS=',' read -r -a MAINLINE_BRANCHES <<< "$2"
+      shift; shift;;
+    --debug)
+      DEBUG=true; shift;;
+    --dry-run)
+      DRY_RUN=true; shift 1;;
     -h|--help)
       show_help; exit 0;;
     *)
@@ -80,9 +96,26 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Require all arguments
-if [[ -z "$SELECTION_MODE" || -z "$JOBS" || -z "$TAGS" || -z "$SCOPES" ]]; then
-  echo "Error: All arguments --selection-mode, --jobs, --tags, and --scopes are required."
+if [[ -z "$SELECTION_MODE" || -z "$JOBS" || -z "$TAGS" || -z "$SCOPES" || -z "$FILTER_MODE" ]]; then
+  echo "Error: All arguments --selection-mode, --jobs, --tags, --scopes, and --filter-mode are required."
   exit 1
+fi
+
+# Check if mainline branches were provided
+if [[ ${#MAINLINE_BRANCHES[@]} -eq 0 ]]; then
+  echo "Error: --mainline-branches is required."
+  exit 1
+fi
+
+# Debug output
+if [[ "$DEBUG" == true ]]; then
+  echo "Debug: SELECTION_MODE=$SELECTION_MODE"
+  echo "Debug: TAGS=$TAGS"
+  echo "Debug: SCOPES=$SCOPES"
+  echo "Debug: FILTER_MODE=$FILTER_MODE"
+  echo "Debug: JOBS=$JOBS"
+  echo "Debug: GIT_DIFF_FILE=$GIT_DIFF_FILE"
+  echo "Debug: MAINLINE_BRANCHES=${MAINLINE_BRANCHES[*]}"
 fi
 
 # Check if yq is installed, if not install it
@@ -127,77 +160,9 @@ else
   exit 1
 fi
 
-has_matching_tags() {
-  local tags="$1"
-  local filter_any="$2"
-  local filter_all="$3"
-  shift 3
-  local desired_tags=("$@")
-
-  local match_count=0
-
-  for want in "${desired_tags[@]}"; do
-
-    if WANT="$want" \
-       yq -e '.[] | select((downcase) == (env(WANT) | downcase))' \
-       <<< "$tags" \
-       >/dev/null 2>&1
-    then
-      match_count=$((match_count+1))
-    fi
-  done
-
-  if $filter_any && [[ $match_count -ge 1 ]]; then
-    echo 1
-  elif $filter_all && [[ $match_count -eq ${#desired_tags[@]} ]]; then
-    echo 1
-  else
-    echo 0
-  fi
-}
-
-scope_matches() {
-  local scope="$1"
-  shift
-  local desired_scopes=("$@")
-  local match_count=0
-
- for want in "${desired_scopes[@]}"; do
-    # yq v4 NIE ma --arg, więc używamy env(WANT)
-    if WANT="$want" \
-       yq -e '.[] | select((downcase) == (env(WANT) | downcase))' \
-       <<< "$scope" \
-         >/dev/null 2>&1
-    then
-      match_count=$((match_count+1))
-      break
-    fi
-  done
-
-  echo $(( match_count == 1 ? 1 : 0 ))
-}
-
-select_job() {
-  local selection_full="$1"
-  local selection_triaged="$2"
-  local file="$3"
-  local job_name="$4"
-  local git_diff_file="$5"
-
-  if [[ "$selection_full" == true ]]; then
-    echo 1
-  elif [[ "$selection_triaged" == true ]]; then
-    dirtyWhen=$(cat "${file%.yml}.dirtywhen")
-    # Remove quotes from beginning and end of string
-    dirtyWhen="${dirtyWhen%\"}"
-    dirtyWhen="${dirtyWhen#\"}"
-    if cat "$git_diff_file" | grep -E "$dirtyWhen" > /dev/null; then
-      echo 1
-    else
-      echo 0
-    fi
-  fi
-}
+# Find the closest ancestor branch
+# which will be used for excludeIf evaluations
+closest_ancestor=$(find_closest_ancestor)
 
 find "$JOBS" -type f -name "*.yml" | while read -r file; do
   tags=$(yq .spec.tags "$file")
@@ -221,6 +186,26 @@ find "$JOBS" -type f -name "*.yml" | while read -r file; do
 
   if [[ $job_selected -ne 1 ]]; then
     echo "🧹🚫 $job_name rejected job as it does not fall into dirty when: $file" >&2
+    continue
+  fi
+
+  # Check if both includeIf and excludeIf are set - this is not allowed
+  has_include_if=$(yq -r '.spec.includeIf | length' "$file")
+  has_exclude_if=$(yq -r '.spec.excludeIf | length' "$file")
+  if [[ "$has_include_if" != "null" && "$has_include_if" -gt 0 && "$has_exclude_if" != "null" && "$has_exclude_if" -gt 0 ]]; then
+    echo "❌ Error: $job_name has both includeIf and excludeIf set. This is not allowed. Please use only one of them." >&2
+    exit 1
+  fi
+
+  is_excluded=$(check_exclude_if "$file" "$job_name" "$closest_ancestor")
+
+  if [[ $is_excluded -eq 1 ]]; then
+    continue
+  fi
+
+  is_included=$(check_include_if "$file" "$job_name" "$closest_ancestor")
+
+  if [[ $is_included -ne 1 ]]; then
     continue
   fi
 

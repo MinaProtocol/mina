@@ -154,7 +154,7 @@ copy_common_daemon_configs() {
 
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_configs inputs:"
-  echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
+  echo "Network Name: ${1} (like mainnet, devnet, berkeley, mesa)"
   echo "Signature Type: ${2} (mainnet or testnet)"
   echo "Seed List URL path: ${3} (like seed-lists/berkeley_seeds.txt)"
 
@@ -183,6 +183,8 @@ copy_common_daemon_configs() {
   cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/mainnet.json"
   cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
   cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
+  cp ../genesis_ledgers/mesa.json "${BUILDDIR}/var/lib/coda/mesa.json"
+
   # Set the default configuration based on Network name ($1)
   cp ../genesis_ledgers/"${1}".json \
     "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
@@ -420,7 +422,31 @@ build_rosetta_berkeley_deb() {
 
   build_deb mina-rosetta-berkeley
 }
-## END BERKELEY PACKAGE ##
+## END ROSETTA BERKELEY PACKAGE ##
+
+## ROSETTA MESA PACKAGE ##
+
+#
+# Builds mina-rosetta-mesa package for Mesa testnet Rosetta API
+#
+# Output: mina-rosetta-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}
+#
+# Rosetta API implementation for Mesa testnet with testnet signature binaries.
+#
+build_rosetta_mesa_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building mesa rosetta deb"
+
+  create_control_file mina-rosetta-mesa "${SHARED_DEPS}" \
+    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_configs "testnet"
+
+  build_deb mina-rosetta-mesa
+}
+## END ROSETTA MESA PACKAGE ##
 
 ## MAINNET PACKAGE ##
 
@@ -475,6 +501,37 @@ build_daemon_devnet_deb() {
   copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
   build_deb "${MINA_DEVNET_DEB_NAME}"
+}
+## END DEVNET PACKAGE ##
+
+## MESA PACKAGE ##
+
+#
+# Builds mesa daemon package with profile-aware naming
+#
+# Output: ${MINA_DEVNET_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Where MINA_DEVNET_DEB_NAME can be:
+#   - "mina-mesa" (default)
+#   - "mina-mesa-lightnet" (if DUNE_PROFILE=lightnet)
+#   - "mina-mesa-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#   - "mina-mesa-lightnet-instrumented" (both conditions)
+#
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Mesa daemon with testnet signatures and devnet genesis ledger as default.
+# Package name includes suffixes for different profiles and instrumentation.
+#
+build_daemon_mesa_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building testnet signatures deb without keys:"
+
+  create_control_file mina-mesa "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_configs mesa testnet 'o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
+
+  build_deb "mina-mesa"
 }
 ## END DEVNET PACKAGE ##
 
@@ -780,7 +837,38 @@ build_archive_berkeley_deb () {
   copy_common_archive_configs "$ARCHIVE_DEB"
 
 }
-## END ARCHIVE PACKAGE ##
+## END ARCHIVE BERKELEY PACKAGE ##
+
+## ARCHIVE MESA PACKAGE ##
+
+#
+# Builds Mesa archive package with profile-aware naming
+#
+# Output: mina-archive-mesa${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Where DEB_SUFFIX can be:
+#   - "" (empty, default)
+#   - "-lightnet" (if DUNE_PROFILE=lightnet)
+#   - "-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#   - "-lightnet-instrumented" (both conditions)
+#
+# Dependencies: ${ARCHIVE_DEPS}
+#
+# Archive node package for Mesa with suffix-aware naming for different profiles.
+#
+build_archive_mesa_deb () {
+  ARCHIVE_DEB=mina-archive-mesa${DEB_SUFFIX}
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive mesa deb"
+
+
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
+ Compatible with Mina Daemon'
+
+  copy_common_archive_configs "$ARCHIVE_DEB"
+
+}
+## END ARCHIVE MESA PACKAGE ##
 
 ## ARCHIVE MAINNET PACKAGE ##
 
