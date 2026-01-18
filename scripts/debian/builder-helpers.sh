@@ -284,6 +284,15 @@ copy_common_daemon_configs() {
   create_auxiliary_config_files "${3}" "${TARGET_ROOT_DIR}"
 }
 
+copy_pre_hf_daemon_apps() {
+  local NETWORK_NAME=${1}
+  local TARGET_ROOT_DIR="${BUILDDIR}/usr/local/bin/berkeley"
+
+  mkdir -p "${TARGET_ROOT_DIR}"
+
+  copy_common_daemon_shared_apps "${TARGET_ROOT_DIR}" "${NETWORK_NAME}"
+}
+
 ## LOGPROC PACKAGE ##
 
 #
@@ -729,8 +738,7 @@ build_daemon_mainnet_pre_hardfork_deb() {
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
   # Copy legacy binaries
-
-  copy_common_daemon_apps berkeley mainnet 'seed-lists/mainnet_seeds.txt'
+  copy_pre_hf_daemon_apps "mainnet"
 
   build_deb $NAME
 }
@@ -752,13 +760,13 @@ build_daemon_devnet_pre_hardfork_deb() {
   NAME="mina-devnet-pre-hardfork-mesa"
 
   echo "------------------------------------------------------------"
-  echo "--- Building testnet berkeley legacy deb for hardfork automode :"
+  echo "--- Building testnet devnet legacy deb for hardfork automode :"
 
   create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
-  # Copy legacy binaries
-  copy_common_daemon_apps berkeley testnet 'seed-lists/devnet_seeds.txt'
+   # Copy legacy binaries
+  copy_pre_hf_daemon_apps "devnet"
 
   build_deb $NAME
 }
@@ -785,7 +793,7 @@ build_daemon_mesa_pre_hardfork_deb() {
     'Mina Protocol Client and Daemon for the Mesa Network' "${SUGGESTED_DEPS}"
 
   # Copy legacy binaries
-  copy_common_daemon_apps mesa testnet 'o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
+  copy_pre_hf_daemon_apps "mesa"
 
   build_deb $NAME
 }
