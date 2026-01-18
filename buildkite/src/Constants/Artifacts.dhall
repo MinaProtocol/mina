@@ -215,8 +215,7 @@ let dockerTag =
                     "${spec.version}-${Network.lowerName
                                          spec.network}${profile_part}"
                 , DaemonAutoHardfork =
-                    "${spec.version}-${Network.lowerName
-                                         spec.network}${profile_part}"
+                    "${spec.version}-${Network.lowerName spec.network}"
                 , Archive = "${spec.version}${build_flags_part}"
                 , LogProc = "${spec.version}"
                 , TestExecutive = "${spec.version}"

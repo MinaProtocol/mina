@@ -32,6 +32,7 @@ let hardforkDocker =
       Artifacts.fullDockerTag
         Artifacts.Tag::{
         , artifact = Artifacts.Type.DaemonAutoHardfork
+        , network = network
         }
 
 in  Pipeline.build
