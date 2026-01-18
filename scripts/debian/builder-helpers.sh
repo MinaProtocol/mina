@@ -285,12 +285,12 @@ copy_common_daemon_configs() {
 }
 
 copy_pre_hf_daemon_apps() {
-  local NETWORK_NAME=${1}
+  local SIGNATURE_KIND=${1}
   local TARGET_ROOT_DIR="${BUILDDIR}/usr/local/bin/berkeley"
 
   mkdir -p "${TARGET_ROOT_DIR}"
 
-  copy_common_daemon_shared_apps "${TARGET_ROOT_DIR}" "${NETWORK_NAME}"
+  copy_common_daemon_shared_apps "${TARGET_ROOT_DIR}" "${SIGNATURE_KIND}"
 }
 
 ## LOGPROC PACKAGE ##
@@ -766,7 +766,7 @@ build_daemon_devnet_pre_hardfork_deb() {
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
    # Copy legacy binaries
-  copy_pre_hf_daemon_apps "devnet"
+  copy_pre_hf_daemon_apps "testnet"
 
   build_deb $NAME
 }
@@ -793,7 +793,7 @@ build_daemon_mesa_pre_hardfork_deb() {
     'Mina Protocol Client and Daemon for the Mesa Network' "${SUGGESTED_DEPS}"
 
   # Copy legacy binaries
-  copy_pre_hf_daemon_apps "mesa"
+  copy_pre_hf_daemon_apps "testnet"
 
   build_deb $NAME
 }
