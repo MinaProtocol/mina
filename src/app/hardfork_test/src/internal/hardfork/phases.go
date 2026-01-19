@@ -351,10 +351,12 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 	}
 
 	err = t.ValidateFinalForkConfig(analysis.LastBlockBeforeTxEnd, configUnmarshalled, forkGenesisTs, mainGenesisTs)
+	if err != nil {
+		return nil, err
+	}
 
 	forkConfigFile := "/tmp/fork_config.json"
-	os.WriteFile(forkConfigFile, []byte(forkConfig), 0644)
-
+	err = os.WriteFile(forkConfigFile, []byte(forkConfig), 0644)
 	if err != nil {
 		return nil, err
 	}
