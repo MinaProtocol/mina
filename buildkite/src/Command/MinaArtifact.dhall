@@ -86,8 +86,7 @@ let MinaBuildSpec =
           , debianRepo = DebianRepo.Type.Unstable
           , extraBuildEnvs = [] : List Text
           , suffix = None Text
-          , deb_legacy_version =
-              "3.3.0-beta1-compatible-532a749"
+          , deb_legacy_version = "3.3.0-beta1-compatible-532a749"
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
           , if_ = None B/If
