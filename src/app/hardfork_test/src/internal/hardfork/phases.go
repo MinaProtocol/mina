@@ -286,7 +286,7 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 	// with the data they generated on their own. This is more decentralized
 	// compared to the other methods
 
-	nodesDir := "~/.mina-network/nodes"
+	nodesDir := t.Config.Root + "/nodes"
 
 	var err error = nil
 
