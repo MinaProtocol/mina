@@ -294,6 +294,9 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 	forkConfig := ""
 
 	err = filepath.WalkDir(nodesDir, func(path string, d os.DirEntry, err error) error {
+		if path == nodesDir { // skip root
+			return nil
+		}
 		forkConfigBase := path + "/auto-fork-mesa-devnet"
 		if err != nil {
 			return err
