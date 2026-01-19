@@ -17,7 +17,7 @@ type HFHandler func(*HardforkTest, *BlockAnalysisResult) error
 // and returns the fork config bytes and block analysis result
 func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) (*BlockAnalysisResult, *ForkData, error) {
 	// Start the main network
-	mainNetCmd, err := t.RunMainNetwork(mainGenesisTs, t.Config.ForkMethod == config.Auto)
+	mainNetCmd, err := t.RunMainNetwork(mainGenesisTs)
 	if err != nil {
 		return nil, nil, err
 	}

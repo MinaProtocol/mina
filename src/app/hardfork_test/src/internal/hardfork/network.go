@@ -91,7 +91,7 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 }
 
 // RunMainNetwork starts the main network
-func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64, isAutoHFMode bool) (*exec.Cmd, error) {
+func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 
 	mainGenesisTimestamp := config.FormatTimestamp(mainGenesisTs)
 
@@ -104,7 +104,7 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64, isAutoHFMode bool) (*
 		"--hardfork-genesis-slot-delta", strconv.Itoa(t.Config.HfSlotDelta),
 	}
 
-	if isAutoHFMode {
+	if t.Config.ForkMethod == config.Auto {
 		args = append(args, "--hardfork-handling", "migrate-exit")
 		// In auto mode all nodes should exit by itself, hence we're only killing SNARK workers
 		args = append(args, "--on-exit", "kill_snark_workers")
