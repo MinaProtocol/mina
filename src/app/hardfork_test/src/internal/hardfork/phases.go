@@ -293,50 +293,44 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 	seenForkConfig := false
 	forkConfig := ""
 
-	err = filepath.WalkDir(nodesDir, func(path string, d os.DirEntry, err error) error {
-		if path == nodesDir { // skip root
-			return nil
+	entries, err := os.ReadDir(nodesDir)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, e := range entries {
+		if !e.IsDir() {
+			return nil, fmt.Errorf("Unexpected file %s in node directory %s", e.Name(), nodesDir)
 		}
-		forkConfigBase := path + "/auto-fork-mesa-devnet"
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() {
-			return fmt.Errorf("Unexpected file %s in node directory %s", path, nodesDir)
-		}
-		if d.Name() == "snark_workers" {
+		if e.Name() == "snark_workers" {
 			// SNARK workers doesn't participate in fork
-			return nil
+			continue
+		}
+		nodeDir := filepath.Join(nodesDir, e.Name())
+		forkConfigBase := filepath.Join(nodeDir, "auto-fork-mesa-devnet")
+
+		_, err = os.Stat(filepath.Join(forkConfigBase, "activated"))
+		if err != nil {
+			return nil, err
 		}
 
-		_, err = os.Stat(forkConfigBase + "/activated")
+		currentForkConfig, err := os.ReadFile(filepath.Join(forkConfigBase, "daemon.json"))
 		if err != nil {
-			return err
-		}
-
-		currentForkConfig, err := os.ReadFile(forkConfigBase + "/daemon.json")
-		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if !seenForkConfig {
 			seenForkConfig = true
 			forkConfig = string(currentForkConfig)
 		} else if string(currentForkConfig) != forkConfig {
-			return fmt.Errorf("Node at %s generated fork config '%s' not same as the commonly agreed one '%s'",
-				path, currentForkConfig, forkConfig)
+			return nil, fmt.Errorf("Node %s generated fork config '%s' not same as the commonly agreed one '%s'",
+				e.Name(), currentForkConfig, forkConfig)
 		}
 
-		err = os.Rename(forkConfigBase+"/genesis", path+"/override_genesis_ledger")
+		err = os.Rename(filepath.Join(forkConfigBase, "genesis"), filepath.Join(nodeDir, "override_genesis_ledger"))
 		if err != nil {
-			return err
+			return nil, err
 		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
 	}
 
 	if !seenForkConfig {
