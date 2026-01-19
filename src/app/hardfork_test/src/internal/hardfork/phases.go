@@ -58,9 +58,14 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) (*BlockAnalysisR
 		return nil, nil, err
 	}
 
-	// Validate no new blocks are created after chain end
-	if err := t.ValidateNoNewBlocks(t.AnyPortOfType(PORT_REST)); err != nil {
-		return nil, nil, err
+	// On auto mode node shutdown itself at slot-chain-end as long as it heards
+	// from block at slot-tx-end, so it's not guaranteed we can still connect to
+	// nodes here.
+	if t.Config.ForkMethod != config.Auto {
+		// Validate no new blocks are created after chain end
+		if err := t.ValidateNoNewBlocks(t.AnyPortOfType(PORT_REST)); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	t.Logger.Info("Phase 2: Forking with fork method `%s`...", t.Config.ForkMethod.String())
@@ -72,7 +77,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) (*BlockAnalysisR
 	case config.Advanced:
 		forkData, err = t.AdvancedForkPhase(analysis, mainGenesisTs)
 	case config.Auto:
-		panic("TODO: implement auto mode fork config generation")
+		forkData, err = t.AutoForkPhase(analysis, mainGenesisTs)
 	}
 	if err != nil {
 		return nil, nil, err
