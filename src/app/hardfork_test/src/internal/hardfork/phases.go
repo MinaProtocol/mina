@@ -77,7 +77,9 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) (*BlockAnalysisR
 	case config.Advanced:
 		forkData, err = t.AdvancedForkPhase(analysis, mainGenesisTs)
 	case config.Auto:
-		forkData, err = t.AutoForkPhase(analysis, mainGenesisTs)
+		// WARN: We're using the dummy ForkData here, expecting callee to call
+		// `t.AutoForkPhase`, this is because auto fork config is guaranteed to be
+		// produced before the network closed
 	}
 	if err != nil {
 		return nil, nil, err

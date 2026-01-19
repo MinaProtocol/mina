@@ -123,6 +123,12 @@ func (t *HardforkTest) Run() error {
 	if err != nil {
 		return err
 	}
+	if t.Config.ForkMethod == config.Auto {
+		forkData, err = t.AutoForkPhase(analysis, mainGenesisTs)
+	}
+	if err != nil {
+		return err
+	}
 
 	t.Logger.Info("Phase 3: Running fork network...")
 	if err := t.RunForkNetworkPhase(analysis.LastBlockBeforeTxEnd.BlockHeight, *forkData, mainGenesisTs); err != nil {
