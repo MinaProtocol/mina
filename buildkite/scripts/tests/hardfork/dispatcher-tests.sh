@@ -178,7 +178,7 @@ fi
 echo "PASSED: Got Mesa runtime (commit: ${ACTUAL_COMMIT:0:12}...)"
 
 # =============================================================================
-# Test 3: Config Override
+# Test 3: Config Override and Genesis Ledger Addition
 # =============================================================================
 
 echo ""
@@ -200,7 +200,40 @@ if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_CONFIG"* ]]; then
   exit 1
 fi
 
+if [[ "$MINA_EXEC_COMMAND" != *"--genesis-ledger-dir $(activation_marker_dir)/genesis"* ]]; then
+  echo "FAILED: Genesis ledger directory not overridden to mesa-ledgers"
+  echo "  Actual command: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
 echo "PASSED: Config correctly overridden to hardfork config"
+
+# =============================================================================
+# Test 4: Config Override and Genesis Ledger Addition
+# =============================================================================
+
+echo ""
+echo "=== Test 4: Config Override ==="
+echo "Verifying that user-provided genesis ledger directory is overridden with hardfork ones"
+
+# Modify mina-dispatch to echo the command instead of executing it
+PATCH_DISPATCH="sed -i '\$s/^/echo /' /usr/local/bin/mina-dispatch"
+SETUP_CMD="${PATCH_DISPATCH} && $(create_activation_marker)"
+
+MINA_EXEC_COMMAND=$(docker run --entrypoint bash "$DOCKER_IMAGE" \
+  -c "${SETUP_CMD} && mina daemon --genesis-ledger-dir /var/lib/coda/fake/ledger")
+
+EXPECTED_CONFIG="--genesis-ledger-dir $(activation_marker_dir)/genesis"
+if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_CONFIG"* ]]; then
+  echo "FAILED: Config override not applied"
+  echo "  Expected substring: $EXPECTED_CONFIG"
+  echo "  Actual command: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+
+echo "PASSED: Config correctly overridden to hardfork genesis ledgers"
+
 
 # =============================================================================
 # Summary

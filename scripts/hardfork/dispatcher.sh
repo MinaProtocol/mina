@@ -86,6 +86,7 @@ set -euo pipefail
 # =============================================================================
 
 SOURCE_FILE=${SOURCE_FILE:-"/etc/default/mina-dispatch"}
+DEBUG=${DEBUG:-0}
 
 # Validate source file exists before sourcing
 if [[ ! -f "$SOURCE_FILE" ]]; then
@@ -104,9 +105,11 @@ fi
 # shellcheck source=/etc/default/mina-dispatch
 source "${SOURCE_FILE}"
 
-echo "DEBUG: Loaded configuration from $SOURCE_FILE" >&2
-echo "DEBUG: MINA_NETWORK=$MINA_NETWORK, MINA_PROFILE=$MINA_PROFILE" >&2
-echo "DEBUG: RUNTIMES_BASE_PATH=$RUNTIMES_BASE_PATH" >&2
+if [[ "$DEBUG" -ne 0 ]]; then
+  echo "DEBUG: Loaded configuration from $SOURCE_FILE" >&2
+  echo "DEBUG: MINA_NETWORK=$MINA_NETWORK, MINA_PROFILE=$MINA_PROFILE" >&2
+  echo "DEBUG: RUNTIMES_BASE_PATH=$RUNTIMES_BASE_PATH" >&2
+fi
 
 # =============================================================================
 # Required Variable Validation
@@ -146,8 +149,10 @@ else
   runtime="berkeley"
 fi
 
-echo "DEBUG: Selected runtime: $runtime" >&2
-echo "DEBUG: Input arguments: $*" >&2
+if [[ "$DEBUG" -ne 0 ]]; then
+  echo "DEBUG: Selected runtime: $runtime" >&2
+  echo "DEBUG: Input arguments: $*" >&2
+fi
 
 # =============================================================================
 # Command Resolution
@@ -220,8 +225,12 @@ if [[ "$runtime" == "mesa" ]]; then
   new_args=()
   found_genesis_ledger_dir=false
   skip_next=false
+  first_arg="${args[0]}"
 
   i=0
+
+  
+
   while [[ $i -lt ${#args[@]} ]]; do
     arg="${args[$i]}"
 
@@ -239,11 +248,12 @@ if [[ "$runtime" == "mesa" ]]; then
       has_next_arg=true
     fi
 
+
     case "$arg" in
-      -config-file)
+      -config-file|--config-file)
         # Rewrite config file path to mesa config
         if [[ "$has_next_arg" == true ]]; then
-          new_args+=("-config-file" "$MESA_CONFIG")
+          new_args+=("$arg" "$MESA_CONFIG")
           skip_next=true
         else
           # No value provided, pass through as-is (will error at runtime)
@@ -251,20 +261,23 @@ if [[ "$runtime" == "mesa" ]]; then
         fi
         ;;
 
-      --genesis-ledger-dir)
-        # Rewrite genesis ledger directory to mesa ledgers
-        if [[ "$has_next_arg" == true ]]; then
-          new_args+=("--genesis-ledger-dir" "$MESA_LEDGERS_DIR")
-          found_genesis_ledger_dir=true
-          skip_next=true
-        else
-          # No value provided, pass through as-is
-          new_args+=("$arg")
-          found_genesis_ledger_dir=true
+      --genesis-ledger-dir|-genesis-ledger-dir)
+        # Alter arguments only for "daemon" subcommand
+        if [[ "$first_arg" == "daemon" ]]; then
+          # Rewrite genesis ledger directory to mesa ledgers
+          if [[ "$has_next_arg" == true ]]; then
+            new_args+=("$arg" "$MESA_LEDGERS_DIR")
+            found_genesis_ledger_dir=true
+            skip_next=true
+          else
+            # No value provided, pass through as-is
+            new_args+=("$arg")
+            found_genesis_ledger_dir=true
+          fi
         fi
         ;;
 
-      --hardfork-handling)
+      --hardfork-handling|-hardfork-handling)
         # Remove this argument entirely for mesa runtime
         if [[ "$has_next_arg" == true ]]; then
           skip_next=true
@@ -297,9 +310,13 @@ fi
 # Execute the binary with processed arguments
 # Handle empty args array safely for bash strict mode
 if [[ ${#args[@]} -gt 0 ]]; then
-  echo "DEBUG: Executing $bin with arguments: ${args[*]}" >&2
+  if [[ "$DEBUG" -ne 0 ]]; then
+    echo "DEBUG: Executing $bin with arguments: ${args[*]}" >&2
+  fi
   exec "$bin" "${args[@]}"
 else
-  echo "DEBUG: Executing $bin with no arguments" >&2
+  if [[ "$DEBUG" -ne 0 ]]; then
+    echo "DEBUG: Executing $bin with no arguments" >&2
+  fi
   exec "$bin"
 fi
