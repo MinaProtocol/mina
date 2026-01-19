@@ -292,6 +292,7 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 	forkConfig := ""
 
 	err = filepath.WalkDir(nodesDir, func(path string, d os.DirEntry, err error) error {
+		forkConfigBase := path + "/auto-fork-mesa-devnet"
 		if err != nil {
 			return err
 		}
@@ -303,12 +304,12 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 			return nil
 		}
 
-		_, err = os.Stat(path + "/auto-fork-mesa-devnet/activated")
+		_, err = os.Stat(forkConfigBase + "/activated")
 		if err != nil {
 			return err
 		}
 
-		currentForkConfig, err := os.ReadFile(path + "/auto-fork-mesa-devnet/daemon.json")
+		currentForkConfig, err := os.ReadFile(forkConfigBase + "/daemon.json")
 		if err != nil {
 			return err
 		}
@@ -321,13 +322,17 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 				path, currentForkConfig, forkConfig)
 		}
 
-		err = os.Rename(path+"/auto-fork-mesa-devnet/genesis", path+"/override_genesis_ledger")
+		err = os.Rename(forkConfigBase+"/genesis", path+"/override_genesis_ledger")
 		if err != nil {
 			return err
 		}
 
 		return nil
 	})
+
+	if err != nil {
+		return nil, err
+	}
 
 	if !seenForkConfig {
 		return nil, fmt.Errorf("No fork config has been found after auto mode has been used!")
