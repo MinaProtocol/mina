@@ -83,6 +83,60 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
 
 let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
+(** Sign a zkApp command synchronously with the given keys.
+
+    {b This is a test helper and should not be used in production code.}
+
+    This is a simpler, synchronous alternative to [replace_authorizations] for
+    test cases that don't need proof generation. It supports both testnet and
+    mainnet signature kinds.
+
+    @param signature_kind The network signature kind (Testnet or Mainnet)
+    @param fee_payer_sk Private key to sign the fee payer
+    @param account_update_keys Map from public keys to private keys for account updates
+    @param zkapp_command The command with dummy signatures to sign
+
+    The signing logic mirrors what is verified in the transaction snark:
+    - Fee payer always signs the full commitment
+    - Account updates sign partial or full commitment based on [use_full_commitment]
+*)
+let sign_zkapp_command ~signature_kind ~fee_payer_sk ~account_update_keys
+    (zkapp_command : Zkapp_command.t) : Zkapp_command.t =
+  let txn_commitment, full_txn_commitment =
+    Zkapp_command.get_transaction_commitments ~signature_kind zkapp_command
+  in
+  let sign_for_account_update ~use_full_commitment sk =
+    let commitment =
+      if use_full_commitment then full_txn_commitment else txn_commitment
+    in
+    Signature_lib.Schnorr.Chunked.sign ~signature_kind sk
+      (Random_oracle.Input.Chunked.field commitment)
+  in
+  (* Sign fee payer with full commitment *)
+  let fee_payer_signature =
+    sign_for_account_update ~use_full_commitment:true fee_payer_sk
+  in
+  let fee_payer =
+    { zkapp_command.fee_payer with authorization = fee_payer_signature }
+  in
+  (* Sign account updates *)
+  let account_updates =
+    Zkapp_command.Call_forest.map zkapp_command.account_updates
+      ~f:(fun (p : Account_update.t) ->
+        match p.authorization with
+        | Control.Poly.Signature _ ->
+            let sk =
+              Signature_lib.Public_key.Compressed.Map.find_exn account_update_keys
+                p.body.public_key
+            in
+            let use_full_commitment = p.body.use_full_commitment in
+            let signature = sign_for_account_update ~use_full_commitment sk in
+            { p with authorization = Control.Poly.Signature signature }
+        | _ ->
+            p )
+  in
+  { zkapp_command with fee_payer; account_updates }
+
 (* replace dummy signatures, proofs with valid ones for fee payer, other zkapp_command
    [keymap] maps compressed public keys to private keys
 *)

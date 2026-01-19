@@ -35,7 +35,9 @@
   signature_lib
   snarky.backendless
   snark_params
-  with_hash)
+  verifier
+  with_hash
+  zkapp_command_builder)
  (preprocess
   (pps ppx_assert ppx_base ppx_let))
  (instrumentation
