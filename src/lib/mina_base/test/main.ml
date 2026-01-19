@@ -192,4 +192,16 @@ let () =
           ; test_case "No odd slot difference discrepancies" `Quick
               no_odd_vesting_discrepancies
           ] )
+    ; Zkapp_precondition_test.
+        ( "zkApp preconditions"
+        , [ test_case "ClosedInterval JSON roundtrip" `Quick
+              closed_interval_roundtrip_json
+          ; test_case "Numeric JSON roundtrip" `Quick numeric_roundtrip_json
+          ; test_case "Account precondition JSON roundtrip" `Quick
+              account_json_roundtrip
+          ; test_case "Epoch_data JSON roundtrip" `Quick
+              epoch_data_json_roundtrip
+          ; test_case "Protocol_state JSON roundtrip" `Quick
+              protocol_state_json_roundtrip
+          ] )
     ]
