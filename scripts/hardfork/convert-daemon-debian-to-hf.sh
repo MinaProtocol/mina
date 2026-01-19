@@ -2,6 +2,14 @@
 
 # Script to convert an existing mina-daemon Debian package into a hardfork-specific package
 # by replacing its runtime configuration and ledger files.
+#
+# Debian naming scheme for mina daemon packages:
+#   mina-${NETWORK}-${PROFILE_OR_GENERAL_SUFFIX}
+#
+# Where:
+#   NETWORK: mainnet, devnet, berkeley, testnet-agnostic
+#   PROFILE: devnet, mainnet, dev, lightnet
+#   SUFFIX:  hardfork (used to differentiate from standard daemon)
 
 set -ex
 
@@ -45,17 +53,13 @@ VERSION=$(dpkg-deb --field "$DEB_FILE_ABS" Version)
 ARCH=$(dpkg-deb --field "$DEB_FILE_ABS" Architecture)
 
 # Get the base name without version and arch (everything before the first underscore)
-if [[ "$DEB_BASE" =~ ^(.+)_${VERSION}_${ARCH}$ ]]; then
-	FILE_BASE_NAME="${BASH_REMATCH[1]}"
-else
-	# Fallback if pattern doesn't match - just use the base
-	FILE_BASE_NAME="${DEB_BASE%%_*}"
-fi
+FILE_BASE_NAME="${DEB_BASE%%_*}"
 
 # Remove any existing -hardfork suffixes from the base name
-while [[ "$FILE_BASE_NAME" == *-hardfork ]]; do
+if [[ "$FILE_BASE_NAME" == *-hardfork ]]; then
+	echo "Note: Input package is a hardfork package already. Removing existing -hardfork suffix from base name"
 	FILE_BASE_NAME="${FILE_BASE_NAME%-hardfork}"
-done
+fi
 
 # Construct the output filename: <base-name>-hardfork_<version>_<arch>.deb
 OUTPUT_DEB_FILE="${DEB_DIR}/${FILE_BASE_NAME}-hardfork_${VERSION}_${ARCH}.deb"
@@ -81,123 +85,98 @@ echo ""
 echo "=== Step 1: Opening Debian Package for modification ==="
 ./scripts/debian/session/deb-session-open.sh "$DEB_FILE_ABS" "$SESSION_DIR"
 
-# Move existing network config to backup
-echo ""
-echo "=== Step 2: Backing up existing network config (${NETWORK_NAME}.json -> ${NETWORK_NAME}.old.json) ==="
-./scripts/debian/session/deb-session-move.sh "$SESSION_DIR" \
-    "/var/lib/coda/${NETWORK_NAME}.json" \
-    "/var/lib/coda/${NETWORK_NAME}.old.json"
-
 # Insert new runtime config as the network config
 echo ""
-echo "=== Step 3: Inserting new runtime config as ${NETWORK_NAME}.json ==="
+echo "=== Step 2: Inserting new runtime config as ${NETWORK_NAME}.json ==="
 ./scripts/debian/session/deb-session-insert.sh "$SESSION_DIR" \
     "/var/lib/coda/${NETWORK_NAME}.json" \
     "$RUNTIME_CONFIG_JSON_ABS"
 
 # Replace config_*.json with runtime config
 echo ""
-echo "=== Step 4: Replacing config_*.json with new runtime config ==="
+echo "=== Step 3: Replacing config_*.json with new runtime config ==="
 ./scripts/debian/session/deb-session-replace.sh "$SESSION_DIR" \
     "/var/lib/coda/config_*.json" \
     "$RUNTIME_CONFIG_JSON_ABS"
 
 # Remove existing ledger tarballs before adding new ones
 echo ""
-echo "=== Step 5: Removing existing ledger tarballs ==="
+echo "=== Step 4: Removing existing ledger tarballs ==="
 ./scripts/debian/session/deb-session-remove.sh "$SESSION_DIR" \
     "/var/lib/coda/*.tar.gz" || echo "No existing ledger tarballs to remove"
 
 # Insert ledger tarballs
 echo ""
-echo "=== Step 6: Inserting new ledger tarballs ==="
-if [[ -d "$LEDGER_TARBALLS_FULL" ]]; then
-    # Directory of tarballs
-    TARBALL_FILES=("$LEDGER_TARBALLS_FULL"/*.tar.gz)
-    if [[ ! -e "${TARBALL_FILES[0]}" ]]; then
-        echo "ERROR: No .tar.gz files found in $LEDGER_TARBALLS_FULL" >&2
-        exit 1
-    fi
-    ./scripts/debian/session/deb-session-insert.sh "$SESSION_DIR" \
-        "/var/lib/coda/" \
-        "${TARBALL_FILES[@]}"
-else
-    # Single tarball file
-    ./scripts/debian/session/deb-session-insert.sh "$SESSION_DIR" \
-        "/var/lib/coda/" \
-        "$LEDGER_TARBALLS_FULL"
+echo "=== Step 5: Inserting new ledger tarballs ==="
+
+if [[ ! -d "$LEDGER_TARBALLS_FULL" ]]; then
+	echo "ERROR: Ledger tarballs path must be a directory containing exactly 3 files: genesis_ledger, and two epoch ledgers" >&2
+	exit 1
 fi
+
+# Check for required ledgers: genesis_ledger (1), epoch (2)
+
+# Check genesis_ledger
+GENESIS_MATCHES=("$LEDGER_TARBALLS_FULL/genesis_ledger"*.tar.gz)
+if [[ ! -f "${GENESIS_MATCHES[0]}" ]]; then
+    echo "ERROR: Missing required ledger tarball with prefix: genesis_ledger in $LEDGER_TARBALLS_FULL" >&2
+    exit 1
+fi
+# Check epoch (must have 2)
+EPOCH_MATCHES=("$LEDGER_TARBALLS_FULL/epoch"*.tar.gz)
+if [[ ${#EPOCH_MATCHES[@]} -ne 2 ]]; then
+    echo "ERROR: Expected 2 ledger tarballs with prefix: epoch in $LEDGER_TARBALLS_FULL, found ${#EPOCH_MATCHES[@]}" >&2
+    exit 1
+fi
+
+# Use the actual matched filenames for genesis_ledger and epoch tarballs
+TARBALL_FILES=("${GENESIS_MATCHES[0]}" "${EPOCH_MATCHES[0]}" "${EPOCH_MATCHES[1]}")
+./scripts/debian/session/deb-session-insert.sh "$SESSION_DIR" "/var/lib/coda/" "${TARBALL_FILES[@]}"
 
 # Rename package to add -hardfork suffix
 echo ""
-echo "=== Step 7: Renaming package to add -hardfork suffix ==="
-BASE_PACKAGE_NAME="$ORIGINAL_PACKAGE_NAME"
-while [[ "$BASE_PACKAGE_NAME" == *-hardfork ]]; do
-	BASE_PACKAGE_NAME="${BASE_PACKAGE_NAME%-hardfork}"
-done
-NEW_PACKAGE_NAME="${BASE_PACKAGE_NAME}-hardfork"
+echo "=== Step 6: Renaming package to add -hardfork suffix ==="
+NEW_PACKAGE_NAME="${FILE_BASE_NAME}-hardfork"
 
 ./scripts/debian/session/deb-session-rename-package.sh "$SESSION_DIR" "$NEW_PACKAGE_NAME"
 
 # Save the modified package
 echo ""
-echo "=== Step 8: Saving modified package ==="
+echo "=== Step 7: Saving modified package ==="
 ./scripts/debian/session/deb-session-save.sh "$SESSION_DIR" "$OUTPUT_DEB_FILE" --verify
 
 # Verify the final package contents
 echo ""
-echo "=== Step 9: Final Verification (SHA256 checksums and file counts) ==="
+echo "=== Step 8: Final Verification (SHA256 checksums and file counts) ==="
 
 FINAL_DEB_ABS=$(readlink -f "$OUTPUT_DEB_FILE")
 LEDGER_TARBALLS_ABS=$(readlink -f "$LEDGER_TARBALLS_FULL")
 
 echo "Package size: $(ls -lh "$FINAL_DEB_ABS" | awk '{print $5}')"
 
-# Quick file count check
-FILE_COUNT=$(dpkg-deb -c "$FINAL_DEB_ABS" | grep -E "(config_.*\.json|${NETWORK_NAME}|.*ledger.*\.tar\.gz)" | wc -l)
-echo "Files found (configs + network + ledgers): $FILE_COUNT"
+# List all files in the package for debuggability
+echo "Listing all files in the package:"
+dpkg-deb -c "$FINAL_DEB_ABS"
 
-# Count source ledger files
-if [[ -d "$LEDGER_TARBALLS_ABS" ]]; then
-	SOURCE_LEDGER_COUNT=$(ls -1 "$LEDGER_TARBALLS_ABS"/*.tar.gz 2>/dev/null | wc -l)
-else
-	SOURCE_LEDGER_COUNT=1
-fi
-
-# Expected: ledgers + config_*.json + network.json + network.old.json = at least SOURCE_LEDGER_COUNT + 3
-EXPECTED_MIN=$((SOURCE_LEDGER_COUNT + 3))
-
-if [[ $FILE_COUNT -lt $EXPECTED_MIN ]]; then
-	echo "ERROR: Expected at least $EXPECTED_MIN files (${SOURCE_LEDGER_COUNT} ledgers + 3 configs), but found $FILE_COUNT" >&2
-	echo "Listing package contents:" >&2
-	dpkg-deb -c "$FINAL_DEB_ABS" | grep -E "(config_|ledger|${NETWORK_NAME})" >&2
-	exit 1
-fi
-
-# Full SHA256 verification
+# Full file content verification
 echo ""
-echo "=== SHA256 Verification ==="
+echo "=== File Content Verification ==="
 
 VERIFY_DIR=$(mktemp -d)
-trap 'rm -rf "$VERIFY_DIR"' EXIT
+trap 'rm -rf "$SESSION_DIR" "$VERIFY_DIR"' EXIT
 
-cd "$VERIFY_DIR"
+pushd "$VERIFY_DIR" > /dev/null
 ar x "$FINAL_DEB_ABS"
 mkdir data
 tar -xzf data.tar.gz -C data
 
 # Verify runtime config file (config_*.json)
-RUNTIME_CONFIG_HASH=$(sha256sum "$RUNTIME_CONFIG_JSON_ABS" | awk '{print $1}')
-
 PKG_CONFIG=$(ls data/var/lib/coda/config_*.json 2>/dev/null | head -1)
 if [[ -n "$PKG_CONFIG" ]]; then
-	PKG_CONFIG_HASH=$(sha256sum "$PKG_CONFIG" | awk '{print $1}')
-	if [[ "$PKG_CONFIG_HASH" == "$RUNTIME_CONFIG_HASH" ]]; then
+	if cmp -s "$PKG_CONFIG" "$RUNTIME_CONFIG_JSON_ABS"; then
 		echo "✓ Config file verified: $(basename "$PKG_CONFIG")"
 	else
-		echo "ERROR: Config file hash mismatch!" >&2
-		echo "  Expected: $RUNTIME_CONFIG_HASH" >&2
-		echo "  Got:      $PKG_CONFIG_HASH" >&2
+		echo "ERROR: Config file content mismatch!" >&2
 		exit 1
 	fi
 else
@@ -208,13 +187,10 @@ fi
 # Verify network config file
 PKG_NETWORK_CONFIG="data/var/lib/coda/${NETWORK_NAME}.json"
 if [[ -f "$PKG_NETWORK_CONFIG" ]]; then
-	PKG_NETWORK_HASH=$(sha256sum "$PKG_NETWORK_CONFIG" | awk '{print $1}')
-	if [[ "$PKG_NETWORK_HASH" == "$RUNTIME_CONFIG_HASH" ]]; then
+	if cmp -s "$PKG_NETWORK_CONFIG" "$RUNTIME_CONFIG_JSON_ABS"; then
 		echo "✓ Network config verified: ${NETWORK_NAME}.json"
 	else
-		echo "ERROR: Network config hash mismatch!" >&2
-		echo "  Expected: $RUNTIME_CONFIG_HASH" >&2
-		echo "  Got:      $PKG_NETWORK_HASH" >&2
+		echo "ERROR: Network config content mismatch!" >&2
 		exit 1
 	fi
 else
@@ -244,15 +220,10 @@ if [[ -d "$LEDGER_TARBALLS_ABS" ]]; then
 			continue
 		fi
 
-		SOURCE_HASH=$(sha256sum "$SOURCE_LEDGER" | awk '{print $1}')
-		PKG_HASH=$(sha256sum "$PKG_LEDGER" | awk '{print $1}')
-
-		if [[ "$SOURCE_HASH" == "$PKG_HASH" ]]; then
+		if cmp -s "$SOURCE_LEDGER" "$PKG_LEDGER"; then
 			echo "✓ Ledger verified: $LEDGER_NAME"
 		else
-			echo "ERROR: Ledger file hash mismatch: $LEDGER_NAME" >&2
-			echo "  Expected: $SOURCE_HASH" >&2
-			echo "  Got:      $PKG_HASH" >&2
+			echo "ERROR: Ledger file content mismatch: $LEDGER_NAME" >&2
 			LEDGER_ERROR=1
 		fi
 	done
@@ -265,21 +236,16 @@ else
 		echo "ERROR: Ledger file missing in package: $LEDGER_NAME" >&2
 		LEDGER_ERROR=1
 	else
-		SOURCE_HASH=$(sha256sum "$LEDGER_TARBALLS_ABS" | awk '{print $1}')
-		PKG_HASH=$(sha256sum "$PKG_LEDGER" | awk '{print $1}')
-
-		if [[ "$SOURCE_HASH" == "$PKG_HASH" ]]; then
+		if cmp -s "$LEDGER_TARBALLS_ABS" "$PKG_LEDGER"; then
 			echo "✓ Ledger verified: $LEDGER_NAME"
 		else
-			echo "ERROR: Ledger file hash mismatch: $LEDGER_NAME" >&2
-			echo "  Expected: $SOURCE_HASH" >&2
-			echo "  Got:      $PKG_HASH" >&2
+			echo "ERROR: Ledger file content mismatch: $LEDGER_NAME" >&2
 			LEDGER_ERROR=1
 		fi
 	fi
 fi
 
-cd - > /dev/null
+popd > /dev/null
 
 if [[ $LEDGER_ERROR -ne 0 ]]; then
 	exit 1

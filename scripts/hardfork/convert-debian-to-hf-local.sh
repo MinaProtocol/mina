@@ -11,42 +11,45 @@
 set -euo pipefail
 
 usage() {
-    cat <<EOF
+        cat <<EOF
 Usage: $0 [OPTIONS]
 
 Required arguments:
-  -d, --deb-file PATH         Path to input mina-daemon debian package
-  -n, --network NAME          Network name (e.g., devnet, testnet, mainnet)
+    -d, --deb-file PATH         Path to input mina-daemon debian package
+    -n, --network NAME          Network name (e.g., devnet, testnet, mainnet)
 
 Optional arguments:
-  -b, --gcs-bucket PATH       GCS bucket path for state dumps (default: gs://o1labs-gitops-infrastructure/devnet/)
-  -s, --state-dump PATH       Use specific state dump file instead of downloading from GCS
-  -o, --output-dir DIR        Output directory (default: current directory)
-  -w, --work-dir DIR          Working directory for temporary files (default: auto-generated)
-  --skip-verification         Skip final package verification
-  --keep-temp                 Keep temporary working directory after completion
-  -h, --help                  Show this help message
+    -s, --state-dump PATH_OR_GCS  Path to state dump file (local file or GCS path, e.g., /path/to/state-dump.json or gs://bucket/path)
+    -o, --output-dir DIR        Output directory (default: current directory)
+    -w, --work-dir DIR          Working directory for temporary files (default: auto-generated)
+    --skip-verification         Skip final package verification
+    --keep-temp                 Keep temporary working directory after completion
+    -h, --help                  Show this help message
 
 Examples:
-  # Convert using latest devnet state dump
-  $0 -d mina-daemon.deb -n devnet
+    # Convert using latest devnet state dump from default GCS bucket
+    $0 -d mina-daemon.deb -n devnet
 
-  # Convert using specific state dump file
-  $0 -d mina-daemon.deb -n mainnet -s /path/to/state-dump.json
+    # Convert using specific state dump file
+    $0 -d mina-daemon.deb -n mainnet -s /path/to/state-dump.json
 
-  # Convert with custom output directory
-  $0 -d mina-daemon.deb -n testnet -o /path/to/output
+    # Convert using specific state dump from GCS
+    $0 -d mina-daemon.deb -n testnet -s gs://bucket/path/to/state-dump.json.gz
+
+    # Convert with custom output directory
+    $0 -d mina-daemon.deb -n testnet -o /path/to/output
 
 EOF
-    exit 1
+        exit 1
 }
 
+
 # Default values
-GCS_BUCKET="gs://o1labs-gitops-infrastructure/devnet/"
+DEFAULT_GCS_BUCKET="gs://o1labs-gitops-infrastructure/devnet/"
 OUTPUT_DIR="."
 SKIP_VERIFICATION=false
 KEEP_TEMP=false
-STATE_DUMP_FILE=""
+STATE_DUMP_ARG=""
 WORKDIR=""
 
 # Parse arguments
@@ -60,12 +63,8 @@ while [[ $# -gt 0 ]]; do
             NETWORK_NAME="$2"
             shift 2
             ;;
-        -b|--gcs-bucket)
-            GCS_BUCKET="$2"
-            shift 2
-            ;;
         -s|--state-dump)
-            STATE_DUMP_FILE="$2"
+            STATE_DUMP_ARG="$2"
             shift 2
             ;;
         -o|--output-dir)
@@ -144,68 +143,82 @@ echo "Output directory: $OUTPUT_DIR"
 echo "Working directory: $WORKDIR"
 echo ""
 
+
 # Step 1: Get or download state dump
 echo "=== Step 1: Getting state dump ==="
 CONFIG_FILE="$WORKDIR/config.json"
 
-if [[ -n "$STATE_DUMP_FILE" ]]; then
-    # Use provided state dump file
-    if [[ ! -f "$STATE_DUMP_FILE" ]]; then
-        echo "ERROR: Provided state dump file not found: $STATE_DUMP_FILE" >&2
-        exit 1
-    fi
-    echo "Using provided state dump: $STATE_DUMP_FILE"
-
-    # Check if the file is gzipped and unpack if needed
-    if [[ "$STATE_DUMP_FILE" == *.gz ]]; then
-        echo "Unpacking gzipped state dump..."
-        gunzip -c "$STATE_DUMP_FILE" > "$CONFIG_FILE"
-        echo "✓ State dump unpacked"
+if [[ -n "$STATE_DUMP_ARG" ]]; then
+    if [[ "$STATE_DUMP_ARG" == gs://* ]]; then
+        # Download from GCS path provided by user
+        echo "Downloading state dump from GCS: $STATE_DUMP_ARG"
+        if ! command -v gsutil &> /dev/null; then
+            echo "ERROR: gsutil not found. Please install Google Cloud SDK or provide a local state dump file" >&2
+            exit 1
+        fi
+        DOWNLOADED_FILE="$WORKDIR/downloaded_state_dump"
+        if ! gsutil cp "$STATE_DUMP_ARG" "$DOWNLOADED_FILE"; then
+            echo "ERROR: Failed to download state dump from $STATE_DUMP_ARG" >&2
+            exit 1
+        fi
+        echo "\u2713 Downloaded state dump successfully"
+        echo "Downloaded size: $(du -h "$DOWNLOADED_FILE" | cut -f1)"
+        # Check if the downloaded file is gzipped and unpack if needed
+        if [[ "$STATE_DUMP_ARG" == *.gz ]] || file "$DOWNLOADED_FILE" | grep -q "gzip compressed"; then
+            echo "Unpacking gzipped state dump..."
+            gunzip -c "$DOWNLOADED_FILE" > "$CONFIG_FILE"
+            echo "\u2713 State dump unpacked"
+            rm "$DOWNLOADED_FILE"
+        else
+            mv "$DOWNLOADED_FILE" "$CONFIG_FILE"
+        fi
+        echo "State dump size: $(du -h "$CONFIG_FILE" | cut -f1)"
     else
-        cp "$STATE_DUMP_FILE" "$CONFIG_FILE"
+        # Use provided local file
+        if [[ ! -f "$STATE_DUMP_ARG" ]]; then
+            echo "ERROR: Provided state dump file not found: $STATE_DUMP_ARG" >&2
+            exit 1
+        fi
+        echo "Using provided state dump: $STATE_DUMP_ARG"
+        if [[ "$STATE_DUMP_ARG" == *.gz ]]; then
+            echo "Unpacking gzipped state dump..."
+            gunzip -c "$STATE_DUMP_ARG" > "$CONFIG_FILE"
+            echo "\u2713 State dump unpacked"
+        else
+            cp "$STATE_DUMP_ARG" "$CONFIG_FILE"
+        fi
     fi
 else
-    # Download from GCS
+    # Download from default GCS bucket (legacy behavior)
+    GCS_BUCKET="$DEFAULT_GCS_BUCKET"
     echo "Downloading state dump from GCS bucket: $GCS_BUCKET"
-
-    # Check if gsutil is available
     if ! command -v gsutil &> /dev/null; then
         echo "ERROR: gsutil not found. Please install Google Cloud SDK or provide a state dump file with -s" >&2
         exit 1
     fi
-
-    # Get the newest file from the GCS bucket
     set +o pipefail
     NEWEST_FILE=$(gsutil ls -l "$GCS_BUCKET" | grep "devnet-state-dump" | sort -k2 -r | head -n1 | awk '{print $NF}' || true)
     set -o pipefail
-
     if [[ -z "$NEWEST_FILE" ]]; then
         echo "ERROR: No state dump files found in $GCS_BUCKET" >&2
         exit 1
     fi
-
     echo "Newest state dump: $NEWEST_FILE"
-
-    # Download to temporary location first
     DOWNLOADED_FILE="$WORKDIR/downloaded_state_dump"
     if ! gsutil cp "$NEWEST_FILE" "$DOWNLOADED_FILE"; then
         echo "ERROR: Failed to download state dump from $NEWEST_FILE" >&2
         exit 1
     fi
-
-    echo "✓ Downloaded state dump successfully"
+    echo "\u2713 Downloaded state dump successfully"
     echo "Downloaded size: $(du -h "$DOWNLOADED_FILE" | cut -f1)"
-
-    # Check if the downloaded file is gzipped and unpack if needed
     if [[ "$NEWEST_FILE" == *.gz ]] || file "$DOWNLOADED_FILE" | grep -q "gzip compressed"; then
         echo "Unpacking gzipped state dump..."
         gunzip -c "$DOWNLOADED_FILE" > "$CONFIG_FILE"
-        echo "✓ State dump unpacked"
+        echo "\u2713 State dump unpacked"
         rm "$DOWNLOADED_FILE"
     else
         mv "$DOWNLOADED_FILE" "$CONFIG_FILE"
     fi
-
     echo "State dump size: $(du -h "$CONFIG_FILE" | cut -f1)"
 fi
 
@@ -312,11 +325,15 @@ done
 DEB_DIR=$(dirname "$INPUT_DEB_ABS")
 OUTPUT_DEB="${DEB_DIR}/${FILE_BASE_NAME}-hardfork_${VERSION}_${ARCH}.deb"
 
-"$CONVERSION_SCRIPT" \
-    -d "$INPUT_DEB_ABS" \
-    -c "$RUNTIME_CONFIG_JSON" \
-    -l "$LEDGERS_DIR" \
-    -n "$NETWORK_NAME"
+
+# Run the conversion script in a subshell to prevent trap overwriting
+(
+    "$CONVERSION_SCRIPT" \
+        -d "$INPUT_DEB_ABS" \
+        -c "$RUNTIME_CONFIG_JSON" \
+        -l "$LEDGERS_DIR" \
+        -n "$NETWORK_NAME"
+)
 
 # Verify output package was created
 if [[ ! -f "$OUTPUT_DEB" ]]; then
