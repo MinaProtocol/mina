@@ -45,12 +45,11 @@ EOF
 
 
 # Default values
-DEFAULT_GCS_BUCKET="gs://o1labs-gitops-infrastructure/devnet/"
 OUTPUT_DIR="."
-SKIP_VERIFICATION=false
 KEEP_TEMP=false
-STATE_DUMP_ARG=""
+STATE_DUMP_ARG="gs://o1labs-gitops-infrastructure/devnet/"
 WORKDIR=""
+SKIP_VERIFY=0
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -76,7 +75,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --skip-verification)
-            SKIP_VERIFICATION=true
+            SKIP_VERIFY=1
             shift
             ;;
         --keep-temp)
@@ -148,19 +147,53 @@ echo ""
 echo "=== Step 1: Getting state dump ==="
 CONFIG_FILE="$WORKDIR/config.json"
 
-if [[ -n "$STATE_DUMP_ARG" ]]; then
-    if [[ "$STATE_DUMP_ARG" == gs://* ]]; then
-        # Download from GCS path provided by user
-        echo "Downloading state dump from GCS: $STATE_DUMP_ARG"
+
+if [[ "$STATE_DUMP_ARG" == gs://* ]]; then
+    # Download from GCS path provided by user
+    echo "Downloading state dump from GCS: $STATE_DUMP_ARG"
+    if ! command -v gsutil &> /dev/null; then
+        echo "ERROR: gsutil not found. Please install Google Cloud SDK or provide a local state dump file" >&2
+        exit 1
+    fi
+    # Check if STATE_DUMP_ARG is a GCS folder
+    if gsutil ls -d "$STATE_DUMP_ARG" 2>/dev/null | grep -q "/$"; then
+        # Download newest from folder
+        echo "Downloading state dump from GCS bucket: $STATE_DUMP_ARG"
         if ! command -v gsutil &> /dev/null; then
-            echo "ERROR: gsutil not found. Please install Google Cloud SDK or provide a local state dump file" >&2
+            echo "ERROR: gsutil not found. Please install Google Cloud SDK or provide a state dump file with -s" >&2
             exit 1
         fi
+        set +o pipefail
+        NEWEST_FILE=$(gsutil ls -l "$STATE_DUMP_ARG" | grep "devnet-state-dump" | sort -k2 -r | head -n1 | awk '{print $NF}' || true)
+        set -o pipefail
+        if [[ -z "$NEWEST_FILE" ]]; then
+            echo "ERROR: No state dump files found in $STATE_DUMP_ARG" >&2
+            exit 1
+        fi
+        echo "Newest state dump: $NEWEST_FILE"
+        DOWNLOADED_FILE="$WORKDIR/downloaded_state_dump"
+        if ! gsutil cp "$NEWEST_FILE" "$DOWNLOADED_FILE"; then
+            echo "ERROR: Failed to download state dump from $NEWEST_FILE" >&2
+            exit 1
+        fi
+        echo "\u2713 Downloaded state dump successfully"
+        echo "Downloaded size: $(du -h "$DOWNLOADED_FILE" | cut -f1)"
+        if [[ "$NEWEST_FILE" == *.gz ]] || file "$DOWNLOADED_FILE" | grep -q "gzip compressed"; then
+            echo "Unpacking gzipped state dump..."
+            gunzip -c "$DOWNLOADED_FILE" > "$CONFIG_FILE"
+            echo "\u2713 State dump unpacked"
+            rm "$DOWNLOADED_FILE"
+        else
+            mv "$DOWNLOADED_FILE" "$CONFIG_FILE"
+        fi
+        echo "State dump size: $(du -h "$CONFIG_FILE" | cut -f1)"
+    else
         DOWNLOADED_FILE="$WORKDIR/downloaded_state_dump"
         if ! gsutil cp "$STATE_DUMP_ARG" "$DOWNLOADED_FILE"; then
             echo "ERROR: Failed to download state dump from $STATE_DUMP_ARG" >&2
             exit 1
         fi
+
         echo "\u2713 Downloaded state dump successfully"
         echo "Downloaded size: $(du -h "$DOWNLOADED_FILE" | cut -f1)"
         # Check if the downloaded file is gzipped and unpack if needed
@@ -173,53 +206,21 @@ if [[ -n "$STATE_DUMP_ARG" ]]; then
             mv "$DOWNLOADED_FILE" "$CONFIG_FILE"
         fi
         echo "State dump size: $(du -h "$CONFIG_FILE" | cut -f1)"
-    else
-        # Use provided local file
-        if [[ ! -f "$STATE_DUMP_ARG" ]]; then
-            echo "ERROR: Provided state dump file not found: $STATE_DUMP_ARG" >&2
-            exit 1
-        fi
-        echo "Using provided state dump: $STATE_DUMP_ARG"
-        if [[ "$STATE_DUMP_ARG" == *.gz ]]; then
-            echo "Unpacking gzipped state dump..."
-            gunzip -c "$STATE_DUMP_ARG" > "$CONFIG_FILE"
-            echo "\u2713 State dump unpacked"
-        else
-            cp "$STATE_DUMP_ARG" "$CONFIG_FILE"
-        fi
     fi
 else
-    # Download from default GCS bucket (legacy behavior)
-    GCS_BUCKET="$DEFAULT_GCS_BUCKET"
-    echo "Downloading state dump from GCS bucket: $GCS_BUCKET"
-    if ! command -v gsutil &> /dev/null; then
-        echo "ERROR: gsutil not found. Please install Google Cloud SDK or provide a state dump file with -s" >&2
+    # Use provided local file
+    if [[ ! -f "$STATE_DUMP_ARG" ]]; then
+        echo "ERROR: Provided state dump file not found: $STATE_DUMP_ARG" >&2
         exit 1
     fi
-    set +o pipefail
-    NEWEST_FILE=$(gsutil ls -l "$GCS_BUCKET" | grep "devnet-state-dump" | sort -k2 -r | head -n1 | awk '{print $NF}' || true)
-    set -o pipefail
-    if [[ -z "$NEWEST_FILE" ]]; then
-        echo "ERROR: No state dump files found in $GCS_BUCKET" >&2
-        exit 1
-    fi
-    echo "Newest state dump: $NEWEST_FILE"
-    DOWNLOADED_FILE="$WORKDIR/downloaded_state_dump"
-    if ! gsutil cp "$NEWEST_FILE" "$DOWNLOADED_FILE"; then
-        echo "ERROR: Failed to download state dump from $NEWEST_FILE" >&2
-        exit 1
-    fi
-    echo "\u2713 Downloaded state dump successfully"
-    echo "Downloaded size: $(du -h "$DOWNLOADED_FILE" | cut -f1)"
-    if [[ "$NEWEST_FILE" == *.gz ]] || file "$DOWNLOADED_FILE" | grep -q "gzip compressed"; then
+    echo "Using provided state dump: $STATE_DUMP_ARG"
+    if [[ "$STATE_DUMP_ARG" == *.gz ]]; then
         echo "Unpacking gzipped state dump..."
-        gunzip -c "$DOWNLOADED_FILE" > "$CONFIG_FILE"
+        gunzip -c "$STATE_DUMP_ARG" > "$CONFIG_FILE"
         echo "\u2713 State dump unpacked"
-        rm "$DOWNLOADED_FILE"
     else
-        mv "$DOWNLOADED_FILE" "$CONFIG_FILE"
+        cp "$STATE_DUMP_ARG" "$CONFIG_FILE"
     fi
-    echo "State dump size: $(du -h "$CONFIG_FILE" | cut -f1)"
 fi
 
 # Verify it's valid JSON
@@ -310,20 +311,10 @@ ARCH=$(dpkg-deb --field "$INPUT_DEB_ABS" Architecture)
 DEB_BASE=$(basename "$INPUT_DEB_ABS" .deb)
 
 # Extract base name
-if [[ "$DEB_BASE" =~ ^(.+)_${VERSION}_${ARCH}$ ]]; then
-    FILE_BASE_NAME="${BASH_REMATCH[1]}"
-else
-    FILE_BASE_NAME="${DEB_BASE%%_*}"
-fi
-
-# Remove existing -hardfork suffixes
-while [[ "$FILE_BASE_NAME" == *-hardfork ]]; do
-    FILE_BASE_NAME="${FILE_BASE_NAME%-hardfork}"
-done
+FILE_BASE_NAME="${DEB_BASE%%_*}"
 
 # Output path must match what convert-daemon-debian-to-hf.sh produces
-DEB_DIR=$(dirname "$INPUT_DEB_ABS")
-OUTPUT_DEB="${DEB_DIR}/${FILE_BASE_NAME}-hardfork_${VERSION}_${ARCH}.deb"
+OUTPUT_DEB="${OUTPUT_DIR}/${FILE_BASE_NAME}-hardfork_${VERSION}_${ARCH}.deb"
 
 
 # Run the conversion script in a subshell to prevent trap overwriting
@@ -332,130 +323,14 @@ OUTPUT_DEB="${DEB_DIR}/${FILE_BASE_NAME}-hardfork_${VERSION}_${ARCH}.deb"
         -d "$INPUT_DEB_ABS" \
         -c "$RUNTIME_CONFIG_JSON" \
         -l "$LEDGERS_DIR" \
-        -n "$NETWORK_NAME"
+        -n "$NETWORK_NAME" \
+        -s "$SKIP_VERIFY"
 )
 
 # Verify output package was created
 if [[ ! -f "$OUTPUT_DEB" ]]; then
     echo "ERROR: Output hardfork package not created at $OUTPUT_DEB" >&2
     exit 1
-fi
-
-echo "✓ Hardfork package created: $OUTPUT_DEB"
-echo "Output package size: $(du -h "$OUTPUT_DEB" | cut -f1)"
-
-# Step 5: Verify the converted package (optional)
-if [[ "$SKIP_VERIFICATION" == "false" ]]; then
-    echo ""
-    echo "=== Step 5: Verifying converted package ==="
-
-    # Check package name
-    PKG_NAME=$(dpkg-deb --field "$OUTPUT_DEB" Package)
-    EXPECTED_PKG_NAME="mina-${NETWORK_NAME}-hardfork"
-    if [[ "$PKG_NAME" != "$EXPECTED_PKG_NAME" ]]; then
-        echo "ERROR: Package name is '$PKG_NAME', expected '$EXPECTED_PKG_NAME'" >&2
-        exit 1
-    fi
-    echo "✓ Package name is correct: $PKG_NAME"
-
-    # Extract and verify contents
-    VERIFY_DIR="$WORKDIR/verify"
-    mkdir -p "$VERIFY_DIR"
-    cd "$VERIFY_DIR"
-    ar x "$OUTPUT_DEB"
-    mkdir -p data
-    tar -xzf data.tar.gz -C data
-
-    # Check that new runtime config was inserted
-    if [[ ! -f "data/var/lib/coda/${NETWORK_NAME}.json" ]]; then
-        echo "ERROR: Network config ${NETWORK_NAME}.json not found in package" >&2
-        exit 1
-    fi
-    echo "✓ Network config ${NETWORK_NAME}.json exists"
-
-    # Check that old config was backed up
-    if [[ ! -f "data/var/lib/coda/${NETWORK_NAME}.old.json" ]]; then
-        echo "ERROR: Backup network config ${NETWORK_NAME}.old.json not found in package" >&2
-        exit 1
-    fi
-    echo "✓ Backup network config ${NETWORK_NAME}.old.json exists"
-
-    # Check that config_*.json was replaced
-    CONFIG_FILE_IN_PKG=$(find data/var/lib/coda -name "config_*.json" | head -1)
-    if [[ -z "$CONFIG_FILE_IN_PKG" ]]; then
-        echo "ERROR: No config_*.json file found in package" >&2
-        exit 1
-    fi
-    echo "✓ Runtime config file exists: $(basename "$CONFIG_FILE_IN_PKG")"
-
-    # Verify config content matches runtime config
-    RUNTIME_CONFIG_HASH=$(sha256sum "$RUNTIME_CONFIG_JSON" | awk '{print $1}')
-    PKG_CONFIG_HASH=$(sha256sum "$CONFIG_FILE_IN_PKG" | awk '{print $1}')
-    if [[ "$RUNTIME_CONFIG_HASH" != "$PKG_CONFIG_HASH" ]]; then
-        echo "ERROR: Runtime config hash mismatch!" >&2
-        echo "  Expected: $RUNTIME_CONFIG_HASH" >&2
-        echo "  Got:      $PKG_CONFIG_HASH" >&2
-        exit 1
-    fi
-    echo "✓ Runtime config content verified"
-
-    # Check that new ledger tarballs were added
-    NEW_TARBALL_COUNT=$(find data/var/lib/coda -name "*.tar.gz" | wc -l)
-    if [[ $NEW_TARBALL_COUNT -ne $TARBALL_COUNT ]]; then
-        echo "ERROR: Expected $TARBALL_COUNT ledger tarballs, but found $NEW_TARBALL_COUNT" >&2
-        exit 1
-    fi
-    echo "✓ New ledger tarballs added: $NEW_TARBALL_COUNT files"
-
-    # Verify ledger tarballs content
-    echo ""
-    echo "Verifying ledger tarball contents..."
-    LEDGER_ERROR=0
-    for SOURCE_LEDGER in "$LEDGERS_DIR"/*.tar.gz; do
-        LEDGER_NAME=$(basename "$SOURCE_LEDGER")
-        PKG_LEDGER="data/var/lib/coda/$LEDGER_NAME"
-
-        if [[ ! -f "$PKG_LEDGER" ]]; then
-            echo "ERROR: Ledger file missing in package: $LEDGER_NAME" >&2
-            LEDGER_ERROR=1
-            continue
-        fi
-
-        SOURCE_HASH=$(sha256sum "$SOURCE_LEDGER" | awk '{print $1}')
-        PKG_HASH=$(sha256sum "$PKG_LEDGER" | awk '{print $1}')
-
-        if [[ "$SOURCE_HASH" == "$PKG_HASH" ]]; then
-            echo "✓ Ledger verified: $LEDGER_NAME"
-        else
-            echo "ERROR: Ledger file hash mismatch: $LEDGER_NAME" >&2
-            echo "  Expected: $SOURCE_HASH" >&2
-            echo "  Got:      $PKG_HASH" >&2
-            LEDGER_ERROR=1
-        fi
-    done
-
-    cd - > /dev/null
-
-    if [[ $LEDGER_ERROR -ne 0 ]]; then
-        exit 1
-    fi
-
-    echo ""
-    echo "=== Verification Complete ==="
-else
-    echo ""
-    echo "=== Skipping verification (--skip-verification) ==="
-fi
-
-# Step 6: Copy output to final destination
-echo ""
-echo "=== Step 6: Copying output package ==="
-FINAL_OUTPUT="$OUTPUT_DIR/$(basename "$OUTPUT_DEB")"
-# Check if source and destination are the same file
-if [[ "$(realpath "$OUTPUT_DEB")" != "$(realpath "$FINAL_OUTPUT" 2>/dev/null || echo "")" ]]; then
-    cp "$OUTPUT_DEB" "$FINAL_OUTPUT"
-else
-    echo "Output already in destination directory, skipping copy"
 fi
 
 echo ""
