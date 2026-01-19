@@ -23,7 +23,7 @@ function export_base_image () {
 
 function export_version () {
     case "${SERVICE}" in
-        mina-daemon|mina-archive|mina-batch-txn|mina-rosetta|mina-daemon-legacy-hardfork|mina-daemon-auto-hardfork) export VERSION="${VERSION}-${NETWORK##*=}" ;;
+        mina-daemon|mina-archive|mina-batch-txn|mina-rosetta|mina-daemon-pre-hardfork|mina-daemon-post-hardfork) export VERSION="${VERSION}-${NETWORK##*=}" ;;
         *)  ;;
 esac
 }
