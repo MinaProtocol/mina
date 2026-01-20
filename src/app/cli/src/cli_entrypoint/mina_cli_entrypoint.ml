@@ -154,6 +154,30 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
   , chain_state_locations
   , ledger_backing )
 
+(** Check if an auto hard fork config exists and is activated for the given
+    config directory. Outputs JSON to stdout and shuts down. *)
+let resolve_auto_fork_config_and_shutdown ~conf_dir =
+  let network_id =
+    Mina_signature_kind.to_directory_name Mina_signature_kind.t_DEPRECATED
+  in
+  let auto_fork_dir = conf_dir ^/ sprintf "auto-fork-mesa-%s" network_id in
+  let activated_file = auto_fork_dir ^/ "activated" in
+  let json =
+    match Core.Sys.file_exists activated_file with
+    | `Yes ->
+        `Assoc
+          [ ("status", `String "activated")
+          ; ("fork_config_dir", `String auto_fork_dir)
+          ; ("genesis_config_file", `String (auto_fork_dir ^/ "daemon.json"))
+          ; ("genesis_ledger_dir", `String (auto_fork_dir ^/ "genesis"))
+          ]
+    | `No | `Unknown ->
+        `Assoc [ ("status", `String "not_activated") ]
+  in
+  Core.printf "%s\n" (Yojson.Safe.to_string json) ;
+  Async.shutdown 0 ;
+  Deferred.never ()
+
 let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -608,6 +632,14 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
          (default: keep-running). "
       (optional_with_default Hardfork_handling.Keep_running
          Hardfork_handling.arg )
+  and resolve_auto_fork_config =
+    flag "--resolve-auto-fork-config"
+      ~aliases:[ "resolve-auto-fork-config" ]
+      ~doc:
+        " Check if an auto hard fork config exists and is activated, output \
+         JSON result, and exit. Used by entrypoint scripts to determine which \
+         binary to run."
+      no_arg
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -627,6 +659,11 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
     O1trace.thread "mina" (fun () ->
         let open Deferred.Let_syntax in
         let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
+        let%bind () =
+          if resolve_auto_fork_config then
+            resolve_auto_fork_config_and_shutdown ~conf_dir
+          else Deferred.unit
+        in
         let%bind () = Mina_stdlib_unix.File_system.create_dir conf_dir in
         let () =
           if is_background then (
