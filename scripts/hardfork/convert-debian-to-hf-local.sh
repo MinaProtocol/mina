@@ -158,11 +158,6 @@ if [[ "$STATE_DUMP_ARG" == gs://* ]]; then
     # Check if STATE_DUMP_ARG is a GCS folder
     if gsutil ls -d "$STATE_DUMP_ARG" 2>/dev/null | grep -q "/$"; then
         # Download newest from folder
-        echo "Downloading state dump from GCS bucket: $STATE_DUMP_ARG"
-        if ! command -v gsutil &> /dev/null; then
-            echo "ERROR: gsutil not found. Please install Google Cloud SDK or provide a state dump file with -s" >&2
-            exit 1
-        fi
         set +o pipefail
         NEWEST_FILE=$(gsutil ls -l "$STATE_DUMP_ARG" | grep "devnet-state-dump" | sort -k2 -r | head -n1 | awk '{print $NF}' || true)
         set -o pipefail
