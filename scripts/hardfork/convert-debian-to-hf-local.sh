@@ -148,6 +148,41 @@ echo "=== Step 1: Getting state dump ==="
 CONFIG_FILE="$WORKDIR/config.json"
 
 
+
+# Helper: set CONFIG_FILE to the correct file, unpacking if needed, but do not move/copy
+set_config_file_from_downloaded() {
+    local downloaded_file="$1"
+    local orig_name="$2"
+    if [[ "$orig_name" == *.gz ]] || file "$downloaded_file" | grep -q "gzip compressed"; then
+        echo "Unpacking gzipped state dump..."
+        gunzip -c "$downloaded_file" > "$WORKDIR/unpacked_state_dump.json"
+        echo "\u2713 State dump unpacked"
+        CONFIG_FILE="$WORKDIR/unpacked_state_dump.json"
+    else
+        CONFIG_FILE="$downloaded_file"
+    fi
+    echo "State dump size: $(du -h "$CONFIG_FILE" | cut -f1)"
+}
+
+get_newest_file_from_gcs_folder_or_direct_one() {
+    local STATE_DUMP_ARG="$1"
+
+    if gsutil ls -d "$STATE_DUMP_ARG" 2>/dev/null | grep -q "/$"; then
+        # Download newest from folder
+        set +o pipefail
+        REMOTE_GZIPPED_FILE=$(gsutil ls -l "$STATE_DUMP_ARG" | grep "devnet-state-dump" | sort -k2 -r | head -n1 | awk '{print $NF}' || true)
+        set -o pipefail
+        if [[ -z "$REMOTE_GZIPPED_FILE" ]]; then
+            echo "ERROR: No state dump files found in $STATE_DUMP_ARG" >&2
+            exit 1
+        fi
+        echo "Newest state dump: $REMOTE_GZIPPED_FILE"
+    else
+        REMOTE_GZIPPED_FILE="$STATE_DUMP_ARG"
+    fi
+    echo "$REMOTE_GZIPPED_FILE"
+}
+
 if [[ "$STATE_DUMP_ARG" == gs://* ]]; then
     # Download from GCS path provided by user
     echo "Downloading state dump from GCS: $STATE_DUMP_ARG"
@@ -155,68 +190,26 @@ if [[ "$STATE_DUMP_ARG" == gs://* ]]; then
         echo "ERROR: gsutil not found. Please install Google Cloud SDK or provide a local state dump file" >&2
         exit 1
     fi
-    # Check if STATE_DUMP_ARG is a GCS folder
-    if gsutil ls -d "$STATE_DUMP_ARG" 2>/dev/null | grep -q "/$"; then
-        # Download newest from folder
-        set +o pipefail
-        NEWEST_FILE=$(gsutil ls -l "$STATE_DUMP_ARG" | grep "devnet-state-dump" | sort -k2 -r | head -n1 | awk '{print $NF}' || true)
-        set -o pipefail
-        if [[ -z "$NEWEST_FILE" ]]; then
-            echo "ERROR: No state dump files found in $STATE_DUMP_ARG" >&2
-            exit 1
-        fi
-        echo "Newest state dump: $NEWEST_FILE"
-        DOWNLOADED_FILE="$WORKDIR/downloaded_state_dump"
-        if ! gsutil cp "$NEWEST_FILE" "$DOWNLOADED_FILE"; then
-            echo "ERROR: Failed to download state dump from $NEWEST_FILE" >&2
-            exit 1
-        fi
-        echo "\u2713 Downloaded state dump successfully"
-        echo "Downloaded size: $(du -h "$DOWNLOADED_FILE" | cut -f1)"
-        if [[ "$NEWEST_FILE" == *.gz ]] || file "$DOWNLOADED_FILE" | grep -q "gzip compressed"; then
-            echo "Unpacking gzipped state dump..."
-            gunzip -c "$DOWNLOADED_FILE" > "$CONFIG_FILE"
-            echo "\u2713 State dump unpacked"
-            rm "$DOWNLOADED_FILE"
-        else
-            mv "$DOWNLOADED_FILE" "$CONFIG_FILE"
-        fi
-        echo "State dump size: $(du -h "$CONFIG_FILE" | cut -f1)"
-    else
-        DOWNLOADED_FILE="$WORKDIR/downloaded_state_dump"
-        if ! gsutil cp "$STATE_DUMP_ARG" "$DOWNLOADED_FILE"; then
-            echo "ERROR: Failed to download state dump from $STATE_DUMP_ARG" >&2
-            exit 1
-        fi
 
-        echo "\u2713 Downloaded state dump successfully"
-        echo "Downloaded size: $(du -h "$DOWNLOADED_FILE" | cut -f1)"
-        # Check if the downloaded file is gzipped and unpack if needed
-        if [[ "$STATE_DUMP_ARG" == *.gz ]] || file "$DOWNLOADED_FILE" | grep -q "gzip compressed"; then
-            echo "Unpacking gzipped state dump..."
-            gunzip -c "$DOWNLOADED_FILE" > "$CONFIG_FILE"
-            echo "\u2713 State dump unpacked"
-            rm "$DOWNLOADED_FILE"
-        else
-            mv "$DOWNLOADED_FILE" "$CONFIG_FILE"
-        fi
-        echo "State dump size: $(du -h "$CONFIG_FILE" | cut -f1)"
+    GZIPPED_STATE_DUMP="$WORKDIR/state_dump.gz"
+    # Check if STATE_DUMP_ARG is a GCS folder
+    STATE_DUMP_GZIP=$(get_newest_file_from_gcs_folder_or_direct_one "$STATE_DUMP_ARG")
+
+    if ! gsutil cp "$STATE_DUMP_GZIP" "$GZIPPED_STATE_DUMP"; then
+        echo "ERROR: Failed to download state dump from $STATE_DUMP_GZIP" >&2
+        exit 1
     fi
+    set_config_file_from_downloaded "$STATE_DUMP_GZIP" "$GZIPPED_STATE_DUMP"
 else
     # Use provided local file
     if [[ ! -f "$STATE_DUMP_ARG" ]]; then
         echo "ERROR: Provided state dump file not found: $STATE_DUMP_ARG" >&2
         exit 1
     fi
-    echo "Using provided state dump: $STATE_DUMP_ARG"
-    if [[ "$STATE_DUMP_ARG" == *.gz ]]; then
-        echo "Unpacking gzipped state dump..."
-        gunzip -c "$STATE_DUMP_ARG" > "$CONFIG_FILE"
-        echo "\u2713 State dump unpacked"
-    else
-        cp "$STATE_DUMP_ARG" "$CONFIG_FILE"
-    fi
+    set_config_file_from_downloaded "$STATE_DUMP_ARG" "$STATE_DUMP_ARG"
 fi
+
+echo "State dump size: $(du -h "$CONFIG_FILE" | cut -f1)"
 
 # Verify it's valid JSON
 if ! jq empty "$CONFIG_FILE" 2>/dev/null; then
