@@ -8,7 +8,7 @@
 # 4. Converts the debian package to a hardfork package
 # 5. Optionally verifies the conversion
 
-set -euo pipefail
+set -euox pipefail
 
 usage() {
         cat <<EOF
@@ -147,8 +147,6 @@ echo ""
 echo "=== Step 1: Getting state dump ==="
 CONFIG_FILE="$WORKDIR/config.json"
 
-
-
 # Helper: set CONFIG_FILE to the correct file, unpacking if needed, but do not move/copy
 set_config_file_from_downloaded() {
     local downloaded_file="$1"
@@ -176,7 +174,6 @@ get_newest_file_from_gcs_folder_or_direct_one() {
             echo "ERROR: No state dump files found in $STATE_DUMP_ARG" >&2
             exit 1
         fi
-        echo "Newest state dump: $REMOTE_GZIPPED_FILE"
     else
         REMOTE_GZIPPED_FILE="$STATE_DUMP_ARG"
     fi
