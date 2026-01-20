@@ -68,8 +68,8 @@ type Config struct {
 // matching those in the original shell script
 func DefaultConfig() *Config {
 	return &Config{
-		SlotTxEnd:                     30,
-		SlotChainEnd:                  38, // SlotTxEnd + 8
+		SlotTxEnd:                     33,
+		SlotChainEnd:                  37,
 		BestChainQueryFrom:            25,
 		MainSlot:                      30,
 		ForkSlot:                      30,

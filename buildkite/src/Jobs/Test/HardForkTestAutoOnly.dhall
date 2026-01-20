@@ -54,7 +54,7 @@ in  Pipeline.build
                   , privileged = True
                   , useBash = False
                   }
-                  "./scripts/hardfork/build-and-test.sh --fork-from origin/compatible --fork-method auto"
+                  "./scripts/hardfork/build-and-test.sh --fork-from origin/compatible --fork-method auto --main-slot 45"
               ]
             , label = "hard fork test - auto mode only"
             , key = "hard-fork-test-auto-only"
