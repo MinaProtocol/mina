@@ -335,7 +335,7 @@ fi
 
 echo ""
 echo "=== Success! ==="
-echo "Hardfork package created: $FINAL_OUTPUT"
-echo "Package size: $(du -h "$FINAL_OUTPUT" | cut -f1)"
+echo "Hardfork package created: $OUTPUT_DEB"
+echo "Package size: $(du -h "$OUTPUT_DEB" | cut -f1)"
 echo "Network: $NETWORK_NAME"
 echo ""

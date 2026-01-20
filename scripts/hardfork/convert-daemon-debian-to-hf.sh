@@ -269,8 +269,6 @@ if [ $VERIFY -ne 0 ]; then
 
 fi
 
-popd > /dev/null
-
 echo ""
 echo "=== Hardfork Package Creation Complete ==="
 echo "Output: $OUTPUT_DEB_FILE"
