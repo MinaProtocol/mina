@@ -14,6 +14,8 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let Network = ../../Constants/Network.dhall
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -44,7 +46,9 @@ in  Pipeline.build
             , label = "Hardfork: Package Conversion"
             , key = "hf-package-conversion-test"
             , target = Size.Large
-            , depends_on = DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
+            , depends_on =
+                DebianVersions.dependsOn
+                  DebianVersions.DepsSpec::{ network = Network.Type.Devnet }
             }
         ]
       }
