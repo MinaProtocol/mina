@@ -226,11 +226,11 @@ let default () = { config = Config.default (); executor = Executor.AutoDetect }
 
 let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
-let start ?hardfork_handling ?block_producer_key t =
-  let open Deferred.Let_syntax in
+(** Build the list of arguments that would be passed to a daemon command.
+    Does NOT include the command name itself (e.g., "daemon"). *)
+let daemon_args ?hardfork_handling ?block_producer_key t =
   let base_args =
-    [ "daemon"
-    ; "--seed"
+    [ "--seed"
     ; "--demo-mode"
     ; "--insecure-rest-server"
     ; "--working-dir"
@@ -252,15 +252,15 @@ let start ?hardfork_handling ?block_producer_key t =
   let opt_arg key value_opt =
     match value_opt with None -> [] | Some value -> [ key; value ]
   in
-  let args =
-    base_args
-    @ opt_arg "--hardfork-handling" hardfork_handling
-    @ opt_arg "--block-producer-key" block_producer_key
-  in
+  base_args
+  @ opt_arg "--hardfork-handling" hardfork_handling
+  @ opt_arg "--block-producer-key" block_producer_key
+
+let start ?hardfork_handling ?block_producer_key t =
+  let open Deferred.Let_syntax in
+  let args = "daemon" :: daemon_args ?hardfork_handling ?block_producer_key t in
   [%log debug] "Starting daemon" ;
-
   let%bind _, process = Executor.run_in_background t.executor ~args () in
-
   let mina_process : Process.t =
     { config = t.config
     ; process
@@ -268,3 +268,12 @@ let start ?hardfork_handling ?block_producer_key t =
     }
   in
   Deferred.return mina_process
+
+(** Run [mina daemon --resolve-auto-fork-config] with the same arguments
+    that would be passed to [mina daemon]. Returns the stdout output. *)
+let run_resolve_auto_fork_config ?hardfork_handling ?block_producer_key t =
+  let args =
+    "daemon" :: "--resolve-auto-fork-config"
+    :: daemon_args ?hardfork_handling ?block_producer_key t
+  in
+  Executor.run t.executor ~args ()
