@@ -2494,8 +2494,10 @@ let%test_module "staged ledger tests" =
       Quickcheck.random_value ~seed:(`Deterministic prover_seed)
         Public_key.Compressed.gen
 
-    let proofs stmts : Ledger_proof.Cached.t One_or_two.t =
-      let sok_digest = Sok_message.Digest.default in
+    let proofs ~fee ~prover (stmts : Transaction_snark_work.Statement.t) :
+        Ledger_proof.Cached.t One_or_two.t =
+      let sok_message = Sok_message.create ~fee ~prover in
+      let sok_digest = Sok_message.digest sok_message in
       One_or_two.map stmts ~f:(fun statement ->
           Ledger_proof.Cached.create ~statement ~sok_digest
             ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag) )
@@ -2503,16 +2505,18 @@ let%test_module "staged ledger tests" =
     let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
         : Transaction_snark_work.Checked.t option =
       let prover = stmt_to_prover stmts in
+      let fee = work_fee in
       Some
         (Transaction_snark_work.Checked.create_unsafe
-           { fee = work_fee; proofs = proofs stmts; prover } )
+           { fee; proofs = proofs ~fee ~prover stmts; prover } )
 
     let stmt_to_work_zero_fee ~prover
         (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
+      let fee = Currency.Fee.zero in
       Some
         (Transaction_snark_work.Checked.create_unsafe
-           { fee = Currency.Fee.zero; proofs = proofs stmts; prover } )
+           { fee; proofs = proofs ~fee ~prover stmts; prover } )
 
     (* Fixed public key for when there is only one snark worker. *)
     let snark_worker_pk =
@@ -2521,9 +2525,11 @@ let%test_module "staged ledger tests" =
 
     let stmt_to_work_one_prover (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
+      let fee = work_fee in
+      let prover = snark_worker_pk in
       Some
         (Transaction_snark_work.Checked.create_unsafe
-           { fee = work_fee; proofs = proofs stmts; prover = snark_worker_pk } )
+           { fee; proofs = proofs ~fee ~prover stmts; prover } )
 
     let coinbase_first_prediff = function
       | Staged_ledger_diff.At_most_two.Zero ->
@@ -3169,13 +3175,12 @@ let%test_module "staged ledger tests" =
 
     let%test_unit "Zero proof-fee should not create a fee transfer" =
       let signature_kind = Mina_signature_kind.Testnet in
+      let fee = Currency.Fee.zero in
+      let prover = snark_worker_pk in
       let stmt_to_work_zero_fee stmts =
         Some
           (Transaction_snark_work.Checked.create_unsafe
-             { fee = Currency.Fee.zero
-             ; proofs = proofs stmts
-             ; prover = snark_worker_pk
-             } )
+             { fee; proofs = proofs ~fee ~prover stmts; prover } )
       in
       let expected_proof_count = 3 in
       Quickcheck.test
@@ -3267,14 +3272,14 @@ let%test_module "staged ledger tests" =
                     let partitions =
                       Sl.Scan_state.partition_if_overflowing scan_state
                     in
+                    let fee = Fee.zero in
+                    let prover = snark_worker_pk in
                     let work_done =
                       List.map
                         ~f:(fun stmts ->
                           Transaction_snark_work.Checked.create_unsafe
-                            { fee = Fee.zero
-                            ; proofs = proofs stmts
-                            ; prover = snark_worker_pk
-                            } )
+                            { fee; proofs = proofs ~fee ~prover stmts; prover }
+                          )
                         work
                     in
                     let cmds_this_iter = cmds_this_iter |> Sequence.to_list in
@@ -3333,14 +3338,13 @@ let%test_module "staged ledger tests" =
       in
       let stmt_to_work stmts =
         let prover = stmt_to_prover stmts in
+        let fee =
+          Currency.Fee.(sub work_fee (of_nanomina_int_exn 1))
+          |> Option.value_exn
+        in
         Some
           (Transaction_snark_work.Checked.create_unsafe
-             { fee =
-                 Currency.Fee.(sub work_fee (of_nanomina_int_exn 1))
-                 |> Option.value_exn
-             ; proofs = proofs stmts
-             ; prover
-             } )
+             { fee; proofs = proofs ~fee ~prover stmts; prover } )
       in
       Quickcheck.test
         Quickcheck.Generator.(
@@ -3402,9 +3406,10 @@ let%test_module "staged ledger tests" =
           (List.find work_list ~f:(fun s ->
                Transaction_snark_work.Statement.compare s stmts = 0 ) )
       then
+        let fee = work_fee in
         Some
           (Transaction_snark_work.Checked.create_unsafe
-             { fee = work_fee; proofs = proofs stmts; prover } )
+             { fee; proofs = proofs ~fee ~prover stmts; prover } )
       else None
 
     (** Like test_simple but with a random number of completed jobs available.
@@ -3601,7 +3606,7 @@ let%test_module "staged ledger tests" =
              Transaction_snark_work.Statement.compare s stmts = 0 ) )
         ~f:(fun (_, fee) ->
           Transaction_snark_work.Checked.create_unsafe
-            { fee; proofs = proofs stmts; prover } )
+            { fee; proofs = proofs ~fee ~prover stmts; prover } )
 
     (** Like test_random_number_of_proofs but with random proof fees.
                    *)
