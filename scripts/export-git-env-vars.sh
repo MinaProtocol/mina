@@ -20,8 +20,11 @@ function find_most_recent_numeric_tag() {
     echo $TAG
 }
 
-GITHASH=$(git rev-parse --short=7 HEAD)
-THIS_COMMIT_TAG=$(git tag --points-at HEAD)
+GITHASH_CONFIG=${OVERRIDE_GITHASH:-$(git rev-parse --short=8 --verify HEAD)}
+# Remove last character to get 7-character short hash
+GITHASH=${GITHASH_CONFIG%?}
+THIS_COMMIT_TAG=${OVERRIDE_TAG:-$(git tag --points-at HEAD)}
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 if [[ -v BRANCH_NAME ]]; then
    GITBRANCH=$(echo "$BRANCH_NAME" | sed 's!/!-!g; s!_!-!g; s!#!-!g')
@@ -31,15 +34,23 @@ fi
 
 GITTAG=$(find_most_recent_numeric_tag HEAD)
 
-MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
+
+if [[ "${SKIP_GITBRANCH:-0}" == "1" ]]; then
+    MINA_DEB_VERSION="${GITTAG}-${GITHASH}"
+else
+    MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
+fi
+
 MINA_DOCKER_TAG=$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')
 
 [[ -v THIS_COMMIT_TAG ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
 
 export GITTAG
 export GITHASH
+export GITHASH_CONFIG
 export GITBRANCH
 export MINA_DEB_VERSION
 export MINA_DOCKER_TAG
 export THIS_COMMIT_TAG
 export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=bullseye}
+export REPO_ROOT
