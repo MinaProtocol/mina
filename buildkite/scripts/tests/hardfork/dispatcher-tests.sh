@@ -27,7 +27,7 @@
 #   --network     Optional. Network name (default: mesa)
 #
 
-set -euo pipefail
+set -euox pipefail
 
 # =============================================================================
 # Configuration

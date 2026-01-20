@@ -295,8 +295,10 @@ if [[ "$runtime" == "mesa" ]]; then
   done
 
   # Append genesis ledger dir if not provided
-  if [[ "$found_genesis_ledger_dir" == false ]]; then
-    new_args+=("--genesis-ledger-dir" "$MESA_LEDGERS_DIR")
+  if [[ "$first_arg" == "daemon" ]]; then
+    if [[ "$found_genesis_ledger_dir" == false ]]; then
+      new_args+=("--genesis-ledger-dir" "$MESA_LEDGERS_DIR")
+    fi
   fi
 
   # Replace args with the processed continuous array
