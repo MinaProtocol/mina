@@ -123,7 +123,7 @@ fi
 
 if [[ -z "$GIT_COMMIT" ]]; then
   echo "Detecting current git commit..."
-  GIT_COMMIT=$(git rev-parse --long HEAD)
+  GIT_COMMIT=$(git rev-parse HEAD)
   echo "Using git commit: $GIT_COMMIT"
 fi
 
