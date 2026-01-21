@@ -4,7 +4,7 @@
 
 // Provides: tsSrs
 // Requires: tsBindings, plonk_wasm
-var tsSrs = tsBindings.srsNative(plonk_wasm);
+var tsSrs = tsBindings.srs(plonk_wasm);
 
 // srs
 

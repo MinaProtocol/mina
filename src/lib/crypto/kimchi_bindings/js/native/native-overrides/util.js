@@ -2,4 +2,5 @@
 
 // Provides: tsRustConversionNative
 // Requires: tsBindings, plonk_wasm, getTsBindings
-var tsRustConversionNative = tsBindings.nativeRustConversion(plonk_wasm);
+plonk_wasm.__kimchi_use_native = true;
+var tsRustConversionNative = tsBindings.rustConversion(plonk_wasm);
