@@ -6,6 +6,7 @@ on:
       - '**/*.md'
       - '.prettierrc'
       - '.prettierignore'
+      - 'package.json'
 
 permissions:
   contents: read
@@ -21,5 +22,8 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Install dependencies
+        run: npm install
+
       - name: Check formatting
-        run: npx prettier --check "**/*.md"
+        run: make check-markdown
