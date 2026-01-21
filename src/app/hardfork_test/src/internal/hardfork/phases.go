@@ -104,12 +104,10 @@ func (c ConfigWithLedgers) generateLocalNetworkParam() string {
 	return fmt.Sprintf("inherit_with:%s,%s", c.config, c.ledgersDir)
 }
 
-type ConfigOnly struct {
-	config string
-}
+type Inherit struct{}
 
-func (c ConfigOnly) generateLocalNetworkParam() string {
-	return fmt.Sprintf("inherit:%s", c.config)
+func (c Inherit) generateLocalNetworkParam() string {
+	return fmt.Sprintf("inherit")
 }
 
 type ForkData struct {
@@ -401,7 +399,7 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 		return nil, err
 	}
 
-	forkConfigFile := "/tmp/fork_config.json"
+	forkConfigFile := filepath.Join(t.Config.Root, "daemon.json")
 	err = os.WriteFile(forkConfigFile, forkConfigBytes, 0644)
 	if err != nil {
 		return nil, err
@@ -409,9 +407,7 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 
 	// genesis ledgers has been overriden and each node will use a different one generated during auto fork phase
 	return &ForkData{
-			data: ConfigOnly{
-				config: forkConfigFile,
-			},
+			data:    Inherit{},
 			genesis: forkGenesisTs,
 		},
 		nil
