@@ -106,6 +106,15 @@ let of_config ~logger ~signature_kind ~(genesis_constants : Genesis_constants.t)
     Chain_id.make ~signature_kind ~genesis_constants ~constraint_constants
       ~proof_level ~genesis_ledger ~genesis_epoch_data
   in
+  Option.value_map
+    ~default:
+      ([%log debug]
+         "Unable to compute chain_id from runtime config and compile time \
+          constants. Using flat directory hierarchy in chain_state_locations." )
+    ~f:(fun chain_id ->
+      [%log debug] "Rooting chain_state_locations in %s"
+        (Chain_id.to_string chain_id) )
+    chain_id_opt ;
   let config_modifier : string -> string =
     Option.value_map ~default:ident
       ~f:(fun x s -> chain_state ^/ Chain_id.to_string x ^/ s)
