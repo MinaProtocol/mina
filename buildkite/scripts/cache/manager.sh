@@ -104,11 +104,13 @@ function read(){
     local __override=0
     local __root="$BUILDKITE_BUILD_ID"
     local __skip_dirs_creation=0
-      
+    local __from=""
+    local __to=""
+
     while [ "$#" -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
         case $1 in
-            -h | --help ) 
+            -h | --help )
                 read_help;
             ;;
             -o | --override )
@@ -124,13 +126,13 @@ function read(){
                 shift 1;
             ;;
             * )
-                if [[ -z ${__from+x} ]]; then
+                if [[ -z ${__from} ]]; then
                    __from="$CACHE_BASE_URL/$__root/$1"
                    shift 1;
                    continue
                 fi
-                
-                if [[ -z ${__to+x} ]]; then
+
+                if [[ -z ${__to} ]]; then
                    __to="$1"
                    shift 1;
                    continue
@@ -141,11 +143,21 @@ function read(){
             ;;
         esac
     done
-    
+
+    # Validate required arguments
+    if [[ -z ${__from} ]]; then
+        echo -e "${RED} !! Missing required argument: INPUT_CACHE_LOCATION${CLEAR}\n";
+        read_help;
+    fi
+
+    if [[ -z ${__to} ]]; then
+        echo -e "${RED} !! Missing required argument: OUTPUT_LOCAL_LOCATION${CLEAR}\n";
+        read_help;
+    fi
 
     if [[ $__skip_dirs_creation == 1 ]]; then
         echo "..Skipping dirs creation"
-    else 
+    else
         mkdir -p "$__to"
     fi
 
@@ -212,14 +224,16 @@ function write(){
         write_help;
     fi
 
-    
+
     local __override=0
     local __root="$BUILDKITE_BUILD_ID"
-      
+    local __from=""
+    local __to=""
+
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
         case $1 in
-            -h | --help ) 
+            -h | --help )
                 write_help;
             ;;
             -o | --override )
@@ -231,13 +245,13 @@ function write(){
                 shift 2;
             ;;
             * )
-                if [[ ! -v __from ]]; then
+                if [[ -z ${__from} ]]; then
                    __from="$1"
                    shift 1;
                    continue
                 fi
 
-                if [[ ! -v __to ]]; then
+                if [[ -z ${__to} ]]; then
                    __to=$CACHE_BASE_URL/$__root/"$1"
                    shift 1;
                    continue
@@ -248,7 +262,18 @@ function write(){
             ;;
         esac
     done
-    
+
+    # Validate required arguments
+    if [[ -z ${__from} ]]; then
+        echo -e "${RED} !! Missing required argument: INPUT_LOCAL_LOCATION${CLEAR}\n";
+        write_help;
+    fi
+
+    if [[ -z ${__to} ]]; then
+        echo -e "${RED} !! Missing required argument: OUTPUT_CACHE_LOCATION${CLEAR}\n";
+        write_help;
+    fi
+
     echo "..Copying $__from -> $__to"
     
     if [[ $__override == 1 ]]; then 
