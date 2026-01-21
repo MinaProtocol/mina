@@ -314,9 +314,15 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 		activatedFileToWait := filepath.Join(forkConfigBase, "activated")
 
 		watcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			return nil, err
+		}
 		defer watcher.Close()
 
 		err = watcher.Add(activatedFileToWait)
+		if err != nil {
+			return nil, err
+		}
 
 		activatedFileCreated := false
 		timeout := time.After(time.Duration(t.Config.MainSlot * 2))
