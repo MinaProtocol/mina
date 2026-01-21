@@ -183,7 +183,7 @@ echo "Verifying that user-provided config is overridden with hardfork config"
 
 # Modify mina-dispatch to echo the command instead of executing it
 MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
-  -c "$(create_activation_marker) && mina daemon -config-file /var/lib/coda/fake_config.json")
+  -c "$(create_activation_marker) && mina daemon -config-file /var/lib/coda/fake_config.json" 2>&1)
 
 EXPECTED_CONFIG="-config-file $(activation_marker_dir)/daemon.json"
 if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_CONFIG"* ]]; then
@@ -210,7 +210,7 @@ echo "=== Test 4: Config Override ==="
 echo "Verifying that user-provided genesis ledger directory is overridden with hardfork ones"
 
 MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
-  -c "$(create_activation_marker) && mina daemon --genesis-ledger-dir /var/lib/coda/fake/ledger")
+  -c "$(create_activation_marker) && mina daemon --genesis-ledger-dir /var/lib/coda/fake/ledger" 2>&1)
 
 EXPECTED_CONFIG="--genesis-ledger-dir $(activation_marker_dir)/genesis"
 if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_CONFIG"* ]]; then
