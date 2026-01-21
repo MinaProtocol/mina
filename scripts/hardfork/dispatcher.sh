@@ -71,6 +71,13 @@
 #   1   - Configuration error (missing file, undefined variable)
 #   127 - Binary not found or not executable
 #
+# DRYRUN MODE:
+#   Set DRYRUN=1 in environment to print the exec command instead of executing it.
+#   Useful for debugging argument processing and runtime selection.
+#   Example:
+#     DRYRUN=1 mina daemon --peer-list-url ...
+#   Output:
+#     mina-dispatch DRYRUN: exec /path/to/binary arg1 arg2 ...
 # SECURITY CONSIDERATIONS:
 #   - SOURCE_FILE must be owned by root and not world-writable
 #   - Binary paths are constructed from trusted configuration only
@@ -309,16 +316,35 @@ fi
 # Execution
 # =============================================================================
 
+
+# DRYRUN: If set, print the exec command and exit
+if [[ "${DRYRUN:-0}" -ne 0 ]]; then
+  if [[ ${#args[@]} -gt 0 ]]; then
+    echo "mina-dispatch DRYRUN: exec $bin ${args[*]}" >&2
+  else
+    echo "mina-dispatch DRYRUN: exec $bin" >&2
+  fi
+  exit 0
+fi
+
 # Execute the binary with processed arguments
 # Handle empty args array safely for bash strict mode
 if [[ ${#args[@]} -gt 0 ]]; then
   if [[ "$DEBUG" -ne 0 ]]; then
     echo "DEBUG: Executing $bin with arguments: ${args[*]}" >&2
   fi
-  exec "$bin" "${args[@]}"
+  if [[ "$DRYRUN" -ne 0 ]]; then
+    echo "$bin ${args[*]}"
+  else
+    exec "$bin" "${args[@]}"
+  fi
 else
   if [[ "$DEBUG" -ne 0 ]]; then
     echo "DEBUG: Executing $bin with no arguments" >&2
   fi
-  exec "$bin"
+  if [[ "$DRYRUN" -ne 0 ]]; then
+    echo "$bin"
+  else
+    exec "$bin"
+  fi
 fi
