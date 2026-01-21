@@ -144,6 +144,10 @@ type EpochData struct {
 	Seed       string `json:"seed"`
 }
 
+func (self *EpochData) isCompatible(other *EpochData) bool {
+	return self.Hash == other.Hash && self.Seed == other.Seed
+}
+
 type FinalForkConfigView struct {
 	Proof struct {
 		Fork struct {
@@ -164,6 +168,21 @@ type FinalForkConfigView struct {
 		S3DataHash       string `json:"s3_data_hash"`
 		AddGenesisWinner bool   `json:"add_genesis_winner"`
 	} `json:"ledger"`
+}
+
+func (self *FinalForkConfigView) UnmarshalFromJsonBytes(b []byte) error {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+
+	if err := dec.Decode(self); err != nil {
+		return fmt.Errorf("failed to unmarshal fork config: %w", err)
+	}
+
+	return nil
+}
+
+func (self *FinalForkConfigView) IsCompatibleWith(other *FinalForkConfigView) bool {
+	return self.Proof == other.Proof && self.EpochData.Staking.isCompatible(&other.EpochData.Staking) && self.EpochData.Next.isCompatible(&other.EpochData.Next) && self.Genesis == other.Genesis && self.Ledger.Hash == other.Ledger.Hash && self.Ledger.AddGenesisWinner == other.Ledger.AddGenesisWinner
 }
 
 func (t *HardforkTest) ValidateFinalForkConfig(lastBlockBeforeTxEnd client.BlockData, config FinalForkConfigView, forkGenesisTs, mainGenesisTs int64) error {
