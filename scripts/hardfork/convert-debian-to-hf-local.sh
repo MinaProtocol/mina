@@ -150,7 +150,6 @@ CONFIG_FILE="$WORKDIR/config.json"
 # Helper: set CONFIG_FILE to the correct file, unpacking if needed, but do not move/copy
 set_config_file_from_downloaded() {
     local downloaded_file="$1"
-    local orig_name="$2"
     if file "$downloaded_file" | grep -q "gzip compressed"; then
         echo "Unpacking gzipped state dump..."
         gunzip -c "$downloaded_file" > "$WORKDIR/unpacked_state_dump.json"
@@ -196,14 +195,14 @@ if [[ "$STATE_DUMP_ARG" == gs://* ]]; then
         echo "ERROR: Failed to download state dump from $STATE_DUMP_GZIP" >&2
         exit 1
     fi
-    set_config_file_from_downloaded "$STATE_DUMP_GZIP" "$GZIPPED_STATE_DUMP"
+    set_config_file_from_downloaded "$GZIPPED_STATE_DUMP"
 else
     # Use provided local file
     if [[ ! -f "$STATE_DUMP_ARG" ]]; then
         echo "ERROR: Provided state dump file not found: $STATE_DUMP_ARG" >&2
         exit 1
     fi
-    set_config_file_from_downloaded "$STATE_DUMP_ARG" "$STATE_DUMP_ARG"
+    set_config_file_from_downloaded "$STATE_DUMP_ARG"
 fi
 
 echo "State dump size: $(du -h "$CONFIG_FILE" | cut -f1)"
