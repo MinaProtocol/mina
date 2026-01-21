@@ -93,7 +93,8 @@ set -euo pipefail
 # =============================================================================
 
 SOURCE_FILE=${SOURCE_FILE:-"/etc/default/mina-dispatch"}
-DEBUG=${DEBUG:-0}
+MINA_DISPATCHER_DEBUG=${MINA_DISPATCHER_DEBUG:-0}
+MINA_DISPATCHER_DRYRUN=${MINA_DISPATCHER_DRYRUN:-0}
 
 # Validate source file exists before sourcing
 if [[ ! -f "$SOURCE_FILE" ]]; then
@@ -112,7 +113,7 @@ fi
 # shellcheck source=/etc/default/mina-dispatch
 source "${SOURCE_FILE}"
 
-if [[ "$DEBUG" -ne 0 ]]; then
+if [[ "$MINA_DISPATCHER_DEBUG" -ne 0 ]]; then
   echo "DEBUG: Loaded configuration from $SOURCE_FILE" >&2
   echo "DEBUG: MINA_NETWORK=$MINA_NETWORK, MINA_PROFILE=$MINA_PROFILE" >&2
   echo "DEBUG: RUNTIMES_BASE_PATH=$RUNTIMES_BASE_PATH" >&2
@@ -156,7 +157,7 @@ else
   runtime="berkeley"
 fi
 
-if [[ "$DEBUG" -ne 0 ]]; then
+if [[ "$MINA_DISPATCHER_DEBUG" -ne 0 ]]; then
   echo "DEBUG: Selected runtime: $runtime" >&2
   echo "DEBUG: Input arguments: $*" >&2
 fi
@@ -318,7 +319,7 @@ fi
 
 
 # DRYRUN: If set, print the exec command and exit
-if [[ "${DRYRUN:-0}" -ne 0 ]]; then
+if [[ "${MINA_DISPATCHER_DRYRUN:-0}" -ne 0 ]]; then
   if [[ ${#args[@]} -gt 0 ]]; then
     echo "mina-dispatch DRYRUN: exec $bin ${args[*]}" >&2
   else
@@ -330,19 +331,19 @@ fi
 # Execute the binary with processed arguments
 # Handle empty args array safely for bash strict mode
 if [[ ${#args[@]} -gt 0 ]]; then
-  if [[ "$DEBUG" -ne 0 ]]; then
+  if [[ "$MINA_DISPATCHER_DEBUG" -ne 0 ]]; then
     echo "DEBUG: Executing $bin with arguments: ${args[*]}" >&2
   fi
-  if [[ "$DRYRUN" -ne 0 ]]; then
+  if [[ "${MINA_DISPATCHER_DRYRUN}" -ne 0 ]]; then
     echo "$bin ${args[*]}"
   else
     exec "$bin" "${args[@]}"
   fi
 else
-  if [[ "$DEBUG" -ne 0 ]]; then
+  if [[ "$MINA_DISPATCHER_DEBUG" -ne 0 ]]; then
     echo "DEBUG: Executing $bin with no arguments" >&2
   fi
-  if [[ "$DRYRUN" -ne 0 ]]; then
+  if [[ "${MINA_DISPATCHER_DRYRUN}" -ne 0 ]]; then
     echo "$bin"
   else
     exec "$bin"

@@ -100,10 +100,6 @@ while [[ $# -gt 0 ]]; do
       GIT_COMMIT="$2"
       shift 2
       ;;
-    --help|-h)
-      head -35 "$0" | tail -n +2 | sed 's/^# \?//'
-      exit 0
-      ;;
     *)
       echo "Unknown argument: $1"
       echo "Use --help for usage information"
@@ -186,11 +182,8 @@ echo "=== Test 3: Config Override ==="
 echo "Verifying that user-provided config is overridden with hardfork config"
 
 # Modify mina-dispatch to echo the command instead of executing it
-PATCH_DISPATCH="sed -i '\$s/^/echo /' /usr/local/bin/mina-dispatch"
-SETUP_CMD="${PATCH_DISPATCH} && $(create_activation_marker)"
-
-MINA_EXEC_COMMAND=$(docker run --entrypoint bash "$DOCKER_IMAGE" \
-  -c "${SETUP_CMD} && mina daemon -config-file /var/lib/coda/fake_config.json")
+MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
+  -c "$(create_activation_marker) && mina daemon -config-file /var/lib/coda/fake_config.json")
 
 EXPECTED_CONFIG="-config-file $(activation_marker_dir)/daemon.json"
 if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_CONFIG"* ]]; then
@@ -216,12 +209,8 @@ echo ""
 echo "=== Test 4: Config Override ==="
 echo "Verifying that user-provided genesis ledger directory is overridden with hardfork ones"
 
-# Modify mina-dispatch to echo the command instead of executing it
-PATCH_DISPATCH="sed -i '\$s/^/echo /' /usr/local/bin/mina-dispatch"
-SETUP_CMD="${PATCH_DISPATCH} && $(create_activation_marker)"
-
-MINA_EXEC_COMMAND=$(docker run --entrypoint bash "$DOCKER_IMAGE" \
-  -c "${SETUP_CMD} && mina daemon --genesis-ledger-dir /var/lib/coda/fake/ledger")
+MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
+  -c "$(create_activation_marker) && mina daemon --genesis-ledger-dir /var/lib/coda/fake/ledger")
 
 EXPECTED_CONFIG="--genesis-ledger-dir $(activation_marker_dir)/genesis"
 if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_CONFIG"* ]]; then
