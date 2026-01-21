@@ -845,8 +845,8 @@ load_config() {
         exit 1
       fi
       ;;
-    reset)
 
+    reset)
       echo "Making the Ledger..." 
       python3 scripts/mina-local-network/generate-mina-local-network-ledger.py \
         --num-whale-accounts "${WHALES}" \
@@ -860,6 +860,7 @@ load_config() {
 
       reset-genesis-ledger "${ROOT}" "${config_file}"
       ;;
+
     inherit_with:*)
       local replaced_config_file
       IFS=',' read -r replaced_config_file OVERRIDE_GENSIS_LEDGER <<< "${config_mode#inherit_with:}"
@@ -871,6 +872,11 @@ load_config() {
         cat "${replaced_config_file}"
       fi
       cp -f "${replaced_config_file}" "${config_file}"
+      ;;
+
+    *)
+      echo "Error: unexpected CONFIG_MODE: ${config_mode}!" >&2
+      exit 1
       ;;
   esac
 }
