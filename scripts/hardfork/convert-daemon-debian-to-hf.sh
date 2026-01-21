@@ -267,6 +267,7 @@ if [ $VERIFY -ne 0 ]; then
     echo "=== Verification Complete ==="
     echo "All files verified successfully!"
 
+    popd
 fi
 
 echo ""
