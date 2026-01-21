@@ -14,9 +14,12 @@ fi
 
 DEBS=$1
 USE_SUDO=${2:-0}
+ROOT="${ROOT:-${BUILDKITE_BUILD_ID}}"
 
 # Source git environment variables first to get MINA_DEB_CODENAME
 source ./buildkite/scripts/export-git-env-vars.sh
+
+VERSION="${FORCE_VERSION:-"${MINA_DEB_VERSION}"}"
 
 if [ "$USE_SUDO" == "1" ]; then
    SUDO="sudo"
@@ -25,33 +28,31 @@ else
 fi
 
 
+
 LOCAL_DEB_FOLDER=debs
 mkdir -p $LOCAL_DEB_FOLDER
 
 # Download required debians from bucket locally
 if [ -z "$DEBS" ]; then 
-    echo "DEBS env var is empty. It should contains comma delimitered names of debians to install"
+    echo "DEBS env var is empty. It should contains comma separated names of debians to install"
     exit 1
 else
   # shellcheck disable=SC2206
   debs=(${DEBS//,/ })
   for i in "${debs[@]}"; do
     case $i in
-      mina-testnet-generic*|mina-devnet|mina-mainnet)
+      mina-testnet-generic*|mina-berkeley*|mina-devnet|mina-mainnet)
         # Downaload mina-logproc too
         ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
       ;;
-      mina-devnet-legacy|mina-mainnet-legacy)
-        # Download mina-logproc legacy too
-        ./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/$MINA_DEB_CODENAME/${i}*" $LOCAL_DEB_FOLDER
     esac
-    ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/${i}_*" $LOCAL_DEB_FOLDER
+    ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/${i}_${VERSION}_*" $LOCAL_DEB_FOLDER
   done
 fi
 
 debs_with_version=()
 for i in "${debs[@]}"; do
-   debs_with_version+=("${i}=${MINA_DEB_VERSION}")
+   debs_with_version+=("${i}=${VERSION}")
 done
 
 # Start aptly
