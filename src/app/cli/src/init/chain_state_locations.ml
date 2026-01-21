@@ -86,7 +86,7 @@ let make_hashed_ledgers (config : Runtime_config.t) :
       runtime config *)
 let of_config ~logger ~signature_kind ~(genesis_constants : Genesis_constants.t)
     ~constraint_constants ~proof_level ~conf_dir (config : Runtime_config.t) :
-    t * Genesis_ledger_helper.Chain_id.t Option.t =
+    t * Chain_id.t Option.t =
   let chain_state = conf_dir in
   let chain_id_opt =
     let open Option.Let_syntax in
@@ -103,13 +103,12 @@ let of_config ~logger ~signature_kind ~(genesis_constants : Genesis_constants.t)
         config.proof
     in
     let%map genesis_ledger, genesis_epoch_data = make_hashed_ledgers config in
-    Genesis_ledger_helper.Chain_id.make ~signature_kind ~genesis_constants
-      ~constraint_constants ~proof_level ~genesis_ledger ~genesis_epoch_data
+    Chain_id.make ~signature_kind ~genesis_constants ~constraint_constants
+      ~proof_level ~genesis_ledger ~genesis_epoch_data
   in
   let config_modifier : string -> string =
     Option.value_map ~default:ident
-      ~f:(fun x s ->
-        chain_state ^/ Genesis_ledger_helper.Chain_id.to_string x ^/ s )
+      ~f:(fun x s -> chain_state ^/ Chain_id.to_string x ^/ s)
       chain_id_opt
   in
   ( { chain_state

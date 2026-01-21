@@ -1,0 +1,22 @@
+(library
+ (public_name chain_id)
+ (name chain_id)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries
+  core
+  digestif
+  ;; local libraries
+  coda_genesis_proof
+  consensus
+  genesis_constants
+  mina_base.import
+  mina_state
+  staged_ledger_diff
+  )
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_jane
+   )))
