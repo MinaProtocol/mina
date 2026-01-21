@@ -1,4 +1,4 @@
-/* global plonk_wasm, tsRustConversionNative, caml_jsstring_of_string */
+/* global plonk_wasm, tsRustConversion, caml_jsstring_of_string */
 
 // Provides: caml_pasta_fp_plonk_index_max_degree
 // Requires: plonk_wasm
@@ -86,7 +86,7 @@ var caml_pasta_fp_plonk_index_deserialize = function (index) {
 };
 
 // Provides: caml_pasta_fp_plonk_index_create
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fp_plonk_index_create = function (
     gates,
     public_inputs,
@@ -97,8 +97,8 @@ var caml_pasta_fp_plonk_index_create = function (
     lazy_mode
 ) {
     var wasm_lookup_tables =
-        tsRustConversionNative.fp.lookupTablesToRust(caml_lookup_tables);
-    var wasm_runtime_table_cfgs = tsRustConversionNative.fp.runtimeTableCfgsToRust(
+        tsRustConversion.fp.lookupTablesToRust(caml_lookup_tables);
+    var wasm_runtime_table_cfgs = tsRustConversion.fp.runtimeTableCfgsToRust(
         caml_runtime_table_cfgs
     );
     console.time("conversion plonk index create")
@@ -194,7 +194,7 @@ var caml_pasta_fq_plonk_index_deserialize = function (index) {
 };
 
 // Provides: caml_pasta_fq_plonk_index_create
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fq_plonk_index_create = function (
     gates,
     public_inputs,
@@ -205,8 +205,8 @@ var caml_pasta_fq_plonk_index_create = function (
     lazy_mode
 ) {
     var wasm_lookup_tables =
-        tsRustConversionNative.fq.lookupTablesToRust(caml_lookup_tables);
-    var wasm_runtime_table_cfgs = tsRustConversionNative.fq.runtimeTableCfgsToRust(
+        tsRustConversion.fq.lookupTablesToRust(caml_lookup_tables);
+    var wasm_runtime_table_cfgs = tsRustConversion.fq.runtimeTableCfgsToRust(
         caml_runtime_table_cfgs
     );
 

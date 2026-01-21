@@ -8,6 +8,9 @@ var tsBindings = globalThis.__snarkyTsBindings;
 
 // Provides: tsRustConversion
 // Requires: tsBindings, plonk_wasm
+if (plonk_wasm && plonk_wasm.native) {
+  plonk_wasm.__kimchi_use_native = true;
+}
 var tsRustConversion = tsBindings.rustConversion(plonk_wasm);
 
 // Provides: getTsBindings

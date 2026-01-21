@@ -1,5 +1,5 @@
 /* global plonk_wasm, caml_jsstring_of_string, 
-  tsBindings, tsRustConversionNative
+  tsBindings, tsRustConversion
 */
 
 // Provides: tsSrs
@@ -72,41 +72,41 @@ var caml_fp_srs_from_bytes_external = function (bytes) {
 };
 
 // Provides: caml_fp_srs_maybe_lagrange_commitment
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_fp_srs_maybe_lagrange_commitment = function (srs, domain_size, i) {
     var result = plonk_wasm.caml_fp_srs_maybe_lagrange_commitment(srs, domain_size, i);
     if (result == null) return 0; // None
-    var polyComm = tsRustConversionNative.fp.polyCommFromRust(result);
+    var polyComm = tsRustConversion.fp.polyCommFromRust(result);
     if (polyComm == undefined) return 0; // None
     return [0, polyComm]; // Some(...)
 };
 
 // Provides: caml_fp_srs_commit_evaluations
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_fp_srs_commit_evaluations = function (t, domain_size, fps) {
     var res = plonk_wasm.caml_fp_srs_commit_evaluations(
         t,
         domain_size,
-        tsRustConversionNative.fp.vectorToRust(fps)
+        tsRustConversion.fp.vectorToRust(fps)
     );
-    return tsRustConversionNative.fp.polyCommFromRust(res);
+    return tsRustConversion.fp.polyCommFromRust(res);
 };
 
 // Provides: caml_fp_srs_b_poly_commitment
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_fp_srs_b_poly_commitment = function (srs, chals) {
     var res = plonk_wasm.caml_fp_srs_b_poly_commitment(
         srs,
-        tsRustConversionNative.fp.vectorToRust(chals)
+        tsRustConversion.fp.vectorToRust(chals)
     );
-    return tsRustConversionNative.fp.polyCommFromRust(res);
+    return tsRustConversion.fp.polyCommFromRust(res);
 };
 
 // Provides: caml_fp_srs_batch_accumulator_check
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_fp_srs_batch_accumulator_check = function (srs, comms, chals) {
-    var rust_comms = tsRustConversionNative.fp.pointsToRust(comms);
-    var rust_chals = tsRustConversionNative.fp.vectorToRust(chals);
+    var rust_comms = tsRustConversion.fp.pointsToRust(comms);
+    var rust_chals = tsRustConversion.fp.vectorToRust(chals);
     var ok = plonk_wasm.caml_fp_srs_batch_accumulator_check(
         srs,
         rust_comms,
@@ -116,21 +116,21 @@ var caml_fp_srs_batch_accumulator_check = function (srs, comms, chals) {
 };
 
 // Provides: caml_fp_srs_batch_accumulator_generate
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_fp_srs_batch_accumulator_generate = function (srs, n_comms, chals) {
-    var rust_chals = tsRustConversionNative.fp.vectorToRust(chals);
+    var rust_chals = tsRustConversion.fp.vectorToRust(chals);
     var rust_comms = plonk_wasm.caml_fp_srs_batch_accumulator_generate(
         srs,
         n_comms,
         rust_chals
     );
-    return tsRustConversionNative.fp.pointsFromRust(rust_comms);
+    return tsRustConversion.fp.pointsFromRust(rust_comms);
 };
 
 // Provides: caml_fp_srs_h
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_fp_srs_h = function (t) {
-    return tsRustConversionNative.fp.pointFromRust(plonk_wasm.caml_fp_srs_h(t));
+    return tsRustConversion.fp.pointFromRust(plonk_wasm.caml_fp_srs_h(t));
 };
 
 // Provides: caml_fp_srs_add_lagrange_basis
@@ -180,41 +180,41 @@ var caml_fq_srs_lagrange_commitment = tsSrs.fq.lagrangeCommitment;
 
 
 // Provides: caml_fq_srs_maybe_lagrange_commitment
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_fq_srs_maybe_lagrange_commitment = function (srs, domain_size, i) {
     var result = plonk_wasm.caml_fq_srs_maybe_lagrange_commitment(srs, domain_size, i);
     if (result == null) return 0; // None
-    var polyComm = tsRustConversionNative.fq.polyCommFromRust(result);
+    var polyComm = tsRustConversion.fq.polyCommFromRust(result);
     if (polyComm == undefined) return 0; // None
     return [0, polyComm]; // Some(...)
 };
 
 // Provides: caml_fq_srs_commit_evaluations
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_fq_srs_commit_evaluations = function (t, domain_size, fqs) {
     var res = plonk_wasm.caml_fq_srs_commit_evaluations(
         t,
         domain_size,
-        tsRustConversionNative.fq.vectorToRust(fqs)
+        tsRustConversion.fq.vectorToRust(fqs)
     );
-    return tsRustConversionNative.fq.polyCommFromRust(res);
+    return tsRustConversion.fq.polyCommFromRust(res);
 };
 
 // Provides: caml_fq_srs_b_poly_commitment
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_fq_srs_b_poly_commitment = function (srs, chals) {
     var res = plonk_wasm.caml_fq_srs_b_poly_commitment(
         srs,
-        tsRustConversionNative.fq.vectorToRust(chals)
+        tsRustConversion.fq.vectorToRust(chals)
     );
-    return tsRustConversionNative.fq.polyCommFromRust(res);
+    return tsRustConversion.fq.polyCommFromRust(res);
 };
 
 // Provides: caml_fq_srs_batch_accumulator_check
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_fq_srs_batch_accumulator_check = function (srs, comms, chals) {
-    var rust_comms = tsRustConversionNative.fq.pointsToRust(comms);
-    var rust_chals = tsRustConversionNative.fq.vectorToRust(chals);
+    var rust_comms = tsRustConversion.fq.pointsToRust(comms);
+    var rust_chals = tsRustConversion.fq.vectorToRust(chals);
     var ok = plonk_wasm.caml_fq_srs_batch_accumulator_check(
         srs,
         rust_comms,
@@ -224,21 +224,21 @@ var caml_fq_srs_batch_accumulator_check = function (srs, comms, chals) {
 };
 
 // Provides: caml_fq_srs_batch_accumulator_generate
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_fq_srs_batch_accumulator_generate = function (srs, comms, chals) {
-    var rust_chals = tsRustConversionNative.fq.vectorToRust(chals);
+    var rust_chals = tsRustConversion.fq.vectorToRust(chals);
     var rust_comms = plonk_wasm.caml_fq_srs_batch_accumulator_generate(
         srs,
         comms,
         rust_chals
     );
-    return tsRustConversionNative.fq.pointsFromRust(rust_comms);
+    return tsRustConversion.fq.pointsFromRust(rust_comms);
 };
 
 // Provides: caml_fq_srs_h
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_fq_srs_h = function (t) {
-    return tsRustConversionNative.fq.pointFromRust(plonk_wasm.caml_fq_srs_h(t));
+    return tsRustConversion.fq.pointFromRust(plonk_wasm.caml_fq_srs_h(t));
 };
 
 // Provides: caml_fq_srs_add_lagrange_basis

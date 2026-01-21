@@ -2,18 +2,18 @@
  */
 
 // Provides: caml_pasta_fp_plonk_verifier_index_create
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fp_plonk_verifier_index_create = function (x) {
   var vk = plonk_wasm.caml_pasta_fp_plonk_verifier_index_create(x);
-  return tsRustConversionNative.fp.verifierIndexFromRust(vk);
+  return tsRustConversion.fp.verifierIndexFromRust(vk);
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_shifts
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fq_plonk_verifier_index_shifts = function (log2_size) {
   try {
     var shifts = plonk_wasm.caml_pasta_fq_plonk_verifier_index_shifts(log2_size);
-    return tsRustConversionNative.fq.shiftsFromRust(
+    return tsRustConversion.fq.shiftsFromRust(
       shifts
     );
   } catch (e) {
@@ -23,14 +23,14 @@ var caml_pasta_fq_plonk_verifier_index_shifts = function (log2_size) {
 };
 
 // Provides: caml_pasta_fp_plonk_verifier_index_read
-// Requires: plonk_wasm, caml_jsstring_of_string, tsRustConversionNative
+// Requires: plonk_wasm, caml_jsstring_of_string, tsRustConversion
 var caml_pasta_fp_plonk_verifier_index_read = function (offset, urs, path) {
   if (offset === 0) {
     offset = undefined;
   } else {
     offset = offset[1];
   }
-  return tsRustConversionNative.fp.verifierIndexFromRust(
+  return tsRustConversion.fp.verifierIndexFromRust(
     plonk_wasm.caml_pasta_fp_plonk_verifier_index_read(
       offset,
       urs,
@@ -40,7 +40,7 @@ var caml_pasta_fp_plonk_verifier_index_read = function (offset, urs, path) {
 };
 
 // Provides: caml_pasta_fp_plonk_verifier_index_write
-// Requires: plonk_wasm, caml_jsstring_of_string, tsRustConversionNative
+// Requires: plonk_wasm, caml_jsstring_of_string, tsRustConversion
 var caml_pasta_fp_plonk_verifier_index_write = function (append, t, path) {
   if (append === 0) {
     append = undefined;
@@ -49,56 +49,56 @@ var caml_pasta_fp_plonk_verifier_index_write = function (append, t, path) {
   }
   return plonk_wasm.caml_pasta_fp_plonk_verifier_index_write(
     append,
-    tsRustConversionNative.fp.verifierIndexToRust(t),
+    tsRustConversion.fp.verifierIndexToRust(t),
     caml_jsstring_of_string(path)
   );
 };
 
 
 // Provides: caml_pasta_fp_plonk_verifier_index_dummy
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fp_plonk_verifier_index_dummy = function () {
   var res = plonk_wasm.caml_pasta_fp_plonk_verifier_index_dummy();
-  return tsRustConversionNative.fp.verifierIndexFromRust(res);
+  return tsRustConversion.fp.verifierIndexFromRust(res);
 };
 
 // Provides: caml_pasta_fp_plonk_verifier_index_deep_copy
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fp_plonk_verifier_index_deep_copy = function (x) {
-  return tsRustConversionNative.fp.verifierIndexFromRust(
+  return tsRustConversion.fp.verifierIndexFromRust(
     plonk_wasm.caml_pasta_fp_plonk_verifier_index_deep_copy(
-      tsRustConversionNative.fp.verifierIndexToRust(x)
+      tsRustConversion.fp.verifierIndexToRust(x)
     )
   );
 };
 
 
 // Provides: caml_pasta_fq_plonk_verifier_index_create
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fq_plonk_verifier_index_create = function (x) {
-  return tsRustConversionNative.fq.verifierIndexFromRust(
+  return tsRustConversion.fq.verifierIndexFromRust(
     plonk_wasm.caml_pasta_fq_plonk_verifier_index_create(x)
   );
 };
 
 
 // Provides: caml_pasta_fp_plonk_verifier_index_shifts
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fp_plonk_verifier_index_shifts = function (log2_size) {
-  return tsRustConversionNative.fp.shiftsFromRust(
+  return tsRustConversion.fp.shiftsFromRust(
     plonk_wasm.caml_pasta_fp_plonk_verifier_index_shifts(log2_size)
   );
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_read
-// Requires: plonk_wasm, caml_jsstring_of_string, tsRustConversionNative
+// Requires: plonk_wasm, caml_jsstring_of_string, tsRustConversion
 var caml_pasta_fq_plonk_verifier_index_read = function (offset, urs, path) {
   if (offset === 0) {
     offset = undefined;
   } else {
     offset = offset[1];
   }
-  return tsRustConversionNative.fq.verifierIndexFromRust(
+  return tsRustConversion.fq.verifierIndexFromRust(
     plonk_wasm.caml_pasta_fq_plonk_verifier_index_read(
       offset,
       urs,
@@ -108,7 +108,7 @@ var caml_pasta_fq_plonk_verifier_index_read = function (offset, urs, path) {
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_write
-// Requires: plonk_wasm, caml_jsstring_of_string, tsRustConversionNative
+// Requires: plonk_wasm, caml_jsstring_of_string, tsRustConversion
 var caml_pasta_fq_plonk_verifier_index_write = function (append, t, path) {
   if (append === 0) {
     append = undefined;
@@ -117,25 +117,25 @@ var caml_pasta_fq_plonk_verifier_index_write = function (append, t, path) {
   }
   return plonk_wasm.caml_pasta_fq_plonk_verifier_index_write(
     append,
-    tsRustConversionNative.fq.verifierIndexToRust(t),
+    tsRustConversion.fq.verifierIndexToRust(t),
     caml_jsstring_of_string(path)
   );
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_dummy
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fq_plonk_verifier_index_dummy = function () {
-  return tsRustConversionNative.fq.verifierIndexFromRust(
+  return tsRustConversion.fq.verifierIndexFromRust(
     plonk_wasm.caml_pasta_fq_plonk_verifier_index_dummy()
   );
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_deep_copy
-// Requires: plonk_wasm, tsRustConversionNative, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion, tsRustConversion
 var caml_pasta_fq_plonk_verifier_index_deep_copy = function (x) {
-  return tsRustConversionNative.fq.verifierIndexFromRust(
+  return tsRustConversion.fq.verifierIndexFromRust(
     plonk_wasm.caml_pasta_fq_plonk_verifier_index_deep_copy(
-      tsRustConversionNative.fq.verifierIndexToRust(x)
+      tsRustConversion.fq.verifierIndexToRust(x)
     )
   );
 };

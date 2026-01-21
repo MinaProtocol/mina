@@ -7,13 +7,13 @@ function caml_pasta_fp_poseidon_params_create() {
 }
 
 // Provides: fp_oracles_create
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var fp_oracles_create = function (lgr_comm, verifier_index, proof) {
-  return tsRustConversionNative.fp.oraclesFromRust(
+  return tsRustConversion.fp.oraclesFromRust(
     plonk_wasm.fp_oracles_create(
-      tsRustConversionNative.fp.polyCommsToRust(lgr_comm),
-      tsRustConversionNative.fp.verifierIndexToRust(verifier_index),
-      tsRustConversionNative.fp.proofToRust(proof)
+      tsRustConversion.fp.polyCommsToRust(lgr_comm),
+      tsRustConversion.fp.verifierIndexToRust(verifier_index),
+      tsRustConversion.fp.proofToRust(proof)
     )
   );
 };
@@ -25,16 +25,16 @@ var fp_oracles_create_no_public = function (lgr_comm, verifier_index, proof) {
 };
 
 // Provides: fp_oracles_dummy
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var fp_oracles_dummy = function () {
-  return tsRustConversionNative.fp.oraclesFromRust(plonk_wasm.fp_oracles_dummy());
+  return tsRustConversion.fp.oraclesFromRust(plonk_wasm.fp_oracles_dummy());
 };
 
 // Provides: fp_oracles_deep_copy
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var fp_oracles_deep_copy = function (x) {
-  return tsRustConversionNative.fp.oraclesFromRust(
-    plonk_wasm.fp_oracles_deep_copy(tsRustConversionNative.fp.oraclesToRust(x))
+  return tsRustConversion.fp.oraclesFromRust(
+    plonk_wasm.fp_oracles_deep_copy(tsRustConversion.fp.oraclesToRust(x))
   );
 };
 
@@ -44,13 +44,13 @@ function caml_pasta_fq_poseidon_params_create() {
 }
 
 // Provides: fq_oracles_create
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var fq_oracles_create = function (lgr_comm, verifier_index, proof) {
-  return tsRustConversionNative.fq.oraclesFromRust(
+  return tsRustConversion.fq.oraclesFromRust(
     plonk_wasm.fq_oracles_create(
-      tsRustConversionNative.fq.polyCommsToRust(lgr_comm),
-      tsRustConversionNative.fq.verifierIndexToRust(verifier_index),
-      tsRustConversionNative.fq.proofToRust(proof)
+      tsRustConversion.fq.polyCommsToRust(lgr_comm),
+      tsRustConversion.fq.verifierIndexToRust(verifier_index),
+      tsRustConversion.fq.proofToRust(proof)
     )
   );
 };
@@ -62,27 +62,27 @@ var fq_oracles_create_no_public = function (lgr_comm, verifier_index, proof) {
 };
 
 // Provides: fq_oracles_dummy
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var fq_oracles_dummy = function () {
-  return tsRustConversionNative.fq.oraclesFromRust(plonk_wasm.fq_oracles_dummy());
+  return tsRustConversion.fq.oraclesFromRust(plonk_wasm.fq_oracles_dummy());
 };
 
 // Provides: fq_oracles_deep_copy
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 var fq_oracles_deep_copy = function (x) {
-  return tsRustConversionNative.fq.oraclesFromRust(
-    plonk_wasm.fq_oracles_deep_copy(tsRustConversionNative.fq.oraclesToRust(x))
+  return tsRustConversion.fq.oraclesFromRust(
+    plonk_wasm.fq_oracles_deep_copy(tsRustConversion.fq.oraclesToRust(x))
   );
 };
 
 // Provides: caml_pasta_fq_poseidon_block_cipher
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 function caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector) {
   // 1. get permuted field vector from rust
   var wasm_flat_vector = plonk_wasm.caml_pasta_fq_poseidon_block_cipher(
-    tsRustConversionNative.fq.vectorToRust(fq_vector)
+    tsRustConversion.fq.vectorToRust(fq_vector)
   );
-  var new_fq_vector = tsRustConversionNative.fq.vectorFromRust(wasm_flat_vector);
+  var new_fq_vector = tsRustConversion.fq.vectorFromRust(wasm_flat_vector);
   // 2. write back modified field vector to original one
   new_fq_vector.forEach(function (a, i) {
     fq_vector[i] = a;
@@ -91,13 +91,13 @@ function caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector) {
 
 
 // Provides: caml_pasta_fp_poseidon_block_cipher
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: plonk_wasm, tsRustConversion
 function caml_pasta_fp_poseidon_block_cipher(_fake_params, fp_vector) {
   // 1. get permuted field vector from rust
   var wasm_flat_vector = plonk_wasm.caml_pasta_fp_poseidon_block_cipher(
-    tsRustConversionNative.fp.vectorToRust(fp_vector)
+    tsRustConversion.fp.vectorToRust(fp_vector)
   );
-  var new_fp_vector = tsRustConversionNative.fp.vectorFromRust(wasm_flat_vector);
+  var new_fp_vector = tsRustConversion.fp.vectorFromRust(wasm_flat_vector);
   // 2. write back modified field vector to original one
   new_fp_vector.forEach(function (a, i) {
     fp_vector[i] = a;
