@@ -7,7 +7,11 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/fsnotify/fsnotify"
+
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
 
@@ -77,9 +81,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) (*BlockAnalysisR
 	case config.Advanced:
 		forkData, err = t.AdvancedForkPhase(analysis, mainGenesisTs)
 	case config.Auto:
-		// WARN: We're using the dummy ForkData here, expecting callee to call
-		// `t.AutoForkPhase`, this is because auto fork config is guaranteed to be
-		// produced before the network closed
+		forkData, err = t.AutoForkPhase(analysis, mainGenesisTs)
 	}
 	if err != nil {
 		return nil, nil, err
@@ -294,6 +296,10 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 		return nil, err
 	}
 
+	t.WaitForBestTip(t.AnyPortOfType(PORT_REST), func(block client.BlockData) bool {
+		return block.Slot >= t.Config.SlotChainEnd
+	}, "Best tip to reach slot chain end", time.Duration(t.Config.MainSlot*t.Config.SlotChainEnd)*time.Second)
+
 	for _, e := range entries {
 		if !e.IsDir() {
 			return nil, fmt.Errorf("Unexpected file %s in node directory %s", e.Name(), nodesDir)
@@ -305,9 +311,38 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 		nodeDir := filepath.Join(nodesDir, e.Name())
 		forkConfigBase := filepath.Join(nodeDir, "auto-fork-mesa-devnet")
 
-		_, err = os.Stat(filepath.Join(forkConfigBase, "activated"))
-		if err != nil {
-			return nil, err
+		activatedFileToWait := filepath.Join(forkConfigBase, "activated")
+
+		watcher, err := fsnotify.NewWatcher()
+		defer watcher.Close()
+
+		err = watcher.Add(activatedFileToWait)
+
+		activatedFileCreated := false
+		timeout := time.After(time.Duration(t.Config.MainSlot * 2))
+	loop:
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					break loop
+				}
+				if event.Has(fsnotify.Create) {
+					activatedFileCreated = true
+					break loop
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					break loop
+				}
+				return nil, err
+			case <-timeout:
+				break loop
+			}
+		}
+
+		if !activatedFileCreated {
+			return nil, fmt.Errorf("Node %s haven't create activated file, meaning it's not completed auto config generation!", e.Name())
 		}
 
 		currentForkConfigBytes, err := os.ReadFile(filepath.Join(forkConfigBase, "daemon.json"))
