@@ -5,6 +5,7 @@ A script to spin up a local Mina blockchain network for development and testing.
 ## Quick Start
 
 ### Prerequisites
+
 - Mina repository checked out
 - Python 3 and `jq` installed
 - PostgreSQL (optional, for archive node)
@@ -12,6 +13,7 @@ A script to spin up a local Mina blockchain network for development and testing.
 ### Installation
 
 1. Install Python dependencies:
+
    ```shell
    pip3 install -r ./scripts/mina-local-network/requirements.txt
    ```
@@ -30,11 +32,13 @@ A script to spin up a local Mina blockchain network for development and testing.
 ### Basic Usage
 
 Run a local network with default settings:
+
 ```shell
 ./scripts/mina-local-network/mina-local-network.sh
 ```
 
 Run with custom configuration:
+
 ```shell
 ./scripts/mina-local-network/mina-local-network.sh \
   -w 2 \          # 2 whale nodes
@@ -47,6 +51,7 @@ Run with custom configuration:
 ```
 
 View all options:
+
 ```shell
 ./scripts/mina-local-network/mina-local-network.sh -h
 ```
@@ -58,6 +63,7 @@ View all options:
 The `--seed` parameter now supports two modes:
 
 1. **Spawn seed locally** (default):
+
    ```shell
    ./scripts/mina-local-network/mina-local-network.sh --seed "spawn:3000"
    ```
@@ -72,16 +78,19 @@ The `--seed` parameter now supports two modes:
 You can now spawn networks without certain components:
 
 **Disable archive node** (default):
+
 ```shell
 ./scripts/mina-local-network/mina-local-network.sh -ap ""
 ```
 
 **Disable snark coordinator**:
+
 ```shell
 ./scripts/mina-local-network/mina-local-network.sh -swp ""
 ```
 
 **Network without seed** (connect to external seed):
+
 ```shell
 ./scripts/mina-local-network/mina-local-network.sh --seed "at:SEED_PEER_ID"
 ```
@@ -91,11 +100,13 @@ You can now spawn networks without certain components:
 The `--config` parameter supports three modes:
 
 1. **`reset`** - Generate new config, keypairs, and ledgers:
+
    ```shell
    ./scripts/mina-local-network/mina-local-network.sh -c reset
    ```
 
 2. **`inherit`** - Reuse config from previous network:
+
    ```shell
    ./scripts/mina-local-network/mina-local-network.sh -c inherit
    ```
@@ -174,8 +185,10 @@ Control when transactions and block production stop:
 
 ## SnarkyJS and zkApps
 
-- Now, if you’d like to work with `zkApps` using `SnarkyJS` locally, you need to update the `SnarkyJS` reference for your `zkApp` project (e.g. created using [zkApp-CLI](https://github.com/o1-labs/zkapp-cli) like this: `zk project foo`).
-
+- Now, if you’d like to work with `zkApps` using `SnarkyJS` locally, you need to
+  update the `SnarkyJS` reference for your `zkApp` project (e.g. created using
+  [zkApp-CLI](https://github.com/o1-labs/zkapp-cli) like this:
+  `zk project foo`).
   - Suppose you’ve created `zkApp` at following path:
     - `~/projcts/zkapps/foo`
   - Go to `zkApp` project root (☝️).
@@ -187,13 +200,17 @@ Control when transactions and block production stop:
     npm i ${HOME}/<path_to_Mina_repo>/src/lib/snarkyjs
     ```
 
-  - Note: you can also refer to [this repo](https://github.com/o1-labs/e2e-zkapp/) in order to get environment setting up scripts.
+  - Note: you can also refer to
+    [this repo](https://github.com/o1-labs/e2e-zkapp/) in order to get
+    environment setting up scripts.
 
 ## Lightweight Network (Fast Mode)
 
-For faster testing with reduced resource usage, use the `lightnet` build profile:
+For faster testing with reduced resource usage, use the `lightnet` build
+profile:
 
 1. Build with the `lightnet` profile:
+
    ```shell
    MINA_COMMIT_SHA1=$(git rev-parse HEAD) \
    DUNE_PROFILE="lightnet" \
@@ -209,12 +226,14 @@ For faster testing with reduced resource usage, use the `lightnet` build profile
    ```
 
 **Lightnet Configuration:**
+
 - Block window duration: 20 seconds (vs 180 seconds in devnet/mainnet)
 - k (finality): 30 blocks
 - Proof level: none (dummy proofs)
 - Slots per epoch: 720
 
 **Important Notes:**
+
 - **Always test with `devnet` or `mainnet` profiles for production validation**
 - Lightnet uses dummy proofs - not suitable for security testing
 - May be unstable under heavy transaction load
@@ -222,6 +241,7 @@ For faster testing with reduced resource usage, use the `lightnet` build profile
 ## Common Use Cases
 
 ### Development Network
+
 ```shell
 ./scripts/mina-local-network/mina-local-network.sh \
   -w 2 -f 1 -n 1 \
@@ -231,6 +251,7 @@ For faster testing with reduced resource usage, use the `lightnet` build profile
 ```
 
 ### Testing Network (Fast)
+
 ```shell
 ./scripts/mina-local-network/mina-local-network.sh \
   -w 1 -f 1 \
@@ -240,6 +261,7 @@ For faster testing with reduced resource usage, use the `lightnet` build profile
 ```
 
 ### Network with Archive Node
+
 ```shell
 # First, ensure PostgreSQL is running
 ./scripts/mina-local-network/mina-local-network.sh \
@@ -249,6 +271,7 @@ For faster testing with reduced resource usage, use the `lightnet` build profile
 ```
 
 ### Hardfork Test Network
+
 ```shell
 ./scripts/mina-local-network/mina-local-network.sh \
   -w 3 -f 2 \
@@ -260,37 +283,44 @@ For faster testing with reduced resource usage, use the `lightnet` build profile
 ## Important Notes
 
 ### Network Configuration
+
 - **Always run at least 2 block producers** (`-w 2`) to prevent network halting
 - Default work directory: `${HOME}/.mina-network`
 - Account private key passphrase: `naughty blue worm`
 - Seed peer ID is stored at `${ROOT}/seed_peer_id.txt`
 
 ### Archive Node (PostgreSQL)
+
 - Required for archive node functionality (`-ap` flag)
 - Ensure PostgreSQL is running and accessible
 - Database schema is automatically created when not inheriting config
 
 ### GraphQL Endpoints
+
 - Available at `http://localhost:{port}/graphql`
 - Ports follow pattern: base_port + 1 (e.g., seed:3001, fish:5001, etc.)
 - Specific ports shown in script output
 
 ### Port Allocation
-- Seed: `SEED_START_PORT` + [0-5] (client, rest, external, metrics, libp2p-metrics, itn-graphql)
-- Whales: `WHALE_START_PORT` + i*6 + [0-5]
-- Fish: `FISH_START_PORT` + i*6 + [0-5]
-- Nodes: `NODE_START_PORT` + i*6 + [0-5]
+
+- Seed: `SEED_START_PORT` + [0-5] (client, rest, external, metrics,
+  libp2p-metrics, itn-graphql)
+- Whales: `WHALE_START_PORT` + i\*6 + [0-5]
+- Fish: `FISH_START_PORT` + i\*6 + [0-5]
+- Nodes: `NODE_START_PORT` + i\*6 + [0-5]
 - Snark Coordinator: `SNARK_COORDINATOR_PORT` + [0-5]
 
 ### Account Management
 
 **Get encoded private key:**
+
 ```shell
 mina.exe advanced dump-keypair \
   --privkey-path ~/.mina-network/offline_whale_keys/offline_whale_account_1
 ```
 
 **Import and unlock account for transactions:**
+
 ```shell
 mina.exe accounts import \
   --privkey-path ~/.mina-network/offline_whale_keys/offline_whale_account_1 \
@@ -305,8 +335,10 @@ mina.exe accounts unlock \
 
 ### Common Issues
 
-1. **"Failed to generate daemon keypair"** - Check file permissions in `${ROOT}` directory
-2. **PostgreSQL connection errors** - Verify PostgreSQL is running and credentials are correct
+1. **"Failed to generate daemon keypair"** - Check file permissions in `${ROOT}`
+   directory
+2. **PostgreSQL connection errors** - Verify PostgreSQL is running and
+   credentials are correct
 3. **Network not syncing** - Ensure at least 2 block producers are running
 4. **Port conflicts** - Use different start ports or stop existing processes
 
@@ -320,11 +352,13 @@ mina.exe accounts unlock \
 ### Cleaning Up
 
 To completely reset the network:
+
 ```shell
 rm -rf ~/.mina-network
 ```
 
 Or use a custom root directory:
+
 ```shell
 ./scripts/mina-local-network/mina-local-network.sh -r /tmp/test-network -c reset
 ```

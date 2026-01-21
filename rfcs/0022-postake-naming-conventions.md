@@ -1,17 +1,28 @@
 ## Summary
+
 [summary]: #summary
 
-This RFC proposes a new standard for names related to our implementation proof of stake.
+This RFC proposes a new standard for names related to our implementation proof
+of stake.
 
 ## Motivation
+
 [motivation]: #motivation
 
-There has been a great deal of misunderstandings and miscommunications around proof of stake in the past, and nearly all of this has been due to non-unique and non-specific names. By fixing this, the hope would be that the team is able to communicate more effectively about concepts in proof of stake without relaying a ground base of information at the beginning of every meeting.
+There has been a great deal of misunderstandings and miscommunications around
+proof of stake in the past, and nearly all of this has been due to non-unique
+and non-specific names. By fixing this, the hope would be that the team is able
+to communicate more effectively about concepts in proof of stake without
+relaying a ground base of information at the beginning of every meeting.
 
 ## Detailed design
+
 [detailed-design]: #detailed-design
 
-The biggest source of confusion is the ambiguous and non-unique use of "prev" and "next". The goal with these names is to remove those names and keep all names unambiguous. These name changes would be reflected in the code after we agree upon them.
+The biggest source of confusion is the ambiguous and non-unique use of "prev"
+and "next". The goal with these names is to remove those names and keep all
+names unambiguous. These name changes would be reflected in the code after we
+agree upon them.
 
 ```
 Epoch Ledger: the ledger for VRF evaluations (associated with a specific epoch)
