@@ -170,13 +170,11 @@ var plonk_wasm = (function () {
 
     overrides.forEach(function (override) {
       wasm[override] = function (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12) {
-        console.log("calling native override:", override);
         return native[override](x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12);
       }
     });
     ctorOverrides.forEach(function (override) {
       wasm[override] = function (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12) {
-        console.log("calling class native override:", override);
         return new native[override](x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12);
       }
     });

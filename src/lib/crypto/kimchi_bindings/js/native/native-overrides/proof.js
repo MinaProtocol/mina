@@ -21,8 +21,6 @@ var caml_pasta_fp_plonk_proof_create = function (
   var flat_prev = Array.from(
     tsRustConversionNative.fp.vectorToRust(prev_challenges) || []
   );
-  console.log('index: ', index);
-  console.log('witness cols: ', witness_cols)
   var runtime_tables =
     tsRustConversionNative.fp.runtimeTablesToRust(caml_runtime_tables);
   runtime_tables = runtime_tables ? Array.from(runtime_tables) : [];
@@ -35,8 +33,6 @@ var caml_pasta_fp_plonk_proof_create = function (
     flat_prev,
     prev_sgs
   );
-  console.log('proof?')
-  console.log(proof.proof);
   return tsRustConversionNative.fp.proofFromRust(proof);
 };
 
