@@ -101,12 +101,14 @@ var caml_pasta_fp_plonk_index_create = function (
     var wasm_runtime_table_cfgs = tsRustConversion.fp.runtimeTableCfgsToRust(
         caml_runtime_table_cfgs
     );
-    console.time("conversion plonk index create")
-    var gate_vec = plonk_wasm.caml_pasta_fp_plonk_gate_vector_from_bytes(gates.serialize());
-    var urs_ser = plonk_wasm.caml_fp_srs_from_bytes_external(urs.serialize())
-    console.timeEnd("conversion plonk index create")
-
-    console.time("index_create")
+    var gate_vec = gates;
+    var urs_ser = urs;
+    if (plonk_wasm.native == true) {
+        console.time("conversion plonk index create")
+        gate_vec = plonk_wasm.caml_pasta_fp_plonk_gate_vector_from_bytes(gates.serialize())
+        urs_ser = plonk_wasm.caml_fp_srs_from_bytes_external(urs.serialize())
+        console.timeEnd("conversion plonk index create")
+    }
     var t = plonk_wasm.caml_pasta_fp_plonk_index_create(
         gate_vec,
         public_inputs,
@@ -116,7 +118,6 @@ var caml_pasta_fp_plonk_index_create = function (
         urs_ser,
         lazy_mode
     );
-    console.timeEnd("index_create");
 
     return t;
 };
@@ -210,12 +211,15 @@ var caml_pasta_fq_plonk_index_create = function (
         caml_runtime_table_cfgs
     );
 
-    console.time("conversion")
-    var gate_vec = plonk_wasm.caml_pasta_fq_plonk_gate_vector_from_bytes(gates.serialize());
-    var urs_ser = plonk_wasm.caml_fq_srs_from_bytes_external(urs.serialize())
-    console.timeEnd("conversion")
+    var gate_vec = gates;
+    var urs_ser = urs;
+    if (plonk_wasm.native == true) {
+        console.time("conversion plonk index create")
+        gate_vec = plonk_wasm.caml_pasta_fq_plonk_gate_vector_from_bytes(gates.serialize())
+        urs_ser = plonk_wasm.caml_fq_srs_from_bytes_external(urs.serialize())
+        console.timeEnd("conversion plonk index create")
+    }
 
-    console.time("index_create")
     var t = plonk_wasm.caml_pasta_fq_plonk_index_create(
         gate_vec,
         public_inputs,
@@ -225,7 +229,6 @@ var caml_pasta_fq_plonk_index_create = function (
         urs_ser,
         lazy_mode
     );
-    console.timeEnd("index_create");
 
     return t;
 };

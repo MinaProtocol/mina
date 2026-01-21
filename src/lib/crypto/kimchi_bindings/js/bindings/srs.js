@@ -62,13 +62,19 @@ var caml_fp_srs_lagrange_commitment = tsSrs.fp.lagrangeCommitment;
 // Provides: caml_fp_srs_to_bytes_external
 // Requires: plonk_wasm
 var caml_fp_srs_to_bytes_external = function (srs) {
-    return plonk_wasm.caml_fp_srs_to_bytes_external(srs);
+    if (plonk_wasm.native == true) {
+        return plonk_wasm.caml_fp_srs_to_bytes_external(srs);
+    }
+    return srs.serialize();
 };
 
 // Provides: caml_fp_srs_from_bytes_external
 // Requires: plonk_wasm
 var caml_fp_srs_from_bytes_external = function (bytes) {
-    return plonk_wasm.caml_fp_srs_from_bytes_external(bytes);
+    if (plonk_wasm.native == true) {
+        return plonk_wasm.caml_fp_srs_from_bytes_external(bytes);
+    }
+    return plonk_wasm.WasmFpSrs.deserialize(bytes);
 };
 
 // Provides: caml_fp_srs_maybe_lagrange_commitment
