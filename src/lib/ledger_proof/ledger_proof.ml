@@ -60,13 +60,14 @@ module Cached = struct
 end
 
 module For_tests = struct
-  let mk_dummy_proof statement =
-    create ~statement ~sok_digest:Sok_message.Digest.default
-      ~proof:(Lazy.force Proof.transaction_dummy)
+  let mk_dummy_proof ~statement ~fee ~prover =
+    let sok_digest = Sok_message.create ~fee ~prover |> Sok_message.digest in
+    create ~statement ~sok_digest ~proof:(Lazy.force Proof.transaction_dummy)
 
   module Cached = struct
-    let mk_dummy_proof statement =
-      Cached.create ~statement ~sok_digest:Sok_message.Digest.default
+    let mk_dummy_proof ~statement ~fee ~prover =
+      let sok_digest = Sok_message.create ~fee ~prover |> Sok_message.digest in
+      Cached.create ~statement ~sok_digest
         ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag)
   end
 end

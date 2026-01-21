@@ -199,10 +199,12 @@ module Values (S : Sample) = struct
   let ledger_proof () : Ledger_proof.t =
     bin_copy ~bin_class:Ledger_proof.Stable.Latest.bin_t
       (Ledger_proof.For_tests.mk_dummy_proof
-         (Mina_state.Snarked_ledger_state.genesis
-            ~genesis_ledger_hash:
-              (Mina_base.Frozen_ledger_hash.of_ledger_hash
-                 Mina_base.Ledger_hash.empty_hash ) ) )
+         ~statement:
+           (Mina_state.Snarked_ledger_state.genesis
+              ~genesis_ledger_hash:
+                (Mina_base.Frozen_ledger_hash.of_ledger_hash
+                   Mina_base.Ledger_hash.empty_hash ) )
+         ~fee:(fee ()) ~prover:(public_key ()) )
 
   let one_priced_proof () :
       Ledger_proof.t One_or_two.t Network_pool.Priced_proof.t =
