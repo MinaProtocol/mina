@@ -11,21 +11,12 @@ var tsSrs = tsBindings.srsNative(plonk_wasm);
 // Provides: caml_fp_srs_create
 // Requires: tsSrs
 var caml_fp_srs_create = function (log_size) {
-  console.log("native caml_fp_srs_create logsize", log_size);
-  var srs = tsSrs.fp.create(log_size);
-  try {
-    var points = plonk_wasm.caml_fp_srs_get(srs);
-    console.log("native fp srs points length", points ? points.length : points);
-  } catch (err) {
-    console.error("native fp srs get failed", err);
-  }
-  return srs;
+  return tsSrs.fp.create(log_size);
 }
 
 // Provides: caml_fp_srs_write
 // Requires: plonk_wasm, caml_jsstring_of_string
 var caml_fp_srs_write = function (append, t, path) {
-  console.log("native caml_fp_srs_write");
   if (append === 0) {
     append = undefined;
   } else {
@@ -37,7 +28,6 @@ var caml_fp_srs_write = function (append, t, path) {
 // Provides: caml_fp_srs_read
 // Requires: plonk_wasm, caml_jsstring_of_string
 var caml_fp_srs_read = function (offset, path) {
-  console.log("native caml_fp_srs_read");
   if (offset === 0) {
     offset = undefined;
   } else {
@@ -56,14 +46,12 @@ var caml_fp_srs_read = function (offset, path) {
 // Provides: caml_fp_srs_lagrange_commitments_whole_domain
 // Requires: tsSrs
 var caml_fp_srs_lagrange_commitments_whole_domain = function (srs, domain_size) {
-  console.log("native caml_fp_srs_lagrange_commitments_whole_domain");
   return tsSrs.fp.lagrangeCommitmentsWholeDomain(srs, domain_size);
 }
 
 // Provides: caml_fq_srs_lagrange_commitments_whole_domain
 // Requires: tsSrs
 var caml_fq_srs_lagrange_commitments_whole_domain = function (srs, domain_size) {
-  console.log("native caml_fq_srs_lagrange_commitments_whole_domain");
   return tsSrs.fq.lagrangeCommitmentsWholeDomain(srs, domain_size);
 }
 
@@ -74,26 +62,21 @@ var caml_fp_srs_lagrange_commitment = tsSrs.fp.lagrangeCommitment;
 // Provides: caml_fp_srs_to_bytes_external
 // Requires: plonk_wasm
 var caml_fp_srs_to_bytes_external = function (srs) {
-  console.log("native caml_fp_srs_to_bytes_external");
   return plonk_wasm.caml_fp_srs_to_bytes_external(srs);
 };
 
 // Provides: caml_fp_srs_from_bytes_external
 // Requires: plonk_wasm
 var caml_fp_srs_from_bytes_external = function (bytes) {
-  console.log("native caml_fp_srs_from_bytes_external");
   return plonk_wasm.caml_fp_srs_from_bytes_external(bytes);
 };
 
 // Provides: caml_fp_srs_maybe_lagrange_commitment
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_fp_srs_maybe_lagrange_commitment = function (srs, domain_size, i) {
-  console.log("native caml_fp_srs_maybe_lagrange_commitment");
   var result = plonk_wasm.caml_fp_srs_maybe_lagrange_commitment(srs, domain_size, i);
-  console.log("result", result);
   if (result == null) return 0; // None
   var polyComm = tsRustConversionNative.fp.polyCommFromRust(result);
-  console.log("polyComm", polyComm);
   if (polyComm == undefined) return 0; // None
   return [0, polyComm]; // Some(...)
 };
@@ -101,7 +84,6 @@ var caml_fp_srs_maybe_lagrange_commitment = function (srs, domain_size, i) {
 // Provides: caml_fp_srs_commit_evaluations
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_fp_srs_commit_evaluations = function (t, domain_size, fps) {
-  console.log("native caml_fp_srs_commit_evaluations");
   var res = plonk_wasm.caml_fp_srs_commit_evaluations(
     t,
     domain_size,
@@ -113,7 +95,6 @@ var caml_fp_srs_commit_evaluations = function (t, domain_size, fps) {
 // Provides: caml_fp_srs_b_poly_commitment
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_fp_srs_b_poly_commitment = function (srs, chals) {
-  console.log("native caml_fp_srs_b_poly_commitment");
   var res = plonk_wasm.caml_fp_srs_b_poly_commitment(
     srs,
     tsRustConversionNative.fp.vectorToRust(chals)
@@ -124,7 +105,6 @@ var caml_fp_srs_b_poly_commitment = function (srs, chals) {
 // Provides: caml_fp_srs_batch_accumulator_check
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_fp_srs_batch_accumulator_check = function (srs, comms, chals) {
-  console.log("native caml_fp_srs_batch_accumulator_check");
   var rust_comms = tsRustConversionNative.fp.pointsToRust(comms);
   var rust_chals = tsRustConversionNative.fp.vectorToRust(chals);
   var ok = plonk_wasm.caml_fp_srs_batch_accumulator_check(
@@ -138,7 +118,6 @@ var caml_fp_srs_batch_accumulator_check = function (srs, comms, chals) {
 // Provides: caml_fp_srs_batch_accumulator_generate
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_fp_srs_batch_accumulator_generate = function (srs, n_comms, chals) {
-  console.log("native caml_fp_srs_batch_accumulator_generate");
   var rust_chals = tsRustConversionNative.fp.vectorToRust(chals);
   var rust_comms = plonk_wasm.caml_fp_srs_batch_accumulator_generate(
     srs,
@@ -151,35 +130,24 @@ var caml_fp_srs_batch_accumulator_generate = function (srs, n_comms, chals) {
 // Provides: caml_fp_srs_h
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_fp_srs_h = function (t) {
-  console.log("native caml_fp_srs_h");
   return tsRustConversionNative.fp.pointFromRust(plonk_wasm.caml_fp_srs_h(t));
 };
 
 // Provides: caml_fp_srs_add_lagrange_basis
 // Requires: tsSrs
 var caml_fp_srs_add_lagrange_basis = function (srs, domain_size) {
-  console.log("native caml_fp_srs_add_lagrange_basis");
   return tsSrs.fp.addLagrangeBasis(srs, domain_size);
 };
 
 // Provides: caml_fq_srs_create
 // Requires: tsSrs
 var caml_fq_srs_create = function (log_size) {
-  console.log("native caml_fq_srs_create logsize", log_size);
-  var srs = tsSrs.fq.create(log_size);
-  try {
-    var points = plonk_wasm.caml_fq_srs_get(srs);
-    console.log("native fq srs points length", points ? points.length : points);
-  } catch (err) {
-    console.error("native fq srs get failed", err);
-  }
-  return srs;
+  return tsSrs.fq.create(log_size);
 }
 
 // Provides: caml_fq_srs_write
 // Requires: plonk_wasm, caml_jsstring_of_string
 var caml_fq_srs_write = function (append, t, path) {
-  console.log("native caml_fq_srs_write");
   if (append === 0) {
     append = undefined;
   } else {
@@ -191,7 +159,6 @@ var caml_fq_srs_write = function (append, t, path) {
 // Provides: caml_fq_srs_read
 // Requires: plonk_wasm, caml_jsstring_of_string
 var caml_fq_srs_read = function (offset, path) {
-  console.log("native caml_fq_srs_read");
   if (offset === 0) {
     offset = undefined;
   } else {
@@ -215,7 +182,6 @@ var caml_fq_srs_lagrange_commitment = tsSrs.fq.lagrangeCommitment;
 // Provides: caml_fq_srs_maybe_lagrange_commitment
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_fq_srs_maybe_lagrange_commitment = function (srs, domain_size, i) {
-  console.log("native caml_fq_srs_maybe_lagrange_commitment");
   var result = plonk_wasm.caml_fq_srs_maybe_lagrange_commitment(srs, domain_size, i);
   if (result == null) return 0; // None
   var polyComm = tsRustConversionNative.fq.polyCommFromRust(result);
@@ -226,7 +192,6 @@ var caml_fq_srs_maybe_lagrange_commitment = function (srs, domain_size, i) {
 // Provides: caml_fq_srs_commit_evaluations
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_fq_srs_commit_evaluations = function (t, domain_size, fqs) {
-  console.log("native caml_fq_srs_commit_evaluations");
   var res = plonk_wasm.caml_fq_srs_commit_evaluations(
     t,
     domain_size,
@@ -238,22 +203,16 @@ var caml_fq_srs_commit_evaluations = function (t, domain_size, fqs) {
 // Provides: caml_fq_srs_b_poly_commitment
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_fq_srs_b_poly_commitment = function (srs, chals) {
-  console.log("native caml_fq_srs_b_poly_commitment");
-  console.log("srs", srs);
-  console.log("chals", chals);
-  console.log("conv", tsRustConversionNative.fq.vectorToRust(chals))
   var res = plonk_wasm.caml_fq_srs_b_poly_commitment(
     srs,
     tsRustConversionNative.fq.vectorToRust(chals)
   );
-  console.log("res", res);
   return tsRustConversionNative.fq.polyCommFromRust(res);
 };
 
 // Provides: caml_fq_srs_batch_accumulator_check
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_fq_srs_batch_accumulator_check = function (srs, comms, chals) {
-  console.log("native caml_fq_srs_batch_accumulator_check");
   var rust_comms = tsRustConversionNative.fq.pointsToRust(comms);
   var rust_chals = tsRustConversionNative.fq.vectorToRust(chals);
   var ok = plonk_wasm.caml_fq_srs_batch_accumulator_check(
@@ -267,7 +226,6 @@ var caml_fq_srs_batch_accumulator_check = function (srs, comms, chals) {
 // Provides: caml_fq_srs_batch_accumulator_generate
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_fq_srs_batch_accumulator_generate = function (srs, comms, chals) {
-  console.log("native caml_fq_srs_batch_accumulator_generate");
   var rust_chals = tsRustConversionNative.fq.vectorToRust(chals);
   var rust_comms = plonk_wasm.caml_fq_srs_batch_accumulator_generate(
     srs,
@@ -280,13 +238,11 @@ var caml_fq_srs_batch_accumulator_generate = function (srs, comms, chals) {
 // Provides: caml_fq_srs_h
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_fq_srs_h = function (t) {
-  console.log("native caml_fq_srs_h");
   return tsRustConversionNative.fq.pointFromRust(plonk_wasm.caml_fq_srs_h(t));
 };
 
 // Provides: caml_fq_srs_add_lagrange_basis
 // Requires: tsSrs
 var caml_fq_srs_add_lagrange_basis = function (srs, domain_size) {
-  console.log("native caml_fq_srs_add_lagrange_basis");
   return tsSrs.fq.addLagrangeBasis(srs, domain_size);
 };
