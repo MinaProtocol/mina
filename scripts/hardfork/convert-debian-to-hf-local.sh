@@ -151,7 +151,7 @@ CONFIG_FILE="$WORKDIR/config.json"
 set_config_file_from_downloaded() {
     local downloaded_file="$1"
     local orig_name="$2"
-    if [[ "$orig_name" == *.gz ]] || file "$downloaded_file" | grep -q "gzip compressed"; then
+    if file "$downloaded_file" | grep -q "gzip compressed"; then
         echo "Unpacking gzipped state dump..."
         gunzip -c "$downloaded_file" > "$WORKDIR/unpacked_state_dump.json"
         echo "\u2713 State dump unpacked"
