@@ -13,7 +13,9 @@ delivered are
 
 Samasika was invented by [Joseph Bonneau](https://jbonneau.com),
 [Izaak Meckler](https://math.berkeley.edu/~izaak),
+
 <!-- xrefcheck: ignore link -->
+
 [Vanishree Rao](https://www.linkedin.com/in/vanishree-rao) and
 [Evan Shapiro](https://twitter.com/evanashapiro) as the first succinct
 blockchain consensus algorithm. It extends many ideas from

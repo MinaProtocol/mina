@@ -129,6 +129,7 @@
       2 arguments-- the first is the Ok type, the second is the Error type. the
       Ok type is a tuple of (the node or breadcrumb, a list of hashes). the
       Error type is a list of ad-hoc error codes. state_hashes is of type:
+
     ```ocaml
     ([> Breadcrumb of Breadcrumb.t | Node of Node.t ] * (Marlin_plonk_bindings_pasta_fp.t list),
      [> Failed_to_download_transition_chain_proof | Invalid_transition_chain_proof | No_common_ancestor | Peer_moves_too_fast ] list
