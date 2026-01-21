@@ -12,38 +12,27 @@ var caml_pasta_fp_plonk_proof_create = function (
   prev_sgs
 ) {
   var w = new plonk_wasm.WasmVecVecFp(witness_cols.length - 1);
-  var ww = new w.WasmVecVecFp(witness_cols.length - 1)
   for (var i = 1; i < witness_cols.length; i++) {
-    ww.push(tsRustConversionNative.fp.vectorToRust(witness_cols[i]));
+    w.push(tsRustConversionNative.fp.vectorToRust(witness_cols[i]));
   }
 
-  witness_cols = ww;
-  prev_challenges = tsRustConversionNative.fp.vectorToRust(prev_challenges);
-  var wasm_runtime_tables =
+  witness_cols = w;
+  // NapiFlatVector expects a plain JS array of bytes (Vec<u8> on the Rust side).
+  var flat_prev = Array.from(
+    tsRustConversionNative.fp.vectorToRust(prev_challenges) || []
+  );
+  var runtime_tables =
     tsRustConversionNative.fp.runtimeTablesToRust(caml_runtime_tables);
+  runtime_tables = runtime_tables ? Array.from(runtime_tables) : [];
   prev_sgs = tsRustConversionNative.fp.pointsToRust(prev_sgs);
-  
-  /* 
-  index: &External<$NapiIndex>,
-  witness: $NapiVecVec,
-  runtime_tables: NapiVector<JsRuntimeTableF>,
-  prev_challenges: NapiFlatVector<$NapiF>,
-  prev_sgs: NapiVector<$NapiG>,
-  */
-
-  console.log('index: ', index);
-  console.log('witness cols: ', witness_cols)
-  console.log("wasm_runtime_tables: ", wasm_runtime_tables)
-  console.log('prev challenges: ', prev_challenges)
-  console.log('prev_sgs: ', prev_sgs)
+  prev_sgs = prev_sgs ? Array.from(prev_sgs) : [];
   var proof = plonk_wasm.caml_pasta_fp_plonk_proof_create(
     index,
     witness_cols,
-    wasm_runtime_tables,
-    prev_challenges,
+    runtime_tables,
+    flat_prev,
     prev_sgs
   );
-  console.log('proof?')
   return tsRustConversionNative.fp.proofFromRust(proof);
 };
 
@@ -101,15 +90,19 @@ var caml_pasta_fq_plonk_proof_create = function (
     w.push(tsRustConversionNative.fq.vectorToRust(witness_cols[i]));
   }
   witness_cols = w;
-  prev_challenges = tsRustConversionNative.fq.vectorToRust(prev_challenges);
-  var wasm_runtime_tables =
+  var flat_prev = Array.from(
+    tsRustConversionNative.fq.vectorToRust(prev_challenges) || []
+  );
+  var runtime_tables =
     tsRustConversionNative.fq.runtimeTablesToRust(caml_runtime_tables);
+  runtime_tables = runtime_tables ? Array.from(runtime_tables) : [];
   prev_sgs = tsRustConversionNative.fq.pointsToRust(prev_sgs);
+  prev_sgs = prev_sgs ? Array.from(prev_sgs) : [];
   var proof = plonk_wasm.caml_pasta_fq_plonk_proof_create(
     index,
     witness_cols,
-    wasm_runtime_tables,
-    prev_challenges,
+    runtime_tables,
+    flat_prev,
     prev_sgs
   );
   return tsRustConversionNative.fq.proofFromRust(proof);
@@ -154,4 +147,3 @@ var caml_pasta_fq_plonk_proof_deep_copy = function (proof) {
     )
   );
 };
-
