@@ -42,7 +42,7 @@ var caml_pasta_fp_plonk_gate_vector_wrap = function (vector, target, head) {
 };
 
 // Provides: caml_pasta_fp_plonk_gate_vector_digest
-// Requires: plonk_wasm, caml_bytes_of_uint8array
+// Requires: plonk_wasm, caml_bytes_of_uint8array, Uint8Array
 var caml_pasta_fp_plonk_gate_vector_digest = function (public_input_size, gate_vector) {
     var bytes = plonk_wasm.caml_pasta_fp_plonk_gate_vector_digest(
         public_input_size,
@@ -105,7 +105,7 @@ var caml_pasta_fq_plonk_gate_vector_wrap = function (vector, target, head) {
 };
 
 // Provides: caml_pasta_fq_plonk_gate_vector_digest
-// Requires: plonk_wasm, caml_bytes_of_uint8array
+// Requires: plonk_wasm, caml_bytes_of_uint8array, Uint8Array
 var caml_pasta_fq_plonk_gate_vector_digest = function (public_input_size, gate_vector) {
     var bytes = plonk_wasm.caml_pasta_fq_plonk_gate_vector_digest(
         public_input_size,

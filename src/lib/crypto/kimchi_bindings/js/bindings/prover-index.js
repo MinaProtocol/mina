@@ -86,7 +86,7 @@ var caml_pasta_fp_plonk_index_deserialize = function (index) {
 };
 
 // Provides: caml_pasta_fp_plonk_index_create
-// Requires: plonk_wasm, tsRustConversion
+// Requires: plonk_wasm, tsRustConversion, console
 var caml_pasta_fp_plonk_index_create = function (
     gates,
     public_inputs,
@@ -195,7 +195,7 @@ var caml_pasta_fq_plonk_index_deserialize = function (index) {
 };
 
 // Provides: caml_pasta_fq_plonk_index_create
-// Requires: plonk_wasm, tsRustConversion
+// Requires: plonk_wasm, tsRustConversion, console
 var caml_pasta_fq_plonk_index_create = function (
     gates,
     public_inputs,
