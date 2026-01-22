@@ -202,7 +202,7 @@ function write_help(){
     exit 0
 }
 
-# Write multiple files to the cache (destination is treated as a file path)
+# Write file to the cache (destination is treated as a file path)
 function write(){
     if [[ "$#" == 0 ]]; then
         write_help;
@@ -210,7 +210,7 @@ function write(){
 
     local __override=0
     local __root="$BUILDKITE_BUILD_ID"
-    local __inputs=()
+    local __input=""
     local __to=""
 
     while [ "$#" -gt 0 ]; do
@@ -228,20 +228,21 @@ function write(){
                 shift 2;
             ;;
             * )
-                # Collect all but last argument as inputs
-                if [[ "$#" -eq 1 ]]; then
+                if [[ -z "$__input" ]]; then
+                    __input="$1"
+                elif [[ -z "$__to" ]]; then
                     __to=$CACHE_BASE_URL/$__root/"$1"
-                    shift 1;
-                    continue
+                else
+                    echo -e "${RED} !! Only one input and one output (from and to) are allowed${CLEAR}\n";
+                    write_help;
                 fi
-                __inputs+=("$1")
                 shift 1;
             ;;
         esac
     done
 
-    if [[ -z "$__to" ]]; then
-        echo -e "${RED} !! Missing destination file path ('to')${CLEAR}\n";
+    if [[ -z "$__input" || -z "$__to" ]]; then
+        echo -e "${RED} !! Missing input or destination file path ('from' and 'to')${CLEAR}\n";
         write_help;
     fi
 
@@ -254,13 +255,11 @@ function write(){
     # Destination is treated as a file path - create parent directory only
     mkdir -p "$(dirname "$__to")"
 
-    for input_path in "${__inputs[@]}"; do
-        echo "..Copying $input_path -> $__to"
-        if ! cp -R ${EXTRA_FLAGS} $input_path "$__to"; then
-            echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
-            exit 2
-        fi
-    done
+    echo "..Copying $__input -> $__to"
+    if ! cp -R ${EXTRA_FLAGS} "$__input" "$__to"; then
+        echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
+        exit 2
+    fi
 }
 
 #==================
