@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
 
@@ -290,15 +289,8 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 		return nil, err
 	}
 
-	// this error is deliberatey ignored because if the node already exited we'll
-	// not be able to reach to the node
-	t.WaitForBestTip(t.AnyPortOfType(PORT_REST), func(block client.BlockData) bool {
-		return block.Slot >= t.Config.SlotChainEnd
-	}, "Best tip to reach slot chain end", time.Duration(t.Config.MainSlot*t.Config.SlotChainEnd)*time.Second)
-
-	t.Logger.Info("Some node have best tip slot slot-chain-end, checking all nodes local state to see if auto fork config is generated sucessfully")
-
-	timeOutInstant := time.Now().Add(time.Duration(t.Config.MainSlot * 2))
+	// 2 is the buffering param we wait for hf config to be generated
+	timeOutInstant := time.Unix(mainGenesisTs+int64((t.Config.SlotChainEnd+2)*t.Config.MainSlot), 0)
 
 	for _, e := range entries {
 		if !e.IsDir() {
