@@ -4,4 +4,5 @@
  (libraries comptime core_kernel node_config_intf)
  (instrumentation
   (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+ (preprocess
+  (pps ppx_version)))

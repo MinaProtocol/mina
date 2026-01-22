@@ -283,7 +283,8 @@ val skip_delta_block_chain_validation :
 val validate_frontier_dependencies :
      to_header:('a -> Header.t)
   -> context:(module CONTEXT)
-  -> root_block:Block.with_hash
+  -> root_consensus_state:
+       Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
   -> is_block_in_frontier:(Frozen_ledger_hash.t -> bool)
   -> ('a, State_hash.State_hashes.t) With_hash.t
      * ( 'b

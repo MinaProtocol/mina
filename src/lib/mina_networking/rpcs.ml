@@ -47,24 +47,23 @@ end
 
 type ctx = (module CONTEXT)
 
-let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender blocks =
+let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender headers =
   let version_errors =
     let invalid_current_versions =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block |> Mina_block.Header.current_protocol_version
+      List.filter headers ~f:(fun header ->
+          Mina_block.Header.current_protocol_version header
           |> Protocol_version.is_valid |> not )
     in
 
     let invalid_next_versions =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block
-          |> Mina_block.Header.proposed_protocol_version_opt
+      List.filter headers ~f:(fun header ->
+          Mina_block.Header.proposed_protocol_version_opt header
           |> Option.for_all ~f:Protocol_version.is_valid
           |> not )
     in
     let current_version_mismatches =
-      List.filter blocks ~f:(fun block ->
-          Mina_block.header block |> Mina_block.Header.current_protocol_version
+      List.filter headers ~f:(fun header ->
+          Mina_block.Header.current_protocol_version header
           |> Protocol_version.compatible_with_daemon |> not )
     in
     List.map invalid_current_versions ~f:(fun x ->
@@ -77,8 +76,7 @@ let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender blocks =
     (* NB: these errors aren't always accurate... sometimes we are calling this when we were
            requested to serve an outdated block (requested vs sent) *)
     Deferred.List.iter version_errors ~how:`Parallel
-      ~f:(fun (version_error, block) ->
-        let header = Mina_block.header block in
+      ~f:(fun (version_error, header) ->
         let block_protocol_version =
           Mina_block.Header.current_protocol_version header
         in
@@ -539,7 +537,7 @@ module Get_transition_chain = struct
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_transition_chain"
             ~sender:(Envelope.Incoming.sender request)
-            blocks
+            (List.map blocks ~f:Mina_block.header)
         in
         Option.some_if valid_versions
         @@ List.map ~f:Mina_block.read_all_proofs_from_disk blocks
@@ -951,11 +949,13 @@ module Get_ancestry = struct
         in
         None
     | Some { proof = chain, base_block; data = block } ->
+        let block = Frontier_base.Breadcrumb.block block in
+        let base_block = Frontier_base.Breadcrumb.block base_block in
         let%map valid_versions =
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_ancestry"
             ~sender:(Envelope.Incoming.sender request)
-            [ base_block ]
+            [ Mina_block.header base_block ]
         in
         Option.some_if valid_versions
           { Proof_carrying_data.proof =
@@ -1137,11 +1137,7 @@ module Get_best_tip = struct
     let result =
       let open Option.Let_syntax in
       let%bind frontier = get_transition_frontier () in
-      let%map proof_with_data =
-        Best_tip_prover.prove ~context:(module Context) frontier
-      in
-      (* strip hash from proof data *)
-      Proof_carrying_data.map proof_with_data ~f:With_hash.data
+      Best_tip_prover.prove ~context:(module Context) frontier
     in
     match result with
     | None ->
@@ -1154,16 +1150,18 @@ module Get_best_tip = struct
         in
         None
     | Some { data = data_block; proof = chain, proof_block } ->
+        let data_block = Frontier_base.Breadcrumb.block data_block in
+        let proof_block = Frontier_base.Breadcrumb.block proof_block in
         let%map data_valid_versions =
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_best_tip (data)"
             ~sender:(Envelope.Incoming.sender request)
-            [ data_block ]
+            [ Mina_block.header data_block ]
         and proof_valid_versions =
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_best_tip (proof)"
             ~sender:(Envelope.Incoming.sender request)
-            [ proof_block ]
+            [ Mina_block.header proof_block ]
         in
         Option.some_if
           (data_valid_versions && proof_valid_versions)

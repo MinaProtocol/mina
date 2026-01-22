@@ -49,9 +49,10 @@ function main_help(){
     echo ""
     echo "Sub-commands:"
     echo ""
-    echo " read - read file/files from cache";
-    echo " write - write file/files to cache";
-    echo " help - show this help message";
+    echo " read         - read file/files from cache";
+    echo " write        - write file/files to cache (destination is a file path)";
+    echo " write-to-dir - write file/files to cache (destination is a directory)";
+    echo " help         - show this help message";
     echo ""
     exit "${1:-0}";
 }
@@ -68,10 +69,10 @@ function version(){
 
 # Display the help message for the read command
 function read_help(){
-    echo "Read file or files from CI cache"
+    echo "Read multiple files from CI cache into a local directory."
     echo "Script requires to be executed in buildkite context. e.g (BUILDKITE_BUILD_ID env var to be defined)"
     echo ""
-    echo "     $CLI_NAME read [-options] INPUT_CACHE_LOCATION OUTPUT_LOCAL_LOCATION"
+    echo "     $CLI_NAME read [-options] INPUT_CACHE_LOCATION_1 [INPUT_CACHE_LOCATION_2 ...] OUTPUT_LOCAL_LOCATION"
     echo ""
     echo "Parameters:"
     echo ""
@@ -82,20 +83,19 @@ function read_help(){
     echo ""
     echo "Values:"
     echo ""
-    echo " INPUT_CACHE_LOCATION - path from which we will read (copy) cached artifact(s) (supports wildcard)"
-    echo " OUTPUT_LOCAL_LOCATION - local destination"
+    echo " INPUT_CACHE_LOCATION_X - path(s) from which to read (copy) cached artifact(s) (supports wildcard)"
+    echo " OUTPUT_LOCAL_LOCATION - local destination directory"
     echo ""
     echo "Example:"
     echo ""
-    echo "  " "$CLI_NAME" read  debians/mina-devnet*.deb /workdir
+    echo "  $CLI_NAME read debians/mina-devnet*.deb debians/mina-archive*.deb /workdir"
     echo ""
-    echo " Above command will copy 'debians/mina-devnet*.deb' files from CACHE_MOUNTPOINT/BUILDKITE_BUILD_ID/debians to /workdir"
-    echo ""
+    echo " Above command will copy all matching files from CACHE_MOUNTPOINT/BUILDKITE_BUILD_ID/debians to /workdir"
     echo ""
     exit 0
 }
 
-# Read files from the cache
+# Read multiple files from the cache
 function read(){
     if [[ "$#" == 0 ]]; then
         read_help;
@@ -104,11 +104,13 @@ function read(){
     local __override=0
     local __root="$BUILDKITE_BUILD_ID"
     local __skip_dirs_creation=0
-      
+    local __inputs=()
+    local __to=""
+
     while [ "$#" -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
         case $1 in
-            -h | --help ) 
+            -h | --help )
                 read_help;
             ;;
             -o | --override )
@@ -124,28 +126,26 @@ function read(){
                 shift 1;
             ;;
             * )
-                if [[ -z ${__from+x} ]]; then
-                   __from="$CACHE_BASE_URL/$__root/$1"
-                   shift 1;
-                   continue
+                # Collect all but last argument as inputs
+                if [[ "$#" -eq 1 ]]; then
+                    __to="$1"
+                    shift 1;
+                    continue
                 fi
-                
-                if [[ -z ${__to+x} ]]; then
-                   __to="$1"
-                   shift 1;
-                   continue
-                fi
-                echo -e "${RED} !! Unknown option or missing argument: $1${CLEAR}\n";
-                echo "";
-                read_help;
+                __inputs+=("$CACHE_BASE_URL/$__root/$1")
+                shift 1;
             ;;
         esac
     done
-    
+
+    if [[ -z "$__to" ]]; then
+        echo -e "${RED} !! Missing destination directory ('to')${CLEAR}\n";
+        read_help;
+    fi
 
     if [[ $__skip_dirs_creation == 1 ]]; then
         echo "..Skipping dirs creation"
-    else 
+    else
         mkdir -p "$__to"
     fi
 
@@ -155,22 +155,20 @@ function read(){
         exit 1
     fi
 
-    echo "..Copying $__from -> $__to"
-
-    if [[ $__override == 1 ]]; then 
+    if [[ $__override == 1 ]]; then
         EXTRA_FLAGS=""
-    else 
+    else
         EXTRA_FLAGS="-f"
     fi
 
-    mkdir -p "$__to"
-
-    if ! cp -R "${EXTRA_FLAGS}" $__from "$__to"; then
-        echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
-        exit 2
-    fi
+    for input_path in "${__inputs[@]}"; do
+        echo "..Copying $input_path -> $__to"
+        if ! cp -R ${EXTRA_FLAGS} $input_path "$__to"; then
+            echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
+            exit 2
+        fi
+    done
 }
-
 
 #==============
 # write
@@ -178,11 +176,11 @@ function read(){
 
 # Display the help message for the write command
 function write_help(){
-    echo Writes file or files to CI cache
+    echo "Write a file to CI cache (destination is treated as a file path)."
     echo "Script requires to be executed in buildkite context. e.g (BUILDKITE_BUILD_ID env var to be defined)"
+    echo "For writing multiple files to a directory, use 'write-to-dir' instead."
     echo ""
-    echo "     $CLI_NAME write [-options] INPUT_LOCAL_LOCATION OUTPUT_CACHE_LOCATION"
-    echo ""
+    echo "     $CLI_NAME write [-options] INPUT_LOCAL_FILE OUTPUT_CACHE_FILE_PATH"
     echo ""
     echo "Parameters:"
     echo ""
@@ -192,38 +190,37 @@ function write_help(){
     echo ""
     echo "Values:"
     echo ""
-    echo " INPUT_LOCAL_LOCATION - single or multiple files to write (supports wildcard)"
-    echo " OUTPUT_CACHE_LOCATION - destination at cache mount"
+    echo " INPUT_LOCAL_FILE - local file to write to cache"
+    echo " OUTPUT_CACHE_FILE_PATH - destination file path at cache mount"
     echo ""
     echo "Example:"
     echo ""
-    echo "  " $CLI_NAME write  mina-devnet*.deb debians/
+    echo "  $CLI_NAME write mina-devnet.deb debians/mina-devnet.deb"
     echo ""
-    echo " Above command will write mina-devnet*.deb files to CACHE_MOUNTPOINT/BUILDKITE_BUILD_ID/debians"
-    echo ""
+    echo " Above command will write file to CACHE_MOUNTPOINT/BUILDKITE_BUILD_ID/debians/mina-devnet.deb"
     echo ""
     exit 0
 }
 
-# Writes files to the cache
+# Write multiple files to the cache (destination is treated as a file path)
 function write(){
-
     if [[ "$#" == 0 ]]; then
         write_help;
     fi
 
-    
     local __override=0
     local __root="$BUILDKITE_BUILD_ID"
-      
-    while [ ${#} -gt 0 ]; do
+    local __inputs=()
+    local __to=""
+
+    while [ "$#" -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
         case $1 in
-            -h | --help ) 
+            -h | --help )
                 write_help;
             ;;
             -o | --override )
-               __override=1
+                __override=1
                 shift 1;
             ;;
             -r | --root )
@@ -231,40 +228,132 @@ function write(){
                 shift 2;
             ;;
             * )
-                if [[ ! -v __from ]]; then
-                   __from="$1"
-                   shift 1;
-                   continue
+                # Collect all but last argument as inputs
+                if [[ "$#" -eq 1 ]]; then
+                    __to=$CACHE_BASE_URL/$__root/"$1"
+                    shift 1;
+                    continue
                 fi
-
-                if [[ ! -v __to ]]; then
-                   __to=$CACHE_BASE_URL/$__root/"$1"
-                   shift 1;
-                   continue
-                fi
-                echo -e "${RED} !! Unknown option or missing argument: $1${CLEAR}\n";
-                echo "";
-                write_help;
+                __inputs+=("$1")
+                shift 1;
             ;;
         esac
     done
-    
-    echo "..Copying $__from -> $__to"
-    
-    if [[ $__override == 1 ]]; then 
+
+    if [[ -z "$__to" ]]; then
+        echo -e "${RED} !! Missing destination file path ('to')${CLEAR}\n";
+        write_help;
+    fi
+
+    if [[ $__override == 1 ]]; then
         EXTRA_FLAGS=""
-    else 
+    else
         EXTRA_FLAGS="-f"
     fi
 
-    mkdir -p "$__to"
-    
-    if ! cp -R "${EXTRA_FLAGS}" "$__from" "$__to"; then
-        echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
-        exit 2
-    fi
+    # Destination is treated as a file path - create parent directory only
+    mkdir -p "$(dirname "$__to")"
+
+    for input_path in "${__inputs[@]}"; do
+        echo "..Copying $input_path -> $__to"
+        if ! cp -R ${EXTRA_FLAGS} $input_path "$__to"; then
+            echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
+            exit 2
+        fi
+    done
 }
 
+#==================
+# write-to-dir
+#==================
+
+# Display the help message for the write-to-dir command
+function write-to-dir_help(){
+    echo "Write multiple files to CI cache into a cache directory."
+    echo "Script requires to be executed in buildkite context. e.g (BUILDKITE_BUILD_ID env var to be defined)"
+    echo ""
+    echo "     $CLI_NAME write-to-dir [-options] INPUT_LOCAL_LOCATION_1 [INPUT_LOCAL_LOCATION_2 ...] OUTPUT_CACHE_DIRECTORY"
+    echo ""
+    echo "Parameters:"
+    echo ""
+    printf "  %-25s %s\n" "-h  | --help" "show help";
+    printf "  %-25s %s\n" "-o  | --override" "[bool] override existing files";
+    printf "  %-25s %s\n" "-r  | --root" "[path] override cache root folder. WARNING it does not override cache mount point. Do not add leading slash at the beginning or end.";
+    echo ""
+    echo "Values:"
+    echo ""
+    echo " INPUT_LOCAL_LOCATION_X - path(s) of files to write (supports wildcard)"
+    echo " OUTPUT_CACHE_DIRECTORY - destination directory at cache mount (will be created if not exists)"
+    echo ""
+    echo "Example:"
+    echo ""
+    echo "  $CLI_NAME write-to-dir mina-devnet*.deb mina-archive*.deb debians"
+    echo ""
+    echo " Above command will write all matching files to CACHE_MOUNTPOINT/BUILDKITE_BUILD_ID/debians/"
+    echo ""
+    exit 0
+}
+
+# Write multiple files to a cache directory
+function write-to-dir(){
+    if [[ "$#" == 0 ]]; then
+        write-to-dir_help;
+    fi
+
+    local __override=0
+    local __root="$BUILDKITE_BUILD_ID"
+    local __inputs=()
+    local __to=""
+
+    while [ "$#" -gt 0 ]; do
+        error_message="Error: a value is needed for '$1'";
+        case $1 in
+            -h | --help )
+                write-to-dir_help;
+            ;;
+            -o | --override )
+                __override=1
+                shift 1;
+            ;;
+            -r | --root )
+                __root=${2:?$error_message}
+                shift 2;
+            ;;
+            * )
+                # Collect all but last argument as inputs
+                if [[ "$#" -eq 1 ]]; then
+                    __to=$CACHE_BASE_URL/$__root/"$1"
+                    shift 1;
+                    continue
+                fi
+                __inputs+=("$1")
+                shift 1;
+            ;;
+        esac
+    done
+
+    if [[ -z "$__to" ]]; then
+        echo -e "${RED} !! Missing destination directory ('to')${CLEAR}\n";
+        write-to-dir_help;
+    fi
+
+    if [[ $__override == 1 ]]; then
+        EXTRA_FLAGS=""
+    else
+        EXTRA_FLAGS="-f"
+    fi
+
+    # Destination is treated as a directory - create it
+    mkdir -p "$__to"
+
+    for input_path in "${__inputs[@]}"; do
+        echo "..Copying $input_path -> $__to"
+        if ! cp -R ${EXTRA_FLAGS} $input_path "$__to"; then
+            echo -e "${RED} !! There are some errors while copying files to cache. Exiting... ${CLEAR}\n";
+            exit 2
+        fi
+    done
+}
 # Main function to handle the CLI
 function main(){
     if (( "$#" == 0 )); then
@@ -275,7 +364,7 @@ function main(){
         help )
             main_help 0;
         ;;
-        read | write )
+        read | write | write-to-dir )
             $1 "${@:2}";
         ;;
         *)
