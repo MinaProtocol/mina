@@ -59,15 +59,6 @@ var caml_fq_srs_lagrange_commitments_whole_domain = function (srs, domain_size) 
 // Requires: tsSrs
 var caml_fp_srs_lagrange_commitment = tsSrs.fp.lagrangeCommitment;
 
-// Provides: caml_fp_srs_to_bytes_external
-// Requires: plonk_wasm
-var caml_fp_srs_to_bytes_external = function (srs) {
-    if (plonk_wasm.native == true) {
-        return plonk_wasm.caml_fp_srs_to_bytes_external(srs);
-    }
-    return srs.serialize();
-};
-
 // Provides: caml_fp_srs_from_bytes_external
 // Requires: plonk_wasm
 var caml_fp_srs_from_bytes_external = function (bytes) {
