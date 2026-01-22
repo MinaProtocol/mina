@@ -318,6 +318,7 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 			if time.Now().After(timeOutInstant) {
 				return nil, fmt.Errorf("Node %s haven't create activated file, meaning it's not completed auto config generation: %w", e.Name(), err)
 			}
+			t.Logger.Info("No auto fork config is completed for node %s, waiting to poll again...", e.Name())
 			time.Sleep(10 * time.Second)
 			_, err = os.Stat(activatedFile)
 		}
