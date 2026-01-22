@@ -850,6 +850,8 @@ load_config() {
         echo "Error: Config file '${config_file}' does not exist, can't inherit." >&2
         exit 1
       fi
+      echo "Inheriting config file ${config_file}:"
+      cat "${config_file}"
       ;;
 
     reset)
