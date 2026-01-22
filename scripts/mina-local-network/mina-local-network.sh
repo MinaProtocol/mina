@@ -901,6 +901,15 @@ update_genesis_timestamp() {
     fixed:*)
       local timestamp="${1#fixed:}"
       echo "Updating Genesis State timestamp to ${timestamp}..."
+      local overridden_unix=$(date -d "$timestamp" +%s)
+      local now_unix=$(date +%s)
+      # NOTE: will there's still race condition that before all nodes are 
+      # spawned up we passed this time. We should catch the improperly-set 
+      # genesis in most case
+      if (( overridden_unix < now_unix )); then
+        echo "Spawning a network with genesis $timestamp in the past!!"
+        return 1
+      fi
       jq-inplace ".genesis.genesis_state_timestamp=\"${timestamp}\"" "${CONFIG}"
       ;;
     delay_sec:*)
