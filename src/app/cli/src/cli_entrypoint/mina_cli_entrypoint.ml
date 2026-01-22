@@ -637,6 +637,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               ~redirect_stderr:`Dev_null () )
           else Option.iter working_dir ~f:Caml.Sys.chdir
         in
+        (* NOTE: invocation of memtrace must happen after daemonization *)
+        Memtrace.trace_if_requested ~context:"mina" () ;
         Stdout_log.setup log_json log_level ;
         (* 512MB logrotate max size = 1GB max filesystem usage *)
         let logrotate_max_size = 1024 * 1024 * 10 in
