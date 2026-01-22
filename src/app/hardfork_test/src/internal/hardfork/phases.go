@@ -296,6 +296,8 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 		return block.Slot >= t.Config.SlotChainEnd
 	}, "Best tip to reach slot chain end", time.Duration(t.Config.MainSlot*t.Config.SlotChainEnd)*time.Second)
 
+	t.Logger.Info("Some node have best tip slot slot-chain-end, checking all nodes local state to see if auto fork config is generated sucessfully")
+
 	timeOutInstant := time.Now().Add(time.Duration(t.Config.MainSlot * 2))
 
 	for _, e := range entries {
@@ -347,6 +349,8 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 		if err != nil {
 			return nil, err
 		}
+
+		t.Logger.Info("Node %s has successfully generated an auto fork config", e.Name())
 	}
 
 	if !seenForkConfig {
