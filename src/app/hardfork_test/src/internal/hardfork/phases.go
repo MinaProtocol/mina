@@ -89,8 +89,6 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) (*BlockAnalysisR
 
 type ForkDataAndUsage interface {
 	generateLocalNetworkParam() string
-	// config     string
-	// ledgersDir string
 }
 
 type ConfigWithLedgers struct {
