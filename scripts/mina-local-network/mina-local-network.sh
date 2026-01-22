@@ -334,7 +334,7 @@ exec-daemon() {
 }
 
 # Executes the Mina Snark Worker
-exec-worker-daemon() {
+exec-snark-worker() {
   COORDINATOR_PORT=${1}
   shift
   COORDINATOR_HOST_AND_PORT="localhost:${COORDINATOR_PORT}"
@@ -367,56 +367,59 @@ exec-rosetta-node() {
     --graphql-uri $((SEED_START_PORT + 1)) \
     --port "${ROSETTA_PORT}" \
     --log-level "${LOG_LEVEL}" \
-    $@ &
+    $@
+}
+
+log-file() {
+  if [[ "$REDIRECT_LOGS" == true ]]; then
+    tee "${FOLDER}/log.txt"
+  else
+    cat
+  fi
+}
+
+tag-stdout() {
+  awk -v tag="$1" '{ print "[" tag "] " $0 }'
 }
 
 # Spawns the Node in background
 spawn-node() {
-  FOLDER=${1}
-  shift
-  # shellcheck disable=SC2068
+  local tag=${1}
+  FOLDER=${2}
+  shift 2
 
-  if [ "${REDIRECT_LOGS}" = true ]; then
-    exec-daemon $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
-  else
-    exec-daemon $@ -config-directory "${FOLDER}" &
-  fi
+  # shellcheck disable=SC2068
+  exec-daemon $@ --config-directory "$FOLDER" 2>&1 \
+    | log-file | tag-stdout "$tag" &
 }
 
 # Spawns worker in background
 # Optionally redirect worker logs to file if REDIRECT_WORKER_LOGS is true
-spawn-worker() {
-  FOLDER=${1}
-  shift
+spawn-snark-worker() {
+  local tag=${1}
+  FOLDER=${2}
+  shift 2
+
   # shellcheck disable=SC2068
-  if [ "${REDIRECT_WORKER_LOGS}" = true ]; then
-    exec-worker-daemon $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
-  else
-    exec-worker-daemon $@ -config-directory "${FOLDER}" &
-  fi
+  exec-snark-worker $@ --config-directory "${FOLDER}" 2>&1 \
+    | log-file | tag-stdout "$tag" &
 }
 
 # Spawns the Archive Node in background
 spawn-archive-node() {
   FOLDER=${1}
   shift
+
   # shellcheck disable=SC2068
-  if [ "${REDIRECT_LOGS}" = true ]; then
-    exec-archive-node $@ &>"${FOLDER}"/log.txt &
-  else
-    exec-archive-node $@ &
-  fi
+  exec-archive-node $@ 2>&1 | log-file | tag-stdout "archive" &
 }
 
 spawn-rosetta-server() {
   FOLDER=${1}
   shift
+
   # shellcheck disable=SC2068
-  if [ "${REDIRECT_LOGS}" = true ]; then
-    exec-rosetta-node $@ &>"${FOLDER}"/log.txt &
-  else
-    exec-rosetta-node $@ &
-  fi
+  exec-rosetta-node $@ 2>&1 | log-file | tag-stdout "rosetta" &
 }
 
 # Resets genesis ledger
@@ -1000,7 +1003,7 @@ case "${SEED}" in
     if ${DEMO_MODE}; then
       echo "Running in demo mode, an amalgamation node is going to be started."
       printf "\n"
-      spawn-node ${NODES_FOLDER}/seed ${SEED_START_PORT} \
+      spawn-node seed ${NODES_FOLDER}/seed ${SEED_START_PORT} \
         -block-producer-key ${ROOT}/online_whale_keys/online_whale_account_0 \
         --run-snark-worker "$(cat ${ROOT}/snark_coordinator_keys/snark_coordinator_account.pub)" \
         --snark-worker-fee 0.001 \
@@ -1009,7 +1012,7 @@ case "${SEED}" in
         --seed \
         ${ARCHIVE_ADDRESS_CLI_ARG}
     else
-      spawn-node "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY} "${ARCHIVE_ADDRESS_CLI_ARG}"
+      spawn-node seed "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY} "${ARCHIVE_ADDRESS_CLI_ARG}"
     fi
     SEED_PID=$!
 
@@ -1046,7 +1049,7 @@ elif [[ -z "${SNARK_COORDINATOR_PORT}" ]]; then
 else
 
   SNARK_COORDINATOR_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-coordinator ${SNARK_COORDINATOR_PUBKEY} -work-selection seq"
-  spawn-node "${NODES_FOLDER}"/snark_coordinator "${SNARK_COORDINATOR_PORT}" -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} ${SNARK_COORDINATOR_FLAGS}
+  spawn-node snark_coordinator "${NODES_FOLDER}"/snark_coordinator "${SNARK_COORDINATOR_PORT}" -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} ${SNARK_COORDINATOR_FLAGS}
   SNARK_COORDINATOR_PID=$!
 
   echo 'Waiting for snark coordinator to go up...'
@@ -1062,7 +1065,7 @@ fi
 for ((i = 0; i < SNARK_WORKERS_COUNT; i++)); do
   FOLDER=${NODES_FOLDER}/snark_workers/worker_${i}
   mkdir -p "${FOLDER}"
-  spawn-worker "${FOLDER}" "${SNARK_COORDINATOR_PORT}"
+  spawn-snark-worker "snark_worker_${i}" "${FOLDER}" "${SNARK_COORDINATOR_PORT}"
   SNARK_WORKERS_PIDS[${i}]=$!
 done
 
@@ -1072,7 +1075,7 @@ for ((i = 0; i < WHALES; i++)); do
   FOLDER=${NODES_FOLDER}/whale_${i}
   KEY_FILE=${ROOT}/online_whale_keys/online_whale_account_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((WHALE_START_PORT + i * 6)) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
+  spawn-node "whale_${i}" "${FOLDER}" $((WHALE_START_PORT + i * 6)) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
     -libp2p-keypair "${ROOT}"/libp2p_keys/whale_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   WHALE_PIDS[${i}]=$!
 done
@@ -1083,7 +1086,7 @@ for ((i = 0; i < FISH; i++)); do
   FOLDER=${NODES_FOLDER}/fish_${i}
   KEY_FILE=${ROOT}/online_fish_keys/online_fish_account_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((FISH_START_PORT + i * 6)) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
+  spawn-node "fish_${i}" "${FOLDER}" $((FISH_START_PORT + i * 6)) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
     -libp2p-keypair "${ROOT}"/libp2p_keys/fish_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   FISH_PIDS[${i}]=$!
 done
@@ -1093,7 +1096,7 @@ done
 for ((i = 0; i < NODES; i++)); do
   FOLDER=${NODES_FOLDER}/node_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((NODE_START_PORT + i * 6)) -peer ${SEED_PEER_ID} \
+  spawn-node "plain_${i}" "${FOLDER}" $((NODE_START_PORT + i * 6)) -peer ${SEED_PEER_ID} \
     -libp2p-keypair "${ROOT}"/libp2p_keys/node_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   NODE_PIDS[${i}]=$!
 done
