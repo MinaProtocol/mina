@@ -20,7 +20,7 @@ function find_most_recent_numeric_tag() {
     echo $TAG
 }
 
-GITHASH_CONFIG=${OVERRIDE_GITHASH:-$(git rev-parse --short=8 --verify HEAD)}
+GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 # Remove last character to get 7-character short hash
 GITHASH=${GITHASH_CONFIG%?}
 THIS_COMMIT_TAG=${OVERRIDE_TAG:-$(git tag --points-at HEAD)}
