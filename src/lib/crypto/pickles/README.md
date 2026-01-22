@@ -87,6 +87,13 @@ library. Refer to the file header for a content description:
   - [`Tag`](tag.mli)
 - Algebraic objects:
   - [`Plonk_curve_ops`](plonk_curve_ops.mli)
+- Circuit entry points:
+  - [`Step_main`](step_main.mli) - Step circuit logic (runs on Tick/Vesta)
+  - [`Wrap_main`](wrap_main.mli) - Wrap circuit logic (runs on Tock/Pallas)
+  - [`Step_verifier`](step_verifier.mli) - Verification within step circuits
+  - [`Wrap_verifier`](wrap_verifier.mli) - Verification within wrap circuits
+- Type definitions:
+  - [`Composition_types`](composition_types/) - Core data structures for proofs
 
 ## Resources
 
