@@ -91,36 +91,6 @@ module Shifts = struct
     Shifted_value.Type1.Shift.create (module Backend.Tick.Field)
 end
 
-module Lookup_parameters = struct
-  let tick_zero : _ Composition_types.Zero_values.t =
-    Composition_types.Zero_values.
-      { value =
-          { challenge = Challenge.Constant.zero
-          ; scalar =
-              Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
-          }
-      ; var =
-          { challenge = Impls.Step.Field.zero
-          ; scalar =
-              Shifted_value.Type2.Shifted_value
-                (Impls.Step.Field.zero, Impls.Step.Boolean.false_)
-          }
-      }
-
-  let tock_zero : _ Composition_types.Zero_values.t =
-    Composition_types.Zero_values.
-      { value =
-          { challenge = Challenge.Constant.zero
-          ; scalar =
-              Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
-          }
-      ; var =
-          { challenge = Impls.Wrap.Field.zero
-          ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
-          }
-      }
-end
-
 let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
   | Kimchi_types.Finite (x, y) ->
       (x, y)

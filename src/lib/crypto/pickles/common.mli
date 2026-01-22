@@ -138,27 +138,6 @@ module Shifts : sig
   val tock2 : Backend.Tock.Field.t Pickles_types.Shifted_value.Type2.Shift.t
 end
 
-(** {2 Lookup Parameters} *)
-
-(** Zero values for lookup arguments. These are used when lookup arguments
-    are inactive or at circuit boundaries where no actual lookup is performed. *)
-module Lookup_parameters : sig
-  (** Type alias for zero values used in lookup computations. *)
-  type ('a, 'b) zero_value :=
-    ( Import.Challenge.Constant.t
-    , 'a
-    , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
-    , 'b Pickles_types.Shifted_value.Type2.t )
-    Composition_types.Zero_values.t
-
-  (** Zero value for Tick (step) circuits with Type2 field representation. *)
-  val tick_zero :
-    (Impls.Step.Field.t, Impls.Step.Field.t * Impls.Step.Boolean.var) zero_value
-
-  (** Zero value for Tock (wrap) circuits with simple field representation. *)
-  val tock_zero : (Impls.Wrap.Field.t, Impls.Wrap.Field.t) zero_value
-end
-
 (** {2 Inner Product Argument (IPA)} *)
 
 (** IPA helper functions for computing challenges and verifying accumulators.
