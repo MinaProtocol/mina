@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
-
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
@@ -275,39 +273,6 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 	}, nil
 }
 
-func waitForFileCreation(path string, timeout time.Duration) error {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return err
-	}
-	defer watcher.Close()
-
-	err = watcher.Add(path)
-	if err != nil {
-		return err
-	}
-
-	timeoutChan := time.After(timeout)
-	for {
-		select {
-		case event, ok := <-watcher.Events:
-			if !ok {
-				return fmt.Errorf("File %s is not created on watcher exited", path)
-			}
-			if event.Has(fsnotify.Create) {
-				return nil
-			}
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				return fmt.Errorf("File %s is not created on watcher exited", path)
-			}
-			return err
-		case <-timeoutChan:
-			return fmt.Errorf("File %s is not created on timeout", path)
-		}
-	}
-}
-
 func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) (*ForkData, error) {
 
 	// NOTE: Auto mode differs from either Legacy/Advanced fork mode in that each
@@ -333,6 +298,8 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 		return block.Slot >= t.Config.SlotChainEnd
 	}, "Best tip to reach slot chain end", time.Duration(t.Config.MainSlot*t.Config.SlotChainEnd)*time.Second)
 
+	timeOutInstant := time.Now().Add(time.Duration(t.Config.MainSlot * 2))
+
 	for _, e := range entries {
 		if !e.IsDir() {
 			return nil, fmt.Errorf("Unexpected file %s in node directory %s", e.Name(), nodesDir)
@@ -347,12 +314,12 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 		activatedFile := filepath.Join(forkConfigBase, "activated")
 
 		_, err = os.Stat(activatedFile)
-		if err != nil {
-			// Maybe the auto fork config haven't been generated yet, wait for it.
-			err = waitForFileCreation(activatedFile, time.Duration(t.Config.MainSlot*2))
-			if err != nil {
+		for err != nil {
+			if time.Now().After(timeOutInstant) {
 				return nil, fmt.Errorf("Node %s haven't create activated file, meaning it's not completed auto config generation: %w", e.Name(), err)
 			}
+			time.Sleep(10 * time.Second)
+			_, err = os.Stat(activatedFile)
 		}
 
 		currentForkConfigBytes, err := os.ReadFile(filepath.Join(forkConfigBase, "daemon.json"))
