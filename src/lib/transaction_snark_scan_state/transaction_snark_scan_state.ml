@@ -56,7 +56,7 @@ module Transaction_with_witness = struct
     ; hash : Aux_hash.t
     }
 
-  let hash (v : Stable.Latest.t) : string =
+  let hash (v : Stable.Latest.t) : Aux_hash.t =
     let h = Digestif.SHA256.init () in
     let h =
       Binable.to_string (module Stable.Latest) v
@@ -245,9 +245,8 @@ let hash_generic :
  fun ~ledger_proof_hash ~tx_witness_hash
      (parallel_scan_state, previous_incomplete_zkapp_updates) ->
   let state_hash =
-    Parallel_scan.State.hash parallel_scan_state
-      (fun x -> ledger_proof_hash x)
-      (fun x -> tx_witness_hash x)
+    Parallel_scan.State.hash parallel_scan_state ledger_proof_hash
+      tx_witness_hash
   in
   let ( previous_incomplete_zkapp_updates
       , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
