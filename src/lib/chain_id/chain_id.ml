@@ -34,8 +34,7 @@ let of_inputs (inputs : Inputs.t) =
   let b2 =
     Blake2.digest_string
       ( genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash
-      ^ protocol_transaction_version_digest ^ protocol_network_version_digest
-      )
+      ^ protocol_transaction_version_digest ^ protocol_network_version_digest )
   in
   Blake2.to_hex b2
 

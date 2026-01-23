@@ -1,4 +1,4 @@
-type t  [@@deriving equal]
+type t [@@deriving equal]
 
 val to_string : t -> string
 
