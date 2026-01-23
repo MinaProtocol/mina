@@ -95,7 +95,7 @@ module Root_test = struct
 
   let check_converting_open ~primary_dir ~hardfork_slot =
     let module Converting_ledger = L.Make_converting (struct
-      let convert = Account.Hardfork.migrate_from_berkeley ~hardfork_slot
+      let convert = Account.Hardfork.migrate_to_mesa ~hardfork_slot
     end) in
     Converting_ledger.(
       create
