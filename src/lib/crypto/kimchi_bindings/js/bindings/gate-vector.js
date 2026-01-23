@@ -42,14 +42,14 @@ var caml_pasta_fp_plonk_gate_vector_wrap = function (vector, target, head) {
 };
 
 // Provides: caml_pasta_fp_plonk_gate_vector_digest
-// Requires: plonk_wasm, caml_bytes_of_uint8array, Uint8Array
+// Requires: plonk_wasm, caml_bytes_of_uint8array
 var caml_pasta_fp_plonk_gate_vector_digest = function (public_input_size, gate_vector) {
     var bytes = plonk_wasm.caml_pasta_fp_plonk_gate_vector_digest(
         public_input_size,
         gate_vector
     );
-    if (!(bytes instanceof Uint8Array)) {
-        bytes = Uint8Array.from(bytes);
+    if (!(bytes instanceof globalThis.Uint8Array)) {
+        bytes = globalThis.Uint8Array.from(bytes);
     }
     return caml_bytes_of_uint8array(bytes);
 };
@@ -105,14 +105,14 @@ var caml_pasta_fq_plonk_gate_vector_wrap = function (vector, target, head) {
 };
 
 // Provides: caml_pasta_fq_plonk_gate_vector_digest
-// Requires: plonk_wasm, caml_bytes_of_uint8array, Uint8Array
+// Requires: plonk_wasm, caml_bytes_of_uint8array
 var caml_pasta_fq_plonk_gate_vector_digest = function (public_input_size, gate_vector) {
     var bytes = plonk_wasm.caml_pasta_fq_plonk_gate_vector_digest(
         public_input_size,
         gate_vector
     );
-    if (!(bytes instanceof Uint8Array)) {
-        bytes = Uint8Array.from(bytes);
+    if (!(bytes instanceof globalThis.Uint8Array)) {
+        bytes = globalThis.Uint8Array.from(bytes);
     }
     return caml_bytes_of_uint8array(bytes);
 };

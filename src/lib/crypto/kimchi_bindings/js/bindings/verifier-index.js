@@ -9,7 +9,7 @@ var caml_pasta_fp_plonk_verifier_index_create = function (x) {
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_shifts
-// Requires: plonk_wasm, tsRustConversion, console
+// Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fq_plonk_verifier_index_shifts = function (log2_size) {
   try {
     var shifts = plonk_wasm.caml_pasta_fq_plonk_verifier_index_shifts(log2_size);
@@ -17,7 +17,7 @@ var caml_pasta_fq_plonk_verifier_index_shifts = function (log2_size) {
       shifts
     );
   } catch (e) {
-    console.error("Error calling caml_pasta_fq_plonk_verifier_index_shifts:", e);
+    globalThis.console.error("Error calling caml_pasta_fq_plonk_verifier_index_shifts:", e);
     throw e;
   }
 };

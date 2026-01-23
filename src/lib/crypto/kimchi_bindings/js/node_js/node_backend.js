@@ -1,15 +1,12 @@
 // Provides: plonk_wasm
-// Requires: process, Set
 var plonk_wasm = (function () {
   var wasm = require('./plonk_wasm.js');
 
   try {
-    var native = require('@o1js/native-' + process.platform + '-' + process.arch)
+    var native = require('@o1js/native-' + globalThis.process.platform + '-' + globalThis.process.arch)
 
-    // THIS IS A RUNTIME OVERRIDE
-    // YOU HAVE TO RUN IT TO SEE IF IT BREAKS
-    // IT WON'T CRASH UNLESS O1JS_REQUIRE_NATIVE_BINDINGS
-    // IS SET
+    // THIS IS A RUNTIME OVERRIDE, YOU HAVE TO RUN IT TO SEE IF IT BREAKS
+    // IT WON'T CRASH UNLESS O1JS_REQUIRE_NATIVE_BINDINGS IS SET
     var overrides = [
       "prover_to_json",
       "prover_index_fp_deserialize",

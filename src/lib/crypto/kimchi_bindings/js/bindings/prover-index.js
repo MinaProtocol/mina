@@ -86,7 +86,7 @@ var caml_pasta_fp_plonk_index_deserialize = function (index) {
 };
 
 // Provides: caml_pasta_fp_plonk_index_create
-// Requires: plonk_wasm, tsRustConversion, console
+// Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fp_plonk_index_create = function (
     gates,
     public_inputs,
@@ -104,10 +104,10 @@ var caml_pasta_fp_plonk_index_create = function (
     var gate_vec = gates;
     var urs_ser = urs;
     if (plonk_wasm.native == true) {
-        console.time("conversion plonk index create")
+        globalThis.console.time("conversion plonk index create")
         gate_vec = plonk_wasm.caml_pasta_fp_plonk_gate_vector_from_bytes(gates.serialize())
         urs_ser = plonk_wasm.caml_fp_srs_from_bytes_external(urs.serialize())
-        console.timeEnd("conversion plonk index create")
+        globalThis.console.timeEnd("conversion plonk index create")
     }
     var t = plonk_wasm.caml_pasta_fp_plonk_index_create(
         gate_vec,
@@ -195,7 +195,7 @@ var caml_pasta_fq_plonk_index_deserialize = function (index) {
 };
 
 // Provides: caml_pasta_fq_plonk_index_create
-// Requires: plonk_wasm, tsRustConversion, console
+// Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fq_plonk_index_create = function (
     gates,
     public_inputs,
@@ -214,10 +214,10 @@ var caml_pasta_fq_plonk_index_create = function (
     var gate_vec = gates;
     var urs_ser = urs;
     if (plonk_wasm.native == true) {
-        console.time("conversion plonk index create")
+        globalThis.console.time("conversion plonk index create")
         gate_vec = plonk_wasm.caml_pasta_fq_plonk_gate_vector_from_bytes(gates.serialize())
         urs_ser = plonk_wasm.caml_fq_srs_from_bytes_external(urs.serialize())
-        console.timeEnd("conversion plonk index create")
+        globalThis.console.timeEnd("conversion plonk index create")
     }
 
     var t = plonk_wasm.caml_pasta_fq_plonk_index_create(
