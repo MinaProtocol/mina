@@ -28,7 +28,7 @@ module type With_accessors = sig
   val set_primary_input_size : t -> int -> unit
 
   (** Get the number of auxiliary (private witness) inputs. *)
-  val get_auxiliary_input_size : t -> int
+  val get_auxiliary_input_size : t -> int Set_once.t
 
   (** Set the number of auxiliary (private witness) inputs. *)
   val set_auxiliary_input_size : t -> int -> unit

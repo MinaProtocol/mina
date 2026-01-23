@@ -965,7 +965,7 @@ module Make
 
   val set_primary_input_size : t -> int -> unit
 
-  val get_auxiliary_input_size : t -> int
+  val get_auxiliary_input_size : t -> int Set_once.t
 
   val set_auxiliary_input_size : t -> int -> unit
 
@@ -1201,7 +1201,10 @@ end = struct
     }
 
   (** Returns the number of auxiliary inputs. *)
-  let get_auxiliary_input_size t = t.auxiliary_input_size
+  let get_auxiliary_input_size t =
+    let set_once = Set_once.create () in
+    Set_once.set_exn set_once [%here] t.auxiliary_input_size ;
+    set_once
 
   (** Returns the number of public inputs. *)
   let get_primary_input_size t = Set_once.get_exn t.public_input_size [%here]

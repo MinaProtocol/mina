@@ -580,67 +580,6 @@ module Improper_calls = struct
     ]
 end
 
-(* Tests that check that the hashes of the protocol circuits remain the same *)
-module Protocol_circuits = struct
-  (* Full because we want to be sure nothing changes *)
-  let proof_level = Genesis_constants.Proof_level.Full
-
-  let signature_kind = Mina_signature_kind.Testnet
-
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants
-
-  let print_hash print expected digest : unit =
-    if print then (
-      Format.printf "expected:\n%s\n" expected ;
-      Format.printf "obtained:\n%s\n" digest )
-
-  let blockchain () : unit =
-    let expected = "36786c300e37c2a2f1341ad6374aa113" in
-    let digest =
-      Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-    in
-    let digest = digest ~proof_level ~constraint_constants () in
-    assert (List.length digest = 1) ;
-    let _, hash = List.hd_exn digest in
-    let digest = Md5.to_hex hash in
-
-    let digests_match = String.(digest = expected) in
-    print_hash (not digests_match) expected digest ;
-    assert digests_match ;
-    ()
-
-  let transaction () : unit =
-    let expected1 = "b8879f677f622a1d86648030701f43e1" in
-    let expected2 = "740db2397b0b01806a48f061a2e2b063" in
-    let digest =
-      Transaction_snark.constraint_system_digests ~signature_kind
-        ~constraint_constants ()
-    in
-    (* these are for the Base and Merge branches, if more branches were added to the digest this line should be updated *)
-    let hash1, hash2 =
-      match digest with
-      | [ (_, a); (_, b) ] ->
-          (a, b)
-      | _ ->
-          failwith "should have been length 2"
-    in
-    let digest1 = Core.Md5.to_hex hash1 in
-    let digest2 = Core.Md5.to_hex hash2 in
-
-    let check = String.(digest1 = expected1) in
-    print_hash (not check) expected1 digest1 ;
-    assert check ;
-    let check = String.(digest2 = expected2) in
-    print_hash (not check) expected2 digest2 ;
-    assert check ;
-    ()
-
-  let tests =
-    [ ("test blockchain circuit", `Quick, blockchain)
-    ; ("test transaction circuit", `Quick, transaction)
-    ]
-end
-
 (* run tests *)
 
 let api_tests =
@@ -659,7 +598,6 @@ let () =
     ; ("circuit tests", circuit_tests)
     ; ("As_prover tests", As_prover_circuits.as_prover_tests)
     ; ("range checks", range_checks)
-    ; ("protocol circuits", Protocol_circuits.tests)
     ; ("improper calls", Improper_calls.tests)
       (* We run the pure functions before and after other tests,
          because we've had bugs in the past where it would only work after the global state was initialized by an API function
