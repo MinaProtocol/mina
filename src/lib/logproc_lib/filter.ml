@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Ast = struct
   type value = Bool of bool | String of string | Int of int
@@ -210,7 +210,10 @@ module Parser = struct
         >>| String.concat ~sep:""
       in
       char '/' *> commit *> inner
-      <* commit >>| (* TODO: handle gracefully *) Re2.create_exn
+      <* commit
+      >>|
+      (* TODO: handle gracefully *)
+      Re2.create_exn
     in
     lift2
       (fun value f -> f value)
@@ -310,7 +313,7 @@ module Interpreter = struct
         |> Option.value ~default:false
     | Cmp_neq (x, y) ->
         Option.map2 (interpret_value_exp json x) (interpret_value_exp json y)
-          ~f:(fun json1 json2 -> not (Yojson.Safe.equal json1 json2))
+          ~f:(fun json1 json2 -> not (Yojson.Safe.equal json1 json2) )
         |> Option.value ~default:false
     | Cmp_in (x, y) ->
         Option.map2 (interpret_value_exp json x) (interpret_value_exp json y)

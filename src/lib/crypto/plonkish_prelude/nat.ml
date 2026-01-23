@@ -63,7 +63,7 @@ module N0 = struct
 
   let add m = (m, Adds.Z)
 
-  let eq = Core_kernel.Type_equal.T
+  let eq = Core.Type_equal.T
 end
 
 module Add = struct
@@ -72,7 +72,7 @@ module Add = struct
 
     type n
 
-    val eq : (n, z plus_n) Core_kernel.Type_equal.t
+    val eq : (n, z plus_n) Core.Type_equal.t
 
     val n : z plus_n t
 
@@ -92,7 +92,7 @@ module Add = struct
 
           let n = S N.n
 
-          let eq = Core_kernel.Type_equal.T
+          let eq = Core.Type_equal.T
 
           let add t =
             let t_plus_n, pi = N.add t in
@@ -110,7 +110,7 @@ module Add = struct
 
     type n = z plus_n
 
-    val eq : (n, z plus_n) Core_kernel.Type_equal.t
+    val eq : (n, z plus_n) Core.Type_equal.t
 
     val n : z plus_n t
 
@@ -129,7 +129,7 @@ module S (N : Add.Intf) = struct
     let k, pi = N.add m in
     (S k, Adds.S pi)
 
-  let eq = match N.eq with T -> Core_kernel.Type_equal.T
+  let eq = match N.eq with T -> Core.Type_equal.T
 end
 
 module N1 = S (N0)
@@ -191,11 +191,10 @@ module Not = struct
   type 'a t = 'a -> Empty.t
 end
 
-open Core_kernel
+open Core
 
-let rec compare :
-    type n m. n t -> m t -> [ `Lte of (n, m) Lte.t | `Gt of (n, m) Lte.t Not.t ]
-    =
+let rec compare : type n m.
+    n t -> m t -> [ `Lte of (n, m) Lte.t | `Gt of (n, m) Lte.t Not.t ] =
  fun n m ->
   match (n, m) with
   | Z, _ ->
@@ -212,8 +211,8 @@ let rec compare :
 let lte_exn n m =
   match compare n m with `Lte pi -> pi | `Gt _gt -> failwith "lte_exn"
 
-let rec gt_implies_gte :
-    type n m. n nat -> m nat -> (n, m) Lte.t Not.t -> (m, n) Lte.t =
+let rec gt_implies_gte : type n m.
+    n nat -> m nat -> (n, m) Lte.t Not.t -> (m, n) Lte.t =
  fun n m not_lte ->
   match (n, m) with
   | Z, _ ->
@@ -223,8 +222,7 @@ let rec gt_implies_gte :
   | S n, S m ->
       S (gt_implies_gte n m (fun pi -> not_lte (S pi)))
 
-let rec eq :
-    type n m.
+let rec eq : type n m.
        n nat
     -> m nat
     -> [ `Equal of (n, m) Type_equal.t

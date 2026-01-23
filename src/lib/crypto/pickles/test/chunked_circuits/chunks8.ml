@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 open Pickles.Impls.Step
 
@@ -7,7 +7,7 @@ let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 let () = Pickles.Backend.Tock.Keypair.set_urs_info []
 
 let test () =
-  let t11 = Sys.time () in
+  let t11 = Sys_unix.now () in
   let _tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit

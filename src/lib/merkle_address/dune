@@ -19,13 +19,16 @@
   test_util)
  (preprocess
   (pps
-   ppx_mina
-   ppx_version
-   ppx_jane
-   ppx_hash
+   ppx_assert
+   ppx_bitstring
    ppx_compare
    ppx_deriving_yojson
-   ppx_bitstring))
+   ppx_hash
+   ppx_inline_test
+   ppx_let
+   ppx_mina
+   ppx_sexp_conv
+   ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Address for merkle database representations"))

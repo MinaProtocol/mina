@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Import
 module SC = Scalar_challenge
 
@@ -43,7 +43,7 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
   let bits_msb =
     lazy
       (let open Field.Constant in
-      unpack !!scalar |> Fn.flip List.take num_bits |> Array.of_list_rev)
+       unpack !!scalar |> Fn.flip List.take num_bits |> Array.of_list_rev )
   in
   let nybbles_per_row = 8 in
   let bits_per_row = 2 * nybbles_per_row in
@@ -147,7 +147,8 @@ let to_field_constant (type f) ~endo
 module Make
     (Impl : Kimchi_pasta_snarky_backend.Snark_intf)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
-    (Challenge : Challenge.S with module Impl := Impl) (Endo : sig
+    (Challenge : Challenge.S with module Impl := Impl)
+    (Endo : sig
       val base : Impl.Field.Constant.t
 
       val scalar : G.Constant.Scalar.t
@@ -179,8 +180,8 @@ struct
     let bits =
       lazy
         (let open Field.Constant in
-        unpack !!scalar |> Fn.flip List.take num_bits
-        |> Array.of_list_rev_map ~f:(fun b -> if b then one else zero))
+         unpack !!scalar |> Fn.flip List.take num_bits
+         |> Array.of_list_rev_map ~f:(fun b -> if b then one else zero) )
     in
     let bits () = Lazy.force bits in
     let xt, yt = Tuple_lib.Double.map t ~f:seal in
@@ -267,7 +268,7 @@ struct
           As_prover.(
             fun () ->
               let x = Constant.to_field (read typ chal) in
-              G.Constant.scale (read G.typ g) Scalar.(one / x))
+              G.Constant.scale (read G.typ g) Scalar.(one / x) )
     in
     let x, y = endo res chal in
     Field.Assert.(equal gx x ; equal gy y) ;

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let test_hex_conversion () =
   let module Bigint = Kimchi_pasta_snarky_backend.Bigint256 in

@@ -1,5 +1,5 @@
 module S = Sponge
-open Core_kernel
+open Core
 open Util
 module SC = Scalar_challenge
 open Pickles_types
@@ -136,7 +136,7 @@ struct
   module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
 
   let _product m f =
-    Core_kernel.List.reduce_exn (Core_kernel.List.init m ~f) ~f:Field.( * )
+    Core.List.reduce_exn (Core.List.init m ~f) ~f:Field.( * )
 
   let absorb sponge ty t =
     absorb
@@ -315,7 +315,7 @@ struct
            ~f_opt:(function
              | Opt.Nothing ->
                  Opt.Nothing
-             | Opt.Maybe (b, x) ->
+             | Opt.Maybe ((b : Boolean.var), x) ->
                  Opt.Maybe
                    ( Boolean.Unsafe.of_cvar (Util.Wrap.seal (b :> t))
                    , Array.map ~f:(Double.map ~f:Util.Wrap.seal) x )
@@ -1597,7 +1597,7 @@ struct
               let a =
                 Evals.In_circuit.to_list e
                 |> List.map ~f:(function
-                     | Nothing ->
+                     | Plonkish_prelude.Opt.Nothing ->
                          [||]
                      | Just a ->
                          Array.map a ~f:Pickles_types.Opt.just

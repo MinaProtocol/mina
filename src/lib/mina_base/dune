@@ -19,7 +19,6 @@
   integers
   ppx_inline_test.config
   result
-  sexp_diff_kernel
   sexplib0
   yojson
   ;; local libraries

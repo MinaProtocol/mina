@@ -1,3 +1,5 @@
+open Core
+
 let naive_num_bits n =
   let rec go k =
     match Int.pow 2 k with

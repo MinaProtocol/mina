@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 type uuid := Uuid.Stable.V1.t
 

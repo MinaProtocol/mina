@@ -17,7 +17,7 @@ val get : t -> int -> char
 
 val length : t -> int
 
-val create : ?max_mem_waiting_gc:Core_kernel__Byte_units0.t -> int -> t
+val create : ?max_mem_waiting_gc:Core__Byte_units0.t -> int -> t
 
 val to_string : ?pos:int -> ?len:int -> t -> string
 

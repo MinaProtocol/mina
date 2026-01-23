@@ -1,6 +1,6 @@
 (** Compile the inductive rules *)
 
-open Core_kernel
+open Core
 open Async_kernel
 open Pickles_types
 open Hlist

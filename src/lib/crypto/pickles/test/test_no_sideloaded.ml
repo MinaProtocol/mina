@@ -13,7 +13,7 @@ let () = Pickles.Backend.Tock.Keypair.set_urs_info []
 
 let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 
-let () = Core_kernel.Backtrace.elide := false
+let () = Core.Backtrace.elide := false
 
 open Impls.Step
 

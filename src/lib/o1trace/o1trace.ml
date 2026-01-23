@@ -1,8 +1,8 @@
-open Core_kernel
+open Core
 open Async
 module Execution_timer = Execution_timer
 module Plugins = Plugins
-module Thread = Thread
+module Thread = O1thread
 
 (* TODO: this should probably go somewhere else (mina_cli_entrypoint or coda_run) *)
 let () = Plugins.enable_plugin (module Execution_timer)
@@ -118,7 +118,7 @@ let sync_thread name f =
           result )
 
 let () =
-  Stdlib.(Async_kernel.Tracing.fns := { on_job_enter; on_job_exit }) ;
+  Async_kernel.Tracing.set_tracers ~on_job_enter ~on_job_exit ;
   Scheduler.Expert.run_every_cycle_end (fun () ->
       Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
           Plugin.on_cycle_end () ) )

@@ -52,7 +52,7 @@ val finalize_other_proof :
      , Impl.Boolean.var )
      Import.Types.Wrap.Proof_state.Deferred_values.In_circuit.t
   -> ( Impl.Field.t
-     , Impl.Field.t Core_kernel.Array.t
+     , Impl.Field.t Core.Array.t
      , Impl.Boolean.var )
      Pickles_types.Plonk_types.All_evals.In_circuit.t
   -> Impl.Boolean.var * (Impl.Field.t, 'c) Pickles_types.Vector.t
@@ -70,7 +70,7 @@ val hash_messages_for_next_step_proof :
            Pickles_types.Vector.t )
          Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
       -> Impl.Field.t )
-     Core_kernel.Staged.t
+     Core.Staged.t
 
 val hash_messages_for_next_step_proof_opt :
      index:
@@ -90,7 +90,7 @@ val hash_messages_for_next_step_proof_opt :
              , 'b )
              Pickles_types.Vector.t
         -> Impl.Field.t )
-       Core_kernel.Staged.t
+       Core.Staged.t
 
 (** Actual verification using cryptographic tools. Returns [true] (encoded as a
     in-circuit Boolean variable) if the verification is successful *)

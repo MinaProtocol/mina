@@ -1,6 +1,6 @@
 (* exit_handlers -- code to call at daemon exit *)
 
-open Core_kernel
+open Core
 open Async_kernel
 open Async_unix
 

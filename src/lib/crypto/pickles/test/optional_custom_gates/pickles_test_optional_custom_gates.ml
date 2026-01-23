@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 open Pickles.Impls.Step
 open Pickles_optional_custom_gates_circuits
@@ -69,7 +69,7 @@ let fixed_lt_queries_n = 1 + Random.State.int state 100
 let fixed_lt_data =
   (* generate some random unique table ids *)
   let fixed_table_ids =
-    Int.Set.to_array
+    Set.to_array
       (Int.Set.of_list
          (List.init max_fixed_lt_n ~f:(fun _ ->
               1 + Random.State.int state (max_fixed_lt_n * 4) ) ) )
@@ -77,7 +77,7 @@ let fixed_lt_data =
   Array.map fixed_table_ids ~f:(fun table_id ->
       let max_table_size = 1 + Random.State.int state 100 in
       let indexes =
-        Int.Set.to_array
+        Set.to_array
           (Int.Set.of_list
              (List.init max_table_size ~f:(fun _ ->
                   1 + Random.State.int state (max_table_size * 4) ) ) )
@@ -147,14 +147,13 @@ let runtime_lt_data =
           1 + Random.State.int state 100 )
     in
     (* making sure they're all unique *)
-    Int.Set.to_array
-      (Int.Set.of_list (List.cons random_fixed_table_id other_ids))
+    Set.to_array (Int.Set.of_list (List.cons random_fixed_table_id other_ids))
   in
 
   Array.map runtime_table_ids ~f:(fun table_id ->
       let max_table_size = 1 + Random.State.int state 100 in
       let first_column =
-        Int.Set.to_array
+        Set.to_array
           (Int.Set.of_list
              (List.init max_table_size ~f:(fun _ ->
                   1 + Random.State.int state (max_table_size * 4) ) ) )

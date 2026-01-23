@@ -1,3 +1,5 @@
+open Core
+
 let test_initialize_with_correct_size () =
   let v =
     Plonkish_prelude.Vector.init Plonkish_prelude.Nat.N10.n ~f:(fun i -> i)

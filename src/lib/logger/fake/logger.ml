@@ -1,6 +1,6 @@
 (* logger.ml : the fake one *)
 
-open Core_kernel
+open Core
 
 let not_implemented () = failwith "Not implemented"
 
@@ -26,7 +26,7 @@ end
 
 (* Core modules extended with Yojson converters *)
 module Time = struct
-  include Time
+  include Time_float
 
   let to_yojson _ = not_implemented ()
 
@@ -60,7 +60,7 @@ module Metadata = struct
 
       include
         Binable.Of_binable_without_uuid
-          (Core_kernel.String.Stable.V1)
+          (Core.String.Stable.V1)
           (struct
             type nonrec t = t
 

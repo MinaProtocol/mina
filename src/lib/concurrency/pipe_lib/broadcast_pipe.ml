@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 type 'a t =
@@ -27,7 +27,7 @@ let create a =
   don't_wait_for
     (Pipe.iter ~flushed:(Consumer consumer) root_r ~f:(fun v ->
          downstream_flushed_v := Ivar.create () ;
-         let inner_pipes = Int.Table.data t.pipes in
+         let inner_pipes = Hashtbl.data t.pipes in
          let%bind () =
            Deferred.List.iter ~how:`Parallel inner_pipes ~f:(fun p ->
                Pipe.write p v )
@@ -67,10 +67,10 @@ module Reader = struct
         let r, w = Pipe.create () in
         Pipe.write_without_pushback w (peek t) ;
         let reader_id = fresh_reader_id t in
-        Int.Table.add_exn t.pipes ~key:reader_id ~data:w ;
+        Hashtbl.add_exn t.pipes ~key:reader_id ~data:w ;
         let d =
           let%map b = f r in
-          Int.Table.remove t.pipes reader_id ;
+          Hashtbl.remove t.pipes reader_id ;
           b
         in
         d )
@@ -123,8 +123,8 @@ module Writer = struct
   let close t =
     guard_already_closed ~context:"Writer.close" t (fun () ->
         Pipe.close t.root_pipe ;
-        Int.Table.iter t.pipes ~f:(fun w -> Pipe.close w) ;
-        Int.Table.clear t.pipes )
+        Hashtbl.iter t.pipes ~f:(fun w -> Pipe.close w) ;
+        Hashtbl.clear t.pipes )
 end
 
 let map t ~f =
@@ -192,16 +192,15 @@ let%test_module _ =
 
     let%test "Writing is synchronous" =
       Run_in_thread.block_on_async_exn (fun () ->
-          Core_kernel.Backtrace.elide := false ;
+          Backtrace.elide := false ;
           let pipe_r, pipe_w = create () in
           let counts1, counts2 = (zero_counts (), zero_counts ()) in
           let setup_reader counts =
             don't_wait_for
             @@ Reader.iter pipe_r ~f:(fun () ->
-                   counts.immediate_iterations <-
-                     counts.immediate_iterations + 1 ;
-                   let%map () = after @@ Time_ns.Span.of_sec 1. in
-                   counts.deferred_iterations <- counts.deferred_iterations + 1 )
+                counts.immediate_iterations <- counts.immediate_iterations + 1 ;
+                let%map () = after @@ Time_ns.Span.of_sec 1. in
+                counts.deferred_iterations <- counts.deferred_iterations + 1 )
           in
           setup_reader counts1 ;
           (* The reader doesn't run until we yield. *)

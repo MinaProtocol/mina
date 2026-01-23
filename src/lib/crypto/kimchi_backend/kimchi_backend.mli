@@ -3,13 +3,13 @@ module Kimchi_backend_common : sig
     module type S = sig
       type t
 
-      val to_yojson : t -> Yojson.Safe.t
-
-      val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
-
       val t_of_sexp : Sexplib0.Sexp.t -> t
 
       val sexp_of_t : t -> Sexplib0.Sexp.t
+
+      val to_yojson : t -> Yojson.Safe.t
+
+      val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
 
       val bin_size_t : t Bin_prot.Size.sizer
 
@@ -19,7 +19,7 @@ module Kimchi_backend_common : sig
 
       val __bin_read_t__ : (int -> t) Bin_prot.Read.reader
 
-      val bin_shape_t : Bin_shape_lib.Bin_shape.t
+      val bin_shape_t : Bin_prot.Shape.t
 
       val bin_writer_t : t Bin_prot.Type_class.writer0
 

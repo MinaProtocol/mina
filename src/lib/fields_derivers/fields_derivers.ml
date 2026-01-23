@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Annotations = struct
   module Utils = struct
@@ -91,7 +91,6 @@ let under_to_camel s =
   String.concat [ prefix_us; result ]
 
 let%test_unit "under_to_camel works as expected" =
-  let open Core_kernel in
   [%test_eq: string] "fooHello" (under_to_camel "foo_hello") ;
   [%test_eq: string] "fooHello" (under_to_camel "foo_hello___") ;
   [%test_eq: string] "_fooHello" (under_to_camel "_foo_hello__")

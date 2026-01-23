@@ -1,5 +1,5 @@
 module Hex64 : sig
-  include module type of Core_kernel.Int64
+  include module type of Core.Int64
 
   type t = int64
 

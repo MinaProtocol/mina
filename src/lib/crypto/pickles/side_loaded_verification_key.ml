@@ -23,7 +23,7 @@
         a 'transaction' or a 'merge'.
 *)
 
-open Core_kernel
+open Core
 open Pickles_types
 open Import
 module V = Pickles_base.Side_loaded_verification_key
@@ -384,8 +384,10 @@ module Checked = struct
 
   let to_input =
     let open Random_oracle_input.Chunked in
-    fun { max_proofs_verified; actual_wrap_domain_size; wrap_index } :
-        _ Random_oracle_input.Chunked.t ->
+    fun { max_proofs_verified; actual_wrap_domain_size; wrap_index }
+      :
+      _ Random_oracle_input.Chunked.t
+    ->
       let max_proofs_verified =
         Pickles_base.Proofs_verified.One_hot.Checked.to_input
           max_proofs_verified
@@ -414,9 +416,6 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
     ~value_of_hlist:(fun _ ->
       failwith "Side_loaded_verification_key: value_of_hlist" )
-    ~value_to_hlist:(fun { Poly.wrap_index
-                         ; actual_wrap_domain_size
-                         ; max_proofs_verified
-                         ; _
-                         } ->
+    ~value_to_hlist:(fun
+        { Poly.wrap_index; actual_wrap_domain_size; max_proofs_verified; _ } ->
       [ max_proofs_verified; actual_wrap_domain_size; wrap_index ] )

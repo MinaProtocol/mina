@@ -6,7 +6,6 @@
   async
   async_unix
   core
-  core.uuid
   ;; local libraries
   block_time
   mina_stdlib
@@ -46,4 +45,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_deriving.std ppx_jane ppx_mina ppx_version)))
+  (pps ppx_deriving.std ppx_let ppx_mina ppx_version)))

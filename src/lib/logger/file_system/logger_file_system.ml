@@ -1,10 +1,9 @@
 open Core
+open Core_unix
 
 let log_perm = 0o644
 
 module Dumb_logrotate = struct
-  open Core.Unix
-
   type t =
     { directory : string
     ; log_filename : string
@@ -69,7 +68,6 @@ let dumb_logrotate ~directory ~log_filename ~max_size ~num_rotate =
     (Dumb_logrotate.create ~directory ~log_filename ~max_size ~num_rotate)
 
 let evergrowing ~log_filename =
-  let open Unix in
   Logger.Transport.create
     ( module struct
       type t = File_descr.t
@@ -83,6 +81,7 @@ let evergrowing ~log_filename =
     (openfile ~perm:log_perm ~mode:[ O_RDWR; O_APPEND; O_CREAT ] log_filename)
 
 let time_pretty_to_string timestamp =
-  Time.format timestamp "%Y-%m-%d %H:%M:%S UTC" ~zone:Time.Zone.utc
+  Time_float_unix.format timestamp "%Y-%m-%d %H:%M:%S UTC"
+    ~zone:Time_float.Zone.utc
 
 let () = Logger.Time.set_pretty_to_string time_pretty_to_string

@@ -4,7 +4,7 @@ module Impl := Impls.Wrap
 val challenge_polynomial :
      (module Pickles_types.Shifted_value.Field_intf with type t = 'a)
   -> 'a array
-  -> ('a -> 'a) Core_kernel.Staged.t
+  -> ('a -> 'a) Core.Staged.t
 
 type ('a, 'a_opt) index' =
   ('a, 'a_opt) Pickles_types.Plonk_verification_key_evals.Step.t
@@ -43,7 +43,7 @@ val all_possible_domains :
   , ( Pickles_base.Domain.Stable.V1.t
     , Wrap_hack.Padded_length.n Pickles_types.Nat.s )
     Pickles_types.Vector.t )
-  Core_kernel.Memo.fn
+  Core.Memo.fn
 
 val num_possible_domains :
   Wrap_hack.Padded_length.n Pickles_types.Nat.s Pickles_types.Nat.t
@@ -101,7 +101,7 @@ val incrementally_verify_proof :
        Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
   -> Wrap_main_inputs.Impl.Field.t
      * ( [> `Success of Wrap_main_inputs.Impl.Boolean.var ]
-       * Scalar_challenge.t Import.Bulletproof_challenge.t Core_kernel.Array.t
+       * Scalar_challenge.t Import.Bulletproof_challenge.t Core.Array.t
        )
 
 val finalize_other_proof :

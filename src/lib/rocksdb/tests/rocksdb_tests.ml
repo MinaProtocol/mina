@@ -41,7 +41,7 @@ module Tests = struct
         Async.Quickcheck.async_test ~trials:20
           Quickcheck.Generator.(
             tuple2 String.quickcheck_generator String.quickcheck_generator
-            |> list)
+            |> list )
           ~f:(fun kvs ->
             match Hashtbl.of_alist (module String) kvs with
             | `Duplicate_key _ ->
@@ -52,7 +52,7 @@ module Tests = struct
                     let sorted =
                       List.sort kvs ~compare:[%compare: string * string]
                       |> List.map ~f:(fun (k, v) ->
-                             (to_bigstring k, to_bigstring v) )
+                          (to_bigstring k, to_bigstring v) )
                     in
                     let db = create db_dir in
                     List.iter sorted ~f:(fun (key, data) -> set db ~key ~data) ;
@@ -61,7 +61,7 @@ module Tests = struct
                         ~compare:[%compare: Bigstring.t * Bigstring.t]
                     in
                     Alcotest.(
-                      check (list (pair bigstring_testable bigstring_testable)))
+                      check (list (pair bigstring_testable bigstring_testable)) )
                       "to_alist returns the expected list" sorted alist ;
                     close db ;
                     Async.Deferred.unit ) ) )
@@ -74,7 +74,7 @@ module Tests = struct
         Quickcheck.async_test ~trials:20
           Quickcheck.Generator.(
             list
-            @@ tuple2 String.quickcheck_generator String.quickcheck_generator)
+            @@ tuple2 String.quickcheck_generator String.quickcheck_generator )
           ~f:(fun kvs ->
             match Hashtbl.of_alist (module String) kvs with
             | `Duplicate_key _ ->
@@ -82,11 +82,11 @@ module Tests = struct
             | `Ok db_hashtbl -> (
                 let open Core in
                 let cp_hashtbl = Hashtbl.copy db_hashtbl in
-                let db_dir = Filename.temp_dir "test_db" "" in
+                let db_dir = Filename_unix.temp_dir "test_db" "" in
                 let cp_dir =
                   Filename.temp_dir_name ^/ "test_cp"
                   ^ String.init 16 ~f:(fun _ ->
-                        (Int.to_string (Random.int 10)).[0] )
+                      (Int.to_string (Random.int 10)).[0] )
                 in
                 let db = create db_dir in
                 Hashtbl.iteri db_hashtbl ~f:(fun ~key ~data ->
@@ -106,14 +106,14 @@ module Tests = struct
                         (Hashtbl.to_alist db_hashtbl)
                         ~compare:[%compare: string * string]
                       |> List.map ~f:(fun (k, v) ->
-                             (to_bigstring k, to_bigstring v) )
+                          (to_bigstring k, to_bigstring v) )
                     in
                     let cp_sorted =
                       List.sort
                         (Hashtbl.to_alist cp_hashtbl)
                         ~compare:[%compare: string * string]
                       |> List.map ~f:(fun (k, v) ->
-                             (to_bigstring k, to_bigstring v) )
+                          (to_bigstring k, to_bigstring v) )
                     in
                     let db_alist =
                       List.sort (to_alist db)
@@ -124,11 +124,11 @@ module Tests = struct
                         ~compare:[%compare: Bigstring.t * Bigstring.t]
                     in
                     Alcotest.(
-                      check (list (pair bigstring_testable bigstring_testable)))
+                      check (list (pair bigstring_testable bigstring_testable)) )
                       "Database to_alist has expected content" db_sorted
                       db_alist ;
                     Alcotest.(
-                      check (list (pair bigstring_testable bigstring_testable)))
+                      check (list (pair bigstring_testable bigstring_testable)) )
                       "Checkpoint to_alist has expected content" cp_sorted
                       cp_alist ;
                     close db ;

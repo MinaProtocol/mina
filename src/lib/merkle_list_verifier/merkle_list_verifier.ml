@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module type Inputs_intf = sig
   type proof_elem

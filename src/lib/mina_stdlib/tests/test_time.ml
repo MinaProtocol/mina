@@ -2,98 +2,98 @@
     -------
     Component:  Mina stdlib time
     Invocation: dune exec src/lib/mina_stdlib/tests/test_time.exe
-    Subject:    Test JSON roundtrip for Time.Span.Stable.V1
+    Subject:    Test JSON roundtrip for Time_float.Span.Stable.V1
  *)
 
-open Core_kernel
+open Core
 module SpanV1 = Mina_stdlib.Time.Span.Stable.V1
 
 (* Test that basic JSON serialization roundtrip works *)
 let test_basic_json_roundtrip () =
-  let span = Core_kernel.Time.Span.of_sec 42.0 in
+  let span = Time_float.Span.of_sec 42.0 in
   let json = SpanV1.to_yojson span in
   match SpanV1.of_yojson json with
   | Ok decoded ->
       Alcotest.(check bool)
         "Roundtrip equality" true
-        (Core_kernel.Time.Span.equal span decoded)
+        (Time_float.Span.equal span decoded)
   | Error msg ->
       Alcotest.fail ("JSON parsing failed: " ^ msg)
 
 (* Test zero span roundtrip *)
 let test_zero_span_roundtrip () =
-  let span = Core_kernel.Time.Span.of_sec 0.0 in
+  let span = Time_float.Span.of_sec 0.0 in
   let json = SpanV1.to_yojson span in
   match SpanV1.of_yojson json with
   | Ok decoded ->
       Alcotest.(check bool)
         "Zero span roundtrip" true
-        (Core_kernel.Time.Span.equal span decoded)
+        (Time_float.Span.equal span decoded)
   | Error msg ->
       Alcotest.fail ("JSON parsing failed: " ^ msg)
 
 (* Test positive span roundtrip *)
 let test_positive_span_roundtrip () =
-  let span = Core_kernel.Time.Span.of_sec 86400.0 in
+  let span = Time_float.Span.of_sec 86400.0 in
   (* One day *)
   let json = SpanV1.to_yojson span in
   match SpanV1.of_yojson json with
   | Ok decoded ->
       Alcotest.(check bool)
         "Positive span roundtrip" true
-        (Core_kernel.Time.Span.equal span decoded)
+        (Time_float.Span.equal span decoded)
   | Error msg ->
       Alcotest.fail ("JSON parsing failed: " ^ msg)
 
 (* Test negative span roundtrip *)
 let test_negative_span_roundtrip () =
-  let span = Core_kernel.Time.Span.of_sec (-3600.0) in
+  let span = Time_float.Span.of_sec (-3600.0) in
   (* Negative one hour *)
   let json = SpanV1.to_yojson span in
   match SpanV1.of_yojson json with
   | Ok decoded ->
       Alcotest.(check bool)
         "Negative span roundtrip" true
-        (Core_kernel.Time.Span.equal span decoded)
+        (Time_float.Span.equal span decoded)
   | Error msg ->
       Alcotest.fail ("JSON parsing failed: " ^ msg)
 
 (* Test fraction span roundtrip *)
 let test_fraction_span_roundtrip () =
-  let span = Core_kernel.Time.Span.of_sec 0.001 in
+  let span = Time_float.Span.of_sec 0.001 in
   (* 1 millisecond *)
   let json = SpanV1.to_yojson span in
   match SpanV1.of_yojson json with
   | Ok decoded ->
       Alcotest.(check bool)
         "Fraction span roundtrip" true
-        (Core_kernel.Time.Span.equal span decoded)
+        (Time_float.Span.equal span decoded)
   | Error msg ->
       Alcotest.fail ("JSON parsing failed: " ^ msg)
 
 (* Test very small span roundtrip *)
 let test_very_small_span_roundtrip () =
-  let span = Core_kernel.Time.Span.of_sec 1e-6 in
+  let span = Time_float.Span.of_sec 1e-6 in
   (* 1 microsecond *)
   let json = SpanV1.to_yojson span in
   match SpanV1.of_yojson json with
   | Ok decoded ->
       Alcotest.(check bool)
         "Very small span roundtrip" true
-        (Core_kernel.Time.Span.equal span decoded)
+        (Time_float.Span.equal span decoded)
   | Error msg ->
       Alcotest.fail ("JSON parsing failed: " ^ msg)
 
 (* Test large span roundtrip *)
 let test_large_span_roundtrip () =
-  let span = Core_kernel.Time.Span.of_sec 31536000.0 in
+  let span = Time_float.Span.of_sec 31536000.0 in
   (* 1 year *)
   let json = SpanV1.to_yojson span in
   match SpanV1.of_yojson json with
   | Ok decoded ->
       Alcotest.(check bool)
         "Large span roundtrip" true
-        (Core_kernel.Time.Span.equal span decoded)
+        (Time_float.Span.equal span decoded)
   | Error msg ->
       Alcotest.fail ("JSON parsing failed: " ^ msg)
 
@@ -117,7 +117,7 @@ let test_non_float_json_type () =
 
 let () =
   let open Alcotest in
-  run "Time.Span.Stable.V1 JSON roundtrip"
+  run "Time_float.Span.Stable.V1 JSON roundtrip"
     [ ( "basic roundtrip tests"
       , [ test_case "basic json roundtrip" `Quick test_basic_json_roundtrip
         ; test_case "zero span roundtrip" `Quick test_zero_span_roundtrip

@@ -5264,10 +5264,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let update_empty_permissions =
         let permissions =
-          { Permissions.user_default with
-            send = Permissions.Auth_required.Proof
-          }
-          |> Zkapp_basic.Set_or_keep.Set
+          Zkapp_basic.Set_or_keep.Set
+            { Permissions.user_default with
+              send = Permissions.Auth_required.Proof
+            }
         in
         { Account_update.Update.dummy with permissions }
       in

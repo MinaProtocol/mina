@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 type mode = Hidden | Inline | After
 
@@ -54,7 +54,7 @@ let render ~max_interpolation_length ~format_json metadata items =
             Ok (msg_acc ^ str, extra_acc)
         | `Interpolate id ->
             let%map json =
-              String.Map.find metadata id
+              Map.find metadata id
               |> Result.of_option ~error:(sprintf "bad interpolation for %s" id)
             in
             let str = format_json json in
@@ -68,7 +68,7 @@ let interpolate { mode; max_interpolation_length; pretty_print } msg metadata =
   let open Result.Let_syntax in
   let format_json =
     if pretty_print then Yojson.Safe.pretty_to_string
-    else Yojson.Safe.to_string ?buf:None ?len:None
+    else Yojson.Safe.to_string ?buf:None ?len:None ?suf:None
   in
   match mode with
   | Hidden ->
@@ -79,5 +79,5 @@ let interpolate { mode; max_interpolation_length; pretty_print } msg metadata =
   | After ->
       Ok
         ( msg
-        , List.map (String.Map.to_alist metadata) ~f:(fun (k, v) ->
+        , List.map (Map.to_alist metadata) ~f:(fun (k, v) ->
               (k, format_json v) ) )

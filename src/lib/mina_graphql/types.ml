@@ -1661,7 +1661,8 @@ module AccountObj = struct
                ~resolve:(fun _ { account; _ } ->
                  account.Account.Poly.zkapp
                  |> Option.map ~f:(fun zkapp_account ->
-                        zkapp_account.app_state |> Zkapp_state.V.to_list ) )
+                        zkapp_account.Zkapp_account.app_state
+                        |> Zkapp_state.V.to_list ) )
            ; field "provedState" ~typ:bool
                ~doc:
                  "Boolean indicating whether all 8 fields on zkAppState were \
@@ -1670,7 +1671,7 @@ module AccountObj = struct
                ~resolve:(fun _ { account; _ } ->
                  account.Account.Poly.zkapp
                  |> Option.map ~f:(fun zkapp_account ->
-                        zkapp_account.proved_state ) )
+                        zkapp_account.Zkapp_account.proved_state ) )
            ; field "permissions" ~typ:account_permissions
                ~doc:"Permissions for updating certain fields of this account"
                ~args:Arg.[]

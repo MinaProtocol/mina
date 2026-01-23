@@ -1,7 +1,7 @@
 (* this is ugly, but [Core_kernel.String] doesn't have a [trim] function *)
 let trim = String.trim
 
-open Core_kernel
+open Core
 
 (* instantiate snarky for Vesta *)
 
@@ -320,7 +320,7 @@ module As_prover_circuits = struct
 
   let get_id =
     Snarky_backendless.Cvar.(
-      function Var v -> v | _ -> failwith "should have been a var")
+      function Var v -> v | _ -> failwith "should have been a var" )
 
   let main as_prover vars
       ((b1, b2, b3) : Impl.Field.t * Impl.Field.t * Impl.Field.t) () =
@@ -383,7 +383,7 @@ module As_prover_circuits = struct
     let generate_witness_fails () =
       Alcotest.(
         check_raises "should fail accessing non existent var"
-          (Failure "vector_get") generate_witness_fails)
+          (Failure "vector_get") generate_witness_fails )
 
     (* test that as_prover doesn't affect constraints *)
     let as_prover_does_nothing () =
@@ -502,7 +502,7 @@ module Improper_calls = struct
         check_raises
           "should fail to call prover functions outside as_prover block"
           (Failure "Can't evaluate prover code outside an as_prover block")
-          prover_functions_outside_prover_block)
+          prover_functions_outside_prover_block )
 
     (* There could be cases like recursive proofs where a proof
         is generated inside another and used by the outher circuit *)
@@ -556,7 +556,7 @@ module Improper_calls = struct
           "should fail to use prover functions outside prover block, even \
            inside a block of another circuit  "
           (Failure "Can't evaluate prover code outside an as_prover block")
-          prover_function_in_prover_block_of_other_circuit)
+          prover_function_in_prover_block_of_other_circuit )
   end
 
   let tests =

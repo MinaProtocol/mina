@@ -34,7 +34,7 @@ val wrap :
       -> unit )
   -> typ:('a, 'b) Impls.Step.Typ.t
   -> step_vk:Kimchi_bindings.Protocol.VerifierIndex.Fp.t
-  -> actual_wrap_domains:(Core_kernel.Int.t, 'c) Pickles_types.Vector.t
+  -> actual_wrap_domains:(Core.Int.t, 'c) Pickles_types.Vector.t
   -> step_plonk_indices:'d
   -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
   -> actual_feature_flags:bool Plonk_types.Features.t
@@ -165,7 +165,7 @@ val combined_inner_product :
 
 val challenge_polynomial :
      Backend.Tick.Field.t array
-  -> (Backend.Tick.Field.t -> Backend.Tick.Field.t) Core_kernel.Staged.t
+  -> (Backend.Tick.Field.t -> Backend.Tick.Field.t) Core.Staged.t
 
 module Type1 :
     module type of

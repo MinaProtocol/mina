@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 module Writer = Pipe.Writer
 
@@ -25,8 +25,8 @@ let create_reader ~close_on_exception f =
 
 let write w x =
   ( if Pipe.is_closed w then
-    let logger = Logger.create () in
-    [%log warn] "writing to closed linear pipe" ~metadata:[] ) ;
+      let logger = Logger.create () in
+      [%log warn] "writing to closed linear pipe" ~metadata:[] ) ;
   Pipe.write w x
 
 let write_if_open = Pipe.write_if_open
@@ -134,7 +134,7 @@ let merge_unordered rs =
   List.iter rs ~f:(fun reader ->
       don't_wait_for (iter reader ~f:(fun x -> Pipe.write merged_writer x)) ) ;
   don't_wait_for
-    (let%map () = Deferred.List.iter rs ~f:closed in
+    (let%map () = Deferred.List.iter rs ~f:closed ~how:`Sequential in
      Pipe.close merged_writer ) ;
   merged_reader
 
@@ -147,11 +147,11 @@ let fork reader n =
   let readers = List.map pipes ~f:(fun (r, _) -> r) in
   don't_wait_for
     (iter reader ~f:(fun x ->
-         Deferred.List.iter writers ~f:(fun writer ->
+         Deferred.List.iter writers ~how:`Sequential ~f:(fun writer ->
              if not (Pipe.is_closed writer) then Pipe.write writer x
              else return () ) ) ) ;
   don't_wait_for
-    (let%map () = Deferred.List.iter readers ~f:closed in
+    (let%map () = Deferred.List.iter readers ~f:closed ~how:`Sequential in
      close_read reader ) ;
   readers
 

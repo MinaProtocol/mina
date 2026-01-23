@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 open Import
 open Backend
@@ -392,7 +392,7 @@ module Proofs_verified_2 = struct
       include (T : module type of T with type t := t with module Repr := T.Repr)
 
       include
-        Binable.Of_binable
+        Binable.Of_binable_without_uuid
           (Repr.Stable.V2)
           (struct
             type nonrec t = t
@@ -456,7 +456,7 @@ module Proofs_verified_max = struct
       include (T : module type of T with type t := t with module Repr := T.Repr)
 
       include
-        Binable.Of_binable
+        Binable.Of_binable_without_uuid
           (Repr.Stable.V2)
           (struct
             type nonrec t = t

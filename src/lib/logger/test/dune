@@ -10,6 +10,6 @@
   logger
   logger.file_system)
  (preprocess
-  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
+  (pps ppx_version ppx_mina ppx_deriving.std ppx_deriving_yojson))
  (instrumentation
   (backend bisect_ppx)))

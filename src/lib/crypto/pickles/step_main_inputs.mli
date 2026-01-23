@@ -130,10 +130,10 @@ module Inner_curve : sig
 
     val shift_left_by_window_size : Constant.t -> Constant.t
 
-    val create : shifts:Constant.t Core_kernel.Array.t -> Constant.t -> t
+    val create : shifts:Constant.t Core.Array.t -> Constant.t -> t
   end
 
-  val pow2s : Constant.t -> Constant.t Core_kernel.Array.t
+  val pow2s : Constant.t -> Constant.t Core.Array.t
 
   module Scaling_precomputation : sig
     type t =
@@ -163,7 +163,7 @@ module Inner_curve : sig
   val unshift : shifted -> t
 
   val multiscale_known :
-    (Impl.Boolean.var list * Scaling_precomputation.t) Core_kernel.Array.t -> t
+    (Impl.Boolean.var list * Scaling_precomputation.t) Core.Array.t -> t
 
   val scale_known : Scaling_precomputation.t -> Impl.Boolean.var list -> t
 
@@ -173,7 +173,7 @@ module Inner_curve : sig
 
   val scale_fast :
        t
-    -> [< `Plus_two_to_len_minus_1 of Impl.Boolean.var Core_kernel.Array.t ]
+    -> [< `Plus_two_to_len_minus_1 of Impl.Boolean.var Core.Array.t ]
     -> t
 
   val ( + ) : t -> t -> t
