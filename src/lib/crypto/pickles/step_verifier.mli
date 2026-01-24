@@ -251,7 +251,7 @@ end
     verifying wrap proofs in a step circuit, values from this field must be
     represented as limbs in the native (Tick base) field. *)
 module Other_field : sig
-  (** A field element from Tock's base field, represented in the Step circuit. *)
+  (** A field element from Tock's base field, represented in Step circuit. *)
   type t = Impl.Other_field.t
 
   (** The number of bits in an Other_field element (approximately 255 bits for

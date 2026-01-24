@@ -138,7 +138,8 @@
     - {b messages_for_next_wrap_proof:} Contains the challenge polynomial
       commitment (sg) and old bulletproof challenges
 
-    In code: {!module:Messages_for_next_proof_over_same_field.Step}, {!module:Messages_for_next_proof_over_same_field.Wrap}
+    In code: {!module:Messages_for_next_proof_over_same_field.Step},
+    {!module:Messages_for_next_proof_over_same_field.Wrap}
 
     {3 Accumulator / IPA Terminology}
 

@@ -219,7 +219,7 @@ struct
   type ('comm, 'comm_opt) index' =
     ('comm, 'comm_opt) Plonk_verification_key_evals.Step.t
 
-  (** Select a verification key from a vector based on a one-hot branch selector.
+  (** Select a verification key from a vector based on a one-hot branch.
 
       This function masks the given vector of verification keys with the one-hot
       vector, returning a single key where only the active branch contributes
@@ -252,15 +252,15 @@ struct
           Plonk_verification_key_evals.Step.map key
             ~f:(Array.map ~f:(fun g -> Double.map g ~f:(( * ) (b :> t))))
             ~f_opt:(function
-              (* Here, we split the 3 variants into 3 separate accumulators. This
-                 allows us to only compute the 'maybe' flag when we need to, and
-                 allows us to fall back to the basically-free `Nothing` when a
-                 feature is entirely unused, or to the less expensive `Just` if
-                 it is used for every circuit.
+              (* Here, we split the 3 variants into 3 separate accumulators.
+                 This allows us to only compute the 'maybe' flag when we
+                 need to, and allows us to fall back to the basically-free
+                 `Nothing` when a feature is entirely unused, or to the less
+                 expensive `Just` if it is used for every circuit.
                  In particular, it is important that we generate exactly
-                 `Nothing` when none of the optional gates are used, otherwise
-                 we will change the serialization of the protocol circuits.
-              *)
+                 `Nothing` when none of the optional gates are used,
+                 otherwise we will change the serialization of the protocol
+                 circuits. *)
               | Opt.Nothing ->
                   ([], [], [ b ])
               | Opt.Maybe (b_x, x) ->
@@ -548,8 +548,9 @@ struct
                   if_ acc.non_zero
                     ~then_:(Point.add p (Scalar_challenge.endo acc.point xi))
                     ~else_:
-                      ((* In this branch, the accumulator was zero, so there is no harm in
-                          putting the potentially junk underlying point here. *)
+                      ((* In this branch, the accumulator was zero, so there
+                          is no harm in putting the potentially junk
+                          underlying point here. *)
                        Point.underlying p ))
               in
               let point = ref base_point in
@@ -662,15 +663,18 @@ struct
 
   (* Absorb a value into the Fiat-Shamir sponge.
 
-     The sponge uses pairs (boolean, value) where the boolean indicates whether
-     to actually absorb the value. This conditional absorption is needed because:
+     The sponge uses pairs (boolean, value) where the boolean indicates
+     whether to actually absorb the value. This conditional absorption is
+     needed because:
      - Some proof features (e.g., lookups, runtime tables) are optional
      - When reconstructing the Fiat-Shamir transcript, we must match exactly
        what the prover absorbed
-     - The boolean flag allows in-circuit conditional absorption without branching
+     - The boolean flag allows in-circuit conditional absorption without
+       branching
 
      When a feature is always present, we pass [Boolean.true_] as the flag.
-     When a feature is optional, the flag comes from the proof's feature flags. *)
+     When a feature is optional, the flag comes from the proof's feature
+     flags. *)
   (* TODO: This doesn't need to be an opt sponge *)
   let absorb sponge ty t =
     Util.absorb ~absorb_field:(Opt.absorb sponge)
@@ -1286,7 +1290,7 @@ struct
            These challenges are used in the permutation argument. *)
         let beta = Opt.challenge sponge in
         let gamma = Opt.challenge sponge in
-        (* == IVC Step 8: Absorb lookup aggregation commitment (if present) == *)
+        (* == IVC Step 8: Absorb lookup aggregation commitment (if used) == *)
         let () =
           match messages.lookup with
           | Nothing ->
@@ -1304,7 +1308,7 @@ struct
         let z_comm = messages.z_comm in
         absorb_g z_comm ;
         (* == IVC Step 10: Sample alpha challenge ==
-           Alpha combines different constraint polynomials. Uses endomorphism. *)
+           Alpha combines different constraint polynomials. Uses endo. *)
         let alpha = Opt.scalar_challenge sponge in
         (* == IVC Step 11: Absorb quotient commitment (t_comm) == *)
         let t_comm :
@@ -1338,19 +1342,19 @@ struct
         let sponge_digest_before_evaluations = Sponge.squeeze_field sponge in
 
         (* xi, r are sampled here using the other sponge. *)
-        (* No need to expose the polynomial evaluations as deferred values as they're
-           not needed here for the incremental verification. All we need is a_hat and
-           "combined_inner_product".
+        (* No need to expose polynomial evaluations as deferred values as
+           they're not needed here for incremental verification. All we need
+           is a_hat and "combined_inner_product".
 
-           Then, in the other proof, we can witness the evaluations and check their correctness
-           against "combined_inner_product" *)
+           Then, in the other proof, we can witness the evaluations and check
+           their correctness against "combined_inner_product" *)
         let sigma_comm_init, [ _ ] =
           Vector.split m.sigma_comm (snd (Permuts_minus_1.add Nat.N1.n))
         in
         let scale_fast =
           scale_fast ~num_bits:Other_field.Packed.Constant.size_in_bits
         in
-        (* == IVC Step 14: Compute linearization polynomial commitment (ft_comm) ==
+        (* == IVC Step 14: Compute linearization polynomial (ft_comm) ==
            The ft polynomial is the linearization of the PlonK constraints.
            Its commitment is derived from verification key and quotient poly. *)
         let ft_comm =
@@ -1365,7 +1369,7 @@ struct
         in
         (* == IVC Step 15: Bulletproof/IPA verification ==
            Verify the Inner Product Argument opening proof. This checks that
-           the claimed polynomial evaluations are consistent with the commitments.
+           the claimed polynomial evaluations are consistent with commitments.
 
            This sponge needs to be initialized with (some derivative of)
            1. The polynomial commitments
@@ -1605,10 +1609,10 @@ struct
       Array.iter ~f:(Sponge.absorb sponge) (snd evals.public_input) ;
       (* 4d: Absorb all polynomial evaluations (with optional handling).
          This is a hacky, but much more efficient, version of the opt sponge.
-         This uses the assumption that the sponge 'absorption state' will align
-         after each optional absorption, letting us skip the expensive tracking
-         that this would otherwise require.
-         To future-proof this, we assert that the states are indeed compatible. *)
+         This uses the assumption that the sponge 'absorption state' will
+         align after each optional absorption, letting us skip the expensive
+         tracking that this would otherwise require.
+         To future-proof, we assert that the states are indeed compatible. *)
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
       List.iter xs ~f:(fun opt ->
           let absorb = Array.iter ~f:(fun x -> Sponge.absorb sponge x) in
@@ -1799,7 +1803,7 @@ struct
     in
     (* == Step 10: Verify PlonK relation ==
        Check that the PlonK arithmetic constraints are satisfied.
-       This proof is a wrap proof, so no optional features need consideration. *)
+       This is a wrap proof, so no optional features need consideration. *)
     let plonk_checks_passed =
       with_label __LOC__ (fun () ->
           Plonk_checks.checked
