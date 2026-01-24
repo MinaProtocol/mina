@@ -813,10 +813,6 @@ struct
               (keep, sg) ) )
     in
     with_label __LOC__ (fun () ->
-        let sample () = Opt.challenge sponge in
-        let sample_scalar () : Scalar_challenge.t =
-          Opt.scalar_challenge sponge
-        in
         let index_digest =
           with_label "absorb verifier index" (fun () ->
               let index_sponge = Sponge.create sponge_params in
@@ -982,7 +978,7 @@ struct
               (m.lookup_table_comm, m.runtime_tables_selector)
             with
             | _ :: Just _ :: _, _ | _, Just _ ->
-                let joint_combiner = sample_scalar () in
+                let joint_combiner = Opt.scalar_challenge sponge in
                 absorb_sorted_1 sponge ;
                 absorb_sorted_2_to_4 () ;
                 absorb_sorted_5 () ;
@@ -996,7 +992,7 @@ struct
                 let b = Boolean.(b1 ||| b2) in
                 let sponge2 = Opt.copy sponge in
                 let joint_combiner_if_true =
-                  let joint_combiner = sample_scalar () in
+                  let joint_combiner = Opt.scalar_challenge sponge in
                   absorb_sorted_1 sponge ; joint_combiner
                 in
                 let joint_combiner_if_false : Scalar_challenge.t =
@@ -1012,7 +1008,7 @@ struct
             | _ :: Maybe (b, _) :: _, _ | _, Maybe (b, _) ->
                 let sponge2 = Opt.copy sponge in
                 let joint_combiner_if_true =
-                  let joint_combiner = sample_scalar () in
+                  let joint_combiner = Opt.scalar_challenge sponge in
                   absorb_sorted_1 sponge ; joint_combiner
                 in
                 let joint_combiner_if_false : Scalar_challenge.t =
@@ -1205,8 +1201,8 @@ struct
                   if i = lookup_sorted_minus_1 then l.sorted_5th_column
                   else Types.Opt.Just (Option.value_exn (Vector.nth l.sorted i)) )
         in
-        let beta = sample () in
-        let gamma = sample () in
+        let beta = Opt.challenge sponge in
+        let gamma = Opt.challenge sponge in
         let () =
           match messages.lookup with
           | Nothing ->
@@ -1222,14 +1218,14 @@ struct
         in
         let z_comm = messages.z_comm in
         absorb_g z_comm ;
-        let alpha = sample_scalar () in
+        let alpha = Opt.scalar_challenge sponge in
         let t_comm :
             (Inputs.Impl.Field.t * Inputs.Impl.Field.t)
             Kimchi_backend_common.Plonk_types.Poly_comm.Without_degree_bound.t =
           messages.t_comm
         in
         absorb_g t_comm ;
-        let zeta = sample_scalar () in
+        let zeta = Opt.scalar_challenge sponge in
         (* At this point, we should use the previous "bulletproof_challenges" to
            compute to compute f(beta_1) outside the snark
            where f is the polynomial corresponding to sg_old
