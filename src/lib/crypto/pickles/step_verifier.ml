@@ -507,8 +507,6 @@ struct
               let x = f messages in
               absorb sponge ty x ; x )
         in
-        let sample () = squeeze_challenge sponge in
-        let sample_scalar () = squeeze_scalar sponge in
         let open Plonk_types.Messages.In_circuit in
         let without = Type.Without_degree_bound in
         let absorb_g gs = absorb sponge without gs in
@@ -546,12 +544,12 @@ struct
         absorb sponge PC x_hat ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
-        let beta = sample () in
-        let gamma = sample () in
+        let beta = squeeze_challenge sponge in
+        let gamma = squeeze_challenge sponge in
         let z_comm = receive without z_comm in
-        let alpha = sample_scalar () in
+        let alpha = squeeze_scalar sponge in
         let t_comm = receive without t_comm in
-        let zeta = sample_scalar () in
+        let zeta = squeeze_scalar sponge in
         (* At this point, we should use the previous "bulletproof_challenges" to
            compute to compute f(beta_1) outside the snark
            where f is the polynomial corresponding to sg_old
