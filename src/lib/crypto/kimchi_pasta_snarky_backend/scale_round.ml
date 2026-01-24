@@ -1,12 +1,33 @@
+(** {1 Scale Round State}
+
+    This module defines the state for one round of variable-base scalar
+    multiplication (VarBaseMul gate).
+
+    In standard (non-endomorphism) scalar multiplication, we use a
+    double-and-add algorithm. Each round processes multiple bits of the
+    scalar, accumulating the result.
+
+    {3 See also}
+
+    - {!Plonk_constraint.EC_scale} for the constraint using this type
+    - [kimchi/src/circuits/polynomials/varbasemul.rs] for Rust impl *)
+
 open Core_kernel
 
+(** Round state for variable-base scalar multiplication.
+
+    Each round performs double-and-add operations for multiple bits,
+    updating accumulated points and the scalar accumulator.
+
+    Type parameter ['a] is the field element type. *)
 type 'a t =
   { accs : ('a * 'a) array
-  ; bits : 'a array
-  ; ss : 'a array
-  ; base : 'a * 'a
-  ; n_prev : 'a
-  ; n_next : 'a
+        (** Accumulated points: (x, y) pairs for intermediate results *)
+  ; bits : 'a array  (** Scalar bits being processed in this round *)
+  ; ss : 'a array  (** Slopes for the point additions *)
+  ; base : 'a * 'a  (** Base point (x, y) being multiplied *)
+  ; n_prev : 'a  (** Accumulated scalar value before this round *)
+  ; n_next : 'a  (** Accumulated scalar value after this round *)
   }
 [@@deriving sexp, fields, hlist]
 
