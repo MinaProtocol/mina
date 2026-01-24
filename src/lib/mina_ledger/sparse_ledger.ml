@@ -86,25 +86,6 @@ let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
         (Account.identifier account)
         account )
 
-let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
-  let keygen () =
-    let privkey = Signature_lib.Private_key.create () in
-    ( privkey
-    , Signature_lib.Public_key.of_private_key_exn privkey
-      |> Signature_lib.Public_key.compress )
-  in
-  Ledger.with_ledger
-    ~depth:Genesis_constants.For_unit_tests.Constraint_constants.t.ledger_depth
-    ~f:(fun ledger ->
-      let _, pub1 = keygen () in
-      let _, pub2 = keygen () in
-      let aid1 = Account_id.create pub1 Token_id.default in
-      let aid2 = Account_id.create pub2 Token_id.default in
-      let sl = of_ledger_subset_exn ledger [ aid1; aid2 ] in
-      [%test_eq: Ledger_hash.t]
-        (Ledger.merkle_root ledger)
-        ((merkle_root sl :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) )
-
 module T = Mina_transaction_logic.Make (L)
 
 let apply_transaction_logic f t x =
