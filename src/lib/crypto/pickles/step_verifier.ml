@@ -530,7 +530,7 @@ struct
          , _ )
          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
     with_label "incrementally_verify_proof" (fun () ->
-        (* Helper to receive a commitment from messages and absorb into sponge *)
+        (* Helper to receive commitment from messages and absorb into sponge *)
         let receive ty f =
           with_label "receive" (fun () ->
               let x = f messages in
@@ -616,17 +616,17 @@ struct
         let sponge_digest_before_evaluations = Sponge.squeeze_field sponge in
 
         (* xi, r are sampled here using the other sponge. *)
-        (* No need to expose the polynomial evaluations as deferred values as they're
-           not needed here for the incremental verification. All we need is a_hat and
-           "combined_inner_product".
+        (* No need to expose polynomial evaluations as deferred values as
+           they're not needed here for incremental verification. All we need
+           is a_hat and "combined_inner_product".
 
-           Then, in the other proof, we can witness the evaluations and check their correctness
-           against "combined_inner_product" *)
+           Then, in the other proof, we can witness the evaluations and check
+           their correctness against "combined_inner_product" *)
         let sigma_comm_init, [ _ ] =
           Vector.split m.sigma_comm
             (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
         in
-        (* == IVC Step 12: Compute linearization polynomial commitment (ft_comm) ==
+        (* == IVC Step 12: Compute linearization polynomial (ft_comm) ==
            The ft polynomial is the linearization of the PlonK constraints.
            Its commitment is derived from the verification key commitments
            and the quotient polynomial commitment. *)
@@ -675,7 +675,7 @@ struct
         in
         (* == IVC Step 14: Assert deferred values match sampled challenges ==
            The challenges we sampled must match the deferred values provided
-           by the prover. This ensures the prover used the correct challenges. *)
+           by the prover. This ensures the prover used correct challenges. *)
         let joint_combiner = None in
         assert_eq_deferred_values
           { alpha = plonk.alpha
@@ -880,13 +880,13 @@ struct
       (which_log2, unique_domains)
       ~shifts ~domain_generator
 
-  (* This finalizes the "deferred values" coming from a previous proof over the same field.
-     It
-     1. Checks that [xi] and [r] where sampled correctly. I.e., by absorbing all the
-     evaluation openings and then squeezing.
-     2. Checks that the "combined inner product" value used in the elliptic curve part of
-     the opening proof was computed correctly, in terms of the evaluation openings and the
-     evaluation points.
+  (* This finalizes the "deferred values" coming from a previous proof over
+     the same field. It:
+     1. Checks that [xi] and [r] where sampled correctly. I.e., by absorbing
+        all the evaluation openings and then squeezing.
+     2. Checks that the "combined inner product" value used in the elliptic
+        curve part of the opening proof was computed correctly, in terms of
+        the evaluation openings and the evaluation points.
      3. Check that the "b" value was computed correctly.
      4. Perform the arithmetic checks from marlin. *)
   (* TODO: This needs to handle the fact of variable length evaluations.
@@ -1019,10 +1019,10 @@ struct
         (snd evals.public_input) ;
       (* 7d: Absorb all polynomial evaluations (with optional handling).
          This is a hacky, but much more efficient, version of the opt sponge.
-         This uses the assumption that the sponge 'absorption state' will align
-         after each optional absorption, letting us skip the expensive tracking
-         that this would otherwise require.
-         To future-proof this, we assert that the states are indeed compatible. *)
+         This uses the assumption that the sponge 'absorption state' will
+         align after each optional absorption, letting us skip the expensive
+         tracking that this would otherwise require.
+         To future-proof, we assert that the states are indeed compatible. *)
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
       List.iter xs ~f:(fun opt ->
           let absorb =
@@ -1115,7 +1115,7 @@ struct
             let if_ (b : bool) ~then_ ~else_ =
               match Impl.Field.to_constant (b :> t) with
               | Some x ->
-                  (* We have a constant, only compute the branch we care about. *)
+                  (* We have a constant, only compute relevant branch. *)
                   if Impl.Field.Constant.(equal one) x then then_ ()
                   else else_ ()
               | None ->
@@ -1137,9 +1137,9 @@ struct
        Verify that the combined inner product used in the bulletproof was
        computed correctly. The combined inner product is:
          sum_i r^i sum_j xi^j f_j(beta_i)
-       where f_j are the polynomials, beta_i are evaluation points (zeta, zetaw),
-       r combines evaluations at different points, and xi combines different
-       polynomials. *)
+       where f_j are the polynomials, beta_i are evaluation points (zeta,
+       zetaw), r combines evaluations at different points, and xi combines
+       different polynomials. *)
     let combined_inner_product_correct =
       let evals1, evals2 =
         All_evals.With_public_input.In_circuit.factor evals
@@ -1198,7 +1198,7 @@ struct
     (* == Step 12: B value verification ==
        Verify the b value, which is the evaluation of the challenge polynomial
        at the combined evaluation point: b = h(zeta) + r * h(zetaw)
-       where h is the challenge polynomial from the new bulletproof challenges. *)
+       where h is the challenge polynomial from new bulletproof challenges. *)
     let bulletproof_challenges =
       compute_challenges ~scalar bulletproof_challenges
     in
@@ -1268,7 +1268,7 @@ struct
     let open Types.Step.Proof_state.Messages_for_next_step_proof in
     let after_index = sponge_after_index index in
     ( after_index
-    , (* TODO: Just get rid of the proofs verified mask and always absorb in full *)
+    , (* TODO: Remove proofs verified mask and always absorb in full *)
       stage (fun t ~proofs_verified_mask ->
           let sponge = Sponge.copy after_index in
           let t =
@@ -1391,8 +1391,8 @@ struct
             let { Import.Scalar_challenge.inner = c1 } =
               Bulletproof_challenge.pack c1
             in
-            (* In base case, use c1 for both sides (no real previous challenges).
-               Otherwise, compare with the computed challenge c2. *)
+            (* In base case, use c1 for both sides (no real previous
+               challenges). Otherwise, compare with computed challenge c2. *)
             let c2 =
               Field.if_ is_base_case ~then_:c1
                 ~else_:(match c2.prechallenge with { inner = c2 } -> c2)
