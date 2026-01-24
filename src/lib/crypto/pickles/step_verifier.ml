@@ -1,3 +1,5 @@
+(** Step Verifier Implementation - see step_verifier.mli for documentation. *)
+
 (* q > p *)
 open Core_kernel
 module SC = Scalar_challenge
@@ -57,6 +59,12 @@ struct
       (Inner_curve.to_field_elements g2)
     |> Boolean.all
 
+  (* Absorb a value into the Fiat-Shamir sponge.
+
+     Some values are conditionally absorbed based on feature flags (e.g., for
+     optional features like lookups). The [mask_g1_opt] parameter handles this
+     by zeroing out curve points when the feature is disabled, ensuring the
+     Fiat-Shamir transcript matches what the prover computed. *)
   let absorb sponge ty t =
     absorb
       ~absorb_field:(fun x -> Sponge.absorb sponge (`Field x))
@@ -481,6 +489,26 @@ struct
     in
     x_hat
 
+  (** Generate constraints for incremental verification of a wrap proof.
+
+      This function builds constraints that reconstruct the Fiat-Shamir
+      transcript and verify the IPA opening proof. It is the core of the
+      step circuit's verification logic.
+
+      Type parameters:
+      - [b]: Number of proofs verified (type-level nat)
+
+      The function generates constraints for:
+      1. Absorbing the verification key index
+      2. Absorbing commitments to the previous challenge polynomial (sg_old)
+         from previous proofs
+      3. Computing and absorbing the public input commitment (x_hat)
+      4. Absorbing witness and permutation commitments
+      5. Sampling beta, gamma, alpha, zeta challenges
+      6. Computing the final polynomial commitment (ft_comm)
+      7. Verifying the bulletproof/IPA opening
+      8. Asserting challenges match deferred values
+  *)
   let incrementally_verify_proof (type b)
       (module Proofs_verified : Nat.Add.Intf with type n = b) ~srs:_
       ~(domain :
@@ -502,6 +530,7 @@ struct
          , _ )
          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
     with_label "incrementally_verify_proof" (fun () ->
+        (* Helper to receive a commitment from messages and absorb into sponge *)
         let receive ty f =
           with_label "receive" (fun () ->
               let x = f messages in
@@ -510,16 +539,27 @@ struct
         let open Plonk_types.Messages.In_circuit in
         let without = Type.Without_degree_bound in
         let absorb_g gs = absorb sponge without gs in
+        (* == IVC Step 1: Absorb verification key index ==
+           Hash the verification key and absorb the digest. This binds the
+           proof to a specific circuit. *)
         let index_digest =
           with_label "absorb verifier index" (fun () ->
               let index_sponge = Sponge.copy sponge_after_index in
               Sponge.squeeze_field index_sponge )
         in
         absorb sponge Field index_digest ;
+        (* == IVC Step 2: Absorb commitments to the previous challenge
+           polynomial ==
+           Absorb sg_old from previous IPA rounds. These are padded to a
+           fixed length to support variable numbers of previous proofs. *)
         let sg_old : (_, Wrap_hack.Padded_length.n) Vector.t =
           Wrap_hack.Checked.pad_commitments sg_old
         in
         Vector.iter ~f:(absorb sponge PC) sg_old ;
+        (* == IVC Step 3: Compute public input commitment (x_hat) ==
+           Compute the commitment to the public input polynomial using
+           Lagrange basis. For known domains, use precomputed Lagrange
+           commitments. For side-loaded, compute dynamically. *)
         let x_hat =
           with_label "x_hat" (fun () ->
               match domain with
@@ -536,24 +576,42 @@ struct
                        [ 0; 1; 2 ] )
                     ~public_input )
         in
+        (* == IVC Step 4: Apply blinding to x_hat ==
+           Commitments always include a blinding factor (adding generator H).
+           We add H to x_hat to match this convention. *)
         let x_hat =
           with_label "x_hat blinding" (fun () ->
               Ops.add_fast x_hat
                 (Inner_curve.constant (Lazy.force Generators.h)) )
         in
+        (* == IVC Step 5: Absorb x_hat and witness commitments == *)
         absorb sponge PC x_hat ;
+        (* Absorb witness polynomial commitments *)
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
+        (* == IVC Step 6: Sample beta and gamma challenges ==
+           These challenges are used in the permutation argument. *)
         let beta = squeeze_challenge sponge in
         let gamma = squeeze_challenge sponge in
+        (* == IVC Step 7: Absorb permutation commitment (z_comm) == *)
         let z_comm = receive without z_comm in
+        (* == IVC Step 8: Sample alpha challenge ==
+           Alpha is used to combine different constraint polynomials.
+           It is a scalar challenge using the endomorphism optimization. *)
         let alpha = squeeze_scalar sponge in
+        (* == IVC Step 9: Absorb quotient commitment (t_comm) == *)
         let t_comm = receive without t_comm in
+        (* == IVC Step 10: Sample zeta challenge ==
+           Zeta is the evaluation point for polynomial openings.
+           It is a scalar challenge using the endomorphism optimization. *)
         let zeta = squeeze_scalar sponge in
         (* At this point, we should use the previous "bulletproof_challenges" to
            compute to compute f(beta_1) outside the snark
            where f is the polynomial corresponding to sg_old
         *)
+        (* == IVC Step 11: Save sponge state before evaluations ==
+           The sponge digest at this point is used to derive xi and r
+           in finalize_other_proof. *)
         let sponge_before_evaluations = Sponge.copy sponge in
         let sponge_digest_before_evaluations = Sponge.squeeze_field sponge in
 
@@ -568,6 +626,10 @@ struct
           Vector.split m.sigma_comm
             (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
         in
+        (* == IVC Step 12: Compute linearization polynomial commitment (ft_comm) ==
+           The ft polynomial is the linearization of the PlonK constraints.
+           Its commitment is derived from the verification key commitments
+           and the quotient polynomial commitment. *)
         let ft_comm =
           with_label __LOC__ (fun () ->
               Common.ft_comm
@@ -575,16 +637,22 @@ struct
                 ~scale:scale_fast2 ~negate:Inner_curve.negate
                 ~verification_key:m ~plonk ~t_comm )
         in
-        let bulletproof_challenges =
-          (* This sponge needs to be initialized with (some derivative of)
-             1. The polynomial commitments
-             2. The combined inner product
-             3. The challenge points.
+        (* == IVC Step 13: Bulletproof/IPA verification ==
+           Verify the Inner Product Argument opening proof. This checks that
+           the claimed polynomial evaluations are consistent with the
+           commitments.
 
-             It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
-             the combined inner product.
-          *)
+           This sponge needs to be initialized with (some derivative of)
+           1. The polynomial commitments
+           2. The combined inner product
+           3. The challenge points.
+
+           It should be sufficient to fork the sponge after squeezing beta_3
+           and then to absorb the combined inner product.
+        *)
+        let bulletproof_challenges =
           let num_commitments_without_degree_bound = Nat.N45.n in
+          (* Collect all polynomial commitments for the IPA *)
           let without_degree_bound =
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
@@ -605,6 +673,9 @@ struct
               check_bulletproof ~sponge:sponge_before_evaluations ~xi ~advice
                 ~opening ~polynomials:(without_degree_bound, []) )
         in
+        (* == IVC Step 14: Assert deferred values match sampled challenges ==
+           The challenges we sampled must match the deferred values provided
+           by the prover. This ensures the prover used the correct challenges. *)
         let joint_combiner = None in
         assert_eq_deferred_values
           { alpha = plonk.alpha
@@ -621,6 +692,8 @@ struct
           ; joint_combiner
           ; feature_flags = plonk.feature_flags
           } ;
+        (* Return the sponge digest and bulletproof challenges for use in
+           finalize_other_proof *)
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
   let compute_challenges ~scalar chals =
@@ -818,6 +891,20 @@ struct
      4. Perform the arithmetic checks from marlin. *)
   (* TODO: This needs to handle the fact of variable length evaluations.
      Meaning it needs opt sponge. *)
+
+  (** Generate constraints to finalize deferred values from a wrap proof.
+
+      Type parameters:
+      - [b]: Number of proofs verified (type-level nat)
+      - [branches]: Number of circuit branches (for Known step_domains)
+
+      This function builds constraints that verify:
+      1. Feature flags match evaluation structure
+      2. xi challenge was sampled correctly
+      3. Combined inner product was computed correctly
+      4. b value (challenge polynomial evaluation) is correct
+      5. PlonK relation constraints are satisfied
+  *)
   let finalize_other_proof (type b branches)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
       ~(step_domains :
@@ -842,6 +929,10 @@ struct
         , _ )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
+    (* == Step 1: Feature flag validation ==
+       Validate that the evaluation structure matches the declared feature
+       flags. This ensures the prover provided evaluations for exactly the
+       features that are enabled. *)
     Plonk_types.Evals.In_circuit.validate_feature_flags ~true_:Boolean.true_
       ~false_:Boolean.false_ ~or_:Boolean.( ||| )
       ~assert_equal:Boolean.Assert.( = ) ~feature_flags:plonk.feature_flags
@@ -849,6 +940,10 @@ struct
     let actual_width_mask = branch_data.proofs_verified_mask in
     let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
+    (* == Step 2: Scalar challenge conversion ==
+       Convert scalar challenges to field elements using the endomorphism.
+       The endomorphism allows efficient scalar multiplication by decomposing
+       scalars as s = a + b * endo where endo is the curve endomorphism. *)
     let scalar =
       SC.to_field_checked (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
     in
@@ -856,6 +951,10 @@ struct
       Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
         ~f:Fn.id ~scalar plonk
     in
+    (* == Step 3: Domain determination ==
+       Determine the evaluation domain. For compiled circuits, select from
+       known domains based on branch_data. For side-loaded circuits, compute
+       the domain dynamically from the log2_size. *)
     let domain =
       match step_domains with
       | `Known ds ->
@@ -864,12 +963,22 @@ struct
           ( side_loaded_domain ~log2_size:branch_data.domain_log2
             :> _ Plonk_checks.plonk_domain )
     in
+    (* == Step 4: Evaluation point computation ==
+       Compute zetaw = generator * zeta, the second evaluation point.
+       Polynomials are evaluated at both zeta and zetaw for the opening. *)
     let zetaw = Field.mul domain#generator plonk.zeta in
+    (* == Step 5: Challenge polynomial construction ==
+       Build the challenge polynomials (sg_olds) from previous bulletproof
+       challenges. These encode the accumulated IPA challenges as:
+       prod_i (1 + chals[i] * x^{2^{k-1-i}}) *)
     let sg_olds =
       with_label "sg_olds" (fun () ->
           Vector.map prev_challenges ~f:(fun chals ->
               unstage (challenge_polynomial (Vector.to_array chals)) ) )
     in
+    (* == Step 6: Challenge polynomial evaluation ==
+       Evaluate the challenge polynomials at zeta and zetaw. The evaluations
+       are masked by actual_width_mask to handle variable proof counts. *)
     let sg_evals1, sg_evals2 =
       let sg_evals pt =
         Vector.map2
@@ -880,7 +989,13 @@ struct
       in
       (sg_evals plonk.zeta, sg_evals zetaw)
     in
+    (* == Step 7: Sponge state reconstruction ==
+       Reconstruct the Fiat-Shamir sponge state by absorbing all the
+       evaluation data in the correct order. This must match what the
+       prover did when generating the proof. *)
     let sponge_state =
+      (* 7a: Absorb the challenge digest (hash of previous bulletproof
+         challenges). Uses optional sponge to handle variable proof counts. *)
       let challenge_digest =
         let opt_sponge = Opt_sponge.create sponge_params in
         Vector.iter2
@@ -893,20 +1008,22 @@ struct
         Opt_sponge.squeeze opt_sponge
       in
       Sponge.absorb sponge (`Field challenge_digest) ;
+      (* 7b: Absorb ft_eval1 (quotient polynomial evaluation at zetaw) *)
       Sponge.absorb sponge (`Field ft_eval1) ;
+      (* 7c: Absorb public input evaluations at both zeta and zetaw *)
       Array.iter
         ~f:(fun x -> Sponge.absorb sponge (`Field x))
         (fst evals.public_input) ;
       Array.iter
         ~f:(fun x -> Sponge.absorb sponge (`Field x))
         (snd evals.public_input) ;
-      let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
-      (* This is a hacky, but much more efficient, version of the opt sponge.
+      (* 7d: Absorb all polynomial evaluations (with optional handling).
+         This is a hacky, but much more efficient, version of the opt sponge.
          This uses the assumption that the sponge 'absorption state' will align
          after each optional absorption, letting us skip the expensive tracking
          that this would otherwise require.
-         To future-proof this, we assert that the states are indeed compatible.
-      *)
+         To future-proof this, we assert that the states are indeed compatible. *)
+      let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
       List.iter xs ~f:(fun opt ->
           let absorb =
             Array.iter ~f:(fun x -> Sponge.absorb sponge (`Field x))
@@ -941,19 +1058,30 @@ struct
       Array.copy sponge.state
     in
     sponge.state <- sponge_state ;
+    (* == Step 8: Challenge sampling and verification ==
+       Squeeze xi and r challenges from the sponge. These must match
+       the challenges the prover used. *)
     let squeeze () = squeeze_challenge sponge in
     let xi_actual = squeeze () in
     let r_actual = squeeze () in
+    (* 8a: Verify xi was sampled correctly *)
     let xi_correct =
       Field.equal xi_actual
         (match xi with { Import.Scalar_challenge.inner = xi } -> xi)
     in
+    (* 8b: Convert scalar challenges to field elements for subsequent
+       computations. Uses the curve endomorphism for efficiency. *)
     let xi = scalar xi in
     let r = scalar (Import.Scalar_challenge.create r_actual) in
+    (* == Step 9: PlonK minimal form and combined evaluations ==
+       Convert plonk values to minimal form and combine chunked evaluations
+       into single values using powers of the evaluation point. *)
     let plonk_minimal =
       Plonk.to_minimal plonk ~to_option:Opt.to_option_unsafe
     in
     let combined_evals =
+      (* Combine chunked polynomial evaluations: if a polynomial is split
+         into chunks [f0, f1, ...], combine as f0 + zeta^n * f1 + ... *)
       let n = Int.ceil_log2 Max_degree.step in
       let zeta_n : Field.t = pow2_pow plonk.zeta n in
       let zetaw_n : Field.t = pow2_pow zetaw n in
@@ -963,6 +1091,15 @@ struct
           , actual_evaluation ~pt_to_n:zetaw_n x1 ) )
         evals.evals
     in
+    (* == Step 10: PlonK scalars environment ==
+       Build the environment of scalar values needed for PlonK verification.
+       This includes powers of zeta, vanishing polynomial evaluations, and
+       other derived values used in the PlonK relation checks.
+
+       Note: The endo parameter here is for the Step inner curve endomorphism,
+       which is used in the PlonK constraint equations. This is different from
+       the scalar challenge endomorphism used earlier - this one corresponds
+       to GateType::EndoMul in the Rust/Kimchi codebase. *)
     let env =
       with_label "scalars_env" (fun () ->
           let module Env_bool = struct
@@ -996,10 +1133,19 @@ struct
             ~domain plonk_minimal combined_evals )
     in
     let open Field in
+    (* == Step 11: Combined inner product verification ==
+       Verify that the combined inner product used in the bulletproof was
+       computed correctly. The combined inner product is:
+         sum_i r^i sum_j xi^j f_j(beta_i)
+       where f_j are the polynomials, beta_i are evaluation points (zeta, zetaw),
+       r combines evaluations at different points, and xi combines different
+       polynomials. *)
     let combined_inner_product_correct =
       let evals1, evals2 =
         All_evals.With_public_input.In_circuit.factor evals
       in
+      (* 11a: Compute ft_eval0 (quotient polynomial evaluation at zeta)
+         from the PlonK relation. This is derived from other evaluations. *)
       let ft_eval0 : Field.t =
         with_label "ft_eval0" (fun () ->
             Plonk_checks.ft_eval0
@@ -1008,7 +1154,7 @@ struct
       in
       print_fp "ft_eval0" ft_eval0 ;
       print_fp "ft_eval1" ft_eval1 ;
-      (* sum_i r^i sum_j xi^j f_j(beta_i) *)
+      (* 11b: Compute actual combined inner product from evaluations *)
       let actual_combined_inner_product =
         let combine ~ft ~sg_evals x_hat
             (e : (Field.t array, _) Evals.In_circuit.t) =
@@ -1039,6 +1185,7 @@ struct
               * combine ~ft:ft_eval1 ~sg_evals:sg_evals2 evals2.public_input
                   evals2.evals )
       in
+      (* 11c: Compare expected (from deferred values) with actual *)
       let expected =
         Shifted_value.Type1.to_field
           (module Field)
@@ -1048,6 +1195,10 @@ struct
       print_fp "step_main cip actual" actual_combined_inner_product ;
       equal expected actual_combined_inner_product
     in
+    (* == Step 12: B value verification ==
+       Verify the b value, which is the evaluation of the challenge polynomial
+       at the combined evaluation point: b = h(zeta) + r * h(zetaw)
+       where h is the challenge polynomial from the new bulletproof challenges. *)
     let bulletproof_challenges =
       compute_challenges ~scalar bulletproof_challenges
     in
@@ -1065,21 +1216,27 @@ struct
           in
           equal b_used b_actual )
     in
+    (* == Step 13: PlonK relation checks ==
+       Verify the PlonK arithmetic constraints are satisfied. This checks
+       that the polynomial evaluations satisfy the PlonK relation, which
+       encodes the circuit constraints. *)
     let plonk_checks_passed =
       with_label "plonk_checks_passed" (fun () ->
           Plonk_checks.checked
             (module Impl)
             ~env ~shift:shift1 plonk combined_evals )
     in
+    (* == Step 14: Combine all checks and return ==
+       All checks must pass for the deferred values to be valid. *)
     print_bool "xi_correct" xi_correct ;
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;
     print_bool "plonk_checks_passed" plonk_checks_passed ;
     print_bool "b_correct" b_correct ;
     ( Boolean.all
-        [ xi_correct
-        ; b_correct
-        ; combined_inner_product_correct
-        ; plonk_checks_passed
+        [ xi_correct (* Challenge sampling was correct *)
+        ; b_correct (* Challenge polynomial evaluation was correct *)
+        ; combined_inner_product_correct (* Bulletproof inner product correct *)
+        ; plonk_checks_passed (* PlonK relation satisfied *)
         ]
     , bulletproof_challenges )
 
@@ -1159,10 +1316,23 @@ struct
       _prev_accumulators _proof _new_accumulator : Boolean.var =
     Boolean.false_
 
+  (** Generate constraints for full verification of a wrap proof.
+
+      This orchestrates the full verification by:
+      1. Packing the statement into public input format
+      2. Calling incrementally_verify_proof for transcript reconstruction
+      3. Asserting the sponge digest matches
+      4. Asserting bulletproof challenges match (with base case handling)
+
+      @return Boolean indicating whether all verification constraints pass
+  *)
   let verify ~proofs_verified ~is_base_case ~sg_old ~sponge_after_index
       ~lookup_parameters ~feature_flags ~(proof : Wrap_proof.Checked.t) ~srs
       ~wrap_domain ~wrap_verification_key statement
       (unfinalized : Impls.Step.unfinalized_proof_var) =
+    (* == IVC Step 1: Pack statement into public input ==
+       Convert the statement (containing proof state and application data)
+       into the public input format expected by the wrap circuit. *)
     let public_input :
         [ `Field of Field.t | `Packed_bits of Field.t * int ] array =
       with_label "pack_statement" (fun () ->
@@ -1180,6 +1350,7 @@ struct
            | `Packed_bits (x, n) ->
                `Packed_bits (x, n) )
     in
+    (* == IVC Step 2: Initialize sponge and extract deferred values == *)
     let sponge = Sponge.create sponge_params in
     let { Types.Step.Proof_state.Deferred_values.xi
         ; combined_inner_product
@@ -1188,6 +1359,8 @@ struct
         } =
       unfinalized.deferred_values
     in
+    (* == IVC Step 3: Run incremental verification ==
+       This reconstructs the Fiat-Shamir transcript and verifies the IPA. *)
     let ( sponge_digest_before_evaluations_actual
         , (`Success bulletproof_success, bulletproof_challenges_actual) ) =
       incrementally_verify_proof ~srs proofs_verified ~srs ~domain:wrap_domain
@@ -1200,10 +1373,17 @@ struct
            .to_wrap ~opt_none:Opt.nothing ~false_:Boolean.false_
              unfinalized.deferred_values.plonk )
     in
+    (* == IVC Step 4: Assert sponge digest and challenges match ==
+       The sponge digest computed during incremental verification must match
+       the one provided by the prover. Similarly, bulletproof challenges must
+       match (with special handling for base case where there are no previous
+       challenges to compare against). *)
     with_label __LOC__ (fun () ->
+        (* 4a: Assert sponge digest matches *)
         with_label __LOC__ (fun () ->
             Field.Assert.equal unfinalized.sponge_digest_before_evaluations
               sponge_digest_before_evaluations_actual ) ;
+        (* 4b: Assert bulletproof challenges match *)
         Array.iteri
           (Vector.to_array unfinalized.deferred_values.bulletproof_challenges)
           ~f:(fun i c1 ->
@@ -1211,6 +1391,8 @@ struct
             let { Import.Scalar_challenge.inner = c1 } =
               Bulletproof_challenge.pack c1
             in
+            (* In base case, use c1 for both sides (no real previous challenges).
+               Otherwise, compare with the computed challenge c2. *)
             let c2 =
               Field.if_ is_base_case ~then_:c1
                 ~else_:(match c2.prechallenge with { inner = c2 } -> c2)
