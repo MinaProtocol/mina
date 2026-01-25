@@ -54,7 +54,7 @@
 
   inputs.nix-filter.url = "github:numtide/nix-filter";
 
-  inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
+  inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline/derivation-cache";
 
   inputs.nix-utils.url = "github:juliosueiras-nix/nix-utils";
 
@@ -250,7 +250,7 @@
             derivationCache = "https://storage.googleapis.com/mina-nix-cache";
             reproduceRepo = "mina";
             commonExtraStepConfig = {
-              agents = [ "nix" ];
+              agents = [ { nix = "*"; } { hostname = "builder-2"; } ];
               plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
             };
           } self ++ [
