@@ -2797,7 +2797,7 @@ module Queries = struct
     let init_hash_string = State_hash.to_base58_check init_hash in
     (init_hash_string, state_body_hash_string_list)
 
-  let get_ancestry_proof =
+  let ancestry_proof =
     io_field "ancestryProof"
       ~doc:
         "Get state body hashes for ancestor blocks to prove ancestry \
@@ -2921,7 +2921,7 @@ module Queries = struct
     ; network_id
     ; signature_kind
     ; protocol_state
-    ; get_ancestry_proof
+    ; ancestry_proof
     ; account_actions
     ]
 
