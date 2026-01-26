@@ -548,10 +548,13 @@ struct
               Sponge.squeeze_field index_sponge )
         in
         absorb sponge Field index_digest ;
-        (* == IVC Step 2: Absorb commitments to the previous challenge
-           polynomial ==
-           Absorb sg_old from previous IPA rounds. These are padded to a
-           fixed length to support variable numbers of previous proofs. *)
+        (* == IVC Step 2: Absorb the previous challenge polynomial commitments ==
+           The sg_old values are commitments to the challenge polynomials b(X)
+           from previous proofs. These commitments are the core recursion
+           accumulators - they encode the accumulated IPA verification state
+           from all previous proofs. Absorbing them into the transcript binds
+           this proof to its predecessors. Padded to a fixed length to support
+           variable numbers of previous proofs. *)
         let sg_old : (_, Wrap_hack.Padded_length.n) Vector.t =
           Wrap_hack.Checked.pad_commitments sg_old
         in
@@ -968,9 +971,13 @@ struct
        Polynomials are evaluated at both zeta and zetaw for the opening. *)
     let zetaw = Field.mul domain#generator plonk.zeta in
     (* == Step 5: Challenge polynomial construction ==
-       Build the challenge polynomials (sg_olds) from previous bulletproof
-       challenges. These encode the accumulated IPA challenges as:
-       prod_i (1 + chals[i] * x^{2^{k-1-i}}) *)
+       Build the challenge polynomials b(X) from previous bulletproof
+       challenges. The name "sg_olds" refers to the challenge polynomial
+       evaluations (sg = challenge polynomial commitment). These polynomials
+       encode the accumulated IPA challenges as:
+       b(X) = prod_i (1 + chals[i] * X^{2^{k-1-i}})
+       Evaluating b(X) is the deferred IPA verification - it replaces expensive
+       in-circuit scalar multiplications with polynomial evaluation. *)
     let sg_olds =
       with_label "sg_olds" (fun () ->
           Vector.map prev_challenges ~f:(fun chals ->

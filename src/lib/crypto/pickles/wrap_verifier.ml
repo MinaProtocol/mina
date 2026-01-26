@@ -908,8 +908,11 @@ struct
         let absorb_g gs =
           absorb sponge without (Array.map gs ~f:(fun g -> (Boolean.true_, g)))
         in
-        (* == IVC Step 2: Absorb index digest and commitments to the previous
-           challenge polynomial == *)
+        (* == IVC Step 2: Absorb index digest and challenge polynomial commits ==
+           The sg_old values are commitments to the challenge polynomials b(X)
+           from previous proofs. These are the core recursion accumulators that
+           encode the accumulated IPA verification state. Absorbing them binds
+           this proof to its predecessors. *)
         absorb sponge Field (Boolean.true_, index_digest) ;
         Vector.iter ~f:(absorb sponge PC) sg_old ;
         (* == IVC Step 3: Compute public input commitment (x_hat) ==
@@ -1580,8 +1583,12 @@ struct
        Compute zetaw = generator * zeta, the second evaluation point. *)
     let zetaw = Field.mul domain#generator plonk.zeta in
     (* == Step 3: Build and evaluate challenge polynomials ==
-       Construct sg_olds from previous bulletproof challenges and evaluate
-       at both zeta and zetaw. *)
+       Construct the challenge polynomials b(X) from previous bulletproof
+       challenges and evaluate at both zeta and zetaw. The name "sg_olds"
+       refers to these polynomials (sg = challenge polynomial commitment).
+       b(X) = prod_i (1 + chals[i] * X^{2^{k-1-i}})
+       Evaluating b(X) is the deferred IPA verification - it replaces expensive
+       in-circuit scalar multiplications with polynomial evaluation. *)
     let sg_evals1, sg_evals2 =
       let sg_olds =
         Vector.map old_bulletproof_challenges ~f:(fun chals ->
