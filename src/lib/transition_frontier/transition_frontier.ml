@@ -564,6 +564,68 @@ include struct
     path_map ?max_length full_frontier breadcrumb ~f
 end
 
+let body_and_parent_hashes_of_historical (historical : Root_data.Historical.t) =
+  let validated_block = Root_data.Historical.transition historical in
+  let state_body_hash = Mina_block.Validated.state_body_hash validated_block in
+  let parent_hash =
+    Mina_block.Validated.header validated_block
+    |> Mina_block.Header.protocol_state
+    |> Mina_state.Protocol_state.previous_state_hash
+  in
+  (state_body_hash, parent_hash)
+
+let body_and_parent_hashes_of_breadcrumb breadcrumb =
+  let state_body_hash =
+    Breadcrumb.protocol_state_with_hashes breadcrumb
+    |> State_hash.With_state_hashes.state_body_hash
+         ~compute_hashes:Mina_state.Protocol_state.hashes
+  in
+  let parent_hash = Breadcrumb.parent_hash breadcrumb in
+  (state_body_hash, parent_hash)
+
+let find_in_frontier_or_history ~root_history t state_hash =
+  match find t state_hash with
+  | Some breadcrumb ->
+      Some (body_and_parent_hashes_of_breadcrumb breadcrumb)
+  | None ->
+      Option.map ~f:body_and_parent_hashes_of_historical
+      @@ Extensions.Root_history.lookup root_history state_hash
+
+let get_ancestry_proof ?depth t ~target_state_hash =
+  let max_length = max_length t in
+  let depth = Option.value ~default:max_length depth in
+  (* Validate depth *)
+  let%bind.Or_error () =
+    if depth < 0 then Or_error.error_string "depth must be non-negative"
+    else if depth > max_length then
+      Or_error.errorf "depth must not exceed %d" max_length
+    else Or_error.return ()
+  in
+  (* Find the starting breadcrumb *)
+  let%bind.Or_error start_breadcrumb =
+    match find t target_state_hash with
+    | Some breadcrumb ->
+        Or_error.return (body_and_parent_hashes_of_breadcrumb breadcrumb)
+    | None ->
+        Or_error.error_string "block not found in frontier"
+  in
+  let root_history = Extensions.get_extension (extensions t) Root_history in
+  (* Collect state body hashes by walking backwards
+   * Returns (init_hash, body_hashes) where init_hash is the parent of the oldest block *)
+  let rec collect_hashes (state_body_hash, parent_hash) remaining acc =
+    if remaining <= 1 then
+      (* Base case: include this block's body, use parent as init *)
+      Or_error.return (parent_hash, state_body_hash :: acc)
+    else
+      match find_in_frontier_or_history ~root_history t parent_hash with
+      | Some parent_data ->
+          collect_hashes parent_data (remaining - 1) (state_body_hash :: acc)
+      | None ->
+          (* Reached the root - parent_hash is the init hash for the proof *)
+          Or_error.return (parent_hash, state_body_hash :: acc)
+  in
+  collect_hashes start_breadcrumb depth []
+
 module For_tests = struct
   open Signature_lib
   module Ledger_transfer =
