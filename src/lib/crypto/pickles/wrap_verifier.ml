@@ -852,17 +852,6 @@ struct
 
       Type parameters:
       - [b]: Number of proofs verified (type-level nat)
-
-      The function generates constraints for:
-      1. Absorbing the verification key index
-      2. Absorbing the commitments to the previous challenge polynomial
-         (sg_old) from previous proofs
-      3. Computing and absorbing the public input commitment (x_hat)
-      4. Absorbing witness commitments and handling lookup arguments
-      5. Sampling beta, gamma, alpha, zeta challenges
-      6. Computing the linearization polynomial commitment (ft_comm)
-      7. Verifying the bulletproof/IPA opening
-      8. Asserting challenges match deferred values
   *)
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
