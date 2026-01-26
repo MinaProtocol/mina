@@ -2786,7 +2786,9 @@ module Queries = struct
     in
     (* Use the transition frontier function to get the proof *)
     let%map.Or_error init_hash, state_body_hashes =
-      Transition_frontier.get_ancestry_proof frontier ~target_state_hash ?depth
+      Transition_chain_prover.prove ?length:depth ~frontier target_state_hash
+      |> Result.of_option
+           ~error:(Error.of_string "failed to create ancestry proof")
     in
     let state_body_hash_string_list =
       (* Convert state body hashes to base58check format *)
