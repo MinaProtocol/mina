@@ -46,6 +46,48 @@
     2. Squeezing 128-bit challenges from the sponge
     3. Scalar challenges use the endomorphism for efficiency
 
+    {2 Deferred Verification: Why the Verifier Does Not Fully Verify}
+
+    {b Key design point:} The step verifier does {b not} fully verify the
+    polynomial opening proofs (IPA) from wrap proofs. Fully verifying an IPA
+    inside a circuit would require O(n) scalar multiplications, which is
+    prohibitively expensive. Instead, Pickles uses {e deferred} (or
+    {e incremental}) verification:
+
+    {b What {!val:incrementally_verify_proof} does:}
+    - Reconstructs the Fiat-Shamir transcript (absorbing commitments, squeezing
+      challenges)
+    - Verifies that challenges (beta, gamma, alpha, zeta) match the transcript
+    - Absorbs the previous challenge polynomial commitments ([sg_old])
+    - Computes new bulletproof challenges from the IPA rounds
+    - Does {b not} fully verify that the polynomial evaluations are correct
+
+    {b What {!val:finalize_other_proof} does (the deferred checks):}
+    - Reconstructs the challenge polynomial [b(X)] from bulletproof challenges
+    - Evaluates [b(zeta)] and [b(zeta*omega)]
+    - Verifies the combined inner product is consistent with evaluations
+    - Verifies PlonK relation constraints
+    - These checks are efficient because they use the step circuit's native
+      field
+
+    This split is what makes recursion practical. The expensive IPA verification
+    is "accumulated" into the challenge polynomial rather than being performed
+    directly.
+
+    {2 The Role of sg_old in Recursion}
+
+    The [sg_old] parameter (previous challenge polynomial commitments) is {b the
+    core of recursive accumulation}:
+
+    - Each [sg_old] entry is a commitment to a previous proof's challenge
+      polynomial [b(X)]
+    - These commitments are absorbed into the Fiat-Shamir transcript, binding
+      the current proof to its predecessors
+    - The verifier does not need to re-verify the IPA from previous proofs;
+      instead, it trusts that the [sg_old] commitments correctly encode the
+      accumulated IPA state
+    - This enables constant-size proofs regardless of recursion depth
+
     {2 Correspondence with Kimchi Verifier}
 
     The IVC steps below essentially reimplement the Kimchi verifier as circuit
@@ -61,31 +103,37 @@
 
     {2 Incremental Verification Flow (incrementally_verify_proof)}
 
+    Each step below corresponds to a comment marker in the implementation.
+    To list all steps: [grep -n "== IVC Step" step_verifier.ml]
+
     {v
     +-------------------------------------------------------------------------+
     |                    FIAT-SHAMIR TRANSCRIPT RECONSTRUCTION                |
     +-------------------------------------------------------------------------+
     |                                                                         |
-    |  +------------------+                                                   |
-    |  | Verification Key |------+                                            |
+    |  +------------------+   +------+                                        |
+    |  | Verification Key |-->|Sponge|  Step 1: Absorb index digest           |
+    |  +------------------+   +--+---+                                        |
+    |                            |                                            |
+    |  +------------------+      v                                            |
+    |  |     sg_old       |-->+------+  Step 2: Absorb sg_old                 |
+    |  | (challenge poly  |   |Sponge|  (previous accumulators - binds        |
+    |  |  commitments)    |   +--+---+   this proof to predecessors)          |
+    |  +------------------+      |                                            |
+    |                            |                                            |
+    |  +------------------+      |      Step 3: Compute x_hat (public input   |
+    |  |  Public Input    |------+              commitment via Lagrange)      |
+    |  |   (Lagrange)     |      |                                            |
+    |  +------------------+      v      Step 4: Apply blinding to x_hat       |
+    |                         +------+                                        |
+    |                         |Sponge|  Step 5: Absorb x_hat + w_comm         |
+    |  +------------------+   +--+---+                                        |
+    |  |     w_comm       |------+                                            |
     |  +------------------+      |                                            |
     |                            v                                            |
-    |  +------------------+   +------+                                        |
-    |  |     sg_old       |-->|Sponge|  Step 1-2: Absorb index + sg_old       |
-    |  +------------------+   +--+---+                                        |
-    |                            |                                            |
-    |  +------------------+      |                                            |
-    |  |  Public Input    |------+      Step 3-5: Compute x_hat, blind,       |
-    |  |   (Lagrange)     |      |               absorb x_hat + w_comm        |
-    |  +------------------+      v                                            |
-    |  +------------------+   +------+                                        |
-    |  |     w_comm       |-->|Sponge|                                        |
-    |  +------------------+   +--+---+                                        |
-    |                            |                                            |
-    |                            v      Step 6: Squeeze                       |
     |                      +----------+                                       |
-    |                      | beta,    |  (permutation challenges)             |
-    |                      | gamma    |                                       |
+    |                      | beta,    |  Step 6: Squeeze beta, gamma          |
+    |                      | gamma    |  (permutation challenges)             |
     |                      +----+-----+                                       |
     |                           |                                             |
     |  +------------------+     v                                             |
@@ -93,45 +141,47 @@
     |  +------------------+   |Sponge|                                        |
     |                         +--+---+                                        |
     |                            |                                            |
-    |                            v      Step 8: Squeeze (scalar challenge)    |
+    |                            v                                            |
     |                      +----------+                                       |
-    |                      | alpha    |  (constraint combiner)                |
-    |                      +----+-----+                                       |
+    |                      | alpha    |  Step 8: Squeeze alpha                |
+    |                      +----+-----+  (constraint combiner)                |
     |                           |                                             |
     |  +------------------+     v                                             |
     |  |     t_comm       |-->+------+  Step 9: Absorb t_comm                 |
     |  +------------------+   |Sponge|                                        |
     |                         +--+---+                                        |
     |                            |                                            |
-    |                            v      Step 10: Squeeze (scalar challenge)   |
+    |                            v                                            |
     |                      +----------+                                       |
-    |                      | zeta     |  (evaluation point)                   |
-    |                      +----+-----+                                       |
+    |                      | zeta     |  Step 10: Squeeze zeta                |
+    |                      +----+-----+  (evaluation point)                   |
     |                           |                                             |
-    |                           v      Step 11: Save sponge state             |
+    |                           v                                             |
     |                    +-------------+                                      |
-    |                    |sponge_digest|                                      |
-    |                    +------+------+                                      |
+    |                    |sponge_digest|  Step 11: Save sponge state          |
+    |                    +------+------+  (checkpoint for deferred checks)    |
     |                           |                                             |
     +---------------------------+-----------------------------------------+   |
     |                           |     POLYNOMIAL COMMITMENT VERIFICATION  |   |
+    |                           |     (partial - IPA deferred via b(X))   |   |
     +---------------------------+-----------------------------------------+   |
     |                           v                                             |
     |  +------------------+   +----------------+                              |
-    |  |  Verification    |-->| ft_comm        |  Step 12: Linearization      |
-    |  |  Key + zeta      |   | (linearization)|          polynomial          |
+    |  |  Verification    |-->| ft_comm        |  Step 12: Compute ft_comm    |
+    |  |  Key + zeta      |   | (linearization)|  (linearization polynomial)  |
     |  +------------------+   +-------+--------+                              |
     |                                 |                                       |
     |                                 v                                       |
     |  +------------------+   +----------------+                              |
-    |  |  Opening Proof   |-->| IPA Check      |  Step 13: Bulletproof        |
-    |  |  (L, R, delta, G)|   |                |          verification        |
-    |  +------------------+   +-------+--------+                              |
-    |                                 |                                       |
+    |  |  Opening Proof   |-->| IPA Check      |  Step 13: Partial IPA check  |
+    |  |  (L, R, delta,   |   | (incremental)  |  - absorb L, R pairs         |
+    |  |   sg = new accum)|   +-------+--------+  - squeeze new challenges    |
+    |  +------------------+           |           - deferred (not full check) |
     |                                 v                                       |
     |                         +----------------+                              |
-    |                         | Bulletproof    |  Step 14: Return challenges  |
-    |                         | Challenges     |          for next layer      |
+    |                         | New Bulletproof|  Step 14: Assert challenges  |
+    |                         | Challenges     |  match + return new accum    |
+    |                         | (for next sg)  |  (challenges define new b(X))|
     |                         +----------------+                              |
     |                                                                         |
     +-------------------------------------------------------------------------+
@@ -139,62 +189,113 @@
 
     {2 Deferred Verification Flow (finalize_other_proof)}
 
+    This is where the deferred IPA verification happens. The key check is
+    verifying that [b = b(zeta) + r * b(zeta*omega)] where b(X) is the
+    challenge polynomial reconstructed from bulletproof_challenges.
+
+    Each step below corresponds to a comment marker in the implementation.
+    To list all steps: [grep -n "== Step" step_verifier.ml | grep -v IVC]
+
     {v
     +-------------------------------------------------------------------------+
     |                      DEFERRED VALUES VERIFICATION                       |
+    |                   (completing the IPA accumulator check)                |
     +-------------------------------------------------------------------------+
     |                                                                         |
     |  +------------------+   +------------------+                             |
-    |  | Deferred Values  |   | Feature Flags    |  Step 1: Validate flags    |
-    |  | (from wrap)      |   |                  |                            |
+    |  | Deferred Values  |   | Feature Flags    |  Step 1: Validate evals    |
+    |  | (from wrap)      |   |                  |          match flags       |
     |  +--------+---------+   +--------+---------+                            |
     |           |                      |                                      |
     |           v                      v                                      |
     |  +----------------------------------------+                             |
-    |  | Scalar Challenge Conversion            |  Step 2: EndoMulScalar      |
-    |  | (a,b) -> a + b*endo                    |          gate constraints   |
+    |  | Scalar Challenge Conversion            |  Step 2: Convert alpha,     |
+    |  | (a,b) -> a + b*endo                    |          zeta, xi via endo  |
     |  +-------------------+--------------------+                             |
     |                      |                                                  |
     |                      v                                                  |
     |  +--------------------------------------+                               |
-    |  | Domain Setup (known or side-loaded)  |   Step 3-4: Domain + zeta*w  |
-    |  | zeta*w = generator * zeta            |                              |
+    |  | Domain Setup (known or side-loaded)  |   Step 3: Determine domain   |
     |  +-------------------+------------------+                               |
     |                      |                                                  |
     |                      v                                                  |
     |  +--------------------------------------+                               |
-    |  | Challenge Polynomial b(X)            |   Step 5-6: Build and         |
-    |  | Evaluate at zeta and zeta*w          |            evaluate b(X)      |
+    |  | Compute zeta*omega                   |   Step 4: Second eval point  |
+    |  | zetaw = generator * zeta             |                              |
+    |  +-------------------+------------------+                               |
+    |                      |                                                  |
+    +----------------------+--------------------------------------------------+
+    |                      |      ACCUMULATOR VERIFICATION (b(X) check)       |
+    +----------------------+--------------------------------------------------+
+    |                      v                                                  |
+    |  +--------------------------------------+                               |
+    |  | Build Challenge Polynomials b(X)     |   Step 5: Reconstruct b(X)   |
+    |  | from prev_challenges (sg_olds)       |   from bulletproof challenges|
+    |  | b(X) = prod_i (1 + u_i * X^{2^k-1-i})|   (one per previous proof)   |
     |  +-------------------+------------------+                               |
     |                      |                                                  |
     |                      v                                                  |
     |  +--------------------------------------+                               |
-    |  | Sponge Reconstruction                |   Step 7-8: Absorb evals,     |
-    |  | Absorb: digest, ft_eval1, evals      |            verify xi          |
-    |  | Squeeze: xi, r                       |                               |
+    |  | Evaluate b(X) at zeta and zetaw      |   Step 6: Compute b(zeta),   |
+    |  | for each previous proof's challenges |            b(zetaw)          |
+    |  +-------------------+------------------+                               |
+    |                      |                                                  |
+    +----------------------+--------------------------------------------------+
+    |                      |      SPONGE RECONSTRUCTION & CHALLENGE CHECK     |
+    +----------------------+--------------------------------------------------+
+    |                      v                                                  |
+    |  +--------------------------------------+                               |
+    |  | Sponge Reconstruction                |   Step 7: Absorb challenge   |
+    |  | - Absorb challenge_digest            |            digest, ft_eval1, |
+    |  | - Absorb ft_eval1                    |            public input      |
+    |  | - Absorb all polynomial evaluations  |            evals, poly evals |
     |  +-------------------+------------------+                               |
     |                      |                                                  |
     |                      v                                                  |
     |  +--------------------------------------+                               |
-    |  | PlonK Evaluation Checks              |   Step 9-10: Build minimal    |
-    |  | Combined evaluations + scalars env   |             form + env        |
+    |  | Squeeze and verify xi                |   Step 8: Verify xi matches  |
+    |  | Squeeze r (batching challenge)       |            deferred value    |
+    |  +-------------------+------------------+                               |
+    |                      |                                                  |
+    +----------------------+--------------------------------------------------+
+    |                      |      PLONK RELATION & INNER PRODUCT CHECKS       |
+    +----------------------+--------------------------------------------------+
+    |                      v                                                  |
+    |  +--------------------------------------+                               |
+    |  | PlonK minimal form + combined evals  |   Step 9: Prepare PlonK      |
+    |  | (combine chunked evals into singles) |            data structures   |
     |  +-------------------+------------------+                               |
     |                      |                                                  |
     |                      v                                                  |
     |  +--------------------------------------+                               |
-    |  | Combined Inner Product               |   Step 11: Verify IPA         |
-    |  | sum r^i * (xi*f(zeta) + f(zeta*w))   |            accumulator        |
+    |  | Build PlonK scalars environment      |   Step 10: Compute all       |
+    |  | (vanishing poly, permutation, etc.)  |             scalar values    |
     |  +-------------------+------------------+                               |
     |                      |                                                  |
     |                      v                                                  |
     |  +--------------------------------------+                               |
-    |  | B Value = b(zeta)*b(zeta*w)*G        |   Step 12: Verify b           |
+    |  | Combined Inner Product Check         |   Step 11: Verify            |
+    |  | actual = sum_i r^i sum_j xi^j f_j()  |   combined_inner_product     |
+    |  | Check: actual == deferred value      |   matches claimed value      |
     |  +-------------------+------------------+                               |
     |                      |                                                  |
     |                      v                                                  |
     |  +--------------------------------------+                               |
-    |  | PlonK Relation Constraints           |   Step 13-14: Gate checks,    |
-    |  | (gates + permutation + lookup)       |              return result    |
+    |  | B Value Verification (core IPA check)|   Step 12: Verify b value    |
+    |  | actual_b = b(zeta) + r * b(zetaw)    |   This is the accumulator    |
+    |  | Check: actual_b == deferred b        |   check that completes IPA   |
+    |  +-------------------+------------------+                               |
+    |                      |                                                  |
+    |                      v                                                  |
+    |  +--------------------------------------+                               |
+    |  | PlonK Relation Constraints           |   Step 13: Verify PlonK      |
+    |  | (gates + permutation checks)         |            constraints hold  |
+    |  +-------------------+------------------+                               |
+    |                      |                                                  |
+    |                      v                                                  |
+    |  +--------------------------------------+                               |
+    |  | Return: all checks passed +          |   Step 14: Combine all       |
+    |  |         new bulletproof_challenges   |   all checks + challenges    |
     |  +--------------------------------------+                               |
     |                                                                         |
     +-------------------------------------------------------------------------+
@@ -275,11 +376,29 @@ val assert_n_bits : n:int -> Impl.Field.t -> unit
 (** [finalize_other_proof] generates constraints that complete the deferred
     scalar-field checks from a previous wrap proof.
 
+    {b This is where the deferred IPA verification happens.} When a wrap circuit
+    creates a proof, the expensive IPA verification is deferred rather than
+    performed in full. This function completes that deferred verification by
+    checking the challenge polynomial [b(X)] and the combined inner product.
+    The [sg] commitment from the previous proof encodes the accumulated IPA
+    state, and this function verifies that state is consistent.
+
     When a wrap circuit creates a proof, some checks that would be expensive
     in the wrap circuit's native field are deferred. These deferred values
     are passed to the next step circuit, which can perform them efficiently
     since they involve its native field. This function builds the constraints
     to verify those deferred values.
+
+    {3 The Critical b(X) Verification}
+
+    The most important check in this function is verifying the [b] value:
+    - Reconstruct the challenge polynomial [b(X)] from [bulletproof_challenges]
+    - Evaluate [b(zeta)] and [b(zeta * omega)]
+    - Verify that [b = b(zeta) + r * b(zeta * omega)]
+
+    This check ensures the accumulated IPA state (encoded in the previous
+    proof's [sg] commitment) is consistent with the claimed evaluations.
+    Without this check, a malicious prover could forge IPA opening proofs.
 
     {3 Type Parameters}
 
@@ -298,7 +417,8 @@ val assert_n_bits : n:int -> Impl.Field.t -> unit
        input evaluations, and all polynomial evaluations
     5. {b Challenge verification}: Squeeze xi and r, verify xi matches
     6. {b Combined inner product}: Compute and verify the combined inner product
-    7. {b B value verification}: Verify b value was computed correctly
+    7. {b B value verification}: Verify b value was computed correctly -
+       {e this is the core IPA accumulation check}
     8. {b PlonK checks}: Verify PlonK arithmetic constraints
 
     {3 Parameters}
@@ -454,7 +574,10 @@ val hash_messages_for_next_step_proof_opt :
 
     - [~proofs_verified]: First-class module specifying number of proofs
     - [~is_base_case]: Whether this is the base case (no previous proofs)
-    - [~sg_old]: challenge polynomial from previous IPA rounds
+    - [~sg_old]: {b The recursion accumulator} - challenge polynomial
+      commitments from previous proofs. Each entry is a curve point encoding
+      the accumulated IPA state from a predecessor proof. Absorbed into the
+      Fiat-Shamir transcript to bind this proof to its predecessors.
     - [~sponge_after_index]: Sponge state after absorbing the verification key
     - [~lookup_parameters]: Parameters for lookup arguments (if used)
     - [~feature_flags]: Which optional features are enabled in the circuit

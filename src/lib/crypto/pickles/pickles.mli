@@ -149,6 +149,24 @@
     "Bulletproofs" in some contexts. The IPA allows proving that a committed
     polynomial evaluates to a claimed value at a given point.
 
+    {b Deferred verification.} In recursive SNARKs, fully verifying an IPA
+    opening proof inside a circuit would be prohibitively expensive. Instead,
+    Pickles uses {e deferred} (or {e incremental}) verification: the in-circuit
+    verifier does {b not} fully verify the polynomial opening proof. Rather,
+    it:
+
+    + Accumulates the IPA challenges into a new challenge polynomial [b(X)]
+    + Produces a commitment [sg] to this polynomial
+    + Passes [sg] (and associated challenges) to the next layer of recursion
+
+    The actual verification of the IPA is "accumulated" across recursion layers
+    rather than being performed in full at each step. This accumulation via the
+    challenge polynomial is what makes Pickles efficient. See
+    {!module:Step_verifier.incrementally_verify_proof} and
+    {!module:Wrap_verifier.incrementally_verify_proof} for the in-circuit
+    verifiers, and {!module:Step_verifier.finalize_other_proof} and
+    {!module:Wrap_verifier.finalize_other_proof} for the deferred checks.
+
     {4 Bulletproof Challenges}
 
     The challenges generated during the IPA protocol. In each round of the
@@ -157,23 +175,55 @@
 
     In code: {!type:Bulletproof_challenge.t}, {!type:Step_bp_vec.t}
 
-    {4 Challenge Polynomial}
+    {4 Challenge Polynomial b(X) - The Core of Recursion}
 
     The polynomial [b(X) = prod_i (1 + u_i * X^{2^{n-1-i}})] where [u_i] are the
-    bulletproof challenges. Evaluating this polynomial is part of IPA
-    verification. The verifiers build and evaluate this polynomial as part of
-    the deferred verification flow.
+    bulletproof challenges from the IPA. This polynomial is {b the key to
+    efficient recursive verification}:
+
+    + It encodes all IPA challenges as coefficients of a single polynomial
+    + Its commitment [sg] serves as a compact "accumulator" of verification state
+    + Evaluating [b(zeta)] and [b(zeta*omega)] replaces expensive in-circuit IPA
+      verification with simple polynomial evaluation
+
+    The challenge polynomial enables {e incremental verification}: rather than
+    fully verifying each IPA inside a circuit (which would be too expensive),
+    the verifier:
+
+    1. Reconstructs [b(X)] from the bulletproof challenges
+    2. Evaluates it at the required points ([zeta] and [zeta * omega])
+    3. Checks that the evaluations are consistent with the combined inner
+       product
+
+    This deferred approach is what makes Pickles practical. Without it, each
+    recursion layer would need to perform O(n) curve operations for IPA
+    verification inside the circuit.
 
     In code: [challenge_polynomial] in {!module:Wrap_verifier},
     see also {!module:Step_verifier.finalize_other_proof}
 
-    {4 Challenge Polynomial Commitment (sg)}
+    {4 Challenge Polynomial Commitment sg / sg_old - The Recursion Accumulator}
 
-    The commitment to the challenge polynomial, often called "sg" in the code.
-    This commitment is the "accumulator" that carries IPA state across
-    recursive proof steps.
+    The commitment to the challenge polynomial [b(X)], often called [sg] in the
+    code. This is {b the fundamental accumulator} that carries IPA verification
+    state across recursive proof layers:
 
-    In code: [challenge_polynomial_commitment], {!val:sg}
+    + [sg]: The challenge polynomial commitment from the {e current} proof
+    + [sg_old]: Challenge polynomial commitments from {e previous} proofs being
+      verified (one per predecessor proof)
+
+    The [sg_old] values are absorbed into the Fiat-Shamir transcript at the
+    beginning of verification, binding the current proof to its predecessors.
+    This creates a chain of accumulated IPA state through the recursion.
+
+    {b Why sg is critical:} Without [sg], each recursive step would need to
+    fully re-verify all previous IPA proofs. Instead, [sg] compresses all
+    previous IPA verification into a single curve point, enabling constant-size
+    recursive proofs regardless of recursion depth.
+
+    In code: [challenge_polynomial_commitment] in opening proofs,
+    [sg_old] parameter in {!module:Step_verifier.verify} and
+    {!module:Wrap_verifier.incrementally_verify_proof}
 
     {4 Combined Inner Product}
 
@@ -379,7 +429,7 @@
     - [combined_inner_product] and [b]: Deferred scalar-field values
 
     {b Recomputed in Step:}
-    The step circuit does NOT recompute the wrap proof's challenges. Instead:
+    The step circuit does not recompute the wrap proof's challenges. Instead:
     + It uses the challenges from the wrap statement
     + It verifies that these challenges are consistent with the proof
     + Group operations (native in step) are verified directly
