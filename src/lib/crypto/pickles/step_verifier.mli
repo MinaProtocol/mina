@@ -409,17 +409,26 @@ val assert_n_bits : n:int -> Impl.Field.t -> unit
 
     {3 Constraint Generation Steps}
 
+    To find each step in code: [grep -n "== Step" step_verifier.ml | grep -v IVC]
+
     1. {b Feature flag validation}: Validate evaluation structure matches flags
-    2. {b Domain determination}: Determine domain (known or side-loaded)
-    3. {b Challenge polynomial evaluation}: Compute sg_olds and evaluate at
-       zeta and zetaw
-    4. {b Sponge reconstruction}: Absorb challenge digest, ft_eval1, public
-       input evaluations, and all polynomial evaluations
-    5. {b Challenge verification}: Squeeze xi and r, verify xi matches
-    6. {b Combined inner product}: Compute and verify the combined inner product
-    7. {b B value verification}: Verify b value was computed correctly -
-       {e this is the core IPA accumulation check}
-    8. {b PlonK checks}: Verify PlonK arithmetic constraints
+    2. {b Scalar challenge conversion}: Convert alpha, zeta, xi via endomorphism
+    3. {b Domain determination}: Determine domain (known or side-loaded)
+    4. {b Evaluation point computation}: Compute zetaw = generator * zeta
+    5. {b Challenge polynomial construction}: Build b(X) from prev_challenges
+    6. {b Challenge polynomial evaluation}: Evaluate b(X) at zeta and zetaw
+    7. {b Sponge state reconstruction}: Absorb challenge digest, ft_eval1,
+       public input evaluations, and all polynomial evaluations
+    8. {b Challenge sampling and verification}: Squeeze xi and r, verify xi
+    9. {b PlonK minimal form}: Prepare PlonK data structures, combine chunked
+       evaluations
+    10. {b PlonK scalars environment}: Compute vanishing poly, permutation, etc.
+    11. {b Combined inner product verification}: Verify combined_inner_product
+        matches claimed value
+    12. {b B value verification}: Verify [b = b(zeta) + r * b(zetaw)] -
+        {e this is the core IPA accumulation check}
+    13. {b PlonK relation checks}: Verify PlonK arithmetic constraints
+    14. {b Combine all checks}: Return boolean AND of all checks + challenges
 
     {3 Parameters}
 
@@ -559,12 +568,18 @@ val hash_messages_for_next_step_proof_opt :
 
     {3 Constraint Generation Steps}
 
-    1. {b Pack statement}: Convert statement to public input array
-    2. {b Incremental verification}: Call [incrementally_verify_proof] to
+    To find each step in code: search for ["== IVC Step"] in the [verify]
+    function in [step_verifier.ml] (lines ~1334-1390).
+
+    1. {b Pack statement into public input}: Convert statement to public input
+       array for the circuit
+    2. {b Initialize sponge and extract deferred values}: Set up sponge state,
+       extract deferred values from the unfinalized proof
+    3. {b Run incremental verification}: Call [incrementally_verify_proof] to
        build constraints for Fiat-Shamir transcript reconstruction and IPA
-    3. {b Sponge digest assertion}: Assert computed sponge digest matches
-    4. {b Bulletproof challenge assertion}: Assert bulletproof challenges match
-       (with special handling for base case)
+    4. {b Assert sponge digest and challenges match}: Verify computed sponge
+       digest matches expected, assert bulletproof challenges match (with
+       special handling for base case where challenges are dummy values)
 
     {3 Type Parameters}
 
