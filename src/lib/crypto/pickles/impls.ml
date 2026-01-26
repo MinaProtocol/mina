@@ -104,9 +104,6 @@ module Step = struct
     let typ : _ Impl.Typ.t =
       let (Typ typ_unchecked) = typ_unchecked in
       Typ { typ_unchecked with check }
-
-    let _to_bits (x, b) =
-      Field.unpack x ~length:(Field.size_in_bits - 1) @ [ b ]
   end
 
   module Digest = Digest.Make (Impl)
@@ -227,8 +224,6 @@ module Wrap = struct
     let typ : _ Impl.Typ.t =
       let (Typ typ_unchecked) = typ_unchecked in
       Typ { typ_unchecked with check }
-
-    let _to_bits x = Field.unpack x ~length:Field.size_in_bits
   end
 
   let input

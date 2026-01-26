@@ -92,8 +92,6 @@ struct
 
       let typ = Impls.Wrap.Other_field.typ
 
-      let _to_bits_unsafe (x : t) = Wrap_main_inputs.Unsafe.unpack_unboolean x
-
       let absorb_shifted sponge (x : t Shifted_value.Type1.t) =
         match x with Shifted_value x -> Sponge.absorb sponge x
     end
@@ -106,9 +104,6 @@ struct
       type t = Impls.Wrap.Other_field.t
 
       let typ = Impls.Wrap.Other_field.typ_unchecked
-
-      let _absorb_shifted sponge (x : t Pickles_types.Shifted_value.Type1.t) =
-        match x with Shifted_value x -> Sponge.absorb sponge x
     end
   end
 
@@ -126,23 +121,6 @@ struct
                 %!"
               lab (read_var x) (read_var y))
 
-  let _print_w lab gs =
-    if Import.debug then
-      Array.iteri gs ~f:(fun i (fin, g) ->
-          as_prover
-            As_prover.(fun () -> printf "fin=%b %!" (read Boolean.typ fin)) ;
-          ksprintf print_g "%s[%d]" lab i g )
-
-  let _print_chal lab x =
-    if Import.debug then
-      as_prover
-        As_prover.(
-          fun () ->
-            printf "in-snark %s:%!" lab ;
-            Field.Constant.print
-              (Field.Constant.project (List.map ~f:(read Boolean.typ) x)) ;
-            printf "\n%!")
-
   let print_bool lab x =
     if debug then
       as_prover (fun () ->
@@ -153,9 +131,6 @@ struct
   module Scalar_challenge =
     SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Wrap_inner_curve)
   module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
-
-  let _product m f =
-    Core_kernel.List.reduce_exn (Core_kernel.List.init m ~f) ~f:Field.( * )
 
   let absorb sponge ty t =
     absorb
@@ -466,9 +441,6 @@ struct
                      (Array.map2_exn
                         ~f:(Double.map2 ~f:(Double.map2 ~f:Field.( + ))) )
               |> Array.map ~f:(Double.map ~f:(Double.map ~f:Util.Wrap.seal)) )
-
-  let _h_precomp =
-    Lazy.map ~f:Inner_curve.Scaling_precomputation.create Generators.h
 
   let group_map =
     let f =
@@ -1465,15 +1437,6 @@ struct
         (* Return sponge digest and bulletproof challenges for finalization *)
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
-  let _mask_evals (type n)
-      ~(lengths :
-         (int, n) Pickles_types.Vector.t Pickles_types.Plonk_types.Evals.t )
-      (choice : n One_hot_vector.t)
-      (e : Field.t array Pickles_types.Plonk_types.Evals.t) :
-      (Boolean.var * Field.t) array Pickles_types.Plonk_types.Evals.t =
-    Pickles_types.Plonk_types.Evals.map2 lengths e ~f:(fun lengths e ->
-        Array.zip_exn (mask lengths choice) e )
-
   let compute_challenges ~scalar chals =
     Vector.map chals ~f:(fun prechallenge ->
         scalar @@ Bulletproof_challenge.pack prechallenge )
@@ -1514,10 +1477,6 @@ struct
                 acc' )
         | [] ->
             failwith "empty list" )
-
-  let _shift1 =
-    Pickles_types.Shifted_value.Type1.Shift.(
-      map ~f:Field.constant (create (module Field.Constant)))
 
   let shift2 =
     Shifted_value.Type2.Shift.(
@@ -1822,25 +1781,6 @@ struct
         ; plonk_checks_passed (* PlonK relation satisfied *)
         ]
     , bulletproof_challenges )
-
-  let _map_challenges
-      { Import.Types.Step.Proof_state.Deferred_values.plonk
-      ; combined_inner_product
-      ; xi
-      ; bulletproof_challenges
-      ; b
-      } ~f ~scalar =
-    { Types.Step.Proof_state.Deferred_values.plonk =
-        Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
-          plonk ~f ~scalar
-    ; combined_inner_product
-    ; bulletproof_challenges =
-        Vector.map bulletproof_challenges
-          ~f:(fun (r : _ Bulletproof_challenge.t) ->
-            Bulletproof_challenge.map ~f:scalar r )
-    ; xi = scalar xi
-    ; b
-    }
 end
 
 include Make (Wrap_main_inputs)

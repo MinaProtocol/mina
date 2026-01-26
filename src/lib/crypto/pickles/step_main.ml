@@ -11,12 +11,6 @@ open Impls.Step
 
    to the numeric representation i. *)
 
-let _one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
-    Field.t =
-  let n = Vector.length (v :> (Boolean.var, n) Vector.t) in
-  let open Step_verifier in
-  Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
-
 module Make (Inductive_rule : Inductive_rule.Intf) = struct
   module B = Inductive_rule.B
 

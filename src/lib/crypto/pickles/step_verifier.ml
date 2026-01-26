@@ -76,9 +76,6 @@ struct
         Field.((b :> t) * x, (b :> t) * y) )
       ty t
 
-  let _scalar_to_field s =
-    SC.to_field_checked (module Impl) s ~endo:Endo.Wrap_inner_curve.scalar
-
   let assert_n_bits ~n a =
     (* Scalar_challenge.to_field_checked has the side effect of
         checking that the input fits in n bits. *)
@@ -229,10 +226,6 @@ struct
     in
     fun x -> Lazy.force f x
 
-  let _scale_fast p s =
-    with_label __LOC__ (fun () ->
-        Ops.scale_fast p s ~num_bits:Field.size_in_bits )
-
   let scale_fast2 p (s : Other_field.t Shifted_value.Type2.t) =
     with_label __LOC__ (fun () ->
         Ops.scale_fast2 p s ~num_bits:Field.size_in_bits )
@@ -381,11 +374,6 @@ struct
       (domains : (Domains.t, n) Vector.t)
       ~(public_input :
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array ) =
-    (*
-    let domains : (Domains.t, Nat.N3.n) Vector.t =
-      Vector.map ~f:(fun proofs_verified -> Common.wrap_domains ~proofs_verified)
-        [ 0; 1 ; 2 ]
-    in *)
     let lagrange_commitment (d : Domains.t) (i : int) : Inner_curve.Constant.t =
       lagrange_commitment ~domain:d.h srs i
     in
@@ -707,15 +695,6 @@ struct
 
   module Pseudo = Pseudo.Step
 
-  (* module Bounded = struct
-       type t = { max : int; actual : Field.t }
-
-       let _of_pseudo ((_, ns) as p : _ Pseudo.t) =
-         { max = Vector.reduce_exn ~f:Int.max ns
-         ; actual = Pseudo.choose p ~f:Field.of_int
-         }
-     end *)
-
   let vanishing_polynomial mask =
     with_label "vanishing_polynomial" (fun () ->
         let mask = Vector.to_array mask in
@@ -762,59 +741,6 @@ struct
       in
       domain ~max:(Domain.log2_size max_domains.h)
 
-  (* module Split_evaluations = struct
-       open Plonk_types
-
-       let mask' { Bounded.max; actual } : Boolean.var array =
-         let (T max) = Nat.of_int max in
-         Vector.to_array (ones_vector (module Impl) ~first_zero:actual max)
-
-       let mask (type n) ~(lengths : (int, n) Vector.t)
-           (choice : n One_hot_vector.T(Impl).t) : Boolean.var array =
-         let max =
-           Option.value_exn
-             (List.max_elt ~compare:Int.compare (Vector.to_list lengths))
-         in
-         let actual = Pseudo.choose (choice, lengths) ~f:Field.of_int in
-         mask' { max; actual }
-
-       let _last =
-         Array.reduce_exn ~f:(fun (b_acc, x_acc) (b, x) ->
-             (Boolean.(b_acc ||| b), Field.if_ b ~then_:x ~else_:x_acc) )
-
-       let pow x bits_lsb =
-         with_label "pow" (fun () ->
-             let rec go acc bs =
-               match bs with
-               | [] ->
-                   acc
-               | b :: bs ->
-                   let acc = Field.square acc in
-                   let acc = Field.if_ b ~then_:Field.(x * acc) ~else_:acc in
-                   go acc bs
-             in
-             go Field.one (List.rev bits_lsb) )
-
-       let _mod_max_degree =
-         let k = Nat.to_int Backend.Tick.Rounds.n in
-         fun d ->
-           let d =
-             Number.of_bits
-               (Field.unpack
-                  ~length:Pickles_base.Side_loaded_verification_key.max_log2_degree
-                  d )
-           in
-           Number.mod_pow_2 d (`Two_to_the k)
-
-       let _mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
-           (choice : n One_hot_vector.T(Impl).t) (e : Field.t array Evals.t) :
-           (Boolean.var * Field.t) array Evals.t =
-         Evals.map2 lengths e ~f:(fun lengths e ->
-             Array.zip_exn (mask ~lengths choice) e )
-     end *)
-
-  let _absorb_field sponge x = Sponge.absorb sponge (`Field x)
-
   (* pt^{2^n} *)
   let pow2_pow (pt : Field.t) (n : int) : Field.t =
     with_label "pow2_pow" (fun () ->
@@ -835,17 +761,10 @@ struct
 
   module Opt_sponge = struct
     include Opt_sponge.Make (Impl) (Step_main_inputs.Sponge.Permutation)
-
-    let _squeeze_challenge sponge : Field.t =
-      lowest_128_bits (squeeze sponge) ~constrain_low_bits:true
   end
 
   let shift1 =
     Shifted_value.Type1.Shift.(
-      map ~f:Field.constant (create (module Field.Constant)))
-
-  let _shift2 =
-    Shifted_value.Type2.Shift.(
       map ~f:Field.constant (create (module Field.Constant)))
 
   module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
@@ -1317,11 +1236,6 @@ struct
               Sponge.squeeze_field sponge
           | `Opt sponge ->
               Opt_sponge.squeeze sponge ) )
-
-  let _accumulation_verifier
-      (_accumulator_verification_key : _ Types_map.For_step.t)
-      _prev_accumulators _proof _new_accumulator : Boolean.var =
-    Boolean.false_
 
   (** Generate constraints for full verification of a wrap proof.
 
