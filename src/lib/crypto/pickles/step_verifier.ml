@@ -1325,12 +1325,6 @@ struct
 
   (** Generate constraints for full verification of a wrap proof.
 
-      This orchestrates the full verification by:
-      1. Packing the statement into public input format
-      2. Calling incrementally_verify_proof for transcript reconstruction
-      3. Asserting the sponge digest matches
-      4. Asserting bulletproof challenges match (with base case handling)
-
       @return Boolean indicating whether all verification constraints pass
   *)
   let verify ~proofs_verified ~is_base_case ~sg_old ~sponge_after_index
