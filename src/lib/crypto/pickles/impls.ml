@@ -10,8 +10,8 @@ let test_bit x i = B.(shift_right x i land one = one)
 (* TODO: I think there are other forbidden values as well. *)
 
 (** returns all the values that can fit in [~size_in_bits] bits and that are
- * either congruent with -2^[~size_in_bits] mod [~modulus] 
- * or congruent with -2^[~size_in_bits] - 1 mod [~modulus] 
+ * either congruent with -2^[~size_in_bits] mod [~modulus]
+ * or congruent with -2^[~size_in_bits] - 1 mod [~modulus]
  *)
 let forbidden_shifted_values ~modulus:r ~size_in_bits =
   let two_to_n = B.(pow (of_int 2) (of_int size_in_bits)) in
@@ -235,6 +235,14 @@ module Wrap = struct
       ~feature_flags:
         ({ Plonk_types.Features.Full.uses_lookups; _ } as feature_flags) () =
     let feature_flags = Plonk_types.Features.of_full feature_flags in
+    (* Zero values for lookup arguments when lookups are inactive or at circuit
+       boundaries. These dummy values are used by the spec system to pad optional
+       lookup data.
+
+       - Type1 shifted values are used because the Wrap circuit's scalar field
+         (Tick/Vesta) fits within its native field (Tock/Pallas), so no
+         high-bit separation is needed (unlike Type2 which splits into
+         (high_bits, low_bit) for larger scalar fields). *)
     let lookup =
       { Types.Wrap.Lookup_parameters.use = uses_lookups
       ; zero =

@@ -1,11 +1,12 @@
 (tests
- (names test_blockchain_snark)
+ (names test_constraint_count)
  (libraries
   alcotest
-  blockchain_snark
   core_kernel
   genesis_constants
+  mina_signature_kind
   node_config
-  snark_params)
+  snark_params
+  transaction_snark)
  (preprocess
   (pps ppx_jane)))
