@@ -56,9 +56,9 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V1 = struct
+  module V2 = struct
     type t =
-      { accounts : (Location.Stable.V1.t, Account.Stable.V2.t) Map.Stable.V1.t
+      { accounts : (Location.Stable.V1.t, Account.Stable.V3.t) Map.Stable.V1.t
       ; token_owners :
           (Token_id.Stable.V2.t, Account_id.Stable.V2.t) Map.Stable.V1.t
       ; hashes : (Address.Stable.V1.t, Ledger_hash.Stable.V1.t) Map.Stable.V1.t
