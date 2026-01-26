@@ -105,7 +105,7 @@ if [[ -z "$TAG" ]]; then usage "Docker tag is not set!"; usage; exit 1; fi;
 
 set -x
 
-container_id=$(docker run -v .:/workdir -p 3087:3087 -d --env MINA_NETWORK=$NETWORK $REPO/mina-rosetta:$TAG-$NETWORK )
+container_id=$(docker run -v .:/workdir -p 3087:3087 -p 3085:3085 -d --env MINA_NETWORK=$NETWORK $REPO/mina-rosetta:$TAG-$NETWORK )
 
 stop_docker() {
         { docker stop "$container_id" ; docker rm "$container_id" ; } || true
