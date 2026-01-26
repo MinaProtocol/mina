@@ -155,7 +155,7 @@ execute_script() {
 # Wait for the container to start
 sleep 5
 #run sanity test
-./scripts/tests/rosetta-sanity.sh --address "http://localhost:3087" --network $NETWORK --wait-for-sync --timeout $TIMEOUT
+./scripts/tests/rosetta-sanity.sh --address "http://localhost:3087" --daemon-graphql-address "http://localhost:3085/graphql" --network $NETWORK --wait-for-sync --timeout $TIMEOUT
 
 # Run load test
 if [[ "$RUN_LOAD_TEST" == true ]]; then
