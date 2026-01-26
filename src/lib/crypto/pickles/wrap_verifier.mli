@@ -431,24 +431,27 @@ val assert_n_bits : n:int -> Impl.Field.t -> unit
 
     {3 Constraint Generation Steps}
 
-    1. {b Index absorption}: Hash the verification key to get index_digest
-    2. {b Old challenges}: Absorb masked sg_old commitments from previous proofs
-    3. {b Public input commitment}: Compute x_hat from public inputs using
-       Lagrange basis, apply blinding, and absorb
-    4. {b Witness commitments}: Absorb w_comm (witness polynomial commitments)
-    5. {b Lookup handling} (if enabled):
-       - Absorb runtime table commitments
-       - Sample joint_combiner challenge
-       - Absorb sorted lookup commitments
-    6. {b Beta/gamma sampling}: Squeeze beta and gamma challenges for
-       permutation argument
-    7. {b Permutation commitment}: Absorb z_comm
-    8. {b Alpha sampling}: Squeeze alpha challenge
-    9. {b Quotient commitment}: Absorb t_comm
-    10. {b Zeta sampling}: Squeeze zeta challenge (evaluation point)
-    11. {b Linearization polynomial}: Compute ft_comm from verification key
-    12. {b Bulletproof check}: Generate constraints for IPA opening proof
-    13. {b Challenge assertion}: Assert sampled challenges match deferred values
+    To find each step in code: [grep -n "== IVC Step" wrap_verifier.ml]
+
+    1. {b Absorb verification key index}: Hash vk to compute index_digest
+    2. {b Absorb index digest + sg_old}: Absorb index_digest and challenge
+       polynomial commitments from previous proofs (the recursion accumulators)
+    3. {b Compute x_hat}: Compute public input commitment via Lagrange basis
+    4. {b Apply blinding and absorb x_hat}: Blind x_hat, absorb into sponge
+    5. {b Absorb w_comm}: Absorb witness polynomial commitments
+    6. {b Handle lookup arguments}: If lookups enabled, absorb runtime tables,
+       sample joint_combiner, absorb sorted commitments
+    7. {b Sample beta and gamma}: Squeeze permutation argument challenges
+    8. {b Absorb lookup aggregation}: If lookups present, absorb aggregation
+    9. {b Absorb z_comm}: Absorb permutation commitment
+    10. {b Sample alpha}: Squeeze constraint combiner challenge
+    11. {b Absorb t_comm}: Absorb quotient polynomial commitment
+    12. {b Sample zeta}: Squeeze evaluation point challenge
+    13. {b Save sponge state}: Checkpoint sponge for deferred verification
+    14. {b Compute ft_comm}: Build linearization polynomial commitment
+    15. {b Bulletproof/IPA verification}: Absorb L, R pairs, squeeze challenges
+        (partial check - full verification deferred via b(X))
+    16. {b Assert deferred values match}: Verify sampled challenges match
 
     {3 Type Parameters}
 
@@ -554,19 +557,24 @@ val incrementally_verify_proof :
 
     {3 Constraint Generation Steps}
 
-    1. {b Challenge computation}: Convert scalar challenges to field elements
-    2. {b Evaluation points}: Compute zetaw = generator * zeta
-    3. {b Challenge polynomials}: Evaluate sg_olds at zeta and zetaw
-    4. {b Sponge reconstruction}:
-       - Absorb challenge digest (hash of old bulletproof challenges)
-       - Absorb ft_eval1, public input evaluations
-       - Absorb all polynomial evaluations (with optional handling)
-    5. {b Challenge verification}: Squeeze xi and r, verify xi matches
-    6. {b Combined inner product}: Compute and verify the combined inner
-       product used in the bulletproof
-    7. {b B value verification}: Verify the b value (challenge polynomial
-       evaluation) was computed correctly
-    8. {b PlonK checks}: Verify the PlonK relation constraints
+    To find each step in code: [grep -n "== Step" wrap_verifier.ml | grep -v IVC]
+
+    1. {b Convert PlonK values to field elements}: Convert scalar challenges
+       to field elements via endomorphism
+    2. {b Compute evaluation points}: Compute zetaw = generator * zeta
+    3. {b Build and evaluate challenge polynomials}: Construct b(X) from
+       old_bulletproof_challenges and evaluate at zeta and zetaw
+    4. {b Reconstruct sponge state}: Absorb challenge digest, ft_eval1,
+       public input evaluations, and all polynomial evaluations
+    5. {b Sample and verify xi challenge}: Squeeze xi and r, verify xi matches
+    6. {b Prepare PlonK minimal form}: Combine chunked evaluations into singles
+    7. {b Build PlonK scalars environment}: Compute vanishing poly, permutation
+    8. {b Verify combined inner product}: Check combined_inner_product matches
+    9. {b Verify b value}: Verify [b = b(zeta) + r * b(zetaw)] -
+       {e this is the core IPA accumulation check}
+    10. {b Verify PlonK relation}: Check PlonK arithmetic constraints
+    11. {b Combine all checks and return}: Return boolean AND of all checks
+        plus the new bulletproof challenges
 
     {3 Parameters}
 
