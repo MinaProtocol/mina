@@ -70,6 +70,25 @@
 
     In code: {!module:Wrap}, {!module:Wrap_main}, {!module:Wrap_verifier}
 
+    {4 Why Constraint Generation?}
+
+    In recursive SNARKs, we cannot simply "run" a verifier inside a circuit.
+    Instead, we express the verification algorithm as arithmetic constraints
+    over field elements. The {!module:Step_verifier} and {!module:Wrap_verifier}
+    modules generate these constraints during circuit construction. The actual
+    verification happens when a prover generates a proof - satisfying these
+    constraints proves that the embedded proof was valid.
+
+    {4 Correspondence with Kimchi Verifier}
+
+    The IVC (incremental verifiable computation) steps in {!module:Step_verifier}
+    and {!module:Wrap_verifier} essentially reimplement the Kimchi verifier as
+    circuit constraints. The order and structure of these steps should match
+    the Kimchi verifier implementation in Rust ([kimchi/src/verifier.rs]).
+    Maintaining this correspondence is critical for correctness: any divergence
+    between the in-circuit verifier and the native Kimchi verifier would break
+    the recursive proof system.
+
     {4 Inductive Rule}
 
     User-defined circuit logic that specifies what a step circuit should
