@@ -11,16 +11,6 @@ let sponge_params_constant = Kimchi_pasta_basic.poseidon_params_fq
 let field_random_oracle ?(length = Me.Field.size_in_bits - 1) s =
   Me.Field.of_bits (Ro.bits_random_oracle ~length s)
 
-let _unrelated_g =
-  let open Common in
-  let group_map =
-    unstage
-      (group_map
-         (module Me.Field)
-         ~a:Me.Inner_curve.Params.a ~b:Me.Inner_curve.Params.b )
-  and str = Fn.compose bits_to_bytes Me.Field.to_bits in
-  fun (x, y) -> group_map (field_random_oracle (str x ^ str y))
-
 open Impl
 
 (* Debug helper to convert wrap circuit field element to a hex string *)
@@ -84,20 +74,6 @@ end
 let%test_unit "sponge" =
   let module T = Make_sponge.Test (Impl) (Tock_field_sponge.Field) (Sponge.S) in
   T.test Tock_field_sponge.params
-
-(* module Input_domain = struct
-     let _lagrange_commitments domain : Backend.Tock.Inner_curve.Affine.t array =
-       let domain_size = Import.Domain.size domain in
-       Common.time "lagrange" (fun () ->
-           Array.init domain_size ~f:(fun i ->
-               (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
-                  (Backend.Tick.Keypair.load_urs ())
-                  domain_size i )
-                 .unshifted.(0)
-               |> Common.finite_exn ) )
-
-     let _domain = Import.Domain.Pow_2_roots_of_unity 7
-   end *)
 
 module Inner_curve = struct
   module C = Kimchi_pasta.Pasta.Vesta

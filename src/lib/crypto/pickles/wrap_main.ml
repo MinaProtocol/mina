@@ -49,19 +49,6 @@ let shifts ~log2_size = Common.tock_shifts ~log2_size
 let domain_generator ~log2_size =
   Backend.Tock.Field.domain_generator ~log2_size |> Impl.Field.constant
 
-let _split_field_typ : (Field.t * Boolean.var, Field.Constant.t) Typ.t =
-  Typ.transport
-    Typ.(field * Boolean.typ)
-    ~there:(fun (x : Field.Constant.t) ->
-      let n = Bigint.of_field x in
-      let is_odd = Bigint.test_bit n 0 in
-      let y = Field.Constant.((if is_odd then x - one else x) / of_int 2) in
-      (y, is_odd) )
-    ~back:(fun (hi, is_odd) ->
-      let open Field.Constant in
-      let x = hi + hi in
-      if is_odd then x + one else x )
-
 (* Split a field element into its high bits (packed) and the low bit.
 
    It does not check that the "high bits" actually fit into n - 1 bits,
