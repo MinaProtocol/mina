@@ -163,7 +163,7 @@ help() {
                                          |   Default: ${ROOT}
 --redirect-logs                          | When set, redirect logs for nodes (excluding workers) and archive to file instead of console output
                                          |   Default: ${REDIRECT_LOGS}
---on-exit                                | How is exit handled. Set to 'grace_exit_all' to use mina CLI to stop all daemon  nodes, and kill SNARK workers; Set to 'kill_snark_workers' to only kill SNARK workers but ignoring everything else. 
+--on-exit                                | Possible Values : {grace_exit_all,kill_snark_workers} . Defines how script exit is handled. If set to 'grace_exit_all' mina CLI to stop all daemon nodes, and kill SNARK workers; If set to 'kill_snark_workers' to only kill SNARK workers but ignoring everything else.
                                          |   Default: ${ON_EXIT}
 -h   |--help                             | Displays this help message
 
@@ -252,6 +252,8 @@ on-exit() {
       fi
       ;;
     kill_snark_workers)
+      # NOTE: SNARK workers are already killed out of this case-statement. Hence
+      # no need to do anything here.
       : ;;
     *)
       echo "Unknown ON_EXIT value: $1" >&2
