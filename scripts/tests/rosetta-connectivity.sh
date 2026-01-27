@@ -107,11 +107,33 @@ set -x
 
 container_id=$(docker run -v .:/workdir -p 3087:3087 -p 3085:3085 -d --env MINA_NETWORK=$NETWORK $REPO/mina-rosetta:$TAG-$NETWORK )
 
+# Function to collect logs from the Docker container (called on exit or error)
+collect_logs() {
+    echo "========================= COLLECTING LOGS ==========================="
+    mkdir -p test_output/artifacts
+
+    # Container stdout/stderr (includes rosetta, archive output)
+    docker logs "$container_id" > test_output/artifacts/container-stdout.log 2> test_output/artifacts/container-stderr.log
+
+    # Mina config directory contains mina.log, mina-best-tip.log, etc.
+    docker cp "$container_id:/data/.mina-config" test_output/artifacts/mina-config || echo "mina config dir not accessible"
+
+    # Daemon status at end of test
+    docker exec "$container_id" mina client status --json > test_output/artifacts/daemon-status.json 2>/dev/null || echo "Could not get daemon status" > test_output/artifacts/daemon-status.json
+
+    echo "Logs collected in test_output/artifacts/"
+}
+
 stop_docker() {
         { docker stop "$container_id" ; docker rm "$container_id" ; } || true
 }
 
-trap stop_docker ERR
+cleanup() {
+    collect_logs
+    stop_docker
+}
+
+trap cleanup EXIT
 
 # Function to wait for new blocks
 wait_for_new_blocks() {
@@ -205,4 +227,4 @@ else
         echo "Skipping compatibility test."
 fi
 
-stop_docker
+# cleanup is called automatically on EXIT via trap
