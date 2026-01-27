@@ -33,6 +33,7 @@
 (package (name data_hash_lib))
 (package (name disk_cache))
 (package (name downloader))
+(package (name dsu))
 (package (name dummy_values))
 (package (name error_json))
 (package (name extract_blocks))
