@@ -103,6 +103,13 @@ let generateDockerForCodename =
                   }
                   spec.precomputed_block_prefix
 
+          let genesis_timestamp =
+                merge
+                  { Some = \(ts : Text) -> [ "GENESIS_TIMESTAMP=${ts}" ]
+                  , None = [] : List Text
+                  }
+                  spec.genesis_timestamp
+
           in  [ MinaArtifact.buildArtifacts
                   MinaArtifact.MinaBuildSpec::{
                   , artifacts =
@@ -118,9 +125,10 @@ let generateDockerForCodename =
                   , prefix = pipelineName
                   , suffix = Some "-${DebianVersions.lowerName codename}"
                   , extraBuildEnvs =
-                    [ "NETWORK_NAME=${Network.lowerName spec.network}"
-                    , "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
-                    ]
+                        [ "NETWORK_NAME=${Network.lowerName spec.network}"
+                        , "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
+                        ]
+                      # genesis_timestamp
                   , buildScript =
                       "./buildkite/scripts/hardfork/build-packages.sh"
                   }
