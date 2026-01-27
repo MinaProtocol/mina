@@ -1,5 +1,6 @@
-// Provides: plonk_wasm
-var plonk_wasm = globalThis.plonk_wasm;
+// Provides: kimchi_ffi
+var kimchi_ffi = globalThis.kimchi_wasm;
 
-// Provides: plonk_napi
-var plonk_napi = globalThis.plonk_wasm
+// Requires: kimchi_ffi
+// Provides: kimchi_napi
+var kimchi_napi = kimchi_ffi
