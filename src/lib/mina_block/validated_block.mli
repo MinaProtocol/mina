@@ -11,6 +11,17 @@ module Stable : sig
   end
 end]
 
+module Serializable_type : sig
+  [%%versioned:
+  module Stable : sig
+    module V2 : sig
+      type t
+
+      val hashes : t -> State_hash.State_hashes.t
+    end
+  end]
+end
+
 type t [@@deriving to_yojson]
 
 val lift : Validation.fully_valid_with_block -> t
@@ -39,3 +50,5 @@ val body : t -> Staged_ledger_diff.Body.t
 val is_genesis : t -> bool
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+val to_serializable_type : t -> Serializable_type.t

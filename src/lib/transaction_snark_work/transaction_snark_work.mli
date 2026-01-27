@@ -92,6 +92,23 @@ module Stable : sig
 end
 with type V2.t = Mina_wire_types.Transaction_snark_work.V2.t
 
+module Serializable_type : sig
+  [%%versioned:
+  module Stable : sig
+    module V2 : sig
+      type t
+
+      val statement : t -> Statement.Stable.V2.t
+
+      val fee : t -> Fee.Stable.V1.t
+
+      val prover : t -> Public_key.Compressed.Stable.V1.t
+
+      val proofs : t -> Ledger_proof.Serializable_type.t One_or_two.t
+    end
+  end]
+end
+
 type unchecked = t
 
 module Checked : sig
@@ -110,3 +127,5 @@ val write_all_proofs_to_disk :
   proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+val to_serializable_type : t -> Serializable_type.t

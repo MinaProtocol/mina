@@ -32,7 +32,39 @@ module Stable = struct
   end
 end]
 
+module Serializable_type = struct
+  type raw_serializable = Stable.Latest.t
+
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t =
+        ( Proof_cache_tag.Serializable_type.Stable.V2.t
+        , Signature.Stable.V1.t )
+        Poly.Stable.V1.t
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let to_raw_serializable : t -> raw_serializable = function
+    | Proof proof ->
+        Proof (Proof_cache_tag.Serializable_type.to_proof proof)
+    | Signature s ->
+        Signature s
+    | None_given ->
+        None_given
+end
+
 type t = (Proof_cache_tag.t, Signature.t) Poly.t [@@deriving sexp_of, to_yojson]
+
+let to_serializable_type : t -> Serializable_type.t = function
+  | Proof proof ->
+      Proof (Proof_cache_tag.Serializable_type.of_cache_tag proof)
+  | Signature s ->
+      Signature s
+  | None_given ->
+      None_given
 
 (* lazy, to prevent spawning Rust threads at startup, which prevents daemonization *)
 let gen_with_dummies : Stable.Latest.t Quickcheck.Generator.t =

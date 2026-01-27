@@ -103,6 +103,26 @@ module type Full = sig
     end
   end]
 
+  module Serializable_type : sig
+    type raw_serializable := Stable.Latest.t
+
+    [%%versioned:
+    module Stable : sig
+      module V2 : sig
+        type t
+      end
+    end]
+
+    val create :
+         statement:Statement.With_sok.t
+      -> proof:Proof_cache_tag.Serializable_type.Stable.Latest.t
+      -> t
+
+    val statement : t -> Statement.t
+
+    val to_raw_serializable : t -> raw_serializable
+  end
+
   val create : statement:Statement.With_sok.t -> proof:Mina_base.Proof.t -> t
 
   val proof : t -> Mina_base.Proof.t

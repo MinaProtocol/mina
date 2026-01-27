@@ -353,13 +353,13 @@ module Util = struct
     in
     let heir_transition =
       Breadcrumb.validated_transition heir
-      |> Mina_block.Validated.read_all_proofs_from_disk
+      |> Mina_block.Validated.to_serializable_type
     in
     let new_scan_state_unwrapped =
-      Staged_ledger.Scan_state.read_all_proofs_from_disk new_scan_state
+      Staged_ledger.Scan_state.to_serializable_type new_scan_state
     in
     let new_root_data =
-      Root_data.Limited.Stable.Latest.create ~transition:heir_transition
+      Root_data.Limited.Serializable_type.create ~transition:heir_transition
         ~scan_state:new_scan_state_unwrapped
         ~pending_coinbase:
           (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
@@ -665,11 +665,11 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       (old_best_tip, None)
   | Root_transitioned { new_root; garbage = Full garbage; _ } ->
       let new_root_hash =
-        (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
+        (Root_data.Limited.Serializable_type.hashes new_root).state_hash
       in
       let old_root_hash = t.root in
       let new_root_protocol_states =
-        Root_data.Limited.Stable.Latest.protocol_states new_root
+        Root_data.Limited.Serializable_type.protocol_states new_root
       in
       [%log' internal t.logger] "Move_frontier_root" ;
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage

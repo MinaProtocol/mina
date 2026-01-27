@@ -10,9 +10,24 @@ module Common : sig
     end
   end]
 
+  module Serializable_type : sig
+    type raw_serializable := Stable.Latest.t
+
+    [%%versioned:
+    module Stable : sig
+      module V2 : sig
+        type t
+      end
+    end]
+
+    val to_raw_serializable : t -> raw_serializable
+  end
+
   type t
 
   val read_all_proofs_from_disk : t -> Stable.V2.t
+
+  val to_serializable_type : t -> Serializable_type.t
 end
 
 (* Historical root data is similar to Limited root data, except that it also
@@ -65,6 +80,35 @@ module Limited : sig
     end
   end]
 
+  module Serializable_type : sig
+    [%%versioned:
+    module Stable : sig
+      module V3 : sig
+        type t
+      end
+    end]
+
+    val hashes : t -> State_hash.State_hashes.Stable.V1.t
+
+    val common : t -> Common.Serializable_type.t
+
+    val protocol_states :
+         t
+      -> Mina_state.Protocol_state.Value.Stable.V2.t
+         Mina_base.State_hash.With_state_hashes.Stable.V1.t
+         list
+
+    val create :
+         transition:Mina_block.Validated.Serializable_type.Stable.V2.t
+      -> scan_state:Staged_ledger.Scan_state.Serializable_type.Stable.V2.t
+      -> pending_coinbase:Pending_coinbase.Stable.V2.t
+      -> protocol_states:
+           Mina_state.Protocol_state.value
+           State_hash.With_state_hashes.Stable.V1.t
+           list
+      -> t
+  end
+
   type t [@@deriving to_yojson]
 
   val transition : t -> Mina_block.Validated.t
@@ -113,6 +157,27 @@ module Minimal : sig
       val pending_coinbase : t -> Pending_coinbase.Stable.V2.t
     end
   end]
+
+  module Serializable_type : sig
+    [%%versioned:
+    module Stable : sig
+      module V2 : sig
+        type t
+
+        val hash : t -> State_hash.t
+
+        val of_limited :
+          common:Common.Serializable_type.t -> State_hash.Stable.V1.t -> t
+
+        val common : t -> Common.Serializable_type.t
+
+        val scan_state :
+          t -> Staged_ledger.Scan_state.Serializable_type.Stable.V2.t
+
+        val pending_coinbase : t -> Pending_coinbase.Stable.V2.t
+      end
+    end]
+  end
 
   type t
 

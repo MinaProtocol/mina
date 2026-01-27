@@ -154,6 +154,21 @@ module Pre_diff_with_at_most_two_coinbase = struct
     end
   end]
 
+  module Serializable_type = struct
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          ( Transaction_snark_work.Serializable_type.Stable.V2.t
+          , User_command.Serializable_type.Stable.V2.t With_status.Stable.V2.t
+          )
+          Pre_diff_two.Stable.V2.t
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
   type t =
     (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
 
@@ -170,6 +185,10 @@ module Pre_diff_with_at_most_two_coinbase = struct
   let read_all_proofs_from_disk : t -> Stable.Latest.t =
     Pre_diff_two.map ~f1:Transaction_snark_work.read_all_proofs_from_disk
       ~f2:(With_status.map ~f:User_command.read_all_proofs_from_disk)
+
+  let to_serializable_type : t -> Serializable_type.t =
+    Pre_diff_two.map ~f1:Transaction_snark_work.to_serializable_type
+      ~f2:(With_status.map ~f:User_command.to_serializable_type)
 end
 
 module Pre_diff_with_at_most_one_coinbase = struct
@@ -188,6 +207,21 @@ module Pre_diff_with_at_most_one_coinbase = struct
     end
   end]
 
+  module Serializable_type = struct
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          ( Transaction_snark_work.Serializable_type.Stable.V2.t
+          , User_command.Serializable_type.Stable.V2.t With_status.Stable.V2.t
+          )
+          Pre_diff_one.Stable.V2.t
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
   type t =
     (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
 
@@ -204,6 +238,10 @@ module Pre_diff_with_at_most_one_coinbase = struct
   let read_all_proofs_from_disk : t -> Stable.Latest.t =
     Pre_diff_one.map ~f1:Transaction_snark_work.read_all_proofs_from_disk
       ~f2:(With_status.map ~f:User_command.read_all_proofs_from_disk)
+
+  let to_serializable_type : t -> Serializable_type.t =
+    Pre_diff_one.map ~f1:Transaction_snark_work.to_serializable_type
+      ~f2:(With_status.map ~f:User_command.to_serializable_type)
 end
 
 module Diff = struct
@@ -247,6 +285,22 @@ module Diff = struct
     end
   end]
 
+  module Serializable_type = struct
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          Pre_diff_with_at_most_two_coinbase.Serializable_type.Stable.V2.t
+          * Pre_diff_with_at_most_one_coinbase.Serializable_type.Stable.V2.t
+            option
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let coinbase = coinbase
+  end
+
   type t =
     Pre_diff_with_at_most_two_coinbase.t
     * Pre_diff_with_at_most_one_coinbase.t option
@@ -270,6 +324,15 @@ module Diff = struct
         pre_diff_with_at_most_two_coinbase
     , Option.map pre_diff_with_at_most_one_coinbase_opt
         ~f:Pre_diff_with_at_most_one_coinbase.read_all_proofs_from_disk )
+
+  let to_serializable_type
+      (( pre_diff_with_at_most_two_coinbase
+       , pre_diff_with_at_most_one_coinbase_opt ) :
+        t ) : Serializable_type.t =
+    ( Pre_diff_with_at_most_two_coinbase.to_serializable_type
+        pre_diff_with_at_most_two_coinbase
+    , Option.map pre_diff_with_at_most_one_coinbase_opt
+        ~f:Pre_diff_with_at_most_one_coinbase.to_serializable_type )
 end
 
 [%%versioned
@@ -298,6 +361,27 @@ module Stable = struct
   end
 end]
 
+module Serializable_type = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t = { diff : Diff.Serializable_type.Stable.V2.t }
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let empty_diff : t =
+    { diff =
+        ( { completed_works = []
+          ; commands = []
+          ; coinbase = At_most_two.Zero
+          ; internal_command_statuses = []
+          }
+        , None )
+    }
+end
+
 type t = { diff : Diff.t } [@@deriving fields]
 
 let write_all_proofs_to_disk ~signature_kind ~proof_cache_db t =
@@ -308,6 +392,9 @@ let write_all_proofs_to_disk ~signature_kind ~proof_cache_db t =
 
 let read_all_proofs_from_disk t =
   { Stable.Latest.diff = Diff.read_all_proofs_from_disk t.diff }
+
+let to_serializable_type t =
+  { Serializable_type.diff = Diff.to_serializable_type t.diff }
 
 module With_valid_signatures_and_proofs = struct
   type pre_diff_with_at_most_two_coinbase =

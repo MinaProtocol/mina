@@ -15,6 +15,21 @@ module type S = sig
     end
   end]
 
+  module Serializable_type : sig
+    type raw_serializable := Stable.Latest.t
+
+    [%%versioned:
+    module Stable : sig
+      module V2 : sig
+        type t
+      end
+    end]
+
+    val to_raw_serializable : Stable.Latest.t -> raw_serializable
+
+    val statement : t -> Mina_state.Snarked_ledger_state.t
+  end
+
   val create :
        statement:Mina_state.Snarked_ledger_state.t
     -> sok_digest:Sok_message.Digest.t
@@ -63,5 +78,7 @@ module type S = sig
       -> sok_digest:Sok_message.Digest.t
       -> proof:Proof_cache_tag.t
       -> t
+
+    val to_serializable_type : t -> Serializable_type.Stable.Latest.t
   end
 end

@@ -461,7 +461,7 @@ module For_tests = struct
           ~staged_ledger_hash ~genesis_ledger_hash
           ~body_reference:
             ( Body.compute_reference ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-            @@ Body.read_all_proofs_from_disk body )
+            @@ Body.to_serializable_type body )
           ~ledger_proof_statement
       in
       let previous_state_hashes =
