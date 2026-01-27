@@ -1,22 +1,27 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2025-11-27T13:00:00Z"
+    "genesis_state_timestamp": "2026-01-23T13:00:00Z"
   },
   "ledger": {
     "add_genesis_winner": false,
-    "s3_data_hash": "cce08a77918b5727bf9dd7769e9a729727a394d2fa4377674311e567a9071dc2",
-    "hash": "jwQkrmEhsdde6T3gR98A7GPZSqsfRGP1G2Hi7PJuKLfh3s64Sa3"
+    "s3_data_hash": "d0f921c9db97265e5e8c25cfecbb08ae259e735c0bb5acd0912e43aaec10fced",
+    "hash": "jwXMfukdwJVNpZ3wMEZbuq4zwucYS4cJnij23buAnNYo1GKKrFB"
+  },
+  "daemon": {
+    "slot_tx_end": 2010,
+    "slot_chain_end": 2020,
+    "hard_fork_genesis_slot_delta": 30
   },
   "epoch_data": {
     "staking": {
       "seed": "2vahsgRV5nDPmtgr2Xo2Uq2dkngfSgvg7d1TKqQbY3wUS2ZDxCC3",
-      "s3_data_hash": "58480aacdabf777d0a1394be6781c264e8042f0e7f57473ae861a5026a841d96",
-      "hash": "jxEKtzF5zDcmGuz377zdndK1sa7bUvQK1WzkJiX2a7s4WhoB11q"
+      "s3_data_hash": "8053060205998762d7eb07804edda4723fcc31aac9c819142acac4aed80282d5",
+      "hash": "jwkUfFHU5xnAYNZzHPWGRNuZCve2SkbwuuXXETZuH6hdBup77D7"
     },
     "next": {
       "seed": "2vbH4D8B76WMYPRFgeuVvdWVhv6tAFoCJtg83yuJT1dud3QVSiZn",
-      "s3_data_hash": "bc1d73bbd4005a9aab1de53eadc3d3308c92fd9407b7cfe715882afd138e3d78",
-      "hash": "jxyb5RtQoQAQuZDpJY8KawPRp8jqsCidWyAgueTeKBbhJKdQj9t"
+      "s3_data_hash": "7554a3b0333018e2e7d1dacebb3f5b114c85fddb65b3ae6f8e295f28a7cd75d4",
+      "hash": "jxqJ5NT4txXQKLnxJyDBwAAHysWAiAezV8agV7Qg5Md2yRGaAWq"
     }
   }
 }
