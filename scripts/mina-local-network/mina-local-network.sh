@@ -78,6 +78,7 @@ NODE_PIDS=()
 OVERRIDE_GENSIS_LEDGER=""
 ON_EXIT="grace_exit_all"
 REDIRECT_LOGS=false
+NODE_STATUS_URL=""
 
 
 # =================================================
@@ -165,6 +166,8 @@ help() {
                                          |   Default: ${REDIRECT_LOGS}
 --on-exit                                | Possible Values : {grace_exit_all,kill_snark_workers} . Defines how script exit is handled. If set to 'grace_exit_all' mina CLI to stop all daemon nodes, and kill SNARK workers; If set to 'kill_snark_workers' to only kill SNARK workers but ignoring everything else.
                                          |   Default: ${ON_EXIT}
+--node-status-url                        | Url of the node status collection service 
+                                         |   Default: not set
 -h   |--help                             | Displays this help message
 
 Available logging levels:
@@ -316,6 +319,10 @@ exec-daemon() {
 
   if [ -n "$HARDFORK_HANDLING" ]; then
     extra_opts+=( --hardfork-handling "$HARDFORK_HANDLING" )
+  fi
+
+  if [ -n "$NODE_STATUS_URL" ]; then
+    extra_opts+=( --node-status-url "$NODE_STATUS_URL" )
   fi
 
   # shellcheck disable=SC2068
@@ -638,6 +645,10 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --on-exit)
     ON_EXIT="${2}"
+    shift
+    ;;
+  --node-status-url) 
+    NODE_STATUS_URL="${2}"
     shift
     ;;
   *)
