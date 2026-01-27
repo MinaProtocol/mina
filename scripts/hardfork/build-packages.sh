@@ -57,7 +57,7 @@ gunzip config.json.gz
 
 echo "--- Generate hardfork ledger tarballs"
 mkdir hardfork_ledgers
-_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --config-file config.json --genesis-dir hardfork_ledgers/ --hash-output-file hardfork_ledger_hashes.json | tee runtime_genesis_ledger.log | _build/default/src/app/logproc/logproc.exe
+_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --config-file config.json --pad-app-state --genesis-dir hardfork_ledgers/ --hash-output-file hardfork_ledger_hashes.json | tee runtime_genesis_ledger.log | _build/default/src/app/logproc/logproc.exe
 
 echo "--- Create hardfork config"
 FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
