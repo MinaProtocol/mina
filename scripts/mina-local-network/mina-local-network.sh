@@ -10,6 +10,7 @@ POLL_INTERVAL=10s
 
 MINA_EXE=${MINA_EXE:-_build/default/src/app/cli/src/mina.exe}
 ARCHIVE_EXE=${ARCHIVE_EXE:-_build/default/src/app/archive/archive.exe}
+ROSETTA_EXE=${ROSETTA_EXE:-_build/default/src/app/rosetta/rosetta.exe}
 ZKAPP_EXE=${ZKAPP_EXE:-_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe}
 
 export MINA_PRIVKEY_PASS='naughty blue worm'
@@ -23,7 +24,6 @@ SNARK_COORDINATOR_PEER_KEY="CAESQFjWdR18zKuCssN+Fi33fah9f5QGebOCc9xTITR8cdoyC+bk
 WHALES=2
 FISH=1
 NODES=1
-ARCHIVE=false
 LOG_LEVEL="Trace"
 FILE_LOG_LEVEL=${LOG_LEVEL}
 VALUE_TRANSFERS=false
@@ -38,12 +38,15 @@ LOG_PRECOMPUTED_BLOCKS=false
 SNARK_WORKER_FEE=0.001
 TRANSACTION_INTERVAL=10 # in seconds
 
-SEED_START_PORT=3000
-ARCHIVE_SERVER_PORT=3086
+SEED="spawn:3000"
+ARCHIVE_SERVER_PORT=
 SNARK_COORDINATOR_PORT=7000
 WHALE_START_PORT=4000
 FISH_START_PORT=5000
 NODE_START_PORT=6000
+ROSETTA_PORT=
+
+MINA_ROSETTA_MAX_DB_POOL_SIZE=64
 
 PG_HOST="localhost"
 PG_PORT="5432"
@@ -52,9 +55,10 @@ PG_PASSWD=""
 PG_DB="archive"
 
 DEMO_MODE=false
-
 SLOT_TX_END=
 SLOT_CHAIN_END=
+HARDFORK_GENESIS_SLOT_DELTA=
+HARDFORK_HANDLING=
 
 # ================================================
 # Globals (assigned during execution of script)
@@ -93,11 +97,9 @@ help() {
                                          |   Default: ${FISH}
 -n   |--nodes <#>                        | Number of non block-producing nodes to spin-up
                                          |   Default: ${NODES}
--a   |--archive                          | Whether to run the Archive Node (presence of argument)
-                                         |   Default: ${ARCHIVE}
--sp  |--seed-start-port <#>              | Seed Node range start port
-                                         |   Default: ${SEED_START_PORT}
--swp |--snark-coordinator-start-port <#> | Snark Worker Coordinator Node range start port
+-s   |--seed                             | How to start the seed. Set to 'spawn:SEED_START_PORT' to spawn the seed in this script with Seed range start port, 'at:SEED_PEER_ID' to let the script discover the seed node at specific address. Regardless the option taken, this script will always store the seed peer ID used under ROOT/seed_peer_id.txt, when the seed node is/should be ready.
+                                         |   Default: ${SEED}
+-swp |--snark-coordinator-start-port <#> | Snark Worker Coordinator Node range start port. Set to empty to disable snark coodinator
                                          |   Default: ${SNARK_COORDINATOR_PORT}
 -swc |--snark-workers-count <#>          | Snark Workers count
                                          |   Default: ${SNARK_WORKERS_COUNT}
@@ -107,8 +109,12 @@ help() {
                                          |   Default: ${FISH_START_PORT}
 -np  |--node-start-port <#>              | Non block-producing Nodes range start port
                                          |   Default: ${NODE_START_PORT}
--ap  |--archive-server-port <#>          | Archive Node server port
+-ap  |--archive-server-port <#>          | Archive Node server port. Set to empty to disable archive node.
                                          |   Default: ${ARCHIVE_SERVER_PORT}
+-rp  |--rosetta-port <#>                 | Rosetta server port. Set to empty to disable Rosetta server.
+                                         |   Default: ${ROSETTA_PORT}
+-rmps|--rosetta-max-pool-size <#>        | Rosetta Db max pool size
+                                         |   Default: ${MINA_ROSETTA_MAX_DB_POOL_SIZE}
 -ll  |--log-level <level>                | Console output logging level
                                          |   Default: ${LOG_LEVEL}
 -fll |--file-log-level <level>           | File output logging level
@@ -127,7 +133,7 @@ help() {
                                          |   Default: ${VALUE_TRANSFERS}
 -zt  |--zkapp-transactions               | Whether to execute periodic zkapp transactions (presence of argument)
                                          |   Default: ${ZKAPP_TRANSACTIONS}
--ti  |--transaction-interval <#>       | Frequency of periodic transactions execution (in seconds)
+-ti  |--transaction-interval <#>         | Frequency of periodic transactions execution (in seconds)
                                          |   Default: ${TRANSACTION_INTERVAL}
 -sf  |--snark-worker-fee <#>             | SNARK Worker fee
                                          |   Default: ${SNARK_WORKER_FEE}
@@ -148,6 +154,9 @@ help() {
 -sce |--slot-chain-end                   | When set, stop producing blocks from this chain on.
                                          |   Default: None
 --itn-keys <keys>                        | Use ITN keys for nodes authentication
+                                         |   Default: not set
+-hfd |--hardfork-genesis-slot-delta      | When set override the value `hard_fork_genesis_slot_delta` in daemon config. 
+--hardfork-handling                      | When set, passed to daemons participating the network.
                                          |   Default: not set
 -r   |--root                             | When set, override the root working folder (i.e. the value of ROOT) for this script. WARN: this script will clean up anything inside that folder when initializing any run!
                                          |   Default: ${ROOT}
@@ -200,8 +209,10 @@ on-exit() {
   job_pids=()
 
   # 2. stop every non-seed nodes
-  stop-node "snark-coordinator" "$SNARK_COORDINATOR_PORT" &
-  job_pids+=("$!")
+  if [[ -n "${SNARK_COORDINATOR_PORT}" ]]; then
+    stop-node "snark-coordinator" "$SNARK_COORDINATOR_PORT" &
+    job_pids+=("$!")
+  fi
 
   for ((i=0; i<FISH; i++)); do
     port=$((FISH_START_PORT + i*6))
@@ -225,8 +236,15 @@ on-exit() {
     wait "$jpid"
   done
 
-  # 3. stop the seed node
-  stop-node "seed" "$SEED_START_PORT"
+  if [[ -n "${ROSETTA_PORT}" ]]; then
+    kill "$ROSETTA_PID"
+    wait "$ROSETTA_PID"
+  fi
+
+  # 3. stop the seed node, if we've spawned it.
+  if [[ -n "${SEED_PID}" ]]; then
+    stop-node "seed" "$SEED_START_PORT"
+  fi
 }
 
 trap on-exit TERM INT
@@ -274,8 +292,12 @@ exec-daemon() {
   if [ -n "$ITN_KEYS" ]; then
     ITN_GRAPHQL_PORT=$((BASE_PORT + 5))
 
-    extra_opts+=( "--itn-keys $ITN_KEYS" )
-    extra_opts+=( "--itn-graphql-port ${ITN_GRAPHQL_PORT}" )
+    extra_opts+=( --itn-keys "$ITN_KEYS" )
+    extra_opts+=( --itn-graphql-port "${ITN_GRAPHQL_PORT}" )
+  fi
+
+  if [ -n "$HARDFORK_HANDLING" ]; then
+    extra_opts+=( --hardfork-handling "$HARDFORK_HANDLING" )
   fi
 
   # shellcheck disable=SC2068
@@ -322,6 +344,16 @@ exec-archive-node() {
     $@
 }
 
+exec-rosetta-node() {
+  # shellcheck disable=SC2068
+  MINA_ROSETTA_MAX_DB_POOL_SIZE=${MINA_ROSETTA_MAX_DB_POOL_SIZE} exec ${ROSETTA_EXE} \
+    --archive-uri postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" \
+    --graphql-uri $((SEED_START_PORT + 1)) \
+    --port "${ROSETTA_PORT}" \
+    --log-level "${LOG_LEVEL}" \
+    $@ &
+}
+
 # Spawns the Node in background
 spawn-node() {
   FOLDER=${1}
@@ -354,9 +386,20 @@ spawn-archive-node() {
   shift
   # shellcheck disable=SC2068
   if [ "${REDIRECT_LOGS}" = true ]; then
-    exec-archive-node $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
+    exec-archive-node $@ &>"${FOLDER}"/log.txt &
   else
-    exec-archive-node $@ -config-directory "${FOLDER}" &
+    exec-archive-node $@ &
+  fi
+}
+
+spawn-rosetta-server() {
+  FOLDER=${1}
+  shift
+  # shellcheck disable=SC2068
+  if [ "${REDIRECT_LOGS}" = true ]; then
+    exec-rosetta-node $@ &>"${FOLDER}"/log.txt &
+  else
+    exec-rosetta-node $@ &
   fi
 }
 
@@ -451,10 +494,20 @@ while [[ "$#" -gt 0 ]]; do
     NODES="${2}"
     shift
     ;;
-  -a | --archive) ARCHIVE=true ;;
-  -sp | --seed-start-port)
-    SEED_START_PORT="${2}"
+  -s | --seed)
+    SEED="${2}"
     shift
+    ;;
+  -rmps | --rosetta-max-pool-size)
+    MINA_ROSETTA_MAX_DB_POOL_SIZE="${2}"
+    shift
+    ;;
+  -rp | --rosetta-port)
+    ROSETTA_PORT="${2}"
+    shift
+    ;;
+  -d | --demo)
+    DEMO_MODE=true
     ;;
   -scp | --snark-coordinator-start-port)
     SNARK_COORDINATOR_PORT="${2}"
@@ -535,7 +588,6 @@ while [[ "$#" -gt 0 ]]; do
     OVERRIDE_SLOT_TIME_MS="${2}"
     shift
     ;;
-  -d | --demo) DEMO_MODE=true ;;
   -ste | --slot-transaction-end) 
     SLOT_TX_END="${2}"
     shift
@@ -546,6 +598,14 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --itn-keys)
     ITN_KEYS="${2}"
+    shift
+    ;;
+  -hfd |--hardfork-genesis-slot-delta)
+    HARDFORK_GENESIS_SLOT_DELTA="${2}"
+    shift
+    ;;
+  --hardfork-handling)
+    HARDFORK_HANDLING="${2}"
     shift
     ;;
   -r | --root)
@@ -584,7 +644,7 @@ EOF
 # Check the PostgreSQL configuration required
 # for Archive Node operation
 
-if ${ARCHIVE}; then
+if [[ -n "${ARCHIVE_SERVER_PORT}" ]]; then
 cat <<EOF
 
 Archive Node spawning is enabled, we need to do the PostgreSQL communication check.
@@ -608,11 +668,6 @@ EOF
 
   ARCHIVE_ADDRESS_CLI_ARG="-archive-address ${ARCHIVE_SERVER_PORT}"
 fi
-
-# ================================================
-# Configure the Seed Peer ID
-
-SEED_PEER_ID="/ip4/127.0.0.1/tcp/$((SEED_START_PORT + 2))/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
 
 # ================================================
 #
@@ -717,12 +772,11 @@ printf "\n"
 
 SNARK_COORDINATOR_PUBKEY=$(cat "${ROOT}"/snark_coordinator_keys/snark_coordinator_account.pub)
 
-
 # ================================================
 # Check the demo mode
 
 if ${DEMO_MODE}; then
-  echo "Demo mode requires no Whale nodes, no Fish nodes and no non block-producing nodes!"
+  echo "Demo mode requires no standalone whales, fish, plain nodes, or snark workers!"
   echo "Resetting the values to 0."
 
   # Set the default values for demo mode
@@ -748,7 +802,8 @@ Starting the Network with:
     1 seed
     1 snark coordinator
     ${SNARK_WORKERS_COUNT} snark worker(s)
-    $( ${ARCHIVE} && echo 1 || echo 0) archive
+    $([[ -n "$ARCHIVE_SERVER_PORT" ]] && echo 1 || echo 0) archive
+    $([[ -n "$ROSETTA_PORT" ]] && echo 1 || echo 0) rosetta
     ${WHALES} whales
     ${FISH} fish
     ${NODES} non block-producing nodes
@@ -794,12 +849,24 @@ load_config() {
     inherit_with:*)
       local replaced_config_file
       IFS=',' read -r replaced_config_file OVERRIDE_GENSIS_LEDGER <<< "${config_mode#inherit_with:}"
+      if [ ! -f "${replaced_config_file}" ]; then
+        echo "Error: Config file '${replaced_config_file}' does not exist, can't inherit_with." >&2
+        exit 1
+      else
+        echo "Inheriting config at ${replaced_config_file}:"
+        cat "${replaced_config_file}"
+      fi
       cp -f "${replaced_config_file}" "${config_file}"
       ;;
   esac
 }
 
 load_config "${CONFIG_MODE}" "${CONFIG}"
+
+if [ -n "$OVERRIDE_GENSIS_LEDGER" ]; then
+  echo "Inherited genesis ledgers: "
+  ls -1 "$OVERRIDE_GENSIS_LEDGER"
+fi
 
 update_genesis_timestamp() {
   case "$1" in
@@ -828,18 +895,23 @@ update_genesis_timestamp() {
 update_genesis_timestamp "${UPDATE_GENESIS_TIMESTAMP}"
 
 if [ ! -z "${OVERRIDE_SLOT_TIME_MS}" ]; then
-  echo 'Modifying configuration to override slot time...'
+  echo "Setting proof.block_window_duration_ms to ${OVERRIDE_SLOT_TIME_MS}..."
   jq-inplace ".proof.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" "${CONFIG}"
 fi
 
 if [ ! -z "${SLOT_TX_END}" ]; then
-  echo 'Modifying configuration to override slot transaction end...'
+  echo "Setting daemon.slot_tx_end to ${SLOT_TX_END}..."
   jq-inplace ".daemon.slot_tx_end=${SLOT_TX_END}" "${CONFIG}"
 fi
 
 if [ ! -z "${SLOT_CHAIN_END}" ]; then
-  echo 'Modifying configuration to override slot chain end...'
+  echo "Setting daemon.slot_chain_end to ${SLOT_CHAIN_END}..."
   jq-inplace ".daemon.slot_chain_end=${SLOT_CHAIN_END}" "${CONFIG}"
+fi
+
+if [ ! -z "${HARDFORK_GENESIS_SLOT_DELTA}" ]; then
+  echo "Setting daemon.hard_fork_genesis_slot_delta to ${HARDFORK_GENESIS_SLOT_DELTA}..."
+  jq-inplace ".daemon.hard_fork_genesis_slot_delta=${HARDFORK_GENESIS_SLOT_DELTA}" "${CONFIG}"
 fi
 
 # ================================================
@@ -848,10 +920,8 @@ fi
 NODES_FOLDER=${ROOT}/nodes
 mkdir -p ${NODES_FOLDER}/seed
 
-if ! ${DEMO_MODE}; then
-  mkdir -p "${NODES_FOLDER}"/snark_coordinator
-  mkdir -p "${NODES_FOLDER}"/snark_workers
-fi
+mkdir -p "${NODES_FOLDER}"/snark_coordinator
+mkdir -p "${NODES_FOLDER}"/snark_workers
 
 if ! config_mode_is_inherit "$CONFIG_MODE"; then
   clean-dir "${NODES_FOLDER}"
@@ -862,7 +932,7 @@ fi
 
 # ----------
 
-if ${ARCHIVE}; then
+if [[ -n "${ARCHIVE_SERVER_PORT}" ]]; then
   echo 'Starting the Archive Node...'
   printf "\n"
 
@@ -872,33 +942,66 @@ if ${ARCHIVE}; then
   ARCHIVE_PID=$!
 fi
 
-# ----------
+if [[ -n "${ROSETTA_PORT}" ]]; then
+  if [[ -z "${ARCHIVE_SERVER_PORT}" ]]; then
+    echo "Rosetta server requires Archive node to be running!"
+    printf "\n"
 
-if ${DEMO_MODE}; then
-  echo "Running in demo mode, only seed node is going to be started."
+    exit 1
+  fi
+
+  echo 'Starting the Rosetta server...'
   printf "\n"
 
-  spawn-node ${NODES_FOLDER}/seed ${SEED_START_PORT} \
-    -block-producer-key ${ROOT}/online_whale_keys/online_whale_account_0 \
-    --run-snark-worker "$(cat ${ROOT}/snark_coordinator_keys/snark_coordinator_account.pub)" \
-    --snark-worker-fee 0.001 \
-    --demo-mode \
-    --external-ip "$(hostname -i)" \
-    --seed \
-    ${ARCHIVE_ADDRESS_CLI_ARG}
+  mkdir -p "${NODES_FOLDER}"/rosetta
 
-else 
-  spawn-node "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY} "${ARCHIVE_ADDRESS_CLI_ARG}"
+  spawn-rosetta-server "${NODES_FOLDER}"/rosetta
+  ROSETTA_PID=$!
 fi
 
-SEED_PID=$!
+# ----------
 
-echo 'Waiting for seed to go up...'
-printf "\n"
+SEED_PEER_ID=
+case "${SEED}" in
+  spawn:*)
+    SEED_START_PORT="${SEED#spawn:}"
+    SEED_PEER_ID="/ip4/127.0.0.1/tcp/$((SEED_START_PORT + 2))/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
+    if ${DEMO_MODE}; then
+      echo "Running in demo mode, an amalgamation node is going to be started."
+      printf "\n"
+      spawn-node ${NODES_FOLDER}/seed ${SEED_START_PORT} \
+        -block-producer-key ${ROOT}/online_whale_keys/online_whale_account_0 \
+        --run-snark-worker "$(cat ${ROOT}/snark_coordinator_keys/snark_coordinator_account.pub)" \
+        --snark-worker-fee 0.001 \
+        --demo-mode \
+        --external-ip "$(hostname -i)" \
+        --seed \
+        ${ARCHIVE_ADDRESS_CLI_ARG}
+    else
+      spawn-node "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY} "${ARCHIVE_ADDRESS_CLI_ARG}"
+    fi
+    SEED_PID=$!
 
-until ${MINA_EXE} client status -daemon-port "${SEED_START_PORT}" &>/dev/null; do
-  sleep ${POLL_INTERVAL}
-done
+    echo 'Waiting for seed to go up...'
+    printf "\n"
+
+    until ${MINA_EXE} client status -daemon-port "${SEED_START_PORT}" &>/dev/null; do
+      sleep ${POLL_INTERVAL}
+    done
+    ;;
+
+  at:*)
+    if ${DEMO_MODE}; then
+      echo "Running in demo mode, external seed is not supported!" >&2
+      exit 1
+    fi
+
+    SEED_PEER_ID="${SEED#at:}"
+    echo "Listening to external seed node at ${SEED_PEER_ID}"
+    SEED_PID=""
+    ;;
+esac
+printf "$SEED_PEER_ID" > "${ROOT}/seed_peer_id.txt"
 
 #---------- Starting snark coordinator
 
@@ -906,6 +1009,9 @@ if [ "${SNARK_WORKERS_COUNT}" -eq "0" ]; then
   echo "Skipping snark coordinator because SNARK_WORKERS_COUNT is 0"
   SNARK_COORDINATOR_PID=""
 
+elif [[ -z "${SNARK_COORDINATOR_PORT}" ]]; then
+  echo "Skipping snark coordinator because no SNARK_COORDINATOR_PORT is provided"
+  SNARK_COORDINATOR_PID=""
 else
 
   SNARK_COORDINATOR_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-coordinator ${SNARK_COORDINATOR_PUBKEY} -work-selection seq"
@@ -966,13 +1072,16 @@ done
 cat <<EOF
 ================================
 Network participants information:
-
-	Seed:
-		Instance #0:
-		  pid ${SEED_PID}
-		  status: ${MINA_EXE} client status -daemon-port ${SEED_START_PORT}
-		  data dir: ${NODES_FOLDER}/seed
 EOF
+if [[ -n "${SEED_PID}" ]]; then
+  cat <<EOF
+          Seed:
+                  Instance #0:
+                    pid ${SEED_PID}
+                    status: ${MINA_EXE} client status -daemon-port ${SEED_START_PORT}
+                    data dir: ${NODES_FOLDER}/seed
+EOF
+fi
 
 if [ "${SNARK_WORKERS_COUNT}" -gt 0 ]; then
   cat <<EOF
@@ -994,13 +1103,23 @@ EOF
   done
 fi
 
-if ${ARCHIVE}; then
+if [[ -n "${ARCHIVE_SERVER_PORT}" ]]; then
   cat <<EOF
 	Archive:
 		Instance #0:
 		  pid ${ARCHIVE_PID}
 		  server-port: ${ARCHIVE_SERVER_PORT}
 		  data dir: "${NODES_FOLDER}"/archive
+EOF
+fi
+
+if [[ -n "${ROSETTA_PORT}" ]]; then
+  cat <<EOF
+  Rosetta:
+    Instance #0:
+      pid ${ROSETTA_PID}
+      port: ${ROSETTA_PORT}
+      data dir: "${NODES_FOLDER}"/rosetta
 EOF
 fi
 
@@ -1107,7 +1226,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   sender_nonce=1
   state=0
 
-  # TODO: simulate scripts/hardfork/run-localnet.sh to send txns to everyone in the ledger. 
+  # TODO: simulate scripts/hardfork/run-localnet.sh to send txns to everyone in the ledger.
   value_txn_id=0
   while is_process_running "${FISH_PIDS[0]}"; do
     sleep ${TRANSACTION_INTERVAL}

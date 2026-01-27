@@ -53,6 +53,8 @@ DEFAULT_PROFILE=devnet
 
 DEBIAN_CACHE_FOLDER=${DEBIAN_CACHE_FOLDER:-~/.release/debian/cache}
 DEFAULT_DOCKER_REPO="gcr.io/o1labs-192920"
+GCR_REPO=$DEFAULT_DOCKER_REPO
+DOCKER_IO_REPO="minaprotocol"
 DEBIAN_REPO=packages.o1test.net
 
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"

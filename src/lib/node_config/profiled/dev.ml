@@ -44,6 +44,8 @@ let block_window_duration = 2000
 
 let network = "testnet"
 
+let profile = "dev"
+
 let compaction_interval = None
 
 let vrf_poll_interval = 0

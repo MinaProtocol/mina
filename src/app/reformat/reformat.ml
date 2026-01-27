@@ -43,9 +43,13 @@ let dirs_trustlist =
     ; ".direnv"
     ]
 
+(* Global throttle to limit concurrent process executions *)
+let process_throttle =
+  Throttle.create ~continue_on_error:true ~max_concurrent_jobs:8
+
 let rec fold_over_files ~path ~process_path ~f =
   let%bind all = Sys.ls_dir path in
-  Deferred.List.iter ~how:(`Max_concurrent_jobs 8) all ~f:(fun x ->
+  Deferred.List.iter all ~f:(fun x ->
       let full_path = path ^/ x in
       match%bind Sys.is_directory full_path with
       | `Yes when process_path `Dir full_path ->
@@ -53,7 +57,7 @@ let rec fold_over_files ~path ~process_path ~f =
       | `Yes ->
           return ()
       | _ when process_path `File full_path ->
-          f full_path
+          Throttle.enqueue process_throttle (fun () -> f full_path)
       | _ ->
           return () )
 

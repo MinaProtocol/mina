@@ -16,8 +16,8 @@ echo "--- Setting up the environment to build debian packages..."
 cd "${BUILD_DIR}" || exit 1
 
 
-GITHASH=$(git rev-parse --short=7 HEAD)
-GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
+source "${SCRIPTPATH}/../export-git-env-vars.sh"
+
 
 SUGGESTED_DEPS="jq, curl, wget"
 
@@ -152,30 +152,12 @@ build_deb() {
 # Function to DRY copying config files into daemon packages
 copy_common_daemon_configs() {
 
-  echo "------------------------------------------------------------"
-  echo "copy_common_daemon_configs inputs:"
-  echo "Network Name: ${1} (like mainnet, devnet, testnet-generic)"
-  echo "Signature Type: ${2} (mainnet or testnet)"
-  echo "Seed List URL path: ${3} (like seed-lists/devnet_seeds.txt)"
+  local NETWORK_NAME="${1}"
+  local SIGNATURE_TYPE="${2}"
+  local SEED_LIST_URL_PATH="${3}"
 
-  # Copy shared binaries
-  cp ../src/app/libp2p_helper/result/bin/libp2p_helper \
-    "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
-  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-    "${BUILDDIR}/usr/local/bin/mina-create-genesis"
-  cp ./default/src/app/generate_keypair/generate_keypair.exe \
-    "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
-  cp ./default/src/app/validate_keypair/validate_keypair.exe \
-    "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
-  cp ./default/src/lib/snark_worker/standalone/run_snark_worker.exe \
-    "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
-  cp ./default/src/app/rocksdb-scanner/rocksdb_scanner.exe \
-    "${BUILDDIR}/usr/local/bin/mina-rocksdb-scanner"
-
-  # Copy signature-based Binaries (based on signature type $2 passed into the \
-  # function)
-  cp ./default/src/app/cli/src/mina_"${2}"_signatures.exe \
-    "${BUILDDIR}/usr/local/bin/mina"
+  copy_common_daemon_apps "${NETWORK_NAME}" "${SIGNATURE_TYPE}" \
+    "${SEED_LIST_URL_PATH}" "${BUILDDIR}/usr/local/bin"
 
   mkdir -p "${BUILDDIR}/var/lib/coda"
 
@@ -185,17 +167,17 @@ copy_common_daemon_configs() {
   # This config is automatically picked up by the daemon on startup.
   # In case of testnet-generic we only copy the devnet ledger without magic one
   # as testnet-generic should be testnet agnostic.
-  case "${1}" in
+  case "${NETWORK_NAME}" in
     devnet|mainnet)
-      cp ../genesis_ledgers/"${1}".json \
+      cp ../genesis_ledgers/"${NETWORK_NAME}".json \
         "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
-      cp ../genesis_ledgers/${1}.json "${BUILDDIR}/var/lib/coda/${1}.json"
+      cp ../genesis_ledgers/${NETWORK_NAME}.json "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
       ;;
     testnet-generic)
       cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
       ;;
     *)
-      echo "Unknown network name provided: ${1}"; exit 1
+      echo "Unknown network name provided: ${NETWORK_NAME}"; exit 1
       ;;
   esac
 
@@ -206,17 +188,8 @@ copy_common_daemon_configs() {
   # Update the mina.service with a new default PEERS_URL based on Seed List \
   # URL $3
   mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
-  sed "s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/${3}%" \
+  sed "s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/${SEED_LIST_URL_PATH}%" \
     ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
-
-  # Copy the genesis ledgers and proofs as these are fairly small and very \
-  # valuable to have
-  # Genesis Ledger/proof/epoch ledger Copy
-  for f in /tmp/coda_cache_dir/genesis*; do
-      if [ -e "$f" ]; then
-          mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
-      fi
-  done
 
   # Support bash completion
   # NOTE: We do not list bash-completion as a required package,
@@ -491,57 +464,95 @@ build_daemon_devnet_deb() {
 }
 ## END DEVNET PACKAGE ##
 
+# Copies common daemon binaries only to debian package
+copy_common_daemon_apps() {
+
+  local TARGET_ROOT_DIR="${4:-${BUILDDIR}/usr/lib/mina/${1}}"
+
+  echo "------------------------------------------------------------"
+  echo "copy_common_daemon_apps inputs:"
+  echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
+  echo "Signature Type: ${2} (mainnet or testnet)"
+  echo "Seed List URL path: ${3} (like seed-lists/berkeley_seeds.txt)"
+  echo "Target Root Dir: ${TARGET_ROOT_DIR}"
+
+  mkdir -p "${TARGET_ROOT_DIR}"
+
+  cp ../src/app/libp2p_helper/result/bin/libp2p_helper \
+    "${TARGET_ROOT_DIR}/coda-libp2p_helper"
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    "${TARGET_ROOT_DIR}/mina-create-genesis"
+  cp ./default/src/app/generate_keypair/generate_keypair.exe \
+    "${TARGET_ROOT_DIR}/mina-generate-keypair"
+  cp ./default/src/app/validate_keypair/validate_keypair.exe \
+    "${TARGET_ROOT_DIR}/mina-validate-keypair"
+  cp ./default/src/lib/snark_worker/standalone/run_snark_worker.exe \
+    "${TARGET_ROOT_DIR}/mina-standalone-snark-worker"
+  cp ./default/src/app/rocksdb-scanner/rocksdb_scanner.exe \
+    "${TARGET_ROOT_DIR}/mina-rocksdb-scanner"
+
+  # Copy signature-based Binaries (based on signature type $2 passed into the \
+  # function)
+  cp ./default/src/app/cli/src/mina_"${2}"_signatures.exe \
+    "${TARGET_ROOT_DIR}/mina"
+
+}
+
+
 ## MAINNET LEGACY PACKAGE ##
 
 #
-# Builds mina-mainnet-legacy package with legacy binary
+# Builds mina-mainnet-pre-hardfork-mesa tailored package for automode package
 #
-# Output: mina-mainnet-legacy_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-mainnet-pre-hardfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Contains only the legacy mainnet binary as "mina-legacy" without
+# Contains only the legacy mainnet binaries places in "/usr/lib/mina/berkeley" without
 # configuration files or genesis ledgers.
 #
-build_daemon_mainnet_legacy_deb() {
+build_daemon_mainnet_pre_hardfork_deb() {
+
+  NAME="mina-mainnet-pre-hardfork-mesa"
 
   echo "------------------------------------------------------------"
-  echo "--- Building mainnet legacy deb without keys:"
+  echo "--- Building mainnet berkeley deb for hardfork automode :"
 
-  create_control_file mina-mainnet-legacy "${SHARED_DEPS}${DAEMON_DEPS}" \
+  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
-  # Copy legacy binary
-  cp ./default/src/app/cli/src/mina_mainnet_signatures.exe \
-    "${BUILDDIR}/usr/local/bin/mina-legacy"
+  # Copy legacy binaries
 
-  build_deb mina-mainnet-legacy
+  copy_common_daemon_apps berkeley mainnet 'seed-lists/mainnet_seeds.txt'
+
+  build_deb $NAME
 }
 ## END MAINNET LEGACY PACKAGE ##
 
 ## DEVNET LEGACY PACKAGE ##
 
 #
-# Builds mina-devnet-legacy package with legacy testnet binary
+# Builds mina-devnet-pre-hardfork-mesa tailored package for automode package
 #
-# Output: mina-devnet-legacy_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-devnet-pre-hardfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Contains only the legacy testnet binary as "mina-legacy" without
+# Contains only the legacy mainnet binaries places in "/usr/lib/mina/berkeley" without
 # configuration files or genesis ledgers.
 #
-build_daemon_devnet_legacy_deb() {
+build_daemon_devnet_pre_hardfork_deb() {
+
+  NAME="mina-devnet-pre-hardfork-mesa"
 
   echo "------------------------------------------------------------"
-  echo "--- Building testnet signatures legacy deb without keys:"
+  echo "--- Building testnet berkeley legacy deb for hardfork automode :"
 
-  create_control_file mina-devnet-legacy "${SHARED_DEPS}${DAEMON_DEPS}" \
+  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
-  # Copy legacy binary
-  cp ./default/src/app/cli/src/mina_testnet_signatures.exe \
-    "${BUILDDIR}/usr/local/bin/mina-legacy"
+  # Copy legacy binaries
+  copy_common_daemon_apps berkeley testnet 'seed-lists/devnet_seeds.txt'
 
-  build_deb mina-devnet-legacy
+  build_deb $NAME
 }
 ## END DEVNET LEGACY PACKAGE ##
 
