@@ -1,6 +1,6 @@
-// Provides: plonk_wasm
-var plonk_wasm = (function () {
-  var wasm = require('./plonk_wasm.js');
+// Provides: kimchi_ffi
+var kimchi_ffi = (function () {
+  var wasm = require('./kimchi_wasm.js');
 
   try {
     var native = require('@o1js/native-' + globalThis.process.platform + '-' + globalThis.process.arch)

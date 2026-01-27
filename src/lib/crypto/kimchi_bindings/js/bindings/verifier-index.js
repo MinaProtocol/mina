@@ -1,18 +1,18 @@
-/* global plonk_wasm, caml_jsstring_of_string, tsRustConversion
+/* global kimchi_ffi, caml_jsstring_of_string, tsRustConversion
  */
 
 // Provides: caml_pasta_fp_plonk_verifier_index_create
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fp_plonk_verifier_index_create = function (x) {
-  var vk = plonk_wasm.caml_pasta_fp_plonk_verifier_index_create(x);
+  var vk = kimchi_ffi.caml_pasta_fp_plonk_verifier_index_create(x);
   return tsRustConversion.fp.verifierIndexFromRust(vk);
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_shifts
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fq_plonk_verifier_index_shifts = function (log2_size) {
   try {
-    var shifts = plonk_wasm.caml_pasta_fq_plonk_verifier_index_shifts(log2_size);
+    var shifts = kimchi_ffi.caml_pasta_fq_plonk_verifier_index_shifts(log2_size);
     return tsRustConversion.fq.shiftsFromRust(
       shifts
     );
@@ -23,7 +23,7 @@ var caml_pasta_fq_plonk_verifier_index_shifts = function (log2_size) {
 };
 
 // Provides: caml_pasta_fp_plonk_verifier_index_read
-// Requires: plonk_wasm, caml_jsstring_of_string, tsRustConversion
+// Requires: kimchi_ffi, caml_jsstring_of_string, tsRustConversion
 var caml_pasta_fp_plonk_verifier_index_read = function (offset, urs, path) {
   if (offset === 0) {
     offset = undefined;
@@ -31,7 +31,7 @@ var caml_pasta_fp_plonk_verifier_index_read = function (offset, urs, path) {
     offset = offset[1];
   }
   return tsRustConversion.fp.verifierIndexFromRust(
-    plonk_wasm.caml_pasta_fp_plonk_verifier_index_read(
+    kimchi_ffi.caml_pasta_fp_plonk_verifier_index_read(
       offset,
       urs,
       caml_jsstring_of_string(path)
@@ -40,14 +40,14 @@ var caml_pasta_fp_plonk_verifier_index_read = function (offset, urs, path) {
 };
 
 // Provides: caml_pasta_fp_plonk_verifier_index_write
-// Requires: plonk_wasm, caml_jsstring_of_string, tsRustConversion
+// Requires: kimchi_ffi, caml_jsstring_of_string, tsRustConversion
 var caml_pasta_fp_plonk_verifier_index_write = function (append, t, path) {
   if (append === 0) {
     append = undefined;
   } else {
     append = append[1];
   }
-  return plonk_wasm.caml_pasta_fp_plonk_verifier_index_write(
+  return kimchi_ffi.caml_pasta_fp_plonk_verifier_index_write(
     append,
     tsRustConversion.fp.verifierIndexToRust(t),
     caml_jsstring_of_string(path)
@@ -56,17 +56,17 @@ var caml_pasta_fp_plonk_verifier_index_write = function (append, t, path) {
 
 
 // Provides: caml_pasta_fp_plonk_verifier_index_dummy
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fp_plonk_verifier_index_dummy = function () {
-  var res = plonk_wasm.caml_pasta_fp_plonk_verifier_index_dummy();
+  var res = kimchi_ffi.caml_pasta_fp_plonk_verifier_index_dummy();
   return tsRustConversion.fp.verifierIndexFromRust(res);
 };
 
 // Provides: caml_pasta_fp_plonk_verifier_index_deep_copy
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fp_plonk_verifier_index_deep_copy = function (x) {
   return tsRustConversion.fp.verifierIndexFromRust(
-    plonk_wasm.caml_pasta_fp_plonk_verifier_index_deep_copy(
+    kimchi_ffi.caml_pasta_fp_plonk_verifier_index_deep_copy(
       tsRustConversion.fp.verifierIndexToRust(x)
     )
   );
@@ -74,24 +74,24 @@ var caml_pasta_fp_plonk_verifier_index_deep_copy = function (x) {
 
 
 // Provides: caml_pasta_fq_plonk_verifier_index_create
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fq_plonk_verifier_index_create = function (x) {
   return tsRustConversion.fq.verifierIndexFromRust(
-    plonk_wasm.caml_pasta_fq_plonk_verifier_index_create(x)
+    kimchi_ffi.caml_pasta_fq_plonk_verifier_index_create(x)
   );
 };
 
 
 // Provides: caml_pasta_fp_plonk_verifier_index_shifts
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fp_plonk_verifier_index_shifts = function (log2_size) {
   return tsRustConversion.fp.shiftsFromRust(
-    plonk_wasm.caml_pasta_fp_plonk_verifier_index_shifts(log2_size)
+    kimchi_ffi.caml_pasta_fp_plonk_verifier_index_shifts(log2_size)
   );
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_read
-// Requires: plonk_wasm, caml_jsstring_of_string, tsRustConversion
+// Requires: kimchi_ffi, caml_jsstring_of_string, tsRustConversion
 var caml_pasta_fq_plonk_verifier_index_read = function (offset, urs, path) {
   if (offset === 0) {
     offset = undefined;
@@ -99,7 +99,7 @@ var caml_pasta_fq_plonk_verifier_index_read = function (offset, urs, path) {
     offset = offset[1];
   }
   return tsRustConversion.fq.verifierIndexFromRust(
-    plonk_wasm.caml_pasta_fq_plonk_verifier_index_read(
+    kimchi_ffi.caml_pasta_fq_plonk_verifier_index_read(
       offset,
       urs,
       caml_jsstring_of_string(path)
@@ -108,14 +108,14 @@ var caml_pasta_fq_plonk_verifier_index_read = function (offset, urs, path) {
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_write
-// Requires: plonk_wasm, caml_jsstring_of_string, tsRustConversion
+// Requires: kimchi_ffi, caml_jsstring_of_string, tsRustConversion
 var caml_pasta_fq_plonk_verifier_index_write = function (append, t, path) {
   if (append === 0) {
     append = undefined;
   } else {
     append = append[1];
   }
-  return plonk_wasm.caml_pasta_fq_plonk_verifier_index_write(
+  return kimchi_ffi.caml_pasta_fq_plonk_verifier_index_write(
     append,
     tsRustConversion.fq.verifierIndexToRust(t),
     caml_jsstring_of_string(path)
@@ -123,18 +123,18 @@ var caml_pasta_fq_plonk_verifier_index_write = function (append, t, path) {
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_dummy
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fq_plonk_verifier_index_dummy = function () {
   return tsRustConversion.fq.verifierIndexFromRust(
-    plonk_wasm.caml_pasta_fq_plonk_verifier_index_dummy()
+    kimchi_ffi.caml_pasta_fq_plonk_verifier_index_dummy()
   );
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_deep_copy
-// Requires: plonk_wasm, tsRustConversion, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion, tsRustConversion
 var caml_pasta_fq_plonk_verifier_index_deep_copy = function (x) {
   return tsRustConversion.fq.verifierIndexFromRust(
-    plonk_wasm.caml_pasta_fq_plonk_verifier_index_deep_copy(
+    kimchi_ffi.caml_pasta_fq_plonk_verifier_index_deep_copy(
       tsRustConversion.fq.verifierIndexToRust(x)
     )
   );

@@ -1,40 +1,40 @@
-/* global plonk_wasm, caml_string_of_jsstring */
+/* global kimchi_ffi, caml_string_of_jsstring */
 /* eslint-disable no-unused-vars */
-/* global plonk_wasm, tsRustConversion, caml_bytes_of_uint8array, caml_string_of_jsstring */
+/* global kimchi_ffi, tsRustConversion, caml_bytes_of_uint8array, caml_string_of_jsstring */
 
 // Provides: caml_pasta_fp_plonk_gate_vector_create
-// Requires: plonk_wasm
+// Requires: kimchi_ffi
 var caml_pasta_fp_plonk_gate_vector_create = function () {
-    return plonk_wasm.caml_pasta_fp_plonk_gate_vector_create();
+    return kimchi_ffi.caml_pasta_fp_plonk_gate_vector_create();
 };
 
 // Provides: caml_pasta_fp_plonk_gate_vector_add
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fp_plonk_gate_vector_add = function (vector, gate) {
-    return plonk_wasm.caml_pasta_fp_plonk_gate_vector_add(
+    return kimchi_ffi.caml_pasta_fp_plonk_gate_vector_add(
         vector,
         tsRustConversion.fp.gateToRust(gate)
     );
 };
 
 // Provides: caml_pasta_fp_plonk_gate_vector_get
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fp_plonk_gate_vector_get = function (vector, index) {
     return tsRustConversion.fp.gateFromRust(
-        plonk_wasm.caml_pasta_fp_plonk_gate_vector_get(vector, index)
+        kimchi_ffi.caml_pasta_fp_plonk_gate_vector_get(vector, index)
     );
 };
 
 // Provides: caml_pasta_fp_plonk_gate_vector_len
-// Requires: plonk_wasm
+// Requires: kimchi_ffi
 var caml_pasta_fp_plonk_gate_vector_len = function (vector) {
-    return plonk_wasm.caml_pasta_fp_plonk_gate_vector_len(vector);
+    return kimchi_ffi.caml_pasta_fp_plonk_gate_vector_len(vector);
 };
 
 // Provides: caml_pasta_fp_plonk_gate_vector_wrap
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fp_plonk_gate_vector_wrap = function (vector, target, head) {
-    return plonk_wasm.caml_pasta_fp_plonk_gate_vector_wrap(
+    return kimchi_ffi.caml_pasta_fp_plonk_gate_vector_wrap(
         vector,
         tsRustConversion.wireToRust(target),
         tsRustConversion.wireToRust(head)
@@ -42,9 +42,9 @@ var caml_pasta_fp_plonk_gate_vector_wrap = function (vector, target, head) {
 };
 
 // Provides: caml_pasta_fp_plonk_gate_vector_digest
-// Requires: plonk_wasm, caml_bytes_of_uint8array
+// Requires: kimchi_ffi, caml_bytes_of_uint8array
 var caml_pasta_fp_plonk_gate_vector_digest = function (public_input_size, gate_vector) {
-    var bytes = plonk_wasm.caml_pasta_fp_plonk_gate_vector_digest(
+    var bytes = kimchi_ffi.caml_pasta_fp_plonk_gate_vector_digest(
         public_input_size,
         gate_vector
     );
@@ -55,49 +55,49 @@ var caml_pasta_fp_plonk_gate_vector_digest = function (public_input_size, gate_v
 };
 
 // Provides: caml_pasta_fp_plonk_circuit_serialize
-// Requires: plonk_wasm, caml_string_of_jsstring
+// Requires: kimchi_ffi, caml_string_of_jsstring
 var caml_pasta_fp_plonk_circuit_serialize = function (public_input_size, gate_vector) {
     return caml_string_of_jsstring(
-        plonk_wasm.caml_pasta_fp_plonk_circuit_serialize(public_input_size, gate_vector)
+        kimchi_ffi.caml_pasta_fp_plonk_circuit_serialize(public_input_size, gate_vector)
     );
 };
 
 // --- Fq versions ---
 
 // Provides: caml_pasta_fq_plonk_gate_vector_create
-// Requires: plonk_wasm
+// Requires: kimchi_ffi
 var caml_pasta_fq_plonk_gate_vector_create = function () {
-    return plonk_wasm.caml_pasta_fq_plonk_gate_vector_create();
+    return kimchi_ffi.caml_pasta_fq_plonk_gate_vector_create();
 };
 
 // Provides: caml_pasta_fq_plonk_gate_vector_add
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fq_plonk_gate_vector_add = function (vector, gate) {
-    return plonk_wasm.caml_pasta_fq_plonk_gate_vector_add(
+    return kimchi_ffi.caml_pasta_fq_plonk_gate_vector_add(
         vector,
         tsRustConversion.fq.gateToRust(gate)
     );
 };
 
 // Provides: caml_pasta_fq_plonk_gate_vector_get
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fq_plonk_gate_vector_get = function (vector, index) {
     return tsRustConversion.fq.gateFromRust(
-        plonk_wasm.caml_pasta_fq_plonk_gate_vector_get(vector, index)
+        kimchi_ffi.caml_pasta_fq_plonk_gate_vector_get(vector, index)
     );
 };
 
 
 // Provides: caml_pasta_fq_plonk_gate_vector_len
-// Requires: plonk_wasm
+// Requires: kimchi_ffi
 var caml_pasta_fq_plonk_gate_vector_len = function (vector) {
-    return plonk_wasm.caml_pasta_fq_plonk_gate_vector_len(vector);
+    return kimchi_ffi.caml_pasta_fq_plonk_gate_vector_len(vector);
 };
 
 // Provides: caml_pasta_fq_plonk_gate_vector_wrap
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fq_plonk_gate_vector_wrap = function (vector, target, head) {
-    return plonk_wasm.caml_pasta_fq_plonk_gate_vector_wrap(
+    return kimchi_ffi.caml_pasta_fq_plonk_gate_vector_wrap(
         vector,
         tsRustConversion.wireToRust(target),
         tsRustConversion.wireToRust(head)
@@ -105,9 +105,9 @@ var caml_pasta_fq_plonk_gate_vector_wrap = function (vector, target, head) {
 };
 
 // Provides: caml_pasta_fq_plonk_gate_vector_digest
-// Requires: plonk_wasm, caml_bytes_of_uint8array
+// Requires: kimchi_ffi, caml_bytes_of_uint8array
 var caml_pasta_fq_plonk_gate_vector_digest = function (public_input_size, gate_vector) {
-    var bytes = plonk_wasm.caml_pasta_fq_plonk_gate_vector_digest(
+    var bytes = kimchi_ffi.caml_pasta_fq_plonk_gate_vector_digest(
         public_input_size,
         gate_vector
     );
@@ -118,9 +118,9 @@ var caml_pasta_fq_plonk_gate_vector_digest = function (public_input_size, gate_v
 };
 
 // Provides: caml_pasta_fq_plonk_circuit_serialize
-// Requires: plonk_wasm, caml_string_of_jsstring
+// Requires: kimchi_ffi, caml_string_of_jsstring
 var caml_pasta_fq_plonk_circuit_serialize = function (public_input_size, gate_vector) {
     return caml_string_of_jsstring(
-        plonk_wasm.caml_pasta_fq_plonk_circuit_serialize(public_input_size, gate_vector)
+        kimchi_ffi.caml_pasta_fq_plonk_circuit_serialize(public_input_size, gate_vector)
     );
 };

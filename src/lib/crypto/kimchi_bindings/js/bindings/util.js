@@ -1,17 +1,17 @@
 /* global UInt64, caml_int64_of_int32, caml_create_bytes,
     caml_bytes_unsafe_set, caml_bytes_unsafe_get, caml_ml_bytes_length,
-    plonk_wasm, getTsBindings
+    kimchi_ffi, getTsBindings
  */
 
 // Provides: tsBindings
 var tsBindings = globalThis.__snarkyTsBindings;
 
 // Provides: tsRustConversion
-// Requires: tsBindings, plonk_wasm
-if (plonk_wasm && plonk_wasm.native) {
-  plonk_wasm.__kimchi_use_native = true;
+// Requires: tsBindings, kimchi_ffi
+if (kimchi_ffi && kimchi_ffi.native) {
+  kimchi_ffi.__kimchi_use_native = true;
 }
-var tsRustConversion = tsBindings.rustConversion(plonk_wasm);
+var tsRustConversion = tsBindings.rustConversion(kimchi_ffi);
 
 // Provides: getTsBindings
 // Requires: tsBindings

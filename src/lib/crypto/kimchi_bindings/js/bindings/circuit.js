@@ -1,10 +1,10 @@
-/* global plonk_wasm, tsRustConversionNative */
+/* global kimchi_ffi, tsRustConversionNative */
 
 
 // Provides: prover_to_json
-// Requires: plonk_wasm, tsRustConversionNative
+// Requires: kimchi_ffi, tsRustConversionNative
 function prover_to_json(prover_index) {
   var bytes = prover_index.serialize()
-  var index = plonk_wasm.prover_index_fp_from_bytes(bytes);
-  return plonk_wasm.prover_to_json(index);
+  var index = kimchi_ffi.prover_index_fp_from_bytes(bytes);
+  return kimchi_ffi.prover_to_json(index);
 }

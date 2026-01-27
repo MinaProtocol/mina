@@ -1,9 +1,9 @@
-/* global plonk_wasm, tsRustConversion
+/* global kimchi_ffi, tsRustConversion
  */
 
 
 // Provides: caml_pasta_fp_plonk_proof_create
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fp_plonk_proof_create = function (
     index,
     witness_cols,
@@ -11,7 +11,7 @@ var caml_pasta_fp_plonk_proof_create = function (
     prev_challenges,
     prev_sgs
 ) {
-    var w = new plonk_wasm.WasmVecVecFp(witness_cols.length - 1);
+    var w = new kimchi_ffi.WasmVecVecFp(witness_cols.length - 1);
     for (var i = 1; i < witness_cols.length; i++) {
         w.push(tsRustConversion.fp.vectorToRust(witness_cols[i]));
     }
@@ -26,7 +26,7 @@ var caml_pasta_fp_plonk_proof_create = function (
     runtime_tables = runtime_tables ? Array.from(runtime_tables) : [];
     prev_sgs = tsRustConversion.fp.pointsToRust(prev_sgs);
     prev_sgs = prev_sgs ? Array.from(prev_sgs) : [];
-    var proof = plonk_wasm.caml_pasta_fp_plonk_proof_create(
+    var proof = kimchi_ffi.caml_pasta_fp_plonk_proof_create(
         index,
         witness_cols,
         runtime_tables,
@@ -37,15 +37,15 @@ var caml_pasta_fp_plonk_proof_create = function (
 };
 
 // Provides: caml_pasta_fp_plonk_proof_verify
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fp_plonk_proof_verify = function (index, proof) {
     index = tsRustConversion.fp.verifierIndexToRust(index);
     proof = tsRustConversion.fp.proofToRust(proof);
-    return plonk_wasm.caml_pasta_fp_plonk_proof_verify(index, proof);
+    return kimchi_ffi.caml_pasta_fp_plonk_proof_verify(index, proof);
 };
 
 // Provides: caml_pasta_fp_plonk_proof_batch_verify
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fp_plonk_proof_batch_verify = function (indexes, proofs) {
     indexes = tsRustConversion.mapMlArrayToRustVector(
         indexes,
@@ -55,29 +55,29 @@ var caml_pasta_fp_plonk_proof_batch_verify = function (indexes, proofs) {
         proofs,
         tsRustConversion.fp.proofToRust
     );
-    return plonk_wasm.caml_pasta_fp_plonk_proof_batch_verify(indexes, proofs);
+    return kimchi_ffi.caml_pasta_fp_plonk_proof_batch_verify(indexes, proofs);
 };
 
 // Provides: caml_pasta_fp_plonk_proof_dummy
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fp_plonk_proof_dummy = function () {
     return tsRustConversion.fp.proofFromRust(
-        plonk_wasm.caml_pasta_fp_plonk_proof_dummy()
+        kimchi_ffi.caml_pasta_fp_plonk_proof_dummy()
     );
 };
 
 // Provides: caml_pasta_fp_plonk_proof_deep_copy
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fp_plonk_proof_deep_copy = function (proof) {
     return tsRustConversion.fp.proofFromRust(
-        plonk_wasm.caml_pasta_fp_plonk_proof_deep_copy(
+        kimchi_ffi.caml_pasta_fp_plonk_proof_deep_copy(
             tsRustConversion.fp.proofToRust(proof)
         )
     );
 };
 
 // Provides: caml_pasta_fq_plonk_proof_create
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fq_plonk_proof_create = function (
     index,
     witness_cols,
@@ -85,7 +85,7 @@ var caml_pasta_fq_plonk_proof_create = function (
     prev_challenges,
     prev_sgs
 ) {
-    var w = new plonk_wasm.WasmVecVecFq(witness_cols.length - 1);
+    var w = new kimchi_ffi.WasmVecVecFq(witness_cols.length - 1);
     for (var i = 1; i < witness_cols.length; i++) {
         w.push(tsRustConversion.fq.vectorToRust(witness_cols[i]));
     }
@@ -98,7 +98,7 @@ var caml_pasta_fq_plonk_proof_create = function (
     runtime_tables = runtime_tables ? Array.from(runtime_tables) : [];
     prev_sgs = tsRustConversion.fq.pointsToRust(prev_sgs);
     prev_sgs = prev_sgs ? Array.from(prev_sgs) : [];
-    var proof = plonk_wasm.caml_pasta_fq_plonk_proof_create(
+    var proof = kimchi_ffi.caml_pasta_fq_plonk_proof_create(
         index,
         witness_cols,
         runtime_tables,
@@ -109,15 +109,15 @@ var caml_pasta_fq_plonk_proof_create = function (
 };
 
 // Provides: caml_pasta_fq_plonk_proof_verify
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fq_plonk_proof_verify = function (index, proof) {
     index = tsRustConversion.fq.verifierIndexToRust(index);
     proof = tsRustConversion.fq.proofToRust(proof);
-    return plonk_wasm.caml_pasta_fq_plonk_proof_verify(index, proof);
+    return kimchi_ffi.caml_pasta_fq_plonk_proof_verify(index, proof);
 };
 
 // Provides: caml_pasta_fq_plonk_proof_batch_verify
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fq_plonk_proof_batch_verify = function (indexes, proofs) {
     indexes = tsRustConversion.mapMlArrayToRustVector(
         indexes,
@@ -127,22 +127,22 @@ var caml_pasta_fq_plonk_proof_batch_verify = function (indexes, proofs) {
         proofs,
         tsRustConversion.fq.proofToRust
     );
-    return plonk_wasm.caml_pasta_fq_plonk_proof_batch_verify(indexes, proofs);
+    return kimchi_ffi.caml_pasta_fq_plonk_proof_batch_verify(indexes, proofs);
 };
 
 // Provides: caml_pasta_fq_plonk_proof_dummy
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fq_plonk_proof_dummy = function () {
     return tsRustConversion.fq.proofFromRust(
-        plonk_wasm.caml_pasta_fq_plonk_proof_dummy()
+        kimchi_ffi.caml_pasta_fq_plonk_proof_dummy()
     );
 };
 
 // Provides: caml_pasta_fq_plonk_proof_deep_copy
-// Requires: plonk_wasm, tsRustConversion
+// Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fq_plonk_proof_deep_copy = function (proof) {
     return tsRustConversion.fq.proofFromRust(
-        plonk_wasm.caml_pasta_fq_plonk_proof_deep_copy(
+        kimchi_ffi.caml_pasta_fq_plonk_proof_deep_copy(
             tsRustConversion.fq.proofToRust(proof)
         )
     );
