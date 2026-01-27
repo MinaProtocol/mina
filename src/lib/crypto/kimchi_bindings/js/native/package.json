@@ -1,6 +1,6 @@
 {
   "napi": {
-    "binaryName": "plonk_napi",
+    "binaryName": "kimchi_napi",
     "dtsHeaderFile": "./header-d.ts"
   }
 }

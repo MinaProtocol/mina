@@ -9,7 +9,7 @@
   (pps ppx_version js_of_ocaml-ppx)))
 
 (rule
- (targets plonk_napi.node index.d.ts)
+ (targets kimchi_napi.node index.d.ts)
  (mode
   (promote
    (into ./artifacts)))
