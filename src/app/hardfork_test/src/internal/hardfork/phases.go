@@ -315,6 +315,20 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 			_, err = os.Stat(activatedFile)
 		}
 
+		// Remove everything else in that folder because it seems to be affecting operation.
+		entries, err := os.ReadDir(nodeDir)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range entries {
+			if e.Name() != "auto-fork-mesa-devnet" {
+				err = os.RemoveAll(filepath.Join(nodeDir, e.Name()))
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
 		currentForkConfigBytes, err := os.ReadFile(filepath.Join(forkConfigBase, "daemon.json"))
 		if err != nil {
 			return nil, err
@@ -339,6 +353,11 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 		}
 
 		err = os.Rename(filepath.Join(forkConfigBase, "genesis"), filepath.Join(nodeDir, "override_genesis_ledger"))
+		if err != nil {
+			return nil, err
+		}
+
+		err = os.RemoveAll(forkConfigBase)
 		if err != nil {
 			return nil, err
 		}
