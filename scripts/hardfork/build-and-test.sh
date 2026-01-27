@@ -160,8 +160,8 @@ nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfor
 
 # 5. Execute hardfork_test on them.
 
-SLOT_TX_END=33
-SLOT_CHAIN_END=$((SLOT_TX_END+4))
+SLOT_TX_END=${SLOT_TX_END:-$((RANDOM%120+30))}      
+SLOT_CHAIN_END=${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}
 
 NETWORK_ROOT=$(mktemp -d --tmpdir hardfork-network.XXXXXXX)
 
