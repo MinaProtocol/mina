@@ -103,7 +103,7 @@ fi
 
 if [[ -z "$TAG" ]]; then usage "Docker tag is not set!"; usage; exit 1; fi;
 
-set -x
+set -eox pipefail
 
 container_id=$(docker run -v .:/workdir -p 3087:3087 -p 3085:3085 -d --env MINA_NETWORK=$NETWORK $REPO/mina-rosetta:$TAG-$NETWORK )
 
@@ -115,8 +115,9 @@ collect_logs() {
     # Container stdout/stderr (includes rosetta, archive output)
     docker logs "$container_id" > test_output/artifacts/container-stdout.log 2> test_output/artifacts/container-stderr.log
 
-    # Mina config directory contains mina.log, mina-best-tip.log, etc.
-    docker cp "$container_id:/data/.mina-config" test_output/artifacts/mina-config || echo "mina config dir not accessible"
+    # Copy top-level .log files from mina config directory (excludes binary LevelDB logs in subdirs)
+    mkdir -p test_output/artifacts/mina-logs
+    docker exec "$container_id" bash -c "cd /data/.mina-config && find . -maxdepth 1 -name '*.log' | tar -cf - -T -" | tar -xf - -C test_output/artifacts/mina-logs 2>/dev/null || true
 
     # Daemon status at end of test
     docker exec "$container_id" mina client status --json > test_output/artifacts/daemon-status.json 2>/dev/null || echo "Could not get daemon status" > test_output/artifacts/daemon-status.json
@@ -129,8 +130,13 @@ stop_docker() {
 }
 
 cleanup() {
-    collect_logs
+    local exit_code=$?
+    # Only collect logs on failure
+    if [[ $exit_code -ne 0 ]]; then
+        collect_logs
+    fi
     stop_docker
+    exit $exit_code
 }
 
 trap cleanup EXIT
