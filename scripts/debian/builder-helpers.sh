@@ -888,7 +888,7 @@ build_daemon_devnet_hardfork_deb() {
   create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt' "/usr/lib/mina/mesa"
+  copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt' "/usr/local/bin"
 
   replace_runtime_config_and_ledgers_with_hardforked_ones devnet
 
@@ -918,7 +918,7 @@ build_daemon_berkeley_hardfork_deb() {
   create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Berkeley Network' "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt' "/usr/lib/mina/mesa"
+  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt' "/usr/local/bin"
 
   replace_runtime_config_and_ledgers_with_hardforked_ones berkeley
 
@@ -949,7 +949,7 @@ build_daemon_mainnet_hardfork_deb() {
   create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Mainnet Network' "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_configs mainnet mainnet 'seed-lists/mainnet_seeds.txt'
+  copy_common_daemon_configs mainnet mainnet 'seed-lists/mainnet_seeds.txt' "/usr/local/bin"
 
   replace_runtime_config_and_ledgers_with_hardforked_ones mainnet
 
