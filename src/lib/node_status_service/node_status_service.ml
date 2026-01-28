@@ -108,6 +108,8 @@ let send_node_status_data (type data) ~logger ~url (node_status_data : data)
   in
   match%map
     Async.try_with ~here:[%here] (fun () ->
+        [%log debug] "Sending node status data to $url"
+          ~metadata:[ ("body", json); ("url", `String (Uri.to_string url)) ] ;
         Cohttp_async.Client.post ~headers
           ~body:(Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
           url )
