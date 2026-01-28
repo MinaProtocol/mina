@@ -1,3 +1,85 @@
+(** Transaction SNARK circuits.
+
+    This code is called in:
+    - [src/lib/prover/prover.ml] - block production
+    - [src/lib/verifier/verifier.ml] - proof verification
+    - [src/lib/snark_worker/prod.ml] - SNARK work generation
+    - [src/lib/genesis_proof/genesis_proof.ml] - genesis proof
+
+    The transaction SNARK has 5 circuits:
+
+    - {b transaction-merge}: Combines two transaction proofs into one. Used to
+      parallelize proof generation by merging sub-proofs in a tree structure.
+      This circuit is used for all transaction types, including zkApp commands.
+
+    - {b transaction-base}: Proves a single non-zkApp transaction (payments,
+      stake delegations, coinbase, fee transfers). This is the leaf circuit
+      that processes individual transactions.
+
+    - {b zkapp-opt_signed-opt_signed}: Proves a zkApp command with two account
+      updates that may have optional signatures. Handles the most complex case
+      with multiple authorization modes.
+
+    - {b zkapp-opt_signed}: Proves a zkApp command with one account update that
+      may have an optional signature.
+
+    - {b zkapp-proved}: Proves a zkApp command where authorization comes from a
+      side-loaded proof (the zkApp's own proof).
+
+    Constraint counts vary by profile due to different configuration parameters
+    (e.g., ledger depth).
+
+    Note: These values are measured with proof_level=Full, which generates the
+    actual constraint system used in production. See {!Genesis_constants.Proof_level}
+    for details on proof levels.
+
+    {b Dev profile:}
+    {v
+    | Circuit                     | Constraints | Public Input | Auxiliary Input |
+    |-----------------------------|-------------|--------------|-----------------|
+    | transaction-merge           | 632         | 300          | 1,895           |
+    | transaction-base            | 12,875      | 300          | 37,502          |
+    | zkapp-opt_signed-opt_signed | 14,537      | 300          | 56,588          |
+    | zkapp-opt_signed            | 8,026       | 300          | 32,166          |
+    | zkapp-proved                | 4,249       | 300          | 30,732          |
+    v}
+
+    {b Devnet profile:}
+    {v
+    | Circuit                     | Constraints | Public Input | Auxiliary Input |
+    |-----------------------------|-------------|--------------|-----------------|
+    | transaction-merge           | 632         | 300          | 1,895           |
+    | transaction-base            | 15,357      | 300          | 63,806          |
+    | zkapp-opt_signed-opt_signed | 16,206      | 300          | 74,242          |
+    | zkapp-opt_signed            | 8,883       | 300          | 41,170          |
+    | zkapp-proved                | 5,106       | 300          | 39,736          |
+    v}
+
+    {b Lightnet profile:}
+    {v
+    | Circuit                     | Constraints | Public Input | Auxiliary Input |
+    |-----------------------------|-------------|--------------|-----------------|
+    | transaction-merge           | 632         | 300          | 1,895           |
+    | transaction-base            | 15,357      | 300          | 63,806          |
+    | zkapp-opt_signed-opt_signed | 16,206      | 300          | 74,242          |
+    | zkapp-opt_signed            | 8,883       | 300          | 41,170          |
+    | zkapp-proved                | 5,106       | 300          | 39,736          |
+    v}
+
+    {b Mainnet profile:}
+    {v
+    | Circuit                     | Constraints | Public Input | Auxiliary Input |
+    |-----------------------------|-------------|--------------|-----------------|
+    | transaction-merge           | 632         | 300          | 1,895           |
+    | transaction-base            | 15,357      | 300          | 63,806          |
+    | zkapp-opt_signed-opt_signed | 16,206      | 300          | 74,242          |
+    | zkapp-opt_signed            | 8,883       | 300          | 41,170          |
+    | zkapp-proved                | 5,106       | 300          | 39,736          |
+    v}
+
+    If these values change, update the tables above and the expected values in
+    [test/constraint_count/test_constraint_count.ml]. *)
+
 module type Full = sig
   open Core
   open Mina_base
@@ -219,6 +301,33 @@ module type Full = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> unit
     -> (string * Md5.t) list
+
+  (** Return the constraint system for the transaction-merge circuit. *)
+  val merge_constraint_system : unit -> Tick.R1CS_constraint_system.t
+
+  (** Return the constraint system for the transaction-base circuit. *)
+  val base_constraint_system :
+       signature_kind:Mina_signature_kind.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Tick.R1CS_constraint_system.t
+
+  (** Return the constraint system for the zkapp-opt_signed-opt_signed circuit. *)
+  val zkapp_opt_signed_opt_signed_constraint_system :
+       signature_kind:Mina_signature_kind.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Tick.R1CS_constraint_system.t
+
+  (** Return the constraint system for the zkapp-opt_signed circuit. *)
+  val zkapp_opt_signed_constraint_system :
+       signature_kind:Mina_signature_kind.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Tick.R1CS_constraint_system.t
+
+  (** Return the constraint system for the zkapp-proved circuit. *)
+  val zkapp_proved_constraint_system :
+       signature_kind:Mina_signature_kind.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> Tick.R1CS_constraint_system.t
 
   (* Every circuit must have at least 1 of each type of constraint.
      This function can be used to add the missing constraints *)

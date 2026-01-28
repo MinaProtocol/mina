@@ -1,5 +1,17 @@
 open Core_kernel
 
+(** Proof level controls how proofs are handled during execution.
+
+    - [Full]: Generates and verifies actual proofs. This is used in production
+      and creates the real constraint systems. Circuit statistics (constraint
+      counts, public/auxiliary input sizes) are only meaningful with this level.
+
+    - [Check]: Runs the constraint system logic for verification but skips
+      actual proof generation. Useful for testing correctness without the
+      overhead of proof generation.
+
+    - [No_check]: Skips both proof generation and verification. Fastest mode,
+      used for quick testing where proofs are not needed. *)
 module Proof_level = struct
   type t = Full | Check | No_check [@@deriving bin_io_unversioned, equal]
 
