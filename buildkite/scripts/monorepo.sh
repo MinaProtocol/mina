@@ -393,7 +393,7 @@ find "$JOBS" -type f -name "*.yml" | while read -r file; do
   else
     job_path=$(yq -r .spec.path "$file")
 
-    dhall-to-yaml --quoted <<< "(./buildkite/src/Jobs/$job_path/$job_name.dhall).pipeline" | buildkite-agent pipeline upload
+    ./buildkite/scripts/pipeline/upload.sh "(./buildkite/src/Jobs/$job_path/$job_name.dhall).pipeline"
     printf " -> ✅ Uploaded job: %s\n" "$job_name"
   fi
 
