@@ -7,18 +7,18 @@ let Integer/nonNegative =
       ? ../Integer/nonNegative
 
 let renderInteger
-    : Integer → Text
-    =   λ(integer : Integer)
-      →       if Integer/nonNegative integer
+    : Integer -> Text
+    =     \(integer : Integer)
+      ->        if Integer/nonNegative integer
 
-        then  Natural/show (Integer/clamp integer)
+          then  Natural/show (Integer/clamp integer)
 
-        else  Integer/show integer
+          else  Integer/show integer
 
-let positive = assert : renderInteger +1 ≡ "1"
+let positive = assert : renderInteger +1 === "1"
 
-let zero = assert : renderInteger +0 ≡ "0"
+let zero = assert : renderInteger +0 === "0"
 
-let negative = assert : renderInteger -1 ≡ "-1"
+let negative = assert : renderInteger -1 === "-1"
 
 in  renderInteger
