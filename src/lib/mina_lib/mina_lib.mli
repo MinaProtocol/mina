@@ -334,11 +334,11 @@ module Hardfork_config : sig
       and node config) both without hard fork ledger migrations applied (the
       "legacy" format, compatible with the current daemon) and with the hard
       fork ledger migrations applied (the actual hard fork format, compatible
-      with a hard fork daemon). The legacy format config will be saved in
-      [daemon.legacy.json] and [genesis_legacy/] in [directory_name], and the
-      hard fork format files will be saved in [daemon.json] and [genesis/] in
-      that same directory. An empty [activated] file will be created in
-      [directory_name] at the very end of this process to indicate that the
+      with a hard fork daemon). When [generate_fork_validation] is true, the
+      legacy format config will be saved in the [fork_validation/] subdirectory
+      of [config_dir]. The hard fork format files will be saved in [daemon.json]
+      and [genesis/] in [config_dir]. An empty [activated] file will be created
+      in [config_dir] at the very end of this process to indicate that the
       config was generated successfully. *)
   val dump_reference_config :
        breadcrumb_spec:breadcrumb_spec
