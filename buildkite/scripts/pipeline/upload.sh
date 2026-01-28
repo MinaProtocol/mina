@@ -13,9 +13,12 @@ else
 fi
 
 # Generate YAML from Dhall
-if ! output=$(dhall-to-yaml --quoted <<< "$input"); then
-  echo "Error: dhall-to-yaml failed with exit code $?" >&2
-  exit 1
+if output=$(dhall-to-yaml --quoted <<< "$input"); then
+  :
+else
+  dhall_status=$?
+  echo "Error: dhall-to-yaml failed with exit code $dhall_status" >&2
+  exit "$dhall_status"
 fi
 
 if [[ -z "$output" ]]; then
