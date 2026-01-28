@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eo pipefail
+set -eox pipefail
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -9,15 +9,18 @@ function usage() {
     echo -e "${RED}☞  $1${CLEAR}\n";
   fi
   echo "Usage: $0 [-d deb-name] [-v new-version] "
-  echo "  -d, --deb         The Debian name"
-  echo "  --version         The Current Debian version"
-  echo "  --arch            The Debian architecture"
-  echo "  --new-version     The New Debian version"
-  echo "  --suite           The Current Debian suite"
-  echo "  --repo            The Source Debian repo"
-  echo "  --new-repo        The Target Debian repo. By default equal to '--repo'"
-  echo "  --new-suite       The New Debian suite"
-  echo "  --sign            The Public Key id, which is used to sign package. Key must be stored locally"
+  echo "  -d, --deb                 The Debian name"
+  echo "  --version                 The Current Debian version"
+  echo "  --arch                    The Debian architecture"
+  echo "  --new-version             The New Debian version"
+  echo "  --suite                   The Current Debian suite"
+  echo "  --repo                    The Source Debian repo"
+  echo "  --new-repo                The Target Debian repo. By default equal to '--repo'"
+  echo "  --new-suite               The New Debian suite"
+  echo "  --codename                The Debian codename"
+  echo "  --sign                    The Public Key id, which is used to sign package. Key must be stored locally"
+  echo "  --skip-cache-invalidation Skip CloudFront cache invalidation after publishing the debian"
+  echo "  --help                    Show this help message and exit"
   echo ""
   echo "Example: $0 --deb mina-archive --version 2.0.0-rc1-48efea4 --new-version 2.0.0-rc1 --codename bullseye --release unstable --new-release umt"
 }
@@ -33,6 +36,9 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --arch) ARCH="$2"; shift;;
   --repo) REPO="$2"; shift;;
   --sign) SIGN="$2"; shift;;
+  --codename) CODENAME="$2"; shift;;
+  --skip-cache-invalidation) SKIP_CACHE_INVALIDATION="1";;
+  --help) usage; exit 0;;
   *) echo "❌ Unknown parameter passed: $1"; usage exit 1;;
 esac; shift; done
 
@@ -54,7 +60,7 @@ fi
 function rebuild_deb() {
   source scripts/debian/reversion-helper.sh
 
-  wget https://s3.us-west-2.amazonaws.com/${REPO}/pool/${CODENAME}/m/mi/${DEB}_${VERSION}.deb
+  wget https://s3.us-west-2.amazonaws.com/${REPO}/pool/${CODENAME}/m/mi/${DEB}_${VERSION}_${ARCH}.deb
   reversion --deb ${DEB} \
             --package ${DEB} \
             --source-version ${VERSION} \
@@ -66,4 +72,11 @@ function rebuild_deb() {
 }
 
 rebuild_deb
-source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}_${ARCH}.deb" --arch "${ARCH}" --version "${NEW_VERSION}" --codename "${CODENAME}" --release "${NEW_SUITE}" --bucket "${NEW_REPO}" ${SIGN_ARG}
+
+if [[ -n "$SKIP_CACHE_INVALIDATION" ]]; then
+  SKIP_CACHE_INVALIDATION_ARG="--skip-cache-invalidation"
+else
+  SKIP_CACHE_INVALIDATION_ARG=""
+fi
+
+source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}_${ARCH}.deb" --arch "${ARCH}" --version "${NEW_VERSION}" --codename "${CODENAME}" --release "${NEW_SUITE}" --bucket "${NEW_REPO}" ${SIGN_ARG} ${SKIP_CACHE_INVALIDATION_ARG}
