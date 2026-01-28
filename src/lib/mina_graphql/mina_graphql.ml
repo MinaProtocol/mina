@@ -2596,14 +2596,18 @@ module Queries = struct
         let%bind breadcrumb_spec =
           match (state_hash_opt, block_height_opt) with
           | None, None ->
-              return `Stop_slot
+              return
+                (Mina_lib.Hardfork_config.Stop_slot
+                   { preserve_fork_block_time = true } )
           | Some state_hash_base58, None ->
               let%map state_hash =
                 State_hash.of_base58_check state_hash_base58 |> Deferred.return
               in
-              `State_hash state_hash
+              Mina_lib.Hardfork_config.State_hash state_hash
           | None, Some block_height ->
-              return (`Block_height (Unsigned.UInt32.of_int block_height))
+              return
+                (Mina_lib.Hardfork_config.Block_height
+                   (Unsigned.UInt32.of_int block_height) )
           | Some _, Some _ ->
               Deferred.Or_error.error_string
                 "Cannot specify both state hash and height"

@@ -2697,17 +2697,17 @@ module Hardfork_config = struct
   type mina_lib = t
 
   type breadcrumb_spec =
-    [ `Stop_slot
-    | `State_hash of State_hash.t
-    | `Block_height of Unsigned.UInt32.t ]
+    | Stop_slot of { preserve_fork_block_time : bool }
+    | State_hash of State_hash.t
+    | Block_height of Unsigned.UInt32.t
 
   let breadcrumb ~breadcrumb_spec mina =
     match breadcrumb_spec with
-    | `Stop_slot ->
+    | Stop_slot _ ->
         best_chain_block_before_stop_slot mina
-    | `State_hash state_hash_base58 ->
+    | State_hash state_hash_base58 ->
         best_chain_block_by_state_hash mina state_hash_base58 |> Deferred.return
-    | `Block_height block_height ->
+    | Block_height block_height ->
         best_chain_block_by_height mina block_height |> Deferred.return
 
   let genesis_source_of_snapshot = function
@@ -2855,12 +2855,14 @@ module Hardfork_config = struct
     in
     let configured_slot =
       match breadcrumb_spec with
-      | `Stop_slot ->
+      | Stop_slot { preserve_fork_block_time = true } ->
+          None
+      | Stop_slot { preserve_fork_block_time = false } ->
           Runtime_config.scheduled_hard_fork_genesis_slot
             mina.config.precomputed_values.runtime_config
-      | `State_hash _state_hash_base58 ->
+      | State_hash _state_hash_base58 ->
           None
-      | `Block_height _block_height ->
+      | Block_height _block_height ->
           None
     in
     Option.value ~default:block_global_slot configured_slot

@@ -280,9 +280,9 @@ module Hardfork_config : sig
   type mina_lib = t
 
   type breadcrumb_spec =
-    [ `Stop_slot
-    | `State_hash of State_hash.t
-    | `Block_height of Unsigned.UInt32.t ]
+    | Stop_slot of { preserve_fork_block_time : bool }
+    | State_hash of State_hash.t
+    | Block_height of Unsigned.UInt32.t
 
   val breadcrumb :
        breadcrumb_spec:breadcrumb_spec
