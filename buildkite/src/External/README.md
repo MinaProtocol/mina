@@ -34,3 +34,7 @@ Current version is v15.0.0.
 Buildkite module contains all buildkite bindings which serves the purpose of delivering buildkite primitives which we are using to express pipelines and steps in dhall.
 
 We are hosting them at: s3://dhall.packages.minaprotocol.com/buildkite/releases. Newest version 0.0.1.
+
+### Validation and formatting
+
+Script is also testing/format output dhall scripts running make all in buildkite/ folder. Make sure you have it and mina repo is checked out at commit which serve correct version of Makefile (usually from mainline branch)

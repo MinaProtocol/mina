@@ -8,9 +8,12 @@ EXTERNAL_DIR="${REPO_ROOT}/buildkite/src/External"
 
 PRELUDE_VERSION="${PRELUDE_VERSION:-v15.0.0}"
 PRELUDE_REPO_URL="${PRELUDE_REPO_URL:-https://github.com/dhall-lang/dhall-lang.git}"
+
 BUILDKITE_RELEASE="${BUILDKITE_RELEASE:-0.0.1}"
+BUILDKITE_S3_PATH="s3://dhall.packages.minaprotocol.com/buildkite/releases/${BUILDKITE_RELEASE}"
 
 TMP_ROOT="${TMPDIR:-/tmp}"
+AWS_REGION="us-west-2"
 
 ONLY="all"
 KEEP_TMP=0
@@ -24,20 +27,13 @@ Updates buildkite/src/External/{prelude,buildkite} and refreshes dhall hashes.
 Options:
   --only <all|prelude|buildkite>  Update a single dependency (default: all)
   --prelude-version <tag>         dhall-lang tag/branch (default: v15.0.0)
-  --prelude-repo <name|url>       dhall-lang repo (default: https://github.com/dhall-lang/dhall-lang.git)
+  --prelude-repo <name|url>       dhall-lang repo (default: ${PRELUDE_REPO_URL})
   --buildkite-release <version>   S3 release version (default: 0.0.1)
+  --buildkite-s3-path <s3 path>   S3 path to Buildkite bindings ( default: ${BUILDKITE_S3_PATH} )
   --tmp-root <path>               Temp directory root (default: /tmp)
   --keep-tmp                      Do not delete temp directories
   -h, --help                      Show this help
 
-Environment variables are also supported:
-  PRELUDE_VERSION, PRELUDE_REPO_URL, BUILDKITE_RELEASE, TMPDIR
-
-Notes:
-  - If --buildkite-out is not provided, the script will try to download from S3
-    using aws-cli and BUILDKITE_RELEASE. Hosted at:
-    https://s3.us-west-2.amazonaws.com/dhall.packages.minaprotocol.com/buildkite/releases/${VERSION}
-  - To regenerate Buildkite bindings, see buildkite/src/External/README.md.
 USAGE
 }
 
@@ -154,9 +150,9 @@ update_buildkite() {
   local out_dir="${tmp}/out"
   echo "Syncing Buildkite bindings from S3 (release ${BUILDKITE_RELEASE})"
   aws s3 sync \
-    "s3://dhall.packages.minaprotocol.com/buildkite/releases/${BUILDKITE_RELEASE}/" \
+    "${BUILDKITE_S3_PATH}" \
     "${out_dir}" \
-    --region us-west-2 \
+    --region "${AWS_REGION}" \
     --quiet
 
   local src_dir
@@ -172,6 +168,13 @@ update_buildkite() {
   cp -R "${src_dir}/." "${EXTERNAL_DIR}/buildkite"
   echo "Freezing ${EXTERNAL_DIR}/Buildkite.dhall"
   dhall freeze --inplace "${EXTERNAL_DIR}/Buildkite.dhall"
+}
+
+format_and_validate() {
+  echo "Running 'make all' in ${REPO_ROOT}/buildkite"
+  # The subshell (parentheses) ensures the local working directory (pwd)
+  # is NOT changed
+  (cd "${REPO_ROOT}/buildkite" && make all)
 }
 
 case "${ONLY}" in
@@ -191,3 +194,5 @@ case "${ONLY}" in
     exit 1
     ;;
 esac
+
+format_and_validate
