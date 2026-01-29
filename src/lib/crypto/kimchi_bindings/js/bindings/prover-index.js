@@ -17,7 +17,7 @@ var caml_pasta_fp_plonk_index_deserialize = function (index) {
 };
 
 // Provides: caml_pasta_fp_plonk_index_create
-// Requires: kimchi_ffi, tsRustConversion, kimchi_is_native
+// Requires: kimchi_ffi, tsRustConversion, kimchi_is_native, free_on_finalize
 var caml_pasta_fp_plonk_index_create = function (
     gates,
     public_inputs,
@@ -152,7 +152,7 @@ var caml_pasta_fq_plonk_index_deserialize = function (index) {
 };
 
 // Provides: caml_pasta_fq_plonk_index_create
-// Requires: kimchi_ffi, tsRustConversion, kimchi_is_native
+// Requires: kimchi_ffi, tsRustConversion, kimchi_is_native, free_on_finalize
 var caml_pasta_fq_plonk_index_create = function (
     gates,
     public_inputs,
