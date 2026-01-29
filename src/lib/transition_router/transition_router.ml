@@ -361,6 +361,59 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
             "Will start initialization without connecting to too many peers" ;
           Deferred.unit )
 
+let best_tip_metadata best_tip =
+  [ ( "length"
+    , `Int
+        (Unsigned.UInt32.to_int
+           ( Mina_block.blockchain_length
+           @@ Mina_block.Validation.block best_tip.Envelope.Incoming.data ) ) )
+  ]
+
+let log_recent_best_tip ~logger ~local_sync_resolution ~ready_for_catcup
+    best_tip =
+  let state =
+    if ready_for_catcup then "recent enough for catchup" else "downloaded"
+  in
+  [%log info]
+    ~metadata:(best_tip_metadata best_tip)
+    "Network best tip is %s (best_tip with $length); %s" state
+    local_sync_resolution
+
+let log_recent_best_tip_opt ~logger ?(ready_for_catcup = true) ?best_tip
+    local_sync_resolution =
+  match best_tip with
+  | Some best_tip ->
+      log_recent_best_tip ~logger ~ready_for_catcup ~local_sync_resolution
+        best_tip
+  | None ->
+      [%log info]
+        "Successfully loaded frontier, but failed to download best tip from \
+         network"
+
+let collected_transitions_of_best_tip best_tip_opt =
+  match best_tip_opt with
+  | Some best_tip ->
+      [ (Envelope.Incoming.map ~f:(fun x -> `Block x) best_tip, None) ]
+  | None ->
+      []
+
+let initialize_with_existing_frontier ~context:(module Context : CONTEXT)
+    ~start_catchup ~frontier ~required_local_state_sync ~sync_local_state
+    best_tip_opt =
+  let open Context in
+  match required_local_state_sync (Transition_frontier.best_tip frontier) with
+  | None ->
+      log_recent_best_tip_opt ~logger ?best_tip:best_tip_opt
+        "local state already in sync" ;
+      let%map () = Deferred.unit in
+      start_catchup frontier @@ collected_transitions_of_best_tip best_tip_opt
+  | Some sync_jobs ->
+      log_recent_best_tip_opt ~logger ~ready_for_catcup:false
+        ?best_tip:best_tip_opt "starting local sync" ;
+      let%map result = sync_local_state sync_jobs in
+      Or_error.tag ~tag:"local state sync failed" result |> Or_error.ok_exn ;
+      start_catchup frontier @@ collected_transitions_of_best_tip best_tip_opt
+
 let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
     ~sync_local_state ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
     ~time_controller ~get_completed_work ~frontier_w
@@ -400,61 +453,42 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
       ~collected_transitions ~cache_exceptions ~network_transition_pipe
       ~frontier_w frontier
   in
-  let best_tip_metadata best_tip =
-    [ ( "length"
-      , `Int
-          (Unsigned.UInt32.to_int
-             ( Mina_block.blockchain_length
-             @@ Mina_block.Validation.block best_tip.Envelope.Incoming.data ) )
-      )
-    ]
+  let close_frontier_and_start_bootstrap best_tip frontier =
+    [%log info]
+      ~metadata:(best_tip_metadata best_tip)
+      "Network best tip is too new to catchup to (best_tip with $length); \
+       starting bootstrap" ;
+    let initial_root_transition =
+      Transition_frontier.(Breadcrumb.validated_transition (root frontier))
+    in
+    let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
+    start_bootstrap initial_root_transition (Some (`Block best_tip))
   in
-  let is_sync_required transition =
+  let required_local_state_sync transition =
     Consensus.Hooks.required_local_state_sync
       ~constants:precomputed_values.consensus_constants
       ~consensus_state:
         (Transition_frontier.Breadcrumb.consensus_state transition)
       ~local_state:consensus_local_state
   in
-  let log_recent_best_tip_for_catchup ~local_sync_resolution ~ready_for_catcup
-      best_tip =
-    let state =
-      if ready_for_catcup then "recent enough for catchup" else "downloaded"
-    in
-    [%log info]
-      ~metadata:(best_tip_metadata best_tip)
-      "Network best tip is %s (best_tip with $length); %s" state
-      local_sync_resolution
+  let sync_local_state_do =
+    Consensus.Hooks.sync_local_state ~local_state:consensus_local_state
+      ~glue_sync_ledger:(Mina_networking.glue_sync_ledger network)
+      ~context:(module Context)
+      ~trust_system
   in
-  let log_recent_best_tip_opt ?(ready_for_catcup = true) ?best_tip
-      local_sync_resolution =
-    match best_tip with
-    | Some best_tip ->
-        log_recent_best_tip_for_catchup ~ready_for_catcup ~local_sync_resolution
-          best_tip
-    | None ->
-        [%log info]
-          "Successfully loaded frontier, but failed to download best tip from \
-           network"
+  let%bind best_tip_opt =
+    download_best_tip
+      ~context:(module Context)
+      ~notify_online ~network ~verifier ~trust_system
+      ~most_recent_valid_block_writer ~genesis_constants
+  and frontier_opt =
+    load_frontier
+      ~context:(module Context)
+      ~verifier ~persistent_frontier ~persistent_root ~consensus_local_state
+      ~catchup_mode
   in
-  let collected_transitions_of_best_tip best_tip_opt =
-    match best_tip_opt with
-    | Some best_tip ->
-        [ (Envelope.Incoming.map ~f:(fun x -> `Block x) best_tip, None) ]
-    | None ->
-        []
-  in
-  match%bind
-    Deferred.both
-      (download_best_tip
-         ~context:(module Context)
-         ~notify_online ~network ~verifier ~trust_system
-         ~most_recent_valid_block_writer ~genesis_constants )
-      (load_frontier
-         ~context:(module Context)
-         ~verifier ~persistent_frontier ~persistent_root ~consensus_local_state
-         ~catchup_mode )
-  with
+  match (best_tip_opt, frontier_opt) with
   | best_seen_transition, None ->
       let download_status_str, metadata =
         match best_seen_transition with
@@ -476,43 +510,18 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
            frontier
            ( best_tip |> Envelope.Incoming.data
            |> Mina_block.Validation.to_header ) ->
-      [%log info]
-        ~metadata:(best_tip_metadata best_tip)
-        "Network best tip is too new to catchup to (best_tip with $length); \
-         starting bootstrap" ;
-      let initial_root_transition =
-        Transition_frontier.(Breadcrumb.validated_transition (root frontier))
-      in
-      let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
-      start_bootstrap initial_root_transition (Some (`Block best_tip))
+      close_frontier_and_start_bootstrap best_tip frontier
   | best_tip_opt, Some frontier when not sync_local_state ->
-      log_recent_best_tip_opt ?best_tip:best_tip_opt
+      log_recent_best_tip_opt ~logger ?best_tip:best_tip_opt
         "not syncing local state, should only occur in tests" ;
       (* make frontier available for tests *)
       let%map () = Broadcast_pipe.Writer.write frontier_w (Some frontier) in
       start_catchup frontier @@ collected_transitions_of_best_tip best_tip_opt
-  | best_tip_opt, Some frontier
-    when Option.is_none
-           (is_sync_required (Transition_frontier.best_tip frontier)) ->
-      log_recent_best_tip_opt ?best_tip:best_tip_opt
-        "local state already in sync" ;
-      let%map () = Deferred.unit in
-      start_catchup frontier @@ collected_transitions_of_best_tip best_tip_opt
   | best_tip_opt, Some frontier ->
-      log_recent_best_tip_opt ~ready_for_catcup:false ?best_tip:best_tip_opt
-        "starting local sync" ;
-      let sync_jobs =
-        Option.value_exn
-          (is_sync_required (Transition_frontier.best_tip frontier))
-      in
-      let%map result =
-        Consensus.Hooks.sync_local_state ~local_state:consensus_local_state
-          ~glue_sync_ledger:(Mina_networking.glue_sync_ledger network)
-          ~context:(module Context)
-          ~trust_system sync_jobs
-      in
-      Or_error.tag ~tag:"local state sync failed" result |> Or_error.ok_exn ;
-      start_catchup frontier @@ collected_transitions_of_best_tip best_tip_opt
+      initialize_with_existing_frontier
+        ~context:(module Context)
+        ~start_catchup ~frontier ~required_local_state_sync
+        ~sync_local_state:sync_local_state_do best_tip_opt
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
