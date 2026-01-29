@@ -390,16 +390,61 @@ let log_recent_best_tip_opt ~logger ?(ready_for_catcup = true) ?best_tip
         "Successfully loaded frontier, but failed to download best tip from \
          network"
 
+let collected_transition_of_best_tip best_tip =
+  (Envelope.Incoming.map ~f:(fun x -> `Block x) best_tip, None)
+
 let collected_transitions_of_best_tip best_tip_opt =
   match best_tip_opt with
   | Some best_tip ->
-      [ (Envelope.Incoming.map ~f:(fun x -> `Block x) best_tip, None) ]
+      [ collected_transition_of_best_tip best_tip ]
   | None ->
       []
 
 let initialize_with_existing_frontier ~context:(module Context : CONTEXT)
     ~start_catchup ~frontier ~required_local_state_sync ~sync_local_state
-    best_tip_opt =
+    ~close_frontier_and_start_bootstrap ~download_best_tip best_tip_opt =
+  let handle_successful_local_state_sync ~collected_transitions ~resolved result
+      =
+    Ivar.fill_if_empty resolved true ;
+    Or_error.tag ~tag:"local state sync failed" result |> Or_error.ok_exn ;
+    `Finished (`Catchup collected_transitions)
+  in
+  let handle_best_tip collected_transitions = function
+    | Some best_tip
+      when is_transition_for_bootstrap
+             ~context:(module Context)
+             frontier
+             ( best_tip |> Envelope.Incoming.data
+             |> Mina_block.Validation.to_header ) ->
+        `Finished (`Bootstrap best_tip)
+    | None ->
+        `Repeat collected_transitions
+    | Some best_tip ->
+        log_recent_best_tip ~logger:Context.logger
+          ~local_sync_resolution:"sync is in progress" ~ready_for_catcup:false
+          best_tip ;
+        `Repeat
+          (collected_transition_of_best_tip best_tip :: collected_transitions)
+  in
+  let local_state_sync_iter sync_job_deferred collected_transitions =
+    let resolved = Ivar.create () in
+    upon
+      (after (Time_ns.Span.of_min 5.))
+      (fun () -> Ivar.fill_if_empty resolved false) ;
+    Deferred.choose
+      [ Deferred.choice sync_job_deferred
+          (handle_successful_local_state_sync ~resolved ~collected_transitions)
+      ; Deferred.choice
+          ( Ivar.read resolved
+          >>= function
+          | true -> Deferred.return None | _ -> download_best_tip () )
+          (handle_best_tip collected_transitions)
+      ]
+  in
+  let local_state_sync_loop sync_job_deferred collected_transitions =
+    Deferred.repeat_until_finished collected_transitions
+      (local_state_sync_iter sync_job_deferred)
+  in
   let open Context in
   match required_local_state_sync (Transition_frontier.best_tip frontier) with
   | None ->
@@ -407,12 +452,18 @@ let initialize_with_existing_frontier ~context:(module Context : CONTEXT)
         "local state already in sync" ;
       let%map () = Deferred.unit in
       start_catchup frontier @@ collected_transitions_of_best_tip best_tip_opt
-  | Some sync_jobs ->
+  | Some sync_jobs -> (
       log_recent_best_tip_opt ~logger ~ready_for_catcup:false
         ?best_tip:best_tip_opt "starting local sync" ;
-      let%map result = sync_local_state sync_jobs in
-      Or_error.tag ~tag:"local state sync failed" result |> Or_error.ok_exn ;
-      start_catchup frontier @@ collected_transitions_of_best_tip best_tip_opt
+      local_state_sync_loop
+        (sync_local_state sync_jobs)
+        (collected_transitions_of_best_tip best_tip_opt)
+      >>= function
+      | `Bootstrap best_tip ->
+          close_frontier_and_start_bootstrap best_tip frontier
+      | `Catchup collected_transitions ->
+          let%map () = Deferred.unit in
+          start_catchup frontier collected_transitions )
 
 let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
     ~sync_local_state ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
@@ -477,11 +528,13 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
       ~context:(module Context)
       ~trust_system
   in
-  let%bind best_tip_opt =
+  let download_best_tip () =
     download_best_tip
       ~context:(module Context)
       ~notify_online ~network ~verifier ~trust_system
       ~most_recent_valid_block_writer ~genesis_constants
+  in
+  let%bind best_tip_opt = download_best_tip ()
   and frontier_opt =
     load_frontier
       ~context:(module Context)
@@ -522,6 +575,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
         ~context:(module Context)
         ~start_catchup ~frontier ~required_local_state_sync
         ~sync_local_state:sync_local_state_do best_tip_opt
+        ~close_frontier_and_start_bootstrap ~download_best_tip
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
