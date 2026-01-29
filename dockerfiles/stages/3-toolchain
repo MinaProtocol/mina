@@ -77,12 +77,11 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
-# --- yarn + nodejs, pinned version
+# --- nodejs, pinned version
+# REF: https://nodesource.com/products/distributions
 RUN curl -sL https://deb.nodesource.com/setup_24.x | bash - \
-    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
-    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
     && apt-get update --yes \
-    && apt-get install --yes --no-install-recommends nodejs yarn \
+    && apt-get install --yes --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Hadolint
