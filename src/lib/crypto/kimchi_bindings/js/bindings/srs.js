@@ -1,5 +1,5 @@
-/* global kimchi_ffi, caml_jsstring_of_string, 
-  tsBindings, tsRustConversion
+/* global kimchi_ffi, caml_jsstring_of_string,
+  tsBindings, tsRustConversion, kimchi_is_native
 */
 
 // Provides: tsSrs
@@ -10,9 +10,7 @@ var tsSrs = tsBindings.srs(kimchi_ffi);
 
 // Provides: caml_fp_srs_create
 // Requires: tsSrs
-var caml_fp_srs_create = function (log_size) {
-    return tsSrs.fp.create(log_size);
-}
+var caml_fp_srs_create = tsSrs.fp.create;
 
 // Provides: caml_fp_srs_write
 // Requires: kimchi_ffi, caml_jsstring_of_string
@@ -35,8 +33,6 @@ var caml_fp_srs_read = function (offset, path) {
     }
     var res = kimchi_ffi.caml_fp_srs_read(offset, caml_jsstring_of_string(path));
     if (res) {
-        var points = kimchi_ffi.caml_fp_srs_get(res);
-        if (points == null || points.length <= 1) return 0; // None
         return [0, res]; // Some(res)
     } else {
         return 0; // None
@@ -45,36 +41,32 @@ var caml_fp_srs_read = function (offset, path) {
 
 // Provides: caml_fp_srs_lagrange_commitments_whole_domain
 // Requires: tsSrs
-var caml_fp_srs_lagrange_commitments_whole_domain = function (srs, domain_size) {
-    return tsSrs.fp.lagrangeCommitmentsWholeDomain(srs, domain_size);
-}
+var caml_fp_srs_lagrange_commitments_whole_domain = tsSrs.fp.lagrangeCommitmentsWholeDomain;
 
 // Provides: caml_fq_srs_lagrange_commitments_whole_domain
 // Requires: tsSrs
-var caml_fq_srs_lagrange_commitments_whole_domain = function (srs, domain_size) {
-    return tsSrs.fq.lagrangeCommitmentsWholeDomain(srs, domain_size);
-}
+var caml_fq_srs_lagrange_commitments_whole_domain = tsSrs.fq.lagrangeCommitmentsWholeDomain;
 
 // Provides: caml_fp_srs_lagrange_commitment
 // Requires: tsSrs
 var caml_fp_srs_lagrange_commitment = tsSrs.fp.lagrangeCommitment;
 
 // Provides: caml_fp_srs_from_bytes_external
-// Requires: kimchi_ffi
+// Requires: kimchi_ffi, kimchi_is_native
 var caml_fp_srs_from_bytes_external = function (bytes) {
-    if (kimchi_ffi.native == true) {
+    // Call only from native
+    if (kimchi_is_native) {
         return kimchi_ffi.caml_fp_srs_from_bytes_external(bytes);
+    } else {
+        throw new Error("caml_fp_srs_from_bytes_external can be called only in native backend");
     }
-    return kimchi_ffi.WasmFpSrs.deserialize(bytes);
 };
 
 // Provides: caml_fp_srs_maybe_lagrange_commitment
 // Requires: kimchi_ffi, tsRustConversion
 var caml_fp_srs_maybe_lagrange_commitment = function (srs, domain_size, i) {
     var result = kimchi_ffi.caml_fp_srs_maybe_lagrange_commitment(srs, domain_size, i);
-    if (result == null) return 0; // None
     var polyComm = tsRustConversion.fp.polyCommFromRust(result);
-    if (polyComm == undefined) return 0; // None
     return [0, polyComm]; // Some(...)
 };
 
@@ -163,8 +155,6 @@ var caml_fq_srs_read = function (offset, path) {
     }
     var res = kimchi_ffi.caml_fq_srs_read(offset, caml_jsstring_of_string(path));
     if (res) {
-        var points = kimchi_ffi.caml_fq_srs_get(res);
-        if (points == null || points.length <= 1) return 0; // None
         return [0, res]; // Some(res)
     } else {
         return 0; // None
@@ -180,9 +170,7 @@ var caml_fq_srs_lagrange_commitment = tsSrs.fq.lagrangeCommitment;
 // Requires: kimchi_ffi, tsRustConversion
 var caml_fq_srs_maybe_lagrange_commitment = function (srs, domain_size, i) {
     var result = kimchi_ffi.caml_fq_srs_maybe_lagrange_commitment(srs, domain_size, i);
-    if (result == null) return 0; // None
     var polyComm = tsRustConversion.fq.polyCommFromRust(result);
-    if (polyComm == undefined) return 0; // None
     return [0, polyComm]; // Some(...)
 };
 

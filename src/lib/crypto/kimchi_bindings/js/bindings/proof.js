@@ -1,5 +1,5 @@
-/* global kimchi_ffi, tsRustConversion
- */
+/* global kimchi_ffi, tsRustConversion 
+*/
 
 
 // Provides: caml_pasta_fp_plonk_proof_create
@@ -16,21 +16,15 @@ var caml_pasta_fp_plonk_proof_create = function (
         w.push(tsRustConversion.fp.vectorToRust(witness_cols[i]));
     }
     witness_cols = w;
-
-    // NapiFlatVector expects a plain JS array of bytes (Vec<u8> on the Rust side).
-    var flat_prev = Array.from(
-        tsRustConversion.fp.vectorToRust(prev_challenges) || []
-    );
+    prev_challenges = tsRustConversion.fp.vectorToRust(prev_challenges);
     var runtime_tables =
         tsRustConversion.fp.runtimeTablesToRust(caml_runtime_tables);
-    runtime_tables = runtime_tables ? Array.from(runtime_tables) : [];
     prev_sgs = tsRustConversion.fp.pointsToRust(prev_sgs);
-    prev_sgs = prev_sgs ? Array.from(prev_sgs) : [];
     var proof = kimchi_ffi.caml_pasta_fp_plonk_proof_create(
         index,
         witness_cols,
         runtime_tables,
-        flat_prev,
+        prev_challenges,
         prev_sgs
     );
     return tsRustConversion.fp.proofFromRust(proof);
@@ -90,21 +84,15 @@ var caml_pasta_fq_plonk_proof_create = function (
         w.push(tsRustConversion.fq.vectorToRust(witness_cols[i]));
     }
     witness_cols = w;
-
-    // NapiFlatVector expects a plain JS array of bytes (Vec<u8> on the Rust side).
-    var flat_prev = Array.from(
-        tsRustConversion.fq.vectorToRust(prev_challenges) || []
-    );
+    prev_challenges = tsRustConversion.fq.vectorToRust(prev_challenges);
     var runtime_tables =
         tsRustConversion.fq.runtimeTablesToRust(caml_runtime_tables);
-    runtime_tables = runtime_tables ? Array.from(runtime_tables) : [];
     prev_sgs = tsRustConversion.fq.pointsToRust(prev_sgs);
-    prev_sgs = prev_sgs ? Array.from(prev_sgs) : [];
     var proof = kimchi_ffi.caml_pasta_fq_plonk_proof_create(
         index,
         witness_cols,
         runtime_tables,
-        flat_prev,
+        prev_challenges,
         prev_sgs
     );
     return tsRustConversion.fq.proofFromRust(proof);

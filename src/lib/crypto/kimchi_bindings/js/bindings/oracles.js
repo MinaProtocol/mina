@@ -79,10 +79,10 @@ var fq_oracles_deep_copy = function (x) {
 // Requires: kimchi_ffi, tsRustConversion
 function caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector) {
   // 1. get permuted field vector from rust
-  var wasm_flat_vector = kimchi_ffi.caml_pasta_fq_poseidon_block_cipher(
+  var rust_flat_vector = kimchi_ffi.caml_pasta_fq_poseidon_block_cipher(
     tsRustConversion.fq.vectorToRust(fq_vector)
   );
-  var new_fq_vector = tsRustConversion.fq.vectorFromRust(wasm_flat_vector);
+  var new_fq_vector = tsRustConversion.fq.vectorFromRust(rust_flat_vector);
   // 2. write back modified field vector to original one
   new_fq_vector.forEach(function (a, i) {
     fq_vector[i] = a;
@@ -94,10 +94,10 @@ function caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector) {
 // Requires: kimchi_ffi, tsRustConversion
 function caml_pasta_fp_poseidon_block_cipher(_fake_params, fp_vector) {
   // 1. get permuted field vector from rust
-  var wasm_flat_vector = kimchi_ffi.caml_pasta_fp_poseidon_block_cipher(
+  var rust_flat_vector = kimchi_ffi.caml_pasta_fp_poseidon_block_cipher(
     tsRustConversion.fp.vectorToRust(fp_vector)
   );
-  var new_fp_vector = tsRustConversion.fp.vectorFromRust(wasm_flat_vector);
+  var new_fp_vector = tsRustConversion.fp.vectorFromRust(rust_flat_vector);
   // 2. write back modified field vector to original one
   new_fp_vector.forEach(function (a, i) {
     fp_vector[i] = a;

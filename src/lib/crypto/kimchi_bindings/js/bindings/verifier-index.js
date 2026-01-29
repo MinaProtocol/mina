@@ -8,20 +8,6 @@ var caml_pasta_fp_plonk_verifier_index_create = function (x) {
   return tsRustConversion.fp.verifierIndexFromRust(vk);
 };
 
-// Provides: caml_pasta_fq_plonk_verifier_index_shifts
-// Requires: kimchi_ffi, tsRustConversion
-var caml_pasta_fq_plonk_verifier_index_shifts = function (log2_size) {
-  try {
-    var shifts = kimchi_ffi.caml_pasta_fq_plonk_verifier_index_shifts(log2_size);
-    return tsRustConversion.fq.shiftsFromRust(
-      shifts
-    );
-  } catch (e) {
-    globalThis.console.error("Error calling caml_pasta_fq_plonk_verifier_index_shifts:", e);
-    throw e;
-  }
-};
-
 // Provides: caml_pasta_fp_plonk_verifier_index_read
 // Requires: kimchi_ffi, caml_jsstring_of_string, tsRustConversion
 var caml_pasta_fp_plonk_verifier_index_read = function (offset, urs, path) {
@@ -54,6 +40,13 @@ var caml_pasta_fp_plonk_verifier_index_write = function (append, t, path) {
   );
 };
 
+// Provides: caml_pasta_fp_plonk_verifier_index_shifts
+// Requires: kimchi_ffi, tsRustConversion
+var caml_pasta_fp_plonk_verifier_index_shifts = function (log2_size) {
+  return tsRustConversion.fp.shiftsFromRust(
+    kimchi_ffi.caml_pasta_fp_plonk_verifier_index_shifts(log2_size)
+  );
+};
 
 // Provides: caml_pasta_fp_plonk_verifier_index_dummy
 // Requires: kimchi_ffi, tsRustConversion
@@ -72,21 +65,11 @@ var caml_pasta_fp_plonk_verifier_index_deep_copy = function (x) {
   );
 };
 
-
 // Provides: caml_pasta_fq_plonk_verifier_index_create
 // Requires: kimchi_ffi, tsRustConversion
 var caml_pasta_fq_plonk_verifier_index_create = function (x) {
   return tsRustConversion.fq.verifierIndexFromRust(
     kimchi_ffi.caml_pasta_fq_plonk_verifier_index_create(x)
-  );
-};
-
-
-// Provides: caml_pasta_fp_plonk_verifier_index_shifts
-// Requires: kimchi_ffi, tsRustConversion
-var caml_pasta_fp_plonk_verifier_index_shifts = function (log2_size) {
-  return tsRustConversion.fp.shiftsFromRust(
-    kimchi_ffi.caml_pasta_fp_plonk_verifier_index_shifts(log2_size)
   );
 };
 
@@ -120,6 +103,20 @@ var caml_pasta_fq_plonk_verifier_index_write = function (append, t, path) {
     tsRustConversion.fq.verifierIndexToRust(t),
     caml_jsstring_of_string(path)
   );
+};
+
+// Provides: caml_pasta_fq_plonk_verifier_index_shifts
+// Requires: kimchi_ffi, tsRustConversion
+var caml_pasta_fq_plonk_verifier_index_shifts = function (log2_size) {
+  try {
+    var shifts = kimchi_ffi.caml_pasta_fq_plonk_verifier_index_shifts(log2_size);
+    return tsRustConversion.fq.shiftsFromRust(
+      shifts
+    );
+  } catch (e) {
+    globalThis.console.error("Error calling caml_pasta_fq_plonk_verifier_index_shifts:", e);
+    throw e;
+  }
 };
 
 // Provides: caml_pasta_fq_plonk_verifier_index_dummy

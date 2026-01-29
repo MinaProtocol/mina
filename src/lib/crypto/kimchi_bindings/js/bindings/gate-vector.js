@@ -3,9 +3,10 @@
 /* global kimchi_ffi, tsRustConversion, caml_bytes_of_uint8array, caml_string_of_jsstring */
 
 // Provides: caml_pasta_fp_plonk_gate_vector_create
-// Requires: kimchi_ffi
+// Requires: kimchi_ffi, kimchi_is_wasm, free_on_finalize
 var caml_pasta_fp_plonk_gate_vector_create = function () {
-    return kimchi_ffi.caml_pasta_fp_plonk_gate_vector_create();
+    var res = kimchi_ffi.caml_pasta_fp_plonk_gate_vector_create();
+    return free_on_finalize(res);
 };
 
 // Provides: caml_pasta_fp_plonk_gate_vector_add
@@ -48,9 +49,6 @@ var caml_pasta_fp_plonk_gate_vector_digest = function (public_input_size, gate_v
         public_input_size,
         gate_vector
     );
-    if (!(bytes instanceof globalThis.Uint8Array)) {
-        bytes = globalThis.Uint8Array.from(bytes);
-    }
     return caml_bytes_of_uint8array(bytes);
 };
 
@@ -65,9 +63,10 @@ var caml_pasta_fp_plonk_circuit_serialize = function (public_input_size, gate_ve
 // --- Fq versions ---
 
 // Provides: caml_pasta_fq_plonk_gate_vector_create
-// Requires: kimchi_ffi
+// Requires: kimchi_ffi, kimchi_is_wasm, free_on_finalize
 var caml_pasta_fq_plonk_gate_vector_create = function () {
-    return kimchi_ffi.caml_pasta_fq_plonk_gate_vector_create();
+    var res = kimchi_ffi.caml_pasta_fq_plonk_gate_vector_create();
+    return free_on_finalize(res);
 };
 
 // Provides: caml_pasta_fq_plonk_gate_vector_add
@@ -111,9 +110,6 @@ var caml_pasta_fq_plonk_gate_vector_digest = function (public_input_size, gate_v
         public_input_size,
         gate_vector
     );
-    if (!(bytes instanceof globalThis.Uint8Array)) {
-        bytes = globalThis.Uint8Array.from(bytes);
-    }
     return caml_bytes_of_uint8array(bytes);
 };
 

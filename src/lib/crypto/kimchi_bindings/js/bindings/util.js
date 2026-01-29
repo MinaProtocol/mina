@@ -86,8 +86,12 @@ var free_finalization_registry = new globalThis.FinalizationRegistry(function (
 });
 
 // Provides: free_on_finalize
-// Requires: free_finalization_registry
+// Requires: free_finalization_registry, kimchi_is_native
 var free_on_finalize = function (x) {
+  // No-op for native backend
+  if (kimchi_is_native) {
+    return x;
+  }
   // This is an unfortunate hack: we're creating a second instance of the
   // class to be able to call free on it. We can't pass the value itself,
   // since the registry holds a strong reference to the representative value.
