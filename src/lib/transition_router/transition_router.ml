@@ -431,6 +431,7 @@ let initialize_with_existing_frontier ~context:(module Context : CONTEXT)
     upon
       (after (Time_ns.Span.of_min 5.))
       (fun () -> Ivar.fill_if_empty resolved false) ;
+    (* TODO listen to block/header gossips and switch too *)
     Deferred.choose
       [ Deferred.choice sync_job_deferred
           (handle_successful_local_state_sync ~resolved ~collected_transitions)
