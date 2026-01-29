@@ -416,16 +416,22 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
         (Transition_frontier.Breadcrumb.consensus_state transition)
       ~local_state:consensus_local_state
   in
-  let log_recent_best_tip_for_catchup best_tip =
+  let log_recent_best_tip_for_catchup ~local_sync_resolution ~ready_for_catcup
+      best_tip =
+    let state =
+      if ready_for_catcup then "recent enough for catchup" else "downloaded"
+    in
     [%log info]
       ~metadata:(best_tip_metadata best_tip)
-      "Network best tip is recent enough to catchup to (best_tip with \
-       $length); syncing local state and starting participation"
+      "Network best tip is %s (best_tip with $length); %s" state
+      local_sync_resolution
   in
-  let log_recent_best_tip_opt ?best_tip () =
+  let log_recent_best_tip_opt ?(ready_for_catcup = true) ?best_tip
+      local_sync_resolution =
     match best_tip with
     | Some best_tip ->
-        log_recent_best_tip_for_catchup best_tip
+        log_recent_best_tip_for_catchup ~ready_for_catcup ~local_sync_resolution
+          best_tip
     | None ->
         [%log info]
           "Successfully loaded frontier, but failed to download best tip from \
@@ -480,8 +486,8 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
       let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
       start_bootstrap initial_root_transition (Some (`Block best_tip))
   | best_tip_opt, Some frontier when not sync_local_state ->
-      log_recent_best_tip_opt ?best_tip:best_tip_opt () ;
-      [%log info] "Not syncing local state, should only occur in tests" ;
+      log_recent_best_tip_opt ?best_tip:best_tip_opt
+        "not syncing local state, should only occur in tests" ;
       (* make frontier available for tests *)
       let%map () = Broadcast_pipe.Writer.write frontier_w (Some frontier) in
       start_catchup frontier
@@ -489,14 +495,14 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
   | best_tip_opt, Some frontier
     when Option.is_none
            (is_sync_required (Transition_frontier.best_tip frontier)) ->
-      log_recent_best_tip_opt ?best_tip:best_tip_opt () ;
-      [%log info] "Local state already in sync" ;
+      log_recent_best_tip_opt ?best_tip:best_tip_opt
+        "local state already in sync" ;
       start_catchup frontier
       @@ collected_transitions_of_best_tip ?best_tip:best_tip_opt () ;
       Deferred.unit
   | best_tip_opt, Some frontier ->
-      log_recent_best_tip_opt ?best_tip:best_tip_opt () ;
-      [%log info] "Local state is out of sync; " ;
+      log_recent_best_tip_opt ~ready_for_catcup:false ?best_tip:best_tip_opt
+        "starting local sync" ;
       let sync_jobs =
         Option.value_exn
           (is_sync_required (Transition_frontier.best_tip frontier))
