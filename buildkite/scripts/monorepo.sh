@@ -102,14 +102,20 @@ if [[ ${#MAINLINE_BRANCHES[@]} -eq 0 ]]; then
 fi
 
 # Debug output
-if [[ "$DEBUG" == true ]]; then
+if [[ "${DEBUG:-false}" == true ]]; then
   echo "Debug: SELECTION_MODE=$SELECTION_MODE"
   echo "Debug: TAGS=$TAGS"
   echo "Debug: SCOPES=$SCOPES"
   echo "Debug: FILTER_MODE=$FILTER_MODE"
   echo "Debug: JOBS=$JOBS"
   echo "Debug: GIT_DIFF_FILE=$GIT_DIFF_FILE"
+  if [[ -n "$GIT_DIFF_FILE" && -f "$GIT_DIFF_FILE" ]]; then
+    echo "Debug: Contents of GIT_DIFF_FILE ($GIT_DIFF_FILE):"
+    cat "$GIT_DIFF_FILE"
+  fi
   echo "Debug: MAINLINE_BRANCHES=${MAINLINE_BRANCHES[*]}"
+  echo "Debug: DRY_RUN=$DRY_RUN"
+
 fi
 
 # Check if yq is installed, if not install it
@@ -332,11 +338,12 @@ select_job() {
   if [[ "$selection_full" == true ]]; then
     echo 1
   elif [[ "$selection_triaged" == true ]]; then
-    dirtyWhen=$(cat "${file%.yml}.dirtywhen")
-    # Remove quotes from beginning and end of string
-    dirtyWhen="${dirtyWhen%\"}"
-    dirtyWhen="${dirtyWhen#\"}"
-    if cat "$git_diff_file" | grep -E "$dirtyWhen" > /dev/null; then
+    # Use yq to properly parse the YAML string (handles escape sequences correctly)
+    dirtyWhen=$(yq -r '.' "${file%.yml}.dirtywhen")
+    if [[ "${DEBUG:-false}" == true ]]; then
+      echo "Dirty when for $job_name: $dirtyWhen" >&2
+    fi
+    if grep -E "$dirtyWhen" "$git_diff_file" > /dev/null; then
       echo 1
     else
       echo 0
