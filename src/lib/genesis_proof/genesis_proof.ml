@@ -157,17 +157,16 @@ include T
 
 let constraint_system_digests ~signature_kind ~constraint_constants ~proof_level
     =
-  Lazy.from_val
-  @@
-  let txn_digests =
-    Transaction_snark.constraint_system_digests ~signature_kind
-      ~constraint_constants ()
-  in
-  let blockchain_digests =
-    Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-      ~proof_level ~constraint_constants ()
-  in
-  txn_digests @ blockchain_digests
+  lazy
+    (let txn_digests =
+       Transaction_snark.constraint_system_digests ~signature_kind
+         ~constraint_constants ()
+     in
+     let blockchain_digests =
+       Blockchain_snark.Blockchain_snark_state.constraint_system_digests
+         ~proof_level ~constraint_constants ()
+     in
+     txn_digests @ blockchain_digests )
 
 let create_values_no_proof (t : Inputs.t) =
   { runtime_config = t.runtime_config
