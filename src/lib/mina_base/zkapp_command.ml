@@ -1,6 +1,69 @@
+(** ZkApp command representation and operations.
+
+    This module defines the core types and operations for zkApp transactions
+    (also called "zkApp commands") in the Mina protocol. A zkApp command
+    consists of a fee payer, a list of account updates organized as a call
+    forest, and a memo.
+
+    {2 Core Types}
+
+    - {!type:t} - A zkApp command with computed digests (hashes)
+    - {!module:Poly} - Polymorphic base type for zkApp commands
+    - {!module:Simple} - Simplified representation for easy construction
+    - {!module:Graphql_repr} - Representation used in GraphQL APIs
+    - {!module:Verifiable} - Commands with attached verification keys
+    - {!module:Valid} - Commands that have been validated
+
+    {2 Structure}
+
+    A zkApp command has three components:
+    - [fee_payer]: The account paying the transaction fee (always signs)
+    - [account_updates]: A forest of account updates (may contain proofs or signatures)
+    - [memo]: An arbitrary memo string
+
+    The account updates are organized as a {i call forest}, which is a list of
+    trees where each tree represents an account update and its nested calls.
+    This structure mirrors zkApp contract call hierarchies.
+
+    {2 Transaction Commitments}
+
+    Signatures in zkApp commands sign a {i transaction commitment}, which is
+    a hash computed from the command's components:
+
+    - {i Partial commitment}: Hash of just the account updates forest
+    - {i Full commitment}: Hash of memo + fee_payer + partial commitment
+
+    The fee payer always signs the full commitment. Other account updates
+    sign either the partial or full commitment based on [use_full_commitment].
+
+    {2 Verification Keys}
+
+    Account updates with proof authorization require verification keys.
+    The {!module:Verifiable} submodule handles associating verification keys
+    with account updates, either from the ledger or from earlier updates
+    in the same transaction.
+
+    {2 Serialization}
+
+    zkApp commands support multiple serialization formats:
+    - Binary via bin_io (for network transmission)
+    - JSON via to_json/of_json (for GraphQL and debugging)
+    - Base64 via the Codable interface (for transaction IDs)
+
+    {2 Validation}
+
+    The {!val:valid_size} function checks that a zkApp command fits within
+    protocol limits for cost, events, and actions. *)
+
 open Core_kernel
 open Signature_lib
 
+(** Polymorphic base type for zkApp commands.
+
+    This module defines the shape of a zkApp command without fixing the
+    concrete type of account updates. This allows the same structure to
+    be used with different representations (simple lists, call forests,
+    forests with hashes, etc.). *)
 module Poly = struct
   [%%versioned
   module Stable = struct
@@ -18,6 +81,10 @@ module Poly = struct
   end]
 end
 
+(** Representation used in GraphQL APIs.
+
+    This format uses a flat list of account updates with explicit [call_depth]
+    fields, which is easier to work with in GraphQL queries and mutations. *)
 module Graphql_repr = struct
   [%%versioned
   module Stable = struct
@@ -30,8 +97,13 @@ module Graphql_repr = struct
   end]
 end
 
+(** Simplified representation for easy construction.
+
+    This format is convenient for programmatically building zkApp commands.
+    Account updates are stored as a flat list with explicit [call_depth] fields
+    that indicate the nesting structure. Use {!val:of_simple} to convert to
+    the full representation. *)
 module Simple = struct
-  (* For easily constructing values *)
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -43,13 +115,28 @@ module Simple = struct
   end]
 end
 
+(** Re-export of {!Zkapp_call_forest_base} for organizing account updates
+    as a tree structure representing nested contract calls. *)
 module Call_forest = Zkapp_call_forest_base
+
+(** Hash digests for account updates and forests. Used in transaction
+    commitments and Merkle tree construction. *)
 module Digest = Call_forest.Digest
 
+(** Type alias for a zkApp command with a call forest of account updates.
+
+    The type parameters are:
+    - ['account_update]: The type of individual account updates
+    - ['account_update_digest]: Hash digest type for account updates
+    - ['forest_digest]: Hash digest type for the forest structure *)
 type ('account_update, 'account_update_digest, 'forest_digest) with_forest =
   ('account_update, 'account_update_digest, 'forest_digest) Call_forest.t Poly.t
 [@@deriving sexp, compare, equal, hash, yojson]
 
+(** Core zkApp command type with full digests.
+
+    This is the main type used throughout the protocol. Account updates
+    are stored in a call forest with computed hash digests at each node. *)
 module T = struct
   type t =
     (Account_update.t, Digest.Account_update.t, Digest.Forest.t) with_forest
@@ -136,6 +223,11 @@ end
 
 include T
 
+(** Convert a wire-format zkApp command to the in-memory format.
+
+    This computes all the hash digests and writes any proofs to the disk
+    cache. The [signature_kind] determines whether this is for testnet
+    or mainnet (affects hash computation). *)
 let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
     (w : Stable.Latest.t) : t =
   { fee_payer = w.fee_payer
@@ -148,6 +240,9 @@ let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
            w.account_updates
   }
 
+(** Convert from in-memory format back to wire format.
+
+    Reads proofs from the disk cache and strips the computed hash digests. *)
 let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
   { fee_payer = t.fee_payer
   ; memo = t.memo
@@ -156,6 +251,10 @@ let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
       @@ Call_forest.forget_hashes t.account_updates
   }
 
+(** Strip all computed data from a zkApp command.
+
+    Removes hash digests, proof data, and auxiliary data from account updates.
+    Useful for comparing the semantic content of commands. *)
 let forget_digests_and_proofs_and_aux
     ({ fee_payer; memo; account_updates } : _ with_forest) =
   { Poly.fee_payer
@@ -166,6 +265,10 @@ let forget_digests_and_proofs_and_aux
 
 [%%define_locally Stable.Latest.(gen)]
 
+(** Convert from the simple flat-list representation to the full format.
+
+    Takes a {!Simple.t} with explicit [call_depth] fields and builds the
+    proper call forest structure with computed hashes. *)
 let of_simple ~signature_kind ~proof_cache_db (w : Simple.t) : t =
   { fee_payer = w.fee_payer
   ; memo = w.memo
@@ -182,6 +285,9 @@ let of_simple ~signature_kind ~proof_cache_db (w : Simple.t) : t =
            ~hash_account_update:(Digest.Account_update.create ~signature_kind)
   }
 
+(** Convert to the simple flat-list representation.
+
+    Flattens the call forest back to a list with explicit [call_depth] fields. *)
 let to_simple (t : t) : Simple.t =
   { fee_payer = t.fee_payer
   ; memo = t.memo
@@ -214,6 +320,10 @@ let to_simple (t : t) : Simple.t =
              } )
   }
 
+(** Get all account updates including the fee payer as an account update.
+
+    Prepends the fee payer (converted to an account update) to the
+    account updates forest. Useful for iterating over all updates uniformly. *)
 let all_account_updates ~signature_kind t : _ Call_forest.t =
   let p = t.Poly.fee_payer in
   let body = Account_update.Body.of_fee_payer p.body in
@@ -229,13 +339,22 @@ let all_account_updates ~signature_kind t : _ Call_forest.t =
   in
   Call_forest.cons_tree tree t.account_updates
 
+(** Extract the transaction fee from a zkApp command. *)
 let fee (t : (_, _, _) with_forest) : Currency.Fee.t = t.fee_payer.body.fee
 
+(** Get the fee payer account update. *)
 let fee_payer_account_update (t : (_, _, _) with_forest) = t.fee_payer
 
+(** Get the nonce that this command should be applied at.
+
+    This is the nonce in the fee payer's account that the command expects. *)
 let applicable_at_nonce (t : (_, _, _) with_forest) : Account.Nonce.t =
   t.fee_payer.body.nonce
 
+(** Compute what the fee payer's nonce will be after successful application.
+
+    This accounts for the fee payer's nonce increment plus any additional
+    increments from account updates that target the fee payer's account. *)
 let target_nonce_on_success
     (t : ((Account_update.Body.t, _, _) Account_update.Poly.t, _, _) with_forest)
     : Account.Nonce.t =
@@ -249,6 +368,10 @@ let target_nonce_on_success
   Account.Nonce.add base_nonce
     (Account.Nonce.of_int fee_payer_account_update_increments)
 
+(** Compute nonce increments for all accounts affected by this command.
+
+    Returns a map from public key to the total nonce increment for that account.
+    The fee payer always has at least 1 increment. *)
 let nonce_increments
     (t : ((Account_update.Body.t, _, _) Account_update.Poly.t, _, _) with_forest)
     : int Public_key.Compressed.Map.t =
@@ -262,11 +385,17 @@ let nonce_increments
           ~f:(Option.value_map ~default:1 ~f:(( + ) 1))
       else incr_map )
 
+(** Get the token ID used for fees. Always the default MINA token. *)
 let fee_token (_t : (_, _, _) with_forest) = Token_id.default
 
+(** Get the fee payer's account ID (public key + token). *)
 let fee_payer (t : (_, _, _) with_forest) =
   Account_id.create t.fee_payer.body.public_key (fee_token t)
 
+(** Extract all verification keys being set by this command.
+
+    Returns pairs of (account_id, verification_key) for each account update
+    that sets a new verification key. *)
 let extract_vks (t : (_, _, _) with_forest) :
     (Account_id.t * Verification_key_wire.t) List.t =
   Call_forest.fold ~init:[] t.account_updates ~f:(fun acc p ->
@@ -276,10 +405,15 @@ let extract_vks (t : (_, _, _) with_forest) :
       | _ ->
           acc )
 
+(** Get account updates as a flat list (excludes fee payer). *)
 let account_updates_list (t : (_, _, _) with_forest) :
     _ Account_update.Poly.t list =
   Call_forest.fold t.account_updates ~init:[] ~f:(Fn.flip List.cons) |> List.rev
 
+(** Get all account updates as a flat list with custom transformers.
+
+    @param of_fee_payer Function to transform the fee payer
+    @param of_account_update Function to transform each account update *)
 let all_account_updates_list' ~of_fee_payer ~of_account_update
     (t : (_, _, _) with_forest) : _ list =
   Call_forest.fold t.account_updates
@@ -287,15 +421,23 @@ let all_account_updates_list' ~of_fee_payer ~of_account_update
     ~f:(Fn.flip (Fn.compose List.cons of_account_update))
   |> List.rev
 
+(** Get all account updates as a flat list (includes fee payer). *)
 let all_account_updates_list (t : (_, _, _) with_forest) :
     _ Account_update.Poly.t list =
   all_account_updates_list' ~of_fee_payer:Account_update.of_fee_payer
     ~of_account_update:Fn.id t
 
+(** Compute the fee excess for this command.
+
+    For zkApp commands, this is simply the fee as a positive signed amount. *)
 let fee_excess (t : (_, _, _) with_forest) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
-(* always `Accessed` for fee payer *)
+(** Get access status for all accounts touched by this command.
+
+    The fee payer is always marked as [`Accessed]. Other accounts are
+    [`Accessed] if the command was applied successfully, [`Not_accessed]
+    if it failed. Returns deduplicated list preserving order. *)
 let account_access_statuses (t : (_, _, _) with_forest)
     (status : Transaction_status.t) =
   let init = [ (fee_payer t, `Accessed) ] in
@@ -306,14 +448,22 @@ let account_access_statuses (t : (_, _, _) with_forest)
       (Account_update.account_id p, status_sym) :: acc )
   |> List.rev |> List.stable_dedup
 
+(** Get all account IDs referenced by this command (assuming success). *)
 let accounts_referenced (t : (_, _, _) with_forest) =
   List.map (account_access_statuses t Applied) ~f:(fun (acct_id, _status) ->
       acct_id )
 
+(** Get the fee payer's public key. *)
 let fee_payer_pk (t : (_, _, _) with_forest) = t.fee_payer.body.public_key
 
+(** Helper for conditional expressions. *)
 let value_if b ~then_ ~else_ = if b then then_ else else_
 
+(** Virtual implementations of types for zkApp command application.
+
+    These modules provide simple implementations used when applying zkApp
+    commands outside of a SNARK circuit. They mirror the interface of the
+    checked (in-circuit) versions but use plain OCaml values. *)
 module Virtual = struct
   module Bool = struct
     type t = bool
@@ -382,7 +532,29 @@ module Virtual = struct
   end
 end
 
+(** ZkApp commands with attached verification keys.
+
+    A verifiable command has verification keys associated with each
+    account update that requires proof verification. This module handles:
+
+    - Loading verification keys from the ledger
+    - Tracking verification keys set by earlier updates in the same transaction
+    - Creating verifiable commands from regular commands
+
+    {2 Verification Key Resolution}
+
+    When an account update uses proof authorization, its verification key
+    is resolved in priority order:
+    1. From a previous account update in the same transaction that set the key
+    2. From the ledger (the account's current verification key)
+
+    This allows a transaction to set a verification key and immediately use
+    it for proof verification in subsequent account updates. *)
 module Verifiable : sig
+  (** A zkApp command with verification keys attached to proved updates.
+
+      The second element of each pair is [Some vk] for account updates
+      with proof authorization, [None] otherwise. *)
   type t =
     ( Account_update.t
     , (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option )
@@ -390,6 +562,12 @@ module Verifiable : sig
     Poly.t
   [@@deriving sexp_of]
 
+  (** Load a single verification key from the ledger.
+
+      @param location_of_account Function to find account location
+      @param get Function to retrieve account at location
+      @param expected_vk_hash The expected hash of the verification key
+      @param account_id The account to load the key from *)
   val load_vk_from_ledger :
        location_of_account:(Account_id.t -> 'loc option)
     -> get:('loc -> Account.t option)
@@ -397,6 +575,7 @@ module Verifiable : sig
     -> Account_id.t
     -> Verification_key_wire.t Or_error.t
 
+  (** Load verification keys for multiple accounts in batch. *)
   val load_vks_from_ledger :
        location_of_account_batch:
          (Account_id.t list -> (Account_id.t * 'loc option) list)
@@ -404,6 +583,10 @@ module Verifiable : sig
     -> Account_id.t list
     -> Verification_key_wire.t Account_id.Map.t
 
+  (** Create a verifiable command from a regular command.
+
+      @param failed Whether the command is known to have failed
+      @param find_vk Function to look up verification keys by hash and account *)
   val create :
        T.t
     -> failed:bool
@@ -411,6 +594,7 @@ module Verifiable : sig
          (Zkapp_basic.F.t -> Account_id.t -> Verification_key_wire.t Or_error.t)
     -> t Or_error.t
 
+  (** Interface for command wrappers used in batch verification key loading. *)
   module type Command_wrapper_intf = sig
     type 'a t
 
@@ -421,6 +605,7 @@ module Verifiable : sig
     val is_failed : 'a t -> bool
   end
 
+  (** Interface for batch creation of verifiable commands. *)
   module type Create_all_intf = sig
     type cache
 
@@ -430,17 +615,26 @@ module Verifiable : sig
       T.t Command_wrapper.t list -> cache -> t Command_wrapper.t list Or_error.t
   end
 
+  (** Create verifiable commands from a sequence where status is not yet known.
+
+      Uses a cache that maps (account_id, vk_hash) -> vk, allowing multiple
+      verification keys per account (for different transactions). *)
   module From_unapplied_sequence :
     Create_all_intf
       with type 'a Command_wrapper.t = 'a
        and type cache =
         Verification_key_wire.t Zkapp_basic.F_map.Map.t Account_id.Map.t
 
+  (** Create verifiable commands from a sequence with known status.
+
+      Uses a simpler cache that maps account_id -> vk, since we only need
+      to track the most recent verification key per account. *)
   module From_applied_sequence :
     Create_all_intf
       with type 'a Command_wrapper.t = 'a With_status.t
        and type cache = Verification_key_wire.t Account_id.Map.t
 
+  (** Serializable format for verifiable commands. *)
   module Serializable : sig
     type t =
       ( Account_update.Stable.Latest.t
@@ -764,6 +958,9 @@ end = struct
   end
 end
 
+(** Extract the base command from a verifiable command.
+
+    Strips the verification key data, keeping just the account updates. *)
 let of_verifiable
     ({ Poly.fee_payer; account_updates; memo } :
       _ Call_forest.With_hashes_and_data.t Poly.t ) =
@@ -772,6 +969,21 @@ let of_verifiable
   ; memo
   }
 
+(** Transaction commitment computation.
+
+    The transaction commitment is a hash that signatures are computed over.
+    There are two types of commitments:
+
+    - {b Partial commitment}: Hash of just the account updates forest.
+      Used by account updates with [use_full_commitment = false].
+
+    - {b Full commitment}: Hash of (memo, fee_payer, partial_commitment).
+      Always used by the fee payer and by account updates with
+      [use_full_commitment = true].
+
+    The full commitment includes more context, making signatures more
+    specific to the exact transaction. This is important for account
+    updates that modify sensitive state. *)
 module Transaction_commitment = struct
   module Stable = Kimchi_backend.Pasta.Basic.Fp.Stable
 
@@ -806,12 +1018,18 @@ module Transaction_commitment = struct
   end
 end
 
+(** Compute the hash of the account updates forest. *)
 let account_updates_hash (t : _ Poly.t) = Call_forest.hash t.account_updates
 
+(** Compute the partial transaction commitment (account updates hash only). *)
 let commitment (t : t) : Transaction_commitment.t =
   Transaction_commitment.create ~account_updates_hash:(account_updates_hash t)
 
-(** This module defines weights for each component of a `Zkapp_command.t` element. *)
+(** Weight computation for zkApp commands.
+
+    Weights are used for transaction pool ordering and fee calculations.
+    Each account update has weight 1, the fee payer has weight 1,
+    and memos have weight 0. *)
 module Weight = struct
   let account_update : _ Account_update.Poly.t -> int = fun _ -> 1
 
@@ -823,6 +1041,7 @@ module Weight = struct
   let memo : Signed_command_memo.t -> int = fun _ -> 0
 end
 
+(** Compute the total weight of a zkApp command. *)
 let weight (zkapp_command : (_, _, _) with_forest) : int =
   let { Poly.fee_payer; account_updates; memo } = zkapp_command in
   List.sum
@@ -833,9 +1052,19 @@ let weight (zkapp_command : (_, _, _) with_forest) : int =
     ; Weight.memo memo
     ]
 
+(** Interface for validated zkApp commands.
+
+    A {!Valid.t} is a zkApp command that has passed validation checks.
+    The private record type prevents construction outside of validation
+    functions, ensuring all {!Valid.t} values are actually valid. *)
 module type Valid_intf = sig
+  (** A validated zkApp command. Private to prevent invalid construction. *)
   type nonrec t = private { zkapp_command : t } [@@deriving sexp_of, to_yojson]
 
+  (** Unsafely mark a command as valid without checking.
+
+      The verbose return type is intentional - any use should be accompanied
+      by a comment explaining why the command is known to be valid. *)
   val to_valid_unsafe :
     T.t -> [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ]
 
@@ -852,9 +1081,11 @@ module type Valid_intf = sig
     val of_verifiable : Verifiable.t -> t
   end
 
+  (** Extract the underlying command, forgetting validity. *)
   val forget : t -> T.t
 end
 
+(** Validated zkApp commands. See {!Valid_intf}. *)
 module Valid : Valid_intf = struct
   type t = { zkapp_command : T.t } [@@deriving sexp_of, to_yojson]
 
@@ -875,9 +1106,15 @@ module Valid : Valid_intf = struct
   end
 end
 
-(* so transaction ids have a version tag *)
+(* Base64 encoding for transaction IDs.
+   The version tag ensures transaction IDs are distinguishable across
+   protocol versions. *)
 include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
 
+(** JSON deriver for account updates.
+
+    Converts between the call forest representation (used internally) and
+    the flat list with call_depth (used in GraphQL). *)
 let account_updates_deriver obj =
   let of_zkapp_command_with_depth (ps : Account_update.Graphql_repr.t list) =
     Call_forest.of_account_updates ps
@@ -894,6 +1131,7 @@ let account_updates_deriver obj =
   iso ~map:of_zkapp_command_with_depth ~contramap:to_zkapp_command_with_depth
     inner obj
 
+(** GraphQL deriver for zkApp commands. *)
 let deriver obj =
   let open Fields_derivers_zkapps.Derivers in
   let open Poly in
@@ -904,26 +1142,36 @@ let deriver obj =
     ~memo:!.Signed_command_memo.deriver
   |> finish "ZkappCommand" ~t_toplevel_annots
 
+(** GraphQL input type for zkApp commands. *)
 let arg_typ () = Fields_derivers_zkapps.(arg_typ (deriver @@ Derivers.o ()))
 
+(** GraphQL output type for zkApp commands. *)
 let typ () = Fields_derivers_zkapps.(typ (deriver @@ Derivers.o ()))
 
+(** Convert a zkApp command to JSON. *)
 let to_json x = Fields_derivers_zkapps.(to_json (deriver @@ Derivers.o ())) x
 
+(** Parse a zkApp command from JSON. *)
 let of_json x = Fields_derivers_zkapps.(of_json (deriver @@ Derivers.o ())) x
 
+(** Parse just the account updates from JSON. *)
 let account_updates_of_json x =
   Fields_derivers_zkapps.(
     of_json
       ((list @@ Account_update.Graphql_repr.deriver @@ o ()) @@ derivers ()))
     x
 
+(** Convert a zkApp command to JSON (alias). *)
 let zkapp_command_to_json x =
   Fields_derivers_zkapps.(to_json (deriver @@ derivers ())) x
 
+(** Convert to GraphQL query string format. *)
 let arg_query_string x =
   Fields_derivers_zkapps.Test.Loop.json_to_string_gql @@ to_json x
 
+(** Create a dummy zkApp command for testing.
+
+    Returns a lazy value since construction requires hashing. *)
 let dummy ~signature_kind =
   lazy
     (let account_update =
@@ -939,6 +1187,17 @@ let dummy ~signature_kind =
      ; memo = Signed_command_memo.empty
      } )
 
+(** Functor for grouping account updates for SNARK proving.
+
+    This module implements the logic for combining multiple account updates
+    into "segments" that can be proved together. The goal is to minimize the
+    number of SNARK proofs needed while respecting constraints:
+
+    - Account updates with proofs cannot be combined with other updates
+    - Signature/None_given updates can be paired together
+    - The grouping must track state transitions correctly
+
+    @param Input Configuration for state types and segment classification *)
 module Make_update_group (Input : sig
   type global_state
 
@@ -1285,9 +1544,14 @@ end = struct
     group_by_zkapp_command_rev zkapp_account_updatess stmtss []
 end
 
-(*Transaction_snark.Zkapp_command_segment.Basic.t*)
+(** Possible segment types for account update grouping.
+
+    - [Proved]: A single account update with proof authorization
+    - [Signed_single]: A single account update with signature/none authorization
+    - [Signed_pair]: Two consecutive signature/none updates combined *)
 type possible_segments = Proved | Signed_single | Signed_pair
 
+(** Default instantiation of {!Make_update_group} for computing segment costs. *)
 module Update_group = Make_update_group (struct
   type local_state = unit
 
@@ -1309,6 +1573,12 @@ module Update_group = Make_update_group (struct
         failwith "zkapp_segment_of_controls: Unsupported combination"
 end)
 
+(** Compute the cost of a zkApp command based on its segment composition.
+
+    The cost formula weights proofs more heavily than signatures:
+    - Proof segments have the highest cost
+    - Signed pairs are slightly cheaper than two signed singles
+    - This incentivizes batching signatures together *)
 let zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
     ~(genesis_constants : Genesis_constants.t) () =
   (*10.26*np + 10.08*n2 + 9.14*n1 < 69.45*)
@@ -1320,10 +1590,18 @@ let zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
     + (signed_pair_cost * of_int signed_pair_segments)
     + (signed_single_cost * of_int signed_single_segments))
 
-(* Zkapp_command transactions are filtered using this predicate
-   - when adding to the transaction pool
-   - in incoming blocks
-*)
+(** Validate that a zkApp command fits within protocol limits.
+
+    This predicate is used to filter transactions:
+    - When adding to the transaction pool
+    - When validating incoming blocks
+
+    Checks performed:
+    - Total cost is within the transaction cost limit
+    - Number of event elements is within the maximum
+    - Number of action elements is within the maximum
+
+    @return [Ok ()] if valid, [Error msg] with description of violations *)
 let valid_size (type aux) ~(genesis_constants : Genesis_constants.t)
     (t :
       ((Account_update.Body.t, _, aux) Account_update.Poly.t, _, _) with_forest
@@ -1402,6 +1680,10 @@ let valid_size (type aux) ~(genesis_constants : Genesis_constants.t)
     in
     Error (Error.of_string err_msg)
 
+(** Check if any account update sets a zero vesting period.
+
+    Zero vesting periods are invalid and would cause division by zero
+    in vesting calculations. *)
 let has_zero_vesting_period
     (t :
       ( (Account_update.Body.t, 'p, 'aux) Account_update.Poly.t
@@ -1416,6 +1698,10 @@ let has_zero_vesting_period
       | Set { vesting_period; _ } ->
           Mina_numbers.Global_slot_span.(equal zero) vesting_period )
 
+(** Check if any account update uses an incompatible transaction version.
+
+    This is used to reject transactions that try to set permissions with
+    a future or outdated transaction version. *)
 let is_incompatible_version
     (t :
       ( (Account_update.Body.t, 'p, 'aux) Account_update.Poly.t
@@ -1430,6 +1716,9 @@ let is_incompatible_version
       | Set { set_verification_key = _auth, txn_version; _ } ->
           not Mina_numbers.Txn_version.(equal_to_current txn_version) )
 
+(** Compute both partial and full transaction commitments.
+
+    @return A pair of (partial_commitment, full_commitment) *)
 let get_transaction_commitments ~signature_kind (zkapp_command : _ Poly.t) =
   let memo_hash = Signed_command_memo.hash zkapp_command.memo in
   let fee_payer_hash =
@@ -1444,12 +1733,18 @@ let get_transaction_commitments ~signature_kind (zkapp_command : _ Poly.t) =
   in
   (txn_commitment, full_txn_commitment)
 
+(** GraphQL inner query for zkApp commands. Lazy since derivers are expensive. *)
 let inner_query =
   lazy
     (Option.value_exn ~message:"Invariant: All projectable derivers are Some"
        Fields_derivers_zkapps.(inner_query (deriver @@ Derivers.o ())) )
 
+(** Test utilities for zkApp commands. *)
 module For_tests = struct
+  (** Replace dummy verification keys in a single account update.
+
+      Updates both the [verification_key] field (if being set) and the
+      [authorization_kind] hash (if using proof authorization). *)
   let replace_vk vk (p : (Account_update.Body.t, _, _) Account_update.Poly.t) =
     { p with
       body =
@@ -1474,6 +1769,7 @@ module For_tests = struct
         }
     }
 
+  (** Replace all dummy verification keys in a zkApp command with a real one. *)
   let replace_vks (t : t) vk =
     { t with
       account_updates = Call_forest.map t.account_updates ~f:(replace_vk vk)
