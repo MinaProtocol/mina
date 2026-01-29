@@ -377,6 +377,51 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
   let genesis_constants =
     Precomputed_values.genesis_constants precomputed_values
   in
+  let start_bootstrap initial_root_transition best_seen_transition =
+    start_bootstrap_controller
+      ~context:(module Context)
+      ~trust_system ~verifier ~network ~time_controller ~get_completed_work
+      ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
+      ~network_transition_pipe ~consensus_local_state ~frontier_w
+      ~persistent_root ~persistent_frontier ~cache_exceptions
+      ~initial_root_transition ~catchup_mode ~best_seen_transition
+  in
+  let load_initial_root_transition_from_persistence () =
+    Persistent_frontier.(
+      with_instance_exn persistent_frontier
+        ~f:(Instance.get_root_transition ~signature_kind ~proof_cache_db))
+    >>| Result.ok_or_failwith
+  in
+  let start_catchup frontier collected_transitions =
+    start_transition_frontier_controller ?transaction_pool_proxy
+      ~context:(module Context)
+      ~trust_system ~verifier ~network ~time_controller ~get_completed_work
+      ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
+      ~collected_transitions ~cache_exceptions ~network_transition_pipe
+      ~frontier_w frontier
+  in
+  let best_tip_metadata best_tip =
+    [ ( "length"
+      , `Int
+          (Unsigned.UInt32.to_int
+             ( Mina_block.blockchain_length
+             @@ Mina_block.Validation.block best_tip.Envelope.Incoming.data ) )
+      )
+    ]
+  in
+  let is_sync_required transition =
+    Consensus.Hooks.required_local_state_sync
+      ~constants:precomputed_values.consensus_constants
+      ~consensus_state:
+        (Transition_frontier.Breadcrumb.consensus_state transition)
+      ~local_state:consensus_local_state
+  in
+  let log_recent_best_tip_for_catchup best_tip =
+    [%log info]
+      ~metadata:(best_tip_metadata best_tip)
+      "Network best tip is recent enough to catchup to (best_tip with \
+       $length); syncing local state and starting participation"
+  in
   match%bind
     Deferred.both
       (download_best_tip
@@ -389,22 +434,20 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
          ~catchup_mode )
   with
   | best_seen_transition, None ->
-      [%log info] "Unable to load frontier; starting bootstrap" ;
-      let%map initial_root_transition =
-        Persistent_frontier.(
-          with_instance_exn persistent_frontier
-            ~f:(Instance.get_root_transition ~signature_kind ~proof_cache_db))
-        >>| Result.ok_or_failwith
+      let download_status_str, metadata =
+        match best_seen_transition with
+        | Some best_tip ->
+            ("downloaded", best_tip_metadata best_tip)
+        | None ->
+            ("failed to download", [])
       in
-      start_bootstrap_controller
-        ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
-        ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ~network_transition_pipe ~consensus_local_state
-        ~frontier_w ~persistent_root ~persistent_frontier ~cache_exceptions
-        ~initial_root_transition ~catchup_mode
-        ~best_seen_transition:
-          (Option.map ~f:(fun x -> `Block x) best_seen_transition)
+      [%log info] "Unable to load frontier; starting bootstrap, best tip %s"
+        download_status_str ~metadata ;
+      let%map initial_root_transition =
+        load_initial_root_transition_from_persistence ()
+      in
+      start_bootstrap initial_root_transition
+        (Option.map ~f:(fun x -> `Block x) best_seen_transition)
   | Some best_tip, Some frontier
     when is_transition_for_bootstrap
            ~context:(module Context)
@@ -412,41 +455,19 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
            ( best_tip |> Envelope.Incoming.data
            |> Mina_block.Validation.to_header ) ->
       [%log info]
-        ~metadata:
-          [ ( "length"
-            , `Int
-                (Unsigned.UInt32.to_int
-                   ( Mina_block.blockchain_length
-                   @@ Mina_block.Validation.block best_tip.data ) ) )
-          ]
+        ~metadata:(best_tip_metadata best_tip)
         "Network best tip is too new to catchup to (best_tip with $length); \
          starting bootstrap" ;
       let initial_root_transition =
         Transition_frontier.(Breadcrumb.validated_transition (root frontier))
       in
       let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
-      start_bootstrap_controller
-        ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
-        ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ~network_transition_pipe ~consensus_local_state
-        ~frontier_w ~initial_root_transition ~persistent_root
-        ~persistent_frontier ~cache_exceptions ~catchup_mode
-        ~best_seen_transition:(Some (`Block best_tip))
+      start_bootstrap initial_root_transition (Some (`Block best_tip))
   | best_tip_opt, Some frontier ->
       let collected_transitions =
         match best_tip_opt with
         | Some best_tip ->
-            [%log info]
-              ~metadata:
-                [ ( "length"
-                  , `Int
-                      (Unsigned.UInt32.to_int
-                         ( Mina_block.blockchain_length
-                         @@ Mina_block.Validation.block best_tip.data ) ) )
-                ]
-              "Network best tip is recent enough to catchup to (best_tip with \
-               $length); syncing local state and starting participation" ;
+            log_recent_best_tip_for_catchup best_tip ;
             [ (Envelope.Incoming.map ~f:(fun x -> `Block x) best_tip, None) ]
         | None ->
             [%log info]
@@ -461,13 +482,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
           (* make frontier available for tests *)
           Broadcast_pipe.Writer.write frontier_w (Some frontier) )
         else
-          match
-            Consensus.Hooks.required_local_state_sync
-              ~constants:precomputed_values.consensus_constants
-              ~consensus_state:
-                (Transition_frontier.Breadcrumb.consensus_state curr_best_tip)
-              ~local_state:consensus_local_state
-          with
+          match is_sync_required curr_best_tip with
           | None ->
               [%log info] "Local state already in sync" ;
               Deferred.unit
@@ -485,12 +500,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
               | Ok () ->
                   () )
       in
-      start_transition_frontier_controller ?transaction_pool_proxy
-        ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
-        ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ~collected_transitions ~cache_exceptions
-        ~network_transition_pipe ~frontier_w frontier
+      start_catchup frontier collected_transitions
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
