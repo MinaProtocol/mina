@@ -344,10 +344,13 @@ select_job() {
   fi
 }
 
-
-# Find the closest ancestor branch
-# which will be used for excludeIf evaluations
-closest_ancestor=$(find_closest_ancestor)
+# Check for forced closest ancestor via environment variable
+# Used only in testing or if git is on fire
+if [[ -n "${FORCE_CLOSEST_ANCESTOR:-}" ]]; then
+  closest_ancestor="$FORCE_CLOSEST_ANCESTOR"
+else
+  closest_ancestor=$(find_closest_ancestor)
+fi
 
 find "$JOBS" -type f -name "*.yml" | while read -r file; do
   tags=$(yq .spec.tags "$file")
@@ -398,4 +401,3 @@ find "$JOBS" -type f -name "*.yml" | while read -r file; do
   fi
 
 done
-
