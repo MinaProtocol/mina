@@ -174,11 +174,20 @@ var kimchi_ffi = (function () {
         return new native[override](x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12);
       }
     });
-    wasm.native = true;
+    wasm.__kimchi_backend = 'native';
+    if (typeof globalThis !== 'undefined') {
+      globalThis.__kimchi_backend = 'native';
+    }
   } catch (e) {
     if (process.env.O1JS_REQUIRE_NATIVE_BINDINGS) {
       throw e
     }
+  }
+  if (!wasm.__kimchi_backend) {
+    wasm.__kimchi_backend = 'wasm';
+  }
+  if (typeof globalThis !== 'undefined' && !globalThis.__kimchi_backend) {
+    globalThis.__kimchi_backend = wasm.__kimchi_backend;
   }
   return wasm
 })()

@@ -6,11 +6,20 @@
 // Provides: tsBindings
 var tsBindings = globalThis.__snarkyTsBindings;
 
+// Provides: kimchi_backend
+// Requires: kimchi_ffi
+var kimchi_backend = kimchi_ffi ? kimchi_ffi.__kimchi_backend : 'wasm'; // default to wasm
+
+// Provides: kimchi_is_wasm
+// Requires: kimchi_backend
+var kimchi_is_wasm = kimchi_backend === 'wasm';
+
+// Provides: kimchi_is_native
+// Requires: kimchi_backend
+var kimchi_is_native = kimchi_backend === 'native';
+
 // Provides: tsRustConversion
 // Requires: tsBindings, kimchi_ffi
-if (kimchi_ffi && kimchi_ffi.native) {
-  kimchi_ffi.__kimchi_use_native = true;
-}
 var tsRustConversion = tsBindings.rustConversion(kimchi_ffi);
 
 // Provides: getTsBindings

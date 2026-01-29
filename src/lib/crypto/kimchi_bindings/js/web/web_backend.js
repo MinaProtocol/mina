@@ -1,6 +1,8 @@
 // Provides: kimchi_ffi
 var kimchi_ffi = globalThis.kimchi_wasm;
-
-// Requires: kimchi_ffi
-// Provides: kimchi_napi
-var kimchi_napi = kimchi_ffi
+if (kimchi_ffi) {
+  kimchi_ffi.__kimchi_backend = 'wasm';
+  if (typeof globalThis !== 'undefined') {
+    globalThis.__kimchi_backend = 'wasm';
+  }
+}
