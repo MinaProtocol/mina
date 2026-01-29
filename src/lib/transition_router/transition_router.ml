@@ -369,21 +369,21 @@ let best_tip_metadata best_tip =
            @@ Mina_block.Validation.block best_tip.Envelope.Incoming.data ) ) )
   ]
 
-let log_recent_best_tip ~logger ~local_sync_resolution ~ready_for_catcup
+let log_recent_best_tip ~logger ~local_sync_resolution ~ready_for_catchup
     best_tip =
   let state =
-    if ready_for_catcup then "recent enough for catchup" else "downloaded"
+    if ready_for_catchup then "recent enough for catchup" else "downloaded"
   in
   [%log info]
     ~metadata:(best_tip_metadata best_tip)
     "Network best tip is %s (best_tip with $length); %s" state
     local_sync_resolution
 
-let log_recent_best_tip_opt ~logger ?(ready_for_catcup = true) ?best_tip
+let log_recent_best_tip_opt ~logger ?(ready_for_catchup = true) ?best_tip
     local_sync_resolution =
   match best_tip with
   | Some best_tip ->
-      log_recent_best_tip ~logger ~ready_for_catcup ~local_sync_resolution
+      log_recent_best_tip ~logger ~ready_for_catchup ~local_sync_resolution
         best_tip
   | None ->
       [%log info]
@@ -421,7 +421,7 @@ let initialize_with_existing_frontier ~context:(module Context : CONTEXT)
         `Repeat collected_transitions
     | Some best_tip ->
         log_recent_best_tip ~logger:Context.logger
-          ~local_sync_resolution:"sync is in progress" ~ready_for_catcup:false
+          ~local_sync_resolution:"sync is in progress" ~ready_for_catchup:false
           best_tip ;
         `Repeat
           (collected_transition_of_best_tip best_tip :: collected_transitions)
@@ -453,7 +453,7 @@ let initialize_with_existing_frontier ~context:(module Context : CONTEXT)
       let%map () = Deferred.unit in
       start_catchup frontier @@ collected_transitions_of_best_tip best_tip_opt
   | Some sync_jobs -> (
-      log_recent_best_tip_opt ~logger ~ready_for_catcup:false
+      log_recent_best_tip_opt ~logger ~ready_for_catchup:false
         ?best_tip:best_tip_opt "starting local sync" ;
       local_state_sync_loop
         (sync_local_state sync_jobs)
