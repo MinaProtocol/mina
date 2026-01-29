@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 
+# Run a single Buildkite job plus its dependency chain. This script handles !ci-single-me {job}
+# You can use it to run a specific job and all its prerequisites in the correct order.
+# IMPORTANT: This script assumes that the job pipelines have already been generated
+# (e.g. via dhall) and are available in the specified --jobs directory.
+# In order to get job name visit dhall file in buildkite/src/Jobs and look for spec.name field.
+# Flow:
+# - Reads generated job pipeline YAMLs in --jobs.
+# - Resolves the requested job by name (case-insensitive).
+# - Walks step dependencies to find prerequisite jobs.
+# - Orders jobs topologically and uploads each pipeline.
+
 set -euo pipefail
 
 show_help() {
@@ -20,6 +31,7 @@ JOBS_DIR=""
 DEBUG=false
 DRY_RUN=false
 
+# Parse CLI args.
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --job-name)
@@ -38,6 +50,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Basic input validation.
 if [[ -z "$JOB_NAME" || -z "$JOBS_DIR" ]]; then
   echo "Error: --job-name and --jobs are required." >&2
   show_help
@@ -49,6 +62,7 @@ if [[ ! -d "$JOBS_DIR" ]]; then
   exit 1
 fi
 
+# Optional debug logging.
 if [[ "$DEBUG" == true ]]; then
   echo "Debug: JOB_NAME=$JOB_NAME"
   echo "Debug: JOBS_DIR=$JOBS_DIR"
@@ -60,6 +74,7 @@ to_lower() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
+# Ensure yq is available for YAML parsing.
 # Check if yq is installed, if not install it
 if ! command -v yq &> /dev/null; then
   echo "yq not found, installing..."
@@ -73,6 +88,7 @@ if ! command -v yq &> /dev/null; then
   fi
 fi
 
+# Index job files by name and map step keys to job names.
 declare -A step_key_to_job
 declare -A job_file_by_name
 declare -A job_display_by_name
@@ -108,6 +124,7 @@ for file in "${job_files[@]}"; do
   done < <(yq -r '.pipeline.steps[].key' "$file")
 done
 
+# Resolve the requested job name.
 job_name_key=$(to_lower "$JOB_NAME")
 if [[ -z "${job_file_by_name[$job_name_key]-}" ]]; then
   candidate="$JOBS_DIR/$JOB_NAME.yml"
@@ -130,12 +147,14 @@ if [[ -z "${job_file_by_name[$job_name_key]-}" ]]; then
   exit 1
 fi
 
+# Extract dependency step keys from a pipeline file.
 list_dep_steps() {
   local file="$1"
   yq -r '.pipeline.steps[].depends_on[]? | select(type == "object") | .step' "$file"
   yq -r '.pipeline.steps[].depends_on[]? | select(type == "string")' "$file"
 }
 
+# Map dependency step keys to job names and return unique deps.
 get_job_deps() {
   local job="$1"
   local file="${job_file_by_name[$job]}"
@@ -158,6 +177,7 @@ get_job_deps() {
   done < <(list_dep_steps "$file")
 }
 
+# Depth-first walk for topological ordering with cycle detection.
 declare -A temp_mark
 declare -A perm_mark
 declare -a ordered_jobs
@@ -193,6 +213,7 @@ if [[ "$DEBUG" == true ]]; then
   echo "Debug: upload order: ${ordered_jobs[*]}"
 fi
 
+# Upload pipelines in dependency order (or print in dry-run).
 for job in "${ordered_jobs[@]}"; do
   file="${job_file_by_name[$job]}"
   display_name="${job_display_by_name[$job]}"
