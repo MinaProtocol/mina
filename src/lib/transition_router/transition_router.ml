@@ -422,6 +422,22 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
       "Network best tip is recent enough to catchup to (best_tip with \
        $length); syncing local state and starting participation"
   in
+  let log_recent_best_tip_opt ?best_tip () =
+    match best_tip with
+    | Some best_tip ->
+        log_recent_best_tip_for_catchup best_tip
+    | None ->
+        [%log info]
+          "Successfully loaded frontier, but failed to download best tip from \
+           network"
+  in
+  let collected_transitions_of_best_tip ?best_tip () =
+    match best_tip with
+    | Some best_tip ->
+        [ (Envelope.Incoming.map ~f:(fun x -> `Block x) best_tip, None) ]
+    | None ->
+        []
+  in
   match%bind
     Deferred.both
       (download_best_tip
@@ -463,44 +479,42 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
       in
       let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
       start_bootstrap initial_root_transition (Some (`Block best_tip))
+  | best_tip_opt, Some frontier when not sync_local_state ->
+      log_recent_best_tip_opt ?best_tip:best_tip_opt () ;
+      [%log info] "Not syncing local state, should only occur in tests" ;
+      (* make frontier available for tests *)
+      let%map () = Broadcast_pipe.Writer.write frontier_w (Some frontier) in
+      start_catchup frontier
+      @@ collected_transitions_of_best_tip ?best_tip:best_tip_opt ()
+  | best_tip_opt, Some frontier
+    when Option.is_none
+           (is_sync_required (Transition_frontier.best_tip frontier)) ->
+      log_recent_best_tip_opt ?best_tip:best_tip_opt () ;
+      [%log info] "Local state already in sync" ;
+      start_catchup frontier
+      @@ collected_transitions_of_best_tip ?best_tip:best_tip_opt () ;
+      Deferred.unit
   | best_tip_opt, Some frontier ->
-      let collected_transitions =
-        match best_tip_opt with
-        | Some best_tip ->
-            log_recent_best_tip_for_catchup best_tip ;
-            [ (Envelope.Incoming.map ~f:(fun x -> `Block x) best_tip, None) ]
-        | None ->
-            [%log info]
-              "Successfully loaded frontier, but failed downloaded best tip \
-               from network" ;
-            []
+      log_recent_best_tip_opt ?best_tip:best_tip_opt () ;
+      [%log info] "Local state is out of sync; " ;
+      let sync_jobs =
+        Option.value_exn
+          (is_sync_required (Transition_frontier.best_tip frontier))
       in
-      let curr_best_tip = Transition_frontier.best_tip frontier in
       let%map () =
-        if not sync_local_state then (
-          [%log info] "Not syncing local state, should only occur in tests" ;
-          (* make frontier available for tests *)
-          Broadcast_pipe.Writer.write frontier_w (Some frontier) )
-        else
-          match is_sync_required curr_best_tip with
-          | None ->
-              [%log info] "Local state already in sync" ;
-              Deferred.unit
-          | Some sync_jobs -> (
-              [%log info] "Local state is out of sync; " ;
-              match%map
-                Consensus.Hooks.sync_local_state
-                  ~local_state:consensus_local_state
-                  ~glue_sync_ledger:(Mina_networking.glue_sync_ledger network)
-                  ~context:(module Context)
-                  ~trust_system sync_jobs
-              with
-              | Error e ->
-                  Error.tag e ~tag:"Local state sync failed" |> Error.raise
-              | Ok () ->
-                  () )
+        match%map
+          Consensus.Hooks.sync_local_state ~local_state:consensus_local_state
+            ~glue_sync_ledger:(Mina_networking.glue_sync_ledger network)
+            ~context:(module Context)
+            ~trust_system sync_jobs
+        with
+        | Error e ->
+            Error.tag e ~tag:"Local state sync failed" |> Error.raise
+        | Ok () ->
+            ()
       in
-      start_catchup frontier collected_transitions
+      start_catchup frontier
+      @@ collected_transitions_of_best_tip ?best_tip:best_tip_opt ()
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
