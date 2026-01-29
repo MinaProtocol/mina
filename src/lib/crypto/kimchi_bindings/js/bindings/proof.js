@@ -15,8 +15,8 @@ var caml_pasta_fp_plonk_proof_create = function (
     for (var i = 1; i < witness_cols.length; i++) {
         w.push(tsRustConversion.fp.vectorToRust(witness_cols[i]));
     }
-
     witness_cols = w;
+
     // NapiFlatVector expects a plain JS array of bytes (Vec<u8> on the Rust side).
     var flat_prev = Array.from(
         tsRustConversion.fp.vectorToRust(prev_challenges) || []
@@ -90,6 +90,8 @@ var caml_pasta_fq_plonk_proof_create = function (
         w.push(tsRustConversion.fq.vectorToRust(witness_cols[i]));
     }
     witness_cols = w;
+
+    // NapiFlatVector expects a plain JS array of bytes (Vec<u8> on the Rust side).
     var flat_prev = Array.from(
         tsRustConversion.fq.vectorToRust(prev_challenges) || []
     );
