@@ -437,8 +437,8 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
           "Successfully loaded frontier, but failed to download best tip from \
            network"
   in
-  let collected_transitions_of_best_tip ?best_tip () =
-    match best_tip with
+  let collected_transitions_of_best_tip best_tip_opt =
+    match best_tip_opt with
     | Some best_tip ->
         [ (Envelope.Incoming.map ~f:(fun x -> `Block x) best_tip, None) ]
     | None ->
@@ -490,16 +490,14 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
         "not syncing local state, should only occur in tests" ;
       (* make frontier available for tests *)
       let%map () = Broadcast_pipe.Writer.write frontier_w (Some frontier) in
-      start_catchup frontier
-      @@ collected_transitions_of_best_tip ?best_tip:best_tip_opt ()
+      start_catchup frontier @@ collected_transitions_of_best_tip best_tip_opt
   | best_tip_opt, Some frontier
     when Option.is_none
            (is_sync_required (Transition_frontier.best_tip frontier)) ->
       log_recent_best_tip_opt ?best_tip:best_tip_opt
         "local state already in sync" ;
-      start_catchup frontier
-      @@ collected_transitions_of_best_tip ?best_tip:best_tip_opt () ;
-      Deferred.unit
+      let%map () = Deferred.unit in
+      start_catchup frontier @@ collected_transitions_of_best_tip best_tip_opt
   | best_tip_opt, Some frontier ->
       log_recent_best_tip_opt ~ready_for_catcup:false ?best_tip:best_tip_opt
         "starting local sync" ;
@@ -507,20 +505,14 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
         Option.value_exn
           (is_sync_required (Transition_frontier.best_tip frontier))
       in
-      let%map () =
-        match%map
-          Consensus.Hooks.sync_local_state ~local_state:consensus_local_state
-            ~glue_sync_ledger:(Mina_networking.glue_sync_ledger network)
-            ~context:(module Context)
-            ~trust_system sync_jobs
-        with
-        | Error e ->
-            Error.tag e ~tag:"Local state sync failed" |> Error.raise
-        | Ok () ->
-            ()
+      let%map result =
+        Consensus.Hooks.sync_local_state ~local_state:consensus_local_state
+          ~glue_sync_ledger:(Mina_networking.glue_sync_ledger network)
+          ~context:(module Context)
+          ~trust_system sync_jobs
       in
-      start_catchup frontier
-      @@ collected_transitions_of_best_tip ?best_tip:best_tip_opt ()
+      Or_error.tag ~tag:"local state sync failed" result |> Or_error.ok_exn ;
+      start_catchup frontier @@ collected_transitions_of_best_tip best_tip_opt
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
