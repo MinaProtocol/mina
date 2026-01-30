@@ -29,7 +29,9 @@ APT_SOURCES_DIR="/etc/apt/sources.list.d"
 export DEBIAN_FRONTEND=noninteractive
 
 # Configuration
-BLACKLISTED_REPOS=()  # Uncomment to start with no blacklisted repos
+
+# yarn is giving us issues frequently on invalid signatures
+BLACKLISTED_REPOS=("yarn.list")  # Uncomment to start with no blacklisted repos
 VERBOSE=false
 DRY_RUN=false
 SUDO_CMD=""
