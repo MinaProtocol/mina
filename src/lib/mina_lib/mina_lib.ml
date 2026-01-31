@@ -2843,9 +2843,10 @@ module Hardfork_config = struct
     |> Block_time.to_time_exn
     |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
 
-  (** Compute the hard fork slot. This will be derived from the stop slots and
-      hard fork genesis slot delta in the runtime config, if those have been set
-      and the [breadcrum_spec] was [`Stop_slot]. Otherwise, it will be the
+  (** Compute the hard fork slot. If the [breadcrumb_spec] uses [`Stop_slot] and
+      does not request the hard fork block's slot be preserved, this slot will
+      be derived from the stop slots and hard fork genesis slot delta in the
+      runtime config when possible. Otherwise, the hard fork slot will be the
       global slot since genesis of the hard fork block. *)
   let hard_fork_global_slot ~breadcrumb_spec ~block mina :
       Mina_numbers.Global_slot_since_hard_fork.t =
@@ -2855,14 +2856,10 @@ module Hardfork_config = struct
     in
     let configured_slot =
       match breadcrumb_spec with
-      | Stop_slot { preserve_fork_block_time = true } ->
-          None
       | Stop_slot { preserve_fork_block_time = false } ->
           Runtime_config.scheduled_hard_fork_genesis_slot
             mina.config.precomputed_values.runtime_config
-      | State_hash _state_hash_base58 ->
-          None
-      | Block_height _block_height ->
+      | _ ->
           None
     in
     Option.value ~default:block_global_slot configured_slot
