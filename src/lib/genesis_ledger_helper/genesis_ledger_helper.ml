@@ -702,8 +702,6 @@ end
    It is used to determine whether we should make a new genesis proof, or use the
    one generated at compile-time.
 *)
-module Genesis_proof_inputs = Genesis_proof.Inputs
-
 module Base_hash : sig
   type t [@@deriving equal, yojson]
 
@@ -722,35 +720,6 @@ end = struct
 end
 
 module Genesis_proof = struct
-  let filename ~base_hash = "genesis_proof_" ^ Base_hash.to_string base_hash
-
-  let find_file ~logger ~base_hash ~genesis_dir =
-    let search_paths = genesis_dir :: Cache_dir.possible_paths "" in
-    let genesis_proof_file_exists filename path =
-      let full_path = path ^/ filename in
-      match%map Sys.file_exists ~follow_symlinks:true full_path with
-      | `Yes ->
-          [%log info] "Found genesis proof file at $path"
-            ~metadata:[ ("path", `String full_path) ] ;
-          Some full_path
-      | _ ->
-          [%log info] "Genesis proof file $path does not exist"
-            ~metadata:[ ("path", `String full_path) ] ;
-          None
-    in
-    let filename = filename ~base_hash in
-    match%bind
-      Deferred.List.find_map
-        ~f:(genesis_proof_file_exists filename)
-        search_paths
-    with
-    | Some filename ->
-        return (Some filename)
-    | None ->
-        [%log warn] "No genesis proof found for $base_hash"
-          ~metadata:[ ("base_hash", Base_hash.to_yojson base_hash) ] ;
-        return None
-
   let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
       ~constraint_constants ~blockchain_proof_system_id
       ~(genesis_constants : Genesis_constants.t) =
@@ -780,43 +749,6 @@ module Genesis_proof = struct
     ; genesis_body_reference
     ; signature_kind = Mina_signature_kind.t_DEPRECATED
     }
-
-  let generate (inputs : Genesis_proof.Inputs.t) =
-    match inputs.proof_level with
-    | Genesis_constants.Proof_level.Full ->
-        Deferred.return
-        @@ Genesis_proof.create_values_no_proof
-             { genesis_ledger = inputs.genesis_ledger
-             ; genesis_epoch_data = inputs.genesis_epoch_data
-             ; runtime_config = inputs.runtime_config
-             ; proof_level = inputs.proof_level
-             ; blockchain_proof_system_id = None
-             ; constraint_system_digests = None
-             ; protocol_state_with_hashes = inputs.protocol_state_with_hashes
-             ; genesis_constants = inputs.genesis_constants
-             ; consensus_constants = inputs.consensus_constants
-             ; constraint_constants = inputs.constraint_constants
-             ; genesis_body_reference = inputs.genesis_body_reference
-             ; signature_kind = Mina_signature_kind.t_DEPRECATED
-             }
-    | _ ->
-        Deferred.return (Genesis_proof.create_values_no_proof inputs)
-
-  let store ~filename proof =
-    (* TODO: Use [Writer.write_bin_prot]. *)
-    Monitor.try_with_or_error ~here:[%here] ~extract_exn:true (fun () ->
-        let%bind wr = Writer.open_file filename in
-        Writer.write wr (Proof.Stable.V2.sexp_of_t proof |> Sexp.to_string) ;
-        Writer.close wr )
-
-  let load filename =
-    (* TODO: Use [Reader.load_bin_prot]. *)
-    Monitor.try_with_or_error ~here:[%here] ~extract_exn:true (fun () ->
-        Reader.file_contents filename
-        >>| Sexp.of_string >>| Proof.Stable.V2.t_of_sexp )
-
-  let id_to_json x =
-    `String (Sexp.to_string (Pickles.Verification_key.Id.sexp_of_t x))
 
   let create_values_no_proof = Genesis_proof.create_values_no_proof
 end

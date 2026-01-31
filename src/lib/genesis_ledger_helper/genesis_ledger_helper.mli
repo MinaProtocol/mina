@@ -74,46 +74,12 @@ module Ledger : sig
        Deferred.t
 end
 
-(** Alias to preserve access to the top-level {!Genesis_proof} module, which
-    is shadowed by the local [Genesis_proof] module below. *)
-module Genesis_proof_inputs = Genesis_proof.Inputs
-
 module Base_hash : sig
   type t [@@deriving equal, yojson]
 
   val create : id:Pickles.Verification_key.Id.t -> state_hash:State_hash.t -> t
 
   val to_string : t -> string
-end
-
-module Genesis_proof : sig
-  val filename : base_hash:Base_hash.t -> string
-
-  val find_file :
-       logger:Logger.t
-    -> base_hash:Base_hash.t
-    -> genesis_dir:string
-    -> string option Deferred.t
-
-  val generate_inputs :
-       runtime_config:Runtime_config.t
-    -> proof_level:Genesis_constants.Proof_level.t
-    -> ledger:Genesis_ledger.Packed.t
-    -> genesis_epoch_data:Genesis_ledger.Packed.t Consensus.Genesis_data.Epoch.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> blockchain_proof_system_id:Pickles.Verification_key.Id.t option
-    -> genesis_constants:Genesis_constants.t
-    -> Genesis_proof_inputs.t
-
-  val generate : Genesis_proof_inputs.t -> Precomputed_values.t Deferred.t
-
-  val store : filename:string -> Proof.t -> unit Or_error.t Deferred.t
-
-  val load : string -> Proof.t Or_error.t Deferred.t
-
-  val id_to_json : Pickles.Verification_key.Id.t -> Yojson.Safe.t
-
-  val create_values_no_proof : Genesis_proof_inputs.t -> Precomputed_values.t
 end
 
 val load_config_json : string -> Yojson.Safe.t Or_error.t Deferred.t
