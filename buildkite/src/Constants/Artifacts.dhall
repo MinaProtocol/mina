@@ -142,9 +142,28 @@ let toDebianNames =
                   (List Text)
                   (     \(a : Artifact)
                     ->  merge
-                          { Daemon = [ toDebianName a network ]
+                          { Daemon =
+                              merge
+                                { Devnet =
+                                  [ toDebianName a network
+                                  , "daemon_${Network.lowerName network}_config"
+                                  ]
+                                , Mainnet =
+                                  [ toDebianName a network
+                                  , "daemon_${Network.lowerName network}_config"
+                                  ]
+                                , TestnetGeneric = [ toDebianName a network ]
+                                , DevnetLegacy = [ toDebianName a network ]
+                                , MainnetLegacy = [ toDebianName a network ]
+                                , PreMesa1 = [ toDebianName a network ]
+                                }
+                                network
                           , DaemonLegacyHardfork = [ toDebianName a network ]
-                          , DaemonAutoHardfork = [ toDebianName a network ]
+                          , DaemonAutoHardfork =
+                            [ toDebianName a network
+                            , "daemon_${Network.lowerName
+                                          network}_hardfork_config"
+                            ]
                           , Archive = [ toDebianName a network ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
