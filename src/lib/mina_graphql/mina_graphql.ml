@@ -2596,6 +2596,9 @@ module Queries = struct
         let%bind breadcrumb_spec =
           match (state_hash_opt, block_height_opt) with
           | None, None ->
+              (* For compatibility, we request that the hard fork block's
+                 global_slot_since_genesis always be used as the hard fork
+                 slot *)
               return
                 (Mina_lib.Hardfork_config.Stop_slot
                    { preserve_fork_block_time = true } )
