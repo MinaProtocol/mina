@@ -84,9 +84,6 @@ end
 
 val load_config_json : string -> Yojson.Safe.t Or_error.t Deferred.t
 
-val load_config_file :
-  string -> Runtime_config.t Or_error.t Or_error.t Deferred.t
-
 val init_from_config_file :
      cli_proof_level:Genesis_constants.Proof_level.t option
   -> genesis_constants:Genesis_constants.t
