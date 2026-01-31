@@ -120,15 +120,8 @@ fi
 
 # Check if yq is installed, if not install it
 if ! command -v yq &> /dev/null; then
-  echo "yq not found, installing..."
-  if command -v apt-get &> /dev/null; then
-    sudo apt-get update && sudo apt-get install -y wget
-    sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
-    sudo chmod +x /usr/local/bin/yq
-  else
-    echo "Error: yq is not installed and automatic installation is not supported on this system. Please install yq manually."
-    exit 1
-  fi
+  echo "Error: yq is not installed and automatic installation is not supported on this system. Please install yq manually."
+  exit 1
 fi
 
 IFS=',' read -r -a DESIRED_TAGS <<< "$TAGS"
