@@ -15,6 +15,9 @@ fi
 DEBS=$1
 USE_SUDO=${2:-0}
 
+# Don't prompt for answers during apt-get install
+export DEBIAN_FRONTEND=noninteractive
+
 # Source git environment variables first to get MINA_DEB_CODENAME
 source ./buildkite/scripts/export-git-env-vars.sh
 
