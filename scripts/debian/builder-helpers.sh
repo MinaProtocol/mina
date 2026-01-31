@@ -19,6 +19,7 @@ cd "${BUILD_DIR}" || exit 1
 source "${SCRIPTPATH}/../export-git-env-vars.sh"
 
 
+# SUGGESTED_DEPS should only be used for Suggests, not Depends.
 SUGGESTED_DEPS="jq, curl, wget"
 
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker-ce "
@@ -85,16 +86,19 @@ create_control_file() {
   echo "Package Name: ${1}"
   echo "Dependencies: ${2}"
   echo "Description: ${3}"
-
+  if [ -n "${4:-}" ]; then
+    echo "Broken/Replaces: ${4}"
+  fi
   # Make sure the directory exists
   mkdir -p "${BUILDDIR}/DEBIAN"
 
-  # Also clean/create the binary directory that all packages need
+  # Also clean the binary directory that all packages need
   rm -rf "${BUILDDIR}/usr/local/bin"
-  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  CONTROL="${BUILDDIR}/DEBIAN/control"
 
   # Create the control file itself
-  cat << EOF > "${BUILDDIR}/DEBIAN/control"
+  cat << EOF > ${CONTROL}
 Package: ${1}
 Version: ${MINA_DEB_VERSION}
 License: Apache-2.0
@@ -106,7 +110,20 @@ Suite: ${MINA_DEB_RELEASE}
 Architecture: ${ARCHITECTURE}
 Maintainer: O(1)Labs <build@o1labs.org>
 Installed-Size:
-Depends: ${2}
+EOF
+
+  if [ -n "${2:-}" ]; then
+    echo "Depends: ${2}" >> ${CONTROL}
+  fi
+  if [ -n "${4:-}" ]; then
+    echo "Suggests: ${4}" >> ${CONTROL}
+  fi
+  if [ -n "${5:-}" ]; then
+    echo "Replaces: ${5}" >> ${CONTROL}
+    echo "Breaks: ${5}" >> ${CONTROL}
+  fi
+
+  cat <<EOF >> ${CONTROL}
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/
@@ -213,6 +230,8 @@ build_logproc_deb() {
   create_control_file mina-logproc "${SHARED_DEPS}" \
     'Utility for processing mina-daemon log output'
 
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
   # Binaries
   cp ./default/src/app/logproc/logproc.exe \
     "${BUILDDIR}/usr/local/bin/mina-logproc"
@@ -237,6 +256,8 @@ build_test_executive_deb () {
     'Tool to run automated tests against a full mina testnet with multiple \
     nodes.'
 
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
   # Binaries
   cp ./default/src/app/test_executive/test_executive.exe \
     "${BUILDDIR}/usr/local/bin/mina-test-executive"
@@ -259,6 +280,8 @@ build_batch_txn_deb() {
 
   create_control_file mina-batch-txn "${SHARED_DEPS}" \
     'Load transaction tool against a mina node.'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
 
   # Binaries
   cp ./default/src/app/batch_txn_tool/batch_txn_tool.exe \
@@ -284,6 +307,8 @@ build_functional_test_suite_deb() {
     'Test suite apps for mina.'
 
   mkdir -p "${BUILDDIR}/etc/mina/test/archive"
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
 
   cp -r ../src/test/archive/* "${BUILDDIR}"/etc/mina/test/archive/
 
@@ -725,6 +750,8 @@ build_daemon_mainnet_hardfork_deb() {
 copy_common_archive_configs() {
   local ARCHIVE_DEB="${1}"
 
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
   cp ./default/src/app/archive/archive.exe \
     "${BUILDDIR}/usr/local/bin/mina-archive"
   cp ./default/src/app/archive_blocks/archive_blocks.exe \
@@ -846,6 +873,8 @@ build_zkapp_test_transaction_deb () {
     "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Utility to generate ZkApp transactions in Mina GraphQL format'
 
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
   # Binaries
   cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
     "${BUILDDIR}/usr/local/bin/mina-zkapp-test-transaction"
@@ -902,6 +931,8 @@ build_create_legacy_genesis_deb() {
   create_control_file mina-create-legacy-genesis \
     "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Utility to verify post hardfork ledger for Mina'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
 
   # Binaries
   cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
