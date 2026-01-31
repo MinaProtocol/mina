@@ -695,30 +695,6 @@ module Epoch_data = struct
             } )
 end
 
-(* This hash encodes the data that determines a genesis proof:
-   1. The blockchain snark constraint system
-   2. The genesis protocol state (including the genesis ledger)
-
-   It is used to determine whether we should make a new genesis proof, or use the
-   one generated at compile-time.
-*)
-module Base_hash : sig
-  type t [@@deriving equal, yojson]
-
-  val create : id:Pickles.Verification_key.Id.t -> state_hash:State_hash.t -> t
-
-  val to_string : t -> string
-end = struct
-  type t = string [@@deriving equal, yojson]
-
-  let to_string = Fn.id
-
-  let create ~id ~state_hash =
-    Pickles.Verification_key.Id.to_string id
-    |> ( ^ ) (State_hash.to_base58_check state_hash)
-    |> Blake2.digest_string |> Blake2.to_hex
-end
-
 module Genesis_proof = struct
   let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
       ~constraint_constants ~blockchain_proof_system_id

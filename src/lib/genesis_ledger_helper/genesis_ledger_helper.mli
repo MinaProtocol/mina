@@ -74,14 +74,6 @@ module Ledger : sig
        Deferred.t
 end
 
-module Base_hash : sig
-  type t [@@deriving equal, yojson]
-
-  val create : id:Pickles.Verification_key.Id.t -> state_hash:State_hash.t -> t
-
-  val to_string : t -> string
-end
-
 val load_config_json : string -> Yojson.Safe.t Or_error.t Deferred.t
 
 val init_from_config_file :
