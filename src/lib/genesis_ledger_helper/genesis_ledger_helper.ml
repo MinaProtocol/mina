@@ -874,6 +874,9 @@ let init_from_config_file ~cli_proof_level ~genesis_constants
     config
   |> Deferred.Or_error.map ~f:Genesis_proof.create_values_no_proof
 
+(* TODO: The old-style config format appears to date from before 2020. Also,
+   unconditionally updating in-place feels strange. Consider removing this
+   migration. *)
 let upgrade_old_config ~logger filename json =
   match json with
   | `Assoc fields ->
