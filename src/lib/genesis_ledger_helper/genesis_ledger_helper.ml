@@ -758,16 +758,6 @@ let load_config_json filename =
       let%map json = Reader.file_contents filename in
       Yojson.Safe.from_string json )
 
-let load_config_file filename =
-  let open Deferred.Or_error.Let_syntax in
-  Monitor.try_with_join_or_error ~here:[%here] (fun () ->
-      let%map json = load_config_json filename in
-      match Runtime_config.of_yojson json with
-      | Ok config ->
-          Ok config
-      | Error err ->
-          Or_error.error_string err )
-
 let print_config ~logger config =
   let ledger_name_json =
     Option.value ~default:`Null
