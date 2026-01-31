@@ -416,6 +416,9 @@ module Ledger = struct
         { accounts : (Private_key.t option * Account.value) list lazy_t }
     | Extracted of { extracted_path : string }
     | Tar of { tar_file : string; extracted_path : string }
+  (* Warning silenced because Extracted is unused. TODO: finish implementation
+     of direct unpacked genesis ledger loading, or remove this *)
+  [@@warning "-37"]
 
   let load_extracted_ledger ~(config : Runtime_config.Ledger.t) ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -699,6 +702,8 @@ end
    It is used to determine whether we should make a new genesis proof, or use the
    one generated at compile-time.
 *)
+module Genesis_proof_inputs = Genesis_proof.Inputs
+
 module Base_hash : sig
   type t [@@deriving equal, yojson]
 
