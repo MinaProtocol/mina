@@ -805,12 +805,10 @@ let fill_in_ledger_data ~genesis_dir ~logger
   Genesis_proof.generate_inputs ~light_proof ~runtime_config:config
     ~ledger:genesis_ledger ~genesis_epoch_data
 
-let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
+let light_proof_from_runtime_config ~logger ~cli_proof_level
+    ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~proof_level:compiled_proof_level ?overwrite_version
-    (config : Runtime_config.t) =
-  print_config ~logger config ;
+    ~proof_level:compiled_proof_level (config : Runtime_config.t) =
   let open Deferred.Or_error.Let_syntax in
   let proof_level =
     List.find_map_exn ~f:Fn.id
@@ -853,7 +851,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           "Proof level %s is not compatible with compile-time proof level %s"
           (str proof_level) (str compiled)
   in
-  let%bind genesis_constants =
+  let%map genesis_constants =
     Deferred.return
     @@ make_genesis_constants ~logger ~default:genesis_constants config
   in
@@ -861,14 +859,23 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     Consensus.Constants.create ~constraint_constants
       ~protocol_constants:genesis_constants.protocol
   in
-  let light_proof =
-    { Genesis_proof.Light.constraint_constants
-    ; proof_level
-    ; genesis_constants
-    ; genesis_body_reference = Staged_ledger_diff.genesis_body_reference
-    ; consensus_constants
-    ; signature_kind = Mina_signature_kind.t_DEPRECATED
-    }
+  { Genesis_proof.Light.constraint_constants
+  ; proof_level
+  ; genesis_constants
+  ; genesis_body_reference = Staged_ledger_diff.genesis_body_reference
+  ; consensus_constants
+  ; signature_kind = Mina_signature_kind.t_DEPRECATED
+  }
+
+let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
+    ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~proof_level ?overwrite_version (config : Runtime_config.t) =
+  print_config ~logger config ;
+  let open Deferred.Or_error.Let_syntax in
+  let%bind light_proof =
+    light_proof_from_runtime_config ~logger ~cli_proof_level ~genesis_constants
+      ~constraint_constants ~proof_level config
   in
   fill_in_ledger_data ~light_proof ~genesis_dir ~logger ?overwrite_version
     config
