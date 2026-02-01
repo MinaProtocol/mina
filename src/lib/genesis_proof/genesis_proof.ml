@@ -39,8 +39,6 @@ module Inputs = struct
   let ledger_depth { genesis_ledger; _ } =
     Genesis_ledger.Packed.depth genesis_ledger
 
-  include Genesis_ledger.Utils
-
   let genesis_ledger { genesis_ledger; _ } =
     Genesis_ledger.Packed.t genesis_ledger
 

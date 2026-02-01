@@ -31,8 +31,6 @@ module Inputs : sig
 
   val ledger_depth : t -> int
 
-  include module type of Genesis_ledger.Utils
-
   val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t
 
   val genesis_epoch_data :
