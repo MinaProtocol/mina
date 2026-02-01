@@ -868,23 +868,20 @@ let light_proof_from_runtime_config ~logger ~cli_proof_level
   }
 
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~proof_level ?overwrite_version (config : Runtime_config.t) =
+    ~light_proof ?overwrite_version (config : Runtime_config.t) =
   print_config ~logger config ;
-  let open Deferred.Or_error.Let_syntax in
-  let%bind light_proof =
-    light_proof_from_runtime_config ~logger ~cli_proof_level ~genesis_constants
-      ~constraint_constants ~proof_level config
-  in
   fill_in_ledger_data ~light_proof ~genesis_dir ~logger ?overwrite_version
     config
 
 let init_from_config_file ~cli_proof_level ~genesis_constants
     ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
     (config : Runtime_config.t) : Precomputed_values.t Deferred.Or_error.t =
-  inputs_from_config_file ~cli_proof_level ~genesis_constants
-    ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
+  let open Deferred.Or_error.Let_syntax in
+  let%bind light_proof =
+    light_proof_from_runtime_config ~logger ~cli_proof_level ~genesis_constants
+      ~constraint_constants ~proof_level config
+  in
+  inputs_from_config_file ~logger ~light_proof ?overwrite_version ?genesis_dir
     config
   |> Deferred.Or_error.map ~f:Genesis_proof.create_values_no_proof
 
