@@ -697,11 +697,8 @@ end
 
 module Genesis_proof = struct
   let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
-      ~constraint_constants ~(genesis_constants : Genesis_constants.t) =
-    let consensus_constants =
-      Consensus.Constants.create ~constraint_constants
-        ~protocol_constants:genesis_constants.protocol
-    in
+      ~constraint_constants ~(genesis_constants : Genesis_constants.t)
+      ~consensus_constants =
     let open Staged_ledger_diff in
     let protocol_state_with_hashes =
       let genesis_ledger = Consensus.Genesis_data.Ledger.to_hashed ledger in
@@ -761,7 +758,8 @@ let print_config ~logger config =
     ~metadata
 
 let fill_in_ledger_data ~genesis_dir ~logger ~proof_level ~constraint_constants
-    ~genesis_constants ?overwrite_version (config : Runtime_config.t) =
+    ~genesis_constants ~consensus_constants ?overwrite_version
+    (config : Runtime_config.t) =
   let open Deferred.Or_error.Let_syntax in
   (* If the backing type were set to Converting_db here, then the daemon would
      be forced to keep a migrated copy of the genesis ledgers around on disk the
@@ -802,7 +800,7 @@ let fill_in_ledger_data ~genesis_dir ~logger ~proof_level ~constraint_constants
   in
   Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
     ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
-    ~genesis_epoch_data
+    ~consensus_constants ~genesis_epoch_data
 
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
@@ -856,8 +854,12 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     Deferred.return
     @@ make_genesis_constants ~logger ~default:genesis_constants config
   in
+  let consensus_constants =
+    Consensus.Constants.create ~constraint_constants
+      ~protocol_constants:genesis_constants.protocol
+  in
   fill_in_ledger_data ~genesis_dir ~logger ~proof_level ~constraint_constants
-    ~genesis_constants ?overwrite_version config
+    ~consensus_constants ~genesis_constants ?overwrite_version config
 
 let init_from_config_file ~cli_proof_level ~genesis_constants
     ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
