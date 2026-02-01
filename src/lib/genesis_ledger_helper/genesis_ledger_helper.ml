@@ -808,6 +808,10 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           "Proof level %s is not compatible with compile-time proof level %s"
           (str proof_level) (str compiled)
   in
+  let%bind genesis_constants =
+    Deferred.return
+    @@ make_genesis_constants ~logger ~default:genesis_constants config
+  in
   (* If the backing type were set to Converting_db here, then the daemon would
      be forced to keep a migrated copy of the genesis ledgers around on disk the
      entire time it operated. This is a waste of disk space; the daemon only
@@ -835,7 +839,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   [%log info] "Loaded genesis ledger from $ledger_file"
     ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-  let%bind genesis_epoch_data, genesis_epoch_data_config =
+  let%map genesis_epoch_data, genesis_epoch_data_config =
     Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
       ~genesis_backing_type config.epoch_data
   in
@@ -844,10 +848,6 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ledger = Option.map config.ledger ~f:(fun _ -> ledger_config)
     ; epoch_data = genesis_epoch_data_config
     }
-  in
-  let%map genesis_constants =
-    Deferred.return
-    @@ make_genesis_constants ~logger ~default:genesis_constants config
   in
   Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
     ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
