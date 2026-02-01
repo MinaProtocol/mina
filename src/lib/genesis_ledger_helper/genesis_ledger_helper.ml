@@ -699,7 +699,7 @@ module Genesis_proof = struct
   let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
       ~constraint_constants ~(genesis_constants : Genesis_constants.t)
       ~consensus_constants =
-    let open Staged_ledger_diff in
+    let genesis_body_reference = Staged_ledger_diff.genesis_body_reference in
     let protocol_state_with_hashes =
       let genesis_ledger = Consensus.Genesis_data.Ledger.to_hashed ledger in
       let genesis_epoch_data =
