@@ -760,6 +760,50 @@ let print_config ~logger config =
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
     ~metadata
 
+let fill_in_ledger_data ~genesis_dir ~logger ~proof_level ~constraint_constants
+    ~genesis_constants ?overwrite_version (config : Runtime_config.t) =
+  let open Deferred.Or_error.Let_syntax in
+  (* If the backing type were set to Converting_db here, then the daemon would
+     be forced to keep a migrated copy of the genesis ledgers around on disk the
+     entire time it operated. This is a waste of disk space; the daemon only
+     ever uses the genesis ledgers to populate Root ledgers when bootstrapping
+     from genesis, which should happen quite infrequently (usually only once
+     during startup, and only if the transition frontier on disk is too far
+     behind the network).
+
+     To avoid keeping migrated genesis ledgers around on disk, the backing here
+     is set to [Stable_db] even if the daemon is configured to maintain synced
+     ledgers for an upcoming hard fork. As a result, if the daemon does need to
+     bootstrap from genesis, it will migrate its genesis ledgers on-demand while
+     executing one of the implementations of [create_root] from
+     genesis_ledger/intf.ml. *)
+  let genesis_backing_type = Mina_ledger.Root.Config.Stable_db in
+  let%bind genesis_ledger, ledger_config, ledger_file =
+    match config.ledger with
+    | Some ledger ->
+        Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+          ~genesis_backing_type ?overwrite_version ledger
+    | None ->
+        [%log fatal] "No ledger was provided in the runtime configuration" ;
+        Deferred.Or_error.errorf
+          "No ledger was provided in the runtime configuration"
+  in
+  [%log info] "Loaded genesis ledger from $ledger_file"
+    ~metadata:[ ("ledger_file", `String ledger_file) ] ;
+  let%map genesis_epoch_data, genesis_epoch_data_config =
+    Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+      ~genesis_backing_type config.epoch_data
+  in
+  let config =
+    { config with
+      ledger = Option.map config.ledger ~f:(fun _ -> ledger_config)
+    ; epoch_data = genesis_epoch_data_config
+    }
+  in
+  Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
+    ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
+    ~genesis_epoch_data
+
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -812,46 +856,8 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     Deferred.return
     @@ make_genesis_constants ~logger ~default:genesis_constants config
   in
-  (* If the backing type were set to Converting_db here, then the daemon would
-     be forced to keep a migrated copy of the genesis ledgers around on disk the
-     entire time it operated. This is a waste of disk space; the daemon only
-     ever uses the genesis ledgers to populate Root ledgers when bootstrapping
-     from genesis, which should happen quite infrequently (usually only once
-     during startup, and only if the transition frontier on disk is too far
-     behind the network).
-
-     To avoid keeping migrated genesis ledgers around on disk, the backing here
-     is set to [Stable_db] even if the daemon is configured to maintain synced
-     ledgers for an upcoming hard fork. As a result, if the daemon does need to
-     bootstrap from genesis, it will migrate its genesis ledgers on-demand while
-     executing one of the implementations of [create_root] from
-     genesis_ledger/intf.ml. *)
-  let genesis_backing_type = Mina_ledger.Root.Config.Stable_db in
-  let%bind genesis_ledger, ledger_config, ledger_file =
-    match config.ledger with
-    | Some ledger ->
-        Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-          ~genesis_backing_type ?overwrite_version ledger
-    | None ->
-        [%log fatal] "No ledger was provided in the runtime configuration" ;
-        Deferred.Or_error.errorf
-          "No ledger was provided in the runtime configuration"
-  in
-  [%log info] "Loaded genesis ledger from $ledger_file"
-    ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-  let%map genesis_epoch_data, genesis_epoch_data_config =
-    Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      ~genesis_backing_type config.epoch_data
-  in
-  let config =
-    { config with
-      ledger = Option.map config.ledger ~f:(fun _ -> ledger_config)
-    ; epoch_data = genesis_epoch_data_config
-    }
-  in
-  Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
-    ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
-    ~genesis_epoch_data
+  fill_in_ledger_data ~genesis_dir ~logger ~proof_level ~constraint_constants
+    ~genesis_constants ?overwrite_version config
 
 let init_from_config_file ~cli_proof_level ~genesis_constants
     ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
