@@ -2116,6 +2116,78 @@ let internal_commands logger ~itn_features =
           in
           let () = printf "%s" chain_id in
           exit 0) )
+  ; ( "print-hard-fork-genesis-timestamp"
+    , Command.async
+        ~summary:
+          "Print the scheduled hard fork genesis timestamp computed from the \
+           given config file(s)"
+        (let open Command.Let_syntax in
+        let%map_open config_files =
+          flag "--config-file" ~aliases:[ "config-file" ]
+            ~doc:
+              "PATH path to a configuration file. Pass multiple times to \
+               override fields from earlier config files"
+            (listed string)
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          let logger = Logger.null () in
+          let genesis_constants =
+            Genesis_constants.Compiled.genesis_constants
+          in
+          let constraint_constants =
+            Genesis_constants.Compiled.constraint_constants
+          in
+          let proof_level = Genesis_constants.Compiled.proof_level in
+          let config =
+            let config_jsons =
+              List.map config_files ~f:(fun config_file ->
+                  let json =
+                    In_channel.with_file config_file ~f:(fun ic ->
+                        Yojson.Safe.from_channel ic )
+                  in
+                  (config_file, json) )
+            in
+            List.fold ~init:Runtime_config.default config_jsons
+              ~f:(fun config (config_file, config_json) ->
+                match Runtime_config.of_yojson config_json with
+                | Ok loaded_config ->
+                    Runtime_config.combine config loaded_config
+                | Error err ->
+                    failwithf "Could not parse configuration file %s: %s"
+                      config_file err () )
+          in
+          let scheduled_genesis_slot =
+            match Runtime_config.scheduled_hard_fork_genesis_slot config with
+            | Some slot ->
+                slot
+            | None ->
+                failwith
+                  "Could not compute scheduled genesis slot: slot_chain_end \
+                   and hard_fork_genesis_slot_delta must both be set in the \
+                   daemon config"
+          in
+          let%map light_proof =
+            match%map
+              Genesis_ledger_helper.light_proof_from_runtime_config ~logger
+                ~cli_proof_level:None ~genesis_constants ~constraint_constants
+                ~proof_level config
+            with
+            | Ok light_proof ->
+                light_proof
+            | Error err ->
+                Error.raise err
+          in
+          let consensus_constants = light_proof.consensus_constants in
+          let timestamp =
+            Consensus.Data.Consensus_time.(
+              start_time ~constants:consensus_constants
+                (of_global_slot ~constants:consensus_constants
+                   scheduled_genesis_slot ))
+            |> Block_time.to_time_exn
+            |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+          in
+          print_endline timestamp) )
   ]
 
 let mina_commands logger ~itn_features =
