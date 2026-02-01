@@ -15,7 +15,6 @@ module Inputs : sig
     ; protocol_state_with_hashes :
         Protocol_state.value State_hash.With_state_hashes.t
     ; constraint_system_digests : (string * Md5_lib.t) list option
-    ; blockchain_proof_system_id : Pickles.Verification_key.Id.t option
     ; signature_kind : Mina_signature_kind.t
     }
 
@@ -66,10 +65,7 @@ module Inputs : sig
 end
 
 module Proof_data : sig
-  type t =
-    { blockchain_proof_system_id : Pickles.Verification_key.Id.t
-    ; genesis_proof : Proof.t
-    }
+  type t = { genesis_proof : Proof.t }
 end
 
 module T : sig

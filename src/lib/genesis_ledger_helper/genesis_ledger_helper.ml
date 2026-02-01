@@ -697,8 +697,7 @@ end
 
 module Genesis_proof = struct
   let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
-      ~constraint_constants ~blockchain_proof_system_id
-      ~(genesis_constants : Genesis_constants.t) =
+      ~constraint_constants ~(genesis_constants : Genesis_constants.t) =
     let consensus_constants =
       Consensus.Constants.create ~constraint_constants
         ~protocol_constants:genesis_constants.protocol
@@ -715,7 +714,6 @@ module Genesis_proof = struct
     { Genesis_proof.Inputs.runtime_config
     ; constraint_constants
     ; proof_level
-    ; blockchain_proof_system_id
     ; genesis_ledger = ledger
     ; genesis_epoch_data
     ; consensus_constants
@@ -784,25 +782,14 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ; Some compiled_proof_level
       ]
   in
-  let constraint_constants, blockchain_proof_system_id =
+  let constraint_constants =
     match config.proof with
     | None ->
         [%log info] "Using the compiled constraint constants" ;
-        (constraint_constants, Some (Pickles.Verification_key.Id.dummy ()))
+        constraint_constants
     | Some config ->
         [%log info] "Using the constraint constants from the configuration file" ;
-        let blockchain_proof_system_id =
-          (* We pass [None] here, which will force the constraint systems to be
-             set up and their hashes evaluated before we can calculate the
-             genesis proof's filename.
-             This adds no overhead if we are generating a genesis proof, since
-             we will do these evaluations anyway to load the blockchain proving
-             key. Otherwise, this will in a slight slowdown.
-          *)
-          None
-        in
-        ( make_constraint_constants ~default:constraint_constants config
-        , blockchain_proof_system_id )
+        make_constraint_constants ~default:constraint_constants config
   in
   let%bind () =
     match (proof_level, compiled_proof_level) with
@@ -864,7 +851,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
     ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
-    ~blockchain_proof_system_id ~genesis_epoch_data
+    ~genesis_epoch_data
 
 let init_from_config_file ~cli_proof_level ~genesis_constants
     ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
