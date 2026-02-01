@@ -759,7 +759,7 @@ let print_config ~logger config =
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
     ~metadata
 
-let fill_in_ledger_data ~genesis_dir ~logger
+let fill_in_ledger_data ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~(light_proof : Genesis_proof.Light.t) ?overwrite_version
     (config : Runtime_config.t) =
   let open Deferred.Or_error.Let_syntax in
@@ -867,23 +867,20 @@ let light_proof_from_runtime_config ~logger ~cli_proof_level
   ; signature_kind = Mina_signature_kind.t_DEPRECATED
   }
 
-let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~light_proof ?overwrite_version (config : Runtime_config.t) =
-  print_config ~logger config ;
-  fill_in_ledger_data ~light_proof ~genesis_dir ~logger ?overwrite_version
-    config
-
 let init_from_config_file ~cli_proof_level ~genesis_constants
     ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
     (config : Runtime_config.t) : Precomputed_values.t Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
+  print_config ~logger config ;
   let%bind light_proof =
     light_proof_from_runtime_config ~logger ~cli_proof_level ~genesis_constants
       ~constraint_constants ~proof_level config
   in
-  inputs_from_config_file ~logger ~light_proof ?overwrite_version ?genesis_dir
-    config
-  |> Deferred.Or_error.map ~f:Genesis_proof.create_values_no_proof
+  let%map genesis_proof =
+    fill_in_ledger_data ~light_proof ?genesis_dir ~logger ?overwrite_version
+      config
+  in
+  Genesis_proof.create_values_no_proof genesis_proof
 
 (* TODO: The old-style config format appears to date from before 2020. Also,
    unconditionally updating in-place feels strange. Consider removing this
