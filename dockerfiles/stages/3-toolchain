@@ -7,18 +7,7 @@ FROM opam-deps AS toolchain
 ARG DOCKER_VERSION=28.3.1
 ARG DEBS3_VERSION=0.11.7
 ARG INFLUXDB_CLI_VERSION=2.7.5
-ARG HADOLINT_VERSION=2.12.0
-ARG TARGETPLATFORM
-ARG TARGETARCH
-ARG BUILDPLATFORM
-
-# Canonical naming convention
-# : aarch64/x86_64
-ARG CANONICAL_ARCH
-
-# Debian naming convention
-# : arm64/x86_64
-ARG DEBIAN_ARCH
+ARG SHELLCHECK_VERSION=0.10.0
 
 USER root
 
@@ -89,5 +78,9 @@ RUN curl -sL https://deb.nodesource.com/setup_24.x | bash - \
 RUN curl -sL https://github.com/hadolint/hadolint/releases/download/v$HADOLINT_VERSION/hadolint-Linux-${DEBIAN_ARCH} \
     -o /usr/bin/hadolint \
     && chmod +x /usr/bin/hadolint
+
+# --- Shellcheck
+RUN curl -sL https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHECK_VERSION/shellcheck-v$SHELLCHECK_VERSION.linux.${DEBIAN_ARCH}.tar.xz \
+    | tar --extract --file=- --xz --strip-components=1 --directory=/usr/bin shellcheck-v$SHELLCHECK_VERSION/shellcheck
 
 USER opam
