@@ -6,7 +6,7 @@ if [[ -z "$BUILDKITE_AGENT_WRITE_TOKEN" ]]; then
 fi
 
 FORKING_BRANCH=$BUILDKITE_BRANCH
-PREFIX="https://storage.googleapis.com/o1labs-gitops-infrastructure/pre-mesa/pre-mesa-1-hardfork"
+PREFIX="https://storage.googleapis.com/o1labs-gitops-infrastructure/devnet/devnet"
 
 export BUILDKITE_API_TOKEN=$BUILDKITE_AGENT_WRITE_TOKEN
 

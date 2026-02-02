@@ -74,6 +74,14 @@ function check_docker() {
     check_app "docker"
 }
 
+function check_aws() {
+    check_app "aws"
+}
+
+function check_debs3() {
+    check_app "deb-s3"
+}
+
 function check_app() {
     if ! command -v $1 &> /dev/null; then
         echo -e "❌ ${RED} !! $1 program not found. Please install program to proceed. ${CLEAR}\n";
@@ -99,6 +107,15 @@ function prefix_cmd {
     shift
     local CMD=("$@")
     "${CMD[@]}" 1> >(sed "s/^/${PREF}/") 2> >(sed "s/^/${PREF}/" 1>&2)
+}
+
+# Extract bucket name from potentially full S3 URL
+# Input: s3.us-west-2.amazonaws.com/bucket-name or just bucket-name
+# Output: bucket-name
+function extract_bucket_name() {
+    local __repo=$1
+    # Strip s3 prefix patterns like "s3.us-west-2.amazonaws.com/" or "s3.amazonaws.com/"
+    echo "$__repo" | sed -E 's|^s3(\.[^/]+)?\.amazonaws\.com/||'
 }
 
 function main_help(){
@@ -328,10 +345,10 @@ function storage_upload() {
 
     case $backend in
         local)
-            cp "$local_path" "$remote_path"
+            cp $local_path "$remote_path"
             ;;
         gs)
-            gsutil cp "$local_path" "$remote_path"
+            gsutil cp $local_path "$remote_path"
             ;;
         hetzner)
            rsync -avz -e "ssh -p 23 -i $HETZNER_KEY" $local_path "$HETZNER_USER@$HETZNER_HOST:$remote_path"
@@ -417,6 +434,7 @@ function publish_debian() {
     local __force_upload_debians=${13:-0}
     local __debian_sign_key=${14}
     local __new_artifact_name=${15:-""}
+    local __skip_cache_invalidation=${SKIP_CACHE_INVALIDATION:-0}
 
     get_cached_debian_or_download $__backend $__artifact $__codename "$__network" "$__arch" "$__profile"
     local __artifact_full_name
@@ -458,6 +476,7 @@ function publish_debian() {
             --bucket $__debian_repo \
             $(if [[ $__force_upload_debians == 1 ]]; then echo "--force"; fi) \
             -c $__codename \
+            $(if [[ $__skip_cache_invalidation == 1 ]]; then echo "--skip-cache-invalidation"; fi) \
             -r $__channel \
             --arch $__arch \
             ${__sign_arg[@]}
@@ -543,6 +562,7 @@ function promote_debian() {
     local __debian_repo=${10}
     local __arch=${11}
     local __debian_sign_key=${12}
+    local __skip_cache_invalidation=${SKIP_CACHE_INVALIDATION:-0}
 
     if [[ $__debian_sign_key != "" ]]; then
         local __sign_arg=("--sign" "$__debian_sign_key")
@@ -558,18 +578,31 @@ function promote_debian() {
     local __artifact_full_name
     __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
 
+    local __new_artifact_name=$__artifact_full_name
+
     local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
 
     if [[ $__dry_run == 0 ]]; then
         echo "    🗃️  Promoting $__artifact debian from $__codename/$__source_version to $__codename/$__target_version"
+        local __debian_bucket
+        __debian_bucket=$(extract_bucket_name "$__debian_repo")
+
+
+
+        # shellcheck disable=SC2068,SC2046
         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/reversion.sh \
                 --deb ${__artifact_full_name} \
                 --version ${__source_version} \
                 --new-version ${__target_version} \
                 --suite ${__source_channel} \
-                --repo ${__debian_repo} \
+                --repo ${__debian_bucket} \
+                --arch ${__arch} \
+                --codename ${__codename} \
                 --new-suite ${__target_channel} \
-                --new-name ${__new_artifact_name}
+                --new-name ${__new_artifact_name} \
+                $(if [[ $__skip_cache_invalidation == 1 ]]; then echo "--skip-cache-invalidation"; fi) \
+                --codename ${__codename}
+
 
         if [[ $__verify == 1 ]]; then
             echo "     📋 Verifying: $__artifact debian to $__target_channel channel with $__target_version version"
@@ -739,6 +772,10 @@ function publish(){
                 __profile=${2:?$error_message}
                 shift 2;
             ;;
+            --skip-cache-invalidation )
+                export SKIP_CACHE_INVALIDATION=1
+                shift 1;
+            ;;
             * )
                 echo -e "❌ ${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
@@ -788,6 +825,7 @@ function publish(){
     echo " - Architectures: $__archs"
     echo " - Profile: $__profile"
     echo " - Force upload debians: $__force_upload_debians"
+    echo " - Skip cache invalidation: ${SKIP_CACHE_INVALIDATION:-0}"
     echo ""
 
     if [[ $__backend != "gs" && $__backend != "hetzner" && $__backend != "local" ]]; then
@@ -806,7 +844,11 @@ function publish(){
         fi
     fi
 
-
+    # Only require aws and deb-s3 if we are dealing with debians
+    if [[ $__only_dockers == 0 ]]; then
+        check_aws
+        check_debs3
+    fi
 
     if [[ $__verify == 1 ]]; then
         check_docker
@@ -842,6 +884,7 @@ function publish(){
                                             "$__arch" \
                                             "$__force_upload_debians" \
                                             "$__debian_sign_key"
+
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -987,6 +1030,7 @@ function promote(){
     fi
 
     local __artifacts="$DEFAULT_ARTIFACTS"
+    local __backend="local"
     local __networks="$DEFAULT_NETWORKS"
     local __source_version
     local __target_version
@@ -1004,7 +1048,7 @@ function promote(){
     local __debian_sign_key=""
     local __arch="$DEFAULT_ARCHITECTURES"
     local __profile="$DEFAULT_PROFILE"
-
+    local __force_upload_debians=0
 
     while [ ${#} -gt 0 ]; do
         error_message="❌ Error: a value is needed for '$1'";
@@ -1014,6 +1058,10 @@ function promote(){
             ;;
             --artifacts )
                 __artifacts=${2:?$error_message}
+                shift 2;
+            ;;
+            --backend )
+                __backend=${2:?$error_message}
                 shift 2;
             ;;
             --networks )
@@ -1080,9 +1128,17 @@ function promote(){
                 __arch=${2:?$error_message}
                 shift 2;
             ;;
+            --force-upload-debians )
+                __force_upload_debians=1
+                shift 1;
+            ;;
             --profile )
                 __profile=${2:?$error_message}
                 shift 2;
+            ;;
+            --skip-cache-invalidation )
+                export SKIP_CACHE_INVALIDATION=1
+                shift 1;
             ;;
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
@@ -1136,20 +1192,43 @@ function promote(){
     echo " - Only dockers: $__only_dockers"
     echo " - Only debians: $__only_debians"
     echo " - Verify: $__verify"
-    echo " - Architecture: $__arch"
     echo " - Dry run: $__dry_run"
+    echo " - Backend: $__backend"
+    echo " - Debian repo: $__debian_repo"
+    echo " - Debian sign key: $__debian_sign_key"
     echo " - Strip network from archive: $__strip_network_from_archive"
+    echo " - Architectures: $__arch"
+    echo " - Profile: $__profile"
+    echo " - Force upload debians: $__force_upload_debians"
+    echo " - Skip cache invalidation: ${SKIP_CACHE_INVALIDATION:-0}"
     echo ""
 
-    #check environment setup
-    if [[ $__verify == 1 ]]; then
-        check_docker
+
+
+    if [[ $__backend != "gs" && $__backend != "hetzner" && $__backend != "local" ]]; then
+        echo -e "❌ ${RED} !! Backend (--backend) can be only gs, hetzner or local ${CLEAR}\n";
+        promote_help; exit 1;
     fi
 
-    if [[ $__source_version == "$__target_version" ]]; then
-        echo " ⚠️  Warning: Source version and target version are the same.
-    Script will do promotion but it won't have an effect at the end unless you are publishing dockers..."
-        echo ""
+    if [[ $__backend == "gs" ]]; then
+        #check environment setup
+        check_gsutil
+    elif [[ $__backend == "local" ]]; then
+        #check root folder is writable
+        if [[ ! -r $(storage_root "$__backend") ]]; then
+            echo -e "❌ ${RED} !! Local backend root folder $(storage_root "$__backend") is not readable. Please check it exists and is accessible ${CLEAR}\n";
+            exit 1
+        fi
+    fi
+
+    # Only require deb-s3 and aws if we are dealing with debians
+    if [[ $__only_dockers == 0 ]]; then
+        check_aws
+        check_debs3
+    fi
+
+    if [[ $__verify == 1 ]]; then
+        check_docker
     fi
 
     IFS=', '
@@ -1197,8 +1276,7 @@ function promote(){
                                         $__dry_run \
                                         $__debian_repo \
                                         "$__arch" \
-                                        $__debian_sign_key \
-                                        $new_name
+                                        $__debian_sign_key
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -1221,7 +1299,6 @@ function promote(){
                                             $__debian_repo \
                                             "$__arch" \
                                             $__debian_sign_key
-
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -1243,7 +1320,7 @@ function promote(){
                                             $__dry_run \
                                             $__debian_repo \
                                             "$__arch" \
-                                            $__debian_sign_key
+                                            "$__debian_sign_key"
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -1426,6 +1503,12 @@ function verify(){
     echo " - Build flag: $__build_flag"
     echo ""
 
+    # Only require deb-s3 and aws if we are dealing with debians
+    if [[ $__only_dockers == 0 ]]; then
+        check_aws
+        check_debs3
+    fi
+
     #check environment setup
     if [[ $__only_debians == 0 ]]; then
         check_docker
@@ -1471,7 +1554,9 @@ function verify(){
                                 __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag")
 
                                 if [[ $__only_dockers == 0 ]]; then
-                                        echo "     📋  Verifying: $artifact debian on $__channel channel with $__version version for $__codename codename"
+
+                                        echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
+                                        echo ""
 
                                         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
                                             -p $__artifact_full_name \
@@ -1479,7 +1564,7 @@ function verify(){
                                             -m $__codename \
                                             -r $__debian_repo \
                                             -c $__channel \
-                                            -a $__arch \
+                                            -a "$__arch" \
                                             ${__signed_debian_repo:+--signed}
 
                                         echo ""
@@ -1488,6 +1573,7 @@ function verify(){
                                     if [[ $__only_debians == 0 ]]; then
 
                                         echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_repo" $artifact $__version $__codename "$network" "$__arch")"
+                                        echo ""
 
                                         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
                                             -p "$artifact" \
@@ -1691,12 +1777,12 @@ function persist_help(){
     printf "  %-25s %s\n" "--arch" "[string] target architecture. Default: $DEFAULT_ARCHITECTURES";
     printf "  %-25s %s\n" "--backend" "[string] backend to persist artifacts. e.g gs,hetzner";
     printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to persist. e.g mina-logproc,mina-archive,mina-rosetta";
-    printf "  %-25s %s\n" "--build_id" "[string] buildkite build id to persist artifacts";
+    printf "  %-25s %s\n" "--buildkite-build-id" "[string] buildkite build id to persist artifacts";
     printf "  %-25s %s\n" "--target" "[string] target location to persist artifacts";
     echo ""
     echo "Example:"
     echo ""
-    echo "  " $CLI_NAME persist --backend gs --artifacts mina-logproc,mina-archive,mina-rosetta --build_id 123 --target /debians_legacy
+    echo "  " $CLI_NAME persist --backend gs --artifacts mina-logproc,mina-archive,mina-rosetta --buildkite-build-id 123 --target /debians_legacy
     echo ""
     echo " Above command will persist mina-logproc,mina-archive,mina-rosetta artifacts to {backend root}/debians_legacy"
     echo ""
