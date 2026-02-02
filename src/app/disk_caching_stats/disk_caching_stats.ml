@@ -366,8 +366,13 @@ module Values (S : Sample) = struct
 
   let base_work varying witness :
       Transaction_snark_scan_state.Transaction_with_witness.t =
+    let transaction_with_info : Mina_transaction_logic.Transaction_applied.t =
+      { previous_hash = field (); varying = varying () }
+    in
     Transaction_snark_scan_state.Transaction_with_witness.create
-      ~transaction_with_info:{ previous_hash = field (); varying = varying () }
+      ~transaction_with_status:
+        (Mina_transaction_logic.Transaction_applied.transaction_with_status
+           transaction_with_info )
       ~state_hash:(state_hash (), field ())
       ~statement:
         { source =
@@ -389,7 +394,7 @@ module Values (S : Sample) = struct
         ; fee_excess = fee_excess ()
         ; sok_digest = ()
         }
-      ~init_stack:(Base (pending_coinbase_stack ()))
+      ~init_stack:(pending_coinbase_stack ())
       ~first_pass_ledger_witness:(witness ())
       ~second_pass_ledger_witness:(witness ())
       ~block_global_slot:(global_slot_since_genesis ())
