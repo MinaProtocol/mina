@@ -12,7 +12,7 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
+let Network = ../../Constants/Network.dhall
 
 let Arch = ../../Constants/Arch.dhall
 
@@ -24,7 +24,7 @@ let dependsOn =
       DebianVersions.dependsOn
         DebianVersions.DepsSpec::{
         , deb_version = DebianVersions.DebVersion.Bullseye
-        , profile = Profiles.Type.Devnet
+        , network = Network.Type.Devnet
         }
 
 let buildTestCmd
