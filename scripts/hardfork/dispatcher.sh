@@ -17,15 +17,16 @@
 #   or user workflows.
 #
 # HOW IT WORKS:
-#   1. The dispatcher is installed as a symlink (e.g., /usr/bin/mina -> mina-dispatch)
+#   1. The dispatcher is installed as a symlink (e.g., /usr/local/bin/mina -> mina-dispatch)
 #   2. When invoked, it checks for an activation state file
 #   3. If the state file exists, mesa runtime is used; otherwise berkeley
 #   4. Arguments are processed and modified as needed for the target runtime
 #   5. The actual binary is exec'd with the processed arguments
+#   6. Not all subcommand are supported in. Main focus is on "daemon" command. Other commands might require explicit invocation of the runtime binary (mina-berkeley, mina-mesa).
 #
 # RUNTIME SELECTION:
-#   - STATE_FILE absent  -> berkeley runtime (pre-hardfork)
-#   - STATE_FILE present -> mesa runtime (post-hardfork)
+#   - MINA_HARDFORK_STATE_DIR absent  -> berkeley runtime (pre-hardfork)
+#   - MINA_HARDFORK_STATE_DIR present -> mesa runtime (post-hardfork)
 #
 # ARGUMENT PROCESSING (mesa runtime only):
 #   - "-config-file <path>" is rewritten to use MESA_CONFIG
@@ -38,6 +39,9 @@
 #   MINA_PROFILE          - Profile name for configuration paths
 #   RUNTIMES_BASE_PATH    - Base path where runtime binaries are installed
 #   MINA_LIBP2P_ENVVAR_NAME - Environment variable name for libp2p helper path
+#
+# REQUIRED ENVIRONMENT VARIABLES :
+#   MINA_HARDFORK_STATE_DIR="${HOME}/.mina-config"
 #
 # DIRECTORY STRUCTURE:
 #   ${RUNTIMES_BASE_PATH}/
@@ -52,7 +56,7 @@
 #
 # INVOCATION METHODS:
 #   1. Via symlink (normal operation):
-#      /usr/bin/mina daemon --peer-list-url ...
+#      /usr/local/bin/mina daemon --peer-list-url ...
 #
 #   2. Direct invocation (debugging):
 #      mina-dispatch mina daemon --peer-list-url ...
@@ -62,7 +66,7 @@
 #     - Configuration file sourced at startup
 #     - Must define required environment variables
 #
-#   STATE_FILE (default: ${MESA_CONFIG_ROOT}/activated)
+#   MINA_HARDFORK_STATE_DIR (default: ${MESA_CONFIG_ROOT}/activated)
 #     - Presence indicates mesa runtime should be used
 #     - Created by hardfork activation process
 #
@@ -138,14 +142,22 @@ for var in "${required_vars[@]}"; do
   fi
 done
 
+if [[ -z "$MINA_HARDFORK_STATE_DIR" ]]; then
+  echo "mina-dispatch ERROR: MINA_HARDFORK_STATE_DIR is not defined" >&2
+  echo "  This variable should be set in your environment and point" >&2
+  echo "  to the mina config directory (usually ${HOME}/.mina-config)." >&2
+
+  exit 1
+fi
+
 # =============================================================================
 # Path Configuration
 # =============================================================================
 
-MESA_CONFIG_ROOT=${MESA_CONFIG_ROOT:-"${HOME}/.mina-config/auto-fork-${MINA_NETWORK}-${MINA_PROFILE}"}
-MESA_CONFIG="${MESA_CONFIG_ROOT}/daemon.json"
-MESA_LEDGERS_DIR=${MESA_LEDGERS_DIR:-"${MESA_CONFIG_ROOT}/genesis"}
-STATE_FILE=${OVERRIDE_STATE_FILE:-"${MESA_CONFIG_ROOT}/activated"}
+MESA_HARDFORK_STATE_PARENT_FOLDER="${MINA_HARDFORK_STATE_DIR}/auto-fork-${MINA_NETWORK}-${MINA_PROFILE}"
+MESA_CONFIG="${MESA_HARDFORK_STATE_PARENT_FOLDER}/daemon.json"
+MESA_LEDGERS_DIR=${MESA_LEDGERS_DIR:-"${MESA_HARDFORK_STATE_PARENT_FOLDER}/genesis"}
+STATE_FILE=${OVERRIDE_STATE_FILE:-"${MESA_HARDFORK_STATE_PARENT_FOLDER}/activated"}
 
 # =============================================================================
 # Runtime Selection
@@ -227,18 +239,24 @@ else
   args=()
 fi
 
+first_arg="${args[0]}"
+
+if [[ "$first_arg" != "daemon" ]]; then
+  echo "mina-dispatch ERROR: unsupported subcommand '$first_arg' for automatic hardfork handling" >&2
+  echo "  Automatic argument adjustments are only implemented for the 'daemon' subcommand." >&2
+  echo "  Please ensure you are invoking the correct runtime binary directly if needed." >&2
+  echo "  For example, use 'mina-berkeley' or 'mina-mesa' instead of relying on the dispatcher (mina)." >&2
+fi
+
 if [[ "$runtime" == "mesa" ]]; then
   # Build a new argument array to ensure continuous indices
   # This is safer than unsetting elements which creates sparse arrays
   new_args=()
   found_genesis_ledger_dir=false
   skip_next=false
-  first_arg="${args[0]}"
 
   i=0
-
   
-
   while [[ $i -lt ${#args[@]} ]]; do
     arg="${args[$i]}"
 
@@ -261,12 +279,25 @@ if [[ "$runtime" == "mesa" ]]; then
       -config-file|--config-file)
         # Rewrite config file path to mesa config
         if [[ "$has_next_arg" == true ]]; then
-          new_args+=("$arg" "$MESA_CONFIG")
-          skip_next=true
+          config_file_arg_used=true
         else
           # No value provided, pass through as-is (will error at runtime)
           new_args+=("$arg")
         fi
+        ;;
+
+      -config-directory|--config-directory)
+        # Check config directory provided as next arg is equal to MINA_HARDFORK_STATE_PARENT_FOLDER
+        if [[ "$has_next_arg" == true ]]; then
+          provided_dir="${args[$next_i]}"
+          if [[ "$provided_dir" != "$MESA_HARDFORK_STATE_PARENT_FOLDER" ]]; then
+            echo "mina-dispatch ERROR: Discrepancy between provided --config-directory ($provided_dir) and expected ($MESA_HARDFORK_STATE_PARENT_FOLDER)" >&2
+            echo " Those must match for auto hardfork mode correct behavior." >&2
+            echo " Please adjust your invocation accordingly." >&2
+            exit 1
+          fi
+        fi
+        new_args+=("$arg")
         ;;
 
       --genesis-ledger-dir|-genesis-ledger-dir)
@@ -307,8 +338,15 @@ if [[ "$runtime" == "mesa" ]]; then
     if [[ "$found_genesis_ledger_dir" == false ]]; then
       new_args+=("--genesis-ledger-dir" "$MESA_LEDGERS_DIR")
     fi
-  fi
 
+    if [[ "$config_file_arg_used" == true ]]; then
+      # Prepend config file argument if not already provided
+      # This ensures mesa uses the correct config file
+      # As mina daemon subcommand accepts more than one config argument,
+      # we always append ours at end to override genesis ledger part.
+      new_args+=("-config-file" "$MESA_CONFIG")
+    fi
+  fi
   # Replace args with the processed continuous array
   args=("${new_args[@]}")
 fi

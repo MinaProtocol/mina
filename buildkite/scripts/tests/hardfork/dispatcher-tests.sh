@@ -223,6 +223,93 @@ fi
 
 echo "PASSED: Config correctly overridden to hardfork genesis ledgers"
 
+# =============================================================================
+# Test 5: Unsupported Subcommand Error
+# =============================================================================
+
+echo ""
+echo "=== Test 5: Unsupported Subcommand ==="
+echo "Verifying that dispatcher reports an error for non-daemon subcommands"
+
+MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
+  -c "mina accounts list" 2>&1)
+
+EXPECTED_ERROR="mina-dispatch ERROR: unsupported subcommand 'accounts'"
+if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_ERROR"* ]]; then
+  echo "FAILED: Expected unsupported subcommand error"
+  echo "  Expected substring: $EXPECTED_ERROR"
+  echo "  Actual output: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+echo "PASSED: Unsupported subcommand error is emitted"
+
+# =============================================================================
+# Test 6: MINA_HARDFORK_STATE_DIR Must Be Defined
+# =============================================================================
+
+echo ""
+echo "=== Test 6: MINA_HARDFORK_STATE_DIR Required ==="
+echo "Verifying that missing MINA_HARDFORK_STATE_DIR returns an error"
+
+set +e
+MINA_EXEC_COMMAND=$(docker run --env MINA_HARDFORK_STATE_DIR= --entrypoint bash "$DOCKER_IMAGE" \
+  -c "mina --version" 2>&1)
+STATUS=$?
+set -e
+
+EXPECTED_ERROR="mina-dispatch ERROR: MINA_HARDFORK_STATE_DIR is not defined"
+if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_ERROR"* ]]; then
+  echo "FAILED: Expected missing MINA_HARDFORK_STATE_DIR error"
+  echo "  Expected substring: $EXPECTED_ERROR"
+  echo "  Actual output: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+if [[ "$STATUS" -eq 0 ]]; then
+  echo "FAILED: Expected non-zero exit when MINA_HARDFORK_STATE_DIR is missing"
+  exit 1
+fi
+
+echo "PASSED: Missing MINA_HARDFORK_STATE_DIR error is emitted"
+
+# =============================================================================
+# Test 7: Config Directory Must Match Hardfork State Dir
+# =============================================================================
+
+echo ""
+echo "=== Test 7: Config Directory Validation ==="
+echo "Verifying that --config-directory must match hardfork state directory"
+
+set +e
+MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
+  -c "$(create_activation_marker) && mina daemon --config-directory /var/lib/coda/fake" 2>&1)
+STATUS=$?
+set -e
+
+EXPECTED_ERROR="mina-dispatch ERROR: Discrepancy between provided --config-directory"
+if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_ERROR"* ]]; then
+  echo "FAILED: Expected config directory validation error"
+  echo "  Expected substring: $EXPECTED_ERROR"
+  echo "  Actual output: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+EXPECTED_DIR="$(activation_marker_dir)"
+if [[ "$MINA_EXEC_COMMAND" != *"$EXPECTED_DIR"* ]]; then
+  echo "FAILED: Expected error to mention required hardfork config directory"
+  echo "  Expected substring: $EXPECTED_DIR"
+  echo "  Actual output: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+if [[ "$STATUS" -eq 0 ]]; then
+  echo "FAILED: Expected non-zero exit for mismatched --config-directory"
+  exit 1
+fi
+
+echo "PASSED: Mismatched --config-directory is rejected"
+
 
 # =============================================================================
 # Summary
