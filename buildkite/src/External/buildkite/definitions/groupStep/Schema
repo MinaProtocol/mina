@@ -1,0 +1,17 @@
+\(var52 : Type) -> \(var53 : Type) -> \(var82 : Type) -> \(var83 : Type) -> \(var84 : Type) -> \(var85 : Type) -> \(var116 : Type) -> \(var117 : Type) -> \(var118 : Type) -> \(var119 : Type) -> \(var120 : Type) -> \(var121 : Type) -> \(var144 : Type) -> \(var145 : Type) -> \(var146 : Type) -> \(var147 : Type) -> \(var148 : Type) -> \(var149 : Type) -> \(var150 : Type) -> \(var151 : Type) -> { Type = { group : Optional (./properties/group/Type ) 
+, id : Optional (./properties/id/Type ) 
+, identifier : Optional (./properties/identifier/Type ) 
+, label : Optional (./properties/label/Type ) 
+, name : Optional (./properties/name/Type ) 
+, steps : Optional (./properties/steps/Type0 var52 var53 var82 var83 var84 var85 var116 var117 var118 var119 var120 var121 var144 var145 var146 var147 var148 var149 var150 var151) 
+, type : Optional (./properties/type/Type ) 
+} 
+, default = { group = None ((./properties/group/Type )) 
+, id = None ((./properties/id/Type )) 
+, identifier = None ((./properties/identifier/Type )) 
+, label = None ((./properties/label/Type )) 
+, name = None ((./properties/name/Type )) 
+, steps = None ((./properties/steps/Type0 var52 var53 var82 var83 var84 var85 var116 var117 var118 var119 var120 var121 var144 var145 var146 var147 var148 var149 var150 var151)) 
+, type = None ((./properties/type/Type )) 
+} 
+}
