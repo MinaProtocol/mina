@@ -89,7 +89,7 @@ let dockerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "mina-daemon"
-            , DaemonLegacyHardfork = "mina-daemon-hardfork"
+            , DaemonLegacyHardfork = "mina-daemon-pre-hardfork"
             , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
@@ -142,9 +142,28 @@ let toDebianNames =
                   (List Text)
                   (     \(a : Artifact)
                     ->  merge
-                          { Daemon = [ toDebianName a network ]
+                          { Daemon =
+                              merge
+                                { Devnet =
+                                  [ toDebianName a network
+                                  , "daemon_${Network.lowerName network}_config"
+                                  ]
+                                , Mainnet =
+                                  [ toDebianName a network
+                                  , "daemon_${Network.lowerName network}_config"
+                                  ]
+                                , TestnetGeneric = [ toDebianName a network ]
+                                , DevnetLegacy = [ toDebianName a network ]
+                                , MainnetLegacy = [ toDebianName a network ]
+                                , PreMesa1 = [ toDebianName a network ]
+                                }
+                                network
                           , DaemonLegacyHardfork = [ toDebianName a network ]
-                          , DaemonAutoHardfork = [ toDebianName a network ]
+                          , DaemonAutoHardfork =
+                            [ toDebianName a network
+                            , "daemon_${Network.lowerName
+                                          network}_hardfork_config"
+                            ]
                           , Archive = [ toDebianName a network ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
@@ -184,7 +203,7 @@ let Tag =
           , version = "\\\${MINA_DOCKER_TAG}"
           , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
-          , network = Network.Type.Berkeley
+          , network = Network.Type.TestnetGeneric
           , remove_profile_from_name = False
           }
       }
@@ -208,19 +227,20 @@ let dockerTag =
 
           in  merge
                 { Daemon =
-                    "${spec.version}-${Network.lowerName
+                    "${spec.version}-${Network.debianSuffix
                                          spec.network}${profile_part}${build_flags_part}"
                 , DaemonLegacyHardfork =
-                    "${spec.version}-${Network.lowerName
+                    "${spec.version}-${Network.debianSuffix
                                          spec.network}${profile_part}"
                 , DaemonAutoHardfork =
-                    "${spec.version}-${Network.lowerName
+                    "${spec.version}-${Network.debianSuffix
                                          spec.network}${profile_part}"
                 , Archive = "${spec.version}${build_flags_part}"
                 , LogProc = "${spec.version}"
                 , TestExecutive = "${spec.version}"
                 , BatchTxn = "${spec.version}"
-                , Rosetta = "${spec.version}-${Network.lowerName spec.network}"
+                , Rosetta =
+                    "${spec.version}-${Network.debianSuffix spec.network}"
                 , ZkappTestTransaction = "${spec.version}"
                 , FunctionalTestSuite = "${spec.version}${build_flags_part}"
                 , Toolchain = "${spec.version}"

@@ -21,7 +21,6 @@ type t =
   ; pids : Child_processes.Termination.t
   ; trust_system : Trust_system.t
   ; monitor : Monitor.t option
-  ; is_seed : bool
   ; disable_node_status : bool
   ; block_production_keypairs : Keypair.And_compressed_pk.Set.t
   ; coinbase_receiver : Consensus.Coinbase_receiver.t

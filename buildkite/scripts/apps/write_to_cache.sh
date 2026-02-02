@@ -8,5 +8,5 @@ find _build -type f -name "*.exe" | while read -r entry; do
     continue
   fi
 
-  ./buildkite/scripts/cache/manager.sh write "$entry" "apps/${CODENAME}/"
+  ./buildkite/scripts/cache/manager.sh write-to-dir "$entry" "apps/${CODENAME}"
 done

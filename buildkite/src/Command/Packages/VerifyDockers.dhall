@@ -61,7 +61,7 @@ let joinNetworks
             ( Prelude.List.map
                 Network.Type
                 Text
-                (\(network : Network.Type) -> Network.lowerName network)
+                (\(network : Network.Type) -> Network.debianSuffix network)
                 spec.networks
             )
 

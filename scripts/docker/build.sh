@@ -33,11 +33,18 @@ function usage() {
   echo "      --deb-build-flags     The build-flags string for the debian package to install"
   echo "      --deb-suffix          The debian suffix to use for the docker image"
   echo "  -p, --platform            The target platform for the docker build (e.g. linux/amd64). Default=linux/amd64"
+  echo "  -l, --load-only           Load the built image into local docker daemon only, do not push to remote registry"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
   exit 1
 }
+
+# Defines if build is for pushing to remote registry or loading locally only.
+# Can be overridden with --load-only flag.
+DOCKER_ACTION="push"
+# By default we use cache
+NO_CACHE=""
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -s|--service) SERVICE="$2"; shift;;
@@ -47,6 +54,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -c|--cache-from) INPUT_CACHE="$2"; shift;;
   -r|--repo) MINA_REPO="$2"; shift;;
   -p|--platform) INPUT_PLATFORM="$2"; shift;;
+  -l|--load-only) DOCKER_ACTION="load" ;;
   --docker-registry) export DOCKER_REGISTRY="$2"; shift;;
   --no-cache) NO_CACHE="--no-cache"; ;;
   --deb-codename) INPUT_CODENAME="$2"; shift;;
@@ -149,9 +157,11 @@ if [[ -z "$DEB_BUILD_FLAGS" ]]; then
   DEB_BUILD_FLAGS=""
 fi
 
-CACHE="--cache-from $INPUT_CACHE"
-if [[ -z "$INPUT_CACHE" ]]; then
+
+if [[ -z "${INPUT_CACHE:-}" ]]; then
   CACHE=""
+else
+  CACHE="--cache-from $INPUT_CACHE"
 fi
 
 DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
@@ -255,11 +265,11 @@ export_docker_tag
 BUILD_NETWORK="--allow=network.host"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
-if [[ -z "${DOCKER_CONTEXT}" ]]; then
+if [[ -z "${DOCKER_CONTEXT:-}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
-  --load --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
+  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -t "$HASHTAG" -
 else
-  docker buildx build --load --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
+  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."
