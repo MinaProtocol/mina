@@ -883,6 +883,8 @@ load_config() {
         --out-genesis-ledger-file "${ROOT}"/genesis_ledger.json
 
       reset-genesis-ledger "${ROOT}" "${config_file}"
+      echo "Using freshly generated config file ${config_file}:"
+      cat "${config_file}"
       ;;
     inherit_with:*)
       local replaced_config_file
