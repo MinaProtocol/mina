@@ -1,0 +1,5 @@
+\(var70 : Type) -> \(var71 : Type) -> { Type = { trigger : Optional (./properties/trigger/Type var70 var71) 
+} 
+, default = { trigger = None ((./properties/trigger/Type var70 var71)) 
+} 
+}
