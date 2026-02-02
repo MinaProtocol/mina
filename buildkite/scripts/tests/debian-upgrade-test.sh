@@ -143,7 +143,7 @@ echo "deb [trusted=yes] https://${REPO} ${CODENAME} ${CHANNEL}" | $SUDO tee /etc
 $SUDO apt-get install -y -qq lsb-release ca-certificates wget gnupg
 
 log_info "Available versions of ${PACKAGE}:"
-apt-cache policy "${PACKAGE}" || true
+apt-cache policy "${PACKAGE}"
 
 $SUDO apt-get install -y --allow-downgrades "${PACKAGE}"
 
@@ -196,7 +196,7 @@ fi
 # Step 5: Verify post-upgrade state
 log_info "--- Step 5: Verifying post-upgrade state ---"
 
-POST_COMMIT=$(mina --version 2>&1 || echo "version check failed")
+POST_COMMIT=$(mina --version 2>&1)
 log_info "Post-upgrade mina version: ${POST_COMMIT}"
 
 POST_COMMIT_SHORT=$(get_short_commit "${POST_COMMIT}")
