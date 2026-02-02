@@ -10,20 +10,9 @@
 /README.md @MinaProtocol/product-eng-reviewers
 /README-dev.md @MinaProtocol/protocol-eng-reviewers
 
-/src/app/archive @MinaProtocol/protocol-eng-reviewers
-/src/app/cli/src/mina.ml @MinaProtocol/protocol-eng-reviewers
-/src/app/cli/src/init @MinaProtocol/protocol-eng-reviewers
-/src/app/libp2p_helper @MinaProtocol/protocol-eng-reviewers
 /src/app/reformat/ @MinaProtocol/infra-eng-reviewers
-/src/app/trace-tool/ @MinaProtocol/protocol-eng-reviewers
-/src/app/runtime_genesis_ledger/ @MinaProtocol/protocol-eng-reviewers
-/src/app/archive_blocks/ @MinaProtocol/protocol-eng-reviewers
-/src/app/extract_blocks/ @MinaProtocol/protocol-eng-reviewers
-/src/app/rosetta/ @MinaProtocol/protocol-eng-reviewers
-/src/lib/rosetta_coding/ @MinaProtocol/protocol-eng-reviewers
-/src/lib/rosetta_lib/ @MinaProtocol/protocol-eng-reviewers
-/src/lib/rosetta_models/ @MinaProtocol/protocol-eng-reviewers
 
+/src/app/ @MinaProtocol/protocol-eng-reviewers
 /src/lib/ @MinaProtocol/protocol-eng-reviewers
 
 /src/lib/mina_numbers/ @MinaProtocol/crypto-eng-reviewers

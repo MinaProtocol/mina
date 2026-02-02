@@ -1,0 +1,9 @@
+\(var32 : Type) -> \(var33 : Type) -> \(var34 : Type) -> \(var35 : Type) -> \(var36 : Type) -> \(var37 : Type) -> \(var64 : Type) -> \(var65 : Type) -> \(var66 : Type) -> \(var67 : Type) -> \(var68 : Type) -> \(var69 : Type) -> { Type = { command : Optional (./properties/command/Type var32 var33 var64 var65) 
+, commands : Optional (./properties/commands/Type var34 var35 var66 var67) 
+, script : Optional (./properties/script/Type var36 var37 var68 var69) 
+} 
+, default = { command = None ((./properties/command/Type var32 var33 var64 var65)) 
+, commands = None ((./properties/commands/Type var34 var35 var66 var67)) 
+, script = None ((./properties/script/Type var36 var37 var68 var69)) 
+} 
+}
