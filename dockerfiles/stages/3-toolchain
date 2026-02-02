@@ -8,6 +8,7 @@ ARG DOCKER_VERSION=28.3.1
 ARG DEBS3_VERSION=0.11.7
 ARG INFLUXDB_CLI_VERSION=2.7.5
 ARG HADOLINT_VERSION=2.12.0
+ARG GCLOUD_VERSION=476.0.0
 ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG BUILDPLATFORM
@@ -68,12 +69,22 @@ RUN curl -sL https://download.docker.com/linux/static/stable/${CANONICAL_ARCH}/d
     | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=-
 
 # --- Google Cloud tools
-RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | \
-    tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | \
-    gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
-    && apt-get update -y && apt-get install --no-install-recommends -y google-cloud-sdk kubectl \
-    && rm -rf /var/lib/apt/lists/*
+RUN case "${DEBIAN_ARCH}" in \
+        "amd64")  GCLOUD_ARCH="x86_64" ;; \
+        "arm64")  GCLOUD_ARCH="arm" ;; \
+        *)        echo "Unsupported architecture: ${DEBIAN_ARCH}"; exit 1 ;; \
+    esac && \
+    # Download the specific tarball
+    curl -sSfL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${GCLOUD_ARCH}.tar.gz" | \
+    tar -xz -C /opt/ && \
+    # Run the install script (includes bundled python support)
+    /opt/google-cloud-sdk/install.sh --quiet && \
+    # Install kubectl via gcloud (this ensures the binary matches the arch)
+    /opt/google-cloud-sdk/bin/gcloud components install kubectl --quiet && \
+    # Clean up
+    rm gcloud.tar.gz
+
+ENV PATH="/opt/google-cloud-sdk/bin:${PATH}"
 
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
