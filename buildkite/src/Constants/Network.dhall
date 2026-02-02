@@ -7,8 +7,6 @@ let Network
     = < Devnet
       | Mainnet
       | Berkeley
-      | DevnetLegacy
-      | MainnetLegacy
       | PreMesa1
       | Mesa
       >
@@ -19,8 +17,6 @@ let capitalName =
             { Devnet = "Devnet"
             , Mainnet = "Mainnet"
             , Berkeley = "Berkeley"
-            , DevnetLegacy = "DevnetLegacy"
-            , MainnetLegacy = "MainnetLegacy"
             , PreMesa1 = "PreMesa1"
             , Mesa = "Mesa"
             }
@@ -32,8 +28,6 @@ let lowerName =
             { Devnet = "devnet"
             , Mainnet = "mainnet"
             , Berkeley = "berkeley"
-            , DevnetLegacy = "devnet_legacy"
-            , MainnetLegacy = "mainnet_legacy"
             , PreMesa1 = "hetzner-pre-mesa-1"
             , Mesa = "mesa"
             }
@@ -45,8 +39,6 @@ let requiresMainnetBuild =
             { Devnet = True
             , Mainnet = True
             , Berkeley = False
-            , DevnetLegacy = True
-            , MainnetLegacy = True
             , PreMesa1 = False
             , Mesa = False
             }

@@ -23,8 +23,9 @@ let Artifact
       | ZkappTestTransaction
       | FunctionalTestSuite
       | Toolchain
-      | CreateLegacyGenesis
+      | PreforkGenesisLedger
       | DelegationVerifier
+      | PreforkDaemon
       >
 
 let AllButTests =
@@ -38,12 +39,13 @@ let AllButTests =
       , Artifact.Rosetta
       , Artifact.ZkappTestTransaction
       , Artifact.Toolchain
-      , Artifact.CreateLegacyGenesis
+      , Artifact.PreforkDaemon
+      , Artifact.PreforkGenesisLedger
       , Artifact.DelegationVerifier
       ]
 
 let Main =
-      [ Artifact.Daemon, Artifact.LogProc, Artifact.Archive, Artifact.Rosetta ]
+      [ Artifact.PreforkDaemon, Artifact.LogProc, Artifact.Archive, Artifact.Rosetta ]
 
 let All = AllButTests # [ Artifact.FunctionalTestSuite ]
 
@@ -53,6 +55,7 @@ let capitalName =
             { Daemon = "Daemon"
             , DaemonLegacyHardfork = "DaemonLegacyHardfork"
             , DaemonAutoHardfork = "DaemonAutoHardfork"
+            , PreforkDaemon = "PreforkDaemon"
             , LogProc = "LogProc"
             , Archive = "Archive"
             , TestExecutive = "TestExecutive"
@@ -62,7 +65,7 @@ let capitalName =
             , DelegationVerifier = "DelegationVerifier"
             , FunctionalTestSuite = "FunctionalTestSuite"
             , Toolchain = "Toolchain"
-            , CreateLegacyGenesis = "CreateLegacyGenesis"
+            , PreforkGenesisLedger = "PreforkGenesisLedger"
             }
             artifact
 
@@ -70,7 +73,7 @@ let lowerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "daemon"
-            , DaemonLegacyHardfork = "daemon_hardfork"
+            , DaemonLegacyHardfork = "daemon_legacy_hardfork"
             , DaemonAutoHardfork = "daemon_auto_hardfork"
             , LogProc = "logproc"
             , Archive = "archive"
@@ -79,7 +82,8 @@ let lowerName =
             , Rosetta = "rosetta"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
-            , CreateLegacyGenesis = "create_legacy_genesis"
+            , PreforkGenesisLedger = "prefork_genesis_ledger"
+            , PreforkDaemon = "prefork_daemon"
             , Toolchain = "toolchain"
             , DelegationVerifier = "delegation_verifier"
             }
@@ -89,7 +93,7 @@ let dockerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "mina-daemon"
-            , DaemonLegacyHardfork = "mina-daemon-hardfork"
+            , DaemonLegacyHardfork = "mina-daemon-legacy-hardfork"
             , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
@@ -99,7 +103,8 @@ let dockerName =
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
             , FunctionalTestSuite = "mina-test-suite"
             , Toolchain = "mina-toolchain"
-            , CreateLegacyGenesis = "mina-create-legacy-genesis"
+            , PreforkGenesisLedger = ""
+            , PreforkDaemon = ""
             , DelegationVerifier = "mina-delegation-verifier"
             }
             artifact
@@ -117,9 +122,8 @@ let toDebianName =
       ->  \(network : Network.Type)
       ->  merge
             { Daemon = "daemon_${Network.lowerName network}"
-            , DaemonLegacyHardfork =
-                "daemon_${Network.lowerName network}_hardfork"
-            , DaemonAutoHardfork = ""
+            , DaemonLegacyHardfork = "daemon_${Network.lowerName network}_legacy_hardfork"
+            , DaemonAutoHardfork = "daemon_${Network.lowerName network}_post_hardfork"
             , LogProc = "logproc"
             , Archive = "archive_${Network.lowerName network}"
             , TestExecutive = "test_executive"
@@ -129,7 +133,8 @@ let toDebianName =
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = ""
             , DelegationVerifier = "delegation_verifier"
-            , CreateLegacyGenesis = "create_legacy_genesis"
+            , PreforkGenesisLedger = "prefork_genesis_ledger"
+            , PreforkDaemon = "daemon_${Network.lowerName network}_prefork"
             }
             artifact
 
@@ -142,24 +147,44 @@ let toDebianNames =
                   (List Text)
                   (     \(a : Artifact)
                     ->  merge
-                          { Daemon = [ toDebianName a network ]
-                          , DaemonLegacyHardfork = [ toDebianName a network ]
-                          , DaemonAutoHardfork = [ toDebianName a network ]
+                          { Daemon =
+                              merge
+                                { Devnet =
+                                  [ toDebianName a network
+                                  , "daemon_${Network.lowerName network}_config"
+                                  ]
+                                , Mainnet =
+                                  [ toDebianName a network
+                                  , "daemon_${Network.lowerName network}_config"
+                                  ]
+                                , TestnetGeneric = [ toDebianName a network ]
+                                , PreMesa1 =
+                                  [ toDebianName a network
+                                  , "daemon_${Network.lowerName network}_config"
+                                  ]
+                                }
+                                network
+                          , DaemonAutoHardfork =
+                            [
+                            , toDebianName a network
+                            , "daemon_${Network.lowerName
+                                          network}_hardfork_config"
+                            ]
                           , Archive = [ toDebianName a network ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
                           , BatchTxn = [ "batch_txn" ]
-                          , Rosetta = [ toDebianName a network ]
+                          , Rosetta = [ "rosetta_${Network.lowerName network}" ]
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
-                          , CreateLegacyGenesis = [ "create_legacy_genesis" ]
+                          , PreforkGenesisLedger = [ "prefork_genesis_ledger" ]
+                          , PreforkDaemon = [ toDebianName a network ]
                           , DelegationVerifier = [ "delegation_verify" ]
                           , Toolchain = [] : List Text
                           }
                           a
                   )
                   artifacts
-
           let items =
                 Prelude.List.fold
                   (List Text)
@@ -184,7 +209,7 @@ let Tag =
           , version = "\\\${MINA_DOCKER_TAG}"
           , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
-          , network = Network.Type.Berkeley
+          , network = Network.Type.TestnetGeneric
           , remove_profile_from_name = False
           }
       }
@@ -208,24 +233,26 @@ let dockerTag =
 
           in  merge
                 { Daemon =
-                    "${spec.version}-${Network.lowerName
+                    "${spec.version}-${Network.debianSuffix
                                          spec.network}${profile_part}${build_flags_part}"
                 , DaemonLegacyHardfork =
-                    "${spec.version}-${Network.lowerName
+                    "${spec.version}-${Network.debianSuffix
                                          spec.network}${profile_part}"
                 , DaemonAutoHardfork =
-                    "${spec.version}-${Network.lowerName
+                    "${spec.version}-${Network.debianSuffix
                                          spec.network}${profile_part}"
                 , Archive = "${spec.version}${build_flags_part}"
                 , LogProc = "${spec.version}"
                 , TestExecutive = "${spec.version}"
                 , BatchTxn = "${spec.version}"
-                , Rosetta = "${spec.version}-${Network.lowerName spec.network}"
+                , Rosetta =
+                    "${spec.version}-${Network.debianSuffix spec.network}"
                 , ZkappTestTransaction = "${spec.version}"
                 , FunctionalTestSuite = "${spec.version}${build_flags_part}"
                 , Toolchain = "${spec.version}"
                 , DelegationVerifier = "${spec.version}"
-                , CreateLegacyGenesis = "${spec.version}"
+                , PreforkDaemon = "${spec.version}"
+                , PreforkGenesisLedger = "${spec.version}"
                 }
                 spec.artifact
 
@@ -239,7 +266,6 @@ in  { Type = Artifact
     , Tag = Tag
     , capitalName = capitalName
     , lowerName = lowerName
-    , toDebianName = toDebianName
     , toDebianNames = toDebianNames
     , dockerName = dockerName
     , dockerNames = dockerNames
