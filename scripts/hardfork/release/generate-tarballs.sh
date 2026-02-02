@@ -90,7 +90,7 @@ echo "--- Create hardfork config"
 FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
 
 echo "--- New genesis config"
-head new_config.json
+cat new_config.json
 
 echo "--- Ledger tarballs generated:"
 
