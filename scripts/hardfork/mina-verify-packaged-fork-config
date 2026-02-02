@@ -185,7 +185,7 @@ if [ "$result" != "true" ]; then
     exit 1
 fi
 
-"$MINA_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$WORKDIR/ledgers" --hash-output-file "$WORKDIR/hashes.json"
+"$MINA_GENESIS_EXE" --pad-app-state --config-file "$FORK_CONFIG" --genesis-dir "$WORKDIR/ledgers" --hash-output-file "$WORKDIR/hashes.json"
 
 FORK_CONFIG_JSON="$FORK_CONFIG" \
 LEDGER_HASHES_JSON="$WORKDIR/hashes.json" \
