@@ -1,6 +1,8 @@
 package hardfork
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
@@ -128,20 +130,28 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, mainGenesi
 	}
 
 	// Define all fork_data file paths
-	prepatchConfig := "fork_data/prepatch/config.json"
+	prepatchConfigFile := "fork_data/prepatch/config.json"
+
+	var prepatchConfig LegacyPrepatchForkConfigView
+	dec := json.NewDecoder(bytes.NewReader(forkConfigBytes))
+	dec.DisallowUnknownFields()
+
+	if err := dec.Decode(&prepatchConfig); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal legacy prepatch fork config: %w", err)
+	}
 
 	// Validate fork config data
-	if err := t.ValidateLegacyPrepatchForkConfig(analysis.LastBlockBeforeTxEnd, forkConfigBytes); err != nil {
+	if err := t.ValidateLegacyPrepatchForkConfig(analysis.LastBlockBeforeTxEnd, prepatchConfig); err != nil {
 		return nil, err
 	}
 	// Write fork config to file
-	if err := os.WriteFile(prepatchConfig, forkConfigBytes, 0644); err != nil {
+	if err := os.WriteFile(prepatchConfigFile, forkConfigBytes, 0644); err != nil {
 		return nil, err
 	}
 
 	prepatchLedgersDir := "fork_data/prepatch/hf_ledgers"
 	prepatchHashesFile := "fork_data/prepatch/hf_ledger_hashes.json"
-	if err := t.GenerateAndValidateHashesAndLedgers(analysis, prepatchConfig, prepatchLedgersDir, prepatchHashesFile); err != nil {
+	if err := t.GenerateAndValidateHashesAndLedgers(analysis, prepatchConfigFile, prepatchLedgersDir, prepatchHashesFile); err != nil {
 		return nil, err
 	}
 
@@ -149,24 +159,33 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, mainGenesi
 		return nil, err
 	}
 
-	postpatchConfig := "fork_data/postpatch/config.json"
-	postpatchLedgersDir := "fork_data/postpatch/hf_ledgers"
+	patchedConfigFile := "fork_data/postpatch/config.json"
+	patchedLedgersDir := "fork_data/postpatch/hf_ledgers"
 
 	forkGenesisTs := t.Config.ForkGenesisTsGivenMainGenesisTs(mainGenesisTs)
 
 	preforkGenesisConfigFile := fmt.Sprintf("%s/daemon.json", t.Config.Root)
 	forkHashesFile := "fork_data/hf_ledger_hashes.json"
 
-	patchedConfigBytes, err := t.PatchForkConfigAndGenerateLedgersLegacy(analysis, prepatchConfig, postpatchLedgersDir, forkHashesFile, postpatchConfig, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs)
-	if err != nil {
-		return nil, err
-	}
-	err = t.ValidateFinalForkConfig(analysis.LastBlockBeforeTxEnd, patchedConfigBytes, forkGenesisTs, mainGenesisTs)
+	patchedConfigBytes, err := t.PatchForkConfigAndGenerateLedgersLegacy(analysis, prepatchConfigFile, patchedLedgersDir, forkHashesFile, patchedConfigFile, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs)
 	if err != nil {
 		return nil, err
 	}
 
-	return &ForkData{config: postpatchConfig, ledgersDir: postpatchLedgersDir, genesis: forkGenesisTs}, nil
+	var patchedConfig FinalForkConfigView
+	dec = json.NewDecoder(bytes.NewReader(patchedConfigBytes))
+	dec.DisallowUnknownFields()
+
+	if err := dec.Decode(&patchedConfig); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal fork config: %w", err)
+	}
+
+	err = t.ValidateFinalForkConfig(analysis.LastBlockBeforeTxEnd, patchedConfig, forkGenesisTs, mainGenesisTs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ForkData{config: patchedConfigFile, ledgersDir: patchedLedgersDir, genesis: forkGenesisTs}, nil
 
 }
 
@@ -195,7 +214,15 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 
 	forkGenesisTs := t.Config.ForkGenesisTsGivenMainGenesisTs(mainGenesisTs)
 
-	err = t.ValidateFinalForkConfig(analysis.LastBlockBeforeTxEnd, forkConfigBytes, forkGenesisTs, mainGenesisTs)
+	var config FinalForkConfigView
+	dec := json.NewDecoder(bytes.NewReader(forkConfigBytes))
+	dec.DisallowUnknownFields()
+
+	if err := dec.Decode(&config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal fork config: %w", err)
+	}
+
+	err = t.ValidateFinalForkConfig(analysis.LastBlockBeforeTxEnd, config, forkGenesisTs, mainGenesisTs)
 	if err != nil {
 		return nil, err
 	}
