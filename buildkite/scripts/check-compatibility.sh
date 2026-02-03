@@ -4,7 +4,7 @@
 
 set -eox pipefail
 
-CURR_BRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
+CURR_BRANCH="$GITBRANCH"
 
 function get_shas {
   SHAS=$(git log -n 10 --format="%h" --abbrev=7 --first-parent)

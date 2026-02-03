@@ -2,6 +2,8 @@
 
 set -eox pipefail
 
+source "$(dirname "$0")/../export-git-env-vars.sh"
+
 # Array of valid service names
 export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-legacy-hardfork' 'mina-daemon-auto-hardfork' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
 
@@ -97,10 +99,7 @@ function export_docker_tag() {
 
     PLATFORM_SUFFIX="$(get_platform_suffix)"
     export TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}${BUILD_FLAG_SUFFIX}${PLATFORM_SUFFIX}"
-    # friendly, predictable tag
-    GITHASH=$(git rev-parse --short=7 HEAD)
     export PLATFORM_SUFFIX
-    export GITHASH
     export HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${BUILD_FLAG_SUFFIX}${PLATFORM_SUFFIX}"
 
 }
