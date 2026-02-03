@@ -380,7 +380,10 @@ exec-rosetta-node() {
 }
 
 log-file() {
-  if [[ "$REDIRECT_LOGS" == true ]]; then
+  # If $1 is provided, use it. Otherwise, fall back to $REDIRECT_LOGS.
+  local should_redirect="${1:-$REDIRECT_LOGS}"
+
+  if [[ "$should_redirect" == true ]]; then
     tee "${FOLDER}/log.txt"
   else
     cat
@@ -411,7 +414,7 @@ spawn-snark-worker() {
 
   # shellcheck disable=SC2068
   exec-snark-worker $@ --config-directory "${FOLDER}" 2>&1 \
-    | log-file | tag-stdout "$tag" &
+    | log-file "$REDIRECT_WORKER_LOGS" | tag-stdout "$tag" &
 }
 
 # Spawns the Archive Node in background
@@ -913,11 +916,15 @@ update_genesis_timestamp() {
     fixed:*)
       local timestamp="${1#fixed:}"
       echo "Updating Genesis State timestamp to ${timestamp}..."
-      local overridden_unix=$(date -d "$timestamp" +%s)
-      local now_unix=$(date +%s)
-      # NOTE: will there's still race condition that before all nodes are 
-      # spawned up we passed this time. We should catch the improperly-set 
-      # genesis in most case
+
+      local overridden_unix
+      overridden_unix=$(date -d "$timestamp" +%s)
+      local now_unix
+      now_unix=$(date +%s)
+
+      # NOTE: while there's still race condition that before all nodes are 
+      # spawned up we passed this instant, we should catch the improperly-set 
+      # genesis timestamp in most scenarios
       if (( overridden_unix < now_unix )); then
         echo "Spawning a network with genesis $timestamp in the past!!"
         return 1
