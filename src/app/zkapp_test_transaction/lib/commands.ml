@@ -108,8 +108,11 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
       let open Staged_ledger_diff in
       (*not using Precomputed_values.for_unit_test because of dependency cycle*)
       Mina_state.Genesis_protocol_state.t
-        ~genesis_ledger:Genesis_ledger.for_unit_tests
-        ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+        ~genesis_ledger:
+          (Consensus.Genesis_data.Ledger.to_hashed Genesis_ledger.for_unit_tests)
+        ~genesis_epoch_data:
+          (Consensus.Genesis_data.Epoch.to_hashed
+             Consensus.Genesis_data.Epoch.for_unit_tests )
         ~constraint_constants ~consensus_constants ~genesis_body_reference
     in
     compile_time_genesis.data |> Mina_state.Protocol_state.body
@@ -170,8 +173,11 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   let compile_time_genesis =
     (*not using Precomputed_values.for_unit_test because of dependency cycle*)
     Mina_state.Genesis_protocol_state.t
-      ~genesis_ledger:Genesis_ledger.for_unit_tests
-      ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+      ~genesis_ledger:
+        (Consensus.Genesis_data.Ledger.to_hashed Genesis_ledger.for_unit_tests)
+      ~genesis_epoch_data:
+        (Consensus.Genesis_data.Epoch.to_hashed
+           Consensus.Genesis_data.Epoch.for_unit_tests )
       ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   let protocol_state_predicate =

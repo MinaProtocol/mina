@@ -1,14 +1,17 @@
 (executable
  (name print_blockchain_snark_vk)
- (libraries blockchain_snark genesis_constants)
+ (libraries blockchain_snark genesis_constants mina_node_config)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version)))
 
+; Generate the verification key JSON file for the current profile.
+; The output file name includes the profile to allow profile-specific regression testing.
+
 (rule
  (deps print_blockchain_snark_vk.exe)
- (targets blockchain_snark_vk.json.computed)
+ (targets %{profile}_blockchain_snark_vk.json.computed)
  (action
   (with-stdout-to
    %{targets}
@@ -16,8 +19,8 @@
 
 (rule
  (deps
-  (:orig blockchain_snark_vk.json)
-  (:computed blockchain_snark_vk.json.computed))
+  (:orig %{profile}_blockchain_snark_vk.json)
+  (:computed %{profile}_blockchain_snark_vk.json.computed))
  (alias runtest)
  (action
   (diff %{orig} %{computed})))

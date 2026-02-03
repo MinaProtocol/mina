@@ -21,6 +21,8 @@ module Scan_state : sig
 
   type t
 
+  val hash : t -> Staged_ledger_hash.Aux_hash.t
+
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]
   end
@@ -37,35 +39,11 @@ module Scan_state : sig
     [@@deriving sexp]
   end
 
-  module Transactions_ordered : sig
-    module Poly : sig
-      type 'a t =
-        { first_pass : 'a list
-        ; second_pass : 'a list
-        ; previous_incomplete : 'a list
-        ; current_incomplete : 'a list
-        }
-      [@@deriving sexp, to_yojson]
-    end
-
-    type t = Transaction_snark_scan_state.Transaction_with_witness.t Poly.t
-  end
-
   val empty :
     constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
   (** Statements of the required snark work *)
   val snark_job_list_json : t -> string
-
-  (** All the transactions with hash of the parent block in which they were
-      included in the order in which they were applied *)
-  val staged_transactions_with_state_hash :
-       t
-    -> ( Transaction.t With_status.t
-       * State_hash.t
-       * Mina_numbers.Global_slot_since_genesis.t )
-       Transactions_ordered.Poly.t
-       list
 
   (** Statements of all the pending work. Fails if there are any invalid
       statements in the scan state [t] *)
@@ -194,16 +172,6 @@ val create_exn :
 
 val replace_ledger_exn : t -> Ledger.t -> t
 
-(** Transactions corresponding to the most recent ledger proof in t *)
-val proof_txns_with_state_hashes :
-     t
-  -> ( Transaction.t With_status.t
-     * State_hash.t
-     * Mina_numbers.Global_slot_since_genesis.t )
-     Scan_state.Transactions_ordered.Poly.t
-     Mina_stdlib.Nonempty_list.t
-     option
-
 val copy : t -> t
 
 val hash : t -> Staged_ledger_hash.t
@@ -253,32 +221,6 @@ val apply_diff_unchecked :
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
      , Staged_ledger_error.t )
      Deferred.Result.t
-
-(* Internals of the txn application. This is only exposed to facilitate
-   writing unit tests. *)
-module Application_state : sig
-  type txn =
-    ( Signed_command.With_valid_signature.t
-    , Zkapp_command.Valid.t )
-    User_command.t_
-
-  type t =
-    { valid_seq : txn Sequence.t
-    ; invalid : (txn * Error.t) list
-    ; skipped_by_fee_payer : txn list Account_id.Map.t
-    ; zkapp_space_remaining : int option
-    ; total_space_remaining : int
-    }
-
-  val init : ?zkapp_limit:int -> total_limit:int -> t
-
-  val try_applying_txn :
-       ?logger:Logger.t
-    -> apply:(User_command.t Transaction.t_ -> ('a, Error.t) Result.t)
-    -> t
-    -> txn
-    -> (t, txn Sequence.t * (txn * Error.t) list) Continue_or_stop.t
-end
 
 (* This should memoize the snark verifications *)
 
@@ -347,6 +289,10 @@ val all_work_pairs :
 
 (** Statements of all the pending work in t*)
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
+
+module For_tests : sig
+  module Application_state = Application_state
+end
 
 module Test_helpers : sig
   val dummy_state_and_view :

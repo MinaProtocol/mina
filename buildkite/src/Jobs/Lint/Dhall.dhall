@@ -21,13 +21,17 @@ let dump_pipelines_cmd =
         Cmd.Docker::{
         , image = (../../Constants/ContainerImages.dhall).toolchainBase
         }
-        "buildkite/scripts/dhall/dump_dhall_to_pipelines.sh ./buildkite/src/ _pipelines"
+        "buildkite/scripts/dhall/dump_dhall_to_pipelines.sh ./buildkite/src _pipelines"
 
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
-          [ S.contains "buildkite/src", S.exactly "buildkite/Makefile" "" ]
+          [ S.contains "buildkite/src"
+          , S.exactly "buildkite/Makefile" ""
+          , S.exactly "buildkite/scripts/monorepo" "sh"
+          , S.exactly "buildkite/scripts/test_monorepo" "sh"
+          ]
         , path = "Lint"
         , name = "Dhall"
         , tags =
@@ -114,6 +118,16 @@ in  Pipeline.build
             , key = "check-dhall-jobs"
             , target = Size.Multi
             , docker = None Docker.Type
+            }
+        , Command.build
+            Command.Config::{
+            , commands = [ Cmd.run "cd buildkite && make test_monorepo" ]
+            , label = "Dhall: monorepo tests"
+            , key = "check-monorepo-tests"
+            , target = Size.Multi
+            , docker = Some Docker::{
+              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              }
             }
         ]
       }

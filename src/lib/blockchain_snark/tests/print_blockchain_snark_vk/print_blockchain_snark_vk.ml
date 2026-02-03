@@ -1,6 +1,13 @@
+(** Print the blockchain snark verification key as JSON.
+
+    This is used to generate reference verification key files for each profile.
+    The output file is named based on the current profile (dev, devnet, lightnet,
+    mainnet). *)
+
 open Core_kernel
 
 let () =
+  Format.eprintf "Profile: %s@." Node_config.profile ;
   Async.Thread_safe.block_on_async_exn (fun () ->
       let () = Format.eprintf "Generating transaction snark circuit..@." in
       let module Transaction_snark_instance = Transaction_snark.Make (struct

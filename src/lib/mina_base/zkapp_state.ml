@@ -61,6 +61,14 @@ module Value = struct
   type t = Zkapp_basic.F.t V.t [@@deriving sexp, equal, yojson, hash, compare]
 
   let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
+
+  let gen : t Quickcheck.Generator.t =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map fields =
+      Quickcheck.Generator.list_with_length max_size_int
+        Snark_params.Tick.Field.gen
+    in
+    V.of_list_exn fields
 end
 
 let to_input (t : _ V.t) ~f =
@@ -87,8 +95,5 @@ module Hardfork = struct
   module Value = struct
     type t = Zkapp_basic.F.Stable.V1.t V.t
     [@@deriving sexp, equal, hash, compare, yojson, bin_io_unversioned]
-
-    let of_stable (value : Value.Stable.Latest.t) : t =
-      Vector.extend_front_exn value Nat.N32.n Zkapp_basic.F.zero
   end
 end

@@ -174,7 +174,7 @@ module AutoHardforkConfigGeneration = struct
 
   let slot_tx_end = 3
 
-  let slot_chain_end = 6
+  let slot_chain_end = slot_tx_end + 6
 
   let hard_fork_genesis_slot_delta = 1
 
@@ -273,7 +273,9 @@ module AutoHardforkConfigGeneration = struct
     let block_producer_account, other_accounts =
       match all_accounts with
       | first :: rest ->
-          let block_producer_balance = Currency.Balance.of_mina_int_exn 10000 in
+          let block_producer_balance =
+            Currency.Balance.of_mina_int_exn 10000000
+          in
           ({ first with balance = block_producer_balance }, rest)
       | [] ->
           failwith "No accounts generated"

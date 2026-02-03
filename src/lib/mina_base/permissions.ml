@@ -675,3 +675,41 @@ let%test_unit "json value" =
         setTiming: "Signature"
       }|json}
     |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
+
+module Hardfork = struct
+  type t = Stable.Latest.t [@@deriving equal, sexp, compare]
+
+  let hardfork_txn_version = Mina_numbers.Txn_version.(succ current)
+
+  let user_default : t =
+    { edit_state = Signature
+    ; send = Signature
+    ; receive = None
+    ; set_delegate = Signature
+    ; set_permissions = Signature
+    ; set_verification_key = (Signature, hardfork_txn_version)
+    ; set_zkapp_uri = Signature
+    ; edit_action_state = Signature
+    ; set_token_symbol = Signature
+    ; increment_nonce = Signature
+    ; set_voting_for = Signature
+    ; set_timing = Signature
+    ; access = None
+    }
+
+  let empty : t =
+    { edit_state = None
+    ; send = None
+    ; receive = None
+    ; access = None
+    ; set_delegate = None
+    ; set_permissions = None
+    ; set_verification_key = (None, hardfork_txn_version)
+    ; set_zkapp_uri = None
+    ; edit_action_state = None
+    ; set_token_symbol = None
+    ; increment_nonce = None
+    ; set_voting_for = None
+    ; set_timing = None
+    }
+end

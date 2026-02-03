@@ -44,6 +44,8 @@ let block_window_duration = 90000
 
 let network = "mainnet"
 
+let profile = "mainnet"
+
 let compaction_interval = Some (2 * block_window_duration)
 
 let vrf_poll_interval = 5000

@@ -44,7 +44,7 @@ let DepsSpec =
           }
       , default =
           { deb_version = DebVersion.Bullseye
-          , network = Network.Type.Berkeley
+          , network = Network.Type.TestnetGeneric
           , profile = Profiles.Type.Devnet
           , build_flag = BuildFlags.Type.None
           , step = "build"
@@ -113,10 +113,13 @@ let dirtyWhen =
             }
             debVersion
 
+let overrideEnvs = [ "OVERRIDE_TAG", "SKIP_GITBRANCH" ]
+
 in  { DebVersion = DebVersion
     , capitalName = capitalName
     , lowerName = lowerName
     , dependsOn = dependsOn
     , dirtyWhen = dirtyWhen
     , DepsSpec = DepsSpec
+    , overrideEnvs = overrideEnvs
     }
