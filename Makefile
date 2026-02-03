@@ -573,9 +573,25 @@ debian-build-daemon-devnet: ## Build the Debian daemon package for devnet
 debian-build-daemon-mainnet: ## Build the Debian daemon package for mainnet
 	$(call build_debian_package,daemon_mainnet)
 
+.PHONY: debian-build-config-devnet
+debian-build-config-devnet: ## Build the Debian config package for devnet
+	$(call build_debian_package,daemon_devnet_config)
+
+.PHONY: debian-build-config-mainnet
+debian-build-config-mainnet: ## Build the Debian config package for mainnet
+	$(call build_debian_package,daemon_mainnet_config)
+
 .PHONY: debian-build-logproc
 debian-build-logproc: ## Build the Debian logproc package
 	$(call build_debian_package,logproc)
+
+.PHONY: debian-build-functional-tests
+debian-build-functional-tests: ## Build the Debian Functional tests package
+	$(call build_debian_package,functional_test_suite)
+
+.PHONY: debian-build-create-legacy-genesis
+debian-build-create-legacy-genesis: ## Build the Debian Create Legacy Genesis package
+	$(call build_debian_package,create_legacy_genesis)
 
 .PHONY: debian-build-rosetta-testnet-generic
 debian-build-rosetta-testnet-generic: ## Build the Debian Rosetta package
@@ -595,11 +611,11 @@ debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devn
 
 .PHONY: debian-build-daemon-devnet-pre-hardfork
 debian-build-daemon-devnet-pre-hardfork: ## Build the Debian daemon package for automote devnet pre hardfork
-	$(call build_debian_package,daemon_pre_hardfork_devnet)
+	$(call build_debian_package,daemon_devnet_pre_hardfork)
 
 .PHONY: debian-build-daemon-mainnet-pre-hardfork
 debian-build-daemon-mainnet-pre-hardfork: ## Build the Debian daemon package for automote mainnet pre hardfork
-	$(call build_debian_package,daemon_pre_hardfork_mainnet)
+	$(call build_debian_package,daemon_mainnet_pre_hardfork)
 
 .PHONY: debian-download-create-legacy-hardfork
 debian-download-create-legacy-hardfork: ## Download and create legacy hardfork Debian packages
