@@ -16,19 +16,6 @@ source ./scripts/export-git-env-vars.sh
 RUNTIME_GENESIS_LEDGER=${RUNTIME_GENESIS_LEDGER:-_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe}
 LOGPROC=${LOGPROC:-_build/default/src/app/logproc/logproc.exe}
 
-# Optional: reuse build artifacts from Buildkite builds instead of building from source
-SKIP_APPS_BUILD=${SKIP_APPS_BUILD:-}
-
-# Optional: skip building the debian packages but inject the runtime config and ledger tarballs instead
-SKIP_DEBIAN_PACKAGE_BUILD=${SKIP_DEBIAN_PACKAGE_BUILD:-}
-
-# Optional: skip generation of ledger tarballs
-SKIP_TARBALLS_GENERATION=${SKIP_TARBALLS_GENERATION:-}
-
-# Optional: skip upload of generated tarballs
-SKIP_TARBALL_UPLOAD=${SKIP_TARBALL_UPLOAD:-}
-
-
 # Path to the generated runtime config JSON; can be overridden by environment variable
 RUNTIME_CONFIG_JSON=${RUNTIME_CONFIG_JSON:-$PWD/new_config.json}
 
@@ -66,37 +53,18 @@ fi
 
 echo "--- Starting hardfork package generation for network: ${NETWORK_NAME} with Debian codename: ${MINA_DEB_CODENAME}"
 
-if [ -z "${SKIP_APPS_BUILD:-}" ]; then
-  echo "--- Building necessary executables from source"
-  build_packages
-else
-  echo "--- Skipping build of executables; using prebuilt ones"
-fi
+build_packages
 
-if [ -z "${SKIP_TARBALLS_GENERATION:-}" ]; then
-  echo "--- Generating runtime config and ledger tarballs"
-  ./scripts/hardfork/release/generate-tarballs.sh \
+echo "--- Generating runtime config and ledger tarballs"
+./scripts/hardfork/release/generate-tarballs.sh \
     --network "$NETWORK_NAME" \
     --config-url "$CONFIG_JSON_GZ_URL" \
     --runtime-ledger "$RUNTIME_GENESIS_LEDGER" \
     --logproc "$LOGPROC" \
     --output-dir "$DEFAULT_LEDGER_TARBALLS_DIR"
-else
-  echo "--- Skipping generation of runtime config and ledger tarballs"
-fi
 
-if [ -z "${SKIP_TARBALL_UPLOAD:-}" ]; then
-  echo "--- Uploading generated ledger tarballs to aws"
-  INPUT_FOLDER="$DEFAULT_LEDGER_TARBALLS_DIR" ./scripts/hardfork/release/upload-ledger-tarballs.sh
-else
-  echo "--- Skipping upload of generated ledger tarballs"
-fi
+echo "--- Uploading generated ledger tarballs to aws"
+INPUT_FOLDER="$DEFAULT_LEDGER_TARBALLS_DIR" ./scripts/hardfork/release/upload-ledger-tarballs.sh
 
 echo "--- Build hardfork package for Debian ${MINA_DEB_CODENAME}"
-if [ -n "${SKIP_DEBIAN_PACKAGE_BUILD:-}" ]; then
-  echo "--- Skipping debian package build; injecting runtime config and ledger tarballs into existing packages"
-  ./scripts/hardfork/release/convert-debian-to-hf.sh -d mina-daemon.deb -c "$RUNTIME_CONFIG_JSON" -l "$LEDGER_TARBALLS"
-else
-  echo "--- Building debian packages from source"
-  RUNTIME_CONFIG_JSON=$RUNTIME_CONFIG_JSON LEDGER_TARBALLS="$LEDGER_TARBALLS" ./scripts/debian/build.sh "$@"
-fi
+RUNTIME_CONFIG_JSON=$RUNTIME_CONFIG_JSON LEDGER_TARBALLS="$LEDGER_TARBALLS" ./scripts/debian/build.sh "$@"
