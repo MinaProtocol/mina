@@ -88,9 +88,13 @@ func (t *HardforkTest) AdvancedGenerateHardForkConfig(configDir string, clientPo
 		return fmt.Errorf("failed to call mina CLI: %w", err)
 	}
 
-	cmd.Wait()
+	err := cmd.Wait()
 
-	_, err := os.Stat(fmt.Sprintf("%s/activated", configDir))
+	if err != nil {
+		return fmt.Errorf("failed to wait for mina CLI to terminate: %w", err)
+	}
+
+	_, err = os.Stat(fmt.Sprintf("%s/activated", configDir))
 	if err != nil {
 		return fmt.Errorf("failed to check on activated file for advanced generate fork config: %w", err)
 	}
