@@ -1,3 +1,11 @@
+(** Polymorphic types for work specifications and results.
+
+    [Spec]: Bundles one or two job instances with a fee.
+    [Result]: Contains proofs, timing metrics, and prover info.
+
+    Concretized versions are in [Selector].
+*)
+
 (* WARN:
    This file would be rewritten finally
 *)

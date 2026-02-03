@@ -1,3 +1,8 @@
+(** Result returned from a SNARK worker after completing a partitioned job.
+
+    Contains the job ID and proof with elapsed time.
+*)
+
 open Core_kernel
 
 [%%versioned:
