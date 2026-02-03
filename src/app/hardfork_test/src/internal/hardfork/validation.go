@@ -203,12 +203,13 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, []int, error) {
 	for i, port := range allRestPorts {
 		state := states[i]
 
-		keyBytes, err := json.Marshal(state)
-		key := string(keyBytes)
+		keyBytes, err := json.Marshal(state.LastBlockBeforeTxEnd)
 
 		if err != nil {
 			return nil, nil, fmt.Errorf("Failed to marshal consensus state on port %d: %w", port, err)
 		}
+
+		key := string(keyBytes)
 
 		consensusStateVote[key] = append(consensusStateVote[key], port-int(PORT_REST))
 
