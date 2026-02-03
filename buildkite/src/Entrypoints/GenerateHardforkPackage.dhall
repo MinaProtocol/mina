@@ -83,7 +83,6 @@ let generateDockerForCodename =
                 , deb_codename = codename
                 , deb_profile = profile
                 , deb_repo = DebianRepo.Type.Local
-                , deb_suffix = Some "hardfork"
                 , step_key_suffix =
                     "-${DebianVersions.lowerName codename}-docker-image"
                 , size = spec.size
