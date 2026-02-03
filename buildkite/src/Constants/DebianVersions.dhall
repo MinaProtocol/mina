@@ -111,10 +111,13 @@ let dirtyWhen =
             }
             debVersion
 
+let overrideEnvs = [ "OVERRIDE_TAG", "SKIP_GITBRANCH" ]
+
 in  { DebVersion = DebVersion
     , capitalName = capitalName
     , lowerName = lowerName
     , dependsOn = dependsOn
     , dirtyWhen = dirtyWhen
     , DepsSpec = DepsSpec
+    , overrideEnvs = overrideEnvs
     }

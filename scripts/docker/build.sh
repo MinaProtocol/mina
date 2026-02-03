@@ -39,6 +39,9 @@ function usage() {
   exit 1
 }
 
+# By default we use cache
+NO_CACHE=""
+
 while [[ "$#" -gt 0 ]]; do case $1 in
   -s|--service) SERVICE="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
@@ -147,9 +150,11 @@ if [[ -z "$DEB_BUILD_FLAGS" ]]; then
   DEB_BUILD_FLAGS=""
 fi
 
-CACHE="--cache-from $INPUT_CACHE"
-if [[ -z "$INPUT_CACHE" ]]; then
+
+if [[ -z "${INPUT_CACHE:-}" ]]; then
   CACHE=""
+else
+  CACHE="--cache-from $INPUT_CACHE"
 fi
 
 DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
@@ -250,7 +255,7 @@ export_docker_tag
 BUILD_NETWORK="--allow=network.host"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
-if [[ -z "${DOCKER_CONTEXT}" ]]; then
+if [[ -z "${DOCKER_CONTEXT:-}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
   --load --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
 else

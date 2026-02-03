@@ -17,8 +17,8 @@ echo "--- Setting up the environment to build debian packages..."
 cd "${BUILD_DIR}" || exit 1
 
 
-GITHASH=$(git rev-parse --short=7 HEAD)
-GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
+source "${SCRIPTPATH}/../export-git-env-vars.sh"
+
 
 SUGGESTED_DEPS="jq, curl, wget"
 
