@@ -284,8 +284,11 @@ module Snark_worker = struct
               , `Int (Pid.to_int (Process.pid snark_worker_process)) )
             ]
           "Started snark worker process with pid: $snark_worker_pid" ;
-        Mina_metrics.Process_memory.Snark_worker.set_pid
-          (Process.pid snark_worker_process) ;
+
+        let snark_worker_pid = Process.pid snark_worker_process in
+        [%log' info t.config.logger] "Snark worker process has PID %d"
+          (Pid.to_int snark_worker_pid) ;
+        Mina_metrics.Process_memory.Snark_worker.set_pid snark_worker_pid ;
         if Ivar.is_full process_ivar then
           [%log' error t.config.logger] "Ivar.fill bug is here!" ;
         Ivar.fill process_ivar snark_worker_process
