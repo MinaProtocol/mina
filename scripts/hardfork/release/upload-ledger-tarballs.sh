@@ -56,7 +56,7 @@ check_s3_permissions
 existing_files=$(aws s3 ls "$LEDGER_S3_BUCKET" | awk '{print $4}')
 
 for file in "$INPUT_FOLDER"/*; do
-filename=$(basename "$file")
+  filename=$(basename "$file")
   printf "Processing: %s\n" "$filename"
   if echo "$existing_files" | grep -q "$filename"; then
     printf "Info: %s already exists in the bucket, packaging it instead.\n" "$filename"

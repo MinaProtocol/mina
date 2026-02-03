@@ -56,7 +56,7 @@ echo "--- Starting hardfork package generation for network: ${NETWORK_NAME} with
 build_packages
 
 echo "--- Generating runtime config and ledger tarballs"
-./scripts/hardfork/release/generate-tarballs.sh \
+./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs.sh \
     --network "$NETWORK_NAME" \
     --config-url "$CONFIG_JSON_GZ_URL" \
     --runtime-ledger "$RUNTIME_GENESIS_LEDGER" \
