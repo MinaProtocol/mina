@@ -64,7 +64,7 @@ let instantiate_verify_functions ~logger ~genesis_constants
         Genesis_ledger_helper.init_from_config_file ~logger ~proof_level
           ~constraint_constants ~genesis_constants ~cli_proof_level config
       in
-      let%map.Deferred precomputed_values =
+      let%map.Deferred precomputed_values, _ =
         match precomputed_values with
         | Ok precomputed_values ->
             Deferred.return precomputed_values

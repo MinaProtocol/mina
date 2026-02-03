@@ -104,13 +104,15 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
     make_ledger_backing ~constraint_constants ~runtime_config:config
       ~hardfork_handling
   in
-  let chain_state_locations =
-    Init.Chain_state_locations.of_config ~conf_dir config
+  let chain_state_locations, chain_id_opt =
+    Init.Chain_state_locations.of_config ~logger
+      ~signature_kind:Mina_signature_kind.t_DEPRECATED ~proof_level
+      ~genesis_constants ~constraint_constants ~conf_dir config
   in
   let genesis_dir =
     Option.value ~default:chain_state_locations.genesis genesis_dir
   in
-  let%map precomputed_values =
+  let%map precomputed_values, chain_id =
     match%map
       Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
         ~logger ~genesis_constants ~constraint_constants ~proof_level config
@@ -148,11 +150,24 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
           ~metadata ;
         Error.raise err
   in
+  let _ =
+    match chain_id_opt with
+    | None ->
+        ()
+    | Some cid ->
+        let open Chain_id in
+        let chain_id = Lazy.force chain_id in
+        if not (Chain_id.equal cid chain_id) then
+          failwithf "Chain_id mismatch %s /= %s" (to_string cid)
+            (to_string chain_id) ()
+  in
+
   ( precomputed_values
   , config_jsons
   , config
   , chain_state_locations
-  , ledger_backing )
+  , ledger_backing
+  , chain_id )
 
 let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   let open Command.Let_syntax in
@@ -820,7 +835,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                    , config_jsons
                    , config
                    , chain_state_locations
-                   , ledger_backing ) =
+                   , ledger_backing
+                   , chain_id ) =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
@@ -1163,10 +1179,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let%bind () = Async.Unix.mkdir ~p:() trust_dir in
           let%bind trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
-          let genesis_state_hash =
-            (Precomputed_values.genesis_state_hashes precomputed_values)
-              .state_hash
-          in
           let genesis_ledger_hash =
             Precomputed_values.genesis_ledger precomputed_values
             |> Lazy.force |> Mina_ledger.Ledger.merkle_root
@@ -1289,6 +1301,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                    ~f:(fun { Runtime_config.Daemon.peer_list_url; _ } ->
                      peer_list_url ) )
           in
+          let chain_id = Lazy.force chain_id |> Chain_id.to_string in
           if is_seed then [%log info] "Starting node as a seed node"
           else if demo_mode then [%log info] "Starting node in demo mode"
           else if
@@ -1298,22 +1311,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               {|No peers were given.
 
 Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
-          let chain_id =
-            let protocol_transaction_version =
-              Protocol_version.(transaction current)
-            in
-            let protocol_network_version =
-              Protocol_version.(transaction current)
-            in
-            Chain_id.make
-              { genesis_state_hash
-              ; genesis_constants = precomputed_values.genesis_constants
-              ; constraint_system_digests =
-                  Lazy.force precomputed_values.constraint_system_digests
-              ; protocol_transaction_version
-              ; protocol_network_version
-              }
-          in
           [%log info] "Daemon will use chain id %s" chain_id ;
           [%log info] "Daemon running protocol version %s"
             Protocol_version.(to_string current) ;
@@ -2017,6 +2014,7 @@ let internal_commands logger ~itn_features =
                    , _config_jsons
                    , _config
                    , _chain_state_locations
+                   , _
                    , _ ) =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
               ~constraint_constants ~proof_level ~cli_proof_level:None
@@ -2078,40 +2076,17 @@ let internal_commands logger ~itn_features =
             List.map config_files ~f:(fun config_file ->
                 (config_file, `Must_exist) )
           in
-          let%bind ( precomputed_values
+          let%bind ( _
                    , _config_jsons
                    , _config
                    , _chain_state_locations
-                   , _ ) =
+                   , _
+                   , chain_id ) =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
               ~constraint_constants ~proof_level ~cli_proof_level:None
               ~hardfork_handling:Keep_running config_files
           in
-          let chain_id =
-            let protocol_transaction_version =
-              Protocol_version.(transaction current)
-            in
-            (*TODO: this is wrong, should be `Protocol_version.network current`, but is
-              consistent with the computation made by the daemon's entrypoint. Fix this in
-              the PR for develop.
-            *)
-            let protocol_network_version =
-              Protocol_version.(transaction current)
-            in
-            let genesis_state_hash =
-              (Precomputed_values.genesis_state_hashes precomputed_values)
-                .state_hash
-            in
-            Chain_id.make
-              { genesis_state_hash
-              ; genesis_constants = precomputed_values.genesis_constants
-              ; constraint_system_digests =
-                  Lazy.force precomputed_values.constraint_system_digests
-              ; protocol_transaction_version
-              ; protocol_network_version
-              }
-          in
-          let () = printf "%s" chain_id in
+          let () = printf "%s" (Lazy.force chain_id |> Chain_id.to_string) in
           exit 0) )
   ]
 

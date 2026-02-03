@@ -1855,7 +1855,7 @@ let compile_time_constants =
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
                  ~constraint_constants ~logger:(Logger.null ()) ~proof_level
                  ~cli_proof_level:None ~genesis_dir
-           >>| Or_error.ok_exn
+           >>| Or_error.ok_exn >>| fst
          in
          let all_constants =
            `Assoc
@@ -2177,45 +2177,6 @@ let receipt_chain_hash =
                account_update_index receipt_elt previous_hash
        in
        printf "%s\n" (Receipt.Chain_hash.to_base58_check hash) )
-
-let chain_id_inputs =
-  let open Deferred.Let_syntax in
-  Command.async ~summary:"Print the inputs that yield the current chain id"
-    (Cli_lib.Background_daemon.rpc_init (Command.Param.all_unit [])
-       ~f:(fun port () ->
-         let open Daemon_rpcs in
-         match%map Client.dispatch Chain_id_inputs.rpc () port with
-         | Ok
-             ( genesis_state_hash
-             , genesis_constants
-             , snark_keys
-             , protocol_transaction_version
-             , protocol_network_version ) ->
-             let open Format in
-             printf
-               "@[<v>Genesis state hash: %s@,\
-                @[<v 2>Genesis_constants:@,\
-                Protocol:          %a@,\
-                Txn pool max size: %d@,\
-                Num accounts:      %a@,\
-                @]@,\
-                @[<v 2>Snark keys:@,\
-                %a@]@,\
-                Protocol transaction version: %u@,\
-                Protocol network version: %u@]@."
-               (State_hash.to_base58_check genesis_state_hash)
-               Yojson.Safe.pp
-               (Genesis_constants.Protocol.to_yojson genesis_constants.protocol)
-               genesis_constants.txpool_max_size
-               (pp_print_option
-                  ~none:(fun ppf () -> pp_print_string ppf "None")
-                  pp_print_int )
-               genesis_constants.num_accounts
-               (pp_print_list ~pp_sep:pp_print_cut pp_print_string)
-               snark_keys protocol_transaction_version protocol_network_version
-         | Error err ->
-             Format.eprintf "Could not get chain id inputs: %s@."
-               (Error.to_string_hum err) ) )
 
 let hash_transaction =
   let open Command.Let_syntax in
@@ -2563,7 +2524,6 @@ let advanced ~itn_features =
     ; ("compute-receipt-chain-hash", receipt_chain_hash)
     ; ("hash-transaction", hash_transaction)
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
-    ; ("chain-id-inputs", chain_id_inputs)
     ; ("runtime-config", runtime_config)
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)

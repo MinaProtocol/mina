@@ -754,27 +754,36 @@ module Genesis_proof = struct
         ~protocol_constants:genesis_constants.protocol
     in
     let open Staged_ledger_diff in
-    let protocol_state_with_hashes =
+    let protocol_state_with_hashes, chain_id =
       let genesis_ledger = Consensus.Genesis_data.Ledger.to_hashed ledger in
       let genesis_epoch_data =
         Consensus.Genesis_data.Epoch.to_hashed genesis_epoch_data
       in
-      Mina_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_epoch_data
-        ~constraint_constants ~consensus_constants ~genesis_body_reference
+      let protocol_state_with_hashes =
+        Mina_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_epoch_data
+          ~constraint_constants ~consensus_constants ~genesis_body_reference
+      in
+      let chain_id =
+        Chain_id.make ~signature_kind:Mina_signature_kind.t_DEPRECATED
+          ~genesis_constants ~constraint_constants ~proof_level ~genesis_ledger
+          ~genesis_epoch_data
+      in
+      (protocol_state_with_hashes, chain_id)
     in
-    { Genesis_proof.Inputs.runtime_config
-    ; constraint_constants
-    ; proof_level
-    ; blockchain_proof_system_id
-    ; genesis_ledger = ledger
-    ; genesis_epoch_data
-    ; consensus_constants
-    ; protocol_state_with_hashes
-    ; constraint_system_digests = None
-    ; genesis_constants
-    ; genesis_body_reference
-    ; signature_kind = Mina_signature_kind.t_DEPRECATED
-    }
+    ( { Genesis_proof.Inputs.runtime_config
+      ; constraint_constants
+      ; proof_level
+      ; blockchain_proof_system_id
+      ; genesis_ledger = ledger
+      ; genesis_epoch_data
+      ; consensus_constants
+      ; protocol_state_with_hashes
+      ; constraint_system_digests = None
+      ; genesis_constants
+      ; genesis_body_reference
+      ; signature_kind = Mina_signature_kind.t_DEPRECATED
+      }
+    , chain_id )
 
   let generate (inputs : Genesis_proof.Inputs.t) =
     match inputs.proof_level with
@@ -965,11 +974,13 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
 
 let init_from_config_file ~cli_proof_level ~genesis_constants
     ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
-    (config : Runtime_config.t) : Precomputed_values.t Deferred.Or_error.t =
+    (config : Runtime_config.t) :
+    (Precomputed_values.t * Chain_id.t Lazy.t) Deferred.Or_error.t =
   inputs_from_config_file ~cli_proof_level ~genesis_constants
     ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
     config
-  |> Deferred.Or_error.map ~f:Genesis_proof.create_values_no_proof
+  |> Deferred.Or_error.map ~f:(fun (inputs, chain_id) ->
+         (Genesis_proof.create_values_no_proof inputs, chain_id) )
 
 let upgrade_old_config ~logger filename json =
   match json with

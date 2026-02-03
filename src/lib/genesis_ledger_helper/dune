@@ -17,6 +17,7 @@
   sexplib0
   digestif
   ;; local libraries
+  chain_id
   mina_ledger
   with_hash
   mina_stdlib

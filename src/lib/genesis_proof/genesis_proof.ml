@@ -155,31 +155,18 @@ end
 
 include T
 
-let digests (module T : Transaction_snark.S)
-    (module B : Blockchain_snark.Blockchain_snark_state.S) =
-  let open Lazy.Let_syntax in
-  let%bind txn_digests = T.constraint_system_digests in
-  let%map blockchain_digests = B.constraint_system_digests in
-  txn_digests @ blockchain_digests
-
-let blockchain_snark_state (inputs : Inputs.t) :
-    (module Transaction_snark.S)
-    * (module Blockchain_snark.Blockchain_snark_state.S) =
-  let module T = Transaction_snark.Make (struct
-    let signature_kind = inputs.signature_kind
-
-    let constraint_constants = inputs.constraint_constants
-
-    let proof_level = inputs.proof_level
-  end) in
-  let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
-    let tag = T.tag
-
-    let constraint_constants = inputs.constraint_constants
-
-    let proof_level = inputs.proof_level
-  end) in
-  ((module T), (module B))
+let constraint_system_digests ~signature_kind ~constraint_constants ~proof_level
+    =
+  lazy
+    (let txn_digests =
+       Transaction_snark.constraint_system_digests ~signature_kind
+         ~constraint_constants ()
+     in
+     let blockchain_digests =
+       Blockchain_snark.Blockchain_snark_state.constraint_system_digests
+         ~proof_level ~constraint_constants ()
+     in
+     txn_digests @ blockchain_digests )
 
 let create_values_no_proof (t : Inputs.t) =
   { runtime_config = t.runtime_config
@@ -192,9 +179,8 @@ let create_values_no_proof (t : Inputs.t) =
   ; consensus_constants = t.consensus_constants
   ; protocol_state_with_hashes = t.protocol_state_with_hashes
   ; constraint_system_digests =
-      lazy
-        (let txn, b = blockchain_snark_state t in
-         Lazy.force (digests txn b) )
+      constraint_system_digests ~signature_kind:t.signature_kind
+        ~constraint_constants:t.constraint_constants ~proof_level:t.proof_level
   ; proof_data = None
   ; signature_kind = t.signature_kind
   }
