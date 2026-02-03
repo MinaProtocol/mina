@@ -30,7 +30,7 @@ func (t *HardforkTest) GetForkConfig(port int) ([]byte, error) {
 		forkConfigBytes := []byte(forkConfig.Raw)
 
 		if !bytes.Equal(forkConfigBytes, []byte("null")) {
-			t.Logger.Info("Suecessfully queried fork config on node port %d", port)
+			t.Logger.Info("Successfully queried fork config on node port %d", port)
 			return forkConfigBytes, nil
 		}
 
