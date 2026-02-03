@@ -102,17 +102,9 @@ type LegacyPrepatchForkConfigView struct {
 	} `json:"ledger"`
 }
 
-func (t *HardforkTest) ValidateLegacyPrepatchForkConfig(lastBlockBeforeTxEnd client.BlockData, forkConfigBytes []byte) error {
+func (t *HardforkTest) ValidateLegacyPrepatchForkConfig(lastBlockBeforeTxEnd client.BlockData, config LegacyPrepatchForkConfigView) error {
 
 	t.Logger.Info("Validating legacy prepatch fork config")
-
-	var config LegacyPrepatchForkConfigView
-	dec := json.NewDecoder(bytes.NewReader(forkConfigBytes))
-	dec.DisallowUnknownFields()
-
-	if err := dec.Decode(&config); err != nil {
-		return fmt.Errorf("failed to unmarshal legacy prepatch fork config: %w", err)
-	}
 
 	if config.Proof.Fork.BlockChainLength != lastBlockBeforeTxEnd.BlockHeight {
 		return fmt.Errorf("Expected proof.fork.blockchain_length to be %d, got %d", lastBlockBeforeTxEnd.BlockHeight, config.Proof.Fork.BlockChainLength)
@@ -174,19 +166,11 @@ type FinalForkConfigView struct {
 	} `json:"ledger"`
 }
 
-func (t *HardforkTest) ValidateFinalForkConfig(lastBlockBeforeTxEnd client.BlockData, forkConfigBytes []byte, forkGenesisTs, mainGenesisTs int64) error {
+func (t *HardforkTest) ValidateFinalForkConfig(lastBlockBeforeTxEnd client.BlockData, config FinalForkConfigView, forkGenesisTs, mainGenesisTs int64) error {
 
 	t.Logger.Info("Validating final fork config")
 	// Calculate expected genesis slot
 	expectedGenesisSlot := (forkGenesisTs - mainGenesisTs) / int64(t.Config.MainSlot)
-
-	var config FinalForkConfigView
-	dec := json.NewDecoder(bytes.NewReader(forkConfigBytes))
-	dec.DisallowUnknownFields()
-
-	if err := dec.Decode(&config); err != nil {
-		return fmt.Errorf("failed to unmarshal fork config: %w", err)
-	}
 
 	if config.Proof.Fork.BlockChainLength != lastBlockBeforeTxEnd.BlockHeight {
 		return fmt.Errorf("Expected proof.fork.blockchain_length to be %d, got %d", lastBlockBeforeTxEnd.BlockHeight, config.Proof.Fork.BlockChainLength)
