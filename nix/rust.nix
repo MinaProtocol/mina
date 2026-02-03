@@ -144,7 +144,7 @@ in {
     '';
   };
 
-  plonk_wasm = let
+  kimchi_wasm = let
     lock = ../src/lib/crypto/proof-systems/Cargo.lock;
 
     deps = builtins.listToAttrs (map (pkg: {
@@ -179,7 +179,7 @@ in {
       cargoTestFlags = [ "--test=reference" ];
     };
   in rustPlatform.buildRustPackage {
-    pname = "plonk_wasm";
+    pname = "kimchi_wasm";
     version = "0.1.0";
     src = final.lib.sourceByRegex ../src [
       "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
@@ -212,8 +212,8 @@ in {
       (
       set -x
       export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs plonk-wasm -- --features nodejs -Z build-std=panic_abort,std
-      wasm-pack build --mode no-install --target web --out-dir $out/web plonk-wasm -Z build-std=panic_abort,std
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs kimchi-wasm -- --features nodejs -Z build-std=panic_abort,std
+      wasm-pack build --mode no-install --target web --out-dir $out/web kimchi-wasm -Z build-std=panic_abort,std
       )
       runHook postBuild
     '';

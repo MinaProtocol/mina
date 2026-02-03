@@ -1,7 +1,7 @@
 final: prev:
 let
   inherit (final)
-    pkgs stdenv writeScript nix-npm-buildPackage ocamlPackages_mina plonk_wasm;
+    pkgs stdenv writeScript nix-npm-buildPackage ocamlPackages_mina kimchi_wasm;
 in {
   client_sdk = nix-npm-buildPackage.buildYarnPackage {
     name = "client_sdk";

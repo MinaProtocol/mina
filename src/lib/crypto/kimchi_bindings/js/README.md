@@ -4,11 +4,11 @@ backend. This means that `external` OCaml functions now know what implementation
 
 The different versions of the backend are generated in subdirectories; e.g. the
 NodeJS backend is generated in `node_js/` and the Web backend is generated
-in `web/`. To use a backend, run `dune build **backend**/plonk_wasm.js` (where `**backend**` is either `web` or `node_js`) and copy `**backend**/plonk_wasm*` to the project directory.
+in `web/`. To use a backend, run `dune build **backend**/kimchi_wasm.js` (where `**backend**` is either `web` or `node_js`) and copy `**backend**/kimchi_wasm*` to the project directory.
 
 Note that the backend code is not automatically compiled while linking against
 the backend library. You should always manually issue a build command for the
-`plonk_wasm.js` for the desired backend to ensure that it has been generated.
+`kimchi_wasm.js` for the desired backend to ensure that it has been generated.
 For example, to run the nodejs tests in the `test/nodejs` directory you will
 need to run
 
