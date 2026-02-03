@@ -157,6 +157,7 @@ let toDebianNames =
                                 , DevnetLegacy = [ toDebianName a network ]
                                 , MainnetLegacy = [ toDebianName a network ]
                                 , PreMesa1 = [ toDebianName a network ]
+                                , Mesa = [ toDebianName a network ]
                                 }
                                 network
                           , DaemonLegacyHardfork =
