@@ -175,8 +175,11 @@ func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
 func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, []int, error) {
 	allRestPorts := t.AllPortOfType(PORT_REST)
 	consensusStateVote := make(map[string][]int)
-	majorityKey := "<none>"
+
+	var majorityConsensusState ConsensusState
+	// majorityKey := "<none>"
 	majorityCount := 0
+
 	var wg sync.WaitGroup
 
 	states := make([]*ConsensusState, len(allRestPorts)) // store results
@@ -203,18 +206,19 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, []int, error) {
 	for i, port := range allRestPorts {
 		state := states[i]
 
-		keyBytes, err := json.Marshal(state)
-		key := string(keyBytes)
+		keyBytes, err := json.Marshal(state.LastBlockBeforeTxEnd)
 
 		if err != nil {
 			return nil, nil, fmt.Errorf("Failed to marshal consensus state on port %d: %w", port, err)
 		}
 
+		key := string(keyBytes)
+
 		consensusStateVote[key] = append(consensusStateVote[key], port-int(PORT_REST))
 
 		if len(consensusStateVote[key]) > majorityCount {
 			majorityCount = len(consensusStateVote[key])
-			majorityKey = key
+			majorityConsensusState = *state
 		}
 	}
 
@@ -227,13 +231,12 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, []int, error) {
 			"The majority state hash at slot_tx_end %d is less than 50%%: %v",
 			t.Config.SlotTxEnd, consensusStateVote)
 	}
-	var majorityConsensusState ConsensusState
-	err := json.Unmarshal([]byte(majorityKey), &majorityConsensusState)
-	candidateRestPortsForFork := consensusStateVote[majorityKey]
-
+	majorityKeyBytes, err := json.Marshal(majorityConsensusState.LastBlockBeforeTxEnd)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Unreachable: failed to unmarshal majorityKey %s: %w", majorityKey, err)
+		return nil, nil, fmt.Errorf("Failed to marshal majority consensus state to string!")
 	}
+	candidateRestPortsForFork := consensusStateVote[string(majorityKeyBytes)]
+
 	return &majorityConsensusState, candidateRestPortsForFork, nil
 }
 
