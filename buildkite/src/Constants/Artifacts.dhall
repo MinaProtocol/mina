@@ -118,8 +118,9 @@ let toDebianName =
       ->  merge
             { Daemon = "daemon_${Network.lowerName network}"
             , DaemonLegacyHardfork =
-                "daemon_${Network.lowerName network}_hardfork"
-            , DaemonAutoHardfork = ""
+                "daemon_${Network.lowerName network}_hardfork_config"
+            , DaemonAutoHardfork =
+                "daemon_${Network.lowerName network}_pre_hardfork"
             , LogProc = "logproc"
             , Archive = "archive_${Network.lowerName network}"
             , TestExecutive = "test_executive"
@@ -158,12 +159,11 @@ let toDebianNames =
                                 , PreMesa1 = [ toDebianName a network ]
                                 }
                                 network
-                          , DaemonLegacyHardfork = [ toDebianName a network ]
-                          , DaemonAutoHardfork =
+                          , DaemonLegacyHardfork =
                             [ toDebianName a network
-                            , "daemon_${Network.lowerName
-                                          network}_hardfork_config"
+                            , toDebianName Artifact.Daemon network
                             ]
+                          , DaemonAutoHardfork = [ toDebianName a network ]
                           , Archive = [ toDebianName a network ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
