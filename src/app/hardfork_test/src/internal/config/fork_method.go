@@ -27,7 +27,7 @@ func (m *ForkMethod) String() string {
 	if s, ok := forkMethodToString[*m]; ok {
 		return s
 	}
-	return "unknown"
+	panic(fmt.Sprintf("Can't convert fork method %d to string", int(*m)))
 }
 
 func validKeys(m map[string]ForkMethod) string {
