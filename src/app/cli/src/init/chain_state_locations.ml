@@ -105,6 +105,7 @@ let of_config ~logger ~signature_kind ~(genesis_constants : Genesis_constants.t)
     let%map genesis_ledger, genesis_epoch_data = make_hashed_ledgers config in
     Chain_id.make ~signature_kind ~genesis_constants ~constraint_constants
       ~proof_level ~genesis_ledger ~genesis_epoch_data
+    |> Lazy.force
   in
   Option.value_map
     ~default:

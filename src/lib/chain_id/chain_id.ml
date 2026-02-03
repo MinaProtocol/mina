@@ -12,6 +12,7 @@ module Inputs = struct
 end
 
 let of_inputs (inputs : Inputs.t) =
+  let open Lazy.Let_syntax in
   (* if this changes, also change Mina_commands.chain_id_inputs *)
   let genesis_state_hash =
     State_hash.to_base58_check inputs.genesis_state_hash
@@ -19,9 +20,9 @@ let of_inputs (inputs : Inputs.t) =
   let genesis_constants_hash =
     Genesis_constants.hash inputs.genesis_constants
   in
+  let%map constraint_system_digests = inputs.constraint_system_digests in
   let all_snark_keys =
-    List.map (Lazy.force inputs.constraint_system_digests)
-      ~f:(fun (_, digest) -> Md5.to_hex digest)
+    List.map constraint_system_digests ~f:(fun (_, digest) -> Md5.to_hex digest)
     |> String.concat ~sep:""
   in
   let version_digest v = Int.to_string v |> Md5.digest_string |> Md5.to_hex in

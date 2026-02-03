@@ -156,6 +156,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
         ()
     | Some cid ->
         let open Chain_id in
+        let chain_id = Lazy.force chain_id in
         if not (Chain_id.equal cid chain_id) then
           failwithf "Chain_id mismatch %s /= %s" (to_string cid)
             (to_string chain_id) ()
@@ -1300,7 +1301,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                    ~f:(fun { Runtime_config.Daemon.peer_list_url; _ } ->
                      peer_list_url ) )
           in
-          let chain_id = Chain_id.to_string chain_id in
+          let chain_id = Lazy.force chain_id |> Chain_id.to_string in
           if is_seed then [%log info] "Starting node as a seed node"
           else if demo_mode then [%log info] "Starting node in demo mode"
           else if
@@ -2088,7 +2089,7 @@ let internal_commands logger ~itn_features =
               ~constraint_constants ~proof_level ~cli_proof_level:None
               ~hardfork_handling:Keep_running config_files
           in
-          let () = printf "%s" (Chain_id.to_string chain_id) in
+          let () = printf "%s" (Lazy.force chain_id |> Chain_id.to_string) in
           exit 0) )
   ]
 

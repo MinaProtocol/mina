@@ -10,4 +10,4 @@ val make :
   -> genesis_ledger:Consensus.Genesis_data.Hashed.t
   -> genesis_epoch_data:
        Consensus.Genesis_data.Hashed.t Consensus.Genesis_data.Epoch.t
-  -> t
+  -> t Lazy.t

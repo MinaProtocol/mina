@@ -975,7 +975,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
 let init_from_config_file ~cli_proof_level ~genesis_constants
     ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
     (config : Runtime_config.t) :
-    (Precomputed_values.t * Chain_id.t) Deferred.Or_error.t =
+    (Precomputed_values.t * Chain_id.t Lazy.t) Deferred.Or_error.t =
   inputs_from_config_file ~cli_proof_level ~genesis_constants
     ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
     config
