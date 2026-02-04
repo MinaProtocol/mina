@@ -48,7 +48,7 @@ else
         # Download mina-logproc too
         ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
       ;;
-      mina-devnet|mina-mainnet)
+      mina-devnet|mina-mainnet|mina-mesa)
         # Downaload mina-logproc and sub debians (apps and config) too
         ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
         ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/${i}-config*" $LOCAL_DEB_FOLDER
