@@ -628,9 +628,9 @@ build_daemon_mesa_config_deb() {
   echo "--- Building testnet signatures config deb without keys:"
 
   create_control_file mina-mesa-config "" \
-    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}" "mina-devnet (<< ${MINA_DEB_VERSION})"
+    'Mina Protocol Client and Daemon for the Mesa Network' "${SUGGESTED_DEPS}" "mina-mesa (<< ${MINA_DEB_VERSION})"
 
-  copy_common_daemon_configs devnet
+  copy_common_daemon_configs mesa
 
   build_deb mina-mesa-config
 }
