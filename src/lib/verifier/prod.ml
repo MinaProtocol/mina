@@ -55,7 +55,7 @@ module Worker_state = struct
          Deferred.t
 
     val verify_transaction_snarks :
-      (Transaction_snark.t * Sok_message.t) list -> unit Or_error.t Deferred.t
+      Transaction_snark.t list -> unit Or_error.t Deferred.t
 
     val toggle_internal_tracing : bool -> unit
 
@@ -182,7 +182,7 @@ module Worker = struct
     type 'w functions =
       { verify_blockchains : ('w, Blockchain.t list, unit Or_error.t) F.t
       ; verify_transaction_snarks :
-          ('w, (Transaction_snark.t * Sok_message.t) list, unit Or_error.t) F.t
+          ('w, Transaction_snark.t list, unit Or_error.t) F.t
       ; verify_commands :
           ( 'w
           , User_command.Verifiable.Serializable.t With_status.t list
@@ -251,10 +251,7 @@ module Worker = struct
               , verify_blockchains )
         ; verify_transaction_snarks =
             f
-              ( [%bin_type_class:
-                  ( Transaction_snark.Stable.Latest.t
-                  * Sok_message.Stable.Latest.t )
-                  list]
+              ( [%bin_type_class: Transaction_snark.Stable.Latest.t list]
               , [%bin_type_class: unit Or_error.t]
               , verify_transaction_snarks )
         ; verify_commands =
@@ -411,7 +408,9 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
         ] ;
     Child_processes.Termination.register_process pids process
       Child_processes.Termination.Verifier ;
-    Mina_metrics.Process_memory.Verifier.set_pid (Process.pid process) ;
+    let pid = Process.pid process in
+    [%log info] "Verifier process has PID %d" (Pid.to_int pid) ;
+    Mina_metrics.Process_memory.Verifier.set_pid pid ;
     (* Always report termination as expected, and use the restart logic here
        instead.
     *)

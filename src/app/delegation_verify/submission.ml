@@ -33,8 +33,7 @@ module type Data_source = sig
     -> unit Async_kernel__Deferred_or_error.t
 
   val verify_transaction_snarks :
-       (Ledger_proof.t * Mina_base.Sok_message.t) list
-    -> (unit, Error.t) Deferred.Result.t
+    Ledger_proof.t list -> (unit, Error.t) Deferred.Result.t
 
   val output :
     t -> submission -> Output.t Or_error.t -> unit Deferred.Or_error.t

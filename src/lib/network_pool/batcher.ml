@@ -437,6 +437,26 @@ module Snark_pool = struct
     | Error e ->
         Error (`Crash e)
 
+  (* This check is placed in batcher in order to
+     have both positive and negative tests defined for the component.
+
+     If the check would be performed outside of batcher,
+     tests need would have to be moved to another place as well. *)
+  let sok_digest_check (proof, message) =
+    Mina_base.Sok_message.Digest.equal
+      (Mina_base.Sok_message.digest message)
+      (Ledger_proof.sok_digest proof)
+
+  let verify_batch ~verifier ps =
+    if List.for_all ps ~f:sok_digest_check then
+      Verifier.verify_transaction_snarks verifier (List.map ~f:fst ps)
+    else
+      let e =
+        Error.of_string
+          "proof's sok message digest does not match the sok message"
+      in
+      Deferred.Or_error.return (Error e)
+
   let create ~proof_cache_db ~logger verifier : t =
     create
       ~proof_cache_db
@@ -457,7 +477,7 @@ module Snark_pool = struct
               One_or_two.map ps ~f:(fun p -> (p, message)) |> One_or_two.to_list )
         in
         let open Deferred.Or_error.Let_syntax in
-        let%map result = Verifier.verify_transaction_snarks verifier ps in
+        let%map result = verify_batch ~verifier ps in
         match result with
         | Ok () ->
             List.map ps0 ~f:(fun _ -> `Valid ())
@@ -520,7 +540,8 @@ module Snark_pool = struct
           in
           let%map { fee; prover } = Fee_with_prover.gen in
           let message = Mina_base.Sok_message.create ~fee ~prover in
-          ( One_or_two.map statements ~f:Ledger_proof.For_tests.mk_dummy_proof
+          ( One_or_two.map statements ~f:(fun statement ->
+                Ledger_proof.For_tests.mk_dummy_proof ~fee ~prover ~statement )
           , message )
         in
         Envelope.Incoming.gen data_gen
