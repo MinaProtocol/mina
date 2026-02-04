@@ -33,9 +33,7 @@ export DEBIAN_FRONTEND=noninteractive
 # Set BLACKLISTED_REPOS=() to start with no blacklisted repos
 # Usage: Specify name of repo files (not full paths) to blacklist by default
 
-# 31-01-2025 yarn is giving us issues frequently on invalid signatures
-# because their key rotation is not well managed. So we blacklist it by default.
-BLACKLISTED_REPOS=("yarn.list")
+BLACKLISTED_REPOS=()
 VERBOSE=false
 DRY_RUN=false
 SUDO_CMD=""

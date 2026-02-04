@@ -8,6 +8,7 @@ let isEssential =
           \(service : Artifacts.Type)
       ->  merge
             { Daemon = True
+            , DaemonConfig = False
             , LogProc = False
             , Archive = True
             , TestExecutive = False
