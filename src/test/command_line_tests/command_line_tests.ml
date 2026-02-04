@@ -312,10 +312,6 @@ module AutoHardforkConfigGeneration = struct
     let daemon : Runtime_config.Daemon.t =
       { txpool_max_size = None
       ; peer_list_url = None
-      ; zkapp_proof_update_cost = None
-      ; zkapp_signed_single_update_cost = None
-      ; zkapp_signed_pair_update_cost = None
-      ; zkapp_transaction_cost_limit = None
       ; max_event_elements = None
       ; max_action_elements = None
       ; zkapp_cmd_limit_hardcap = None
@@ -326,6 +322,7 @@ module AutoHardforkConfigGeneration = struct
       ; network_id = None
       ; sync_ledger_max_subtree_depth = None
       ; sync_ledger_default_subtree_depth = None
+      ; max_zkapp_segment_per_transaction = None
       }
     in
     let proof =

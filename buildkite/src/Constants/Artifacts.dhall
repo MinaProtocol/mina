@@ -15,6 +15,7 @@ let Artifact
     = < Daemon
       | DaemonLegacyHardfork
       | DaemonAutoHardfork
+      | DaemonConfig
       | LogProc
       | Archive
       | TestExecutive
@@ -31,6 +32,7 @@ let AllButTests =
       [ Artifact.Daemon
       , Artifact.DaemonLegacyHardfork
       , Artifact.DaemonAutoHardfork
+      , Artifact.DaemonConfig
       , Artifact.LogProc
       , Artifact.Archive
       , Artifact.BatchTxn
@@ -43,7 +45,12 @@ let AllButTests =
       ]
 
 let Main =
-      [ Artifact.Daemon, Artifact.LogProc, Artifact.Archive, Artifact.Rosetta ]
+      [ Artifact.Daemon
+      , Artifact.DaemonConfig
+      , Artifact.LogProc
+      , Artifact.Archive
+      , Artifact.Rosetta
+      ]
 
 let All = AllButTests # [ Artifact.FunctionalTestSuite ]
 
@@ -53,6 +60,7 @@ let capitalName =
             { Daemon = "Daemon"
             , DaemonLegacyHardfork = "DaemonLegacyHardfork"
             , DaemonAutoHardfork = "DaemonAutoHardfork"
+            , DaemonConfig = "DaemonConfig"
             , LogProc = "LogProc"
             , Archive = "Archive"
             , TestExecutive = "TestExecutive"
@@ -72,6 +80,7 @@ let lowerName =
             { Daemon = "daemon"
             , DaemonLegacyHardfork = "daemon_hardfork"
             , DaemonAutoHardfork = "daemon_auto_hardfork"
+            , DaemonConfig = "daemon_config"
             , LogProc = "logproc"
             , Archive = "archive"
             , TestExecutive = "test_executive"
@@ -101,6 +110,7 @@ let dockerName =
             , Toolchain = "mina-toolchain"
             , CreateLegacyGenesis = "mina-create-legacy-genesis"
             , DelegationVerifier = "mina-delegation-verifier"
+            , DaemonConfig = ""
             }
             artifact
 
@@ -118,8 +128,9 @@ let toDebianName =
       ->  merge
             { Daemon = "daemon_${Network.lowerName network}"
             , DaemonLegacyHardfork =
-                "daemon_${Network.lowerName network}_hardfork"
-            , DaemonAutoHardfork = ""
+                "daemon_${Network.lowerName network}_hardfork_config"
+            , DaemonAutoHardfork =
+                "daemon_${Network.lowerName network}_pre_hardfork"
             , LogProc = "logproc"
             , Archive = "archive_${Network.lowerName network}"
             , TestExecutive = "test_executive"
@@ -130,6 +141,7 @@ let toDebianName =
             , Toolchain = ""
             , DelegationVerifier = "delegation_verifier"
             , CreateLegacyGenesis = "create_legacy_genesis"
+            , DaemonConfig = "daemon_${Network.lowerName network}_config"
             }
             artifact
 
@@ -142,28 +154,10 @@ let toDebianNames =
                   (List Text)
                   (     \(a : Artifact)
                     ->  merge
-                          { Daemon =
-                              merge
-                                { Devnet =
-                                  [ toDebianName a network
-                                  , "daemon_${Network.lowerName network}_config"
-                                  ]
-                                , Mainnet =
-                                  [ toDebianName a network
-                                  , "daemon_${Network.lowerName network}_config"
-                                  ]
-                                , TestnetGeneric = [ toDebianName a network ]
-                                , DevnetLegacy = [ toDebianName a network ]
-                                , MainnetLegacy = [ toDebianName a network ]
-                                , PreMesa1 = [ toDebianName a network ]
-                                }
-                                network
+                          { Daemon = [ toDebianName a network ]
                           , DaemonLegacyHardfork = [ toDebianName a network ]
-                          , DaemonAutoHardfork =
-                            [ toDebianName a network
-                            , "daemon_${Network.lowerName
-                                          network}_hardfork_config"
-                            ]
+                          , DaemonAutoHardfork = [ toDebianName a network ]
+                          , DaemonConfig = [ toDebianName a network ]
                           , Archive = [ toDebianName a network ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
@@ -246,6 +240,7 @@ let dockerTag =
                 , Toolchain = "${spec.version}"
                 , DelegationVerifier = "${spec.version}"
                 , CreateLegacyGenesis = "${spec.version}"
+                , DaemonConfig = "${spec.version}"
                 }
                 spec.artifact
 
