@@ -24,8 +24,6 @@ in  Pipeline.build
               ( S.contains
                   "buildkite/scripts/tests/convert-debian-to-hf-test.sh"
               )
-          , S.strictlyStart
-              (S.contains "scripts/hardfork/convert-daemon-debian-to-hf.sh")
           , S.strictlyStart (S.contains "scripts/debian/session")
           ]
         , path = "Test"
