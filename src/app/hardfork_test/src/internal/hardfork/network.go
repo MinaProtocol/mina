@@ -65,7 +65,7 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 		"--whales", strconv.Itoa(t.Config.NumWhales),
 		"--fish", strconv.Itoa(t.Config.NumFish),
 		"--nodes", strconv.Itoa(t.Config.NumNodes),
-		"--log-level", "Error",
+		"--log-level", "Debug",
 		"--file-log-level", "Trace",
 		"--value-transfer-txns",
 		"--transaction-interval", strconv.Itoa(t.Config.PaymentInterval),
@@ -104,13 +104,19 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 		"--hardfork-genesis-slot-delta", strconv.Itoa(t.Config.HfSlotDelta),
 	}
 
+	if t.Config.ForkMethod == config.Auto {
+		args = append(args, "--hardfork-handling", "migrate-exit")
+		// In auto mode all nodes should exit by itself, hence we're only killing SNARK workers
+		args = append(args, "--on-exit", "kill_snark_workers")
+	}
+
 	return t.startLocalNetwork(t.Config.MainMinaExe, "main", args)
 }
 
 // RunForkNetwork starts the fork network with hardfork configuration
-func (t *HardforkTest) RunForkNetwork(configFile, forkLedgersDir string) (*exec.Cmd, error) {
+func (t *HardforkTest) RunForkNetwork(d ForkDataAndUsage) (*exec.Cmd, error) {
 	return t.startLocalNetwork(t.Config.ForkMinaExe, "fork", []string{
-		"--config", fmt.Sprintf("inherit_with:%s,%s", configFile, forkLedgersDir),
+		"--config", fmt.Sprintf(d.generateLocalNetworkParam()),
 		"--override-slot-time", strconv.Itoa(t.Config.ForkSlot * 1000)},
 	)
 }

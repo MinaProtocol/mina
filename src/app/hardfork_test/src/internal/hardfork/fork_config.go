@@ -10,15 +10,6 @@ import (
 	"time"
 )
 
-// ForkConfigData holds the expected fork configuration data
-type ForkConfigData struct {
-	BlockchainLength int    `json:"blockchain_length"`
-	GlobalSlot       int    `json:"global_slot_since_genesis"`
-	StateHash        string `json:"state_hash"`
-	NextSeed         string `json:"next_seed"`
-	StakingSeed      string `json:"staking_seed"`
-}
-
 // ExtractForkConfig extracts the fork configuration from the network
 func (t *HardforkTest) GetForkConfig(port int) ([]byte, error) {
 	for attempt := 1; attempt <= t.Config.ForkConfigMaxRetries; attempt++ {
