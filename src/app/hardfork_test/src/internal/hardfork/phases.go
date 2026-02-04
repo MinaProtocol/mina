@@ -380,10 +380,20 @@ func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisT
 		return nil, err
 	}
 
-	forkConfigFile := filepath.Join(t.Config.Root, "daemon.json")
-	err = os.WriteFile(forkConfigFile, forkConfigBytes, 0644)
+	// Write the consensus config to each node's directory, so they load the correct configuration
+	entries, err = os.ReadDir(nodesDir)
 	if err != nil {
 		return nil, err
+	}
+	for _, e := range entries {
+		if !e.IsDir() || e.Name() == "snark_workers" {
+			continue
+		}
+		nodeDir := filepath.Join(nodesDir, e.Name())
+		daemonJsonPath := filepath.Join(nodeDir, "daemon.json")
+		if err := os.WriteFile(daemonJsonPath, forkConfigBytes, 0644); err != nil {
+			return nil, err
+		}
 	}
 
 	// genesis ledgers has been overriden and each node will use a different one generated during auto fork phase
