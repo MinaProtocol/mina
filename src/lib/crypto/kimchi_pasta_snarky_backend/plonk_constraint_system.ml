@@ -15,6 +15,10 @@ module Kimchi_gate_type = struct
     | EndoMul
     | EndoMulScalar
     | Lookup
+    | CairoClaim
+    | CairoInstruction
+    | CairoFlags
+    | CairoTransition
     | RangeCheck0
     | RangeCheck1
     | ForeignFieldAdd

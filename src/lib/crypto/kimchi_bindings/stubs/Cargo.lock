@@ -636,6 +636,7 @@ dependencies = [
  "thiserror 2.0.12",
  "tikv-jemalloc-ctl",
  "tikv-jemallocator",
+ "turshi",
 ]
 
 [[package]]
@@ -1259,6 +1260,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c9d3793400a45f954c52e73d068316d76b6f4e36977e3fcebb13a2721e80237"
 dependencies = [
  "crunchy",
+]
+
+[[package]]
+name = "turshi"
+version = "0.1.0"
+dependencies = [
+ "ark-ff",
+ "hex",
+ "o1-utils",
 ]
 
 [[package]]
