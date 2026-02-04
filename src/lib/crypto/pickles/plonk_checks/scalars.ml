@@ -16,6 +16,10 @@ module Gate_type = struct
       | EndoMul
       | EndoMulScalar
       | Lookup
+      | CairoClaim
+      | CairoInstruction
+      | CairoFlags
+      | CairoTransition
       | RangeCheck0
       | RangeCheck1
       | ForeignFieldAdd
