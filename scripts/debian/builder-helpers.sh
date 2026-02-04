@@ -1045,6 +1045,8 @@ build_delegation_verify_deb () {
     "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Utility to verify delegation in Mina GraphQL format'
 
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
   # Binaries
   cp ./default/src/app/delegation_verify/delegation_verify.exe \
     "${BUILDDIR}/usr/local/bin/mina-delegation-verify"

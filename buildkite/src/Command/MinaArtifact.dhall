@@ -205,6 +205,7 @@ let docker_step
                     , if_ = spec.if_
                     }
                   ]
+                , DaemonConfig = [] : List DockerImage.ReleaseSpec.Type
                 , DaemonAutoHardfork =
                   [ DockerImage.ReleaseSpec::{
                     , deps =
