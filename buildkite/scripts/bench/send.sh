@@ -15,4 +15,7 @@ done
 
 echo "Sending perf data to InfluxDB"
 
+# Original INFLUX_HOST does not start with https://
+export INFLUX_HOST="https://${INFLUX_HOST}"
+
 cat /workdir/*.perf | influx write
