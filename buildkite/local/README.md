@@ -37,6 +37,10 @@ EOF
 | `dhall-to-yaml` | Pipeline generation | https://github.com/dhall-lang/dhall-haskell |
 | `docker` | Container execution | https://docs.docker.com/get-docker/ |
 | `rsync` | Cache sync from Hetzner | Usually pre-installed |
+| `aptly` | Local Debian repository (inside container) | Pre-installed in mina-toolchain image |
+
+**Port requirement:** Port `8080` must be available. Aptly starts a local Debian
+repository server on this port during hardfork package generation.
 
 ### Required Directories (Permissions)
 
@@ -85,12 +89,12 @@ Local execution differs from CI in several ways:
 
 **CI behavior:** Containers run as the `opam` user (UID 1000 inside container).
 
-**Local behavior:** Containers run as your host UID via `--user $(id -u):$(id -g)`.
+**Local behavior:** Containers also run as `opam` (UID 1000). This allows sudo
+to work inside containers for apt operations.
 
-This prevents file ownership issues on bind-mounted directories but means:
-- Container's `/home/opam` may not be writable
-- Go modules are redirected to `/tmp/go` inside container
-- Git safe.directory is configured via `XDG_CONFIG_HOME=/tmp/xdg`
+If your host user has a different UID than 1000, you may see permission issues
+with the `_build` directory. The script checks for this at startup and will
+show an error with instructions to fix ownership.
 
 ### Environment Variables
 
@@ -126,7 +130,7 @@ These are derived from your local git state:
 
 | Variable | Description |
 |----------|-------------|
-| `BUILDKITE_BUILD_ID` | Random UUID for this build |
+| `BUILDKITE_BUILD_ID` | Random UUID for this build (or value from `--build-id`) |
 | `BUILDKITE_JOB_ID` | Random UUID for this job |
 | `BUILDKITE_BUILD_NUMBER` | Unix timestamp |
 
@@ -137,6 +141,7 @@ These are derived from your local git state:
 | `LOCAL_BK_RUN` | `1` | Indicates local execution (scripts can check this) |
 | `SKIP_DOCKER_PRUNE` | `1` | Prevents docker system prune |
 | `GIT_LFS_SKIP_SMUDGE` | `1` | Skips LFS file download |
+| `APTLY_ROOT` | `/tmp/aptly` | Writable directory for aptly database (avoids ~/.aptly permission issues) |
 
 ### Cache Configuration
 
@@ -208,8 +213,11 @@ Options:
   --skip-sync        Skip legacy folder sync from Hetzner
   --jobs-dir DIR     Path to pre-generated pipeline YAMLs
   --step KEY         Run only the step matching this key (substring match)
+  --start-from KEY   Start execution from this step (skip all previous steps)
+  --build-id ID      Reuse a specific BUILDKITE_BUILD_ID (for resuming/debugging)
   --env-file FILE    File with KEY=VALUE pairs passed to all commands (including Docker)
   --list             List available job names and exit
+  --list-steps       List steps in the job and exit (requires job name)
   -h, --help         Show this help
 ```
 
@@ -219,11 +227,26 @@ Options:
 # List all available jobs
 ./run_job.sh --list
 
+# List jobs without regenerating pipelines (faster)
+./run_job.sh --list --jobs-dir ./jobs
+
+# List steps in a specific job
+./run_job.sh --list-steps GenerateHardforkPackage
+
+# List steps without regenerating pipelines
+./run_job.sh --list-steps --jobs-dir ./jobs GenerateHardforkPackage
+
 # See what commands a job would run
 ./run_job.sh --dry-run MinaArtifactBullseyeDevnet
 
 # Run a specific step within a job
 ./run_job.sh --step "build-deb-pkg" MinaArtifactBullseyeDevnet
+
+# Start from a specific step (skip earlier steps)
+./run_job.sh --start-from "upload-ledger" GenerateHardforkPackage
+
+# Resume a failed build using the same build ID
+./run_job.sh --build-id abc123-def456 --start-from "step-3" GenerateHardforkPackage
 
 # Reuse previously generated pipelines (faster iteration)
 ./run_job.sh --skip-dump --jobs-dir /tmp/pipelines MinaArtifactBullseyeDevnet
@@ -233,7 +256,26 @@ Options:
 
 # Run with custom environment variables
 ./run_job.sh --env-file ./my-env.txt --step "build-deb-pkg-noble" HardforkPackageGenerationNew
+
+# Full example: resume a hardfork build from a specific step
+./run_job.sh --build-id 465d2528-715f-4b01-8ee6-18bbac491a7a \
+    --skip-sync --skip-dump --jobs-dir ./jobs \
+    --start-from "_GenerateHardforkPackage-build-hf-debian-noble" \
+    GenerateHardforkPackage
 ```
+
+### Resuming Builds
+
+The `--build-id` and `--start-from` options work together to resume failed or interrupted builds:
+
+1. **Note the build ID** from your original run (printed at startup)
+2. **List steps** to find where to resume: `./run_job.sh --list-steps --jobs-dir ./jobs JobName`
+3. **Resume** with: `./run_job.sh --build-id <id> --start-from <step-key> JobName`
+
+This is useful for:
+- **Resuming failed builds** - continue from where it failed without re-running earlier steps
+- **Debugging** - re-run a specific step with the same artifact paths
+- **Iterating** - make changes and re-run only the affected steps
 
 ## Troubleshooting
 
