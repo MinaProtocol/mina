@@ -295,8 +295,6 @@ while [[ ${current_block_height} -lt 11 ]]; do
 done
 
 echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
-
-echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
 rosetta-cli check:data --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
 echo "========================= ROSETTA CLI: CHECK:PERF ==========================="
