@@ -37,6 +37,10 @@ EOF
 | `dhall-to-yaml` | Pipeline generation | https://github.com/dhall-lang/dhall-haskell |
 | `docker` | Container execution | https://docs.docker.com/get-docker/ |
 | `rsync` | Cache sync from Hetzner | Usually pre-installed |
+| `aptly` | Local Debian repository (inside container) | Pre-installed in mina-toolchain image |
+
+**Port requirement:** Port `8080` must be available. Aptly starts a local Debian
+repository server on this port during hardfork package generation.
 
 ### Required Directories (Permissions)
 
@@ -85,12 +89,12 @@ Local execution differs from CI in several ways:
 
 **CI behavior:** Containers run as the `opam` user (UID 1000 inside container).
 
-**Local behavior:** Containers run as your host UID via `--user $(id -u):$(id -g)`.
+**Local behavior:** Containers also run as `opam` (UID 1000). This allows sudo
+to work inside containers for apt operations.
 
-This prevents file ownership issues on bind-mounted directories but means:
-- Container's `/home/opam` may not be writable
-- Go modules are redirected to `/tmp/go` inside container
-- Git safe.directory is configured via `XDG_CONFIG_HOME=/tmp/xdg`
+If your host user has a different UID than 1000, you may see permission issues
+with the `_build` directory. The script checks for this at startup and will
+show an error with instructions to fix ownership.
 
 ### Environment Variables
 
@@ -137,6 +141,7 @@ These are derived from your local git state:
 | `LOCAL_BK_RUN` | `1` | Indicates local execution (scripts can check this) |
 | `SKIP_DOCKER_PRUNE` | `1` | Prevents docker system prune |
 | `GIT_LFS_SKIP_SMUDGE` | `1` | Skips LFS file download |
+| `APTLY_ROOT` | `/tmp/aptly` | Writable directory for aptly database (avoids ~/.aptly permission issues) |
 
 ### Cache Configuration
 
