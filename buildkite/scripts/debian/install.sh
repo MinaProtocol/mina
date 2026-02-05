@@ -15,6 +15,7 @@ fi
 DEBS=$1
 USE_SUDO=${2:-0}
 ROOT="${ROOT:-${BUILDKITE_BUILD_ID}}"
+SKIP_DEPS=${SKIP_DEPS:-0}
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
@@ -37,7 +38,7 @@ mkdir -p $LOCAL_DEB_FOLDER
 
 # Download required debians from bucket locally
 if [ -z "$DEBS" ]; then 
-    echo "DEBS env var is empty. It should contains comma separated names of debians to install"
+    echo "DEBS env var is empty. It should contain comma separated names of debians to install"
     exit 1
 else
   # shellcheck disable=SC2206
@@ -46,12 +47,16 @@ else
     case $i in
       mina-testnet-generic*)
         # Download mina-logproc too
-        ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
+        if [[ "$SKIP_DEPS" -eq 0 ]]; then
+          ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
+        fi
       ;;
       mina-devnet|mina-mainnet)
-        # Downaload mina-logproc and sub debians (apps and config) too
-        ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
-        ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/${i}-config*" $LOCAL_DEB_FOLDER
+        # Download mina-logproc and sub debians (apps and config) too
+        if [[ "$SKIP_DEPS" -eq 0 ]]; then
+          ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
+          ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/${i}-config*" $LOCAL_DEB_FOLDER
+        fi
       ;;
       mina-devnet-legacy|mina-mainnet-legacy)
         # Download mina-logproc legacy too
