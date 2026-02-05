@@ -52,7 +52,7 @@ esac
 
 MINA_DEB_NAME="mina-testnet-generic"
 MINA_DEVNET_DEB_NAME="mina-devnet"
-DUNE_PROFILE="${DUNE_PROFILE}"
+DUNE_PROFILE="${DUNE_PROFILE:-dev}"
 DEB_SUFFIX=""
 
 # Add suffix to debian to distinguish different profiles

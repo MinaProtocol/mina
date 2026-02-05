@@ -52,14 +52,16 @@ fi
 
 echo "--- Restoring cached build artifacts for apps/${CODENAME}/"
 
-if [[ -n "$CACHED_BUILDKITE_BUILD_ID" ]]; then
-  export ROOT="$CACHED_BUILDKITE_BUILD_ID"
-  export FORCE_VERSION="*"
+# Install mina-logproc from cached build if available, else from current build
+if [[ -n "${CACHED_BUILDKITE_BUILD_ID:-}" ]]; then
+  MINA_DEB_CODENAME=$CODENAME FORCE_VERSION="*" ROOT="$CACHED_BUILDKITE_BUILD_ID" ./buildkite/scripts/debian/install.sh mina-${NETWORK_NAME} 1
+else
+  MINA_DEB_CODENAME=$CODENAME ./buildkite/scripts/debian/install.sh mina-${NETWORK_NAME} 1
 fi
-MINA_DEB_CODENAME="$CODENAME" ./buildkite/scripts/debian/install.sh mina-${NETWORK_NAME} 1
+
 echo "--- Generating ledger tarballs for hardfork network: $NETWORK_NAME"
 
-./scripts/hardfork/release/generate-fork-config-and-ledger-tarballs.sh --network "$NETWORK_NAME" --config-url "$CONFIG_JSON_GZ_URL" --runtime-ledger mina-create-genesis --logproc mina-logproc
+./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs.sh --network "$NETWORK_NAME" --config-url "$CONFIG_JSON_GZ_URL" --runtime-ledger mina-create-genesis --logproc mina-logproc
 
 # Write to cache
 ./buildkite/scripts/cache/manager.sh write hardfork_ledgers/*.tar.gz hardfork/ledgers/

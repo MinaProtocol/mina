@@ -85,7 +85,7 @@ let generateReferenceTarballsCommand =
                       codename
                       Arch.Type.Amd64
                       [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
-                      "./buildkite/scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --network ${Network.lowerName
+                      "./buildkite/scripts/hardfork/release/generate-fork-config-and-ledger-tarballs-using-legacy-app.sh --network ${Network.lowerName
                                                                                                                                         spec.network} --version 3.2.0-f77c8c9  --codename ${DebianVersions.lowerName
                                                                                                                                                                                               codename} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg}"
                 , label =
@@ -101,7 +101,17 @@ let generateTarballsCommand =
       ->  \(codename : DebianVersions.DebVersion)
       ->  \(key : Text)
       ->  \(depends_on : List Command.TaggedKey.Type)
-      ->  Command.build
+      ->
+
+        let cacheArg =
+                merge
+                  { Some =
+                      \(build : Text) -> "--cached-buildkite-build-id " ++ build
+                  , None = ""
+                  }
+                  spec.use_artifacts_from_buildkite_build
+        in
+          Command.build
             Command.Config::{
             , commands =
                 Toolchain.select
@@ -113,6 +123,7 @@ let generateTarballsCommand =
                     ++  "--network ${Network.lowerName spec.network} "
                     ++  "--config-url ${spec.config_json_gz_url} "
                     ++  "--codename ${DebianVersions.lowerName codename} "
+                    ++  "${cacheArg}"
                   )
             , label =
                 "Generate hardfork tarballs for ${DebianVersions.lowerName
@@ -203,6 +214,7 @@ let generateDockerForCodename =
                         , artifacts =
                           [ Artifacts.Type.LogProc
                           , Artifacts.Type.Daemon
+                          , Artifacts.Type.DaemonConfig
                           , Artifacts.Type.Archive
                           , Artifacts.Type.Rosetta
                           , Artifacts.Type.ZkappTestTransaction
@@ -243,23 +255,23 @@ let generateDockerForCodename =
               # [ Command.build
                     Command.Config::{
                     , commands =
-                        Toolchain.select
-                          Toolchain.SelectionMode.ByDebianAndArch
-                          codename
-                          Arch.Type.Amd64
-                          (   [ "NETWORK_NAME=${Network.lowerName spec.network}"
-                              , "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
-                              , "CODENAME=${lowerNameCodename}"
+                            [
+                                Cmd.run "./buildkite/scripts/cache/manager.sh read hardfork"
+                            ]
+                            #( Toolchain.select
+                                Toolchain.SelectionMode.ByDebianAndArch
+                                codename
+                                Arch.Type.Amd64
+                              [ "NETWORK_NAME=${Network.lowerName spec.network}"
+                              , "MINA_DEB_CODENAME=${lowerNameCodename}"
                               ]
-                            # useArtifactsEnvVar
-                          )
-                          (     "./scripts/debian/build.sh build_daemon_${Network.lowerName
-                                                                            spec.network}_hardfork_config_deb"
-                            ++  merge
+                               ("RUNTIME_CONFIG_JSON=/workdir/new_config.json LEDGER_TARBALLS='/workdir/hardfork_ledgers/*.tar.gz' ./buildkite/scripts/debian/build.sh daemon_${Network.lowerName
+                                                                            spec.network}_hardfork_config "
+                            ++  (merge
                                   { Some =
                                           \(cached_build_id : Text)
                                       ->      "&& ./buildkite/scripts/release/manager.sh persist "
-                                          ++  " --backend local --artifacts mina-logproc,mina-daemon,mina-daemon-config,mina-archive-${Network.lowerName
+                                          ++  " --backend local --artifacts mina-logproc,mina-${Network.lowerName spec.network},mina-archive-${Network.lowerName
                                                                                                                                          spec.network},mina-rosetta-${Network.lowerName
                                                                                                                                                                         spec.network},mina-zkapp-test-transaction "
                                           ++  " --buildkite-build-id ${cached_build_id}"
@@ -267,8 +279,9 @@ let generateDockerForCodename =
                                           ++  " --target \\\${BUILDKITE_BUILD_ID} "
                                   , None = ""
                                   }
-                                  spec.use_artifacts_from_buildkite_build
-                          )
+                                  spec.use_artifacts_from_buildkite_build)
+                            ))
+
                     , label =
                         "Create hardfork packages for ${lowerNameCodename}"
                     , key = buildHfDebian

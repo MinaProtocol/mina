@@ -149,22 +149,22 @@ let generateStep =
 
                 else  ""
 
-      let pruneDockerImages =
-              "if [ -z \"\\\${SKIP_DOCKER_PRUNE:-}\" ]; then "
-            ++ "docker system prune --all --force "
-            ++ merge
-                  { Arm64 = ""
-                  , XLarge = "--filter until=24h"
-                  , Large = "--filter until=24h"
-                  , Medium = "--filter until=24h"
-                  , Small = "--filter until=24h"
-                  , Integration = "--filter until=24h"
-                  , QA = "--filter until=24h"
-                  , Multi = "--filter until=24h"
-                  , Perf = "--filter until=24h"
-                  }
-                  spec.size
-            ++ "; else echo 'Skipping docker prune due to SKIP_DOCKER_PRUNE'; fi"
+          let pruneDockerImages =
+                    "if [ -z \"\\\${SKIP_DOCKER_PRUNE:-}\" ]; then "
+                ++  "docker system prune --all --force "
+                ++  merge
+                      { Arm64 = ""
+                      , XLarge = "--filter until=24h"
+                      , Large = "--filter until=24h"
+                      , Medium = "--filter until=24h"
+                      , Small = "--filter until=24h"
+                      , Integration = "--filter until=24h"
+                      , QA = "--filter until=24h"
+                      , Multi = "--filter until=24h"
+                      , Perf = "--filter until=24h"
+                      }
+                      spec.size
+                ++  "; else echo 'Skipping docker prune due to SKIP_DOCKER_PRUNE'; fi"
 
           let loadOnlyArg =
                       if DockerPublish.shouldPublish

@@ -15,7 +15,6 @@ fi
 DEBS=$1
 USE_SUDO=${2:-0}
 ROOT="${ROOT:-${BUILDKITE_BUILD_ID}}"
-SKIP_DEPS=${SKIP_DEPS:-0}
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
@@ -47,16 +46,12 @@ else
     case $i in
       mina-testnet-generic*)
         # Download mina-logproc too
-        if [[ "$SKIP_DEPS" -eq 0 ]]; then
-          ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
-        fi
+          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
       ;;
       mina-devnet|mina-mainnet)
         # Download mina-logproc and sub debians (apps and config) too
-        if [[ "$SKIP_DEPS" -eq 0 ]]; then
-          ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
-          ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/${i}-config*" $LOCAL_DEB_FOLDER
-        fi
+          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
+          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/${i}-config*" $LOCAL_DEB_FOLDER
       ;;
       mina-devnet-legacy|mina-mainnet-legacy)
         # Download mina-logproc legacy too
