@@ -112,6 +112,12 @@ type ForkData struct {
 
 // RunForkNetworkPhase runs the fork network and validates its operation
 func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData ForkData, mainGenesisTs int64) error {
+	forkGenesisInstant := time.Unix(forkData.genesis, 0)
+
+	if time.Now().After(forkGenesisInstant) {
+		return fmt.Errorf("Now is %s, fork genesis %s happened in the past! We should bump up hf-slot-delta!", time.Now(), forkGenesisInstant)
+	}
+
 	// Start fork network
 	forkCmd, err := t.RunForkNetwork(forkData.data)
 	if err != nil {
