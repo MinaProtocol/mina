@@ -664,6 +664,33 @@ build_daemon_mainnet_pre_hardfork_deb() {
 }
 ## END MAINNET LEGACY PACKAGE ##
 
+## MESA LEGACY PACKAGE ##
+
+#
+# Builds mina-mesa-pre-hardfork-mesa tailored package for automode package
+#
+# Output: mina-mesa-pre-hardfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Contains only the legacy mesa binaries places in "/usr/lib/mina/berkeley" without
+# configuration files or genesis ledgers.
+#
+build_daemon_mesa_pre_hardfork_deb() {
+
+  NAME="mina-mesa-pre-hardfork-mesa"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building mesa berkeley deb for hardfork automode :"
+
+  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_apps mesa $AUTOMODE_PRE_HF_DIR
+
+  build_deb $NAME
+}
+## END MESA LEGACY PACKAGE ##
+
 ## DEVNET LEGACY PACKAGE ##
 
 #
