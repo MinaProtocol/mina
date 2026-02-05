@@ -208,7 +208,6 @@ export BUILDKITE_AGENT_NAME="${BUILDKITE_AGENT_NAME:-$(hostname)}"
 export BUILDKITE_BUILD_CHECKOUT_PATH="${BUILDKITE_BUILD_CHECKOUT_PATH:-$MINA_ROOT}"
 export BUILDKITE_ARTIFACT_PATHS="${BUILDKITE_ARTIFACT_PATHS:-}"
 export BUILDKITE_TIMEOUT="${BUILDKITE_TIMEOUT:-false}"
-export BUILDKITE_AGENT_ACCESS_TOKEN="${BUILDKITE_AGENT_ACCESS_TOKEN:-local-stub}"
 
 # Local overrides for testing
 export LOCAL_BK_RUN="${LOCAL_BK_RUN:-1}"
@@ -262,29 +261,9 @@ if [[ "$LIST_JOBS" == true ]]; then
 fi
 
 # ==============================================================================
-# Step 3: Ensure buildkite-agent is installed
+# Step 3: Sync legacy folder from hetzner
 # ==============================================================================
-log "Step 3: Checking buildkite-agent"
-
-if command -v buildkite-agent &>/dev/null; then
-  echo "buildkite-agent found: $(which buildkite-agent)"
-else
-  echo "Installing buildkite-agent..."
-  TOKEN="${BUILDKITE_AGENT_ACCESS_TOKEN}" bash -c "$(curl -sL https://raw.githubusercontent.com/buildkite/agent/main/install.sh)"
-  if [[ -d "$HOME/.buildkite-agent/bin" ]]; then
-    export PATH="$HOME/.buildkite-agent/bin:$PATH"
-  fi
-  if command -v buildkite-agent &>/dev/null; then
-    echo "buildkite-agent installed: $(which buildkite-agent)"
-  else
-    warn "buildkite-agent installation may have failed; some scripts may not work"
-  fi
-fi
-
-# ==============================================================================
-# Step 4: Sync legacy folder from hetzner
-# ==============================================================================
-log "Step 4: Syncing legacy folder from hetzner"
+log "Step 3: Syncing legacy folder from hetzner"
 
 if [[ "$SKIP_SYNC" == true ]]; then
   echo "Skipping legacy sync"
@@ -325,7 +304,7 @@ else
 fi
 
 # ==============================================================================
-# Step 4b: Ensure local storagebox directories are usable
+# Step 4: Ensure local storagebox directories are usable
 # ==============================================================================
 # The cache manager (scripts/cache/manager.sh) writes build artifacts into
 # $LOCAL_STORAGEBOX/$BUILDKITE_BUILD_ID/.  The base directory must be writable.

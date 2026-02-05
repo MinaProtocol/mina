@@ -37,7 +37,6 @@ EOF
 | `dhall-to-yaml` | Pipeline generation | https://github.com/dhall-lang/dhall-haskell |
 | `docker` | Container execution | https://docs.docker.com/get-docker/ |
 | `rsync` | Cache sync from Hetzner | Usually pre-installed |
-| `buildkite-agent` | Artifact commands | Auto-installed if missing |
 
 ### Required Directories (Permissions)
 
@@ -103,11 +102,6 @@ local execution and adjust behavior accordingly.
 **CI:** Uses Hetzner storagebox directly via network mounts.
 
 **Local:** Syncs a local copy to `/var/storagebox`. First sync may be slow.
-
-### Artifact Upload
-
-`buildkite-agent artifact upload` commands will run but artifacts go to a
-local stub since there's no real Buildkite backend.
 
 ### Parallelism
 
