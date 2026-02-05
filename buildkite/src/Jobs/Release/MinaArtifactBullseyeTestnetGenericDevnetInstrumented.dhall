@@ -15,6 +15,7 @@ in  Pipeline.build
             [ Artifacts.Type.Daemon
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
+            , Artifacts.Type.Rosetta
             , Artifacts.Type.FunctionalTestSuite
             , Artifacts.Type.CreateLegacyGenesis
             ]

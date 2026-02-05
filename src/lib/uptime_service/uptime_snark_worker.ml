@@ -176,7 +176,9 @@ let create ~logger ~constraint_constants ~pids : t Deferred.t =
       ] ;
   Child_processes.Termination.register_process pids process
     Child_processes.Termination.Uptime_snark_worker ;
-  Mina_metrics.Process_memory.Uptime_snark_worker.set_pid (Process.pid process) ;
+  let pid = Process.pid process in
+  [%log info] "Uptime snark worker process has PID %d" (Pid.to_int pid) ;
+  Mina_metrics.Process_memory.Uptime_snark_worker.set_pid pid ;
   (* the wait loop in the daemon will terminate the daemon if this SNARK worker
      process dies
 

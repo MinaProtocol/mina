@@ -284,8 +284,11 @@ module Snark_worker = struct
               , `Int (Pid.to_int (Process.pid snark_worker_process)) )
             ]
           "Started snark worker process with pid: $snark_worker_pid" ;
-        Mina_metrics.Process_memory.Snark_worker.set_pid
-          (Process.pid snark_worker_process) ;
+
+        let snark_worker_pid = Process.pid snark_worker_process in
+        [%log' info t.config.logger] "Snark worker process has PID %d"
+          (Pid.to_int snark_worker_pid) ;
+        Mina_metrics.Process_memory.Snark_worker.set_pid snark_worker_pid ;
         if Ivar.is_full process_ivar then
           [%log' error t.config.logger] "Ivar.fill bug is here!" ;
         Ivar.fill process_ivar snark_worker_process
@@ -1457,13 +1460,13 @@ let start t =
   let () =
     match t.config.node_status_url with
     | Some node_status_url ->
+        let block_producer_public_key_base58 =
+          Option.map ~f:(fun (_, pk) ->
+              Public_key.Compressed.to_base58_check pk )
+          @@ Keypair.And_compressed_pk.Set.choose
+               t.config.block_production_keypairs
+        in
         if t.config.simplified_node_stats then
-          let block_producer_public_key_base58 =
-            Option.map ~f:(fun (_, pk) ->
-                Public_key.Compressed.to_base58_check pk )
-            @@ Keypair.And_compressed_pk.Set.choose
-                 t.config.block_production_keypairs
-          in
           Node_status_service.start_simplified ~commit_id:t.commit_id
             ~logger:t.config.logger ~node_status_url ~network:t.components.net
             ~chain_id:t.config.chain_id
@@ -1484,6 +1487,7 @@ let start t =
               (Block_time.Span.to_time_span
                  t.config.precomputed_values.consensus_constants
                    .slot_duration_ms )
+            ~block_producer_public_key_base58
     | None ->
         ()
   in

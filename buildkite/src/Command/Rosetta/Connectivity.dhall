@@ -26,6 +26,8 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let DockerRepo = ../../Constants/DockerRepo.dhall
 
+let Expr = ../../Pipeline/Expr.dhall
+
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let B/If = B.definitions/commandStep/properties/if/Type
@@ -41,6 +43,8 @@ let Spec =
           , scope : List PipelineScope.Type
           , repo : DockerRepo.Type
           , if_ : B/If
+          , excludeIf : List Expr.Type
+          , includeIf : List Expr.Type
           }
       , default =
           { dockerType = Dockers.Type.Bullseye
@@ -51,6 +55,8 @@ let Spec =
           , profile = Profiles.Type.Devnet
           , scope = PipelineScope.Full
           , repo = DockerRepo.Type.InternalEurope
+          , includeIf = [] : List Expr.Type
+          , excludeIf = [] : List Expr.Type
           , if_ =
               "build.pull_request.base_branch != \"develop\" && build.branch != \"develop\""
           }
@@ -115,6 +121,8 @@ let pipeline
             , path = "Test"
             , name = "Rosetta${Network.capitalName spec.network}Connect"
             , scope = spec.scope
+            , excludeIf = spec.excludeIf
+            , includeIf = spec.includeIf
             , tags =
               [ PipelineTag.Type.Long
               , PipelineTag.Type.Test
