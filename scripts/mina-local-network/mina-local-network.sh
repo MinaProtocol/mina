@@ -78,6 +78,7 @@ NODE_PIDS=()
 OVERRIDE_GENSIS_LEDGER=""
 ON_EXIT="grace_exit_all"
 REDIRECT_LOGS=false
+NODE_STATUS_URL=""
 
 
 # =================================================
@@ -163,8 +164,10 @@ help() {
                                          |   Default: ${ROOT}
 --redirect-logs                          | When set, redirect logs for nodes (excluding workers) and archive to file instead of console output
                                          |   Default: ${REDIRECT_LOGS}
---on-exit                                | How is exit handled. Set to 'grace_exit_all' to use mina CLI to stop all daemon  nodes, and kill SNARK workers; Set to 'kill_snark_workers' to only kill SNARK workers but ignoring everything else. 
+--on-exit                                | Possible Values : {grace_exit_all,kill_snark_workers} . Defines how script exit is handled. If set to 'grace_exit_all' mina CLI to stop all daemon nodes, and kill SNARK workers; If set to 'kill_snark_workers' to only kill SNARK workers but ignoring everything else.
                                          |   Default: ${ON_EXIT}
+--node-status-url                        | Url of the node status collection service 
+                                         |   Default: not set
 -h   |--help                             | Displays this help message
 
 Available logging levels:
@@ -252,6 +255,8 @@ on-exit() {
       fi
       ;;
     kill_snark_workers)
+      # NOTE: SNARK workers are already killed out of this case-statement. Hence
+      # no need to do anything here.
       : ;;
     *)
       echo "Unknown ON_EXIT value: $1" >&2
@@ -316,6 +321,10 @@ exec-daemon() {
     extra_opts+=( --hardfork-handling "$HARDFORK_HANDLING" )
   fi
 
+  if [ -n "$NODE_STATUS_URL" ]; then
+    extra_opts+=( --node-status-url "$NODE_STATUS_URL" )
+  fi
+
   # shellcheck disable=SC2068
   exec ${MINA_EXE} daemon \
     --client-port "${CLIENT_PORT}" \
@@ -371,7 +380,10 @@ exec-rosetta-node() {
 }
 
 log-file() {
-  if [[ "$REDIRECT_LOGS" == true ]]; then
+  # If $1 is provided, use it. Otherwise, fall back to $REDIRECT_LOGS.
+  local should_redirect="${1:-$REDIRECT_LOGS}"
+
+  if [[ "$should_redirect" == true ]]; then
     tee "${FOLDER}/log.txt"
   else
     cat
@@ -402,7 +414,7 @@ spawn-snark-worker() {
 
   # shellcheck disable=SC2068
   exec-snark-worker $@ --config-directory "${FOLDER}" 2>&1 \
-    | log-file | tag-stdout "$tag" &
+    | log-file "$REDIRECT_WORKER_LOGS" | tag-stdout "$tag" &
 }
 
 # Spawns the Archive Node in background
@@ -638,6 +650,10 @@ while [[ "$#" -gt 0 ]]; do
     ON_EXIT="${2}"
     shift
     ;;
+  --node-status-url) 
+    NODE_STATUS_URL="${2}"
+    shift
+    ;;
   *)
     echo "Unknown parameter passed: ${1}"
 
@@ -864,6 +880,8 @@ load_config() {
         --out-genesis-ledger-file "${ROOT}"/genesis_ledger.json
 
       reset-genesis-ledger "${ROOT}" "${config_file}"
+      echo "Using freshly generated config file ${config_file}:"
+      cat "${config_file}"
       ;;
 
     inherit_with:*)
@@ -898,11 +916,15 @@ update_genesis_timestamp() {
     fixed:*)
       local timestamp="${1#fixed:}"
       echo "Updating Genesis State timestamp to ${timestamp}..."
-      local overridden_unix=$(date -d "$timestamp" +%s)
-      local now_unix=$(date +%s)
-      # NOTE: will there's still race condition that before all nodes are 
-      # spawned up we passed this time. We should catch the improperly-set 
-      # genesis in most case
+
+      local overridden_unix
+      overridden_unix=$(date -d "$timestamp" +%s)
+      local now_unix
+      now_unix=$(date +%s)
+
+      # NOTE: while there's still race condition that before all nodes are 
+      # spawned up we passed this instant, we should catch the improperly-set 
+      # genesis timestamp in most scenarios
       if (( overridden_unix < now_unix )); then
         echo "Spawning a network with genesis $timestamp in the past!!"
         return 1
