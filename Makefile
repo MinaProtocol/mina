@@ -730,7 +730,7 @@ hardfork-debian: ocaml_checks ## Generate hardfork packages
 	MINA_DEB_CODENAME=$(CODENAME) \
 	BRANCH_NAME=$(BRANCH_NAME) \
 	KEEP_MY_TAGS_INTACT=true \
-	./scripts/hardfork/build-packages.sh daemon_devnet_hardfork
+	./scripts/hardfork/release/build-packages.sh daemon_devnet_hardfork
 
 
 .PHONY: hardfork-docker

@@ -282,7 +282,7 @@ echo ""
 echo "=== Step 4: Converting debian package ==="
 
 # Check if conversion script exists
-CONVERSION_SCRIPT="$REPO_ROOT/scripts/hardfork/convert-daemon-debian-to-hf.sh"
+CONVERSION_SCRIPT="$REPO_ROOT/scripts/hardfork/release/convert-daemon-debian-to-hf.sh"
 if [[ ! -f "$CONVERSION_SCRIPT" ]]; then
     echo "ERROR: Conversion script not found: $CONVERSION_SCRIPT" >&2
     exit 1

@@ -13,9 +13,8 @@
 set -eux -o pipefail
 
 PREFORK=""
-FORK_METHOD="legacy"
 
-USAGE="Usage: $0 --fork-from <PREFORK> [--fork-method <FORK_METHOD>]"
+USAGE="Usage: $0 --fork-from <PREFORK> [EXTRA_ARGS]"
 usage() {
   if (( $# > 0 )); then
     echo "$1" >&2
@@ -26,6 +25,8 @@ usage() {
     exit 0
   fi
 }
+
+EXTRA_ARGS=()
 
 # ---- argument parsing --------------------------------------------------------
 while [[ $# -gt 0 ]]; do
@@ -38,30 +39,12 @@ while [[ $# -gt 0 ]]; do
       PREFORK="$2"
       shift 2
       ;;
-    --fork-method)
-      # ensure value exists
-      if [[ $# -lt 2 ]]; then
-        usage "Error: $1 requires an argument."
-      fi
-      case "$2" in
-        legacy|advanced)
-          FORK_METHOD="$2"
-          ;;
-        *)
-          usage "Error: $1 must be either 'legacy' or 'advanced'."
-          ;;
-      esac
-      shift 2
-      ;;
     --help|-h)
       usage
       ;;
-    --*)
-      usage "Unknown option: $1"
-      ;;
     *)
-      # positional arg — store if needed later
-      usage "Unexpected argument: $1"
+      EXTRA_ARGS+=("$1")
+      shift
       ;;
   esac
 done
@@ -105,7 +88,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 if [ -n "${BUILDKITE:-}" ]; then
   # This is a CI run, ensure nix docker has everything what we want.
-  nix-env -iA unstable.{curl,git-lfs,gnused,jq,python311}
+  nix-env -iA unstable.{curl,gawk,git-lfs,gnused,jq,python311}
 
   python -m venv .venv
   source .venv/bin/activate
@@ -170,10 +153,8 @@ hardfork_test/bin/hardfork_test \
   --main-runtime-genesis-ledger prefork-devnet/bin/runtime_genesis_ledger \
   --fork-mina-exe postfork-devnet/bin/mina \
   --fork-runtime-genesis-ledger postfork-devnet/bin/runtime_genesis_ledger \
-  --slot-tx-end "$SLOT_TX_END" \
-  --slot-chain-end "$SLOT_CHAIN_END" \
   --script-dir "$SCRIPT_DIR" \
   --root "$NETWORK_ROOT" \
-  --fork-method "$FORK_METHOD"
+  "${EXTRA_ARGS[@]}"
 
 popd

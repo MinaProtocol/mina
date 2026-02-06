@@ -22,7 +22,7 @@ in  Pipeline.build
         , dirtyWhen =
           [ S.strictlyStart
               ( S.contains
-                  "buildkite/scripts/tests/convert-debian-to-hf-test.sh"
+                  "scripts/hardfork/release/convert-daemon-debian-to-hf.sh"
               )
           , S.strictlyStart (S.contains "scripts/debian/session")
           ]
