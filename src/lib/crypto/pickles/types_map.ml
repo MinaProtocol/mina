@@ -310,34 +310,6 @@ let num_chunks : type var value. (var, value, _, _) Tag.t -> int =
   | Side_loaded ->
       (lookup_side_loaded tag.id).permanent.num_chunks
 
-let _value_to_field_elements :
-    type a. (_, a, _, _) Tag.t -> a -> Backend.Tick.Field.t array =
- fun t ->
-  let (Typ typ) = public_input t in
-  fun x -> fst (typ.value_to_fields x)
-
-let _lookup_map (type var value c d) (t : (var, value, c, d) Tag.t) ~self
-    ~default
-    ~(f :
-          [ `Compiled of (var, value, c, d) Compiled.t
-          | `Side_loaded of (var, value, c) Side_loaded.t ]
-       -> _ ) =
-  match Type_equal.Id.same_witness t.id self with
-  | Some _ ->
-      default
-  | None -> (
-      match t.kind with
-      | Compiled ->
-          let (T (other_id, d)) = find univ.compiled (Type_equal.Id.uid t.id) in
-          let T = Type_equal.Id.same_witness_exn t.id other_id in
-          f (`Compiled d)
-      | Side_loaded ->
-          let (T (other_id, d)) =
-            find univ.side_loaded (Type_equal.Id.uid t.id)
-          in
-          let T = Type_equal.Id.same_witness_exn t.id other_id in
-          f (`Side_loaded d) )
-
 let add_side_loaded ~name permanent =
   let (Tag.{ id; _ } as tag) = Tag.(create ~kind:Side_loaded name) in
   Hashtbl.add_exn univ.side_loaded ~key:(Type_equal.Id.uid id)

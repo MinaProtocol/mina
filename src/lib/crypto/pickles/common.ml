@@ -9,8 +9,6 @@ module Max_degree = struct
   let step = 1 lsl step_log2
 
   let wrap_log2 = Nat.to_int Backend.Tock.Rounds.n
-
-  let _wrap = 1 lsl wrap_log2
 end
 
 let tick_shifts, tock_shifts =
