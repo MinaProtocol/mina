@@ -260,31 +260,6 @@ copy_common_daemon_configs() {
   esac
 }
 
-function copy_common_rosetta_configs () {
-
-  mkdir -p "${BUILDDIR}/usr/local/bin"
-
-  # Copy rosetta-based Binaries
-  cp ./default/src/app/rosetta/rosetta_"${1}"_signatures.exe \
-    "${BUILDDIR}/usr/local/bin/mina-rosetta"
-  cp ./default/src/app/rosetta/ocaml-signer/signer_"${1}"_signatures.exe \
-    "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
-
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta"
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta/scripts"
-
-  # --- Copy artifacts
-  cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
-  cp ../src/app/rosetta/rosetta-cli-config/*.json \
-    "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  cp ../src/app/rosetta/rosetta-cli-config/*.ros \
-    "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe \
-    "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
-
-}
-
 ## LOGPROC PACKAGE ##
 
 #
@@ -407,79 +382,64 @@ build_functional_test_suite_deb() {
 }
 ## END TEST SUITE PACKAGE ##
 
-## ROSETTA MAINNET PACKAGE ##
+## ROSETTA PACKAGE ##
 
 #
-# Builds mina-rosetta-mainnet package for mainnet Rosetta API
+# Builds mina-rosetta-{NETWORK} package for Rosetta API on specified network
 #
-# Output: mina-rosetta-mainnet_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-rosetta-${NETWORK}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}
 #
-# Rosetta API implementation for mainnet with mainnet signature binaries.
+# Rosetta API implementation for specified network
 #
-build_rosetta_mainnet_deb() {
+build_rosetta_deb() {
+
+  local network="$1"
 
   echo "------------------------------------------------------------"
-  echo "--- Building mainnet rosetta deb"
+  echo "--- Building ${network} rosetta deb"
 
-  create_control_file mina-rosetta-mainnet "${SHARED_DEPS}" \
+  create_control_file "mina-rosetta-${network}" "${SHARED_DEPS}" \
     'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
 
-  copy_common_rosetta_configs "mainnet"
+  local profile_of_network
 
-  build_deb mina-rosetta-mainnet
+  case "${network}" in
+    mainnet)
+      profile_of_network="mainnet"
+      ;;
+    devnet|testnet-generic)
+      profile_of_network="testnet"
+      ;;
+    *)
+      echo "Unknown network name provided: ${network}"; exit 1
+      ;;
+  esac
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Copy rosetta-based Binaries
+  cp ./default/src/app/rosetta/rosetta_"${profile_of_network}"_signatures.exe \
+    "${BUILDDIR}/usr/local/bin/mina-rosetta"
+  cp ./default/src/app/rosetta/ocaml-signer/signer_"${profile_of_network}"_signatures.exe \
+    "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
+
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/scripts"
+
+  # --- Copy artifacts
+  cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
+  cp ../src/app/rosetta/rosetta-cli-config/*.json \
+    "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ../src/app/rosetta/rosetta-cli-config/*.ros \
+    "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe \
+    "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
+
+  build_deb "mina-rosetta-${network}"
 }
-## END ROSETTA MAINNET PACKAGE ##
-
-## ROSETTA DEVNET PACKAGE ##
-
-#
-# Builds mina-rosetta-devnet package for devnet Rosetta API
-#
-# Output: mina-rosetta-devnet_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}
-#
-# Rosetta API implementation for devnet with testnet signature binaries.
-#
-build_rosetta_devnet_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building devnet rosetta deb"
-
-  create_control_file mina-rosetta-devnet "${SHARED_DEPS}" \
-    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
-
-  copy_common_rosetta_configs "testnet"
-
-  build_deb mina-rosetta-devnet
-}
-## END ROSETTA DEVNET PACKAGE ##
-
-## ROSETTA GENERIC TESTNET PACKAGE ##
-
-#
-# Builds mina-rosetta-testnet-generic package for Generic testnet Rosetta API
-#
-# Output: mina-rosetta-testnet-generic_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}
-#
-# Rosetta API implementation for testnet-generic testnet with testnet signature binaries.
-#
-build_rosetta_testnet_generic_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building testnet-generic rosetta deb"
-
-  create_control_file mina-rosetta-testnet-generic "${SHARED_DEPS}" \
-    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
-
-  copy_common_rosetta_configs "testnet"
-
-  build_deb mina-rosetta-testnet-generic
-}
-## END GENERIC TESTNET PACKAGE ##
-
-## MAINNET PACKAGE ##
+## END ROSETTA PACKAGE ##
 
 #
 # Builds mina-mainnet package for mainnet daemon
