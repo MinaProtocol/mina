@@ -441,6 +441,26 @@ build_rosetta_deb() {
 }
 ## END ROSETTA PACKAGE ##
 
+## CONFIG PACKAGE ##
+build_daemon_config_deb() {
+
+  local network="$1"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building ${network} config deb without keys:"
+
+  local package_name="mina-${network}-config"
+
+  create_control_file "${package_name}" "" \
+    "Mina Protocol Config for daemons running under ${network}" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
+
+  copy_common_daemon_configs "${network}"
+
+  build_deb "${package_name}"
+}
+
+## END CONFIG PACKAGE ##
+
 #
 # Builds mina-mainnet package for mainnet daemon
 #
@@ -465,19 +485,6 @@ build_daemon_mainnet_deb() {
   build_deb mina-mainnet
 }
 
-build_daemon_mainnet_config_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building mainnet config deb without keys:"
-
-  # Remove SUGGESTED_DEPS from Depends, add as Suggests instead.
-  create_control_file mina-mainnet-config "" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-mainnet (<< ${MINA_DEB_VERSION})"
-
-  copy_common_daemon_configs mainnet
-
-  build_deb mina-mainnet-config
-}
 ## END MAINNET PACKAGE ##
 
 ## DEVNET PACKAGE ##
@@ -510,19 +517,6 @@ build_daemon_devnet_deb() {
   copy_common_daemon_utils 'seed-lists/devnet_seeds.txt'
 
   build_deb "${MINA_DEVNET_DEB_NAME}"
-}
-
-build_daemon_devnet_config_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building testnet signatures config deb without keys:"
-
-  create_control_file mina-devnet-config "" \
-    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}" "mina-devnet (<< ${MINA_DEB_VERSION})"
-
-  copy_common_daemon_configs devnet
-
-  build_deb mina-devnet-config
 }
 ## END DEVNET PACKAGE ##
 
