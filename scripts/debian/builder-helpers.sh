@@ -461,64 +461,56 @@ build_daemon_config_deb() {
 
 ## END CONFIG PACKAGE ##
 
+## DAEMON PACKAGE ##
+
 #
-# Builds mina-mainnet package for mainnet daemon
+# Builds package for daemon under specified network
 #
-# Output: mina-mainnet_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: 
+# - If we're building for mainnet: mina-${NETWORK}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# - If we're building for devnet: ${MINA_DEVNET_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+#   Where MINA_DEVNET_DEB_NAME can be:
+#     - "mina-devnet" (default)
+#     - "mina-devnet-lightnet" (if DUNE_PROFILE=lightnet)
+#     - "mina-devnet-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#     - "mina-devnet-lightnet-instrumented" (both conditions)
+#
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS} (includes libpq-dev, jemalloc, logproc)
 #
-# Full mainnet daemon package with mainnet signatures and mainnet genesis ledger
-# as default. Uses mainnet seed list and mainnet configuration.
-#
-build_daemon_mainnet_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building mainnet apps deb without keys:"
-
-  create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}, mina-mainnet-config (>=${MINA_DEB_VERSION})" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-mainnet (<< ${MINA_DEB_VERSION})"
-
-  copy_common_daemon_apps mainnet
-
-  copy_common_daemon_utils 'mina-seed-lists/mainnet_seeds.txt'
-
-  build_deb mina-mainnet
-}
-
-## END MAINNET PACKAGE ##
-
-## DEVNET PACKAGE ##
-
-#
-# Builds devnet daemon package with profile-aware naming
-#
-# Output: ${MINA_DEVNET_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Where MINA_DEVNET_DEB_NAME can be:
-#   - "mina-devnet" (default)
-#   - "mina-devnet-lightnet" (if DUNE_PROFILE=lightnet)
-#   - "mina-devnet-instrumented" (if DUNE_INSTRUMENT_WITH is set)
-#   - "mina-devnet-lightnet-instrumented" (both conditions)
-#
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Devnet daemon with testnet signatures and devnet genesis ledger as default.
+# Full daemon package with signatures and genesis ledger for specified network.
 # Package name includes suffixes for different profiles and instrumentation.
 #
-build_daemon_devnet_deb() {
+build_daemon_deb() {
+
+  local network="$1"
 
   echo "------------------------------------------------------------"
-  echo "--- Building testnet signatures deb without keys:"
+  echo "--- Building ${network} daemon deb without keys:"
 
-  create_control_file "${MINA_DEVNET_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-devnet-config (>=${MINA_DEB_VERSION})" \
-    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}" "${MINA_DEVNET_DEB_NAME} (<< ${MINA_DEB_VERSION})"
+  local deb_name
+  case "${network}" in
+    mainnet)
+      deb_name="mina-mainnet"
+      ;;
+    devnet)
+      deb_name="${MINA_DEVNET_DEB_NAME}"
+      ;;
+    *)
+      echo "Unknown network name provided: ${network}"; exit 1
+      ;;
+  esac
 
-  copy_common_daemon_apps testnet
+  create_control_file "${deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network}-config (>=${MINA_DEB_VERSION})" \
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "${deb_name} (<< ${MINA_DEB_VERSION})"
 
-  copy_common_daemon_utils 'seed-lists/devnet_seeds.txt'
+  copy_common_daemon_apps "${network}"
 
-  build_deb "${MINA_DEVNET_DEB_NAME}"
+  copy_common_daemon_utils "seed-lists/${network}_seeds.txt"
+
+  build_deb "${deb_name}"
 }
-## END DEVNET PACKAGE ##
+
+## END DAEMON PACKAGE ##
 
 ## MAINNET LEGACY PACKAGE ##
 
