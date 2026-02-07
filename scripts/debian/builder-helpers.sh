@@ -632,17 +632,43 @@ build_daemon_hardfork_config_deb() {
 
 ## END HARDFORK PACKAGE ##
 
+
+## ARCHIVE PACKAGE ##
+
+# Builds mina-archive-${NETWORK} package for devnet archive node
 #
-# Copies common binaries and configuration for archive packages
-#
-# Parameters:
-#   $1 - Archive package name (used for build_deb call)
-#
-# Sets up archive daemon, archive blocks tool, extract blocks tool,
-# missing blocks utilities, replayer, and SQL migration scripts.
-#
-copy_common_archive_configs() {
-  local ARCHIVE_DEB="${1}"
+# Output: 
+# - If network is one of mainnet/devnt: mina-archive-${NETWORK}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# - O.w. if network is 'testnet-generic': mina-archive-testnet-generic${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+#   Where DEB_SUFFIX can be:
+#     - "" (empty, default)
+#     - "-lightnet" (if DUNE_PROFILE=lightnet)
+#     - "-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#     - "-lightnet-instrumented" (both conditions)
+# Dependencies: ${ARCHIVE_DEPS} (libssl, libgomp, libpq-dev, libjemalloc)
+# Archive node package for devnet with all archive utilities and SQL scripts.
+build_archive_deb () {
+  local network="$1"
+
+  local ARCHIVE_DEB
+
+  case "${network}" in
+    mainnet|devnet)
+      ARCHIVE_DEB="mina-archive-${network}"
+      ;;
+    testnet-generic)
+      ARCHIVE_DEB=mina-archive-testnet-generic${DEB_SUFFIX}
+      ;;
+    *)
+      echo "Unknown network name provided: ${network}" >&2
+      exit 1
+      ;;
+  esac
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive devnet deb"
+
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process Compatible with Mina Daemon'
 
   mkdir -p "${BUILDDIR}/usr/local/bin"
 
@@ -667,87 +693,9 @@ copy_common_archive_configs() {
   rsync -Huav ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/archive"
 
   build_deb "$ARCHIVE_DEB"
-}
-
-## ARCHIVE DEVNET PACKAGE ##
-
-#
-# Builds mina-archive-devnet package for devnet archive node
-#
-# Output: mina-archive-devnet_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${ARCHIVE_DEPS} (libssl, libgomp, libpq-dev, libjemalloc)
-#
-# Archive node package for devnet with all archive utilities and SQL scripts.
-#
-build_archive_devnet_deb () {
-  ARCHIVE_DEB=mina-archive-devnet
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive devnet deb"
-
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
-
-  copy_common_archive_configs "$ARCHIVE_DEB"
-
-}
-## END ARCHIVE DEVNET PACKAGE ##
-
-## ARCHIVE GENERIC TESTNET PACKAGE ##
-
-#
-# Builds Generic testnet archive package with profile-aware naming
-#
-# Output: mina-archive-testnet-generic${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Where DEB_SUFFIX can be:
-#   - "" (empty, default)
-#   - "-lightnet" (if DUNE_PROFILE=lightnet)
-#   - "-instrumented" (if DUNE_INSTRUMENT_WITH is set)
-#   - "-lightnet-instrumented" (both conditions)
-#
-# Dependencies: ${ARCHIVE_DEPS}
-#
-# Archive node package for Generic testnet with suffix-aware naming for different profiles.
-#
-build_archive_testnet_generic_deb () {
-  ARCHIVE_DEB=mina-archive-testnet-generic${DEB_SUFFIX}
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive testnet-generic deb"
-
-
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
-
-  copy_common_archive_configs "$ARCHIVE_DEB"
 
 }
 ## END ARCHIVE PACKAGE ##
-
-## ARCHIVE MAINNET PACKAGE ##
-
-#
-# Builds mina-archive-mainnet package for mainnet archive node
-#
-# Output: mina-archive-mainnet_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${ARCHIVE_DEPS}
-#
-# Archive node package for mainnet with all archive utilities and SQL scripts.
-#
-build_archive_mainnet_deb () {
-  ARCHIVE_DEB=mina-archive-mainnet
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive mainnet deb"
-
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
-
-  copy_common_archive_configs "$ARCHIVE_DEB"
-
-}
-## END ARCHIVE MAINNET PACKAGE ##
-
 
 ## ZKAPP TEST TXN ##
 
