@@ -83,6 +83,21 @@ BUILDDIR="deb_build"
 AUTOMODE_PRE_HF_DIR=${BUILDDIR}/usr/lib/mina/bin/berkeley
 HF_NAME="mesa"
 
+signature_of_network() {
+  case "${network}" in
+    mainnet)
+      printf "mainnet"
+      ;;
+    devnet|testnet-generic)
+      printf "testnet"
+      ;;
+    *)
+      echo "Unknown network name provided: ${network}" >&2
+      exit 1
+      ;;
+  esac
+}
+
 # Function to ease creation of Debian package control files
 create_control_file() {
 
@@ -199,13 +214,16 @@ copy_common_daemon_utils() {
 # Copies common daemon binaries only to debian package
 copy_common_daemon_apps() {
 
-  echo "------------------------------------------------------------"
-  echo "copy_common_daemon_apps inputs:"
-  echo "Signature Type: ${1} (mainnet or testnet)"
-
+  local network="$1"
   local TARGET_ROOT_DIR="${2:-${BUILDDIR}/usr/local/bin}"
 
+  echo "------------------------------------------------------------"
+  echo "copy_common_daemon_apps inputs:"
+  echo "Network: ${1} (mainnet, devnet or testnet-generic)"
   echo "Target Root Dir: ${TARGET_ROOT_DIR}"
+
+  local signature
+  signature=$(signature_of_network "$network")
 
   mkdir -p "${TARGET_ROOT_DIR}"
 
@@ -224,7 +242,7 @@ copy_common_daemon_apps() {
 
   # Copy signature-based Binaries (based on signature type $1 passed into the \
   # function)
-  cp ./default/src/app/cli/src/mina_"${1}"_signatures.exe \
+  cp "./default/src/app/cli/src/mina_${signature}_signatures.exe" \
     "${TARGET_ROOT_DIR}/mina"
 
 }
@@ -403,26 +421,15 @@ build_rosetta_deb() {
   create_control_file "mina-rosetta-${network}" "${SHARED_DEPS}" \
     'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
 
-  local profile_of_network
-
-  case "${network}" in
-    mainnet)
-      profile_of_network="mainnet"
-      ;;
-    devnet|testnet-generic)
-      profile_of_network="testnet"
-      ;;
-    *)
-      echo "Unknown network name provided: ${network}"; exit 1
-      ;;
-  esac
+  local signature
+  signature=$(signature_of_network "$network")
 
   mkdir -p "${BUILDDIR}/usr/local/bin"
 
   # Copy rosetta-based Binaries
-  cp ./default/src/app/rosetta/rosetta_"${profile_of_network}"_signatures.exe \
+  cp "./default/src/app/rosetta/rosetta_${signature}_signatures.exe" \
     "${BUILDDIR}/usr/local/bin/mina-rosetta"
-  cp ./default/src/app/rosetta/ocaml-signer/signer_"${profile_of_network}"_signatures.exe \
+  cp "./default/src/app/rosetta/ocaml-signer/signer_${signature}_signatures.exe" \
     "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
 
   mkdir -p "${BUILDDIR}/etc/mina/rosetta"
@@ -568,7 +575,7 @@ build_daemon_testnet_generic_deb() {
     'Mina Protocol Client and Daemon for the Generic Testnet Network' \
     "${SUGGESTED_DEPS}" "mina-devnet (<< ${MINA_DEB_VERSION})"
 
-  copy_common_daemon_apps testnet
+  copy_common_daemon_apps testnet-generic
 
   # copy devnet config just in case, but not as magic config, so it won't get picked up by default
   # when starting the daemon
