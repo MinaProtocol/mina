@@ -89,6 +89,12 @@ module Wrap = struct
         open Pickles_types
 
         module In_circuit = struct
+          [@@@warning "-27"]
+
+          (* 'fp_opt is unused but kept for type compatibility with other
+             In_circuit types. We suppress the warning instead of using a
+             phantom type to preserve the serialization format. *)
+
           (** All scalar values deferred by a verifier circuit.
               We expose them so the next guy (who can do scalar arithmetic) can check that they
               were computed correctly from the evaluations in the proof and the challenges.
@@ -239,9 +245,14 @@ module Wrap = struct
       [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
       module Minimal = struct
+        [@@@warning "-27"]
+
         [%%versioned
         module Stable = struct
           module V1 = struct
+            (* 'fp is unused in Minimal but kept for type compatibility with
+               In_circuit. We suppress the warning instead of using a phantom
+               type to preserve the serialization format. *)
             type ( 'challenge
                  , 'scalar_challenge
                  , 'fp
@@ -732,7 +743,7 @@ module Wrap = struct
 
       (** A layout of the raw data in a statement, which is needed for
           representing it inside the circuit. *)
-      let spec impl lookup feature_flags =
+      let spec _impl lookup feature_flags =
         let feature_flags_spec =
           let [ f1; f2; f3; f4; f5; f6; f7; f8 ] =
             (* Ensure that layout is the same *)
