@@ -81,6 +81,7 @@ BUILDDIR="deb_build"
 
 # For automode purpose. We need to control location for both runtimes
 AUTOMODE_PRE_HF_DIR=${BUILDDIR}/usr/lib/mina/bin/berkeley
+HF_NAME="mesa"
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -512,59 +513,34 @@ build_daemon_deb() {
 
 ## END DAEMON PACKAGE ##
 
-## MAINNET LEGACY PACKAGE ##
+## LEGACY PACKAGE ##
 
 #
-# Builds mina-mainnet-pre-hardfork-mesa tailored package for automode package
+# Builds mina-${NETWORK}-pre-hardfork-${HF_NAME} tailored package for automode package
 #
-# Output: mina-mainnet-pre-hardfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-${NETWORK}-pre-hardfork-${HF_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Contains only the legacy mainnet binaries places in "/usr/lib/mina/berkeley" without
+# Contains only the legacy binaries placed in "$AUTOMODE_PRE_HF_DIR" without
 # configuration files or genesis ledgers.
 #
-build_daemon_mainnet_pre_hardfork_deb() {
+build_daemon_pre_hardfork_deb() {
 
-  NAME="mina-mainnet-pre-hardfork-mesa"
+  local network="$1"
 
-  echo "------------------------------------------------------------"
-  echo "--- Building mainnet berkeley deb for hardfork automode :"
-
-  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
-
-  copy_common_daemon_apps mainnet $AUTOMODE_PRE_HF_DIR
-
-  build_deb $NAME
-}
-## END MAINNET LEGACY PACKAGE ##
-
-## DEVNET LEGACY PACKAGE ##
-
-#
-# Builds mina-devnet-pre-hardfork-mesa tailored package for automode package
-#
-# Output: mina-devnet-pre-hardfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Contains only the legacy mainnet binaries places in "/usr/lib/mina/berkeley" without
-# configuration files or genesis ledgers.
-#
-build_daemon_devnet_pre_hardfork_deb() {
-
-  NAME="mina-devnet-pre-hardfork-mesa"
+  local deb_name="mina-${network}-pre-hardfork-${HF_NAME}"
 
   echo "------------------------------------------------------------"
-  echo "--- Building testnet berkeley legacy deb for hardfork automode :"
+  echo "--- Building ${network} berkeley deb for hardfork automode :"
 
-  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
+  create_control_file "${deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
+    "Mina Protocol Client and Daemon for network ${network} before hardfork ${HF_NAME}" "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_apps testnet $AUTOMODE_PRE_HF_DIR
+  copy_common_daemon_apps "$network" "$AUTOMODE_PRE_HF_DIR"
 
-  build_deb $NAME
+  build_deb "$deb_name"
 }
-## END DEVNET LEGACY PACKAGE ##
+## END LEGACY PACKAGE ##
 
 ## TESTNET GENERIC PACKAGE ##
 
