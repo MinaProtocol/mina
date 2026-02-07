@@ -1,8 +1,8 @@
 # Snarky Taylor
 
 This library implements Taylor series approximations of functions for use in
-zkSNARKs. It provides facilities for approximating functions like
-exponentiation with arbitrary-precision fixed-point arithmetics.
+zkSNARKs. It provides facilities for approximating functions like exponentiation
+with arbitrary-precision fixed-point arithmetics.
 
 ## Overview
 
@@ -17,8 +17,8 @@ The library consists of two main components:
 ## Usage
 
 The library is designed to be used with the Snarky framework for constructing
-zkSNARKs. It provides both checked (for use within SNARK circuits) and
-unchecked (for regular computation) implementations of functions.
+zkSNARKs. It provides both checked (for use within SNARK circuits) and unchecked
+(for regular computation) implementations of functions.
 
 ## Testing
 

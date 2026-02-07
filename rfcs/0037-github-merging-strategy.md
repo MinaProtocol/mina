@@ -1,9 +1,11 @@
 ## Summary
+
 [summary]: #summary
 
 This RFC proposes changing our git merge strategy from squash to merge commits.
 
 ## Motivation
+
 [motivation]: #motivation
 
 We would like for pull-requests (PRs) to merge more quickly and automatically.
@@ -13,9 +15,9 @@ changes in the `develop` branch.
 
 In addition, we have begun to use GitHub's 'PR chains', where a series of
 smaller changes can be linked together in a chain, but with each change in its
-own PR. These allow us to continue to work on larger features even when
-earlier changes haven't yet been included in the `develop` branch, and without
-combining the changes into a single large PR.  PR #5093 added support for the
+own PR. These allow us to continue to work on larger features even when earlier
+changes haven't yet been included in the `develop` branch, and without combining
+the changes into a single large PR. PR #5093 added support for the
 `ready-to-merge-into-develop` label, which automates the process of merging
 these PR chains correctly.
 
@@ -23,9 +25,10 @@ When multiple PRs modify the same lines of code and one of them is merged into
 `develop`, the other will have 'merge conflicts' and will need manual
 intervention to fix the conflict before it can be merged. We would like to
 minimise this because
-* PRs with conflicts do not merge automatically
-* the PR process is slowed down by waiting for these manual interventions
-* developer time is wasted in resolving these conflicts.
+
+- PRs with conflicts do not merge automatically
+- the PR process is slowed down by waiting for these manual interventions
+- developer time is wasted in resolving these conflicts.
 
 Our current merge strategy is 'squash and merge', which discards the
 individually committed changes within each PR. This hampers `git`'s ability to
@@ -34,6 +37,7 @@ commits, unnecessarily creating more merge conflicts to be handled manually.
 
 These unnecessary conflicts are particularly prevelant in PR chains. For
 example,
+
 ```
 PR 1
    develop
@@ -47,12 +51,14 @@ PR 2 (chained to PR 1)
 -> [Modify line 1 in A.txt]
 -> ...
 ```
-when `PR 1` is squashed and merged into develop, `git` is unable to recognise
-that the initial changes made in `PR 2` match with those from `PR 1` and
-reports a merge conflict.
 
-If PRs in chains have review comments that result in changes, these will
-usually also result in a merge conflict. For example,
+when `PR 1` is squashed and merged into develop, `git` is unable to recognise
+that the initial changes made in `PR 2` match with those from `PR 1` and reports
+a merge conflict.
+
+If PRs in chains have review comments that result in changes, these will usually
+also result in a merge conflict. For example,
+
 ```
 PR 1
    develop
@@ -67,10 +73,12 @@ PR 2 (chained to PR 1)
 -> [Add line 1 in C.txt]
 -> ...
 ```
+
 when `PR 1` is squashed and merged, `git` will again be unable to merge `PR 2`
 automatically.
 
 ## Detailed design
+
 [detailed-design]: #detailed-design
 
 We can use `git`'s merge commits when merging to avoid the above issues. These
@@ -80,6 +88,7 @@ resolve these conflicts.
 This is a simple configuration change in the GitHub settings for the repo.
 
 ## Drawbacks
+
 [drawbacks]: #drawbacks
 
 #### We lose a linear `git` history (from `git log` and friends)
@@ -90,6 +99,7 @@ beneath the merge commit, as expected.
 
 To generate a linear history from any branch between commits `aaaaaa` and
 `ffffff`, run the commands
+
 ```bash
 git checkout aaaaaa
 for commit_id in $(git rev-list --reverse --topo-order --first-parent aaaaaa..ffffff); do
@@ -138,28 +148,36 @@ This can be mostly ignored when using the above mitigations. Changing commit
 message culture is out of the scope of this RFC.
 
 ## Rationale and alternatives
+
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-* Why is this design the best in the space of possible designs?
+- Why is this design the best in the space of possible designs?
   - The alternatives (squashing and rebasing) both throw away the information
     that `git` needs to handle merges most effectively.
-* What other designs have been considered and what is the rationale for not choosing them?
+- What other designs have been considered and what is the rationale for not
+  choosing them?
   - Squashing and rebasing, as above.
-* What is the impact of not doing this?
+- What is the impact of not doing this?
   - Slower, manual PR merging and wasted developer effort.
 
 ## Prior art
+
 [prior-art]: #prior-art
 
 `git` was designed with merges using these kinds of merge commits in mind. The
 Linux kernel has used merge commits since it switched over to `git` in 2005.
 
 ## Unresolved questions
+
 [unresolved-questions]: #unresolved-questions
 
-* What parts of the design do you expect to resolve through the RFC process before this gets merged?
+- What parts of the design do you expect to resolve through the RFC process
+  before this gets merged?
   - None
-* What parts of the design do you expect to resolve through the implementation of this feature before merge?
+- What parts of the design do you expect to resolve through the implementation
+  of this feature before merge?
   - None
-* What related issues do you consider out of scope for this RFC that could be addressed in the future independently of the solution that comes out of this RFC?
+- What related issues do you consider out of scope for this RFC that could be
+  addressed in the future independently of the solution that comes out of this
+  RFC?
   - Commit message culture.

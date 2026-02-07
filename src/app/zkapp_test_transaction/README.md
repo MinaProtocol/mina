@@ -1,13 +1,22 @@
 # ZkApp test transaction tool
 
-A tool to generate zkapp transactions that can be sent to a mina test network. For more information on zkapps, checkout the following resources: https://docs.minaprotocol.com/en/zkapps.
-The WIP progress spec [here](https://o1-labs.github.io/snapps-txns-reference-impl/target/doc/snapps_txn_reference_impl/index.html) proposes the structure and behavior of mina zkapp transactions.
+A tool to generate zkapp transactions that can be sent to a mina test network.
+For more information on zkapps, checkout the following resources:
+https://docs.minaprotocol.com/en/zkapps. The WIP progress spec
+[here](https://o1-labs.github.io/snapps-txns-reference-impl/target/doc/snapps_txn_reference_impl/index.html)
+proposes the structure and behavior of mina zkapp transactions.
 
-The smart contract (which users might write using snarkyJS) used in the tool is intended only for testing as it does no operation on the state and simply accepts any update. The tool provides options to deploy this smart contract to a mina account and make various updates to the account
+The smart contract (which users might write using snarkyJS) used in the tool is
+intended only for testing as it does no operation on the state and simply
+accepts any update. The tool provides options to deploy this smart contract to a
+mina account and make various updates to the account
 
 #### Usage
 
-The tool generates a graphQL `sendZkapp` mutation that can be sent to the graphQL server the daemon starts by default at port 3085. One can use the UI to interact with the local graphQL server mounted at http://localhost:3085/graphql and paste the graphQL object that the tool prints
+The tool generates a graphQL `sendZkapp` mutation that can be sent to the
+graphQL server the daemon starts by default at port 3085. One can use the UI to
+interact with the local graphQL server mounted at http://localhost:3085/graphql
+and paste the graphQL object that the tool prints
 
 The commands proivded by this tool are-
 
@@ -47,13 +56,14 @@ ZkApp test transaction
 
 #### 1. Create a zkapp account / Deploy the test smart contract
 
-`create-zkapp-account` command takes the following input to create a zkapp account and deploy the test smart contract. 
+`create-zkapp-account` command takes the following input to create a zkapp
+account and deploy the test smart contract.
 
 ```shell
 $mina-zkapp-test-transaction create-zkapp-account -help
 Generate a zkApp transaction that creates a zkApp account
 
-  zkapp_test_transaction.exe create-zkapp-account 
+  zkapp_test_transaction.exe create-zkapp-account
 
 === flags ===
 
@@ -76,15 +86,26 @@ For example:
 $mina-zkapp-test-transaction create-zkapp-account --fee-payer-key my-fee-payer --nonce 0 --receiver-amount 2 --zkapp-account-key my-zkapp-key
 ```
 
-generates the following graphQL object- a zkapp transaction as input to the `sendZkapp` mutation. A zkapp transaction is basically a list of parties where each [party](https://o1-labs.github.io/snapps-txns-reference-impl/target/doc/snapps_txn_reference_impl/party/index.html) is an update performed on an account.
+generates the following graphQL object- a zkapp transaction as input to the
+`sendZkapp` mutation. A zkapp transaction is basically a list of parties where
+each
+[party](https://o1-labs.github.io/snapps-txns-reference-impl/target/doc/snapps_txn_reference_impl/party/index.html)
+is an update performed on an account.
 
 The zkapp transaction here has three parties-
 
-1. the fee payer party which specifies who pays the transaction fees and how much
-2. A party that pays the account creation fee to create the new zkapp account which in this case is the same as the fee payer
-3. A party to create a new zkapp account, set its verification key associated with the test smart contract, and update `editState` and `editSequenceState` permissions to use proofs as [authorization](https://o1-labs.github.io/snapps-txns-reference-impl/target/doc/snapps_txn_reference_impl/party/enum.PartyAuthorization.html).
+1. the fee payer party which specifies who pays the transaction fees and how
+   much
+2. A party that pays the account creation fee to create the new zkapp account
+   which in this case is the same as the fee payer
+3. A party to create a new zkapp account, set its verification key associated
+   with the test smart contract, and update `editState` and `editSequenceState`
+   permissions to use proofs as
+   [authorization](https://o1-labs.github.io/snapps-txns-reference-impl/target/doc/snapps_txn_reference_impl/party/enum.PartyAuthorization.html).
 
-The authorization used in each of the parties here is a signature of the respective accounts i.e., the updates on these accounts are authorized as per the accounts' permissions.
+The authorization used in each of the parties here is a signature of the
+respective accounts i.e., the updates on these accounts are authorized as per
+the accounts' permissions.
 
 ```
 mutation MyMutation {
@@ -281,10 +302,13 @@ mutation MyMutation {
 }
 ```
 
-Send the generated graphQL object to the local daemon via GraphiQL interface at http://localhost:3085/graphql ![Screenshot](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/deploy-zkapp.png)
+Send the generated graphQL object to the local daemon via GraphiQL interface at
+http://localhost:3085/graphql
+![Screenshot](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/deploy-zkapp.png)
 
-
-After the transaction is sent and included in a block, a new zkapp account with the verification of the test smart contract gets created. The account information can be queried through the graphQL `account` query.
+After the transaction is sent and included in a block, a new zkapp account with
+the verification of the test smart contract gets created. The account
+information can be queried through the graphQL `account` query.
 
 ```
 query MyQuery {
@@ -314,7 +338,6 @@ query MyQuery {
 }
 ```
 
-
 Query result:
 
 ```json
@@ -338,24 +361,26 @@ Query result:
         "setZkappUri": "Signature",
         "setTokenSymbol": "Signature",
         "setVerificationKey": "Signature",
-        "setVotingFor": "Signature",
+        "setVotingFor": "Signature"
       },
       "nonce": "0"
     }
   }
 }
 ```
+
 ![Screenshot](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/account-after-deploy.png)
 
 #### 2. Update zkapp state
 
-A zkapp transaction to update the 8 field elements representing the on-chain state of a smart contract
+A zkapp transaction to update the 8 field elements representing the on-chain
+state of a smart contract
 
 ```shell
 $mina-zkapp-test-transaction update-state -help
 Generate a zkApp transaction that updates zkApp state
 
-  zkapp_test_transaction.exe update-state 
+  zkapp_test_transaction.exe update-state
 
 === flags ===
 
@@ -389,8 +414,11 @@ $mina-zkapp-test-transaction update-state --fee-payer-key my-fee-payer --nonce 2
 
 The zkapp transaction here has two parties-
 
-1. The fee payer party which specifies who pays the transaction fees and how much
-2. A party that updates the `app_state` of the zkapp account. The authorization required to update the state is a proof (as updated the by deploy-zkapp transaction above `editState: Proof`)
+1. The fee payer party which specifies who pays the transaction fees and how
+   much
+2. A party that updates the `app_state` of the zkapp account. The authorization
+   required to update the state is a proof (as updated the by deploy-zkapp
+   transaction above `editState: Proof`)
 
 ```
 mutation MyMutation {
@@ -530,20 +558,12 @@ Result of the query
   "data": {
     "account": {
       "nonce": "0",
-      "zkappState": [
-        "1",
-        "2",
-        "3",
-        "4",
-        "5",
-        "6",
-        "7",
-        "8"
-      ]
+      "zkappState": ["1", "2", "3", "4", "5", "6", "7", "8"]
     }
   }
 }
 ```
+
 ![Screenshot](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/account-after-state-update.png)
 
 #### 3. Update Account Permissions
@@ -554,7 +574,7 @@ A zkapp transaction to update the account's permissions.
 $mina-zkapp-test-transaction update-permissions -help
 Generate a zkApp transaction that updates the permissions of a zkApp account
 
-  zkapp_test_transaction.exe update-permissions 
+  zkapp_test_transaction.exe update-permissions
 
 === flags ===
 
@@ -588,7 +608,8 @@ Generate a zkApp transaction that updates the permissions of a zkApp account
 
 ```
 
-For example: To change the permission required to edit permissions from Signature to Proof
+For example: To change the permission required to edit permissions from
+Signature to Proof
 
 ```shell
 $mina-zkapp-test-transaction update-permissions --fee-payer-key ..my-fee-payer --nonce 4 --zkapp-account-key my-zkapp-key --current-auth signature --edit-state Proof --receive None --set-permissions Proof --set-delegate Signature --set-verification-key Signature --set-zkapp-uri Signature --set-sequence-state Proof --set-token-symbol Signature --send Signature --increment-nonce Signature --set-voting-for Signature
@@ -725,6 +746,7 @@ mutation MyMutation {
   )
 }
 ```
+
 Account state after the above transaction is sent and included in a block
 
 ```
@@ -764,10 +786,11 @@ Result of the query
         "setZkappUri": "Signature",
         "setTokenSymbol": "Signature",
         "setVerificationKey": "Signature",
-        "setVotingFor": "Signature",
+        "setVotingFor": "Signature"
       }
     }
   }
 }
 ```
+
 ![Screenshot](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/account-after-setting-permissions.png)

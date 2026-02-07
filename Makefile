@@ -388,6 +388,14 @@ reformat: ocaml_checks ## Reformat all OCaml code
 	  src/app/reformat/reformat.exe -- \
 		-path .
 
+.PHONY: prettify-markdown
+prettify-markdown: ## Format markdown files with prettier
+	npx prettier --write "**/*.md"
+
+.PHONY: check-markdown
+check-markdown: ## Check markdown formatting with prettier
+	npx prettier --check "**/*.md"
+
 .PHONY: reformat-diff
 reformat-diff: ## Reformat only modified OCaml files
 	@FILES=$$(git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done); \

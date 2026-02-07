@@ -24,6 +24,7 @@ Note the `--` separator between the dune command and the arguments for the
 executable.
 
 A help option is always available using:
+
 ```
 dune exec src/lib/snark_worker/standalone/run_snark_worker.exe -- --help
 ```

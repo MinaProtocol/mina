@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "format:md": "make prettify-markdown",
+    "check:md": "make check-markdown"
+  },
+  "devDependencies": {
+    "prettier": "3.8.1"
+  }
+}

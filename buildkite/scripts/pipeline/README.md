@@ -1,6 +1,7 @@
 # Hardfork Pipeline Runner
 
-A robust Go-based tool for running and monitoring the hardfork package generation pipeline on Buildkite with custom environment variables.
+A robust Go-based tool for running and monitoring the hardfork package
+generation pipeline on Buildkite with custom environment variables.
 
 ## Features
 
@@ -10,11 +11,13 @@ A robust Go-based tool for running and monitoring the hardfork package generatio
 - ✅ **Duration tracking** - See how long each job runs
 - ✅ **Signal handling** - Graceful shutdown with Ctrl+C
 - ✅ **Exit codes** - Proper exit codes for CI/CD integration
-- ✅ **Hardfork-specific** - Tailored for hardfork package generation with all required parameters
+- ✅ **Hardfork-specific** - Tailored for hardfork package generation with all
+  required parameters
 
 ## Building
 
 ### Quick build:
+
 ```bash
 cd buildkite/scripts/pipeline
 make build
@@ -23,11 +26,13 @@ make build
 The binary will be created at `./bin/hardfork-runner`
 
 ### Install system-wide:
+
 ```bash
 make install
 ```
 
 ### Build for all platforms:
+
 ```bash
 make build-all
 ```
@@ -35,11 +40,13 @@ make build-all
 ## Usage
 
 ### Set up API token:
+
 ```bash
 export BUILDKITE_API_TOKEN="your_token_here"
 ```
 
 ### Basic usage (create build without monitoring):
+
 ```bash
 ./bin/hardfork-runner \
     --version "3.3.0-beta1-dkijania-do-not-rebuild-on-hf-pipeline-d62d701" \
@@ -48,6 +55,7 @@ export BUILDKITE_API_TOKEN="your_token_here"
 ```
 
 ### Create and monitor build:
+
 ```bash
 ./bin/hardfork-runner \
     --version "3.3.0-beta1-dkijania-do-not-rebuild-on-hf-pipeline-d62d701" \
@@ -63,24 +71,24 @@ export BUILDKITE_API_TOKEN="your_token_here"
 
 ## Command-line Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--version` | VERSION environment variable (required) | - |
-| `--codename` | CODENAMES environment variable | Noble |
-| `--config-url` | CONFIG_JSON_GZ_URL environment variable | - |
-| `--genesis-timestamp` | GENESIS_TIMESTAMP environment variable | - |
-| `--network` | NETWORK environment variable | Devnet |
-| `--repo` | REPO environment variable | Nightly |
-| `--precomputed-prefix` | PRECOMPUTED_FORK_BLOCK_PREFIX environment variable | - |
-| `--use-artifacts-from` | USE_ARTIFACTS_FROM_BUILDKITE_BUILD environment variable | - |
-| `--ledger-bucket` | MINA_LEDGER_S3_BUCKET environment variable | https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net |
-| `--branch` | Git branch to build | develop |
-| `--pipeline` | Pipeline in format org/pipeline | minaprotocol/mina |
-| `--message` | Build message | Custom pipeline run |
-| `--monitor` | Monitor build progress in real-time | false |
-| `--poll-interval` | Polling interval in seconds | 10 |
-| `--show-all-updates` | Show all job states, not just changes | false |
-| `--api-token` | Buildkite API token | $BUILDKITE_API_TOKEN |
+| Flag                   | Description                                             | Default                                                  |
+| ---------------------- | ------------------------------------------------------- | -------------------------------------------------------- |
+| `--version`            | VERSION environment variable (required)                 | -                                                        |
+| `--codename`           | CODENAMES environment variable                          | Noble                                                    |
+| `--config-url`         | CONFIG_JSON_GZ_URL environment variable                 | -                                                        |
+| `--genesis-timestamp`  | GENESIS_TIMESTAMP environment variable                  | -                                                        |
+| `--network`            | NETWORK environment variable                            | Devnet                                                   |
+| `--repo`               | REPO environment variable                               | Nightly                                                  |
+| `--precomputed-prefix` | PRECOMPUTED_FORK_BLOCK_PREFIX environment variable      | -                                                        |
+| `--use-artifacts-from` | USE_ARTIFACTS_FROM_BUILDKITE_BUILD environment variable | -                                                        |
+| `--ledger-bucket`      | MINA_LEDGER_S3_BUCKET environment variable              | https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net |
+| `--branch`             | Git branch to build                                     | develop                                                  |
+| `--pipeline`           | Pipeline in format org/pipeline                         | minaprotocol/mina                                        |
+| `--message`            | Build message                                           | Custom pipeline run                                      |
+| `--monitor`            | Monitor build progress in real-time                     | false                                                    |
+| `--poll-interval`      | Polling interval in seconds                             | 10                                                       |
+| `--show-all-updates`   | Show all job states, not just changes                   | false                                                    |
+| `--api-token`          | Buildkite API token                                     | $BUILDKITE_API_TOKEN                                     |
 
 ## Exit Codes
 
@@ -130,6 +138,7 @@ Job Summary:
 ## Integration Examples
 
 ### Use in CI/CD:
+
 ```bash
 #!/bin/bash
 set -e
@@ -150,6 +159,7 @@ fi
 ```
 
 ### Use in scripts:
+
 ```bash
 #!/bin/bash
 
@@ -177,16 +187,19 @@ echo "Build #$BUILD_NUMBER started"
 ## Development
 
 ### Run without building:
+
 ```bash
 go run run-hardfork-pipeline.go --version "1.0.0" --monitor
 ```
 
 ### Format code:
+
 ```bash
 go fmt run-hardfork-pipeline.go
 ```
 
 ### Run tests:
+
 ```bash
 make test
 ```
