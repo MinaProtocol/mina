@@ -588,8 +588,27 @@ build_daemon_testnet_generic_deb() {
 }
 ## END TESTNET GENERIC PACKAGE ##
 
-copy_common_daemon_hardfork_configs() {
-  local NETWORK_NAME="${1}"
+## HARDFORK PACKAGE ##
+
+#
+# Builds mina-${NETWORK}-hardfork package for specified network
+#
+# Output: mina-${NETWORK}-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Config only package with hardfork-specific runtime config and ledgers. 
+# Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
+#
+build_daemon_hardfork_config_deb() {
+
+  local NETWORK_NAME="$1"
+  local deb_name="mina-${NETWORK_NAME}-config"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building hardfork config testnet signatures deb without keys:"
+
+  create_control_file "${deb_name}" "" \
+    "Mina Protocol Client and Daemon for the ${NETWORK_NAME} Network" "${SUGGESTED_DEPS}" "mina-${NETWORK_NAME} (<< ${MINA_DEB_VERSION})"
 
   # Copy build config and ledgers
   copy_common_daemon_configs ${NETWORK_NAME}
@@ -607,94 +626,11 @@ copy_common_daemon_hardfork_configs() {
   cp "../genesis_ledgers/${NETWORK_NAME}.json" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.old.json"
 
   cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
+
+  build_deb "${deb_name}"
 }
 
-
-## DEVNET HARDFORK PACKAGE ##
-
-#
-# Builds mina-devnet-hardfork package for devnet hardfork
-#
-# Output: mina-devnet-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Devnet daemon package with hardfork-specific runtime config and ledgers.
-# Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
-#
-build_daemon_devnet_hardfork_config_deb() {
-  local __deb_name=mina-devnet-config
-
-  echo "------------------------------------------------------------"
-  echo "--- Building hardfork config testnet signatures deb without keys:"
-
-  create_control_file "${__deb_name}" "" \
-    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}" "mina-devnet (<< ${MINA_DEB_VERSION})"
-
-  copy_common_daemon_hardfork_configs devnet
-
-  build_deb "${__deb_name}"
-
-}
-
-## END DEVNET HARDFORK PACKAGE ##
-
-## TESTNET GENERIC  HARDFORK PACKAGE ##
-
-#
-# Builds mina-testnet-generic-hardfork package for Testnet Generic hardfork
-#
-# Output: mina-testnet-generic-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Testnet Generic daemon package with hardfork-specific runtime config and ledgers.
-# Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
-#
-build_daemon_testnet_generic_hardfork_config_deb() {
-  local __deb_name=mina-testnet-generic-config
-
-  echo "------------------------------------------------------------"
-  echo "--- Building hardfork config testnet-generic signatures deb without keys:"
-
-  create_control_file "${__deb_name}" "" \
-    'Mina Protocol Client and Daemon for the Berkeley Network' "${SUGGESTED_DEPS}" \
-    "mina-testnet-generic (<< ${MINA_DEB_VERSION})"
-
-  copy_common_daemon_hardfork_configs berkeley
-
-  build_deb "${__deb_name}"
-}
-
-## END TESTNET GENERIC HARDFORK PACKAGE ##
-
-## MAINNET HARDFORK PACKAGE ##
-
-#
-# Builds mina-mainnet-hardfork config package for mainnet hardfork
-#
-# Output: mina-mainnet-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Mainnet daemon package with hardfork-specific runtime config and ledgers.
-# Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
-# Note: Uses testnet signatures despite being mainnet hardfork package.
-#
-build_daemon_mainnet_hardfork_config_deb() {
-  local __deb_name=mina-mainnet-config
-
-  echo "------------------------------------------------------------"
-  echo "--- Building hardfork mainnet signatures deb without keys:"
-
-  create_control_file "${__deb_name}" "" \
-    'Mina Protocol Client and Daemon for the Mainnet Network' "${SUGGESTED_DEPS}" \
-    "mina-mainnet (<< ${MINA_DEB_VERSION})"
-
-  copy_common_daemon_hardfork_configs mainnet
-
-  build_deb "${__deb_name}"
-
-}
-
-## END MAINNET HARDFORK PACKAGE ##
+## END HARDFORK PACKAGE ##
 
 #
 # Copies common binaries and configuration for archive packages
