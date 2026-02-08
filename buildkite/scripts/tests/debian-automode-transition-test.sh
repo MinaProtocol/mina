@@ -101,6 +101,7 @@ fi
 PKG_DAEMON="mina-${NETWORK}-generic"
 PKG_AUTOMODE="mina-${NETWORK}-automode"
 PKG_CONFIG="mina-${NETWORK}-config"
+PKG_PROFILE="mina-${NETWORK}-profile"
 PKG_POSTFORK="mina-${NETWORK}-postfork-mesa"
 PKG_PREFORK="mina-${NETWORK}-prefork-mesa"
 
@@ -129,6 +130,7 @@ log_info "=== Step 1: Download debs from cache ==="
 ./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_DAEMON}_*" "${DEB_DIR}"
 ./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_AUTOMODE}_*" "${DEB_DIR}"
 ./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_CONFIG}_*" "${DEB_DIR}"
+./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_PROFILE}_*" "${DEB_DIR}"
 ./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_POSTFORK}_*" "${DEB_DIR}"
 ./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/mina-logproc_*" "${DEB_DIR}"
 
@@ -150,6 +152,7 @@ log_info "=== Step 2: Create versioned package variants ==="
 ORIG_DAEMON_DEB=$(ls "${DEB_DIR}"/${PKG_DAEMON}_*.deb | head -1)
 ORIG_AUTOMODE_DEB=$(ls "${DEB_DIR}"/${PKG_AUTOMODE}_*.deb | head -1)
 ORIG_CONFIG_DEB=$(ls "${DEB_DIR}"/${PKG_CONFIG}_*.deb | head -1)
+ORIG_PROFILE_DEB=$(ls "${DEB_DIR}"/${PKG_PROFILE}_*.deb | head -1)
 ORIG_POSTFORK_DEB=$(ls "${DEB_DIR}"/${PKG_POSTFORK}_*.deb | head -1)
 ORIG_LOGPROC_DEB=$(ls "${DEB_DIR}"/mina-logproc_*.deb | head -1)
 
@@ -173,12 +176,33 @@ reversion_deb() {
     rm -rf "${session_dir}"
 }
 
+reversion_legacy_daemon_deb() {
+    local input_deb="$1"
+    local new_version="$2"
+    local output_deb="$3"
+    local session_dir="${WORKDIR}/session_tmp"
+
+    rm -rf "${session_dir}"
+    "${SESSION_DIR}/deb-session-open.sh" "${input_deb}" "${session_dir}"
+    "${SESSION_DIR}/deb-session-reversion.sh" --update-deps "${session_dir}" "${new_version}"
+    sed -i -E "s/, ${PKG_PROFILE} \\([^)]*\\)//" "${session_dir}/control/control"
+    if grep -q "^Depends:.*${PKG_PROFILE}" "${session_dir}/control/control"; then
+        log_error "Legacy ${PKG_DAEMON} package should not depend on ${PKG_PROFILE}"
+        grep -E "^(Package|Version|Depends):" "${session_dir}/control/control" || true
+        exit 1
+    fi
+    "${SESSION_DIR}/deb-session-save.sh" "${session_dir}" "${output_deb}"
+    rm -rf "${session_dir}"
+}
+
 V1="1.0.0-transition-test"
 V2="2.0.0-transition-test"
 V3="3.0.0-transition-test"
 
 # V1: generic daemon + config + logproc (pre-hardfork)
 reversion_deb "${ORIG_DAEMON_DEB}"  "${V1}" "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
+# V1: mina-devnet + config + logproc (pre-hardfork, before profile packages)
+reversion_legacy_daemon_deb "${ORIG_DAEMON_DEB}" "${V1}" "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd64.deb"
 reversion_deb "${ORIG_CONFIG_DEB}"  "${V1}" "${REPO_DIR}/${PKG_CONFIG}_${V1}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}" "${V1}" "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
 
@@ -189,9 +213,10 @@ reversion_deb "${ORIG_POSTFORK_DEB}" "${V2}" "${REPO_DIR}/${PKG_POSTFORK}_${V2}_
 reversion_deb "${ORIG_CONFIG_DEB}"   "${V2}" "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}"  "${V2}" "${REPO_DIR}/mina-logproc_${V2}_amd64.deb"
 
-# V3: generic daemon + config + logproc (post-hardfork, back to normal)
+# V3: generic daemon + config + profile + logproc (post-hardfork, back to normal)
 reversion_deb "${ORIG_DAEMON_DEB}"  "${V3}" "${REPO_DIR}/${PKG_DAEMON}_${V3}_amd64.deb"
 reversion_deb "${ORIG_CONFIG_DEB}"  "${V3}" "${REPO_DIR}/${PKG_CONFIG}_${V3}_all.deb"
+reversion_deb "${ORIG_PROFILE_DEB}" "${V3}" "${REPO_DIR}/${PKG_PROFILE}_${V3}_amd64.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}" "${V3}" "${REPO_DIR}/mina-logproc_${V3}_amd64.deb"
 
 log_info "Versioned packages:"
@@ -252,6 +277,12 @@ $SUDO apt-get install -y --allow-downgrades --no-install-recommends "${V1_DEBS[@
 log_info "Installed ${PKG_DAEMON} v1"
 dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1
 
+if dpkg -l "${PKG_PROFILE}" 2>/dev/null | grep -q "^ii"; then
+    log_error "${PKG_PROFILE} should not be installed in v1"
+    exit 1
+fi
+log_info "PASS: ${PKG_PROFILE} is not installed in v1"
+
 # Verify mina binary is a real file (not a symlink to dispatcher)
 if [[ -L "/usr/local/bin/mina" ]]; then
     log_error "/usr/local/bin/mina should be a real binary in v1, not a symlink"
@@ -291,6 +322,7 @@ log_info "Package state after automode install:"
 dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_POSTFORK}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_PREFORK}" 2>/dev/null | tail -1 || true
+dpkg -l "${PKG_PROFILE}" 2>/dev/null | tail -1 || true
 dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1 || true
 
 # the generic daemon should be removed (replaced by automode)
@@ -343,6 +375,12 @@ if ! dpkg -l "${PKG_DAEMON}" 2>/dev/null | grep -q "^ii"; then
     exit 1
 fi
 log_info "PASS: ${PKG_DAEMON} v3 installed"
+
+if ! dpkg -l "${PKG_PROFILE}" 2>/dev/null | grep -q "^ii"; then
+    log_error "${PKG_PROFILE} should have been installed as a dependency of ${PKG_DAEMON} v3"
+    exit 1
+fi
+log_info "PASS: ${PKG_PROFILE} installed automatically"
 
 # Automode metapackage should be gone
 if dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | grep -q "^ii"; then
