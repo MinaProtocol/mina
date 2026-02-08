@@ -78,14 +78,27 @@ type executable_target =
   ; e_link_flags : string list
   ; e_bisect_sigterm : bool
   ; e_no_instrumentation : bool
+  ; e_forbidden_libraries : string list
   ; e_enabled_if : string option
   ; e_opam_deps : string list
   ; e_extra_stanzas : Dune_s_expr.t list
   }
 
+type test_target =
+  { t_internal_name : string
+  ; t_path : string
+  ; t_deps : dep list
+  ; t_ppx : Ppx.t option
+  ; t_modules : string list
+  ; t_flags : Dune_s_expr.t list
+  ; t_no_instrumentation : bool
+  ; t_extra_stanzas : Dune_s_expr.t list
+  }
+
 type target =
   | Library of library_target
   | Executable of executable_target
+  | Test of test_target
   | File_stanzas of string * Dune_s_expr.t list
 
 (* -- Global registry ---------------------------------------------- *)
@@ -204,7 +217,8 @@ let executable ?package ?internal_name ?(path = "")
     ?(deps = []) ?ppx ?(modules = []) ?(modes = [])
     ?(flags = []) ?(link_flags = [])
     ?(bisect_sigterm = false)
-    ?(no_instrumentation = false) ?enabled_if
+    ?(no_instrumentation = false)
+    ?(forbidden_libraries = []) ?enabled_if
     ?(opam_deps = []) ?(extra_stanzas = [])
     public_name =
   let iname =
@@ -226,6 +240,7 @@ let executable ?package ?internal_name ?(path = "")
       ; e_link_flags = link_flags
       ; e_bisect_sigterm = bisect_sigterm
       ; e_no_instrumentation = no_instrumentation
+      ; e_forbidden_libraries = forbidden_libraries
       ; e_enabled_if = enabled_if
       ; e_opam_deps = opam_deps
       ; e_extra_stanzas = extra_stanzas
@@ -237,7 +252,8 @@ let private_executable ?package ?(path = "")
     ?(deps = []) ?ppx ?(modules = []) ?(modes = [])
     ?(flags = []) ?(link_flags = [])
     ?(bisect_sigterm = false)
-    ?(no_instrumentation = false) ?enabled_if
+    ?(no_instrumentation = false)
+    ?(forbidden_libraries = []) ?enabled_if
     ?(opam_deps = []) ?(extra_stanzas = [])
     name =
   let t =
@@ -254,9 +270,28 @@ let private_executable ?package ?(path = "")
       ; e_link_flags = link_flags
       ; e_bisect_sigterm = bisect_sigterm
       ; e_no_instrumentation = no_instrumentation
+      ; e_forbidden_libraries = forbidden_libraries
       ; e_enabled_if = enabled_if
       ; e_opam_deps = opam_deps
       ; e_extra_stanzas = extra_stanzas
+      }
+  in
+  targets := t :: !targets
+
+let test ?(path = "") ?(deps = []) ?ppx ?(modules = [])
+    ?(flags = []) ?(no_instrumentation = false)
+    ?(extra_stanzas = [])
+    name =
+  let t =
+    Test
+      { t_internal_name = name
+      ; t_path = path
+      ; t_deps = deps
+      ; t_ppx = ppx
+      ; t_modules = modules
+      ; t_flags = flags
+      ; t_no_instrumentation = no_instrumentation
+      ; t_extra_stanzas = extra_stanzas
       }
   in
   targets := t :: !targets
@@ -395,6 +430,10 @@ let generate_executable_sexpr exe =
     @ (if exe.e_deps <> [] then
          [ render_deps exe.e_deps ]
        else [])
+    @ (if exe.e_forbidden_libraries <> [] then
+         [ "forbidden_libraries"
+           @: List.map atom exe.e_forbidden_libraries ]
+       else [])
     @ (if not exe.e_no_instrumentation then
          [ render_instrumentation
              ~sigterm:exe.e_bisect_sigterm () ]
@@ -406,6 +445,27 @@ let generate_executable_sexpr exe =
           "enabled_if" @: [ atom e ])
   in
   "executable" @: fields
+
+let generate_test_sexpr t =
+  let fields =
+    [ "name" @: [ atom t.t_internal_name ] ]
+    @ (if t.t_modules <> [] then
+         [ "modules" @: List.map atom t.t_modules ]
+       else [])
+    @ (if t.t_flags <> [] then
+         [ "flags" @: t.t_flags ]
+       else [])
+    @ (if t.t_deps <> [] then
+         [ render_deps t.t_deps ]
+       else [])
+    @ (if not t.t_no_instrumentation then
+         [ render_instrumentation () ]
+       else [])
+    @ (match t.t_ppx with
+       | Some ppxes -> [ render_ppx ppxes ]
+       | None -> [])
+  in
+  "test" @: fields
 
 (* -- File output -------------------------------------------------- *)
 
@@ -432,6 +492,7 @@ let write_file path content =
 let target_path = function
   | Library l -> l.l_path
   | Executable e -> e.e_path
+  | Test t -> t.t_path
   | File_stanzas (p, _) -> p
 
 let check_mode = ref false
@@ -471,6 +532,9 @@ let check () =
               | Executable e ->
                   generate_executable_sexpr e
                   :: e.e_extra_stanzas
+              | Test tt ->
+                  generate_test_sexpr tt
+                  :: tt.t_extra_stanzas
               | File_stanzas (_, ss) -> ss)
             targets_in_dir
         in
@@ -576,7 +640,7 @@ let generate_opam_files targets =
             Hashtbl.replace packages pkg
               (None, e.e_opam_deps, e.e_path)
           end
-      | File_stanzas _ -> ())
+      | Test _ | File_stanzas _ -> ())
     targets;
   if Hashtbl.length packages > 0 then begin
     Printf.printf "Generating opam files...\n";
@@ -637,6 +701,9 @@ let generate () =
               | Executable e ->
                   generate_executable_sexpr e
                   :: e.e_extra_stanzas
+              | Test tt ->
+                  generate_test_sexpr tt
+                  :: tt.t_extra_stanzas
               | File_stanzas (_, ss) -> ss)
             targets_in_dir
         in

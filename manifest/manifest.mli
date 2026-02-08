@@ -113,6 +113,7 @@ val executable :
   ?link_flags:string list ->
   ?bisect_sigterm:bool ->
   ?no_instrumentation:bool ->
+  ?forbidden_libraries:string list ->
   ?enabled_if:string ->
   ?opam_deps:string list ->
   ?extra_stanzas:Dune_s_expr.t list ->
@@ -130,8 +131,22 @@ val private_executable :
   ?link_flags:string list ->
   ?bisect_sigterm:bool ->
   ?no_instrumentation:bool ->
+  ?forbidden_libraries:string list ->
   ?enabled_if:string ->
   ?opam_deps:string list ->
+  ?extra_stanzas:Dune_s_expr.t list ->
+  string ->
+  unit
+
+(** {1 Test registration} *)
+
+val test :
+  ?path:string ->
+  ?deps:dep list ->
+  ?ppx:Ppx.t ->
+  ?modules:string list ->
+  ?flags:Dune_s_expr.t list ->
+  ?no_instrumentation:bool ->
   ?extra_stanzas:Dune_s_expr.t list ->
   string ->
   unit
