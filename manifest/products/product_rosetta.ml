@@ -35,7 +35,7 @@ let () =
       ; core_kernel
       ; Layer_domain.genesis_constants
       ; local "lib"
-      ; Layer_infra.mina_signature_kind_testnet
+      ; Layer_protocol.mina_signature_kind_testnet
       ]
     ~ppx:Ppx.minimal
 
@@ -53,7 +53,7 @@ let () =
       ; core_kernel
       ; Layer_domain.genesis_constants
       ; local "lib"
-      ; Layer_infra.mina_signature_kind_mainnet
+      ; Layer_protocol.mina_signature_kind_mainnet
       ]
     ~ppx:Ppx.minimal
 
@@ -90,9 +90,9 @@ let lib =
       ; Layer_base.mina_base_import
       ; local "mina_caqti"
       ; Layer_base.mina_compile_config
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; local "mina_runtime_config"
-      ; Layer_infra.mina_signature_kind
+      ; Layer_protocol.mina_signature_kind
       ; Layer_transaction.mina_transaction
       ; Layer_base.mina_version
       ; Layer_base.mina_wire_types

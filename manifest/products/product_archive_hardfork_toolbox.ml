@@ -36,7 +36,7 @@ let archive_hardfork_toolbox_lib =
       ; Layer_base.mina_base_import
       ; Layer_network.mina_block
       ; local "mina_caqti"
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction
       ; Layer_base.mina_wire_types
@@ -92,7 +92,7 @@ let () =
       ; Layer_base.mina_base_import
       ; Layer_network.mina_block
       ; local "mina_caqti"
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction
       ; Layer_base.mina_wire_types
@@ -146,7 +146,7 @@ let () =
       ; Layer_base.mina_base_import
       ; Layer_network.mina_block
       ; local "mina_caqti"
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction
       ; Layer_base.mina_wire_types

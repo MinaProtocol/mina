@@ -6,7 +6,77 @@
 open Manifest
 open Externals
 
-(* Blockchain & Network Layer                                       *)
+let network_peer =
+  library "network_peer" ~path:"src/lib/network_peer"
+    ~deps:
+      [ core
+      ; async
+      ; async_rpc
+      ; async_rpc_kernel
+      ; core_kernel
+      ; bin_prot_shape
+      ; sexplib0
+      ; base_caml
+      ; base_internalhash_types
+      ; result
+      ; async_kernel
+      ; mina_metrics
+      ; ppx_version_runtime
+      ; Layer_base.mina_stdlib
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_compare
+         ; Ppx_lib.ppx_mina
+         ; Ppx_lib.ppx_version
+         ; Ppx_lib.ppx_jane
+         ; Ppx_lib.ppx_deriving_yojson
+         ] )
+
+let trust_system =
+  library "trust_system" ~path:"src/lib/trust_system"
+    ~synopsis:"Track how much we trust peers" ~library_flags:[ "-linkall" ]
+    ~inline_tests:true
+    ~deps:
+      [ sexplib0
+      ; core
+      ; ppx_inline_test_config
+      ; base_caml
+      ; async_kernel
+      ; core_kernel
+      ; bin_prot_shape
+      ; base
+      ; result
+      ; async
+      ; async_unix
+      ; local "mina_metrics"
+      ; local "rocksdb"
+      ; local "pipe_lib"
+      ; local "logger"
+      ; Layer_base.key_value_database
+      ; network_peer
+      ; local "run_in_thread"
+      ; Layer_test.test_util
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_base.mina_stdlib
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_assert
+         ; Ppx_lib.ppx_base
+         ; Ppx_lib.ppx_bin_prot
+         ; Ppx_lib.ppx_mina
+         ; Ppx_lib.ppx_custom_printf
+         ; Ppx_lib.ppx_deriving_std
+         ; Ppx_lib.ppx_deriving_yojson
+         ; Ppx_lib.ppx_fields_conv
+         ; Ppx_lib.ppx_inline_test
+         ; Ppx_lib.ppx_let
+         ; Ppx_lib.ppx_register_event
+         ; Ppx_lib.ppx_sexp_conv
+         ; Ppx_lib.ppx_snarky
+         ; Ppx_lib.ppx_version
+         ] )
 
 let mina_block =
   library "mina_block" ~path:"src/lib/mina_block"
@@ -15,7 +85,7 @@ let mina_block =
       ; base64
       ; core
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.currency
       ; Layer_base.unsigned_extended
       ; Layer_snark_worker.ledger_proof
@@ -141,8 +211,8 @@ let staged_ledger =
       ; local "mina_generators"
       ; Layer_ledger.mina_ledger
       ; Layer_tooling.mina_metrics
-      ; Layer_infra.mina_numbers
-      ; Layer_infra.mina_signature_kind
+      ; Layer_base.mina_numbers
+      ; Layer_protocol.mina_signature_kind
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
@@ -250,7 +320,7 @@ let genesis_ledger_helper_lib =
       ; Layer_domain.genesis_constants
       ; Layer_consensus.coda_genesis_proof
       ; Layer_crypto.signature_lib
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.with_hash
       ; Layer_base.currency
       ; Layer_crypto.pickles_backend
@@ -295,7 +365,7 @@ let genesis_ledger_helper =
       ; Layer_consensus.mina_state
       ; Layer_crypto.random_oracle
       ; Layer_crypto.blake2
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; genesis_ledger_helper_lib
       ; Layer_consensus.precomputed_values
       ; Layer_consensus.coda_genesis_ledger
@@ -314,7 +384,7 @@ let genesis_ledger_helper =
       ; Layer_infra.logger
       ; Layer_base.mina_base_import
       ; Layer_ledger.staged_ledger_diff
-      ; Layer_infra.mina_stdlib_unix
+      ; Layer_base.mina_stdlib_unix
       ; local "cli_lib"
       ]
     ~ppx:
@@ -393,7 +463,7 @@ let vrf_evaluator =
       ; Layer_consensus.consensus
       ; Layer_base.mina_base
       ; Layer_base.child_processes
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_domain.genesis_constants
       ; Layer_infra.logger
       ; Layer_infra.logger_file_system
@@ -437,7 +507,7 @@ let snark_profiler_lib =
       ; genesis_ledger_helper
       ; Layer_crypto.signature_lib
       ; Layer_base.mina_base_import
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.precomputed_values
       ; Layer_base.with_hash
       ; Layer_protocol.transaction_snark
@@ -450,7 +520,7 @@ let snark_profiler_lib =
       ; Layer_base.mina_compile_config
       ; Layer_transaction.mina_transaction_logic
       ; Layer_service.verifier
-      ; Layer_infra.parallel
+      ; Layer_concurrency.parallel
       ; Layer_crypto.random_oracle
       ; Layer_crypto.kimchi_backend
       ; Layer_crypto.kimchi_pasta
@@ -501,7 +571,7 @@ let rosetta_lib =
       ; Layer_base.mina_wire_types
       ; Layer_base.hex
       ; Layer_crypto.random_oracle_input
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
@@ -588,7 +658,7 @@ let () =
 
 let mina_incremental =
   library "mina_incremental" ~path:"src/lib/mina_incremental"
-    ~deps:[ incremental; Layer_base.pipe_lib; async_kernel ]
+    ~deps:[ incremental; Layer_concurrency.pipe_lib; async_kernel ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version ])
 
 let mina_plugins =
@@ -627,10 +697,10 @@ let gossip_net =
       ; ppx_hash_runtime_lib
       ; integers
       ; Layer_ppx.ppx_version_runtime
-      ; Layer_domain.network_peer
+      ; network_peer
       ; Layer_infra.logger
-      ; Layer_base.pipe_lib
-      ; Layer_infra.trust_system
+      ; Layer_concurrency.pipe_lib
+      ; trust_system
       ; local "network_pool"
       ; local "mina_net2"
       ; mina_block
@@ -689,10 +759,10 @@ let mina_net2 =
       ; Layer_crypto.blake2
       ; Layer_base.error_json
       ; Layer_base.child_processes
-      ; Layer_infra.mina_stdlib_unix
+      ; Layer_base.mina_stdlib_unix
       ; Layer_infra.logger
-      ; Layer_domain.network_peer
-      ; Layer_base.pipe_lib
+      ; network_peer
+      ; Layer_concurrency.pipe_lib
       ; Layer_concurrency.timeout_lib
       ; Layer_tooling.mina_metrics
       ; Layer_infra.o1trace
@@ -727,8 +797,8 @@ let mina_net2_tests =
       ; Layer_base.mina_stdlib
       ; Layer_infra.logger
       ; Layer_base.child_processes
-      ; Layer_domain.network_peer
-      ; Layer_infra.mina_stdlib_unix
+      ; network_peer
+      ; Layer_base.mina_stdlib_unix
       ; Layer_base.mina_compile_config
       ]
     ~ppx:
@@ -758,11 +828,11 @@ let mina_networking =
       ; Layer_base.error_json
       ; mina_net2
       ; Layer_domain.block_time
-      ; Layer_infra.trust_system
+      ; trust_system
       ; Layer_crypto.signature_lib
       ; Layer_base.with_hash
       ; Layer_consensus.mina_state
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; staged_ledger
       ; mina_block
       ; Layer_consensus.consensus
@@ -772,7 +842,7 @@ let mina_networking =
       ; Layer_domain.proof_carrying_data
       ; local "network_pool"
       ; Layer_base.sync_status
-      ; Layer_domain.network_peer
+      ; network_peer
       ; Layer_domain.data_hash_lib
       ; Layer_infra.logger
       ; Layer_domain.genesis_constants
@@ -836,19 +906,19 @@ let network_pool =
       ; Layer_ledger.mina_ledger
       ; Layer_tooling.mina_metrics
       ; mina_net2
-      ; Layer_infra.mina_numbers
-      ; Layer_infra.mina_signature_kind
+      ; Layer_base.mina_numbers
+      ; Layer_protocol.mina_signature_kind
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ; Layer_base.mina_wire_types
-      ; Layer_domain.network_peer
+      ; network_peer
       ; Layer_infra.o1trace
       ; Layer_base.one_or_two
       ; Layer_crypto.pickles
       ; Layer_crypto.pickles_backend
       ; Layer_crypto.pickles_types
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; Layer_ppx.ppx_version_runtime
       ; Layer_consensus.precomputed_values
       ; Layer_test.quickcheck_lib
@@ -866,7 +936,7 @@ let network_pool =
       ; local "transition_frontier"
       ; local "transition_frontier_base"
       ; local "transition_frontier_extensions"
-      ; Layer_infra.trust_system
+      ; trust_system
       ; Layer_service.verifier
       ; Layer_base.with_hash
       ; Layer_protocol.zkapp_command_builder
@@ -906,11 +976,11 @@ let syncable_ledger =
       ; sexplib0
       ; core
       ; async
-      ; Layer_infra.trust_system
+      ; trust_system
       ; Layer_infra.logger
       ; Layer_ledger.merkle_ledger
-      ; Layer_base.pipe_lib
-      ; Layer_domain.network_peer
+      ; Layer_concurrency.pipe_lib
+      ; network_peer
       ; Layer_ledger.merkle_address
       ; Layer_base.mina_stdlib
       ; Layer_base.error_json
@@ -942,16 +1012,16 @@ let syncable_ledger_test =
       ; sexplib0
       ; ppx_inline_test_config
       ; base_caml
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.mina_base
       ; Layer_ledger.merkle_address
       ; Layer_infra.logger
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; Layer_ledger.merkle_ledger_tests
       ; Layer_ledger.merkle_ledger
       ; syncable_ledger
-      ; Layer_domain.network_peer
-      ; Layer_infra.trust_system
+      ; network_peer
+      ; trust_system
       ; Layer_base.currency
       ; Layer_domain.data_hash_lib
       ; Layer_base.mina_base_import
@@ -980,7 +1050,7 @@ let sync_handler =
       ; Layer_domain.data_hash_lib
       ; Layer_consensus.precomputed_values
       ; Layer_domain.genesis_constants
-      ; Layer_infra.trust_system
+      ; trust_system
       ; local "transition_frontier_extensions"
       ; local "transition_frontier_base"
       ; Layer_consensus.consensus
@@ -990,7 +1060,7 @@ let sync_handler =
       ; local "transition_frontier"
       ; local "best_tip_prover"
       ; mina_block
-      ; Layer_domain.network_peer
+      ; network_peer
       ; Layer_infra.logger
       ; Layer_ledger.merkle_ledger
       ; staged_ledger
@@ -1065,10 +1135,10 @@ let transition_frontier_base =
       ; Layer_base.allocation_functor
       ; Layer_domain.genesis_constants
       ; Layer_snark_worker.transaction_snark_work
-      ; Layer_infra.trust_system
+      ; trust_system
       ; Layer_consensus.precomputed_values
       ; Layer_consensus.consensus
-      ; Layer_domain.network_peer
+      ; network_peer
       ; Layer_ledger.mina_ledger
       ; mina_block
       ; Layer_base.mina_base
@@ -1082,7 +1152,7 @@ let transition_frontier_base =
       ; Layer_base.with_hash
       ; Layer_infra.o1trace
       ; Layer_base.visualization
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_snark_worker.ledger_proof
       ; Layer_protocol.protocol_version
       ; mina_net2
@@ -1140,7 +1210,7 @@ let transition_frontier_full_frontier =
       ; Layer_base.with_hash
       ; Layer_base.mina_stdlib
       ; Layer_ledger.staged_ledger_diff
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_tooling.internal_tracing
       ; async
       ; async_kernel
@@ -1180,7 +1250,7 @@ let transition_frontier_persistent_root =
       ; core_uuid
       ; base_caml
       ; Layer_consensus.precomputed_values
-      ; Layer_infra.mina_stdlib_unix
+      ; Layer_base.mina_stdlib_unix
       ; Layer_ledger.merkle_ledger
       ; transition_frontier_base
       ; Layer_base.mina_base
@@ -1208,7 +1278,7 @@ let transition_frontier_persistent_frontier =
       ; Layer_base.mina_stdlib
       ; Layer_infra.o1trace
       ; Layer_tooling.mina_metrics
-      ; Layer_infra.trust_system
+      ; trust_system
       ; staged_ledger
       ; Layer_consensus.precomputed_values
       ; Layer_domain.data_hash_lib
@@ -1216,7 +1286,7 @@ let transition_frontier_persistent_frontier =
       ; Layer_base.otp_lib
       ; Layer_consensus.consensus
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_stdlib_unix
+      ; Layer_base.mina_stdlib_unix
       ; transition_frontier_full_frontier
       ; transition_frontier_persistent_root
       ; transition_frontier_base
@@ -1238,7 +1308,7 @@ let transition_frontier_persistent_frontier =
       ; Layer_crypto.sgn
       ; Layer_base.sgn_type
       ; Layer_base.currency
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.kimchi_pasta
       ; Layer_crypto.kimchi_pasta_basic
       ; Layer_base.mina_wire_types
@@ -1268,7 +1338,7 @@ let transition_frontier_extensions =
       ; mina_block
       ; Layer_snark_worker.transaction_snark_work
       ; Layer_domain.data_hash_lib
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; Layer_base.mina_base
       ; transition_frontier_base
       ; transition_frontier_full_frontier
@@ -1298,7 +1368,7 @@ let transition_frontier =
       ; Layer_ledger.mina_ledger
       ; Layer_consensus.consensus
       ; Layer_domain.genesis_constants
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; mina_block
       ; Layer_infra.logger
       ; transition_frontier_full_frontier
@@ -1308,14 +1378,14 @@ let transition_frontier =
       ; transition_frontier_persistent_frontier
       ; transition_frontier_extensions
       ; Layer_base.mina_base
-      ; Layer_infra.cache_lib
+      ; Layer_storage.cache_lib
       ; Layer_domain.data_hash_lib
-      ; Layer_domain.network_peer
+      ; network_peer
       ; Layer_base.unsigned_extended
       ; Layer_service.verifier
       ; Layer_consensus.precomputed_values
       ; Layer_domain.block_time
-      ; Layer_infra.trust_system
+      ; trust_system
       ; Layer_base.with_hash
       ; Layer_base.mina_stdlib
       ; Layer_test.quickcheck_lib
@@ -1386,11 +1456,11 @@ let transition_frontier_controller =
       ; transition_frontier
       ; Layer_domain.data_hash_lib
       ; Layer_tooling.mina_metrics
-      ; Layer_domain.network_peer
-      ; Layer_infra.cache_lib
+      ; network_peer
+      ; Layer_storage.cache_lib
       ; mina_block
       ; Layer_infra.o1trace
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; Layer_base.mina_base
       ; local "transition_handler"
       ; local "ledger_catchup"
@@ -1423,13 +1493,13 @@ let transition_handler =
       ; Layer_base.error_json
       ; Layer_domain.data_hash_lib
       ; Layer_domain.block_time
-      ; Layer_infra.trust_system
+      ; trust_system
       ; Layer_infra.o1trace
       ; transition_frontier_base
-      ; Layer_infra.cache_lib
+      ; Layer_storage.cache_lib
       ; Layer_base.mina_base
       ; Layer_base.otp_lib
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; Layer_base.mina_stdlib
       ; Layer_consensus.consensus
       ; transition_frontier
@@ -1437,7 +1507,7 @@ let transition_handler =
       ; Layer_tooling.mina_metrics
       ; mina_block
       ; Layer_transaction.mina_transaction
-      ; Layer_domain.network_peer
+      ; network_peer
       ; Layer_base.with_hash
       ; Layer_infra.logger
       ; Layer_consensus.mina_state
@@ -1447,7 +1517,7 @@ let transition_handler =
       ; Layer_domain.genesis_constants
       ; network_pool
       ; mina_net2
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
       ; Layer_crypto.pickles_backend
       ; Layer_crypto.snark_params
@@ -1481,13 +1551,13 @@ let transition_router =
       ; Layer_consensus.consensus
       ; Layer_infra.logger
       ; Layer_base.error_json
-      ; Layer_infra.trust_system
+      ; trust_system
       ; mina_block
       ; Layer_consensus.mina_state
       ; transition_frontier_persistent_frontier
       ; mina_networking
       ; transition_frontier_controller
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; transition_frontier
       ; local "bootstrap_controller"
       ; local "mina_intf"
@@ -1495,12 +1565,12 @@ let transition_router =
       ; transition_frontier_base
       ; Layer_base.mina_base
       ; Layer_crypto.signature_lib
-      ; Layer_domain.network_peer
+      ; network_peer
       ; Layer_base.with_hash
       ; Layer_domain.block_time
       ; Layer_tooling.mina_metrics
       ; Layer_consensus.precomputed_values
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_concurrency.interruptible
       ; Layer_domain.genesis_constants
       ; Layer_base.unsigned_extended
@@ -1551,16 +1621,16 @@ let bootstrap_controller =
       ; Layer_tooling.mina_metrics
       ; mina_net2
       ; mina_networking
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_base.mina_stdlib
       ; Layer_transaction.mina_transaction_logic
       ; Layer_base.mina_wire_types
-      ; Layer_domain.network_peer
+      ; network_peer
       ; Layer_infra.o1trace
       ; Layer_crypto.pickles
       ; Layer_crypto.pickles_backend
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; Layer_consensus.precomputed_values
       ; Layer_crypto.sgn
       ; Layer_base.sgn_type
@@ -1572,7 +1642,7 @@ let bootstrap_controller =
       ; transition_frontier_base
       ; transition_frontier_persistent_frontier
       ; transition_frontier_persistent_root
-      ; Layer_infra.trust_system
+      ; trust_system
       ; Layer_service.verifier
       ; Layer_base.with_hash
       ]
@@ -1644,10 +1714,10 @@ let ledger_catchup =
       ; Layer_base.with_hash
       ; Layer_domain.data_hash_lib
       ; Layer_consensus.precomputed_values
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; mina_networking
       ; Layer_tooling.mina_metrics
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; transition_handler
       ; transition_frontier
       ; Layer_consensus.consensus
@@ -1656,10 +1726,10 @@ let ledger_catchup =
       ; local "fake_network"
       ; mina_block
       ; Layer_domain.proof_carrying_data
-      ; Layer_infra.cache_lib
-      ; Layer_domain.network_peer
+      ; Layer_storage.cache_lib
+      ; network_peer
       ; Layer_infra.logger
-      ; Layer_infra.trust_system
+      ; trust_system
       ; Layer_base.error_json
       ; transition_frontier_base
       ; network_pool
@@ -1687,10 +1757,10 @@ let downloader =
       ; core_kernel_pairing_heap
       ; Layer_base.mina_stdlib
       ; Layer_infra.logger
-      ; Layer_domain.network_peer
+      ; network_peer
       ; Layer_infra.o1trace
-      ; Layer_base.pipe_lib
-      ; Layer_infra.trust_system
+      ; Layer_concurrency.pipe_lib
+      ; trust_system
       ]
     ~ppx:
       (Ppx.custom
@@ -1734,7 +1804,7 @@ let block_producer =
       ; Layer_tooling.mina_metrics
       ; mina_net2
       ; mina_networking
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; local "mina_runtime_config"
       ; Layer_consensus.mina_state
       ; Layer_base.mina_stdlib
@@ -1748,7 +1818,7 @@ let block_producer =
       ; local "pasta_bindings"
       ; Layer_crypto.pickles
       ; Layer_crypto.pickles_backend
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; Layer_consensus.precomputed_values
       ; Layer_protocol.protocol_version
       ; Layer_service.prover
@@ -1801,12 +1871,12 @@ let fake_network =
       ; Layer_ledger.mina_ledger
       ; mina_networking
       ; Layer_consensus.mina_state
-      ; Layer_domain.network_peer
+      ; network_peer
       ; network_pool
       ; local "pasta_bindings"
       ; Layer_crypto.pickles
       ; Layer_crypto.pickles_backend
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; Layer_consensus.precomputed_values
       ; Layer_domain.proof_carrying_data
       ; Layer_crypto.signature_lib
@@ -1816,7 +1886,7 @@ let fake_network =
       ; transition_chain_prover
       ; transition_frontier
       ; transition_handler
-      ; Layer_infra.trust_system
+      ; trust_system
       ; Layer_service.verifier
       ; Layer_base.with_hash
       ]

@@ -44,7 +44,7 @@ let () =
       ; Layer_base.mina_base_import
       ; local "mina_caqti"
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; local "mina_runtime_config"
       ; Layer_consensus.mina_state
       ; Layer_base.mina_stdlib

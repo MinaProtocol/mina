@@ -83,7 +83,7 @@ let transaction_snark_scan_state =
       ; Layer_transaction.transaction_witness
       ; Layer_protocol.transaction_snark
       ; Layer_base.mina_base
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ; local "snark_work_lib"
@@ -237,7 +237,7 @@ let work_selector =
       ; Layer_base.currency
       ; Layer_base.one_or_two
       ; Layer_protocol.transaction_snark
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; local "transition_frontier"
       ; Layer_base.with_hash
       ; Layer_tooling.mina_metrics

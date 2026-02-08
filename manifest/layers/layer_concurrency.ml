@@ -22,6 +22,27 @@ let run_in_thread_fake =
     ~path:"src/lib/concurrency/run_in_thread/fake" ~deps:[ async_kernel ]
     ~ppx:Ppx.minimal ~implements:"run_in_thread"
 
+let pipe_lib =
+  library "pipe_lib" ~path:"src/lib/concurrency/pipe_lib"
+    ~deps:
+      [ async_kernel
+      ; core
+      ; core_kernel
+      ; ppx_inline_test_config
+      ; sexplib
+      ; local "logger"
+      ; local "o1trace"
+      ; run_in_thread
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_mina
+         ; Ppx_lib.ppx_version
+         ; Ppx_lib.ppx_jane
+         ; Ppx_lib.ppx_deriving_make
+         ] )
+    ~inline_tests:true
+
 let interruptible =
   library "interruptible" ~path:"src/lib/concurrency/interruptible"
     ~synopsis:"Interruptible monad (deferreds, that can be triggered to cancel)"
@@ -53,6 +74,16 @@ let promise_js_helpers =
   library "promise.js_helpers" ~internal_name:"promise_js_helpers"
     ~path:"src/lib/concurrency/promise/js_helpers" ~deps:[ promise_js ]
     ~ppx:Ppx.minimal
+
+let parallel =
+  library "parallel" ~path:"src/lib/parallel"
+    ~synopsis:"Template code to run programs that rely Rpc_parallel.Expert"
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ async_rpc_kernel; async; core; rpc_parallel; async_rpc; core_kernel ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_compare ] )
 
 let timeout_lib =
   library "timeout_lib" ~path:"src/lib/timeout_lib"

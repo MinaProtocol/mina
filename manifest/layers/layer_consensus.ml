@@ -67,7 +67,7 @@ let consensus_vrf =
       ; local "snarky.backendless"
       ; Layer_crypto.pickles
       ; local "snarky_taylor"
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; local "fold_lib"
       ; Layer_base.mina_base
       ; Layer_crypto.snark_params
@@ -139,7 +139,7 @@ let consensus =
       ; Layer_ledger.merkle_ledger
       ; Layer_crypto.pickles_backend
       ; Layer_crypto.random_oracle
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; Layer_crypto.bignum_bigint
       ; vrf_lib
       ; Layer_crypto.snark_params
@@ -155,7 +155,7 @@ let consensus =
       ; Layer_test.test_util
       ; Layer_crypto.non_zero_curve_point
       ; Layer_tooling.mina_metrics
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_crypto.signature_lib
       ; local "snarky.backendless"
@@ -163,15 +163,15 @@ let consensus =
       ; Layer_crypto.crypto_params
       ; Layer_domain.data_hash_lib
       ; Layer_base.currency
-      ; Layer_infra.mina_stdlib_unix
+      ; Layer_base.mina_stdlib_unix
       ; local "coda_genesis_ledger"
       ; Layer_concurrency.interruptible
-      ; Layer_domain.network_peer
+      ; local "network_peer"
       ; Layer_crypto.pickles
       ; Layer_snarky.snark_bits
       ; Layer_ledger.sparse_ledger_lib
       ; local "syncable_ledger"
-      ; Layer_infra.trust_system
+      ; local "trust_system"
       ; Layer_base.mina_base_import
       ; Layer_ppx.ppx_version_runtime
       ; Layer_tooling.internal_tracing
@@ -239,7 +239,7 @@ let mina_state =
       ; Layer_base.currency
       ; Layer_base.visualization
       ; Layer_base.linked_tree
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.kimchi_pasta
       ; Layer_crypto.kimchi_pasta_basic
       ; Layer_crypto.kimchi_backend
@@ -280,7 +280,7 @@ let coda_genesis_ledger =
       ; Layer_base.mina_base
       ; Layer_crypto.signature_lib
       ; Layer_base.currency
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_domain.genesis_constants
       ; Layer_domain.data_hash_lib
       ; Layer_ledger.mina_ledger
@@ -341,7 +341,7 @@ let coda_genesis_proof =
       ; Layer_crypto.pickles_backend
       ; Layer_transaction.mina_transaction_logic
       ; Layer_crypto.kimchi_backend
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_domain.block_time
       ; Layer_crypto.kimchi_pasta
       ; Layer_crypto.kimchi_pasta_basic

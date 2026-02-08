@@ -18,7 +18,7 @@ let zkapps_examples =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; local "pasta_bindings"
       ; Layer_crypto.pickles
@@ -237,7 +237,7 @@ let tokens =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_base.mina_stdlib
       ; Layer_transaction.mina_transaction_logic
@@ -284,7 +284,7 @@ let () =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_base.mina_wire_types
       ; Layer_crypto.pickles
@@ -325,7 +325,7 @@ let () =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.pickles
       ; Layer_crypto.pickles_backend
       ; Layer_crypto.pickles_types
@@ -362,7 +362,7 @@ let () =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction_logic
       ; local "pasta_bindings"
@@ -408,7 +408,7 @@ let () =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction_logic
       ; local "pasta_bindings"
@@ -452,7 +452,7 @@ let () =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_base.mina_stdlib
       ; Layer_transaction.mina_transaction_logic
@@ -499,7 +499,7 @@ let () =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction_logic
       ; local "pasta_bindings"
@@ -544,7 +544,7 @@ let () =
       ; Layer_base.mina_base_import
       ; local "mina_generators"
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_transaction.mina_transaction_logic
       ; Layer_crypto.pickles
       ; local "pickles_optional_custom_gates_circuits"

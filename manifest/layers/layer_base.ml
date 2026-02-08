@@ -39,27 +39,6 @@ let with_hash =
          ; Ppx_lib.ppx_fields_conv
          ] )
 
-let pipe_lib =
-  library "pipe_lib" ~path:"src/lib/concurrency/pipe_lib"
-    ~deps:
-      [ async_kernel
-      ; core
-      ; core_kernel
-      ; ppx_inline_test_config
-      ; sexplib
-      ; local "logger"
-      ; local "o1trace"
-      ; local "run_in_thread"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ Ppx_lib.ppx_mina
-         ; Ppx_lib.ppx_version
-         ; Ppx_lib.ppx_jane
-         ; Ppx_lib.ppx_deriving_make
-         ] )
-    ~inline_tests:true
-
 let allocation_functor =
   library "allocation_functor" ~path:"src/lib/allocation_functor"
     ~deps:
@@ -199,7 +178,7 @@ let one_or_two =
 
 let otp_lib =
   library "otp_lib" ~path:"src/lib/otp_lib"
-    ~deps:[ core_kernel; async_kernel; ppx_inline_test_config; pipe_lib ]
+    ~deps:[ core_kernel; async_kernel; ppx_inline_test_config; local "pipe_lib" ]
     ~ppx:Ppx.standard ~inline_tests:true
 
 let participating_state =
@@ -470,6 +449,69 @@ let mina_stdlib =
          ; Ppx_lib.ppx_version
          ] )
 
+let mina_stdlib_unix =
+  library "mina_stdlib_unix" ~path:"src/lib/mina_stdlib_unix"
+    ~synopsis:"Mina standard library Unix utilities"
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ async; async_kernel; async_unix; core; core_kernel; ptime; local "logger" ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_here
+         ; Ppx_lib.ppx_jane
+         ; Ppx_lib.ppx_let
+         ; Ppx_lib.ppx_mina
+         ; Ppx_lib.ppx_version
+         ] )
+
+let mina_numbers =
+  library "mina_numbers" ~path:"src/lib/mina_numbers"
+    ~synopsis:"Snark-friendly numbers used in Coda consensus"
+    ~library_flags:[ "-linkall" ] ~inline_tests:true
+    ~deps:
+      [ result
+      ; base_caml
+      ; bin_prot_shape
+      ; bignum_bigint
+      ; core_kernel
+      ; integers
+      ; sexplib0
+      ; base
+      ; base_internalhash_types
+      ; ppx_inline_test_config
+      ; local "protocol_version"
+      ; mina_wire_types
+      ; local "bignum_bigint"
+      ; local "pickles"
+      ; codable
+      ; local "snarky.backendless"
+      ; local "fold_lib"
+      ; local "tuple_lib"
+      ; Layer_snarky.snark_bits
+      ; local "snark_params"
+      ; unsigned_extended
+      ; local "random_oracle"
+      ; local "random_oracle_input"
+      ; local "bitstring_lib"
+      ; Layer_test.test_util
+      ; local "kimchi_backend_common"
+      ; Layer_ppx.ppx_version_runtime
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_version
+         ; Ppx_lib.ppx_mina
+         ; Ppx_lib.ppx_bin_prot
+         ; Ppx_lib.ppx_sexp_conv
+         ; Ppx_lib.ppx_compare
+         ; Ppx_lib.ppx_hash
+         ; Ppx_lib.ppx_let
+         ; Ppx_lib.ppx_inline_test
+         ; Ppx_lib.ppx_compare
+         ; Ppx_lib.ppx_deriving_yojson
+         ; Ppx_lib.ppx_assert
+         ] )
+
 let base58_check =
   library "base58_check" ~path:"src/lib/base58_check"
     ~synopsis:"Base58Check implementation"
@@ -559,6 +601,17 @@ let mina_version_normal =
            ]
       ]
 
+let mina_version_dummy =
+  library "mina_version.dummy" ~internal_name:"mina_version_dummy"
+    ~path:"src/lib/mina_version/dummy" ~deps:[ core_kernel; base ]
+    ~ppx:Ppx.minimal ~implements:"mina_version"
+
+let mina_version_runtime =
+  library "mina_version.runtime" ~internal_name:"mina_version_runtime"
+    ~path:"src/lib/mina_version/runtime"
+    ~deps:[ core_kernel; base; unix ]
+    ~ppx:Ppx.minimal ~implements:"mina_version"
+
 let child_processes =
   library "child_processes" ~path:"src/lib/child_processes"
     ~deps:
@@ -579,7 +632,7 @@ let child_processes =
       ; error_json
       ; local "logger"
       ; local "mina_stdlib_unix"
-      ; pipe_lib
+      ; local "pipe_lib"
       ]
     ~ppx:
       (Ppx.custom

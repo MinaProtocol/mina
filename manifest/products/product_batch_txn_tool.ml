@@ -24,7 +24,7 @@ let () =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_base.mina_compile_config
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_crypto.secrets

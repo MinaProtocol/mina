@@ -28,7 +28,7 @@ let () =
       ; Layer_infra.logger
       ; Layer_infra.logger_file_system
       ; Layer_base.mina_base
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types

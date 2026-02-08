@@ -17,7 +17,7 @@ let hash_prefix_states =
       ; base
       ; Layer_crypto.snark_params
       ; Layer_crypto.random_oracle
-      ; Layer_infra.mina_signature_kind
+      ; local "mina_signature_kind"
       ; Layer_crypto.hash_prefixes
       ; local "hash_prefix_create"
       ; Layer_crypto.pickles
@@ -119,7 +119,7 @@ let block_time =
       ; Layer_crypto.pickles
       ; Layer_base.unsigned_extended
       ; Layer_crypto.snark_params
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_infra.logger
       ; Layer_snarky.snark_bits
       ; Layer_concurrency.timeout_lib
@@ -175,7 +175,7 @@ let genesis_constants =
       ; Layer_node.mina_node_config
       ; Layer_base.mina_wire_types
       ; Layer_base.unsigned_extended
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.pickles
       ; Layer_base.currency
       ; Layer_crypto.blake2
@@ -206,33 +206,6 @@ let genesis_constants =
          ] )
     ~synopsis:"Coda genesis constants"
 
-let network_peer =
-  library "network_peer" ~path:"src/lib/network_peer"
-    ~deps:
-      [ core
-      ; async
-      ; async_rpc
-      ; async_rpc_kernel
-      ; core_kernel
-      ; bin_prot_shape
-      ; sexplib0
-      ; base_caml
-      ; base_internalhash_types
-      ; result
-      ; async_kernel
-      ; mina_metrics
-      ; ppx_version_runtime
-      ; Layer_base.mina_stdlib
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ Ppx_lib.ppx_compare
-         ; Ppx_lib.ppx_mina
-         ; Ppx_lib.ppx_version
-         ; Ppx_lib.ppx_jane
-         ; Ppx_lib.ppx_deriving_yojson
-         ] )
-
 let node_addrs_and_ports =
   library "node_addrs_and_ports" ~path:"src/lib/node_addrs_and_ports"
     ~inline_tests:true
@@ -244,7 +217,7 @@ let node_addrs_and_ports =
       ; base_caml
       ; core_kernel
       ; bin_prot_shape
-      ; network_peer
+      ; local "network_peer"
       ; Layer_ppx.ppx_version_runtime
       ; Layer_base.mina_stdlib
       ]
@@ -274,7 +247,7 @@ let user_command_input =
       ; Layer_crypto.secrets
       ; Layer_crypto.signature_lib
       ; Layer_base.mina_base
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.mina_base_import
       ; Layer_ppx.ppx_version_runtime
       ]
@@ -366,7 +339,7 @@ let fields_derivers_zkapps =
       ; fields_derivers
       ; fields_derivers_graphql
       ; fields_derivers_json
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.pickles
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
@@ -404,7 +377,7 @@ let parallel_scan =
       ; async_unix
       ; Layer_tooling.mina_metrics
       ; Layer_base.mina_stdlib
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; Layer_ppx.ppx_version_runtime
       ]
     ~ppx:
@@ -486,7 +459,7 @@ let mina_base_test_helpers =
       ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.monad_lib
       ; Layer_crypto.signature_lib
       ]

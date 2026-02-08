@@ -35,7 +35,7 @@ let () =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_network.mina_block
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; local "mina_runtime_config"
       ; Layer_consensus.mina_state
       ; Layer_base.mina_wire_types

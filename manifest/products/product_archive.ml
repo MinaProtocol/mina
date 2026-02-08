@@ -84,7 +84,7 @@ let archive_lib =
       ; local "mina_generators"
       ; Layer_ledger.mina_ledger
       ; Layer_tooling.mina_metrics
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; local "mina_runtime_config"
       ; Layer_consensus.mina_state
       ; Layer_base.mina_stdlib
@@ -95,7 +95,7 @@ let archive_lib =
       ; Layer_crypto.pickles
       ; Layer_crypto.pickles_backend
       ; Layer_crypto.pickles_types
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; Layer_consensus.precomputed_values
       ; Layer_protocol.protocol_version
       ; Layer_test.quickcheck_lib

@@ -26,7 +26,7 @@ let () =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction_logic
       ; Layer_base.mina_wire_types

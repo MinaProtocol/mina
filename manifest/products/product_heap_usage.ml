@@ -36,7 +36,7 @@ let () =
       ; Layer_base.mina_compile_config
       ; local "mina_generators"
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_base.mina_stdlib
       ; Layer_transaction.mina_transaction_logic

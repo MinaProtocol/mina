@@ -35,7 +35,7 @@ let zkapp_test_transaction_lib =
       ; local "mina_generators"
       ; local "mina_graphql"
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; local "mina_runtime_config"
       ; Layer_consensus.mina_state
       ; Layer_base.mina_stdlib
@@ -86,7 +86,7 @@ let () =
       ; Layer_base.currency
       ; Layer_base.mina_base
       ; local "mina_graphql"
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_crypto.signature_lib
       ]

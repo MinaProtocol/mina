@@ -36,18 +36,18 @@ let () =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; local "mina_generators"
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; local "mina_runtime_config"
-      ; Layer_infra.mina_signature_kind
+      ; Layer_protocol.mina_signature_kind
       ; Layer_base.mina_stdlib
-      ; Layer_infra.mina_stdlib_unix
+      ; Layer_base.mina_stdlib_unix
       ; Layer_transaction.mina_transaction
       ; Layer_network.network_pool
       ; Layer_base.participating_state
       ; Layer_crypto.pickles
       ; Layer_crypto.pickles_backend
       ; Layer_crypto.pickles_types
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.pipe_lib
       ; Layer_protocol.protocol_version
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input

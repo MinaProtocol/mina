@@ -90,7 +90,7 @@ let merkle_ledger =
       ; sexplib0
       ; Layer_storage.cache_dir
       ; Layer_base.mina_stdlib
-      ; Layer_infra.mina_stdlib_unix
+      ; Layer_base.mina_stdlib_unix
       ; Layer_base.key_value_database
       ; merkle_address
       ; Layer_ppx.ppx_version_runtime
@@ -135,7 +135,7 @@ let merkle_ledger_tests =
       ; local "merkle_mask"
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_ppx.ppx_version_runtime
       ; Layer_crypto.signature_lib
@@ -251,7 +251,7 @@ let mina_ledger =
       ; local "mina_transaction"
       ; local "mina_transaction_logic"
       ; Layer_crypto.signature_lib
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; merkle_address
       ; Layer_base.key_value_database
       ; Layer_domain.data_hash_lib
@@ -292,7 +292,7 @@ let mina_ledger_test_helpers =
       ; Layer_base.mina_base
       ; Layer_domain.mina_base_test_helpers
       ; mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.monad_lib
       ; Layer_crypto.pickles
       ; Layer_crypto.pickles_backend
@@ -338,7 +338,7 @@ let staged_ledger_diff =
       ; Layer_crypto.pickles
       ; Layer_crypto.kimchi_pasta
       ; Layer_crypto.kimchi_pasta_basic
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ]
     ~ppx:
       (Ppx.custom

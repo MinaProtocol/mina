@@ -22,7 +22,7 @@ let () =
     ~deps:
       [ Layer_storage.disk_cache_lmdb
       ; local "mina_cli_entrypoint"
-      ; Layer_infra.mina_signature_kind_testnet
+      ; Layer_protocol.mina_signature_kind_testnet
       ]
     ~ppx:Ppx.minimal
 
@@ -35,7 +35,7 @@ let () =
     ~deps:
       [ Layer_storage.disk_cache_lmdb
       ; local "mina_cli_entrypoint"
-      ; Layer_infra.mina_signature_kind_mainnet
+      ; Layer_protocol.mina_signature_kind_mainnet
       ]
     ~ppx:Ppx.minimal
 
@@ -118,23 +118,23 @@ let init =
       ; Layer_tooling.mina_metrics
       ; Layer_network.mina_net2
       ; Layer_network.mina_networking
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; local "mina_runtime_config"
-      ; Layer_infra.mina_signature_kind
+      ; Layer_protocol.mina_signature_kind
       ; Layer_consensus.mina_state
       ; Layer_base.mina_stdlib
-      ; Layer_infra.mina_stdlib_unix
+      ; Layer_base.mina_stdlib_unix
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ; Layer_base.mina_version
       ; Layer_base.mina_wire_types
-      ; Layer_domain.network_peer
+      ; Layer_network.network_peer
       ; Layer_network.network_pool
       ; local "node_error_service"
       ; Layer_infra.o1trace
       ; Layer_infra.o1trace_webkit_event
       ; Layer_base.one_or_two
-      ; Layer_infra.parallel
+      ; Layer_concurrency.parallel
       ; Layer_base.participating_state
       ; Layer_base.perf_histograms
       ; Layer_crypto.pickles
@@ -158,7 +158,7 @@ let init =
       ; Layer_protocol.transaction_snark
       ; Layer_snark_worker.transaction_snark_scan_state
       ; Layer_protocol.transaction_snark_tests
-      ; Layer_infra.trust_system
+      ; Layer_network.trust_system
       ; Layer_base.unsigned_extended
       ; Layer_domain.user_command_input
       ; Layer_service.verifier
@@ -250,13 +250,13 @@ let cli_mina_cli_entrypoint =
       ; Layer_network.mina_plugins
       ; local "mina_runtime_config"
       ; Layer_base.mina_stdlib
-      ; Layer_infra.mina_stdlib_unix
+      ; Layer_base.mina_stdlib_unix
       ; Layer_base.mina_version
       ; Layer_domain.node_addrs_and_ports
       ; local "node_error_service"
       ; Layer_infra.o1trace
-      ; Layer_infra.parallel
-      ; Layer_base.pipe_lib
+      ; Layer_concurrency.parallel
+      ; Layer_concurrency.pipe_lib
       ; Layer_ppx.ppx_version_runtime
       ; Layer_consensus.precomputed_values
       ; Layer_protocol.protocol_version
@@ -268,7 +268,7 @@ let cli_mina_cli_entrypoint =
       ; Layer_snark_worker.snark_worker
       ; Layer_protocol.transaction_snark
       ; Layer_transaction.transaction_witness
-      ; Layer_infra.trust_system
+      ; Layer_network.trust_system
       ; Layer_service.verifier
       ; Layer_base.with_hash
       ]

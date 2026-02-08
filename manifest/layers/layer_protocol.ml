@@ -7,6 +7,44 @@ open Manifest
 open Externals
 open Dune_s_expr
 
+let mina_signature_kind_type =
+  library "mina_signature_kind.type" ~internal_name:"mina_signature_kind_type"
+    ~path:"src/lib/signature_kind/type" ~deps:[ core_kernel ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_deriving_yojson; Ppx_lib.ppx_jane; Ppx_lib.ppx_version ] )
+
+let mina_signature_kind =
+  library "mina_signature_kind" ~path:"src/lib/signature_kind"
+    ~deps:[ mina_signature_kind_type ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_bin_prot
+         ; Ppx_lib.ppx_version
+         ; Ppx_lib.ppx_deriving_yojson
+         ] )
+    ~virtual_modules:[ "mina_signature_kind" ]
+    ~default_implementation:"mina_signature_kind_config"
+
+let mina_signature_kind_config =
+  library "mina_signature_kind.config"
+    ~internal_name:"mina_signature_kind_config"
+    ~path:"src/lib/signature_kind/compile_config"
+    ~deps:[ Layer_node.mina_node_config ]
+    ~ppx:Ppx.minimal ~implements:"mina_signature_kind"
+
+let mina_signature_kind_testnet =
+  library "mina_signature_kind.testnet"
+    ~internal_name:"mina_signature_kind_testnet"
+    ~path:"src/lib/signature_kind/testnet" ~ppx:Ppx.minimal
+    ~implements:"mina_signature_kind"
+
+let mina_signature_kind_mainnet =
+  library "mina_signature_kind.mainnet"
+    ~internal_name:"mina_signature_kind_mainnet"
+    ~path:"src/lib/signature_kind/mainnet" ~ppx:Ppx.minimal
+    ~implements:"mina_signature_kind"
+
 let protocol_version =
   library "protocol_version" ~path:"src/lib/protocol_version"
     ~library_flags:[ "-linkall" ]
@@ -46,7 +84,7 @@ let transaction_protocol_state =
       ; Layer_crypto.snark_params
       ; local "snarky.backendless"
       ; Layer_consensus.mina_state
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; Layer_ppx.ppx_version_runtime
       ]
@@ -121,8 +159,8 @@ let transaction_snark =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_util
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
-      ; Layer_infra.mina_signature_kind
+      ; Layer_base.mina_numbers
+      ; mina_signature_kind
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
@@ -327,7 +365,7 @@ let transaction_snark_tests =
       ; Layer_crypto.kimchi_pasta_basic
       ; Layer_storage.cache_dir
       ; Layer_domain.data_hash_lib
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.random_oracle
       ; Layer_crypto.sgn
       ; Layer_base.sgn_type
@@ -392,7 +430,7 @@ let transaction_snark_tests_access_permission =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction_logic
       ; Layer_crypto.pickles
@@ -458,7 +496,7 @@ let account_timing_tests =
       ; transaction_protocol_state
       ; Layer_base.with_hash
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ; Layer_test.test_util
@@ -499,11 +537,11 @@ let account_update_network_id =
       ; Layer_base.currency
       ; Layer_consensus.mina_state
       ; Layer_crypto.signature_lib
-      ; Layer_infra.mina_signature_kind
+      ; mina_signature_kind
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ; Layer_test.test_util
@@ -546,7 +584,7 @@ let app_state_tests =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ]
@@ -580,7 +618,7 @@ let delegate_tests =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ]
@@ -621,7 +659,7 @@ let fee_payer_tests =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ]
@@ -666,7 +704,7 @@ let multisig_tests =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ; Layer_crypto.random_oracle
@@ -705,7 +743,7 @@ let permissions_tests =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ]
@@ -740,7 +778,7 @@ let token_symbol_tests =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ]
@@ -777,7 +815,7 @@ let transaction_union_tests =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ; Layer_test.test_util
@@ -823,7 +861,7 @@ let verification_key_tests =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_transaction.mina_transaction_logic
       ; Layer_crypto.sgn
       ; transaction_snark_tests
@@ -862,7 +900,7 @@ let verification_key_permission_tests =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ]
@@ -910,7 +948,7 @@ let transaction_snark_tests_verify_simple_test =
       ; Layer_crypto.kimchi_pasta_basic
       ; Layer_storage.cache_dir
       ; Layer_domain.data_hash_lib
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.random_oracle
       ; Layer_crypto.sgn
       ; Layer_base.sgn_type
@@ -959,7 +997,7 @@ let voting_for_tests =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ; Layer_base.with_hash
@@ -999,7 +1037,7 @@ let zkapp_deploy_tests =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ]
@@ -1038,7 +1076,7 @@ let () =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ; Layer_test.test_util
@@ -1090,7 +1128,7 @@ let zkapp_payments_tests =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ; Layer_test.test_util
@@ -1142,7 +1180,7 @@ let account_update_precondition_tests =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ; Layer_crypto.random_oracle
@@ -1172,7 +1210,7 @@ let zkapp_tokens_tests =
       ; local "mina_generators"
       ; Layer_base.currency
       ; Layer_crypto.pickles
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; zkapp_command_builder
       ; Layer_crypto.signature_lib
       ; Layer_domain.genesis_constants
@@ -1217,7 +1255,7 @@ let zkapp_uri_tests =
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_crypto.pickles_types
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; transaction_snark_tests
       ]

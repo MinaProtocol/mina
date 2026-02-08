@@ -48,7 +48,7 @@ let string_sign =
       ; local "kimchi_pasta"
       ; local "kimchi_pasta_basic"
       ; Layer_base.mina_base
-      ; Layer_infra.mina_signature_kind
+      ; local "mina_signature_kind"
       ; local "pickles"
       ; local "pickles_backend"
       ; local "random_oracle"
@@ -127,7 +127,7 @@ let outside_hash_image =
 
 let hash_prefixes =
   library "hash_prefixes" ~path:"src/lib/hash_prefixes"
-    ~deps:[ Layer_infra.mina_signature_kind ]
+    ~deps:[ local "mina_signature_kind" ]
     ~ppx:Ppx.minimal
 
 let sgn =
@@ -916,7 +916,7 @@ let secrets =
       ; sexplib0
       ; base58
       ; ppx_inline_test_config
-      ; Layer_infra.mina_stdlib_unix
+      ; Layer_base.mina_stdlib_unix
       ; random_oracle
       ; local "pickles"
       ; Layer_infra.logger
@@ -927,7 +927,7 @@ let secrets =
       ; Layer_base.base58_check
       ; signature_lib
       ; local "network_peer"
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; local "snarky.backendless"
       ; Layer_base.error_json
       ; Layer_base.mina_base_import

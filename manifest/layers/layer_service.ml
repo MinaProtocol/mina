@@ -105,7 +105,7 @@ let prover =
       ; Layer_crypto.pickles_backend
       ; Layer_base.sgn_type
       ; Layer_crypto.kimchi_backend
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_crypto.kimchi_pasta
       ; Layer_crypto.kimchi_pasta_basic
       ; Layer_base.mina_wire_types

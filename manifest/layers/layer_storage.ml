@@ -7,6 +7,32 @@ open Manifest
 open Externals
 open Dune_s_expr
 
+let cache_lib =
+  library "cache_lib" ~path:"src/lib/cache_lib" ~inline_tests:true
+    ~deps:
+      [ async_kernel
+      ; base
+      ; base_internalhash_types
+      ; core
+      ; core_kernel
+      ; ppx_inline_test_config
+      ; local "logger"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_base
+         ; Ppx_lib.ppx_custom_printf
+         ; Ppx_lib.ppx_inline_test
+         ; Ppx_lib.ppx_let
+         ; Ppx_lib.ppx_mina
+         ; Ppx_lib.ppx_version
+         ] )
+
+let multi_key_file_storage =
+  library "multi_key_file_storage" ~path:"src/lib/multi-key-file-storage"
+    ~deps:[ core_kernel; bin_prot; Layer_base.mina_stdlib ]
+    ~modules_without_implementation:[ "intf" ] ~ppx:Ppx.mina
+
 let disk_cache_intf =
   library "disk_cache.intf" ~internal_name:"disk_cache_intf"
     ~path:"src/lib/disk_cache/intf"
@@ -67,7 +93,7 @@ let rocksdb =
       ; ppx_inline_test_config
       ; rocks
       ; sexplib0
-      ; Layer_infra.mina_stdlib_unix
+      ; Layer_base.mina_stdlib_unix
       ; Layer_base.key_value_database
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
@@ -123,7 +149,7 @@ let key_cache_native =
 
 let lmdb_storage =
   library "lmdb_storage" ~path:"src/lib/lmdb_storage"
-    ~deps:[ lmdb; Layer_crypto.blake2; Layer_infra.mina_stdlib_unix ]
+    ~deps:[ lmdb; Layer_crypto.blake2; Layer_base.mina_stdlib_unix ]
     ~ppx:
       (Ppx.custom
          [ Ppx_lib.ppx_deriving_std
@@ -147,7 +173,7 @@ let disk_cache_filesystem =
       [ core
       ; async
       ; Layer_infra.logger
-      ; Layer_infra.mina_stdlib_unix
+      ; Layer_base.mina_stdlib_unix
       ; local "disk_cache_utils"
       ; local "disk_cache_test_lib"
       ]
@@ -182,7 +208,7 @@ let disk_cache_test_lib =
       ; async
       ; mina_stdlib
       ; Layer_infra.logger
-      ; Layer_infra.mina_stdlib_unix
+      ; Layer_base.mina_stdlib_unix
       ; disk_cache_intf
       ]
     ~ppx:
@@ -198,7 +224,7 @@ let test_cache_deadlock_lib =
       ; core_kernel
       ; disk_cache_intf
       ; Layer_infra.logger
-      ; Layer_infra.mina_stdlib_unix
+      ; Layer_base.mina_stdlib_unix
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version ])
     ~flags:
@@ -224,7 +250,7 @@ let () =
 let disk_cache_utils =
   library "disk_cache.utils" ~internal_name:"disk_cache_utils"
     ~path:"src/lib/disk_cache/utils"
-    ~deps:[ core; async; Layer_infra.mina_stdlib_unix; Layer_infra.logger ]
+    ~deps:[ core; async; Layer_base.mina_stdlib_unix; Layer_infra.logger ]
     ~ppx:
       (Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 

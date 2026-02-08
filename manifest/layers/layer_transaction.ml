@@ -24,7 +24,7 @@ let mina_transaction =
       ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.one_or_two
       ; Layer_crypto.pickles
       ; Layer_crypto.random_oracle
@@ -79,7 +79,7 @@ let mina_transaction_logic =
       ; Layer_crypto.kimchi_pasta_basic
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; mina_transaction
       ; Layer_base.one_or_two
       ; Layer_crypto.pickles_types
@@ -138,7 +138,7 @@ let transaction_logic_tests =
       ; Layer_ledger.mina_ledger_test_helpers
       ; mina_transaction
       ; mina_transaction_logic
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
       ; Layer_base.monad_lib
       ; local "pasta_bindings"
@@ -176,7 +176,7 @@ let transaction_witness =
       ; Layer_ledger.mina_ledger
       ; local "mina_state"
       ; Layer_base.mina_base
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; mina_transaction
       ; mina_transaction_logic
       ; Layer_crypto.kimchi_backend

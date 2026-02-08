@@ -31,7 +31,7 @@ let () =
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; local "mina_caqti"
-      ; Layer_infra.mina_numbers
+      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_transaction.mina_transaction
       ; Layer_base.mina_wire_types
