@@ -1,3 +1,5 @@
+(include_subdirs no)
+
 (test
  (name test_manifest)
  (libraries alcotest manifest_lib)
