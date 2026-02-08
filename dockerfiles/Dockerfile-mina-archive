@@ -54,6 +54,7 @@ RUN apt-get update --quiet --yes \
         apt-transport-https \
         dnsutils \
         tzdata \
+        python3 \
         postgresql \
         postgresql-contrib \
         apt-utils \
