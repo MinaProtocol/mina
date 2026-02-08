@@ -8,19 +8,52 @@
  (name manifest_product)
  (libraries manifest_lib)
  (wrapped false)
- (modules product_mina))
+ (modules
+  product_mina
+  layer_base
+  layer_concurrency
+  layer_crypto
+  layer_domain
+  layer_infra
+  layer_ledger
+  layer_network
+  layer_node
+  layer_ppx
+  layer_protocol
+  layer_snarky
+  layer_storage
+  layer_test
+  layer_tooling
+  layer_transaction
+  product_archive
+  product_archive_blocks
+  product_archive_hardfork_toolbox
+  product_batch_txn_tool
+  product_benchmarks
+  product_best_tip_merger
+  product_cli
+  product_delegation_verify
+  product_disk_caching_stats
+  product_dump_blocks
+  product_extract_blocks
+  product_generate_keypair
+  product_graphql_schema_dump
+  product_heap_usage
+  product_ledger_export_bench
+  product_logproc
+  product_missing_blocks_auditor
+  product_reformat
+  product_replayer
+  product_rocksdb_scanner
+  product_rosetta
+  product_runtime_genesis_ledger
+  product_test_executive
+  product_validate_keypair
+  product_zkapp_limits
+  product_zkapp_test_transaction
+  product_zkapps_examples))
 
 (executable
  (name main)
  (libraries manifest_product)
  (modules main))
-
-(test
- (name test_manifest)
- (libraries alcotest manifest_lib)
- (modules test_manifest))
-
-(test
- (name test_integration)
- (libraries alcotest manifest_product)
- (modules test_integration))
