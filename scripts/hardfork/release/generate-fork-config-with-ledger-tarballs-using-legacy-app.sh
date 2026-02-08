@@ -7,6 +7,7 @@ set -e
 # Default values
 LEDGER_NAME="legacy_ledgers"
 HASH_NAME="legacy_hashes.json"
+MINA_LEGACY_GENESIS_EXE="mina-create-legacy-genesis"
 
 # Parse CLI args
 while [[ $# -gt 0 ]]; do
