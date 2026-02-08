@@ -320,8 +320,9 @@ module Util = struct
 end
 
 let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let (module G) = Genesis_constants.profiled () in
+  let constraint_constants = G.constraint_constants in
+  let genesis_constants = G.genesis_constants in
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_kp = Util.snapp_keypair_of_file zkapp_keyfile in
@@ -351,8 +352,9 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
 
 let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
     ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo =
-  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let (module G) = Genesis_constants.profiled () in
+  let constraint_constants = G.constraint_constants in
+  let genesis_constants = G.genesis_constants in
   let open Deferred.Let_syntax in
   let%bind sender_keypair = Util.keypair_of_file sender ~which:"Sender" in
   let%bind fee_payer_keypair = Util.fee_payer_keypair_of_file fee_payer in

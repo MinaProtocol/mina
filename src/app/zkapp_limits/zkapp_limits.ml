@@ -2,7 +2,8 @@
 open Core_kernel
 
 let main () =
-  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let (module G) = Genesis_constants.profiled () in
+  let genesis_constants = G.genesis_constants in
   let cost_limit = genesis_constants.zkapp_transaction_cost_limit in
   let max_event_elements = genesis_constants.max_event_elements in
   let max_action_elements = genesis_constants.max_action_elements in
