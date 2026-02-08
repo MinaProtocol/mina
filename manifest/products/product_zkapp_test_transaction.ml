@@ -1,25 +1,26 @@
 (** Product: zkapp_test_transaction — Test zkApp transactions. *)
 
 open Manifest
+open Externals
 
 let register () =
   (* -- zkapp_test_transaction_lib (library) --------------------------- *)
   library "zkapp_test_transaction_lib"
     ~path:"src/app/zkapp_test_transaction/lib" ~inline_tests:true
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base_quickcheck"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "graphql-async"
-      ; opam "graphql_parser"
-      ; opam "ppx_inline_test.config"
-      ; opam "result"
-      ; opam "sexplib0"
-      ; opam "splittable_random"
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_quickcheck
+      ; core
+      ; core_kernel
+      ; graphql_async
+      ; graphql_parser
+      ; ppx_inline_test_config
+      ; result
+      ; sexplib0
+      ; splittable_random
       ; local "coda_genesis_ledger"
       ; local "consensus"
       ; local "currency"
@@ -74,14 +75,14 @@ let register () =
   executable "zkapp_test_transaction" ~package:"zkapp_test_transaction"
     ~path:"src/app/zkapp_test_transaction"
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "zkapp_test_transaction_lib"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; core
+      ; core_kernel
+      ; zkapp_test_transaction_lib
       ; local "cli_lib"
       ; local "currency"
       ; local "mina_base"

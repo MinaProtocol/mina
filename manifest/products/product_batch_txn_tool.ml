@@ -1,21 +1,22 @@
 (** Product: batch_txn_tool — Batch transaction submission tool. *)
 
 open Manifest
+open Externals
 
 let register () =
   executable "mina-batch-txn" ~internal_name:"batch_txn_tool"
     ~package:"mina_batch_txn" ~path:"src/app/batch_txn_tool"
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "uri"
-      ; opam "yojson"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; core
+      ; core_kernel
+      ; integers
+      ; uri
+      ; yojson
       ; local "currency"
       ; local "graphql_lib"
       ; local "integration_test_lib"

@@ -1,29 +1,30 @@
 (** Product: replayer — Replay transactions from archive database. *)
 
 open Manifest
+open Externals
 
 let register () =
   executable "replayer" ~package:"replayer" ~path:"src/app/replayer"
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "bin_prot.shape"
-      ; opam "caqti"
-      ; opam "caqti-async"
-      ; opam "caqti-driver-postgresql"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "result"
-      ; opam "sexplib0"
-      ; opam "stdio"
-      ; opam "uri"
-      ; opam "yojson"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_internalhash_types
+      ; base_caml
+      ; bin_prot_shape
+      ; caqti
+      ; caqti_async
+      ; caqti_driver_postgresql
+      ; core
+      ; core_kernel
+      ; integers
+      ; result
+      ; sexplib0
+      ; stdio
+      ; uri
+      ; yojson
       ; local "archive_lib"
       ; local "block_time"
       ; local "cli_lib"

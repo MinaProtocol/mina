@@ -1,25 +1,26 @@
 (** Product: best_tip_merger — Merge best tips from multiple nodes. *)
 
 open Manifest
+open Externals
 
 let register () =
   executable "best_tip_merger" ~package:"best_tip_merger"
     ~path:"src/app/best_tip_merger" ~modes:[ "native" ]
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "lib"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
-      ; opam "sexplib0"
-      ; opam "stdio"
-      ; opam "yojson"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; async_unix
+      ; base_internalhash_types
+      ; base_caml
+      ; core
+      ; core_kernel
+      ; lib
+      ; ppx_deriving_yojson_runtime
+      ; result
+      ; sexplib0
+      ; stdio
+      ; yojson
       ; local "cli_lib"
       ; local "consensus"
       ; local "data_hash_lib"

@@ -4,6 +4,7 @@
     The manifest generates these files from the declarations below. *)
 
 open Manifest
+open Externals
 open Dune_s_expr
 
 let register_protocol () =
@@ -11,12 +12,12 @@ let register_protocol () =
   library "protocol_version" ~path:"src/lib/protocol_version"
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
-      ; opam "base"
-      ; opam "ppx_version.runtime"
+      [ core_kernel
+      ; sexplib0
+      ; bin_prot_shape
+      ; base_caml
+      ; base
+      ; ppx_version_runtime
       ; local "mina_wire_types"
       ; local "mina_node_config.version"
       ]
@@ -36,11 +37,11 @@ let register_protocol () =
     ~path:"src/lib/transaction_protocol_state" ~inline_tests:true
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "sexplib0"
-      ; opam "core_kernel"
-      ; opam "core"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
+      [ sexplib0
+      ; core_kernel
+      ; core
+      ; bin_prot_shape
+      ; base_caml
       ; local "pickles"
       ; local "genesis_constants"
       ; local "snark_params"
@@ -64,9 +65,9 @@ let register_protocol () =
   library "zkapp_command_builder" ~path:"src/lib/zkapp_command_builder"
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core_kernel"
+      [ async_kernel
+      ; async_unix
+      ; core_kernel
       ; local "mina_base"
       ; local "currency"
       ; local "kimchi_backend"
@@ -100,11 +101,11 @@ let register_transaction_snark () =
   library "transaction_snark" ~path:"src/lib/transaction_snark"
     ~inline_tests:true ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "async"
-      ; opam "async_unix"
-      ; opam "bignum"
-      ; opam "core"
-      ; opam "splittable_random"
+      [ async
+      ; async_unix
+      ; bignum
+      ; core
+      ; splittable_random
       ; local "bitstring_lib"
       ; local "mina_stdlib"
       ; local "cache_dir"
@@ -171,14 +172,14 @@ let register_transaction_snark () =
     ~flags:[ atom ":standard"; atom "-warn-error"; atom "+a" ]
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "base.caml"
-      ; opam "base.md5"
-      ; opam "bin_prot.shape"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
+      [ async
+      ; async_kernel
+      ; base_caml
+      ; base_md5
+      ; bin_prot_shape
+      ; core
+      ; core_kernel
+      ; sexplib0
       ; local "allocation_functor"
       ; local "cache_dir"
       ; local "consensus"
@@ -287,18 +288,18 @@ let register_transaction_snark_tests_a () =
     ~inline_tests:true ~inline_tests_deps:[ "proof_cache.json" ]
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "base64"
-      ; opam "yojson"
-      ; opam "integers"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; core
+      ; base
+      ; core_kernel
+      ; base64
+      ; yojson
+      ; integers
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "mina_stdlib"
       ; local "logger"
       ; local "random_oracle_input"
@@ -371,17 +372,17 @@ let register_transaction_snark_tests_a () =
     ~path:"src/lib/transaction_snark/test/access_permission" ~inline_tests:true
     ~inline_tests_deps:[ "proof_cache.json" ] ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "ppx_inline_test.config"
-      ; opam "sexplib0"
-      ; opam "yojson"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; core
+      ; core_kernel
+      ; ppx_inline_test_config
+      ; sexplib0
+      ; yojson
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "cache_dir"
       ; local "currency"
       ; local "data_hash_lib"
@@ -421,16 +422,16 @@ let register_transaction_snark_tests_a () =
     ~path:"src/lib/transaction_snark/test/account_timing" ~inline_tests:true
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "base"
-      ; opam "base.caml"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "yojson"
+      [ ppx_inline_test_config
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; core
+      ; base
+      ; base_caml
+      ; core_kernel
+      ; sexplib0
+      ; yojson
       ; local "mina_base.import"
       ; local "pickles"
       ; local "pickles.backend"
@@ -472,15 +473,15 @@ let register_transaction_snark_tests_a () =
     ~path:"src/lib/transaction_snark/test/account_update_network_id"
     ~inline_tests:true ~inline_tests_bare:true ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "sexplib0"
+      [ ppx_inline_test_config
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; sexplib0
       ; local "logger"
       ; local "mina_base.import"
       ; local "pickles"
@@ -516,15 +517,15 @@ let register_transaction_snark_tests_b () =
     ~path:"src/lib/transaction_snark/test/app_state" ~inline_tests:true
     ~inline_tests_deps:[ "proof_cache.json" ] ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async_unix"
-      ; opam "async"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async_unix
+      ; async
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "mina_base.import"
       ; local "pickles"
       ; local "transaction_snark"
@@ -549,15 +550,15 @@ let register_transaction_snark_tests_b () =
     ~path:"src/lib/transaction_snark/test/delegate" ~inline_tests:true
     ~inline_tests_deps:[ "proof_cache.json" ] ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async_unix"
-      ; opam "async"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async_unix
+      ; async
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "mina_base.import"
       ; local "pickles"
       ; local "transaction_snark"
@@ -582,18 +583,18 @@ let register_transaction_snark_tests_b () =
     ~path:"src/lib/transaction_snark/test/fee_payer" ~inline_tests:true
     ~inline_tests_deps:[ "proof_cache.json" ] ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async_unix"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "sexplib0"
-      ; opam "integers"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async_unix
+      ; async
+      ; async_kernel
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; sexplib0
+      ; integers
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "mina_base.import"
       ; local "pickles"
       ; local "pickles.backend"
@@ -622,16 +623,16 @@ let register_transaction_snark_tests_b () =
     ~path:"src/lib/transaction_snark/test/multisig_account" ~inline_tests:true
     ~inline_tests_deps:[ "proof_cache.json" ] ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "mina_wire_types"
       ; local "mina_base.import"
       ; local "pickles"
@@ -671,15 +672,15 @@ let register_transaction_snark_tests_b () =
     ~path:"src/lib/transaction_snark/test/permissions" ~inline_tests:true
     ~inline_tests_deps:[ "proof_cache.json" ] ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async_unix"
-      ; opam "async"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async_unix
+      ; async
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "mina_base.import"
       ; local "pickles"
       ; local "transaction_snark"
@@ -704,15 +705,15 @@ let register_transaction_snark_tests_b () =
     ~path:"src/lib/transaction_snark/test/token_symbol" ~inline_tests:true
     ~inline_tests_deps:[ "proof_cache.json" ] ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async_unix"
-      ; opam "async"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async_unix
+      ; async
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "mina_base.import"
       ; local "pickles"
       ; local "transaction_snark"
@@ -741,14 +742,14 @@ let register_transaction_snark_tests_c () =
     ~path:"src/lib/transaction_snark/test/transaction_union" ~inline_tests:true
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
+      [ ppx_inline_test_config
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
       ; local "mina_base.import"
       ; local "mina_stdlib"
       ; local "pickles"
@@ -787,15 +788,15 @@ let register_transaction_snark_tests_c () =
     ~path:"src/lib/transaction_snark/test/verification_key" ~inline_tests:true
     ~inline_tests_deps:[ "proof_cache.json" ] ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async_unix"
-      ; opam "async"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async_unix
+      ; async
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "mina_base.import"
       ; local "pickles.backend"
       ; local "kimchi_pasta"
@@ -826,15 +827,15 @@ let register_transaction_snark_tests_c () =
     ~inline_tests:true ~inline_tests_deps:[ "proof_cache.json" ]
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async_unix"
-      ; opam "async"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async_unix
+      ; async
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "protocol_version"
       ; local "mina_base.import"
       ; local "pickles"
@@ -860,15 +861,15 @@ let register_transaction_snark_tests_c () =
     ~path:"src/lib/transaction_snark/test/verify-simple-test" ~inline_tests:true
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "base64"
-      ; opam "yojson"
+      [ ppx_inline_test_config
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; core
+      ; base
+      ; core_kernel
+      ; base64
+      ; yojson
       ; local "random_oracle_input"
       ; local "pickles.backend"
       ; local "mina_base.import"
@@ -915,15 +916,15 @@ let register_transaction_snark_tests_c () =
     ~path:"src/lib/transaction_snark/test/voting_for" ~inline_tests:true
     ~inline_tests_deps:[ "proof_cache.json" ] ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async_unix"
-      ; opam "async"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async_unix
+      ; async
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "mina_base.import"
       ; local "pickles.backend"
       ; local "kimchi_pasta"
@@ -956,16 +957,16 @@ let register_transaction_snark_tests_d () =
     ~path:"src/lib/transaction_snark/test/zkapp_deploy" ~inline_tests:true
     ~inline_tests_deps:[ "proof_cache.json" ] ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "mina_base.import"
       ; local "pickles"
       ; local "pickles.backend"
@@ -992,16 +993,16 @@ let register_transaction_snark_tests_d () =
   private_executable ~path:"src/lib/transaction_snark/test/zkapp_fuzzy"
     ~link_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "async.async_command"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "splittable_random"
+      [ ppx_inline_test_config
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; async_command
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; splittable_random
       ; local "logger"
       ; local "mina_base.import"
       ; local "data_hash_lib"
@@ -1039,17 +1040,17 @@ let register_transaction_snark_tests_d () =
     ~path:"src/lib/transaction_snark/test/zkapp_payments" ~inline_tests:true
     ~inline_tests_deps:[ "proof_cache.json" ] ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "sexplib0"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; sexplib0
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "logger"
       ; local "mina_base.import"
       ; local "pickles"
@@ -1081,16 +1082,16 @@ let register_transaction_snark_tests_d () =
     ~inline_tests:true ~inline_tests_deps:[ "proof_cache.json" ]
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async_unix"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async_unix
+      ; async
+      ; async_kernel
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "mina_base.import"
       ; local "data_hash_lib"
       ; local "pickles"
@@ -1126,14 +1127,14 @@ let register_transaction_snark_tests_d () =
     ~path:"src/lib/transaction_snark/test/zkapp_tokens" ~inline_tests:true
     ~inline_tests_deps:[ "proof_cache.json" ] ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; core_kernel
+      ; sexplib0
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "mina_base.import"
       ; local "transaction_snark"
       ; local "mina_ledger"
@@ -1157,15 +1158,15 @@ let register_transaction_snark_tests_d () =
     ~path:"src/lib/transaction_snark/test/zkapp_uri" ~inline_tests:true
     ~inline_tests_deps:[ "proof_cache.json" ] ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async_unix"
-      ; opam "async"
-      ; opam "core"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; async_unix
+      ; async
+      ; core
+      ; base
+      ; core_kernel
+      ; yojson
+      ; ppx_deriving_yojson_runtime
+      ; result
       ; local "mina_base.import"
       ; local "pickles"
       ; local "transaction_snark"

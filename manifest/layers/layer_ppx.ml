@@ -4,27 +4,27 @@
     The manifest generates these files from the declarations below. *)
 
 open Manifest
+open Externals
 open Dune_s_expr
 
 let register () =
   (* -- ppx_annot ------------------------------------------------ *)
   library "ppx_annot" ~path:"src/lib/ppx_annot" ~kind:"ppx_deriver"
-    ~deps:
-      [ opam "ppxlib"; opam "core_kernel"; opam "base"; opam "compiler-libs" ]
+    ~deps:[ ppxlib; core_kernel; base; compiler_libs ]
     ~ppx:(Ppx.custom [ "ppx_version"; "ppxlib.metaquot" ]) ;
 
   (* -- ppx_register_event --------------------------------------- *)
   library "ppx_register_event" ~path:"src/lib/ppx_register_event"
     ~kind:"ppx_deriver"
     ~deps:
-      [ opam "ocaml-compiler-libs.common"
-      ; opam "ppxlib.ast"
-      ; opam "ppx_deriving_yojson"
-      ; opam "core_kernel"
-      ; opam "ppxlib"
-      ; opam "compiler-libs.common"
-      ; opam "ocaml-migrate-parsetree"
-      ; opam "base"
+      [ ocaml_compiler_libs_common
+      ; ppxlib_ast
+      ; ppx_deriving_yojson
+      ; core_kernel
+      ; ppxlib
+      ; compiler_libs_common
+      ; ocaml_migrate_parsetree
+      ; base
       ; local "interpolator_lib"
       ]
     ~ppx:(Ppx.custom [ "ppx_version"; "ppxlib.metaquot" ])
@@ -36,40 +36,34 @@ let register () =
   library "ppx_version" ~path:"src/lib/ppx_version" ~kind:"ppx_deriver"
     ~no_instrumentation:true
     ~deps:
-      [ opam "compiler-libs.common"
-      ; opam "ppxlib"
-      ; opam "ppxlib.astlib"
-      ; opam "ppx_derivers"
-      ; opam "ppx_bin_prot"
-      ; opam "base"
-      ; opam "base.caml"
-      ; opam "core_kernel"
-      ; opam "ppx_version.runtime"
-      ; opam "bin_prot"
+      [ compiler_libs_common
+      ; ppxlib
+      ; ppxlib_astlib
+      ; ppx_derivers
+      ; ppx_bin_prot
+      ; base
+      ; base_caml
+      ; core_kernel
+      ; ppx_version_runtime
+      ; bin_prot
       ]
     ~ppx:(Ppx.custom [ "ppx_compare"; "ppxlib.metaquot" ]) ;
 
   (* -- ppx_version.runtime -------------------------------------- *)
   library "ppx_version.runtime" ~internal_name:"ppx_version_runtime"
     ~path:"src/lib/ppx_version/runtime" ~no_instrumentation:true
-    ~deps:
-      [ opam "base"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "bin_prot"
-      ; opam "bin_prot.shape"
-      ] ;
+    ~deps:[ base; core_kernel; sexplib0; bin_prot; bin_prot_shape ] ;
 
   (* -- ppx_mina ------------------------------------------------- *)
   file_stanzas ~path:"src/lib/ppx_mina" [ "vendored_dirs" @: [ atom "tests" ] ] ;
   library "ppx_mina" ~path:"src/lib/ppx_mina" ~kind:"ppx_deriver"
     ~deps:
-      [ opam "ppx_deriving.api"
-      ; opam "ppxlib"
-      ; opam "ppx_bin_prot"
-      ; opam "core_kernel"
-      ; opam "base"
-      ; opam "base.caml"
+      [ ppx_deriving_api
+      ; ppxlib
+      ; ppx_bin_prot
+      ; core_kernel
+      ; base
+      ; base_caml
       ; local "ppx_representatives"
       ; local "ppx_register_event"
       ; local "ppx_to_enum"
@@ -78,18 +72,18 @@ let register () =
 
   (* -- ppx_to_enum ---------------------------------------------- *)
   library "ppx_to_enum" ~path:"src/lib/ppx_mina/ppx_to_enum" ~kind:"ppx_deriver"
-    ~deps:[ opam "compiler-libs.common"; opam "ppxlib"; opam "base" ]
+    ~deps:[ compiler_libs_common; ppxlib; base ]
     ~ppx:(Ppx.custom [ "ppxlib.metaquot" ]) ;
 
   (* -- ppx_representatives -------------------------------------- *)
   library "ppx_representatives" ~path:"src/lib/ppx_mina/ppx_representatives"
     ~kind:"ppx_deriver"
     ~deps:
-      [ opam "ppxlib.ast"
-      ; opam "ocaml-compiler-libs.common"
-      ; opam "compiler-libs.common"
-      ; opam "ppxlib"
-      ; opam "base"
+      [ ppxlib_ast
+      ; ocaml_compiler_libs_common
+      ; compiler_libs_common
+      ; ppxlib
+      ; base
       ]
     ~ppx:(Ppx.custom [ "ppxlib.metaquot" ])
     ~ppx_runtime_libraries:[ "ppx_representatives.runtime" ] ;

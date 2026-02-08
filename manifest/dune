@@ -11,6 +11,7 @@
  (libraries manifest_lib)
  (wrapped false)
  (modules
+  externals
   product_mina
   layer_base
   layer_concurrency

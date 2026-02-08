@@ -4,6 +4,7 @@
     The manifest generates these files from the declarations below. *)
 
 open Manifest
+open Externals
 
 let register () =
   (* -- mina_node_config.intf -------------------------------------- *)
@@ -37,7 +38,7 @@ let register () =
   (* -- mina_node_config.profiled ---------------------------------- *)
   library "mina_node_config.profiled" ~internal_name:"node_config_profiled"
     ~path:"src/lib/node_config/profiled"
-    ~deps:[ opam "core_kernel"; local "comptime"; local "node_config_intf" ]
+    ~deps:[ core_kernel; local "comptime"; local "node_config_intf" ]
     ~ppx:Ppx.minimal ;
 
   (* -- mina_node_config.unconfigurable_constants ------------------ *)

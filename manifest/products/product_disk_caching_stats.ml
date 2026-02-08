@@ -1,20 +1,21 @@
 (** Product: disk_caching_stats — Disk caching performance stats. *)
 
 open Manifest
+open Externals
 
 let register () =
   executable "mina-disk-caching-stats" ~internal_name:"disk_caching_stats"
     ~package:"mina_disk_caching_stats" ~path:"src/app/disk_caching_stats"
     ~deps:
-      [ opam "base"
-      ; opam "base.caml"
-      ; opam "bin_prot"
-      ; opam "bigarray-compat"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "digestif"
-      ; opam "sexplib0"
-      ; opam "splittable_random"
+      [ base
+      ; base_caml
+      ; bin_prot
+      ; bigarray_compat
+      ; core
+      ; core_kernel
+      ; digestif
+      ; sexplib0
+      ; splittable_random
       ; local "crypto_params"
       ; local "currency"
       ; local "data_hash_lib"

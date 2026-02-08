@@ -1,20 +1,21 @@
 (** Product: dump_blocks — Dump blocks from transition frontier. *)
 
 open Manifest
+open Externals
 
 let register () =
   executable "dump_blocks" ~path:"src/app/dump_blocks" ~modes:[ "native" ]
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "core_unix.command_unix"
-      ; opam "ppx_inline_test.runner.lib"
-      ; opam "sexplib0"
-      ; opam "yojson"
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; core
+      ; core_kernel
+      ; core_unix_command_unix
+      ; ppx_inline_test_runner_lib
+      ; sexplib0
+      ; yojson
       ; local "block_time"
       ; local "logger"
       ; local "mina_base"

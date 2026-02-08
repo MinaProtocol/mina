@@ -4,6 +4,7 @@
     The manifest generates these files from the declarations below. *)
 
 open Manifest
+open Externals
 
 let register () =
   (* -- snark_bits ------------------------------------------------- *)
@@ -11,9 +12,9 @@ let register () =
     ~synopsis:"Snark parameters" ~library_flags:[ "-linkall" ]
     ~inline_tests:true
     ~deps:
-      [ opam "core_kernel"
-      ; opam "integers"
-      ; opam "base"
+      [ core_kernel
+      ; integers
+      ; base
       ; local "fold_lib"
       ; local "snarky.backendless"
       ; local "tuple_lib"

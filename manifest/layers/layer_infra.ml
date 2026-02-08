@@ -4,6 +4,7 @@
     The manifest generates these files from the declarations below. *)
 
 open Manifest
+open Externals
 
 let register () =
   (* ============================================================ *)
@@ -12,7 +13,7 @@ let register () =
 
   (* -- logger (virtual) ------------------------------------------- *)
   library "logger" ~path:"src/lib/logger"
-    ~deps:[ opam "core_kernel"; opam "sexplib0"; local "interpolator_lib" ]
+    ~deps:[ core_kernel; sexplib0; local "interpolator_lib" ]
     ~ppx:Ppx.mina_rich ~virtual_modules:[ "logger" ]
     ~default_implementation:"logger.native" ;
 
@@ -23,10 +24,10 @@ let register () =
       "Context logger: useful for passing logger down the deep callstacks"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ opam "base.base_internalhash_types"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "async_kernel"
+      [ base_internalhash_types
+      ; core_kernel
+      ; sexplib0
+      ; async_kernel
       ; local "logger"
       ]
     ~ppx:
@@ -37,12 +38,12 @@ let register () =
   library "logger.fake" ~internal_name:"logger_fake" ~path:"src/lib/logger/fake"
     ~synopsis:"Fake logging library"
     ~deps:
-      [ opam "result"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
-      ; opam "base.base_internalhash_types"
+      [ result
+      ; core_kernel
+      ; sexplib0
+      ; bin_prot_shape
+      ; base_caml
+      ; base_internalhash_types
       ; local "interpolator_lib"
       ; local "ppx_version.runtime"
       ; local "mina_stdlib"
@@ -53,7 +54,7 @@ let register () =
   library "logger.file_system" ~internal_name:"logger_file_system"
     ~path:"src/lib/logger/file_system" ~synopsis:"Logging library"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
-    ~deps:[ opam "core"; opam "yojson"; opam "core_kernel"; local "logger" ]
+    ~deps:[ core; yojson; core_kernel; local "logger" ]
     ~ppx:Ppx.mina_rich ;
 
   (* -- logger.native ---------------------------------------------- *)
@@ -61,13 +62,13 @@ let register () =
     ~path:"src/lib/logger/native" ~synopsis:"Logging library"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ opam "result"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
-      ; opam "base.base_internalhash_types"
+      [ result
+      ; core
+      ; core_kernel
+      ; sexplib0
+      ; bin_prot_shape
+      ; base_caml
+      ; base_internalhash_types
       ; local "itn_logger"
       ; local "interpolator_lib"
       ; local "ppx_version.runtime"
@@ -79,15 +80,15 @@ let register () =
   library "o1trace" ~path:"src/lib/o1trace" ~synopsis:"Basic event tracing"
     ~inline_tests:true
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base.base_internalhash_types"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "ocamlgraph"
-      ; opam "ppx_inline_test.config"
-      ; opam "sexplib0"
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; base_internalhash_types
+      ; core
+      ; core_kernel
+      ; ocamlgraph
+      ; ppx_inline_test_config
+      ; sexplib0
       ; local "logger"
       ]
     ~ppx:Ppx.mina ;
@@ -95,15 +96,15 @@ let register () =
   (* -- o1trace_webkit_event --------------------------------------- *)
   library "o1trace_webkit_event" ~path:"src/lib/o1trace/webkit_event"
     ~deps:
-      [ opam "base"
-      ; opam "base.caml"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "core.time_stamp_counter"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
+      [ base
+      ; base_caml
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; core
+      ; core_time_stamp_counter
+      ; core_kernel
+      ; sexplib0
       ; local "webkit_trace_event.binary"
       ; local "webkit_trace_event"
       ; local "o1trace"
@@ -115,12 +116,12 @@ let register () =
     ~synopsis:"Mina standard library Unix utilities"
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "ptime"
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; core
+      ; core_kernel
+      ; ptime
       ; local "logger"
       ]
     ~ppx:
@@ -132,16 +133,16 @@ let register () =
     ~synopsis:"Snark-friendly numbers used in Coda consensus"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ opam "result"
-      ; opam "base.caml"
-      ; opam "bin_prot.shape"
-      ; opam "bignum.bigint"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "sexplib0"
-      ; opam "base"
-      ; opam "base.base_internalhash_types"
-      ; opam "ppx_inline_test.config"
+      [ result
+      ; base_caml
+      ; bin_prot_shape
+      ; bignum_bigint
+      ; core_kernel
+      ; integers
+      ; sexplib0
+      ; base
+      ; base_internalhash_types
+      ; ppx_inline_test_config
       ; local "protocol_version"
       ; local "mina_wire_types"
       ; local "bignum_bigint"
@@ -178,12 +179,12 @@ let register () =
   (* -- cache_lib -------------------------------------------------- *)
   library "cache_lib" ~path:"src/lib/cache_lib" ~inline_tests:true
     ~deps:
-      [ opam "async_kernel"
-      ; opam "base"
-      ; opam "base.base_internalhash_types"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "ppx_inline_test.config"
+      [ async_kernel
+      ; base
+      ; base_internalhash_types
+      ; core
+      ; core_kernel
+      ; ppx_inline_test_config
       ; local "logger"
       ]
     ~ppx:
@@ -201,17 +202,17 @@ let register () =
     ~synopsis:"Track how much we trust peers" ~library_flags:[ "-linkall" ]
     ~inline_tests:true
     ~deps:
-      [ opam "sexplib0"
-      ; opam "core"
-      ; opam "ppx_inline_test.config"
-      ; opam "base.caml"
-      ; opam "async_kernel"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "base"
-      ; opam "result"
-      ; opam "async"
-      ; opam "async_unix"
+      [ sexplib0
+      ; core
+      ; ppx_inline_test_config
+      ; base_caml
+      ; async_kernel
+      ; core_kernel
+      ; bin_prot_shape
+      ; base
+      ; result
+      ; async
+      ; async_unix
       ; local "mina_metrics"
       ; local "rocksdb"
       ; local "pipe_lib"
@@ -246,25 +247,18 @@ let register () =
     ~synopsis:"Template code to run programs that rely Rpc_parallel.Expert"
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "async_rpc_kernel"
-      ; opam "async"
-      ; opam "core"
-      ; opam "rpc_parallel"
-      ; opam "async.async_rpc"
-      ; opam "core_kernel"
-      ]
+      [ async_rpc_kernel; async; core; rpc_parallel; async_rpc; core_kernel ]
     ~ppx:(Ppx.custom [ "ppx_version"; "ppx_jane"; "ppx_compare" ]) ;
 
   (* -- mina_version.dummy ----------------------------------------- *)
   library "mina_version.dummy" ~internal_name:"mina_version_dummy"
-    ~path:"src/lib/mina_version/dummy"
-    ~deps:[ opam "core_kernel"; opam "base" ]
+    ~path:"src/lib/mina_version/dummy" ~deps:[ core_kernel; base ]
     ~ppx:Ppx.minimal ~implements:"mina_version" ;
 
   (* -- mina_version.runtime --------------------------------------- *)
   library "mina_version.runtime" ~internal_name:"mina_version_runtime"
     ~path:"src/lib/mina_version/runtime"
-    ~deps:[ opam "core_kernel"; opam "base"; opam "unix" ]
+    ~deps:[ core_kernel; base; unix ]
     ~ppx:Ppx.minimal ~implements:"mina_version" ;
 
   (* -- mina_signature_kind (virtual) ------------------------------ *)
@@ -276,8 +270,7 @@ let register () =
 
   (* -- mina_signature_kind.type ----------------------------------- *)
   library "mina_signature_kind.type" ~internal_name:"mina_signature_kind_type"
-    ~path:"src/lib/signature_kind/type"
-    ~deps:[ opam "core_kernel" ]
+    ~path:"src/lib/signature_kind/type" ~deps:[ core_kernel ]
     ~ppx:(Ppx.custom [ "ppx_deriving_yojson"; "ppx_jane"; "ppx_version" ]) ;
 
   (* -- mina_signature_kind.config --------------------------------- *)
@@ -301,7 +294,7 @@ let register () =
 
   (* -- multi_key_file_storage ------------------------------------- *)
   library "multi_key_file_storage" ~path:"src/lib/multi-key-file-storage"
-    ~deps:[ opam "core_kernel"; opam "bin_prot"; local "mina_stdlib" ]
+    ~deps:[ core_kernel; bin_prot; local "mina_stdlib" ]
     ~modules_without_implementation:[ "intf" ] ~ppx:Ppx.mina ;
 
   ()

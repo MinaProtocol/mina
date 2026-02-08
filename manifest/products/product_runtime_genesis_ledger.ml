@@ -1,19 +1,20 @@
 (** Product: runtime_genesis_ledger — Generate genesis ledgers at runtime. *)
 
 open Manifest
+open Externals
 
 let register () =
   executable "runtime_genesis_ledger" ~path:"src/app/runtime_genesis_ledger"
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "result"
-      ; opam "yojson"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; core
+      ; core_kernel
+      ; result
+      ; yojson
       ; local "cache_dir"
       ; local "cli_lib"
       ; local "coda_genesis_ledger"

@@ -1,25 +1,26 @@
 (** Product: test_executive — Mina integration test executive. *)
 
 open Manifest
+open Externals
 
 let register () =
   executable "mina-test-executive" ~internal_name:"test_executive"
     ~package:"mina_test_executive" ~path:"src/app/test_executive"
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "cmdliner"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "sexplib0"
-      ; opam "stdio"
-      ; opam "unsigned_extended"
-      ; opam "uri"
-      ; opam "yojson"
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; base_internalhash_types
+      ; base_caml
+      ; cmdliner
+      ; core
+      ; core_kernel
+      ; integers
+      ; sexplib0
+      ; stdio
+      ; unsigned_extended
+      ; uri
+      ; yojson
       ; local "block_time"
       ; local "cache_dir"
       ; local "currency"

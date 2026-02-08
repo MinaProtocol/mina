@@ -3,6 +3,7 @@
     The main mina executable with testnet/mainnet signature variants. *)
 
 open Manifest
+open Externals
 open Dune_s_expr
 
 let register () =
@@ -52,34 +53,34 @@ let register () =
   (* -- init (library) ------------------------------------------------- *)
   library "init" ~path:"src/app/cli/src/init"
     ~deps:
-      [ opam "astring"
-      ; opam "async"
-      ; opam "async.async_command"
-      ; opam "async.async_rpc"
-      ; opam "async_kernel"
-      ; opam "async_rpc_kernel"
-      ; opam "async_ssl"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "base_quickcheck"
-      ; opam "cohttp"
-      ; opam "cohttp-async"
-      ; opam "core"
-      ; opam "core.uuid"
-      ; opam "core_kernel"
-      ; opam "core_kernel.uuid"
-      ; opam "graphql"
-      ; opam "graphql-async"
-      ; opam "graphql-cohttp"
-      ; opam "graphql_parser"
-      ; opam "integers"
-      ; opam "mirage-crypto-ec"
-      ; opam "result"
-      ; opam "sexplib0"
-      ; opam "stdio"
-      ; opam "uri"
+      [ astring
+      ; async
+      ; async_command
+      ; async_rpc
+      ; async_kernel
+      ; async_rpc_kernel
+      ; async_ssl
+      ; async_unix
+      ; base
+      ; base_internalhash_types
+      ; base_caml
+      ; base_quickcheck
+      ; cohttp
+      ; cohttp_async
+      ; core
+      ; core_uuid
+      ; core_kernel
+      ; core_kernel_uuid
+      ; graphql
+      ; graphql_async
+      ; graphql_cohttp
+      ; graphql_parser
+      ; integers
+      ; mirage_crypto_ec
+      ; result
+      ; sexplib0
+      ; stdio
+      ; uri
       ; local "allocation_functor"
       ; local "archive_lib"
       ; local "block_time"
@@ -201,23 +202,23 @@ let register () =
   library "cli.mina_cli_entrypoint" ~internal_name:"mina_cli_entrypoint"
     ~path:"src/app/cli/src/cli_entrypoint" ~modes:[ "native" ]
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.caml"
-      ; opam "bin_prot"
-      ; opam "bin_prot.shape"
-      ; opam "core"
-      ; opam "core.daemon"
-      ; opam "core_kernel"
-      ; opam "init"
-      ; opam "memtrace"
-      ; opam "result"
-      ; opam "sexplib0"
-      ; opam "stdio"
-      ; opam "uri"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_caml
+      ; bin_prot
+      ; bin_prot_shape
+      ; core
+      ; core_daemon
+      ; core_kernel
+      ; init
+      ; memtrace
+      ; result
+      ; sexplib0
+      ; stdio
+      ; uri
       ; local "blake2"
       ; local "block_producer"
       ; local "block_time"

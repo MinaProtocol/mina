@@ -1,17 +1,18 @@
 (** Product: logproc — Mina log processor. *)
 
 open Manifest
+open Externals
 
 let register () =
   executable "logproc" ~path:"src/app/logproc" ~modules:[ "logproc" ]
     ~deps:
-      [ opam "cmdliner"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
-      ; opam "stdio"
-      ; opam "yojson"
+      [ cmdliner
+      ; core
+      ; core_kernel
+      ; ppx_deriving_yojson_runtime
+      ; result
+      ; stdio
+      ; yojson
       ; local "interpolator_lib"
       ; local "logger"
       ; local "logproc_lib"

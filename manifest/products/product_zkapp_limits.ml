@@ -1,13 +1,14 @@
 (** Product: zkapp_limits — Display zkApp limits. *)
 
 open Manifest
+open Externals
 
 let register () =
   executable "zkapp_limits" ~package:"zkapp_limits" ~path:"src/app/zkapp_limits"
     ~deps:
-      [ opam "base"
-      ; opam "base.caml"
-      ; opam "core_kernel"
+      [ base
+      ; base_caml
+      ; core_kernel
       ; local "genesis_constants"
       ; local "mina_base"
       ; local "mina_stdlib"

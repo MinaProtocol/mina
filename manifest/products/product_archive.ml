@@ -3,28 +3,23 @@
     Stores blockchain data in a PostgreSQL database. *)
 
 open Manifest
+open Externals
 
 let register () =
   (* -- archive (executable) ------------------------------------------- *)
   executable "archive" ~package:"archive" ~path:"src/app/archive"
-    ~deps:
-      [ opam "archive_cli"
-      ; opam "async"
-      ; opam "async_unix"
-      ; opam "core_kernel"
-      ; local "mina_version"
-      ]
+    ~deps:[ archive_cli; async; async_unix; core_kernel; local "mina_version" ]
     ~modules:[ "archive" ] ~modes:[ "native" ] ~ppx:Ppx.minimal
     ~bisect_sigterm:true ;
 
   (* -- archive_cli (library) ------------------------------------------ *)
   library "archive.cli" ~internal_name:"archive_cli" ~path:"src/app/archive/cli"
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "caqti"
-      ; opam "caqti-async"
-      ; opam "core"
+      [ async
+      ; async_command
+      ; caqti
+      ; caqti_async
+      ; core
       ; local "archive_lib"
       ; local "block_time"
       ; local "cli_lib"
@@ -40,26 +35,26 @@ let register () =
   (* -- archive_lib (library) ------------------------------------------ *)
   library "archive_lib" ~path:"src/app/archive/lib"
     ~deps:
-      [ opam "async"
-      ; opam "async.async_rpc"
-      ; opam "async_kernel"
-      ; opam "async_rpc_kernel"
-      ; opam "async_unix"
-      ; opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "base64"
-      ; opam "bin_prot.shape"
-      ; opam "caqti"
-      ; opam "caqti-async"
-      ; opam "caqti-driver-postgresql"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "ppx_inline_test.config"
-      ; opam "ppx_version.runtime"
-      ; opam "sexplib0"
-      ; opam "uri"
+      [ async
+      ; async_rpc
+      ; async_kernel
+      ; async_rpc_kernel
+      ; async_unix
+      ; base_internalhash_types
+      ; base_caml
+      ; base64
+      ; bin_prot_shape
+      ; caqti
+      ; caqti_async
+      ; caqti_driver_postgresql
+      ; core
+      ; core_kernel
+      ; integers
+      ; ppx_deriving_yojson_runtime
+      ; ppx_inline_test_config
+      ; ppx_version_runtime
+      ; sexplib0
+      ; uri
       ; local "block_time"
       ; local "child_processes"
       ; local "coda_genesis_ledger"

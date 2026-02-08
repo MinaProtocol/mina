@@ -2,6 +2,7 @@
     archive database migrations. *)
 
 open Manifest
+open Externals
 
 let register () =
   (* -- archive_hardfork_toolbox.lib (library) ------------------------- *)
@@ -9,21 +10,21 @@ let register () =
     ~internal_name:"archive_hardfork_toolbox_lib"
     ~path:"src/app/archive_hardfork_toolbox" ~modules:[ "logic"; "sql" ]
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.caml"
-      ; opam "caqti"
-      ; opam "caqti-async"
-      ; opam "caqti-driver-postgresql"
-      ; opam "cli_lib"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "result"
-      ; opam "stdio"
-      ; opam "uri"
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_caml
+      ; caqti
+      ; caqti_async
+      ; caqti_driver_postgresql
+      ; cli_lib
+      ; core
+      ; core_kernel
+      ; integers
+      ; result
+      ; stdio
+      ; uri
       ; local "archive_lib"
       ; local "block_time"
       ; local "consensus"
@@ -63,22 +64,22 @@ let register () =
     ~path:"src/app/archive_hardfork_toolbox"
     ~modules:[ "archive_hardfork_toolbox" ]
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.caml"
-      ; opam "caqti"
-      ; opam "caqti-async"
-      ; opam "caqti-driver-postgresql"
-      ; opam "cli_lib"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "result"
-      ; opam "stdio"
-      ; opam "uri"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_caml
+      ; caqti
+      ; caqti_async
+      ; caqti_driver_postgresql
+      ; cli_lib
+      ; core
+      ; core_kernel
+      ; integers
+      ; result
+      ; stdio
+      ; uri
       ; local "archive_hardfork_toolbox_lib"
       ; local "archive_lib"
       ; local "block_time"
@@ -118,21 +119,21 @@ let register () =
   test "test_convert_canonical" ~path:"src/app/archive_hardfork_toolbox/tests"
     ~modules:[ "test_convert_canonical" ]
     ~deps:
-      [ opam "alcotest"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.caml"
-      ; opam "caqti"
-      ; opam "caqti-async"
-      ; opam "caqti-driver-postgresql"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "result"
-      ; opam "stdio"
-      ; opam "threads.posix"
-      ; opam "uri"
+      [ alcotest
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_caml
+      ; caqti
+      ; caqti_async
+      ; caqti_driver_postgresql
+      ; core
+      ; core_kernel
+      ; result
+      ; stdio
+      ; threads_posix
+      ; uri
       ; local "archive_hardfork_toolbox_lib"
       ; local "archive_lib"
       ; local "block_time"

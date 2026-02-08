@@ -1,23 +1,24 @@
 (** Product: extract_blocks — Extract blocks from archive database. *)
 
 open Manifest
+open Externals
 
 let register () =
   executable "extract_blocks" ~package:"extract_blocks"
     ~path:"src/app/extract_blocks"
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base64"
-      ; opam "caqti"
-      ; opam "caqti-async"
-      ; opam "caqti-driver-postgresql"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "uri"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base64
+      ; caqti
+      ; caqti_async
+      ; caqti_driver_postgresql
+      ; core_kernel
+      ; integers
+      ; uri
       ; local "archive_lib"
       ; local "block_time"
       ; local "consensus.vrf"

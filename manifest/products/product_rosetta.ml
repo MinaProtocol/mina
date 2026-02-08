@@ -4,18 +4,19 @@
     signature variants, a signing library, and an indexer test. *)
 
 open Manifest
+open Externals
 
 let register () =
   (* -- rosetta (executable) ------------------------------------------- *)
   executable "rosetta" ~package:"rosetta" ~path:"src/app/rosetta"
     ~modules:[ "rosetta" ] ~modes:[ "native" ]
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; base
+      ; core
+      ; core_kernel
       ; local "genesis_constants"
       ; local "lib"
       ]
@@ -27,12 +28,12 @@ let register () =
     ~modules:[ "rosetta_testnet_signatures" ]
     ~modes:[ "native" ]
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; base
+      ; core
+      ; core_kernel
       ; local "genesis_constants"
       ; local "lib"
       ; local "mina_signature_kind.testnet"
@@ -45,12 +46,12 @@ let register () =
     ~modules:[ "rosetta_mainnet_signatures" ]
     ~modes:[ "native" ]
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; base
+      ; core
+      ; core_kernel
       ; local "genesis_constants"
       ; local "lib"
       ; local "mina_signature_kind.mainnet"
@@ -60,23 +61,23 @@ let register () =
   (* -- lib (rosetta library) ------------------------------------------ *)
   library "lib" ~path:"src/app/rosetta/lib" ~inline_tests:true
     ~deps:
-      [ opam "archive_lib"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.caml"
-      ; opam "caqti"
-      ; opam "caqti-async"
-      ; opam "cohttp"
-      ; opam "cohttp-async"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "ppx_inline_test.config"
-      ; opam "result"
-      ; opam "sexplib0"
-      ; opam "uri"
+      [ archive_lib
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_caml
+      ; caqti
+      ; caqti_async
+      ; cohttp
+      ; cohttp_async
+      ; core
+      ; core_kernel
+      ; integers
+      ; ppx_inline_test_config
+      ; result
+      ; sexplib0
+      ; uri
       ; local "cli_lib"
       ; local "currency"
       ; local "genesis_constants"
@@ -139,14 +140,14 @@ let register () =
   library "signer.cli" ~internal_name:"signer_cli"
     ~path:"src/app/rosetta/ocaml-signer" ~modules:[ "signer_cli" ]
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "lib"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; core
+      ; core_kernel
+      ; lib
       ; local "cli_lib"
       ; local "kimchi_pasta"
       ; local "kimchi_pasta.basic"
@@ -175,7 +176,7 @@ let register () =
   (* -- signer (executable) -------------------------------------------- *)
   executable "signer" ~package:"signer" ~path:"src/app/rosetta/ocaml-signer"
     ~modules:[ "signer" ] ~modes:[ "native" ]
-    ~deps:[ opam "async"; opam "base"; opam "core_kernel"; local "signer_cli" ]
+    ~deps:[ async; base; core_kernel; local "signer_cli" ]
     ~ppx:
       (Ppx.custom
          [ "graphql_ppx"
@@ -193,7 +194,7 @@ let register () =
     ~package:"signer" ~path:"src/app/rosetta/ocaml-signer"
     ~modules:[ "signer_testnet_signatures" ]
     ~modes:[ "native" ]
-    ~deps:[ opam "async"; opam "base"; opam "core_kernel"; local "signer_cli" ]
+    ~deps:[ async; base; core_kernel; local "signer_cli" ]
     ~ppx:
       (Ppx.custom
          [ "graphql_ppx"
@@ -211,7 +212,7 @@ let register () =
     ~package:"signer" ~path:"src/app/rosetta/ocaml-signer"
     ~modules:[ "signer_mainnet_signatures" ]
     ~modes:[ "native" ]
-    ~deps:[ opam "async"; opam "base"; opam "core_kernel"; local "signer_cli" ]
+    ~deps:[ async; base; core_kernel; local "signer_cli" ]
     ~ppx:
       (Ppx.custom
          [ "graphql_ppx"
@@ -227,15 +228,15 @@ let register () =
   (* -- indexer_test (test, disabled) ---------------------------------- *)
   test "indexer_test" ~path:"src/app/rosetta/indexer_test" ~enabled_if:"false"
     ~deps:
-      [ opam "alcotest"
-      ; opam "alcotest-async"
-      ; opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "base"
-      ; opam "cmdliner"
-      ; opam "core"
-      ; opam "core_kernel"
+      [ alcotest
+      ; alcotest_async
+      ; async
+      ; async_command
+      ; async_kernel
+      ; base
+      ; cmdliner
+      ; core
+      ; core_kernel
       ; local "lib"
       ]
     ~ppx:

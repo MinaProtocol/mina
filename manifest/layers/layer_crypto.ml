@@ -5,6 +5,7 @@
     The manifest generates these files from the declarations below. *)
 
 open Manifest
+open Externals
 open Dune_s_expr
 
 let register_low_level () =
@@ -15,14 +16,14 @@ let register_low_level () =
   (* -- blake2 ----------------------------------------------------- *)
   library "blake2" ~path:"src/lib/crypto/blake2" ~inline_tests:true
     ~deps:
-      [ opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "bigarray-compat"
-      ; opam "bin_prot.shape"
-      ; opam "core_kernel"
-      ; opam "digestif"
-      ; opam "ppx_inline_test.config"
-      ; opam "sexplib0"
+      [ base_internalhash_types
+      ; base_caml
+      ; bigarray_compat
+      ; bin_prot_shape
+      ; core_kernel
+      ; digestif
+      ; ppx_inline_test_config
+      ; sexplib0
       ; local "mina_stdlib"
       ; local "ppx_version.runtime"
       ]
@@ -39,20 +40,15 @@ let register_low_level () =
   library "bignum_bigint" ~path:"src/lib/crypto/bignum_bigint"
     ~synopsis:"Bignum's bigint re-exported as Bignum_bigint"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
-    ~deps:
-      [ opam "core_kernel"
-      ; opam "async_kernel"
-      ; opam "bignum.bigint"
-      ; local "fold_lib"
-      ]
+    ~deps:[ core_kernel; async_kernel; bignum_bigint; local "fold_lib" ]
     ~ppx:Ppx.standard ;
 
   (* -- string_sign ------------------------------------------------ *)
   library "string_sign" ~path:"src/lib/crypto/string_sign"
     ~synopsis:"Schnorr signatures for strings"
     ~deps:
-      [ opam "core_kernel"
-      ; opam "result"
+      [ core_kernel
+      ; result
       ; local "kimchi_backend"
       ; local "kimchi_pasta"
       ; local "kimchi_pasta.basic"
@@ -69,15 +65,7 @@ let register_low_level () =
 
   (* -- snark_keys_header ------------------------------------------ *)
   library "snark_keys_header" ~path:"src/lib/crypto/snark_keys_header"
-    ~deps:
-      [ opam "base"
-      ; opam "base.caml"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "result"
-      ; opam "sexplib0"
-      ; opam "stdio"
-      ]
+    ~deps:[ base; base_caml; core_kernel; integers; result; sexplib0; stdio ]
     ~ppx:
       (Ppx.custom
          [ "ppx_compare"
@@ -101,11 +89,11 @@ let register_low_level () =
       ]
     ~modules_without_implementation:[ "sigs"; "poly_types" ]
     ~deps:
-      [ opam "base.caml"
-      ; opam "bin_prot.shape"
-      ; opam "core_kernel"
-      ; opam "result"
-      ; opam "sexplib0"
+      [ base_caml
+      ; bin_prot_shape
+      ; core_kernel
+      ; result
+      ; sexplib0
       ; local "mina_stdlib"
       ; local "kimchi_pasta_snarky_backend"
       ; local "mina_wire_types"
@@ -126,12 +114,7 @@ let register_low_level () =
   (* -- random_oracle_input ---------------------------------------- *)
   library "random_oracle_input" ~path:"src/lib/crypto/random_oracle_input"
     ~inline_tests:true
-    ~deps:
-      [ opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "base.caml"
-      ; opam "ppx_inline_test.config"
-      ]
+    ~deps:[ core_kernel; sexplib0; base_caml; ppx_inline_test_config ]
     ~ppx:
       (Ppx.custom
          [ "ppx_jane"
@@ -156,13 +139,13 @@ let register_low_level () =
   library "sgn" ~path:"src/lib/sgn" ~synopsis:"sgn library"
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_deriving_yojson.runtime"
-      ; opam "core_kernel"
-      ; opam "yojson"
-      ; opam "sexplib0"
-      ; opam "base"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
+      [ ppx_deriving_yojson_runtime
+      ; core_kernel
+      ; yojson
+      ; sexplib0
+      ; base
+      ; bin_prot_shape
+      ; base_caml
       ; local "snark_params"
       ; local "sgn_type"
       ; local "pickles"
@@ -326,18 +309,18 @@ let register_backends () =
     ~flags:[ atom "-warn-error"; atom "-27" ]
     ~inline_tests:true
     ~deps:
-      [ opam "result"
-      ; opam "async_kernel"
-      ; opam "sexplib0"
-      ; opam "bin_prot.shape"
-      ; opam "integers"
-      ; opam "digestif"
-      ; opam "core_kernel"
-      ; opam "base.caml"
-      ; opam "ppx_inline_test.config"
-      ; opam "bignum.bigint"
-      ; opam "zarith"
-      ; opam "base.base_internalhash_types"
+      [ result
+      ; async_kernel
+      ; sexplib0
+      ; bin_prot_shape
+      ; integers
+      ; digestif
+      ; core_kernel
+      ; base_caml
+      ; ppx_inline_test_config
+      ; bignum_bigint
+      ; zarith
+      ; base_internalhash_types
       ; local "tuple_lib"
       ; local "key_cache"
       ; local "hex"
@@ -370,11 +353,11 @@ let register_backends () =
     ~flags:[ atom "-warn-error"; atom "-27" ]
     ~inline_tests:true
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "sexplib0"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
+      [ ppx_inline_test_config
+      ; sexplib0
+      ; core_kernel
+      ; bin_prot_shape
+      ; base_caml
       ; local "sponge"
       ; local "kimchi_backend_common"
       ; local "promise"
@@ -401,11 +384,11 @@ let register_backends () =
     ~flags:[ atom "-warn-error"; atom "-27" ]
     ~inline_tests:true
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "sexplib0"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
+      [ ppx_inline_test_config
+      ; sexplib0
+      ; core_kernel
+      ; bin_prot_shape
+      ; base_caml
       ; local "sponge"
       ; local "kimchi_backend_common"
       ; local "promise"
@@ -431,11 +414,11 @@ let register_backends () =
     ~flags:[ atom "-warn-error"; atom "-27" ]
     ~inline_tests:true
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "sexplib0"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
+      [ ppx_inline_test_config
+      ; sexplib0
+      ; core_kernel
+      ; bin_prot_shape
+      ; base_caml
       ; local "sponge"
       ; local "kimchi_backend_common"
       ; local "promise"
@@ -464,11 +447,11 @@ let register_backends () =
     ~flags:[ atom "-warn-error"; atom "-27" ]
     ~inline_tests:true
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "sexplib0"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
+      [ ppx_inline_test_config
+      ; sexplib0
+      ; core_kernel
+      ; bin_prot_shape
+      ; base_caml
       ; local "sponge"
       ; local "kimchi_backend_common"
       ; local "promise"
@@ -493,12 +476,12 @@ let register_backends () =
     ~flags:[ atom "-warn-error"; atom "-27" ]
     ~inline_tests:true
     ~deps:
-      [ opam "base.base_internalhash_types"
-      ; opam "bin_prot.shape"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "ppx_inline_test.config"
-      ; opam "sexplib0"
+      [ base_internalhash_types
+      ; bin_prot_shape
+      ; core_kernel
+      ; integers
+      ; ppx_inline_test_config
+      ; sexplib0
       ; local "hex"
       ; local "key_cache"
       ; local "kimchi_backend_common"
@@ -524,11 +507,11 @@ let register_backends () =
   library "kimchi_backend.gadgets" ~internal_name:"kimchi_gadgets"
     ~path:"src/lib/crypto/kimchi_backend/gadgets" ~inline_tests:true
     ~deps:
-      [ opam "bignum.bigint"
-      ; opam "core_kernel"
-      ; opam "digestif"
-      ; opam "ppx_inline_test.config"
-      ; opam "zarith"
+      [ bignum_bigint
+      ; core_kernel
+      ; digestif
+      ; ppx_inline_test_config
+      ; zarith
       ; local "kimchi_backend_common"
       ; local "kimchi_pasta"
       ; local "kimchi_gadgets_test_runner"
@@ -542,19 +525,19 @@ let register_backends () =
     ~internal_name:"kimchi_gadgets_test_runner"
     ~path:"src/lib/crypto/kimchi_backend/gadgets/runner"
     ~deps:
-      [ opam "stdio"
-      ; opam "integers"
-      ; opam "result"
-      ; opam "base.caml"
-      ; opam "bignum.bigint"
-      ; opam "core_kernel"
-      ; opam "base64"
-      ; opam "digestif"
-      ; opam "ppx_inline_test.config"
-      ; opam "sexplib0"
-      ; opam "base"
-      ; opam "async_kernel"
-      ; opam "bin_prot.shape"
+      [ stdio
+      ; integers
+      ; result
+      ; base_caml
+      ; bignum_bigint
+      ; core_kernel
+      ; base64
+      ; digestif
+      ; ppx_inline_test_config
+      ; sexplib0
+      ; base
+      ; async_kernel
+      ; bin_prot_shape
       ; local "mina_wire_types"
       ; local "kimchi_bindings"
       ; local "kimchi_types"
@@ -590,9 +573,9 @@ let register_backends () =
       [ atom ":standard"; atom "-short-paths"; atom "-warn-error"; atom "-58" ]
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ opam "bin_prot.shape"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
+      [ bin_prot_shape
+      ; core_kernel
+      ; sexplib0
       ; local "cache_dir"
       ; local "group_map"
       ; local "kimchi_backend"
@@ -624,12 +607,12 @@ let register_backends () =
           ]
       ]
     ~deps:
-      [ opam "base.base_internalhash_types"
-      ; opam "sexplib0"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
-      ; opam "ppxlib"
-      ; opam "core_kernel"
+      [ base_internalhash_types
+      ; sexplib0
+      ; bin_prot_shape
+      ; base_caml
+      ; ppxlib
+      ; core_kernel
       ; local "mina_wire_types"
       ; local "snarky.backendless"
       ; local "random_oracle_input"
@@ -663,8 +646,7 @@ let register_backends () =
       ; atom "-open"
       ; atom "Core_kernel"
       ]
-    ~deps:
-      [ opam "core_kernel"; local "snarky.backendless"; local "pickles_types" ]
+    ~deps:[ core_kernel; local "snarky.backendless"; local "pickles_types" ]
     ~ppx:Ppx.standard ;
 
   (* -- pickles_types ---------------------------------------------- *)
@@ -679,11 +661,11 @@ let register_backends () =
           ]
       ]
     ~deps:
-      [ opam "sexplib0"
-      ; opam "result"
-      ; opam "core_kernel"
-      ; opam "base.caml"
-      ; opam "bin_prot.shape"
+      [ sexplib0
+      ; result
+      ; core_kernel
+      ; base_caml
+      ; bin_prot_shape
       ; local "kimchi_types"
       ; local "kimchi_backend_common"
       ; local "kimchi_pasta_snarky_backend"
@@ -708,11 +690,11 @@ let register_backends () =
   library "snark_params" ~path:"src/lib/crypto/snark_params"
     ~synopsis:"Snark parameters" ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "base.base_internalhash_types"
-      ; opam "core_kernel"
-      ; opam "digestif"
-      ; opam "base"
-      ; opam "sexplib0"
+      [ base_internalhash_types
+      ; core_kernel
+      ; digestif
+      ; base
+      ; sexplib0
       ; local "mina_wire_types"
       ; local "kimchi_pasta"
       ; local "kimchi_pasta.basic"
@@ -751,10 +733,10 @@ let register_backends () =
   library "random_oracle" ~path:"src/lib/crypto/random_oracle"
     ~inline_tests:true
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
+      [ ppx_inline_test_config
+      ; base
+      ; core_kernel
+      ; sexplib0
       ; local "snark_params"
       ; local "pickles.backend"
       ; local "sponge"
@@ -796,10 +778,10 @@ let register_backends () =
     ~internal_name:"random_oracle_permutation_external"
     ~path:"src/lib/crypto/random_oracle/permutation/external" ~inline_tests:true
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
+      [ ppx_inline_test_config
+      ; base
+      ; core_kernel
+      ; sexplib0
       ; local "sponge"
       ; local "pickles"
       ; local "pickles.backend"
@@ -818,8 +800,8 @@ let register_backends () =
     ~internal_name:"random_oracle_permutation_ocaml"
     ~path:"src/lib/crypto/random_oracle/permutation/ocaml"
     ~deps:
-      [ opam "base"
-      ; opam "core_kernel"
+      [ base
+      ; core_kernel
       ; local "sponge"
       ; local "pickles"
       ; local "pickles.backend"
@@ -834,13 +816,13 @@ let register_backends () =
     ~flags:[ atom ":standard"; atom "-short-paths" ]
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "base.caml"
-      ; opam "sexplib0"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "base"
-      ; opam "base.base_internalhash_types"
+      [ ppx_inline_test_config
+      ; base_caml
+      ; sexplib0
+      ; core_kernel
+      ; bin_prot_shape
+      ; base
+      ; base_internalhash_types
       ; local "mina_wire_types"
       ; local "snarky.backendless"
       ; local "random_oracle_input"
@@ -879,15 +861,15 @@ let register_backends () =
     ~synopsis:"Schnorr signatures using the tick and tock curves"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ opam "bignum.bigint"
-      ; opam "ppx_inline_test.config"
-      ; opam "base"
-      ; opam "sexplib0"
-      ; opam "yojson"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
-      ; opam "result"
+      [ bignum_bigint
+      ; ppx_inline_test_config
+      ; base
+      ; sexplib0
+      ; yojson
+      ; core_kernel
+      ; bin_prot_shape
+      ; base_caml
+      ; result
       ; local "mina_wire_types"
       ; local "crypto_params"
       ; local "kimchi_pasta"
@@ -934,20 +916,20 @@ let register_backends () =
     ~synopsis:"Managing secrets including passwords and keypairs"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ opam "result"
-      ; opam "base.caml"
-      ; opam "bignum.bigint"
-      ; opam "async_kernel"
-      ; opam "async"
-      ; opam "core"
-      ; opam "async_unix"
-      ; opam "sodium"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "yojson"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "base58"
-      ; opam "ppx_inline_test.config"
+      [ result
+      ; base_caml
+      ; bignum_bigint
+      ; async_kernel
+      ; async
+      ; core
+      ; async_unix
+      ; sodium
+      ; ppx_deriving_yojson_runtime
+      ; yojson
+      ; core_kernel
+      ; sexplib0
+      ; base58
+      ; ppx_inline_test_config
       ; local "mina_stdlib_unix"
       ; local "random_oracle"
       ; local "pickles"
@@ -975,13 +957,12 @@ let register_backends () =
 
   (* -- key_gen ---------------------------------------------------- *)
   library "key_gen" ~path:"src/lib/crypto/key_gen"
-    ~deps:[ opam "core_kernel"; local "signature_lib" ]
+    ~deps:[ core_kernel; local "signature_lib" ]
     ~ppx:Ppx.minimal ;
 
   (* -- bowe_gabizon_hash ------------------------------------------ *)
   library "bowe_gabizon_hash" ~path:"src/lib/crypto/bowe_gabizon_hash"
-    ~inline_tests:true
-    ~deps:[ opam "core_kernel" ]
+    ~inline_tests:true ~deps:[ core_kernel ]
     ~ppx:(Ppx.custom [ "ppx_compare"; "ppx_jane"; "ppx_version" ]) ;
 
   (* -- pickles.limb_vector ---------------------------------------- *)
@@ -1000,11 +981,11 @@ let register_backends () =
       ]
     ~modules_without_implementation:[ "limb_vector" ]
     ~deps:
-      [ opam "bin_prot.shape"
-      ; opam "sexplib0"
-      ; opam "core_kernel"
-      ; opam "base.caml"
-      ; opam "result"
+      [ bin_prot_shape
+      ; sexplib0
+      ; core_kernel
+      ; base_caml
+      ; result
       ; local "snarky.backendless"
       ; local "pickles.backend"
       ; local "pickles_types"
@@ -1029,7 +1010,7 @@ let register_backends () =
       ; atom "Core_kernel"
       ]
     ~deps:
-      [ opam "core_kernel"
+      [ core_kernel
       ; local "pickles_types"
       ; local "pickles.plonk_checks"
       ; local "pickles_base.one_hot_vector"
@@ -1053,10 +1034,10 @@ let register_backends () =
       ; atom "Core_kernel"
       ]
     ~deps:
-      [ opam "sexplib0"
-      ; opam "bin_prot.shape"
-      ; opam "core_kernel"
-      ; opam "base.caml"
+      [ sexplib0
+      ; bin_prot_shape
+      ; core_kernel
+      ; base_caml
       ; local "mina_wire_types"
       ; local "kimchi_pasta"
       ; local "kimchi_pasta.basic"
@@ -1094,11 +1075,11 @@ let register_backends () =
       ; atom "Core_kernel"
       ]
     ~deps:
-      [ opam "sexplib0"
-      ; opam "ppxlib.ast"
-      ; opam "core_kernel"
-      ; opam "ocaml-migrate-parsetree"
-      ; opam "base.base_internalhash_types"
+      [ sexplib0
+      ; ppxlib_ast
+      ; core_kernel
+      ; ocaml_migrate_parsetree
+      ; base_internalhash_types
       ; local "pickles_types"
       ; local "pickles_base"
       ; local "pickles.composition_types"
@@ -1152,19 +1133,19 @@ let register_backends () =
       [ "full_signature"; "type"; "intf"; "pickles_intf" ]
     ~flags:[ atom "-open"; atom "Core_kernel" ]
     ~deps:
-      [ opam "stdio"
-      ; opam "integers"
-      ; opam "result"
-      ; opam "base.caml"
-      ; opam "bignum.bigint"
-      ; opam "core_kernel"
-      ; opam "base64"
-      ; opam "digestif"
-      ; opam "ppx_inline_test.config"
-      ; opam "sexplib0"
-      ; opam "base"
-      ; opam "async_kernel"
-      ; opam "bin_prot.shape"
+      [ stdio
+      ; integers
+      ; result
+      ; base_caml
+      ; bignum_bigint
+      ; core_kernel
+      ; base64
+      ; digestif
+      ; ppx_inline_test_config
+      ; sexplib0
+      ; base
+      ; async_kernel
+      ; bin_prot_shape
       ; local "mina_wire_types"
       ; local "kimchi_bindings"
       ; local "kimchi_types"

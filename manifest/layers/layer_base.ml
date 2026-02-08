@@ -4,6 +4,7 @@
     The manifest generates these files from the declarations below. *)
 
 open Manifest
+open Externals
 open Dune_s_expr
 
 let register () =
@@ -12,23 +13,21 @@ let register () =
   (* ============================================================ *)
 
   (* -- hex -------------------------------------------------------- *)
-  library "hex" ~path:"src/lib/hex"
-    ~deps:[ opam "core_kernel" ]
+  library "hex" ~path:"src/lib/hex" ~deps:[ core_kernel ]
     ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_version"; "ppx_inline_test" ])
     ~inline_tests:true ;
 
   (* -- monad_lib -------------------------------------------------- *)
-  library "monad_lib" ~path:"src/lib/monad_lib"
-    ~deps:[ opam "core_kernel" ]
+  library "monad_lib" ~path:"src/lib/monad_lib" ~deps:[ core_kernel ]
     ~ppx:Ppx.standard ;
 
   (* -- with_hash -------------------------------------------------- *)
   library "with_hash" ~path:"src/lib/with_hash"
     ~deps:
-      [ opam "base.caml"
-      ; opam "bin_prot.shape"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
+      [ base_caml
+      ; bin_prot_shape
+      ; core_kernel
+      ; sexplib0
       ; local "mina_stdlib"
       ; local "mina_wire_types"
       ; local "ppx_version.runtime"
@@ -46,11 +45,11 @@ let register () =
   (* -- pipe_lib --------------------------------------------------- *)
   library "pipe_lib" ~path:"src/lib/concurrency/pipe_lib"
     ~deps:
-      [ opam "async_kernel"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "ppx_inline_test.config"
-      ; opam "sexplib"
+      [ async_kernel
+      ; core
+      ; core_kernel
+      ; ppx_inline_test_config
+      ; sexplib
       ; local "logger"
       ; local "o1trace"
       ; local "run_in_thread"
@@ -63,10 +62,10 @@ let register () =
   (* -- allocation_functor --------------------------------------- *)
   library "allocation_functor" ~path:"src/lib/allocation_functor"
     ~deps:
-      [ opam "core_kernel"
-      ; opam "result"
-      ; opam "ppx_inline_test.config"
-      ; opam "sexplib0"
+      [ core_kernel
+      ; result
+      ; ppx_inline_test_config
+      ; sexplib0
       ; local "mina_metrics"
       ; local "ppx_version.runtime"
       ]
@@ -79,19 +78,18 @@ let register () =
   library "codable" ~path:"src/lib/codable"
     ~synopsis:"Extension of Yojson to make it easy for a type to derive yojson"
     ~deps:
-      [ opam "base64"
-      ; opam "core_kernel"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "result"
-      ; opam "yojson"
+      [ base64
+      ; core_kernel
+      ; ppx_deriving_yojson_runtime
+      ; result
+      ; yojson
       ; local "base58_check"
       ]
     ~ppx:(Ppx.custom [ "ppx_deriving_yojson"; "ppx_jane"; "ppx_version" ])
     ~inline_tests:true ~library_flags:[ "-linkall" ] ;
 
   (* -- comptime ------------------------------------------------- *)
-  library "comptime" ~path:"src/lib/comptime"
-    ~deps:[ opam "core_kernel"; opam "base" ]
+  library "comptime" ~path:"src/lib/comptime" ~deps:[ core_kernel; base ]
     ~ppx:Ppx.minimal
     ~extra_stanzas:
       [ "rule"
@@ -105,36 +103,34 @@ let register () =
 
   (* -- error_json ----------------------------------------------- *)
   library "error_json" ~path:"src/lib/error_json"
-    ~deps:[ opam "base"; opam "sexplib"; opam "sexplib0"; opam "yojson" ]
+    ~deps:[ base; sexplib; sexplib0; yojson ]
     ~ppx:(Ppx.custom [ "ppx_deriving_yojson"; "ppx_version" ]) ;
 
   (* -- integers_stubs_js ---------------------------------------- *)
   library "integers_stubs_js" ~path:"src/lib/integers_stubs_js"
-    ~deps:[ opam "zarith_stubs_js" ]
-    ~ppx:Ppx.minimal
+    ~deps:[ zarith_stubs_js ] ~ppx:Ppx.minimal
     ~js_of_ocaml:
       ("js_of_ocaml" @: [ "javascript_files" @: [ atom "./runtime.js" ] ]) ;
 
   (* -- key_value_database --------------------------------------- *)
   library "key_value_database" ~path:"src/lib/key_value_database"
     ~synopsis:"Collection of key-value databases used in Coda"
-    ~deps:[ opam "core_kernel" ]
-    ~ppx:Ppx.standard ~library_flags:[ "-linkall" ] ;
+    ~deps:[ core_kernel ] ~ppx:Ppx.standard ~library_flags:[ "-linkall" ] ;
 
   (* -- linked_tree ---------------------------------------------- *)
   library "linked_tree" ~path:"src/lib/linked_tree"
-    ~deps:[ opam "core_kernel"; local "mina_numbers" ]
+    ~deps:[ core_kernel; local "mina_numbers" ]
     ~ppx:(Ppx.custom [ "ppx_version"; "ppx_jane"; "ppx_compare" ]) ;
 
   (* -- logproc_lib ---------------------------------------------- *)
   library "logproc_lib" ~path:"src/lib/logproc_lib"
     ~modules:[ "logproc_lib"; "filter" ]
     ~deps:
-      [ opam "core_kernel"
-      ; opam "yojson"
-      ; opam "angstrom"
-      ; opam "re2"
-      ; opam "ppx_inline_test.config"
+      [ core_kernel
+      ; yojson
+      ; angstrom
+      ; re2
+      ; ppx_inline_test_config
       ; local "interpolator_lib"
       ]
     ~ppx:(Ppx.custom [ "ppx_version"; "ppx_jane"; "ppx_deriving.std" ])
@@ -143,7 +139,7 @@ let register () =
   (* -- interpolator_lib ----------------------------------------- *)
   library "interpolator_lib" ~path:"src/lib/logproc_lib"
     ~modules:[ "interpolator" ]
-    ~deps:[ opam "core_kernel"; opam "yojson"; opam "angstrom" ]
+    ~deps:[ core_kernel; yojson; angstrom ]
     ~ppx:(Ppx.custom [ "ppx_version"; "ppx_jane"; "ppx_deriving.std" ])
     ~inline_tests:true ;
 
@@ -152,10 +148,10 @@ let register () =
     [ "include_subdirs" @: [ atom "unqualified" ] ] ;
   library "mina_wire_types" ~path:"src/lib/mina_wire_types"
     ~deps:
-      [ opam "integers"
-      ; opam "pasta_bindings"
-      ; opam "kimchi_types"
-      ; opam "kimchi_bindings"
+      [ integers
+      ; pasta_bindings
+      ; kimchi_types
+      ; kimchi_bindings
       ; local "blake2"
       ]
     ~ppx:Ppx.minimal
@@ -167,14 +163,14 @@ let register () =
     ~flags:[ atom ":standard"; atom "-short-paths" ]
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "bin_prot.shape"
-      ; opam "base"
-      ; opam "async_kernel"
-      ; opam "core_kernel"
-      ; opam "ppx_hash.runtime-lib"
-      ; opam "sexplib0"
-      ; opam "base.caml"
-      ; opam "ppx_version.runtime"
+      [ bin_prot_shape
+      ; base
+      ; async_kernel
+      ; core_kernel
+      ; ppx_hash_runtime_lib
+      ; sexplib0
+      ; base_caml
+      ; ppx_version_runtime
       ]
     ~ppx:
       (Ppx.custom
@@ -189,16 +185,12 @@ let register () =
   (* -- otp_lib -------------------------------------------------- *)
   library "otp_lib" ~path:"src/lib/otp_lib"
     ~deps:
-      [ opam "core_kernel"
-      ; opam "async_kernel"
-      ; opam "ppx_inline_test.config"
-      ; local "pipe_lib"
-      ]
+      [ core_kernel; async_kernel; ppx_inline_test_config; local "pipe_lib" ]
     ~ppx:Ppx.standard ~inline_tests:true ;
 
   (* -- participating_state -------------------------------------- *)
   library "participating_state" ~path:"src/lib/participating_state"
-    ~deps:[ opam "async_kernel"; opam "core_kernel"; opam "base" ]
+    ~deps:[ async_kernel; core_kernel; base ]
     ~ppx:Ppx.minimal ;
 
   (* -- perf_histograms ------------------------------------------ *)
@@ -208,17 +200,17 @@ let register () =
       [ "perf_histograms0"; "perf_histograms"; "histogram"; "rpc"; "intf" ]
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "bin_prot.shape"
-      ; opam "async_rpc_kernel"
-      ; opam "yojson"
-      ; opam "async"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "async.async_rpc"
-      ; opam "base.caml"
-      ; opam "async_kernel"
+      [ ppx_inline_test_config
+      ; bin_prot_shape
+      ; async_rpc_kernel
+      ; yojson
+      ; async
+      ; core
+      ; core_kernel
+      ; ppx_deriving_yojson_runtime
+      ; async_rpc
+      ; base_caml
+      ; async_kernel
       ; local "mina_metrics"
       ]
     ~ppx:
@@ -229,8 +221,8 @@ let register () =
   (* -- proof_cache_tag ------------------------------------------ *)
   library "proof_cache_tag" ~path:"src/lib/proof_cache_tag"
     ~deps:
-      [ opam "core_kernel"
-      ; opam "async_kernel"
+      [ core_kernel
+      ; async_kernel
       ; local "logger"
       ; local "disk_cache"
       ; local "pickles"
@@ -241,8 +233,8 @@ let register () =
   library "rosetta_coding" ~path:"src/lib/rosetta_coding"
     ~synopsis:"Encoders and decoders for Rosetta" ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "base"
-      ; opam "core_kernel"
+      [ base
+      ; core_kernel
       ; local "mina_stdlib"
       ; local "signature_lib"
       ; local "snark_params"
@@ -251,7 +243,7 @@ let register () =
 
   (* -- rosetta_models ------------------------------------------- *)
   library "rosetta_models" ~path:"src/lib/rosetta_models"
-    ~deps:[ opam "ppx_deriving_yojson.runtime"; opam "yojson" ]
+    ~deps:[ ppx_deriving_yojson_runtime; yojson ]
     ~ppx:
       (Ppx.custom
          [ "ppx_deriving_yojson"
@@ -263,13 +255,13 @@ let register () =
   (* -- sgn_type ------------------------------------------------- *)
   library "sgn_type" ~path:"src/lib/sgn_type"
     ~deps:
-      [ opam "core_kernel"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "yojson"
-      ; opam "sexplib0"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
-      ; opam "ppx_version.runtime"
+      [ core_kernel
+      ; ppx_deriving_yojson_runtime
+      ; yojson
+      ; sexplib0
+      ; bin_prot_shape
+      ; base_caml
+      ; ppx_version_runtime
       ; local "mina_wire_types"
       ]
     ~ppx:
@@ -279,12 +271,7 @@ let register () =
   (* -- structured_log_events ------------------------------------ *)
   library "structured_log_events" ~path:"src/lib/structured_log_events"
     ~synopsis:"Events, logging and parsing" ~library_flags:[ "-linkall" ]
-    ~deps:
-      [ opam "core_kernel"
-      ; opam "yojson"
-      ; opam "sexplib0"
-      ; local "interpolator_lib"
-      ]
+    ~deps:[ core_kernel; yojson; sexplib0; local "interpolator_lib" ]
     ~ppx:
       (Ppx.custom
          [ "ppx_version"
@@ -299,12 +286,12 @@ let register () =
   library "sync_status" ~path:"src/lib/sync_status"
     ~synopsis:"Different kinds of status for Coda "
     ~deps:
-      [ opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "bin_prot.shape"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "ppx_version.runtime"
+      [ base_internalhash_types
+      ; base_caml
+      ; bin_prot_shape
+      ; core_kernel
+      ; sexplib0
+      ; ppx_version_runtime
       ]
     ~ppx:
       (Ppx.custom
@@ -314,16 +301,16 @@ let register () =
   library "unsigned_extended" ~path:"src/lib/unsigned_extended"
     ~synopsis:"Unsigned integer functions" ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "base.caml"
-      ; opam "result"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "sexplib0"
-      ; opam "bignum.bigint"
-      ; opam "base.base_internalhash_types"
-      ; opam "bin_prot.shape"
-      ; opam "ppx_inline_test.config"
+      [ base_caml
+      ; result
+      ; base
+      ; core_kernel
+      ; integers
+      ; sexplib0
+      ; bignum_bigint
+      ; base_internalhash_types
+      ; bin_prot_shape
+      ; ppx_inline_test_config
       ; local "bignum_bigint"
       ; local "snark_params"
       ; local "test_util"
@@ -345,13 +332,7 @@ let register () =
 
   (* -- visualization -------------------------------------------- *)
   library "visualization" ~path:"src/lib/visualization"
-    ~deps:
-      [ opam "core_kernel"
-      ; opam "async_kernel"
-      ; opam "ocamlgraph"
-      ; opam "yojson"
-      ; opam "sexplib0"
-      ]
+    ~deps:[ core_kernel; async_kernel; ocamlgraph; yojson; sexplib0 ]
     ~ppx:
       (Ppx.custom
          [ "ppx_version"; "ppx_jane"; "ppx_deriving_yojson"; "ppx_sexp_conv" ] ) ;
@@ -359,37 +340,30 @@ let register () =
   (* -- webkit_trace_event --------------------------------------- *)
   library "webkit_trace_event" ~path:"src/lib/webkit_trace_event"
     ~synopsis:"Binary and JSON output of WebKit trace events"
-    ~deps:[ opam "core_kernel"; opam "base" ]
-    ~ppx:Ppx.minimal ;
+    ~deps:[ core_kernel; base ] ~ppx:Ppx.minimal ;
 
   (* -- webkit_trace_event.binary -------------------------------- *)
   library "webkit_trace_event.binary"
     ~internal_name:"webkit_trace_event_binary_output"
     ~path:"src/lib/webkit_trace_event/binary_output"
     ~deps:
-      [ opam "core"
-      ; opam "async"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "async_unix"
-      ; local "webkit_trace_event"
-      ]
+      [ core; async; base; core_kernel; async_unix; local "webkit_trace_event" ]
     ~ppx:Ppx.minimal ;
 
   (* -- graphql_basic_scalars ------------------------------------ *)
   library "graphql_basic_scalars" ~path:"src/lib/graphql_basic_scalars"
     ~deps:
-      [ opam "async"
-      ; opam "async_unix"
-      ; opam "async_kernel"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "core"
-      ; opam "graphql"
-      ; opam "graphql-async"
-      ; opam "graphql_parser"
-      ; opam "yojson"
-      ; opam "sexplib0"
+      [ async
+      ; async_unix
+      ; async_kernel
+      ; core_kernel
+      ; integers
+      ; core
+      ; graphql
+      ; graphql_async
+      ; graphql_parser
+      ; yojson
+      ; sexplib0
       ; local "base_quickcheck"
       ; local "graphql_wrapper"
       ; local "quickcheck_lib"
@@ -399,7 +373,7 @@ let register () =
 
   (* -- graphql_wrapper ------------------------------------------ *)
   library "graphql_wrapper" ~path:"src/lib/graphql_wrapper"
-    ~deps:[ opam "graphql"; opam "graphql-async"; opam "graphql_parser" ]
+    ~deps:[ graphql; graphql_async; graphql_parser ]
     ~ppx:
       (Ppx.custom
          [ "ppx_deriving.show"; "ppx_deriving_yojson"; "ppx_version" ] ) ;
@@ -409,7 +383,7 @@ let register () =
     ~deps:
       [ local "mina_node_config"
       ; local "mina_node_config.for_unit_tests"
-      ; opam "core_kernel"
+      ; core_kernel
       ; local "currency"
       ]
     ~ppx:(Ppx.custom [ "ppx_version"; "ppx_base"; "ppx_deriving_yojson" ]) ;
@@ -419,16 +393,16 @@ let register () =
     ~synopsis:"Storage module checksums data and stores it"
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "core"
-      ; opam "async"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "bin_prot"
-      ; opam "base"
-      ; opam "sexplib0"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base.caml"
+      [ core
+      ; async
+      ; core_kernel
+      ; bin_prot_shape
+      ; bin_prot
+      ; base
+      ; sexplib0
+      ; async_kernel
+      ; async_unix
+      ; base_caml
       ; local "logger"
       ; local "ppx_version.runtime"
       ]
@@ -450,15 +424,15 @@ let register () =
       ; atom "Core_kernel"
       ]
     ~deps:
-      [ opam "async_kernel"
-      ; opam "base.caml"
-      ; opam "bin_prot"
-      ; opam "bin_prot.shape"
-      ; opam "core_kernel"
-      ; opam "ppx_inline_test.config"
-      ; opam "result"
-      ; opam "sexplib0"
-      ; opam "stdlib"
+      [ async_kernel
+      ; base_caml
+      ; bin_prot
+      ; bin_prot_shape
+      ; core_kernel
+      ; ppx_inline_test_config
+      ; result
+      ; sexplib0
+      ; stdlib
       ; local "ppx_version.runtime"
       ]
     ~ppx:
@@ -479,13 +453,7 @@ let register () =
   (* -- base58_check ----------------------------------------------- *)
   library "base58_check" ~path:"src/lib/base58_check"
     ~synopsis:"Base58Check implementation"
-    ~deps:
-      [ opam "base"
-      ; opam "base58"
-      ; opam "core_kernel"
-      ; opam "digestif"
-      ; opam "ppx_inline_test.config"
-      ]
+    ~deps:[ base; base58; core_kernel; digestif; ppx_inline_test_config ]
     ~ppx:
       (Ppx.custom
          [ "ppx_assert"
@@ -502,16 +470,16 @@ let register () =
   (* -- currency --------------------------------------------------- *)
   library "currency" ~path:"src/lib/currency" ~synopsis:"Currency types"
     ~deps:
-      [ opam "base"
-      ; opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "bin_prot.shape"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "ppx_inline_test.config"
-      ; opam "result"
-      ; opam "sexplib0"
-      ; opam "zarith"
+      [ base
+      ; base_internalhash_types
+      ; base_caml
+      ; bin_prot_shape
+      ; core_kernel
+      ; integers
+      ; ppx_inline_test_config
+      ; result
+      ; sexplib0
+      ; zarith
       ; local "bignum_bigint"
       ; local "bitstring_lib"
       ; local "codable"
@@ -554,15 +522,13 @@ let register () =
   (* ============================================================ *)
 
   (* -- mina_version ----------------------------------------------- *)
-  library "mina_version" ~path:"src/lib/mina_version"
-    ~deps:[ opam "core_kernel" ]
+  library "mina_version" ~path:"src/lib/mina_version" ~deps:[ core_kernel ]
     ~ppx:Ppx.minimal ~virtual_modules:[ "mina_version" ]
     ~default_implementation:"mina_version.normal" ;
 
   (* -- mina_version.normal ---------------------------------------- *)
   library "mina_version.normal" ~internal_name:"mina_version_normal"
-    ~path:"src/lib/mina_version/normal"
-    ~deps:[ opam "base"; opam "core_kernel" ]
+    ~path:"src/lib/mina_version/normal" ~deps:[ base; core_kernel ]
     ~ppx:Ppx.minimal ~implements:"mina_version"
     ~extra_stanzas:
       [ "rule"
@@ -584,20 +550,20 @@ let register () =
   (* -- child_processes -------------------------------------------- *)
   library "child_processes" ~path:"src/lib/child_processes"
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "ctypes"
-      ; opam "ctypes.foreign"
-      ; opam "integers"
-      ; opam "ppx_hash.runtime-lib"
-      ; opam "ppx_inline_test.config"
-      ; opam "sexplib0"
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_internalhash_types
+      ; base_caml
+      ; core
+      ; core_kernel
+      ; ctypes
+      ; ctypes_foreign
+      ; integers
+      ; ppx_hash_runtime_lib
+      ; ppx_inline_test_config
+      ; sexplib0
       ; local "error_json"
       ; local "logger"
       ; local "mina_stdlib_unix"
@@ -622,22 +588,22 @@ let register () =
   library "mina_base" ~path:"src/lib/mina_base"
     ~synopsis:"Snarks and friends necessary for keypair generation"
     ~deps:
-      [ opam "async_kernel"
-      ; opam "base"
-      ; opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "base_quickcheck"
-      ; opam "base_quickcheck.ppx_quickcheck"
-      ; opam "bin_prot.shape"
-      ; opam "core_kernel"
-      ; opam "core_kernel.uuid"
-      ; opam "digestif"
-      ; opam "integers"
-      ; opam "ppx_inline_test.config"
-      ; opam "result"
-      ; opam "sexp_diff_kernel"
-      ; opam "sexplib0"
-      ; opam "yojson"
+      [ async_kernel
+      ; base
+      ; base_internalhash_types
+      ; base_caml
+      ; base_quickcheck
+      ; base_quickcheck_ppx
+      ; bin_prot_shape
+      ; core_kernel
+      ; core_kernel_uuid
+      ; digestif
+      ; integers
+      ; ppx_inline_test_config
+      ; result
+      ; sexp_diff_kernel
+      ; sexplib0
+      ; yojson
       ; local "base58_check"
       ; local "bignum_bigint"
       ; local "blake2"
@@ -727,7 +693,7 @@ let register () =
   (* -- mina_base.util (sub-library) ------------------------------- *)
   library "mina_base.util" ~internal_name:"mina_base_util"
     ~path:"src/lib/mina_base/util"
-    ~deps:[ opam "core_kernel"; local "bignum_bigint"; local "snark_params" ]
+    ~deps:[ core_kernel; local "bignum_bigint"; local "snark_params" ]
     ~ppx:Ppx.minimal ;
 
   ()

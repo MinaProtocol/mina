@@ -4,20 +4,21 @@
     The manifest generates these files from the declarations below. *)
 
 open Manifest
+open Externals
 
 let register () =
   (* -- mina_transaction --------------------------------------------- *)
   library "mina_transaction" ~path:"src/lib/transaction" ~inline_tests:true
     ~deps:
-      [ opam "base.caml"
-      ; opam "base"
-      ; opam "base.base_internalhash_types"
-      ; opam "bin_prot.shape"
-      ; opam "core_kernel"
-      ; opam "ppx_inline_test.config"
-      ; opam "result"
-      ; opam "sexplib0"
-      ; opam "base64"
+      [ base_caml
+      ; base
+      ; base_internalhash_types
+      ; bin_prot_shape
+      ; core_kernel
+      ; ppx_inline_test_config
+      ; result
+      ; sexplib0
+      ; base64
       ; local "base58_check"
       ; local "blake2"
       ; local "codable"
@@ -51,19 +52,19 @@ let register () =
   (* -- mina_transaction_logic --------------------------------------- *)
   library "mina_transaction_logic" ~path:"src/lib/transaction_logic"
     ~deps:
-      [ opam "async_kernel"
-      ; opam "result"
-      ; opam "bin_prot.shape"
-      ; opam "ppx_inline_test.config"
-      ; opam "sexplib0"
-      ; opam "yojson"
-      ; opam "sexp_diff_kernel"
-      ; opam "core_kernel"
-      ; opam "base.caml"
-      ; opam "base"
-      ; opam "base.base_internalhash_types"
-      ; opam "integers"
-      ; opam "base_quickcheck"
+      [ async_kernel
+      ; result
+      ; bin_prot_shape
+      ; ppx_inline_test_config
+      ; sexplib0
+      ; yojson
+      ; sexp_diff_kernel
+      ; core_kernel
+      ; base_caml
+      ; base
+      ; base_internalhash_types
+      ; integers
+      ; base_quickcheck
       ; local "mina_stdlib"
       ; local "mina_wire_types"
       ; local "block_time"
@@ -114,16 +115,16 @@ let register () =
     ~path:"src/lib/transaction_logic/test" ~inline_tests:true
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.base_internalhash_types"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "ppx_inline_test.config"
-      ; opam "sexplib0"
-      ; opam "yojson"
+      [ async_kernel
+      ; async_unix
+      ; base
+      ; base_internalhash_types
+      ; core
+      ; core_kernel
+      ; integers
+      ; ppx_inline_test_config
+      ; sexplib0
+      ; yojson
       ; local "currency"
       ; local "data_hash_lib"
       ; local "genesis_constants"
@@ -166,11 +167,11 @@ let register () =
   library "transaction_witness" ~path:"src/lib/transaction_witness"
     ~inline_tests:true
     ~deps:
-      [ opam "base.caml"
-      ; opam "bin_prot.shape"
-      ; opam "sexplib0"
-      ; opam "core_kernel"
-      ; opam "core"
+      [ base_caml
+      ; bin_prot_shape
+      ; sexplib0
+      ; core_kernel
+      ; core
       ; local "currency"
       ; local "signature_lib"
       ; local "mina_ledger"
@@ -193,12 +194,12 @@ let register () =
   (* -- transaction_snark_work --------------------------------------- *)
   library "transaction_snark_work" ~path:"src/lib/transaction_snark_work"
     ~deps:
-      [ opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
-      ; opam "base.base_internalhash_types"
-      ; opam "core"
+      [ core_kernel
+      ; sexplib0
+      ; bin_prot_shape
+      ; base_caml
+      ; base_internalhash_types
+      ; core
       ; local "currency"
       ; local "transaction_snark"
       ; local "mina_state"
@@ -221,19 +222,19 @@ let register () =
   library "transaction_snark_scan_state"
     ~path:"src/lib/transaction_snark_scan_state" ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "base.base_internalhash_types"
-      ; opam "async_kernel"
-      ; opam "core"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "sexplib0"
-      ; opam "base.caml"
-      ; opam "digestif"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "async"
-      ; opam "yojson"
-      ; opam "bin_prot.shape"
-      ; opam "async_unix"
+      [ base_internalhash_types
+      ; async_kernel
+      ; core
+      ; ppx_deriving_yojson_runtime
+      ; sexplib0
+      ; base_caml
+      ; digestif
+      ; base
+      ; core_kernel
+      ; async
+      ; yojson
+      ; bin_prot_shape
+      ; async_unix
       ; local "mina_stdlib"
       ; local "mina_base.import"
       ; local "data_hash_lib"

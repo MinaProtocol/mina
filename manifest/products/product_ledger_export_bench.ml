@@ -1,6 +1,7 @@
 (** Product: ledger_export_bench — Ledger export benchmarking. *)
 
 open Manifest
+open Externals
 open Dune_s_expr
 
 let register () =
@@ -15,11 +16,11 @@ let register () =
       ; atom "@a-4-29-40-41-42-44-45-48-58-59-60"
       ]
     ~deps:
-      [ opam "base"
-      ; opam "core"
-      ; opam "core_bench"
-      ; opam "core_kernel"
-      ; opam "yojson"
+      [ base
+      ; core
+      ; core_bench
+      ; core_kernel
+      ; yojson
       ; local "mina_runtime_config"
       ]
     ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_version" ]) ;

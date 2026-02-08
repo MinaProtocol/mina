@@ -4,6 +4,7 @@
     The manifest generates these files from the declarations below. *)
 
 open Manifest
+open Externals
 
 let register () =
   (* ================================================================ *)
@@ -13,7 +14,7 @@ let register () =
   (* -- mina_state ---------------------------------------------------- *)
   library "mina_state" ~path:"src/lib/mina_state" ~inline_tests:true
     ~deps:
-      [ opam "core"
+      [ core
       ; local "signature_lib"
       ; local "pickles.backend"
       ; local "outside_hash_image"
@@ -72,9 +73,9 @@ let register () =
   (* -- mina_block ---------------------------------------------------- *)
   library "mina_block" ~path:"src/lib/mina_block"
     ~deps:
-      [ opam "integers"
-      ; opam "base64"
-      ; opam "core"
+      [ integers
+      ; base64
+      ; core
       ; local "mina_ledger"
       ; local "mina_numbers"
       ; local "currency"
@@ -158,12 +159,12 @@ let register () =
 
   test "main" ~path:"src/lib/mina_block/tests"
     ~deps:
-      [ opam "alcotest"
-      ; opam "async"
-      ; opam "core_kernel"
+      [ alcotest
+      ; async
+      ; core_kernel
       ; local "disk_cache.lmdb"
       ; local "mina_block"
-      ; opam "yojson"
+      ; yojson
       ]
     ~file_deps:
       [ "hetzner-itn-1-1795.json"
@@ -176,23 +177,23 @@ let register () =
     ~library_flags:[ "-linkall" ]
     ~modules_exclude:[ "proof_of_stake_fuzzer" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "async_unix"
-      ; opam "core.uuid"
-      ; opam "async_kernel"
-      ; opam "sexplib0"
-      ; opam "base.caml"
-      ; opam "integers"
-      ; opam "async"
-      ; opam "core"
-      ; opam "yojson"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "base"
-      ; opam "result"
-      ; opam "core_kernel.uuid"
-      ; opam "async_rpc_kernel"
-      ; opam "sexp_diff_kernel"
+      [ ppx_inline_test_config
+      ; async_unix
+      ; core_uuid
+      ; async_kernel
+      ; sexplib0
+      ; base_caml
+      ; integers
+      ; async
+      ; core
+      ; yojson
+      ; core_kernel
+      ; bin_prot_shape
+      ; base
+      ; result
+      ; core_kernel_uuid
+      ; async_rpc_kernel
+      ; sexp_diff_kernel
       ; local "mina_wire_types"
       ; local "mina_base.util"
       ; local "unsigned_extended"
@@ -273,7 +274,7 @@ let register () =
   private_executable ~path:"src/lib/consensus"
     ~modules:[ "proof_of_stake_fuzzer" ]
     ~deps:
-      [ opam "core_kernel"
+      [ core_kernel
       ; local "signature_lib"
       ; local "mina_state"
       ; local "mina_block"
@@ -289,17 +290,17 @@ let register () =
   library "consensus.vrf" ~internal_name:"consensus_vrf"
     ~path:"src/lib/consensus/vrf"
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "bignum.bigint"
-      ; opam "base.caml"
-      ; opam "base"
-      ; opam "base64"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "result"
-      ; opam "bignum"
-      ; opam "integers"
-      ; opam "bin_prot.shape"
+      [ ppx_inline_test_config
+      ; bignum_bigint
+      ; base_caml
+      ; base
+      ; base64
+      ; core_kernel
+      ; sexplib0
+      ; result
+      ; bignum
+      ; integers
+      ; bin_prot_shape
       ; local "mina_wire_types"
       ; local "mina_base.util"
       ; local "kimchi_pasta"
@@ -354,12 +355,12 @@ let register () =
   library "staged_ledger" ~path:"src/lib/staged_ledger"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ opam "async"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "integers"
-      ; opam "lens"
-      ; opam "ppx_hash.runtime-lib"
+      [ async
+      ; async_unix
+      ; core
+      ; integers
+      ; lens
+      ; ppx_hash_runtime_lib
       ; local "mina_stdlib"
       ; local "cache_dir"
       ; local "child_processes"
@@ -432,11 +433,11 @@ let register () =
   library "snark_work_lib" ~path:"src/lib/snark_work_lib" ~inline_tests:true
     ~modules_without_implementation:[ "combined_result" ]
     ~deps:
-      [ opam "base.caml"
-      ; opam "bin_prot.shape"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
+      [ base_caml
+      ; bin_prot_shape
+      ; core
+      ; core_kernel
+      ; sexplib0
       ; local "currency"
       ; local "ledger_proof"
       ; local "mina_state"
@@ -455,23 +456,23 @@ let register () =
   library "snark_worker" ~path:"src/lib/snark_worker"
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async.async_rpc"
-      ; opam "async_kernel"
-      ; opam "async_rpc_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "bin_prot.shape"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "core_kernel.hash_heap"
-      ; opam "ppx_hash.runtime-lib"
-      ; opam "ppx_version.runtime"
-      ; opam "result"
-      ; opam "sexplib0"
+      [ async
+      ; async_command
+      ; async_rpc
+      ; async_kernel
+      ; async_rpc_kernel
+      ; async_unix
+      ; base
+      ; base_internalhash_types
+      ; base_caml
+      ; bin_prot_shape
+      ; core
+      ; core_kernel
+      ; core_kernel_hash_heap
+      ; ppx_hash_runtime_lib
+      ; ppx_version_runtime
+      ; result
+      ; sexplib0
       ; local "mina_stdlib"
       ; local "cli_lib"
       ; local "currency"
@@ -516,16 +517,16 @@ let register () =
   executable "mina-standalone-snark-worker" ~internal_name:"run_snark_worker"
     ~package:"mina_snark_worker" ~path:"src/lib/snark_worker/standalone"
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.caml"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "uri"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_caml
+      ; core
+      ; core_kernel
+      ; sexplib0
+      ; uri
       ; local "currency"
       ; local "genesis_constants"
       ; local "graphql_lib"
@@ -553,8 +554,8 @@ let register () =
   library "precomputed_values" ~path:"src/lib/precomputed_values"
     ~ppx_runtime_libraries:[ "base" ]
     ~deps:
-      [ opam "core"
-      ; opam "core_kernel"
+      [ core
+      ; core_kernel
       ; local "genesis_constants"
       ; local "mina_state"
       ; local "coda_genesis_proof"
@@ -574,7 +575,7 @@ let register () =
   library "coda_genesis_ledger" ~internal_name:"genesis_ledger"
     ~path:"src/lib/genesis_ledger"
     ~deps:
-      [ opam "core"
+      [ core
       ; local "key_gen"
       ; local "mina_base"
       ; local "signature_lib"
@@ -591,12 +592,12 @@ let register () =
   library "coda_genesis_proof" ~internal_name:"genesis_proof"
     ~path:"src/lib/genesis_proof"
     ~deps:
-      [ opam "base"
-      ; opam "core_kernel"
-      ; opam "base.md5"
-      ; opam "core"
-      ; opam "async"
-      ; opam "async_kernel"
+      [ base
+      ; core_kernel
+      ; base_md5
+      ; core
+      ; async
+      ; async_kernel
       ; local "snarky.backendless"
       ; local "pickles_types"
       ; local "currency"
@@ -628,12 +629,12 @@ let register () =
   library "genesis_ledger_helper.lib" ~internal_name:"genesis_ledger_helper_lib"
     ~path:"src/lib/genesis_ledger_helper/lib" ~inline_tests:true
     ~deps:
-      [ opam "splittable_random"
-      ; opam "integers"
-      ; opam "core_kernel"
-      ; opam "core"
-      ; opam "sexplib0"
-      ; opam "base64"
+      [ splittable_random
+      ; integers
+      ; core_kernel
+      ; core
+      ; sexplib0
+      ; base64
       ; local "mina_wire_types"
       ; local "mina_base.import"
       ; local "random_oracle"
@@ -674,17 +675,17 @@ let register () =
   library "genesis_ledger_helper" ~path:"src/lib/genesis_ledger_helper"
     ~inline_tests:true
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "core_kernel.uuid"
-      ; opam "async_unix"
-      ; opam "async"
-      ; opam "core_kernel"
-      ; opam "core"
-      ; opam "async_kernel"
-      ; opam "core.uuid"
-      ; opam "base.caml"
-      ; opam "sexplib0"
-      ; opam "digestif"
+      [ ppx_inline_test_config
+      ; core_kernel_uuid
+      ; async_unix
+      ; async
+      ; core_kernel
+      ; core
+      ; async_kernel
+      ; core_uuid
+      ; base_caml
+      ; sexplib0
+      ; digestif
       ; local "mina_ledger"
       ; local "with_hash"
       ; local "mina_stdlib"
@@ -732,15 +733,15 @@ let register () =
     ~flags:[ Dune_s_expr.atom ":standard"; Dune_s_expr.atom "-short-paths" ]
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "zarith"
-      ; opam "bignum.bigint"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
-      ; opam "core"
-      ; opam "sexplib0"
-      ; opam "core_kernel"
-      ; opam "bignum"
-      ; opam "ppx_inline_test.config"
+      [ zarith
+      ; bignum_bigint
+      ; bin_prot_shape
+      ; base_caml
+      ; core
+      ; sexplib0
+      ; core_kernel
+      ; bignum
+      ; ppx_inline_test_config
       ; local "snarky.backendless"
       ; local "genesis_constants"
       ; local "snarky_curves"
@@ -756,11 +757,11 @@ let register () =
   library "vrf_lib_tests" ~path:"src/lib/vrf_lib/tests"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ opam "core"
-      ; opam "core_kernel"
-      ; opam "ppx_inline_test.config"
-      ; opam "sexplib0"
-      ; opam "ppx_deriving.runtime"
+      [ core
+      ; core_kernel
+      ; ppx_inline_test_config
+      ; sexplib0
+      ; ppx_deriving_runtime
       ; local "snark_params"
       ; local "signature_lib"
       ; local "snarky_curves"
@@ -792,16 +793,16 @@ let register () =
   (* -- vrf_evaluator ------------------------------------------------- *)
   library "vrf_evaluator" ~path:"src/lib/vrf_evaluator"
     ~deps:
-      [ opam "async_unix"
-      ; opam "async_kernel"
-      ; opam "rpc_parallel"
-      ; opam "core"
-      ; opam "async"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "sexplib0"
-      ; opam "base.caml"
-      ; opam "integers"
+      [ async_unix
+      ; async_kernel
+      ; rpc_parallel
+      ; core
+      ; async
+      ; core_kernel
+      ; bin_prot_shape
+      ; sexplib0
+      ; base_caml
+      ; integers
       ; local "mina_wire_types"
       ; local "error_json"
       ; local "currency"
@@ -823,18 +824,18 @@ let register () =
   (* -- snark_profiler_lib -------------------------------------------- *)
   library "snark_profiler_lib" ~path:"src/lib/snark_profiler_lib"
     ~deps:
-      [ opam "integers"
-      ; opam "astring"
-      ; opam "sexplib0"
-      ; opam "result"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core_kernel"
-      ; opam "core"
-      ; opam "base"
-      ; opam "async"
-      ; opam "base.caml"
-      ; opam "base.base_internalhash_types"
+      [ integers
+      ; astring
+      ; sexplib0
+      ; result
+      ; async_kernel
+      ; async_unix
+      ; core_kernel
+      ; core
+      ; base
+      ; async
+      ; base_caml
+      ; base_internalhash_types
       ; local "mina_stdlib"
       ; local "mina_wire_types"
       ; local "child_processes"
@@ -906,15 +907,15 @@ let register () =
   library "rosetta_lib" ~path:"src/lib/rosetta_lib"
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "result"
-      ; opam "base.caml"
-      ; opam "caqti"
-      ; opam "core_kernel"
-      ; opam "base"
-      ; opam "async_kernel"
-      ; opam "uri"
-      ; opam "sexplib0"
-      ; opam "integers"
+      [ result
+      ; base_caml
+      ; caqti
+      ; core_kernel
+      ; base
+      ; async_kernel
+      ; uri
+      ; sexplib0
+      ; integers
       ; local "mina_wire_types"
       ; local "hex"
       ; local "random_oracle_input"
@@ -948,16 +949,16 @@ let register () =
     ~preprocessor_deps:
       [ "../../../graphql_schema.json"; "../../graphql-ppx-config.inc" ]
     ~deps:
-      [ opam "async"
-      ; opam "cohttp"
-      ; opam "core"
-      ; opam "cohttp-async"
+      [ async
+      ; cohttp
+      ; core
+      ; cohttp_async
       ; local "mina_base"
-      ; opam "graphql-async"
-      ; opam "graphql-cohttp"
-      ; opam "yojson"
+      ; graphql_async
+      ; graphql_cohttp
+      ; yojson
       ; local "graphql_lib"
-      ; opam "base"
+      ; base
       ]
     ~ppx:
       (Ppx.custom
@@ -982,17 +983,17 @@ let register () =
   private_executable ~path:"src/lib/generated_graphql_queries/gen"
     ~modes:[ "native" ]
     ~deps:
-      [ opam "base"
-      ; opam "core_kernel"
-      ; opam "ppxlib"
-      ; opam "ppxlib.ast"
-      ; opam "ppxlib.astlib"
-      ; opam "yojson"
+      [ base
+      ; core_kernel
+      ; ppxlib
+      ; ppxlib_ast
+      ; ppxlib_astlib
+      ; yojson
       ; local "mina_base"
-      ; opam "base.caml"
-      ; opam "compiler-libs"
-      ; opam "ocaml-migrate-parsetree"
-      ; opam "stdio"
+      ; base_caml
+      ; compiler_libs
+      ; ocaml_migrate_parsetree
+      ; stdio
       ]
     ~ppx:
       (Ppx.custom
@@ -1002,7 +1003,7 @@ let register () =
   (* -- ledger_proof -------------------------------------------------- *)
   library "ledger_proof" ~path:"src/lib/ledger_proof"
     ~deps:
-      [ opam "core_kernel"
+      [ core_kernel
       ; local "transaction_snark"
       ; local "mina_base"
       ; local "mina_state"
@@ -1024,16 +1025,16 @@ let register () =
   (* -- prover -------------------------------------------------------- *)
   library "prover" ~path:"src/lib/prover"
     ~deps:
-      [ opam "base64"
-      ; opam "async_unix"
-      ; opam "rpc_parallel"
-      ; opam "core"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
-      ; opam "sexplib0"
+      [ base64
+      ; async_unix
+      ; rpc_parallel
+      ; core
+      ; async
+      ; async_kernel
+      ; core_kernel
+      ; bin_prot_shape
+      ; base_caml
+      ; sexplib0
       ; local "with_hash"
       ; local "coda_genesis_ledger"
       ; local "mina_metrics"
@@ -1077,16 +1078,16 @@ let register () =
   (* -- verifier ------------------------------------------------------ *)
   library "verifier" ~path:"src/lib/verifier"
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.caml"
-      ; opam "bin_prot.shape"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "rpc_parallel"
-      ; opam "sexplib0"
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_caml
+      ; bin_prot_shape
+      ; core
+      ; core_kernel
+      ; rpc_parallel
+      ; sexplib0
       ; local "blockchain_snark"
       ; local "child_processes"
       ; local "error_json"
@@ -1131,26 +1132,19 @@ let register () =
 
   (* -- mina_incremental ---------------------------------------------- *)
   library "mina_incremental" ~path:"src/lib/mina_incremental"
-    ~deps:[ opam "incremental"; local "pipe_lib"; opam "async_kernel" ]
+    ~deps:[ incremental; local "pipe_lib"; async_kernel ]
     ~ppx:(Ppx.custom [ "ppx_version" ]) ;
 
   (* -- mina_plugins -------------------------------------------------- *)
   library "mina_plugins" ~path:"src/lib/mina_plugins"
-    ~deps:
-      [ opam "core_kernel"
-      ; opam "dynlink"
-      ; opam "core"
-      ; opam "base"
-      ; local "mina_lib"
-      ; local "logger"
-      ]
+    ~deps:[ core_kernel; dynlink; core; base; local "mina_lib"; local "logger" ]
     ~ppx:(Ppx.custom [ "ppx_mina"; "ppx_version" ]) ;
 
   (* -- mina_plugins/examples/do_nothing ------------------------------ *)
   private_library ~path:"src/lib/mina_plugins/examples/do_nothing"
     ~deps:
-      [ opam "core_kernel"
-      ; opam "core"
+      [ core_kernel
+      ; core
       ; local "mina_plugins"
       ; local "mina_lib"
       ; local "logger"
@@ -1166,22 +1160,22 @@ let register () =
   library "gossip_net" ~path:"src/lib/gossip_net" ~library_flags:[ "-linkall" ]
     ~inline_tests:true
     ~deps:
-      [ opam "uri"
-      ; opam "async.async_rpc"
-      ; opam "async_kernel"
-      ; opam "base"
-      ; opam "base.caml"
-      ; opam "bin_prot.shape"
-      ; opam "async_rpc_kernel"
-      ; opam "async"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "cohttp-async"
-      ; opam "async_unix"
-      ; opam "base.base_internalhash_types"
-      ; opam "ppx_hash.runtime-lib"
-      ; opam "integers"
+      [ uri
+      ; async_rpc
+      ; async_kernel
+      ; base
+      ; base_caml
+      ; bin_prot_shape
+      ; async_rpc_kernel
+      ; async
+      ; core
+      ; core_kernel
+      ; sexplib0
+      ; cohttp_async
+      ; async_unix
+      ; base_internalhash_types
+      ; ppx_hash_runtime_lib
+      ; integers
       ; local "ppx_version.runtime"
       ; local "network_peer"
       ; local "logger"
@@ -1223,25 +1217,25 @@ let register () =
   (* -- mina_net2 ----------------------------------------------------- *)
   library "mina_net2" ~path:"src/lib/mina_net2" ~inline_tests:true
     ~deps:
-      [ opam "async"
-      ; opam "base58"
-      ; opam "base64"
-      ; opam "capnp"
-      ; opam "digestif"
-      ; opam "stdio"
-      ; opam "core"
-      ; opam "libp2p_ipc"
-      ; opam "yojson"
-      ; opam "async_kernel"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "ppx_inline_test.config"
-      ; opam "async_unix"
-      ; opam "sexplib0"
-      ; opam "base.caml"
-      ; opam "base.base_internalhash_types"
-      ; opam "splittable_random"
-      ; opam "integers"
+      [ async
+      ; base58
+      ; base64
+      ; capnp
+      ; digestif
+      ; stdio
+      ; core
+      ; libp2p_ipc
+      ; yojson
+      ; async_kernel
+      ; core_kernel
+      ; bin_prot_shape
+      ; ppx_inline_test_config
+      ; async_unix
+      ; sexplib0
+      ; base_caml
+      ; base_internalhash_types
+      ; splittable_random
+      ; integers
       ; local "blake2"
       ; local "error_json"
       ; local "child_processes"
@@ -1270,15 +1264,15 @@ let register () =
   (* -- mina_net2/tests ----------------------------------------------- *)
   private_library ~path:"src/lib/mina_net2/tests" ~inline_tests:true
     ~deps:
-      [ opam "core"
-      ; opam "async"
-      ; opam "ppx_inline_test.config"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
+      [ core
+      ; async
+      ; ppx_inline_test_config
+      ; async_kernel
+      ; async_unix
+      ; core_kernel
+      ; sexplib0
+      ; bin_prot_shape
+      ; base_caml
       ; local "mina_net2"
       ; local "mina_stdlib"
       ; local "logger"
@@ -1294,18 +1288,18 @@ let register () =
   library "mina_networking" ~path:"src/lib/mina_networking"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ opam "base.caml"
-      ; opam "async_rpc_kernel"
-      ; opam "result"
-      ; opam "core"
-      ; opam "async"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "base"
-      ; opam "bin_prot.shape"
-      ; opam "async_unix"
-      ; opam "async_kernel"
-      ; opam "base.base_internalhash_types"
+      [ base_caml
+      ; async_rpc_kernel
+      ; result
+      ; core
+      ; async
+      ; core_kernel
+      ; sexplib0
+      ; base
+      ; bin_prot_shape
+      ; async_unix
+      ; async_kernel
+      ; base_internalhash_types
       ; local "precomputed_values"
       ; local "merkle_ledger"
       ; local "downloader"
@@ -1365,11 +1359,11 @@ let register () =
   library "network_pool" ~path:"src/lib/network_pool" ~inline_tests:true
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "async"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "integers"
-      ; opam "stdio"
+      [ async
+      ; async_unix
+      ; core
+      ; integers
+      ; stdio
       ; local "block_time"
       ; local "mina_stdlib"
       ; local "child_processes"
@@ -1454,13 +1448,13 @@ let register () =
     ~library_flags:[ "-linkall" ]
     ~flags:[ Dune_s_expr.atom ":standard"; Dune_s_expr.atom "-short-paths" ]
     ~deps:
-      [ opam "async_kernel"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
-      ; opam "sexplib0"
-      ; opam "core"
-      ; opam "async"
+      [ async_kernel
+      ; core_kernel
+      ; bin_prot_shape
+      ; base_caml
+      ; sexplib0
+      ; core
+      ; async
       ; local "trust_system"
       ; local "logger"
       ; local "merkle_ledger"
@@ -1486,17 +1480,17 @@ let register () =
   (* -- syncable_ledger/test ------------------------------------------ *)
   private_library ~path:"src/lib/syncable_ledger/test" ~inline_tests:true
     ~deps:
-      [ opam "result"
-      ; opam "base.base_internalhash_types"
-      ; opam "bin_prot.shape"
-      ; opam "async_unix"
-      ; opam "async_kernel"
-      ; opam "core_kernel"
-      ; opam "core"
-      ; opam "async"
-      ; opam "sexplib0"
-      ; opam "ppx_inline_test.config"
-      ; opam "base.caml"
+      [ result
+      ; base_internalhash_types
+      ; bin_prot_shape
+      ; async_unix
+      ; async_kernel
+      ; core_kernel
+      ; core
+      ; async
+      ; sexplib0
+      ; ppx_inline_test_config
+      ; base_caml
       ; local "mina_numbers"
       ; local "mina_base"
       ; local "merkle_address"
@@ -1522,11 +1516,11 @@ let register () =
   (* -- sync_handler -------------------------------------------------- *)
   library "sync_handler" ~path:"src/lib/sync_handler" ~inline_tests:true
     ~deps:
-      [ opam "sexplib0"
-      ; opam "core"
-      ; opam "async"
-      ; opam "core_kernel"
-      ; opam "async_kernel"
+      [ sexplib0
+      ; core
+      ; async
+      ; core_kernel
+      ; async_kernel
       ; local "with_hash"
       ; local "data_hash_lib"
       ; local "precomputed_values"
@@ -1555,8 +1549,8 @@ let register () =
   (* -- transition_chain_prover --------------------------------------- *)
   library "transition_chain_prover" ~path:"src/lib/transition_chain_prover"
     ~deps:
-      [ opam "core"
-      ; opam "core_kernel"
+      [ core
+      ; core_kernel
       ; local "transition_frontier_extensions"
       ; local "mina_block"
       ; local "mina_state"
@@ -1579,8 +1573,8 @@ let register () =
   (* -- transition_chain_verifier ------------------------------------- *)
   library "transition_chain_verifier" ~path:"src/lib/transition_chain_verifier"
     ~deps:
-      [ opam "core_kernel"
-      ; opam "core"
+      [ core_kernel
+      ; core
       ; local "merkle_list_verifier"
       ; local "mina_state"
       ; local "mina_base"
@@ -1593,16 +1587,16 @@ let register () =
   library "transition_frontier_base" ~internal_name:"frontier_base"
     ~path:"src/lib/transition_frontier/frontier_base"
     ~deps:
-      [ opam "async_unix"
-      ; opam "base.caml"
-      ; opam "async_kernel"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "sexplib0"
-      ; opam "integers"
-      ; opam "core"
-      ; opam "async"
-      ; opam "base.base_internalhash_types"
+      [ async_unix
+      ; base_caml
+      ; async_kernel
+      ; core_kernel
+      ; bin_prot_shape
+      ; sexplib0
+      ; integers
+      ; core
+      ; async
+      ; base_internalhash_types
       ; local "unsigned_extended"
       ; local "staged_ledger_diff"
       ; local "block_time"
@@ -1661,13 +1655,13 @@ let register () =
   library "transition_frontier_full_frontier" ~internal_name:"full_frontier"
     ~path:"src/lib/transition_frontier/full_frontier"
     ~deps:
-      [ opam "integers"
-      ; opam "core"
-      ; opam "base.caml"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "base.base_internalhash_types"
-      ; opam "stdio"
+      [ integers
+      ; core
+      ; base_caml
+      ; core_kernel
+      ; sexplib0
+      ; base_internalhash_types
+      ; stdio
       ; local "mina_wire_types"
       ; local "unsigned_extended"
       ; local "o1trace"
@@ -1690,13 +1684,13 @@ let register () =
       ; local "staged_ledger_diff"
       ; local "mina_numbers"
       ; local "internal_tracing"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
+      ; async
+      ; async_kernel
+      ; async_unix
       ; local "child_processes"
       ; local "coda_genesis_ledger"
-      ; opam "core.uuid"
-      ; opam "core_kernel.uuid"
+      ; core_uuid
+      ; core_kernel_uuid
       ; local "genesis_constants"
       ; local "merkle_ledger"
       ; local "protocol_version"
@@ -1722,11 +1716,11 @@ let register () =
   library "transition_frontier_persistent_root" ~internal_name:"persistent_root"
     ~path:"src/lib/transition_frontier/persistent_root"
     ~deps:
-      [ opam "core_kernel.uuid"
-      ; opam "core_kernel"
-      ; opam "core"
-      ; opam "core.uuid"
-      ; opam "base.caml"
+      [ core_kernel_uuid
+      ; core_kernel
+      ; core
+      ; core_uuid
+      ; base_caml
       ; local "precomputed_values"
       ; local "mina_stdlib_unix"
       ; local "merkle_ledger"
@@ -1743,15 +1737,15 @@ let register () =
     ~internal_name:"persistent_frontier"
     ~path:"src/lib/transition_frontier/persistent_frontier"
     ~deps:
-      [ opam "result"
-      ; opam "bin_prot.shape"
-      ; opam "core_kernel"
-      ; opam "async"
-      ; opam "core"
-      ; opam "async_kernel"
-      ; opam "base.caml"
-      ; opam "sexplib0"
-      ; opam "async_unix"
+      [ result
+      ; bin_prot_shape
+      ; core_kernel
+      ; async
+      ; core
+      ; async_kernel
+      ; base_caml
+      ; sexplib0
+      ; async_unix
       ; local "mina_stdlib"
       ; local "o1trace"
       ; local "mina_metrics"
@@ -1805,12 +1799,12 @@ let register () =
   library "transition_frontier_extensions" ~internal_name:"extensions"
     ~path:"src/lib/transition_frontier/extensions"
     ~deps:
-      [ opam "base.caml"
-      ; opam "async_kernel"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "result"
-      ; opam "base.base_internalhash_types"
+      [ base_caml
+      ; async_kernel
+      ; core_kernel
+      ; sexplib0
+      ; result
+      ; base_internalhash_types
       ; local "with_hash"
       ; local "mina_block"
       ; local "transaction_snark_work"
@@ -1830,10 +1824,10 @@ let register () =
   (* -- transition_frontier ------------------------------------------- *)
   library "transition_frontier" ~path:"src/lib/transition_frontier"
     ~deps:
-      [ opam "async_unix"
-      ; opam "integers"
-      ; opam "async"
-      ; opam "core"
+      [ async_unix
+      ; integers
+      ; async
+      ; core
       ; local "o1trace"
       ; local "mina_metrics"
       ; local "mina_wire_types"
@@ -1882,15 +1876,15 @@ let register () =
   (* -- transition_frontier/tests ------------------------------------- *)
   private_library ~path:"src/lib/transition_frontier/tests" ~inline_tests:true
     ~deps:
-      [ opam "core.uuid"
-      ; opam "core"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "core_kernel"
-      ; opam "ppx_inline_test.config"
-      ; opam "async_unix"
-      ; opam "core_kernel.uuid"
-      ; opam "sexplib0"
+      [ core_uuid
+      ; core
+      ; async
+      ; async_kernel
+      ; core_kernel
+      ; ppx_inline_test_config
+      ; async_unix
+      ; core_kernel_uuid
+      ; sexplib0
       ; local "mina_state"
       ; local "staged_ledger"
       ; local "with_hash"
@@ -1912,9 +1906,9 @@ let register () =
       ; local "transition_frontier_base"
       ; local "transition_frontier"
       ; local "protocol_version"
-      ; opam "yojson"
+      ; yojson
       ; local "mina_net2"
-      ; opam "libp2p_ipc"
+      ; libp2p_ipc
       ; local "staged_ledger_diff"
       ]
     ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_version"; "ppx_mina" ])
@@ -1924,10 +1918,10 @@ let register () =
   library "transition_frontier_controller"
     ~path:"src/lib/transition_frontier_controller"
     ~deps:
-      [ opam "base"
-      ; opam "async_kernel"
-      ; opam "core_kernel"
-      ; opam "core"
+      [ base
+      ; async_kernel
+      ; core_kernel
+      ; core
       ; local "transition_frontier"
       ; local "data_hash_lib"
       ; local "mina_metrics"
@@ -1955,16 +1949,16 @@ let register () =
   library "transition_handler" ~path:"src/lib/transition_handler"
     ~inline_tests:true
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "sexplib0"
-      ; opam "core_kernel"
-      ; opam "core"
-      ; opam "async"
-      ; opam "async_unix"
-      ; opam "base.base_internalhash_types"
-      ; opam "async_kernel"
-      ; opam "integers"
-      ; opam "result"
+      [ ppx_inline_test_config
+      ; sexplib0
+      ; core_kernel
+      ; core
+      ; async
+      ; async_unix
+      ; base_internalhash_types
+      ; async_kernel
+      ; integers
+      ; result
       ; local "error_json"
       ; local "data_hash_lib"
       ; local "block_time"
@@ -2010,13 +2004,13 @@ let register () =
   (* -- transition_router --------------------------------------------- *)
   library "transition_router" ~path:"src/lib/transition_router"
     ~deps:
-      [ opam "integers"
-      ; opam "base.caml"
-      ; opam "async_kernel"
-      ; opam "core_kernel"
-      ; opam "core"
-      ; opam "async"
-      ; opam "sexplib0"
+      [ integers
+      ; base_caml
+      ; async_kernel
+      ; core_kernel
+      ; core
+      ; async
+      ; sexplib0
       ; local "best_tip_prover"
       ; local "transition_handler"
       ; local "o1trace"
@@ -2060,13 +2054,13 @@ let register () =
   library "bootstrap_controller" ~path:"src/lib/bootstrap_controller"
     ~inline_tests:true
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "ppx_inline_test.config"
-      ; opam "sexplib0"
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; core
+      ; core_kernel
+      ; ppx_inline_test_config
+      ; sexplib0
       ; local "block_time"
       ; local "child_processes"
       ; local "coda_genesis_ledger"
@@ -2126,9 +2120,9 @@ let register () =
   (* -- best_tip_prover ----------------------------------------------- *)
   library "best_tip_prover" ~path:"src/lib/best_tip_prover"
     ~deps:
-      [ opam "core"
-      ; opam "core_kernel"
-      ; opam "async_kernel"
+      [ core
+      ; core_kernel
+      ; async_kernel
       ; local "genesis_constants"
       ; local "consensus"
       ; local "with_hash"
@@ -2157,8 +2151,8 @@ let register () =
   (* -- ledger_catchup ------------------------------------------------ *)
   library "ledger_catchup" ~path:"src/lib/ledger_catchup" ~inline_tests:true
     ~deps:
-      [ opam "async"
-      ; opam "core"
+      [ async
+      ; core
       ; local "mina_stdlib"
       ; local "mina_wire_types"
       ; local "genesis_constants"
@@ -2212,10 +2206,10 @@ let register () =
   (* -- downloader ---------------------------------------------------- *)
   library "downloader" ~path:"src/lib/downloader"
     ~deps:
-      [ opam "async"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "core_kernel.pairing_heap"
+      [ async
+      ; async_unix
+      ; core
+      ; core_kernel_pairing_heap
       ; local "mina_stdlib"
       ; local "logger"
       ; local "network_peer"
@@ -2236,12 +2230,12 @@ let register () =
   library "block_producer" ~path:"src/lib/block_producer"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "sexplib0"
+      [ async
+      ; async_kernel
+      ; core
+      ; core_kernel
+      ; integers
+      ; sexplib0
       ; local "block_time"
       ; local "blockchain_snark"
       ; local "coda_genesis_proof"
@@ -2308,8 +2302,8 @@ let register () =
   library "work_partitioner" ~path:"src/lib/work_partitioner"
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "async"
-      ; opam "core_kernel"
+      [ async
+      ; core_kernel
       ; local "mina_base"
       ; local "snark_work_lib"
       ; local "transaction_snark"
@@ -2334,17 +2328,17 @@ let register () =
   library "work_selector" ~path:"src/lib/work_selector"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ opam "bin_prot.shape"
-      ; opam "sexplib0"
-      ; opam "core"
-      ; opam "async"
-      ; opam "core_kernel"
-      ; opam "base"
-      ; opam "base.caml"
-      ; opam "base.base_internalhash_types"
-      ; opam "async_kernel"
-      ; opam "ppx_inline_test.config"
-      ; opam "async_unix"
+      [ bin_prot_shape
+      ; sexplib0
+      ; core
+      ; async
+      ; core_kernel
+      ; base
+      ; base_caml
+      ; base_internalhash_types
+      ; async_kernel
+      ; ppx_inline_test_config
+      ; async_unix
       ; local "transaction_protocol_state"
       ; local "transaction_snark_work"
       ; local "transition_frontier_base"
@@ -2390,10 +2384,10 @@ let register () =
   (* -- fake_network -------------------------------------------------- *)
   library "fake_network" ~path:"src/lib/fake_network"
     ~deps:
-      [ opam "async"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "core.uuid"
+      [ async
+      ; async_unix
+      ; core
+      ; core_uuid
       ; local "block_time"
       ; local "mina_stdlib"
       ; local "coda_genesis_proof"

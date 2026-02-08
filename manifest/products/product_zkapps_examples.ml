@@ -1,14 +1,15 @@
 (** Product: zkapps_examples — Example zkApp smart contracts and tests. *)
 
 open Manifest
+open Externals
 
 let register () =
   (* -- zkapps_examples (library) -------------------------------------- *)
   library "zkapps_examples" ~path:"src/app/zkapps_examples"
     ~deps:
-      [ opam "async_kernel"
-      ; opam "base"
-      ; opam "core_kernel"
+      [ async_kernel
+      ; base
+      ; core_kernel
       ; local "crypto_params"
       ; local "currency"
       ; local "kimchi_backend"
@@ -38,8 +39,8 @@ let register () =
   (* -- zkapps_actions (library) --------------------------------------- *)
   private_library "zkapps_actions" ~path:"src/app/zkapps_examples/actions"
     ~deps:
-      [ opam "base"
-      ; opam "core_kernel"
+      [ base
+      ; core_kernel
       ; local "crypto_params"
       ; local "currency"
       ; local "mina_base"
@@ -55,8 +56,8 @@ let register () =
   (* -- zkapps_add_events (library) ------------------------------------ *)
   private_library "zkapps_add_events" ~path:"src/app/zkapps_examples/add_events"
     ~deps:
-      [ opam "base"
-      ; opam "core_kernel"
+      [ base
+      ; core_kernel
       ; local "crypto_params"
       ; local "currency"
       ; local "mina_base"
@@ -73,7 +74,7 @@ let register () =
   private_library "zkapps_big_circuit"
     ~path:"src/app/zkapps_examples/big_circuit"
     ~deps:
-      [ opam "core_kernel"
+      [ core_kernel
       ; local "crypto_params"
       ; local "currency"
       ; local "kimchi_backend"
@@ -99,8 +100,8 @@ let register () =
   (* -- zkapps_calls (library) ----------------------------------------- *)
   private_library "zkapps_calls" ~path:"src/app/zkapps_examples/calls"
     ~deps:
-      [ opam "base"
-      ; opam "core_kernel"
+      [ base
+      ; core_kernel
       ; local "crypto_params"
       ; local "currency"
       ; local "kimchi_backend"
@@ -129,7 +130,7 @@ let register () =
   private_library "zkapps_empty_update"
     ~path:"src/app/zkapps_examples/empty_update"
     ~deps:
-      [ opam "core_kernel"
+      [ core_kernel
       ; local "crypto_params"
       ; local "currency"
       ; local "kimchi_backend"
@@ -155,8 +156,8 @@ let register () =
   private_library "zkapps_initialize_state"
     ~path:"src/app/zkapps_examples/initialize_state"
     ~deps:
-      [ opam "base"
-      ; opam "core_kernel"
+      [ base
+      ; core_kernel
       ; local "crypto_params"
       ; local "currency"
       ; local "kimchi_backend"
@@ -181,12 +182,12 @@ let register () =
   (* -- zkapps_tokens (library) ---------------------------------------- *)
   private_library "zkapps_tokens" ~path:"src/app/zkapps_examples/tokens"
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "yojson"
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; core_kernel
+      ; yojson
       ; local "cache_dir"
       ; local "crypto_params"
       ; local "currency"
@@ -217,14 +218,14 @@ let register () =
   private_library "tokens" ~path:"src/app/zkapps_examples/test/tokens"
     ~inline_tests:true
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "ppx_inline_test.config"
-      ; opam "yojson"
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; core
+      ; core_kernel
+      ; ppx_inline_test_config
+      ; yojson
       ; local "cache_dir"
       ; local "currency"
       ; local "data_hash_lib"
@@ -262,13 +263,13 @@ let register () =
   (* -- actions (test) ------------------------------------------------- *)
   test "actions" ~path:"src/app/zkapps_examples/test/actions"
     ~deps:
-      [ opam "alcotest"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "yojson"
+      [ alcotest
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; core
+      ; core_kernel
+      ; yojson
       ; local "cache_dir"
       ; local "consensus"
       ; local "currency"
@@ -305,12 +306,12 @@ let register () =
   (* -- add_events (test) ---------------------------------------------- *)
   test "add_events" ~path:"src/app/zkapps_examples/test/add_events"
     ~deps:
-      [ opam "alcotest"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "core"
-      ; opam "core_kernel"
+      [ alcotest
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; core
+      ; core_kernel
       ; local "cache_dir"
       ; local "currency"
       ; local "data_hash_lib"
@@ -342,14 +343,14 @@ let register () =
   (* -- big_circuit (test) --------------------------------------------- *)
   test "big_circuit" ~path:"src/app/zkapps_examples/test/big_circuit"
     ~deps:
-      [ opam "alcotest"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "yojson"
+      [ alcotest
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; core
+      ; core_kernel
+      ; yojson
       ; local "cache_dir"
       ; local "currency"
       ; local "data_hash_lib"
@@ -386,14 +387,14 @@ let register () =
   (* -- calls (test) --------------------------------------------------- *)
   test "calls" ~path:"src/app/zkapps_examples/test/calls"
     ~deps:
-      [ opam "alcotest"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "yojson"
+      [ alcotest
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; core
+      ; core_kernel
+      ; yojson
       ; local "cache_dir"
       ; local "currency"
       ; local "data_hash_lib"
@@ -430,14 +431,14 @@ let register () =
   (* -- empty_update (test) -------------------------------------------- *)
   test "empty_update" ~path:"src/app/zkapps_examples/test/empty_update"
     ~deps:
-      [ opam "alcotest"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "yojson"
+      [ alcotest
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; core
+      ; core_kernel
+      ; yojson
       ; local "cache_dir"
       ; local "currency"
       ; local "data_hash_lib"
@@ -475,14 +476,14 @@ let register () =
   (* -- initialize_state (test) ---------------------------------------- *)
   test "initialize_state" ~path:"src/app/zkapps_examples/test/initialize_state"
     ~deps:
-      [ opam "alcotest"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "yojson"
+      [ alcotest
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; core
+      ; core_kernel
+      ; yojson
       ; local "cache_dir"
       ; local "currency"
       ; local "data_hash_lib"
@@ -520,17 +521,17 @@ let register () =
   test "zkapp_optional_custom_gates_tests"
     ~path:"src/app/zkapps_examples/test/optional_custom_gates"
     ~deps:
-      [ opam "alcotest"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.caml"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "result"
-      ; opam "sexplib0"
+      [ alcotest
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_caml
+      ; core
+      ; core_kernel
+      ; integers
+      ; result
+      ; sexplib0
       ; local "currency"
       ; local "data_hash_lib"
       ; local "genesis_constants"

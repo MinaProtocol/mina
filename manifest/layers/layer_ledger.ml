@@ -4,6 +4,7 @@
     The manifest generates these files from the declarations below. *)
 
 open Manifest
+open Externals
 open Dune_s_expr
 
 let register () =
@@ -11,14 +12,14 @@ let register () =
   library "sparse_ledger_lib" ~path:"src/lib/sparse_ledger_lib"
     ~inline_tests:true ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "base.caml"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "base"
-      ; opam "ppx_inline_test.config"
-      ; opam "bin_prot.shape"
-      ; opam "result"
-      ; opam "ppx_version.runtime"
+      [ base_caml
+      ; core_kernel
+      ; sexplib0
+      ; base
+      ; ppx_inline_test_config
+      ; bin_prot_shape
+      ; result
+      ; ppx_version_runtime
       ; local "mina_stdlib"
       ]
     ~ppx:
@@ -30,13 +31,13 @@ let register () =
   library "merkle_address" ~path:"src/lib/merkle_address" ~inline_tests:true
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "base.base_internalhash_types"
-      ; opam "bin_prot.shape"
-      ; opam "bitstring"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "base.caml"
-      ; opam "ppx_inline_test.config"
+      [ base_internalhash_types
+      ; bin_prot_shape
+      ; bitstring
+      ; core_kernel
+      ; sexplib0
+      ; base_caml
+      ; ppx_inline_test_config
       ; local "mina_stdlib"
       ; local "ppx_version.runtime"
       ; local "test_util"
@@ -55,12 +56,11 @@ let register () =
 
   (* -- merkle_list_prover ------------------------------------------- *)
   library "merkle_list_prover" ~path:"src/lib/merkle_list_prover"
-    ~deps:[ opam "core_kernel" ]
-    ~ppx:Ppx.standard ;
+    ~deps:[ core_kernel ] ~ppx:Ppx.standard ;
 
   (* -- merkle_list_verifier ----------------------------------------- *)
   library "merkle_list_verifier" ~path:"src/lib/merkle_list_verifier"
-    ~deps:[ opam "core_kernel"; local "mina_stdlib" ]
+    ~deps:[ core_kernel; local "mina_stdlib" ]
     ~ppx:(Ppx.custom [ "ppx_version"; "ppx_jane"; "ppx_compare" ]) ;
 
   (* -- merkle_ledger ------------------------------------------------ *)
@@ -69,20 +69,20 @@ let register () =
     ~library_flags:[ "-linkall" ]
     ~modules_without_implementation:[ "location_intf" ]
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "bin_prot.shape"
-      ; opam "bitstring"
-      ; opam "core"
-      ; opam "core.uuid"
-      ; opam "core_kernel"
-      ; opam "core_kernel.uuid"
-      ; opam "integers"
-      ; opam "rocks"
-      ; opam "sexplib0"
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; base_internalhash_types
+      ; base_caml
+      ; bin_prot_shape
+      ; bitstring
+      ; core
+      ; core_uuid
+      ; core_kernel
+      ; core_kernel_uuid
+      ; integers
+      ; rocks
+      ; sexplib0
       ; local "cache_dir"
       ; local "mina_stdlib"
       ; local "mina_stdlib_unix"
@@ -107,19 +107,19 @@ let register () =
     ~flags:[ list [ atom ":standard"; atom "-warn-error"; atom "+a" ] ]
     ~modules_exclude:[ "test" ]
     ~deps:
-      [ opam "alcotest"
-      ; opam "async"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "bin_prot.shape"
-      ; opam "core"
-      ; opam "core.uuid"
-      ; opam "core_kernel"
-      ; opam "core_kernel.uuid"
-      ; opam "result"
-      ; opam "sexplib0"
+      [ alcotest
+      ; async
+      ; async_kernel
+      ; async_unix
+      ; base_internalhash_types
+      ; base_caml
+      ; bin_prot_shape
+      ; core
+      ; core_uuid
+      ; core_kernel
+      ; core_kernel_uuid
+      ; result
+      ; sexplib0
       ; local "base58_check"
       ; local "codable"
       ; local "currency"
@@ -148,7 +148,7 @@ let register () =
   test "test" ~package:"merkle_ledger_tests" ~path:"src/lib/merkle_ledger/test"
     ~modules:[ "test" ]
     ~flags:[ list [ atom ":standard"; atom "-warn-error"; atom "+a" ] ]
-    ~deps:[ opam "alcotest"; local "merkle_ledger_tests" ]
+    ~deps:[ alcotest; local "merkle_ledger_tests" ]
     ~ppx:
       (Ppx.custom
          [ "ppx_version"
@@ -178,19 +178,19 @@ let register () =
       ; "masking_merkle_tree_intf"
       ]
     ~deps:
-      [ opam "async"
-      ; opam "async_kernel"
-      ; opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "bitstring"
-      ; opam "core"
-      ; opam "core.uuid"
-      ; opam "core_kernel"
-      ; opam "core_kernel.uuid"
-      ; opam "integers"
-      ; opam "sexplib0"
-      ; opam "stdio"
-      ; opam "yojson"
+      [ async
+      ; async_kernel
+      ; base_internalhash_types
+      ; base_caml
+      ; bitstring
+      ; core
+      ; core_uuid
+      ; core_kernel
+      ; core_kernel_uuid
+      ; integers
+      ; sexplib0
+      ; stdio
+      ; yojson
       ; local "mina_stdlib"
       ; local "logger"
       ; local "merkle_ledger"
@@ -210,19 +210,19 @@ let register () =
   (* -- mina_ledger -------------------------------------------------- *)
   library "mina_ledger" ~path:"src/lib/mina_ledger" ~inline_tests:true
     ~deps:
-      [ opam "rocks"
-      ; opam "integers"
-      ; opam "async_kernel"
-      ; opam "base.caml"
-      ; opam "base"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "bin_prot.shape"
-      ; opam "base.base_internalhash_types"
-      ; opam "async"
-      ; opam "core_kernel.uuid"
-      ; opam "ppx_inline_test.config"
+      [ rocks
+      ; integers
+      ; async_kernel
+      ; base_caml
+      ; base
+      ; core
+      ; core_kernel
+      ; sexplib0
+      ; bin_prot_shape
+      ; base_internalhash_types
+      ; async
+      ; core_kernel_uuid
+      ; ppx_inline_test_config
       ; local "mina_wire_types"
       ; local "sgn"
       ; local "syncable_ledger"
@@ -273,13 +273,13 @@ let register () =
   private_library "mina_ledger_test_helpers"
     ~path:"src/lib/mina_ledger/test/helpers"
     ~deps:
-      [ opam "base"
-      ; opam "base.caml"
-      ; opam "core_kernel"
-      ; opam "core"
-      ; opam "integers"
-      ; opam "sexplib0"
-      ; opam "yojson"
+      [ base
+      ; base_caml
+      ; core_kernel
+      ; core
+      ; integers
+      ; sexplib0
+      ; yojson
       ; local "currency"
       ; local "kimchi_backend_common"
       ; local "kimchi_pasta"
@@ -299,18 +299,18 @@ let register () =
   (* -- staged_ledger_diff ------------------------------------------- *)
   library "staged_ledger_diff" ~path:"src/lib/staged_ledger_diff"
     ~deps:
-      [ opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "async"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
-      ; opam "blake2"
-      ; opam "stdint"
-      ; opam "ppx_inline_test.config"
-      ; opam "splittable_random"
-      ; opam "stdio"
-      ; opam "async_unix"
-      ; opam "async_kernel"
+      [ core_kernel
+      ; sexplib0
+      ; async
+      ; bin_prot_shape
+      ; base_caml
+      ; blake2
+      ; stdint
+      ; ppx_inline_test_config
+      ; splittable_random
+      ; stdio
+      ; async_unix
+      ; async_kernel
       ; local "mina_base"
       ; local "transaction_snark_work"
       ; local "genesis_constants"

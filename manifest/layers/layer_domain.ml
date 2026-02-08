@@ -4,6 +4,7 @@
     The manifest generates these files from the declarations below. *)
 
 open Manifest
+open Externals
 open Dune_s_expr
 
 let register () =
@@ -15,8 +16,8 @@ let register () =
   library "hash_prefix_states" ~path:"src/lib/hash_prefix_states"
     ~inline_tests:true ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "core_kernel"
-      ; opam "base"
+      [ core_kernel
+      ; base
       ; local "snark_params"
       ; local "random_oracle"
       ; local "mina_signature_kind"
@@ -54,21 +55,16 @@ let register () =
   library "hash_prefix_create.js" ~internal_name:"hash_prefix_create_js"
     ~path:"src/lib/hash_prefix_states/hash_prefix_create/js"
     ~deps:
-      [ opam "js_of_ocaml"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; local "pickles"
-      ; local "random_oracle"
-      ]
+      [ js_of_ocaml; base; core_kernel; local "pickles"; local "random_oracle" ]
     ~implements:"hash_prefix_create" ~ppx:Ppx.minimal ;
 
   (* -- data_hash_lib ----------------------------------------------- *)
   library "data_hash_lib" ~path:"src/lib/data_hash_lib" ~inline_tests:true
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "base"
-      ; opam "core_kernel"
-      ; opam "ppx_inline_test.config"
+      [ base
+      ; core_kernel
+      ; ppx_inline_test_config
       ; local "base58_check"
       ; local "bignum_bigint"
       ; local "bitstring_lib"
@@ -108,14 +104,14 @@ let register () =
   library "block_time" ~path:"src/lib/block_time" ~inline_tests:true
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "integers"
-      ; opam "base.caml"
-      ; opam "bin_prot.shape"
-      ; opam "sexplib0"
-      ; opam "async_kernel"
-      ; opam "core_kernel"
-      ; opam "base"
-      ; opam "base.base_internalhash_types"
+      [ integers
+      ; base_caml
+      ; bin_prot_shape
+      ; sexplib0
+      ; async_kernel
+      ; core_kernel
+      ; base
+      ; base_internalhash_types
       ; local "mina_wire_types"
       ; local "bitstring_lib"
       ; local "pickles"
@@ -149,11 +145,11 @@ let register () =
   (* -- proof_carrying_data ----------------------------------------- *)
   library "proof_carrying_data" ~path:"src/lib/proof_carrying_data"
     ~deps:
-      [ opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "base"
-      ; opam "base.caml"
-      ; opam "sexplib0"
+      [ core_kernel
+      ; bin_prot_shape
+      ; base
+      ; base_caml
+      ; sexplib0
       ; local "mina_wire_types"
       ; local "ppx_version.runtime"
       ]
@@ -163,13 +159,13 @@ let register () =
   library "genesis_constants" ~path:"src/lib/genesis_constants"
     ~inline_tests:true ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "base"
-      ; opam "bin_prot.shape"
-      ; opam "core_kernel"
-      ; opam "base.caml"
-      ; opam "sexplib0"
-      ; opam "integers"
+      [ ppx_inline_test_config
+      ; base
+      ; bin_prot_shape
+      ; core_kernel
+      ; base_caml
+      ; sexplib0
+      ; integers
       ; local "mina_node_config.intf"
       ; local "mina_node_config.for_unit_tests"
       ; local "mina_node_config"
@@ -209,19 +205,19 @@ let register () =
   (* -- network_peer ------------------------------------------------ *)
   library "network_peer" ~path:"src/lib/network_peer"
     ~deps:
-      [ opam "core"
-      ; opam "async"
-      ; opam "async.async_rpc"
-      ; opam "async_rpc_kernel"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "sexplib0"
-      ; opam "base.caml"
-      ; opam "base.base_internalhash_types"
-      ; opam "result"
-      ; opam "async_kernel"
-      ; opam "mina_metrics"
-      ; opam "ppx_version.runtime"
+      [ core
+      ; async
+      ; async_rpc
+      ; async_rpc_kernel
+      ; core_kernel
+      ; bin_prot_shape
+      ; sexplib0
+      ; base_caml
+      ; base_internalhash_types
+      ; result
+      ; async_kernel
+      ; mina_metrics
+      ; ppx_version_runtime
       ; local "mina_stdlib"
       ]
     ~ppx:
@@ -237,13 +233,13 @@ let register () =
   library "node_addrs_and_ports" ~path:"src/lib/node_addrs_and_ports"
     ~inline_tests:true
     ~deps:
-      [ opam "core"
-      ; opam "async"
-      ; opam "yojson"
-      ; opam "sexplib0"
-      ; opam "base.caml"
-      ; opam "core_kernel"
-      ; opam "bin_prot.shape"
+      [ core
+      ; async
+      ; yojson
+      ; sexplib0
+      ; base_caml
+      ; core_kernel
+      ; bin_prot_shape
       ; local "network_peer"
       ; local "ppx_version.runtime"
       ; local "mina_stdlib"
@@ -255,13 +251,13 @@ let register () =
   (* -- user_command_input ------------------------------------------ *)
   library "user_command_input" ~path:"src/lib/user_command_input"
     ~deps:
-      [ opam "bin_prot.shape"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "async_kernel"
-      ; opam "sexplib0"
-      ; opam "base.caml"
-      ; opam "async"
+      [ bin_prot_shape
+      ; core
+      ; core_kernel
+      ; async_kernel
+      ; sexplib0
+      ; base_caml
+      ; async
       ; local "logger"
       ; local "genesis_constants"
       ; local "currency"
@@ -285,8 +281,7 @@ let register () =
 
   (* -- fields_derivers --------------------------------------------- *)
   library "fields_derivers" ~path:"src/lib/fields_derivers" ~inline_tests:true
-    ~deps:
-      [ opam "core_kernel"; opam "fieldslib"; opam "ppx_inline_test.config" ]
+    ~deps:[ core_kernel; fieldslib; ppx_inline_test_config ]
     ~ppx:
       (Ppx.custom
          [ "ppx_annot"
@@ -302,11 +297,11 @@ let register () =
   library "fields_derivers.json" ~internal_name:"fields_derivers_json"
     ~path:"src/lib/fields_derivers_json" ~inline_tests:true
     ~deps:
-      [ opam "core_kernel"
-      ; opam "fieldslib"
-      ; opam "ppx_inline_test.config"
-      ; opam "result"
-      ; opam "yojson"
+      [ core_kernel
+      ; fieldslib
+      ; ppx_inline_test_config
+      ; result
+      ; yojson
       ; local "fields_derivers"
       ]
     ~ppx:
@@ -325,14 +320,14 @@ let register () =
   library "fields_derivers.graphql" ~internal_name:"fields_derivers_graphql"
     ~path:"src/lib/fields_derivers_graphql" ~inline_tests:true
     ~deps:
-      [ opam "async_kernel"
-      ; opam "core_kernel"
-      ; opam "fieldslib"
-      ; opam "graphql"
-      ; opam "graphql-async"
-      ; opam "graphql_parser"
-      ; opam "ppx_inline_test.config"
-      ; opam "yojson"
+      [ async_kernel
+      ; core_kernel
+      ; fieldslib
+      ; graphql
+      ; graphql_async
+      ; graphql_parser
+      ; ppx_inline_test_config
+      ; yojson
       ; local "fields_derivers"
       ]
     ~ppx:
@@ -350,15 +345,15 @@ let register () =
   library "fields_derivers.zkapps" ~internal_name:"fields_derivers_zkapps"
     ~path:"src/lib/fields_derivers_zkapps"
     ~deps:
-      [ opam "base"
-      ; opam "base.caml"
-      ; opam "core_kernel"
-      ; opam "fieldslib"
-      ; opam "graphql"
-      ; opam "graphql_parser"
-      ; opam "integers"
-      ; opam "result"
-      ; opam "sexplib0"
+      [ base
+      ; base_caml
+      ; core_kernel
+      ; fieldslib
+      ; graphql
+      ; graphql_parser
+      ; integers
+      ; result
+      ; sexplib0
       ; local "currency"
       ; local "fields_derivers"
       ; local "fields_derivers.graphql"
@@ -387,18 +382,18 @@ let register () =
   library "parallel_scan" ~path:"src/lib/parallel_scan" ~inline_tests:true
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ opam "ppx_inline_test.config"
-      ; opam "base"
-      ; opam "core_kernel"
-      ; opam "sexplib0"
-      ; opam "async"
-      ; opam "digestif"
-      ; opam "core"
-      ; opam "lens"
-      ; opam "async_kernel"
-      ; opam "bin_prot.shape"
-      ; opam "base.caml"
-      ; opam "async_unix"
+      [ ppx_inline_test_config
+      ; base
+      ; core_kernel
+      ; sexplib0
+      ; async
+      ; digestif
+      ; core
+      ; lens
+      ; async_kernel
+      ; bin_prot_shape
+      ; base_caml
+      ; async_unix
       ; local "mina_metrics"
       ; local "mina_stdlib"
       ; local "pipe_lib"
@@ -418,7 +413,7 @@ let register () =
   library "dummy_values" ~path:"src/lib/dummy_values"
     ~flags:[ atom ":standard"; atom "-short-paths" ]
     ~deps:
-      [ opam "core_kernel"
+      [ core_kernel
       ; local "crypto_params"
       ; local "snarky.backendless"
       ; local "pickles"
@@ -443,19 +438,19 @@ let register () =
   (* -- gen_values (executable) ------------------------------------- *)
   private_executable ~path:"src/lib/dummy_values/gen_values"
     ~deps:
-      [ opam "async_unix"
-      ; opam "stdio"
-      ; opam "base.caml"
-      ; opam "ocaml-migrate-parsetree"
-      ; opam "core"
-      ; opam "async"
-      ; opam "ppxlib"
-      ; opam "ppxlib.ast"
-      ; opam "ppxlib.astlib"
-      ; opam "core_kernel"
-      ; opam "compiler-libs"
-      ; opam "async_kernel"
-      ; opam "ocaml-compiler-libs.common"
+      [ async_unix
+      ; stdio
+      ; base_caml
+      ; ocaml_migrate_parsetree
+      ; core
+      ; async
+      ; ppxlib
+      ; ppxlib_ast
+      ; ppxlib_astlib
+      ; core_kernel
+      ; compiler_libs
+      ; async_kernel
+      ; ocaml_compiler_libs_common
       ; local "pickles_types"
       ; local "pickles"
       ; local "crypto_params"
@@ -470,12 +465,12 @@ let register () =
   library "mina_base.test_helpers" ~internal_name:"mina_base_test_helpers"
     ~path:"src/lib/mina_base/test/helpers"
     ~deps:
-      [ opam "base"
-      ; opam "base.caml"
-      ; opam "core_kernel"
-      ; opam "integers"
-      ; opam "sexplib0"
-      ; opam "yojson"
+      [ base
+      ; base_caml
+      ; core_kernel
+      ; integers
+      ; sexplib0
+      ; yojson
       ; local "currency"
       ; local "mina_base"
       ; local "mina_base.import"

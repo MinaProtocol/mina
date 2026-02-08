@@ -1,26 +1,27 @@
 (** Product: delegation_verify — Verify delegation proofs. *)
 
 open Manifest
+open Externals
 
 let register () =
   private_executable "delegation_verify" ~path:"src/app/delegation_verify"
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.caml"
-      ; opam "base64"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "hex"
-      ; opam "integers"
-      ; opam "ppx_deriving_yojson.runtime"
-      ; opam "sexplib"
-      ; opam "sexplib0"
-      ; opam "stdio"
-      ; opam "yojson"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_caml
+      ; base64
+      ; core
+      ; core_kernel
+      ; hex
+      ; integers
+      ; ppx_deriving_yojson_runtime
+      ; sexplib
+      ; sexplib0
+      ; stdio
+      ; yojson
       ; local "blockchain_snark"
       ; local "consensus"
       ; local "currency"

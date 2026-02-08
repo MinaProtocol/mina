@@ -1,23 +1,24 @@
 (** Product: heap_usage — Analyze Mina heap memory usage. *)
 
 open Manifest
+open Externals
 
 let register () =
   executable "heap_usage" ~package:"heap_usage" ~path:"src/app/heap_usage"
     ~deps:
-      [ opam "async"
-      ; opam "async.async_command"
-      ; opam "async_kernel"
-      ; opam "async_unix"
-      ; opam "base"
-      ; opam "base.base_internalhash_types"
-      ; opam "base.caml"
-      ; opam "core"
-      ; opam "core_kernel"
-      ; opam "result"
-      ; opam "sexplib0"
-      ; opam "stdio"
-      ; opam "yojson"
+      [ async
+      ; async_command
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_internalhash_types
+      ; base_caml
+      ; core
+      ; core_kernel
+      ; result
+      ; sexplib0
+      ; stdio
+      ; yojson
       ; local "blake2"
       ; local "currency"
       ; local "crypto_params"
