@@ -7,6 +7,11 @@ open Manifest
 open Externals
 open Dune_s_expr
 
+let key_value_database =
+  library "key_value_database" ~path:"src/lib/key_value_database"
+    ~synopsis:"Collection of key-value databases used in Coda"
+    ~deps:[ core_kernel ] ~ppx:Ppx.standard ~library_flags:[ "-linkall" ]
+
 let cache_lib =
   library "cache_lib" ~path:"src/lib/cache_lib" ~inline_tests:true
     ~deps:
@@ -94,7 +99,7 @@ let rocksdb =
       ; rocks
       ; sexplib0
       ; Layer_base.mina_stdlib_unix
-      ; Layer_base.key_value_database
+      ; key_value_database
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
     ~synopsis:"RocksDB Database module"

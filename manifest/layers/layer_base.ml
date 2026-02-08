@@ -98,11 +98,6 @@ let integers_stubs_js =
     ~js_of_ocaml:
       ("js_of_ocaml" @: [ "javascript_files" @: [ atom "./runtime.js" ] ])
 
-let key_value_database =
-  library "key_value_database" ~path:"src/lib/key_value_database"
-    ~synopsis:"Collection of key-value databases used in Coda"
-    ~deps:[ core_kernel ] ~ppx:Ppx.standard ~library_flags:[ "-linkall" ]
-
 let linked_tree =
   library "linked_tree" ~path:"src/lib/linked_tree"
     ~deps:[ core_kernel; local "mina_numbers" ]

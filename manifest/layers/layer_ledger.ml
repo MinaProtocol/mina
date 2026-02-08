@@ -91,7 +91,7 @@ let merkle_ledger =
       ; Layer_storage.cache_dir
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_stdlib_unix
-      ; Layer_base.key_value_database
+      ; Layer_storage.key_value_database
       ; merkle_address
       ; Layer_ppx.ppx_version_runtime
       ; Layer_base.visualization
@@ -129,7 +129,7 @@ let merkle_ledger_tests =
       ; Layer_base.codable
       ; Layer_base.currency
       ; Layer_domain.data_hash_lib
-      ; Layer_base.key_value_database
+      ; Layer_storage.key_value_database
       ; merkle_address
       ; merkle_ledger
       ; local "merkle_mask"
@@ -253,7 +253,7 @@ let mina_ledger =
       ; Layer_crypto.signature_lib
       ; Layer_base.mina_numbers
       ; merkle_address
-      ; Layer_base.key_value_database
+      ; Layer_storage.key_value_database
       ; Layer_domain.data_hash_lib
       ; Layer_test.quickcheck_lib
       ; Snarky_lib.snarky_backendless

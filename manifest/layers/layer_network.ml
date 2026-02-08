@@ -53,7 +53,7 @@ let trust_system =
       ; local "rocksdb"
       ; local "pipe_lib"
       ; local "logger"
-      ; Layer_base.key_value_database
+      ; Layer_storage.key_value_database
       ; network_peer
       ; local "run_in_thread"
       ; Layer_test.test_util
