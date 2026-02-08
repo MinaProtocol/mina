@@ -11,8 +11,8 @@ let () =
       ; async_command
       ; async_kernel
       ; async_unix
-      ; base_internalhash_types
       ; base_caml
+      ; base_internalhash_types
       ; core
       ; core_kernel
       ; lib
@@ -21,23 +21,23 @@ let () =
       ; sexplib0
       ; stdio
       ; yojson
-      ; local "cli_lib"
+      ; Layer_base.mina_base
+      ; Layer_base.mina_numbers
+      ; Layer_base.mina_stdlib
+      ; Layer_base.mina_wire_types
+      ; Layer_base.visualization
       ; Layer_consensus.consensus
+      ; Layer_consensus.mina_state
+      ; Layer_crypto.snark_params
       ; Layer_domain.data_hash_lib
       ; Layer_kimchi.kimchi_pasta
       ; Layer_logging.logger
       ; Layer_logging.logger_file_system
-      ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
-      ; Layer_consensus.mina_state
-      ; Layer_base.mina_stdlib
-      ; Layer_base.mina_wire_types
-      ; Layer_pickles.pickles
-      ; Layer_pickles.pickles_backend
-      ; Layer_crypto.snark_params
       ; Layer_network.transition_frontier
       ; Layer_network.transition_frontier_extensions
-      ; Layer_base.visualization
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; local "cli_lib"
       ]
     ~ppx:
       (Ppx.custom

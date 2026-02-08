@@ -9,21 +9,21 @@ open Dune_s_expr
 
 let ppx_annot =
   library "ppx_annot" ~path:"src/lib/ppx_annot" ~kind:"ppx_deriver"
-    ~deps:[ ppxlib; core_kernel; base; compiler_libs ]
+    ~deps:[ base; compiler_libs; core_kernel; ppxlib ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppxlib_metaquot ])
 
 let ppx_register_event =
   library "ppx_register_event" ~path:"src/lib/ppx_register_event"
     ~kind:"ppx_deriver"
     ~deps:
-      [ ocaml_compiler_libs_common
-      ; ppxlib_ast
-      ; ppx_deriving_yojson
-      ; core_kernel
-      ; ppxlib
+      [ base
       ; compiler_libs_common
+      ; core_kernel
+      ; ocaml_compiler_libs_common
       ; ocaml_migrate_parsetree
-      ; base
+      ; ppx_deriving_yojson
+      ; ppxlib
+      ; ppxlib_ast
       ; local "interpolator_lib"
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppxlib_metaquot ])
@@ -36,22 +36,22 @@ let () =
 let ppx_version_runtime =
   library "ppx_version.runtime" ~internal_name:"ppx_version_runtime"
     ~path:"src/lib/ppx_version/runtime" ~no_instrumentation:true
-    ~deps:[ base; core_kernel; sexplib0; bin_prot; bin_prot_shape ]
+    ~deps:[ base; bin_prot; bin_prot_shape; core_kernel; sexplib0 ]
 
 let ppx_version =
   library "ppx_version" ~path:"src/lib/ppx_version" ~kind:"ppx_deriver"
     ~no_instrumentation:true
     ~deps:
-      [ compiler_libs_common
+      [ base
+      ; base_caml
+      ; bin_prot
+      ; compiler_libs_common
+      ; core_kernel
+      ; ppx_bin_prot
+      ; ppx_derivers
+      ; ppx_version_runtime
       ; ppxlib
       ; ppxlib_astlib
-      ; ppx_derivers
-      ; ppx_bin_prot
-      ; base
-      ; base_caml
-      ; core_kernel
-      ; ppx_version_runtime
-      ; bin_prot
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_compare; Ppx_lib.ppxlib_metaquot ])
 
@@ -60,7 +60,7 @@ let () =
 
 let ppx_to_enum =
   library "ppx_to_enum" ~path:"src/lib/ppx_mina/ppx_to_enum" ~kind:"ppx_deriver"
-    ~deps:[ compiler_libs_common; ppxlib; base ]
+    ~deps:[ base; compiler_libs_common; ppxlib ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppxlib_metaquot ])
 
 let ppx_representatives_runtime =
@@ -73,11 +73,11 @@ let ppx_representatives =
   library "ppx_representatives" ~path:"src/lib/ppx_mina/ppx_representatives"
     ~kind:"ppx_deriver"
     ~deps:
-      [ ppxlib_ast
-      ; ocaml_compiler_libs_common
+      [ base
       ; compiler_libs_common
+      ; ocaml_compiler_libs_common
       ; ppxlib
-      ; base
+      ; ppxlib_ast
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppxlib_metaquot ])
     ~ppx_runtime_libraries:[ "ppx_representatives.runtime" ]
@@ -85,15 +85,15 @@ let ppx_representatives =
 let ppx_mina =
   library "ppx_mina" ~path:"src/lib/ppx_mina" ~kind:"ppx_deriver"
     ~deps:
-      [ ppx_deriving_api
-      ; ppxlib
-      ; ppx_bin_prot
-      ; core_kernel
-      ; base
+      [ base
       ; base_caml
-      ; ppx_representatives
+      ; core_kernel
+      ; ppx_bin_prot
+      ; ppx_deriving_api
       ; ppx_register_event
+      ; ppx_representatives
       ; ppx_to_enum
+      ; ppxlib
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppxlib_metaquot ])
 

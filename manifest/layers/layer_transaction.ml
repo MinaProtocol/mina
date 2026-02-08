@@ -9,23 +9,23 @@ open Externals
 let user_command_input =
   library "user_command_input" ~path:"src/lib/user_command_input"
     ~deps:
-      [ bin_prot_shape
+      [ async
+      ; async_kernel
+      ; base_caml
+      ; bin_prot_shape
       ; core
       ; core_kernel
-      ; async_kernel
       ; sexplib0
-      ; base_caml
-      ; async
-      ; Layer_logging.logger
-      ; Layer_domain.genesis_constants
       ; Layer_base.currency
-      ; Layer_base.unsigned_extended
+      ; Layer_base.mina_base
+      ; Layer_base.mina_base_import
+      ; Layer_base.mina_numbers
       ; Layer_base.participating_state
+      ; Layer_base.unsigned_extended
       ; Layer_crypto.secrets
       ; Layer_crypto.signature_lib
-      ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
-      ; Layer_base.mina_base_import
+      ; Layer_domain.genesis_constants
+      ; Layer_logging.logger
       ; Layer_ppx.ppx_version_runtime
       ]
     ~ppx:
@@ -40,32 +40,32 @@ let user_command_input =
 let mina_transaction =
   library "mina_transaction" ~path:"src/lib/transaction" ~inline_tests:true
     ~deps:
-      [ base_caml
-      ; base
+      [ base
+      ; base64
+      ; base_caml
       ; base_internalhash_types
       ; bin_prot_shape
       ; core_kernel
       ; ppx_inline_test_config
       ; result
       ; sexplib0
-      ; base64
       ; Layer_base.base58_check
-      ; Layer_crypto.blake2
       ; Layer_base.codable
       ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_base.mina_numbers
-      ; Layer_base.one_or_two
-      ; Layer_pickles.pickles
-      ; Layer_crypto.random_oracle
-      ; Layer_crypto.signature_lib
-      ; Layer_crypto.sgn
-      ; Layer_crypto.snark_params
-      ; Snarky_lib.snarky_backendless
-      ; Layer_ppx.ppx_version_runtime
-      ; Layer_base.with_hash
       ; Layer_base.mina_wire_types
+      ; Layer_base.one_or_two
+      ; Layer_base.with_hash
+      ; Layer_crypto.blake2
+      ; Layer_crypto.random_oracle
+      ; Layer_crypto.sgn
+      ; Layer_crypto.signature_lib
+      ; Layer_crypto.snark_params
+      ; Layer_pickles.pickles
+      ; Layer_ppx.ppx_version_runtime
+      ; Snarky_lib.snarky_backendless
       ]
     ~ppx:
       (Ppx.custom
@@ -83,48 +83,48 @@ let mina_transaction_logic =
   library "mina_transaction_logic" ~path:"src/lib/transaction_logic"
     ~deps:
       [ async_kernel
-      ; result
+      ; base
+      ; base_caml
+      ; base_internalhash_types
+      ; base_quickcheck
       ; bin_prot_shape
+      ; core_kernel
+      ; integers
+      ; mina_transaction
       ; ppx_inline_test_config
+      ; result
+      ; sexp_diff_kernel
       ; sexplib0
       ; yojson
-      ; sexp_diff_kernel
-      ; core_kernel
-      ; base_caml
-      ; base
-      ; base_internalhash_types
-      ; integers
-      ; base_quickcheck
-      ; Layer_base.mina_stdlib
-      ; Layer_base.mina_wire_types
-      ; Layer_domain.block_time
       ; Layer_base.currency
-      ; Layer_domain.data_hash_lib
-      ; Layer_domain.genesis_constants
-      ; local "kimchi_bindings"
-      ; local "kimchi_types"
-      ; local "pasta_bindings"
-      ; Layer_kimchi.kimchi_backend_common
-      ; Layer_kimchi.kimchi_backend
-      ; Layer_kimchi.kimchi_pasta
-      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_base.mina_numbers
-      ; mina_transaction
+      ; Layer_base.mina_stdlib
+      ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
-      ; Layer_pickles.pickles_types
-      ; Layer_pickles.pickles
-      ; Layer_pickles.pickles_backend
+      ; Layer_base.unsigned_extended
+      ; Layer_base.with_hash
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
-      ; Layer_crypto.signature_lib
       ; Layer_crypto.sgn
-      ; Snarky_lib.snarky_backendless
+      ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
-      ; Layer_base.unsigned_extended
+      ; Layer_domain.block_time
+      ; Layer_domain.data_hash_lib
+      ; Layer_domain.genesis_constants
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_backend_common
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_ppx.ppx_version_runtime
-      ; Layer_base.with_hash
+      ; Snarky_lib.snarky_backendless
+      ; local "kimchi_bindings"
+      ; local "kimchi_types"
+      ; local "pasta_bindings"
       ]
     ~ppx:
       (Ppx.custom
@@ -152,35 +152,35 @@ let transaction_logic_tests =
       ; core
       ; core_kernel
       ; integers
+      ; mina_transaction
+      ; mina_transaction_logic
       ; ppx_inline_test_config
       ; sexplib0
       ; yojson
       ; Layer_base.currency
+      ; Layer_base.mina_base
+      ; Layer_base.mina_base_import
+      ; Layer_base.mina_numbers
+      ; Layer_base.mina_stdlib
+      ; Layer_base.mina_wire_types
+      ; Layer_base.monad_lib
+      ; Layer_base.sgn_type
+      ; Layer_crypto.random_oracle
+      ; Layer_crypto.sgn
+      ; Layer_crypto.signature_lib
+      ; Layer_crypto.snark_params
       ; Layer_domain.data_hash_lib
       ; Layer_domain.genesis_constants
+      ; Layer_domain.mina_base_test_helpers
       ; Layer_kimchi.kimchi_backend_common
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
-      ; Layer_base.mina_stdlib
-      ; Layer_base.mina_base
-      ; Layer_base.mina_base_import
-      ; Layer_domain.mina_base_test_helpers
       ; Layer_ledger.mina_ledger
       ; Layer_ledger.mina_ledger_test_helpers
-      ; mina_transaction
-      ; mina_transaction_logic
-      ; Layer_base.mina_numbers
-      ; Layer_base.mina_wire_types
-      ; Layer_base.monad_lib
-      ; local "pasta_bindings"
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
-      ; Layer_crypto.random_oracle
-      ; Layer_crypto.sgn
-      ; Layer_base.sgn_type
-      ; Layer_crypto.signature_lib
-      ; Layer_crypto.snark_params
+      ; local "pasta_bindings"
       ; local "zkapp_command_builder"
       ]
     ~ppx:
@@ -199,23 +199,23 @@ let transaction_witness =
     ~deps:
       [ base_caml
       ; bin_prot_shape
-      ; sexplib0
-      ; core_kernel
       ; core
-      ; Layer_base.currency
-      ; Layer_crypto.signature_lib
-      ; Layer_ledger.mina_ledger
-      ; local "mina_state"
-      ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
+      ; core_kernel
       ; mina_transaction
       ; mina_transaction_logic
+      ; sexplib0
+      ; Layer_base.currency
+      ; Layer_base.mina_base
+      ; Layer_base.mina_numbers
+      ; Layer_base.with_hash
+      ; Layer_crypto.sgn
+      ; Layer_crypto.signature_lib
       ; Layer_kimchi.kimchi_backend
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
-      ; Layer_crypto.sgn
-      ; Layer_base.with_hash
+      ; Layer_ledger.mina_ledger
       ; Layer_ppx.ppx_version_runtime
+      ; local "mina_state"
       ]
     ~ppx:
       (Ppx.custom

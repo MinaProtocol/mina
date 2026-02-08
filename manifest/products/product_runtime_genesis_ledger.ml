@@ -15,18 +15,18 @@ let () =
       ; core_kernel
       ; result
       ; yojson
-      ; Layer_storage.cache_dir
-      ; local "cli_lib"
+      ; Layer_base.mina_base
+      ; Layer_base.mina_stdlib
       ; Layer_consensus.coda_genesis_ledger
       ; Layer_consensus.consensus
-      ; Layer_domain.genesis_constants
-      ; Layer_network.genesis_ledger_helper
-      ; Layer_logging.logger
-      ; Layer_base.mina_base
-      ; Layer_ledger.mina_ledger
-      ; local "mina_runtime_config"
-      ; Layer_base.mina_stdlib
       ; Layer_consensus.precomputed_values
+      ; Layer_domain.genesis_constants
+      ; Layer_ledger.mina_ledger
+      ; Layer_logging.logger
+      ; Layer_network.genesis_ledger_helper
+      ; Layer_storage.cache_dir
+      ; local "cli_lib"
+      ; local "mina_runtime_config"
       ]
     ~ppx:
       (Ppx.custom

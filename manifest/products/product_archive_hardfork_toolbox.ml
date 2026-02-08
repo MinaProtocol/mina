@@ -24,28 +24,28 @@ let archive_hardfork_toolbox_lib =
       ; result
       ; stdio
       ; uri
-      ; Product_archive.archive_lib
-      ; Layer_domain.block_time
-      ; Layer_consensus.consensus
-      ; Layer_consensus.consensus_vrf
       ; Layer_base.currency
-      ; Layer_domain.genesis_constants
-      ; Layer_network.genesis_ledger_helper
-      ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_network.mina_block
-      ; local "mina_caqti"
       ; Layer_base.mina_numbers
-      ; Layer_consensus.mina_state
-      ; Layer_transaction.mina_transaction
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
-      ; Layer_protocol.protocol_version
-      ; local "runtime_config"
-      ; Layer_crypto.signature_lib
       ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
+      ; Layer_consensus.consensus
+      ; Layer_consensus.consensus_vrf
+      ; Layer_consensus.mina_state
+      ; Layer_crypto.signature_lib
+      ; Layer_domain.block_time
+      ; Layer_domain.genesis_constants
+      ; Layer_logging.logger
+      ; Layer_network.genesis_ledger_helper
+      ; Layer_network.mina_block
+      ; Layer_protocol.protocol_version
+      ; Layer_transaction.mina_transaction
+      ; Product_archive.archive_lib
+      ; local "mina_caqti"
+      ; local "runtime_config"
       ]
     ~ppx:
       (Ppx.custom
@@ -63,7 +63,8 @@ let () =
     ~path:"src/app/archive_hardfork_toolbox"
     ~modules:[ "archive_hardfork_toolbox" ]
     ~deps:
-      [ async
+      [ archive_hardfork_toolbox_lib
+      ; async
       ; async_command
       ; async_kernel
       ; async_unix
@@ -79,29 +80,28 @@ let () =
       ; result
       ; stdio
       ; uri
-      ; archive_hardfork_toolbox_lib
-      ; Product_archive.archive_lib
-      ; Layer_domain.block_time
-      ; Layer_consensus.consensus
-      ; Layer_consensus.consensus_vrf
       ; Layer_base.currency
-      ; Layer_domain.genesis_constants
-      ; Layer_network.genesis_ledger_helper
-      ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_network.mina_block
-      ; local "mina_caqti"
       ; Layer_base.mina_numbers
-      ; Layer_consensus.mina_state
-      ; Layer_transaction.mina_transaction
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
-      ; Layer_protocol.protocol_version
-      ; local "runtime_config"
-      ; Layer_crypto.signature_lib
       ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
+      ; Layer_consensus.consensus
+      ; Layer_consensus.consensus_vrf
+      ; Layer_consensus.mina_state
+      ; Layer_crypto.signature_lib
+      ; Layer_domain.block_time
+      ; Layer_domain.genesis_constants
+      ; Layer_logging.logger
+      ; Layer_network.genesis_ledger_helper
+      ; Layer_network.mina_block
+      ; Layer_protocol.protocol_version
+      ; Layer_transaction.mina_transaction
+      ; Product_archive.archive_lib
+      ; local "mina_caqti"
+      ; local "runtime_config"
       ]
     ~ppx:
       (Ppx.custom
@@ -119,6 +119,7 @@ let () =
     ~modules:[ "test_convert_canonical" ]
     ~deps:
       [ alcotest
+      ; archive_hardfork_toolbox_lib
       ; async
       ; async_kernel
       ; async_unix
@@ -133,29 +134,28 @@ let () =
       ; stdio
       ; threads_posix
       ; uri
-      ; archive_hardfork_toolbox_lib
-      ; Product_archive.archive_lib
-      ; Layer_domain.block_time
-      ; Layer_consensus.consensus
-      ; Layer_consensus.consensus_vrf
       ; Layer_base.currency
-      ; Layer_domain.genesis_constants
-      ; Layer_network.genesis_ledger_helper
-      ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_network.mina_block
-      ; local "mina_caqti"
       ; Layer_base.mina_numbers
-      ; Layer_consensus.mina_state
-      ; Layer_transaction.mina_transaction
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
-      ; Layer_protocol.protocol_version
-      ; local "runtime_config"
-      ; Layer_crypto.signature_lib
       ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
+      ; Layer_consensus.consensus
+      ; Layer_consensus.consensus_vrf
+      ; Layer_consensus.mina_state
+      ; Layer_crypto.signature_lib
+      ; Layer_domain.block_time
+      ; Layer_domain.genesis_constants
+      ; Layer_logging.logger
+      ; Layer_network.genesis_ledger_helper
+      ; Layer_network.mina_block
+      ; Layer_protocol.protocol_version
+      ; Layer_transaction.mina_transaction
+      ; Product_archive.archive_lib
+      ; local "mina_caqti"
+      ; local "runtime_config"
       ]
     ~ppx:
       (Ppx.custom

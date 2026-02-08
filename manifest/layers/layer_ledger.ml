@@ -11,14 +11,14 @@ let sparse_ledger_lib =
   library "sparse_ledger_lib" ~path:"src/lib/sparse_ledger_lib"
     ~inline_tests:true ~library_flags:[ "-linkall" ]
     ~deps:
-      [ base_caml
-      ; core_kernel
-      ; sexplib0
-      ; base
-      ; ppx_inline_test_config
+      [ base
+      ; base_caml
       ; bin_prot_shape
-      ; result
+      ; core_kernel
+      ; ppx_inline_test_config
       ; ppx_version_runtime
+      ; result
+      ; sexplib0
       ; Layer_base.mina_stdlib
       ]
     ~ppx:
@@ -34,13 +34,13 @@ let merkle_address =
   library "merkle_address" ~path:"src/lib/merkle_address" ~inline_tests:true
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ base_internalhash_types
+      [ base_caml
+      ; base_internalhash_types
       ; bin_prot_shape
       ; bitstring
       ; core_kernel
-      ; sexplib0
-      ; base_caml
       ; ppx_inline_test_config
+      ; sexplib0
       ; Layer_base.mina_stdlib
       ; Layer_ppx.ppx_version_runtime
       ; Layer_test.test_util
@@ -77,24 +77,24 @@ let merkle_ledger =
       [ async
       ; async_kernel
       ; async_unix
-      ; base_internalhash_types
       ; base_caml
+      ; base_internalhash_types
       ; bin_prot_shape
       ; bitstring
       ; core
-      ; core_uuid
       ; core_kernel
       ; core_kernel_uuid
+      ; core_uuid
       ; integers
+      ; merkle_address
       ; rocks
       ; sexplib0
-      ; Layer_storage.cache_dir
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_stdlib_unix
-      ; Layer_storage.key_value_database
-      ; merkle_address
-      ; Layer_ppx.ppx_version_runtime
       ; Layer_base.visualization
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_storage.cache_dir
+      ; Layer_storage.key_value_database
       ]
     ~ppx:
       (Ppx.custom
@@ -116,29 +116,29 @@ let merkle_ledger_tests =
       ; async
       ; async_kernel
       ; async_unix
-      ; base_internalhash_types
       ; base_caml
+      ; base_internalhash_types
       ; bin_prot_shape
       ; core
-      ; core_uuid
       ; core_kernel
       ; core_kernel_uuid
+      ; core_uuid
+      ; merkle_address
+      ; merkle_ledger
       ; result
       ; sexplib0
       ; Layer_base.base58_check
       ; Layer_base.codable
       ; Layer_base.currency
-      ; Layer_domain.data_hash_lib
-      ; Layer_storage.key_value_database
-      ; merkle_address
-      ; merkle_ledger
-      ; local "merkle_mask"
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
-      ; Layer_ppx.ppx_version_runtime
       ; Layer_crypto.signature_lib
+      ; Layer_domain.data_hash_lib
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_storage.key_value_database
+      ; local "merkle_mask"
       ]
     ~ppx:
       (Ppx.custom
@@ -185,21 +185,21 @@ let merkle_mask =
     ~deps:
       [ async
       ; async_kernel
-      ; base_internalhash_types
       ; base_caml
+      ; base_internalhash_types
       ; bitstring
       ; core
-      ; core_uuid
       ; core_kernel
       ; core_kernel_uuid
+      ; core_uuid
       ; integers
+      ; merkle_ledger
       ; sexplib0
       ; stdio
       ; yojson
       ; Layer_base.mina_stdlib
-      ; Layer_logging.logger
-      ; merkle_ledger
       ; Layer_base.visualization
+      ; Layer_logging.logger
       ]
     ~ppx:
       (Ppx.custom
@@ -215,52 +215,52 @@ let merkle_mask =
 let mina_ledger =
   library "mina_ledger" ~path:"src/lib/mina_ledger" ~inline_tests:true
     ~deps:
-      [ rocks
-      ; integers
+      [ async
       ; async_kernel
-      ; base_caml
       ; base
+      ; base_caml
+      ; base_internalhash_types
+      ; bin_prot_shape
       ; core
       ; core_kernel
-      ; sexplib0
-      ; bin_prot_shape
-      ; base_internalhash_types
-      ; async
       ; core_kernel_uuid
+      ; integers
+      ; merkle_address
+      ; merkle_ledger
+      ; merkle_mask
       ; ppx_inline_test_config
-      ; Layer_base.mina_wire_types
-      ; Layer_crypto.sgn
-      ; local "syncable_ledger"
-      ; Layer_crypto.snark_params
-      ; local "zkapp_command_builder"
-      ; Layer_pickles.pickles
-      ; Layer_pickles.pickles_backend
-      ; Layer_pickles.pickles_types
-      ; Layer_base.mina_base_import
-      ; Layer_logging.o1trace
-      ; Layer_storage.rocksdb
-      ; Layer_crypto.random_oracle
+      ; rocks
+      ; sexplib0
       ; Layer_base.currency
+      ; Layer_base.mina_base
+      ; Layer_base.mina_base_import
+      ; Layer_base.mina_numbers
+      ; Layer_base.mina_stdlib
+      ; Layer_base.mina_wire_types
+      ; Layer_base.unsigned_extended
+      ; Layer_base.with_hash
+      ; Layer_crypto.random_oracle
+      ; Layer_crypto.sgn
+      ; Layer_crypto.signature_lib
+      ; Layer_crypto.snark_params
+      ; Layer_domain.data_hash_lib
       ; Layer_domain.genesis_constants
       ; Layer_kimchi.kimchi_backend
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
-      ; merkle_mask
-      ; merkle_ledger
-      ; Layer_base.mina_base
-      ; local "mina_transaction"
-      ; local "mina_transaction_logic"
-      ; Layer_crypto.signature_lib
-      ; Layer_base.mina_numbers
-      ; merkle_address
+      ; Layer_logging.o1trace
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
+      ; Layer_ppx.ppx_version_runtime
       ; Layer_storage.key_value_database
-      ; Layer_domain.data_hash_lib
+      ; Layer_storage.rocksdb
       ; Layer_test.quickcheck_lib
       ; Snarky_lib.snarky_backendless
-      ; Layer_base.unsigned_extended
-      ; Layer_base.with_hash
-      ; Layer_ppx.ppx_version_runtime
-      ; Layer_base.mina_stdlib
+      ; local "mina_transaction"
+      ; local "mina_transaction_logic"
+      ; local "syncable_ledger"
+      ; local "zkapp_command_builder"
       ]
     ~ppx:
       (Ppx.custom
@@ -280,24 +280,24 @@ let mina_ledger_test_helpers =
     ~deps:
       [ base
       ; base_caml
-      ; core_kernel
       ; core
+      ; core_kernel
       ; integers
+      ; mina_ledger
       ; sexplib0
       ; yojson
       ; Layer_base.currency
+      ; Layer_base.mina_base
+      ; Layer_base.mina_numbers
+      ; Layer_base.monad_lib
+      ; Layer_crypto.signature_lib
+      ; Layer_domain.mina_base_test_helpers
       ; Layer_kimchi.kimchi_backend_common
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
-      ; Layer_base.mina_base
-      ; Layer_domain.mina_base_test_helpers
-      ; mina_ledger
-      ; Layer_base.mina_numbers
-      ; Layer_base.monad_lib
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
-      ; Layer_crypto.signature_lib
       ]
     ~ppx:
       (Ppx.custom
@@ -310,35 +310,35 @@ let mina_ledger_test_helpers =
 let staged_ledger_diff =
   library "staged_ledger_diff" ~path:"src/lib/staged_ledger_diff"
     ~deps:
-      [ core_kernel
-      ; sexplib0
-      ; async
-      ; bin_prot_shape
-      ; base_caml
-      ; blake2
-      ; stdint
-      ; ppx_inline_test_config
-      ; splittable_random
-      ; stdio
-      ; async_unix
+      [ async
       ; async_kernel
-      ; Layer_base.mina_base
-      ; local "transaction_snark_work"
-      ; Layer_domain.genesis_constants
-      ; Layer_base.currency
+      ; async_unix
+      ; base_caml
+      ; bin_prot_shape
+      ; blake2
+      ; core_kernel
+      ; ppx_inline_test_config
+      ; sexplib0
+      ; splittable_random
+      ; stdint
+      ; stdio
       ; Layer_base.allocation_functor
-      ; local "consensus"
-      ; Layer_logging.logger
-      ; Layer_ppx.ppx_version_runtime
-      ; Layer_base.mina_wire_types
+      ; Layer_base.currency
+      ; Layer_base.mina_base
       ; Layer_base.mina_base_import
+      ; Layer_base.mina_numbers
+      ; Layer_base.mina_wire_types
       ; Layer_crypto.signature_lib
-      ; Layer_pickles.pickles_backend
       ; Layer_crypto.snark_params
-      ; Layer_pickles.pickles
+      ; Layer_domain.genesis_constants
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
-      ; Layer_base.mina_numbers
+      ; Layer_logging.logger
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_ppx.ppx_version_runtime
+      ; local "consensus"
+      ; local "transaction_snark_work"
       ]
     ~ppx:
       (Ppx.custom

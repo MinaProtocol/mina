@@ -19,20 +19,20 @@ let pickles_types =
           ]
       ]
     ~deps:
-      [ sexplib0
-      ; result
-      ; core_kernel
-      ; base_caml
+      [ base_caml
       ; bin_prot_shape
-      ; local "kimchi_types"
-      ; Layer_kimchi.kimchi_backend_common
-      ; local "kimchi_pasta_snarky_backend"
-      ; Layer_kimchi.plonkish_prelude
-      ; Snarky_lib.snarky_backendless
-      ; Snarky_lib.tuple_lib
-      ; Layer_ppx.ppx_version_runtime
+      ; core_kernel
+      ; result
+      ; sexplib0
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
+      ; Layer_kimchi.kimchi_backend_common
+      ; Layer_kimchi.plonkish_prelude
+      ; Layer_ppx.ppx_version_runtime
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.tuple_lib
+      ; local "kimchi_pasta_snarky_backend"
+      ; local "kimchi_types"
       ]
     ~ppx:
       (Ppx.custom
@@ -58,7 +58,7 @@ let pickles_base_one_hot_vector =
       ; atom "-open"
       ; atom "Core_kernel"
       ]
-    ~deps:[ core_kernel; Snarky_lib.snarky_backendless; pickles_types ]
+    ~deps:[ core_kernel; pickles_types; Snarky_lib.snarky_backendless ]
     ~ppx:Ppx.standard
 
 let pickles_base =
@@ -73,19 +73,19 @@ let pickles_base =
           ]
       ]
     ~deps:
-      [ base_internalhash_types
-      ; sexplib0
+      [ base_caml
+      ; base_internalhash_types
       ; bin_prot_shape
-      ; base_caml
-      ; ppxlib
       ; core_kernel
-      ; Layer_base.mina_wire_types
-      ; Snarky_lib.snarky_backendless
-      ; Layer_crypto.random_oracle_input
-      ; pickles_types
       ; pickles_base_one_hot_vector
+      ; pickles_types
+      ; ppxlib
+      ; sexplib0
+      ; Layer_base.mina_wire_types
+      ; Layer_crypto.random_oracle_input
       ; Layer_kimchi.plonkish_prelude
       ; Layer_ppx.ppx_version_runtime
+      ; Snarky_lib.snarky_backendless
       ]
     ~ppx:
       (Ppx.custom
@@ -124,17 +124,17 @@ let pickles_limb_vector =
       ]
     ~modules_without_implementation:[ "limb_vector" ]
     ~deps:
-      [ bin_prot_shape
-      ; sexplib0
+      [ base_caml
+      ; bin_prot_shape
       ; core_kernel
-      ; base_caml
-      ; result
-      ; Snarky_lib.snarky_backendless
       ; pickles_backend
       ; pickles_types
+      ; result
+      ; sexplib0
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ppx.ppx_version_runtime
+      ; Snarky_lib.snarky_backendless
       ]
     ~ppx:Ppx.mina_rich
 
@@ -154,11 +154,11 @@ let pickles_pseudo =
       ]
     ~deps:
       [ core_kernel
-      ; pickles_types
-      ; local "pickles_plonk_checks"
-      ; pickles_base_one_hot_vector
-      ; Snarky_lib.snarky_backendless
       ; pickles_base
+      ; pickles_base_one_hot_vector
+      ; pickles_types
+      ; Snarky_lib.snarky_backendless
+      ; local "pickles_plonk_checks"
       ]
     ~ppx:Ppx.mina_rich
 
@@ -177,21 +177,21 @@ let pickles_composition_types =
       ; atom "Core_kernel"
       ]
     ~deps:
-      [ sexplib0
+      [ base_caml
       ; bin_prot_shape
       ; core_kernel
-      ; base_caml
+      ; pickles_backend
+      ; pickles_base
+      ; pickles_limb_vector
+      ; pickles_types
+      ; sexplib0
       ; Layer_base.mina_wire_types
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_backend_common
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
-      ; Snarky_lib.snarky_backendless
-      ; pickles_types
-      ; pickles_limb_vector
-      ; Layer_kimchi.kimchi_backend
-      ; pickles_base
-      ; pickles_backend
-      ; Layer_kimchi.kimchi_backend_common
       ; Layer_ppx.ppx_version_runtime
+      ; Snarky_lib.snarky_backendless
       ]
     ~ppx:
       (Ppx.custom
@@ -218,18 +218,18 @@ let pickles_plonk_checks =
       ; atom "Core_kernel"
       ]
     ~deps:
-      [ sexplib0
-      ; ppxlib_ast
+      [ base_internalhash_types
       ; core_kernel
       ; ocaml_migrate_parsetree
-      ; base_internalhash_types
-      ; pickles_types
       ; pickles_base
       ; pickles_composition_types
+      ; pickles_types
+      ; ppxlib_ast
+      ; sexplib0
       ; Layer_kimchi.kimchi_backend
-      ; local "kimchi_types"
       ; Snarky_lib.snarky_backendless
       ; Snarky_lib.tuple_lib
+      ; local "kimchi_types"
       ]
     ~ppx:
       (Ppx.custom
@@ -266,58 +266,58 @@ let pickles =
       [ "full_signature"; "type"; "intf"; "pickles_intf" ]
     ~flags:[ atom "-open"; atom "Core_kernel" ]
     ~deps:
-      [ stdio
-      ; integers
-      ; result
-      ; base_caml
-      ; Layer_crypto.bignum_bigint
-      ; core_kernel
-      ; base64
-      ; digestif
-      ; ppx_inline_test_config
-      ; sexplib0
+      [ async_kernel
       ; base
-      ; async_kernel
+      ; base64
+      ; base_caml
       ; bin_prot_shape
+      ; core_kernel
+      ; digestif
+      ; integers
+      ; pickles_backend
+      ; pickles_base
+      ; pickles_base_one_hot_vector
+      ; pickles_composition_types
+      ; pickles_limb_vector
+      ; pickles_plonk_checks
+      ; pickles_pseudo
+      ; pickles_types
+      ; ppx_inline_test_config
+      ; result
+      ; sexplib0
+      ; stdio
+      ; Layer_base.base58_check
+      ; Layer_base.codable
+      ; Layer_base.error_json
+      ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
-      ; local "kimchi_bindings"
-      ; local "kimchi_types"
-      ; local "pasta_bindings"
+      ; Layer_concurrency.promise
+      ; Layer_crypto.bignum_bigint
+      ; Layer_crypto.random_oracle_input
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_backend_common
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_kimchi.kimchi_pasta_constraint_system
-      ; local "kimchi_pasta_snarky_backend"
-      ; Snarky_lib.bitstring_lib
-      ; Snarky_lib.snarky_intf
-      ; pickles_backend
-      ; pickles_types
-      ; Snarky_lib.snarky_backendless
-      ; Layer_snarky.snarky_group_map
-      ; Snarky_lib.sponge
-      ; pickles_pseudo
-      ; pickles_limb_vector
-      ; pickles_base
       ; Layer_kimchi.plonkish_prelude
-      ; Layer_kimchi.kimchi_backend
-      ; Layer_base.base58_check
-      ; Layer_base.codable
-      ; Layer_crypto.random_oracle_input
-      ; pickles_composition_types
-      ; pickles_plonk_checks
-      ; pickles_base_one_hot_vector
-      ; Layer_snarky.snarky_log
-      ; Snarky_lib.group_map
-      ; Snarky_lib.snarky_curve
-      ; local "key_cache"
-      ; Layer_snarky.snark_keys_header
-      ; Snarky_lib.tuple_lib
-      ; Layer_concurrency.promise
-      ; Layer_kimchi.kimchi_backend_common
       ; Layer_logging.logger
       ; Layer_logging.logger_context_logger
       ; Layer_ppx.ppx_version_runtime
-      ; Layer_base.error_json
-      ; Layer_base.mina_stdlib
+      ; Layer_snarky.snark_keys_header
+      ; Layer_snarky.snarky_group_map
+      ; Layer_snarky.snarky_log
+      ; Snarky_lib.bitstring_lib
+      ; Snarky_lib.group_map
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.snarky_curve
+      ; Snarky_lib.snarky_intf
+      ; Snarky_lib.sponge
+      ; Snarky_lib.tuple_lib
+      ; local "key_cache"
+      ; local "kimchi_bindings"
+      ; local "kimchi_pasta_snarky_backend"
+      ; local "kimchi_types"
+      ; local "pasta_bindings"
       ]
     ~ppx:
       (Ppx.custom
@@ -332,5 +332,10 @@ let pickles =
 let proof_cache_tag =
   library "proof_cache_tag" ~path:"src/lib/proof_cache_tag"
     ~deps:
-      [ core_kernel; async_kernel; local "logger"; local "disk_cache"; pickles ]
+      [ async_kernel
+      ; core_kernel
+      ; pickles
+      ; local "disk_cache"
+      ; local "logger"
+      ]
     ~ppx:Ppx.standard

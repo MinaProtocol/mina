@@ -18,8 +18,8 @@ let () =
       ; core
       ; core_kernel
       ; uri
+      ; Layer_base.mina_stdlib
       ; Layer_logging.logger
       ; local "mina_caqti"
-      ; Layer_base.mina_stdlib
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_let; Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])

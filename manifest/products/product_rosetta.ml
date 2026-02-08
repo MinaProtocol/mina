@@ -34,8 +34,8 @@ let () =
       ; core
       ; core_kernel
       ; Layer_domain.genesis_constants
-      ; local "lib"
       ; Layer_protocol.mina_signature_kind_testnet
+      ; local "lib"
       ]
     ~ppx:Ppx.minimal
 
@@ -52,8 +52,8 @@ let () =
       ; core
       ; core_kernel
       ; Layer_domain.genesis_constants
-      ; local "lib"
       ; Layer_protocol.mina_signature_kind_mainnet
+      ; local "lib"
       ]
     ~ppx:Ppx.minimal
 
@@ -77,36 +77,36 @@ let lib =
       ; result
       ; sexplib0
       ; uri
-      ; local "cli_lib"
       ; Layer_base.currency
-      ; Layer_domain.genesis_constants
-      ; local "graphql_lib"
       ; Layer_base.hex
       ; Layer_base.interpolator_lib
-      ; Layer_kimchi.kimchi_pasta
-      ; Layer_kimchi.kimchi_pasta_basic
-      ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; local "mina_caqti"
       ; Layer_base.mina_compile_config
       ; Layer_base.mina_numbers
-      ; local "mina_runtime_config"
-      ; Layer_protocol.mina_signature_kind
-      ; Layer_transaction.mina_transaction
       ; Layer_base.mina_version
       ; Layer_base.mina_wire_types
-      ; Layer_pickles.pickles
-      ; Layer_pickles.pickles_backend
+      ; Layer_base.unsigned_extended
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
-      ; Layer_rosetta.rosetta_coding
-      ; Layer_rosetta.rosetta_lib
-      ; Layer_rosetta.rosetta_models
       ; Layer_crypto.secrets
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
-      ; Layer_base.unsigned_extended
+      ; Layer_domain.genesis_constants
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
+      ; Layer_logging.logger
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_protocol.mina_signature_kind
+      ; Layer_rosetta.rosetta_coding
+      ; Layer_rosetta.rosetta_lib
+      ; Layer_rosetta.rosetta_models
+      ; Layer_transaction.mina_transaction
+      ; local "cli_lib"
+      ; local "graphql_lib"
+      ; local "mina_caqti"
+      ; local "mina_runtime_config"
       ]
     ~preprocessor_deps:
       [ "../../../graphql-ppx-config.inc"; "../../../../graphql_schema.json" ]
@@ -147,18 +147,18 @@ let signer_cli =
       ; core
       ; core_kernel
       ; lib
-      ; local "cli_lib"
-      ; Layer_kimchi.kimchi_pasta
-      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_base.mina_base
-      ; Layer_pickles.pickles
-      ; Layer_pickles.pickles_backend
-      ; Layer_rosetta.rosetta_coding
-      ; Layer_rosetta.rosetta_lib
       ; Layer_crypto.secrets
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
       ; Layer_crypto.string_sign
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_rosetta.rosetta_coding
+      ; Layer_rosetta.rosetta_lib
+      ; local "cli_lib"
       ]
     ~ppx:
       (Ppx.custom

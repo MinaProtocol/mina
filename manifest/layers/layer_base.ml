@@ -25,9 +25,9 @@ let with_hash =
       ; bin_prot_shape
       ; core_kernel
       ; sexplib0
+      ; Layer_ppx.ppx_version_runtime
       ; local "mina_stdlib"
       ; local "mina_wire_types"
-      ; Layer_ppx.ppx_version_runtime
       ]
     ~ppx:
       (Ppx.custom
@@ -43,11 +43,11 @@ let allocation_functor =
   library "allocation_functor" ~path:"src/lib/allocation_functor"
     ~deps:
       [ core_kernel
-      ; result
       ; ppx_inline_test_config
+      ; result
       ; sexplib0
-      ; local "mina_metrics"
       ; Layer_ppx.ppx_version_runtime
+      ; local "mina_metrics"
       ]
     ~ppx:
       (Ppx.custom
@@ -75,7 +75,7 @@ let codable =
     ~inline_tests:true ~library_flags:[ "-linkall" ]
 
 let comptime =
-  library "comptime" ~path:"src/lib/comptime" ~deps:[ core_kernel; base ]
+  library "comptime" ~path:"src/lib/comptime" ~deps:[ base; core_kernel ]
     ~ppx:Ppx.minimal
     ~extra_stanzas:
       [ "rule"
@@ -109,11 +109,11 @@ let logproc_lib =
   library "logproc_lib" ~path:"src/lib/logproc_lib"
     ~modules:[ "logproc_lib"; "filter" ]
     ~deps:
-      [ core_kernel
-      ; yojson
-      ; angstrom
-      ; re2
+      [ angstrom
+      ; core_kernel
       ; ppx_inline_test_config
+      ; re2
+      ; yojson
       ; local "interpolator_lib"
       ]
     ~ppx:
@@ -124,7 +124,7 @@ let logproc_lib =
 let interpolator_lib =
   library "interpolator_lib" ~path:"src/lib/logproc_lib"
     ~modules:[ "interpolator" ]
-    ~deps:[ core_kernel; yojson; angstrom ]
+    ~deps:[ angstrom; core_kernel; yojson ]
     ~ppx:
       (Ppx.custom
          [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_deriving_std ] )
@@ -138,9 +138,9 @@ let mina_wire_types =
   library "mina_wire_types" ~path:"src/lib/mina_wire_types"
     ~deps:
       [ integers
-      ; pasta_bindings
-      ; kimchi_types
       ; kimchi_bindings
+      ; kimchi_types
+      ; pasta_bindings
       ; local "blake2"
       ]
     ~ppx:Ppx.minimal
@@ -152,14 +152,14 @@ let one_or_two =
     ~flags:[ atom ":standard"; atom "-short-paths" ]
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ bin_prot_shape
+      [ async_kernel
       ; base
-      ; async_kernel
+      ; base_caml
+      ; bin_prot_shape
       ; core_kernel
       ; ppx_hash_runtime_lib
-      ; sexplib0
-      ; base_caml
       ; ppx_version_runtime
+      ; sexplib0
       ]
     ~ppx:
       (Ppx.custom
@@ -173,25 +173,25 @@ let one_or_two =
 
 let otp_lib =
   library "otp_lib" ~path:"src/lib/otp_lib"
-    ~deps:[ core_kernel; async_kernel; ppx_inline_test_config; local "pipe_lib" ]
+    ~deps:[ async_kernel; core_kernel; ppx_inline_test_config; local "pipe_lib" ]
     ~ppx:Ppx.standard ~inline_tests:true
 
 let participating_state =
   library "participating_state" ~path:"src/lib/participating_state"
-    ~deps:[ async_kernel; core_kernel; base ]
+    ~deps:[ async_kernel; base; core_kernel ]
     ~ppx:Ppx.minimal
 
 let sgn_type =
   library "sgn_type" ~path:"src/lib/sgn_type"
     ~deps:
-      [ core_kernel
-      ; ppx_deriving_yojson_runtime
-      ; yojson
-      ; sexplib0
+      [ base_caml
       ; bin_prot_shape
-      ; base_caml
-      ; ppx_version_runtime
+      ; core_kernel
       ; mina_wire_types
+      ; ppx_deriving_yojson_runtime
+      ; ppx_version_runtime
+      ; sexplib0
+      ; yojson
       ]
     ~ppx:
       (Ppx.custom
@@ -205,12 +205,12 @@ let sync_status =
   library "sync_status" ~path:"src/lib/sync_status"
     ~synopsis:"Different kinds of status for Coda "
     ~deps:
-      [ base_internalhash_types
-      ; base_caml
+      [ base_caml
+      ; base_internalhash_types
       ; bin_prot_shape
       ; core_kernel
-      ; sexplib0
       ; ppx_version_runtime
+      ; sexplib0
       ]
     ~ppx:
       (Ppx.custom
@@ -224,20 +224,20 @@ let unsigned_extended =
   library "unsigned_extended" ~path:"src/lib/unsigned_extended"
     ~synopsis:"Unsigned integer functions" ~library_flags:[ "-linkall" ]
     ~deps:
-      [ base_caml
-      ; result
-      ; base
+      [ base
+      ; base_caml
+      ; base_internalhash_types
+      ; bignum_bigint
+      ; bin_prot_shape
       ; core_kernel
       ; integers
-      ; sexplib0
-      ; bignum_bigint
-      ; base_internalhash_types
-      ; bin_prot_shape
       ; ppx_inline_test_config
+      ; result
+      ; sexplib0
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_test.test_util
       ; local "bignum_bigint"
       ; local "snark_params"
-      ; Layer_test.test_util
-      ; Layer_ppx.ppx_version_runtime
       ]
     ~ppx:
       (Ppx.custom
@@ -255,7 +255,7 @@ let unsigned_extended =
 
 let visualization =
   library "visualization" ~path:"src/lib/visualization"
-    ~deps:[ core_kernel; async_kernel; ocamlgraph; yojson; sexplib0 ]
+    ~deps:[ async_kernel; core_kernel; ocamlgraph; sexplib0; yojson ]
     ~ppx:
       (Ppx.custom
          [ Ppx_lib.ppx_version
@@ -267,32 +267,32 @@ let visualization =
 let webkit_trace_event =
   library "webkit_trace_event" ~path:"src/lib/webkit_trace_event"
     ~synopsis:"Binary and JSON output of WebKit trace events"
-    ~deps:[ core_kernel; base ] ~ppx:Ppx.minimal
+    ~deps:[ base; core_kernel ] ~ppx:Ppx.minimal
 
 let webkit_trace_event_binary =
   library "webkit_trace_event.binary"
     ~internal_name:"webkit_trace_event_binary_output"
     ~path:"src/lib/webkit_trace_event/binary_output"
-    ~deps:[ core; async; base; core_kernel; async_unix; webkit_trace_event ]
+    ~deps:[ async; async_unix; base; core; core_kernel; webkit_trace_event ]
     ~ppx:Ppx.minimal
 
 let graphql_basic_scalars =
   library "graphql_basic_scalars" ~path:"src/lib/graphql_basic_scalars"
     ~deps:
       [ async
-      ; async_unix
       ; async_kernel
-      ; core_kernel
-      ; integers
+      ; async_unix
       ; core
+      ; core_kernel
       ; graphql
       ; graphql_async
       ; graphql_parser
-      ; yojson
+      ; integers
       ; sexplib0
+      ; yojson
+      ; Layer_test.quickcheck_lib
       ; local "base_quickcheck"
       ; local "graphql_wrapper"
-      ; Layer_test.quickcheck_lib
       ; local "unix"
       ]
     ~ppx:Ppx.standard ~inline_tests:true
@@ -310,9 +310,9 @@ let graphql_wrapper =
 let mina_compile_config =
   library "mina_compile_config" ~path:"src/lib/mina_compile_config"
     ~deps:
-      [ Layer_node.mina_node_config
+      [ core_kernel
+      ; Layer_node.mina_node_config
       ; Layer_node.mina_node_config_for_unit_tests
-      ; core_kernel
       ; local "currency"
       ]
     ~ppx:
@@ -324,18 +324,18 @@ let storage =
     ~synopsis:"Storage module checksums data and stores it"
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ core
-      ; async
-      ; core_kernel
-      ; bin_prot_shape
-      ; bin_prot
-      ; base
-      ; sexplib0
+      [ async
       ; async_kernel
       ; async_unix
+      ; base
       ; base_caml
-      ; local "logger"
+      ; bin_prot
+      ; bin_prot_shape
+      ; core
+      ; core_kernel
+      ; sexplib0
       ; Layer_ppx.ppx_version_runtime
+      ; local "logger"
       ]
     ~ppx:Ppx.standard ~inline_tests:true
 
@@ -382,7 +382,14 @@ let mina_stdlib_unix =
     ~synopsis:"Mina standard library Unix utilities"
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ async; async_kernel; async_unix; core; core_kernel; ptime; local "logger" ]
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; core
+      ; core_kernel
+      ; ptime
+      ; local "logger"
+      ]
     ~ppx:
       (Ppx.custom
          [ Ppx_lib.ppx_here
@@ -397,33 +404,33 @@ let mina_numbers =
     ~synopsis:"Snark-friendly numbers used in Coda consensus"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ result
+      [ base
       ; base_caml
-      ; bin_prot_shape
+      ; base_internalhash_types
       ; bignum_bigint
+      ; bin_prot_shape
+      ; codable
       ; core_kernel
       ; integers
-      ; sexplib0
-      ; base
-      ; base_internalhash_types
-      ; ppx_inline_test_config
-      ; local "protocol_version"
       ; mina_wire_types
-      ; local "bignum_bigint"
-      ; local "pickles"
-      ; codable
-      ; Snarky_lib.snarky_backendless
-      ; Snarky_lib.fold_lib
-      ; Snarky_lib.tuple_lib
-      ; Layer_snarky.snark_bits
-      ; local "snark_params"
+      ; ppx_inline_test_config
+      ; result
+      ; sexplib0
       ; unsigned_extended
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_snarky.snark_bits
+      ; Layer_test.test_util
+      ; Snarky_lib.bitstring_lib
+      ; Snarky_lib.fold_lib
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.tuple_lib
+      ; local "bignum_bigint"
+      ; local "kimchi_backend_common"
+      ; local "pickles"
+      ; local "protocol_version"
       ; local "random_oracle"
       ; local "random_oracle_input"
-      ; Snarky_lib.bitstring_lib
-      ; Layer_test.test_util
-      ; local "kimchi_backend_common"
-      ; Layer_ppx.ppx_version_runtime
+      ; local "snark_params"
       ]
     ~ppx:
       (Ppx.custom
@@ -461,31 +468,31 @@ let currency =
   library "currency" ~path:"src/lib/currency" ~synopsis:"Currency types"
     ~deps:
       [ base
-      ; base_internalhash_types
       ; base_caml
+      ; base_internalhash_types
       ; bin_prot_shape
+      ; codable
       ; core_kernel
       ; integers
+      ; mina_wire_types
       ; ppx_inline_test_config
       ; result
       ; sexplib0
+      ; unsigned_extended
       ; zarith
-      ; local "bignum_bigint"
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_snarky.snark_bits
+      ; Layer_test.test_util
       ; Snarky_lib.bitstring_lib
-      ; codable
+      ; Snarky_lib.snarky_backendless
+      ; local "bignum_bigint"
       ; local "kimchi_backend_common"
       ; local "mina_numbers"
-      ; mina_wire_types
       ; local "pickles"
-      ; Layer_ppx.ppx_version_runtime
       ; local "random_oracle"
       ; local "random_oracle_input"
       ; local "sgn"
-      ; Layer_snarky.snark_bits
       ; local "snark_params"
-      ; Snarky_lib.snarky_backendless
-      ; Layer_test.test_util
-      ; unsigned_extended
       ]
     ~ppx:
       (Ppx.custom
@@ -531,13 +538,13 @@ let mina_version_normal =
 
 let mina_version_dummy =
   library "mina_version.dummy" ~internal_name:"mina_version_dummy"
-    ~path:"src/lib/mina_version/dummy" ~deps:[ core_kernel; base ]
+    ~path:"src/lib/mina_version/dummy" ~deps:[ base; core_kernel ]
     ~ppx:Ppx.minimal ~implements:"mina_version"
 
 let mina_version_runtime =
   library "mina_version.runtime" ~internal_name:"mina_version_runtime"
     ~path:"src/lib/mina_version/runtime"
-    ~deps:[ core_kernel; base; unix ]
+    ~deps:[ base; core_kernel; unix ]
     ~ppx:Ppx.minimal ~implements:"mina_version"
 
 let mina_base =
@@ -546,38 +553,49 @@ let mina_base =
     ~deps:
       [ async_kernel
       ; base
-      ; base_internalhash_types
+      ; base58_check
       ; base_caml
+      ; base_internalhash_types
       ; base_quickcheck
       ; base_quickcheck_ppx
       ; bin_prot_shape
+      ; codable
       ; core_kernel
       ; core_kernel_uuid
+      ; currency
       ; digestif
+      ; error_json
+      ; hex
       ; integers
+      ; mina_stdlib
+      ; mina_wire_types
+      ; one_or_two
       ; ppx_inline_test_config
       ; result
       ; sexp_diff_kernel
       ; sexplib0
+      ; sgn_type
+      ; unsigned_extended
+      ; with_hash
       ; yojson
-      ; base58_check
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_snarky.snark_bits
+      ; Layer_test.quickcheck_lib
+      ; Layer_test.test_util
+      ; Snarky_lib.fold_lib
+      ; Snarky_lib.snarky_backendless
       ; local "bignum_bigint"
       ; local "blake2"
       ; local "block_time"
-      ; codable
       ; local "crypto_params"
-      ; currency
       ; local "data_hash_lib"
       ; local "dummy_values"
-      ; error_json
       ; local "fields_derivers_graphql"
       ; local "fields_derivers_json"
       ; local "fields_derivers_zkapps"
-      ; Snarky_lib.fold_lib
       ; local "genesis_constants"
       ; local "hash_prefix_create"
       ; local "hash_prefix_states"
-      ; hex
       ; local "kimchi_backend"
       ; local "kimchi_backend_common"
       ; local "kimchi_pasta"
@@ -586,31 +604,20 @@ let mina_base =
       ; local "mina_base_util"
       ; local "mina_numbers"
       ; local "mina_signature_kind"
-      ; mina_stdlib
-      ; mina_wire_types
-      ; one_or_two
       ; local "outside_hash_image"
       ; local "pickles"
       ; local "pickles_backend"
       ; local "pickles_types"
-      ; Layer_ppx.ppx_version_runtime
       ; local "proof_cache_tag"
       ; local "protocol_version"
-      ; Layer_test.quickcheck_lib
       ; local "random_oracle"
       ; local "random_oracle_input"
       ; local "rosetta_coding"
       ; local "run_in_thread"
       ; local "sgn"
-      ; sgn_type
       ; local "signature_lib"
-      ; Layer_snarky.snark_bits
       ; local "snark_params"
-      ; Snarky_lib.snarky_backendless
       ; local "sparse_ledger_lib"
-      ; Layer_test.test_util
-      ; unsigned_extended
-      ; with_hash
       ]
     ~ppx:
       (Ppx.custom

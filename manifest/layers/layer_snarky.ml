@@ -22,12 +22,12 @@ let snark_keys_header =
 let snarky_blake2 =
   library "snarky_blake2" ~path:"src/lib/crypto/snarky_blake2"
     ~deps:
-      [ local "blake2"
-      ; core_kernel
+      [ core_kernel
       ; digestif
       ; integers
-      ; local "mina_stdlib"
       ; Snarky_lib.snarky_backendless
+      ; local "blake2"
+      ; local "mina_stdlib"
       ]
     ~ppx:
       (Ppx.custom
@@ -38,10 +38,10 @@ let snarky_field_extensions =
     ~path:"src/lib/crypto/snarky_field_extensions" ~inline_tests:true
     ~deps:
       [ bignum_bigint
-      ; sexplib0
       ; core_kernel
       ; ppx_inline_test_config
       ; result
+      ; sexplib0
       ; Snarky_lib.snarkette
       ; Snarky_lib.snarky_backendless
       ]
@@ -56,12 +56,12 @@ let snarky_field_extensions =
 let snarky_curves =
   library "snarky_curves" ~path:"src/lib/crypto/snarky_curves"
     ~deps:
-      [ core_kernel
+      [ bignum_bigint
+      ; core_kernel
       ; sexplib0
-      ; bignum_bigint
+      ; snarky_field_extensions
       ; Snarky_lib.bitstring_lib
       ; Snarky_lib.snarky_backendless
-      ; snarky_field_extensions
       ]
     ~ppx:
       (Ppx.custom
@@ -76,8 +76,8 @@ let snarky_group_map =
     ~inline_tests:true
     ~deps:
       [ core_kernel
-      ; Snarky_lib.snarky_backendless
       ; Snarky_lib.group_map
+      ; Snarky_lib.snarky_backendless
       ]
     ~ppx:
       (Ppx.custom
@@ -111,14 +111,14 @@ let snark_bits =
     ~synopsis:"Snark parameters" ~library_flags:[ "-linkall" ]
     ~inline_tests:true
     ~deps:
-      [ core_kernel
+      [ base
+      ; core_kernel
       ; integers
-      ; base
+      ; Snarky_lib.bitstring_lib
       ; Snarky_lib.fold_lib
       ; Snarky_lib.snarky_backendless
-      ; Snarky_lib.tuple_lib
-      ; Snarky_lib.bitstring_lib
       ; Snarky_lib.snarky_intf
+      ; Snarky_lib.tuple_lib
       ]
     ~ppx:
       (Ppx.custom

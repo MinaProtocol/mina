@@ -10,8 +10,8 @@ let quickcheck_lib =
   library "quickcheck_lib" ~path:"src/lib/testing/quickcheck_lib"
     ~inline_tests:true
     ~deps:
-      [ core_kernel
-      ; base
+      [ base
+      ; core_kernel
       ; ppx_inline_test_config
       ; local "currency"
       ; local "mina_stdlib"
@@ -28,14 +28,14 @@ let test_util =
   library "test_util" ~path:"src/lib/testing/test_util" ~synopsis:"test utils"
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ core_kernel
-      ; base_caml
+      [ base_caml
       ; bin_prot
-      ; local "snark_params"
+      ; core_kernel
       ; Snarky_lib.fold_lib
       ; Snarky_lib.snarky_backendless
-      ; local "pickles"
       ; local "crypto_params"
+      ; local "pickles"
+      ; local "snark_params"
       ]
     ~ppx:
       (Ppx.custom

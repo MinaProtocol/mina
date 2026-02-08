@@ -29,10 +29,10 @@ let pipe_lib =
       ; core
       ; core_kernel
       ; ppx_inline_test_config
+      ; run_in_thread
       ; sexplib
       ; local "logger"
       ; local "o1trace"
-      ; run_in_thread
       ]
     ~ppx:
       (Ppx.custom
@@ -54,18 +54,18 @@ let interruptible =
 
 let promise =
   library "promise" ~path:"src/lib/concurrency/promise"
-    ~deps:[ base; async_kernel ] ~ppx:Ppx.minimal ~virtual_modules:[ "promise" ]
+    ~deps:[ async_kernel; base ] ~ppx:Ppx.minimal ~virtual_modules:[ "promise" ]
     ~default_implementation:"promise.native"
 
 let promise_native =
   library "promise.native" ~internal_name:"promise_native"
     ~path:"src/lib/concurrency/promise/native"
-    ~deps:[ base; async_kernel; run_in_thread ]
+    ~deps:[ async_kernel; base; run_in_thread ]
     ~ppx:Ppx.minimal ~implements:"promise"
 
 let promise_js =
   library "promise.js" ~internal_name:"promise_js"
-    ~path:"src/lib/concurrency/promise/js" ~deps:[ base; async_kernel ]
+    ~path:"src/lib/concurrency/promise/js" ~deps:[ async_kernel; base ]
     ~ppx:Ppx.minimal ~implements:"promise"
     ~js_of_ocaml:
       ("js_of_ocaml" @: [ "javascript_files" @: [ atom "promise.js" ] ])
@@ -80,7 +80,13 @@ let parallel =
     ~synopsis:"Template code to run programs that rely Rpc_parallel.Expert"
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ async_rpc_kernel; async; core; rpc_parallel; async_rpc; core_kernel ]
+      [ async
+      ; async_rpc
+      ; async_rpc_kernel
+      ; core
+      ; core_kernel
+      ; rpc_parallel
+      ]
     ~ppx:
       (Ppx.custom
          [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_compare ] )
@@ -92,20 +98,20 @@ let child_processes =
       ; async_kernel
       ; async_unix
       ; base
-      ; base_internalhash_types
       ; base_caml
+      ; base_internalhash_types
       ; core
       ; core_kernel
       ; ctypes
       ; ctypes_foreign
       ; integers
+      ; pipe_lib
       ; ppx_hash_runtime_lib
       ; ppx_inline_test_config
       ; sexplib0
       ; Layer_base.error_json
-      ; Layer_logging.logger
       ; Layer_base.mina_stdlib_unix
-      ; pipe_lib
+      ; Layer_logging.logger
       ]
     ~ppx:
       (Ppx.custom
@@ -124,5 +130,5 @@ let child_processes =
 
 let timeout_lib =
   library "timeout_lib" ~path:"src/lib/timeout_lib"
-    ~deps:[ core_kernel; async_kernel; Layer_logging.logger ]
+    ~deps:[ async_kernel; core_kernel; Layer_logging.logger ]
     ~ppx:Ppx.mina

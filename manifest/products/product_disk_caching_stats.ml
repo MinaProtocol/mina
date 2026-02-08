@@ -9,40 +9,40 @@ let () =
     ~deps:
       [ base
       ; base_caml
-      ; bin_prot
       ; bigarray_compat
+      ; bin_prot
       ; core
       ; core_kernel
       ; digestif
       ; sexplib0
       ; splittable_random
-      ; Layer_crypto.crypto_params
       ; Layer_base.currency
-      ; Layer_domain.data_hash_lib
-      ; Layer_domain.genesis_constants
-      ; Layer_kimchi.kimchi_pasta
-      ; Layer_kimchi.kimchi_pasta_basic
-      ; Layer_snark_worker.ledger_proof
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_ledger.mina_ledger
       ; Layer_base.mina_numbers
-      ; Layer_consensus.mina_state
-      ; Layer_transaction.mina_transaction_logic
       ; Layer_base.mina_wire_types
-      ; Layer_network.network_pool
       ; Layer_base.one_or_two
-      ; Layer_pickles.pickles
-      ; Layer_pickles.pickles_backend
-      ; Layer_pickles.pickles_types
+      ; Layer_base.with_hash
+      ; Layer_consensus.mina_state
+      ; Layer_crypto.crypto_params
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
+      ; Layer_domain.data_hash_lib
+      ; Layer_domain.genesis_constants
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
+      ; Layer_ledger.mina_ledger
+      ; Layer_network.network_pool
       ; Layer_network.snark_profiler_lib
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_protocol.transaction_snark
+      ; Layer_snark_worker.ledger_proof
       ; Layer_snark_worker.transaction_snark_scan_state
-      ; Layer_base.with_hash
+      ; Layer_transaction.mina_transaction_logic
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version ])

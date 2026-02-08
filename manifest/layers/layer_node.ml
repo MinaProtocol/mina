@@ -17,9 +17,9 @@ let mina_node_config =
     ~path:"src/lib/node_config"
     ~deps:
       [ local "node_config_intf"
-      ; local "node_config_version"
-      ; local "node_config_unconfigurable_constants"
       ; local "node_config_profiled"
+      ; local "node_config_unconfigurable_constants"
+      ; local "node_config_version"
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_base ])
 
@@ -29,8 +29,8 @@ let mina_node_config_for_unit_tests =
     ~path:"src/lib/node_config/for_unit_tests"
     ~deps:
       [ local "node_config_intf"
-      ; local "node_config_version"
       ; local "node_config_unconfigurable_constants"
+      ; local "node_config_version"
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_base ])
 

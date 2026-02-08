@@ -12,20 +12,20 @@ let vrf_lib =
     ~flags:[ atom ":standard"; atom "-short-paths" ]
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ zarith
+      [ base_caml
+      ; bignum
       ; bignum_bigint
       ; bin_prot_shape
-      ; base_caml
       ; core
-      ; sexplib0
       ; core_kernel
-      ; bignum
       ; ppx_inline_test_config
-      ; Snarky_lib.snarky_backendless
+      ; sexplib0
+      ; zarith
       ; Layer_domain.genesis_constants
+      ; Layer_ppx.ppx_version_runtime
       ; Layer_snarky.snarky_curves
       ; Snarky_lib.bitstring_lib
-      ; Layer_ppx.ppx_version_runtime
+      ; Snarky_lib.snarky_backendless
       ]
     ~ppx:
       (Ppx.custom
@@ -41,52 +41,52 @@ let consensus_vrf =
   library "consensus.vrf" ~internal_name:"consensus_vrf"
     ~path:"src/lib/consensus/vrf"
     ~deps:
-      [ ppx_inline_test_config
-      ; bignum_bigint
-      ; base_caml
-      ; base
+      [ base
       ; base64
-      ; core_kernel
-      ; sexplib0
-      ; result
+      ; base_caml
       ; bignum
-      ; integers
+      ; bignum_bigint
       ; bin_prot_shape
-      ; Layer_base.mina_wire_types
-      ; Layer_base.mina_base_util
-      ; Layer_kimchi.kimchi_pasta
-      ; Layer_kimchi.kimchi_pasta_basic
-      ; Layer_domain.genesis_constants
-      ; Layer_base.mina_stdlib
-      ; Layer_crypto.crypto_params
-      ; Layer_crypto.random_oracle
-      ; Layer_crypto.blake2
-      ; Layer_base.base58_check
-      ; Layer_crypto.random_oracle_input
-      ; Layer_base.unsigned_extended
-      ; Snarky_lib.snarky_backendless
-      ; Layer_pickles.pickles
-      ; Layer_snarky.snarky_taylor
-      ; Layer_base.mina_numbers
-      ; Snarky_lib.fold_lib
-      ; Layer_base.mina_base
-      ; Layer_crypto.snark_params
+      ; core_kernel
+      ; integers
+      ; ppx_inline_test_config
+      ; result
+      ; sexplib0
       ; vrf_lib
-      ; Snarky_lib.snarky_integer
-      ; Layer_test.test_util
-      ; Layer_pickles.pickles_backend
-      ; Layer_crypto.non_zero_curve_point
-      ; Layer_crypto.bignum_bigint
+      ; Layer_base.base58_check
       ; Layer_base.codable
-      ; Layer_crypto.signature_lib
       ; Layer_base.currency
+      ; Layer_base.mina_base
+      ; Layer_base.mina_base_util
+      ; Layer_base.mina_numbers
+      ; Layer_base.mina_stdlib
+      ; Layer_base.mina_wire_types
+      ; Layer_base.unsigned_extended
+      ; Layer_crypto.bignum_bigint
+      ; Layer_crypto.blake2
+      ; Layer_crypto.crypto_params
+      ; Layer_crypto.non_zero_curve_point
+      ; Layer_crypto.random_oracle
+      ; Layer_crypto.random_oracle_input
+      ; Layer_crypto.signature_lib
+      ; Layer_crypto.snark_params
+      ; Layer_domain.genesis_constants
       ; Layer_domain.hash_prefix_states
       ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_snarky.snarky_taylor
+      ; Layer_test.test_util
+      ; Snarky_lib.fold_lib
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.snarky_integer
       ; local "kimchi_bindings"
       ; local "kimchi_types"
       ; local "pasta_bindings"
       ; local "ppx_deriving_yojson.runtime"
-      ; Layer_ppx.ppx_version_runtime
       ]
     ~ppx:
       (Ppx.custom
@@ -107,75 +107,75 @@ let consensus =
     ~library_flags:[ "-linkall" ]
     ~modules_exclude:[ "proof_of_stake_fuzzer" ]
     ~deps:
-      [ ppx_inline_test_config
-      ; async_unix
-      ; core_uuid
+      [ async
       ; async_kernel
-      ; sexplib0
-      ; base_caml
-      ; integers
-      ; async
-      ; core
-      ; yojson
-      ; core_kernel
-      ; bin_prot_shape
-      ; base
-      ; result
-      ; core_kernel_uuid
       ; async_rpc_kernel
-      ; sexp_diff_kernel
-      ; Layer_base.mina_wire_types
-      ; Layer_base.mina_base_util
-      ; Layer_base.unsigned_extended
-      ; Layer_kimchi.kimchi_pasta
-      ; Layer_kimchi.kimchi_pasta_basic
-      ; Snarky_lib.fold_lib
-      ; Layer_crypto.random_oracle_input
-      ; Layer_crypto.outside_hash_image
-      ; Layer_logging.logger
-      ; Layer_domain.hash_prefix_states
-      ; Layer_domain.genesis_constants
-      ; Layer_base.error_json
-      ; Layer_ledger.merkle_ledger
-      ; Layer_pickles.pickles_backend
-      ; Layer_crypto.random_oracle
-      ; Layer_concurrency.pipe_lib
-      ; Layer_crypto.bignum_bigint
-      ; vrf_lib
-      ; Layer_crypto.snark_params
-      ; Layer_base.with_hash
-      ; Layer_ledger.mina_ledger
+      ; async_unix
+      ; base
+      ; base_caml
+      ; bin_prot_shape
       ; consensus_vrf
-      ; Layer_snarky.snarky_taylor
+      ; core
+      ; core_kernel
+      ; core_kernel_uuid
+      ; core_uuid
+      ; integers
+      ; ppx_inline_test_config
+      ; result
+      ; sexp_diff_kernel
+      ; sexplib0
+      ; vrf_lib
+      ; yojson
+      ; Layer_base.currency
+      ; Layer_base.error_json
       ; Layer_base.mina_base
-      ; Layer_transaction.mina_transaction_logic
-      ; Layer_crypto.key_gen
-      ; Layer_domain.block_time
-      ; Layer_tooling.perf_histograms
-      ; Layer_test.test_util
-      ; Layer_crypto.non_zero_curve_point
-      ; Layer_tooling.mina_metrics
+      ; Layer_base.mina_base_import
+      ; Layer_base.mina_base_util
       ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
-      ; Layer_crypto.signature_lib
-      ; Snarky_lib.snarky_backendless
+      ; Layer_base.mina_stdlib_unix
+      ; Layer_base.mina_wire_types
+      ; Layer_base.unsigned_extended
+      ; Layer_base.with_hash
+      ; Layer_concurrency.interruptible
+      ; Layer_concurrency.pipe_lib
+      ; Layer_crypto.bignum_bigint
       ; Layer_crypto.blake2
       ; Layer_crypto.crypto_params
+      ; Layer_crypto.key_gen
+      ; Layer_crypto.non_zero_curve_point
+      ; Layer_crypto.outside_hash_image
+      ; Layer_crypto.random_oracle
+      ; Layer_crypto.random_oracle_input
+      ; Layer_crypto.signature_lib
+      ; Layer_crypto.snark_params
+      ; Layer_domain.block_time
       ; Layer_domain.data_hash_lib
-      ; Layer_base.currency
-      ; Layer_base.mina_stdlib_unix
-      ; local "coda_genesis_ledger"
-      ; Layer_concurrency.interruptible
-      ; local "network_peer"
-      ; Layer_pickles.pickles
-      ; Layer_snarky.snark_bits
+      ; Layer_domain.genesis_constants
+      ; Layer_domain.hash_prefix_states
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
+      ; Layer_ledger.merkle_ledger
+      ; Layer_ledger.mina_ledger
       ; Layer_ledger.sparse_ledger_lib
+      ; Layer_logging.logger
+      ; Layer_logging.o1trace
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_snarky.snark_bits
+      ; Layer_snarky.snarky_taylor
+      ; Layer_test.test_util
+      ; Layer_tooling.internal_tracing
+      ; Layer_tooling.mina_metrics
+      ; Layer_tooling.perf_histograms
+      ; Layer_transaction.mina_transaction_logic
+      ; Snarky_lib.fold_lib
+      ; Snarky_lib.snarky_backendless
+      ; local "coda_genesis_ledger"
+      ; local "network_peer"
       ; local "syncable_ledger"
       ; local "trust_system"
-      ; Layer_base.mina_base_import
-      ; Layer_ppx.ppx_version_runtime
-      ; Layer_tooling.internal_tracing
-      ; Layer_logging.o1trace
       ]
     ~ppx:
       (Ppx.custom
@@ -200,14 +200,14 @@ let () =
   private_executable ~path:"src/lib/consensus"
     ~modules:[ "proof_of_stake_fuzzer" ]
     ~deps:
-      [ core_kernel
+      [ consensus
+      ; core_kernel
       ; Layer_crypto.signature_lib
-      ; local "mina_state"
-      ; local "mina_block"
-      ; consensus
-      ; local "prover"
-      ; local "blockchain_snark"
       ; Layer_logging.logger_file_system
+      ; local "blockchain_snark"
+      ; local "mina_block"
+      ; local "mina_state"
+      ; local "prover"
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
     ~enabled_if:"false" "proof_of_stake_fuzzer"
@@ -215,42 +215,42 @@ let () =
 let mina_state =
   library "mina_state" ~path:"src/lib/mina_state" ~inline_tests:true
     ~deps:
-      [ core
-      ; Layer_crypto.signature_lib
-      ; Layer_pickles.pickles_backend
-      ; Layer_crypto.outside_hash_image
-      ; Layer_pickles.pickles
-      ; Layer_crypto.random_oracle_input
-      ; Layer_crypto.random_oracle
-      ; Layer_domain.genesis_constants
-      ; Layer_domain.block_time
-      ; Layer_base.mina_base
-      ; local "mina_debug"
-      ; Layer_transaction.mina_transaction_logic
-      ; Layer_crypto.snark_params
-      ; consensus
-      ; Snarky_lib.bitstring_lib
-      ; Snarky_lib.fold_lib
-      ; Snarky_lib.tuple_lib
-      ; Layer_base.with_hash
-      ; Snarky_lib.snarky_backendless
-      ; Layer_crypto.crypto_params
-      ; Layer_domain.data_hash_lib
+      [ consensus
+      ; core
       ; Layer_base.currency
-      ; Layer_base.visualization
       ; Layer_base.linked_tree
+      ; Layer_base.mina_base
+      ; Layer_base.mina_base_util
       ; Layer_base.mina_numbers
+      ; Layer_base.mina_wire_types
+      ; Layer_base.sgn_type
+      ; Layer_base.unsigned_extended
+      ; Layer_base.visualization
+      ; Layer_base.with_hash
+      ; Layer_crypto.blake2
+      ; Layer_crypto.crypto_params
+      ; Layer_crypto.outside_hash_image
+      ; Layer_crypto.random_oracle
+      ; Layer_crypto.random_oracle_input
+      ; Layer_crypto.sgn
+      ; Layer_crypto.signature_lib
+      ; Layer_crypto.snark_params
+      ; Layer_domain.block_time
+      ; Layer_domain.data_hash_lib
+      ; Layer_domain.genesis_constants
+      ; Layer_kimchi.kimchi_backend
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
-      ; Layer_kimchi.kimchi_backend
-      ; Layer_base.mina_base_util
       ; Layer_ledger.mina_ledger
-      ; Layer_base.unsigned_extended
-      ; Layer_crypto.sgn
-      ; Layer_base.sgn_type
-      ; Layer_crypto.blake2
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
       ; Layer_ppx.ppx_version_runtime
-      ; Layer_base.mina_wire_types
+      ; Layer_transaction.mina_transaction_logic
+      ; Snarky_lib.bitstring_lib
+      ; Snarky_lib.fold_lib
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.tuple_lib
+      ; local "mina_debug"
       ]
     ~ppx:
       (Ppx.custom
@@ -276,15 +276,15 @@ let coda_genesis_ledger =
     ~path:"src/lib/genesis_ledger"
     ~deps:
       [ core
-      ; Layer_crypto.key_gen
-      ; Layer_base.mina_base
-      ; Layer_crypto.signature_lib
       ; Layer_base.currency
+      ; Layer_base.mina_base
       ; Layer_base.mina_numbers
-      ; Layer_domain.genesis_constants
-      ; Layer_domain.data_hash_lib
-      ; Layer_ledger.mina_ledger
       ; Layer_base.mina_stdlib
+      ; Layer_crypto.key_gen
+      ; Layer_crypto.signature_lib
+      ; Layer_domain.data_hash_lib
+      ; Layer_domain.genesis_constants
+      ; Layer_ledger.mina_ledger
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_let ])
 
@@ -292,20 +292,20 @@ let precomputed_values =
   library "precomputed_values" ~path:"src/lib/precomputed_values"
     ~ppx_runtime_libraries:[ "base" ]
     ~deps:
-      [ core
-      ; core_kernel
-      ; Layer_domain.genesis_constants
-      ; mina_state
-      ; local "coda_genesis_proof"
-      ; Layer_crypto.crypto_params
-      ; Layer_base.mina_base
-      ; Layer_domain.dummy_values
-      ; Snarky_lib.snarky_backendless
-      ; coda_genesis_ledger
+      [ coda_genesis_ledger
       ; consensus
+      ; core
+      ; core_kernel
+      ; mina_state
+      ; Layer_base.mina_base
+      ; Layer_crypto.crypto_params
+      ; Layer_domain.dummy_values
+      ; Layer_domain.genesis_constants
+      ; Layer_ledger.staged_ledger_diff
+      ; Snarky_lib.snarky_backendless
+      ; local "coda_genesis_proof"
       ; local "mina_runtime_config"
       ; local "test_genesis_ledger"
-      ; Layer_ledger.staged_ledger_diff
       ]
     ~ppx:
       (Ppx.custom
@@ -315,35 +315,35 @@ let coda_genesis_proof =
   library "coda_genesis_proof" ~internal_name:"genesis_proof"
     ~path:"src/lib/genesis_proof"
     ~deps:
-      [ base
-      ; core_kernel
-      ; base_md5
-      ; core
-      ; async
+      [ async
       ; async_kernel
-      ; Snarky_lib.snarky_backendless
-      ; Layer_pickles.pickles_types
-      ; Layer_base.currency
-      ; Layer_pickles.pickles
-      ; consensus
-      ; local "mina_runtime_config"
-      ; local "blockchain_snark"
-      ; Layer_base.mina_base
-      ; mina_state
-      ; Layer_domain.genesis_constants
-      ; Layer_base.with_hash
+      ; base
+      ; base_md5
       ; coda_genesis_ledger
-      ; local "transaction_snark"
-      ; Layer_crypto.sgn
-      ; Layer_crypto.snark_params
+      ; consensus
+      ; core
+      ; core_kernel
+      ; mina_state
+      ; Layer_base.currency
+      ; Layer_base.mina_base
+      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
       ; Layer_base.sgn_type
-      ; Layer_pickles.pickles_backend
-      ; Layer_transaction.mina_transaction_logic
-      ; Layer_kimchi.kimchi_backend
-      ; Layer_base.mina_numbers
+      ; Layer_base.with_hash
+      ; Layer_crypto.sgn
+      ; Layer_crypto.snark_params
       ; Layer_domain.block_time
+      ; Layer_domain.genesis_constants
+      ; Layer_kimchi.kimchi_backend
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
+      ; Layer_transaction.mina_transaction_logic
+      ; Snarky_lib.snarky_backendless
+      ; local "blockchain_snark"
+      ; local "mina_runtime_config"
+      ; local "transaction_snark"
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_let ])

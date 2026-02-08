@@ -9,7 +9,7 @@ open Externals
 let structured_log_events =
   library "structured_log_events" ~path:"src/lib/structured_log_events"
     ~synopsis:"Events, logging and parsing" ~library_flags:[ "-linkall" ]
-    ~deps:[ core_kernel; yojson; sexplib0; Layer_base.interpolator_lib ]
+    ~deps:[ core_kernel; sexplib0; yojson; Layer_base.interpolator_lib ]
     ~ppx:
       (Ppx.custom
          [ Ppx_lib.ppx_version
@@ -33,7 +33,12 @@ let logger_context_logger =
       "Context logger: useful for passing logger down the deep callstacks"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ base_internalhash_types; core_kernel; sexplib0; async_kernel; logger ]
+      [ async_kernel
+      ; base_internalhash_types
+      ; core_kernel
+      ; logger
+      ; sexplib0
+      ]
     ~ppx:
       (Ppx.custom
          [ Ppx_lib.ppx_jane
@@ -46,15 +51,15 @@ let logger_fake =
   library "logger.fake" ~internal_name:"logger_fake" ~path:"src/lib/logger/fake"
     ~synopsis:"Fake logging library"
     ~deps:
-      [ result
-      ; core_kernel
-      ; sexplib0
-      ; bin_prot_shape
-      ; base_caml
+      [ base_caml
       ; base_internalhash_types
+      ; bin_prot_shape
+      ; core_kernel
+      ; result
+      ; sexplib0
       ; Layer_base.interpolator_lib
-      ; Layer_ppx.ppx_version_runtime
       ; Layer_base.mina_stdlib
+      ; Layer_ppx.ppx_version_runtime
       ]
     ~ppx:Ppx.mina_rich ~implements:"logger"
 
@@ -62,7 +67,7 @@ let logger_file_system =
   library "logger.file_system" ~internal_name:"logger_file_system"
     ~path:"src/lib/logger/file_system" ~synopsis:"Logging library"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
-    ~deps:[ core; yojson; core_kernel; logger ]
+    ~deps:[ core; core_kernel; logger; yojson ]
     ~ppx:Ppx.mina_rich
 
 let logger_native =
@@ -70,17 +75,17 @@ let logger_native =
     ~path:"src/lib/logger/native" ~synopsis:"Logging library"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ result
+      [ base_caml
+      ; base_internalhash_types
+      ; bin_prot_shape
       ; core
       ; core_kernel
+      ; result
       ; sexplib0
-      ; bin_prot_shape
-      ; base_caml
-      ; base_internalhash_types
-      ; local "itn_logger"
       ; Layer_base.interpolator_lib
-      ; Layer_ppx.ppx_version_runtime
       ; Layer_base.mina_stdlib
+      ; Layer_ppx.ppx_version_runtime
+      ; local "itn_logger"
       ]
     ~ppx:Ppx.mina_rich ~implements:"logger"
 
@@ -94,28 +99,28 @@ let o1trace =
       ; base_internalhash_types
       ; core
       ; core_kernel
+      ; logger
       ; ocamlgraph
       ; ppx_inline_test_config
       ; sexplib0
-      ; logger
       ]
     ~ppx:Ppx.mina
 
 let o1trace_webkit_event =
   library "o1trace_webkit_event" ~path:"src/lib/o1trace/webkit_event"
     ~deps:
-      [ base
-      ; base_caml
-      ; async
+      [ async
       ; async_kernel
       ; async_unix
+      ; base
+      ; base_caml
       ; core
-      ; core_time_stamp_counter
       ; core_kernel
-      ; sexplib0
-      ; Layer_base.webkit_trace_event_binary
-      ; Layer_base.webkit_trace_event
+      ; core_time_stamp_counter
       ; o1trace
+      ; sexplib0
+      ; Layer_base.webkit_trace_event
+      ; Layer_base.webkit_trace_event_binary
       ]
     ~ppx:Ppx.standard
 

@@ -16,14 +16,14 @@ let () =
       ; ppx_inline_test_runner_lib
       ; sexplib0
       ; yojson
-      ; Layer_domain.block_time
-      ; Layer_logging.logger
       ; Layer_base.mina_base
-      ; Layer_network.mina_block
-      ; Layer_consensus.mina_state
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
+      ; Layer_consensus.mina_state
       ; Layer_consensus.precomputed_values
+      ; Layer_domain.block_time
+      ; Layer_logging.logger
+      ; Layer_network.mina_block
       ; Layer_network.transition_frontier
       ; Layer_network.transition_frontier_base
       ; Layer_network.transition_frontier_full_frontier

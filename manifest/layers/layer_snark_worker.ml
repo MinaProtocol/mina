@@ -10,13 +10,13 @@ let ledger_proof =
   library "ledger_proof" ~path:"src/lib/ledger_proof"
     ~deps:
       [ core_kernel
-      ; Layer_protocol.transaction_snark
       ; Layer_base.mina_base
       ; Layer_consensus.mina_state
-      ; Layer_transaction.mina_transaction_logic
-      ; Layer_ppx.ppx_version_runtime
-      ; Layer_pickles.proof_cache_tag
       ; Layer_domain.proof_carrying_data
+      ; Layer_pickles.proof_cache_tag
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_protocol.transaction_snark
+      ; Layer_transaction.mina_transaction_logic
       ]
     ~ppx:
       (Ppx.custom
@@ -31,25 +31,25 @@ let ledger_proof =
 let transaction_snark_work =
   library "transaction_snark_work" ~path:"src/lib/transaction_snark_work"
     ~deps:
-      [ core_kernel
-      ; sexplib0
-      ; bin_prot_shape
-      ; base_caml
+      [ base_caml
       ; base_internalhash_types
+      ; bin_prot_shape
       ; core
-      ; Layer_base.currency
-      ; Layer_protocol.transaction_snark
-      ; Layer_consensus.mina_state
-      ; Layer_base.one_or_two
+      ; core_kernel
       ; ledger_proof
-      ; Layer_crypto.signature_lib
-      ; Layer_ppx.ppx_version_runtime
+      ; sexplib0
+      ; Layer_base.currency
       ; Layer_base.mina_wire_types
-      ; Layer_pickles.pickles_backend
+      ; Layer_base.one_or_two
+      ; Layer_consensus.mina_state
+      ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
-      ; Layer_pickles.pickles
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_protocol.transaction_snark
       ]
     ~ppx:
       (Ppx.custom
@@ -63,45 +63,45 @@ let transaction_snark_scan_state =
   library "transaction_snark_scan_state"
     ~path:"src/lib/transaction_snark_scan_state" ~library_flags:[ "-linkall" ]
     ~deps:
-      [ base_internalhash_types
+      [ async
       ; async_kernel
+      ; async_unix
+      ; base
+      ; base_caml
+      ; base_internalhash_types
+      ; bin_prot_shape
       ; core
+      ; core_kernel
+      ; digestif
+      ; ledger_proof
       ; ppx_deriving_yojson_runtime
       ; sexplib0
-      ; base_caml
-      ; digestif
-      ; base
-      ; core_kernel
-      ; async
+      ; transaction_snark_work
       ; yojson
-      ; bin_prot_shape
-      ; async_unix
-      ; Layer_base.mina_stdlib
-      ; Layer_base.mina_base_import
-      ; Layer_domain.data_hash_lib
-      ; Layer_consensus.mina_state
-      ; Layer_transaction.transaction_witness
-      ; Layer_protocol.transaction_snark
+      ; Layer_base.currency
       ; Layer_base.mina_base
+      ; Layer_base.mina_base_import
       ; Layer_base.mina_numbers
+      ; Layer_base.mina_stdlib
+      ; Layer_base.mina_wire_types
+      ; Layer_base.one_or_two
+      ; Layer_base.with_hash
+      ; Layer_consensus.mina_state
+      ; Layer_crypto.sgn
+      ; Layer_domain.data_hash_lib
+      ; Layer_domain.genesis_constants
+      ; Layer_domain.parallel_scan
+      ; Layer_ledger.merkle_ledger
+      ; Layer_ledger.mina_ledger
+      ; Layer_logging.logger
+      ; Layer_logging.o1trace
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_protocol.transaction_snark
+      ; Layer_tooling.internal_tracing
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
+      ; Layer_transaction.transaction_witness
       ; local "snark_work_lib"
-      ; Layer_base.one_or_two
-      ; Layer_ledger.mina_ledger
-      ; Layer_ledger.merkle_ledger
-      ; Layer_base.currency
-      ; Layer_logging.logger
-      ; transaction_snark_work
-      ; Layer_domain.parallel_scan
-      ; Layer_crypto.sgn
-      ; ledger_proof
-      ; Layer_domain.genesis_constants
-      ; Layer_logging.o1trace
-      ; Layer_base.with_hash
-      ; Layer_ppx.ppx_version_runtime
-      ; Layer_base.mina_wire_types
-      ; Layer_tooling.internal_tracing
       ]
     ~ppx:
       (Ppx.custom
@@ -125,14 +125,14 @@ let snark_work_lib =
       ; bin_prot_shape
       ; core
       ; core_kernel
+      ; ledger_proof
       ; sexplib0
       ; Layer_base.currency
-      ; ledger_proof
-      ; Layer_consensus.mina_state
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
-      ; Layer_ppx.ppx_version_runtime
+      ; Layer_consensus.mina_state
       ; Layer_crypto.signature_lib
+      ; Layer_ppx.ppx_version_runtime
       ; Layer_protocol.transaction_snark
       ]
     ~ppx:
@@ -150,45 +150,45 @@ let snark_worker =
     ~deps:
       [ async
       ; async_command
-      ; async_rpc
       ; async_kernel
+      ; async_rpc
       ; async_rpc_kernel
       ; async_unix
       ; base
-      ; base_internalhash_types
       ; base_caml
+      ; base_internalhash_types
       ; bin_prot_shape
       ; core
       ; core_kernel
       ; core_kernel_hash_heap
+      ; ledger_proof
       ; ppx_hash_runtime_lib
       ; ppx_version_runtime
       ; result
       ; sexplib0
-      ; Layer_base.mina_stdlib
-      ; local "cli_lib"
+      ; snark_work_lib
+      ; transaction_snark_work
       ; Layer_base.currency
       ; Layer_base.error_json
-      ; Layer_domain.genesis_constants
-      ; ledger_proof
-      ; Layer_logging.logger
-      ; Layer_logging.logger_file_system
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_ledger.mina_ledger
-      ; Layer_tooling.mina_metrics
-      ; Layer_node.mina_node_config_unconfigurable_constants
-      ; Layer_consensus.mina_state
-      ; Layer_transaction.mina_transaction
+      ; Layer_base.mina_stdlib
       ; Layer_base.one_or_two
-      ; Layer_tooling.perf_histograms
+      ; Layer_consensus.mina_state
       ; Layer_crypto.signature_lib
-      ; snark_work_lib
-      ; local "work_partitioner"
+      ; Layer_domain.genesis_constants
+      ; Layer_ledger.mina_ledger
+      ; Layer_logging.logger
+      ; Layer_logging.logger_file_system
+      ; Layer_node.mina_node_config_unconfigurable_constants
       ; Layer_protocol.transaction_protocol_state
       ; Layer_protocol.transaction_snark
-      ; transaction_snark_work
+      ; Layer_tooling.mina_metrics
+      ; Layer_tooling.perf_histograms
+      ; Layer_transaction.mina_transaction
       ; Layer_transaction.transaction_witness
+      ; local "cli_lib"
+      ; local "work_partitioner"
       ]
     ~ppx:
       (Ppx.custom
@@ -209,42 +209,42 @@ let work_selector =
   library "work_selector" ~path:"src/lib/work_selector"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
     ~deps:
-      [ bin_prot_shape
-      ; sexplib0
-      ; core
-      ; async
-      ; core_kernel
+      [ async
+      ; async_kernel
+      ; async_unix
       ; base
       ; base_caml
       ; base_internalhash_types
-      ; async_kernel
-      ; ppx_inline_test_config
-      ; async_unix
-      ; Layer_protocol.transaction_protocol_state
-      ; transaction_snark_work
-      ; local "transition_frontier_base"
-      ; Layer_base.error_json
+      ; bin_prot_shape
+      ; core
+      ; core_kernel
       ; ledger_proof
-      ; Layer_consensus.precomputed_values
-      ; Layer_transaction.transaction_witness
+      ; ppx_inline_test_config
+      ; sexplib0
       ; snark_work_lib
-      ; Layer_consensus.mina_state
+      ; transaction_snark_work
+      ; Layer_base.currency
+      ; Layer_base.error_json
       ; Layer_base.mina_base
+      ; Layer_base.one_or_two
+      ; Layer_base.with_hash
+      ; Layer_concurrency.pipe_lib
+      ; Layer_consensus.mina_state
+      ; Layer_consensus.precomputed_values
+      ; Layer_ledger.mina_ledger
+      ; Layer_logging.logger
+      ; Layer_logging.o1trace
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_protocol.transaction_protocol_state
+      ; Layer_protocol.transaction_snark
+      ; Layer_tooling.mina_metrics
       ; Layer_transaction.mina_transaction
+      ; Layer_transaction.transaction_witness
       ; local "network_pool"
       ; local "staged_ledger"
-      ; Layer_logging.logger
-      ; Layer_base.currency
-      ; Layer_base.one_or_two
-      ; Layer_protocol.transaction_snark
-      ; Layer_concurrency.pipe_lib
       ; local "transition_frontier"
-      ; Layer_base.with_hash
-      ; Layer_tooling.mina_metrics
+      ; local "transition_frontier_base"
       ; local "transition_frontier_extensions"
-      ; Layer_ledger.mina_ledger
-      ; Layer_ppx.ppx_version_runtime
-      ; Layer_logging.o1trace
       ]
     ~ppx:
       (Ppx.custom
@@ -264,11 +264,11 @@ let work_partitioner =
     ~deps:
       [ async
       ; core_kernel
-      ; Layer_base.mina_base
       ; snark_work_lib
+      ; work_selector
+      ; Layer_base.mina_base
       ; Layer_protocol.transaction_snark
       ; Layer_transaction.transaction_witness
-      ; work_selector
       ]
     ~ppx:
       (Ppx.custom

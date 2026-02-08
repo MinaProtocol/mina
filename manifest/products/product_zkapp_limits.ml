@@ -9,9 +9,9 @@ let () =
       [ base
       ; base_caml
       ; core_kernel
-      ; Layer_domain.genesis_constants
       ; Layer_base.mina_base
       ; Layer_base.mina_stdlib
+      ; Layer_domain.genesis_constants
       ]
     ~ppx:
       (Ppx.custom

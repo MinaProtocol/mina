@@ -13,14 +13,14 @@ let hash_prefix_states =
   library "hash_prefix_states" ~path:"src/lib/hash_prefix_states"
     ~inline_tests:true ~library_flags:[ "-linkall" ]
     ~deps:
-      [ core_kernel
-      ; base
-      ; Layer_crypto.snark_params
-      ; Layer_crypto.random_oracle
-      ; local "mina_signature_kind"
+      [ base
+      ; core_kernel
       ; Layer_crypto.hash_prefixes
-      ; local "hash_prefix_create"
+      ; Layer_crypto.random_oracle
+      ; Layer_crypto.snark_params
       ; Layer_pickles.pickles
+      ; local "hash_prefix_create"
+      ; local "mina_signature_kind"
       ]
     ~ppx:
       (Ppx.custom
@@ -52,11 +52,11 @@ let hash_prefix_create_js =
   library "hash_prefix_create.js" ~internal_name:"hash_prefix_create_js"
     ~path:"src/lib/hash_prefix_states/hash_prefix_create/js"
     ~deps:
-      [ js_of_ocaml
-      ; base
+      [ base
       ; core_kernel
-      ; Layer_pickles.pickles
+      ; js_of_ocaml
       ; Layer_crypto.random_oracle
+      ; Layer_pickles.pickles
       ]
     ~implements:"hash_prefix_create" ~ppx:Ppx.minimal
 
@@ -68,25 +68,25 @@ let data_hash_lib =
       ; core_kernel
       ; ppx_inline_test_config
       ; Layer_base.base58_check
-      ; Layer_crypto.bignum_bigint
-      ; Snarky_lib.bitstring_lib
       ; Layer_base.codable
+      ; Layer_base.mina_wire_types
+      ; Layer_crypto.bignum_bigint
+      ; Layer_crypto.outside_hash_image
+      ; Layer_crypto.random_oracle
+      ; Layer_crypto.random_oracle_input
+      ; Layer_crypto.snark_params
+      ; Layer_pickles.pickles
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_snarky.snark_bits
+      ; Layer_test.test_util
+      ; Snarky_lib.bitstring_lib
+      ; Snarky_lib.fold_lib
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.snarky_intf
       ; local "fields_derivers"
       ; local "fields_derivers_graphql"
       ; local "fields_derivers_json"
       ; local "fields_derivers_zkapps"
-      ; Snarky_lib.fold_lib
-      ; Layer_base.mina_wire_types
-      ; Layer_crypto.outside_hash_image
-      ; Layer_pickles.pickles
-      ; Layer_ppx.ppx_version_runtime
-      ; Layer_crypto.random_oracle
-      ; Layer_crypto.random_oracle_input
-      ; Layer_snarky.snark_bits
-      ; Layer_crypto.snark_params
-      ; Snarky_lib.snarky_backendless
-      ; Snarky_lib.snarky_intf
-      ; Layer_test.test_util
       ]
     ~ppx:
       (Ppx.custom
@@ -106,28 +106,28 @@ let block_time =
   library "block_time" ~path:"src/lib/block_time" ~inline_tests:true
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ integers
-      ; base_caml
-      ; bin_prot_shape
-      ; sexplib0
-      ; async_kernel
-      ; core_kernel
+      [ async_kernel
       ; base
+      ; base_caml
       ; base_internalhash_types
-      ; Layer_base.mina_wire_types
-      ; Snarky_lib.bitstring_lib
-      ; Layer_pickles.pickles
-      ; Layer_base.unsigned_extended
-      ; Layer_crypto.snark_params
+      ; bin_prot_shape
+      ; core_kernel
+      ; integers
+      ; sexplib0
       ; Layer_base.mina_numbers
-      ; Layer_logging.logger
-      ; Layer_snarky.snark_bits
+      ; Layer_base.mina_wire_types
+      ; Layer_base.unsigned_extended
       ; Layer_concurrency.timeout_lib
       ; Layer_crypto.crypto_params
-      ; Snarky_lib.snarky_backendless
-      ; Layer_crypto.random_oracle_input
       ; Layer_crypto.random_oracle
+      ; Layer_crypto.random_oracle_input
+      ; Layer_crypto.snark_params
+      ; Layer_logging.logger
+      ; Layer_pickles.pickles
       ; Layer_ppx.ppx_version_runtime
+      ; Layer_snarky.snark_bits
+      ; Snarky_lib.bitstring_lib
+      ; Snarky_lib.snarky_backendless
       ]
     ~ppx:
       (Ppx.custom
@@ -147,10 +147,10 @@ let block_time =
 let proof_carrying_data =
   library "proof_carrying_data" ~path:"src/lib/proof_carrying_data"
     ~deps:
-      [ core_kernel
-      ; bin_prot_shape
-      ; base
+      [ base
       ; base_caml
+      ; bin_prot_shape
+      ; core_kernel
       ; sexplib0
       ; Layer_base.mina_wire_types
       ; Layer_ppx.ppx_version_runtime
@@ -163,29 +163,29 @@ let genesis_constants =
   library "genesis_constants" ~path:"src/lib/genesis_constants"
     ~inline_tests:true ~library_flags:[ "-linkall" ]
     ~deps:
-      [ ppx_inline_test_config
-      ; base
+      [ base
+      ; base_caml
       ; bin_prot_shape
       ; core_kernel
-      ; base_caml
-      ; sexplib0
+      ; data_hash_lib
       ; integers
-      ; Layer_node.mina_node_config_intf
-      ; Layer_node.mina_node_config_for_unit_tests
-      ; Layer_node.mina_node_config
+      ; ppx_inline_test_config
+      ; sexplib0
+      ; Layer_base.currency
+      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
       ; Layer_base.unsigned_extended
-      ; Layer_base.mina_numbers
-      ; Layer_pickles.pickles
-      ; Layer_base.currency
       ; Layer_crypto.blake2
-      ; data_hash_lib
-      ; Layer_pickles.pickles_backend
-      ; Layer_snarky.snark_keys_header
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
-      ; Layer_test.test_util
+      ; Layer_node.mina_node_config
+      ; Layer_node.mina_node_config_for_unit_tests
+      ; Layer_node.mina_node_config_intf
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
       ; Layer_ppx.ppx_version_runtime
+      ; Layer_snarky.snark_keys_header
+      ; Layer_test.test_util
       ]
     ~ppx:
       (Ppx.custom
@@ -210,16 +210,16 @@ let node_addrs_and_ports =
   library "node_addrs_and_ports" ~path:"src/lib/node_addrs_and_ports"
     ~inline_tests:true
     ~deps:
-      [ core
-      ; async
-      ; yojson
-      ; sexplib0
+      [ async
       ; base_caml
-      ; core_kernel
       ; bin_prot_shape
-      ; local "network_peer"
-      ; Layer_ppx.ppx_version_runtime
+      ; core
+      ; core_kernel
+      ; sexplib0
+      ; yojson
       ; Layer_base.mina_stdlib
+      ; Layer_ppx.ppx_version_runtime
+      ; local "network_peer"
       ]
     ~ppx:
       (Ppx.custom
@@ -249,11 +249,11 @@ let fields_derivers_json =
     ~path:"src/lib/fields_derivers_json" ~inline_tests:true
     ~deps:
       [ core_kernel
+      ; fields_derivers
       ; fieldslib
       ; ppx_inline_test_config
       ; result
       ; yojson
-      ; fields_derivers
       ]
     ~ppx:
       (Ppx.custom
@@ -273,13 +273,13 @@ let fields_derivers_graphql =
     ~deps:
       [ async_kernel
       ; core_kernel
+      ; fields_derivers
       ; fieldslib
       ; graphql
       ; graphql_async
       ; graphql_parser
       ; ppx_inline_test_config
       ; yojson
-      ; fields_derivers
       ]
     ~ppx:
       (Ppx.custom
@@ -299,6 +299,9 @@ let fields_derivers_zkapps =
       [ base
       ; base_caml
       ; core_kernel
+      ; fields_derivers
+      ; fields_derivers_graphql
+      ; fields_derivers_json
       ; fieldslib
       ; graphql
       ; graphql_parser
@@ -306,16 +309,13 @@ let fields_derivers_zkapps =
       ; result
       ; sexplib0
       ; Layer_base.currency
-      ; fields_derivers
-      ; fields_derivers_graphql
-      ; fields_derivers_json
       ; Layer_base.mina_numbers
-      ; Layer_pickles.pickles
+      ; Layer_base.unsigned_extended
+      ; Layer_base.with_hash
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
-      ; Layer_base.unsigned_extended
-      ; Layer_base.with_hash
+      ; Layer_pickles.pickles
       ]
     ~ppx:
       (Ppx.custom
@@ -333,22 +333,22 @@ let parallel_scan =
   library "parallel_scan" ~path:"src/lib/parallel_scan" ~inline_tests:true
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ ppx_inline_test_config
-      ; base
-      ; core_kernel
-      ; sexplib0
-      ; async
-      ; digestif
-      ; core
-      ; lens
+      [ async
       ; async_kernel
-      ; bin_prot_shape
-      ; base_caml
       ; async_unix
-      ; Layer_tooling.mina_metrics
+      ; base
+      ; base_caml
+      ; bin_prot_shape
+      ; core
+      ; core_kernel
+      ; digestif
+      ; lens
+      ; ppx_inline_test_config
+      ; sexplib0
       ; Layer_base.mina_stdlib
       ; Layer_concurrency.pipe_lib
       ; Layer_ppx.ppx_version_runtime
+      ; Layer_tooling.mina_metrics
       ]
     ~ppx:
       (Ppx.custom
@@ -366,8 +366,8 @@ let dummy_values =
     ~deps:
       [ core_kernel
       ; Layer_crypto.crypto_params
-      ; Snarky_lib.snarky_backendless
       ; Layer_pickles.pickles
+      ; Snarky_lib.snarky_backendless
       ]
     ~ppx_runtime_libraries:[ "base" ]
     ~ppx:
@@ -391,24 +391,24 @@ let dummy_values =
 let () =
   private_executable ~path:"src/lib/dummy_values/gen_values"
     ~deps:
-      [ async_unix
-      ; stdio
+      [ async
+      ; async_kernel
+      ; async_unix
       ; base_caml
-      ; ocaml_migrate_parsetree
+      ; compiler_libs
       ; core
-      ; async
+      ; core_kernel
+      ; ocaml_compiler_libs_common
+      ; ocaml_migrate_parsetree
       ; ppxlib
       ; ppxlib_ast
       ; ppxlib_astlib
-      ; core_kernel
-      ; compiler_libs
-      ; async_kernel
-      ; ocaml_compiler_libs_common
-      ; Layer_pickles.pickles_types
-      ; Layer_pickles.pickles
+      ; stdio
       ; Layer_crypto.crypto_params
-      ; Layer_tooling.mina_metrics_none
       ; Layer_logging.logger_fake
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_types
+      ; Layer_tooling.mina_metrics_none
       ]
     ~forbidden_libraries:[ "mina_node_config"; "protocol_version" ]
     ~ppx:

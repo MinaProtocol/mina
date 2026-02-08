@@ -35,18 +35,18 @@ let cache_lib =
 
 let multi_key_file_storage =
   library "multi_key_file_storage" ~path:"src/lib/multi-key-file-storage"
-    ~deps:[ core_kernel; bin_prot; Layer_base.mina_stdlib ]
+    ~deps:[ bin_prot; core_kernel; Layer_base.mina_stdlib ]
     ~modules_without_implementation:[ "intf" ] ~ppx:Ppx.mina
 
 let disk_cache_intf =
   library "disk_cache.intf" ~internal_name:"disk_cache_intf"
     ~path:"src/lib/disk_cache/intf"
-    ~deps:[ core_kernel; async_kernel; Layer_logging.logger ]
+    ~deps:[ async_kernel; core_kernel; Layer_logging.logger ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])
 
 let cache_dir =
   library "cache_dir" ~path:"src/lib/cache_dir"
-    ~deps:[ async_kernel; local "key_cache"; Layer_logging.logger ]
+    ~deps:[ async_kernel; Layer_logging.logger; local "key_cache" ]
     ~ppx:Ppx.minimal ~virtual_modules:[ "cache_dir" ]
     ~default_implementation:"cache_dir.native"
 
@@ -54,16 +54,16 @@ let cache_dir_native =
   library "cache_dir.native" ~internal_name:"cache_dir_native"
     ~path:"src/lib/cache_dir/native"
     ~deps:
-      [ base_caml
+      [ async
+      ; async_kernel
       ; async_unix
       ; base
+      ; base_caml
       ; core
-      ; async
       ; core_kernel
       ; stdio
-      ; async_kernel
-      ; local "key_cache"
       ; Layer_logging.logger
+      ; local "key_cache"
       ]
     ~ppx:
       (Ppx.custom
@@ -89,31 +89,38 @@ let rocksdb =
       [ async
       ; async_kernel
       ; async_unix
-      ; base_internalhash_types
       ; base_caml
+      ; base_internalhash_types
       ; core
-      ; core_uuid
       ; core_kernel
       ; core_kernel_uuid
+      ; core_uuid
+      ; key_value_database
       ; ppx_inline_test_config
       ; rocks
       ; sexplib0
       ; Layer_base.mina_stdlib_unix
-      ; key_value_database
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
     ~synopsis:"RocksDB Database module"
 
 let key_cache =
   library "key_cache" ~path:"src/lib/key_cache"
-    ~deps:[ core_kernel; async_kernel ]
+    ~deps:[ async_kernel; core_kernel ]
     ~ppx:Ppx.minimal
 
 let key_cache_sync =
   library "key_cache.sync" ~internal_name:"key_cache_sync"
     ~path:"src/lib/key_cache/sync"
     ~deps:
-      [ async; core; core_kernel; base; stdio; key_cache; Layer_logging.logger ]
+      [ async
+      ; base
+      ; core
+      ; core_kernel
+      ; key_cache
+      ; stdio
+      ; Layer_logging.logger
+      ]
     ~ppx:
       (Ppx.custom
          [ Ppx_lib.ppx_mina
@@ -128,12 +135,12 @@ let key_cache_async =
     ~path:"src/lib/key_cache/async"
     ~deps:
       [ async
-      ; core
       ; async_kernel
       ; async_unix
-      ; core_kernel
       ; base
       ; base_caml
+      ; core
+      ; core_kernel
       ; key_cache
       ; Layer_logging.logger
       ]
@@ -154,7 +161,7 @@ let key_cache_native =
 
 let lmdb_storage =
   library "lmdb_storage" ~path:"src/lib/lmdb_storage"
-    ~deps:[ lmdb; Layer_crypto.blake2; Layer_base.mina_stdlib_unix ]
+    ~deps:[ lmdb; Layer_base.mina_stdlib_unix; Layer_crypto.blake2 ]
     ~ppx:
       (Ppx.custom
          [ Ppx_lib.ppx_deriving_std
@@ -175,12 +182,12 @@ let disk_cache_filesystem =
     ~path:"src/lib/disk_cache/filesystem" ~inline_tests:true
     ~implements:"disk_cache"
     ~deps:
-      [ core
-      ; async
-      ; Layer_logging.logger
+      [ async
+      ; core
       ; Layer_base.mina_stdlib_unix
-      ; local "disk_cache_utils"
+      ; Layer_logging.logger
       ; local "disk_cache_test_lib"
+      ; local "disk_cache_utils"
       ]
     ~ppx:
       (Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
@@ -196,11 +203,11 @@ let disk_cache_lmdb =
   library "disk_cache.lmdb" ~internal_name:"disk_cache_lmdb"
     ~path:"src/lib/disk_cache/lmdb" ~inline_tests:true ~implements:"disk_cache"
     ~deps:
-      [ core_kernel
-      ; core
+      [ core
+      ; core_kernel
       ; lmdb_storage
-      ; local "disk_cache_utils"
       ; local "disk_cache_test_lib"
+      ; local "disk_cache_utils"
       ]
     ~ppx:
       (Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_mina ])
@@ -209,12 +216,12 @@ let disk_cache_test_lib =
   library "disk_cache.test_lib" ~internal_name:"disk_cache_test_lib"
     ~path:"src/lib/disk_cache/test_lib"
     ~deps:
-      [ core
-      ; async
-      ; mina_stdlib
-      ; Layer_logging.logger
-      ; Layer_base.mina_stdlib_unix
+      [ async
+      ; core
       ; disk_cache_intf
+      ; mina_stdlib
+      ; Layer_base.mina_stdlib_unix
+      ; Layer_logging.logger
       ]
     ~ppx:
       (Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
@@ -228,8 +235,8 @@ let test_cache_deadlock_lib =
       ; core
       ; core_kernel
       ; disk_cache_intf
-      ; Layer_logging.logger
       ; Layer_base.mina_stdlib_unix
+      ; Layer_logging.logger
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version ])
     ~flags:
@@ -255,17 +262,17 @@ let () =
 let disk_cache_utils =
   library "disk_cache.utils" ~internal_name:"disk_cache_utils"
     ~path:"src/lib/disk_cache/utils"
-    ~deps:[ core; async; Layer_base.mina_stdlib_unix; Layer_logging.logger ]
+    ~deps:[ async; core; Layer_base.mina_stdlib_unix; Layer_logging.logger ]
     ~ppx:
       (Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
 let zkapp_vk_cache_tag =
   library "zkapp_vk_cache_tag" ~path:"src/lib/zkapp_vk_cache_tag"
     ~deps:
-      [ core_kernel
-      ; async
-      ; Layer_logging.logger
+      [ async
+      ; core_kernel
       ; disk_cache
       ; Layer_base.mina_base
+      ; Layer_logging.logger
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])

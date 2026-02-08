@@ -21,11 +21,11 @@ let () =
       ; result
       ; stdio
       ; uri
-      ; Product_archive.archive_lib
+      ; Layer_base.mina_stdlib
       ; Layer_domain.genesis_constants
       ; Layer_logging.logger
       ; Layer_network.mina_block
-      ; Layer_base.mina_stdlib
+      ; Product_archive.archive_lib
       ]
     ~ppx:
       (Ppx.custom

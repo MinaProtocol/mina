@@ -34,27 +34,27 @@ let rosetta_lib =
   library "rosetta_lib" ~path:"src/lib/rosetta_lib"
     ~library_flags:[ "-linkall" ]
     ~deps:
-      [ result
+      [ async_kernel
+      ; base
       ; base_caml
       ; caqti
       ; core_kernel
-      ; base
-      ; async_kernel
-      ; uri
-      ; sexplib0
       ; integers
-      ; Layer_base.mina_wire_types
+      ; result
+      ; rosetta_models
+      ; sexplib0
+      ; uri
+      ; Layer_base.currency
       ; Layer_base.hex
-      ; Layer_crypto.random_oracle_input
+      ; Layer_base.mina_base
+      ; Layer_base.mina_base_import
       ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
+      ; Layer_base.mina_wire_types
+      ; Layer_base.unsigned_extended
+      ; Layer_crypto.random_oracle_input
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
-      ; rosetta_models
-      ; Layer_base.mina_base
-      ; Layer_base.currency
-      ; Layer_base.unsigned_extended
-      ; Layer_base.mina_base_import
       ]
     ~ppx:
       (Ppx.custom

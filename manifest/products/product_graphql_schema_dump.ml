@@ -11,9 +11,9 @@ let () =
       ; graphql_async
       ; graphql_parser
       ; yojson
-      ; Layer_domain.genesis_constants
-      ; local "mina_graphql"
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_version
+      ; Layer_domain.genesis_constants
+      ; local "mina_graphql"
       ]
     ~ppx:Ppx.minimal

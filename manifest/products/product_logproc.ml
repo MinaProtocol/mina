@@ -14,9 +14,9 @@ let () =
       ; stdio
       ; yojson
       ; Layer_base.interpolator_lib
-      ; Layer_logging.logger
       ; Layer_base.logproc_lib
       ; Layer_base.mina_stdlib
+      ; Layer_logging.logger
       ]
     ~ppx:
       (Ppx.custom

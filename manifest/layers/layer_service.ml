@@ -19,31 +19,31 @@ let verifier =
       ; core_kernel
       ; rpc_parallel
       ; sexplib0
-      ; Layer_protocol.blockchain_snark
-      ; Layer_concurrency.child_processes
       ; Layer_base.error_json
-      ; Layer_domain.genesis_constants
-      ; Layer_tooling.internal_tracing
-      ; local "itn_logger"
-      ; Layer_kimchi.kimchi_backend
-      ; Layer_kimchi.kimchi_pasta
-      ; Layer_kimchi.kimchi_pasta_basic
-      ; Layer_snark_worker.ledger_proof
-      ; Layer_logging.logger
-      ; Layer_logging.logger_file_system
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
+      ; Layer_base.with_hash
+      ; Layer_concurrency.child_processes
       ; Layer_consensus.mina_state
-      ; Layer_logging.o1trace
-      ; Layer_pickles.pickles
-      ; Layer_pickles.pickles_backend
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
-      ; Snarky_lib.snarky_backendless
+      ; Layer_domain.genesis_constants
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
+      ; Layer_logging.logger
+      ; Layer_logging.logger_file_system
+      ; Layer_logging.o1trace
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_protocol.blockchain_snark
       ; Layer_protocol.transaction_snark
-      ; Layer_base.with_hash
+      ; Layer_snark_worker.ledger_proof
+      ; Layer_tooling.internal_tracing
+      ; Snarky_lib.snarky_backendless
+      ; local "itn_logger"
       ]
     ~ppx:
       (Ppx.custom
@@ -63,53 +63,53 @@ let verifier =
 let prover =
   library "prover" ~path:"src/lib/prover"
     ~deps:
-      [ base64
-      ; async_unix
-      ; rpc_parallel
-      ; core
-      ; async
+      [ async
       ; async_kernel
-      ; core_kernel
-      ; bin_prot_shape
+      ; async_unix
+      ; base64
       ; base_caml
+      ; bin_prot_shape
+      ; core
+      ; core_kernel
+      ; rpc_parallel
       ; sexplib0
-      ; Layer_base.with_hash
-      ; Layer_consensus.coda_genesis_ledger
-      ; Layer_tooling.mina_metrics
-      ; Layer_base.error_json
-      ; Layer_pickles.pickles_types
-      ; Snarky_lib.snarky_backendless
-      ; Layer_crypto.snark_params
-      ; Layer_pickles.pickles
-      ; Layer_crypto.sgn
       ; Layer_base.currency
-      ; Layer_concurrency.child_processes
-      ; Layer_protocol.blockchain_snark
-      ; local "mina_block"
-      ; Layer_consensus.mina_state
+      ; Layer_base.error_json
       ; Layer_base.mina_base
       ; Layer_base.mina_compile_config
-      ; Layer_logging.logger
-      ; local "itn_logger"
-      ; Layer_tooling.internal_tracing
-      ; Layer_domain.genesis_constants
-      ; Layer_snark_worker.ledger_proof
-      ; Layer_consensus.consensus
-      ; Layer_consensus.coda_genesis_proof
-      ; Layer_protocol.transaction_snark
-      ; Layer_logging.logger_file_system
-      ; Layer_domain.data_hash_lib
-      ; Layer_ledger.staged_ledger_diff
-      ; Layer_ppx.ppx_version_runtime
-      ; Layer_transaction.mina_transaction_logic
-      ; Layer_pickles.pickles_backend
-      ; Layer_base.sgn_type
-      ; Layer_kimchi.kimchi_backend
       ; Layer_base.mina_numbers
+      ; Layer_base.mina_wire_types
+      ; Layer_base.sgn_type
+      ; Layer_base.with_hash
+      ; Layer_concurrency.child_processes
+      ; Layer_concurrency.promise
+      ; Layer_consensus.coda_genesis_ledger
+      ; Layer_consensus.coda_genesis_proof
+      ; Layer_consensus.consensus
+      ; Layer_consensus.mina_state
+      ; Layer_crypto.sgn
+      ; Layer_crypto.snark_params
+      ; Layer_domain.data_hash_lib
+      ; Layer_domain.genesis_constants
+      ; Layer_kimchi.kimchi_backend
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
-      ; Layer_base.mina_wire_types
-      ; Layer_concurrency.promise
+      ; Layer_ledger.staged_ledger_diff
+      ; Layer_logging.logger
+      ; Layer_logging.logger_file_system
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_protocol.blockchain_snark
+      ; Layer_protocol.transaction_snark
+      ; Layer_snark_worker.ledger_proof
+      ; Layer_tooling.internal_tracing
+      ; Layer_tooling.mina_metrics
+      ; Layer_transaction.mina_transaction_logic
+      ; Snarky_lib.snarky_backendless
+      ; local "itn_logger"
+      ; local "mina_block"
       ]
     ~ppx:
       (Ppx.custom

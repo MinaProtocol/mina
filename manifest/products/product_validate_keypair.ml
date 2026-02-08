@@ -16,9 +16,9 @@ let () =
       [ async
       ; async_unix
       ; core_kernel
-      ; local "cli_lib"
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_version
+      ; local "cli_lib"
       ]
     ~ppx:
       (Ppx.custom
