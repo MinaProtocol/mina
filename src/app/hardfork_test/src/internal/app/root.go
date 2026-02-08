@@ -64,8 +64,8 @@ func init() {
 	rootCmd.Flags().IntVar(&cfg.ForkSlot, "fork-slot", cfg.ForkSlot, "Slot duration in seconds for fork version")
 
 	// Delay configuration
-	rootCmd.Flags().IntVar(&cfg.MainDelay, "main-delay", cfg.MainDelay, "Delay before genesis slot in minutes for main version")
-	rootCmd.Flags().IntVar(&cfg.ForkDelay, "fork-delay", cfg.ForkDelay, "Delay before genesis slot in minutes for fork version")
+	rootCmd.Flags().IntVar(&cfg.MainDelayMin, "main-delay", cfg.MainDelayMin, "Delay before genesis slot in minutes for main version")
+	rootCmd.Flags().IntVar(&cfg.HfSlotDelta, "hf-slot-delta", cfg.HfSlotDelta, "Difference in slot between slot-chain-end and genesis of new network")
 
 	// Script directory configuration
 	rootCmd.Flags().StringVar(&cfg.ScriptDir, "script-dir", cfg.ScriptDir, "Path to the hardfork script directory")
@@ -84,7 +84,8 @@ func init() {
 	rootCmd.Flags().IntVar(&cfg.UserCommandCheckMaxIterations, "user-command-check-max-iterations", cfg.UserCommandCheckMaxIterations, "Max iterations to check for user commands in blocks")
 	rootCmd.Flags().IntVar(&cfg.ForkEarliestBlockMaxRetries, "fork-earliest-block-max-retries", cfg.ForkEarliestBlockMaxRetries, "Maximum number of retries to wait for earliest block in fork network")
 	rootCmd.Flags().IntVar(&cfg.HTTPClientTimeoutSeconds, "http-timeout", cfg.HTTPClientTimeoutSeconds, "HTTP client timeout in seconds for GraphQL requests")
-	rootCmd.Flags().IntVar(&cfg.GraphQLMaxRetries, "graphql-max-retries", cfg.GraphQLMaxRetries, "Maximum number of retries for GraphQL requests")
+	rootCmd.Flags().IntVar(&cfg.ClientMaxRetries, "client-max-retries", cfg.ClientMaxRetries, "Maximum number of retries for client requests")
+	rootCmd.Flags().Var(&cfg.ForkMethod, "fork-method", "The implementation of fork")
 
 	// Mark required flags
 	rootCmd.MarkFlagRequired("main-mina-exe")
