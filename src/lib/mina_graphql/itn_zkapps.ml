@@ -187,6 +187,8 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
     Transaction_snark.For_tests.create_trivial_snapp ()
   in
   let%bind.Deferred vk = vk in
+  (* Cache for max cost zkapp proof reuse *)
+  let cache = ref Signature_lib.Public_key.Compressed.Map.empty in
   let account_queue = Queue.create () in
   let num_fee_payers = Array.length fee_payer_array in
   Deferred.repeat_until_finished (init_tm_next, init_counter)
@@ -203,7 +205,7 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
     Uuid.Table.remove scheduler_tbl uuid ;
     Deferred.return (`Finished ()) )
   else
-    let fee_payer = fee_payer_array.(ndx) in
+    let fee_payer : Signature_lib.Keypair.t = fee_payer_array.(ndx) in
     let zkapp_dummy_opt_res =
       O1trace.sync_thread "itn_generate_dummy_zkapp"
       @@ fun () ->
@@ -229,6 +231,9 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
           let memo =
             sprintf "%s-%d" zkapp_command_details.memo_prefix counter
           in
+          let fee_payer_pk =
+            Signature_lib.Public_key.compress fee_payer.public_key
+          in
           Result.try_with
           @@ fun () ->
           Option.some
@@ -239,7 +244,7 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
                    ~fee_range:
                      ( zkapp_command_details.min_fee
                      , zkapp_command_details.max_fee )
-                   ~fee_payer_keypair:fee_payer ~account_state_tbl ~vk
+                   ~fee_payer_pk ~account_state_tbl ~vk
                    ~genesis_constants:
                      (Mina_lib.config mina).precomputed_values.genesis_constants
                    ()
@@ -282,8 +287,15 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
         let%bind zkapp_command =
           O1trace.thread "itn_replace_zkapp_auth"
           @@ fun () ->
-          Zkapp_command_builder.replace_authorizations ~prover ~keymap
-            zkapp_dummy
+          (* Use cache for max cost zkapp commands *)
+          if zkapp_command_details.max_cost then
+            Mina_generators.Zkapp_command_generators
+            .replace_proof_authorizations_for_max_cost ~cache ~prover ~keymap
+              zkapp_dummy
+            >>= Zkapp_command_builder.replace_authorizations ~keymap
+          else
+            Zkapp_command_builder.replace_authorizations ~prover ~keymap
+              zkapp_dummy
         in
         let%bind () =
           O1trace.thread "itn_send_zkapp"

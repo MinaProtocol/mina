@@ -422,30 +422,88 @@ let mk_payment ~(valid_until : Mina_numbers.Global_slot_since_genesis.t)
   in
   { Signed_command.Poly.signer = signer_keypair.public_key; signature; payload }
 
-let generate_txs ~valid_until ~init_nonce ~n_zkapp_txs ~n_payments ~n_blocks
-    ~constraint_constants keypair : User_command.Valid.t Sequence.t list =
-  let signer_pk = Public_key.compress keypair.Keypair.public_key in
+(** Create a transaction to create [n_accounts] many zkapp accounts and insert them into 
+    the accounts table.
+*)
+let create_zkapp_accounts_tx
+    ?(fee = Currency.Fee.of_nanomina_int_exn 20_000_000)
+    ?(initial_balance = Currency.Balance.of_mina_int_exn 10)
+    ~constraint_constants ~sender ~nonce_ref ~n_accounts ~account_state_tbl =
+  let zkapp_keypairs =
+    List.init n_accounts ~f:(fun _ ->
+        let sk, zkapp_account =
+          Quickcheck.random_value
+          @@ Account.gen_zkapp_account_with_private_key
+               ~token_id:Token_id.default ~balance:initial_balance
+        in
+        Account_id.Table.set account_state_tbl
+          ~key:(Account.identifier zkapp_account)
+          ~data:(zkapp_account, `Ordinary_participant) ;
+        Keypair.of_private_key_exn sk )
+  in
+  let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t) =
+    { sender = (sender, !nonce_ref)
+    ; fee
+    ; fee_payer = None
+    ; amount = Currency.Balance.to_amount initial_balance
+    ; zkapp_account_keypairs = zkapp_keypairs
+    ; memo = Signed_command_memo.create_from_string_exn "Zkapp create accounts"
+    ; new_zkapp_account = true
+    ; snapp_update = Account_update.Update.dummy
+    ; preconditions = None
+    ; authorization_kind = Signature
+    }
+  in
+  let%map tx =
+    Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+      ~signature_kind:Testnet zkapp_command_spec
+  in
+  Ref.replace nonce_ref Unsigned.UInt32.succ ;
+  tx
+
+let generate_txs ~valid_until ~nonce_ref ~n_zkapp_txs ~n_payments ~n_blocks
+    ~constraint_constants ~max_cost ~account_state_tbl ~vk ~genesis_constants
+    fee_payer_keypair : User_command.Valid.t Sequence.t list =
+  let signer_pk = Public_key.compress fee_payer_keypair.Keypair.public_key in
   let event_elements = 12 in
   let action_elements = 12 in
-  let generate_payments block_i =
+  let generate_payments () =
     Sequence.init (n_payments + n_zkapp_txs) ~f:(fun i ->
-        let nonce =
-          Mina_numbers.Account_nonce.(
-            add init_nonce @@ of_int
-            @@ ((block_i * (n_payments + n_zkapp_txs)) + i))
-        in
         let command =
-          if i < n_payments then
+          if i < n_payments then (
             (* Creates a simple payment that initializes a new account *)
-            User_command.Signed_command
-              (mk_payment ~valid_until ~nonce ~signer_pk keypair)
+            let res =
+              User_command.Signed_command
+                (mk_payment ~valid_until ~nonce:!nonce_ref ~signer_pk
+                   fee_payer_keypair )
+            in
+            Ref.replace nonce_ref Unsigned.UInt32.succ ;
+            res )
+          else if max_cost then (
+            let max_cost_cmd =
+              Quickcheck.Generator.generate
+                (Mina_generators.Zkapp_command_generators
+                 .gen_max_cost_zkapp_command_from
+                   ~fee_payer_pk:
+                     (Public_key.compress fee_payer_keypair.public_key)
+                   ~account_state_tbl ~vk ~genesis_constants () )
+                ~size:1
+                ~random:(Splittable_random.State.create Random.State.default)
+            in
+            Ref.replace nonce_ref Unsigned.UInt32.succ ;
+            Zkapp_command max_cost_cmd )
           else
             (* Generates a 9-account-update zkapp transaction
                creating 8 new accounts with 0 balance each *)
-            Zkapp_command
-              (Test_ledger_application.mk_tx
-                 ~transfer_parties_get_actions_events:true ~event_elements
-                 ~action_elements ~constraint_constants keypair nonce )
+            let res =
+              User_command.Zkapp_command
+                (Test_ledger_application.mk_tx
+                   ~transfer_parties_get_actions_events:true ~event_elements
+                   ~action_elements ~constraint_constants fee_payer_keypair
+                   !nonce_ref )
+            in
+            Ref.replace nonce_ref Unsigned.UInt32.succ ;
+            res
         in
         (* This is used in the context of a test, and we know that the command is valid *)
         let (`If_this_is_used_it_should_have_a_comment_justifying_it
@@ -454,9 +512,9 @@ let generate_txs ~valid_until ~init_nonce ~n_zkapp_txs ~n_payments ~n_blocks
         in
         valid_command )
   in
-  List.init n_blocks ~f:generate_payments
+  List.init n_blocks ~f:(fun _ -> generate_payments ())
 
-let load_and_initialize_config ~logger ~config_file =
+let load_and_initialize_config ~genesis_dir ~logger ~config_file =
   let%bind runtime_config_json =
     Genesis_ledger_helper.load_config_json config_file >>| Or_error.ok_exn
   in
@@ -470,7 +528,7 @@ let load_and_initialize_config ~logger ~config_file =
   let proof_level = Genesis_constants.Compiled.proof_level in
   Genesis_ledger_helper.init_from_config_file ~genesis_constants
     ~constraint_constants ~logger ~proof_level ~cli_proof_level:None
-    ~genesis_dir:"genesis" runtime_config
+    ~genesis_dir runtime_config
   >>| Or_error.ok_exn
 
 let initialize_verifier_and_components ~logger
@@ -507,7 +565,7 @@ let initialize_verifier_and_components ~logger
   ((module Context : Consensus.Intf.CONTEXT), (module Keys : Keys_S), verifier)
 
 let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
-    ~n_blocks ~n_zkapp_txs ~n_payments ~keypair genesis =
+    ~n_blocks ~n_zkapp_txs ~n_payments ~max_cost ~fee_payer_keypair genesis =
   let genesis_slot =
     Block.protocol_state genesis
     |> Protocol_state.consensus_state
@@ -521,19 +579,63 @@ let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
     Mina_numbers.Global_slot_since_genesis.add genesis_slot
       (Mina_numbers.Global_slot_span.of_int @@ (n_blocks * 10))
   in
-  let signer_account_id = Account_id.of_public_key keypair.Keypair.public_key in
+  let signer_account_id =
+    Account_id.of_public_key fee_payer_keypair.Keypair.public_key
+  in
   let genesis_ledger = Staged_ledger.ledger genesis.staged_ledger in
-  let init_nonce =
+  let nonce_ref =
     (* Retrieve the nonce of the signer's account from genesis ledger. *)
     Mina_ledger.Ledger.location_of_account genesis_ledger signer_account_id
     |> Option.value_exn ~message:"Sender's account not found in ledger"
     |> Mina_ledger.Ledger.get genesis_ledger
     |> Option.value_exn
          ~message:"Sender's account not found in ledger by location"
-    |> Account.nonce
+    |> Account.nonce |> ref
   in
-  generate_txs ~init_nonce ~valid_until ~n_payments ~n_zkapp_txs ~n_blocks
-    ~constraint_constants:precomputed_values.constraint_constants keypair
+  let account_state_tbl = Account_id.Table.create () in
+  let genesis_accounts = Mina_ledger.Ledger.to_list_sequential genesis_ledger in
+  List.iter genesis_accounts ~f:(fun account ->
+      let account_id = Account.identifier account in
+      let role =
+        if Account_id.equal account_id signer_account_id then `Fee_payer
+        else `Ordinary_participant
+      in
+      Account_id.Table.set account_state_tbl ~key:account_id
+        ~data:(account, role) ) ;
+  let vk =
+    let data =
+      Pickles.Side_loaded.Verification_key.(
+        dummy |> to_base58_check |> of_base58_check_exn)
+    in
+    let hash = Zkapp_account.digest_vk data in
+    { With_hash.data; hash }
+  in
+
+  (* Always generate zkApp accounts in the first block *)
+  let%map gen_zk_apps_tx =
+    let%map tx =
+      create_zkapp_accounts_tx ?fee:None ?initial_balance:None
+        ~constraint_constants:precomputed_values.constraint_constants
+        ~sender:fee_payer_keypair ~nonce_ref ~n_accounts:10 ~account_state_tbl
+    in
+    let
+        (* This is used in the context of a test, and we know that the command is valid.
+           Respect my authoritah
+        *)
+        (`If_this_is_used_it_should_have_a_comment_justifying_it valid_command)
+        =
+      User_command.to_valid_unsafe (Zkapp_command tx)
+    in
+    valid_command
+  in
+
+  let rest_txs =
+    generate_txs ~nonce_ref ~valid_until ~n_payments ~n_zkapp_txs ~n_blocks
+      ~constraint_constants:precomputed_values.constraint_constants ~max_cost
+      ~account_state_tbl ~vk
+      ~genesis_constants:precomputed_values.genesis_constants fee_payer_keypair
+  in
+  List.cons (Sequence.singleton gen_zk_apps_tx) rest_txs
 
 let create_blocks_with_diffs ~logger
     ~(precomputed_values : Precomputed_values.t) ~verifier ~context ~keys_module
@@ -556,10 +658,10 @@ let create_blocks_with_diffs ~logger
   List.rev diffs_rev
 
 let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
-    ~n_payments ~n_blocks =
+    ~n_payments ~n_blocks ~max_cost ~output_file ~genesis_dir =
   (* Section 1: Load and initialize precomputed values from config *)
   let%bind precomputed_values =
-    load_and_initialize_config ~logger ~config_file
+    load_and_initialize_config ~logger ~config_file ~genesis_dir
   in
 
   (* Section 2: Initialize verifier and other components *)
@@ -573,19 +675,22 @@ let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
     Block.compute_genesis keys_module ~precomputed_values ~logger
   in
 
-  (* Section 4: Compute VRF to find n_blocks winning slots *)
-  [%log info] "Computing VRF to find %d winning slots" n_blocks ;
+  (* Section 4: Compute VRF to find n_blocks+1 winning slots (including zkApp deployment block) *)
+  [%log info] "Computing VRF to find %d winning slots" (n_blocks + 1) ;
   let%bind winning_slots =
-    find_winning_slots ~context ~precomputed_values ~n_blocks ~keypair genesis
+    find_winning_slots ~context ~precomputed_values ~n_blocks:(n_blocks + 1)
+      ~keypair genesis
   in
   [%log info] "Found %d winning slots" (List.length winning_slots) ;
 
   (* Section 5: Generate zkApp transactions and payments *)
-  [%log info] "Generate %d blocks with %d zkApp transactions and %d payments"
-    n_blocks n_zkapp_txs n_payments ;
-  let all_transactions =
+  [%log info]
+    "Generate %d blocks (1 zkApp deployment + %d user blocks) with %d zkApp \
+     transactions and %d payments"
+    (n_blocks + 1) n_blocks n_zkapp_txs n_payments ;
+  let%bind all_transactions =
     generate_all_transactions ~precomputed_values ~n_blocks ~n_zkapp_txs
-      ~n_payments ~keypair genesis
+      ~n_payments ~max_cost ~fee_payer_keypair:keypair genesis
   in
 
   (* Section 6: Create blocks *)
@@ -595,14 +700,45 @@ let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
       ~keys_module ~winning_slots ~all_transactions ~genesis
   in
 
-  (* Section 7: Submit blocks to archive *)
-  [%log info] "Submit blocks to archive at port %d" archive_node_port ;
+  (* Section 7: Submit blocks to archive or save to file *)
+  let%bind () =
+    match archive_node_port with
+    | Some port ->
+        [%log info] "Submit blocks to archive at port %d" port ;
+        Deferred.List.iter diffs ~f:(fun diff ->
+            (* Copied from archive_client.ml *)
+            Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t
+              (Transition_frontier diff)
+              { host = "127.0.0.1"; port }
+            >>| Or_error.ok_exn )
+    | None ->
+        [%log info] "Skipping archive submission (no archive port provided)" ;
+        Deferred.unit
+  in
+
+  (* Section 8: Save blocks to output file if specified *)
   let%map () =
-    Deferred.List.iter diffs ~f:(fun diff ->
-        (* Copied from archive_client.ml *)
-        Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t (Transition_frontier diff)
-          { host = "127.0.0.1"; port = archive_node_port }
-        >>| Or_error.ok_exn )
+    match output_file with
+    | Some file_path ->
+        [%log info] "Writing blocks to file: %s" file_path ;
+        let%map () =
+          Async.Writer.with_file file_path ~f:(fun writer ->
+              List.iter diffs ~f:(fun diff ->
+                  let archive_diff =
+                    Archive_lib.Diff.Transition_frontier diff
+                  in
+                  let serialized =
+                    Bin_prot.Writer.to_bytes Archive_lib.Diff.bin_writer_t
+                      archive_diff
+                  in
+                  Async.Writer.write_bytes writer serialized ) ;
+              Deferred.unit )
+        in
+        [%log info] "Successfully wrote %d blocks to %s" (List.length diffs)
+          file_path
+    | None ->
+        [%log info] "No output file specified, blocks generated in memory only" ;
+        Deferred.unit
   in
 
   [%log info] "Test completed"
@@ -610,16 +746,19 @@ let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
 let command =
   Command.async
     ~summary:
-      "Generate blocks with zkApp transactions and payments, and submit them \
-       to an archive node"
+      "Generate blocks with zkApp transactions and payments. Optionally submit \
+       to archive node or save to file for analysis."
     (let open Command.Let_syntax in
     let%map_open archive_node_port =
       flag "--archive-node-port"
-        ~doc:"PORT Archive node's daemon port to submit blocks to"
-        (required int)
+        ~doc:"PORT Archive node's daemon port to submit blocks to (optional)"
+        (optional int)
     and config_file =
       flag "--config-file" ~doc:"FILE Path to the runtime configuration file"
         (required string)
+    and genesis_dir =
+      flag "--genesis-dir" ~doc:"FILE Path to the genesis ledger directory"
+        (optional string)
     and privkey_path = Flag.privkey_read_path
     and n_zkapp_txs =
       flag "--num-zkapp-txs"
@@ -633,19 +772,30 @@ let command =
         (required int)
     and n_blocks =
       flag "--num-blocks" ~doc:"NUM Number of blocks to generate" (required int)
+    and max_cost =
+      flag "--max-cost" ~doc:" Generate maximum cost zkApp transactions" no_arg
+    and output_file =
+      flag "--output-file"
+        ~doc:
+          "FILE Write generated blocks to JSON file (useful when not \
+           submitting to archive)"
+        (optional string)
     in
     Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let logger = Logger.create ~id:Logger.Logger_id.mina () in
-    [%log info] "Starting submit-to-archive test"
-      ~metadata:
-        [ ("archive_node_port", `Int archive_node_port)
-        ; ("config_file", `String config_file)
-        ; ("n_zkapp_txs", `Int n_zkapp_txs)
-        ; ("n_payments", `Int n_payments)
-        ; ("n_blocks", `Int n_blocks)
-        ] ;
+    let metadata =
+      [ ("config_file", `String config_file)
+      ; ("n_zkapp_txs", `Int n_zkapp_txs)
+      ; ("n_payments", `Int n_payments)
+      ; ("n_blocks", `Int n_blocks)
+      ; ("max_cost", `Bool max_cost)
+      ; ("archive_node_port", [%to_yojson: int option] archive_node_port)
+      ; ("output_file", [%to_yojson: int option] archive_node_port)
+      ]
+    in
+    [%log info] "Starting submit-to-archive test" ~metadata ;
     [%log info] "Loading keypair from %s" privkey_path ;
     let%bind keypair =
       Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair" privkey_path
@@ -670,6 +820,7 @@ let command =
       ~transport:(Logger.Transport.stdout ())
       () ;
     let%bind () = Internal_tracing.toggle ~commit_id:"" ~logger `Enabled in
+    let genesis_dir = Option.value ~default:"genesis" genesis_dir in
 
     run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
-      ~n_payments ~n_blocks)
+      ~n_payments ~n_blocks ~max_cost ~output_file ~genesis_dir)
