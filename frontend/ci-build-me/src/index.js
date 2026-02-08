@@ -78,11 +78,11 @@ const parseParams = (comment) => {
 const buildEnvFromParams = ({ arch, profile, codename }) => {
   var filter = "DockerBuild";
 
-  if (!arch || !profile || !codename ) {
+  if (!arch || !profile || !codename) {
     return { BUILDKITE_PIPELINE_FILTER: filter };
   }
 
-  const profiles = ["devnet", "lightnet", "mainnet"];
+  const profiles = ["devnet", "lightnet", "mainnet", "testnet_generic"];
   const arches = ["amd64", "arm64"];
   const codenames = ["jammy", "noble", "bullseye", "focal", "bookworm"];
 
@@ -99,7 +99,7 @@ const buildEnvFromParams = ({ arch, profile, codename }) => {
     filter += codename.charAt(0).toUpperCase() + codename.slice(1); // Jammy / Noble / Bullseye / Focal / Bookworm
   }
 
-    return { BUILDKITE_PIPELINE_FILTER: filter, BUILDKITE_PIPELINE_FILTER_MODE: "All" };
+  return { BUILDKITE_PIPELINE_FILTER: filter, BUILDKITE_PIPELINE_FILTER_MODE: "All" };
 };
 // -------------------
 
@@ -112,7 +112,7 @@ const handler = async (event, req) => {
     req.body.issue.pull_request.url &&
     req.body.comment.body == "!approved-for-mainnet"
   ) {
-     // TODO: Actually look at @MinaProtocol/stakeholder-reviewers team instead of hardcoding the users here
+    // TODO: Actually look at @MinaProtocol/stakeholder-reviewers team instead of hardcoding the users here
     if (
       req.body.sender.login == "amc-ie" ||
       req.body.sender.login == "deepthiskumar" ||
