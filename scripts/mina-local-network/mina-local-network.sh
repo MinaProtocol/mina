@@ -711,22 +711,16 @@ fi
 # ================================================
 #
 
-if ${VALUE_TRANSFERS}; then
-  if [ "${FISH}" -eq "0" ]; then
-    echo "Sending transactions requires at least one 'Fish' node running!"
-    printf "\n"
-
+# Ensure at least 1 Whale or 1 Fish for standard transfers
+if [ "${VALUE_TRANSFERS}" = "true" ] && [ "${WHALES}" -lt 1 ] && [ "${FISH}" -lt 1 ]; then
+    echo "Error: Value transfers require at least 1 Whale or 1 Fish node."
     exit 1
-  fi
 fi
 
-if ${ZKAPP_TRANSACTIONS}; then
-  if [ "${WHALES}" -lt "2" ] || [ "${FISH}" -eq "0" ]; then
-    echo "Send zkApp transactions requires at least one 'Fish' node running and at least 2 whale accounts acting as the fee payer and sender account!"
-    printf "\n"
-
+# Ensure at least 2 Whales for zkApp transactions
+if [ "${ZKAPP_TRANSACTIONS}" = "true" ] && [ "${WHALES}" -lt 2 ]; then
+    echo "Error: zkApp transactions require at least 2 Whale accounts."
     exit 1
-  fi
 fi
 
 # ================================================
@@ -1228,6 +1222,34 @@ printf "\n"
 # Start sending transactions and zkApp transactions
 
 if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
+
+  VALID_TRANSFER_NODES=$((WHALES + FISH))
+
+  if [ "$VALID_TRANSFER_NODES" -eq 0 ]; then
+      echo "Error: No nodes available to send transactions."
+      exit 1
+  fi
+
+  RANDOM_INDEX=$(( RANDOM % VALID_TRANSFER_NODES ))
+
+  # Determine if the index falls into the Whale or Fish range
+  if [ "$RANDOM_INDEX" -lt "$WHALES" ]; then
+      TRANSFER_NODE_TYPE="whale"
+      # For whales, the relative index is just the RANDOM_INDEX
+      TRANSFER_NODE_INDEX="$RANDOM_INDEX"
+      TRANSFER_PORT_BASE=$(( WHALE_START_PORT + TRANSFER_NODE_INDEX * 6 ))
+      TRANFER_NODE_PID="${WHALE_PIDS[TRANSFER_NODE_INDEX]}"
+  else
+      TRANSFER_NODE_TYPE="fish" # Fixed variable name here
+      TRANSFER_NODE_INDEX=$((RANDOM_INDEX - WHALES))
+      # For fish, we subtract the whale count to get the 0-based fish index
+      TRANSFER_PORT_BASE=$(( FISH_START_PORT + TRANSFER_NODE_INDEX * 6 ))
+      TRANFER_NODE_PID="${FISH_PIDS[TRANSFER_NODE_INDEX]}"
+  fi
+
+  echo "Using ${TRANSFER_NODE_TYPE} at base port ${TRANSFER_PORT_BASE} to send transactions"
+
+
   FEE_PAYER_KEY_FILE=${ROOT}/offline_whale_keys/offline_whale_account_0
   SENDER_KEY_FILE=${ROOT}/offline_whale_keys/offline_whale_account_1
   if ${ZKAPP_TRANSACTIONS}; then
@@ -1235,14 +1257,14 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     ZKAPP_ACCOUNT_PUB_KEY=$(cat "${ROOT}/zkapp_keys/zkapp_account.pub")
   fi
 
-  KEY_FILE=${ROOT}/online_fish_keys/online_fish_account_0
-  PUB_KEY=$(cat "${ROOT}"/online_fish_keys/online_fish_account_0.pub)
-  REST_SERVER="http://127.0.0.1:$((FISH_START_PORT + 1))/graphql"
+  KEY_FILE="${ROOT}/online_${TRANSFER_NODE_TYPE}_keys/online_${TRANSFER_NODE_TYPE}_account_${TRANSFER_NODE_INDEX}"
+  PUB_KEY=$(cat "${KEY_FILE}.pub")
+  REST_SERVER="http://127.0.0.1:$((TRANSFER_PORT_BASE + 1))/graphql"
 
   echo "Waiting for Node (${REST_SERVER}) to be up to start sending value transfer transactions..."
   printf "\n"
 
-  until ${MINA_EXE} client status -daemon-port "${FISH_START_PORT}" &>/dev/null; do
+  until ${MINA_EXE} client status -daemon-port "${TRANSFER_PORT_BASE}" &>/dev/null; do
     sleep ${POLL_INTERVAL}
   done
 
@@ -1284,9 +1306,9 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
 
   # TODO: simulate scripts/hardfork/run-localnet.sh to send txns to everyone in the ledger.
   value_txn_id=0
-  while is_process_running "${FISH_PIDS[0]}"; do
+  while is_process_running "${TRANFER_NODE_PID}"; do
     sleep ${TRANSACTION_INTERVAL}
-    echo "Fish 1 at ${FISH_PIDS[0]} is alive, sending txns"
+    echo "${TRANSFER_NODE_TYPE} ${TRANSFER_NODE_INDEX} at ${TRANFER_NODE_PID} is alive, sending txns"
 
     if ${VALUE_TRANSFERS} && \
       ${MINA_EXE} client send-payment \
