@@ -339,16 +339,11 @@ let get_individual_info (type c)
       List.map coinbase_parts ~f:(fun Coinbase.{ amount; _ } -> amount)
   }
 
-let check_coinbase
-    (diff :
-      _ Staged_ledger_diff.Pre_diff_two.t
-      * _ Staged_ledger_diff.Pre_diff_one.t option ) =
-  match
-    ( (fst diff).coinbase
-    , Option.value_map ~default:Staged_ledger_diff.At_most_one.Zero (snd diff)
-        ~f:(fun d -> d.coinbase) )
-  with
-  | Zero, Zero | Zero, One _ | One _, Zero | Two _, Zero ->
+let check_coinbase = function
+  | Staged_ledger_diff.At_most_two.Zero, Staged_ledger_diff.At_most_one.Zero
+  | Zero, One _
+  | One _, Zero
+  | Two _, Zero ->
       Ok ()
   | x, y ->
       Error
@@ -451,7 +446,8 @@ let compute_statuses
 let get_impl (type c) ~get_transaction_data
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~(to_user_command : c With_status.t -> (_, _, _) User_command.with_forest)
-    ~diff ~coinbase_receiver ~coinbase_amount =
+    ~diff ~coinbase_receiver ~coinbase_amount ~extract_prediff_two
+    ~extract_prediff_one =
   let open Result.Let_syntax in
   let%bind coinbase_amount =
     Option.value_map coinbase_amount
@@ -466,37 +462,61 @@ let get_impl (type c) ~get_transaction_data
                  constraint_constants.coinbase_amount ) ) )
       ~f:(fun x -> Ok x)
   in
-  let apply_pre_diff_with_at_most_two (t1 : _ Staged_ledger_diff.Pre_diff_two.t)
-      =
+  let apply_pre_diff_with_at_most_two ~constraint_constants t1 =
+    let completed_works, commands, coinbases, internal_command_statuses =
+      extract_prediff_two t1
+    in
     let coinbase_parts =
-      match t1.coinbase with Zero -> `Zero | One x -> `One x | Two x -> `Two x
+      match coinbases with
+      | Staged_ledger_diff.At_most_two.Zero ->
+          `Zero
+      | One x ->
+          `One x
+      | Two x ->
+          `Two x
     in
-    get_individual_info ~get_transaction_data coinbase_parts
-      ~receiver:coinbase_receiver t1.commands t1.completed_works
-      ~coinbase_amount ~internal_command_statuses:t1.internal_command_statuses
-      ~to_user_command
+    let%map p =
+      get_individual_info ~get_transaction_data coinbase_parts
+        ~receiver:coinbase_receiver commands completed_works ~coinbase_amount
+        ~internal_command_statuses ~to_user_command ~constraint_constants
+    in
+    (coinbases, p)
   in
-  let apply_pre_diff_with_at_most_one (t2 : _ Staged_ledger_diff.Pre_diff_one.t)
-      =
+  let apply_pre_diff_with_at_most_one ~constraint_constants t2 =
+    let completed_works, commands, coinbases, internal_command_statuses =
+      extract_prediff_one t2
+    in
     let coinbase_added =
-      match t2.coinbase with Zero -> `Zero | One x -> `One x
+      match coinbases with
+      | Staged_ledger_diff.At_most_one.Zero ->
+          `Zero
+      | One x ->
+          `One x
     in
-    get_individual_info ~get_transaction_data coinbase_added
-      ~receiver:coinbase_receiver t2.commands t2.completed_works
-      ~coinbase_amount ~internal_command_statuses:t2.internal_command_statuses
-      ~to_user_command
+    let%map p =
+      get_individual_info ~get_transaction_data coinbase_added
+        ~receiver:coinbase_receiver commands completed_works ~coinbase_amount
+        ~internal_command_statuses ~to_user_command ~constraint_constants
+    in
+    (coinbases, p)
   in
-  let%bind () = check_coinbase diff in
-  let%bind p1 =
+  let%bind cb1, p1 =
     apply_pre_diff_with_at_most_two ~constraint_constants (fst diff)
   in
-  let%map p2 =
+  let%bind cb2, p2 =
     Option.value_map
-      ~f:(fun d -> apply_pre_diff_with_at_most_one ~constraint_constants d)
+      ~f:(apply_pre_diff_with_at_most_one ~constraint_constants)
       (snd diff)
       ~default:
-        (Ok { transactions = []; work = []; commands_count = 0; coinbases = [] })
+        (Ok
+           ( Staged_ledger_diff.At_most_one.Zero
+           , { transactions = []
+             ; work = []
+             ; commands_count = 0
+             ; coinbases = []
+             } ) )
   in
+  let%map () = check_coinbase (cb1, cb2) in
   ( p1.transactions @ p2.transactions
   , p1.work @ p2.work
   , p1.commands_count + p2.commands_count
@@ -519,6 +539,8 @@ let get ~check ~constraint_constants ~coinbase_receiver ~supercharge_coinbase t
         ~coinbase_amount:
           (Staged_ledger_diff.With_valid_signatures.coinbase
              ~constraint_constants ~supercharge_coinbase diff )
+        ~extract_prediff_two:Staged_ledger_diff.Pre_diff_generic.extract_prediff
+        ~extract_prediff_one:Staged_ledger_diff.Pre_diff_generic.extract_prediff
 
 let get_unchecked ~constraint_constants ~coinbase_receiver ~supercharge_coinbase
     (t : Staged_ledger_diff.With_valid_signatures_and_proofs.t) =
@@ -530,17 +552,26 @@ let get_unchecked ~constraint_constants ~coinbase_receiver ~supercharge_coinbase
     ~coinbase_amount:
       (Staged_ledger_diff.With_valid_signatures.coinbase ~constraint_constants
          ~supercharge_coinbase t )
+    ~extract_prediff_two:Staged_ledger_diff.Pre_diff_generic.extract_prediff
+    ~extract_prediff_one:Staged_ledger_diff.Pre_diff_generic.extract_prediff
 
 let get_transactions_stable ~constraint_constants ~coinbase_receiver
     ~supercharge_coinbase ({ diff } : Staged_ledger_diff.Stable.Latest.t) =
   let open Result.Let_syntax in
   let open Transaction_data_getter_stable in
+  let extract_prediff_two x =
+    Staged_ledger_diff.Pre_diff_generic.Stable.Latest.extract_prediff x
+  in
+  let extract_prediff_one x =
+    Staged_ledger_diff.Pre_diff_generic.Stable.Latest.extract_prediff x
+  in
   let%map transactions, _, _, _ =
     get_impl ~get_transaction_data ~constraint_constants
       ~to_user_command:With_status.data ~diff ~coinbase_receiver
       ~coinbase_amount:
         (Staged_ledger_diff.Diff.Stable.Latest.coinbase ~constraint_constants
            ~supercharge_coinbase diff )
+      ~extract_prediff_two ~extract_prediff_one
   in
   transactions
 
@@ -548,11 +579,18 @@ let get_transactions ~constraint_constants ~coinbase_receiver
     ~supercharge_coinbase ({ diff } : Staged_ledger_diff.t) =
   let open Result.Let_syntax in
   let open Transaction_data_getter_unchecked in
+  let extract_prediff_two x =
+    Staged_ledger_diff.Pre_diff_generic.extract_prediff x
+  in
+  let extract_prediff_one x =
+    Staged_ledger_diff.Pre_diff_generic.extract_prediff x
+  in
   let%map transactions, _, _, _ =
     get_impl ~get_transaction_data ~constraint_constants
       ~to_user_command:With_status.data ~diff ~coinbase_receiver
       ~coinbase_amount:
         (Staged_ledger_diff.Diff.coinbase ~constraint_constants
            ~supercharge_coinbase diff )
+      ~extract_prediff_two ~extract_prediff_one
   in
   transactions

@@ -477,19 +477,13 @@ let add_breadcrumb_exn t breadcrumb =
       ; ("n", `Int (Full_frontier.size t.full_frontier))
       ]
     "POST: ($state_hash, $n)" ;
-  let user_cmds =
-    Mina_block.Validated.valid_commands
-    @@ Breadcrumb.validated_transition breadcrumb
-  in
-  let tx_hash_json command =
-    User_command.forget_check command
-    |> Mina_transaction.Transaction_hash.hash_command_with_hashes
-    |> Mina_transaction.Transaction_hash.to_yojson
-  in
+  let user_cmd_hashes = Breadcrumb.command_hashes breadcrumb in
   [%str_log' trace t.logger] Added_breadcrumb_user_commands
     ~metadata:
       [ ( "user_commands"
-        , `List (List.map user_cmds ~f:(With_status.to_yojson tx_hash_json)) )
+        , `List
+            (List.map user_cmd_hashes
+               ~f:Mina_transaction.Transaction_hash.to_yojson ) )
       ; ("state_hash", State_hash.to_yojson (Breadcrumb.state_hash breadcrumb))
       ] ;
   let lite_diffs =

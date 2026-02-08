@@ -25,8 +25,10 @@ module type Transition_frontier_intf = sig
   end
 
   type best_tip_diff =
-    { new_commands : User_command.Valid.t With_status.t list
-    ; removed_commands : User_command.Valid.t With_status.t list
+    { new_commands :
+        Transaction_hash.User_command_with_valid_signature.t With_status.t list
+    ; removed_commands :
+        Transaction_hash.User_command_with_valid_signature.t With_status.t list
     ; reorg_best_tip : bool
     }
 
@@ -531,8 +533,13 @@ struct
           (diff_error_of_indexed_pool_error e)
       , indexed_pool_error_metadata e )
 
-    let handle_transition_frontier_diff_inner ~new_commands ~removed_commands
-        ~best_tip_ledger t =
+    let handle_transition_frontier_diff_inner
+        ~(new_commands :
+           Transaction_hash.User_command_with_valid_signature.t With_status.t
+           list )
+        ~(removed_commands :
+           Transaction_hash.User_command_with_valid_signature.t With_status.t
+           list ) ~best_tip_ledger t =
       (* This runs whenever the best tip changes. The simple case is when the
          new best tip is an extension of the old one. There, we just remove any
          user commands that were included in it from the transaction pool.
@@ -554,9 +561,12 @@ struct
       let vk_table_dec t ~account_id ~(vk : Verification_key_wire.t) =
         Vk_refcount_table.dec t ~account_id ~vk_hash:vk.hash
       in
-      let vk_table_lift = Vk_refcount_table.lift t.verification_key_table in
       let vk_table_lift_hashed =
         Vk_refcount_table.lift_hashed t.verification_key_table
+      in
+      let vk_table_lift_hashed_with_status f tx =
+        Vk_refcount_table.lift_hashed t.verification_key_table f
+          (With_status.data tx)
       in
       let global_slot = Indexed_pool.global_slot_since_genesis t.pool in
       t.best_tip_ledger <- Some best_tip_ledger ;
@@ -573,30 +583,24 @@ struct
               ]
             @ metadata )
       in
-      List.iter new_commands ~f:(vk_table_lift vk_table_inc) ;
-      List.iter removed_commands ~f:(vk_table_lift vk_table_dec) ;
-      let compact_json =
-        Fn.compose User_command.fee_payer_summary_json User_command.forget_check
+      List.iter new_commands ~f:(vk_table_lift_hashed_with_status vk_table_inc) ;
+      List.iter removed_commands
+        ~f:(vk_table_lift_hashed_with_status vk_table_dec) ;
+      let hash_json =
+        With_status.to_yojson
+          (Fn.compose Transaction_hash.to_yojson
+             Transaction_hash.User_command_with_valid_signature.transaction_hash )
       in
       [%log' trace t.logger]
         ~metadata:
-          [ ( "removed"
-            , `List
-                (List.map removed_commands
-                   ~f:(With_status.to_yojson compact_json) ) )
-          ; ( "added"
-            , `List
-                (List.map new_commands ~f:(With_status.to_yojson compact_json))
-            )
+          [ ("removed", `List (List.map removed_commands ~f:hash_json))
+          ; ("added", `List (List.map new_commands ~f:hash_json))
           ]
         "Diff: removed: $removed added: $added from best tip" ;
       let pool', dropped_backtrack =
         List.fold (List.rev removed_commands) ~init:(t.pool, Sequence.empty)
-          ~f:(fun (pool, dropped_so_far) unhashed_cmd ->
-            let cmd =
-              Transaction_hash.User_command_with_valid_signature.create
-                unhashed_cmd.data
-            in
+          ~f:(fun (pool, dropped_so_far) cmd_with_status ->
+            let cmd = With_status.data cmd_with_status in
             ( match
                 Locally_generated.find_and_remove t.locally_generated_committed
                   cmd
@@ -606,11 +610,7 @@ struct
             | Some time_added ->
                 [%log' info t.logger]
                   "Locally generated command $cmd committed in a block!"
-                  ~metadata:
-                    [ ( "cmd"
-                      , With_status.to_yojson User_command.Valid.to_yojson
-                          unhashed_cmd )
-                    ] ;
+                  ~metadata:[ ("cmd", hash_json cmd_with_status) ] ;
                 Locally_generated.add_exn t.locally_generated_uncommitted
                   ~key:cmd ~data:time_added ) ;
             let pool', dropped_seq =
@@ -649,7 +649,8 @@ struct
           List.fold (new_commands @ removed_commands) ~init:Account_id.Set.empty
             ~f:(fun set cmd ->
               let set' =
-                With_status.data cmd |> User_command.forget_check
+                With_status.data cmd
+                |> Transaction_hash.User_command_with_valid_signature.command
                 |> User_command.accounts_referenced |> Account_id.Set.of_list
               in
               Set.union set set' )
@@ -678,7 +679,6 @@ struct
             ~f:(fun set cmd ->
               let cmd_hash =
                 With_status.data cmd
-                |> Transaction_hash.User_command_with_valid_signature.create
                 |> Transaction_hash.User_command_with_valid_signature
                    .transaction_hash
               in
@@ -1641,8 +1641,16 @@ include
       include Transition_frontier
 
       type best_tip_diff = Extensions.Best_tip_diff.view =
-        { new_commands : User_command.Valid.t With_status.t list
-        ; removed_commands : User_command.Valid.t With_status.t list
+        { new_commands :
+            Mina_transaction.Transaction_hash.User_command_with_valid_signature
+            .t
+            With_status.t
+            list
+        ; removed_commands :
+            Mina_transaction.Transaction_hash.User_command_with_valid_signature
+            .t
+            With_status.t
+            list
         ; reorg_best_tip : bool
         }
 
@@ -1736,8 +1744,12 @@ let%test_module _ =
       end
 
       type best_tip_diff =
-        { new_commands : User_command.Valid.t With_status.t list
-        ; removed_commands : User_command.Valid.t With_status.t list
+        { new_commands :
+            Transaction_hash.User_command_with_valid_signature.t With_status.t
+            list
+        ; removed_commands :
+            Transaction_hash.User_command_with_valid_signature.t With_status.t
+            list
         ; reorg_best_tip : bool
         }
 
@@ -2211,7 +2223,10 @@ let%test_module _ =
               expected_commands ) )
 
     let mk_with_status (cmd : User_command.Valid.t) =
-      { With_status.data = cmd; status = Applied }
+      { With_status.data =
+          Transaction_hash.User_command_with_valid_signature.create cmd
+      ; status = Applied
+      }
 
     let add_commands ?(local = true) test cs =
       let sender =

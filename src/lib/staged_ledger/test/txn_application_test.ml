@@ -3,9 +3,7 @@ open Mina_base
 open Mina_generators
 open Mina_numbers
 open Mina_transaction
-
-module Application_state =
-  Staged_ledger.For_tests.Application_state.Valid_user_command
+module Application_state = Staged_ledger.For_tests.Application_state
 
 type apply =
      User_command.t Transaction.t_
@@ -33,7 +31,8 @@ let gen_apply_and_txn : (apply * User_command.Valid.t) Quickcheck.Generator.t =
   in
   (apply, txn)
 
-let gen_application_state : Application_state.t Quickcheck.Generator.t =
+let gen_application_state :
+    User_command.Valid.t Application_state.t Quickcheck.Generator.t =
   let open Application_state in
   let open Quickcheck.Generator in
   let open Let_syntax in
@@ -54,7 +53,9 @@ let apply_against_non_empty_scan_state () =
   Quickcheck.test
     (Quickcheck.Generator.tuple2 gen_apply_and_txn gen_application_state)
     ~f:(fun ((apply, txn), state) ->
-      match Application_state.try_applying_txn ~apply state txn with
+      match
+        Application_state.Valid_user_command.try_applying_txn ~apply state txn
+      with
       | Continue state' when state.total_space_remaining > 0 ->
           [%test_pred: int]
             (fun delta -> delta = 0 || delta = 1)

@@ -2070,7 +2070,7 @@ module Queries = struct
         let transaction_pool = Mina_lib.transaction_pool mina in
         (* TODO: do not compute hashes to just get the status *)
         Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
-          ~transaction_pool txn.data )
+          ~transaction_pool txn.hash )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
