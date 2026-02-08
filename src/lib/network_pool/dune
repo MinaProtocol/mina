@@ -1,17 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name network_pool)
  (public_name network_pool)
  (inline_tests
   (flags -verbose -show-counts))
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   async_unix
   core
   integers
   stdio
-  ;; local libraries
+  ; local libraries
   block_time
   mina_stdlib
   child_processes
@@ -68,6 +71,7 @@
   with_hash
   zkapp_command_builder
   zkapp_vk_cache_tag)
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

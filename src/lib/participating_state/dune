@@ -1,8 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name participating_state)
  (public_name participating_state)
+ (libraries async_kernel core_kernel base)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
- (libraries async_kernel core_kernel base))
+  (pps ppx_version)))

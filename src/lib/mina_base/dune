@@ -1,11 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name mina_base)
  (public_name mina_base)
  (inline_tests
   (flags -verbose -show-counts))
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async_kernel
   base
   base.base_internalhash_types
@@ -22,7 +25,7 @@
   sexp_diff_kernel
   sexplib0
   yojson
-  ;; local libraries
+  ; local libraries
   base58_check
   bignum_bigint
   blake2
@@ -56,9 +59,9 @@
   pickles
   pickles.backend
   pickles_types
+  ppx_version.runtime
   proof_cache_tag
   protocol_version
-  ppx_version.runtime
   quickcheck_lib
   random_oracle
   random_oracle_input
@@ -74,6 +77,9 @@
   test_util
   unsigned_extended
   with_hash)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    base_quickcheck.ppx_quickcheck
@@ -99,6 +105,4 @@
    ppx_snarky
    ppx_variants_conv
    ppx_version))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "Snarks and friends necessary for keypair generation"))

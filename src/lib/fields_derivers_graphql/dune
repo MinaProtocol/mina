@@ -1,8 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name fields_derivers_graphql)
  (public_name fields_derivers.graphql)
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async_kernel
   core_kernel
   fieldslib
@@ -11,12 +17,10 @@
   graphql_parser
   ppx_inline_test.config
   yojson
-  ;; local libraries
+  ; local libraries
   fields_derivers)
  (instrumentation
   (backend bisect_ppx))
- (inline_tests
-  (flags -verbose -show-counts))
  (preprocess
   (pps
    ppx_annot

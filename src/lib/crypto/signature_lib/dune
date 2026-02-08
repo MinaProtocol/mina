@@ -1,11 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name signature_lib)
  (public_name signature_lib)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   bignum.bigint
   ppx_inline_test.config
   base
@@ -15,7 +18,7 @@
   bin_prot.shape
   base.caml
   result
-  ;; local libraries
+  ; local libraries
   mina_wire_types
   crypto_params
   kimchi_pasta
@@ -40,6 +43,7 @@
   h_list
   test_util
   ppx_version.runtime)
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

@@ -1,6 +1,29 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name random_oracle)
  (public_name random_oracle)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries
+  ; opam libraries
+  ppx_inline_test.config
+  base
+  core_kernel
+  sexplib0
+  ; local libraries
+  snark_params
+  pickles.backend
+  sponge
+  pickles
+  random_oracle_input
+  snarky.backendless
+  kimchi_pasta
+  kimchi_pasta.basic
+  fold_lib
+  random_oracle.permutation)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -12,23 +35,4 @@
    ppx_assert
    ppx_compare
    ppx_deriving_yojson
-   ppx_let))
- (inline_tests
-  (flags -verbose -show-counts))
- (libraries
-  ;; opam libraries
-  ppx_inline_test.config
-  base
-  core_kernel
-  sexplib0
-  ;; local libraries
-  snark_params
-  pickles.backend
-  sponge
-  pickles
-  random_oracle_input
-  snarky.backendless
-  kimchi_pasta
-  kimchi_pasta.basic
-  fold_lib
-  random_oracle.permutation))
+   ppx_let)))

@@ -1,21 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (inline_tests
-  (flags -verbose -show-counts))
  (name kimchi_backend_common)
  (public_name kimchi_backend_common)
+ (inline_tests
+  (flags -verbose -show-counts))
  (flags -warn-error -27)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps
-   ppx_version
-   ppx_mina
-   ppx_jane
-   ppx_deriving_yojson
-   ppx_deriving.std
-   h_list.ppx))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   result
   async_kernel
   sexplib0
@@ -28,7 +22,7 @@
   bignum.bigint
   zarith
   base.base_internalhash_types
-  ;; local libraries
+  ; local libraries
   tuple_lib
   key_cache
   hex
@@ -44,4 +38,14 @@
   logger
   logger.context_logger
   ppx_version.runtime
-  mina_stdlib))
+  mina_stdlib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_version
+   ppx_mina
+   ppx_jane
+   ppx_deriving_yojson
+   ppx_deriving.std
+   h_list.ppx)))

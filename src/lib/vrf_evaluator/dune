@@ -1,8 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name vrf_evaluator)
  (public_name vrf_evaluator)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async_unix
   async_kernel
   rpc_parallel
@@ -13,7 +17,7 @@
   sexplib0
   base.caml
   integers
-  ;; local libraries
+  ; local libraries
   mina_wire_types
   error_json
   currency

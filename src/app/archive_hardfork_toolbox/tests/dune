@@ -1,47 +1,57 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (test
  (name test_convert_canonical)
- (libraries
-   ;; opam libraries
-   alcotest
-   async_unix
-   core
-   result
-   async_kernel
-   uri
-   stdio
-   caqti-driver-postgresql
-   caqti
-   async
-   core_kernel
-   caqti-async
-   base
-   base.caml
-   threads.posix
-   ;; from parent dir
-   archive_hardfork_toolbox_lib
-   ;; local libraries
-   logger
-   archive_lib
-   block_time
-   consensus
-   consensus_vrf
-   currency
-   genesis_constants
-   genesis_ledger_helper
-   mina_base
-   mina_base.import
-   mina_block
-   mina_caqti
-   mina_numbers
-   mina_state
-   mina_transaction
-   mina_wire_types
-   one_or_two
-   protocol_version
-   runtime_config
-   signature_lib
-   unsigned_extended
-   with_hash)
- 
  (modules test_convert_canonical)
- (preprocess (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv h_list.ppx)))
+ (libraries
+  ; opam libraries
+  alcotest
+  async
+  async_kernel
+  async_unix
+  base
+  base.caml
+  caqti
+  caqti-async
+  caqti-driver-postgresql
+  core
+  core_kernel
+  result
+  stdio
+  threads.posix
+  uri
+  ; local libraries
+  archive_hardfork_toolbox_lib
+  archive_lib
+  block_time
+  consensus
+  consensus_vrf
+  currency
+  genesis_constants
+  genesis_ledger_helper
+  logger
+  mina_base
+  mina_base.import
+  mina_block
+  mina_caqti
+  mina_numbers
+  mina_state
+  mina_transaction
+  mina_wire_types
+  one_or_two
+  protocol_version
+  runtime_config
+  signature_lib
+  unsigned_extended
+  with_hash)
+ (preprocess
+  (pps
+   h_list.ppx
+   ppx_compare
+   ppx_hash
+   ppx_let
+   ppx_mina
+   ppx_sexp_conv
+   ppx_version)))

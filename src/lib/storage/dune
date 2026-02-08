@@ -1,11 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name storage)
  (public_name storage)
  (inline_tests
   (flags -verbose -show-counts))
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   core
   async
   core_kernel
@@ -16,11 +19,12 @@
   async_kernel
   async_unix
   base.caml
-  ;; local libraries
+  ; local libraries
   logger
   ppx_version.runtime)
- (preprocess
-  (pps ppx_version ppx_jane))
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane))
  (synopsis "Storage module checksums data and stores it"))

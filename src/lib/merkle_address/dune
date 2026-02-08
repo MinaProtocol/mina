@@ -1,11 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name merkle_address)
  (public_name merkle_address)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   base.base_internalhash_types
   bin_prot.shape
   bitstring
@@ -13,10 +16,13 @@
   sexplib0
   base.caml
   ppx_inline_test.config
-  ;; local libraries
+  ; local libraries
   mina_stdlib
   ppx_version.runtime
   test_util)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_mina
@@ -26,6 +32,4 @@
    ppx_compare
    ppx_deriving_yojson
    ppx_bitstring))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "Address for merkle database representations"))

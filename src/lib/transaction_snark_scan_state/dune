@@ -1,9 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name transaction_snark_scan_state)
  (public_name transaction_snark_scan_state)
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   base.base_internalhash_types
   async_kernel
   core
@@ -17,7 +20,7 @@
   yojson
   bin_prot.shape
   async_unix
-  ;; local libraries
+  ; local libraries
   mina_stdlib
   mina_base.import
   data_hash_lib
@@ -44,6 +47,9 @@
   ppx_version.runtime
   mina_wire_types
   internal_tracing)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_base
@@ -55,6 +61,4 @@
    ppx_custom_printf
    ppx_compare
    ppx_deriving_yojson))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "Transaction-snark specialization of the parallel scan state"))

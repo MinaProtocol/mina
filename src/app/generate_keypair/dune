@@ -1,11 +1,22 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (package generate_keypair)
  (name generate_keypair)
  (public_name mina-generate-keypair)
  (modes native)
- (libraries async async_unix cli_lib core_kernel mina_version)
+ (flags :standard -w +a)
+ (libraries
+  ; opam libraries
+  async
+  async_unix
+  cli_lib
+  core_kernel
+  ; local libraries
+  mina_version)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
- (flags :standard -w +a))
+  (pps ppx_version)))

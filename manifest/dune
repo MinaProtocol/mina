@@ -1,0 +1,100 @@
+(include_subdirs unqualified)
+
+(library
+ (name manifest_lib)
+ (libraries str unix)
+ (wrapped false)
+ (modules dune_s_expr manifest externals))
+
+(library
+ (name layer_snarky)
+ (libraries manifest_lib)
+ (wrapped false)
+ (modules layer_snarky))
+
+(library
+ (name manifest_foundation)
+ (libraries manifest_lib layer_snarky)
+ (wrapped false)
+ (modules
+  layer_base
+  layer_base_types
+  layer_concurrency
+  layer_logging
+  layer_node
+  layer_ppx
+  layer_test
+  layer_tooling))
+
+(library
+ (name layer_kimchi)
+ (libraries manifest_foundation)
+ (wrapped false)
+ (modules layer_kimchi))
+
+(library
+ (name layer_crypto)
+ (libraries layer_kimchi)
+ (wrapped false)
+ (modules layer_crypto))
+
+(library
+ (name layer_pickles)
+ (libraries layer_crypto)
+ (wrapped false)
+ (modules layer_pickles))
+
+(library
+ (name manifest_upper)
+ (libraries layer_pickles)
+ (wrapped false)
+ (modules
+  layer_consensus
+  layer_domain
+  layer_ledger
+  layer_network
+  layer_protocol
+  layer_rosetta
+  layer_service
+  layer_snark_worker
+  layer_storage
+  layer_transaction))
+
+(library
+ (name manifest_products)
+ (libraries manifest_upper)
+ (wrapped false)
+ (modules
+  product_mina
+  product_archive
+  product_archive_blocks
+  product_archive_hardfork_toolbox
+  product_batch_txn_tool
+  product_benchmarks
+  product_best_tip_merger
+  product_cli
+  product_delegation_verify
+  product_disk_caching_stats
+  product_dump_blocks
+  product_extract_blocks
+  product_generate_keypair
+  product_graphql_schema_dump
+  product_heap_usage
+  product_ledger_export_bench
+  product_logproc
+  product_missing_blocks_auditor
+  product_reformat
+  product_replayer
+  product_rocksdb_scanner
+  product_rosetta
+  product_runtime_genesis_ledger
+  product_test_executive
+  product_validate_keypair
+  product_zkapp_limits
+  product_zkapp_test_transaction
+  product_zkapps_examples))
+
+(executable
+ (name main)
+ (libraries manifest_products)
+ (modules main))

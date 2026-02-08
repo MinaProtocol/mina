@@ -1,8 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (public_name cache_dir.native)
  (name cache_dir_native)
+ (public_name cache_dir.native)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   base.caml
   async_unix
   base
@@ -11,11 +15,11 @@
   core_kernel
   stdio
   async_kernel
-  ;; local libraries
+  ; local libraries
   key_cache
   logger)
+ (implements cache_dir)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_here ppx_let ppx_custom_printf))
- (implements cache_dir))
+  (pps ppx_mina ppx_version ppx_here ppx_let ppx_custom_printf)))

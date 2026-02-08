@@ -1,13 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name consensus)
  (public_name consensus)
  (inline_tests
   (flags -verbose -show-counts))
- (modules
-  (:standard \ proof_of_stake_fuzzer))
- (library_flags (-linkall))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   ppx_inline_test.config
   async_unix
   core.uuid
@@ -25,7 +26,7 @@
   core_kernel.uuid
   async_rpc_kernel
   sexp_diff_kernel
-  ;; local libraries
+  ; local libraries
   mina_wire_types
   mina_base.util
   unsigned_extended
@@ -78,6 +79,9 @@
   ppx_version.runtime
   internal_tracing
   o1trace)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    h_list.ppx
@@ -94,15 +98,16 @@
    ppx_sexp_conv
    ppx_snarky
    ppx_version))
- (instrumentation
-  (backend bisect_ppx))
- (synopsis "Consensus mechanisms"))
+ (synopsis "Consensus mechanisms")
+ (modules :standard \ proof_of_stake_fuzzer))
 
 (executable
  (name proof_of_stake_fuzzer)
  (modules proof_of_stake_fuzzer)
  (libraries
+  ; opam libraries
   core_kernel
+  ; local libraries
   signature_lib
   mina_state
   mina_block
@@ -114,5 +119,4 @@
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version ppx_jane))
- (enabled_if false) ;; Compilation is disabled until this executable has been fixed.
- )
+ (enabled_if false))

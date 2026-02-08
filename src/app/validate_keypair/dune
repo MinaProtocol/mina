@@ -1,19 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (package validate_keypair)
  (name validate_keypair)
  (public_name validate_keypair)
  (modes native)
+ (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60)
  (libraries
-  ;; opam libraries
-  core_kernel
+  ; opam libraries
   async
   async_unix
-  ;; local libraries
-  mina_version
+  core_kernel
+  ; local libraries
+  cli_lib
   mina_stdlib
-  cli_lib)
+  mina_version)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_let ppx_sexp_conv))
- (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60))
+  (pps ppx_let ppx_sexp_conv ppx_version)))

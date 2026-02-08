@@ -1,0 +1,11 @@
+(include_subdirs no)
+
+(test
+ (name test_manifest)
+ (libraries alcotest manifest_lib)
+ (modules test_manifest))
+
+(test
+ (name test_integration)
+ (libraries alcotest manifest_product)
+ (modules test_integration))

@@ -1,15 +1,18 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name snark_params)
  (public_name snark_params)
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   base.base_internalhash_types
   core_kernel
   digestif
   base
   sexplib0
-  ;; local libraries
+  ; local libraries
   mina_wire_types
   kimchi_pasta
   kimchi_pasta.basic
@@ -28,6 +31,9 @@
   snarky_field_extensions
   snarky.intf
   kimchi_backend)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_version
@@ -41,6 +47,4 @@
    ppx_bin_prot
    ppx_custom_printf
    ppx_snarky))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "Snark parameters"))

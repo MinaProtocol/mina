@@ -1,17 +1,17 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name transition_frontier_controller)
  (public_name transition_frontier_controller)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_version ppx_mina))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   base
   async_kernel
   core_kernel
   core
-  ;; local libraries
+  ; local libraries
   transition_frontier
   data_hash_lib
   mina_metrics
@@ -31,4 +31,8 @@
   genesis_constants
   consensus
   bootstrap_controller
-  staged_ledger))
+  staged_ledger)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_mina)))

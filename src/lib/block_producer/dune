@@ -1,18 +1,21 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name block_producer)
  (public_name block_producer)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   async_kernel
   core
   core_kernel
   integers
   sexplib0
-  ;; local libraries
+  ; local libraries
   block_time
   blockchain_snark
   coda_genesis_proof
@@ -69,8 +72,9 @@
   unsigned_extended
   vrf_evaluator
   with_hash)
- (preprocess
-  (pps ppx_jane ppx_mina ppx_register_event ppx_version))
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_mina ppx_register_event ppx_version))
  (synopsis "Coda block producer"))

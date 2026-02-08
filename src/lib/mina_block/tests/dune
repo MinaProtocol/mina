@@ -1,3 +1,7 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (rule
  (alias precomputed_block)
  (target hetzner-itn-1-1795.json)
@@ -27,10 +31,18 @@
 
 (test
  (name main)
- (libraries alcotest async core_kernel disk_cache.lmdb mina_block yojson)
  (deps
   hetzner-itn-1-1795.json
   regtest-devnet-319281-3NKq8WXEzMFJH3VdmK4seCTpciyjSY2Rf39K7q1Yyt1p4HkqSzqA.json)
+ (libraries
+  ; opam libraries
+  alcotest
+  async
+  core_kernel
+  yojson
+  ; local libraries
+  disk_cache.lmdb
+  mina_block)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

@@ -1,14 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name bootstrap_controller)
  (public_name bootstrap_controller)
  (inline_tests
   (flags -verbose -show-counts))
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_compare ppx_jane ppx_mina ppx_register_event ppx_version))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   async_kernel
   async_unix
@@ -16,7 +16,7 @@
   core_kernel
   ppx_inline_test.config
   sexplib0
-  ;; local libraries
+  ; local libraries
   block_time
   child_processes
   coda_genesis_ledger
@@ -62,4 +62,8 @@
   transition_frontier_persistent_root
   trust_system
   verifier
-  with_hash))
+  with_hash)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_compare ppx_jane ppx_mina ppx_register_event ppx_version)))

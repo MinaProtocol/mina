@@ -1,3 +1,7 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (rule
  (targets assets.ml)
  (deps
@@ -9,140 +13,136 @@
  (name init)
  (public_name init)
  (libraries
-  ;;opam libraries
-  stdio
-  integers
+  ; opam libraries
   astring
-  async_ssl
-  sexplib0
+  async
+  async.async_command
   async.async_rpc
-  result
-  graphql
   async_kernel
+  async_rpc_kernel
+  async_ssl
   async_unix
-  uri
-  core_kernel
-  core_kernel.uuid
+  base
+  base.base_internalhash_types
+  base.caml
+  base_quickcheck
+  cohttp
+  cohttp-async
   core
   core.uuid
-  base
-  async
-  cohttp
-  graphql_parser
-  async.async_command
-  async_rpc_kernel
-  base.caml
-  base.base_internalhash_types
-  graphql-cohttp
-  cohttp-async
+  core_kernel
+  core_kernel.uuid
+  graphql
   graphql-async
+  graphql-cohttp
+  graphql_parser
+  integers
   mirage-crypto-ec
-  base_quickcheck
-  ;;local libraries
-  mina_stdlib
-  mina_stdlib_unix
-  snark_profiler_lib
-  archive_lib
-  mina_wire_types
-  perf_histograms
-  one_or_two
-  block_time
-  child_processes
-  mina_net2
-  snark_worker
+  result
+  sexplib0
+  stdio
+  uri
+  ; local libraries
   allocation_functor
+  archive_lib
+  block_time
   blockchain_snark
-  genesis_ledger_helper.lib
-  transaction_inclusion_status
-  error_json
-  network_pool
-  user_command_input
-  network_peer
-  logger
-  itn_logger
-  coda_genesis_proof
-  data_hash_lib
-  currency
-  genesis_constants
-  graphql_lib
-  o1trace_webkit_event
-  generated_graphql_queries
-  itn_crypto
-  mina_transaction
-  mina_generators
-  mina_ledger
-  mina_block
-  mina_lib
-  mina_base
+  child_processes
   cli_lib
-  mina_graphql
-  mina_state
-  consensus
-  mina_version
-  o1trace
-  protocol_version
-  node_error_service
-  genesis_ledger_helper
-  signature_lib
-  mina_base.import
-  mina_numbers
-  precomputed_values
-  with_hash
-  transaction_snark
-  transaction_snark_tests
-  transaction_protocol_state
-  test_util
-  daemon_rpcs
-  trust_system
-  secrets
-  participating_state
-  staged_ledger
-  mina_commands
-  mina_runtime_config
   coda_genesis_ledger
-  mina_networking
-  sgn
-  unsigned_extended
-  mina_metrics
+  coda_genesis_proof
+  consensus
+  currency
+  daemon_rpcs
+  data_hash_lib
+  error_json
+  generated_graphql_queries
+  genesis_constants
+  genesis_ledger_helper
+  genesis_ledger_helper.lib
+  graphql_lib
   group_map
-  snark_work_lib
-  mina_compile_config
-  mina_transaction_logic
-  verifier
-  parallel
-  random_oracle
+  internal_tracing
+  itn_crypto
+  itn_logger
   kimchi_backend
   kimchi_pasta
   kimchi_pasta.basic
-  pickles_types
+  logger
+  mina_base
+  mina_base.import
+  mina_block
+  mina_commands
+  mina_compile_config
+  mina_generators
+  mina_graphql
+  mina_ledger
+  mina_lib
+  mina_metrics
+  mina_net2
+  mina_networking
+  mina_numbers
+  mina_runtime_config
+  mina_signature_kind
+  mina_state
+  mina_stdlib
+  mina_stdlib_unix
+  mina_transaction
+  mina_transaction_logic
+  mina_version
+  mina_wire_types
+  network_peer
+  network_pool
+  node_error_service
+  o1trace
+  o1trace_webkit_event
+  one_or_two
+  parallel
+  participating_state
+  perf_histograms
   pickles
   pickles.backend
+  pickles_types
+  precomputed_values
+  protocol_version
+  random_oracle
+  secrets
+  sgn
+  signature_lib
   snark_params
-  mina_signature_kind
+  snark_profiler_lib
+  snark_work_lib
+  snark_worker
+  staged_ledger
   string_sign
-  zkapp_command_builder
-  internal_tracing
-  transaction_snark_scan_state)
+  test_util
+  transaction_inclusion_status
+  transaction_protocol_state
+  transaction_snark
+  transaction_snark_scan_state
+  transaction_snark_tests
+  trust_system
+  unsigned_extended
+  user_command_input
+  verifier
+  with_hash
+  zkapp_command_builder)
  (instrumentation
   (backend bisect_ppx))
- (preprocessor_deps
-  ../../../../../graphql_schema.json
-  ../../../../graphql-ppx-config.inc)
  (preprocess
   (pps
-   ppx_deriving_yojson
-   ppx_mina
-   ppx_version
-   ppx_base
    ppx_assert
+   ppx_base
    ppx_bench
    ppx_bin_prot
    ppx_custom_printf
+   ppx_deriving_yojson
    ppx_fields_conv
    ppx_fixed_literal
    ppx_here
    ppx_inline_test
    ppx_let
+   ppx_mina
    ppx_module_timer
    ppx_optional
    ppx_pipebang
@@ -151,6 +151,10 @@
    ppx_string
    ppx_typerep_conv
    ppx_variants_conv
+   ppx_version
    graphql_ppx
    --
-   %{read-lines:../../../../graphql-ppx-config.inc})))
+   %{read-lines:../../../../graphql-ppx-config.inc}))
+ (preprocessor_deps
+  ../../../../../graphql_schema.json
+  ../../../../graphql-ppx-config.inc))

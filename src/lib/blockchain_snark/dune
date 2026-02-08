@@ -1,11 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name blockchain_snark)
- (flags
-  (:standard -warn-error +a))
  (public_name blockchain_snark)
- (library_flags -linkall)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (flags :standard -warn-error +a)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   async_kernel
   base.caml
@@ -14,7 +18,7 @@
   core
   core_kernel
   sexplib0
-  ;; local libraries
+  ; local libraries
   allocation_functor
   cache_dir
   consensus
@@ -39,10 +43,9 @@
   snark_keys_header
   snark_params
   transaction_snark)
- (inline_tests
-  (flags -verbose -show-counts))
- (preprocess
-  (pps ppx_compare ppx_jane ppx_mina ppx_snarky ppx_version))
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
+ (preprocess
+  (pps ppx_compare ppx_jane ppx_mina ppx_snarky ppx_version))
  (synopsis "blockchain state transition snarking library"))

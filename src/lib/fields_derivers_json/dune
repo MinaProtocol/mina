@@ -1,19 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name fields_derivers_json)
  (public_name fields_derivers.json)
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   core_kernel
   fieldslib
   ppx_inline_test.config
   result
   yojson
-  ;; local libraries
+  ; local libraries
   fields_derivers)
  (instrumentation
   (backend bisect_ppx))
- (inline_tests
-  (flags -verbose -show-counts))
  (preprocess
   (pps
    ppx_annot

@@ -1,10 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (public_name coda_genesis_ledger)
  (name genesis_ledger)
+ (public_name coda_genesis_ledger)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   core
-  ;; local libraries
+  ; local libraries
   key_gen
   mina_base
   signature_lib

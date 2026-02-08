@@ -1,9 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (public_name mina_metrics.none)
  (name mina_metrics_none)
+ (public_name mina_metrics.none)
  (libraries async_kernel logger uri core_kernel)
+ (implements mina_metrics)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
- (implements mina_metrics))
+  (pps ppx_version)))

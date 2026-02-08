@@ -1,10 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name bowe_gabizon_hash)
  (public_name bowe_gabizon_hash)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries core_kernel)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_compare ppx_jane ppx_version))
- (inline_tests
-  (flags -verbose -show-counts))
- (libraries core_kernel))
+  (pps ppx_compare ppx_jane ppx_version)))

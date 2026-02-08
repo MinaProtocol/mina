@@ -1,10 +1,16 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name mina_compile_config)
  (public_name mina_compile_config)
  (libraries
+  ; opam libraries
+  core_kernel
+  ; local libraries
   mina_node_config
   mina_node_config.for_unit_tests
-  core_kernel
   currency)
  (instrumentation
   (backend bisect_ppx))

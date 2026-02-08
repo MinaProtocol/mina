@@ -1,11 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name logger_native)
  (public_name logger.native)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   result
   core
   core_kernel
@@ -13,14 +16,15 @@
   bin_prot.shape
   base.caml
   base.base_internalhash_types
-  ;; local libraries
+  ; local libraries
   itn_logger
   interpolator_lib
   ppx_version.runtime
   mina_stdlib)
- (preprocess
-  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
+ (library_flags -linkall)
+ (implements logger)
  (instrumentation
   (backend bisect_ppx))
- (implements logger)
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (synopsis "Logging library"))

@@ -1,17 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name transaction_protocol_state)
  (public_name transaction_protocol_state)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   sexplib0
   core_kernel
   core
   bin_prot.shape
   base.caml
-  ;; local libraries
+  ; local libraries
   pickles
   genesis_constants
   snark_params
@@ -20,8 +23,9 @@
   mina_numbers
   sgn
   ppx_version.runtime)
- (preprocess
-  (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
+ (preprocess
+  (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (synopsis "Transaction protocol state library"))

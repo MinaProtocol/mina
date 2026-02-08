@@ -1,9 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name trust_system)
  (public_name trust_system)
- (library_flags (-linkall))
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   sexplib0
   core
   ppx_inline_test.config
@@ -15,7 +20,7 @@
   result
   async
   async_unix
-  ;; local libraries
+  ; local libraries
   mina_metrics
   rocksdb
   pipe_lib
@@ -26,8 +31,9 @@
   test_util
   ppx_version.runtime
   mina_stdlib)
- (inline_tests
-  (flags -verbose -show-counts))
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_assert
@@ -44,6 +50,4 @@
    ppx_sexp_conv
    ppx_snarky
    ppx_version))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "Track how much we trust peers"))

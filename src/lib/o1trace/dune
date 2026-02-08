@@ -1,8 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name o1trace)
  (public_name o1trace)
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-  ;;opam libraries
+  ; opam libraries
   async
   async_kernel
   async_unix
@@ -12,12 +18,10 @@
   ocamlgraph
   ppx_inline_test.config
   sexplib0
-  ;;local libraries
+  ; local libraries
   logger)
- (inline_tests
-  (flags -verbose -show-counts))
- (synopsis "Basic event tracing")
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane ppx_mina)))
+  (pps ppx_mina ppx_version ppx_jane))
+ (synopsis "Basic event tracing"))

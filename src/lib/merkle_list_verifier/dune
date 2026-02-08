@@ -1,8 +1,16 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name merkle_list_verifier)
  (public_name merkle_list_verifier)
+ (libraries
+  ; opam libraries
+  core_kernel
+  ; local libraries
+  mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane ppx_compare))
- (libraries core_kernel mina_stdlib))
+  (pps ppx_version ppx_jane ppx_compare)))

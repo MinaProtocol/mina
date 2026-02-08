@@ -1,11 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name currency)
  (public_name currency)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   base
   base.base_internalhash_types
   base.caml
@@ -16,7 +19,7 @@
   result
   sexplib0
   zarith
-  ;; local libraries
+  ; local libraries
   bignum_bigint
   bitstring_lib
   codable
@@ -33,6 +36,9 @@
   snarky.backendless
   test_util
   unsigned_extended)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    h_list.ppx
@@ -50,6 +56,4 @@
    ppx_mina
    ppx_sexp_conv
    ppx_version))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "Currency types"))

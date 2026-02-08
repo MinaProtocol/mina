@@ -1,7 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name tokens)
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   async_kernel
   async_unix
@@ -10,12 +16,11 @@
   core_kernel
   ppx_inline_test.config
   yojson
-  ;; local libraries
+  ; local libraries
   cache_dir
   currency
   data_hash_lib
   genesis_constants
-  pasta_bindings
   kimchi_backend
   kimchi_pasta
   kimchi_pasta.basic
@@ -25,12 +30,14 @@
   mina_ledger
   mina_numbers
   mina_state
+  mina_stdlib
   mina_transaction_logic
+  pasta_bindings
   pickles
   pickles.backend
   pickles_types
-  random_oracle_input
   random_oracle
+  random_oracle_input
   sgn
   signature_lib
   snark_params
@@ -39,12 +46,9 @@
   transaction_snark
   transaction_snark_tests
   with_hash
-  zkapps_tokens
   zkapps_examples
-  mina_stdlib)
- (inline_tests
-  (flags -verbose -show-counts))
- (preprocess
-  (pps ppx_snarky ppx_version ppx_jane))
+  zkapps_tokens)
  (instrumentation
-  (backend bisect_ppx)))
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_snarky ppx_version)))

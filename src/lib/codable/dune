@@ -1,18 +1,22 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name codable)
  (public_name codable)
- (library_flags (-linkall))
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   base64
   core_kernel
   ppx_deriving_yojson.runtime
   result
   yojson
-  ;; local libraries
+  ; local libraries
   base58_check)
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

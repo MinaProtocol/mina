@@ -1,7 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name transaction_snark_tests_verify_simple_test)
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   ppx_inline_test.config
   async
   async_kernel
@@ -11,7 +17,7 @@
   core_kernel
   base64
   yojson
-  ;; local libraries
+  ; local libraries
   random_oracle_input
   pickles.backend
   mina_base.import
@@ -50,9 +56,7 @@
   mina_wire_types
   block_time)
  (library_flags -linkall)
- (inline_tests
-  (flags -verbose -show-counts))
- (preprocess
-  (pps ppx_snarky ppx_version ppx_jane ppx_sexp_conv))
  (instrumentation
-  (backend bisect_ppx)))
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_snarky ppx_version ppx_jane ppx_sexp_conv)))

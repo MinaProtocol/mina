@@ -1,11 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name work_selector)
  (public_name work_selector)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   bin_prot.shape
   sexplib0
   core
@@ -17,7 +20,7 @@
   async_kernel
   ppx_inline_test.config
   async_unix
-  ;; local libraries
+  ; local libraries
   transaction_protocol_state
   transaction_snark_work
   transition_frontier_base
@@ -43,6 +46,9 @@
   mina_ledger
   ppx_version.runtime
   o1trace)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_mina
@@ -56,6 +62,4 @@
    ppx_bin_prot
    ppx_custom_printf
    ppx_inline_test))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "Selects work from the work pool"))

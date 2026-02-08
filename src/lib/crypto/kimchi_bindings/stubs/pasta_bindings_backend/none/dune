@@ -1,10 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (public_name pasta_bindings.backend.none)
  (name pasta_bindings_backend_none)
- (instrumentation
-  (backend bisect_ppx))
+ (public_name pasta_bindings.backend.none)
  (inline_tests
   (flags -verbose -show-counts))
+ (implements pasta_bindings.backend)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_inline_test))
- (implements pasta_bindings.backend))
+  (pps ppx_version ppx_inline_test)))
