@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "bs58check": "^4.0.0",
+    "mina-signer": "^3.1.0"
+  }
+}
