@@ -4,21 +4,25 @@
  (name manifest_lib)
  (libraries str unix)
  (wrapped false)
- (modules dune_s_expr manifest))
+ (modules dune_s_expr manifest externals))
+
+(library
+ (name layer_snarky)
+ (libraries manifest_lib)
+ (wrapped false)
+ (modules layer_snarky))
 
 (library
  (name manifest_foundation)
- (libraries manifest_lib)
+ (libraries manifest_lib layer_snarky)
  (wrapped false)
  (modules
-  externals
   layer_base
   layer_base_types
   layer_concurrency
   layer_logging
   layer_node
   layer_ppx
-  layer_snarky
   layer_test
   layer_tooling))
 
