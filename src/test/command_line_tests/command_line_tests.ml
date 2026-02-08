@@ -261,6 +261,33 @@ module AutoHardforkConfigGeneration = struct
            slot_duration_ms )
     else Deferred.Or_error.return ()
 
+  (** Validate the output of [mina daemon --resolve-auto-fork-config].
+      @param conf_dir The config directory used by the daemon
+      @param output The stdout from running the command
+      @param expected_status Either "activated" or "not_activated" *)
+  let validate_resolve_auto_fork_config ~conf_dir output expected_status =
+    let open Deferred.Or_error in
+    let json = Yojson.Safe.from_string (String.strip output) in
+    let auto_fork_dir = conf_dir ^/ "auto-fork-mesa-devnet" in
+    let expected_json =
+      match expected_status with
+      | `Not_activated ->
+          `Assoc [ ("status", `String "not_activated") ]
+      | `Activated ->
+          `Assoc
+            [ ("status", `String "activated")
+            ; ("fork_config_dir", `String auto_fork_dir)
+            ; ("genesis_config_file", `String (auto_fork_dir ^/ "daemon.json"))
+            ; ("genesis_ledger_dir", `String (auto_fork_dir ^/ "genesis"))
+            ]
+    in
+    if Yojson.Safe.equal json expected_json then return ()
+    else
+      error_string
+        (sprintf "resolve-auto-fork-config mismatch: expected %s, got %s"
+           (Yojson.Safe.to_string expected_json)
+           (Yojson.Safe.to_string json) )
+
   let generate_hardfork_config daemon output =
     (* Generate 10 test accounts *)
     let client = Daemon.client daemon in
@@ -375,10 +402,29 @@ module AutoHardforkConfigGeneration = struct
       Secrets.Keypair.write_exn block_producer_kp ~privkey_path:bp_key_path
         ~password
     in
+    (* Test --resolve-auto-fork-config before daemon starts *)
+    let conf_dir = test.config.dirs.conf in
+    let%bind detect_output_before_start =
+      Daemon.run_resolve_auto_fork_config ~hardfork_handling:"migrate-exit"
+        ~block_producer_key:bp_key_path daemon
+    in
+    let%bind.Deferred.Or_error () =
+      validate_resolve_auto_fork_config ~conf_dir detect_output_before_start
+        `Not_activated
+    in
     (* Start daemon with migrate-exit flag and block producer key *)
     let%bind process =
       Daemon.start ~hardfork_handling:"migrate-exit"
         ~block_producer_key:bp_key_path daemon
+    in
+    (* Test --resolve-auto-fork-config right after daemon starts *)
+    let%bind detect_output_after_start =
+      Daemon.run_resolve_auto_fork_config ~hardfork_handling:"migrate-exit"
+        ~block_producer_key:bp_key_path daemon
+    in
+    let%bind.Deferred.Or_error () =
+      validate_resolve_auto_fork_config ~conf_dir detect_output_after_start
+        `Not_activated
     in
     (* Wait for daemon to bootstrap *)
     let%bind result = Daemon.Client.wait_for_bootstrap process.client () in
@@ -394,7 +440,6 @@ module AutoHardforkConfigGeneration = struct
           Writer.flushed (Lazy.force Writer.stdout)
     in
     (* Poll for activated file to appear (with 10 minute timeout) *)
-    let conf_dir = test.config.dirs.conf in
     let auto_fork_dir = conf_dir ^/ "auto-fork-mesa-devnet" in
     let activated = auto_fork_dir ^/ "activated" in
     let start_time = Core.Time.now () in
@@ -421,6 +466,15 @@ module AutoHardforkConfigGeneration = struct
           (Mina_automation_fixture.Intf.Failed
              "Hardfork config was not generated within timeout" )
     | `Success -> (
+        (* Test --resolve-auto-fork-config after activated file appears *)
+        let%bind.Deferred detect_output_after_activated =
+          Daemon.run_resolve_auto_fork_config ~hardfork_handling:"migrate-exit"
+            ~block_producer_key:bp_key_path daemon
+        in
+        let%bind.Deferred.Or_error () =
+          validate_resolve_auto_fork_config ~conf_dir
+            detect_output_after_activated `Activated
+        in
         (* Wait for daemon to auto-shutdown after generating hardfork config *)
         match%bind.Deferred
           Async.Clock.with_timeout (Core.Time.Span.of_min 5.)
