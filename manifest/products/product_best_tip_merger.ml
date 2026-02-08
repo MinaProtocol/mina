@@ -24,7 +24,7 @@ let () =
       ; local "cli_lib"
       ; Layer_consensus.consensus
       ; Layer_domain.data_hash_lib
-      ; Layer_crypto.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta
       ; Layer_logging.logger
       ; Layer_logging.logger_file_system
       ; Layer_base.mina_base
@@ -32,8 +32,8 @@ let () =
       ; Layer_consensus.mina_state
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
       ; Layer_crypto.snark_params
       ; Layer_network.transition_frontier
       ; Layer_network.transition_frontier_extensions

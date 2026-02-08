@@ -29,9 +29,9 @@ let () =
       ; local "integration_test_lib"
       ; local "integration_test_local_engine"
       ; Layer_crypto.key_gen
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
@@ -44,9 +44,9 @@ let () =
       ; Layer_transaction.mina_transaction
       ; Layer_network.network_pool
       ; Layer_base.participating_state
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_concurrency.pipe_lib
       ; Layer_protocol.protocol_version
       ; Layer_crypto.random_oracle

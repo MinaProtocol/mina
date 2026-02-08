@@ -24,10 +24,10 @@ let () =
       ; Layer_crypto.crypto_params
       ; Layer_domain.data_hash_lib
       ; Layer_domain.genesis_constants
-      ; Layer_crypto.kimchi_backend
+      ; Layer_kimchi.kimchi_backend
       ; local "kimchi_bindings"
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_snark_worker.ledger_proof
       ; Layer_ledger.merkle_ledger
       ; Layer_base.mina_base
@@ -42,10 +42,10 @@ let () =
       ; Layer_transaction.mina_transaction_logic
       ; Layer_domain.parallel_scan
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
-      ; Layer_crypto.proof_cache_tag
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
+      ; Layer_pickles.proof_cache_tag
       ; Layer_crypto.random_oracle
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params

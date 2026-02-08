@@ -72,9 +72,9 @@ let archive_lib =
       ; Layer_domain.genesis_constants
       ; Layer_network.genesis_ledger_helper
       ; Layer_network.genesis_ledger_helper_lib
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
@@ -92,9 +92,9 @@ let archive_lib =
       ; Layer_base.mina_wire_types
       ; Layer_logging.o1trace
       ; Layer_base.one_or_two
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_concurrency.pipe_lib
       ; Layer_consensus.precomputed_values
       ; Layer_protocol.protocol_version

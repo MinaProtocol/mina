@@ -35,10 +35,10 @@ let () =
       ; Layer_domain.genesis_constants
       ; Layer_network.genesis_ledger_helper
       ; Layer_network.genesis_ledger_helper_lib
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_backend_common
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_backend_common
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
@@ -52,9 +52,9 @@ let () =
       ; Layer_transaction.mina_transaction_logic
       ; Layer_base.mina_version
       ; Layer_base.mina_wire_types
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_ppx.ppx_version_runtime
       ; Layer_crypto.random_oracle
       ; Layer_crypto.sgn

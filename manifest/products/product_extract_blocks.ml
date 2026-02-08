@@ -25,8 +25,8 @@ let () =
       ; Layer_base.currency
       ; Layer_domain.data_hash_lib
       ; Layer_base.error_json
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
@@ -36,9 +36,9 @@ let () =
       ; Layer_transaction.mina_transaction
       ; Layer_base.mina_wire_types
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_protocol.protocol_version
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib

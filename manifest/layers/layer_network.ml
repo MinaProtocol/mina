@@ -114,11 +114,11 @@ let mina_block =
       ; Layer_crypto.blake2
       ; Layer_crypto.snark_params
       ; Layer_crypto.crypto_params
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
       ; local "pasta_bindings"
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_ppx.ppx_version_runtime
@@ -201,9 +201,9 @@ let staged_ledger =
       ; Layer_base.error_json
       ; Layer_domain.genesis_constants
       ; Layer_tooling.internal_tracing
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_snark_worker.ledger_proof
       ; Layer_logging.logger
       ; Layer_ledger.merkle_ledger
@@ -219,9 +219,9 @@ let staged_ledger =
       ; Layer_base.mina_wire_types
       ; Layer_logging.o1trace
       ; Layer_base.one_or_two
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_ppx.ppx_version_runtime
       ; Layer_test.quickcheck_lib
       ; Layer_crypto.random_oracle
@@ -310,8 +310,8 @@ let genesis_ledger_helper_lib =
       ; Layer_base.mina_base_import
       ; Layer_crypto.random_oracle
       ; Layer_domain.data_hash_lib
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_types
       ; Layer_base.unsigned_extended
       ; Layer_base.mina_stdlib
       ; Layer_storage.key_cache_native
@@ -323,11 +323,11 @@ let genesis_ledger_helper_lib =
       ; Layer_base.mina_numbers
       ; Layer_base.with_hash
       ; Layer_base.currency
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles_backend
       ; Layer_logging.logger
       ; Layer_crypto.snark_params
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; local "ppx_inline_test.config"
       ]
     ~ppx:
@@ -380,7 +380,7 @@ let genesis_ledger_helper =
       ; Layer_crypto.snark_params
       ; Layer_base.unsigned_extended
       ; Layer_consensus.consensus
-      ; Layer_crypto.pickles
+      ; Layer_pickles.pickles
       ; Layer_logging.logger
       ; Layer_base.mina_base_import
       ; Layer_ledger.staged_ledger_diff
@@ -416,18 +416,18 @@ let vrf_lib_tests =
       ; Layer_base.mina_base
       ; Layer_crypto.random_oracle
       ; local "fold_lib"
-      ; Layer_crypto.pickles
+      ; Layer_pickles.pickles
       ; Layer_crypto.bignum_bigint
       ; local "snarky.backendless"
       ; local "bitstring_lib"
       ; Layer_crypto.crypto_params
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.kimchi_backend
+      ; Layer_pickles.pickles_backend
+      ; Layer_kimchi.kimchi_backend
       ; local "kimchi_bindings"
       ; local "kimchi_types"
       ; local "pasta_bindings"
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; local "snarky_field_extensions"
       ; local "tuple_lib"
       ; Layer_domain.genesis_constants
@@ -522,12 +522,12 @@ let snark_profiler_lib =
       ; Layer_service.verifier
       ; Layer_concurrency.parallel
       ; Layer_crypto.random_oracle
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
-      ; Layer_crypto.pickles_types
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
+      ; Layer_pickles.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
       ; Layer_crypto.snark_params
       ; Layer_protocol.zkapp_command_builder
       ]
@@ -895,10 +895,10 @@ let network_pool =
       ; Layer_base.error_json
       ; Layer_domain.genesis_constants
       ; Layer_concurrency.interruptible
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_backend_common
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_backend_common
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_snark_worker.ledger_proof
       ; Layer_logging.logger
       ; Layer_ledger.merkle_ledger
@@ -915,9 +915,9 @@ let network_pool =
       ; network_peer
       ; Layer_logging.o1trace
       ; Layer_base.one_or_two
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_concurrency.pipe_lib
       ; Layer_ppx.ppx_version_runtime
       ; Layer_consensus.precomputed_values
@@ -1088,11 +1088,11 @@ let transition_chain_prover =
       ; Layer_domain.data_hash_lib
       ; Layer_base.with_hash
       ; Layer_base.mina_wire_types
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles_backend
       ; Layer_crypto.snark_params
-      ; Layer_crypto.pickles
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_pickles.pickles
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
@@ -1159,14 +1159,14 @@ let transition_frontier_base =
       ; Layer_protocol.transaction_snark
       ; Layer_consensus.coda_genesis_proof
       ; Layer_ppx.ppx_version_runtime
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles_backend
       ; Layer_crypto.snark_params
-      ; Layer_crypto.pickles
-      ; Layer_crypto.kimchi_backend
+      ; Layer_pickles.pickles
+      ; Layer_kimchi.kimchi_backend
       ; Layer_crypto.sgn
       ; Layer_base.sgn_type
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_base.mina_wire_types
       ; Layer_tooling.internal_tracing
       ]
@@ -1224,11 +1224,11 @@ let transition_frontier_full_frontier =
       ; Layer_protocol.protocol_version
       ; Layer_crypto.signature_lib
       ; Layer_service.verifier
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles_backend
       ; Layer_crypto.snark_params
-      ; Layer_crypto.pickles
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_pickles.pickles
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_transaction.mina_transaction_logic
       ]
     ~ppx:
@@ -1301,16 +1301,16 @@ let transition_frontier_persistent_frontier =
       ; Layer_service.verifier
       ; Layer_base.with_hash
       ; Layer_ppx.ppx_version_runtime
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles_backend
       ; Layer_crypto.snark_params
-      ; Layer_crypto.pickles
-      ; Layer_crypto.kimchi_backend
+      ; Layer_pickles.pickles
+      ; Layer_kimchi.kimchi_backend
       ; Layer_crypto.sgn
       ; Layer_base.sgn_type
       ; Layer_base.currency
       ; Layer_base.mina_numbers
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_base.mina_wire_types
       ; Layer_tooling.internal_tracing
       ]
@@ -1519,11 +1519,11 @@ let transition_handler =
       ; mina_net2
       ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles_backend
       ; Layer_crypto.snark_params
-      ; Layer_crypto.pickles
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_pickles.pickles
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_tooling.internal_tracing
       ; transition_frontier_extensions
       ; Layer_ledger.staged_ledger_diff
@@ -1608,9 +1608,9 @@ let bootstrap_controller =
       ; Layer_base.error_json
       ; local "fake_network"
       ; Layer_domain.genesis_constants
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_logging.logger
       ; Layer_ledger.merkle_ledger
       ; Layer_base.mina_base
@@ -1628,8 +1628,8 @@ let bootstrap_controller =
       ; Layer_base.mina_wire_types
       ; network_peer
       ; Layer_logging.o1trace
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
       ; Layer_concurrency.pipe_lib
       ; Layer_consensus.precomputed_values
       ; Layer_crypto.sgn
@@ -1678,11 +1678,11 @@ let best_tip_prover =
       ; Layer_ledger.merkle_list_prover
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles_backend
       ; Layer_crypto.snark_params
-      ; Layer_crypto.pickles
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_pickles.pickles
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ]
     ~ppx:
       (Ppx.custom
@@ -1701,7 +1701,7 @@ let ledger_catchup =
       ; Layer_base.mina_wire_types
       ; Layer_domain.genesis_constants
       ; Layer_base.mina_base_import
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles_backend
       ; Layer_base.one_or_two
       ; transition_frontier_extensions
       ; Layer_base.child_processes
@@ -1735,10 +1735,10 @@ let ledger_catchup =
       ; network_pool
       ; Layer_ledger.staged_ledger_diff
       ; Layer_snark_worker.transaction_snark_work
-      ; Layer_crypto.pickles
+      ; Layer_pickles.pickles
       ; Layer_crypto.snark_params
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_logging.o1trace
       ; mina_net2
       ; Layer_tooling.internal_tracing
@@ -1791,9 +1791,9 @@ let block_producer =
       ; Layer_domain.genesis_constants
       ; Layer_tooling.internal_tracing
       ; Layer_concurrency.interruptible
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_snark_worker.ledger_proof
       ; Layer_logging.logger
       ; Layer_base.mina_base
@@ -1816,8 +1816,8 @@ let block_producer =
       ; Layer_logging.o1trace
       ; Layer_base.otp_lib
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
       ; Layer_concurrency.pipe_lib
       ; Layer_consensus.precomputed_values
       ; Layer_protocol.protocol_version
@@ -1861,8 +1861,8 @@ let fake_network =
       ; Layer_domain.data_hash_lib
       ; Layer_domain.genesis_constants
       ; local "kimchi_bindings"
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; local "kimchi_types"
       ; Layer_logging.logger
       ; Layer_base.mina_base
@@ -1874,8 +1874,8 @@ let fake_network =
       ; network_peer
       ; network_pool
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
       ; Layer_concurrency.pipe_lib
       ; Layer_consensus.precomputed_values
       ; Layer_domain.proof_carrying_data

@@ -19,10 +19,12 @@
   layer_consensus
   layer_crypto
   layer_domain
+  layer_kimchi
   layer_logging
   layer_ledger
   layer_network
   layer_node
+  layer_pickles
   layer_ppx
   layer_protocol
   layer_service

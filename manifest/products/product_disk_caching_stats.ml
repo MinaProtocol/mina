@@ -20,8 +20,8 @@ let () =
       ; Layer_base.currency
       ; Layer_domain.data_hash_lib
       ; Layer_domain.genesis_constants
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_snark_worker.ledger_proof
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
@@ -32,9 +32,9 @@ let () =
       ; Layer_base.mina_wire_types
       ; Layer_network.network_pool
       ; Layer_base.one_or_two
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.sgn

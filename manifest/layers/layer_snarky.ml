@@ -6,6 +6,20 @@
 open Manifest
 open Externals
 
+let snarky_taylor =
+  library "snarky_taylor" ~path:"src/lib/crypto/snarky_taylor"
+    ~deps:
+      [ bignum
+      ; bignum_bigint
+      ; core_kernel
+      ; sexplib0
+      ; local "snarky.backendless"
+      ; local "snarky_integer"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_compare; Ppx_lib.ppx_jane; Ppx_lib.ppx_version ] )
+
 let snark_bits =
   library "snark_bits" ~path:"src/lib/crypto/snark_bits"
     ~synopsis:"Snark parameters" ~library_flags:[ "-linkall" ]

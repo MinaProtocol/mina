@@ -11,19 +11,19 @@ let zkapps_examples =
       ; core_kernel
       ; Layer_crypto.crypto_params
       ; Layer_base.currency
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_backend_common
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_backend_common
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
       ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.sgn
@@ -43,8 +43,8 @@ let zkapps_actions =
       ; Layer_crypto.crypto_params
       ; Layer_base.currency
       ; Layer_base.mina_base
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.signature_lib
       ; local "snarky.backendless"
       ; Layer_crypto.snark_params
@@ -60,8 +60,8 @@ let zkapps_add_events =
       ; Layer_crypto.crypto_params
       ; Layer_base.currency
       ; Layer_base.mina_base
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.signature_lib
       ; local "snarky.backendless"
       ; Layer_crypto.snark_params
@@ -76,16 +76,16 @@ let zkapps_big_circuit =
       [ core_kernel
       ; Layer_crypto.crypto_params
       ; Layer_base.currency
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_backend_common
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
-      ; Layer_crypto.kimchi_pasta_constraint_system
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_backend_common
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta_constraint_system
       ; Layer_base.mina_base
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.random_oracle
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
@@ -103,16 +103,16 @@ let zkapps_calls =
       ; core_kernel
       ; Layer_crypto.crypto_params
       ; Layer_base.currency
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_backend_common
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_backend_common
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.sgn
@@ -132,15 +132,15 @@ let zkapps_empty_update =
       [ core_kernel
       ; Layer_crypto.crypto_params
       ; Layer_base.currency
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_backend_common
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_backend_common
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_base.mina_base
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.random_oracle
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
@@ -159,15 +159,15 @@ let zkapps_initialize_state =
       ; core_kernel
       ; Layer_crypto.crypto_params
       ; Layer_base.currency
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_backend_common
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_backend_common
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_base.mina_base
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.random_oracle
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
@@ -191,16 +191,16 @@ let zkapps_tokens =
       ; Layer_crypto.crypto_params
       ; Layer_base.currency
       ; Layer_domain.genesis_constants
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_backend_common
-      ; Layer_crypto.kimchi_pasta
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_backend_common
+      ; Layer_kimchi.kimchi_pasta
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_base
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_base
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.sgn
@@ -230,9 +230,9 @@ let tokens =
       ; Layer_base.currency
       ; Layer_domain.data_hash_lib
       ; Layer_domain.genesis_constants
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.merkle_ledger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
@@ -242,9 +242,9 @@ let tokens =
       ; Layer_base.mina_stdlib
       ; Layer_transaction.mina_transaction_logic
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.sgn
@@ -276,9 +276,9 @@ let () =
       ; Layer_base.currency
       ; Layer_domain.data_hash_lib
       ; Layer_domain.genesis_constants
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.merkle_ledger
       ; Layer_ledger.merkle_list_verifier
       ; Layer_base.mina_base
@@ -287,10 +287,10 @@ let () =
       ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_base.mina_wire_types
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_base
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_base
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.signature_lib
@@ -317,18 +317,18 @@ let () =
       ; Layer_base.currency
       ; Layer_domain.data_hash_lib
       ; Layer_domain.genesis_constants
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.merkle_ledger
       ; Layer_ledger.merkle_list_verifier
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
       ; Layer_base.mina_numbers
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.signature_lib
@@ -356,9 +356,9 @@ let () =
       ; Layer_base.currency
       ; Layer_domain.data_hash_lib
       ; Layer_domain.genesis_constants
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
@@ -366,10 +366,10 @@ let () =
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction_logic
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_base
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_base
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.sgn
@@ -401,9 +401,9 @@ let () =
       ; Layer_base.currency
       ; Layer_domain.data_hash_lib
       ; Layer_domain.genesis_constants
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.merkle_ledger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
@@ -412,9 +412,9 @@ let () =
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction_logic
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.sgn
@@ -446,9 +446,9 @@ let () =
       ; Layer_base.currency
       ; Layer_domain.data_hash_lib
       ; Layer_domain.genesis_constants
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
@@ -457,10 +457,10 @@ let () =
       ; Layer_base.mina_stdlib
       ; Layer_transaction.mina_transaction_logic
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_base
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_base
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.sgn
@@ -492,9 +492,9 @@ let () =
       ; Layer_base.currency
       ; Layer_domain.data_hash_lib
       ; Layer_domain.genesis_constants
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.merkle_ledger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
@@ -503,9 +503,9 @@ let () =
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction_logic
       ; local "pasta_bindings"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.sgn
@@ -546,9 +546,9 @@ let () =
       ; Layer_ledger.mina_ledger
       ; Layer_base.mina_numbers
       ; Layer_transaction.mina_transaction_logic
-      ; Layer_crypto.pickles
+      ; Layer_pickles.pickles
       ; local "pickles_optional_custom_gates_circuits"
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_keys_header

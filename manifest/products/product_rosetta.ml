@@ -83,8 +83,8 @@ let lib =
       ; local "graphql_lib"
       ; Layer_base.hex
       ; Layer_base.interpolator_lib
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
@@ -96,8 +96,8 @@ let lib =
       ; Layer_transaction.mina_transaction
       ; Layer_base.mina_version
       ; Layer_base.mina_wire_types
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_base.rosetta_coding
@@ -148,11 +148,11 @@ let signer_cli =
       ; core_kernel
       ; lib
       ; local "cli_lib"
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_base.mina_base
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
       ; Layer_base.rosetta_coding
       ; Layer_network.rosetta_lib
       ; Layer_crypto.secrets

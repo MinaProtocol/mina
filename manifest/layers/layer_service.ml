@@ -25,9 +25,9 @@ let verifier =
       ; Layer_domain.genesis_constants
       ; Layer_tooling.internal_tracing
       ; local "itn_logger"
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_snark_worker.ledger_proof
       ; Layer_logging.logger
       ; Layer_logging.logger_file_system
@@ -35,8 +35,8 @@ let verifier =
       ; Layer_base.mina_base_import
       ; Layer_consensus.mina_state
       ; Layer_logging.o1trace
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.signature_lib
@@ -77,10 +77,10 @@ let prover =
       ; Layer_consensus.coda_genesis_ledger
       ; Layer_tooling.mina_metrics
       ; Layer_base.error_json
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles_types
       ; local "snarky.backendless"
       ; Layer_crypto.snark_params
-      ; Layer_crypto.pickles
+      ; Layer_pickles.pickles
       ; Layer_crypto.sgn
       ; Layer_base.currency
       ; Layer_base.child_processes
@@ -102,12 +102,12 @@ let prover =
       ; Layer_ledger.staged_ledger_diff
       ; Layer_ppx.ppx_version_runtime
       ; Layer_transaction.mina_transaction_logic
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles_backend
       ; Layer_base.sgn_type
-      ; Layer_crypto.kimchi_backend
+      ; Layer_kimchi.kimchi_backend
       ; Layer_base.mina_numbers
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_base.mina_wire_types
       ; Layer_concurrency.promise
       ]

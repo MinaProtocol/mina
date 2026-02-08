@@ -20,7 +20,7 @@ let hash_prefix_states =
       ; local "mina_signature_kind"
       ; Layer_crypto.hash_prefixes
       ; local "hash_prefix_create"
-      ; Layer_crypto.pickles
+      ; Layer_pickles.pickles
       ]
     ~ppx:
       (Ppx.custom
@@ -55,7 +55,7 @@ let hash_prefix_create_js =
       [ js_of_ocaml
       ; base
       ; core_kernel
-      ; Layer_crypto.pickles
+      ; Layer_pickles.pickles
       ; Layer_crypto.random_oracle
       ]
     ~implements:"hash_prefix_create" ~ppx:Ppx.minimal
@@ -78,7 +78,7 @@ let data_hash_lib =
       ; local "fold_lib"
       ; Layer_base.mina_wire_types
       ; Layer_crypto.outside_hash_image
-      ; Layer_crypto.pickles
+      ; Layer_pickles.pickles
       ; Layer_ppx.ppx_version_runtime
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
@@ -116,7 +116,7 @@ let block_time =
       ; base_internalhash_types
       ; Layer_base.mina_wire_types
       ; local "bitstring_lib"
-      ; Layer_crypto.pickles
+      ; Layer_pickles.pickles
       ; Layer_base.unsigned_extended
       ; Layer_crypto.snark_params
       ; Layer_base.mina_numbers
@@ -176,14 +176,14 @@ let genesis_constants =
       ; Layer_base.mina_wire_types
       ; Layer_base.unsigned_extended
       ; Layer_base.mina_numbers
-      ; Layer_crypto.pickles
+      ; Layer_pickles.pickles
       ; Layer_base.currency
       ; Layer_crypto.blake2
       ; data_hash_lib
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles_backend
       ; Layer_crypto.snark_keys_header
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_test.test_util
       ; Layer_ppx.ppx_version_runtime
       ]
@@ -340,7 +340,7 @@ let fields_derivers_zkapps =
       ; fields_derivers_graphql
       ; fields_derivers_json
       ; Layer_base.mina_numbers
-      ; Layer_crypto.pickles
+      ; Layer_pickles.pickles
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
@@ -397,7 +397,7 @@ let dummy_values =
       [ core_kernel
       ; Layer_crypto.crypto_params
       ; local "snarky.backendless"
-      ; Layer_crypto.pickles
+      ; Layer_pickles.pickles
       ]
     ~ppx_runtime_libraries:[ "base" ]
     ~ppx:
@@ -434,8 +434,8 @@ let () =
       ; compiler_libs
       ; async_kernel
       ; ocaml_compiler_libs_common
-      ; Layer_crypto.pickles_types
-      ; Layer_crypto.pickles
+      ; Layer_pickles.pickles_types
+      ; Layer_pickles.pickles
       ; Layer_crypto.crypto_params
       ; Layer_tooling.mina_metrics_none
       ; Layer_logging.logger_fake

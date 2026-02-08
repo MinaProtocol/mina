@@ -15,7 +15,7 @@ let ledger_proof =
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction_logic
       ; Layer_ppx.ppx_version_runtime
-      ; Layer_crypto.proof_cache_tag
+      ; Layer_pickles.proof_cache_tag
       ; Layer_domain.proof_carrying_data
       ]
     ~ppx:
@@ -45,11 +45,11 @@ let transaction_snark_work =
       ; Layer_crypto.signature_lib
       ; Layer_ppx.ppx_version_runtime
       ; Layer_base.mina_wire_types
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles_backend
       ; Layer_crypto.snark_params
-      ; Layer_crypto.pickles
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_pickles.pickles
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ]
     ~ppx:
       (Ppx.custom

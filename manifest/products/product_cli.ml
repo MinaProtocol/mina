@@ -102,9 +102,9 @@ let init =
       ; Layer_tooling.internal_tracing
       ; local "itn_crypto"
       ; local "itn_logger"
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
@@ -137,9 +137,9 @@ let init =
       ; Layer_concurrency.parallel
       ; Layer_base.participating_state
       ; Layer_base.perf_histograms
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_consensus.precomputed_values
       ; Layer_protocol.protocol_version
       ; Layer_crypto.random_oracle

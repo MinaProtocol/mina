@@ -233,18 +233,18 @@ let mina_ledger =
       ; local "syncable_ledger"
       ; Layer_crypto.snark_params
       ; local "zkapp_command_builder"
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_base.mina_base_import
       ; Layer_logging.o1trace
       ; Layer_storage.rocksdb
       ; Layer_crypto.random_oracle
       ; Layer_base.currency
       ; Layer_domain.genesis_constants
-      ; Layer_crypto.kimchi_backend
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; merkle_mask
       ; merkle_ledger
       ; Layer_base.mina_base
@@ -286,17 +286,17 @@ let mina_ledger_test_helpers =
       ; sexplib0
       ; yojson
       ; Layer_base.currency
-      ; Layer_crypto.kimchi_backend_common
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_kimchi.kimchi_backend_common
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_base.mina_base
       ; Layer_domain.mina_base_test_helpers
       ; mina_ledger
       ; Layer_base.mina_numbers
       ; Layer_base.monad_lib
-      ; Layer_crypto.pickles
-      ; Layer_crypto.pickles_backend
-      ; Layer_crypto.pickles_types
+      ; Layer_pickles.pickles
+      ; Layer_pickles.pickles_backend
+      ; Layer_pickles.pickles_types
       ; Layer_crypto.signature_lib
       ]
     ~ppx:
@@ -333,11 +333,11 @@ let staged_ledger_diff =
       ; Layer_base.mina_wire_types
       ; Layer_base.mina_base_import
       ; Layer_crypto.signature_lib
-      ; Layer_crypto.pickles_backend
+      ; Layer_pickles.pickles_backend
       ; Layer_crypto.snark_params
-      ; Layer_crypto.pickles
-      ; Layer_crypto.kimchi_pasta
-      ; Layer_crypto.kimchi_pasta_basic
+      ; Layer_pickles.pickles
+      ; Layer_kimchi.kimchi_pasta
+      ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_base.mina_numbers
       ]
     ~ppx:
