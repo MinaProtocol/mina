@@ -181,7 +181,7 @@ let genesis_constants =
       ; Layer_crypto.blake2
       ; data_hash_lib
       ; Layer_pickles.pickles_backend
-      ; Layer_crypto.snark_keys_header
+      ; Layer_snarky.snark_keys_header
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_test.test_util
@@ -229,36 +229,6 @@ let node_addrs_and_ports =
          ; Ppx_lib.ppx_deriving_yojson
          ] )
 
-let user_command_input =
-  library "user_command_input" ~path:"src/lib/user_command_input"
-    ~deps:
-      [ bin_prot_shape
-      ; core
-      ; core_kernel
-      ; async_kernel
-      ; sexplib0
-      ; base_caml
-      ; async
-      ; Layer_logging.logger
-      ; genesis_constants
-      ; Layer_base.currency
-      ; Layer_base.unsigned_extended
-      ; Layer_base.participating_state
-      ; Layer_crypto.secrets
-      ; Layer_crypto.signature_lib
-      ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
-      ; Layer_base.mina_base_import
-      ; Layer_ppx.ppx_version_runtime
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ Ppx_lib.ppx_mina
-         ; Ppx_lib.ppx_version
-         ; Ppx_lib.ppx_deriving_yojson
-         ; Ppx_lib.ppx_jane
-         ; Ppx_lib.ppx_deriving_make
-         ] )
 
 let fields_derivers =
   library "fields_derivers" ~path:"src/lib/fields_derivers" ~inline_tests:true

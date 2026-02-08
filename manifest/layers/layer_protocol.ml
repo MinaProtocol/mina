@@ -181,7 +181,7 @@ let transaction_snark =
       ; Layer_crypto.signature_lib
       ; Snarky_lib.snarky_backendless
       ; Snarky_lib.snarky_integer
-      ; Layer_crypto.snark_keys_header
+      ; Layer_snarky.snark_keys_header
       ; Layer_crypto.snark_params
       ; Layer_test.test_util
       ; transaction_protocol_state
@@ -235,7 +235,7 @@ let blockchain_snark =
       ; Layer_crypto.random_oracle
       ; Layer_crypto.sgn
       ; Snarky_lib.snarky_backendless
-      ; Layer_crypto.snark_keys_header
+      ; Layer_snarky.snark_keys_header
       ; Layer_crypto.snark_params
       ; transaction_snark
       ]

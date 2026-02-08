@@ -292,7 +292,7 @@ let pickles =
       ; pickles_backend
       ; pickles_types
       ; Snarky_lib.snarky_backendless
-      ; local "snarky_group_map"
+      ; Layer_snarky.snarky_group_map
       ; Snarky_lib.sponge
       ; pickles_pseudo
       ; pickles_limb_vector
@@ -305,11 +305,11 @@ let pickles =
       ; pickles_composition_types
       ; pickles_plonk_checks
       ; pickles_base_one_hot_vector
-      ; local "snarky_log"
+      ; Layer_snarky.snarky_log
       ; Snarky_lib.group_map
       ; Snarky_lib.snarky_curve
       ; local "key_cache"
-      ; Layer_crypto.snark_keys_header
+      ; Layer_snarky.snark_keys_header
       ; Snarky_lib.tuple_lib
       ; Layer_concurrency.promise
       ; Layer_kimchi.kimchi_backend_common

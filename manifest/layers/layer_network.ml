@@ -410,7 +410,7 @@ let vrf_lib_tests =
       ; ppx_deriving_runtime
       ; Layer_crypto.snark_params
       ; Layer_crypto.signature_lib
-      ; local "snarky_curves"
+      ; Layer_snarky.snarky_curves
       ; Snarky_lib.snarky
       ; Layer_consensus.vrf_lib
       ; Layer_base.mina_base
@@ -428,7 +428,7 @@ let vrf_lib_tests =
       ; local "pasta_bindings"
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
-      ; local "snarky_field_extensions"
+      ; Layer_snarky.snarky_field_extensions
       ; Snarky_lib.tuple_lib
       ; Layer_domain.genesis_constants
       ]

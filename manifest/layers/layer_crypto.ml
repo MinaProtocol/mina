@@ -57,19 +57,6 @@ let string_sign =
       ]
     ~ppx:Ppx.mina
 
-let snark_keys_header =
-  library "snark_keys_header" ~path:"src/lib/crypto/snark_keys_header"
-    ~deps:[ base; base_caml; core_kernel; integers; result; sexplib0; stdio ]
-    ~ppx:
-      (Ppx.custom
-         [ Ppx_lib.ppx_compare
-         ; Ppx_lib.ppx_deriving_ord
-         ; Ppx_lib.ppx_deriving_yojson
-         ; Ppx_lib.ppx_let
-         ; Ppx_lib.ppx_sexp_conv
-         ; Ppx_lib.ppx_version
-         ] )
-
 let random_oracle_input =
   library "random_oracle_input" ~path:"src/lib/crypto/random_oracle_input"
     ~inline_tests:true
@@ -166,9 +153,9 @@ let snark_params =
       ; Layer_kimchi.kimchi_pasta_basic
       ; bignum_bigint
       ; local "pickles_backend"
-      ; local "snarky_curves"
+      ; Layer_snarky.snarky_curves
       ; Snarky_lib.snarky_backendless
-      ; local "snarky_group_map"
+      ; Layer_snarky.snarky_group_map
       ; Snarky_lib.sponge
       ; Snarky_lib.group_map
       ; Snarky_lib.fold_lib
@@ -176,7 +163,7 @@ let snark_params =
       ; Layer_snarky.snark_bits
       ; local "pickles"
       ; crypto_params
-      ; local "snarky_field_extensions"
+      ; Layer_snarky.snarky_field_extensions
       ; Snarky_lib.snarky_intf
       ; Layer_kimchi.kimchi_backend
       ]
@@ -354,7 +341,7 @@ let signature_lib =
       ; Snarky_lib.snarky_backendless
       ; bignum_bigint
       ; Layer_base.base58_check
-      ; local "snarky_curves"
+      ; Layer_snarky.snarky_curves
       ; local "pickles"
       ; Snarky_lib.fold_lib
       ; local "pickles_backend"

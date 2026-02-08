@@ -6,6 +6,37 @@
 open Manifest
 open Externals
 
+let user_command_input =
+  library "user_command_input" ~path:"src/lib/user_command_input"
+    ~deps:
+      [ bin_prot_shape
+      ; core
+      ; core_kernel
+      ; async_kernel
+      ; sexplib0
+      ; base_caml
+      ; async
+      ; Layer_logging.logger
+      ; Layer_domain.genesis_constants
+      ; Layer_base.currency
+      ; Layer_base.unsigned_extended
+      ; Layer_base.participating_state
+      ; Layer_crypto.secrets
+      ; Layer_crypto.signature_lib
+      ; Layer_base.mina_base
+      ; Layer_base.mina_numbers
+      ; Layer_base.mina_base_import
+      ; Layer_ppx.ppx_version_runtime
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_mina
+         ; Ppx_lib.ppx_version
+         ; Ppx_lib.ppx_deriving_yojson
+         ; Ppx_lib.ppx_jane
+         ; Ppx_lib.ppx_deriving_make
+         ] )
+
 let mina_transaction =
   library "mina_transaction" ~path:"src/lib/transaction" ~inline_tests:true
     ~deps:

@@ -551,7 +551,7 @@ let () =
       ; Layer_pickles.pickles_types
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
-      ; Layer_crypto.snark_keys_header
+      ; Layer_snarky.snark_keys_header
       ; Layer_crypto.snark_params
       ; Layer_test.test_util
       ; Layer_protocol.transaction_snark

@@ -23,7 +23,7 @@ let vrf_lib =
       ; ppx_inline_test_config
       ; Snarky_lib.snarky_backendless
       ; Layer_domain.genesis_constants
-      ; local "snarky_curves"
+      ; Layer_snarky.snarky_curves
       ; Snarky_lib.bitstring_lib
       ; Layer_ppx.ppx_version_runtime
       ]

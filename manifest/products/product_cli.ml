@@ -160,7 +160,7 @@ let init =
       ; Layer_protocol.transaction_snark_tests
       ; Layer_network.trust_system
       ; Layer_base.unsigned_extended
-      ; Layer_domain.user_command_input
+      ; Layer_transaction.user_command_input
       ; Layer_service.verifier
       ; Layer_base.with_hash
       ; Layer_protocol.zkapp_command_builder

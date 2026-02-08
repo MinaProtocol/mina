@@ -420,17 +420,17 @@ let kimchi_backend_gadgets_test_runner =
       ; Snarky_lib.bitstring_lib
       ; Snarky_lib.snarky_intf
       ; Snarky_lib.snarky_backendless
-      ; local "snarky_group_map"
+      ; Layer_snarky.snarky_group_map
       ; Snarky_lib.sponge
       ; kimchi_backend
       ; Layer_base.base58_check
       ; Layer_base.codable
       ; local "random_oracle_input"
-      ; local "snarky_log"
+      ; Layer_snarky.snarky_log
       ; Snarky_lib.group_map
       ; Snarky_lib.snarky_curve
       ; local "key_cache"
-      ; local "snark_keys_header"
+      ; Layer_snarky.snark_keys_header
       ; Snarky_lib.tuple_lib
       ; Layer_concurrency.promise
       ; kimchi_backend_common
