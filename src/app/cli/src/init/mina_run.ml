@@ -121,8 +121,8 @@ let start_auto_hardfork_config_generation ~logger mina =
             ~metadata:[ ("config_dir", `String config_dir) ] ;
           let%bind result =
             Mina_lib.Hardfork_config.dump_reference_config
-              ~breadcrumb_spec:`Stop_slot ~config_dir
-              ~generate_fork_validation:false mina
+              ~breadcrumb_spec:(Stop_slot { preserve_fork_block_time = false })
+              ~config_dir ~generate_fork_validation:false mina
           in
           match result with
           | Ok () ->
@@ -494,8 +494,8 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
     ; implement Daemon_rpcs.Generate_hardfork_config.rpc
         (fun () { config_dir; generate_fork_validation } ->
           Mina_lib.Hardfork_config.dump_reference_config
-            ~breadcrumb_spec:`Stop_slot ~config_dir ~generate_fork_validation
-            mina )
+            ~breadcrumb_spec:(Stop_slot { preserve_fork_block_time = false })
+            ~config_dir ~generate_fork_validation mina )
     ; implement Daemon_rpcs.Submit_internal_log.rpc
         (fun () { timestamp; message; metadata; process } ->
           let metadata =
