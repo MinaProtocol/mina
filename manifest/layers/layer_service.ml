@@ -29,12 +29,12 @@ let verifier =
       ; Layer_crypto.kimchi_pasta
       ; Layer_crypto.kimchi_pasta_basic
       ; Layer_snark_worker.ledger_proof
-      ; Layer_infra.logger
-      ; Layer_infra.logger_file_system
+      ; Layer_logging.logger
+      ; Layer_logging.logger_file_system
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_consensus.mina_state
-      ; Layer_infra.o1trace
+      ; Layer_logging.o1trace
       ; Layer_crypto.pickles
       ; Layer_crypto.pickles_backend
       ; Layer_crypto.random_oracle
@@ -89,7 +89,7 @@ let prover =
       ; Layer_consensus.mina_state
       ; Layer_base.mina_base
       ; Layer_base.mina_compile_config
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; local "itn_logger"
       ; Layer_tooling.internal_tracing
       ; Layer_domain.genesis_constants
@@ -97,7 +97,7 @@ let prover =
       ; Layer_consensus.consensus
       ; Layer_consensus.coda_genesis_proof
       ; Layer_protocol.transaction_snark
-      ; Layer_infra.logger_file_system
+      ; Layer_logging.logger_file_system
       ; Layer_domain.data_hash_lib
       ; Layer_ledger.staged_ledger_diff
       ; Layer_ppx.ppx_version_runtime

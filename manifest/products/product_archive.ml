@@ -29,7 +29,7 @@ let archive_cli =
       ; Layer_domain.block_time
       ; local "cli_lib"
       ; Layer_domain.genesis_constants
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; local "mina_caqti"
       ; local "mina_runtime_config"
       ; Layer_base.mina_version
@@ -75,7 +75,7 @@ let archive_lib =
       ; Layer_crypto.kimchi_backend
       ; Layer_crypto.kimchi_pasta
       ; Layer_crypto.kimchi_pasta_basic
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_base.mina_base_util
@@ -90,7 +90,7 @@ let archive_lib =
       ; Layer_base.mina_stdlib
       ; Layer_transaction.mina_transaction
       ; Layer_base.mina_wire_types
-      ; Layer_infra.o1trace
+      ; Layer_logging.o1trace
       ; Layer_base.one_or_two
       ; Layer_crypto.pickles
       ; Layer_crypto.pickles_backend

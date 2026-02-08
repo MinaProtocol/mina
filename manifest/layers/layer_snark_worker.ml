@@ -91,13 +91,13 @@ let transaction_snark_scan_state =
       ; Layer_ledger.mina_ledger
       ; Layer_ledger.merkle_ledger
       ; Layer_base.currency
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; transaction_snark_work
       ; Layer_domain.parallel_scan
       ; Layer_crypto.sgn
       ; ledger_proof
       ; Layer_domain.genesis_constants
-      ; Layer_infra.o1trace
+      ; Layer_logging.o1trace
       ; Layer_base.with_hash
       ; Layer_ppx.ppx_version_runtime
       ; Layer_base.mina_wire_types
@@ -171,8 +171,8 @@ let snark_worker =
       ; Layer_base.error_json
       ; Layer_domain.genesis_constants
       ; ledger_proof
-      ; Layer_infra.logger
-      ; Layer_infra.logger_file_system
+      ; Layer_logging.logger
+      ; Layer_logging.logger_file_system
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_ledger.mina_ledger
@@ -233,7 +233,7 @@ let work_selector =
       ; Layer_transaction.mina_transaction
       ; local "network_pool"
       ; local "staged_ledger"
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_base.currency
       ; Layer_base.one_or_two
       ; Layer_protocol.transaction_snark
@@ -244,7 +244,7 @@ let work_selector =
       ; local "transition_frontier_extensions"
       ; Layer_ledger.mina_ledger
       ; Layer_ppx.ppx_version_runtime
-      ; Layer_infra.o1trace
+      ; Layer_logging.o1trace
       ]
     ~ppx:
       (Ppx.custom

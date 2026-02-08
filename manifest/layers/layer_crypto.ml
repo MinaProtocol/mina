@@ -321,8 +321,8 @@ let kimchi_backend_common =
       ; Layer_base.allocation_functor
       ; local "snarky.intf"
       ; Layer_concurrency.promise
-      ; Layer_infra.logger
-      ; Layer_infra.logger_context_logger
+      ; Layer_logging.logger
+      ; Layer_logging.logger_context_logger
       ; Layer_ppx.ppx_version_runtime
       ; Layer_base.mina_stdlib
       ]
@@ -919,7 +919,7 @@ let secrets =
       ; Layer_base.mina_stdlib_unix
       ; random_oracle
       ; local "pickles"
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; snark_params
       ; Layer_base.mina_stdlib
       ; local "mina_net2"
@@ -1164,8 +1164,8 @@ let pickles =
       ; local "tuple_lib"
       ; Layer_concurrency.promise
       ; kimchi_backend_common
-      ; Layer_infra.logger
-      ; Layer_infra.logger_context_logger
+      ; Layer_logging.logger
+      ; Layer_logging.logger_context_logger
       ; Layer_ppx.ppx_version_runtime
       ; Layer_base.error_json
       ; Layer_base.mina_stdlib

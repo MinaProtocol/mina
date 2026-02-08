@@ -1,4 +1,4 @@
-(** Mina Core infrastructure libraries: logging, metrics, config, etc.
+(** Mina logging libraries: structured logging, tracing, and log context.
 
   Each declaration corresponds to a dune file in src/.
   The manifest generates these files from the declarations below. *)

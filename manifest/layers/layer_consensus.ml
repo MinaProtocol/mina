@@ -132,7 +132,7 @@ let consensus =
       ; local "fold_lib"
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.outside_hash_image
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_domain.hash_prefix_states
       ; Layer_domain.genesis_constants
       ; Layer_base.error_json
@@ -175,7 +175,7 @@ let consensus =
       ; Layer_base.mina_base_import
       ; Layer_ppx.ppx_version_runtime
       ; Layer_tooling.internal_tracing
-      ; Layer_infra.o1trace
+      ; Layer_logging.o1trace
       ]
     ~ppx:
       (Ppx.custom
@@ -207,7 +207,7 @@ let () =
       ; consensus
       ; local "prover"
       ; local "blockchain_snark"
-      ; Layer_infra.logger_file_system
+      ; Layer_logging.logger_file_system
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
     ~enabled_if:"false" "proof_of_stake_fuzzer"

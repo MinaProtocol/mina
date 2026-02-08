@@ -105,7 +105,7 @@ let init =
       ; Layer_crypto.kimchi_backend
       ; Layer_crypto.kimchi_pasta
       ; Layer_crypto.kimchi_pasta_basic
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_network.mina_block
@@ -131,8 +131,8 @@ let init =
       ; Layer_network.network_peer
       ; Layer_network.network_pool
       ; local "node_error_service"
-      ; Layer_infra.o1trace
-      ; Layer_infra.o1trace_webkit_event
+      ; Layer_logging.o1trace
+      ; Layer_logging.o1trace_webkit_event
       ; Layer_base.one_or_two
       ; Layer_concurrency.parallel
       ; Layer_base.participating_state
@@ -236,8 +236,8 @@ let cli_mina_cli_entrypoint =
       ; Layer_tooling.internal_tracing
       ; local "itn_logger"
       ; Layer_snark_worker.ledger_proof
-      ; Layer_infra.logger
-      ; Layer_infra.logger_file_system
+      ; Layer_logging.logger
+      ; Layer_logging.logger_file_system
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_network.mina_block
@@ -254,7 +254,7 @@ let cli_mina_cli_entrypoint =
       ; Layer_base.mina_version
       ; Layer_domain.node_addrs_and_ports
       ; local "node_error_service"
-      ; Layer_infra.o1trace
+      ; Layer_logging.o1trace
       ; Layer_concurrency.parallel
       ; Layer_concurrency.pipe_lib
       ; Layer_ppx.ppx_version_runtime

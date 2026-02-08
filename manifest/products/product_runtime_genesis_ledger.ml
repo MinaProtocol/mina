@@ -21,7 +21,7 @@ let () =
       ; Layer_consensus.consensus
       ; Layer_domain.genesis_constants
       ; Layer_network.genesis_ledger_helper
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_ledger.mina_ledger
       ; local "mina_runtime_config"

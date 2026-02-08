@@ -23,7 +23,7 @@ let () =
       ; uri
       ; Product_archive.archive_lib
       ; Layer_domain.genesis_constants
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_network.mina_block
       ; Layer_base.mina_stdlib
       ]

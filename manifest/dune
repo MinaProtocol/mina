@@ -19,7 +19,7 @@
   layer_consensus
   layer_crypto
   layer_domain
-  layer_infra
+  layer_logging
   layer_ledger
   layer_network
   layer_node

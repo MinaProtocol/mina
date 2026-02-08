@@ -17,7 +17,7 @@ let () =
       ; sexplib0
       ; yojson
       ; Layer_domain.block_time
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_network.mina_block
       ; Layer_consensus.mina_state

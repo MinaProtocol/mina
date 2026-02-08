@@ -18,7 +18,7 @@ let () =
       ; core
       ; core_kernel
       ; uri
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; local "mina_caqti"
       ; Layer_base.mina_stdlib
       ]

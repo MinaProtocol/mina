@@ -120,7 +120,7 @@ let block_time =
       ; Layer_base.unsigned_extended
       ; Layer_crypto.snark_params
       ; Layer_base.mina_numbers
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_snarky.snark_bits
       ; Layer_concurrency.timeout_lib
       ; Layer_crypto.crypto_params
@@ -239,7 +239,7 @@ let user_command_input =
       ; sexplib0
       ; base_caml
       ; async
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; genesis_constants
       ; Layer_base.currency
       ; Layer_base.unsigned_extended
@@ -438,7 +438,7 @@ let () =
       ; Layer_crypto.pickles
       ; Layer_crypto.crypto_params
       ; Layer_tooling.mina_metrics_none
-      ; Layer_infra.logger_fake
+      ; Layer_logging.logger_fake
       ]
     ~forbidden_libraries:[ "mina_node_config"; "protocol_version" ]
     ~ppx:

@@ -154,7 +154,7 @@ let transaction_snark =
       ; Layer_crypto.kimchi_backend_common
       ; Layer_crypto.kimchi_pasta
       ; Layer_crypto.kimchi_pasta_basic
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_ledger.merkle_ledger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_util
@@ -165,7 +165,7 @@ let transaction_snark =
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ; Layer_base.mina_wire_types
-      ; Layer_infra.o1trace
+      ; Layer_logging.o1trace
       ; Layer_base.one_or_two
       ; Layer_crypto.pickles
       ; Layer_crypto.pickles_backend
@@ -223,7 +223,7 @@ let blockchain_snark =
       ; Layer_domain.genesis_constants
       ; Layer_crypto.kimchi_pasta
       ; Layer_crypto.kimchi_pasta_basic
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction_logic
@@ -337,7 +337,7 @@ let transaction_snark_tests =
       ; ppx_deriving_yojson_runtime
       ; result
       ; Layer_base.mina_stdlib
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.pickles_backend
       ; Layer_base.mina_base_import
@@ -524,7 +524,7 @@ let account_update_network_id =
       ; core_kernel
       ; yojson
       ; sexplib0
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_base.mina_base_import
       ; Layer_crypto.pickles
       ; Layer_crypto.pickles_backend
@@ -1058,7 +1058,7 @@ let () =
       ; core_kernel
       ; yojson
       ; splittable_random
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_base.mina_base_import
       ; Layer_domain.data_hash_lib
       ; local "mina_generators"
@@ -1112,7 +1112,7 @@ let zkapp_payments_tests =
       ; sexplib0
       ; ppx_deriving_yojson_runtime
       ; result
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_base.mina_base_import
       ; Layer_crypto.pickles
       ; Layer_crypto.pickles_backend

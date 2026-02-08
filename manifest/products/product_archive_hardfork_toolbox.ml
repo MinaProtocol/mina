@@ -31,7 +31,7 @@ let archive_hardfork_toolbox_lib =
       ; Layer_base.currency
       ; Layer_domain.genesis_constants
       ; Layer_network.genesis_ledger_helper
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_network.mina_block
@@ -87,7 +87,7 @@ let () =
       ; Layer_base.currency
       ; Layer_domain.genesis_constants
       ; Layer_network.genesis_ledger_helper
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_network.mina_block
@@ -141,7 +141,7 @@ let () =
       ; Layer_base.currency
       ; Layer_domain.genesis_constants
       ; Layer_network.genesis_ledger_helper
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_network.mina_block

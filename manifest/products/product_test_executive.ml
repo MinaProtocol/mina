@@ -32,7 +32,7 @@ let () =
       ; Layer_crypto.kimchi_backend
       ; Layer_crypto.kimchi_pasta
       ; Layer_crypto.kimchi_pasta_basic
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; local "mina_generators"

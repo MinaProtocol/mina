@@ -87,5 +87,5 @@ let parallel =
 
 let timeout_lib =
   library "timeout_lib" ~path:"src/lib/timeout_lib"
-    ~deps:[ core_kernel; async_kernel; Layer_infra.logger ]
+    ~deps:[ core_kernel; async_kernel; Layer_logging.logger ]
     ~ppx:Ppx.mina

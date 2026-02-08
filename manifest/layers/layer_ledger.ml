@@ -197,7 +197,7 @@ let merkle_mask =
       ; stdio
       ; yojson
       ; Layer_base.mina_stdlib
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; merkle_ledger
       ; Layer_base.visualization
       ]
@@ -237,7 +237,7 @@ let mina_ledger =
       ; Layer_crypto.pickles_backend
       ; Layer_crypto.pickles_types
       ; Layer_base.mina_base_import
-      ; Layer_infra.o1trace
+      ; Layer_logging.o1trace
       ; Layer_storage.rocksdb
       ; Layer_crypto.random_oracle
       ; Layer_base.currency
@@ -328,7 +328,7 @@ let staged_ledger_diff =
       ; Layer_base.currency
       ; Layer_base.allocation_functor
       ; local "consensus"
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_ppx.ppx_version_runtime
       ; Layer_base.mina_wire_types
       ; Layer_base.mina_base_import

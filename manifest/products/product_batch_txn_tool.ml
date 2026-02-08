@@ -20,7 +20,7 @@ let () =
       ; Layer_base.currency
       ; local "graphql_lib"
       ; local "integration_test_lib"
-      ; Layer_infra.logger
+      ; Layer_logging.logger
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_base.mina_compile_config

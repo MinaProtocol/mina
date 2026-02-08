@@ -25,8 +25,8 @@ let () =
       ; Layer_consensus.consensus
       ; Layer_domain.data_hash_lib
       ; Layer_crypto.kimchi_pasta
-      ; Layer_infra.logger
-      ; Layer_infra.logger_file_system
+      ; Layer_logging.logger
+      ; Layer_logging.logger_file_system
       ; Layer_base.mina_base
       ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
