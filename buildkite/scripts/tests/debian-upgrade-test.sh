@@ -202,15 +202,29 @@ log_info "Post-upgrade mina version: ${POST_COMMIT}"
 POST_COMMIT_SHORT=$(get_short_commit "${POST_COMMIT}")
 log_info "Post-upgrade commit: ${POST_COMMIT_SHORT}"
 
+# Function to verify file existence and log details
+# Arguments: 
+#   1: File path
+#   2: Human-readable name/description for error messages
+verify_required_file() {
+    local file_path="$1"
+    local description="$2"
 
-POST_CONFIG_FILE="${CONFIG_DIR}"/config_${POST_COMMIT_SHORT}.json
-if [[ -f "${POST_CONFIG_FILE}" ]]; then
-    log_info "Found config file: ${POST_CONFIG_FILE}"
-    log_info "  - $(basename "$POST_CONFIG_FILE"): $(stat -c %s "$POST_CONFIG_FILE") bytes"
-else
-    log_error "No config_${POST_COMMIT_SHORT}.json file found after upgrade"
-    exit 1
-fi
+    if [[ -f "$file_path" ]]; then
+        log_info "Found ${description}: ${file_path}"
+        log_info "  - $(basename "$file_path"): $(stat -c %s "$file_path") bytes"
+    else
+        log_error "No ${file_path} file found after upgrade (${description})"
+        exit 1
+    fi
+}
+
+# --- Usage ---
+
+POST_CONFIG_FILE="${CONFIG_DIR}/config_${POST_COMMIT_SHORT}.json"
+verify_required_file "$POST_CONFIG_FILE" "config file"
+
+verify_required_file "/etc/coda/build_config/PROFILE" "profile file"
 
 log_info "=== Debian Upgrade Test PASSED ==="
 log_info "Successfully upgraded from ${PRE_COMMIT} to ${POST_COMMIT}"
