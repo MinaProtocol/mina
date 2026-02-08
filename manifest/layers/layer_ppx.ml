@@ -33,6 +33,11 @@ let () =
   file_stanzas ~path:"src/lib/ppx_version"
     [ "vendored_dirs" @: [ atom "test" ] ]
 
+let ppx_version_runtime =
+  library "ppx_version.runtime" ~internal_name:"ppx_version_runtime"
+    ~path:"src/lib/ppx_version/runtime" ~no_instrumentation:true
+    ~deps:[ base; core_kernel; sexplib0; bin_prot; bin_prot_shape ]
+
 let ppx_version =
   library "ppx_version" ~path:"src/lib/ppx_version" ~kind:"ppx_deriver"
     ~no_instrumentation:true
@@ -45,38 +50,24 @@ let ppx_version =
       ; base
       ; base_caml
       ; core_kernel
-      ; local "ppx_version_runtime"
+      ; ppx_version_runtime
       ; bin_prot
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_compare; Ppx_lib.ppxlib_metaquot ])
 
-let ppx_version_runtime =
-  library "ppx_version.runtime" ~internal_name:"ppx_version_runtime"
-    ~path:"src/lib/ppx_version/runtime" ~no_instrumentation:true
-    ~deps:[ base; core_kernel; sexplib0; bin_prot; bin_prot_shape ]
-
 let () =
   file_stanzas ~path:"src/lib/ppx_mina" [ "vendored_dirs" @: [ atom "tests" ] ]
-
-let ppx_mina =
-  library "ppx_mina" ~path:"src/lib/ppx_mina" ~kind:"ppx_deriver"
-    ~deps:
-      [ ppx_deriving_api
-      ; ppxlib
-      ; ppx_bin_prot
-      ; core_kernel
-      ; base
-      ; base_caml
-      ; local "ppx_representatives"
-      ; ppx_register_event
-      ; local "ppx_to_enum"
-      ]
-    ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppxlib_metaquot ])
 
 let ppx_to_enum =
   library "ppx_to_enum" ~path:"src/lib/ppx_mina/ppx_to_enum" ~kind:"ppx_deriver"
     ~deps:[ compiler_libs_common; ppxlib; base ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppxlib_metaquot ])
+
+let ppx_representatives_runtime =
+  library "ppx_representatives.runtime"
+    ~internal_name:"ppx_representatives_runtime"
+    ~path:"src/lib/ppx_mina/ppx_representatives/runtime"
+    ~no_instrumentation:true
 
 let ppx_representatives =
   library "ppx_representatives" ~path:"src/lib/ppx_mina/ppx_representatives"
@@ -91,11 +82,20 @@ let ppx_representatives =
     ~ppx:(Ppx.custom [ Ppx_lib.ppxlib_metaquot ])
     ~ppx_runtime_libraries:[ "ppx_representatives.runtime" ]
 
-let ppx_representatives_runtime =
-  library "ppx_representatives.runtime"
-    ~internal_name:"ppx_representatives_runtime"
-    ~path:"src/lib/ppx_mina/ppx_representatives/runtime"
-    ~no_instrumentation:true
+let ppx_mina =
+  library "ppx_mina" ~path:"src/lib/ppx_mina" ~kind:"ppx_deriver"
+    ~deps:
+      [ ppx_deriving_api
+      ; ppxlib
+      ; ppx_bin_prot
+      ; core_kernel
+      ; base
+      ; base_caml
+      ; ppx_representatives
+      ; ppx_register_event
+      ; ppx_to_enum
+      ]
+    ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppxlib_metaquot ])
 
 let unexpired =
   private_library "unexpired" ~path:"src/lib/ppx_mina/tests"
