@@ -5537,4 +5537,1222 @@ let register () =
       ]
     ~ppx:(Ppx.custom [ "ppx_mina"; "ppx_version" ]);
 
+  (* ================================================================ *)
+  (* Wave 7: Blockchain & Network Layer                                *)
+  (* ================================================================ *)
+
+  (* -- blockchain_snark ---------------------------------------------- *)
+  library "blockchain_snark"
+    ~path:"src/lib/blockchain_snark"
+    ~inline_tests:true
+    ~flags:[ Dune_s_expr.atom ":standard"
+           ; Dune_s_expr.atom "-warn-error"
+           ; Dune_s_expr.atom "+a" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "async"
+      ; opam "async_kernel"
+      ; opam "base.caml"
+      ; opam "base.md5"
+      ; opam "bin_prot.shape"
+      ; opam "core"
+      ; opam "core_kernel"
+      ; opam "sexplib0"
+      ; local "allocation_functor"
+      ; local "cache_dir"
+      ; local "consensus"
+      ; local "crypto_params"
+      ; local "currency"
+      ; local "data_hash_lib"
+      ; local "genesis_constants"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "logger"
+      ; local "mina_base"
+      ; local "mina_state"
+      ; local "mina_transaction_logic"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "pickles_base"
+      ; local "pickles_types"
+      ; local "ppx_version.runtime"
+      ; local "random_oracle"
+      ; local "sgn"
+      ; local "snarky.backendless"
+      ; local "snark_keys_header"
+      ; local "snark_params"
+      ; local "transaction_snark"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_compare"; "ppx_jane"; "ppx_mina"
+         ; "ppx_snarky"; "ppx_version"
+         ])
+    ~synopsis:"blockchain state transition snarking library";
+
+  (* -- blockchain_snark/tests/print_blockchain_snark_vk -------------- *)
+  private_executable
+    ~path:"src/lib/blockchain_snark/tests/print_blockchain_snark_vk"
+    ~deps:
+      [ local "blockchain_snark"
+      ; local "genesis_constants"
+      ; local "mina_node_config"
+      ]
+    ~ppx:(Ppx.custom [ "ppx_version" ])
+    ~extra_stanzas:
+      [ Dune_s_expr.parse_string
+          {|(rule
+ (deps print_blockchain_snark_vk.exe)
+ (targets %{profile}_blockchain_snark_vk.json.computed)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run %{deps}))))|}
+        |> List.hd
+      ; Dune_s_expr.parse_string
+          {|(rule
+ (deps
+  (:orig %{profile}_blockchain_snark_vk.json)
+  (:computed %{profile}_blockchain_snark_vk.json.computed))
+ (alias runtest)
+ (action
+  (diff %{orig} %{computed})))|}
+        |> List.hd
+      ]
+    "print_blockchain_snark_vk";
+
+  (* -- mina_state ---------------------------------------------------- *)
+  library "mina_state"
+    ~path:"src/lib/mina_state"
+    ~inline_tests:true
+    ~deps:
+      [ opam "core"
+      ; local "signature_lib"
+      ; local "pickles.backend"
+      ; local "outside_hash_image"
+      ; local "pickles"
+      ; local "random_oracle_input"
+      ; local "random_oracle"
+      ; local "genesis_constants"
+      ; local "block_time"
+      ; local "mina_base"
+      ; local "mina_debug"
+      ; local "mina_transaction_logic"
+      ; local "snark_params"
+      ; local "consensus"
+      ; local "bitstring_lib"
+      ; local "fold_lib"
+      ; local "tuple_lib"
+      ; local "with_hash"
+      ; local "snarky.backendless"
+      ; local "crypto_params"
+      ; local "data_hash_lib"
+      ; local "currency"
+      ; local "visualization"
+      ; local "linked_tree"
+      ; local "mina_numbers"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "kimchi_backend"
+      ; local "mina_base.util"
+      ; local "mina_ledger"
+      ; local "unsigned_extended"
+      ; local "sgn"
+      ; local "sgn_type"
+      ; local "blake2"
+      ; local "ppx_version.runtime"
+      ; local "mina_wire_types"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_custom_printf"; "ppx_mina"; "ppx_version"
+         ; "ppx_snarky"; "ppx_bin_prot"; "ppx_compare"
+         ; "ppx_sexp_conv"; "ppx_hash"; "ppx_fields_conv"
+         ; "ppx_let"; "ppx_inline_test"; "ppx_assert"
+         ; "ppx_deriving.std"; "ppx_deriving_yojson"
+         ; "h_list.ppx"
+         ]);
+
+  (* -- mina_block ---------------------------------------------------- *)
+  library "mina_block"
+    ~path:"src/lib/mina_block"
+    ~deps:
+      [ opam "integers"
+      ; opam "base64"
+      ; opam "core"
+      ; local "mina_ledger"
+      ; local "mina_numbers"
+      ; local "currency"
+      ; local "unsigned_extended"
+      ; local "ledger_proof"
+      ; local "logger"
+      ; local "blockchain_snark"
+      ; local "allocation_functor"
+      ; local "verifier"
+      ; local "staged_ledger_diff"
+      ; local "protocol_version"
+      ; local "consensus"
+      ; local "precomputed_values"
+      ; local "mina_state"
+      ; local "mina_net2"
+      ; local "mina_base"
+      ; local "mina_transaction"
+      ; local "mina_stdlib"
+      ; local "transition_chain_verifier"
+      ; local "staged_ledger"
+      ; local "data_hash_lib"
+      ; local "block_time"
+      ; local "with_hash"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_snark_work"
+      ; local "coda_genesis_proof"
+      ; local "blake2"
+      ; local "snark_params"
+      ; local "crypto_params"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "pasta_bindings"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "random_oracle"
+      ; local "random_oracle_input"
+      ; local "ppx_version.runtime"
+      ; local "mina_wire_types"
+      ; local "internal_tracing"
+      ; local "proof_carrying_data"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_mina"; "ppx_version"; "ppx_jane"
+         ; "ppx_deriving.std"; "ppx_deriving_yojson"
+         ]);
+
+  (* -- mina_block/tests ---------------------------------------------- *)
+  file_stanzas ~path:"src/lib/mina_block/tests"
+    (Dune_s_expr.parse_string
+       {|(rule
+ (alias precomputed_block)
+ (target hetzner-itn-1-1795.json)
+ (deps
+  (env_var TEST_PRECOMPUTED_BLOCK_JSON_PATH))
+ (enabled_if
+  (= %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} n))
+ (action
+  (progn
+   (run
+    curl
+    -L
+    -o
+    %{target}.gz
+    https://storage.googleapis.com/o1labs-ci-test-data/precomputed-blocks/hetzner-itn-1-1795-3NL9Vn7Rg1mz8cS1gVxFkVPsjESG1Zu1XRpMLRQAz3W24hctRoD6.json.gz)
+   (run gzip -d %{target}.gz))))
+
+(rule
+ (enabled_if
+  (<> %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} n))
+ (target hetzner-itn-1-1795.json)
+ (deps
+  (env_var TEST_PRECOMPUTED_BLOCK_JSON_PATH))
+ (action
+  (progn
+   (copy %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} %{target}))))|}
+    );
+
+  test "main"
+    ~path:"src/lib/mina_block/tests"
+    ~deps:
+      [ opam "alcotest"
+      ; opam "async"
+      ; opam "core_kernel"
+      ; local "disk_cache.lmdb"
+      ; local "mina_block"
+      ; opam "yojson"
+      ]
+    ~file_deps:
+      [ "hetzner-itn-1-1795.json"
+      ; {|regtest-devnet-319281-3NKq8WXEzMFJH3VdmK4seCTpciyjSY2Rf39K7q1Yyt1p4HkqSzqA.json|}
+      ]
+    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_version" ]);
+
+  (* -- consensus ----------------------------------------------------- *)
+  library "consensus"
+    ~path:"src/lib/consensus"
+    ~inline_tests:true
+    ~library_flags:[ "-linkall" ]
+    ~modules_exclude:[ "proof_of_stake_fuzzer" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async_unix"
+      ; opam "core.uuid"
+      ; opam "async_kernel"
+      ; opam "sexplib0"
+      ; opam "base.caml"
+      ; opam "integers"
+      ; opam "async"
+      ; opam "core"
+      ; opam "yojson"
+      ; opam "core_kernel"
+      ; opam "bin_prot.shape"
+      ; opam "base"
+      ; opam "result"
+      ; opam "core_kernel.uuid"
+      ; opam "async_rpc_kernel"
+      ; opam "sexp_diff_kernel"
+      ; local "mina_wire_types"
+      ; local "mina_base.util"
+      ; local "unsigned_extended"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "fold_lib"
+      ; local "random_oracle_input"
+      ; local "outside_hash_image"
+      ; local "logger"
+      ; local "hash_prefix_states"
+      ; local "genesis_constants"
+      ; local "error_json"
+      ; local "merkle_ledger"
+      ; local "pickles.backend"
+      ; local "random_oracle"
+      ; local "pipe_lib"
+      ; local "bignum_bigint"
+      ; local "vrf_lib"
+      ; local "snark_params"
+      ; local "with_hash"
+      ; local "mina_ledger"
+      ; local "consensus.vrf"
+      ; local "snarky_taylor"
+      ; local "mina_base"
+      ; local "mina_transaction_logic"
+      ; local "key_gen"
+      ; local "block_time"
+      ; local "perf_histograms"
+      ; local "test_util"
+      ; local "non_zero_curve_point"
+      ; local "mina_metrics"
+      ; local "mina_numbers"
+      ; local "mina_stdlib"
+      ; local "signature_lib"
+      ; local "snarky.backendless"
+      ; local "blake2"
+      ; local "crypto_params"
+      ; local "data_hash_lib"
+      ; local "currency"
+      ; local "mina_stdlib_unix"
+      ; local "coda_genesis_ledger"
+      ; local "interruptible"
+      ; local "network_peer"
+      ; local "pickles"
+      ; local "snark_bits"
+      ; local "sparse_ledger_lib"
+      ; local "syncable_ledger"
+      ; local "trust_system"
+      ; local "mina_base.import"
+      ; local "ppx_version.runtime"
+      ; local "internal_tracing"
+      ; local "o1trace"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "h_list.ppx"; "ppx_assert"; "ppx_base"
+         ; "ppx_bin_prot"; "ppx_mina"; "ppx_custom_printf"
+         ; "ppx_deriving.std"; "ppx_deriving_yojson"
+         ; "ppx_fields_conv"; "ppx_inline_test"
+         ; "ppx_let"; "ppx_sexp_conv"; "ppx_snarky"
+         ; "ppx_version"
+         ])
+    ~synopsis:"Consensus mechanisms";
+
+  (* consensus has (modules (:standard \ proof_of_stake_fuzzer))
+     which we need to handle via extra_stanzas or modules field.
+     We use file_stanzas for the modules override. *)
+
+  (* -- consensus: proof_of_stake_fuzzer (disabled executable) -------- *)
+  private_executable
+    ~path:"src/lib/consensus"
+    ~modules:[ "proof_of_stake_fuzzer" ]
+    ~deps:
+      [ opam "core_kernel"
+      ; local "signature_lib"
+      ; local "mina_state"
+      ; local "mina_block"
+      ; local "consensus"
+      ; local "prover"
+      ; local "blockchain_snark"
+      ; local "logger.file_system"
+      ]
+    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_jane" ])
+    ~enabled_if:"false"
+    "proof_of_stake_fuzzer";
+
+  (* -- consensus/vrf ------------------------------------------------- *)
+  library "consensus.vrf"
+    ~internal_name:"consensus_vrf"
+    ~path:"src/lib/consensus/vrf"
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "bignum.bigint"
+      ; opam "base.caml"
+      ; opam "base"
+      ; opam "base64"
+      ; opam "core_kernel"
+      ; opam "sexplib0"
+      ; opam "result"
+      ; opam "bignum"
+      ; opam "integers"
+      ; opam "bin_prot.shape"
+      ; local "mina_wire_types"
+      ; local "mina_base.util"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "genesis_constants"
+      ; local "mina_stdlib"
+      ; local "crypto_params"
+      ; local "random_oracle"
+      ; local "blake2"
+      ; local "base58_check"
+      ; local "random_oracle_input"
+      ; local "unsigned_extended"
+      ; local "snarky.backendless"
+      ; local "pickles"
+      ; local "snarky_taylor"
+      ; local "mina_numbers"
+      ; local "fold_lib"
+      ; local "mina_base"
+      ; local "snark_params"
+      ; local "vrf_lib"
+      ; local "snarky_integer"
+      ; local "test_util"
+      ; local "pickles.backend"
+      ; local "non_zero_curve_point"
+      ; local "bignum_bigint"
+      ; local "codable"
+      ; local "signature_lib"
+      ; local "currency"
+      ; local "hash_prefix_states"
+      ; local "kimchi_backend"
+      ; local "kimchi_bindings"
+      ; local "kimchi_types"
+      ; local "pasta_bindings"
+      ; local "ppx_deriving_yojson.runtime"
+      ; local "ppx_version.runtime"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_mina"; "h_list.ppx"; "ppx_assert"
+         ; "ppx_compare"; "ppx_deriving_yojson"
+         ; "ppx_hash"; "ppx_inline_test"; "ppx_let"
+         ; "ppx_sexp_conv"; "ppx_version"
+         ]);
+
+  (* -- staged_ledger ------------------------------------------------- *)
+  library "staged_ledger"
+    ~path:"src/lib/staged_ledger"
+    ~library_flags:[ "-linkall" ]
+    ~inline_tests:true
+    ~deps:
+      [ opam "async"
+      ; opam "async_unix"
+      ; opam "core"
+      ; opam "integers"
+      ; opam "lens"
+      ; opam "ppx_hash.runtime-lib"
+      ; local "mina_stdlib"
+      ; local "cache_dir"
+      ; local "child_processes"
+      ; local "coda_genesis_ledger"
+      ; local "consensus"
+      ; local "currency"
+      ; local "data_hash_lib"
+      ; local "error_json"
+      ; local "genesis_constants"
+      ; local "internal_tracing"
+      ; local "kimchi_backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "ledger_proof"
+      ; local "logger"
+      ; local "merkle_ledger"
+      ; local "mina_base"
+      ; local "mina_generators"
+      ; local "mina_ledger"
+      ; local "mina_metrics"
+      ; local "mina_numbers"
+      ; local "mina_signature_kind"
+      ; local "mina_state"
+      ; local "mina_transaction"
+      ; local "mina_transaction_logic"
+      ; local "mina_wire_types"
+      ; local "o1trace"
+      ; local "one_or_two"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "pickles_types"
+      ; local "ppx_version.runtime"
+      ; local "quickcheck_lib"
+      ; local "random_oracle"
+      ; local "random_oracle_input"
+      ; local "sgn"
+      ; local "signature_lib"
+      ; local "snarky.backendless"
+      ; local "snark_params"
+      ; local "snark_work_lib"
+      ; local "staged_ledger_diff"
+      ; local "transaction_snark"
+      ; local "transaction_snark_scan_state"
+      ; local "transaction_snark_work"
+      ; local "transaction_witness"
+      ; local "verifier"
+      ; local "with_hash"
+      ; local "zkapp_command_builder"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "lens.ppx_deriving"; "ppx_assert"
+         ; "ppx_bin_prot"; "ppx_compare"
+         ; "ppx_custom_printf"; "ppx_deriving.make"
+         ; "ppx_deriving_yojson"; "ppx_fields_conv"
+         ; "ppx_inline_test"; "ppx_let"; "ppx_mina"
+         ; "ppx_pipebang"; "ppx_sexp_conv"
+         ; "ppx_version"
+         ])
+    ~synopsis:
+      "Staged Ledger updates the current ledger with \
+       new transactions";
+
+  (* -- snark_work_lib ------------------------------------------------ *)
+  library "snark_work_lib"
+    ~path:"src/lib/snark_work_lib"
+    ~inline_tests:true
+    ~modules_without_implementation:[ "combined_result" ]
+    ~deps:
+      [ opam "base.caml"
+      ; opam "bin_prot.shape"
+      ; opam "core"
+      ; opam "core_kernel"
+      ; opam "sexplib0"
+      ; local "currency"
+      ; local "ledger_proof"
+      ; local "mina_state"
+      ; local "mina_wire_types"
+      ; local "one_or_two"
+      ; local "ppx_version.runtime"
+      ; local "signature_lib"
+      ; local "transaction_snark"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_deriving_yojson"; "ppx_mina"
+         ; "ppx_jane"; "ppx_version"
+         ])
+    ~synopsis:"Snark work types";
+
+  (* -- snark_worker -------------------------------------------------- *)
+  library "snark_worker"
+    ~path:"src/lib/snark_worker"
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "async"
+      ; opam "async.async_command"
+      ; opam "async.async_rpc"
+      ; opam "async_kernel"
+      ; opam "async_rpc_kernel"
+      ; opam "async_unix"
+      ; opam "base"
+      ; opam "base.base_internalhash_types"
+      ; opam "base.caml"
+      ; opam "bin_prot.shape"
+      ; opam "core"
+      ; opam "core_kernel"
+      ; opam "core_kernel.hash_heap"
+      ; opam "ppx_hash.runtime-lib"
+      ; opam "ppx_version.runtime"
+      ; opam "result"
+      ; opam "sexplib0"
+      ; local "mina_stdlib"
+      ; local "cli_lib"
+      ; local "currency"
+      ; local "error_json"
+      ; local "genesis_constants"
+      ; local "ledger_proof"
+      ; local "logger"
+      ; local "logger.file_system"
+      ; local "mina_base"
+      ; local "mina_base.import"
+      ; local "mina_ledger"
+      ; local "mina_metrics"
+      ; local "mina_node_config.unconfigurable_constants"
+      ; local "mina_state"
+      ; local "mina_transaction"
+      ; local "one_or_two"
+      ; local "perf_histograms"
+      ; local "signature_lib"
+      ; local "snark_work_lib"
+      ; local "work_partitioner"
+      ; local "transaction_protocol_state"
+      ; local "transaction_snark"
+      ; local "transaction_snark_work"
+      ; local "transaction_witness"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_bin_prot"; "ppx_mina"; "ppx_here"
+         ; "ppx_custom_printf"; "ppx_deriving_yojson"
+         ; "ppx_inline_test"; "ppx_let"
+         ; "ppx_register_event"; "ppx_sexp_conv"
+         ; "ppx_version"
+         ])
+    ~synopsis:
+      "Lib powering the snark_worker interactions \
+       with the daemon";
+
+  (* -- snark_worker/standalone --------------------------------------- *)
+  executable "mina-standalone-snark-worker"
+    ~internal_name:"run_snark_worker"
+    ~package:"mina_snark_worker"
+    ~path:"src/lib/snark_worker/standalone"
+    ~deps:
+      [ opam "async"
+      ; opam "async.async_command"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "base"
+      ; opam "base.caml"
+      ; opam "core"
+      ; opam "core_kernel"
+      ; opam "sexplib0"
+      ; opam "uri"
+      ; local "currency"
+      ; local "genesis_constants"
+      ; local "graphql_lib"
+      ; local "key_gen"
+      ; local "mina_base"
+      ; local "mina_base.import"
+      ; local "mina_graphql"
+      ; local "signature_lib"
+      ; local "snark_worker"
+      ; local "transaction_snark"
+      ]
+    ~preprocessor_deps:
+      [ "../../../graphql-ppx-config.inc"
+      ; "../../../../graphql_schema.json"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_let"; "ppx_custom_printf"; "ppx_version"
+         ; "graphql_ppx"; "--"
+         ; {|%{read-lines:../../../graphql-ppx-config.inc}|}
+         ]);
+
+  (* -- precomputed_values -------------------------------------------- *)
+  library "precomputed_values"
+    ~path:"src/lib/precomputed_values"
+    ~ppx_runtime_libraries:[ "base" ]
+    ~deps:
+      [ opam "core"
+      ; opam "core_kernel"
+      ; local "genesis_constants"
+      ; local "mina_state"
+      ; local "coda_genesis_proof"
+      ; local "crypto_params"
+      ; local "mina_base"
+      ; local "dummy_values"
+      ; local "snarky.backendless"
+      ; local "coda_genesis_ledger"
+      ; local "consensus"
+      ; local "mina_runtime_config"
+      ; local "test_genesis_ledger"
+      ; local "staged_ledger_diff"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_version"; "ppx_jane"; "ppxlib.metaquot" ]);
+
+  (* -- genesis_ledger (coda_genesis_ledger) -------------------------- *)
+  library "coda_genesis_ledger"
+    ~internal_name:"genesis_ledger"
+    ~path:"src/lib/genesis_ledger"
+    ~deps:
+      [ opam "core"
+      ; local "key_gen"
+      ; local "mina_base"
+      ; local "signature_lib"
+      ; local "currency"
+      ; local "mina_numbers"
+      ; local "genesis_constants"
+      ; local "data_hash_lib"
+      ; local "mina_ledger"
+      ; local "mina_stdlib"
+      ]
+    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_let" ]);
+
+  (* -- genesis_proof (coda_genesis_proof) ---------------------------- *)
+  library "coda_genesis_proof"
+    ~internal_name:"genesis_proof"
+    ~path:"src/lib/genesis_proof"
+    ~deps:
+      [ opam "base"
+      ; opam "core_kernel"
+      ; opam "base.md5"
+      ; opam "core"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; local "snarky.backendless"
+      ; local "pickles_types"
+      ; local "currency"
+      ; local "pickles"
+      ; local "consensus"
+      ; local "mina_runtime_config"
+      ; local "blockchain_snark"
+      ; local "mina_base"
+      ; local "mina_state"
+      ; local "genesis_constants"
+      ; local "with_hash"
+      ; local "coda_genesis_ledger"
+      ; local "transaction_snark"
+      ; local "sgn"
+      ; local "snark_params"
+      ; local "mina_wire_types"
+      ; local "sgn_type"
+      ; local "pickles.backend"
+      ; local "mina_transaction_logic"
+      ; local "kimchi_backend"
+      ; local "mina_numbers"
+      ; local "block_time"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ]
+    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_let" ]);
+
+  (* -- genesis_ledger_helper/lib ------------------------------------- *)
+  library "genesis_ledger_helper.lib"
+    ~internal_name:"genesis_ledger_helper_lib"
+    ~path:"src/lib/genesis_ledger_helper/lib"
+    ~inline_tests:true
+    ~deps:
+      [ opam "splittable_random"
+      ; opam "integers"
+      ; opam "core_kernel"
+      ; opam "core"
+      ; opam "sexplib0"
+      ; opam "base64"
+      ; local "mina_wire_types"
+      ; local "mina_base.import"
+      ; local "random_oracle"
+      ; local "data_hash_lib"
+      ; local "pickles"
+      ; local "pickles_types"
+      ; local "unsigned_extended"
+      ; local "mina_stdlib"
+      ; local "key_cache.native"
+      ; local "mina_base"
+      ; local "mina_runtime_config"
+      ; local "genesis_constants"
+      ; local "coda_genesis_proof"
+      ; local "signature_lib"
+      ; local "mina_numbers"
+      ; local "with_hash"
+      ; local "currency"
+      ; local "pickles.backend"
+      ; local "logger"
+      ; local "snark_params"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "ppx_inline_test.config"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_mina"; "ppx_jane"; "ppx_version"
+         ; "ppx_inline_test"; "ppx_let"
+         ; "ppx_deriving.std"; "ppx_deriving_yojson"
+         ; "ppx_custom_printf"
+         ]);
+
+  (* -- genesis_ledger_helper ----------------------------------------- *)
+  library "genesis_ledger_helper"
+    ~path:"src/lib/genesis_ledger_helper"
+    ~inline_tests:true
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "core_kernel.uuid"
+      ; opam "async_unix"
+      ; opam "async"
+      ; opam "core_kernel"
+      ; opam "core"
+      ; opam "async_kernel"
+      ; opam "core.uuid"
+      ; opam "base.caml"
+      ; opam "sexplib0"
+      ; opam "digestif"
+      ; local "mina_ledger"
+      ; local "with_hash"
+      ; local "mina_stdlib"
+      ; local "blockchain_snark"
+      ; local "error_json"
+      ; local "mina_state"
+      ; local "random_oracle"
+      ; local "blake2"
+      ; local "mina_numbers"
+      ; local "genesis_ledger_helper.lib"
+      ; local "precomputed_values"
+      ; local "coda_genesis_ledger"
+      ; local "mina_runtime_config"
+      ; local "signature_lib"
+      ; local "mina_base"
+      ; local "genesis_constants"
+      ; local "cache_dir"
+      ; local "coda_genesis_proof"
+      ; local "currency"
+      ; local "data_hash_lib"
+      ; local "snark_params"
+      ; local "unsigned_extended"
+      ; local "consensus"
+      ; local "pickles"
+      ; local "logger"
+      ; local "mina_base.import"
+      ; local "staged_ledger_diff"
+      ; local "mina_stdlib_unix"
+      ; local "cli_lib"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_mina"; "ppx_jane"; "ppx_version"
+         ; "ppx_inline_test"; "ppx_let"
+         ; "ppx_deriving.std"; "ppx_deriving_yojson"
+         ; "ppx_custom_printf"
+         ]);
+
+  (* -- vrf_lib ------------------------------------------------------- *)
+  library "vrf_lib"
+    ~path:"src/lib/vrf_lib"
+    ~flags:[ Dune_s_expr.atom ":standard"
+           ; Dune_s_expr.atom "-short-paths" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "zarith"
+      ; opam "bignum.bigint"
+      ; opam "bin_prot.shape"
+      ; opam "base.caml"
+      ; opam "core"
+      ; opam "sexplib0"
+      ; opam "core_kernel"
+      ; opam "bignum"
+      ; opam "ppx_inline_test.config"
+      ; local "snarky.backendless"
+      ; local "genesis_constants"
+      ; local "snarky_curves"
+      ; local "bitstring_lib"
+      ; local "ppx_version.runtime"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "h_list.ppx"; "ppx_bench"; "ppx_compare"
+         ; "ppx_jane"; "ppx_version"
+         ])
+    ~synopsis:"VRF instantiation";
+
+  (* -- vrf_lib/tests ------------------------------------------------- *)
+  library "vrf_lib_tests"
+    ~path:"src/lib/vrf_lib/tests"
+    ~library_flags:[ "-linkall" ]
+    ~inline_tests:true
+    ~deps:
+      [ opam "core"
+      ; opam "core_kernel"
+      ; opam "ppx_inline_test.config"
+      ; opam "sexplib0"
+      ; opam "ppx_deriving.runtime"
+      ; local "snark_params"
+      ; local "signature_lib"
+      ; local "snarky_curves"
+      ; local "snarky"
+      ; local "vrf_lib"
+      ; local "mina_base"
+      ; local "random_oracle"
+      ; local "fold_lib"
+      ; local "pickles"
+      ; local "bignum.bigint"
+      ; local "snarky.backendless"
+      ; local "bitstring_lib"
+      ; local "crypto_params"
+      ; local "pickles.backend"
+      ; local "kimchi_backend"
+      ; local "kimchi_bindings"
+      ; local "kimchi_types"
+      ; local "pasta_bindings"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "snarky_field_extensions"
+      ; local "tuple_lib"
+      ; local "genesis_constants"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "h_list.ppx"; "ppx_bench"; "ppx_compare"
+         ; "ppx_jane"; "ppx_version"
+         ]);
+
+  (* -- vrf_evaluator ------------------------------------------------- *)
+  library "vrf_evaluator"
+    ~path:"src/lib/vrf_evaluator"
+    ~deps:
+      [ opam "async_unix"
+      ; opam "async_kernel"
+      ; opam "rpc_parallel"
+      ; opam "core"
+      ; opam "async"
+      ; opam "core_kernel"
+      ; opam "bin_prot.shape"
+      ; opam "sexplib0"
+      ; opam "base.caml"
+      ; opam "integers"
+      ; local "mina_wire_types"
+      ; local "error_json"
+      ; local "currency"
+      ; local "unsigned_extended"
+      ; local "interruptible"
+      ; local "signature_lib"
+      ; local "consensus"
+      ; local "mina_base"
+      ; local "child_processes"
+      ; local "mina_numbers"
+      ; local "genesis_constants"
+      ; local "logger"
+      ; local "logger.file_system"
+      ; local "ppx_version.runtime"
+      ; local "mina_compile_config"
+      ]
+    ~ppx:(Ppx.custom [ "ppx_mina"; "ppx_version"; "ppx_jane" ]);
+
+  (* -- snark_profiler_lib -------------------------------------------- *)
+  library "snark_profiler_lib"
+    ~path:"src/lib/snark_profiler_lib"
+    ~deps:
+      [ opam "integers"
+      ; opam "astring"
+      ; opam "sexplib0"
+      ; opam "result"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "core_kernel"
+      ; opam "core"
+      ; opam "base"
+      ; opam "async"
+      ; opam "base.caml"
+      ; opam "base.base_internalhash_types"
+      ; local "mina_stdlib"
+      ; local "mina_wire_types"
+      ; local "child_processes"
+      ; local "snark_worker"
+      ; local "genesis_ledger_helper.lib"
+      ; local "logger"
+      ; local "coda_genesis_proof"
+      ; local "data_hash_lib"
+      ; local "currency"
+      ; local "genesis_constants"
+      ; local "generated_graphql_queries"
+      ; local "mina_transaction"
+      ; local "mina_generators"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "mina_state"
+      ; local "genesis_ledger_helper"
+      ; local "signature_lib"
+      ; local "mina_base.import"
+      ; local "mina_numbers"
+      ; local "precomputed_values"
+      ; local "with_hash"
+      ; local "transaction_snark"
+      ; local "transaction_snark_tests"
+      ; local "transaction_protocol_state"
+      ; local "test_util"
+      ; local "sgn"
+      ; local "unsigned_extended"
+      ; local "snark_work_lib"
+      ; local "mina_compile_config"
+      ; local "mina_transaction_logic"
+      ; local "verifier"
+      ; local "parallel"
+      ; local "random_oracle"
+      ; local "kimchi_backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "pickles_types"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "snark_params"
+      ; local "zkapp_command_builder"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_mina"; "ppx_version"; "ppx_base"
+         ; "ppx_assert"; "ppx_bench"; "ppx_bin_prot"
+         ; "ppx_custom_printf"; "ppx_fields_conv"
+         ; "ppx_fixed_literal"; "ppx_here"
+         ; "ppx_inline_test"; "ppx_let"
+         ; "ppx_module_timer"; "ppx_optional"
+         ; "ppx_pipebang"; "ppx_sexp_message"
+         ; "ppx_sexp_value"; "ppx_string"
+         ; "ppx_typerep_conv"; "ppx_variants_conv"
+         ]);
+
+  (* -- rosetta_lib --------------------------------------------------- *)
+  library "rosetta_lib"
+    ~path:"src/lib/rosetta_lib"
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "result"
+      ; opam "base.caml"
+      ; opam "caqti"
+      ; opam "core_kernel"
+      ; opam "base"
+      ; opam "async_kernel"
+      ; opam "uri"
+      ; opam "sexplib0"
+      ; opam "integers"
+      ; local "mina_wire_types"
+      ; local "hex"
+      ; local "random_oracle_input"
+      ; local "mina_numbers"
+      ; local "mina_stdlib"
+      ; local "signature_lib"
+      ; local "snark_params"
+      ; local "rosetta_models"
+      ; local "mina_base"
+      ; local "currency"
+      ; local "unsigned_extended"
+      ; local "mina_base.import"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_mina"; "ppx_version"; "ppx_assert"
+         ; "ppx_let"; "ppx_sexp_conv"; "ppx_compare"
+         ; "ppx_deriving.std"; "ppx_custom_printf"
+         ; "ppx_deriving_yojson"; "ppx_inline_test"
+         ])
+    ~synopsis:"Rosetta-related support code";
+
+  (* -- generated_graphql_queries ------------------------------------- *)
+  library "generated_graphql_queries"
+    ~path:"src/lib/generated_graphql_queries"
+    ~preprocessor_deps:
+      [ "../../../graphql_schema.json"
+      ; "../../graphql-ppx-config.inc"
+      ]
+    ~deps:
+      [ opam "async"
+      ; opam "cohttp"
+      ; opam "core"
+      ; opam "cohttp-async"
+      ; local "mina_base"
+      ; opam "graphql-async"
+      ; opam "graphql-cohttp"
+      ; opam "yojson"
+      ; local "graphql_lib"
+      ; opam "base"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_base"; "ppx_version"; "graphql_ppx"
+         ; "--"
+         ; {|%{read-lines:../../graphql-ppx-config.inc}|}
+         ])
+    ~extra_stanzas:
+      [ Dune_s_expr.parse_string
+          {|(rule
+ (targets generated_graphql_queries.ml)
+ (deps
+  (:< gen/gen.exe))
+ (action
+  (run %{<} %{targets})))|}
+        |> List.hd
+      ];
+
+  (* -- generated_graphql_queries/gen --------------------------------- *)
+  private_executable
+    ~path:"src/lib/generated_graphql_queries/gen"
+    ~modes:[ "native" ]
+    ~deps:
+      [ opam "base"
+      ; opam "core_kernel"
+      ; opam "ppxlib"
+      ; opam "ppxlib.ast"
+      ; opam "ppxlib.astlib"
+      ; opam "yojson"
+      ; local "mina_base"
+      ; opam "base.caml"
+      ; opam "compiler-libs"
+      ; opam "ocaml-migrate-parsetree"
+      ; opam "stdio"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_base"; "ppx_version"; "ppxlib.metaquot"
+         ; "graphql_ppx"
+         ])
+    "gen";
+
+  (* -- ledger_proof -------------------------------------------------- *)
+  library "ledger_proof"
+    ~path:"src/lib/ledger_proof"
+    ~deps:
+      [ opam "core_kernel"
+      ; local "transaction_snark"
+      ; local "mina_base"
+      ; local "mina_state"
+      ; local "mina_transaction_logic"
+      ; local "ppx_version.runtime"
+      ; local "proof_cache_tag"
+      ; local "proof_carrying_data"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_bin_prot"; "ppx_sexp_conv"; "ppx_hash"
+         ; "ppx_compare"; "ppx_version"
+         ; "ppx_deriving_yojson"
+         ]);
+
+  (* -- prover -------------------------------------------------------- *)
+  library "prover"
+    ~path:"src/lib/prover"
+    ~deps:
+      [ opam "base64"
+      ; opam "async_unix"
+      ; opam "rpc_parallel"
+      ; opam "core"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; opam "core_kernel"
+      ; opam "bin_prot.shape"
+      ; opam "base.caml"
+      ; opam "sexplib0"
+      ; local "with_hash"
+      ; local "coda_genesis_ledger"
+      ; local "mina_metrics"
+      ; local "error_json"
+      ; local "pickles_types"
+      ; local "snarky.backendless"
+      ; local "snark_params"
+      ; local "pickles"
+      ; local "sgn"
+      ; local "currency"
+      ; local "child_processes"
+      ; local "blockchain_snark"
+      ; local "mina_block"
+      ; local "mina_state"
+      ; local "mina_base"
+      ; local "mina_compile_config"
+      ; local "logger"
+      ; local "itn_logger"
+      ; local "internal_tracing"
+      ; local "genesis_constants"
+      ; local "ledger_proof"
+      ; local "consensus"
+      ; local "coda_genesis_proof"
+      ; local "transaction_snark"
+      ; local "logger.file_system"
+      ; local "data_hash_lib"
+      ; local "staged_ledger_diff"
+      ; local "ppx_version.runtime"
+      ; local "mina_transaction_logic"
+      ; local "pickles.backend"
+      ; local "sgn_type"
+      ; local "kimchi_backend"
+      ; local "mina_numbers"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "mina_wire_types"
+      ; local "promise"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_mina"; "ppx_version"; "ppx_jane"
+         ; "ppx_bin_prot"
+         ]);
+
+  (* -- verifier ------------------------------------------------------ *)
+  library "verifier"
+    ~path:"src/lib/verifier"
+    ~deps:
+      [ opam "async"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "base"
+      ; opam "base.caml"
+      ; opam "bin_prot.shape"
+      ; opam "core"
+      ; opam "core_kernel"
+      ; opam "rpc_parallel"
+      ; opam "sexplib0"
+      ; local "blockchain_snark"
+      ; local "child_processes"
+      ; local "error_json"
+      ; local "genesis_constants"
+      ; local "internal_tracing"
+      ; local "itn_logger"
+      ; local "kimchi_backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "ledger_proof"
+      ; local "logger"
+      ; local "logger.file_system"
+      ; local "mina_base"
+      ; local "mina_base.import"
+      ; local "mina_state"
+      ; local "o1trace"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "random_oracle"
+      ; local "random_oracle_input"
+      ; local "signature_lib"
+      ; local "snark_params"
+      ; local "snarky.backendless"
+      ; local "transaction_snark"
+      ; local "with_hash"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_custom_printf"; "ppx_version"
+         ; "ppx_compare"; "ppx_hash"; "ppx_mina"
+         ; "ppx_version"; "ppx_here"; "ppx_bin_prot"
+         ; "ppx_let"; "ppx_deriving.std"
+         ; "ppx_deriving_yojson"; "ppx_sexp_conv"
+         ]);
+
+  (* -- mina_incremental ---------------------------------------------- *)
+  library "mina_incremental"
+    ~path:"src/lib/mina_incremental"
+    ~deps:
+      [ opam "incremental"
+      ; local "pipe_lib"
+      ; opam "async_kernel"
+      ]
+    ~ppx:(Ppx.custom [ "ppx_version" ]);
+
+  (* -- mina_plugins -------------------------------------------------- *)
+  library "mina_plugins"
+    ~path:"src/lib/mina_plugins"
+    ~deps:
+      [ opam "core_kernel"
+      ; opam "dynlink"
+      ; opam "core"
+      ; opam "base"
+      ; local "mina_lib"
+      ; local "logger"
+      ]
+    ~ppx:(Ppx.custom [ "ppx_mina"; "ppx_version" ]);
+
+  (* -- mina_plugins/examples/do_nothing ------------------------------ *)
+  private_library
+    ~path:"src/lib/mina_plugins/examples/do_nothing"
+    ~deps:
+      [ opam "core_kernel"
+      ; opam "core"
+      ; local "mina_plugins"
+      ; local "mina_lib"
+      ; local "logger"
+      ]
+    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_mina" ])
+    "plugin_do_nothing";
+
   ()

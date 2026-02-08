@@ -52,6 +52,7 @@ type library_target =
   ; l_flags : Dune_s_expr.t list
   ; l_library_flags : string list
   ; l_modules : string list
+  ; l_modules_exclude : string list
   ; l_modules_without_implementation : string list
   ; l_virtual_modules : string list
   ; l_default_implementation : string option
@@ -81,6 +82,7 @@ type executable_target =
   ; e_bisect_sigterm : bool
   ; e_no_instrumentation : bool
   ; e_forbidden_libraries : string list
+  ; e_preprocessor_deps : string list
   ; e_enabled_if : string option
   ; e_opam_deps : string list
   ; e_extra_stanzas : Dune_s_expr.t list
@@ -94,6 +96,7 @@ type test_target =
   ; t_ppx : Ppx.t option
   ; t_modules : string list
   ; t_flags : Dune_s_expr.t list
+  ; t_file_deps : string list
   ; t_no_instrumentation : bool
   ; t_extra_stanzas : Dune_s_expr.t list
   }
@@ -131,6 +134,7 @@ let library ?internal_name ?(path = "") ?synopsis ?(deps = [])
     ?(inline_tests_deps = [])
     ?(no_instrumentation = false)
     ?(flags = []) ?(library_flags = []) ?(modules = [])
+    ?(modules_exclude = [])
     ?(modules_without_implementation = [])
     ?(virtual_modules = []) ?default_implementation ?implements
     ?foreign_stubs ?(c_library_flags = [])
@@ -159,6 +163,7 @@ let library ?internal_name ?(path = "") ?synopsis ?(deps = [])
       ; l_flags = flags
       ; l_library_flags = library_flags
       ; l_modules = modules
+      ; l_modules_exclude = modules_exclude
       ; l_modules_without_implementation =
           modules_without_implementation
       ; l_virtual_modules = virtual_modules
@@ -183,6 +188,7 @@ let private_library ?(path = "") ?synopsis ?(deps = [])
     ?(inline_tests_deps = [])
     ?(no_instrumentation = false)
     ?(flags = []) ?(library_flags = []) ?(modules = [])
+    ?(modules_exclude = [])
     ?(modules_without_implementation = [])
     ?(virtual_modules = []) ?default_implementation ?implements
     ?foreign_stubs ?(c_library_flags = [])
@@ -206,6 +212,7 @@ let private_library ?(path = "") ?synopsis ?(deps = [])
       ; l_flags = flags
       ; l_library_flags = library_flags
       ; l_modules = modules
+      ; l_modules_exclude = modules_exclude
       ; l_modules_without_implementation =
           modules_without_implementation
       ; l_virtual_modules = virtual_modules
@@ -229,7 +236,8 @@ let executable ?package ?internal_name ?(path = "")
     ?(flags = []) ?(link_flags = [])
     ?(bisect_sigterm = false)
     ?(no_instrumentation = false)
-    ?(forbidden_libraries = []) ?enabled_if
+    ?(forbidden_libraries = []) ?(preprocessor_deps = [])
+    ?enabled_if
     ?(opam_deps = []) ?(extra_stanzas = [])
     public_name =
   let iname =
@@ -252,6 +260,7 @@ let executable ?package ?internal_name ?(path = "")
       ; e_bisect_sigterm = bisect_sigterm
       ; e_no_instrumentation = no_instrumentation
       ; e_forbidden_libraries = forbidden_libraries
+      ; e_preprocessor_deps = preprocessor_deps
       ; e_enabled_if = enabled_if
       ; e_opam_deps = opam_deps
       ; e_extra_stanzas = extra_stanzas
@@ -264,7 +273,8 @@ let private_executable ?package ?(path = "")
     ?(flags = []) ?(link_flags = [])
     ?(bisect_sigterm = false)
     ?(no_instrumentation = false)
-    ?(forbidden_libraries = []) ?enabled_if
+    ?(forbidden_libraries = []) ?(preprocessor_deps = [])
+    ?enabled_if
     ?(opam_deps = []) ?(extra_stanzas = [])
     name =
   let t =
@@ -282,6 +292,7 @@ let private_executable ?package ?(path = "")
       ; e_bisect_sigterm = bisect_sigterm
       ; e_no_instrumentation = no_instrumentation
       ; e_forbidden_libraries = forbidden_libraries
+      ; e_preprocessor_deps = preprocessor_deps
       ; e_enabled_if = enabled_if
       ; e_opam_deps = opam_deps
       ; e_extra_stanzas = extra_stanzas
@@ -290,7 +301,7 @@ let private_executable ?package ?(path = "")
   targets := t :: !targets
 
 let test ?package ?(path = "") ?(deps = []) ?ppx
-    ?(modules = []) ?(flags = [])
+    ?(modules = []) ?(flags = []) ?(file_deps = [])
     ?(no_instrumentation = false)
     ?(extra_stanzas = [])
     name =
@@ -303,6 +314,7 @@ let test ?package ?(path = "") ?(deps = []) ?ppx
       ; t_ppx = ppx
       ; t_modules = modules
       ; t_flags = flags
+      ; t_file_deps = file_deps
       ; t_no_instrumentation = no_instrumentation
       ; t_extra_stanzas = extra_stanzas
       }
@@ -404,6 +416,10 @@ let generate_library_sexpr lib =
           "synopsis" @: [ atom s ])
     @ (if lib.l_modules <> [] then
          [ "modules" @: List.map atom lib.l_modules ]
+       else if lib.l_modules_exclude <> [] then
+         [ "modules"
+           @: (atom ":standard" :: atom "\\"
+               :: List.map atom lib.l_modules_exclude) ]
        else [])
     @ (if lib.l_modules_without_implementation <> [] then
          [ "modules_without_implementation"
@@ -462,6 +478,10 @@ let generate_executable_sexpr exe =
          [ render_instrumentation
              ~sigterm:exe.e_bisect_sigterm () ]
        else [])
+    @ (if exe.e_preprocessor_deps <> [] then
+         [ "preprocessor_deps"
+           @: List.map atom exe.e_preprocessor_deps ]
+       else [])
     @ (match exe.e_ppx with
        | Some ppxes -> [ render_ppx ppxes ]
        | None -> [])
@@ -480,6 +500,9 @@ let generate_test_sexpr t =
        else [])
     @ (if t.t_flags <> [] then
          [ "flags" @: t.t_flags ]
+       else [])
+    @ (if t.t_file_deps <> [] then
+         [ "deps" @: List.map atom t.t_file_deps ]
        else [])
     @ (if t.t_deps <> [] then
          [ render_deps t.t_deps ]

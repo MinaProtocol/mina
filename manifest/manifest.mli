@@ -58,6 +58,7 @@ val library :
   ?flags:Dune_s_expr.t list ->
   ?library_flags:string list ->
   ?modules:string list ->
+  ?modules_exclude:string list ->
   ?modules_without_implementation:string list ->
   ?virtual_modules:string list ->
   ?default_implementation:string ->
@@ -87,6 +88,7 @@ val private_library :
   ?flags:Dune_s_expr.t list ->
   ?library_flags:string list ->
   ?modules:string list ->
+  ?modules_exclude:string list ->
   ?modules_without_implementation:string list ->
   ?virtual_modules:string list ->
   ?default_implementation:string ->
@@ -118,6 +120,7 @@ val executable :
   ?bisect_sigterm:bool ->
   ?no_instrumentation:bool ->
   ?forbidden_libraries:string list ->
+  ?preprocessor_deps:string list ->
   ?enabled_if:string ->
   ?opam_deps:string list ->
   ?extra_stanzas:Dune_s_expr.t list ->
@@ -136,6 +139,7 @@ val private_executable :
   ?bisect_sigterm:bool ->
   ?no_instrumentation:bool ->
   ?forbidden_libraries:string list ->
+  ?preprocessor_deps:string list ->
   ?enabled_if:string ->
   ?opam_deps:string list ->
   ?extra_stanzas:Dune_s_expr.t list ->
@@ -151,6 +155,7 @@ val test :
   ?ppx:Ppx.t ->
   ?modules:string list ->
   ?flags:Dune_s_expr.t list ->
+  ?file_deps:string list ->
   ?no_instrumentation:bool ->
   ?extra_stanzas:Dune_s_expr.t list ->
   string ->
