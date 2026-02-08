@@ -160,7 +160,7 @@ EOF
 
 # Function to ease package build
 build_deb() {
-
+  echo "--- Building ${1}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
   echo "------------------------------------------------------------"
   echo "build_deb inputs:"
   echo "Package Name: ${1}"
@@ -182,8 +182,6 @@ build_deb() {
   ls -lh "${1}"_*.deb
   echo "deleting BUILDDIR ${BUILDDIR}"
   rm -rf "${BUILDDIR}"
-
-  echo "--- Built ${1}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
 }
 
 # Copies scripts and build utilities to debian package
