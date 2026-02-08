@@ -92,6 +92,8 @@ type target =
 
 let targets : target list ref = ref []
 
+let reset () = targets := []
+
 (* -- Helpers ------------------------------------------------------ *)
 
 let opt condition sexpr =
@@ -427,7 +429,86 @@ let write_file path content =
   output_string oc content;
   close_out oc
 
+let target_path = function
+  | Library l -> l.l_path
+  | Executable e -> e.e_path
+  | File_stanzas (p, _) -> p
+
 let check_mode = ref false
+
+type check_result =
+  { path : string
+  ; status : [ `Ok | `Differs of string option | `New ]
+  }
+
+let check () =
+  let all_targets = List.rev !targets in
+  let tbl = Hashtbl.create 64 in
+  List.iter
+    (fun t ->
+      let path = target_path t in
+      let existing =
+        try Hashtbl.find tbl path with Not_found -> []
+      in
+      Hashtbl.replace tbl path (existing @ [ t ]))
+    all_targets;
+  let paths =
+    Hashtbl.fold (fun k _ acc -> k :: acc) tbl []
+    |> List.sort String.compare
+  in
+  List.filter_map
+    (fun path ->
+      if path = "" then None
+      else begin
+        let targets_in_dir = Hashtbl.find tbl path in
+        let stanzas =
+          List.concat_map
+            (fun t ->
+              match t with
+              | Library l ->
+                  generate_library_sexpr l
+                  :: l.l_extra_stanzas
+              | Executable e ->
+                  generate_executable_sexpr e
+                  :: e.e_extra_stanzas
+              | File_stanzas (_, ss) -> ss)
+            targets_in_dir
+        in
+        let file_path = Filename.concat path "dune" in
+        let existing_stanzas =
+          try Some (parse_file file_path)
+          with _ -> None
+        in
+        match existing_stanzas with
+        | None ->
+            Some { path = file_path; status = `New }
+        | Some existing ->
+            if equal_stanzas stanzas existing then
+              Some { path = file_path; status = `Ok }
+            else begin
+              let gen =
+                List.filter_map strip_comments stanzas
+              in
+              let old =
+                List.filter_map strip_comments existing
+              in
+              let detail =
+                match gen, old with
+                | g :: _, o :: _ -> diff g o
+                | _ ->
+                    Some
+                      (Printf.sprintf
+                         "stanza count: %d vs %d"
+                         (List.length gen)
+                         (List.length old))
+              in
+              Some
+                { path = file_path
+                ; status = `Differs detail
+                }
+            end
+      end)
+    paths
 
 let opam_header =
   "# This file was automatically generated, do not edit.\n\
@@ -516,11 +597,6 @@ let generate_opam_files targets =
         end)
       packages
   end
-
-let target_path = function
-  | Library l -> l.l_path
-  | Executable e -> e.e_path
-  | File_stanzas (p, _) -> p
 
 let generate () =
   let all_targets = List.rev !targets in

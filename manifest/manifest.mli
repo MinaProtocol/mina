@@ -148,8 +148,20 @@ val file_stanzas :
 
 (** {1 Generation} *)
 
+val reset : unit -> unit
+(** Clear all registered targets. *)
+
 val check_mode : bool ref
 (** When [true], compare without writing files. *)
+
+type check_result =
+  { path : string
+  ; status : [ `Ok | `Differs of string option | `New ]
+  }
+
+val check : unit -> check_result list
+(** Compare all registered targets against existing dune files.
+    Returns one result per dune file. Does not write anything. *)
 
 val generate : unit -> unit
 (** Walk all registered targets, write dune files, and verify
