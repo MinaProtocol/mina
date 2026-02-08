@@ -5,16 +5,15 @@ open Externals
 
 let () =
   private_executable "graphql_schema_dump" ~path:"src/app/graphql_schema_dump"
-  ~deps:
-    [ async
-    ; async_unix
-    ; graphql_async
-    ; graphql_parser
-    ; yojson
-    ; Layer_domain.genesis_constants
-    ; local "mina_graphql"
-    ; Layer_base.mina_stdlib
-    ; Layer_base.mina_version
-    ]
-  ~ppx:Ppx.minimal
-
+    ~deps:
+      [ async
+      ; async_unix
+      ; graphql_async
+      ; graphql_parser
+      ; yojson
+      ; Layer_domain.genesis_constants
+      ; local "mina_graphql"
+      ; Layer_base.mina_stdlib
+      ; Layer_base.mina_version
+      ]
+    ~ppx:Ppx.minimal

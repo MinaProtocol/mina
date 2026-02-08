@@ -2,7 +2,6 @@
 
 open Dune_s_expr
 
-
 let test_parse_atom () =
   let result = parse_string "foo" in
   Alcotest.(check int) "one atom" 1 (List.length result) ;
@@ -73,7 +72,6 @@ let test_roundtrip () =
   let s = to_string [ sexpr ] in
   let parsed = parse_string s in
   Alcotest.(check bool) "roundtrip" true (equal_stanzas [ sexpr ] parsed)
-
 
 let test_equal_atoms () =
   Alcotest.(check bool) "same atoms" true (equal (Atom "foo") (Atom "foo")) ;
@@ -174,7 +172,6 @@ let test_equal_stanzas_multiple () =
   in
   Alcotest.(check bool) "multiple stanzas equal" true (equal_stanzas a b)
 
-
 let test_diff_equal () =
   let s =
     "library" @: [ "name" @: [ atom "foo" ]; "libraries" @: [ atom "bar" ] ]
@@ -209,19 +206,20 @@ let test_diff_dep_set () =
   | None ->
       Alcotest.fail "expected diff"
 
-
 let test_library_basic () =
-  ignore (Manifest.library "test_lib" ~path:"/tmp/test_manifest_out/basic"
-    ~deps:[ Manifest.opam "core_kernel" ]
-    ~ppx:Manifest.Ppx.standard) ;
+  ignore
+    (Manifest.library "test_lib" ~path:"/tmp/test_manifest_out/basic"
+       ~deps:[ Manifest.opam "core_kernel" ]
+       ~ppx:Manifest.Ppx.standard ) ;
   (* Verify it registered without error *)
   Alcotest.(check pass) "library registered" () ()
 
 let test_library_with_extras () =
-  ignore (Manifest.library "test_with_extras" ~path:"/tmp/test_manifest_out/extras"
-    ~deps:[ Manifest.opam "base"; Manifest.local "foo_lib" ]
-    ~ppx:Manifest.Ppx.minimal ~inline_tests:true ~library_flags:[ "-linkall" ]
-    ~synopsis:"Test library") ;
+  ignore
+    (Manifest.library "test_with_extras" ~path:"/tmp/test_manifest_out/extras"
+       ~deps:[ Manifest.opam "base"; Manifest.local "foo_lib" ]
+       ~ppx:Manifest.Ppx.minimal ~inline_tests:true
+       ~library_flags:[ "-linkall" ] ~synopsis:"Test library" ) ;
   Alcotest.(check pass) "library with extras" () ()
 
 let test_executable_basic () =
@@ -230,7 +228,6 @@ let test_executable_basic () =
     ~deps:[ Manifest.opam "core" ]
     ~modes:[ "native" ] ~ppx:Manifest.Ppx.minimal ;
   Alcotest.(check pass) "executable registered" () ()
-
 
 let test_at_colon () =
   let s = "library" @: [ atom "foo" ] in
@@ -252,7 +249,6 @@ let test_nested_construction () =
         true
     | _ ->
         false )
-
 
 let () =
   Alcotest.run "manifest"

@@ -7,7 +7,6 @@
 
 open Dune_s_expr
 
-
 module Ppx = struct
   type t = string list
 
@@ -32,7 +31,6 @@ module Ppx = struct
   let extend preset extras = preset @ extras
 end
 
-
 type dep_kind = Opam | Local
 
 type dep = { name : string; kind : dep_kind }
@@ -40,7 +38,6 @@ type dep = { name : string; kind : dep_kind }
 let opam name = { name; kind = Opam }
 
 let local name = { name; kind = Local }
-
 
 type library_target =
   { l_public_name : string option
@@ -115,16 +112,13 @@ type target =
   | Test of test_target
   | File_stanzas of string * Dune_s_expr.t list
 
-
 let targets : target list ref = ref []
 
 let reset () = targets := []
 
-
 let opt condition sexpr = if condition then [ sexpr ] else []
 
 let opt_some o f = match o with Some v -> [ f v ] | None -> []
-
 
 let derive_internal_name s =
   String.map (fun c -> if c = '.' || c = '-' then '_' else c) s
@@ -314,7 +308,6 @@ let test ?package ?(path = "") ?(deps = []) ?ppx ?(modules = []) ?(flags = [])
 let file_stanzas ~path stanzas =
   targets := File_stanzas (path, stanzas) :: !targets
 
-
 let render_deps deps =
   let opam_deps = List.filter (fun d -> d.kind = Opam) deps in
   let local_deps = List.filter (fun d -> d.kind = Local) deps in
@@ -451,7 +444,6 @@ let generate_test_sexpr t =
     @ match t.t_ppx with Some ppxes -> [ render_ppx ppxes ] | None -> []
   in
   "test" @: fields
-
 
 let dune_header =
   "; This file was automatically generated, do not edit.\n\
