@@ -339,7 +339,17 @@ main() {
     if ! detect_sudo; then
         return 1
     fi
-    
+
+    # Configure APT mirrors if enabled (for CI reliability)
+    if [[ "${APT_MIRROR_ENABLED:-false}" == "true" ]]; then
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        MIRROR_SCRIPT="${SCRIPT_DIR}/../apt/configure-mirrors.sh"
+        if [[ -f "${MIRROR_SCRIPT}" ]]; then
+            log "Configuring APT mirrors..."
+            bash "${MIRROR_SCRIPT}" || log "Warning: Mirror configuration failed, continuing with defaults"
+        fi
+    fi
+
     # Create backup directory if we have repos to blacklist
     if [[ ${#BLACKLISTED_REPOS[@]} -gt 0 ]]; then
         if ! create_backup_dir; then

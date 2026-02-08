@@ -22,6 +22,12 @@ export DEBIAN_FRONTEND=noninteractive
 # Source git environment variables first to get MINA_DEB_CODENAME
 source ./buildkite/scripts/export-git-env-vars.sh
 
+# Configure APT mirrors if enabled (for CI reliability)
+if [ "${APT_MIRROR_ENABLED:-false}" = "true" ] && [ -f "./buildkite/scripts/apt/configure-mirrors.sh" ]; then
+    echo "Configuring APT mirrors..."
+    bash ./buildkite/scripts/apt/configure-mirrors.sh || true
+fi
+
 VERSION="${FORCE_VERSION:-"${MINA_DEB_VERSION}"}"
 
 if [ "$USE_SUDO" == "1" ]; then
