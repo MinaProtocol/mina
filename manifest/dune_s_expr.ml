@@ -257,8 +257,16 @@ let rec equal a b =
       else if is_set_field a || is_set_field b then
         equal_set l1 l2
       else
-        List.length l1 = List.length l2
-        && List.for_all2 equal l1 l2
+        (* Handle (field (a b c)) == (field a b c) equivalence
+           for ordered set language expressions like modules *)
+        let unwrap l = match l with
+          | Atom k :: [ List inner ] -> Atom k :: inner
+          | _ -> l
+        in
+        let l1' = unwrap l1 in
+        let l2' = unwrap l2 in
+        List.length l1' = List.length l2'
+        && List.for_all2 equal l1' l2'
   | _ -> false
 
 and equal_set l1 l2 =
@@ -272,6 +280,29 @@ and equal_set l1 l2 =
   | _ ->
       List.length l1 = List.length l2
       && List.for_all2 equal l1 l2
+
+and name_implied_by_public_name keyed =
+  (* Check if (name X) is implied by (public_name Y) where
+     deriving Y gives X. In dune, name is optional when it
+     can be inferred from public_name. *)
+  match find_field "name" keyed, find_field "public_name" keyed with
+  | Some (List [Atom "name"; Atom n]),
+    Some (List [Atom "public_name"; Atom pn]) ->
+      let derived =
+        String.map
+          (fun c -> if c = '.' || c = '-' then '_' else c)
+          pn
+      in
+      n = derived
+  | _ -> false
+
+and field_is_implied key keyed_self keyed_other =
+  (* A field in keyed_self is "implied" (and thus OK to skip)
+     if it's (name X) missing from keyed_other but derivable
+     from (public_name Y) in keyed_other. *)
+  key = "name"
+  && find_field "name" keyed_other = None
+  && name_implied_by_public_name keyed_self
 
 and equal_fields l1 l2 =
   (* First element is the stanza kind (e.g. "library") *)
@@ -297,14 +328,17 @@ and equal_fields l1 l2 =
           | Some k ->
               (match find_field k keyed2 with
                | Some f2 -> equal f1 f2
-               | None -> false))
+               | None ->
+                   field_is_implied k keyed1 keyed2))
         keyed1
       (* And vice versa *)
       && List.for_all
            (fun f2 ->
              match field_key f2 with
              | None -> true
-             | Some k -> find_field k keyed1 <> None)
+             | Some k ->
+                 find_field k keyed1 <> None
+                 || field_is_implied k keyed2 keyed1)
            keyed2
       (* Unkeyed items match positionally *)
       && List.length unkeyed1 = List.length unkeyed2
@@ -361,7 +395,9 @@ and diff_fields l1 l2 =
           (fun f1 ->
             match field_key f1 with
             | None -> false
-            | Some k -> find_field k keyed2 = None)
+            | Some k ->
+                find_field k keyed2 = None
+                && not (field_is_implied k keyed1 keyed2))
           keyed1
       in
       (match missing with
@@ -380,7 +416,9 @@ and diff_fields l1 l2 =
                  match field_key f2 with
                  | None -> false
                  | Some k ->
-                     find_field k keyed1 = None)
+                     find_field k keyed1 = None
+                     && not (field_is_implied k keyed2
+                               keyed1))
                keyed2
            in
            (match extra with

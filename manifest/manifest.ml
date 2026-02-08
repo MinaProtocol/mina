@@ -46,6 +46,8 @@ type library_target =
   ; l_ppx : Ppx.t option
   ; l_kind : string option
   ; l_inline_tests : bool
+  ; l_inline_tests_bare : bool
+  ; l_inline_tests_deps : string list
   ; l_no_instrumentation : bool
   ; l_flags : Dune_s_expr.t list
   ; l_library_flags : string list
@@ -86,6 +88,7 @@ type executable_target =
 
 type test_target =
   { t_internal_name : string
+  ; t_package : string option
   ; t_path : string
   ; t_deps : dep list
   ; t_ppx : Ppx.t option
@@ -124,6 +127,8 @@ let derive_internal_name s =
 
 let library ?internal_name ?(path = "") ?synopsis ?(deps = [])
     ?ppx ?kind ?(inline_tests = false)
+    ?(inline_tests_bare = false)
+    ?(inline_tests_deps = [])
     ?(no_instrumentation = false)
     ?(flags = []) ?(library_flags = []) ?(modules = [])
     ?(modules_without_implementation = [])
@@ -148,6 +153,8 @@ let library ?internal_name ?(path = "") ?synopsis ?(deps = [])
       ; l_ppx = ppx
       ; l_kind = kind
       ; l_inline_tests = inline_tests
+      ; l_inline_tests_bare = inline_tests_bare
+      ; l_inline_tests_deps = inline_tests_deps
       ; l_no_instrumentation = no_instrumentation
       ; l_flags = flags
       ; l_library_flags = library_flags
@@ -172,6 +179,8 @@ let library ?internal_name ?(path = "") ?synopsis ?(deps = [])
 
 let private_library ?(path = "") ?synopsis ?(deps = [])
     ?ppx ?kind ?(inline_tests = false)
+    ?(inline_tests_bare = false)
+    ?(inline_tests_deps = [])
     ?(no_instrumentation = false)
     ?(flags = []) ?(library_flags = []) ?(modules = [])
     ?(modules_without_implementation = [])
@@ -191,6 +200,8 @@ let private_library ?(path = "") ?synopsis ?(deps = [])
       ; l_ppx = ppx
       ; l_kind = kind
       ; l_inline_tests = inline_tests
+      ; l_inline_tests_bare = inline_tests_bare
+      ; l_inline_tests_deps = inline_tests_deps
       ; l_no_instrumentation = no_instrumentation
       ; l_flags = flags
       ; l_library_flags = library_flags
@@ -278,13 +289,15 @@ let private_executable ?package ?(path = "")
   in
   targets := t :: !targets
 
-let test ?(path = "") ?(deps = []) ?ppx ?(modules = [])
-    ?(flags = []) ?(no_instrumentation = false)
+let test ?package ?(path = "") ?(deps = []) ?ppx
+    ?(modules = []) ?(flags = [])
+    ?(no_instrumentation = false)
     ?(extra_stanzas = [])
     name =
   let t =
     Test
       { t_internal_name = name
+      ; t_package = package
       ; t_path = path
       ; t_deps = deps
       ; t_ppx = ppx
@@ -330,9 +343,18 @@ let render_instrumentation ?(sigterm = false) () =
     "instrumentation"
     @: [ "backend" @: [ atom "bisect_ppx" ] ]
 
-let render_inline_tests () =
-  "inline_tests"
-  @: [ "flags" @: [ atom "-verbose"; atom "-show-counts" ] ]
+let render_inline_tests ?(bare = false) ?(deps = []) () =
+  if bare && deps = [] then
+    List [ Atom "inline_tests" ]
+  else
+    let fields =
+      (if bare then [] else
+         [ "flags" @: [ atom "-verbose"; atom "-show-counts" ] ])
+      @ (if deps <> [] then
+           [ "deps" @: List.map atom deps ]
+         else [])
+    in
+    "inline_tests" @: fields
 
 let render_foreign_stubs lang names =
   "foreign_stubs"
@@ -347,7 +369,9 @@ let generate_library_sexpr lib =
           "public_name" @: [ atom pn ])
     @ opt_some lib.l_kind (fun k ->
           "kind" @: [ atom k ])
-    @ opt lib.l_inline_tests (render_inline_tests ())
+    @ opt lib.l_inline_tests
+        (render_inline_tests ~bare:lib.l_inline_tests_bare
+           ~deps:lib.l_inline_tests_deps ())
     @ (match lib.l_foreign_stubs with
        | Some (lang, names) ->
            [ render_foreign_stubs lang names ]
@@ -449,6 +473,8 @@ let generate_executable_sexpr exe =
 let generate_test_sexpr t =
   let fields =
     [ "name" @: [ atom t.t_internal_name ] ]
+    @ opt_some t.t_package (fun pkg ->
+          "package" @: [ atom pkg ])
     @ (if t.t_modules <> [] then
          [ "modules" @: List.map atom t.t_modules ]
        else [])

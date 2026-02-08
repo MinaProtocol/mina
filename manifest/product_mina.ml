@@ -3810,4 +3810,1731 @@ let register () =
          ; "ppx_version"
          ]);
 
+  (* ================================================================ *)
+  (* WAVE 6 — Transaction & Ledger Layer                              *)
+  (* ================================================================ *)
+
+  (* -- staged_ledger_diff ------------------------------------------ *)
+  library "staged_ledger_diff"
+    ~path:"src/lib/staged_ledger_diff"
+    ~deps:
+      [ opam "core_kernel"
+      ; opam "sexplib0"
+      ; opam "async"
+      ; opam "bin_prot.shape"
+      ; opam "base.caml"
+      ; opam "blake2"
+      ; opam "stdint"
+      ; opam "ppx_inline_test.config"
+      ; opam "splittable_random"
+      ; opam "stdio"
+      ; opam "async_unix"
+      ; opam "async_kernel"
+      ; local "mina_base"
+      ; local "transaction_snark_work"
+      ; local "genesis_constants"
+      ; local "currency"
+      ; local "allocation_functor"
+      ; local "consensus"
+      ; local "logger"
+      ; local "ppx_version.runtime"
+      ; local "mina_wire_types"
+      ; local "mina_base.import"
+      ; local "signature_lib"
+      ; local "pickles.backend"
+      ; local "snark_params"
+      ; local "pickles"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "mina_numbers"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_mina"; "ppx_jane"; "ppx_version"
+         ; "ppx_deriving.std"; "ppx_deriving_yojson"
+         ]);
+
+  (* -- mina_transaction -------------------------------------------- *)
+  library "mina_transaction"
+    ~internal_name:"mina_transaction"
+    ~path:"src/lib/transaction"
+    ~inline_tests:true
+    ~deps:
+      [ opam "base.caml"
+      ; opam "base"
+      ; opam "base.base_internalhash_types"
+      ; opam "bin_prot.shape"
+      ; opam "core_kernel"
+      ; opam "ppx_inline_test.config"
+      ; opam "result"
+      ; opam "sexplib0"
+      ; opam "base64"
+      ; local "base58_check"
+      ; local "blake2"
+      ; local "codable"
+      ; local "currency"
+      ; local "mina_base"
+      ; local "mina_base.import"
+      ; local "mina_numbers"
+      ; local "one_or_two"
+      ; local "pickles"
+      ; local "random_oracle"
+      ; local "signature_lib"
+      ; local "sgn"
+      ; local "snark_params"
+      ; local "snarky.backendless"
+      ; local "ppx_version.runtime"
+      ; local "with_hash"
+      ; local "mina_wire_types"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "h_list.ppx"; "ppx_mina"; "ppx_inline_test"
+         ; "ppx_compare"; "ppx_deriving_yojson"
+         ; "ppx_hash"; "ppx_sexp_conv"; "ppx_version"
+         ]);
+
+  (* -- mina_transaction_logic -------------------------------------- *)
+  library "mina_transaction_logic"
+    ~internal_name:"mina_transaction_logic"
+    ~path:"src/lib/transaction_logic"
+    ~deps:
+      [ opam "async_kernel"
+      ; opam "result"
+      ; opam "bin_prot.shape"
+      ; opam "ppx_inline_test.config"
+      ; opam "sexplib0"
+      ; opam "yojson"
+      ; opam "sexp_diff_kernel"
+      ; opam "core_kernel"
+      ; opam "base.caml"
+      ; opam "base"
+      ; opam "base.base_internalhash_types"
+      ; opam "integers"
+      ; opam "base_quickcheck"
+      ; local "mina_stdlib"
+      ; local "mina_wire_types"
+      ; local "block_time"
+      ; local "currency"
+      ; local "data_hash_lib"
+      ; local "genesis_constants"
+      ; local "kimchi_bindings"
+      ; local "kimchi_types"
+      ; local "pasta_bindings"
+      ; local "kimchi_backend_common"
+      ; local "kimchi_backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "mina_base"
+      ; local "mina_base.import"
+      ; local "mina_numbers"
+      ; local "mina_transaction"
+      ; local "one_or_two"
+      ; local "pickles_types"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "random_oracle"
+      ; local "random_oracle_input"
+      ; local "signature_lib"
+      ; local "sgn"
+      ; local "snarky.backendless"
+      ; local "snark_params"
+      ; local "unsigned_extended"
+      ; local "ppx_version.runtime"
+      ; local "with_hash"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "h_list.ppx"; "ppx_assert"; "ppx_compare"
+         ; "ppx_custom_printf"; "ppx_deriving_yojson"
+         ; "ppx_fields_conv"; "ppx_let"; "ppx_hash"
+         ; "ppx_sexp_conv"; "ppx_version"
+         ]);
+
+  (* -- transaction_logic_tests ------------------------------------- *)
+  private_library
+    ~path:"src/lib/transaction_logic/test"
+    ~inline_tests:true
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "base"
+      ; opam "base.base_internalhash_types"
+      ; opam "core"
+      ; opam "core_kernel"
+      ; opam "integers"
+      ; opam "ppx_inline_test.config"
+      ; opam "sexplib0"
+      ; opam "yojson"
+      ; local "currency"
+      ; local "data_hash_lib"
+      ; local "genesis_constants"
+      ; local "kimchi_backend_common"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "mina_stdlib"
+      ; local "mina_base"
+      ; local "mina_base.import"
+      ; local "mina_base.test_helpers"
+      ; local "mina_ledger"
+      ; local "mina_ledger_test_helpers"
+      ; local "mina_transaction"
+      ; local "mina_transaction_logic"
+      ; local "mina_numbers"
+      ; local "mina_wire_types"
+      ; local "monad_lib"
+      ; local "pasta_bindings"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "pickles_types"
+      ; local "random_oracle"
+      ; local "sgn"
+      ; local "sgn_type"
+      ; local "signature_lib"
+      ; local "snark_params"
+      ; local "zkapp_command_builder"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane"
+         ; "ppx_sexp_conv"; "ppx_inline_test"
+         ; "ppx_assert"
+         ])
+    "transaction_logic_tests";
+
+  (* -- transaction_witness ----------------------------------------- *)
+  library "transaction_witness"
+    ~path:"src/lib/transaction_witness"
+    ~inline_tests:true
+    ~deps:
+      [ opam "base.caml"
+      ; opam "bin_prot.shape"
+      ; opam "sexplib0"
+      ; opam "core_kernel"
+      ; opam "core"
+      ; local "currency"
+      ; local "signature_lib"
+      ; local "mina_ledger"
+      ; local "mina_state"
+      ; local "mina_base"
+      ; local "mina_numbers"
+      ; local "mina_transaction"
+      ; local "mina_transaction_logic"
+      ; local "kimchi_backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "sgn"
+      ; local "with_hash"
+      ; local "ppx_version.runtime"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_jane"; "ppx_deriving_yojson"
+         ; "ppx_version"; "ppx_mina"
+         ]);
+
+  (* -- merkle_ledger ----------------------------------------------- *)
+  library "merkle_ledger"
+    ~path:"src/lib/merkle_ledger"
+    ~library_flags:[ "-linkall" ]
+    ~modules_without_implementation:[ "location_intf" ]
+    ~flags:
+      [ list [ atom ":standard"; atom "-warn-error"
+             ; atom "+a" ] ]
+    ~deps:
+      [ opam "async"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "base.base_internalhash_types"
+      ; opam "base.caml"
+      ; opam "bin_prot.shape"
+      ; opam "bitstring"
+      ; opam "core"
+      ; opam "core.uuid"
+      ; opam "core_kernel"
+      ; opam "core_kernel.uuid"
+      ; opam "integers"
+      ; opam "rocks"
+      ; opam "sexplib0"
+      ; local "cache_dir"
+      ; local "mina_stdlib"
+      ; local "mina_stdlib_unix"
+      ; local "key_value_database"
+      ; local "merkle_address"
+      ; local "ppx_version.runtime"
+      ; local "visualization"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_mina"; "ppx_version"; "ppx_jane"
+         ; "ppx_compare"; "ppx_deriving.show"
+         ; "ppx_deriving_yojson"
+         ])
+    ~synopsis:"Implementation of different account databases";
+
+  (* -- merkle_ledger_tests (library) ------------------------------- *)
+  library "merkle_ledger_tests"
+    ~path:"src/lib/merkle_ledger/test"
+    ~modules:[ ":standard"; "\\"; "test" ]
+    ~flags:
+      [ list [ atom ":standard"; atom "-warn-error"
+             ; atom "+a" ] ]
+    ~deps:
+      [ opam "alcotest"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "base.base_internalhash_types"
+      ; opam "base.caml"
+      ; opam "base58_check"
+      ; opam "bin_prot.shape"
+      ; opam "codable"
+      ; opam "core"
+      ; opam "core.uuid"
+      ; opam "core_kernel"
+      ; opam "core_kernel.uuid"
+      ; opam "currency"
+      ; opam "data_hash_lib"
+      ; opam "key_value_database"
+      ; opam "merkle_address"
+      ; opam "merkle_ledger"
+      ; opam "merkle_mask"
+      ; opam "mina_base"
+      ; opam "mina_base.import"
+      ; opam "mina_numbers"
+      ; opam "mina_stdlib"
+      ; opam "ppx_version.runtime"
+      ; opam "result"
+      ; opam "sexplib0"
+      ; opam "signature_lib"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_version"; "ppx_jane"; "ppx_compare"
+         ; "ppx_deriving.show"; "ppx_deriving_yojson"
+         ]);
+
+  (* -- merkle_ledger test (test stanza) ----------------------------- *)
+  test "test"
+    ~package:"merkle_ledger_tests"
+    ~path:"src/lib/merkle_ledger/test"
+    ~modules:[ "test" ]
+    ~flags:
+      [ list [ atom ":standard"; atom "-warn-error"
+             ; atom "+a" ] ]
+    ~deps:
+      [ opam "alcotest"
+      ; local "merkle_ledger_tests"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_version"; "ppx_jane"; "ppx_compare"
+         ; "ppx_deriving.show"; "ppx_deriving_yojson"
+         ]);
+
+  (* -- merkle_mask ------------------------------------------------- *)
+  library "merkle_mask"
+    ~path:"src/lib/merkle_mask"
+    ~library_flags:[ "-linkall" ]
+    ~modules_without_implementation:
+      [ "base_merkle_tree_intf"; "inputs_intf"
+      ; "mask_maps_intf"; "maskable_merkle_tree_intf"
+      ; "masking_merkle_tree_intf"
+      ]
+    ~flags:
+      [ list [ atom ":standard"; atom "-w"
+             ; atom "+a-40..42-44"
+             ; atom "-warn-error"; atom "+a" ] ]
+    ~deps:
+      [ opam "async"
+      ; opam "async_kernel"
+      ; opam "base.base_internalhash_types"
+      ; opam "base.caml"
+      ; opam "bitstring"
+      ; opam "core"
+      ; opam "core.uuid"
+      ; opam "core_kernel"
+      ; opam "core_kernel.uuid"
+      ; opam "integers"
+      ; opam "sexplib0"
+      ; opam "stdio"
+      ; opam "yojson"
+      ; local "mina_stdlib"
+      ; local "logger"
+      ; local "merkle_ledger"
+      ; local "visualization"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_compare"; "ppx_deriving.show"
+         ; "ppx_deriving_yojson"; "ppx_jane"
+         ; "ppx_mina"; "ppx_version"
+         ])
+    ~synopsis:"Implementation of Merkle tree masks";
+
+  (* -- mina_ledger ------------------------------------------------- *)
+  library "mina_ledger"
+    ~path:"src/lib/mina_ledger"
+    ~inline_tests:true
+    ~deps:
+      [ opam "rocks"
+      ; opam "integers"
+      ; opam "async_kernel"
+      ; opam "base.caml"
+      ; opam "base"
+      ; opam "core"
+      ; opam "core_kernel"
+      ; opam "sexplib0"
+      ; opam "bin_prot.shape"
+      ; opam "base.base_internalhash_types"
+      ; opam "async"
+      ; opam "core_kernel.uuid"
+      ; opam "ppx_inline_test.config"
+      ; local "mina_wire_types"
+      ; local "sgn"
+      ; local "syncable_ledger"
+      ; local "snark_params"
+      ; local "zkapp_command_builder"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "pickles_types"
+      ; local "mina_base.import"
+      ; local "o1trace"
+      ; local "rocksdb"
+      ; local "random_oracle"
+      ; local "currency"
+      ; local "genesis_constants"
+      ; local "kimchi_backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "merkle_mask"
+      ; local "merkle_ledger"
+      ; local "mina_base"
+      ; local "mina_transaction"
+      ; local "mina_transaction_logic"
+      ; local "signature_lib"
+      ; local "mina_numbers"
+      ; local "merkle_address"
+      ; local "key_value_database"
+      ; local "data_hash_lib"
+      ; local "quickcheck_lib"
+      ; local "snarky.backendless"
+      ; local "unsigned_extended"
+      ; local "with_hash"
+      ; local "ppx_version.runtime"
+      ; local "mina_stdlib"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_version"; "ppx_let"; "ppx_custom_printf"
+         ; "ppx_base"; "ppx_deriving_yojson"
+         ; "ppx_inline_test"; "ppx_assert"; "ppx_mina"
+         ]);
+
+  (* -- mina_ledger_test_helpers ------------------------------------ *)
+  private_library
+    ~path:"src/lib/mina_ledger/test/helpers"
+    ~deps:
+      [ opam "base"
+      ; opam "base.caml"
+      ; opam "core_kernel"
+      ; opam "core"
+      ; opam "integers"
+      ; opam "sexplib0"
+      ; opam "yojson"
+      ; local "currency"
+      ; local "kimchi_backend_common"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "mina_base"
+      ; local "mina_base.test_helpers"
+      ; local "mina_ledger"
+      ; local "mina_numbers"
+      ; local "monad_lib"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "pickles_types"
+      ; local "signature_lib"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_base"; "ppx_let"; "ppx_assert"
+         ; "ppx_version"
+         ])
+    "mina_ledger_test_helpers";
+
+  (* -- transaction_protocol_state ---------------------------------- *)
+  library "transaction_protocol_state"
+    ~path:"src/lib/transaction_protocol_state"
+    ~inline_tests:true
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "sexplib0"
+      ; opam "core_kernel"
+      ; opam "core"
+      ; opam "bin_prot.shape"
+      ; opam "base.caml"
+      ; local "pickles"
+      ; local "genesis_constants"
+      ; local "snark_params"
+      ; local "snarky.backendless"
+      ; local "mina_state"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "ppx_version.runtime"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane"
+         ; "ppx_deriving.std"; "ppx_deriving_yojson"
+         ])
+    ~synopsis:"Transaction protocol state library";
+
+  (* -- transaction_snark ------------------------------------------- *)
+  library "transaction_snark"
+    ~path:"src/lib/transaction_snark"
+    ~inline_tests:true
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "async"
+      ; opam "async_unix"
+      ; opam "bignum"
+      ; opam "core"
+      ; opam "splittable_random"
+      ; local "bitstring_lib"
+      ; local "mina_stdlib"
+      ; local "cache_dir"
+      ; local "coda_genesis_ledger"
+      ; local "consensus"
+      ; local "crypto_params"
+      ; local "currency"
+      ; local "data_hash_lib"
+      ; local "genesis_constants"
+      ; local "hash_prefix_states"
+      ; local "kimchi_backend"
+      ; local "kimchi_backend_common"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "logger"
+      ; local "merkle_ledger"
+      ; local "mina_base"
+      ; local "mina_base.util"
+      ; local "mina_ledger"
+      ; local "mina_numbers"
+      ; local "mina_signature_kind"
+      ; local "mina_state"
+      ; local "mina_transaction"
+      ; local "mina_transaction_logic"
+      ; local "mina_wire_types"
+      ; local "o1trace"
+      ; local "one_or_two"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "pickles_base"
+      ; local "pickles_types"
+      ; local "ppx_version.runtime"
+      ; local "proof_carrying_data"
+      ; local "quickcheck_lib"
+      ; local "random_oracle"
+      ; local "random_oracle_input"
+      ; local "sgn"
+      ; local "sgn_type"
+      ; local "signature_lib"
+      ; local "snarky.backendless"
+      ; local "snarky_integer"
+      ; local "snark_keys_header"
+      ; local "snark_params"
+      ; local "test_util"
+      ; local "transaction_protocol_state"
+      ; local "transaction_witness"
+      ; local "tuple_lib"
+      ; local "with_hash"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "h_list.ppx"; "ppx_deriving.std"
+         ; "ppx_deriving_yojson"; "ppx_jane"; "ppx_mina"
+         ; "ppx_snarky"; "ppx_version"
+         ])
+    ~synopsis:
+      "Transaction state transition snarking library";
+
+  (* -- transaction_snark_tests ------------------------------------- *)
+  library "transaction_snark_tests"
+    ~path:"src/lib/transaction_snark/test"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "base64"
+      ; opam "yojson"
+      ; opam "integers"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "mina_stdlib"
+      ; local "logger"
+      ; local "random_oracle_input"
+      ; local "pickles.backend"
+      ; local "mina_base.import"
+      ; local "crypto_params"
+      ; local "kimchi_backend"
+      ; local "with_hash"
+      ; local "pickles"
+      ; local "pickles_base"
+      ; local "consensus"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "mina_transaction"
+      ; local "mina_transaction_logic"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "snarky.backendless"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "coda_genesis_ledger"
+      ; local "pickles_types"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "cache_dir"
+      ; local "data_hash_lib"
+      ; local "mina_numbers"
+      ; local "random_oracle"
+      ; local "sgn"
+      ; local "sgn_type"
+      ; local "sexplib0"
+      ; local "test_util"
+      ; local "transaction_witness"
+      ; local "staged_ledger_diff"
+      ; local "mina_wire_types"
+      ; local "block_time"
+      ; local "zkapps_examples"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_mina"; "ppx_snarky"; "ppx_version"
+         ; "ppx_jane"; "ppx_sexp_conv"
+         ]);
+
+  (* -- transaction_snark/test/access_permission -------------------- *)
+  private_library
+    ~path:"src/lib/transaction_snark/test/access_permission"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "async"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "base"
+      ; opam "core"
+      ; opam "core_kernel"
+      ; opam "ppx_inline_test.config"
+      ; opam "sexplib0"
+      ; opam "yojson"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "cache_dir"
+      ; local "currency"
+      ; local "data_hash_lib"
+      ; local "genesis_constants"
+      ; local "pasta_bindings"
+      ; local "kimchi_backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "mina_base"
+      ; local "mina_base.import"
+      ; local "mina_ledger"
+      ; local "mina_numbers"
+      ; local "mina_state"
+      ; local "mina_transaction_logic"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "pickles_types"
+      ; local "random_oracle_input"
+      ; local "random_oracle"
+      ; local "sgn"
+      ; local "signature_lib"
+      ; local "snark_params"
+      ; local "snarky.backendless"
+      ; local "transaction_protocol_state"
+      ; local "transaction_snark"
+      ; local "transaction_snark_tests"
+      ; local "with_hash"
+      ; local "zkapps_empty_update"
+      ; local "zkapps_examples"
+      ; local "mina_stdlib"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane"
+         ; "ppx_sexp_conv"
+         ])
+    "transaction_snark_tests_access_permission";
+
+  (* -- transaction_snark/test/account_timing ----------------------- *)
+  private_library
+    ~path:"src/lib/transaction_snark/test/account_timing"
+    ~inline_tests:true
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "core"
+      ; opam "base"
+      ; opam "base.caml"
+      ; opam "core_kernel"
+      ; opam "sexplib0"
+      ; opam "yojson"
+      ; local "mina_base.import"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "data_hash_lib"
+      ; local "coda_genesis_proof"
+      ; local "mina_stdlib"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "mina_transaction"
+      ; local "mina_compile_config"
+      ; local "precomputed_values"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "random_oracle"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "with_hash"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ; local "test_util"
+      ; local "consensus"
+      ; local "one_or_two"
+      ; local "coda_genesis_ledger"
+      ; local "snarky.backendless"
+      ; local "mina_transaction_logic"
+      ; local "mina_wire_types"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane" ])
+    "account_timing_tests";
+
+  (* -- transaction_snark/test/account_update_network_id ------------ *)
+  private_library
+    ~path:
+      "src/lib/transaction_snark/test/account_update_network_id"
+    ~inline_tests:true
+    ~inline_tests_bare:true
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "sexplib0"
+      ; local "logger"
+      ; local "mina_base.import"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "mina_signature_kind"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ; local "test_util"
+      ; local "mina_transaction_logic"
+      ; local "mina_transaction"
+      ; local "mina_stdlib"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane"
+         ; "ppx_mina"
+         ])
+    "account_update_network_id";
+
+  (* -- transaction_snark/test/app_state ---------------------------- *)
+  private_library
+    ~path:"src/lib/transaction_snark/test/app_state"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async_unix"
+      ; opam "async"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "mina_base.import"
+      ; local "pickles"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "mina_transaction_logic"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane" ])
+    "app_state_tests";
+
+  (* -- transaction_snark/test/delegate ----------------------------- *)
+  private_library
+    ~path:"src/lib/transaction_snark/test/delegate"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async_unix"
+      ; opam "async"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "mina_base.import"
+      ; local "pickles"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "mina_transaction_logic"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane" ])
+    "delegate_tests";
+
+  (* -- transaction_snark/test/fee_payer ---------------------------- *)
+  private_library
+    ~path:"src/lib/transaction_snark/test/fee_payer"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async_unix"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "sexplib0"
+      ; opam "integers"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "mina_base.import"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "mina_transaction"
+      ; local "mina_transaction_logic"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane" ])
+    "fee_payer_tests";
+
+  (* -- transaction_snark/test/multisig_account --------------------- *)
+  private_library
+    ~path:
+      "src/lib/transaction_snark/test/multisig_account"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "mina_wire_types"
+      ; local "mina_base.import"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "pickles_base"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "kimchi_backend_common"
+      ; local "kimchi_backend"
+      ; local "cache_dir"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "crypto_params"
+      ; local "snarky.backendless"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "mina_transaction_logic"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ; local "random_oracle"
+      ; local "random_oracle_input"
+      ; local "with_hash"
+      ; local "data_hash_lib"
+      ; local "mina_stdlib"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane" ])
+    "multisig_tests";
+
+  (* -- transaction_snark/test/permissions -------------------------- *)
+  private_library
+    ~path:"src/lib/transaction_snark/test/permissions"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async_unix"
+      ; opam "async"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "mina_base.import"
+      ; local "pickles"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "mina_transaction_logic"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane" ])
+    "permissions_tests";
+
+  (* -- transaction_snark/test/token_symbol ------------------------- *)
+  private_library
+    ~path:"src/lib/transaction_snark/test/token_symbol"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async_unix"
+      ; opam "async"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "mina_base.import"
+      ; local "pickles"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "mina_transaction_logic"
+      ; local "currency"
+      ; local "mina_stdlib"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane" ])
+    "token_symbol_tests";
+
+  (* -- transaction_snark/test/transaction_union -------------------- *)
+  private_library
+    ~path:
+      "src/lib/transaction_snark/test/transaction_union"
+    ~inline_tests:true
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; local "mina_base.import"
+      ; local "mina_stdlib"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "data_hash_lib"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ; local "test_util"
+      ; local "consensus"
+      ; local "one_or_two"
+      ; local "coda_genesis_ledger"
+      ; local "sexplib0"
+      ; local "quickcheck_lib"
+      ; local "mina_transaction"
+      ; local "mina_transaction_logic"
+      ; local "staged_ledger_diff"
+      ; local "mina_wire_types"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane" ])
+    "transaction_union_tests";
+
+  (* -- transaction_snark/test/verification_key_permission ---------- *)
+  private_library
+    ~path:
+      "src/lib/transaction_snark/test/\
+       verification_key_permission"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async_unix"
+      ; opam "async"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "protocol_version"
+      ; local "mina_base.import"
+      ; local "pickles"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "mina_transaction_logic"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane" ])
+    "verification_key_permission_tests";
+
+  (* -- transaction_snark/test/verification_key --------------------- *)
+  private_library
+    ~path:
+      "src/lib/transaction_snark/test/verification_key"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async_unix"
+      ; opam "async"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "mina_base.import"
+      ; local "pickles.backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "pickles"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "mina_transaction_logic"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ; local "with_hash"
+      ; local "random_oracle"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane" ])
+    "verification_key_tests";
+
+  (* -- transaction_snark/test/verify-simple-test ------------------- *)
+  private_library
+    ~path:
+      "src/lib/transaction_snark/test/verify-simple-test"
+    ~inline_tests:true
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "base64"
+      ; opam "yojson"
+      ; local "random_oracle_input"
+      ; local "pickles.backend"
+      ; local "mina_base.import"
+      ; local "crypto_params"
+      ; local "kimchi_backend"
+      ; local "with_hash"
+      ; local "pickles"
+      ; local "pickles_base"
+      ; local "consensus"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "mina_transaction"
+      ; local "mina_transaction_logic"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "snarky.backendless"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "coda_genesis_ledger"
+      ; local "pickles_types"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "cache_dir"
+      ; local "data_hash_lib"
+      ; local "mina_numbers"
+      ; local "random_oracle"
+      ; local "sgn"
+      ; local "sgn_type"
+      ; local "sexplib0"
+      ; local "test_util"
+      ; local "transaction_witness"
+      ; local "staged_ledger_diff"
+      ; local "mina_wire_types"
+      ; local "block_time"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane"
+         ; "ppx_sexp_conv"
+         ])
+    "transaction_snark_tests_verify_simple_test";
+
+  (* -- transaction_snark/test/voting_for --------------------------- *)
+  private_library
+    ~path:"src/lib/transaction_snark/test/voting_for"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async_unix"
+      ; opam "async"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "mina_base.import"
+      ; local "pickles.backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "pickles"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "mina_transaction_logic"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ; local "with_hash"
+      ; local "random_oracle"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane" ])
+    "voting_for_tests";
+
+  (* -- transaction_snark/test/zkapp_deploy ------------------------- *)
+  private_library
+    ~path:"src/lib/transaction_snark/test/zkapp_deploy"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "mina_base.import"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "mina_transaction_logic"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane" ])
+    "zkapp_deploy_tests";
+
+  (* -- transaction_snark/test/zkapp_payments ----------------------- *)
+  private_library
+    ~path:
+      "src/lib/transaction_snark/test/zkapp_payments"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "sexplib0"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "logger"
+      ; local "mina_base.import"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ; local "test_util"
+      ; local "mina_transaction_logic"
+      ; local "mina_transaction"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane"
+         ; "ppx_mina"
+         ])
+    "zkapp_payments_tests";
+
+  (* -- transaction_snark/test/zkapp_preconditions ------------------ *)
+  private_library
+    ~path:
+      "src/lib/transaction_snark/test/zkapp_preconditions"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async_unix"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "mina_base.import"
+      ; local "data_hash_lib"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "kimchi_backend"
+      ; local "kimchi_backend_common"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "mina_generators"
+      ; local "mina_transaction"
+      ; local "mina_transaction_logic"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ; local "random_oracle"
+      ; local "random_oracle_input"
+      ; local "zkapp_command_builder"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane" ])
+    "account_update_precondition_tests";
+
+  (* -- transaction_snark/test/zkapp_tokens ------------------------- *)
+  private_library
+    ~path:"src/lib/transaction_snark/test/zkapp_tokens"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "core_kernel"
+      ; opam "sexplib0"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "mina_base.import"
+      ; local "transaction_snark"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "mina_generators"
+      ; local "currency"
+      ; local "pickles"
+      ; local "mina_numbers"
+      ; local "zkapp_command_builder"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ; local "test_util"
+      ; local "mina_transaction_logic"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane"
+         ; "ppx_mina"
+         ])
+    "zkapp_tokens_tests";
+
+  (* -- transaction_snark/test/zkapp_uri ---------------------------- *)
+  private_library
+    ~path:"src/lib/transaction_snark/test/zkapp_uri"
+    ~inline_tests:true
+    ~inline_tests_deps:[ "proof_cache.json" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async_unix"
+      ; opam "async"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "result"
+      ; local "mina_base.import"
+      ; local "pickles"
+      ; local "transaction_snark"
+      ; local "mina_stdlib"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "mina_transaction_logic"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_snarky"; "ppx_version"; "ppx_jane" ])
+    "zkapp_uri_tests";
+
+  (* -- transaction_snark/test/print_transaction_snark_vk ----------- *)
+  private_executable
+    ~path:
+      "src/lib/transaction_snark/test/\
+       print_transaction_snark_vk"
+    ~deps:
+      [ local "genesis_constants"
+      ; local "mina_node_config"
+      ; local "transaction_snark"
+      ]
+    ~ppx:Ppx.minimal
+    ~extra_stanzas:
+      [ list
+          [ atom "rule"
+          ; list [ atom "deps"
+                 ; atom "print_transaction_snark_vk.exe" ]
+          ; list
+              [ atom "targets"
+              ; atom
+                  "%{profile}_transaction_snark_vk.json.\
+                   computed"
+              ]
+          ; list
+              [ atom "action"
+              ; list
+                  [ atom "with-stdout-to"
+                  ; atom "%{targets}"
+                  ; list [ atom "run"; atom "%{deps}" ]
+                  ]
+              ]
+          ]
+      ; list
+          [ atom "rule"
+          ; list
+              [ atom "deps"
+              ; list
+                  [ atom ":orig"
+                  ; atom
+                      "%{profile}_transaction_snark_vk.json"
+                  ]
+              ; list
+                  [ atom ":computed"
+                  ; atom
+                      "%{profile}_transaction_snark_vk.\
+                       json.computed"
+                  ]
+              ]
+          ; list [ atom "alias"; atom "runtest" ]
+          ; list
+              [ atom "action"
+              ; list
+                  [ atom "diff"
+                  ; atom "%{orig}"
+                  ; atom "%{computed}"
+                  ]
+              ]
+          ]
+      ]
+    "print_transaction_snark_vk";
+
+  (* -- transaction_snark/test/zkapp_fuzzy (executable) ------------- *)
+  private_executable
+    ~path:"src/lib/transaction_snark/test/zkapp_fuzzy"
+    ~deps:
+      [ opam "ppx_inline_test.config"
+      ; opam "async"
+      ; opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "async.async_command"
+      ; opam "core"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "splittable_random"
+      ; local "logger"
+      ; local "mina_base.import"
+      ; local "data_hash_lib"
+      ; local "mina_generators"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "transaction_snark"
+      ; local "snark_params"
+      ; local "mina_ledger"
+      ; local "mina_base"
+      ; local "currency"
+      ; local "mina_state"
+      ; local "signature_lib"
+      ; local "genesis_constants"
+      ; local "transaction_protocol_state"
+      ; local "pickles_types"
+      ; local "mina_numbers"
+      ; local "sgn"
+      ; local "transaction_snark_tests"
+      ; local "test_util"
+      ; local "mina_transaction_logic"
+      ; local "with_hash"
+      ; local "random_oracle"
+      ; local "sexplib0"
+      ; local "zkapp_command_builder"
+      ; local "mina_stdlib"
+      ]
+    ~link_flags:[ "-linkall" ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_mina"; "ppx_snarky"; "ppx_version"
+         ; "ppx_jane"
+         ])
+    "zkapp_fuzzy";
+
+  (* -- transaction_snark_work -------------------------------------- *)
+  library "transaction_snark_work"
+    ~path:"src/lib/transaction_snark_work"
+    ~deps:
+      [ opam "core_kernel"
+      ; opam "sexplib0"
+      ; opam "bin_prot.shape"
+      ; opam "base.caml"
+      ; opam "base.base_internalhash_types"
+      ; opam "core"
+      ; local "currency"
+      ; local "transaction_snark"
+      ; local "mina_state"
+      ; local "one_or_two"
+      ; local "ledger_proof"
+      ; local "signature_lib"
+      ; local "ppx_version.runtime"
+      ; local "mina_wire_types"
+      ; local "pickles.backend"
+      ; local "snark_params"
+      ; local "pickles"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_jane"; "ppx_version"; "ppx_compare"
+         ; "ppx_deriving_yojson"
+         ]);
+
+  (* -- transaction_snark_scan_state -------------------------------- *)
+  library "transaction_snark_scan_state"
+    ~path:"src/lib/transaction_snark_scan_state"
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "base.base_internalhash_types"
+      ; opam "async_kernel"
+      ; opam "core"
+      ; opam "ppx_deriving_yojson.runtime"
+      ; opam "sexplib0"
+      ; opam "base.caml"
+      ; opam "digestif"
+      ; opam "base"
+      ; opam "core_kernel"
+      ; opam "async"
+      ; opam "yojson"
+      ; opam "bin_prot.shape"
+      ; opam "async_unix"
+      ; local "mina_stdlib"
+      ; local "mina_base.import"
+      ; local "data_hash_lib"
+      ; local "mina_state"
+      ; local "transaction_witness"
+      ; local "transaction_snark"
+      ; local "mina_base"
+      ; local "mina_numbers"
+      ; local "mina_transaction"
+      ; local "mina_transaction_logic"
+      ; local "snark_work_lib"
+      ; local "one_or_two"
+      ; local "mina_ledger"
+      ; local "merkle_ledger"
+      ; local "currency"
+      ; local "logger"
+      ; local "transaction_snark_work"
+      ; local "parallel_scan"
+      ; local "sgn"
+      ; local "ledger_proof"
+      ; local "genesis_constants"
+      ; local "o1trace"
+      ; local "with_hash"
+      ; local "ppx_version.runtime"
+      ; local "mina_wire_types"
+      ; local "internal_tracing"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_base"; "ppx_mina"; "ppx_version"
+         ; "ppx_let"; "ppx_sexp_conv"; "ppx_bin_prot"
+         ; "ppx_custom_printf"; "ppx_compare"
+         ; "ppx_deriving_yojson"
+         ])
+    ~synopsis:
+      "Transaction-snark specialization of the parallel \
+       scan state";
+
+  (* -- zkapp_command_builder --------------------------------------- *)
+  library "zkapp_command_builder"
+    ~path:"src/lib/zkapp_command_builder"
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "async_kernel"
+      ; opam "async_unix"
+      ; opam "core_kernel"
+      ; local "mina_base"
+      ; local "currency"
+      ; local "kimchi_backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "pickles_types"
+      ; local "random_oracle"
+      ; local "random_oracle_input"
+      ; local "signature_lib"
+      ; local "sgn"
+      ; local "snark_params"
+      ; local "snarky.backendless"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_jane"; "ppx_annot"; "ppx_snarky"
+         ; "ppx_here"; "ppx_mina"; "ppx_version"
+         ])
+    ~synopsis:"Builder Zkapp_command.t via combinators";
+
+  (* -- zkapp_vk_cache_tag ------------------------------------------ *)
+  library "zkapp_vk_cache_tag"
+    ~path:"src/lib/zkapp_vk_cache_tag"
+    ~deps:
+      [ opam "core_kernel"
+      ; opam "async"
+      ; local "logger"
+      ; local "disk_cache"
+      ; local "mina_base"
+      ]
+    ~ppx:(Ppx.custom [ "ppx_mina"; "ppx_version" ]);
+
   ()

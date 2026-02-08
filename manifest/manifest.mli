@@ -52,6 +52,8 @@ val library :
   ?ppx:Ppx.t ->
   ?kind:string ->
   ?inline_tests:bool ->
+  ?inline_tests_bare:bool ->
+  ?inline_tests_deps:string list ->
   ?no_instrumentation:bool ->
   ?flags:Dune_s_expr.t list ->
   ?library_flags:string list ->
@@ -79,6 +81,8 @@ val private_library :
   ?ppx:Ppx.t ->
   ?kind:string ->
   ?inline_tests:bool ->
+  ?inline_tests_bare:bool ->
+  ?inline_tests_deps:string list ->
   ?no_instrumentation:bool ->
   ?flags:Dune_s_expr.t list ->
   ?library_flags:string list ->
@@ -141,6 +145,7 @@ val private_executable :
 (** {1 Test registration} *)
 
 val test :
+  ?package:string ->
   ?path:string ->
   ?deps:dep list ->
   ?ppx:Ppx.t ->
