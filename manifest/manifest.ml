@@ -38,14 +38,16 @@ let local name = { name; kind = Local }
 (* -- Target types ------------------------------------------------- *)
 
 type library_target =
-  { l_public_name : string
+  { l_public_name : string option
   ; l_internal_name : string
   ; l_path : string
   ; l_synopsis : string option
   ; l_deps : dep list
   ; l_ppx : Ppx.t option
+  ; l_kind : string option
   ; l_inline_tests : bool
   ; l_no_instrumentation : bool
+  ; l_flags : string list
   ; l_library_flags : string list
   ; l_modules : string list
   ; l_modules_without_implementation : string list
@@ -55,13 +57,16 @@ type library_target =
   ; l_foreign_stubs : (string * string list) option
   ; l_c_library_flags : string list
   ; l_preprocessor_deps : string list
+  ; l_ppx_runtime_libraries : string list
   ; l_wrapped : bool option
+  ; l_enabled_if : string option
+  ; l_js_of_ocaml : Dune_s_expr.t option
   ; l_opam_deps : string list
   ; l_extra_stanzas : Dune_s_expr.t list
   }
 
 type executable_target =
-  { e_public_name : string
+  { e_public_name : string option
   ; e_internal_name : string
   ; e_package : string option
   ; e_path : string
@@ -70,8 +75,10 @@ type executable_target =
   ; e_modules : string list
   ; e_modes : string list
   ; e_flags : string list
+  ; e_link_flags : string list
   ; e_bisect_sigterm : bool
   ; e_no_instrumentation : bool
+  ; e_enabled_if : string option
   ; e_opam_deps : string list
   ; e_extra_stanzas : Dune_s_expr.t list
   }
@@ -79,6 +86,7 @@ type executable_target =
 type target =
   | Library of library_target
   | Executable of executable_target
+  | File_stanzas of string * Dune_s_expr.t list
 
 (* -- Global registry ---------------------------------------------- *)
 
@@ -94,34 +102,39 @@ let opt_some o f =
 
 (* -- Registration ------------------------------------------------- *)
 
+let derive_internal_name s =
+  String.map
+    (fun c -> if c = '.' || c = '-' then '_' else c)
+    s
+
 let library ?internal_name ?(path = "") ?synopsis ?(deps = [])
-    ?ppx ?(inline_tests = false) ?(no_instrumentation = false)
-    ?(library_flags = []) ?(modules = [])
+    ?ppx ?kind ?(inline_tests = false)
+    ?(no_instrumentation = false)
+    ?(flags = []) ?(library_flags = []) ?(modules = [])
     ?(modules_without_implementation = [])
     ?(virtual_modules = []) ?default_implementation ?implements
     ?foreign_stubs ?(c_library_flags = [])
-    ?(preprocessor_deps = []) ?wrapped
+    ?(preprocessor_deps = []) ?(ppx_runtime_libraries = [])
+    ?wrapped ?enabled_if ?js_of_ocaml
     ?(opam_deps = []) ?(extra_stanzas = [])
     public_name =
   let iname =
     match internal_name with
     | Some n -> n
-    | None ->
-        String.map
-          (fun c ->
-            if c = '.' || c = '-' then '_' else c)
-          public_name
+    | None -> derive_internal_name public_name
   in
   let t =
     Library
-      { l_public_name = public_name
+      { l_public_name = Some public_name
       ; l_internal_name = iname
       ; l_path = path
       ; l_synopsis = synopsis
       ; l_deps = deps
       ; l_ppx = ppx
+      ; l_kind = kind
       ; l_inline_tests = inline_tests
       ; l_no_instrumentation = no_instrumentation
+      ; l_flags = flags
       ; l_library_flags = library_flags
       ; l_modules = modules
       ; l_modules_without_implementation =
@@ -132,7 +145,53 @@ let library ?internal_name ?(path = "") ?synopsis ?(deps = [])
       ; l_foreign_stubs = foreign_stubs
       ; l_c_library_flags = c_library_flags
       ; l_preprocessor_deps = preprocessor_deps
+      ; l_ppx_runtime_libraries = ppx_runtime_libraries
       ; l_wrapped = wrapped
+      ; l_enabled_if = enabled_if
+      ; l_js_of_ocaml = js_of_ocaml
+      ; l_opam_deps = opam_deps
+      ; l_extra_stanzas = extra_stanzas
+      }
+  in
+  targets := t :: !targets
+
+let private_library ?(path = "") ?synopsis ?(deps = [])
+    ?ppx ?kind ?(inline_tests = false)
+    ?(no_instrumentation = false)
+    ?(flags = []) ?(library_flags = []) ?(modules = [])
+    ?(modules_without_implementation = [])
+    ?(virtual_modules = []) ?default_implementation ?implements
+    ?foreign_stubs ?(c_library_flags = [])
+    ?(preprocessor_deps = []) ?(ppx_runtime_libraries = [])
+    ?wrapped ?enabled_if ?js_of_ocaml
+    ?(opam_deps = []) ?(extra_stanzas = [])
+    name =
+  let t =
+    Library
+      { l_public_name = None
+      ; l_internal_name = name
+      ; l_path = path
+      ; l_synopsis = synopsis
+      ; l_deps = deps
+      ; l_ppx = ppx
+      ; l_kind = kind
+      ; l_inline_tests = inline_tests
+      ; l_no_instrumentation = no_instrumentation
+      ; l_flags = flags
+      ; l_library_flags = library_flags
+      ; l_modules = modules
+      ; l_modules_without_implementation =
+          modules_without_implementation
+      ; l_virtual_modules = virtual_modules
+      ; l_default_implementation = default_implementation
+      ; l_implements = implements
+      ; l_foreign_stubs = foreign_stubs
+      ; l_c_library_flags = c_library_flags
+      ; l_preprocessor_deps = preprocessor_deps
+      ; l_ppx_runtime_libraries = ppx_runtime_libraries
+      ; l_wrapped = wrapped
+      ; l_enabled_if = enabled_if
+      ; l_js_of_ocaml = js_of_ocaml
       ; l_opam_deps = opam_deps
       ; l_extra_stanzas = extra_stanzas
       }
@@ -141,22 +200,19 @@ let library ?internal_name ?(path = "") ?synopsis ?(deps = [])
 
 let executable ?package ?internal_name ?(path = "")
     ?(deps = []) ?ppx ?(modules = []) ?(modes = [])
-    ?(flags = []) ?(bisect_sigterm = false)
-    ?(no_instrumentation = false)
+    ?(flags = []) ?(link_flags = [])
+    ?(bisect_sigterm = false)
+    ?(no_instrumentation = false) ?enabled_if
     ?(opam_deps = []) ?(extra_stanzas = [])
     public_name =
   let iname =
     match internal_name with
     | Some n -> n
-    | None ->
-        String.map
-          (fun c ->
-            if c = '.' || c = '-' then '_' else c)
-          public_name
+    | None -> derive_internal_name public_name
   in
   let t =
     Executable
-      { e_public_name = public_name
+      { e_public_name = Some public_name
       ; e_internal_name = iname
       ; e_package = package
       ; e_path = path
@@ -165,13 +221,46 @@ let executable ?package ?internal_name ?(path = "")
       ; e_modules = modules
       ; e_modes = modes
       ; e_flags = flags
+      ; e_link_flags = link_flags
       ; e_bisect_sigterm = bisect_sigterm
       ; e_no_instrumentation = no_instrumentation
+      ; e_enabled_if = enabled_if
       ; e_opam_deps = opam_deps
       ; e_extra_stanzas = extra_stanzas
       }
   in
   targets := t :: !targets
+
+let private_executable ?package ?(path = "")
+    ?(deps = []) ?ppx ?(modules = []) ?(modes = [])
+    ?(flags = []) ?(link_flags = [])
+    ?(bisect_sigterm = false)
+    ?(no_instrumentation = false) ?enabled_if
+    ?(opam_deps = []) ?(extra_stanzas = [])
+    name =
+  let t =
+    Executable
+      { e_public_name = None
+      ; e_internal_name = name
+      ; e_package = package
+      ; e_path = path
+      ; e_deps = deps
+      ; e_ppx = ppx
+      ; e_modules = modules
+      ; e_modes = modes
+      ; e_flags = flags
+      ; e_link_flags = link_flags
+      ; e_bisect_sigterm = bisect_sigterm
+      ; e_no_instrumentation = no_instrumentation
+      ; e_enabled_if = enabled_if
+      ; e_opam_deps = opam_deps
+      ; e_extra_stanzas = extra_stanzas
+      }
+  in
+  targets := t :: !targets
+
+let file_stanzas ~path stanzas =
+  targets := File_stanzas (path, stanzas) :: !targets
 
 (* -- S-expr generation -------------------------------------------- *)
 
@@ -216,14 +305,19 @@ let render_foreign_stubs lang names =
 
 let generate_library_sexpr lib =
   let fields =
-    [ "name" @: [ atom lib.l_internal_name ]
-    ; "public_name" @: [ atom lib.l_public_name ]
-    ]
+    [ "name" @: [ atom lib.l_internal_name ] ]
+    @ opt_some lib.l_public_name (fun pn ->
+          "public_name" @: [ atom pn ])
+    @ opt_some lib.l_kind (fun k ->
+          "kind" @: [ atom k ])
     @ opt lib.l_inline_tests (render_inline_tests ())
     @ (match lib.l_foreign_stubs with
        | Some (lang, names) ->
            [ render_foreign_stubs lang names ]
        | None -> [])
+    @ (if lib.l_flags <> [] then
+         [ "flags" @: List.map atom lib.l_flags ]
+       else [])
     @ (if lib.l_deps <> [] then
          [ render_deps lib.l_deps ]
        else [])
@@ -263,9 +357,16 @@ let generate_library_sexpr lib =
          [ "preprocessor_deps"
            @: List.map atom lib.l_preprocessor_deps ]
        else [])
+    @ (if lib.l_ppx_runtime_libraries <> [] then
+         [ "ppx_runtime_libraries"
+           @: List.map atom lib.l_ppx_runtime_libraries ]
+       else [])
     @ opt_some lib.l_wrapped (fun w ->
           "wrapped"
           @: [ atom (if w then "true" else "false") ])
+    @ opt_some lib.l_enabled_if (fun e ->
+          "enabled_if" @: [ atom e ])
+    @ opt_some lib.l_js_of_ocaml (fun j -> j)
   in
   "library" @: fields
 
@@ -273,9 +374,9 @@ let generate_executable_sexpr exe =
   let fields =
     opt_some exe.e_package (fun pkg ->
         "package" @: [ atom pkg ])
-    @ [ "name" @: [ atom exe.e_internal_name ]
-      ; "public_name" @: [ atom exe.e_public_name ]
-      ]
+    @ [ "name" @: [ atom exe.e_internal_name ] ]
+    @ opt_some exe.e_public_name (fun pn ->
+          "public_name" @: [ atom pn ])
     @ (if exe.e_modules <> [] then
          [ "modules" @: List.map atom exe.e_modules ]
        else [])
@@ -284,6 +385,10 @@ let generate_executable_sexpr exe =
        else [])
     @ (if exe.e_flags <> [] then
          [ "flags" @: List.map atom exe.e_flags ]
+       else [])
+    @ (if exe.e_link_flags <> [] then
+         [ "link_flags"
+           @: List.map atom exe.e_link_flags ]
        else [])
     @ (if exe.e_deps <> [] then
          [ render_deps exe.e_deps ]
@@ -295,6 +400,8 @@ let generate_executable_sexpr exe =
     @ (match exe.e_ppx with
        | Some ppxes -> [ render_ppx ppxes ]
        | None -> [])
+    @ opt_some exe.e_enabled_if (fun e ->
+          "enabled_if" @: [ atom e ])
   in
   "executable" @: fields
 
@@ -362,7 +469,11 @@ let generate_opam_files targets =
       match t with
       | Library l ->
           if l.l_opam_deps <> [] then begin
-            let pkg = l.l_public_name in
+            let pkg =
+              match l.l_public_name with
+              | Some pn -> pn
+              | None -> l.l_internal_name
+            in
             let base_pkg =
               match String.index_opt pkg '.' with
               | Some i -> String.sub pkg 0 i
@@ -376,11 +487,15 @@ let generate_opam_files targets =
             let pkg =
               match e.e_package with
               | Some p -> p
-              | None -> e.e_public_name
+              | None ->
+                  (match e.e_public_name with
+                   | Some pn -> pn
+                   | None -> e.e_internal_name)
             in
             Hashtbl.replace packages pkg
               (None, e.e_opam_deps, e.e_path)
-          end)
+          end
+      | File_stanzas _ -> ())
     targets;
   if Hashtbl.length packages > 0 then begin
     Printf.printf "Generating opam files...\n";
@@ -402,17 +517,18 @@ let generate_opam_files targets =
       packages
   end
 
+let target_path = function
+  | Library l -> l.l_path
+  | Executable e -> e.e_path
+  | File_stanzas (p, _) -> p
+
 let generate () =
   let all_targets = List.rev !targets in
   (* Group targets by path *)
   let tbl = Hashtbl.create 64 in
   List.iter
     (fun t ->
-      let path =
-        match t with
-        | Library l -> l.l_path
-        | Executable e -> e.e_path
-      in
+      let path = target_path t in
       let existing =
         try Hashtbl.find tbl path with Not_found -> []
       in
@@ -444,7 +560,8 @@ let generate () =
                   :: l.l_extra_stanzas
               | Executable e ->
                   generate_executable_sexpr e
-                  :: e.e_extra_stanzas)
+                  :: e.e_extra_stanzas
+              | File_stanzas (_, ss) -> ss)
             targets_in_dir
         in
         let content = dune_header ^ to_string stanzas in

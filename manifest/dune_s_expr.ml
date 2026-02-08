@@ -239,11 +239,16 @@ let sort_atoms items =
 (** Field-order-insensitive equality for stanzas.
     For keyed stanzas, compare fields as sets.
     For set fields (libraries, pps), compare as sets.
-    For other lists, compare element-by-element. *)
+    For other lists, compare element-by-element.
+    Atom x and List [Atom x] are considered equal to handle
+    dune syntax variations like
+    [(library_flags -linkall)] vs [(library_flags (-linkall))]. *)
 let rec equal a b =
   match a, b with
   | Atom s1, Atom s2 -> s1 = s2
   | Comment _, _ | _, Comment _ -> true
+  | Atom s, List [ Atom s2 ] | List [ Atom s2 ], Atom s ->
+      s = s2
   | List l1, List l2 ->
       let l1 = strip_comments_list l1 in
       let l2 = strip_comments_list l2 in

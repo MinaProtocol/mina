@@ -50,8 +50,10 @@ val library :
   ?synopsis:string ->
   ?deps:dep list ->
   ?ppx:Ppx.t ->
+  ?kind:string ->
   ?inline_tests:bool ->
   ?no_instrumentation:bool ->
+  ?flags:string list ->
   ?library_flags:string list ->
   ?modules:string list ->
   ?modules_without_implementation:string list ->
@@ -61,7 +63,37 @@ val library :
   ?foreign_stubs:(string * string list) ->
   ?c_library_flags:string list ->
   ?preprocessor_deps:string list ->
+  ?ppx_runtime_libraries:string list ->
   ?wrapped:bool ->
+  ?enabled_if:string ->
+  ?js_of_ocaml:Dune_s_expr.t ->
+  ?opam_deps:string list ->
+  ?extra_stanzas:Dune_s_expr.t list ->
+  string ->
+  unit
+
+val private_library :
+  ?path:string ->
+  ?synopsis:string ->
+  ?deps:dep list ->
+  ?ppx:Ppx.t ->
+  ?kind:string ->
+  ?inline_tests:bool ->
+  ?no_instrumentation:bool ->
+  ?flags:string list ->
+  ?library_flags:string list ->
+  ?modules:string list ->
+  ?modules_without_implementation:string list ->
+  ?virtual_modules:string list ->
+  ?default_implementation:string ->
+  ?implements:string ->
+  ?foreign_stubs:(string * string list) ->
+  ?c_library_flags:string list ->
+  ?preprocessor_deps:string list ->
+  ?ppx_runtime_libraries:string list ->
+  ?wrapped:bool ->
+  ?enabled_if:string ->
+  ?js_of_ocaml:Dune_s_expr.t ->
   ?opam_deps:string list ->
   ?extra_stanzas:Dune_s_expr.t list ->
   string ->
@@ -78,12 +110,41 @@ val executable :
   ?modules:string list ->
   ?modes:string list ->
   ?flags:string list ->
+  ?link_flags:string list ->
   ?bisect_sigterm:bool ->
   ?no_instrumentation:bool ->
+  ?enabled_if:string ->
   ?opam_deps:string list ->
   ?extra_stanzas:Dune_s_expr.t list ->
   string ->
   unit
+
+val private_executable :
+  ?package:string ->
+  ?path:string ->
+  ?deps:dep list ->
+  ?ppx:Ppx.t ->
+  ?modules:string list ->
+  ?modes:string list ->
+  ?flags:string list ->
+  ?link_flags:string list ->
+  ?bisect_sigterm:bool ->
+  ?no_instrumentation:bool ->
+  ?enabled_if:string ->
+  ?opam_deps:string list ->
+  ?extra_stanzas:Dune_s_expr.t list ->
+  string ->
+  unit
+
+(** {1 File-level stanzas} *)
+
+val file_stanzas :
+  path:string ->
+  Dune_s_expr.t list ->
+  unit
+(** Register raw stanzas for a dune file (e.g. [(env ...)]
+    stanzas). These are emitted verbatim alongside any
+    library/executable stanzas for the same path. *)
 
 (** {1 Generation} *)
 
