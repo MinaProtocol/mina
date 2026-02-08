@@ -1,0 +1,15 @@
+(library
+ (name manifest_lib)
+ (libraries str unix)
+ (wrapped false)
+ (modules dune_s_expr manifest))
+
+(executable
+ (name main)
+ (libraries manifest_lib)
+ (modules product_mina main))
+
+(test
+ (name test_manifest)
+ (libraries alcotest manifest_lib)
+ (modules test_manifest))
