@@ -763,3 +763,23 @@ hardfork-docker: ocaml_checks ## Generate hardfork packages
 .PHONY: ml-docs
 ml-docs: ocaml_checks ## Generate OCaml documentation
 	dune build --profile=$(DUNE_PROFILE) @doc
+
+########################################
+## Manifest
+
+.PHONY: manifest-build
+manifest-build: ## Build the manifest generator
+	dune build manifest/main.exe
+
+.PHONY: manifest-generate
+manifest-generate: manifest-build ## Generate dune files from manifest
+	dune exec manifest/main.exe
+	dune fmt --auto-promote 2>/dev/null || true
+
+.PHONY: manifest-check
+manifest-check: manifest-build ## Check dune files match manifest
+	dune exec manifest/main.exe -- --check
+
+.PHONY: manifest-test
+manifest-test: manifest-build ## Run manifest tests
+	dune exec manifest/test/test_manifest.exe
