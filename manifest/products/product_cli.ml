@@ -84,7 +84,7 @@ let init =
       ; Product_archive.archive_lib
       ; Layer_domain.block_time
       ; Layer_protocol.blockchain_snark
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; local "cli_lib"
       ; Layer_consensus.coda_genesis_ledger
       ; Layer_consensus.coda_genesis_proof
@@ -136,7 +136,7 @@ let init =
       ; Layer_base.one_or_two
       ; Layer_concurrency.parallel
       ; Layer_base.participating_state
-      ; Layer_base.perf_histograms
+      ; Layer_tooling.perf_histograms
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
@@ -223,7 +223,7 @@ let cli_mina_cli_entrypoint =
       ; Layer_domain.block_time
       ; Layer_protocol.blockchain_snark
       ; Layer_storage.cache_dir
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; local "cli_lib"
       ; Layer_consensus.coda_genesis_proof
       ; Layer_consensus.consensus

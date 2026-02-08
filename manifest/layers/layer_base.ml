@@ -186,59 +186,6 @@ let participating_state =
     ~deps:[ async_kernel; core_kernel; base ]
     ~ppx:Ppx.minimal
 
-let perf_histograms =
-  library "perf_histograms" ~path:"src/lib/perf_histograms"
-    ~synopsis:"Performance monitoring with histograms"
-    ~modules:
-      [ "perf_histograms0"; "perf_histograms"; "histogram"; "rpc"; "intf" ]
-    ~library_flags:[ "-linkall" ]
-    ~deps:
-      [ ppx_inline_test_config
-      ; bin_prot_shape
-      ; async_rpc_kernel
-      ; yojson
-      ; async
-      ; core
-      ; core_kernel
-      ; ppx_deriving_yojson_runtime
-      ; async_rpc
-      ; base_caml
-      ; async_kernel
-      ; local "mina_metrics"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ Ppx_lib.ppx_version
-         ; Ppx_lib.ppx_jane
-         ; Ppx_lib.ppx_compare
-         ; Ppx_lib.ppx_deriving_yojson
-         ] )
-    ~inline_tests:true
-
-let rosetta_coding =
-  library "rosetta_coding" ~path:"src/lib/rosetta_coding"
-    ~synopsis:"Encoders and decoders for Rosetta" ~library_flags:[ "-linkall" ]
-    ~deps:
-      [ base
-      ; core_kernel
-      ; local "mina_stdlib"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ]
-    ~ppx:
-      (Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_assert; Ppx_lib.ppx_let ])
-
-let rosetta_models =
-  library "rosetta_models" ~path:"src/lib/rosetta_models"
-    ~deps:[ ppx_deriving_yojson_runtime; yojson ]
-    ~ppx:
-      (Ppx.custom
-         [ Ppx_lib.ppx_deriving_yojson
-         ; Ppx_lib.ppx_deriving_eq
-         ; Ppx_lib.ppx_deriving_show
-         ; Ppx_lib.ppx_version
-         ] )
-
 let sgn_type =
   library "sgn_type" ~path:"src/lib/sgn_type"
     ~deps:
@@ -258,20 +205,6 @@ let sgn_type =
          ; Ppx_lib.ppx_compare
          ; Ppx_lib.ppx_deriving_yojson
          ] )
-
-let structured_log_events =
-  library "structured_log_events" ~path:"src/lib/structured_log_events"
-    ~synopsis:"Events, logging and parsing" ~library_flags:[ "-linkall" ]
-    ~deps:[ core_kernel; yojson; sexplib0; interpolator_lib ]
-    ~ppx:
-      (Ppx.custom
-         [ Ppx_lib.ppx_version
-         ; Ppx_lib.ppx_jane
-         ; Ppx_lib.ppx_deriving_std
-         ; Ppx_lib.ppx_deriving_yojson
-         ; Ppx_lib.ppx_inline_test
-         ] )
-    ~inline_tests:true
 
 let sync_status =
   library "sync_status" ~path:"src/lib/sync_status"
@@ -612,43 +545,6 @@ let mina_version_runtime =
     ~deps:[ core_kernel; base; unix ]
     ~ppx:Ppx.minimal ~implements:"mina_version"
 
-let child_processes =
-  library "child_processes" ~path:"src/lib/child_processes"
-    ~deps:
-      [ async
-      ; async_kernel
-      ; async_unix
-      ; base
-      ; base_internalhash_types
-      ; base_caml
-      ; core
-      ; core_kernel
-      ; ctypes
-      ; ctypes_foreign
-      ; integers
-      ; ppx_hash_runtime_lib
-      ; ppx_inline_test_config
-      ; sexplib0
-      ; error_json
-      ; local "logger"
-      ; local "mina_stdlib_unix"
-      ; local "pipe_lib"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ Ppx_lib.ppx_assert
-         ; Ppx_lib.ppx_custom_printf
-         ; Ppx_lib.ppx_deriving_show
-         ; Ppx_lib.ppx_here
-         ; Ppx_lib.ppx_inline_test
-         ; Ppx_lib.ppx_let
-         ; Ppx_lib.ppx_mina
-         ; Ppx_lib.ppx_pipebang
-         ; Ppx_lib.ppx_version
-         ] )
-    ~inline_tests:true
-    ~foreign_stubs:("c", [ "caml_syslimits" ])
-
 let mina_base =
   library "mina_base" ~path:"src/lib/mina_base"
     ~synopsis:"Snarks and friends necessary for keypair generation"
@@ -708,7 +604,7 @@ let mina_base =
       ; Layer_test.quickcheck_lib
       ; local "random_oracle"
       ; local "random_oracle_input"
-      ; rosetta_coding
+      ; local "rosetta_coding"
       ; local "run_in_thread"
       ; local "sgn"
       ; sgn_type

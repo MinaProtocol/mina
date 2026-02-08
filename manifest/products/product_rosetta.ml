@@ -100,9 +100,9 @@ let lib =
       ; Layer_pickles.pickles_backend
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
-      ; Layer_base.rosetta_coding
-      ; Layer_network.rosetta_lib
-      ; Layer_base.rosetta_models
+      ; Layer_rosetta.rosetta_coding
+      ; Layer_rosetta.rosetta_lib
+      ; Layer_rosetta.rosetta_models
       ; Layer_crypto.secrets
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
@@ -153,8 +153,8 @@ let signer_cli =
       ; Layer_base.mina_base
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
-      ; Layer_base.rosetta_coding
-      ; Layer_network.rosetta_lib
+      ; Layer_rosetta.rosetta_coding
+      ; Layer_rosetta.rosetta_lib
       ; Layer_crypto.secrets
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params

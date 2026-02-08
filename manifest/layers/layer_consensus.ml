@@ -151,7 +151,7 @@ let consensus =
       ; Layer_transaction.mina_transaction_logic
       ; Layer_crypto.key_gen
       ; Layer_domain.block_time
-      ; Layer_base.perf_histograms
+      ; Layer_tooling.perf_histograms
       ; Layer_test.test_util
       ; Layer_crypto.non_zero_curve_point
       ; Layer_tooling.mina_metrics

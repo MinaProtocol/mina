@@ -20,7 +20,7 @@ let verifier =
       ; rpc_parallel
       ; sexplib0
       ; Layer_protocol.blockchain_snark
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; Layer_base.error_json
       ; Layer_domain.genesis_constants
       ; Layer_tooling.internal_tracing
@@ -83,7 +83,7 @@ let prover =
       ; Layer_pickles.pickles
       ; Layer_crypto.sgn
       ; Layer_base.currency
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; Layer_protocol.blockchain_snark
       ; local "mina_block"
       ; Layer_consensus.mina_state

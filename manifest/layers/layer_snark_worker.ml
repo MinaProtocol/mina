@@ -181,7 +181,7 @@ let snark_worker =
       ; Layer_consensus.mina_state
       ; Layer_transaction.mina_transaction
       ; Layer_base.one_or_two
-      ; Layer_base.perf_histograms
+      ; Layer_tooling.perf_histograms
       ; Layer_crypto.signature_lib
       ; snark_work_lib
       ; local "work_partitioner"

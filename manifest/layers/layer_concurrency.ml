@@ -85,6 +85,43 @@ let parallel =
       (Ppx.custom
          [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_compare ] )
 
+let child_processes =
+  library "child_processes" ~path:"src/lib/child_processes"
+    ~deps:
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_internalhash_types
+      ; base_caml
+      ; core
+      ; core_kernel
+      ; ctypes
+      ; ctypes_foreign
+      ; integers
+      ; ppx_hash_runtime_lib
+      ; ppx_inline_test_config
+      ; sexplib0
+      ; Layer_base.error_json
+      ; Layer_logging.logger
+      ; Layer_base.mina_stdlib_unix
+      ; pipe_lib
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_assert
+         ; Ppx_lib.ppx_custom_printf
+         ; Ppx_lib.ppx_deriving_show
+         ; Ppx_lib.ppx_here
+         ; Ppx_lib.ppx_inline_test
+         ; Ppx_lib.ppx_let
+         ; Ppx_lib.ppx_mina
+         ; Ppx_lib.ppx_pipebang
+         ; Ppx_lib.ppx_version
+         ] )
+    ~inline_tests:true
+    ~foreign_stubs:("c", [ "caml_syslimits" ])
+
 let timeout_lib =
   library "timeout_lib" ~path:"src/lib/timeout_lib"
     ~deps:[ core_kernel; async_kernel; Layer_logging.logger ]

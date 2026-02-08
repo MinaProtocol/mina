@@ -6,6 +6,35 @@
 open Manifest
 open Externals
 
+let perf_histograms =
+  library "perf_histograms" ~path:"src/lib/perf_histograms"
+    ~synopsis:"Performance monitoring with histograms"
+    ~modules:
+      [ "perf_histograms0"; "perf_histograms"; "histogram"; "rpc"; "intf" ]
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ ppx_inline_test_config
+      ; bin_prot_shape
+      ; async_rpc_kernel
+      ; yojson
+      ; async
+      ; core
+      ; core_kernel
+      ; ppx_deriving_yojson_runtime
+      ; async_rpc
+      ; base_caml
+      ; async_kernel
+      ; local "mina_metrics"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_version
+         ; Ppx_lib.ppx_jane
+         ; Ppx_lib.ppx_compare
+         ; Ppx_lib.ppx_deriving_yojson
+         ] )
+    ~inline_tests:true
+
 let internal_tracing_context_call =
   library "internal_tracing.context_call"
     ~internal_name:"internal_tracing_context_call"

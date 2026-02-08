@@ -193,7 +193,7 @@ let staged_ledger =
       ; ppx_hash_runtime_lib
       ; Layer_base.mina_stdlib
       ; Layer_storage.cache_dir
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; Layer_consensus.coda_genesis_ledger
       ; Layer_consensus.consensus
       ; Layer_base.currency
@@ -462,7 +462,7 @@ let vrf_evaluator =
       ; Layer_crypto.signature_lib
       ; Layer_consensus.consensus
       ; Layer_base.mina_base
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; Layer_base.mina_numbers
       ; Layer_domain.genesis_constants
       ; Layer_logging.logger
@@ -490,7 +490,7 @@ let snark_profiler_lib =
       ; base_internalhash_types
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; Layer_snark_worker.snark_worker
       ; genesis_ledger_helper_lib
       ; Layer_logging.logger
@@ -554,47 +554,6 @@ let snark_profiler_lib =
          ; Ppx_lib.ppx_typerep_conv
          ; Ppx_lib.ppx_variants_conv
          ] )
-
-let rosetta_lib =
-  library "rosetta_lib" ~path:"src/lib/rosetta_lib"
-    ~library_flags:[ "-linkall" ]
-    ~deps:
-      [ result
-      ; base_caml
-      ; caqti
-      ; core_kernel
-      ; base
-      ; async_kernel
-      ; uri
-      ; sexplib0
-      ; integers
-      ; Layer_base.mina_wire_types
-      ; Layer_base.hex
-      ; Layer_crypto.random_oracle_input
-      ; Layer_base.mina_numbers
-      ; Layer_base.mina_stdlib
-      ; Layer_crypto.signature_lib
-      ; Layer_crypto.snark_params
-      ; Layer_base.rosetta_models
-      ; Layer_base.mina_base
-      ; Layer_base.currency
-      ; Layer_base.unsigned_extended
-      ; Layer_base.mina_base_import
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ Ppx_lib.ppx_mina
-         ; Ppx_lib.ppx_version
-         ; Ppx_lib.ppx_assert
-         ; Ppx_lib.ppx_let
-         ; Ppx_lib.ppx_sexp_conv
-         ; Ppx_lib.ppx_compare
-         ; Ppx_lib.ppx_deriving_std
-         ; Ppx_lib.ppx_custom_printf
-         ; Ppx_lib.ppx_deriving_yojson
-         ; Ppx_lib.ppx_inline_test
-         ] )
-    ~synopsis:"Rosetta-related support code"
 
 let generated_graphql_queries =
   library "generated_graphql_queries" ~path:"src/lib/generated_graphql_queries"
@@ -706,11 +665,11 @@ let gossip_net =
       ; mina_block
       ; Layer_base.mina_base
       ; Layer_transaction.mina_transaction
-      ; Layer_base.perf_histograms
+      ; Layer_tooling.perf_histograms
       ; Layer_logging.o1trace
       ; Layer_domain.node_addrs_and_ports
       ; Layer_tooling.mina_metrics
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; Layer_base.error_json
       ; Layer_domain.block_time
       ; Layer_domain.genesis_constants
@@ -758,7 +717,7 @@ let mina_net2 =
       ; integers
       ; Layer_crypto.blake2
       ; Layer_base.error_json
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; Layer_base.mina_stdlib_unix
       ; Layer_logging.logger
       ; network_peer
@@ -796,7 +755,7 @@ let mina_net2_tests =
       ; mina_net2
       ; Layer_base.mina_stdlib
       ; Layer_logging.logger
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; network_peer
       ; Layer_base.mina_stdlib_unix
       ; Layer_base.mina_compile_config
@@ -836,7 +795,7 @@ let mina_networking =
       ; staged_ledger
       ; mina_block
       ; Layer_consensus.consensus
-      ; Layer_base.perf_histograms
+      ; Layer_tooling.perf_histograms
       ; Layer_base.mina_base
       ; gossip_net
       ; Layer_domain.proof_carrying_data
@@ -887,7 +846,7 @@ let network_pool =
       ; stdio
       ; Layer_domain.block_time
       ; Layer_base.mina_stdlib
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; Layer_consensus.coda_genesis_ledger
       ; Layer_consensus.consensus
       ; Layer_base.currency
@@ -1215,7 +1174,7 @@ let transition_frontier_full_frontier =
       ; async
       ; async_kernel
       ; async_unix
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; Layer_consensus.coda_genesis_ledger
       ; core_uuid
       ; core_kernel_uuid
@@ -1419,7 +1378,7 @@ let transition_frontier_tests =
       ; staged_ledger
       ; Layer_base.with_hash
       ; Layer_ledger.mina_ledger
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; Layer_domain.genesis_constants
       ; Layer_logging.logger
       ; mina_block
@@ -1503,7 +1462,7 @@ let transition_handler =
       ; Layer_base.mina_stdlib
       ; Layer_consensus.consensus
       ; transition_frontier
-      ; Layer_base.perf_histograms
+      ; Layer_tooling.perf_histograms
       ; Layer_tooling.mina_metrics
       ; mina_block
       ; Layer_transaction.mina_transaction
@@ -1512,7 +1471,7 @@ let transition_handler =
       ; Layer_logging.logger
       ; Layer_consensus.mina_state
       ; Layer_consensus.precomputed_values
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; Layer_service.verifier
       ; Layer_domain.genesis_constants
       ; network_pool
@@ -1600,7 +1559,7 @@ let bootstrap_controller =
       ; ppx_inline_test_config
       ; sexplib0
       ; Layer_domain.block_time
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; Layer_consensus.coda_genesis_ledger
       ; Layer_consensus.consensus
       ; Layer_base.currency
@@ -1704,7 +1663,7 @@ let ledger_catchup =
       ; Layer_pickles.pickles_backend
       ; Layer_base.one_or_two
       ; transition_frontier_extensions
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; Layer_domain.block_time
       ; Layer_base.unsigned_extended
       ; local "downloader"

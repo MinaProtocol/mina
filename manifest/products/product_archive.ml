@@ -62,7 +62,7 @@ let archive_lib =
       ; sexplib0
       ; uri
       ; Layer_domain.block_time
-      ; Layer_base.child_processes
+      ; Layer_concurrency.child_processes
       ; Layer_consensus.coda_genesis_ledger
       ; Layer_consensus.consensus
       ; Layer_consensus.consensus_vrf

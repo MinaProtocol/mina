@@ -54,6 +54,7 @@
   layer_ledger
   layer_network
   layer_protocol
+  layer_rosetta
   layer_service
   layer_snark_worker
   layer_storage

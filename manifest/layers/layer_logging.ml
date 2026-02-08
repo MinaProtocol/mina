@@ -6,6 +6,20 @@
 open Manifest
 open Externals
 
+let structured_log_events =
+  library "structured_log_events" ~path:"src/lib/structured_log_events"
+    ~synopsis:"Events, logging and parsing" ~library_flags:[ "-linkall" ]
+    ~deps:[ core_kernel; yojson; sexplib0; Layer_base.interpolator_lib ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_version
+         ; Ppx_lib.ppx_jane
+         ; Ppx_lib.ppx_deriving_std
+         ; Ppx_lib.ppx_deriving_yojson
+         ; Ppx_lib.ppx_inline_test
+         ] )
+    ~inline_tests:true
+
 let logger =
   library "logger" ~path:"src/lib/logger"
     ~deps:[ core_kernel; sexplib0; Layer_base.interpolator_lib ]
