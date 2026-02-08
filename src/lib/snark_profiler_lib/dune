@@ -1,8 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name snark_profiler_lib)
  (public_name snark_profiler_lib)
  (libraries
-  ;;opam libraries
+  ; opam libraries
   integers
   astring
   sexplib0
@@ -15,7 +19,7 @@
   async
   base.caml
   base.base_internalhash_types
-  ;;local libraries
+  ; local libraries
   mina_stdlib
   mina_wire_types
   child_processes

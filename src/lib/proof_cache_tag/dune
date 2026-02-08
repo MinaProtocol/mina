@@ -1,15 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name proof_cache_tag)
  (public_name proof_cache_tag)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   core_kernel
   async_kernel
-  ;; local libraries
+  ; local libraries
   logger
   disk_cache
   pickles)
- (preprocess
-  (pps ppx_mina ppx_version ppx_jane))
  (instrumentation
-  (backend bisect_ppx)))
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane)))

@@ -1,7 +1,11 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (test
  (name big_circuit)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   alcotest
   async
   async_kernel
@@ -10,7 +14,7 @@
   core
   core_kernel
   yojson
-  ;; local libraries
+  ; local libraries
   cache_dir
   currency
   data_hash_lib
@@ -41,7 +45,7 @@
   with_hash
   zkapps_big_circuit
   zkapps_examples)
- (preprocess
-  (pps ppx_snarky ppx_version ppx_jane))
  (instrumentation
-  (backend bisect_ppx)))
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_snarky ppx_version)))

@@ -1,99 +1,121 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name signer_cli)
  (public_name signer.cli)
- (modules signer_cli)
  (libraries
-  ;;opam libraries
+  ; opam libraries
+  async
+  async.async_command
   async_kernel
+  async_unix
+  base
   core
   core_kernel
-  async
-  base
   lib
-  async_unix
-  async.async_command
-  ;;local libraries
+  ; local libraries
   cli_lib
   kimchi_pasta
   kimchi_pasta.basic
+  mina_base
   pickles
+  pickles.backend
   rosetta_coding
   rosetta_lib
-  string_sign
+  secrets
   signature_lib
-  mina_base
   snark_params
-  pickles.backend
-  secrets)
+  string_sign)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
    graphql_ppx
-   ppx_mina
+   ppx_base
+   ppx_compare
    ppx_deriving.show
    ppx_deriving_yojson
-   ppx_base
    ppx_let
-   ppx_version
-   ppx_compare)))
+   ppx_mina
+   ppx_version))
+ (modules signer_cli))
 
 (executable
  (package signer)
  (name signer)
  (public_name signer)
- (modes native)
  (modules signer)
- (libraries signer_cli async core_kernel base)
+ (modes native)
+ (libraries
+  ; opam libraries
+  async
+  base
+  core_kernel
+  ; local libraries
+  signer_cli)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
    graphql_ppx
-   ppx_mina
+   ppx_base
+   ppx_compare
    ppx_deriving.show
    ppx_deriving_yojson
-   ppx_base
    ppx_let
-   ppx_version
-   ppx_compare)))
+   ppx_mina
+   ppx_version)))
 
 (executable
  (package signer)
  (name signer_testnet_signatures)
  (public_name signer-testnet)
- (modes native)
  (modules signer_testnet_signatures)
- (libraries signer_cli async core_kernel base)
+ (modes native)
+ (libraries
+  ; opam libraries
+  async
+  base
+  core_kernel
+  ; local libraries
+  signer_cli)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
    graphql_ppx
-   ppx_mina
+   ppx_base
+   ppx_compare
    ppx_deriving.show
    ppx_deriving_yojson
-   ppx_base
    ppx_let
-   ppx_version
-   ppx_compare)))
+   ppx_mina
+   ppx_version)))
 
 (executable
  (package signer)
  (name signer_mainnet_signatures)
  (public_name signer-mainnet)
- (modes native)
  (modules signer_mainnet_signatures)
- (libraries signer_cli async core_kernel base)
+ (modes native)
+ (libraries
+  ; opam libraries
+  async
+  base
+  core_kernel
+  ; local libraries
+  signer_cli)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
    graphql_ppx
-   ppx_mina
+   ppx_base
+   ppx_compare
    ppx_deriving.show
    ppx_deriving_yojson
-   ppx_base
    ppx_let
-   ppx_version
-   ppx_compare)))
+   ppx_mina
+   ppx_version)))

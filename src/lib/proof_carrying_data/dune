@@ -1,17 +1,21 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name proof_carrying_data)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_deriving_yojson ppx_version ppx_jane))
+ (public_name proof_carrying_data)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   core_kernel
   bin_prot.shape
   base
   base.caml
   sexplib0
-  ;; local libraries
+  ; local libraries
   mina_wire_types
   ppx_version.runtime)
- (public_name proof_carrying_data))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_deriving_yojson ppx_version ppx_jane)))

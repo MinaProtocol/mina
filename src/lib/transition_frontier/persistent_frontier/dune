@@ -1,8 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name persistent_frontier)
  (public_name transition_frontier_persistent_frontier)
  (libraries
-  ;;opam libraries
+  ; opam libraries
   result
   bin_prot.shape
   core_kernel
@@ -12,7 +16,7 @@
   base.caml
   sexplib0
   async_unix
-  ;;local libraries
+  ; local libraries
   mina_stdlib
   o1trace
   mina_metrics

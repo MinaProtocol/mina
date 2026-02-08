@@ -1,19 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
- (name ledger_export_benchmark)
  (package mina_ledger_export_benchmark)
+ (name ledger_export_benchmark)
  (public_name mina-ledger-export-benchmark)
+ (modes native)
+ (flags -short-paths -g -w @a-4-29-40-41-42-44-45-48-58-59-60)
  (libraries
+  ; opam libraries
   base
   core
   core_bench
   core_kernel
   yojson
-  ; mina libraries
+  ; local libraries
   mina_runtime_config)
- ; the -w list here should be the same as in src/dune
- (flags -short-paths -g -w @a-4-29-40-41-42-44-45-48-58-59-60)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane))
- (modes native))
+  (pps ppx_jane ppx_version)))

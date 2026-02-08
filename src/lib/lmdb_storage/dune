@@ -1,10 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name lmdb_storage)
  (public_name lmdb_storage)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   lmdb
-  ;; local libraries
+  ; local libraries
   blake2
   mina_stdlib_unix)
  (instrumentation

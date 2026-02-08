@@ -1,52 +1,95 @@
-;;; each library below has an identical preprocess clause, because of this
-;;; dune bug: https://github.com/ocaml/dune/issues/1946
-
-;;; should succeed
-
-;; expiration
-(library
- (name unexpired)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_mina))
- (modules unexpired))
-
-;; define locally
-(library
- (name define_locally_good)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_mina))
- (modules define_locally_good))
-
-;; define from scope
-(library
- (name define_from_scope_good)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_mina))
- (modules define_from_scope_good))
-
-;;; should fail
-
-;; expiration
-(library
- (name expired)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_mina))
- (modules expired))
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
 
 (library
- (name expiry_in_module)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_mina))
- (modules expiry_in_module))
-
+ (name
+  unexpired)
+ (instrumentation
+  (backend
+   bisect_ppx))
+ (preprocess
+  (pps
+   ppx_jane
+   ppx_deriving_yojson
+   ppx_mina))
+ (modules
+  unexpired))
 (library
- (name expiry_invalid_date)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_mina))
- (modules expiry_invalid_date))
-
+ (name
+  define_locally_good)
+ (instrumentation
+  (backend
+   bisect_ppx))
+ (preprocess
+  (pps
+   ppx_jane
+   ppx_deriving_yojson
+   ppx_mina))
+ (modules
+  define_locally_good))
 (library
- (name expiry_invalid_format)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_mina))
- (modules expiry_invalid_format))
+ (name
+  define_from_scope_good)
+ (instrumentation
+  (backend
+   bisect_ppx))
+ (preprocess
+  (pps
+   ppx_jane
+   ppx_deriving_yojson
+   ppx_mina))
+ (modules
+  define_from_scope_good))
+(library
+ (name
+  expired)
+ (instrumentation
+  (backend
+   bisect_ppx))
+ (preprocess
+  (pps
+   ppx_jane
+   ppx_deriving_yojson
+   ppx_mina))
+ (modules
+  expired))
+(library
+ (name
+  expiry_in_module)
+ (instrumentation
+  (backend
+   bisect_ppx))
+ (preprocess
+  (pps
+   ppx_jane
+   ppx_deriving_yojson
+   ppx_mina))
+ (modules
+  expiry_in_module))
+(library
+ (name
+  expiry_invalid_date)
+ (instrumentation
+  (backend
+   bisect_ppx))
+ (preprocess
+  (pps
+   ppx_jane
+   ppx_deriving_yojson
+   ppx_mina))
+ (modules
+  expiry_invalid_date))
+(library
+ (name
+  expiry_invalid_format)
+ (instrumentation
+  (backend
+   bisect_ppx))
+ (preprocess
+  (pps
+   ppx_jane
+   ppx_deriving_yojson
+   ppx_mina))
+ (modules
+  expiry_invalid_format))

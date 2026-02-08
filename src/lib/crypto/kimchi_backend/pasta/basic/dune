@@ -1,21 +1,21 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (inline_tests
-  (flags -verbose -show-counts))
  (name kimchi_pasta_basic)
  (public_name kimchi_pasta.basic)
+ (inline_tests
+  (flags -verbose -show-counts))
  (flags -warn-error -27)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   ppx_inline_test.config
   sexplib0
   core_kernel
   bin_prot.shape
   base.caml
-  ;; local libraries
+  ; local libraries
   sponge
   kimchi_backend_common
   promise
@@ -24,4 +24,8 @@
   mina_stdlib
   pasta_bindings
   snarkette
-  ppx_version.runtime))
+  ppx_version.runtime)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std)))

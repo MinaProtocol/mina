@@ -1,17 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name work_partitioner)
  (public_name work_partitioner)
- (library_flags -linkall)
  (libraries
-  ;; OPAM libraries
+  ; opam libraries
   async
   core_kernel
-  ;; Local libraries
+  ; local libraries
   mina_base
   snark_work_lib
   transaction_snark
   transaction_witness
   work_selector)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_compare
@@ -21,7 +27,5 @@
    ppx_mina
    ppx_sexp_conv
    ppx_version))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis
   "Partition work returned by Work_selector and issue them to real Snark Worker"))

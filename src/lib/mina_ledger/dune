@@ -1,22 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name mina_ledger)
  (public_name mina_ledger)
  (inline_tests
   (flags -verbose -show-counts))
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps
-   ppx_version
-   ppx_let
-   ppx_custom_printf
-   ppx_base
-   ppx_deriving_yojson
-   ppx_inline_test
-   ppx_assert
-   ppx_mina))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   rocks
   integers
   async_kernel
@@ -30,7 +22,7 @@
   async
   core_kernel.uuid
   ppx_inline_test.config
-  ;; local libraries
+  ; local libraries
   mina_wire_types
   sgn
   syncable_ledger
@@ -63,4 +55,16 @@
   unsigned_extended
   with_hash
   ppx_version.runtime
-  mina_stdlib))
+  mina_stdlib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_version
+   ppx_let
+   ppx_custom_printf
+   ppx_base
+   ppx_deriving_yojson
+   ppx_inline_test
+   ppx_assert
+   ppx_mina)))

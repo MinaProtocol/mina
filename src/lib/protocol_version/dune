@@ -1,18 +1,24 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name protocol_version)
  (public_name protocol_version)
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   core_kernel
   sexplib0
   bin_prot.shape
   base.caml
   base
   ppx_version.runtime
-  ;; local libraries
+  ; local libraries
   mina_wire_types
   mina_node_config.version)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_version
@@ -21,6 +27,4 @@
    ppx_sexp_conv
    ppx_compare
    ppx_deriving_yojson))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "Protocol version representation"))

@@ -1,10 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name mina_signature_kind)
  (public_name mina_signature_kind)
  (libraries mina_signature_kind.type)
- (preprocess
-  (pps ppx_bin_prot ppx_version ppx_deriving_yojson))
+ (virtual_modules mina_signature_kind)
+ (default_implementation mina_signature_kind_config)
  (instrumentation
   (backend bisect_ppx))
- (virtual_modules mina_signature_kind)
- (default_implementation mina_signature_kind_config))
+ (preprocess
+  (pps ppx_bin_prot ppx_version ppx_deriving_yojson)))

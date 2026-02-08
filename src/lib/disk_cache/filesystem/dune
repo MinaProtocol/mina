@@ -1,19 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (public_name disk_cache.filesystem)
  (name disk_cache_filesystem)
- (implements disk_cache)
+ (public_name disk_cache.filesystem)
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   core
   async
-  ;; local libraries
+  ; local libraries
   logger
   mina_stdlib_unix
   disk_cache.utils
   disk_cache.test_lib)
- (preprocess
-  (pps ppx_mina ppx_version ppx_jane))
- (inline_tests
-  (flags -verbose -show-counts))
+ (implements disk_cache)
  (instrumentation
-  (backend bisect_ppx)))
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane)))

@@ -1,12 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name merkle_ledger)
  (public_name merkle_ledger)
  (flags
   (:standard -warn-error +a))
- (library_flags -linkall)
- (modules_without_implementation location_intf)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   async_kernel
   async_unix
@@ -21,7 +23,7 @@
   integers
   rocks
   sexplib0
-  ;; local libraries
+  ; local libraries
   cache_dir
   mina_stdlib
   mina_stdlib_unix
@@ -29,6 +31,9 @@
   merkle_address
   ppx_version.runtime
   visualization)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_mina
@@ -37,6 +42,5 @@
    ppx_compare
    ppx_deriving.show
    ppx_deriving_yojson))
- (instrumentation
-  (backend bisect_ppx))
- (synopsis "Implementation of different account databases"))
+ (synopsis "Implementation of different account databases")
+ (modules_without_implementation location_intf))

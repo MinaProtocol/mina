@@ -1,15 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name genesis_proof)
  (public_name coda_genesis_proof)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   base
   core_kernel
   base.md5
   core
   async
   async_kernel
-  ;; local libraries
+  ; local libraries
   snarky.backendless
   pickles_types
   currency

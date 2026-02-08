@@ -1,14 +1,18 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name web_backend)
  (public_name bindings_js.web_backend)
- (js_of_ocaml
-  (flags
-   (:include flags.sexp))
-  (javascript_files web_backend.js))
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version js_of_ocaml-ppx)))
+  (pps ppx_version js_of_ocaml-ppx))
+ (js_of_ocaml
+  (flags
+   (:include flags.sexp))
+  (javascript_files web_backend.js)))
 
 (rule
  (targets
@@ -21,11 +25,11 @@
   build.sh
   ../../dune-build-root
   (source_tree ../../../proof-systems))
- (locks /cargo-lock) ; lock for rustup
+ (locks /cargo-lock)
  (action
   (progn
    (setenv
     CARGO_TARGET_DIR
-    "%{read:../../dune-build-root}/cargo_kimchi_wasm"
+    %{read:../../dune-build-root}/cargo_kimchi_wasm
     (run bash build.sh))
    (write-file flags.sexp "()"))))

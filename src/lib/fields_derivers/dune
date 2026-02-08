@@ -1,11 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name fields_derivers)
  (public_name fields_derivers)
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries core_kernel fieldslib ppx_inline_test.config)
  (instrumentation
   (backend bisect_ppx))
- (inline_tests
-  (flags -verbose -show-counts))
  (preprocess
   (pps
    ppx_annot

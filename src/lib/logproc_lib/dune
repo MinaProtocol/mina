@@ -1,41 +1,35 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name logproc_lib)
  (public_name logproc_lib)
- (modules logproc_lib filter)
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   core_kernel
   yojson
   angstrom
   re2
   ppx_inline_test.config
-  ;; local libraries
+  ; local libraries
   interpolator_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving.std))
- (inline_tests
-  (flags -verbose -show-counts)))
-
-;; interpolator is made separately available because
-;; filter depends on re2, which binds to C++ code,
-;; making it unusable from js_of_ocaml
+ (modules logproc_lib filter))
 
 (library
  (name interpolator_lib)
  (public_name interpolator_lib)
- (modules interpolator)
- (libraries
-  ;; opam libraries
-  core_kernel
-  yojson
-  angstrom
-  ;; local libraries
-  )
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries core_kernel yojson angstrom)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving.std))
- (inline_tests
-  (flags -verbose -show-counts)))
+ (modules interpolator))

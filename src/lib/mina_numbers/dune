@@ -1,11 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name mina_numbers)
  (public_name mina_numbers)
  (inline_tests
   (flags -verbose -show-counts))
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   result
   base.caml
   bin_prot.shape
@@ -16,7 +19,7 @@
   base
   base.base_internalhash_types
   ppx_inline_test.config
-  ;; local libraries
+  ; local libraries
   protocol_version
   mina_wire_types
   bignum_bigint
@@ -34,6 +37,9 @@
   test_util
   kimchi_backend_common
   ppx_version.runtime)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_version
@@ -47,6 +53,4 @@
    ppx_compare
    ppx_deriving_yojson
    ppx_assert))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "Snark-friendly numbers used in Coda consensus"))

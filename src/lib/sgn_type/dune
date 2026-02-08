@@ -1,12 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name sgn_type)
  (public_name sgn_type)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_jane ppx_version ppx_compare ppx_deriving_yojson))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   core_kernel
   ppx_deriving_yojson.runtime
   yojson
@@ -14,5 +14,9 @@
   bin_prot.shape
   base.caml
   ppx_version.runtime
-  ;; local libraries
-  mina_wire_types))
+  ; local libraries
+  mina_wire_types)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_version ppx_compare ppx_deriving_yojson)))

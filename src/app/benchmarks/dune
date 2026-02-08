@@ -1,18 +1,24 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (name benchmarks)
  (public_name mina-benchmarks)
+ (modes native)
+ (link_flags -linkall)
  (libraries
-  core_bench.inline_benchmarks
-  vrf_lib_tests
-  mina_base
-  core_kernel
-  core
+  ; opam libraries
   base
+  core
+  core_bench.inline_benchmarks
+  core_kernel
+  ; local libraries
+  data_hash_lib
+  mina_base
   mina_stdlib
-  data_hash_lib)
+  vrf_lib_tests)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
- (link_flags -linkall)
- (modes native))
+  (pps ppx_version)))

@@ -1,7 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name transition_frontier_tests)
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-  ;;opam libraries
+  ; opam libraries
   core.uuid
   core
   async
@@ -11,7 +17,9 @@
   async_unix
   core_kernel.uuid
   sexplib0
-  ;;local libraries
+  yojson
+  libp2p_ipc
+  ; local libraries
   mina_state
   staged_ledger
   with_hash
@@ -33,12 +41,8 @@
   transition_frontier_base
   transition_frontier
   protocol_version
-  yojson
   mina_net2
-  libp2p_ipc
   staged_ledger_diff)
- (inline_tests
-  (flags -verbose -show-counts))
  (instrumentation
   (backend bisect_ppx))
  (preprocess

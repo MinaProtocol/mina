@@ -1,20 +1,24 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name test_util)
  (public_name test_util)
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   core_kernel
   base.caml
   bin_prot
-  ;; local libraries
+  ; local libraries
   snark_params
   fold_lib
   snarky.backendless
   pickles
   crypto_params)
- (preprocess
-  (pps ppx_version ppx_jane ppx_compare))
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_compare))
  (synopsis "test utils"))

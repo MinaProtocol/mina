@@ -1,22 +1,26 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name archive_cli)
  (public_name archive.cli)
  (libraries
-  ;;opam libraries
+  ; opam libraries
   async
   async.async_command
   caqti
   caqti-async
   core
-  ;;local libraries
+  ; local libraries
   archive_lib
   block_time
   cli_lib
   genesis_constants
   logger
+  mina_caqti
   mina_runtime_config
-  mina_version
-  mina_caqti)
+  mina_version)
  (instrumentation
   (backend bisect_ppx --bisect-sigterm))
  (preprocess

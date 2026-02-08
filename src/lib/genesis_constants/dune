@@ -1,11 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name genesis_constants)
  (public_name genesis_constants)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   ppx_inline_test.config
   base
   bin_prot.shape
@@ -13,7 +16,7 @@
   base.caml
   sexplib0
   integers
-  ;; local libraries
+  ; local libraries
   mina_node_config.intf
   mina_node_config.for_unit_tests
   mina_node_config
@@ -30,6 +33,7 @@
   kimchi_pasta.basic
   test_util
   ppx_version.runtime)
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

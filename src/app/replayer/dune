@@ -1,76 +1,80 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (package replayer)
  (name replayer)
  (public_name replayer)
  (libraries
-  ;; opam libraries
-  stdio
-  sexplib0
-  result
-  async.async_command
+  ; opam libraries
   async
-  base.caml
-  bin_prot.shape
-  caqti-async
-  core_kernel
-  archive_lib
-  caqti-driver-postgresql
+  async.async_command
   async_kernel
-  core
-  yojson
-  caqti
+  async_unix
   base
   base.base_internalhash_types
-  uri
+  base.caml
+  bin_prot.shape
+  caqti
+  caqti-async
+  caqti-driver-postgresql
+  core
+  core_kernel
   integers
-  async_unix
-  ;; local libraries
-  mina_wire_types
-  with_hash
-  snark_params
-  crypto_params
-  pickles_types
-  mina_numbers
+  result
+  sexplib0
+  stdio
+  uri
+  yojson
+  ; local libraries
+  archive_lib
+  block_time
+  cli_lib
+  codable
   coda_genesis_ledger
   currency
-  pickles.backend
-  signature_lib
-  genesis_ledger_helper.lib
-  genesis_ledger_helper
-  mina_state
-  mina_ledger
-  mina_base
-  mina_stdlib
-  mina_base.import
-  mina_transaction
-  mina_transaction_logic
-  mina_caqti
+  data_hash_lib
   genesis_constants
-  mina_runtime_config
-  logger
+  genesis_ledger_helper
+  genesis_ledger_helper.lib
   kimchi_backend
+  kimchi_backend_common
   kimchi_pasta
   kimchi_pasta.basic
-  kimchi_backend_common
-  block_time
-  data_hash_lib
+  logger
+  mina_base
+  mina_base.import
+  mina_caqti
+  mina_ledger
+  mina_numbers
+  mina_runtime_config
+  mina_state
+  mina_stdlib
+  mina_transaction
+  mina_transaction_logic
+  mina_version
+  mina_wire_types
   pickles
-  sgn
-  unsigned_extended
-  random_oracle
-  codable
+  pickles.backend
+  pickles_types
   ppx_version.runtime
-  cli_lib
-  mina_version)
+  random_oracle
+  sgn
+  signature_lib
+  snark_params
+  crypto_params
+  unsigned_extended
+  with_hash)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_mina
-   ppx_version
-   ppx_let
-   ppx_sexp_conv
-   ppx_hash
+   h_list.ppx
    ppx_compare
    ppx_deriving_yojson
-   h_list.ppx)))
+   ppx_hash
+   ppx_let
+   ppx_mina
+   ppx_sexp_conv
+   ppx_version)))

@@ -1,26 +1,17 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name child_processes)
  (public_name child_processes)
+ (inline_tests
+  (flags -verbose -show-counts))
  (foreign_stubs
   (language c)
   (names caml_syslimits))
- (inline_tests
-  (flags -verbose -show-counts))
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps
-   ppx_assert
-   ppx_custom_printf
-   ppx_deriving.show
-   ppx_here
-   ppx_inline_test
-   ppx_let
-   ppx_mina
-   ppx_pipebang
-   ppx_version))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   async_kernel
   async_unix
@@ -35,8 +26,21 @@
   ppx_hash.runtime-lib
   ppx_inline_test.config
   sexplib0
-  ;; local libraries
+  ; local libraries
   error_json
-  mina_stdlib_unix
   logger
-  pipe_lib))
+  mina_stdlib_unix
+  pipe_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_assert
+   ppx_custom_printf
+   ppx_deriving.show
+   ppx_here
+   ppx_inline_test
+   ppx_let
+   ppx_mina
+   ppx_pipebang
+   ppx_version)))

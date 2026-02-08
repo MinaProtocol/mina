@@ -1,11 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name string_sign)
  (public_name string_sign)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   core_kernel
   result
-  ;; local libraries
+  ; local libraries
   kimchi_backend
   kimchi_pasta
   kimchi_pasta.basic
@@ -20,5 +24,5 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_jane ppx_version))
+  (pps ppx_mina ppx_version ppx_jane))
  (synopsis "Schnorr signatures for strings"))

@@ -1,22 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (inline_tests
-  (flags -verbose -show-counts))
  (name pickles)
  (public_name pickles)
- (modules_without_implementation full_signature type intf pickles_intf)
+ (inline_tests
+  (flags -verbose -show-counts))
  (flags -open Core_kernel)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps
-   ppx_version
-   ppx_mina
-   ppx_jane
-   ppx_compare
-   ppx_deriving_yojson
-   h_list.ppx))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   stdio
   integers
   result
@@ -30,7 +23,7 @@
   base
   async_kernel
   bin_prot.shape
-  ;; local libraries
+  ; local libraries
   mina_wire_types
   kimchi_bindings
   kimchi_types
@@ -69,4 +62,15 @@
   logger.context_logger
   ppx_version.runtime
   error_json
-  mina_stdlib))
+  mina_stdlib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_version
+   ppx_mina
+   ppx_jane
+   ppx_compare
+   ppx_deriving_yojson
+   h_list.ppx))
+ (modules_without_implementation full_signature type intf pickles_intf))

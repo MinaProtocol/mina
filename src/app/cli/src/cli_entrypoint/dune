@@ -1,87 +1,91 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name mina_cli_entrypoint)
  (public_name cli.mina_cli_entrypoint)
- (modes native)
  (libraries
-  ;;opam libraries
+  ; opam libraries
   async
+  async.async_command
   async_kernel
   async_unix
-  async.async_command
   base
   base.caml
   bin_prot
   bin_prot.shape
-  core_kernel
   core
   core.daemon
+  core_kernel
   init
   memtrace
   result
   sexplib0
   stdio
   uri
-  ;;local libraries
-  verifier
-  ledger_proof
-  snark_worker
-  mina_block
-  pipe_lib
-  gossip_net
-  data_hash_lib
-  mina_ledger
-  precomputed_values
-  mina_networking
+  ; local libraries
+  blake2
+  block_producer
+  block_time
+  blockchain_snark
   cache_dir
-  parallel
-  secrets
-  logger
-  mina_lib
+  child_processes
+  cli_lib
+  coda_genesis_proof
+  consensus
   currency
-  signature_lib
+  data_hash_lib
+  error_json
+  genesis_constants
+  genesis_ledger_helper
+  gossip_net
+  internal_tracing
+  itn_logger
+  ledger_proof
+  logger
+  logger.file_system
   mina_base
   mina_base.import
-  error_json
-  genesis_ledger_helper
-  consensus
-  child_processes
-  node_addrs_and_ports
-  mina_plugins
-  logger.file_system
-  cli_lib
-  genesis_constants
-  blake2
-  mina_metrics
-  transaction_witness
-  snark_work_lib
-  transaction_snark
+  mina_block
   mina_compile_config
-  node_error_service
+  mina_ledger
+  mina_lib
+  mina_metrics
+  mina_net2
+  mina_networking
+  mina_plugins
+  mina_runtime_config
   mina_stdlib
   mina_stdlib_unix
   mina_version
-  mina_net2
-  block_time
-  mina_runtime_config
-  trust_system
-  protocol_version
-  coda_genesis_proof
-  with_hash
-  block_producer
-  prover
-  blockchain_snark
-  snarky.backendless
+  node_addrs_and_ports
+  node_error_service
   o1trace
+  parallel
+  pipe_lib
   ppx_version.runtime
-  internal_tracing
-  itn_logger)
+  precomputed_values
+  protocol_version
+  prover
+  secrets
+  signature_lib
+  snarky.backendless
+  snark_work_lib
+  snark_worker
+  transaction_snark
+  transaction_witness
+  trust_system
+  verifier
+  with_hash)
+ (modes native)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_mina
-   ppx_version
+   ppx_deriving_yojson
    ppx_here
    ppx_let
+   ppx_mina
    ppx_sexp_conv
-   ppx_deriving_yojson)))
+   ppx_version)))

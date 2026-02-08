@@ -1,8 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (name gen_values)
- (link_flags (-linkall))
+ (modes native)
+ (link_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async_unix
   stdio
   base.caml
@@ -16,15 +21,14 @@
   compiler-libs
   async_kernel
   ocaml-compiler-libs.common
-  ;; local libraries
+  ; local libraries
   pickles_types
   pickles
   crypto_params
   mina_metrics.none
   logger.fake)
  (forbidden_libraries mina_node_config protocol_version)
- (preprocess
-  (pps ppx_version ppx_jane ppxlib.metaquot))
  (instrumentation
   (backend bisect_ppx))
- (modes native))
+ (preprocess
+  (pps ppx_version ppx_jane ppxlib.metaquot)))

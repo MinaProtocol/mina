@@ -1,36 +1,40 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (package zkapp_test_transaction)
  (name zkapp_test_transaction)
  (public_name zkapp_test_transaction)
  (libraries
-  ;;opam libraries
-  async.async_command
-  base
-  core_kernel
-  core
-  async_kernel
-  zkapp_test_transaction_lib
+  ; opam libraries
   async
+  async.async_command
+  async_kernel
   async_unix
-  ;;local libraries
+  base
+  core
+  core_kernel
+  zkapp_test_transaction_lib
+  ; local libraries
+  cli_lib
+  currency
+  mina_base
   mina_graphql
   mina_numbers
-  currency
   mina_stdlib
-  cli_lib
-  mina_base
   signature_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_custom_printf
-   ppx_mina
+   h_list.ppx
    ppx_assert
-   ppx_version
-   ppx_let
-   ppx_sexp_conv
-   ppx_hash
    ppx_compare
+   ppx_custom_printf
    ppx_deriving_yojson
-   h_list.ppx)))
+   ppx_hash
+   ppx_let
+   ppx_mina
+   ppx_sexp_conv
+   ppx_version)))

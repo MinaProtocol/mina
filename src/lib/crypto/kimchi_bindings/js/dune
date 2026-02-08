@@ -1,6 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name bindings_js)
  (public_name bindings_js)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version))
  (js_of_ocaml
   (javascript_files
    bindings/bigint256.js
@@ -14,8 +22,4 @@
    bindings/prover-index.js
    bindings/util.js
    bindings/srs.js
-   bindings/verifier-index.js))
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_version)))
+   bindings/verifier-index.js)))

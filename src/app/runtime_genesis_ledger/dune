@@ -1,18 +1,22 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (name runtime_genesis_ledger)
  (public_name runtime_genesis_ledger)
  (libraries
-  ;;opam libraries
-  base
-  core_kernel
-  async_kernel
+  ; opam libraries
   async
-  core
-  result
   async.async_command
-  yojson
+  async_kernel
   async_unix
-  ;;local libraries
+  base
+  core
+  core_kernel
+  result
+  yojson
+  ; local libraries
   cache_dir
   cli_lib
   coda_genesis_ledger
@@ -21,11 +25,11 @@
   genesis_ledger_helper
   logger
   mina_base
-  mina_runtime_config
   mina_ledger
+  mina_runtime_config
   mina_stdlib
   precomputed_values)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_let ppx_deriving_yojson)))
+  (pps ppx_deriving_yojson ppx_let ppx_mina ppx_version)))

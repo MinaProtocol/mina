@@ -1,9 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name rosetta_lib)
  (public_name rosetta_lib)
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   result
   base.caml
   caqti
@@ -13,7 +16,7 @@
   uri
   sexplib0
   integers
-  ;; local libraries
+  ; local libraries
   mina_wire_types
   hex
   random_oracle_input
@@ -26,6 +29,7 @@
   currency
   unsigned_extended
   mina_base.import)
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

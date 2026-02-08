@@ -1,10 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name vrf_lib)
  (public_name vrf_lib)
  (flags :standard -short-paths)
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   zarith
   bignum.bigint
   bin_prot.shape
@@ -14,14 +17,15 @@
   core_kernel
   bignum
   ppx_inline_test.config
-  ;; local libraries
+  ; local libraries
   snarky.backendless
   genesis_constants
   snarky_curves
   bitstring_lib
   ppx_version.runtime)
- (preprocess
-  (pps h_list.ppx ppx_bench ppx_compare ppx_jane ppx_version))
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
+ (preprocess
+  (pps h_list.ppx ppx_bench ppx_compare ppx_jane ppx_version))
  (synopsis "VRF instantiation"))

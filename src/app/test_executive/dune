@@ -1,9 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
+ (package mina_test_executive)
  (name test_executive)
  (public_name mina-test-executive)
- (package mina_test_executive)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   async_kernel
   async_unix
@@ -12,18 +16,18 @@
   cmdliner
   core
   core_kernel
+  integers
   sexplib0
   stdio
-  uri
   unsigned_extended
+  uri
   yojson
-  ;; local libraries
+  ; local libraries
   block_time
   cache_dir
   currency
   data_hash_lib
   genesis_constants
-  integers
   integration_test_lib
   integration_test_local_engine
   key_gen
@@ -63,4 +67,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_jane ppx_deriving_yojson ppx_mina ppx_version)))
+  (pps ppx_deriving_yojson ppx_jane ppx_mina ppx_mina ppx_version)))

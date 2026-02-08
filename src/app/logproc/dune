@@ -1,22 +1,26 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (name logproc)
  (public_name logproc)
  (modules logproc)
  (libraries
-  ;;opam libraries
-  result
-  stdio
-  core
-  yojson
+  ; opam libraries
   cmdliner
+  core
   core_kernel
   ppx_deriving_yojson.runtime
-  ;;local libraries
+  result
+  stdio
+  yojson
+  ; local libraries
+  interpolator_lib
   logger
   logproc_lib
-  mina_stdlib
-  interpolator_lib)
+  mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving.std)))
+  (pps ppx_deriving.std ppx_jane ppx_version)))

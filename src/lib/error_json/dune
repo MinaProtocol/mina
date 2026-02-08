@@ -1,12 +1,11 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name error_json)
  (public_name error_json)
- (libraries
-  ;; opam libraries
-  base
-  sexplib
-  sexplib0
-  yojson)
+ (libraries base sexplib sexplib0 yojson)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

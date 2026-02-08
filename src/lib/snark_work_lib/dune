@@ -1,16 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name snark_work_lib)
  (public_name snark_work_lib)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   base.caml
   bin_prot.shape
   core
   core_kernel
   sexplib0
-  ;; local libraries
+  ; local libraries
   currency
   ledger_proof
   mina_state
@@ -19,9 +23,9 @@
   ppx_version.runtime
   signature_lib
   transaction_snark)
- (modules_without_implementation combined_result)
- (preprocess
-  (pps ppx_deriving_yojson ppx_mina ppx_jane ppx_version))
  (instrumentation
   (backend bisect_ppx))
- (synopsis "Snark work types"))
+ (preprocess
+  (pps ppx_deriving_yojson ppx_mina ppx_jane ppx_version))
+ (synopsis "Snark work types")
+ (modules_without_implementation combined_result))

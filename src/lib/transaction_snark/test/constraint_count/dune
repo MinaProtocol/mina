@@ -1,3 +1,7 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (tests
  (names test_constraint_count)
  (libraries

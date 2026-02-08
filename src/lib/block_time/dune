@@ -1,11 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name block_time)
  (public_name block_time)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   integers
   base.caml
   bin_prot.shape
@@ -14,7 +17,7 @@
   core_kernel
   base
   base.base_internalhash_types
-  ;; local libraries
+  ; local libraries
   mina_wire_types
   bitstring_lib
   pickles
@@ -29,6 +32,7 @@
   random_oracle_input
   random_oracle
   ppx_version.runtime)
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

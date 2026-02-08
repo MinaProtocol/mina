@@ -1,11 +1,28 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name pickles_base)
  (public_name pickles_base)
- ; Deactivated warnings
- ;
- ; 44: open-shadow-identifier (the use of Core_kernel makes it ubiquitous)
  (flags
   (:standard -w +a-44 -warn-error +a))
+ (libraries
+  ; opam libraries
+  base.base_internalhash_types
+  sexplib0
+  bin_prot.shape
+  base.caml
+  ppxlib
+  core_kernel
+  ; local libraries
+  mina_wire_types
+  snarky.backendless
+  random_oracle_input
+  pickles_types
+  pickles_base.one_hot_vector
+  plonkish_prelude
+  ppx_version.runtime)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -16,20 +33,4 @@
    ppx_jane
    ppx_deriving.std
    ppx_deriving_yojson
-   h_list.ppx))
- (libraries
-  ;; opam libraries
-  base.base_internalhash_types
-  sexplib0
-  bin_prot.shape
-  base.caml
-  ppxlib
-  core_kernel
-  ;; local libraries
-  mina_wire_types
-  snarky.backendless
-  random_oracle_input
-  pickles_types
-  pickles_base.one_hot_vector
-  plonkish_prelude
-  ppx_version.runtime))
+   h_list.ppx)))

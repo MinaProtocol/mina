@@ -1,20 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name sync_handler)
  (public_name sync_handler)
  (inline_tests
   (flags -verbose -show-counts))
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_mina ppx_version ppx_jane))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   sexplib0
   core
   async
   core_kernel
   async_kernel
-  ;; local libraries
+  ; local libraries
   with_hash
   data_hash_lib
   precomputed_values
@@ -36,4 +36,8 @@
   mina_stdlib
   proof_carrying_data
   mina_ledger
-  mina_wire_types))
+  mina_wire_types)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane)))

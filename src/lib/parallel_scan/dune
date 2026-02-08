@@ -1,11 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name parallel_scan)
  (public_name parallel_scan)
  (inline_tests
   (flags -verbose -show-counts))
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   ppx_inline_test.config
   base
   core_kernel
@@ -18,13 +21,14 @@
   bin_prot.shape
   base.caml
   async_unix
-  ;; local libraries
+  ; local libraries
   mina_metrics
   mina_stdlib
   pipe_lib
   ppx_version.runtime)
- (preprocess
-  (pps ppx_jane ppx_mina ppx_version ppx_compare lens.ppx_deriving))
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_mina ppx_version ppx_compare lens.ppx_deriving))
  (synopsis "Parallel scan over an infinite stream (incremental map-reduce)"))

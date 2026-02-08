@@ -1,8 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name user_command_input)
  (public_name user_command_input)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   bin_prot.shape
   core
   core_kernel
@@ -10,7 +14,7 @@
   sexplib0
   base.caml
   async
-  ;; local libraries
+  ; local libraries
   logger
   genesis_constants
   currency

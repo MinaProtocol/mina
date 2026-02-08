@@ -1,4 +1,5 @@
 (data_only_dirs proof-systems)
 
-(subdir proof-systems
+(subdir
+ proof-systems
  (data_only_dirs .cargo))

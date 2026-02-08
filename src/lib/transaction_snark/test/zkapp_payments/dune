@@ -1,7 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name zkapp_payments_tests)
+ (inline_tests
+  (flags -verbose -show-counts)
+  (deps proof_cache.json))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   ppx_inline_test.config
   async
   async_kernel
@@ -13,7 +20,7 @@
   sexplib0
   ppx_deriving_yojson.runtime
   result
-  ;; local libraries
+  ; local libraries
   logger
   mina_base.import
   pickles
@@ -37,10 +44,7 @@
   mina_transaction_logic
   mina_transaction)
  (library_flags -linkall)
- (inline_tests
-  (flags -verbose -show-counts)
-  (deps proof_cache.json))
- (preprocess
-  (pps ppx_snarky ppx_version ppx_jane ppx_mina))
  (instrumentation
-  (backend bisect_ppx)))
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_snarky ppx_version ppx_jane ppx_mina)))

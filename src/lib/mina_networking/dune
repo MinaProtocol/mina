@@ -1,9 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name mina_networking)
  (public_name mina_networking)
- (library_flags -linkall)
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   base.caml
   async_rpc_kernel
   result
@@ -16,7 +21,7 @@
   async_unix
   async_kernel
   base.base_internalhash_types
-  ;; local libraries
+  ; local libraries
   precomputed_values
   merkle_ledger
   downloader
@@ -52,8 +57,9 @@
   sync_handler
   transition_chain_prover
   work_selector)
- (inline_tests
-  (flags -verbose -show-counts))
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_mina
@@ -70,6 +76,4 @@
    ppx_let
    ppx_register_event
    ppx_custom_printf))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "Networking layer for coda"))

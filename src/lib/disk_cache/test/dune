@@ -1,12 +1,17 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name test_cache_deadlock_lib)
- (modules test_cache_deadlock)
+ (flags
+  (:standard -w +a -w -22))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   core
   core_kernel
-  ;; local libraries
+  ; local libraries
   disk_cache_intf
   logger
   mina_stdlib_unix)
@@ -14,38 +19,36 @@
   (backend bisect_ppx))
  (preprocess
   (pps ppx_jane ppx_version))
- ;; Ignoring -22 because we use Binable.of_binable_without_uuid
- (flags
-  (:standard -w +a -w -22)))
+ (modules test_cache_deadlock))
 
 (test
  (name test_lmdb_deadlock)
  (modules test_lmdb_deadlock)
+ (flags
+  (:standard -w +a))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
-  ;; local libraries
+  ; local libraries
   disk_cache.lmdb
   test_cache_deadlock_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_version))
- (flags
-  (:standard -w +a)))
+  (pps ppx_jane ppx_version)))
 
 (test
  (name test_filesystem_deadlock)
  (modules test_filesystem_deadlock)
+ (flags
+  (:standard -w +a))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
-  ;; local libraries
+  ; local libraries
   disk_cache.filesystem
   test_cache_deadlock_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_version))
- (flags
-  (:standard -w +a)))
+  (pps ppx_jane ppx_version)))

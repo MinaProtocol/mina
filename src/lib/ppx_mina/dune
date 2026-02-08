@@ -1,4 +1,6 @@
-;; Don't build tests automatically
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
 
 (vendored_dirs tests)
 
@@ -7,14 +9,14 @@
  (public_name ppx_mina)
  (kind ppx_deriver)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   ppx_deriving.api
   ppxlib
   ppx_bin_prot
   core_kernel
   base
   base.caml
-  ;; local libraries
+  ; local libraries
   ppx_representatives
   ppx_register_event
   ppx_to_enum)
