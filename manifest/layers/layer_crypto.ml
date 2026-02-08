@@ -8,11 +8,7 @@ open Manifest
 open Externals
 open Dune_s_expr
 
-(* ============================================================ *)
-(* Tier 2: Low-level crypto & utilities                         *)
-(* ============================================================ *)
 
-(* -- blake2 ----------------------------------------------------- *)
 let blake2 =
   library "blake2" ~path:"src/lib/crypto/blake2" ~inline_tests:true
   ~deps:
@@ -36,7 +32,6 @@ let blake2 =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- bignum_bigint ---------------------------------------------- *)
 let bignum_bigint =
   library "bignum_bigint" ~path:"src/lib/crypto/bignum_bigint"
   ~synopsis:"Bignum's bigint re-exported as Bignum_bigint"
@@ -44,7 +39,6 @@ let bignum_bigint =
   ~deps:[ core_kernel; async_kernel; bignum_bigint; local "fold_lib" ]
   ~ppx:Ppx.standard
 
-(* -- string_sign ------------------------------------------------ *)
 let string_sign =
   library "string_sign" ~path:"src/lib/crypto/string_sign"
   ~synopsis:"Schnorr signatures for strings"
@@ -74,7 +68,6 @@ let string_sign =
     ]
   ~ppx:Ppx.mina
 
-(* -- snark_keys_header ------------------------------------------ *)
 let snark_keys_header =
   library "snark_keys_header" ~path:"src/lib/crypto/snark_keys_header"
   ~deps:[ base; base_caml; core_kernel; integers; result; sexplib0; stdio ]
@@ -88,7 +81,6 @@ let snark_keys_header =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- plonkish_prelude ------------------------------------------- *)
 let plonkish_prelude =
   library "plonkish_prelude" ~path:"src/lib/crypto/plonkish_prelude"
   ~flags:
@@ -124,7 +116,6 @@ let plonkish_prelude =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- random_oracle_input ---------------------------------------- *)
 let random_oracle_input =
   library "random_oracle_input" ~path:"src/lib/crypto/random_oracle_input"
   ~inline_tests:true
@@ -139,19 +130,16 @@ let random_oracle_input =
        ; Ppx_lib.ppx_deriving_yojson
        ] )
 
-(* -- outside_hash_image ----------------------------------------- *)
 let outside_hash_image =
   library "outside_hash_image" ~path:"src/lib/crypto/outside_hash_image"
   ~deps:[ local "snark_params" ]
   ~ppx:Ppx.minimal
 
-(* -- hash_prefixes ---------------------------------------------- *)
 let hash_prefixes =
   library "hash_prefixes" ~path:"src/lib/hash_prefixes"
   ~deps:[ Layer_infra.mina_signature_kind ]
   ~ppx:Ppx.minimal
 
-(* -- sgn -------------------------------------------------------- *)
 let sgn =
   library "sgn" ~path:"src/lib/sgn" ~synopsis:"sgn library"
   ~library_flags:[ "-linkall" ]
@@ -182,11 +170,7 @@ let sgn =
        ; Ppx_lib.ppx_deriving_yojson
        ] )
 
-(* ============================================================ *)
-(* Tier 4: Crypto layer                                          *)
-(* ============================================================ *)
 
-(* -- pasta_bindings.backend (virtual) --------------------------- *)
 let pasta_bindings_backend =
   library "pasta_bindings.backend" ~internal_name:"pasta_bindings_backend"
   ~path:"src/lib/crypto/kimchi_bindings/stubs/pasta_bindings_backend"
@@ -196,7 +180,6 @@ let pasta_bindings_backend =
   ~virtual_modules:[ "pasta_bindings_backend" ]
   ~default_implementation:"pasta_bindings.backend.native"
 
-(* -- pasta_bindings.backend.none -------------------------------- *)
 let pasta_bindings_backend_none =
   library "pasta_bindings.backend.none"
   ~internal_name:"pasta_bindings_backend_none"
@@ -205,7 +188,6 @@ let pasta_bindings_backend_none =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_inline_test ])
   ~implements:"pasta_bindings.backend"
 
-(* -- bindings_js ------------------------------------------------ *)
 let bindings_js =
   library "bindings_js" ~path:"src/lib/crypto/kimchi_bindings/js"
   ~ppx:Ppx.minimal
@@ -227,7 +209,6 @@ let bindings_js =
             ]
        ] )
 
-(* -- bindings_js.node_backend ----------------------------------- *)
 let bindings_js_node_backend =
   library "bindings_js.node_backend" ~internal_name:"node_backend"
   ~path:"src/lib/crypto/kimchi_bindings/js/node_js"
@@ -268,7 +249,6 @@ let bindings_js_node_backend =
          ]
     ]
 
-(* -- bindings_js.web_backend ------------------------------------ *)
 let bindings_js_web_backend =
   library "bindings_js.web_backend" ~internal_name:"web_backend"
   ~path:"src/lib/crypto/kimchi_bindings/js/web"
@@ -309,7 +289,6 @@ let bindings_js_web_backend =
          ]
     ]
 
-(* -- kimchi_bindings.pasta_fp_poseidon -------------------------- *)
 let kimchi_bindings_pasta_fp_poseidon =
   library "kimchi_bindings.pasta_fp_poseidon"
   ~internal_name:"kimchi_pasta_fp_poseidon"
@@ -318,7 +297,6 @@ let kimchi_bindings_pasta_fp_poseidon =
   ~inline_tests:true
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_inline_test ])
 
-(* -- kimchi_bindings.pasta_fq_poseidon -------------------------- *)
 let kimchi_bindings_pasta_fq_poseidon =
   library "kimchi_bindings.pasta_fq_poseidon"
   ~internal_name:"kimchi_pasta_fq_poseidon"
@@ -327,7 +305,6 @@ let kimchi_bindings_pasta_fq_poseidon =
   ~inline_tests:true
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_inline_test ])
 
-(* -- kimchi_backend_common -------------------------------------- *)
 let kimchi_backend_common =
   library "kimchi_backend_common" ~path:"src/lib/crypto/kimchi_backend/common"
   ~flags:[ atom "-warn-error"; atom "-27" ]
@@ -372,7 +349,6 @@ let kimchi_backend_common =
        ; Ppx_lib.h_list_ppx
        ] )
 
-(* -- kimchi_pasta ----------------------------------------------- *)
 let kimchi_pasta =
   library "kimchi_pasta" ~path:"src/lib/crypto/kimchi_backend/pasta"
   ~flags:[ atom "-warn-error"; atom "-27" ]
@@ -405,7 +381,6 @@ let kimchi_pasta =
        ; Ppx_lib.ppx_deriving_std
        ] )
 
-(* -- kimchi_pasta.basic ----------------------------------------- *)
 let kimchi_pasta_basic =
   library "kimchi_pasta.basic" ~internal_name:"kimchi_pasta_basic"
   ~path:"src/lib/crypto/kimchi_backend/pasta/basic"
@@ -435,7 +410,6 @@ let kimchi_pasta_basic =
        ; Ppx_lib.ppx_deriving_std
        ] )
 
-(* -- kimchi_pasta.constraint_system (virtual) ------------------- *)
 let kimchi_pasta_constraint_system =
   library "kimchi_pasta.constraint_system"
   ~internal_name:"kimchi_pasta_constraint_system"
@@ -469,7 +443,6 @@ let kimchi_pasta_constraint_system =
   ~virtual_modules:[ "pallas_constraint_system"; "vesta_constraint_system" ]
   ~default_implementation:"kimchi_pasta.constraint_system.caml"
 
-(* -- kimchi_pasta.constraint_system.caml ------------------------ *)
 let kimchi_pasta_constraint_system_caml =
   library "kimchi_pasta.constraint_system.caml"
   ~internal_name:"kimchi_pasta_constraint_system_caml"
@@ -501,7 +474,6 @@ let kimchi_pasta_constraint_system_caml =
        ] )
   ~implements:"kimchi_pasta.constraint_system"
 
-(* -- kimchi_backend --------------------------------------------- *)
 let kimchi_backend =
   library "kimchi_backend" ~path:"src/lib/crypto/kimchi_backend"
   ~flags:[ atom "-warn-error"; atom "-27" ]
@@ -534,7 +506,6 @@ let kimchi_backend =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- kimchi_backend.gadgets ------------------------------------- *)
 let kimchi_backend_gadgets =
   library "kimchi_backend.gadgets" ~internal_name:"kimchi_gadgets"
   ~path:"src/lib/crypto/kimchi_backend/gadgets" ~inline_tests:true
@@ -552,7 +523,6 @@ let kimchi_backend_gadgets =
     ]
   ~ppx:Ppx.standard
 
-(* -- kimchi_backend.gadgets_test_runner ------------------------- *)
 let kimchi_backend_gadgets_test_runner =
   library "kimchi_backend.gadgets_test_runner"
   ~internal_name:"kimchi_gadgets_test_runner"
@@ -599,7 +569,6 @@ let kimchi_backend_gadgets_test_runner =
     ]
   ~ppx:Ppx.mina_rich
 
-(* -- crypto_params ---------------------------------------------- *)
 let crypto_params =
   library "crypto_params" ~path:"src/lib/crypto/crypto_params"
   ~synopsis:"Cryptographic parameters"
@@ -631,7 +600,6 @@ let crypto_params =
          ]
     ]
 
-(* -- pickles_base ----------------------------------------------- *)
 let pickles_base =
   library "pickles_base" ~path:"src/lib/crypto/pickles_base"
   ~flags:
@@ -671,7 +639,6 @@ let pickles_base =
        ; Ppx_lib.h_list_ppx
        ] )
 
-(* -- pickles_base.one_hot_vector -------------------------------- *)
 let pickles_base_one_hot_vector =
   library "pickles_base.one_hot_vector" ~internal_name:"one_hot_vector"
   ~path:"src/lib/crypto/pickles_base/one_hot_vector"
@@ -689,7 +656,6 @@ let pickles_base_one_hot_vector =
   ~deps:[ core_kernel; local "snarky.backendless"; local "pickles_types" ]
   ~ppx:Ppx.standard
 
-(* -- pickles_types ---------------------------------------------- *)
 let pickles_types =
   library "pickles_types" ~path:"src/lib/crypto/pickles_types"
   ~flags:
@@ -727,7 +693,6 @@ let pickles_types =
        ; Ppx_lib.h_list_ppx
        ] )
 
-(* -- snark_params ----------------------------------------------- *)
 let snark_params =
   library "snark_params" ~path:"src/lib/crypto/snark_params"
   ~synopsis:"Snark parameters" ~library_flags:[ "-linkall" ]
@@ -773,7 +738,6 @@ let snark_params =
        ; Ppx_lib.ppx_snarky
        ] )
 
-(* -- random_oracle ---------------------------------------------- *)
 let random_oracle =
   library "random_oracle" ~path:"src/lib/crypto/random_oracle"
   ~inline_tests:true
@@ -808,7 +772,6 @@ let random_oracle =
        ; Ppx_lib.ppx_let
        ] )
 
-(* -- random_oracle.permutation (virtual) ------------------------ *)
 let random_oracle_permutation =
   library "random_oracle.permutation" ~internal_name:"random_oracle_permutation"
   ~path:"src/lib/crypto/random_oracle/permutation"
@@ -822,7 +785,6 @@ let random_oracle_permutation =
   ~virtual_modules:[ "random_oracle_permutation" ]
   ~default_implementation:"random_oracle.permutation.external"
 
-(* -- random_oracle.permutation.external ------------------------- *)
 let random_oracle_permutation_external =
   library "random_oracle.permutation.external"
   ~internal_name:"random_oracle_permutation_external"
@@ -847,7 +809,6 @@ let random_oracle_permutation_external =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_inline_test; Ppx_lib.ppx_assert ])
   ~implements:"random_oracle.permutation"
 
-(* -- random_oracle.permutation.ocaml ---------------------------- *)
 let random_oracle_permutation_ocaml =
   library "random_oracle.permutation.ocaml"
   ~internal_name:"random_oracle_permutation_ocaml"
@@ -866,7 +827,6 @@ let random_oracle_permutation_ocaml =
     ]
   ~ppx:Ppx.minimal ~implements:"random_oracle.permutation"
 
-(* -- non_zero_curve_point --------------------------------------- *)
 let non_zero_curve_point =
   library "non_zero_curve_point" ~path:"src/lib/crypto/non_zero_curve_point"
   ~flags:[ atom ":standard"; atom "-short-paths" ]
@@ -914,7 +874,6 @@ let non_zero_curve_point =
        ; Ppx_lib.ppx_custom_printf
        ] )
 
-(* -- signature_lib --------------------------------------------- *)
 let signature_lib =
   library "signature_lib" ~path:"src/lib/crypto/signature_lib"
   ~synopsis:"Schnorr signatures using the tick and tock curves"
@@ -972,7 +931,6 @@ let signature_lib =
        ; Ppx_lib.ppx_let
        ] )
 
-(* -- secrets ---------------------------------------------------- *)
 let secrets =
   library "secrets" ~path:"src/lib/crypto/secrets"
   ~synopsis:"Managing secrets including passwords and keypairs"
@@ -1018,19 +976,16 @@ let secrets =
        ; Ppx_lib.ppx_deriving_make
        ] )
 
-(* -- key_gen ---------------------------------------------------- *)
 let key_gen =
   library "key_gen" ~path:"src/lib/crypto/key_gen"
   ~deps:[ core_kernel; signature_lib ]
   ~ppx:Ppx.minimal
 
-(* -- bowe_gabizon_hash ------------------------------------------ *)
 let bowe_gabizon_hash =
   library "bowe_gabizon_hash" ~path:"src/lib/crypto/bowe_gabizon_hash"
   ~inline_tests:true ~deps:[ core_kernel ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_compare; Ppx_lib.ppx_jane; Ppx_lib.ppx_version ])
 
-(* -- pickles.limb_vector ---------------------------------------- *)
 let pickles_limb_vector =
   library "pickles.limb_vector" ~internal_name:"limb_vector"
   ~path:"src/lib/crypto/pickles/limb_vector"
@@ -1062,7 +1017,6 @@ let pickles_limb_vector =
     ]
   ~ppx:Ppx.mina_rich
 
-(* -- pickles.pseudo --------------------------------------------- *)
 let pickles_pseudo =
   library "pickles.pseudo" ~internal_name:"pseudo"
   ~path:"src/lib/crypto/pickles/pseudo"
@@ -1088,7 +1042,6 @@ let pickles_pseudo =
     ]
   ~ppx:Ppx.mina_rich
 
-(* -- pickles.composition_types ---------------------------------- *)
 let pickles_composition_types =
   library "pickles.composition_types" ~internal_name:"composition_types"
   ~path:"src/lib/crypto/pickles/composition_types"
@@ -1131,7 +1084,6 @@ let pickles_composition_types =
        ; Ppx_lib.h_list_ppx
        ] )
 
-(* -- pickles.plonk_checks -------------------------------------- *)
 let pickles_plonk_checks =
   library "pickles.plonk_checks" ~internal_name:"plonk_checks"
   ~path:"src/lib/crypto/pickles/plonk_checks"
@@ -1189,7 +1141,6 @@ let pickles_plonk_checks =
          ]
     ]
 
-(* -- pickles.backend -------------------------------------------- *)
 let pickles_backend =
   library "pickles.backend" ~internal_name:"backend"
   ~path:"src/lib/crypto/pickles/backend"
@@ -1200,7 +1151,6 @@ let pickles_backend =
     ]
   ~ppx:Ppx.mina_rich
 
-(* -- pickles ---------------------------------------------------- *)
 let pickles =
   library "pickles" ~path:"src/lib/crypto/pickles" ~inline_tests:true
   ~modules_without_implementation:
@@ -1269,4 +1219,15 @@ let pickles =
        ; Ppx_lib.ppx_deriving_yojson
        ; Ppx_lib.h_list_ppx
        ] )
+
+let proof_cache_tag =
+  library "proof_cache_tag" ~path:"src/lib/proof_cache_tag"
+  ~deps:
+    [ core_kernel
+    ; async_kernel
+    ; local "logger"
+    ; local "disk_cache"
+    ; pickles
+    ]
+  ~ppx:Ppx.standard
 

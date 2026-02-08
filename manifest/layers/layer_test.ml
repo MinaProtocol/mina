@@ -6,7 +6,6 @@
 open Manifest
 open Externals
 
-(* -- quickcheck_lib --------------------------------------------- *)
 let quickcheck_lib =
   library "quickcheck_lib" ~path:"src/lib/testing/quickcheck_lib"
   ~inline_tests:true
@@ -21,7 +20,6 @@ let quickcheck_lib =
     (Ppx.custom
        [ Ppx_lib.ppx_version; Ppx_lib.ppx_let; Ppx_lib.ppx_inline_test; Ppx_lib.ppx_custom_printf ] )
 
-(* -- test_util -------------------------------------------------- *)
 let test_util =
   library "test_util" ~path:"src/lib/testing/test_util" ~synopsis:"test utils"
   ~library_flags:[ "-linkall" ]

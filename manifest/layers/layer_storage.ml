@@ -7,21 +7,18 @@ open Manifest
 open Externals
 open Dune_s_expr
 
-(* -- disk_cache.intf -------------------------------------------- *)
 let disk_cache_intf =
   library "disk_cache.intf" ~internal_name:"disk_cache_intf"
   ~path:"src/lib/disk_cache/intf"
   ~deps:[ core_kernel; async_kernel; Layer_infra.logger ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])
 
-(* -- cache_dir (virtual) ---------------------------------------- *)
 let cache_dir =
   library "cache_dir" ~path:"src/lib/cache_dir"
   ~deps:[ async_kernel; local "key_cache"; Layer_infra.logger ]
   ~ppx:Ppx.minimal ~virtual_modules:[ "cache_dir" ]
   ~default_implementation:"cache_dir.native"
 
-(* -- cache_dir.native ------------------------------------------- *)
 let cache_dir_native =
   library "cache_dir.native" ~internal_name:"cache_dir_native"
   ~path:"src/lib/cache_dir/native"
@@ -48,14 +45,12 @@ let cache_dir_native =
        ] )
   ~implements:"cache_dir"
 
-(* -- cache_dir.fake --------------------------------------------- *)
 let cache_dir_fake =
   library "cache_dir.fake" ~internal_name:"cache_dir_fake"
   ~path:"src/lib/cache_dir/fake"
   ~deps:[ async_kernel; core_kernel; local "key_cache" ]
   ~ppx:Ppx.minimal ~implements:"cache_dir"
 
-(* -- rocksdb ---------------------------------------------------- *)
 let rocksdb =
   library "rocksdb" ~path:"src/lib/rocksdb" ~inline_tests:false
   ~library_flags:[ "-linkall" ]
@@ -79,13 +74,11 @@ let rocksdb =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
   ~synopsis:"RocksDB Database module"
 
-(* -- key_cache --------------------------------------------------- *)
 let key_cache =
   library "key_cache" ~path:"src/lib/key_cache"
   ~deps:[ core_kernel; async_kernel ]
   ~ppx:Ppx.minimal
 
-(* -- key_cache.sync ---------------------------------------------- *)
 let key_cache_sync =
   library "key_cache.sync" ~internal_name:"key_cache_sync"
   ~path:"src/lib/key_cache/sync"
@@ -102,7 +95,6 @@ let key_cache_sync =
     (Ppx.custom
        [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_base; Ppx_lib.ppx_here; Ppx_lib.ppx_let ] )
 
-(* -- key_cache.async --------------------------------------------- *)
 let key_cache_async =
   library "key_cache.async" ~internal_name:"key_cache_async"
   ~path:"src/lib/key_cache/async"
@@ -121,14 +113,12 @@ let key_cache_async =
     (Ppx.custom
        [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_base; Ppx_lib.ppx_here; Ppx_lib.ppx_let ] )
 
-(* -- key_cache.native -------------------------------------------- *)
 let key_cache_native =
   library "key_cache.native" ~internal_name:"key_cache_native"
   ~path:"src/lib/key_cache/native"
   ~deps:[ key_cache; key_cache_async; key_cache_sync ]
   ~ppx:Ppx.minimal
 
-(* -- lmdb_storage ------------------------------------------------ *)
 let lmdb_storage =
   library "lmdb_storage" ~path:"src/lib/lmdb_storage"
   ~deps:[ lmdb; Layer_crypto.blake2; Layer_infra.mina_stdlib_unix ]
@@ -141,7 +131,6 @@ let lmdb_storage =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- disk_cache (virtual) ---------------------------------------- *)
 let disk_cache =
   library "disk_cache" ~path:"src/lib/disk_cache"
   ~virtual_modules:[ "disk_cache" ]
@@ -149,7 +138,6 @@ let disk_cache =
   ~deps:[ disk_cache_intf ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])
 
-(* -- disk_cache.filesystem --------------------------------------- *)
 let disk_cache_filesystem =
   library "disk_cache.filesystem" ~internal_name:"disk_cache_filesystem"
   ~path:"src/lib/disk_cache/filesystem" ~inline_tests:true
@@ -166,7 +154,6 @@ let disk_cache_filesystem =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- disk_cache.identity ----------------------------------------- *)
 let disk_cache_identity =
   library "disk_cache.identity" ~internal_name:"disk_cache_identity"
   ~path:"src/lib/disk_cache/identity" ~inline_tests:true
@@ -174,7 +161,6 @@ let disk_cache_identity =
   ~deps:[ async_kernel; core_kernel ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- disk_cache.lmdb --------------------------------------------- *)
 let disk_cache_lmdb =
   library "disk_cache.lmdb" ~internal_name:"disk_cache_lmdb"
   ~path:"src/lib/disk_cache/lmdb" ~inline_tests:true ~implements:"disk_cache"
@@ -189,7 +175,6 @@ let disk_cache_lmdb =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_mina ])
 
-(* -- disk_cache.test_lib ----------------------------------------- *)
 let disk_cache_test_lib =
   library "disk_cache.test_lib" ~internal_name:"disk_cache_test_lib"
   ~path:"src/lib/disk_cache/test_lib"
@@ -203,7 +188,6 @@ let disk_cache_test_lib =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- disk_cache/test --------------------------------------------- *)
 (* library: test_cache_deadlock_lib *)
 let test_cache_deadlock_lib =
   private_library ~path:"src/lib/disk_cache/test"
@@ -238,14 +222,12 @@ let () =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version ])
   ~flags:[ list [ atom ":standard"; atom "-w"; atom "+a" ] ]
 
-(* -- disk_cache.utils -------------------------------------------- *)
 let disk_cache_utils =
   library "disk_cache.utils" ~internal_name:"disk_cache_utils"
   ~path:"src/lib/disk_cache/utils"
   ~deps:[ core; async; Layer_infra.mina_stdlib_unix; Layer_infra.logger ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- zkapp_vk_cache_tag ------------------------------------------- *)
 let zkapp_vk_cache_tag =
   library "zkapp_vk_cache_tag" ~path:"src/lib/zkapp_vk_cache_tag"
   ~deps:

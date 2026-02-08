@@ -6,7 +6,6 @@
 open Manifest
 open Externals
 
-(* -- internal_tracing.context_call ------------------------------ *)
 let internal_tracing_context_call =
   library "internal_tracing.context_call"
   ~internal_name:"internal_tracing_context_call"
@@ -18,7 +17,6 @@ let internal_tracing_context_call =
     (Ppx.custom
        [ Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_deriving_yojson ] )
 
-(* -- internal_tracing ------------------------------------------- *)
 let internal_tracing =
   library "internal_tracing" ~path:"src/lib/internal_tracing"
   ~synopsis:"Internal tracing" ~library_flags:[ "-linkall" ]
@@ -37,21 +35,18 @@ let internal_tracing =
     (Ppx.custom
        [ Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_deriving_yojson ] )
 
-(* -- mina_metrics (virtual) ------------------------------------- *)
 let mina_metrics =
   library "mina_metrics" ~path:"src/lib/mina_metrics"
   ~deps:[ async_kernel; logger; uri; core_kernel ]
   ~ppx:Ppx.minimal ~virtual_modules:[ "mina_metrics" ]
   ~default_implementation:"mina_metrics.prometheus"
 
-(* -- mina_metrics.none ------------------------------------------ *)
 let mina_metrics_none =
   library "mina_metrics.none" ~internal_name:"mina_metrics_none"
   ~path:"src/lib/mina_metrics/no_metrics"
   ~deps:[ async_kernel; logger; uri; core_kernel ]
   ~ppx:Ppx.minimal ~implements:"mina_metrics"
 
-(* -- mina_metrics.prometheus ------------------------------------ *)
 let mina_metrics_prometheus =
   library "mina_metrics.prometheus" ~internal_name:"mina_metrics_prometheus"
   ~path:"src/lib/mina_metrics/prometheus_metrics"

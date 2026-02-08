@@ -3,7 +3,6 @@
 open Manifest
 open Externals
 
-(* -- zkapp_test_transaction_lib (library) --------------------------- *)
 let zkapp_test_transaction_lib =
   library "zkapp_test_transaction_lib"
   ~path:"src/app/zkapp_test_transaction/lib" ~inline_tests:true
@@ -71,7 +70,6 @@ let zkapp_test_transaction_lib =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- zkapp_test_transaction (executable) ---------------------------- *)
 let () =
   executable "zkapp_test_transaction" ~package:"zkapp_test_transaction"
   ~path:"src/app/zkapp_test_transaction"

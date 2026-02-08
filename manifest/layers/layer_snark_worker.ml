@@ -6,7 +6,6 @@
 open Manifest
 open Externals
 
-(* -- ledger_proof --------------------------------------------------------- *)
 let ledger_proof =
   library "ledger_proof" ~path:"src/lib/ledger_proof"
   ~deps:
@@ -16,7 +15,7 @@ let ledger_proof =
     ; Layer_consensus.mina_state
     ; Layer_transaction.mina_transaction_logic
     ; Layer_ppx.ppx_version_runtime
-    ; Layer_base.proof_cache_tag
+    ; Layer_crypto.proof_cache_tag
     ; Layer_domain.proof_carrying_data
     ]
   ~ppx:
@@ -29,7 +28,6 @@ let ledger_proof =
        ; Ppx_lib.ppx_deriving_yojson
        ] )
 
-(* -- transaction_snark_work ----------------------------------------------- *)
 let transaction_snark_work =
   library "transaction_snark_work" ~path:"src/lib/transaction_snark_work"
   ~deps:
@@ -57,7 +55,6 @@ let transaction_snark_work =
     (Ppx.custom
        [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version; Ppx_lib.ppx_compare; Ppx_lib.ppx_deriving_yojson ] )
 
-(* -- transaction_snark_scan_state ----------------------------------------- *)
 let transaction_snark_scan_state =
   library "transaction_snark_scan_state"
   ~path:"src/lib/transaction_snark_scan_state" ~library_flags:[ "-linkall" ]
@@ -117,7 +114,6 @@ let transaction_snark_scan_state =
        ] )
   ~synopsis:"Transaction-snark specialization of the parallel scan state"
 
-(* -- snark_work_lib ------------------------------------------------------- *)
 let snark_work_lib =
   library "snark_work_lib" ~path:"src/lib/snark_work_lib" ~inline_tests:true
   ~modules_without_implementation:[ "combined_result" ]
@@ -141,7 +137,6 @@ let snark_work_lib =
        [ Ppx_lib.ppx_deriving_yojson; Ppx_lib.ppx_mina; Ppx_lib.ppx_jane; Ppx_lib.ppx_version ] )
   ~synopsis:"Snark work types"
 
-(* -- snark_worker --------------------------------------------------------- *)
 let snark_worker =
   library "snark_worker" ~path:"src/lib/snark_worker"
   ~library_flags:[ "-linkall" ]
@@ -204,7 +199,6 @@ let snark_worker =
        ] )
   ~synopsis:"Lib powering the snark_worker interactions with the daemon"
 
-(* -- work_selector -------------------------------------------------------- *)
 let work_selector =
   library "work_selector" ~path:"src/lib/work_selector"
   ~library_flags:[ "-linkall" ] ~inline_tests:true
@@ -258,7 +252,6 @@ let work_selector =
        ] )
   ~synopsis:"Selecting work to distribute"
 
-(* -- work_partitioner ----------------------------------------------------- *)
 let work_partitioner =
   library "work_partitioner" ~path:"src/lib/work_partitioner"
   ~library_flags:[ "-linkall" ]

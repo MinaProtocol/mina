@@ -4,7 +4,6 @@
 open Manifest
 open Externals
 
-(* -- archive_hardfork_toolbox.lib (library) ------------------------- *)
 let archive_hardfork_toolbox_lib =
   library "archive_hardfork_toolbox.lib"
   ~internal_name:"archive_hardfork_toolbox_lib"
@@ -59,7 +58,6 @@ let archive_hardfork_toolbox_lib =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- archive_hardfork_toolbox (executable) -------------------------- *)
 let () =
   executable "archive_hardfork_toolbox" ~package:"archive_hardfork_toolbox"
   ~path:"src/app/archive_hardfork_toolbox"
@@ -116,7 +114,6 @@ let () =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- test_convert_canonical (test) ---------------------------------- *)
 let () =
   test "test_convert_canonical" ~path:"src/app/archive_hardfork_toolbox/tests"
   ~modules:[ "test_convert_canonical" ]

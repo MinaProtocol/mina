@@ -7,7 +7,6 @@ open Manifest
 open Externals
 open Dune_s_expr
 
-(* -- protocol_version --------------------------------------------- *)
 let protocol_version =
   library "protocol_version" ~path:"src/lib/protocol_version"
   ~library_flags:[ "-linkall" ]
@@ -32,7 +31,6 @@ let protocol_version =
        ] )
   ~synopsis:"Protocol version representation"
 
-(* -- transaction_protocol_state ---------------------------------- *)
 let transaction_protocol_state =
   library "transaction_protocol_state"
   ~path:"src/lib/transaction_protocol_state" ~inline_tests:true
@@ -62,7 +60,6 @@ let transaction_protocol_state =
        ] )
   ~synopsis:"Transaction protocol state library"
 
-(* -- zkapp_command_builder ---------------------------------------- *)
 let zkapp_command_builder =
   library "zkapp_command_builder" ~path:"src/lib/zkapp_command_builder"
   ~library_flags:[ "-linkall" ]
@@ -96,7 +93,6 @@ let zkapp_command_builder =
        ] )
   ~synopsis:"Builder Zkapp_command.t via combinators"
 
-(* -- transaction_snark -------------------------------------------- *)
 let transaction_snark =
   library "transaction_snark" ~path:"src/lib/transaction_snark"
   ~inline_tests:true ~library_flags:[ "-linkall" ]
@@ -167,7 +163,6 @@ let transaction_snark =
        ] )
   ~synopsis:"Transaction state transition snarking library"
 
-(* -- blockchain_snark --------------------------------------------- *)
 let blockchain_snark =
   library "blockchain_snark" ~path:"src/lib/blockchain_snark" ~inline_tests:true
   ~flags:[ atom ":standard"; atom "-warn-error"; atom "+a" ]
@@ -211,7 +206,6 @@ let blockchain_snark =
        [ Ppx_lib.ppx_compare; Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_snarky; Ppx_lib.ppx_version ] )
   ~synopsis:"blockchain state transition snarking library"
 
-(* -- print_blockchain_snark_vk ------------------------------------ *)
 let () = private_executable
   ~path:"src/lib/blockchain_snark/tests/print_blockchain_snark_vk"
   ~deps:
@@ -245,7 +239,6 @@ let () = private_executable
     ]
   "print_blockchain_snark_vk"
 
-(* -- print_transaction_snark_vk ----------------------------------- *)
 let () =
   private_executable
   ~path:"src/lib/transaction_snark/test/print_transaction_snark_vk"
@@ -282,7 +275,6 @@ let () =
     ]
   "print_transaction_snark_vk"
 
-(* -- transaction_snark_tests (main test library) ------------------ *)
 let transaction_snark_tests =
   library "transaction_snark_tests" ~path:"src/lib/transaction_snark/test"
   ~inline_tests:true ~inline_tests_deps:[ "proof_cache.json" ]
@@ -350,7 +342,6 @@ let transaction_snark_tests =
        ; Ppx_lib.ppx_sexp_conv
        ] )
 
-(* -- constraint_count --------------------------------------------- *)
 let () =
   file_stanzas ~path:"src/lib/transaction_snark/test/constraint_count"
   [ "tests"
@@ -368,7 +359,6 @@ let () =
        ]
   ]
 
-(* -- access_permission -------------------------------------------- *)
 let transaction_snark_tests_access_permission =
   private_library "transaction_snark_tests_access_permission"
   ~path:"src/lib/transaction_snark/test/access_permission" ~inline_tests:true
@@ -419,7 +409,6 @@ let transaction_snark_tests_access_permission =
   ~ppx:
     (Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_sexp_conv ])
 
-(* -- account_timing ----------------------------------------------- *)
 let account_timing_tests =
   private_library "account_timing_tests"
   ~path:"src/lib/transaction_snark/test/account_timing" ~inline_tests:true
@@ -471,7 +460,6 @@ let account_timing_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- account_update_network_id ------------------------------------ *)
 let account_update_network_id =
   private_library "account_update_network_id"
   ~path:"src/lib/transaction_snark/test/account_update_network_id"
@@ -513,7 +501,6 @@ let account_update_network_id =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_mina ])
 
-(* -- app_state ---------------------------------------------------- *)
 let app_state_tests =
   private_library "app_state_tests"
   ~path:"src/lib/transaction_snark/test/app_state" ~inline_tests:true
@@ -547,7 +534,6 @@ let app_state_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- delegate ----------------------------------------------------- *)
 let delegate_tests =
   private_library "delegate_tests"
   ~path:"src/lib/transaction_snark/test/delegate" ~inline_tests:true
@@ -581,7 +567,6 @@ let delegate_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- fee_payer ---------------------------------------------------- *)
 let fee_payer_tests =
   private_library "fee_payer_tests"
   ~path:"src/lib/transaction_snark/test/fee_payer" ~inline_tests:true
@@ -622,7 +607,6 @@ let fee_payer_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- multisig_account --------------------------------------------- *)
 let multisig_tests =
   private_library "multisig_tests"
   ~path:"src/lib/transaction_snark/test/multisig_account" ~inline_tests:true
@@ -672,7 +656,6 @@ let multisig_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- permissions -------------------------------------------------- *)
 let permissions_tests =
   private_library "permissions_tests"
   ~path:"src/lib/transaction_snark/test/permissions" ~inline_tests:true
@@ -706,7 +689,6 @@ let permissions_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- token_symbol ------------------------------------------------- *)
 let token_symbol_tests =
   private_library "token_symbol_tests"
   ~path:"src/lib/transaction_snark/test/token_symbol" ~inline_tests:true
@@ -741,7 +723,6 @@ let token_symbol_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- transaction_union -------------------------------------------- *)
 let transaction_union_tests =
   private_library "transaction_union_tests"
   ~path:"src/lib/transaction_snark/test/transaction_union" ~inline_tests:true
@@ -788,7 +769,6 @@ let transaction_union_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- verification_key --------------------------------------------- *)
 let verification_key_tests =
   private_library "verification_key_tests"
   ~path:"src/lib/transaction_snark/test/verification_key" ~inline_tests:true
@@ -827,7 +807,6 @@ let verification_key_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- verification_key_permission ---------------------------------- *)
 let verification_key_permission_tests =
   private_library "verification_key_permission_tests"
   ~path:"src/lib/transaction_snark/test/verification_key_permission"
@@ -863,7 +842,6 @@ let verification_key_permission_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- verify-simple-test ------------------------------------------- *)
 let transaction_snark_tests_verify_simple_test =
   private_library "transaction_snark_tests_verify_simple_test"
   ~path:"src/lib/transaction_snark/test/verify-simple-test" ~inline_tests:true
@@ -919,7 +897,6 @@ let transaction_snark_tests_verify_simple_test =
   ~ppx:
     (Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_sexp_conv ])
 
-(* -- voting_for --------------------------------------------------- *)
 let voting_for_tests =
   private_library "voting_for_tests"
   ~path:"src/lib/transaction_snark/test/voting_for" ~inline_tests:true
@@ -958,7 +935,6 @@ let voting_for_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- zkapp_deploy ------------------------------------------------- *)
 let zkapp_deploy_tests =
   private_library "zkapp_deploy_tests"
   ~path:"src/lib/transaction_snark/test/zkapp_deploy" ~inline_tests:true
@@ -996,7 +972,6 @@ let zkapp_deploy_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- zkapp_fuzzy (executable) ------------------------------------- *)
 let () =
   private_executable ~path:"src/lib/transaction_snark/test/zkapp_fuzzy"
   ~link_flags:[ "-linkall" ]
@@ -1043,7 +1018,6 @@ let () =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
   "zkapp_fuzzy"
 
-(* -- zkapp_payments ----------------------------------------------- *)
 let zkapp_payments_tests =
   private_library "zkapp_payments_tests"
   ~path:"src/lib/transaction_snark/test/zkapp_payments" ~inline_tests:true
@@ -1085,7 +1059,6 @@ let zkapp_payments_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_mina ])
 
-(* -- zkapp_preconditions ------------------------------------------ *)
 let account_update_precondition_tests =
   private_library "account_update_precondition_tests"
   ~path:"src/lib/transaction_snark/test/zkapp_preconditions"
@@ -1132,7 +1105,6 @@ let account_update_precondition_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- zkapp_tokens ------------------------------------------------- *)
 let zkapp_tokens_tests =
   private_library "zkapp_tokens_tests"
   ~path:"src/lib/transaction_snark/test/zkapp_tokens" ~inline_tests:true
@@ -1164,7 +1136,6 @@ let zkapp_tokens_tests =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_snarky; Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_mina ])
 
-(* -- zkapp_uri ---------------------------------------------------- *)
 let zkapp_uri_tests =
   private_library "zkapp_uri_tests"
   ~path:"src/lib/transaction_snark/test/zkapp_uri" ~inline_tests:true

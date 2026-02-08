@@ -6,7 +6,6 @@
 open Manifest
 open Externals
 
-(* -- verifier ------------------------------------------------------------- *)
 let verifier =
   library "verifier" ~path:"src/lib/verifier"
   ~deps:
@@ -61,7 +60,6 @@ let verifier =
        ; Ppx_lib.ppx_register_event
        ] )
 
-(* -- prover --------------------------------------------------------------- *)
 let prover =
   library "prover" ~path:"src/lib/prover"
   ~deps:

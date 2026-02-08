@@ -6,7 +6,6 @@
 open Manifest
 open Externals
 
-(* -- rosetta (executable) ------------------------------------------- *)
 let () =
   executable "rosetta" ~package:"rosetta" ~path:"src/app/rosetta"
   ~modules:[ "rosetta" ] ~modes:[ "native" ]
@@ -23,7 +22,6 @@ let () =
     ]
   ~ppx:Ppx.minimal
 
-(* -- rosetta-testnet (executable) ----------------------------------- *)
 let () =
   executable "rosetta-testnet" ~internal_name:"rosetta_testnet_signatures"
   ~package:"rosetta" ~path:"src/app/rosetta"
@@ -43,7 +41,6 @@ let () =
     ]
   ~ppx:Ppx.minimal
 
-(* -- rosetta-mainnet (executable) ----------------------------------- *)
 let () =
   executable "rosetta-mainnet" ~internal_name:"rosetta_mainnet_signatures"
   ~package:"rosetta" ~path:"src/app/rosetta"
@@ -63,7 +60,6 @@ let () =
     ]
   ~ppx:Ppx.minimal
 
-(* -- lib (rosetta library) ------------------------------------------ *)
 let lib =
   library "lib" ~path:"src/app/rosetta/lib" ~inline_tests:true
   ~deps:
@@ -142,7 +138,6 @@ let lib =
        ; "%{read-lines:../../../graphql-ppx-config.inc}"
        ] )
 
-(* -- signer_cli (library) ------------------------------------------- *)
 let signer_cli =
   library "signer.cli" ~internal_name:"signer_cli"
   ~path:"src/app/rosetta/ocaml-signer" ~modules:[ "signer_cli" ]
@@ -180,7 +175,6 @@ let signer_cli =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- signer (executable) -------------------------------------------- *)
 let () =
   executable "signer" ~package:"signer" ~path:"src/app/rosetta/ocaml-signer"
   ~modules:[ "signer" ] ~modes:[ "native" ]
@@ -197,7 +191,6 @@ let () =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- signer-testnet (executable) ------------------------------------ *)
 let () =
   executable "signer-testnet" ~internal_name:"signer_testnet_signatures"
   ~package:"signer" ~path:"src/app/rosetta/ocaml-signer"
@@ -216,7 +209,6 @@ let () =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- signer-mainnet (executable) ------------------------------------ *)
 let () =
   executable "signer-mainnet" ~internal_name:"signer_mainnet_signatures"
   ~package:"signer" ~path:"src/app/rosetta/ocaml-signer"
@@ -235,7 +227,6 @@ let () =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- indexer_test (test, disabled) ---------------------------------- *)
 let () =
   test "indexer_test" ~path:"src/app/rosetta/indexer_test" ~enabled_if:"false"
   ~deps:

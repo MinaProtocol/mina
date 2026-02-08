@@ -7,11 +7,8 @@ open Manifest
 open Externals
 open Dune_s_expr
 
-(* ================================================================ *)
 (* Core Domain Libraries                                            *)
-(* ================================================================ *)
 
-(* -- hash_prefix_states ------------------------------------------ *)
 let hash_prefix_states =
   library "hash_prefix_states" ~path:"src/lib/hash_prefix_states"
   ~inline_tests:true ~library_flags:[ "-linkall" ]
@@ -39,7 +36,6 @@ let hash_prefix_states =
     "Values corresponding to the internal state of the Pedersen hash \
      function on the prefixes used in Coda"
 
-(* -- hash_prefix_create (virtual) -------------------------------- *)
 let hash_prefix_create =
   library "hash_prefix_create"
   ~path:"src/lib/hash_prefix_states/hash_prefix_create"
@@ -47,14 +43,12 @@ let hash_prefix_create =
   ~virtual_modules:[ "hash_prefix_create" ]
   ~default_implementation:"hash_prefix_create.native" ~ppx:Ppx.minimal
 
-(* -- hash_prefix_create.native ----------------------------------- *)
 let hash_prefix_create_native =
   library "hash_prefix_create.native" ~internal_name:"hash_prefix_create_native"
   ~path:"src/lib/hash_prefix_states/hash_prefix_create/native"
   ~deps:[ Layer_crypto.random_oracle ]
   ~implements:"hash_prefix_create" ~ppx:Ppx.minimal
 
-(* -- hash_prefix_create.js --------------------------------------- *)
 let hash_prefix_create_js =
   library "hash_prefix_create.js" ~internal_name:"hash_prefix_create_js"
   ~path:"src/lib/hash_prefix_states/hash_prefix_create/js"
@@ -62,7 +56,6 @@ let hash_prefix_create_js =
     [ js_of_ocaml; base; core_kernel; Layer_crypto.pickles; Layer_crypto.random_oracle ]
   ~implements:"hash_prefix_create" ~ppx:Ppx.minimal
 
-(* -- data_hash_lib ----------------------------------------------- *)
 let data_hash_lib =
   library "data_hash_lib" ~path:"src/lib/data_hash_lib" ~inline_tests:true
   ~library_flags:[ "-linkall" ]
@@ -109,7 +102,6 @@ let data_hash_lib =
        ] )
   ~synopsis:"Data hash"
 
-(* -- block_time -------------------------------------------------- *)
 let block_time =
   library "block_time" ~path:"src/lib/block_time" ~inline_tests:true
   ~library_flags:[ "-linkall" ]
@@ -152,7 +144,6 @@ let block_time =
        ] )
   ~synopsis:"Block time"
 
-(* -- proof_carrying_data ----------------------------------------- *)
 let proof_carrying_data =
   library "proof_carrying_data" ~path:"src/lib/proof_carrying_data"
   ~deps:
@@ -166,7 +157,6 @@ let proof_carrying_data =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_deriving_yojson; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- genesis_constants ------------------------------------------- *)
 let genesis_constants =
   library "genesis_constants" ~path:"src/lib/genesis_constants"
   ~inline_tests:true ~library_flags:[ "-linkall" ]
@@ -214,7 +204,6 @@ let genesis_constants =
        ] )
   ~synopsis:"Coda genesis constants"
 
-(* -- network_peer ------------------------------------------------ *)
 let network_peer =
   library "network_peer" ~path:"src/lib/network_peer"
   ~deps:
@@ -242,7 +231,6 @@ let network_peer =
        ; Ppx_lib.ppx_deriving_yojson
        ] )
 
-(* -- node_addrs_and_ports ---------------------------------------- *)
 let node_addrs_and_ports =
   library "node_addrs_and_ports" ~path:"src/lib/node_addrs_and_ports"
   ~inline_tests:true
@@ -262,7 +250,6 @@ let node_addrs_and_ports =
     (Ppx.custom
        [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_let; Ppx_lib.ppx_deriving_yojson ] )
 
-(* -- user_command_input ------------------------------------------ *)
 let user_command_input =
   library "user_command_input" ~path:"src/lib/user_command_input"
   ~deps:
@@ -294,7 +281,6 @@ let user_command_input =
        ; Ppx_lib.ppx_deriving_make
        ] )
 
-(* -- fields_derivers --------------------------------------------- *)
 let fields_derivers =
   library "fields_derivers" ~path:"src/lib/fields_derivers" ~inline_tests:true
   ~deps:[ core_kernel; fieldslib; ppx_inline_test_config ]
@@ -309,7 +295,6 @@ let fields_derivers =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- fields_derivers.json ---------------------------------------- *)
 let fields_derivers_json =
   library "fields_derivers.json" ~internal_name:"fields_derivers_json"
   ~path:"src/lib/fields_derivers_json" ~inline_tests:true
@@ -333,7 +318,6 @@ let fields_derivers_json =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- fields_derivers.graphql ------------------------------------- *)
 let fields_derivers_graphql =
   library "fields_derivers.graphql" ~internal_name:"fields_derivers_graphql"
   ~path:"src/lib/fields_derivers_graphql" ~inline_tests:true
@@ -359,7 +343,6 @@ let fields_derivers_graphql =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- fields_derivers.zkapps -------------------------------------- *)
 let fields_derivers_zkapps =
   library "fields_derivers.zkapps" ~internal_name:"fields_derivers_zkapps"
   ~path:"src/lib/fields_derivers_zkapps"
@@ -397,7 +380,6 @@ let fields_derivers_zkapps =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- parallel_scan ----------------------------------------------- *)
 let parallel_scan =
   library "parallel_scan" ~path:"src/lib/parallel_scan" ~inline_tests:true
   ~library_flags:[ "-linkall" ]
@@ -429,7 +411,6 @@ let parallel_scan =
        ] )
   ~synopsis:"Parallel scan over an infinite stream (incremental map-reduce)"
 
-(* -- dummy_values ------------------------------------------------ *)
 let dummy_values =
   library "dummy_values" ~path:"src/lib/dummy_values"
   ~flags:[ atom ":standard"; atom "-short-paths" ]
@@ -456,7 +437,6 @@ let dummy_values =
         ]
     ]
 
-(* -- gen_values (executable) ------------------------------------- *)
 let () =
   private_executable ~path:"src/lib/dummy_values/gen_values"
   ~deps:
@@ -483,7 +463,6 @@ let () =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppxlib_metaquot ])
   ~link_flags:[ "-linkall" ] ~modes:[ "native" ] "gen_values"
 
-(* -- mina_base.test_helpers -------------------------------------- *)
 let mina_base_test_helpers =
   library "mina_base.test_helpers" ~internal_name:"mina_base_test_helpers"
   ~path:"src/lib/mina_base/test/helpers"

@@ -3,7 +3,6 @@
 open Manifest
 open Externals
 
-(* -- zkapps_examples (library) -------------------------------------- *)
 let zkapps_examples =
   library "zkapps_examples" ~path:"src/app/zkapps_examples"
   ~deps:
@@ -36,7 +35,6 @@ let zkapps_examples =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_let; Ppx_lib.ppx_version ])
 
-(* -- zkapps_actions (library) --------------------------------------- *)
 let zkapps_actions =
   private_library "zkapps_actions" ~path:"src/app/zkapps_examples/actions"
   ~deps:
@@ -54,7 +52,6 @@ let zkapps_actions =
     ]
   ~ppx:Ppx.minimal
 
-(* -- zkapps_add_events (library) ------------------------------------ *)
 let zkapps_add_events =
   private_library "zkapps_add_events" ~path:"src/app/zkapps_examples/add_events"
   ~deps:
@@ -72,7 +69,6 @@ let zkapps_add_events =
     ]
   ~ppx:Ppx.minimal
 
-(* -- zkapps_big_circuit (library) ----------------------------------- *)
 let zkapps_big_circuit =
   private_library "zkapps_big_circuit"
   ~path:"src/app/zkapps_examples/big_circuit"
@@ -100,7 +96,6 @@ let zkapps_big_circuit =
     ]
   ~ppx:Ppx.minimal
 
-(* -- zkapps_calls (library) ----------------------------------------- *)
 let zkapps_calls =
   private_library "zkapps_calls" ~path:"src/app/zkapps_examples/calls"
   ~deps:
@@ -130,7 +125,6 @@ let zkapps_calls =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.h_list_ppx; Ppx_lib.ppx_version ])
 
-(* -- zkapps_empty_update (library) ---------------------------------- *)
 let zkapps_empty_update =
   private_library "zkapps_empty_update"
   ~path:"src/app/zkapps_examples/empty_update"
@@ -157,7 +151,6 @@ let zkapps_empty_update =
     ]
   ~ppx:Ppx.minimal
 
-(* -- zkapps_initialize_state (library) ------------------------------ *)
 let zkapps_initialize_state =
   private_library "zkapps_initialize_state"
   ~path:"src/app/zkapps_examples/initialize_state"
@@ -185,7 +178,6 @@ let zkapps_initialize_state =
     ]
   ~ppx:Ppx.minimal
 
-(* -- zkapps_tokens (library) ---------------------------------------- *)
 let zkapps_tokens =
   private_library "zkapps_tokens" ~path:"src/app/zkapps_examples/tokens"
   ~deps:
@@ -221,7 +213,6 @@ let zkapps_tokens =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.h_list_ppx; Ppx_lib.ppx_let; Ppx_lib.ppx_version ])
 
-(* -- tokens (test library) ------------------------------------------ *)
 let tokens =
   private_library "tokens" ~path:"src/app/zkapps_examples/test/tokens"
   ~inline_tests:true
@@ -268,7 +259,6 @@ let tokens =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_snarky; Ppx_lib.ppx_version ])
 
-(* -- actions (test) ------------------------------------------------- *)
 let () =
   test "actions" ~path:"src/app/zkapps_examples/test/actions"
   ~deps:
@@ -312,7 +302,6 @@ let () =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version ])
 
-(* -- add_events (test) ---------------------------------------------- *)
 let () =
   test "add_events" ~path:"src/app/zkapps_examples/test/add_events"
   ~deps:
@@ -350,7 +339,6 @@ let () =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version ])
 
-(* -- big_circuit (test) --------------------------------------------- *)
 let () =
   test "big_circuit" ~path:"src/app/zkapps_examples/test/big_circuit"
   ~deps:
@@ -395,7 +383,6 @@ let () =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_snarky; Ppx_lib.ppx_version ])
 
-(* -- calls (test) --------------------------------------------------- *)
 let () =
   test "calls" ~path:"src/app/zkapps_examples/test/calls"
   ~deps:
@@ -440,7 +427,6 @@ let () =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_snarky; Ppx_lib.ppx_version ])
 
-(* -- empty_update (test) -------------------------------------------- *)
 let () =
   test "empty_update" ~path:"src/app/zkapps_examples/test/empty_update"
   ~deps:
@@ -486,7 +472,6 @@ let () =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_snarky; Ppx_lib.ppx_version ])
 
-(* -- initialize_state (test) ---------------------------------------- *)
 let () =
   test "initialize_state" ~path:"src/app/zkapps_examples/test/initialize_state"
   ~deps:
@@ -531,7 +516,6 @@ let () =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_snarky; Ppx_lib.ppx_version ])
 
-(* -- zkapp_optional_custom_gates_tests (test) ----------------------- *)
 let () =
   test "zkapp_optional_custom_gates_tests"
   ~path:"src/app/zkapps_examples/test/optional_custom_gates"

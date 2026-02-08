@@ -6,7 +6,6 @@
 open Manifest
 open Externals
 
-(* -- snark_bits ------------------------------------------------- *)
 let snark_bits =
   library "snark_bits" ~path:"src/lib/crypto/snark_bits"
   ~synopsis:"Snark parameters" ~library_flags:[ "-linkall" ]

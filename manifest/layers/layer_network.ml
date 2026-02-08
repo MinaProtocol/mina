@@ -6,11 +6,8 @@
 open Manifest
 open Externals
 
-(* ================================================================ *)
 (* Blockchain & Network Layer                                       *)
-(* ================================================================ *)
 
-(* -- mina_block ---------------------------------------------------- *)
 let mina_block =
   library "mina_block" ~path:"src/lib/mina_block"
   ~deps:
@@ -71,7 +68,6 @@ let mina_block =
        ; Ppx_lib.ppx_deriving_yojson
        ] )
 
-(* -- mina_block/tests ---------------------------------------------- *)
 let () =
   file_stanzas ~path:"src/lib/mina_block/tests"
   (Dune_s_expr.parse_string
@@ -118,7 +114,6 @@ let () =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version ])
 
-(* -- staged_ledger ------------------------------------------------- *)
 let staged_ledger =
   library "staged_ledger" ~path:"src/lib/staged_ledger"
   ~library_flags:[ "-linkall" ] ~inline_tests:true
@@ -197,7 +192,6 @@ let staged_ledger =
        ] )
   ~synopsis:"Staged Ledger updates the current ledger with new transactions"
 
-(* -- snark_worker/standalone --------------------------------------- *)
 let () =
   executable "mina-standalone-snark-worker" ~internal_name:"run_snark_worker"
   ~package:"mina_snark_worker" ~path:"src/lib/snark_worker/standalone"
@@ -235,7 +229,6 @@ let () =
        ; {|%{read-lines:../../../graphql-ppx-config.inc}|}
        ] )
 
-(* -- genesis_ledger_helper/lib ------------------------------------- *)
 let genesis_ledger_helper_lib =
   library "genesis_ledger_helper.lib" ~internal_name:"genesis_ledger_helper_lib"
   ~path:"src/lib/genesis_ledger_helper/lib" ~inline_tests:true
@@ -282,7 +275,6 @@ let genesis_ledger_helper_lib =
        ; Ppx_lib.ppx_custom_printf
        ] )
 
-(* -- genesis_ledger_helper ----------------------------------------- *)
 let genesis_ledger_helper =
   library "genesis_ledger_helper" ~path:"src/lib/genesis_ledger_helper"
   ~inline_tests:true
@@ -340,7 +332,6 @@ let genesis_ledger_helper =
        ; Ppx_lib.ppx_custom_printf
        ] )
 
-(* -- vrf_lib/tests ------------------------------------------------- *)
 let vrf_lib_tests =
   library "vrf_lib_tests" ~path:"src/lib/vrf_lib/tests"
   ~library_flags:[ "-linkall" ] ~inline_tests:true
@@ -378,7 +369,6 @@ let vrf_lib_tests =
     (Ppx.custom
        [ Ppx_lib.h_list_ppx; Ppx_lib.ppx_bench; Ppx_lib.ppx_compare; Ppx_lib.ppx_jane; Ppx_lib.ppx_version ] )
 
-(* -- vrf_evaluator ------------------------------------------------- *)
 let vrf_evaluator =
   library "vrf_evaluator" ~path:"src/lib/vrf_evaluator"
   ~deps:
@@ -410,7 +400,6 @@ let vrf_evaluator =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- snark_profiler_lib -------------------------------------------- *)
 let snark_profiler_lib =
   library "snark_profiler_lib" ~path:"src/lib/snark_profiler_lib"
   ~deps:
@@ -494,7 +483,6 @@ let snark_profiler_lib =
        ; Ppx_lib.ppx_variants_conv
        ] )
 
-(* -- rosetta_lib --------------------------------------------------- *)
 let rosetta_lib =
   library "rosetta_lib" ~path:"src/lib/rosetta_lib"
   ~library_flags:[ "-linkall" ]
@@ -536,7 +524,6 @@ let rosetta_lib =
        ] )
   ~synopsis:"Rosetta-related support code"
 
-(* -- generated_graphql_queries ------------------------------------- *)
 let generated_graphql_queries =
   library "generated_graphql_queries" ~path:"src/lib/generated_graphql_queries"
   ~preprocessor_deps:
@@ -572,7 +559,6 @@ let generated_graphql_queries =
       |> List.hd
     ]
 
-(* -- generated_graphql_queries/gen --------------------------------- *)
 let () =
   private_executable ~path:"src/lib/generated_graphql_queries/gen"
   ~modes:[ "native" ]
@@ -594,19 +580,16 @@ let () =
        [ Ppx_lib.ppx_base; Ppx_lib.ppx_version; Ppx_lib.ppxlib_metaquot; Ppx_lib.graphql_ppx ] )
   "gen"
 
-(* -- mina_incremental ---------------------------------------------- *)
 let mina_incremental =
   library "mina_incremental" ~path:"src/lib/mina_incremental"
   ~deps:[ incremental; Layer_base.pipe_lib; async_kernel ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version ])
 
-(* -- mina_plugins -------------------------------------------------- *)
 let mina_plugins =
   library "mina_plugins" ~path:"src/lib/mina_plugins"
   ~deps:[ core_kernel; dynlink; core; base; local "mina_lib"; Layer_infra.logger ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])
 
-(* -- mina_plugins/examples/do_nothing ------------------------------ *)
 let plugin_do_nothing =
   private_library ~path:"src/lib/mina_plugins/examples/do_nothing"
   ~deps:
@@ -619,11 +602,8 @@ let plugin_do_nothing =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_mina ])
   "plugin_do_nothing"
 
-(* ================================================================ *)
 (* Networking & Frontier Layer                                      *)
-(* ================================================================ *)
 
-(* -- gossip_net ---------------------------------------------------- *)
 let gossip_net =
   library "gossip_net" ~path:"src/lib/gossip_net" ~library_flags:[ "-linkall" ]
   ~inline_tests:true
@@ -684,7 +664,6 @@ let gossip_net =
        ] )
   ~synopsis:"Gossip Network"
 
-(* -- mina_net2 ----------------------------------------------------- *)
 let mina_net2 =
   library "mina_net2" ~path:"src/lib/mina_net2" ~inline_tests:true
   ~deps:
@@ -732,7 +711,6 @@ let mina_net2 =
        ; Ppx_lib.ppx_deriving_yojson
        ] )
 
-(* -- mina_net2/tests ----------------------------------------------- *)
 let mina_net2_tests =
   private_library ~path:"src/lib/mina_net2/tests" ~inline_tests:true
   ~deps:
@@ -756,7 +734,6 @@ let mina_net2_tests =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])
   "mina_net2_tests"
 
-(* -- mina_networking ----------------------------------------------- *)
 let mina_networking =
   library "mina_networking" ~path:"src/lib/mina_networking"
   ~library_flags:[ "-linkall" ] ~inline_tests:true
@@ -834,7 +811,6 @@ let mina_networking =
        ] )
   ~synopsis:"Networking layer for coda"
 
-(* -- network_pool -------------------------------------------------- *)
 let network_pool =
   library "network_pool" ~path:"src/lib/network_pool" ~inline_tests:true
   ~library_flags:[ "-linkall" ]
@@ -926,7 +902,6 @@ let network_pool =
     "Network pool is an interface that processes incoming diffs and then \
      broadcasts them"
 
-(* -- syncable_ledger ----------------------------------------------- *)
 let syncable_ledger =
   library "syncable_ledger" ~path:"src/lib/syncable_ledger"
   ~library_flags:[ "-linkall" ]
@@ -961,7 +936,6 @@ let syncable_ledger =
        ] )
   ~synopsis:"Synchronization of Merkle-tree backed ledgers"
 
-(* -- syncable_ledger/test ------------------------------------------ *)
 let syncable_ledger_test =
   private_library ~path:"src/lib/syncable_ledger/test" ~inline_tests:true
   ~deps:
@@ -998,7 +972,6 @@ let syncable_ledger_test =
        [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_compare; Ppx_lib.ppx_deriving_yojson ] )
   "test"
 
-(* -- sync_handler -------------------------------------------------- *)
 let sync_handler =
   library "sync_handler" ~path:"src/lib/sync_handler" ~inline_tests:true
   ~deps:
@@ -1036,7 +1009,6 @@ let sync_handler =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- transition_chain_prover --------------------------------------- *)
 let transition_chain_prover =
   library "transition_chain_prover" ~path:"src/lib/transition_chain_prover"
   ~deps:
@@ -1064,7 +1036,6 @@ let transition_chain_prover =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- transition_chain_verifier ------------------------------------- *)
 let transition_chain_verifier =
   library "transition_chain_verifier" ~path:"src/lib/transition_chain_verifier"
   ~deps:
@@ -1078,7 +1049,6 @@ let transition_chain_verifier =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_compare ])
 
-(* -- transition_frontier/frontier_base ----------------------------- *)
 let transition_frontier_base =
   library "transition_frontier_base" ~internal_name:"frontier_base"
   ~path:"src/lib/transition_frontier/frontier_base"
@@ -1147,7 +1117,6 @@ let transition_frontier_base =
        ; Ppx_lib.ppx_deriving_yojson
        ] )
 
-(* -- transition_frontier/full_frontier ----------------------------- *)
 let transition_frontier_full_frontier =
   library "transition_frontier_full_frontier" ~internal_name:"full_frontier"
   ~path:"src/lib/transition_frontier/full_frontier"
@@ -1210,7 +1179,6 @@ let transition_frontier_full_frontier =
        ; Ppx_lib.ppx_deriving_yojson
        ] )
 
-(* -- transition_frontier/persistent_root --------------------------- *)
 let transition_frontier_persistent_root =
   library "transition_frontier_persistent_root" ~internal_name:"persistent_root"
   ~path:"src/lib/transition_frontier/persistent_root"
@@ -1231,7 +1199,6 @@ let transition_frontier_persistent_root =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])
 
-(* -- transition_frontier/persistent_frontier ----------------------- *)
 let transition_frontier_persistent_frontier =
   library "transition_frontier_persistent_frontier"
   ~internal_name:"persistent_frontier"
@@ -1296,7 +1263,6 @@ let transition_frontier_persistent_frontier =
        ; Ppx_lib.ppx_deriving_yojson
        ] )
 
-(* -- transition_frontier/extensions -------------------------------- *)
 let transition_frontier_extensions =
   library "transition_frontier_extensions" ~internal_name:"extensions"
   ~path:"src/lib/transition_frontier/extensions"
@@ -1323,7 +1289,6 @@ let transition_frontier_extensions =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])
 
-(* -- transition_frontier ------------------------------------------- *)
 let transition_frontier =
   library "transition_frontier" ~path:"src/lib/transition_frontier"
   ~deps:
@@ -1377,7 +1342,6 @@ let transition_frontier =
        ; Ppx_lib.ppx_deriving_yojson
        ] )
 
-(* -- transition_frontier/tests ------------------------------------- *)
 let transition_frontier_tests =
   private_library ~path:"src/lib/transition_frontier/tests" ~inline_tests:true
   ~deps:
@@ -1419,7 +1383,6 @@ let transition_frontier_tests =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version; Ppx_lib.ppx_mina ])
   "transition_frontier_tests"
 
-(* -- transition_frontier_controller -------------------------------- *)
 let transition_frontier_controller =
   library "transition_frontier_controller"
   ~path:"src/lib/transition_frontier_controller"
@@ -1454,7 +1417,6 @@ let transition_frontier_controller =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_mina ])
 
-(* -- transition_handler -------------------------------------------- *)
 let transition_handler =
   library "transition_handler" ~path:"src/lib/transition_handler"
   ~inline_tests:true
@@ -1511,7 +1473,6 @@ let transition_handler =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- transition_router --------------------------------------------- *)
 let transition_router =
   library "transition_router" ~path:"src/lib/transition_router"
   ~deps:
@@ -1564,7 +1525,6 @@ let transition_router =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_compare ])
 
-(* -- bootstrap_controller ------------------------------------------ *)
 let bootstrap_controller =
   library "bootstrap_controller" ~path:"src/lib/bootstrap_controller"
   ~inline_tests:true
@@ -1633,7 +1593,6 @@ let bootstrap_controller =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- best_tip_prover ----------------------------------------------- *)
 let best_tip_prover =
   library "best_tip_prover" ~path:"src/lib/best_tip_prover"
   ~deps:
@@ -1665,7 +1624,6 @@ let best_tip_prover =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_compare ])
 
-(* -- ledger_catchup ------------------------------------------------ *)
 let ledger_catchup =
   library "ledger_catchup" ~path:"src/lib/ledger_catchup" ~inline_tests:true
   ~deps:
@@ -1723,7 +1681,6 @@ let ledger_catchup =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-(* -- downloader ---------------------------------------------------- *)
 let downloader =
   library "downloader" ~path:"src/lib/downloader"
   ~deps:
@@ -1747,7 +1704,6 @@ let downloader =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- block_producer ------------------------------------------------ *)
 let block_producer =
   library "block_producer" ~path:"src/lib/block_producer"
   ~library_flags:[ "-linkall" ] ~inline_tests:true
@@ -1820,7 +1776,6 @@ let block_producer =
        [ Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_register_event; Ppx_lib.ppx_version ] )
   ~synopsis:"Coda block producer"
 
-(* -- fake_network -------------------------------------------------- *)
 let fake_network =
   library "fake_network" ~path:"src/lib/fake_network"
   ~deps:

@@ -5,14 +5,12 @@
 open Manifest
 open Externals
 
-(* -- archive (executable) ------------------------------------------- *)
 let () =
   executable "archive" ~package:"archive" ~path:"src/app/archive"
   ~deps:[ local "archive_cli"; async; async_unix; core_kernel; Layer_base.mina_version ]
   ~modules:[ "archive" ] ~modes:[ "native" ] ~ppx:Ppx.minimal
   ~bisect_sigterm:true
 
-(* -- archive_cli (library) ------------------------------------------ *)
 let archive_cli =
   library "archive.cli" ~internal_name:"archive_cli" ~path:"src/app/archive/cli"
   ~deps:
@@ -34,7 +32,6 @@ let archive_cli =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])
   ~bisect_sigterm:true
 
-(* -- archive_lib (library) ------------------------------------------ *)
 let archive_lib =
   library "archive_lib" ~path:"src/app/archive/lib"
   ~deps:

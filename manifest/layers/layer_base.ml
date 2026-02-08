@@ -7,22 +7,16 @@ open Manifest
 open Externals
 open Dune_s_expr
 
-(* ============================================================ *)
-(* Tier 1: Trivial libraries                                    *)
-(* ============================================================ *)
 
-(* -- hex -------------------------------------------------------- *)
 let hex =
   library "hex" ~path:"src/lib/hex" ~deps:[ core_kernel ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version; Ppx_lib.ppx_inline_test ])
   ~inline_tests:true
 
-(* -- monad_lib -------------------------------------------------- *)
 let monad_lib =
   library "monad_lib" ~path:"src/lib/monad_lib" ~deps:[ core_kernel ]
   ~ppx:Ppx.standard
 
-(* -- with_hash -------------------------------------------------- *)
 let with_hash =
   library "with_hash" ~path:"src/lib/with_hash"
   ~deps:
@@ -44,7 +38,6 @@ let with_hash =
        ; Ppx_lib.ppx_fields_conv
        ] )
 
-(* -- pipe_lib --------------------------------------------------- *)
 let pipe_lib =
   library "pipe_lib" ~path:"src/lib/concurrency/pipe_lib"
   ~deps:
@@ -62,7 +55,6 @@ let pipe_lib =
        [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_deriving_make ] )
   ~inline_tests:true
 
-(* -- allocation_functor --------------------------------------- *)
 let allocation_functor =
   library "allocation_functor" ~path:"src/lib/allocation_functor"
   ~deps:
@@ -78,7 +70,6 @@ let allocation_functor =
        [ Ppx_lib.ppx_jane; Ppx_lib.ppx_compare; Ppx_lib.ppx_deriving_yojson; Ppx_lib.ppx_version ] )
   ~inline_tests:true
 
-(* -- codable -------------------------------------------------- *)
 let codable =
   library "codable" ~path:"src/lib/codable"
   ~synopsis:"Extension of Yojson to make it easy for a type to derive yojson"
@@ -93,7 +84,6 @@ let codable =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_deriving_yojson; Ppx_lib.ppx_jane; Ppx_lib.ppx_version ])
   ~inline_tests:true ~library_flags:[ "-linkall" ]
 
-(* -- comptime ------------------------------------------------- *)
 let comptime =
   library "comptime" ~path:"src/lib/comptime" ~deps:[ core_kernel; base ]
   ~ppx:Ppx.minimal
@@ -107,32 +97,27 @@ let comptime =
          ]
     ]
 
-(* -- error_json ----------------------------------------------- *)
 let error_json =
   library "error_json" ~path:"src/lib/error_json"
   ~deps:[ base; sexplib; sexplib0; yojson ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_deriving_yojson; Ppx_lib.ppx_version ])
 
-(* -- integers_stubs_js ---------------------------------------- *)
 let integers_stubs_js =
   library "integers_stubs_js" ~path:"src/lib/integers_stubs_js"
   ~deps:[ zarith_stubs_js ] ~ppx:Ppx.minimal
   ~js_of_ocaml:
     ("js_of_ocaml" @: [ "javascript_files" @: [ atom "./runtime.js" ] ])
 
-(* -- key_value_database --------------------------------------- *)
 let key_value_database =
   library "key_value_database" ~path:"src/lib/key_value_database"
   ~synopsis:"Collection of key-value databases used in Coda"
   ~deps:[ core_kernel ] ~ppx:Ppx.standard ~library_flags:[ "-linkall" ]
 
-(* -- linked_tree ---------------------------------------------- *)
 let linked_tree =
   library "linked_tree" ~path:"src/lib/linked_tree"
   ~deps:[ core_kernel; local "mina_numbers" ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_compare ])
 
-(* -- logproc_lib ---------------------------------------------- *)
 let logproc_lib =
   library "logproc_lib" ~path:"src/lib/logproc_lib"
   ~modules:[ "logproc_lib"; "filter" ]
@@ -147,7 +132,6 @@ let logproc_lib =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_deriving_std ])
   ~inline_tests:true
 
-(* -- interpolator_lib ----------------------------------------- *)
 let interpolator_lib =
   library "interpolator_lib" ~path:"src/lib/logproc_lib"
   ~modules:[ "interpolator" ]
@@ -155,7 +139,6 @@ let interpolator_lib =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_deriving_std ])
   ~inline_tests:true
 
-(* -- mina_wire_types ------------------------------------------ *)
 let () =
   file_stanzas ~path:"src/lib/mina_wire_types"
   [ "include_subdirs" @: [ atom "unqualified" ] ]
@@ -172,7 +155,6 @@ let mina_wire_types =
   ~extra_stanzas:
     [ "documentation" @: [ "package" @: [ atom "mina_wire_types" ] ] ]
 
-(* -- one_or_two ----------------------------------------------- *)
 let one_or_two =
   library "one_or_two" ~path:"src/lib/one_or_two"
   ~flags:[ atom ":standard"; atom "-short-paths" ]
@@ -197,20 +179,17 @@ let one_or_two =
        ; Ppx_lib.ppx_let
        ] )
 
-(* -- otp_lib -------------------------------------------------- *)
 let otp_lib =
   library "otp_lib" ~path:"src/lib/otp_lib"
   ~deps:
     [ core_kernel; async_kernel; ppx_inline_test_config; pipe_lib ]
   ~ppx:Ppx.standard ~inline_tests:true
 
-(* -- participating_state -------------------------------------- *)
 let participating_state =
   library "participating_state" ~path:"src/lib/participating_state"
   ~deps:[ async_kernel; core_kernel; base ]
   ~ppx:Ppx.minimal
 
-(* -- perf_histograms ------------------------------------------ *)
 let perf_histograms =
   library "perf_histograms" ~path:"src/lib/perf_histograms"
   ~synopsis:"Performance monitoring with histograms"
@@ -236,19 +215,6 @@ let perf_histograms =
        [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_compare; Ppx_lib.ppx_deriving_yojson ] )
   ~inline_tests:true
 
-(* -- proof_cache_tag ------------------------------------------ *)
-let proof_cache_tag =
-  library "proof_cache_tag" ~path:"src/lib/proof_cache_tag"
-  ~deps:
-    [ core_kernel
-    ; async_kernel
-    ; local "logger"
-    ; local "disk_cache"
-    ; local "pickles"
-    ]
-  ~ppx:Ppx.mina
-
-(* -- rosetta_coding ------------------------------------------- *)
 let rosetta_coding =
   library "rosetta_coding" ~path:"src/lib/rosetta_coding"
   ~synopsis:"Encoders and decoders for Rosetta" ~library_flags:[ "-linkall" ]
@@ -261,7 +227,6 @@ let rosetta_coding =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_assert; Ppx_lib.ppx_let ])
 
-(* -- rosetta_models ------------------------------------------- *)
 let rosetta_models =
   library "rosetta_models" ~path:"src/lib/rosetta_models"
   ~deps:[ ppx_deriving_yojson_runtime; yojson ]
@@ -273,7 +238,6 @@ let rosetta_models =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- sgn_type ------------------------------------------------- *)
 let sgn_type =
   library "sgn_type" ~path:"src/lib/sgn_type"
   ~deps:
@@ -290,7 +254,6 @@ let sgn_type =
     (Ppx.custom
        [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version; Ppx_lib.ppx_compare; Ppx_lib.ppx_deriving_yojson ] )
 
-(* -- structured_log_events ------------------------------------ *)
 let structured_log_events =
   library "structured_log_events" ~path:"src/lib/structured_log_events"
   ~synopsis:"Events, logging and parsing" ~library_flags:[ "-linkall" ]
@@ -305,7 +268,6 @@ let structured_log_events =
        ] )
   ~inline_tests:true
 
-(* -- sync_status ---------------------------------------------- *)
 let sync_status =
   library "sync_status" ~path:"src/lib/sync_status"
   ~synopsis:"Different kinds of status for Coda "
@@ -321,7 +283,6 @@ let sync_status =
     (Ppx.custom
        [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version; Ppx_lib.ppx_deriving_yojson; Ppx_lib.ppx_enumerate ] )
 
-(* -- unsigned_extended ---------------------------------------- *)
 let unsigned_extended =
   library "unsigned_extended" ~path:"src/lib/unsigned_extended"
   ~synopsis:"Unsigned integer functions" ~library_flags:[ "-linkall" ]
@@ -355,7 +316,6 @@ let unsigned_extended =
        ] )
   ~inline_tests:true
 
-(* -- visualization -------------------------------------------- *)
 let visualization =
   library "visualization" ~path:"src/lib/visualization"
   ~deps:[ core_kernel; async_kernel; ocamlgraph; yojson; sexplib0 ]
@@ -363,13 +323,11 @@ let visualization =
     (Ppx.custom
        [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_deriving_yojson; Ppx_lib.ppx_sexp_conv ] )
 
-(* -- webkit_trace_event --------------------------------------- *)
 let webkit_trace_event =
   library "webkit_trace_event" ~path:"src/lib/webkit_trace_event"
   ~synopsis:"Binary and JSON output of WebKit trace events"
   ~deps:[ core_kernel; base ] ~ppx:Ppx.minimal
 
-(* -- webkit_trace_event.binary -------------------------------- *)
 let webkit_trace_event_binary =
   library "webkit_trace_event.binary"
   ~internal_name:"webkit_trace_event_binary_output"
@@ -378,7 +336,6 @@ let webkit_trace_event_binary =
     [ core; async; base; core_kernel; async_unix; webkit_trace_event ]
   ~ppx:Ppx.minimal
 
-(* -- graphql_basic_scalars ------------------------------------ *)
 let graphql_basic_scalars =
   library "graphql_basic_scalars" ~path:"src/lib/graphql_basic_scalars"
   ~deps:
@@ -400,7 +357,6 @@ let graphql_basic_scalars =
     ]
   ~ppx:Ppx.standard ~inline_tests:true
 
-(* -- graphql_wrapper ------------------------------------------ *)
 let graphql_wrapper =
   library "graphql_wrapper" ~path:"src/lib/graphql_wrapper"
   ~deps:[ graphql; graphql_async; graphql_parser ]
@@ -408,7 +364,6 @@ let graphql_wrapper =
     (Ppx.custom
        [ Ppx_lib.ppx_deriving_show; Ppx_lib.ppx_deriving_yojson; Ppx_lib.ppx_version ] )
 
-(* -- mina_compile_config -------------------------------------- *)
 let mina_compile_config =
   library "mina_compile_config" ~path:"src/lib/mina_compile_config"
   ~deps:
@@ -419,7 +374,6 @@ let mina_compile_config =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_base; Ppx_lib.ppx_deriving_yojson ])
 
-(* -- storage -------------------------------------------------- *)
 let storage =
   library "storage" ~path:"src/lib/storage"
   ~synopsis:"Storage module checksums data and stores it"
@@ -440,7 +394,6 @@ let storage =
     ]
   ~ppx:Ppx.standard ~inline_tests:true
 
-(* -- mina_stdlib ------------------------------------------------ *)
 let mina_stdlib =
   library "mina_stdlib" ~path:"src/lib/mina_stdlib"
   ~synopsis:"Mina standard library" ~inline_tests:true
@@ -479,11 +432,7 @@ let mina_stdlib =
        ; Ppx_lib.ppx_version
        ] )
 
-(* ============================================================ *)
-(* Tier 2: Moderate libraries                                   *)
-(* ============================================================ *)
 
-(* -- base58_check ----------------------------------------------- *)
 let base58_check =
   library "base58_check" ~path:"src/lib/base58_check"
   ~synopsis:"Base58Check implementation"
@@ -501,7 +450,6 @@ let base58_check =
        ] )
   ~inline_tests:true ~library_flags:[ "-linkall" ]
 
-(* -- currency --------------------------------------------------- *)
 let currency =
   library "currency" ~path:"src/lib/currency" ~synopsis:"Currency types"
   ~deps:
@@ -552,17 +500,12 @@ let currency =
        ] )
   ~inline_tests:true ~library_flags:[ "-linkall" ]
 
-(* ============================================================ *)
-(* Tier 3: Virtual modules                                      *)
-(* ============================================================ *)
 
-(* -- mina_version ----------------------------------------------- *)
 let mina_version =
   library "mina_version" ~path:"src/lib/mina_version" ~deps:[ core_kernel ]
   ~ppx:Ppx.minimal ~virtual_modules:[ "mina_version" ]
   ~default_implementation:"mina_version.normal"
 
-(* -- mina_version.normal ---------------------------------------- *)
 let mina_version_normal =
   library "mina_version.normal" ~internal_name:"mina_version_normal"
   ~path:"src/lib/mina_version/normal" ~deps:[ base; core_kernel ]
@@ -580,11 +523,7 @@ let mina_version_normal =
          ]
     ]
 
-(* ============================================================ *)
-(* Tier 4: Edge cases                                           *)
-(* ============================================================ *)
 
-(* -- child_processes -------------------------------------------- *)
 let child_processes =
   library "child_processes" ~path:"src/lib/child_processes"
   ~deps:
@@ -622,7 +561,6 @@ let child_processes =
   ~inline_tests:true
   ~foreign_stubs:("c", [ "caml_syslimits" ])
 
-(* -- mina_base -------------------------------------------------- *)
 let mina_base =
   library "mina_base" ~path:"src/lib/mina_base"
   ~synopsis:"Snarks and friends necessary for keypair generation"
@@ -677,7 +615,7 @@ let mina_base =
     ; local "pickles_backend"
     ; local "pickles_types"
     ; Layer_ppx.ppx_version_runtime
-    ; proof_cache_tag
+    ; local "proof_cache_tag"
     ; local "protocol_version"
     ; Layer_test.quickcheck_lib
     ; local "random_oracle"
@@ -723,14 +661,12 @@ let mina_base =
        ] )
   ~inline_tests:true ~library_flags:[ "-linkall" ]
 
-(* -- mina_base.import (sub-library) ----------------------------- *)
 let mina_base_import =
   library "mina_base.import" ~internal_name:"mina_base_import"
   ~path:"src/lib/mina_base/import"
   ~deps:[ local "signature_lib" ]
   ~ppx:Ppx.minimal
 
-(* -- mina_base.util (sub-library) ------------------------------- *)
 let mina_base_util =
   library "mina_base.util" ~internal_name:"mina_base_util"
   ~path:"src/lib/mina_base/util"

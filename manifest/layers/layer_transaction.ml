@@ -6,7 +6,6 @@
 open Manifest
 open Externals
 
-(* -- mina_transaction --------------------------------------------- *)
 let mina_transaction =
   library "mina_transaction" ~path:"src/lib/transaction" ~inline_tests:true
   ~deps:
@@ -49,7 +48,6 @@ let mina_transaction =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- mina_transaction_logic --------------------------------------- *)
 let mina_transaction_logic =
   library "mina_transaction_logic" ~path:"src/lib/transaction_logic"
   ~deps:
@@ -111,7 +109,6 @@ let mina_transaction_logic =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- transaction_logic_tests -------------------------------------- *)
 let transaction_logic_tests =
   private_library "transaction_logic_tests"
   ~path:"src/lib/transaction_logic/test" ~inline_tests:true
@@ -165,7 +162,6 @@ let transaction_logic_tests =
        ; Ppx_lib.ppx_assert
        ] )
 
-(* -- transaction_witness ------------------------------------------ *)
 let transaction_witness =
   library "transaction_witness" ~path:"src/lib/transaction_witness"
   ~inline_tests:true

@@ -45,7 +45,7 @@ let () =
     ; Layer_crypto.pickles
     ; Layer_crypto.pickles_backend
     ; Layer_crypto.pickles_types
-    ; Layer_base.proof_cache_tag
+    ; Layer_crypto.proof_cache_tag
     ; Layer_crypto.random_oracle
     ; Layer_crypto.signature_lib
     ; Layer_crypto.snark_params

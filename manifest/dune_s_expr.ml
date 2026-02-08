@@ -1,11 +1,9 @@
 (** Dune S-expression AST, pretty-printing, parsing,
     and structural comparison. *)
 
-(* -- AST ---------------------------------------------------------- *)
 
 type t = Atom of string | List of t list | Comment of string
 
-(* -- Construction helpers ----------------------------------------- *)
 
 let atom s = Atom s
 
@@ -13,7 +11,6 @@ let list l = List l
 
 let ( @: ) name children = List (Atom name :: children)
 
-(* -- Pretty-printing ---------------------------------------------- *)
 
 let needs_quoting s =
   s = "" || String.contains s ' ' || String.contains s '\n'
@@ -56,7 +53,6 @@ let to_string stanzas =
   Format.pp_print_flush fmt () ;
   Buffer.contents buf
 
-(* -- Parsing ------------------------------------------------------ *)
 
 type token = LPAREN | RPAREN | STRING of string | COMMENT_TOK of string
 
@@ -171,7 +167,6 @@ let parse_file path =
   close_in ic ;
   parse_string (Bytes.to_string s)
 
-(* -- Structural comparison ---------------------------------------- *)
 
 let rec strip_comments = function
   | Atom _ as a ->

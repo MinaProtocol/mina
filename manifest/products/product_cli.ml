@@ -6,7 +6,6 @@ open Manifest
 open Externals
 open Dune_s_expr
 
-(* -- mina (executable) ---------------------------------------------- *)
 let () =
   executable "mina" ~package:"cli" ~path:"src/app/cli/src" ~modules:[ "mina" ]
   ~modes:[ "native" ]
@@ -14,7 +13,6 @@ let () =
   ~deps:[ Layer_storage.disk_cache_lmdb; local "mina_cli_entrypoint" ]
   ~ppx:Ppx.minimal
 
-(* -- mina-testnet (executable) -------------------------------------- *)
 let () =
   executable "mina-testnet" ~internal_name:"mina_testnet_signatures"
   ~package:"cli" ~path:"src/app/cli/src"
@@ -28,7 +26,6 @@ let () =
     ]
   ~ppx:Ppx.minimal
 
-(* -- mina-mainnet (executable) -------------------------------------- *)
 let () =
   executable "mina-mainnet" ~internal_name:"mina_mainnet_signatures"
   ~package:"cli" ~path:"src/app/cli/src"
@@ -42,7 +39,6 @@ let () =
     ]
   ~ppx:Ppx.minimal
 
-(* -- init: rule for assets.ml generation ----------------------------- *)
 let () =
   file_stanzas ~path:"src/app/cli/src/init"
   (Dune_s_expr.parse_string
@@ -53,7 +49,6 @@ let () =
      \ (action\n\
      \  (run %{bin:ocaml-crunch} -m plain assets -o assets.ml)))" )
 
-(* -- init (library) ------------------------------------------------- *)
 let init =
   library "init" ~path:"src/app/cli/src/init"
   ~deps:
@@ -202,7 +197,6 @@ let init =
        ; "%{read-lines:../../../../graphql-ppx-config.inc}"
        ] )
 
-(* -- mina_cli_entrypoint (library) ---------------------------------- *)
 let cli_mina_cli_entrypoint =
   library "cli.mina_cli_entrypoint" ~internal_name:"mina_cli_entrypoint"
   ~path:"src/app/cli/src/cli_entrypoint" ~modes:[ "native" ]

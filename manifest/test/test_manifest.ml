@@ -2,7 +2,6 @@
 
 open Dune_s_expr
 
-(* -- Dune_s_expr tests -------------------------------------------- *)
 
 let test_parse_atom () =
   let result = parse_string "foo" in
@@ -75,7 +74,6 @@ let test_roundtrip () =
   let parsed = parse_string s in
   Alcotest.(check bool) "roundtrip" true (equal_stanzas [ sexpr ] parsed)
 
-(* -- Structural comparison tests ---------------------------------- *)
 
 let test_equal_atoms () =
   Alcotest.(check bool) "same atoms" true (equal (Atom "foo") (Atom "foo")) ;
@@ -176,7 +174,6 @@ let test_equal_stanzas_multiple () =
   in
   Alcotest.(check bool) "multiple stanzas equal" true (equal_stanzas a b)
 
-(* -- Diff tests --------------------------------------------------- *)
 
 let test_diff_equal () =
   let s =
@@ -212,7 +209,6 @@ let test_diff_dep_set () =
   | None ->
       Alcotest.fail "expected diff"
 
-(* -- Manifest DSL tests ------------------------------------------- *)
 
 let test_library_basic () =
   ignore (Manifest.library "test_lib" ~path:"/tmp/test_manifest_out/basic"
@@ -235,7 +231,6 @@ let test_executable_basic () =
     ~modes:[ "native" ] ~ppx:Manifest.Ppx.minimal ;
   Alcotest.(check pass) "executable registered" () ()
 
-(* -- S-expr construction tests ------------------------------------ *)
 
 let test_at_colon () =
   let s = "library" @: [ atom "foo" ] in
@@ -258,7 +253,6 @@ let test_nested_construction () =
     | _ ->
         false )
 
-(* -- Test runner -------------------------------------------------- *)
 
 let () =
   Alcotest.run "manifest"

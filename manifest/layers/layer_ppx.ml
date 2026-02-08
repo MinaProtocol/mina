@@ -7,13 +7,11 @@ open Manifest
 open Externals
 open Dune_s_expr
 
-(* -- ppx_annot ------------------------------------------------ *)
 let ppx_annot =
   library "ppx_annot" ~path:"src/lib/ppx_annot" ~kind:"ppx_deriver"
   ~deps:[ ppxlib; core_kernel; base; compiler_libs ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppxlib_metaquot ])
 
-(* -- ppx_register_event --------------------------------------- *)
 let ppx_register_event =
   library "ppx_register_event" ~path:"src/lib/ppx_register_event"
   ~kind:"ppx_deriver"
@@ -31,7 +29,6 @@ let ppx_register_event =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppxlib_metaquot ])
   ~ppx_runtime_libraries:[ "structured_log_events"; "yojson" ]
 
-(* -- ppx_version ---------------------------------------------- *)
 let () =
   file_stanzas ~path:"src/lib/ppx_version"
   [ "vendored_dirs" @: [ atom "test" ] ]
@@ -53,13 +50,11 @@ let ppx_version =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_compare; Ppx_lib.ppxlib_metaquot ])
 
-(* -- ppx_version.runtime -------------------------------------- *)
 let ppx_version_runtime =
   library "ppx_version.runtime" ~internal_name:"ppx_version_runtime"
   ~path:"src/lib/ppx_version/runtime" ~no_instrumentation:true
   ~deps:[ base; core_kernel; sexplib0; bin_prot; bin_prot_shape ]
 
-(* -- ppx_mina ------------------------------------------------- *)
 let () =
   file_stanzas ~path:"src/lib/ppx_mina" [ "vendored_dirs" @: [ atom "tests" ] ]
 let ppx_mina =
@@ -77,13 +72,11 @@ let ppx_mina =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppxlib_metaquot ])
 
-(* -- ppx_to_enum ---------------------------------------------- *)
 let ppx_to_enum =
   library "ppx_to_enum" ~path:"src/lib/ppx_mina/ppx_to_enum" ~kind:"ppx_deriver"
   ~deps:[ compiler_libs_common; ppxlib; base ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppxlib_metaquot ])
 
-(* -- ppx_representatives -------------------------------------- *)
 let ppx_representatives =
   library "ppx_representatives" ~path:"src/lib/ppx_mina/ppx_representatives"
   ~kind:"ppx_deriver"
@@ -97,14 +90,12 @@ let ppx_representatives =
   ~ppx:(Ppx.custom [ Ppx_lib.ppxlib_metaquot ])
   ~ppx_runtime_libraries:[ "ppx_representatives.runtime" ]
 
-(* -- ppx_representatives.runtime ------------------------------ *)
 let ppx_representatives_runtime =
   library "ppx_representatives.runtime"
   ~internal_name:"ppx_representatives_runtime"
   ~path:"src/lib/ppx_mina/ppx_representatives/runtime"
   ~no_instrumentation:true
 
-(* -- ppx_mina/tests ------------------------------------------- *)
 let unexpired =
   private_library "unexpired" ~path:"src/lib/ppx_mina/tests"
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_deriving_yojson; Ppx_lib.ppx_mina ])

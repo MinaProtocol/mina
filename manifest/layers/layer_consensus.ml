@@ -7,7 +7,6 @@ open Manifest
 open Externals
 open Dune_s_expr
 
-(* -- vrf_lib -------------------------------------------------------------- *)
 let vrf_lib =
   library "vrf_lib" ~path:"src/lib/vrf_lib"
   ~flags:[ atom ":standard"; atom "-short-paths" ]
@@ -33,7 +32,6 @@ let vrf_lib =
        [ Ppx_lib.h_list_ppx; Ppx_lib.ppx_bench; Ppx_lib.ppx_compare; Ppx_lib.ppx_jane; Ppx_lib.ppx_version ] )
   ~synopsis:"VRF instantiation"
 
-(* -- consensus_vrf -------------------------------------------------------- *)
 let consensus_vrf =
   library "consensus.vrf" ~internal_name:"consensus_vrf"
   ~path:"src/lib/consensus/vrf"
@@ -99,7 +97,6 @@ let consensus_vrf =
        ; Ppx_lib.ppx_version
        ] )
 
-(* -- consensus ------------------------------------------------------------ *)
 let consensus =
   library "consensus" ~path:"src/lib/consensus" ~inline_tests:true
   ~library_flags:[ "-linkall" ]
@@ -195,7 +192,6 @@ let consensus =
        ] )
   ~synopsis:"Consensus mechanisms"
 
-(* -- consensus: proof_of_stake_fuzzer (disabled executable) --------------- *)
 let () =
   private_executable ~path:"src/lib/consensus"
   ~modules:[ "proof_of_stake_fuzzer" ]
@@ -213,7 +209,6 @@ let () =
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
   ~enabled_if:"false" "proof_of_stake_fuzzer"
 
-(* -- mina_state ----------------------------------------------------------- *)
 let mina_state =
   library "mina_state" ~path:"src/lib/mina_state" ~inline_tests:true
   ~deps:
@@ -273,7 +268,6 @@ let mina_state =
        ; Ppx_lib.h_list_ppx
        ] )
 
-(* -- coda_genesis_ledger -------------------------------------------------- *)
 let coda_genesis_ledger =
   library "coda_genesis_ledger" ~internal_name:"genesis_ledger"
   ~path:"src/lib/genesis_ledger"
@@ -291,7 +285,6 @@ let coda_genesis_ledger =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_let ])
 
-(* -- precomputed_values --------------------------------------------------- *)
 let precomputed_values =
   library "precomputed_values" ~path:"src/lib/precomputed_values"
   ~ppx_runtime_libraries:[ "base" ]
@@ -314,7 +307,6 @@ let precomputed_values =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppxlib_metaquot ])
 
-(* -- coda_genesis_proof --------------------------------------------------- *)
 let coda_genesis_proof =
   library "coda_genesis_proof" ~internal_name:"genesis_proof"
   ~path:"src/lib/genesis_proof"

@@ -7,7 +7,6 @@ open Manifest
 open Externals
 open Dune_s_expr
 
-(* -- sparse_ledger_lib -------------------------------------------- *)
 let sparse_ledger_lib =
   library "sparse_ledger_lib" ~path:"src/lib/sparse_ledger_lib"
   ~inline_tests:true ~library_flags:[ "-linkall" ]
@@ -27,7 +26,6 @@ let sparse_ledger_lib =
        [ Ppx_lib.ppx_jane; Ppx_lib.ppx_compare; Ppx_lib.ppx_deriving_yojson; Ppx_lib.ppx_version ] )
   ~synopsis:"sparse Ledger implementation"
 
-(* -- merkle_address ----------------------------------------------- *)
 let merkle_address =
   library "merkle_address" ~path:"src/lib/merkle_address" ~inline_tests:true
   ~library_flags:[ "-linkall" ]
@@ -55,18 +53,15 @@ let merkle_address =
        ] )
   ~synopsis:"Address for merkle database representations"
 
-(* -- merkle_list_prover ------------------------------------------- *)
 let merkle_list_prover =
   library "merkle_list_prover" ~path:"src/lib/merkle_list_prover"
   ~deps:[ core_kernel ] ~ppx:Ppx.standard
 
-(* -- merkle_list_verifier ----------------------------------------- *)
 let merkle_list_verifier =
   library "merkle_list_verifier" ~path:"src/lib/merkle_list_verifier"
   ~deps:[ core_kernel; Layer_base.mina_stdlib ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_compare ])
 
-(* -- merkle_ledger ------------------------------------------------ *)
 let merkle_ledger =
   library "merkle_ledger" ~path:"src/lib/merkle_ledger"
   ~flags:[ list [ atom ":standard"; atom "-warn-error"; atom "+a" ] ]
@@ -106,7 +101,6 @@ let merkle_ledger =
        ] )
   ~synopsis:"Implementation of different account databases"
 
-(* -- merkle_ledger_tests (library) -------------------------------- *)
 let merkle_ledger_tests =
   library "merkle_ledger_tests" ~path:"src/lib/merkle_ledger/test"
   ~flags:[ list [ atom ":standard"; atom "-warn-error"; atom "+a" ] ]
@@ -150,7 +144,6 @@ let merkle_ledger_tests =
        ; Ppx_lib.ppx_deriving_yojson
        ] )
 
-(* -- merkle_ledger test (test stanza) ----------------------------- *)
 let () =
   test "test" ~package:"merkle_ledger_tests" ~path:"src/lib/merkle_ledger/test"
   ~modules:[ "test" ]
@@ -165,7 +158,6 @@ let () =
        ; Ppx_lib.ppx_deriving_yojson
        ] )
 
-(* -- merkle_mask -------------------------------------------------- *)
 let merkle_mask =
   library "merkle_mask" ~path:"src/lib/merkle_mask"
   ~flags:
@@ -215,7 +207,6 @@ let merkle_mask =
        ] )
   ~synopsis:"Implementation of Merkle tree masks"
 
-(* -- mina_ledger -------------------------------------------------- *)
 let mina_ledger =
   library "mina_ledger" ~path:"src/lib/mina_ledger" ~inline_tests:true
   ~deps:
@@ -278,7 +269,6 @@ let mina_ledger =
        ; Ppx_lib.ppx_mina
        ] )
 
-(* -- mina_ledger_test_helpers ------------------------------------- *)
 let mina_ledger_test_helpers =
   private_library "mina_ledger_test_helpers"
   ~path:"src/lib/mina_ledger/test/helpers"
@@ -306,7 +296,6 @@ let mina_ledger_test_helpers =
     ]
   ~ppx:(Ppx.custom [ Ppx_lib.ppx_base; Ppx_lib.ppx_let; Ppx_lib.ppx_assert; Ppx_lib.ppx_version ])
 
-(* -- staged_ledger_diff ------------------------------------------- *)
 let staged_ledger_diff =
   library "staged_ledger_diff" ~path:"src/lib/staged_ledger_diff"
   ~deps:
