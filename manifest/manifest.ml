@@ -47,7 +47,7 @@ type library_target =
   ; l_kind : string option
   ; l_inline_tests : bool
   ; l_no_instrumentation : bool
-  ; l_flags : string list
+  ; l_flags : Dune_s_expr.t list
   ; l_library_flags : string list
   ; l_modules : string list
   ; l_modules_without_implementation : string list
@@ -74,7 +74,7 @@ type executable_target =
   ; e_ppx : Ppx.t option
   ; e_modules : string list
   ; e_modes : string list
-  ; e_flags : string list
+  ; e_flags : Dune_s_expr.t list
   ; e_link_flags : string list
   ; e_bisect_sigterm : bool
   ; e_no_instrumentation : bool
@@ -316,7 +316,7 @@ let generate_library_sexpr lib =
            [ render_foreign_stubs lang names ]
        | None -> [])
     @ (if lib.l_flags <> [] then
-         [ "flags" @: List.map atom lib.l_flags ]
+         [ "flags" @: lib.l_flags ]
        else [])
     @ (if lib.l_deps <> [] then
          [ render_deps lib.l_deps ]
@@ -384,7 +384,7 @@ let generate_executable_sexpr exe =
          [ "modes" @: List.map atom exe.e_modes ]
        else [])
     @ (if exe.e_flags <> [] then
-         [ "flags" @: List.map atom exe.e_flags ]
+         [ "flags" @: exe.e_flags ]
        else [])
     @ (if exe.e_link_flags <> [] then
          [ "link_flags"

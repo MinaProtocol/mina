@@ -53,7 +53,7 @@ val library :
   ?kind:string ->
   ?inline_tests:bool ->
   ?no_instrumentation:bool ->
-  ?flags:string list ->
+  ?flags:Dune_s_expr.t list ->
   ?library_flags:string list ->
   ?modules:string list ->
   ?modules_without_implementation:string list ->
@@ -80,7 +80,7 @@ val private_library :
   ?kind:string ->
   ?inline_tests:bool ->
   ?no_instrumentation:bool ->
-  ?flags:string list ->
+  ?flags:Dune_s_expr.t list ->
   ?library_flags:string list ->
   ?modules:string list ->
   ?modules_without_implementation:string list ->
@@ -109,7 +109,7 @@ val executable :
   ?ppx:Ppx.t ->
   ?modules:string list ->
   ?modes:string list ->
-  ?flags:string list ->
+  ?flags:Dune_s_expr.t list ->
   ?link_flags:string list ->
   ?bisect_sigterm:bool ->
   ?no_instrumentation:bool ->
@@ -126,7 +126,7 @@ val private_executable :
   ?ppx:Ppx.t ->
   ?modules:string list ->
   ?modes:string list ->
-  ?flags:string list ->
+  ?flags:Dune_s_expr.t list ->
   ?link_flags:string list ->
   ?bisect_sigterm:bool ->
   ?no_instrumentation:bool ->

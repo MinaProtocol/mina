@@ -220,7 +220,7 @@ let register () =
   (* -- one_or_two ----------------------------------------------- *)
   library "one_or_two"
     ~path:"src/lib/one_or_two"
-    ~flags:[ ":standard"; "-short-paths" ]
+    ~flags:[ atom ":standard"; atom "-short-paths" ]
     ~library_flags:[ "-linkall" ]
     ~deps:
       [ opam "bin_prot.shape"
@@ -951,6 +951,566 @@ let register () =
     ~ppx:Ppx.minimal;
 
   (* ============================================================ *)
+  (* Tier 2: Low-level crypto & utilities                         *)
+  (* ============================================================ *)
+
+  (* -- mina_stdlib ------------------------------------------------ *)
+  library "mina_stdlib"
+    ~path:"src/lib/mina_stdlib"
+    ~synopsis:"Mina standard library"
+    ~inline_tests:true
+    ~modules_without_implementation:[ "generic_set"; "sigs" ]
+    ~flags:
+      [ list [ atom ":standard"; atom "-w"; atom "a"
+             ; atom "-warn-error"; atom "+a" ]
+      ; atom "-open"
+      ; atom "Core_kernel"
+      ]
+    ~deps:
+      [ opam "async_kernel"
+      ; opam "base.caml"
+      ; opam "bin_prot"
+      ; opam "bin_prot.shape"
+      ; opam "core_kernel"
+      ; opam "ppx_inline_test.config"
+      ; opam "result"
+      ; opam "sexplib0"
+      ; opam "stdlib"
+      ; local "ppx_version.runtime"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_compare"
+         ; "ppx_deriving.std"
+         ; "ppx_deriving_yojson"
+         ; "ppx_inline_test"
+         ; "ppx_jane"
+         ; "ppx_mina"
+         ; "ppx_version"
+         ]);
+
+  (* -- blake2 ----------------------------------------------------- *)
+  library "blake2"
+    ~path:"src/lib/crypto/blake2"
+    ~inline_tests:true
+    ~deps:
+      [ opam "base.base_internalhash_types"
+      ; opam "base.caml"
+      ; opam "bigarray-compat"
+      ; opam "bin_prot.shape"
+      ; opam "core_kernel"
+      ; opam "digestif"
+      ; opam "ppx_inline_test.config"
+      ; opam "sexplib0"
+      ; local "mina_stdlib"
+      ; local "ppx_version.runtime"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_compare"
+         ; "ppx_deriving_yojson"
+         ; "ppx_jane"
+         ; "ppx_mina"
+         ; "ppx_version"
+         ]);
+
+  (* -- bignum_bigint ---------------------------------------------- *)
+  library "bignum_bigint"
+    ~path:"src/lib/crypto/bignum_bigint"
+    ~synopsis:"Bignum's bigint re-exported as Bignum_bigint"
+    ~library_flags:[ "-linkall" ]
+    ~inline_tests:true
+    ~deps:
+      [ opam "core_kernel"
+      ; opam "async_kernel"
+      ; opam "bignum.bigint"
+      ; local "fold_lib"
+      ]
+    ~ppx:Ppx.standard;
+
+  (* -- string_sign ------------------------------------------------ *)
+  library "string_sign"
+    ~path:"src/lib/crypto/string_sign"
+    ~synopsis:"Schnorr signatures for strings"
+    ~deps:
+      [ opam "core_kernel"
+      ; opam "result"
+      ; local "kimchi_backend"
+      ; local "kimchi_pasta"
+      ; local "kimchi_pasta.basic"
+      ; local "mina_base"
+      ; local "mina_signature_kind"
+      ; local "pickles"
+      ; local "pickles.backend"
+      ; local "random_oracle"
+      ; local "random_oracle_input"
+      ; local "signature_lib"
+      ; local "snark_params"
+      ]
+    ~ppx:Ppx.mina;
+
+  (* -- snark_keys_header ------------------------------------------ *)
+  library "snark_keys_header"
+    ~path:"src/lib/crypto/snark_keys_header"
+    ~deps:
+      [ opam "base"
+      ; opam "base.caml"
+      ; opam "core_kernel"
+      ; opam "integers"
+      ; opam "result"
+      ; opam "sexplib0"
+      ; opam "stdio"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_compare"
+         ; "ppx_deriving.ord"
+         ; "ppx_deriving_yojson"
+         ; "ppx_let"
+         ; "ppx_sexp_conv"
+         ; "ppx_version"
+         ]);
+
+  (* -- plonkish_prelude ------------------------------------------- *)
+  library "plonkish_prelude"
+    ~path:"src/lib/crypto/plonkish_prelude"
+    ~flags:
+      [ list [ atom ":standard"; atom "-w"; atom "+a-40..42-44"
+             ; atom "-warn-error"; atom "+a" ] ]
+    ~modules_without_implementation:[ "sigs"; "poly_types" ]
+    ~deps:
+      [ opam "base.caml"
+      ; opam "bin_prot.shape"
+      ; opam "core_kernel"
+      ; opam "result"
+      ; opam "sexplib0"
+      ; local "mina_stdlib"
+      ; local "kimchi_pasta_snarky_backend"
+      ; local "mina_wire_types"
+      ; local "ppx_version.runtime"
+      ; local "snarky.backendless"
+      ; local "tuple_lib"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "h_list.ppx"
+         ; "ppx_deriving.std"
+         ; "ppx_deriving_yojson"
+         ; "ppx_jane"
+         ; "ppx_mina"
+         ; "ppx_version"
+         ]);
+
+  (* -- random_oracle_input ---------------------------------------- *)
+  library "random_oracle_input"
+    ~path:"src/lib/crypto/random_oracle_input"
+    ~inline_tests:true
+    ~deps:
+      [ opam "core_kernel"
+      ; opam "sexplib0"
+      ; opam "base.caml"
+      ; opam "ppx_inline_test.config"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_jane"
+         ; "ppx_sexp_conv"
+         ; "ppx_inline_test"
+         ; "ppx_let"
+         ; "ppx_version"
+         ; "ppx_deriving_yojson"
+         ]);
+
+  (* -- outside_hash_image ----------------------------------------- *)
+  library "outside_hash_image"
+    ~path:"src/lib/crypto/outside_hash_image"
+    ~deps:[ local "snark_params" ]
+    ~ppx:Ppx.minimal;
+
+  (* -- hash_prefixes ---------------------------------------------- *)
+  library "hash_prefixes"
+    ~path:"src/lib/hash_prefixes"
+    ~deps:[ local "mina_signature_kind" ]
+    ~ppx:Ppx.minimal;
+
+  (* -- sgn -------------------------------------------------------- *)
+  library "sgn"
+    ~path:"src/lib/sgn"
+    ~synopsis:"sgn library"
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "ppx_deriving_yojson.runtime"
+      ; opam "core_kernel"
+      ; opam "yojson"
+      ; opam "sexplib0"
+      ; opam "base"
+      ; opam "bin_prot.shape"
+      ; opam "base.caml"
+      ; local "snark_params"
+      ; local "sgn_type"
+      ; local "pickles"
+      ; local "snarky.backendless"
+      ; local "ppx_version.runtime"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_version"
+         ; "ppx_bin_prot"
+         ; "ppx_sexp_conv"
+         ; "ppx_compare"
+         ; "ppx_hash"
+         ; "ppx_compare"
+         ; "ppx_deriving_yojson"
+         ]);
+
+  (* -- timeout_lib ------------------------------------------------ *)
+  library "timeout_lib"
+    ~path:"src/lib/timeout_lib"
+    ~deps:
+      [ opam "core_kernel"
+      ; opam "async_kernel"
+      ; local "logger"
+      ]
+    ~ppx:Ppx.mina;
+
+  (* -- quickcheck_lib --------------------------------------------- *)
+  library "quickcheck_lib"
+    ~path:"src/lib/testing/quickcheck_lib"
+    ~inline_tests:true
+    ~deps:
+      [ opam "core_kernel"
+      ; opam "base"
+      ; opam "ppx_inline_test.config"
+      ; local "currency"
+      ; local "mina_stdlib"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_version"
+         ; "ppx_let"
+         ; "ppx_inline_test"
+         ; "ppx_custom_printf"
+         ]);
+
+  (* -- test_util -------------------------------------------------- *)
+  library "test_util"
+    ~path:"src/lib/testing/test_util"
+    ~synopsis:"test utils"
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "core_kernel"
+      ; opam "base.caml"
+      ; opam "bin_prot"
+      ; local "snark_params"
+      ; local "fold_lib"
+      ; local "snarky.backendless"
+      ; local "pickles"
+      ; local "crypto_params"
+      ]
+    ~ppx:
+      (Ppx.custom [ "ppx_version"; "ppx_jane"; "ppx_compare" ]);
+
+  (* -- disk_cache.intf -------------------------------------------- *)
+  library "disk_cache.intf"
+    ~internal_name:"disk_cache_intf"
+    ~path:"src/lib/disk_cache/intf"
+    ~deps:
+      [ opam "core_kernel"
+      ; opam "async_kernel"
+      ; local "logger"
+      ]
+    ~ppx:(Ppx.custom [ "ppx_mina"; "ppx_version" ]);
+
+  (* -- run_in_thread (virtual) ------------------------------------ *)
+  library "run_in_thread"
+    ~path:"src/lib/concurrency/run_in_thread"
+    ~deps:[ opam "async_kernel" ]
+    ~ppx:Ppx.minimal
+    ~virtual_modules:[ "run_in_thread" ]
+    ~default_implementation:"run_in_thread.native";
+
+  (* -- run_in_thread.native --------------------------------------- *)
+  library "run_in_thread.native"
+    ~internal_name:"run_in_thread_native"
+    ~path:"src/lib/concurrency/run_in_thread/native"
+    ~deps:[ opam "async"; opam "async_unix" ]
+    ~ppx:Ppx.minimal
+    ~implements:"run_in_thread";
+
+  (* -- run_in_thread.fake ----------------------------------------- *)
+  library "run_in_thread.fake"
+    ~internal_name:"run_in_thread_fake"
+    ~path:"src/lib/concurrency/run_in_thread/fake"
+    ~deps:[ opam "async_kernel" ]
+    ~ppx:Ppx.minimal
+    ~implements:"run_in_thread";
+
+  (* -- interruptible ---------------------------------------------- *)
+  library "interruptible"
+    ~path:"src/lib/concurrency/interruptible"
+    ~synopsis:
+      "Interruptible monad (deferreds, that can be triggered to cancel)"
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ opam "async_kernel"
+      ; opam "core_kernel"
+      ; local "run_in_thread"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_deriving.std"; "ppx_jane"; "ppx_version" ]);
+
+  (* -- promise (virtual) ------------------------------------------ *)
+  library "promise"
+    ~path:"src/lib/concurrency/promise"
+    ~deps:[ opam "base"; opam "async_kernel" ]
+    ~ppx:Ppx.minimal
+    ~virtual_modules:[ "promise" ]
+    ~default_implementation:"promise.native";
+
+  (* -- promise.native --------------------------------------------- *)
+  library "promise.native"
+    ~internal_name:"promise_native"
+    ~path:"src/lib/concurrency/promise/native"
+    ~deps:
+      [ opam "base"
+      ; opam "async_kernel"
+      ; local "run_in_thread"
+      ]
+    ~ppx:Ppx.minimal
+    ~implements:"promise";
+
+  (* -- promise.js ------------------------------------------------- *)
+  library "promise.js"
+    ~internal_name:"promise_js"
+    ~path:"src/lib/concurrency/promise/js"
+    ~deps:[ opam "base"; opam "async_kernel" ]
+    ~ppx:Ppx.minimal
+    ~implements:"promise"
+    ~js_of_ocaml:
+      ("js_of_ocaml"
+       @: [ "javascript_files" @: [ atom "promise.js" ] ]);
+
+  (* -- promise.js_helpers ----------------------------------------- *)
+  library "promise.js_helpers"
+    ~internal_name:"promise_js_helpers"
+    ~path:"src/lib/concurrency/promise/js_helpers"
+    ~deps:[ local "promise.js" ]
+    ~ppx:Ppx.minimal;
+
+  (* -- internal_tracing.context_call ------------------------------ *)
+  library "internal_tracing.context_call"
+    ~internal_name:"internal_tracing_context_call"
+    ~path:"src/lib/internal_tracing/context_call"
+    ~synopsis:"Internal tracing context call ID helper"
+    ~library_flags:[ "-linkall" ]
+    ~inline_tests:true
+    ~deps:
+      [ opam "base.base_internalhash_types"
+      ; opam "core_kernel"
+      ; opam "sexplib0"
+      ; opam "async_kernel"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_jane"
+         ; "ppx_mina"
+         ; "ppx_version"
+         ; "ppx_deriving_yojson"
+         ]);
+
+  (* -- internal_tracing ------------------------------------------- *)
+  library "internal_tracing"
+    ~path:"src/lib/internal_tracing"
+    ~synopsis:"Internal tracing"
+    ~library_flags:[ "-linkall" ]
+    ~inline_tests:true
+    ~deps:
+      [ opam "core"
+      ; opam "yojson"
+      ; opam "async_kernel"
+      ; local "logger"
+      ; local "mina_base"
+      ; local "mina_numbers"
+      ; local "internal_tracing.context_call"
+      ; local "logger.context_logger"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_jane"
+         ; "ppx_mina"
+         ; "ppx_version"
+         ; "ppx_deriving_yojson"
+         ]);
+
+  (* -- mina_metrics (virtual) ------------------------------------- *)
+  library "mina_metrics"
+    ~path:"src/lib/mina_metrics"
+    ~deps:
+      [ opam "async_kernel"
+      ; opam "logger"
+      ; opam "uri"
+      ; opam "core_kernel"
+      ]
+    ~ppx:Ppx.minimal
+    ~virtual_modules:[ "mina_metrics" ]
+    ~default_implementation:"mina_metrics.prometheus";
+
+  (* -- mina_metrics.none ------------------------------------------ *)
+  library "mina_metrics.none"
+    ~internal_name:"mina_metrics_none"
+    ~path:"src/lib/mina_metrics/no_metrics"
+    ~deps:
+      [ opam "async_kernel"
+      ; opam "logger"
+      ; opam "uri"
+      ; opam "core_kernel"
+      ]
+    ~ppx:Ppx.minimal
+    ~implements:"mina_metrics";
+
+  (* -- mina_metrics.prometheus ------------------------------------ *)
+  library "mina_metrics.prometheus"
+    ~internal_name:"mina_metrics_prometheus"
+    ~path:"src/lib/mina_metrics/prometheus_metrics"
+    ~deps:
+      [ opam "conduit-async"
+      ; opam "ppx_hash.runtime-lib"
+      ; opam "fmt"
+      ; opam "re"
+      ; opam "base"
+      ; opam "core"
+      ; opam "async_kernel"
+      ; opam "core_kernel"
+      ; opam "prometheus"
+      ; opam "cohttp-async"
+      ; opam "cohttp"
+      ; opam "async"
+      ; opam "base.base_internalhash_types"
+      ; opam "uri"
+      ; opam "async_unix"
+      ; opam "base.caml"
+      ; local "logger"
+      ; local "o1trace"
+      ; local "mina_node_config"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_mina"
+         ; "ppx_let"
+         ; "ppx_version"
+         ; "ppx_pipebang"
+         ; "ppx_custom_printf"
+         ; "ppx_here"
+         ])
+    ~implements:"mina_metrics";
+
+  (* -- cache_dir (virtual) ---------------------------------------- *)
+  library "cache_dir"
+    ~path:"src/lib/cache_dir"
+    ~deps:
+      [ opam "async_kernel"
+      ; local "key_cache"
+      ; local "logger"
+      ]
+    ~ppx:Ppx.minimal
+    ~virtual_modules:[ "cache_dir" ]
+    ~default_implementation:"cache_dir.native";
+
+  (* -- cache_dir.native ------------------------------------------- *)
+  library "cache_dir.native"
+    ~internal_name:"cache_dir_native"
+    ~path:"src/lib/cache_dir/native"
+    ~deps:
+      [ opam "base.caml"
+      ; opam "async_unix"
+      ; opam "base"
+      ; opam "core"
+      ; opam "async"
+      ; opam "core_kernel"
+      ; opam "stdio"
+      ; opam "async_kernel"
+      ; local "key_cache"
+      ; local "logger"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ "ppx_mina"
+         ; "ppx_version"
+         ; "ppx_here"
+         ; "ppx_let"
+         ; "ppx_custom_printf"
+         ])
+    ~implements:"cache_dir";
+
+  (* -- cache_dir.fake --------------------------------------------- *)
+  library "cache_dir.fake"
+    ~internal_name:"cache_dir_fake"
+    ~path:"src/lib/cache_dir/fake"
+    ~deps:
+      [ opam "async_kernel"
+      ; opam "core_kernel"
+      ; local "key_cache"
+      ]
+    ~ppx:Ppx.minimal
+    ~implements:"cache_dir";
+
+  (* -- mina_node_config.intf -------------------------------------- *)
+  library "mina_node_config.intf"
+    ~internal_name:"node_config_intf"
+    ~path:"src/lib/node_config/intf"
+    ~modules_without_implementation:[ "node_config_intf" ]
+    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_base" ]);
+
+  (* -- mina_node_config ------------------------------------------- *)
+  library "mina_node_config"
+    ~internal_name:"node_config"
+    ~path:"src/lib/node_config"
+    ~deps:
+      [ local "node_config_intf"
+      ; local "node_config_version"
+      ; local "node_config_unconfigurable_constants"
+      ; local "node_config_profiled"
+      ]
+    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_base" ]);
+
+  (* -- mina_node_config.for_unit_tests ---------------------------- *)
+  library "mina_node_config.for_unit_tests"
+    ~internal_name:"node_config_for_unit_tests"
+    ~path:"src/lib/node_config/for_unit_tests"
+    ~deps:
+      [ local "node_config_intf"
+      ; local "node_config_version"
+      ; local "node_config_unconfigurable_constants"
+      ]
+    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_base" ]);
+
+  (* -- mina_node_config.profiled ---------------------------------- *)
+  library "mina_node_config.profiled"
+    ~internal_name:"node_config_profiled"
+    ~path:"src/lib/node_config/profiled"
+    ~deps:
+      [ opam "core_kernel"
+      ; local "comptime"
+      ; local "node_config_intf"
+      ]
+    ~ppx:Ppx.minimal;
+
+  (* -- mina_node_config.unconfigurable_constants ------------------ *)
+  library "mina_node_config.unconfigurable_constants"
+    ~internal_name:"node_config_unconfigurable_constants"
+    ~path:"src/lib/node_config/unconfigurable_constants"
+    ~deps:[ local "node_config_intf" ]
+    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_base" ]);
+
+  (* -- mina_node_config.version ----------------------------------- *)
+  library "mina_node_config.version"
+    ~internal_name:"node_config_version"
+    ~path:"src/lib/node_config/version"
+    ~deps:[ local "node_config_intf" ]
+    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_base" ]);
+
+  (* ============================================================ *)
   (* Executables (src/app)                                        *)
   (* ============================================================ *)
 
@@ -983,7 +1543,7 @@ let register () =
       ; local "mina_version"
       ]
     ~modes:[ "native" ]
-    ~flags:[ ":standard"; "-w"; "+a" ]
+    ~flags:[ atom ":standard"; atom "-w"; atom "+a" ]
     ~ppx:Ppx.minimal;
 
   (* -- logproc ---------------------------------------------------- *)
