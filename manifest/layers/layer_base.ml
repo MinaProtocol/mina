@@ -484,15 +484,15 @@ let mina_numbers =
       ; local "bignum_bigint"
       ; local "pickles"
       ; codable
-      ; local "snarky.backendless"
-      ; local "fold_lib"
-      ; local "tuple_lib"
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.fold_lib
+      ; Snarky_lib.tuple_lib
       ; Layer_snarky.snark_bits
       ; local "snark_params"
       ; unsigned_extended
       ; local "random_oracle"
       ; local "random_oracle_input"
-      ; local "bitstring_lib"
+      ; Snarky_lib.bitstring_lib
       ; Layer_test.test_util
       ; local "kimchi_backend_common"
       ; Layer_ppx.ppx_version_runtime
@@ -543,7 +543,7 @@ let currency =
       ; sexplib0
       ; zarith
       ; local "bignum_bigint"
-      ; local "bitstring_lib"
+      ; Snarky_lib.bitstring_lib
       ; codable
       ; local "kimchi_backend_common"
       ; local "mina_numbers"
@@ -555,7 +555,7 @@ let currency =
       ; local "sgn"
       ; Layer_snarky.snark_bits
       ; local "snark_params"
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_test.test_util
       ; unsigned_extended
       ]
@@ -682,7 +682,7 @@ let mina_base =
       ; local "fields_derivers_graphql"
       ; local "fields_derivers_json"
       ; local "fields_derivers_zkapps"
-      ; local "fold_lib"
+      ; Snarky_lib.fold_lib
       ; local "genesis_constants"
       ; local "hash_prefix_create"
       ; local "hash_prefix_states"
@@ -715,7 +715,7 @@ let mina_base =
       ; local "signature_lib"
       ; Layer_snarky.snark_bits
       ; local "snark_params"
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; local "sparse_ledger_lib"
       ; Layer_test.test_util
       ; unsigned_extended

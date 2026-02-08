@@ -32,8 +32,8 @@ let test_util =
       ; base_caml
       ; bin_prot
       ; local "snark_params"
-      ; local "fold_lib"
-      ; local "snarky.backendless"
+      ; Snarky_lib.fold_lib
+      ; Snarky_lib.snarky_backendless
       ; local "pickles"
       ; local "crypto_params"
       ]

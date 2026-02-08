@@ -82,7 +82,7 @@ let transaction_protocol_state =
       ; Layer_pickles.pickles
       ; Layer_domain.genesis_constants
       ; Layer_crypto.snark_params
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_consensus.mina_state
       ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
@@ -118,7 +118,7 @@ let zkapp_command_builder =
       ; Layer_crypto.signature_lib
       ; Layer_crypto.sgn
       ; Layer_crypto.snark_params
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ]
     ~ppx:
       (Ppx.custom
@@ -140,7 +140,7 @@ let transaction_snark =
       ; bignum
       ; core
       ; splittable_random
-      ; local "bitstring_lib"
+      ; Snarky_lib.bitstring_lib
       ; Layer_base.mina_stdlib
       ; Layer_storage.cache_dir
       ; Layer_consensus.coda_genesis_ledger
@@ -179,14 +179,14 @@ let transaction_snark =
       ; Layer_crypto.sgn
       ; Layer_base.sgn_type
       ; Layer_crypto.signature_lib
-      ; local "snarky.backendless"
-      ; local "snarky_integer"
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.snarky_integer
       ; Layer_crypto.snark_keys_header
       ; Layer_crypto.snark_params
       ; Layer_test.test_util
       ; transaction_protocol_state
       ; Layer_transaction.transaction_witness
-      ; local "tuple_lib"
+      ; Snarky_lib.tuple_lib
       ; Layer_base.with_hash
       ]
     ~ppx:
@@ -234,7 +234,7 @@ let blockchain_snark =
       ; Layer_ppx.ppx_version_runtime
       ; Layer_crypto.random_oracle
       ; Layer_crypto.sgn
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.snark_keys_header
       ; Layer_crypto.snark_params
       ; transaction_snark
@@ -356,7 +356,7 @@ let transaction_snark_tests =
       ; Layer_base.currency
       ; Layer_consensus.mina_state
       ; Layer_crypto.signature_lib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_consensus.coda_genesis_ledger
@@ -441,7 +441,7 @@ let transaction_snark_tests_access_permission =
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; transaction_protocol_state
       ; transaction_snark
       ; transaction_snark_tests
@@ -503,7 +503,7 @@ let account_timing_tests =
       ; Layer_consensus.consensus
       ; Layer_base.one_or_two
       ; Layer_consensus.coda_genesis_ledger
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_transaction.mina_transaction_logic
       ; Layer_base.mina_wire_types
       ]
@@ -694,7 +694,7 @@ let multisig_tests =
       ; transaction_snark
       ; Layer_crypto.snark_params
       ; Layer_crypto.crypto_params
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_ledger.mina_ledger
       ; Layer_base.mina_base
       ; Layer_base.currency
@@ -939,7 +939,7 @@ let transaction_snark_tests_verify_simple_test =
       ; Layer_base.currency
       ; Layer_consensus.mina_state
       ; Layer_crypto.signature_lib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_domain.genesis_constants
       ; transaction_protocol_state
       ; Layer_consensus.coda_genesis_ledger

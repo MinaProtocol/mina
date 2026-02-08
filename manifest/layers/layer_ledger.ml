@@ -256,7 +256,7 @@ let mina_ledger =
       ; Layer_base.key_value_database
       ; Layer_domain.data_hash_lib
       ; Layer_test.quickcheck_lib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_ppx.ppx_version_runtime

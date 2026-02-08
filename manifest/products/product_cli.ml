@@ -98,7 +98,7 @@ let init =
       ; Layer_network.genesis_ledger_helper
       ; Layer_network.genesis_ledger_helper_lib
       ; local "graphql_lib"
-      ; local "group_map"
+      ; Snarky_lib.group_map
       ; Layer_tooling.internal_tracing
       ; local "itn_crypto"
       ; local "itn_logger"
@@ -263,7 +263,7 @@ let cli_mina_cli_entrypoint =
       ; Layer_service.prover
       ; Layer_crypto.secrets
       ; Layer_crypto.signature_lib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_snark_worker.snark_work_lib
       ; Layer_snark_worker.snark_worker
       ; Layer_protocol.transaction_snark

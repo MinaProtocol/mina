@@ -21,10 +21,10 @@ let vrf_lib =
       ; core_kernel
       ; bignum
       ; ppx_inline_test_config
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_domain.genesis_constants
       ; local "snarky_curves"
-      ; local "bitstring_lib"
+      ; Snarky_lib.bitstring_lib
       ; Layer_ppx.ppx_version_runtime
       ]
     ~ppx:
@@ -64,15 +64,15 @@ let consensus_vrf =
       ; Layer_base.base58_check
       ; Layer_crypto.random_oracle_input
       ; Layer_base.unsigned_extended
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_pickles.pickles
       ; Layer_snarky.snarky_taylor
       ; Layer_base.mina_numbers
-      ; local "fold_lib"
+      ; Snarky_lib.fold_lib
       ; Layer_base.mina_base
       ; Layer_crypto.snark_params
       ; vrf_lib
-      ; local "snarky_integer"
+      ; Snarky_lib.snarky_integer
       ; Layer_test.test_util
       ; Layer_pickles.pickles_backend
       ; Layer_crypto.non_zero_curve_point
@@ -129,7 +129,7 @@ let consensus =
       ; Layer_base.unsigned_extended
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
-      ; local "fold_lib"
+      ; Snarky_lib.fold_lib
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.outside_hash_image
       ; Layer_logging.logger
@@ -158,7 +158,7 @@ let consensus =
       ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_crypto.signature_lib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.blake2
       ; Layer_crypto.crypto_params
       ; Layer_domain.data_hash_lib
@@ -229,11 +229,11 @@ let mina_state =
       ; Layer_transaction.mina_transaction_logic
       ; Layer_crypto.snark_params
       ; consensus
-      ; local "bitstring_lib"
-      ; local "fold_lib"
-      ; local "tuple_lib"
+      ; Snarky_lib.bitstring_lib
+      ; Snarky_lib.fold_lib
+      ; Snarky_lib.tuple_lib
       ; Layer_base.with_hash
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.crypto_params
       ; Layer_domain.data_hash_lib
       ; Layer_base.currency
@@ -300,7 +300,7 @@ let precomputed_values =
       ; Layer_crypto.crypto_params
       ; Layer_base.mina_base
       ; Layer_domain.dummy_values
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; coda_genesis_ledger
       ; consensus
       ; local "mina_runtime_config"
@@ -321,7 +321,7 @@ let coda_genesis_proof =
       ; core
       ; async
       ; async_kernel
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_pickles.pickles_types
       ; Layer_base.currency
       ; Layer_pickles.pickles

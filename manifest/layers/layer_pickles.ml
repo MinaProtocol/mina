@@ -28,8 +28,8 @@ let pickles_types =
       ; Layer_kimchi.kimchi_backend_common
       ; local "kimchi_pasta_snarky_backend"
       ; Layer_kimchi.plonkish_prelude
-      ; local "snarky.backendless"
-      ; local "tuple_lib"
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.tuple_lib
       ; Layer_ppx.ppx_version_runtime
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
@@ -58,7 +58,7 @@ let pickles_base_one_hot_vector =
       ; atom "-open"
       ; atom "Core_kernel"
       ]
-    ~deps:[ core_kernel; local "snarky.backendless"; pickles_types ]
+    ~deps:[ core_kernel; Snarky_lib.snarky_backendless; pickles_types ]
     ~ppx:Ppx.standard
 
 let pickles_base =
@@ -80,7 +80,7 @@ let pickles_base =
       ; ppxlib
       ; core_kernel
       ; Layer_base.mina_wire_types
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.random_oracle_input
       ; pickles_types
       ; pickles_base_one_hot_vector
@@ -129,7 +129,7 @@ let pickles_limb_vector =
       ; core_kernel
       ; base_caml
       ; result
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; pickles_backend
       ; pickles_types
       ; Layer_kimchi.kimchi_pasta
@@ -157,7 +157,7 @@ let pickles_pseudo =
       ; pickles_types
       ; local "pickles_plonk_checks"
       ; pickles_base_one_hot_vector
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; pickles_base
       ]
     ~ppx:Ppx.mina_rich
@@ -184,7 +184,7 @@ let pickles_composition_types =
       ; Layer_base.mina_wire_types
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; pickles_types
       ; pickles_limb_vector
       ; Layer_kimchi.kimchi_backend
@@ -228,8 +228,8 @@ let pickles_plonk_checks =
       ; pickles_composition_types
       ; Layer_kimchi.kimchi_backend
       ; local "kimchi_types"
-      ; local "snarky.backendless"
-      ; local "tuple_lib"
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.tuple_lib
       ]
     ~ppx:
       (Ppx.custom
@@ -287,13 +287,13 @@ let pickles =
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_kimchi.kimchi_pasta_constraint_system
       ; local "kimchi_pasta_snarky_backend"
-      ; local "bitstring_lib"
-      ; local "snarky.intf"
+      ; Snarky_lib.bitstring_lib
+      ; Snarky_lib.snarky_intf
       ; pickles_backend
       ; pickles_types
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; local "snarky_group_map"
-      ; local "sponge"
+      ; Snarky_lib.sponge
       ; pickles_pseudo
       ; pickles_limb_vector
       ; pickles_base
@@ -306,11 +306,11 @@ let pickles =
       ; pickles_plonk_checks
       ; pickles_base_one_hot_vector
       ; local "snarky_log"
-      ; local "group_map"
-      ; local "snarky_curve"
+      ; Snarky_lib.group_map
+      ; Snarky_lib.snarky_curve
       ; local "key_cache"
       ; Layer_crypto.snark_keys_header
-      ; local "tuple_lib"
+      ; Snarky_lib.tuple_lib
       ; Layer_concurrency.promise
       ; Layer_kimchi.kimchi_backend_common
       ; Layer_logging.logger

@@ -247,6 +247,35 @@ let unsigned_extended = opam "unsigned_extended"
 
 let zkapp_test_transaction_lib = opam "zkapp_test_transaction_lib"
 
+(* Snarky submodule libraries (src/lib/snarky/).
+   These have their own dune-project and are not generated
+   by the manifest. *)
+module Snarky_lib = struct
+  let snarky = submodule "snarky"
+
+  let snarky_backendless = submodule "snarky.backendless"
+
+  let snarky_intf = submodule "snarky.intf"
+
+  let snarky_integer = submodule "snarky_integer"
+
+  let snarky_curve = submodule "snarky_curve"
+
+  let fold_lib = submodule "fold_lib"
+
+  let tuple_lib = submodule "tuple_lib"
+
+  let bitstring_lib = submodule "bitstring_lib"
+
+  let sponge = submodule "sponge"
+
+  let snarkette = submodule "snarkette"
+
+  let group_map = submodule "group_map"
+
+  let h_list = submodule "h_list"
+end
+
 (* PPX preprocessor libraries (string constants for Ppx.custom/extend). *)
 module Ppx_lib = struct
   let base_quickcheck_ppx_quickcheck = "base_quickcheck.ppx_quickcheck"

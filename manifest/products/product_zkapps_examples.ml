@@ -28,9 +28,9 @@ let zkapps_examples =
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.snark_params
-      ; local "tuple_lib"
+      ; Snarky_lib.tuple_lib
       ; Layer_base.with_hash
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_let; Ppx_lib.ppx_version ])
@@ -46,7 +46,7 @@ let zkapps_actions =
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_types
       ; Layer_crypto.signature_lib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.snark_params
       ; zkapps_examples
       ]
@@ -63,7 +63,7 @@ let zkapps_add_events =
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_types
       ; Layer_crypto.signature_lib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.snark_params
       ; zkapps_examples
       ]
@@ -89,9 +89,9 @@ let zkapps_big_circuit =
       ; Layer_crypto.random_oracle
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.snark_params
-      ; local "tuple_lib"
+      ; Snarky_lib.tuple_lib
       ; zkapps_examples
       ]
     ~ppx:Ppx.minimal
@@ -117,9 +117,9 @@ let zkapps_calls =
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.snark_params
-      ; local "tuple_lib"
+      ; Snarky_lib.tuple_lib
       ; Layer_base.with_hash
       ; zkapps_examples
       ]
@@ -144,9 +144,9 @@ let zkapps_empty_update =
       ; Layer_crypto.random_oracle
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.snark_params
-      ; local "tuple_lib"
+      ; Snarky_lib.tuple_lib
       ; zkapps_examples
       ]
     ~ppx:Ppx.minimal
@@ -171,9 +171,9 @@ let zkapps_initialize_state =
       ; Layer_crypto.random_oracle
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.snark_params
-      ; local "tuple_lib"
+      ; Snarky_lib.tuple_lib
       ; zkapps_examples
       ]
     ~ppx:Ppx.minimal
@@ -206,8 +206,8 @@ let zkapps_tokens =
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
-      ; local "snarky.backendless"
-      ; local "tuple_lib"
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.tuple_lib
       ; Layer_base.with_hash
       ; zkapps_examples
       ]
@@ -250,7 +250,7 @@ let tokens =
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_protocol.transaction_protocol_state
       ; Layer_protocol.transaction_snark
       ; Layer_protocol.transaction_snark_tests
@@ -375,7 +375,7 @@ let () =
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_protocol.transaction_protocol_state
       ; Layer_protocol.transaction_snark
       ; Layer_protocol.transaction_snark_tests
@@ -420,7 +420,7 @@ let () =
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_protocol.transaction_protocol_state
       ; Layer_protocol.transaction_snark
       ; Layer_protocol.transaction_snark_tests
@@ -466,7 +466,7 @@ let () =
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_protocol.transaction_protocol_state
       ; Layer_protocol.transaction_snark
       ; Layer_protocol.transaction_snark_tests
@@ -511,7 +511,7 @@ let () =
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_protocol.transaction_protocol_state
       ; Layer_protocol.transaction_snark
       ; Layer_protocol.transaction_snark_tests

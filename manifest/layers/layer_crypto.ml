@@ -34,7 +34,7 @@ let bignum_bigint =
   library "bignum_bigint" ~path:"src/lib/crypto/bignum_bigint"
     ~synopsis:"Bignum's bigint re-exported as Bignum_bigint"
     ~library_flags:[ "-linkall" ] ~inline_tests:true
-    ~deps:[ core_kernel; async_kernel; bignum_bigint; local "fold_lib" ]
+    ~deps:[ core_kernel; async_kernel; bignum_bigint; Snarky_lib.fold_lib ]
     ~ppx:Ppx.standard
 
 let string_sign =
@@ -108,7 +108,7 @@ let sgn =
       ; local "snark_params"
       ; Layer_base.sgn_type
       ; local "pickles"
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_ppx.ppx_version_runtime
       ]
     ~ppx:
@@ -133,14 +133,14 @@ let crypto_params =
       ; core_kernel
       ; sexplib0
       ; local "cache_dir"
-      ; local "group_map"
+      ; Snarky_lib.group_map
       ; Layer_kimchi.kimchi_backend
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; local "pickles"
       ; local "pickles_backend"
-      ; local "snarky.backendless"
-      ; local "tuple_lib"
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.tuple_lib
       ]
     ~ppx:
       (Ppx.custom [ Ppx_lib.h_list_ppx; Ppx_lib.ppx_jane; Ppx_lib.ppx_version ])
@@ -167,17 +167,17 @@ let snark_params =
       ; bignum_bigint
       ; local "pickles_backend"
       ; local "snarky_curves"
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; local "snarky_group_map"
-      ; local "sponge"
-      ; local "group_map"
-      ; local "fold_lib"
-      ; local "bitstring_lib"
+      ; Snarky_lib.sponge
+      ; Snarky_lib.group_map
+      ; Snarky_lib.fold_lib
+      ; Snarky_lib.bitstring_lib
       ; Layer_snarky.snark_bits
       ; local "pickles"
       ; crypto_params
       ; local "snarky_field_extensions"
-      ; local "snarky.intf"
+      ; Snarky_lib.snarky_intf
       ; Layer_kimchi.kimchi_backend
       ]
     ~ppx:
@@ -205,13 +205,13 @@ let random_oracle =
       ; sexplib0
       ; snark_params
       ; local "pickles_backend"
-      ; local "sponge"
+      ; Snarky_lib.sponge
       ; local "pickles"
       ; random_oracle_input
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
-      ; local "fold_lib"
+      ; Snarky_lib.fold_lib
       ; local "random_oracle_permutation"
       ]
     ~ppx:
@@ -230,7 +230,7 @@ let random_oracle_permutation =
   library "random_oracle.permutation" ~internal_name:"random_oracle_permutation"
     ~path:"src/lib/crypto/random_oracle/permutation"
     ~deps:
-      [ local "sponge"
+      [ Snarky_lib.sponge
       ; Layer_kimchi.kimchi_backend
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
@@ -248,7 +248,7 @@ let random_oracle_permutation_external =
       ; base
       ; core_kernel
       ; sexplib0
-      ; local "sponge"
+      ; Snarky_lib.sponge
       ; local "pickles"
       ; local "pickles_backend"
       ; Layer_kimchi.kimchi_bindings_pasta_fp_poseidon
@@ -270,7 +270,7 @@ let random_oracle_permutation_ocaml =
     ~deps:
       [ base
       ; core_kernel
-      ; local "sponge"
+      ; Snarky_lib.sponge
       ; local "pickles"
       ; local "pickles_backend"
       ; Layer_kimchi.kimchi_backend
@@ -292,16 +292,16 @@ let non_zero_curve_point =
       ; base
       ; base_internalhash_types
       ; Layer_base.mina_wire_types
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; random_oracle_input
       ; local "pickles_backend"
       ; local "pickles"
       ; Layer_base.codable
       ; snark_params
-      ; local "fold_lib"
+      ; Snarky_lib.fold_lib
       ; Layer_base.base58_check
       ; random_oracle
-      ; local "bitstring_lib"
+      ; Snarky_lib.bitstring_lib
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_test.test_util
@@ -343,7 +343,7 @@ let signature_lib =
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; random_oracle_input
-      ; local "bitstring_lib"
+      ; Snarky_lib.bitstring_lib
       ; Layer_base.codable
       ; snark_params
       ; local "mina_debug"
@@ -351,15 +351,15 @@ let signature_lib =
       ; local "hash_prefix_states"
       ; non_zero_curve_point
       ; random_oracle
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; bignum_bigint
       ; Layer_base.base58_check
       ; local "snarky_curves"
       ; local "pickles"
-      ; local "fold_lib"
+      ; Snarky_lib.fold_lib
       ; local "pickles_backend"
       ; Layer_kimchi.kimchi_backend
-      ; local "h_list"
+      ; Snarky_lib.h_list
       ; Layer_test.test_util
       ; Layer_ppx.ppx_version_runtime
       ]
@@ -410,7 +410,7 @@ let secrets =
       ; signature_lib
       ; local "network_peer"
       ; Layer_base.mina_numbers
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_base.error_json
       ; Layer_base.mina_base_import
       ]

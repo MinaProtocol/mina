@@ -42,6 +42,12 @@ val opam : string -> dep
 (** Internal (local) dependency. *)
 val local : string -> dep
 
+(** Submodule dependency (e.g. snarky).
+    Like [local] at the dune level, but semantically distinct:
+    the library comes from a git submodule with its own
+    dune-project and is not managed by the manifest. *)
+val submodule : string -> dep
+
 (** {1 Library registration} *)
 
 val library :

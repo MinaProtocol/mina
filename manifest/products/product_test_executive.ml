@@ -54,7 +54,7 @@ let () =
       ; Layer_crypto.secrets
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.snark_params
       ; Layer_protocol.transaction_snark
       ; Layer_domain.user_command_input

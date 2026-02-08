@@ -29,8 +29,8 @@ let plonkish_prelude =
       ; local "kimchi_pasta_snarky_backend"
       ; Layer_base.mina_wire_types
       ; Layer_ppx.ppx_version_runtime
-      ; local "snarky.backendless"
-      ; local "tuple_lib"
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.tuple_lib
       ]
     ~ppx:
       (Ppx.custom
@@ -193,7 +193,7 @@ let kimchi_backend_common =
       ; local "bignum_bigint"
       ; zarith
       ; base_internalhash_types
-      ; local "tuple_lib"
+      ; Snarky_lib.tuple_lib
       ; local "key_cache"
       ; Layer_base.hex
       ; local "kimchi_bindings"
@@ -201,9 +201,9 @@ let kimchi_backend_common =
       ; local "kimchi_types"
       ; local "pasta_bindings"
       ; plonkish_prelude
-      ; local "sponge"
+      ; Snarky_lib.sponge
       ; Layer_base.allocation_functor
-      ; local "snarky.intf"
+      ; Snarky_lib.snarky_intf
       ; Layer_concurrency.promise
       ; Layer_logging.logger
       ; Layer_logging.logger_context_logger
@@ -230,7 +230,7 @@ let kimchi_pasta =
       ; core_kernel
       ; bin_prot_shape
       ; base_caml
-      ; local "sponge"
+      ; Snarky_lib.sponge
       ; kimchi_backend_common
       ; Layer_concurrency.promise
       ; local "kimchi_bindings"
@@ -239,7 +239,7 @@ let kimchi_pasta =
       ; local "kimchi_pasta_constraint_system"
       ; local "kimchi_types"
       ; local "pasta_bindings"
-      ; local "snarkette"
+      ; Snarky_lib.snarkette
       ; Layer_ppx.ppx_version_runtime
       ]
     ~ppx:
@@ -261,14 +261,14 @@ let kimchi_pasta_basic =
       ; core_kernel
       ; bin_prot_shape
       ; base_caml
-      ; local "sponge"
+      ; Snarky_lib.sponge
       ; kimchi_backend_common
       ; Layer_concurrency.promise
       ; local "kimchi_bindings"
       ; local "kimchi_types"
       ; Layer_base.mina_stdlib
       ; local "pasta_bindings"
-      ; local "snarkette"
+      ; Snarky_lib.snarkette
       ; Layer_ppx.ppx_version_runtime
       ]
     ~ppx:
@@ -291,16 +291,16 @@ let kimchi_pasta_constraint_system =
       ; core_kernel
       ; bin_prot_shape
       ; base_caml
-      ; local "sponge"
+      ; Snarky_lib.sponge
       ; kimchi_backend_common
       ; Layer_concurrency.promise
       ; local "kimchi_bindings"
       ; kimchi_pasta_basic
       ; local "kimchi_types"
       ; local "pasta_bindings"
-      ; local "snarkette"
+      ; Snarky_lib.snarkette
       ; Layer_ppx.ppx_version_runtime
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ]
     ~ppx:
       (Ppx.custom
@@ -324,14 +324,14 @@ let kimchi_pasta_constraint_system_caml =
       ; core_kernel
       ; bin_prot_shape
       ; base_caml
-      ; local "sponge"
+      ; Snarky_lib.sponge
       ; kimchi_backend_common
       ; Layer_concurrency.promise
       ; local "kimchi_bindings"
       ; kimchi_pasta_basic
       ; local "kimchi_types"
       ; local "pasta_bindings"
-      ; local "snarkette"
+      ; Snarky_lib.snarkette
       ; Layer_ppx.ppx_version_runtime
       ]
     ~ppx:
@@ -363,9 +363,9 @@ let kimchi_backend =
       ; kimchi_pasta_constraint_system
       ; local "kimchi_types"
       ; local "pasta_bindings"
-      ; local "snarky.intf"
-      ; local "snarkette"
-      ; local "sponge"
+      ; Snarky_lib.snarky_intf
+      ; Snarky_lib.snarkette
+      ; Snarky_lib.sponge
       ]
     ~ppx:
       (Ppx.custom
@@ -388,7 +388,7 @@ let kimchi_backend_gadgets =
       ; kimchi_pasta
       ; local "kimchi_gadgets_test_runner"
       ; Layer_base.mina_stdlib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ]
     ~ppx:Ppx.standard
 
@@ -417,21 +417,21 @@ let kimchi_backend_gadgets_test_runner =
       ; kimchi_pasta
       ; kimchi_pasta_basic
       ; kimchi_pasta_constraint_system
-      ; local "bitstring_lib"
-      ; local "snarky.intf"
-      ; local "snarky.backendless"
+      ; Snarky_lib.bitstring_lib
+      ; Snarky_lib.snarky_intf
+      ; Snarky_lib.snarky_backendless
       ; local "snarky_group_map"
-      ; local "sponge"
+      ; Snarky_lib.sponge
       ; kimchi_backend
       ; Layer_base.base58_check
       ; Layer_base.codable
       ; local "random_oracle_input"
       ; local "snarky_log"
-      ; local "group_map"
-      ; local "snarky_curve"
+      ; Snarky_lib.group_map
+      ; Snarky_lib.snarky_curve
       ; local "key_cache"
       ; local "snark_keys_header"
-      ; local "tuple_lib"
+      ; Snarky_lib.tuple_lib
       ; Layer_concurrency.promise
       ; kimchi_backend_common
       ; Layer_ppx.ppx_version_runtime

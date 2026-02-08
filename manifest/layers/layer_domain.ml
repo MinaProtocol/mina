@@ -69,13 +69,13 @@ let data_hash_lib =
       ; ppx_inline_test_config
       ; Layer_base.base58_check
       ; Layer_crypto.bignum_bigint
-      ; local "bitstring_lib"
+      ; Snarky_lib.bitstring_lib
       ; Layer_base.codable
       ; local "fields_derivers"
       ; local "fields_derivers_graphql"
       ; local "fields_derivers_json"
       ; local "fields_derivers_zkapps"
-      ; local "fold_lib"
+      ; Snarky_lib.fold_lib
       ; Layer_base.mina_wire_types
       ; Layer_crypto.outside_hash_image
       ; Layer_pickles.pickles
@@ -84,8 +84,8 @@ let data_hash_lib =
       ; Layer_crypto.random_oracle_input
       ; Layer_snarky.snark_bits
       ; Layer_crypto.snark_params
-      ; local "snarky.backendless"
-      ; local "snarky.intf"
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.snarky_intf
       ; Layer_test.test_util
       ]
     ~ppx:
@@ -115,7 +115,7 @@ let block_time =
       ; base
       ; base_internalhash_types
       ; Layer_base.mina_wire_types
-      ; local "bitstring_lib"
+      ; Snarky_lib.bitstring_lib
       ; Layer_pickles.pickles
       ; Layer_base.unsigned_extended
       ; Layer_crypto.snark_params
@@ -124,7 +124,7 @@ let block_time =
       ; Layer_snarky.snark_bits
       ; Layer_concurrency.timeout_lib
       ; Layer_crypto.crypto_params
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.random_oracle
       ; Layer_ppx.ppx_version_runtime
@@ -396,7 +396,7 @@ let dummy_values =
     ~deps:
       [ core_kernel
       ; Layer_crypto.crypto_params
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_pickles.pickles
       ]
     ~ppx_runtime_libraries:[ "base" ]

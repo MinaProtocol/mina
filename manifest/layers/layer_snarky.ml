@@ -13,8 +13,8 @@ let snarky_taylor =
       ; bignum_bigint
       ; core_kernel
       ; sexplib0
-      ; local "snarky.backendless"
-      ; local "snarky_integer"
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.snarky_integer
       ]
     ~ppx:
       (Ppx.custom
@@ -28,11 +28,11 @@ let snark_bits =
       [ core_kernel
       ; integers
       ; base
-      ; local "fold_lib"
-      ; local "snarky.backendless"
-      ; local "tuple_lib"
-      ; local "bitstring_lib"
-      ; local "snarky.intf"
+      ; Snarky_lib.fold_lib
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.tuple_lib
+      ; Snarky_lib.bitstring_lib
+      ; Snarky_lib.snarky_intf
       ]
     ~ppx:
       (Ppx.custom

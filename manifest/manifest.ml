@@ -31,13 +31,15 @@ module Ppx = struct
   let extend preset extras = preset @ extras
 end
 
-type dep_kind = Opam | Local
+type dep_kind = Opam | Local | Submodule
 
 type dep = { name : string; kind : dep_kind }
 
 let opam name = { name; kind = Opam }
 
 let local name = { name; kind = Local }
+
+let submodule name = { name; kind = Submodule }
 
 type library_target =
   { l_public_name : string option
@@ -310,7 +312,7 @@ let file_stanzas ~path stanzas =
 
 let render_deps deps =
   let opam_deps = List.filter (fun d -> d.kind = Opam) deps in
-  let local_deps = List.filter (fun d -> d.kind = Local) deps in
+  let local_deps = List.filter (fun d -> d.kind <> Opam) deps in
   let has_both = opam_deps <> [] && local_deps <> [] in
   if has_both then
     "libraries"

@@ -41,7 +41,7 @@ let verifier =
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_protocol.transaction_snark
       ; Layer_base.with_hash
       ]
@@ -78,7 +78,7 @@ let prover =
       ; Layer_tooling.mina_metrics
       ; Layer_base.error_json
       ; Layer_pickles.pickles_types
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.snark_params
       ; Layer_pickles.pickles
       ; Layer_crypto.sgn

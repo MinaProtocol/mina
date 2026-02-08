@@ -31,7 +31,7 @@ let mina_transaction =
       ; Layer_crypto.signature_lib
       ; Layer_crypto.sgn
       ; Layer_crypto.snark_params
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_ppx.ppx_version_runtime
       ; Layer_base.with_hash
       ; Layer_base.mina_wire_types
@@ -89,7 +89,7 @@ let mina_transaction_logic =
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.signature_lib
       ; Layer_crypto.sgn
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.snark_params
       ; Layer_base.unsigned_extended
       ; Layer_ppx.ppx_version_runtime

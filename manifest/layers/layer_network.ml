@@ -228,7 +228,7 @@ let staged_ledger =
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
-      ; local "snarky.backendless"
+      ; Snarky_lib.snarky_backendless
       ; Layer_crypto.snark_params
       ; Layer_snark_worker.snark_work_lib
       ; Layer_ledger.staged_ledger_diff
@@ -411,15 +411,15 @@ let vrf_lib_tests =
       ; Layer_crypto.snark_params
       ; Layer_crypto.signature_lib
       ; local "snarky_curves"
-      ; local "snarky"
+      ; Snarky_lib.snarky
       ; Layer_consensus.vrf_lib
       ; Layer_base.mina_base
       ; Layer_crypto.random_oracle
-      ; local "fold_lib"
+      ; Snarky_lib.fold_lib
       ; Layer_pickles.pickles
       ; Layer_crypto.bignum_bigint
-      ; local "snarky.backendless"
-      ; local "bitstring_lib"
+      ; Snarky_lib.snarky_backendless
+      ; Snarky_lib.bitstring_lib
       ; Layer_crypto.crypto_params
       ; Layer_pickles.pickles_backend
       ; Layer_kimchi.kimchi_backend
@@ -429,7 +429,7 @@ let vrf_lib_tests =
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; local "snarky_field_extensions"
-      ; local "tuple_lib"
+      ; Snarky_lib.tuple_lib
       ; Layer_domain.genesis_constants
       ]
     ~ppx:
