@@ -140,3 +140,5 @@ let oldest { history; _ } = Queue.first history
 let is_empty { history; _ } = Queue.is_empty history
 
 let to_list { history; _ } = Queue.to_list history
+
+let length { history; _ } = Queue.length history

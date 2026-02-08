@@ -5623,6 +5623,57 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "AncestryProof",
+          "description": null,
+          "fields": [
+            {
+              "name": "stateBodyHashes",
+              "description": "The state body hashes of the ancestry proof",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "initStateHash",
+              "description": "The initial state hash of the ancestry proof",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "ENUM",
           "name": "Encoding",
           "description": null,
@@ -16015,6 +16066,42 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "ancestryProof",
+              "description":
+                "Get state body hashes for ancestor blocks to prove ancestry relationships. The returned array of state body hashes, when folded with Poseidon, produces the input state hash. Useful for proving that a block is an nth-degree descendant of an ancestor block.",
+              "args": [
+                {
+                  "name": "depth",
+                  "description":
+                    "Number of ancestor blocks to traverse (depth of ancestry proof)",
+                  "type": { "kind": "SCALAR", "name": "Int", "ofType": null },
+                  "defaultValue": null
+                },
+                {
+                  "name": "stateHash",
+                  "description":
+                    "State hash of the block to start from (best tip will be used if not provided)",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AncestryProof",
                   "ofType": null
                 }
               },

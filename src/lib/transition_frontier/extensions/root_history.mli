@@ -24,3 +24,5 @@ val to_list : t -> Root_data.Historical.t list
 
 val protocol_states_for_scan_state :
   t -> State_hash.t -> Mina_state.Protocol_state.value list option
+
+val length : t -> int
