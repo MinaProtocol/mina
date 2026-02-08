@@ -75,7 +75,7 @@ val library :
   -> ?opam_deps:string list
   -> ?extra_stanzas:Dune_s_expr.t list
   -> string
-  -> unit
+  -> dep
 
 val private_library :
      ?path:string
@@ -107,7 +107,7 @@ val private_library :
   -> ?opam_deps:string list
   -> ?extra_stanzas:Dune_s_expr.t list
   -> string
-  -> unit
+  -> dep
 
 (** {1 Executable registration} *)
 

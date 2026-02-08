@@ -14,7 +14,9 @@
   externals
   product_mina
   layer_base
+  layer_base_types
   layer_concurrency
+  layer_consensus
   layer_crypto
   layer_domain
   layer_infra
@@ -23,7 +25,9 @@
   layer_node
   layer_ppx
   layer_protocol
+  layer_service
   layer_snarky
+  layer_snark_worker
   layer_storage
   layer_test
   layer_tooling

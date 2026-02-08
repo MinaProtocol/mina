@@ -3,50 +3,49 @@
 open Manifest
 open Externals
 
-let register () =
+let () =
   executable "best_tip_merger" ~package:"best_tip_merger"
-    ~path:"src/app/best_tip_merger" ~modes:[ "native" ]
-    ~deps:
-      [ async
-      ; async_command
-      ; async_kernel
-      ; async_unix
-      ; base_internalhash_types
-      ; base_caml
-      ; core
-      ; core_kernel
-      ; lib
-      ; ppx_deriving_yojson_runtime
-      ; result
-      ; sexplib0
-      ; stdio
-      ; yojson
-      ; local "cli_lib"
-      ; local "consensus"
-      ; local "data_hash_lib"
-      ; local "kimchi_pasta"
-      ; local "logger"
-      ; local "logger.file_system"
-      ; local "mina_base"
-      ; local "mina_numbers"
-      ; local "mina_state"
-      ; local "mina_stdlib"
-      ; local "mina_wire_types"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "snark_params"
-      ; local "transition_frontier"
-      ; local "transition_frontier_extensions"
-      ; local "visualization"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_compare"
-         ; "ppx_deriving.show"
-         ; "ppx_deriving_yojson"
-         ; "ppx_jane"
-         ; "ppx_mina"
-         ; "ppx_version"
-         ] ) ;
+  ~path:"src/app/best_tip_merger" ~modes:[ "native" ]
+  ~deps:
+    [ async
+    ; async_command
+    ; async_kernel
+    ; async_unix
+    ; base_internalhash_types
+    ; base_caml
+    ; core
+    ; core_kernel
+    ; lib
+    ; ppx_deriving_yojson_runtime
+    ; result
+    ; sexplib0
+    ; stdio
+    ; yojson
+    ; local "cli_lib"
+    ; Layer_consensus.consensus
+    ; Layer_domain.data_hash_lib
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_infra.logger
+    ; Layer_infra.logger_file_system
+    ; Layer_base.mina_base
+    ; Layer_infra.mina_numbers
+    ; Layer_consensus.mina_state
+    ; Layer_base.mina_stdlib
+    ; Layer_base.mina_wire_types
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.snark_params
+    ; Layer_network.transition_frontier
+    ; Layer_network.transition_frontier_extensions
+    ; Layer_base.visualization
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_deriving_show
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_jane
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ] )
 
-  ()

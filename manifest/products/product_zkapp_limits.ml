@@ -3,25 +3,24 @@
 open Manifest
 open Externals
 
-let register () =
+let () =
   executable "zkapp_limits" ~package:"zkapp_limits" ~path:"src/app/zkapp_limits"
-    ~deps:
-      [ base
-      ; base_caml
-      ; core_kernel
-      ; local "genesis_constants"
-      ; local "mina_base"
-      ; local "mina_stdlib"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_compare"
-         ; "ppx_custom_printf"
-         ; "ppx_hash"
-         ; "ppx_let"
-         ; "ppx_mina"
-         ; "ppx_sexp_conv"
-         ; "ppx_version"
-         ] ) ;
+  ~deps:
+    [ base
+    ; base_caml
+    ; core_kernel
+    ; Layer_domain.genesis_constants
+    ; Layer_base.mina_base
+    ; Layer_base.mina_stdlib
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_custom_printf
+       ; Ppx_lib.ppx_hash
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_sexp_conv
+       ; Ppx_lib.ppx_version
+       ] )
 
-  ()

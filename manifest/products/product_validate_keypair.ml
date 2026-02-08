@@ -4,22 +4,21 @@ open Manifest
 open Externals
 open Dune_s_expr
 
-let register () =
+let () =
   executable "validate_keypair" ~package:"validate_keypair"
-    ~path:"src/app/validate_keypair" ~modes:[ "native" ]
-    ~flags:
-      [ atom "-short-paths"
-      ; atom "-w"
-      ; atom "@a-4-29-40-41-42-44-45-48-58-59-60"
-      ]
-    ~deps:
-      [ async
-      ; async_unix
-      ; core_kernel
-      ; local "cli_lib"
-      ; local "mina_stdlib"
-      ; local "mina_version"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_let"; "ppx_sexp_conv"; "ppx_version" ]) ;
+  ~path:"src/app/validate_keypair" ~modes:[ "native" ]
+  ~flags:
+    [ atom "-short-paths"
+    ; atom "-w"
+    ; atom "@a-4-29-40-41-42-44-45-48-58-59-60"
+    ]
+  ~deps:
+    [ async
+    ; async_unix
+    ; core_kernel
+    ; local "cli_lib"
+    ; Layer_base.mina_stdlib
+    ; Layer_base.mina_version
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_let; Ppx_lib.ppx_sexp_conv; Ppx_lib.ppx_version ])
 
-  ()

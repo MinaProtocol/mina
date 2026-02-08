@@ -185,7 +185,8 @@ let library ?internal_name ?(path = "") ?synopsis ?(deps = []) ?ppx ?kind
       ; l_extra_stanzas = extra_stanzas
       }
   in
-  targets := t :: !targets
+  targets := t :: !targets ;
+  local public_name
 
 let private_library ?(path = "") ?synopsis ?(deps = []) ?ppx ?kind
     ?(inline_tests = false) ?(inline_tests_bare = false)
@@ -230,7 +231,8 @@ let private_library ?(path = "") ?synopsis ?(deps = []) ?ppx ?kind
       ; l_extra_stanzas = extra_stanzas
       }
   in
-  targets := t :: !targets
+  targets := t :: !targets ;
+  local name
 
 let executable ?package ?internal_name ?(path = "") ?(deps = []) ?ppx
     ?(modules = []) ?(modes = []) ?(flags = []) ?(link_flags = [])

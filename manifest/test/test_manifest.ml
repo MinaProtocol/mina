@@ -215,17 +215,17 @@ let test_diff_dep_set () =
 (* -- Manifest DSL tests ------------------------------------------- *)
 
 let test_library_basic () =
-  Manifest.library "test_lib" ~path:"/tmp/test_manifest_out/basic"
+  ignore (Manifest.library "test_lib" ~path:"/tmp/test_manifest_out/basic"
     ~deps:[ Manifest.opam "core_kernel" ]
-    ~ppx:Manifest.Ppx.standard ;
+    ~ppx:Manifest.Ppx.standard) ;
   (* Verify it registered without error *)
   Alcotest.(check pass) "library registered" () ()
 
 let test_library_with_extras () =
-  Manifest.library "test_with_extras" ~path:"/tmp/test_manifest_out/extras"
+  ignore (Manifest.library "test_with_extras" ~path:"/tmp/test_manifest_out/extras"
     ~deps:[ Manifest.opam "base"; Manifest.local "foo_lib" ]
     ~ppx:Manifest.Ppx.minimal ~inline_tests:true ~library_flags:[ "-linkall" ]
-    ~synopsis:"Test library" ;
+    ~synopsis:"Test library") ;
   Alcotest.(check pass) "library with extras" () ()
 
 let test_executable_basic () =

@@ -1,2431 +1,1870 @@
 (** Mina Blockchain, networking, and frontier libraries.
 
-    Each declaration corresponds to a dune file in src/.
-    The manifest generates these files from the declarations below. *)
+  Each declaration corresponds to a dune file in src/.
+  The manifest generates these files from the declarations below. *)
 
 open Manifest
 open Externals
 
-let register () =
-  (* ================================================================ *)
-  (* Blockchain & Network Layer                                       *)
-  (* ================================================================ *)
+(* ================================================================ *)
+(* Blockchain & Network Layer                                       *)
+(* ================================================================ *)
 
-  (* -- mina_state ---------------------------------------------------- *)
-  library "mina_state" ~path:"src/lib/mina_state" ~inline_tests:true
-    ~deps:
-      [ core
-      ; local "signature_lib"
-      ; local "pickles.backend"
-      ; local "outside_hash_image"
-      ; local "pickles"
-      ; local "random_oracle_input"
-      ; local "random_oracle"
-      ; local "genesis_constants"
-      ; local "block_time"
-      ; local "mina_base"
-      ; local "mina_debug"
-      ; local "mina_transaction_logic"
-      ; local "snark_params"
-      ; local "consensus"
-      ; local "bitstring_lib"
-      ; local "fold_lib"
-      ; local "tuple_lib"
-      ; local "with_hash"
-      ; local "snarky.backendless"
-      ; local "crypto_params"
-      ; local "data_hash_lib"
-      ; local "currency"
-      ; local "visualization"
-      ; local "linked_tree"
-      ; local "mina_numbers"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "kimchi_backend"
-      ; local "mina_base.util"
-      ; local "mina_ledger"
-      ; local "unsigned_extended"
-      ; local "sgn"
-      ; local "sgn_type"
-      ; local "blake2"
-      ; local "ppx_version.runtime"
-      ; local "mina_wire_types"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_custom_printf"
-         ; "ppx_mina"
-         ; "ppx_version"
-         ; "ppx_snarky"
-         ; "ppx_bin_prot"
-         ; "ppx_compare"
-         ; "ppx_sexp_conv"
-         ; "ppx_hash"
-         ; "ppx_fields_conv"
-         ; "ppx_let"
-         ; "ppx_inline_test"
-         ; "ppx_assert"
-         ; "ppx_deriving.std"
-         ; "ppx_deriving_yojson"
-         ; "h_list.ppx"
-         ] ) ;
-
-  (* -- mina_block ---------------------------------------------------- *)
+(* -- mina_block ---------------------------------------------------- *)
+let mina_block =
   library "mina_block" ~path:"src/lib/mina_block"
-    ~deps:
-      [ integers
-      ; base64
-      ; core
-      ; local "mina_ledger"
-      ; local "mina_numbers"
-      ; local "currency"
-      ; local "unsigned_extended"
-      ; local "ledger_proof"
-      ; local "logger"
-      ; local "blockchain_snark"
-      ; local "allocation_functor"
-      ; local "verifier"
-      ; local "staged_ledger_diff"
-      ; local "protocol_version"
-      ; local "consensus"
-      ; local "precomputed_values"
-      ; local "mina_state"
-      ; local "mina_net2"
-      ; local "mina_base"
-      ; local "mina_transaction"
-      ; local "mina_stdlib"
-      ; local "transition_chain_verifier"
-      ; local "staged_ledger"
-      ; local "data_hash_lib"
-      ; local "block_time"
-      ; local "with_hash"
-      ; local "signature_lib"
-      ; local "genesis_constants"
-      ; local "transaction_snark_work"
-      ; local "coda_genesis_proof"
-      ; local "blake2"
-      ; local "snark_params"
-      ; local "crypto_params"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pasta_bindings"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "ppx_version.runtime"
-      ; local "mina_wire_types"
-      ; local "internal_tracing"
-      ; local "proof_carrying_data"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_mina"
-         ; "ppx_version"
-         ; "ppx_jane"
-         ; "ppx_deriving.std"
-         ; "ppx_deriving_yojson"
-         ] ) ;
+  ~deps:
+    [ integers
+    ; base64
+    ; core
+    ; Layer_ledger.mina_ledger
+    ; Layer_infra.mina_numbers
+    ; Layer_base.currency
+    ; Layer_base.unsigned_extended
+    ; Layer_snark_worker.ledger_proof
+    ; Layer_infra.logger
+    ; Layer_protocol.blockchain_snark
+    ; Layer_base.allocation_functor
+    ; Layer_service.verifier
+    ; Layer_ledger.staged_ledger_diff
+    ; Layer_protocol.protocol_version
+    ; Layer_consensus.consensus
+    ; Layer_consensus.precomputed_values
+    ; Layer_consensus.mina_state
+    ; local "mina_net2"
 
-  (* -- mina_block/tests ---------------------------------------------- *)
+    ; Layer_base.mina_base
+    ; Layer_transaction.mina_transaction
+    ; Layer_base.mina_stdlib
+    ; local "transition_chain_verifier"
+
+    ; local "staged_ledger"
+
+    ; Layer_domain.data_hash_lib
+    ; Layer_domain.block_time
+    ; Layer_base.with_hash
+    ; Layer_crypto.signature_lib
+    ; Layer_domain.genesis_constants
+    ; Layer_snark_worker.transaction_snark_work
+    ; Layer_consensus.coda_genesis_proof
+    ; Layer_crypto.blake2
+    ; Layer_crypto.snark_params
+    ; Layer_crypto.crypto_params
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; local "pasta_bindings"
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.random_oracle_input
+    ; Layer_ppx.ppx_version_runtime
+    ; Layer_base.mina_wire_types
+    ; Layer_tooling.internal_tracing
+    ; Layer_domain.proof_carrying_data
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.ppx_jane
+       ; Ppx_lib.ppx_deriving_std
+       ; Ppx_lib.ppx_deriving_yojson
+       ] )
+
+(* -- mina_block/tests ---------------------------------------------- *)
+let () =
   file_stanzas ~path:"src/lib/mina_block/tests"
-    (Dune_s_expr.parse_string
-       {|(rule
+  (Dune_s_expr.parse_string
+     {|(rule
  (alias precomputed_block)
  (target hetzner-itn-1-1795.json)
  (deps
-  (env_var TEST_PRECOMPUTED_BLOCK_JSON_PATH))
+(env_var TEST_PRECOMPUTED_BLOCK_JSON_PATH))
  (enabled_if
-  (= %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} n))
+(= %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} n))
  (action
-  (progn
-   (run
-    curl
-    -L
-    -o
-    %{target}.gz
-    https://storage.googleapis.com/o1labs-ci-test-data/precomputed-blocks/hetzner-itn-1-1795-3NL9Vn7Rg1mz8cS1gVxFkVPsjESG1Zu1XRpMLRQAz3W24hctRoD6.json.gz)
-   (run gzip -d %{target}.gz))))
+(progn
+ (run
+  curl
+  -L
+  -o
+  %{target}.gz
+  https://storage.googleapis.com/o1labs-ci-test-data/precomputed-blocks/hetzner-itn-1-1795-3NL9Vn7Rg1mz8cS1gVxFkVPsjESG1Zu1XRpMLRQAz3W24hctRoD6.json.gz)
+ (run gzip -d %{target}.gz))))
 
 (rule
  (enabled_if
-  (<> %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} n))
+(<> %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} n))
  (target hetzner-itn-1-1795.json)
  (deps
-  (env_var TEST_PRECOMPUTED_BLOCK_JSON_PATH))
+(env_var TEST_PRECOMPUTED_BLOCK_JSON_PATH))
  (action
-  (progn
-   (copy %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} %{target}))))|} ) ;
+(progn
+ (copy %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} %{target}))))|} )
 
+let () =
   test "main" ~path:"src/lib/mina_block/tests"
-    ~deps:
-      [ alcotest
-      ; async
-      ; core_kernel
-      ; local "disk_cache.lmdb"
-      ; local "mina_block"
-      ; yojson
-      ]
-    ~file_deps:
-      [ "hetzner-itn-1-1795.json"
-      ; {|regtest-devnet-319281-3NKq8WXEzMFJH3VdmK4seCTpciyjSY2Rf39K7q1Yyt1p4HkqSzqA.json|}
-      ]
-    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_version" ]) ;
+  ~deps:
+    [ alcotest
+    ; async
+    ; core_kernel
+    ; Layer_storage.disk_cache_lmdb
+    ; mina_block
+    ; yojson
+    ]
+  ~file_deps:
+    [ "hetzner-itn-1-1795.json"
+    ; {|regtest-devnet-319281-3NKq8WXEzMFJH3VdmK4seCTpciyjSY2Rf39K7q1Yyt1p4HkqSzqA.json|}
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version ])
 
-  (* -- consensus ----------------------------------------------------- *)
-  library "consensus" ~path:"src/lib/consensus" ~inline_tests:true
-    ~library_flags:[ "-linkall" ]
-    ~modules_exclude:[ "proof_of_stake_fuzzer" ]
-    ~deps:
-      [ ppx_inline_test_config
-      ; async_unix
-      ; core_uuid
-      ; async_kernel
-      ; sexplib0
-      ; base_caml
-      ; integers
-      ; async
-      ; core
-      ; yojson
-      ; core_kernel
-      ; bin_prot_shape
-      ; base
-      ; result
-      ; core_kernel_uuid
-      ; async_rpc_kernel
-      ; sexp_diff_kernel
-      ; local "mina_wire_types"
-      ; local "mina_base.util"
-      ; local "unsigned_extended"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "fold_lib"
-      ; local "random_oracle_input"
-      ; local "outside_hash_image"
-      ; local "logger"
-      ; local "hash_prefix_states"
-      ; local "genesis_constants"
-      ; local "error_json"
-      ; local "merkle_ledger"
-      ; local "pickles.backend"
-      ; local "random_oracle"
-      ; local "pipe_lib"
-      ; local "bignum_bigint"
-      ; local "vrf_lib"
-      ; local "snark_params"
-      ; local "with_hash"
-      ; local "mina_ledger"
-      ; local "consensus.vrf"
-      ; local "snarky_taylor"
-      ; local "mina_base"
-      ; local "mina_transaction_logic"
-      ; local "key_gen"
-      ; local "block_time"
-      ; local "perf_histograms"
-      ; local "test_util"
-      ; local "non_zero_curve_point"
-      ; local "mina_metrics"
-      ; local "mina_numbers"
-      ; local "mina_stdlib"
-      ; local "signature_lib"
-      ; local "snarky.backendless"
-      ; local "blake2"
-      ; local "crypto_params"
-      ; local "data_hash_lib"
-      ; local "currency"
-      ; local "mina_stdlib_unix"
-      ; local "coda_genesis_ledger"
-      ; local "interruptible"
-      ; local "network_peer"
-      ; local "pickles"
-      ; local "snark_bits"
-      ; local "sparse_ledger_lib"
-      ; local "syncable_ledger"
-      ; local "trust_system"
-      ; local "mina_base.import"
-      ; local "ppx_version.runtime"
-      ; local "internal_tracing"
-      ; local "o1trace"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "h_list.ppx"
-         ; "ppx_assert"
-         ; "ppx_base"
-         ; "ppx_bin_prot"
-         ; "ppx_mina"
-         ; "ppx_custom_printf"
-         ; "ppx_deriving.std"
-         ; "ppx_deriving_yojson"
-         ; "ppx_fields_conv"
-         ; "ppx_inline_test"
-         ; "ppx_let"
-         ; "ppx_sexp_conv"
-         ; "ppx_snarky"
-         ; "ppx_version"
-         ] )
-    ~synopsis:"Consensus mechanisms" ;
-
-  (* consensus has (modules (:standard \ proof_of_stake_fuzzer))
-     which we need to handle via extra_stanzas or modules field.
-     We use file_stanzas for the modules override. *)
-
-  (* -- consensus: proof_of_stake_fuzzer (disabled executable) -------- *)
-  private_executable ~path:"src/lib/consensus"
-    ~modules:[ "proof_of_stake_fuzzer" ]
-    ~deps:
-      [ core_kernel
-      ; local "signature_lib"
-      ; local "mina_state"
-      ; local "mina_block"
-      ; local "consensus"
-      ; local "prover"
-      ; local "blockchain_snark"
-      ; local "logger.file_system"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_jane" ])
-    ~enabled_if:"false" "proof_of_stake_fuzzer" ;
-
-  (* -- consensus/vrf ------------------------------------------------- *)
-  library "consensus.vrf" ~internal_name:"consensus_vrf"
-    ~path:"src/lib/consensus/vrf"
-    ~deps:
-      [ ppx_inline_test_config
-      ; bignum_bigint
-      ; base_caml
-      ; base
-      ; base64
-      ; core_kernel
-      ; sexplib0
-      ; result
-      ; bignum
-      ; integers
-      ; bin_prot_shape
-      ; local "mina_wire_types"
-      ; local "mina_base.util"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "genesis_constants"
-      ; local "mina_stdlib"
-      ; local "crypto_params"
-      ; local "random_oracle"
-      ; local "blake2"
-      ; local "base58_check"
-      ; local "random_oracle_input"
-      ; local "unsigned_extended"
-      ; local "snarky.backendless"
-      ; local "pickles"
-      ; local "snarky_taylor"
-      ; local "mina_numbers"
-      ; local "fold_lib"
-      ; local "mina_base"
-      ; local "snark_params"
-      ; local "vrf_lib"
-      ; local "snarky_integer"
-      ; local "test_util"
-      ; local "pickles.backend"
-      ; local "non_zero_curve_point"
-      ; local "bignum_bigint"
-      ; local "codable"
-      ; local "signature_lib"
-      ; local "currency"
-      ; local "hash_prefix_states"
-      ; local "kimchi_backend"
-      ; local "kimchi_bindings"
-      ; local "kimchi_types"
-      ; local "pasta_bindings"
-      ; local "ppx_deriving_yojson.runtime"
-      ; local "ppx_version.runtime"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_mina"
-         ; "h_list.ppx"
-         ; "ppx_assert"
-         ; "ppx_compare"
-         ; "ppx_deriving_yojson"
-         ; "ppx_hash"
-         ; "ppx_inline_test"
-         ; "ppx_let"
-         ; "ppx_sexp_conv"
-         ; "ppx_version"
-         ] ) ;
-
-  (* -- staged_ledger ------------------------------------------------- *)
+(* -- staged_ledger ------------------------------------------------- *)
+let staged_ledger =
   library "staged_ledger" ~path:"src/lib/staged_ledger"
-    ~library_flags:[ "-linkall" ] ~inline_tests:true
-    ~deps:
-      [ async
-      ; async_unix
-      ; core
-      ; integers
-      ; lens
-      ; ppx_hash_runtime_lib
-      ; local "mina_stdlib"
-      ; local "cache_dir"
-      ; local "child_processes"
-      ; local "coda_genesis_ledger"
-      ; local "consensus"
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "error_json"
-      ; local "genesis_constants"
-      ; local "internal_tracing"
-      ; local "kimchi_backend"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "ledger_proof"
-      ; local "logger"
-      ; local "merkle_ledger"
-      ; local "mina_base"
-      ; local "mina_generators"
-      ; local "mina_ledger"
-      ; local "mina_metrics"
-      ; local "mina_numbers"
-      ; local "mina_signature_kind"
-      ; local "mina_state"
-      ; local "mina_transaction"
-      ; local "mina_transaction_logic"
-      ; local "mina_wire_types"
-      ; local "o1trace"
-      ; local "one_or_two"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_types"
-      ; local "ppx_version.runtime"
-      ; local "quickcheck_lib"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "sgn"
-      ; local "signature_lib"
-      ; local "snarky.backendless"
-      ; local "snark_params"
-      ; local "snark_work_lib"
-      ; local "staged_ledger_diff"
-      ; local "transaction_snark"
-      ; local "transaction_snark_scan_state"
-      ; local "transaction_snark_work"
-      ; local "transaction_witness"
-      ; local "verifier"
-      ; local "with_hash"
-      ; local "zkapp_command_builder"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "lens.ppx_deriving"
-         ; "ppx_assert"
-         ; "ppx_bin_prot"
-         ; "ppx_compare"
-         ; "ppx_custom_printf"
-         ; "ppx_deriving.make"
-         ; "ppx_deriving_yojson"
-         ; "ppx_fields_conv"
-         ; "ppx_inline_test"
-         ; "ppx_let"
-         ; "ppx_mina"
-         ; "ppx_pipebang"
-         ; "ppx_sexp_conv"
-         ; "ppx_version"
-         ] )
-    ~synopsis:"Staged Ledger updates the current ledger with new transactions" ;
+  ~library_flags:[ "-linkall" ] ~inline_tests:true
+  ~deps:
+    [ async
+    ; async_unix
+    ; core
+    ; integers
+    ; lens
+    ; ppx_hash_runtime_lib
+    ; Layer_base.mina_stdlib
+    ; Layer_storage.cache_dir
+    ; Layer_base.child_processes
+    ; Layer_consensus.coda_genesis_ledger
+    ; Layer_consensus.consensus
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_base.error_json
+    ; Layer_domain.genesis_constants
+    ; Layer_tooling.internal_tracing
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_snark_worker.ledger_proof
+    ; Layer_infra.logger
+    ; Layer_ledger.merkle_ledger
+    ; Layer_base.mina_base
+    ; local "mina_generators"
+    ; Layer_ledger.mina_ledger
+    ; Layer_tooling.mina_metrics
+    ; Layer_infra.mina_numbers
+    ; Layer_infra.mina_signature_kind
+    ; Layer_consensus.mina_state
+    ; Layer_transaction.mina_transaction
+    ; Layer_transaction.mina_transaction_logic
+    ; Layer_base.mina_wire_types
+    ; Layer_infra.o1trace
+    ; Layer_base.one_or_two
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_types
+    ; Layer_ppx.ppx_version_runtime
+    ; Layer_test.quickcheck_lib
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.random_oracle_input
+    ; Layer_crypto.sgn
+    ; Layer_crypto.signature_lib
+    ; local "snarky.backendless"
+    ; Layer_crypto.snark_params
+    ; Layer_snark_worker.snark_work_lib
+    ; Layer_ledger.staged_ledger_diff
+    ; Layer_protocol.transaction_snark
+    ; Layer_snark_worker.transaction_snark_scan_state
+    ; Layer_snark_worker.transaction_snark_work
+    ; Layer_transaction.transaction_witness
+    ; Layer_service.verifier
+    ; Layer_base.with_hash
+    ; Layer_protocol.zkapp_command_builder
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.lens_ppx_deriving
+       ; Ppx_lib.ppx_assert
+       ; Ppx_lib.ppx_bin_prot
+       ; Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_custom_printf
+       ; Ppx_lib.ppx_deriving_make
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_fields_conv
+       ; Ppx_lib.ppx_inline_test
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_pipebang
+       ; Ppx_lib.ppx_sexp_conv
+       ; Ppx_lib.ppx_version
+       ] )
+  ~synopsis:"Staged Ledger updates the current ledger with new transactions"
 
-  (* -- snark_work_lib ------------------------------------------------ *)
-  library "snark_work_lib" ~path:"src/lib/snark_work_lib" ~inline_tests:true
-    ~modules_without_implementation:[ "combined_result" ]
-    ~deps:
-      [ base_caml
-      ; bin_prot_shape
-      ; core
-      ; core_kernel
-      ; sexplib0
-      ; local "currency"
-      ; local "ledger_proof"
-      ; local "mina_state"
-      ; local "mina_wire_types"
-      ; local "one_or_two"
-      ; local "ppx_version.runtime"
-      ; local "signature_lib"
-      ; local "transaction_snark"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_deriving_yojson"; "ppx_mina"; "ppx_jane"; "ppx_version" ] )
-    ~synopsis:"Snark work types" ;
-
-  (* -- snark_worker -------------------------------------------------- *)
-  library "snark_worker" ~path:"src/lib/snark_worker"
-    ~library_flags:[ "-linkall" ]
-    ~deps:
-      [ async
-      ; async_command
-      ; async_rpc
-      ; async_kernel
-      ; async_rpc_kernel
-      ; async_unix
-      ; base
-      ; base_internalhash_types
-      ; base_caml
-      ; bin_prot_shape
-      ; core
-      ; core_kernel
-      ; core_kernel_hash_heap
-      ; ppx_hash_runtime_lib
-      ; ppx_version_runtime
-      ; result
-      ; sexplib0
-      ; local "mina_stdlib"
-      ; local "cli_lib"
-      ; local "currency"
-      ; local "error_json"
-      ; local "genesis_constants"
-      ; local "ledger_proof"
-      ; local "logger"
-      ; local "logger.file_system"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_ledger"
-      ; local "mina_metrics"
-      ; local "mina_node_config.unconfigurable_constants"
-      ; local "mina_state"
-      ; local "mina_transaction"
-      ; local "one_or_two"
-      ; local "perf_histograms"
-      ; local "signature_lib"
-      ; local "snark_work_lib"
-      ; local "work_partitioner"
-      ; local "transaction_protocol_state"
-      ; local "transaction_snark"
-      ; local "transaction_snark_work"
-      ; local "transaction_witness"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_bin_prot"
-         ; "ppx_mina"
-         ; "ppx_here"
-         ; "ppx_custom_printf"
-         ; "ppx_deriving_yojson"
-         ; "ppx_inline_test"
-         ; "ppx_let"
-         ; "ppx_register_event"
-         ; "ppx_sexp_conv"
-         ; "ppx_version"
-         ] )
-    ~synopsis:"Lib powering the snark_worker interactions with the daemon" ;
-
-  (* -- snark_worker/standalone --------------------------------------- *)
+(* -- snark_worker/standalone --------------------------------------- *)
+let () =
   executable "mina-standalone-snark-worker" ~internal_name:"run_snark_worker"
-    ~package:"mina_snark_worker" ~path:"src/lib/snark_worker/standalone"
-    ~deps:
-      [ async
-      ; async_command
-      ; async_kernel
-      ; async_unix
-      ; base
-      ; base_caml
-      ; core
-      ; core_kernel
-      ; sexplib0
-      ; uri
-      ; local "currency"
-      ; local "genesis_constants"
-      ; local "graphql_lib"
-      ; local "key_gen"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_graphql"
-      ; local "signature_lib"
-      ; local "snark_worker"
-      ; local "transaction_snark"
-      ]
-    ~preprocessor_deps:
-      [ "../../../graphql-ppx-config.inc"; "../../../../graphql_schema.json" ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_let"
-         ; "ppx_custom_printf"
-         ; "ppx_version"
-         ; "graphql_ppx"
-         ; "--"
-         ; {|%{read-lines:../../../graphql-ppx-config.inc}|}
-         ] ) ;
+  ~package:"mina_snark_worker" ~path:"src/lib/snark_worker/standalone"
+  ~deps:
+    [ async
+    ; async_command
+    ; async_kernel
+    ; async_unix
+    ; base
+    ; base_caml
+    ; core
+    ; core_kernel
+    ; sexplib0
+    ; uri
+    ; Layer_base.currency
+    ; Layer_domain.genesis_constants
+    ; local "graphql_lib"
+    ; Layer_crypto.key_gen
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; local "mina_graphql"
+    ; Layer_crypto.signature_lib
+    ; Layer_snark_worker.snark_worker
+    ; Layer_protocol.transaction_snark
+    ]
+  ~preprocessor_deps:
+    [ "../../../graphql-ppx-config.inc"; "../../../../graphql_schema.json" ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_custom_printf
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.graphql_ppx
+       ; "--"
+       ; {|%{read-lines:../../../graphql-ppx-config.inc}|}
+       ] )
 
-  (* -- precomputed_values -------------------------------------------- *)
-  library "precomputed_values" ~path:"src/lib/precomputed_values"
-    ~ppx_runtime_libraries:[ "base" ]
-    ~deps:
-      [ core
-      ; core_kernel
-      ; local "genesis_constants"
-      ; local "mina_state"
-      ; local "coda_genesis_proof"
-      ; local "crypto_params"
-      ; local "mina_base"
-      ; local "dummy_values"
-      ; local "snarky.backendless"
-      ; local "coda_genesis_ledger"
-      ; local "consensus"
-      ; local "mina_runtime_config"
-      ; local "test_genesis_ledger"
-      ; local "staged_ledger_diff"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_jane"; "ppxlib.metaquot" ]) ;
-
-  (* -- genesis_ledger (coda_genesis_ledger) -------------------------- *)
-  library "coda_genesis_ledger" ~internal_name:"genesis_ledger"
-    ~path:"src/lib/genesis_ledger"
-    ~deps:
-      [ core
-      ; local "key_gen"
-      ; local "mina_base"
-      ; local "signature_lib"
-      ; local "currency"
-      ; local "mina_numbers"
-      ; local "genesis_constants"
-      ; local "data_hash_lib"
-      ; local "mina_ledger"
-      ; local "mina_stdlib"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_let" ]) ;
-
-  (* -- genesis_proof (coda_genesis_proof) ---------------------------- *)
-  library "coda_genesis_proof" ~internal_name:"genesis_proof"
-    ~path:"src/lib/genesis_proof"
-    ~deps:
-      [ base
-      ; core_kernel
-      ; base_md5
-      ; core
-      ; async
-      ; async_kernel
-      ; local "snarky.backendless"
-      ; local "pickles_types"
-      ; local "currency"
-      ; local "pickles"
-      ; local "consensus"
-      ; local "mina_runtime_config"
-      ; local "blockchain_snark"
-      ; local "mina_base"
-      ; local "mina_state"
-      ; local "genesis_constants"
-      ; local "with_hash"
-      ; local "coda_genesis_ledger"
-      ; local "transaction_snark"
-      ; local "sgn"
-      ; local "snark_params"
-      ; local "mina_wire_types"
-      ; local "sgn_type"
-      ; local "pickles.backend"
-      ; local "mina_transaction_logic"
-      ; local "kimchi_backend"
-      ; local "mina_numbers"
-      ; local "block_time"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_let" ]) ;
-
-  (* -- genesis_ledger_helper/lib ------------------------------------- *)
+(* -- genesis_ledger_helper/lib ------------------------------------- *)
+let genesis_ledger_helper_lib =
   library "genesis_ledger_helper.lib" ~internal_name:"genesis_ledger_helper_lib"
-    ~path:"src/lib/genesis_ledger_helper/lib" ~inline_tests:true
-    ~deps:
-      [ splittable_random
-      ; integers
-      ; core_kernel
-      ; core
-      ; sexplib0
-      ; base64
-      ; local "mina_wire_types"
-      ; local "mina_base.import"
-      ; local "random_oracle"
-      ; local "data_hash_lib"
-      ; local "pickles"
-      ; local "pickles_types"
-      ; local "unsigned_extended"
-      ; local "mina_stdlib"
-      ; local "key_cache.native"
-      ; local "mina_base"
-      ; local "mina_runtime_config"
-      ; local "genesis_constants"
-      ; local "coda_genesis_proof"
-      ; local "signature_lib"
-      ; local "mina_numbers"
-      ; local "with_hash"
-      ; local "currency"
-      ; local "pickles.backend"
-      ; local "logger"
-      ; local "snark_params"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "ppx_inline_test.config"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_mina"
-         ; "ppx_jane"
-         ; "ppx_version"
-         ; "ppx_inline_test"
-         ; "ppx_let"
-         ; "ppx_deriving.std"
-         ; "ppx_deriving_yojson"
-         ; "ppx_custom_printf"
-         ] ) ;
+  ~path:"src/lib/genesis_ledger_helper/lib" ~inline_tests:true
+  ~deps:
+    [ splittable_random
+    ; integers
+    ; core_kernel
+    ; core
+    ; sexplib0
+    ; base64
+    ; Layer_base.mina_wire_types
+    ; Layer_base.mina_base_import
+    ; Layer_crypto.random_oracle
+    ; Layer_domain.data_hash_lib
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_types
+    ; Layer_base.unsigned_extended
+    ; Layer_base.mina_stdlib
+    ; Layer_storage.key_cache_native
+    ; Layer_base.mina_base
+    ; local "mina_runtime_config"
+    ; Layer_domain.genesis_constants
+    ; Layer_consensus.coda_genesis_proof
+    ; Layer_crypto.signature_lib
+    ; Layer_infra.mina_numbers
+    ; Layer_base.with_hash
+    ; Layer_base.currency
+    ; Layer_crypto.pickles_backend
+    ; Layer_infra.logger
+    ; Layer_crypto.snark_params
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; local "ppx_inline_test.config"
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_jane
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.ppx_inline_test
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_deriving_std
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_custom_printf
+       ] )
 
-  (* -- genesis_ledger_helper ----------------------------------------- *)
+(* -- genesis_ledger_helper ----------------------------------------- *)
+let genesis_ledger_helper =
   library "genesis_ledger_helper" ~path:"src/lib/genesis_ledger_helper"
-    ~inline_tests:true
-    ~deps:
-      [ ppx_inline_test_config
-      ; core_kernel_uuid
-      ; async_unix
-      ; async
-      ; core_kernel
-      ; core
-      ; async_kernel
-      ; core_uuid
-      ; base_caml
-      ; sexplib0
-      ; digestif
-      ; local "mina_ledger"
-      ; local "with_hash"
-      ; local "mina_stdlib"
-      ; local "blockchain_snark"
-      ; local "error_json"
-      ; local "mina_state"
-      ; local "random_oracle"
-      ; local "blake2"
-      ; local "mina_numbers"
-      ; local "genesis_ledger_helper.lib"
-      ; local "precomputed_values"
-      ; local "coda_genesis_ledger"
-      ; local "mina_runtime_config"
-      ; local "signature_lib"
-      ; local "mina_base"
-      ; local "genesis_constants"
-      ; local "cache_dir"
-      ; local "coda_genesis_proof"
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "snark_params"
-      ; local "unsigned_extended"
-      ; local "consensus"
-      ; local "pickles"
-      ; local "logger"
-      ; local "mina_base.import"
-      ; local "staged_ledger_diff"
-      ; local "mina_stdlib_unix"
-      ; local "cli_lib"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_mina"
-         ; "ppx_jane"
-         ; "ppx_version"
-         ; "ppx_inline_test"
-         ; "ppx_let"
-         ; "ppx_deriving.std"
-         ; "ppx_deriving_yojson"
-         ; "ppx_custom_printf"
-         ] ) ;
+  ~inline_tests:true
+  ~deps:
+    [ ppx_inline_test_config
+    ; core_kernel_uuid
+    ; async_unix
+    ; async
+    ; core_kernel
+    ; core
+    ; async_kernel
+    ; core_uuid
+    ; base_caml
+    ; sexplib0
+    ; digestif
+    ; Layer_ledger.mina_ledger
+    ; Layer_base.with_hash
+    ; Layer_base.mina_stdlib
+    ; Layer_protocol.blockchain_snark
+    ; Layer_base.error_json
+    ; Layer_consensus.mina_state
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.blake2
+    ; Layer_infra.mina_numbers
+    ; genesis_ledger_helper_lib
+    ; Layer_consensus.precomputed_values
+    ; Layer_consensus.coda_genesis_ledger
+    ; local "mina_runtime_config"
+    ; Layer_crypto.signature_lib
+    ; Layer_base.mina_base
+    ; Layer_domain.genesis_constants
+    ; Layer_storage.cache_dir
+    ; Layer_consensus.coda_genesis_proof
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_crypto.snark_params
+    ; Layer_base.unsigned_extended
+    ; Layer_consensus.consensus
+    ; Layer_crypto.pickles
+    ; Layer_infra.logger
+    ; Layer_base.mina_base_import
+    ; Layer_ledger.staged_ledger_diff
+    ; Layer_infra.mina_stdlib_unix
+    ; local "cli_lib"
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_jane
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.ppx_inline_test
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_deriving_std
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_custom_printf
+       ] )
 
-  (* -- vrf_lib ------------------------------------------------------- *)
-  library "vrf_lib" ~path:"src/lib/vrf_lib"
-    ~flags:[ Dune_s_expr.atom ":standard"; Dune_s_expr.atom "-short-paths" ]
-    ~library_flags:[ "-linkall" ]
-    ~deps:
-      [ zarith
-      ; bignum_bigint
-      ; bin_prot_shape
-      ; base_caml
-      ; core
-      ; sexplib0
-      ; core_kernel
-      ; bignum
-      ; ppx_inline_test_config
-      ; local "snarky.backendless"
-      ; local "genesis_constants"
-      ; local "snarky_curves"
-      ; local "bitstring_lib"
-      ; local "ppx_version.runtime"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "h_list.ppx"; "ppx_bench"; "ppx_compare"; "ppx_jane"; "ppx_version" ] )
-    ~synopsis:"VRF instantiation" ;
-
-  (* -- vrf_lib/tests ------------------------------------------------- *)
+(* -- vrf_lib/tests ------------------------------------------------- *)
+let vrf_lib_tests =
   library "vrf_lib_tests" ~path:"src/lib/vrf_lib/tests"
-    ~library_flags:[ "-linkall" ] ~inline_tests:true
-    ~deps:
-      [ core
-      ; core_kernel
-      ; ppx_inline_test_config
-      ; sexplib0
-      ; ppx_deriving_runtime
-      ; local "snark_params"
-      ; local "signature_lib"
-      ; local "snarky_curves"
-      ; local "snarky"
-      ; local "vrf_lib"
-      ; local "mina_base"
-      ; local "random_oracle"
-      ; local "fold_lib"
-      ; local "pickles"
-      ; local "bignum.bigint"
-      ; local "snarky.backendless"
-      ; local "bitstring_lib"
-      ; local "crypto_params"
-      ; local "pickles.backend"
-      ; local "kimchi_backend"
-      ; local "kimchi_bindings"
-      ; local "kimchi_types"
-      ; local "pasta_bindings"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "snarky_field_extensions"
-      ; local "tuple_lib"
-      ; local "genesis_constants"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "h_list.ppx"; "ppx_bench"; "ppx_compare"; "ppx_jane"; "ppx_version" ] ) ;
+  ~library_flags:[ "-linkall" ] ~inline_tests:true
+  ~deps:
+    [ core
+    ; core_kernel
+    ; ppx_inline_test_config
+    ; sexplib0
+    ; ppx_deriving_runtime
+    ; Layer_crypto.snark_params
+    ; Layer_crypto.signature_lib
+    ; local "snarky_curves"
+    ; local "snarky"
+    ; Layer_consensus.vrf_lib
+    ; Layer_base.mina_base
+    ; Layer_crypto.random_oracle
+    ; local "fold_lib"
+    ; Layer_crypto.pickles
+    ; Layer_crypto.bignum_bigint
+    ; local "snarky.backendless"
+    ; local "bitstring_lib"
+    ; Layer_crypto.crypto_params
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.kimchi_backend
+    ; local "kimchi_bindings"
+    ; local "kimchi_types"
+    ; local "pasta_bindings"
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; local "snarky_field_extensions"
+    ; local "tuple_lib"
+    ; Layer_domain.genesis_constants
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.h_list_ppx; Ppx_lib.ppx_bench; Ppx_lib.ppx_compare; Ppx_lib.ppx_jane; Ppx_lib.ppx_version ] )
 
-  (* -- vrf_evaluator ------------------------------------------------- *)
+(* -- vrf_evaluator ------------------------------------------------- *)
+let vrf_evaluator =
   library "vrf_evaluator" ~path:"src/lib/vrf_evaluator"
-    ~deps:
-      [ async_unix
-      ; async_kernel
-      ; rpc_parallel
-      ; core
-      ; async
-      ; core_kernel
-      ; bin_prot_shape
-      ; sexplib0
-      ; base_caml
-      ; integers
-      ; local "mina_wire_types"
-      ; local "error_json"
-      ; local "currency"
-      ; local "unsigned_extended"
-      ; local "interruptible"
-      ; local "signature_lib"
-      ; local "consensus"
-      ; local "mina_base"
-      ; local "child_processes"
-      ; local "mina_numbers"
-      ; local "genesis_constants"
-      ; local "logger"
-      ; local "logger.file_system"
-      ; local "ppx_version.runtime"
-      ; local "mina_compile_config"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_mina"; "ppx_version"; "ppx_jane" ]) ;
+  ~deps:
+    [ async_unix
+    ; async_kernel
+    ; rpc_parallel
+    ; core
+    ; async
+    ; core_kernel
+    ; bin_prot_shape
+    ; sexplib0
+    ; base_caml
+    ; integers
+    ; Layer_base.mina_wire_types
+    ; Layer_base.error_json
+    ; Layer_base.currency
+    ; Layer_base.unsigned_extended
+    ; Layer_concurrency.interruptible
+    ; Layer_crypto.signature_lib
+    ; Layer_consensus.consensus
+    ; Layer_base.mina_base
+    ; Layer_base.child_processes
+    ; Layer_infra.mina_numbers
+    ; Layer_domain.genesis_constants
+    ; Layer_infra.logger
+    ; Layer_infra.logger_file_system
+    ; Layer_ppx.ppx_version_runtime
+    ; Layer_base.mina_compile_config
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-  (* -- snark_profiler_lib -------------------------------------------- *)
+(* -- snark_profiler_lib -------------------------------------------- *)
+let snark_profiler_lib =
   library "snark_profiler_lib" ~path:"src/lib/snark_profiler_lib"
-    ~deps:
-      [ integers
-      ; astring
-      ; sexplib0
-      ; result
-      ; async_kernel
-      ; async_unix
-      ; core_kernel
-      ; core
-      ; base
-      ; async
-      ; base_caml
-      ; base_internalhash_types
-      ; local "mina_stdlib"
-      ; local "mina_wire_types"
-      ; local "child_processes"
-      ; local "snark_worker"
-      ; local "genesis_ledger_helper.lib"
-      ; local "logger"
-      ; local "coda_genesis_proof"
-      ; local "data_hash_lib"
-      ; local "currency"
-      ; local "genesis_constants"
-      ; local "generated_graphql_queries"
-      ; local "mina_transaction"
-      ; local "mina_generators"
-      ; local "mina_ledger"
-      ; local "mina_base"
-      ; local "mina_state"
-      ; local "genesis_ledger_helper"
-      ; local "signature_lib"
-      ; local "mina_base.import"
-      ; local "mina_numbers"
-      ; local "precomputed_values"
-      ; local "with_hash"
-      ; local "transaction_snark"
-      ; local "transaction_snark_tests"
-      ; local "transaction_protocol_state"
-      ; local "test_util"
-      ; local "sgn"
-      ; local "unsigned_extended"
-      ; local "snark_work_lib"
-      ; local "mina_compile_config"
-      ; local "mina_transaction_logic"
-      ; local "verifier"
-      ; local "parallel"
-      ; local "random_oracle"
-      ; local "kimchi_backend"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "pickles_types"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "snark_params"
-      ; local "zkapp_command_builder"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_mina"
-         ; "ppx_version"
-         ; "ppx_base"
-         ; "ppx_assert"
-         ; "ppx_bench"
-         ; "ppx_bin_prot"
-         ; "ppx_custom_printf"
-         ; "ppx_fields_conv"
-         ; "ppx_fixed_literal"
-         ; "ppx_here"
-         ; "ppx_inline_test"
-         ; "ppx_let"
-         ; "ppx_module_timer"
-         ; "ppx_optional"
-         ; "ppx_pipebang"
-         ; "ppx_sexp_message"
-         ; "ppx_sexp_value"
-         ; "ppx_string"
-         ; "ppx_typerep_conv"
-         ; "ppx_variants_conv"
-         ] ) ;
+  ~deps:
+    [ integers
+    ; astring
+    ; sexplib0
+    ; result
+    ; async_kernel
+    ; async_unix
+    ; core_kernel
+    ; core
+    ; base
+    ; async
+    ; base_caml
+    ; base_internalhash_types
+    ; Layer_base.mina_stdlib
+    ; Layer_base.mina_wire_types
+    ; Layer_base.child_processes
+    ; Layer_snark_worker.snark_worker
+    ; genesis_ledger_helper_lib
+    ; Layer_infra.logger
+    ; Layer_consensus.coda_genesis_proof
+    ; Layer_domain.data_hash_lib
+    ; Layer_base.currency
+    ; Layer_domain.genesis_constants
+    ; local "generated_graphql_queries"
 
-  (* -- rosetta_lib --------------------------------------------------- *)
+    ; Layer_transaction.mina_transaction
+    ; local "mina_generators"
+    ; Layer_ledger.mina_ledger
+    ; Layer_base.mina_base
+    ; Layer_consensus.mina_state
+    ; genesis_ledger_helper
+    ; Layer_crypto.signature_lib
+    ; Layer_base.mina_base_import
+    ; Layer_infra.mina_numbers
+    ; Layer_consensus.precomputed_values
+    ; Layer_base.with_hash
+    ; Layer_protocol.transaction_snark
+    ; Layer_protocol.transaction_snark_tests
+    ; Layer_protocol.transaction_protocol_state
+    ; Layer_test.test_util
+    ; Layer_crypto.sgn
+    ; Layer_base.unsigned_extended
+    ; Layer_snark_worker.snark_work_lib
+    ; Layer_base.mina_compile_config
+    ; Layer_transaction.mina_transaction_logic
+    ; Layer_service.verifier
+    ; Layer_infra.parallel
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.snark_params
+    ; Layer_protocol.zkapp_command_builder
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.ppx_base
+       ; Ppx_lib.ppx_assert
+       ; Ppx_lib.ppx_bench
+       ; Ppx_lib.ppx_bin_prot
+       ; Ppx_lib.ppx_custom_printf
+       ; Ppx_lib.ppx_fields_conv
+       ; Ppx_lib.ppx_fixed_literal
+       ; Ppx_lib.ppx_here
+       ; Ppx_lib.ppx_inline_test
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_module_timer
+       ; Ppx_lib.ppx_optional
+       ; Ppx_lib.ppx_pipebang
+       ; Ppx_lib.ppx_sexp_message
+       ; Ppx_lib.ppx_sexp_value
+       ; Ppx_lib.ppx_string
+       ; Ppx_lib.ppx_typerep_conv
+       ; Ppx_lib.ppx_variants_conv
+       ] )
+
+(* -- rosetta_lib --------------------------------------------------- *)
+let rosetta_lib =
   library "rosetta_lib" ~path:"src/lib/rosetta_lib"
-    ~library_flags:[ "-linkall" ]
-    ~deps:
-      [ result
-      ; base_caml
-      ; caqti
-      ; core_kernel
-      ; base
-      ; async_kernel
-      ; uri
-      ; sexplib0
-      ; integers
-      ; local "mina_wire_types"
-      ; local "hex"
-      ; local "random_oracle_input"
-      ; local "mina_numbers"
-      ; local "mina_stdlib"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "rosetta_models"
-      ; local "mina_base"
-      ; local "currency"
-      ; local "unsigned_extended"
-      ; local "mina_base.import"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_mina"
-         ; "ppx_version"
-         ; "ppx_assert"
-         ; "ppx_let"
-         ; "ppx_sexp_conv"
-         ; "ppx_compare"
-         ; "ppx_deriving.std"
-         ; "ppx_custom_printf"
-         ; "ppx_deriving_yojson"
-         ; "ppx_inline_test"
-         ] )
-    ~synopsis:"Rosetta-related support code" ;
+  ~library_flags:[ "-linkall" ]
+  ~deps:
+    [ result
+    ; base_caml
+    ; caqti
+    ; core_kernel
+    ; base
+    ; async_kernel
+    ; uri
+    ; sexplib0
+    ; integers
+    ; Layer_base.mina_wire_types
+    ; Layer_base.hex
+    ; Layer_crypto.random_oracle_input
+    ; Layer_infra.mina_numbers
+    ; Layer_base.mina_stdlib
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; Layer_base.rosetta_models
+    ; Layer_base.mina_base
+    ; Layer_base.currency
+    ; Layer_base.unsigned_extended
+    ; Layer_base.mina_base_import
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.ppx_assert
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_sexp_conv
+       ; Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_deriving_std
+       ; Ppx_lib.ppx_custom_printf
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_inline_test
+       ] )
+  ~synopsis:"Rosetta-related support code"
 
-  (* -- generated_graphql_queries ------------------------------------- *)
+(* -- generated_graphql_queries ------------------------------------- *)
+let generated_graphql_queries =
   library "generated_graphql_queries" ~path:"src/lib/generated_graphql_queries"
-    ~preprocessor_deps:
-      [ "../../../graphql_schema.json"; "../../graphql-ppx-config.inc" ]
-    ~deps:
-      [ async
-      ; cohttp
-      ; core
-      ; cohttp_async
-      ; local "mina_base"
-      ; graphql_async
-      ; graphql_cohttp
-      ; yojson
-      ; local "graphql_lib"
-      ; base
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_base"
-         ; "ppx_version"
-         ; "graphql_ppx"
-         ; "--"
-         ; {|%{read-lines:../../graphql-ppx-config.inc}|}
-         ] )
-    ~extra_stanzas:
-      [ Dune_s_expr.parse_string
-          {|(rule
+  ~preprocessor_deps:
+    [ "../../../graphql_schema.json"; "../../graphql-ppx-config.inc" ]
+  ~deps:
+    [ async
+    ; cohttp
+    ; core
+    ; cohttp_async
+    ; Layer_base.mina_base
+    ; graphql_async
+    ; graphql_cohttp
+    ; yojson
+    ; local "graphql_lib"
+    ; base
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_base
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.graphql_ppx
+       ; "--"
+       ; {|%{read-lines:../../graphql-ppx-config.inc}|}
+       ] )
+  ~extra_stanzas:
+    [ Dune_s_expr.parse_string
+        {|(rule
  (targets generated_graphql_queries.ml)
  (deps
-  (:< gen/gen.exe))
+(:< gen/gen.exe))
  (action
-  (run %{<} %{targets})))|}
-        |> List.hd
-      ] ;
+(run %{<} %{targets})))|}
+      |> List.hd
+    ]
 
-  (* -- generated_graphql_queries/gen --------------------------------- *)
+(* -- generated_graphql_queries/gen --------------------------------- *)
+let () =
   private_executable ~path:"src/lib/generated_graphql_queries/gen"
-    ~modes:[ "native" ]
-    ~deps:
-      [ base
-      ; core_kernel
-      ; ppxlib
-      ; ppxlib_ast
-      ; ppxlib_astlib
-      ; yojson
-      ; local "mina_base"
-      ; base_caml
-      ; compiler_libs
-      ; ocaml_migrate_parsetree
-      ; stdio
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_base"; "ppx_version"; "ppxlib.metaquot"; "graphql_ppx" ] )
-    "gen" ;
+  ~modes:[ "native" ]
+  ~deps:
+    [ base
+    ; core_kernel
+    ; ppxlib
+    ; ppxlib_ast
+    ; ppxlib_astlib
+    ; yojson
+    ; Layer_base.mina_base
+    ; base_caml
+    ; compiler_libs
+    ; ocaml_migrate_parsetree
+    ; stdio
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_base; Ppx_lib.ppx_version; Ppx_lib.ppxlib_metaquot; Ppx_lib.graphql_ppx ] )
+  "gen"
 
-  (* -- ledger_proof -------------------------------------------------- *)
-  library "ledger_proof" ~path:"src/lib/ledger_proof"
-    ~deps:
-      [ core_kernel
-      ; local "transaction_snark"
-      ; local "mina_base"
-      ; local "mina_state"
-      ; local "mina_transaction_logic"
-      ; local "ppx_version.runtime"
-      ; local "proof_cache_tag"
-      ; local "proof_carrying_data"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_bin_prot"
-         ; "ppx_sexp_conv"
-         ; "ppx_hash"
-         ; "ppx_compare"
-         ; "ppx_version"
-         ; "ppx_deriving_yojson"
-         ] ) ;
-
-  (* -- prover -------------------------------------------------------- *)
-  library "prover" ~path:"src/lib/prover"
-    ~deps:
-      [ base64
-      ; async_unix
-      ; rpc_parallel
-      ; core
-      ; async
-      ; async_kernel
-      ; core_kernel
-      ; bin_prot_shape
-      ; base_caml
-      ; sexplib0
-      ; local "with_hash"
-      ; local "coda_genesis_ledger"
-      ; local "mina_metrics"
-      ; local "error_json"
-      ; local "pickles_types"
-      ; local "snarky.backendless"
-      ; local "snark_params"
-      ; local "pickles"
-      ; local "sgn"
-      ; local "currency"
-      ; local "child_processes"
-      ; local "blockchain_snark"
-      ; local "mina_block"
-      ; local "mina_state"
-      ; local "mina_base"
-      ; local "mina_compile_config"
-      ; local "logger"
-      ; local "itn_logger"
-      ; local "internal_tracing"
-      ; local "genesis_constants"
-      ; local "ledger_proof"
-      ; local "consensus"
-      ; local "coda_genesis_proof"
-      ; local "transaction_snark"
-      ; local "logger.file_system"
-      ; local "data_hash_lib"
-      ; local "staged_ledger_diff"
-      ; local "ppx_version.runtime"
-      ; local "mina_transaction_logic"
-      ; local "pickles.backend"
-      ; local "sgn_type"
-      ; local "kimchi_backend"
-      ; local "mina_numbers"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "mina_wire_types"
-      ; local "promise"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_mina"; "ppx_version"; "ppx_jane"; "ppx_bin_prot" ]) ;
-
-  (* -- verifier ------------------------------------------------------ *)
-  library "verifier" ~path:"src/lib/verifier"
-    ~deps:
-      [ async
-      ; async_kernel
-      ; async_unix
-      ; base
-      ; base_caml
-      ; bin_prot_shape
-      ; core
-      ; core_kernel
-      ; rpc_parallel
-      ; sexplib0
-      ; local "blockchain_snark"
-      ; local "child_processes"
-      ; local "error_json"
-      ; local "genesis_constants"
-      ; local "internal_tracing"
-      ; local "itn_logger"
-      ; local "kimchi_backend"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "ledger_proof"
-      ; local "logger"
-      ; local "logger.file_system"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_state"
-      ; local "o1trace"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "snarky.backendless"
-      ; local "transaction_snark"
-      ; local "with_hash"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_custom_printf"
-         ; "ppx_version"
-         ; "ppx_compare"
-         ; "ppx_hash"
-         ; "ppx_mina"
-         ; "ppx_version"
-         ; "ppx_here"
-         ; "ppx_bin_prot"
-         ; "ppx_let"
-         ; "ppx_deriving.std"
-         ; "ppx_deriving_yojson"
-         ; "ppx_sexp_conv"
-         ] ) ;
-
-  (* -- mina_incremental ---------------------------------------------- *)
+(* -- mina_incremental ---------------------------------------------- *)
+let mina_incremental =
   library "mina_incremental" ~path:"src/lib/mina_incremental"
-    ~deps:[ incremental; local "pipe_lib"; async_kernel ]
-    ~ppx:(Ppx.custom [ "ppx_version" ]) ;
+  ~deps:[ incremental; Layer_base.pipe_lib; async_kernel ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_version ])
 
-  (* -- mina_plugins -------------------------------------------------- *)
+(* -- mina_plugins -------------------------------------------------- *)
+let mina_plugins =
   library "mina_plugins" ~path:"src/lib/mina_plugins"
-    ~deps:[ core_kernel; dynlink; core; base; local "mina_lib"; local "logger" ]
-    ~ppx:(Ppx.custom [ "ppx_mina"; "ppx_version" ]) ;
+  ~deps:[ core_kernel; dynlink; core; base; local "mina_lib"; Layer_infra.logger ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])
 
-  (* -- mina_plugins/examples/do_nothing ------------------------------ *)
+(* -- mina_plugins/examples/do_nothing ------------------------------ *)
+let plugin_do_nothing =
   private_library ~path:"src/lib/mina_plugins/examples/do_nothing"
-    ~deps:
-      [ core_kernel
-      ; core
-      ; local "mina_plugins"
-      ; local "mina_lib"
-      ; local "logger"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_mina" ])
-    "plugin_do_nothing" ;
+  ~deps:
+    [ core_kernel
+    ; core
+    ; mina_plugins
+    ; local "mina_lib"
+    ; Layer_infra.logger
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_mina ])
+  "plugin_do_nothing"
 
-  (* ================================================================ *)
-  (* Networking & Frontier Layer                                      *)
-  (* ================================================================ *)
+(* ================================================================ *)
+(* Networking & Frontier Layer                                      *)
+(* ================================================================ *)
 
-  (* -- gossip_net ---------------------------------------------------- *)
+(* -- gossip_net ---------------------------------------------------- *)
+let gossip_net =
   library "gossip_net" ~path:"src/lib/gossip_net" ~library_flags:[ "-linkall" ]
-    ~inline_tests:true
-    ~deps:
-      [ uri
-      ; async_rpc
-      ; async_kernel
-      ; base
-      ; base_caml
-      ; bin_prot_shape
-      ; async_rpc_kernel
-      ; async
-      ; core
-      ; core_kernel
-      ; sexplib0
-      ; cohttp_async
-      ; async_unix
-      ; base_internalhash_types
-      ; ppx_hash_runtime_lib
-      ; integers
-      ; local "ppx_version.runtime"
-      ; local "network_peer"
-      ; local "logger"
-      ; local "pipe_lib"
-      ; local "trust_system"
-      ; local "network_pool"
-      ; local "mina_net2"
-      ; local "mina_block"
-      ; local "mina_base"
-      ; local "mina_transaction"
-      ; local "perf_histograms"
-      ; local "o1trace"
-      ; local "node_addrs_and_ports"
-      ; local "mina_metrics"
-      ; local "child_processes"
-      ; local "error_json"
-      ; local "block_time"
-      ; local "genesis_constants"
-      ; local "mina_stdlib"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_mina"
-         ; "ppx_version"
-         ; "ppx_inline_test"
-         ; "ppx_compare"
-         ; "ppx_deriving.make"
-         ; "ppx_deriving_yojson"
-         ; "ppx_here"
-         ; "ppx_bin_prot"
-         ; "ppx_sexp_conv"
-         ; "ppx_fields_conv"
-         ; "ppx_let"
-         ; "ppx_custom_printf"
-         ; "ppx_pipebang"
-         ] )
-    ~synopsis:"Gossip Network" ;
+  ~inline_tests:true
+  ~deps:
+    [ uri
+    ; async_rpc
+    ; async_kernel
+    ; base
+    ; base_caml
+    ; bin_prot_shape
+    ; async_rpc_kernel
+    ; async
+    ; core
+    ; core_kernel
+    ; sexplib0
+    ; cohttp_async
+    ; async_unix
+    ; base_internalhash_types
+    ; ppx_hash_runtime_lib
+    ; integers
+    ; Layer_ppx.ppx_version_runtime
+    ; Layer_domain.network_peer
+    ; Layer_infra.logger
+    ; Layer_base.pipe_lib
+    ; Layer_infra.trust_system
+    ; local "network_pool"
 
-  (* -- mina_net2 ----------------------------------------------------- *)
+    ; local "mina_net2"
+
+    ; mina_block
+    ; Layer_base.mina_base
+    ; Layer_transaction.mina_transaction
+    ; Layer_base.perf_histograms
+    ; Layer_infra.o1trace
+    ; Layer_domain.node_addrs_and_ports
+    ; Layer_tooling.mina_metrics
+    ; Layer_base.child_processes
+    ; Layer_base.error_json
+    ; Layer_domain.block_time
+    ; Layer_domain.genesis_constants
+    ; Layer_base.mina_stdlib
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.ppx_inline_test
+       ; Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_deriving_make
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_here
+       ; Ppx_lib.ppx_bin_prot
+       ; Ppx_lib.ppx_sexp_conv
+       ; Ppx_lib.ppx_fields_conv
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_custom_printf
+       ; Ppx_lib.ppx_pipebang
+       ] )
+  ~synopsis:"Gossip Network"
+
+(* -- mina_net2 ----------------------------------------------------- *)
+let mina_net2 =
   library "mina_net2" ~path:"src/lib/mina_net2" ~inline_tests:true
-    ~deps:
-      [ async
-      ; base58
-      ; base64
-      ; capnp
-      ; digestif
-      ; stdio
-      ; core
-      ; libp2p_ipc
-      ; yojson
-      ; async_kernel
-      ; core_kernel
-      ; bin_prot_shape
-      ; ppx_inline_test_config
-      ; async_unix
-      ; sexplib0
-      ; base_caml
-      ; base_internalhash_types
-      ; splittable_random
-      ; integers
-      ; local "blake2"
-      ; local "error_json"
-      ; local "child_processes"
-      ; local "mina_stdlib_unix"
-      ; local "logger"
-      ; local "network_peer"
-      ; local "pipe_lib"
-      ; local "timeout_lib"
-      ; local "mina_metrics"
-      ; local "o1trace"
-      ; local "staged_ledger_diff"
-      ; local "ppx_version.runtime"
-      ; local "consensus"
-      ; local "mina_stdlib"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_mina"
-         ; "ppx_version"
-         ; "ppx_jane"
-         ; "ppx_deriving.std"
-         ; "ppx_let"
-         ; "ppx_deriving_yojson"
-         ] ) ;
+  ~deps:
+    [ async
+    ; base58
+    ; base64
+    ; capnp
+    ; digestif
+    ; stdio
+    ; core
+    ; libp2p_ipc
+    ; yojson
+    ; async_kernel
+    ; core_kernel
+    ; bin_prot_shape
+    ; ppx_inline_test_config
+    ; async_unix
+    ; sexplib0
+    ; base_caml
+    ; base_internalhash_types
+    ; splittable_random
+    ; integers
+    ; Layer_crypto.blake2
+    ; Layer_base.error_json
+    ; Layer_base.child_processes
+    ; Layer_infra.mina_stdlib_unix
+    ; Layer_infra.logger
+    ; Layer_domain.network_peer
+    ; Layer_base.pipe_lib
+    ; Layer_concurrency.timeout_lib
+    ; Layer_tooling.mina_metrics
+    ; Layer_infra.o1trace
+    ; Layer_ledger.staged_ledger_diff
+    ; Layer_ppx.ppx_version_runtime
+    ; Layer_consensus.consensus
+    ; Layer_base.mina_stdlib
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.ppx_jane
+       ; Ppx_lib.ppx_deriving_std
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_deriving_yojson
+       ] )
 
-  (* -- mina_net2/tests ----------------------------------------------- *)
+(* -- mina_net2/tests ----------------------------------------------- *)
+let mina_net2_tests =
   private_library ~path:"src/lib/mina_net2/tests" ~inline_tests:true
-    ~deps:
-      [ core
-      ; async
-      ; ppx_inline_test_config
-      ; async_kernel
-      ; async_unix
-      ; core_kernel
-      ; sexplib0
-      ; bin_prot_shape
-      ; base_caml
-      ; local "mina_net2"
-      ; local "mina_stdlib"
-      ; local "logger"
-      ; local "child_processes"
-      ; local "network_peer"
-      ; local "mina_stdlib_unix"
-      ; local "mina_compile_config"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_mina"; "ppx_version" ])
-    "mina_net2_tests" ;
+  ~deps:
+    [ core
+    ; async
+    ; ppx_inline_test_config
+    ; async_kernel
+    ; async_unix
+    ; core_kernel
+    ; sexplib0
+    ; bin_prot_shape
+    ; base_caml
+    ; mina_net2
+    ; Layer_base.mina_stdlib
+    ; Layer_infra.logger
+    ; Layer_base.child_processes
+    ; Layer_domain.network_peer
+    ; Layer_infra.mina_stdlib_unix
+    ; Layer_base.mina_compile_config
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])
+  "mina_net2_tests"
 
-  (* -- mina_networking ----------------------------------------------- *)
+(* -- mina_networking ----------------------------------------------- *)
+let mina_networking =
   library "mina_networking" ~path:"src/lib/mina_networking"
-    ~library_flags:[ "-linkall" ] ~inline_tests:true
-    ~deps:
-      [ base_caml
-      ; async_rpc_kernel
-      ; result
-      ; core
-      ; async
-      ; core_kernel
-      ; sexplib0
-      ; base
-      ; bin_prot_shape
-      ; async_unix
-      ; async_kernel
-      ; base_internalhash_types
-      ; local "precomputed_values"
-      ; local "merkle_ledger"
-      ; local "downloader"
-      ; local "protocol_version"
-      ; local "error_json"
-      ; local "mina_net2"
-      ; local "block_time"
-      ; local "trust_system"
-      ; local "signature_lib"
-      ; local "with_hash"
-      ; local "mina_state"
-      ; local "pipe_lib"
-      ; local "staged_ledger"
-      ; local "mina_block"
-      ; local "consensus"
-      ; local "perf_histograms"
-      ; local "mina_base"
-      ; local "gossip_net"
-      ; local "proof_carrying_data"
-      ; local "network_pool"
-      ; local "sync_status"
-      ; local "network_peer"
-      ; local "data_hash_lib"
-      ; local "logger"
-      ; local "genesis_constants"
-      ; local "mina_metrics"
-      ; local "syncable_ledger"
-      ; local "mina_ledger"
-      ; local "transition_handler"
-      ; local "o1trace"
-      ; local "ppx_version.runtime"
-      ; local "mina_stdlib"
-      ; local "sync_handler"
-      ; local "transition_chain_prover"
-      ; local "work_selector"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_mina"
-         ; "ppx_compare"
-         ; "ppx_hash"
-         ; "ppx_version"
-         ; "ppx_inline_test"
-         ; "ppx_compare"
-         ; "ppx_deriving.make"
-         ; "ppx_deriving_yojson"
-         ; "ppx_bin_prot"
-         ; "ppx_sexp_conv"
-         ; "ppx_fields_conv"
-         ; "ppx_let"
-         ; "ppx_register_event"
-         ; "ppx_custom_printf"
-         ] )
-    ~synopsis:"Networking layer for coda" ;
+  ~library_flags:[ "-linkall" ] ~inline_tests:true
+  ~deps:
+    [ base_caml
+    ; async_rpc_kernel
+    ; result
+    ; core
+    ; async
+    ; core_kernel
+    ; sexplib0
+    ; base
+    ; bin_prot_shape
+    ; async_unix
+    ; async_kernel
+    ; base_internalhash_types
+    ; Layer_consensus.precomputed_values
+    ; Layer_ledger.merkle_ledger
+    ; local "downloader"
 
-  (* -- network_pool -------------------------------------------------- *)
+    ; Layer_protocol.protocol_version
+    ; Layer_base.error_json
+    ; mina_net2
+    ; Layer_domain.block_time
+    ; Layer_infra.trust_system
+    ; Layer_crypto.signature_lib
+    ; Layer_base.with_hash
+    ; Layer_consensus.mina_state
+    ; Layer_base.pipe_lib
+    ; staged_ledger
+    ; mina_block
+    ; Layer_consensus.consensus
+    ; Layer_base.perf_histograms
+    ; Layer_base.mina_base
+    ; gossip_net
+    ; Layer_domain.proof_carrying_data
+    ; local "network_pool"
+
+    ; Layer_base.sync_status
+    ; Layer_domain.network_peer
+    ; Layer_domain.data_hash_lib
+    ; Layer_infra.logger
+    ; Layer_domain.genesis_constants
+    ; Layer_tooling.mina_metrics
+    ; local "syncable_ledger"
+
+    ; Layer_ledger.mina_ledger
+    ; local "transition_handler"
+
+    ; Layer_infra.o1trace
+    ; Layer_ppx.ppx_version_runtime
+    ; Layer_base.mina_stdlib
+    ; local "sync_handler"
+
+    ; local "transition_chain_prover"
+
+    ; Layer_snark_worker.work_selector
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_hash
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.ppx_inline_test
+       ; Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_deriving_make
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_bin_prot
+       ; Ppx_lib.ppx_sexp_conv
+       ; Ppx_lib.ppx_fields_conv
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_register_event
+       ; Ppx_lib.ppx_custom_printf
+       ] )
+  ~synopsis:"Networking layer for coda"
+
+(* -- network_pool -------------------------------------------------- *)
+let network_pool =
   library "network_pool" ~path:"src/lib/network_pool" ~inline_tests:true
-    ~library_flags:[ "-linkall" ]
-    ~deps:
-      [ async
-      ; async_unix
-      ; core
-      ; integers
-      ; stdio
-      ; local "block_time"
-      ; local "mina_stdlib"
-      ; local "child_processes"
-      ; local "coda_genesis_ledger"
-      ; local "consensus"
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "error_json"
-      ; local "genesis_constants"
-      ; local "interruptible"
-      ; local "kimchi_backend"
-      ; local "kimchi_backend_common"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "ledger_proof"
-      ; local "logger"
-      ; local "merkle_ledger"
-      ; local "mina_base"
-      ; local "mina_ledger"
-      ; local "mina_metrics"
-      ; local "mina_net2"
-      ; local "mina_numbers"
-      ; local "mina_signature_kind"
-      ; local "mina_state"
-      ; local "mina_transaction"
-      ; local "mina_transaction_logic"
-      ; local "mina_wire_types"
-      ; local "network_peer"
-      ; local "o1trace"
-      ; local "one_or_two"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_types"
-      ; local "pipe_lib"
-      ; local "ppx_version.runtime"
-      ; local "precomputed_values"
-      ; local "quickcheck_lib"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "sgn"
-      ; local "sgn_type"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "snark_work_lib"
-      ; local "staged_ledger"
-      ; local "staged_ledger_diff"
-      ; local "transaction_snark"
-      ; local "transaction_snark_work"
-      ; local "transition_frontier"
-      ; local "transition_frontier_base"
-      ; local "transition_frontier_extensions"
-      ; local "trust_system"
-      ; local "verifier"
-      ; local "with_hash"
-      ; local "zkapp_command_builder"
-      ; local "zkapp_vk_cache_tag"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_assert"
-         ; "ppx_base"
-         ; "ppx_bin_prot"
-         ; "ppx_custom_printf"
-         ; "ppx_deriving.std"
-         ; "ppx_deriving_yojson"
-         ; "ppx_fields_conv"
-         ; "ppx_inline_test"
-         ; "ppx_let"
-         ; "ppx_mina"
-         ; "ppx_pipebang"
-         ; "ppx_register_event"
-         ; "ppx_sexp_conv"
-         ; "ppx_snarky"
-         ; "ppx_version"
-         ] )
-    ~synopsis:
-      "Network pool is an interface that processes incoming diffs and then \
-       broadcasts them" ;
+  ~library_flags:[ "-linkall" ]
+  ~deps:
+    [ async
+    ; async_unix
+    ; core
+    ; integers
+    ; stdio
+    ; Layer_domain.block_time
+    ; Layer_base.mina_stdlib
+    ; Layer_base.child_processes
+    ; Layer_consensus.coda_genesis_ledger
+    ; Layer_consensus.consensus
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_base.error_json
+    ; Layer_domain.genesis_constants
+    ; Layer_concurrency.interruptible
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_backend_common
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_snark_worker.ledger_proof
+    ; Layer_infra.logger
+    ; Layer_ledger.merkle_ledger
+    ; Layer_base.mina_base
+    ; Layer_ledger.mina_ledger
+    ; Layer_tooling.mina_metrics
+    ; mina_net2
+    ; Layer_infra.mina_numbers
+    ; Layer_infra.mina_signature_kind
+    ; Layer_consensus.mina_state
+    ; Layer_transaction.mina_transaction
+    ; Layer_transaction.mina_transaction_logic
+    ; Layer_base.mina_wire_types
+    ; Layer_domain.network_peer
+    ; Layer_infra.o1trace
+    ; Layer_base.one_or_two
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_types
+    ; Layer_base.pipe_lib
+    ; Layer_ppx.ppx_version_runtime
+    ; Layer_consensus.precomputed_values
+    ; Layer_test.quickcheck_lib
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.random_oracle_input
+    ; Layer_crypto.sgn
+    ; Layer_base.sgn_type
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; Layer_snark_worker.snark_work_lib
+    ; staged_ledger
+    ; Layer_ledger.staged_ledger_diff
+    ; Layer_protocol.transaction_snark
+    ; Layer_snark_worker.transaction_snark_work
+    ; local "transition_frontier"
 
-  (* -- syncable_ledger ----------------------------------------------- *)
+    ; local "transition_frontier_base"
+
+    ; local "transition_frontier_extensions"
+
+    ; Layer_infra.trust_system
+    ; Layer_service.verifier
+    ; Layer_base.with_hash
+    ; Layer_protocol.zkapp_command_builder
+    ; Layer_storage.zkapp_vk_cache_tag
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_assert
+       ; Ppx_lib.ppx_base
+       ; Ppx_lib.ppx_bin_prot
+       ; Ppx_lib.ppx_custom_printf
+       ; Ppx_lib.ppx_deriving_std
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_fields_conv
+       ; Ppx_lib.ppx_inline_test
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_pipebang
+       ; Ppx_lib.ppx_register_event
+       ; Ppx_lib.ppx_sexp_conv
+       ; Ppx_lib.ppx_snarky
+       ; Ppx_lib.ppx_version
+       ] )
+  ~synopsis:
+    "Network pool is an interface that processes incoming diffs and then \
+     broadcasts them"
+
+(* -- syncable_ledger ----------------------------------------------- *)
+let syncable_ledger =
   library "syncable_ledger" ~path:"src/lib/syncable_ledger"
-    ~library_flags:[ "-linkall" ]
-    ~flags:[ Dune_s_expr.atom ":standard"; Dune_s_expr.atom "-short-paths" ]
-    ~deps:
-      [ async_kernel
-      ; core_kernel
-      ; bin_prot_shape
-      ; base_caml
-      ; sexplib0
-      ; core
-      ; async
-      ; local "trust_system"
-      ; local "logger"
-      ; local "merkle_ledger"
-      ; local "pipe_lib"
-      ; local "network_peer"
-      ; local "merkle_address"
-      ; local "mina_stdlib"
-      ; local "error_json"
-      ; local "ppx_version.runtime"
-      ; local "mina_compile_config"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_mina"
-         ; "ppx_version"
-         ; "ppx_jane"
-         ; "ppx_compare"
-         ; "ppx_deriving_yojson"
-         ; "ppx_register_event"
-         ] )
-    ~synopsis:"Synchronization of Merkle-tree backed ledgers" ;
+  ~library_flags:[ "-linkall" ]
+  ~flags:[ Dune_s_expr.atom ":standard"; Dune_s_expr.atom "-short-paths" ]
+  ~deps:
+    [ async_kernel
+    ; core_kernel
+    ; bin_prot_shape
+    ; base_caml
+    ; sexplib0
+    ; core
+    ; async
+    ; Layer_infra.trust_system
+    ; Layer_infra.logger
+    ; Layer_ledger.merkle_ledger
+    ; Layer_base.pipe_lib
+    ; Layer_domain.network_peer
+    ; Layer_ledger.merkle_address
+    ; Layer_base.mina_stdlib
+    ; Layer_base.error_json
+    ; Layer_ppx.ppx_version_runtime
+    ; Layer_base.mina_compile_config
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.ppx_jane
+       ; Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_register_event
+       ] )
+  ~synopsis:"Synchronization of Merkle-tree backed ledgers"
 
-  (* -- syncable_ledger/test ------------------------------------------ *)
+(* -- syncable_ledger/test ------------------------------------------ *)
+let syncable_ledger_test =
   private_library ~path:"src/lib/syncable_ledger/test" ~inline_tests:true
-    ~deps:
-      [ result
-      ; base_internalhash_types
-      ; bin_prot_shape
-      ; async_unix
-      ; async_kernel
-      ; core_kernel
-      ; core
-      ; async
-      ; sexplib0
-      ; ppx_inline_test_config
-      ; base_caml
-      ; local "mina_numbers"
-      ; local "mina_base"
-      ; local "merkle_address"
-      ; local "logger"
-      ; local "pipe_lib"
-      ; local "merkle_ledger_tests"
-      ; local "merkle_ledger"
-      ; local "syncable_ledger"
-      ; local "network_peer"
-      ; local "trust_system"
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "mina_base.import"
-      ; local "signature_lib"
-      ; local "mina_stdlib"
-      ; local "mina_compile_config"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_version"; "ppx_jane"; "ppx_compare"; "ppx_deriving_yojson" ] )
-    "test" ;
+  ~deps:
+    [ result
+    ; base_internalhash_types
+    ; bin_prot_shape
+    ; async_unix
+    ; async_kernel
+    ; core_kernel
+    ; core
+    ; async
+    ; sexplib0
+    ; ppx_inline_test_config
+    ; base_caml
+    ; Layer_infra.mina_numbers
+    ; Layer_base.mina_base
+    ; Layer_ledger.merkle_address
+    ; Layer_infra.logger
+    ; Layer_base.pipe_lib
+    ; Layer_ledger.merkle_ledger_tests
+    ; Layer_ledger.merkle_ledger
+    ; syncable_ledger
+    ; Layer_domain.network_peer
+    ; Layer_infra.trust_system
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_base.mina_base_import
+    ; Layer_crypto.signature_lib
+    ; Layer_base.mina_stdlib
+    ; Layer_base.mina_compile_config
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_compare; Ppx_lib.ppx_deriving_yojson ] )
+  "test"
 
-  (* -- sync_handler -------------------------------------------------- *)
+(* -- sync_handler -------------------------------------------------- *)
+let sync_handler =
   library "sync_handler" ~path:"src/lib/sync_handler" ~inline_tests:true
-    ~deps:
-      [ sexplib0
-      ; core
-      ; async
-      ; core_kernel
-      ; async_kernel
-      ; local "with_hash"
-      ; local "data_hash_lib"
-      ; local "precomputed_values"
-      ; local "genesis_constants"
-      ; local "trust_system"
-      ; local "transition_frontier_extensions"
-      ; local "transition_frontier_base"
-      ; local "consensus"
-      ; local "syncable_ledger"
-      ; local "mina_base"
-      ; local "mina_intf"
-      ; local "transition_frontier"
-      ; local "best_tip_prover"
-      ; local "mina_block"
-      ; local "network_peer"
-      ; local "logger"
-      ; local "merkle_ledger"
-      ; local "staged_ledger"
-      ; local "mina_stdlib"
-      ; local "proof_carrying_data"
-      ; local "mina_ledger"
-      ; local "mina_wire_types"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_mina"; "ppx_version"; "ppx_jane" ]) ;
+  ~deps:
+    [ sexplib0
+    ; core
+    ; async
+    ; core_kernel
+    ; async_kernel
+    ; Layer_base.with_hash
+    ; Layer_domain.data_hash_lib
+    ; Layer_consensus.precomputed_values
+    ; Layer_domain.genesis_constants
+    ; Layer_infra.trust_system
+    ; local "transition_frontier_extensions"
 
-  (* -- transition_chain_prover --------------------------------------- *)
+    ; local "transition_frontier_base"
+
+    ; Layer_consensus.consensus
+    ; syncable_ledger
+    ; Layer_base.mina_base
+    ; local "mina_intf"
+    ; local "transition_frontier"
+
+    ; local "best_tip_prover"
+
+    ; mina_block
+    ; Layer_domain.network_peer
+    ; Layer_infra.logger
+    ; Layer_ledger.merkle_ledger
+    ; staged_ledger
+    ; Layer_base.mina_stdlib
+    ; Layer_domain.proof_carrying_data
+    ; Layer_ledger.mina_ledger
+    ; Layer_base.mina_wire_types
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
+
+(* -- transition_chain_prover --------------------------------------- *)
+let transition_chain_prover =
   library "transition_chain_prover" ~path:"src/lib/transition_chain_prover"
-    ~deps:
-      [ core
-      ; core_kernel
-      ; local "transition_frontier_extensions"
-      ; local "mina_block"
-      ; local "mina_state"
-      ; local "mina_intf"
-      ; local "mina_base"
-      ; local "transition_frontier"
-      ; local "merkle_list_prover"
-      ; local "transition_frontier_base"
-      ; local "data_hash_lib"
-      ; local "with_hash"
-      ; local "mina_wire_types"
-      ; local "pickles.backend"
-      ; local "snark_params"
-      ; local "pickles"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_jane" ]) ;
+  ~deps:
+    [ core
+    ; core_kernel
+    ; local "transition_frontier_extensions"
 
-  (* -- transition_chain_verifier ------------------------------------- *)
+    ; mina_block
+    ; Layer_consensus.mina_state
+    ; local "mina_intf"
+    ; Layer_base.mina_base
+    ; local "transition_frontier"
+
+    ; Layer_ledger.merkle_list_prover
+    ; local "transition_frontier_base"
+
+    ; Layer_domain.data_hash_lib
+    ; Layer_base.with_hash
+    ; Layer_base.mina_wire_types
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.snark_params
+    ; Layer_crypto.pickles
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
+
+(* -- transition_chain_verifier ------------------------------------- *)
+let transition_chain_verifier =
   library "transition_chain_verifier" ~path:"src/lib/transition_chain_verifier"
-    ~deps:
-      [ core_kernel
-      ; core
-      ; local "merkle_list_verifier"
-      ; local "mina_state"
-      ; local "mina_base"
-      ; local "mina_stdlib"
-      ; local "data_hash_lib"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_jane"; "ppx_compare" ]) ;
+  ~deps:
+    [ core_kernel
+    ; core
+    ; Layer_ledger.merkle_list_verifier
+    ; Layer_consensus.mina_state
+    ; Layer_base.mina_base
+    ; Layer_base.mina_stdlib
+    ; Layer_domain.data_hash_lib
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_compare ])
 
-  (* -- transition_frontier/frontier_base ----------------------------- *)
+(* -- transition_frontier/frontier_base ----------------------------- *)
+let transition_frontier_base =
   library "transition_frontier_base" ~internal_name:"frontier_base"
-    ~path:"src/lib/transition_frontier/frontier_base"
-    ~deps:
-      [ async_unix
-      ; base_caml
-      ; async_kernel
-      ; core_kernel
-      ; bin_prot_shape
-      ; sexplib0
-      ; integers
-      ; core
-      ; async
-      ; base_internalhash_types
-      ; local "unsigned_extended"
-      ; local "staged_ledger_diff"
-      ; local "block_time"
-      ; local "one_or_two"
-      ; local "mina_base.import"
-      ; local "currency"
-      ; local "mina_stdlib"
-      ; local "allocation_functor"
-      ; local "genesis_constants"
-      ; local "transaction_snark_work"
-      ; local "trust_system"
-      ; local "precomputed_values"
-      ; local "consensus"
-      ; local "network_peer"
-      ; local "mina_ledger"
-      ; local "mina_block"
-      ; local "mina_base"
-      ; local "mina_transaction_logic"
-      ; local "mina_state"
-      ; local "staged_ledger"
-      ; local "data_hash_lib"
-      ; local "signature_lib"
-      ; local "logger"
-      ; local "verifier"
-      ; local "with_hash"
-      ; local "o1trace"
-      ; local "visualization"
-      ; local "mina_numbers"
-      ; local "ledger_proof"
-      ; local "protocol_version"
-      ; local "mina_net2"
-      ; local "transaction_snark"
-      ; local "coda_genesis_proof"
-      ; local "ppx_version.runtime"
-      ; local "pickles.backend"
-      ; local "snark_params"
-      ; local "pickles"
-      ; local "kimchi_backend"
-      ; local "sgn"
-      ; local "sgn_type"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "mina_wire_types"
-      ; local "internal_tracing"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_jane"
-         ; "ppx_mina"
-         ; "ppx_version"
-         ; "ppx_deriving.std"
-         ; "ppx_deriving_yojson"
-         ] ) ;
+  ~path:"src/lib/transition_frontier/frontier_base"
+  ~deps:
+    [ async_unix
+    ; base_caml
+    ; async_kernel
+    ; core_kernel
+    ; bin_prot_shape
+    ; sexplib0
+    ; integers
+    ; core
+    ; async
+    ; base_internalhash_types
+    ; Layer_base.unsigned_extended
+    ; Layer_ledger.staged_ledger_diff
+    ; Layer_domain.block_time
+    ; Layer_base.one_or_two
+    ; Layer_base.mina_base_import
+    ; Layer_base.currency
+    ; Layer_base.mina_stdlib
+    ; Layer_base.allocation_functor
+    ; Layer_domain.genesis_constants
+    ; Layer_snark_worker.transaction_snark_work
+    ; Layer_infra.trust_system
+    ; Layer_consensus.precomputed_values
+    ; Layer_consensus.consensus
+    ; Layer_domain.network_peer
+    ; Layer_ledger.mina_ledger
+    ; mina_block
+    ; Layer_base.mina_base
+    ; Layer_transaction.mina_transaction_logic
+    ; Layer_consensus.mina_state
+    ; staged_ledger
+    ; Layer_domain.data_hash_lib
+    ; Layer_crypto.signature_lib
+    ; Layer_infra.logger
+    ; Layer_service.verifier
+    ; Layer_base.with_hash
+    ; Layer_infra.o1trace
+    ; Layer_base.visualization
+    ; Layer_infra.mina_numbers
+    ; Layer_snark_worker.ledger_proof
+    ; Layer_protocol.protocol_version
+    ; mina_net2
+    ; Layer_protocol.transaction_snark
+    ; Layer_consensus.coda_genesis_proof
+    ; Layer_ppx.ppx_version_runtime
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.snark_params
+    ; Layer_crypto.pickles
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.sgn
+    ; Layer_base.sgn_type
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_base.mina_wire_types
+    ; Layer_tooling.internal_tracing
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_jane
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.ppx_deriving_std
+       ; Ppx_lib.ppx_deriving_yojson
+       ] )
 
-  (* -- transition_frontier/full_frontier ----------------------------- *)
+(* -- transition_frontier/full_frontier ----------------------------- *)
+let transition_frontier_full_frontier =
   library "transition_frontier_full_frontier" ~internal_name:"full_frontier"
-    ~path:"src/lib/transition_frontier/full_frontier"
-    ~deps:
-      [ integers
-      ; core
-      ; base_caml
-      ; core_kernel
-      ; sexplib0
-      ; base_internalhash_types
-      ; stdio
-      ; local "mina_wire_types"
-      ; local "unsigned_extended"
-      ; local "o1trace"
-      ; local "visualization"
-      ; local "mina_metrics"
-      ; local "block_time"
-      ; local "logger"
-      ; local "staged_ledger"
-      ; local "mina_state"
-      ; local "mina_base"
-      ; local "transition_frontier_persistent_root"
-      ; local "transition_frontier_base"
-      ; local "consensus"
-      ; local "mina_ledger"
-      ; local "mina_block"
-      ; local "data_hash_lib"
-      ; local "precomputed_values"
-      ; local "with_hash"
-      ; local "mina_stdlib"
-      ; local "staged_ledger_diff"
-      ; local "mina_numbers"
-      ; local "internal_tracing"
-      ; async
-      ; async_kernel
-      ; async_unix
-      ; local "child_processes"
-      ; local "coda_genesis_ledger"
-      ; core_uuid
-      ; core_kernel_uuid
-      ; local "genesis_constants"
-      ; local "merkle_ledger"
-      ; local "protocol_version"
-      ; local "signature_lib"
-      ; local "verifier"
-      ; local "pickles.backend"
-      ; local "snark_params"
-      ; local "pickles"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "mina_transaction_logic"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_jane"
-         ; "ppx_mina"
-         ; "ppx_version"
-         ; "ppx_deriving.std"
-         ; "ppx_deriving_yojson"
-         ] ) ;
+  ~path:"src/lib/transition_frontier/full_frontier"
+  ~deps:
+    [ integers
+    ; core
+    ; base_caml
+    ; core_kernel
+    ; sexplib0
+    ; base_internalhash_types
+    ; stdio
+    ; Layer_base.mina_wire_types
+    ; Layer_base.unsigned_extended
+    ; Layer_infra.o1trace
+    ; Layer_base.visualization
+    ; Layer_tooling.mina_metrics
+    ; Layer_domain.block_time
+    ; Layer_infra.logger
+    ; staged_ledger
+    ; Layer_consensus.mina_state
+    ; Layer_base.mina_base
+    ; local "transition_frontier_persistent_root"
 
-  (* -- transition_frontier/persistent_root --------------------------- *)
+    ; transition_frontier_base
+    ; Layer_consensus.consensus
+    ; Layer_ledger.mina_ledger
+    ; mina_block
+    ; Layer_domain.data_hash_lib
+    ; Layer_consensus.precomputed_values
+    ; Layer_base.with_hash
+    ; Layer_base.mina_stdlib
+    ; Layer_ledger.staged_ledger_diff
+    ; Layer_infra.mina_numbers
+    ; Layer_tooling.internal_tracing
+    ; async
+    ; async_kernel
+    ; async_unix
+    ; Layer_base.child_processes
+    ; Layer_consensus.coda_genesis_ledger
+    ; core_uuid
+    ; core_kernel_uuid
+    ; Layer_domain.genesis_constants
+    ; Layer_ledger.merkle_ledger
+    ; Layer_protocol.protocol_version
+    ; Layer_crypto.signature_lib
+    ; Layer_service.verifier
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.snark_params
+    ; Layer_crypto.pickles
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_transaction.mina_transaction_logic
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_jane
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.ppx_deriving_std
+       ; Ppx_lib.ppx_deriving_yojson
+       ] )
+
+(* -- transition_frontier/persistent_root --------------------------- *)
+let transition_frontier_persistent_root =
   library "transition_frontier_persistent_root" ~internal_name:"persistent_root"
-    ~path:"src/lib/transition_frontier/persistent_root"
-    ~deps:
-      [ core_kernel_uuid
-      ; core_kernel
-      ; core
-      ; core_uuid
-      ; base_caml
-      ; local "precomputed_values"
-      ; local "mina_stdlib_unix"
-      ; local "merkle_ledger"
-      ; local "transition_frontier_base"
-      ; local "mina_base"
-      ; local "mina_ledger"
-      ; local "logger"
-      ; local "data_hash_lib"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_mina"; "ppx_version" ]) ;
+  ~path:"src/lib/transition_frontier/persistent_root"
+  ~deps:
+    [ core_kernel_uuid
+    ; core_kernel
+    ; core
+    ; core_uuid
+    ; base_caml
+    ; Layer_consensus.precomputed_values
+    ; Layer_infra.mina_stdlib_unix
+    ; Layer_ledger.merkle_ledger
+    ; transition_frontier_base
+    ; Layer_base.mina_base
+    ; Layer_ledger.mina_ledger
+    ; Layer_infra.logger
+    ; Layer_domain.data_hash_lib
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])
 
-  (* -- transition_frontier/persistent_frontier ----------------------- *)
+(* -- transition_frontier/persistent_frontier ----------------------- *)
+let transition_frontier_persistent_frontier =
   library "transition_frontier_persistent_frontier"
-    ~internal_name:"persistent_frontier"
-    ~path:"src/lib/transition_frontier/persistent_frontier"
-    ~deps:
-      [ result
-      ; bin_prot_shape
-      ; core_kernel
-      ; async
-      ; core
-      ; async_kernel
-      ; base_caml
-      ; sexplib0
-      ; async_unix
-      ; local "mina_stdlib"
-      ; local "o1trace"
-      ; local "mina_metrics"
-      ; local "trust_system"
-      ; local "staged_ledger"
-      ; local "precomputed_values"
-      ; local "data_hash_lib"
-      ; local "logger"
-      ; local "otp_lib"
-      ; local "consensus"
-      ; local "mina_ledger"
-      ; local "mina_stdlib_unix"
-      ; local "transition_frontier_full_frontier"
-      ; local "transition_frontier_persistent_root"
-      ; local "transition_frontier_base"
-      ; local "block_time"
-      ; local "transition_frontier_extensions"
-      ; local "mina_base"
-      ; local "mina_transaction_logic"
-      ; local "rocksdb"
-      ; local "mina_block"
-      ; local "mina_state"
-      ; local "genesis_constants"
-      ; local "verifier"
-      ; local "with_hash"
-      ; local "ppx_version.runtime"
-      ; local "pickles.backend"
-      ; local "snark_params"
-      ; local "pickles"
-      ; local "kimchi_backend"
-      ; local "sgn"
-      ; local "sgn_type"
-      ; local "currency"
-      ; local "mina_numbers"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "mina_wire_types"
-      ; local "internal_tracing"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_mina"
-         ; "ppx_version"
-         ; "ppx_jane"
-         ; "ppx_compare"
-         ; "ppx_bin_prot"
-         ; "ppx_deriving_yojson"
-         ] ) ;
+  ~internal_name:"persistent_frontier"
+  ~path:"src/lib/transition_frontier/persistent_frontier"
+  ~deps:
+    [ result
+    ; bin_prot_shape
+    ; core_kernel
+    ; async
+    ; core
+    ; async_kernel
+    ; base_caml
+    ; sexplib0
+    ; async_unix
+    ; Layer_base.mina_stdlib
+    ; Layer_infra.o1trace
+    ; Layer_tooling.mina_metrics
+    ; Layer_infra.trust_system
+    ; staged_ledger
+    ; Layer_consensus.precomputed_values
+    ; Layer_domain.data_hash_lib
+    ; Layer_infra.logger
+    ; Layer_base.otp_lib
+    ; Layer_consensus.consensus
+    ; Layer_ledger.mina_ledger
+    ; Layer_infra.mina_stdlib_unix
+    ; transition_frontier_full_frontier
+    ; transition_frontier_persistent_root
+    ; transition_frontier_base
+    ; Layer_domain.block_time
+    ; local "transition_frontier_extensions"
 
-  (* -- transition_frontier/extensions -------------------------------- *)
+    ; Layer_base.mina_base
+    ; Layer_transaction.mina_transaction_logic
+    ; Layer_storage.rocksdb
+    ; mina_block
+    ; Layer_consensus.mina_state
+    ; Layer_domain.genesis_constants
+    ; Layer_service.verifier
+    ; Layer_base.with_hash
+    ; Layer_ppx.ppx_version_runtime
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.snark_params
+    ; Layer_crypto.pickles
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.sgn
+    ; Layer_base.sgn_type
+    ; Layer_base.currency
+    ; Layer_infra.mina_numbers
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_base.mina_wire_types
+    ; Layer_tooling.internal_tracing
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.ppx_jane
+       ; Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_bin_prot
+       ; Ppx_lib.ppx_deriving_yojson
+       ] )
+
+(* -- transition_frontier/extensions -------------------------------- *)
+let transition_frontier_extensions =
   library "transition_frontier_extensions" ~internal_name:"extensions"
-    ~path:"src/lib/transition_frontier/extensions"
-    ~deps:
-      [ base_caml
-      ; async_kernel
-      ; core_kernel
-      ; sexplib0
-      ; result
-      ; base_internalhash_types
-      ; local "with_hash"
-      ; local "mina_block"
-      ; local "transaction_snark_work"
-      ; local "data_hash_lib"
-      ; local "pipe_lib"
-      ; local "mina_base"
-      ; local "transition_frontier_base"
-      ; local "transition_frontier_full_frontier"
-      ; local "mina_ledger"
-      ; local "logger"
-      ; local "mina_state"
-      ; local "staged_ledger"
-      ; local "mina_wire_types"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_mina"; "ppx_version" ]) ;
+  ~path:"src/lib/transition_frontier/extensions"
+  ~deps:
+    [ base_caml
+    ; async_kernel
+    ; core_kernel
+    ; sexplib0
+    ; result
+    ; base_internalhash_types
+    ; Layer_base.with_hash
+    ; mina_block
+    ; Layer_snark_worker.transaction_snark_work
+    ; Layer_domain.data_hash_lib
+    ; Layer_base.pipe_lib
+    ; Layer_base.mina_base
+    ; transition_frontier_base
+    ; transition_frontier_full_frontier
+    ; Layer_ledger.mina_ledger
+    ; Layer_infra.logger
+    ; Layer_consensus.mina_state
+    ; staged_ledger
+    ; Layer_base.mina_wire_types
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])
 
-  (* -- transition_frontier ------------------------------------------- *)
+(* -- transition_frontier ------------------------------------------- *)
+let transition_frontier =
   library "transition_frontier" ~path:"src/lib/transition_frontier"
-    ~deps:
-      [ async_unix
-      ; integers
-      ; async
-      ; core
-      ; local "o1trace"
-      ; local "mina_metrics"
-      ; local "mina_wire_types"
-      ; local "merkle_ledger"
-      ; local "staged_ledger"
-      ; local "mina_state"
-      ; local "signature_lib"
-      ; local "mina_ledger"
-      ; local "consensus"
-      ; local "genesis_constants"
-      ; local "mina_numbers"
-      ; local "mina_block"
-      ; local "logger"
-      ; local "transition_frontier_full_frontier"
-      ; local "transition_frontier_persistent_root"
-      ; local "downloader"
-      ; local "transition_frontier_base"
-      ; local "transition_frontier_persistent_frontier"
-      ; local "transition_frontier_extensions"
-      ; local "mina_base"
-      ; local "cache_lib"
-      ; local "data_hash_lib"
-      ; local "network_peer"
-      ; local "unsigned_extended"
-      ; local "verifier"
-      ; local "precomputed_values"
-      ; local "block_time"
-      ; local "trust_system"
-      ; local "with_hash"
-      ; local "mina_stdlib"
-      ; local "quickcheck_lib"
-      ; local "protocol_version"
-      ; local "mina_net2"
-      ; local "internal_tracing"
-      ; local "mina_transaction"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_jane"
-         ; "ppx_mina"
-         ; "ppx_version"
-         ; "ppx_compare"
-         ; "ppx_deriving_yojson"
-         ] ) ;
+  ~deps:
+    [ async_unix
+    ; integers
+    ; async
+    ; core
+    ; Layer_infra.o1trace
+    ; Layer_tooling.mina_metrics
+    ; Layer_base.mina_wire_types
+    ; Layer_ledger.merkle_ledger
+    ; staged_ledger
+    ; Layer_consensus.mina_state
+    ; Layer_crypto.signature_lib
+    ; Layer_ledger.mina_ledger
+    ; Layer_consensus.consensus
+    ; Layer_domain.genesis_constants
+    ; Layer_infra.mina_numbers
+    ; mina_block
+    ; Layer_infra.logger
+    ; transition_frontier_full_frontier
+    ; transition_frontier_persistent_root
+    ; local "downloader"
 
-  (* -- transition_frontier/tests ------------------------------------- *)
+    ; transition_frontier_base
+    ; transition_frontier_persistent_frontier
+    ; transition_frontier_extensions
+    ; Layer_base.mina_base
+    ; Layer_infra.cache_lib
+    ; Layer_domain.data_hash_lib
+    ; Layer_domain.network_peer
+    ; Layer_base.unsigned_extended
+    ; Layer_service.verifier
+    ; Layer_consensus.precomputed_values
+    ; Layer_domain.block_time
+    ; Layer_infra.trust_system
+    ; Layer_base.with_hash
+    ; Layer_base.mina_stdlib
+    ; Layer_test.quickcheck_lib
+    ; Layer_protocol.protocol_version
+    ; mina_net2
+    ; Layer_tooling.internal_tracing
+    ; Layer_transaction.mina_transaction
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_jane
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_deriving_yojson
+       ] )
+
+(* -- transition_frontier/tests ------------------------------------- *)
+let transition_frontier_tests =
   private_library ~path:"src/lib/transition_frontier/tests" ~inline_tests:true
-    ~deps:
-      [ core_uuid
-      ; core
-      ; async
-      ; async_kernel
-      ; core_kernel
-      ; ppx_inline_test_config
-      ; async_unix
-      ; core_kernel_uuid
-      ; sexplib0
-      ; local "mina_state"
-      ; local "staged_ledger"
-      ; local "with_hash"
-      ; local "mina_ledger"
-      ; local "child_processes"
-      ; local "genesis_constants"
-      ; local "logger"
-      ; local "mina_block"
-      ; local "transition_frontier_persistent_root"
-      ; local "mina_base"
-      ; local "precomputed_values"
-      ; local "verifier"
-      ; local "coda_genesis_ledger"
-      ; local "merkle_ledger"
-      ; local "consensus"
-      ; local "data_hash_lib"
-      ; local "block_time"
-      ; local "transition_frontier_full_frontier"
-      ; local "transition_frontier_base"
-      ; local "transition_frontier"
-      ; local "protocol_version"
-      ; yojson
-      ; local "mina_net2"
-      ; libp2p_ipc
-      ; local "staged_ledger_diff"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_version"; "ppx_mina" ])
-    "transition_frontier_tests" ;
+  ~deps:
+    [ core_uuid
+    ; core
+    ; async
+    ; async_kernel
+    ; core_kernel
+    ; ppx_inline_test_config
+    ; async_unix
+    ; core_kernel_uuid
+    ; sexplib0
+    ; Layer_consensus.mina_state
+    ; staged_ledger
+    ; Layer_base.with_hash
+    ; Layer_ledger.mina_ledger
+    ; Layer_base.child_processes
+    ; Layer_domain.genesis_constants
+    ; Layer_infra.logger
+    ; mina_block
+    ; transition_frontier_persistent_root
+    ; Layer_base.mina_base
+    ; Layer_consensus.precomputed_values
+    ; Layer_service.verifier
+    ; Layer_consensus.coda_genesis_ledger
+    ; Layer_ledger.merkle_ledger
+    ; Layer_consensus.consensus
+    ; Layer_domain.data_hash_lib
+    ; Layer_domain.block_time
+    ; transition_frontier_full_frontier
+    ; transition_frontier_base
+    ; transition_frontier
+    ; Layer_protocol.protocol_version
+    ; yojson
+    ; mina_net2
+    ; libp2p_ipc
+    ; Layer_ledger.staged_ledger_diff
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version; Ppx_lib.ppx_mina ])
+  "transition_frontier_tests"
 
-  (* -- transition_frontier_controller -------------------------------- *)
+(* -- transition_frontier_controller -------------------------------- *)
+let transition_frontier_controller =
   library "transition_frontier_controller"
-    ~path:"src/lib/transition_frontier_controller"
-    ~deps:
-      [ base
-      ; async_kernel
-      ; core_kernel
-      ; core
-      ; local "transition_frontier"
-      ; local "data_hash_lib"
-      ; local "mina_metrics"
-      ; local "network_peer"
-      ; local "cache_lib"
-      ; local "mina_block"
-      ; local "o1trace"
-      ; local "pipe_lib"
-      ; local "mina_base"
-      ; local "transition_handler"
-      ; local "ledger_catchup"
-      ; local "transition_frontier_extensions"
-      ; local "transition_frontier_base"
-      ; local "precomputed_values"
-      ; local "logger"
-      ; local "with_hash"
-      ; local "genesis_constants"
-      ; local "consensus"
-      ; local "bootstrap_controller"
-      ; local "staged_ledger"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_version"; "ppx_mina" ]) ;
+  ~path:"src/lib/transition_frontier_controller"
+  ~deps:
+    [ base
+    ; async_kernel
+    ; core_kernel
+    ; core
+    ; transition_frontier
+    ; Layer_domain.data_hash_lib
+    ; Layer_tooling.mina_metrics
+    ; Layer_domain.network_peer
+    ; Layer_infra.cache_lib
+    ; mina_block
+    ; Layer_infra.o1trace
+    ; Layer_base.pipe_lib
+    ; Layer_base.mina_base
+    ; local "transition_handler"
 
-  (* -- transition_handler -------------------------------------------- *)
+    ; local "ledger_catchup"
+
+    ; transition_frontier_extensions
+    ; transition_frontier_base
+    ; Layer_consensus.precomputed_values
+    ; Layer_infra.logger
+    ; Layer_base.with_hash
+    ; Layer_domain.genesis_constants
+    ; Layer_consensus.consensus
+    ; local "bootstrap_controller"
+
+    ; staged_ledger
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_mina ])
+
+(* -- transition_handler -------------------------------------------- *)
+let transition_handler =
   library "transition_handler" ~path:"src/lib/transition_handler"
-    ~inline_tests:true
-    ~deps:
-      [ ppx_inline_test_config
-      ; sexplib0
-      ; core_kernel
-      ; core
-      ; async
-      ; async_unix
-      ; base_internalhash_types
-      ; async_kernel
-      ; integers
-      ; result
-      ; local "error_json"
-      ; local "data_hash_lib"
-      ; local "block_time"
-      ; local "trust_system"
-      ; local "o1trace"
-      ; local "transition_frontier_base"
-      ; local "cache_lib"
-      ; local "mina_base"
-      ; local "otp_lib"
-      ; local "pipe_lib"
-      ; local "mina_stdlib"
-      ; local "consensus"
-      ; local "transition_frontier"
-      ; local "perf_histograms"
-      ; local "mina_metrics"
-      ; local "mina_block"
-      ; local "mina_transaction"
-      ; local "network_peer"
-      ; local "with_hash"
-      ; local "logger"
-      ; local "mina_state"
-      ; local "precomputed_values"
-      ; local "child_processes"
-      ; local "verifier"
-      ; local "genesis_constants"
-      ; local "network_pool"
-      ; local "mina_net2"
-      ; local "mina_numbers"
-      ; local "mina_wire_types"
-      ; local "pickles.backend"
-      ; local "snark_params"
-      ; local "pickles"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "internal_tracing"
-      ; local "transition_frontier_extensions"
-      ; local "staged_ledger_diff"
-      ; local "staged_ledger"
-      ; local "mina_runtime_config"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_mina"; "ppx_version"; "ppx_jane" ]) ;
+  ~inline_tests:true
+  ~deps:
+    [ ppx_inline_test_config
+    ; sexplib0
+    ; core_kernel
+    ; core
+    ; async
+    ; async_unix
+    ; base_internalhash_types
+    ; async_kernel
+    ; integers
+    ; result
+    ; Layer_base.error_json
+    ; Layer_domain.data_hash_lib
+    ; Layer_domain.block_time
+    ; Layer_infra.trust_system
+    ; Layer_infra.o1trace
+    ; transition_frontier_base
+    ; Layer_infra.cache_lib
+    ; Layer_base.mina_base
+    ; Layer_base.otp_lib
+    ; Layer_base.pipe_lib
+    ; Layer_base.mina_stdlib
+    ; Layer_consensus.consensus
+    ; transition_frontier
+    ; Layer_base.perf_histograms
+    ; Layer_tooling.mina_metrics
+    ; mina_block
+    ; Layer_transaction.mina_transaction
+    ; Layer_domain.network_peer
+    ; Layer_base.with_hash
+    ; Layer_infra.logger
+    ; Layer_consensus.mina_state
+    ; Layer_consensus.precomputed_values
+    ; Layer_base.child_processes
+    ; Layer_service.verifier
+    ; Layer_domain.genesis_constants
+    ; network_pool
+    ; mina_net2
+    ; Layer_infra.mina_numbers
+    ; Layer_base.mina_wire_types
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.snark_params
+    ; Layer_crypto.pickles
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_tooling.internal_tracing
+    ; transition_frontier_extensions
+    ; Layer_ledger.staged_ledger_diff
+    ; staged_ledger
+    ; local "mina_runtime_config"
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
 
-  (* -- transition_router --------------------------------------------- *)
+(* -- transition_router --------------------------------------------- *)
+let transition_router =
   library "transition_router" ~path:"src/lib/transition_router"
-    ~deps:
-      [ integers
-      ; base_caml
-      ; async_kernel
-      ; core_kernel
-      ; core
-      ; async
-      ; sexplib0
-      ; local "best_tip_prover"
-      ; local "transition_handler"
-      ; local "o1trace"
-      ; local "mina_stdlib"
-      ; local "mina_net2"
-      ; local "consensus"
-      ; local "logger"
-      ; local "error_json"
-      ; local "trust_system"
-      ; local "mina_block"
-      ; local "mina_state"
-      ; local "transition_frontier_persistent_frontier"
-      ; local "mina_networking"
-      ; local "transition_frontier_controller"
-      ; local "pipe_lib"
-      ; local "transition_frontier"
-      ; local "bootstrap_controller"
-      ; local "mina_intf"
-      ; local "transition_frontier_persistent_root"
-      ; local "transition_frontier_base"
-      ; local "mina_base"
-      ; local "signature_lib"
-      ; local "network_peer"
-      ; local "with_hash"
-      ; local "block_time"
-      ; local "mina_metrics"
-      ; local "precomputed_values"
-      ; local "mina_numbers"
-      ; local "interruptible"
-      ; local "genesis_constants"
-      ; local "unsigned_extended"
-      ; local "proof_carrying_data"
-      ; local "ledger_catchup"
-      ; local "data_hash_lib"
-      ; local "mina_wire_types"
-      ; local "internal_tracing"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_mina"; "ppx_version"; "ppx_jane"; "ppx_compare" ]) ;
+  ~deps:
+    [ integers
+    ; base_caml
+    ; async_kernel
+    ; core_kernel
+    ; core
+    ; async
+    ; sexplib0
+    ; local "best_tip_prover"
 
-  (* -- bootstrap_controller ------------------------------------------ *)
+    ; transition_handler
+    ; Layer_infra.o1trace
+    ; Layer_base.mina_stdlib
+    ; mina_net2
+    ; Layer_consensus.consensus
+    ; Layer_infra.logger
+    ; Layer_base.error_json
+    ; Layer_infra.trust_system
+    ; mina_block
+    ; Layer_consensus.mina_state
+    ; transition_frontier_persistent_frontier
+    ; mina_networking
+    ; transition_frontier_controller
+    ; Layer_base.pipe_lib
+    ; transition_frontier
+    ; local "bootstrap_controller"
+
+    ; local "mina_intf"
+    ; transition_frontier_persistent_root
+    ; transition_frontier_base
+    ; Layer_base.mina_base
+    ; Layer_crypto.signature_lib
+    ; Layer_domain.network_peer
+    ; Layer_base.with_hash
+    ; Layer_domain.block_time
+    ; Layer_tooling.mina_metrics
+    ; Layer_consensus.precomputed_values
+    ; Layer_infra.mina_numbers
+    ; Layer_concurrency.interruptible
+    ; Layer_domain.genesis_constants
+    ; Layer_base.unsigned_extended
+    ; Layer_domain.proof_carrying_data
+    ; local "ledger_catchup"
+
+    ; Layer_domain.data_hash_lib
+    ; Layer_base.mina_wire_types
+    ; Layer_tooling.internal_tracing
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_compare ])
+
+(* -- bootstrap_controller ------------------------------------------ *)
+let bootstrap_controller =
   library "bootstrap_controller" ~path:"src/lib/bootstrap_controller"
-    ~inline_tests:true
-    ~deps:
-      [ async
-      ; async_kernel
-      ; async_unix
-      ; core
-      ; core_kernel
-      ; ppx_inline_test_config
-      ; sexplib0
-      ; local "block_time"
-      ; local "child_processes"
-      ; local "coda_genesis_ledger"
-      ; local "consensus"
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "error_json"
-      ; local "fake_network"
-      ; local "genesis_constants"
-      ; local "kimchi_backend"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "logger"
-      ; local "merkle_ledger"
-      ; local "mina_base"
-      ; local "mina_base.util"
-      ; local "mina_block"
-      ; local "mina_intf"
-      ; local "mina_ledger"
-      ; local "mina_metrics"
-      ; local "mina_net2"
-      ; local "mina_networking"
-      ; local "mina_numbers"
-      ; local "mina_state"
-      ; local "mina_stdlib"
-      ; local "mina_transaction_logic"
-      ; local "mina_wire_types"
-      ; local "network_peer"
-      ; local "o1trace"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pipe_lib"
-      ; local "precomputed_values"
-      ; local "sgn"
-      ; local "sgn_type"
-      ; local "snark_params"
-      ; local "staged_ledger"
-      ; local "sync_handler"
-      ; local "syncable_ledger"
-      ; local "transition_frontier"
-      ; local "transition_frontier_base"
-      ; local "transition_frontier_persistent_frontier"
-      ; local "transition_frontier_persistent_root"
-      ; local "trust_system"
-      ; local "verifier"
-      ; local "with_hash"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_compare"
-         ; "ppx_jane"
-         ; "ppx_mina"
-         ; "ppx_register_event"
-         ; "ppx_version"
-         ] ) ;
+  ~inline_tests:true
+  ~deps:
+    [ async
+    ; async_kernel
+    ; async_unix
+    ; core
+    ; core_kernel
+    ; ppx_inline_test_config
+    ; sexplib0
+    ; Layer_domain.block_time
+    ; Layer_base.child_processes
+    ; Layer_consensus.coda_genesis_ledger
+    ; Layer_consensus.consensus
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_base.error_json
+    ; local "fake_network"
 
-  (* -- best_tip_prover ----------------------------------------------- *)
+    ; Layer_domain.genesis_constants
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_infra.logger
+    ; Layer_ledger.merkle_ledger
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_util
+    ; mina_block
+    ; local "mina_intf"
+    ; Layer_ledger.mina_ledger
+    ; Layer_tooling.mina_metrics
+    ; mina_net2
+    ; mina_networking
+    ; Layer_infra.mina_numbers
+    ; Layer_consensus.mina_state
+    ; Layer_base.mina_stdlib
+    ; Layer_transaction.mina_transaction_logic
+    ; Layer_base.mina_wire_types
+    ; Layer_domain.network_peer
+    ; Layer_infra.o1trace
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_base.pipe_lib
+    ; Layer_consensus.precomputed_values
+    ; Layer_crypto.sgn
+    ; Layer_base.sgn_type
+    ; Layer_crypto.snark_params
+    ; staged_ledger
+    ; sync_handler
+    ; syncable_ledger
+    ; transition_frontier
+    ; transition_frontier_base
+    ; transition_frontier_persistent_frontier
+    ; transition_frontier_persistent_root
+    ; Layer_infra.trust_system
+    ; Layer_service.verifier
+    ; Layer_base.with_hash
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_jane
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_register_event
+       ; Ppx_lib.ppx_version
+       ] )
+
+(* -- best_tip_prover ----------------------------------------------- *)
+let best_tip_prover =
   library "best_tip_prover" ~path:"src/lib/best_tip_prover"
-    ~deps:
-      [ core
-      ; core_kernel
-      ; async_kernel
-      ; local "genesis_constants"
-      ; local "consensus"
-      ; local "with_hash"
-      ; local "precomputed_values"
-      ; local "proof_carrying_data"
-      ; local "logger"
-      ; local "merkle_list_verifier"
-      ; local "transition_frontier"
-      ; local "mina_base"
-      ; local "mina_intf"
-      ; local "mina_state"
-      ; local "mina_block"
-      ; local "data_hash_lib"
-      ; local "transition_frontier_base"
-      ; local "merkle_list_prover"
-      ; local "mina_stdlib"
-      ; local "mina_wire_types"
-      ; local "pickles.backend"
-      ; local "snark_params"
-      ; local "pickles"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_mina"; "ppx_version"; "ppx_jane"; "ppx_compare" ]) ;
+  ~deps:
+    [ core
+    ; core_kernel
+    ; async_kernel
+    ; Layer_domain.genesis_constants
+    ; Layer_consensus.consensus
+    ; Layer_base.with_hash
+    ; Layer_consensus.precomputed_values
+    ; Layer_domain.proof_carrying_data
+    ; Layer_infra.logger
+    ; Layer_ledger.merkle_list_verifier
+    ; transition_frontier
+    ; Layer_base.mina_base
+    ; local "mina_intf"
+    ; Layer_consensus.mina_state
+    ; mina_block
+    ; Layer_domain.data_hash_lib
+    ; transition_frontier_base
+    ; Layer_ledger.merkle_list_prover
+    ; Layer_base.mina_stdlib
+    ; Layer_base.mina_wire_types
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.snark_params
+    ; Layer_crypto.pickles
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane; Ppx_lib.ppx_compare ])
 
-  (* -- ledger_catchup ------------------------------------------------ *)
+(* -- ledger_catchup ------------------------------------------------ *)
+let ledger_catchup =
   library "ledger_catchup" ~path:"src/lib/ledger_catchup" ~inline_tests:true
-    ~deps:
-      [ async
-      ; core
-      ; local "mina_stdlib"
-      ; local "mina_wire_types"
-      ; local "genesis_constants"
-      ; local "mina_base.import"
-      ; local "pickles.backend"
-      ; local "one_or_two"
-      ; local "transition_frontier_extensions"
-      ; local "child_processes"
-      ; local "block_time"
-      ; local "unsigned_extended"
-      ; local "downloader"
-      ; local "mina_state"
-      ; local "protocol_version"
-      ; local "verifier"
-      ; local "with_hash"
-      ; local "data_hash_lib"
-      ; local "precomputed_values"
-      ; local "mina_numbers"
-      ; local "mina_networking"
-      ; local "mina_metrics"
-      ; local "pipe_lib"
-      ; local "transition_handler"
-      ; local "transition_frontier"
-      ; local "consensus"
-      ; local "mina_base"
-      ; local "transition_chain_verifier"
-      ; local "fake_network"
-      ; local "mina_block"
-      ; local "proof_carrying_data"
-      ; local "cache_lib"
-      ; local "network_peer"
-      ; local "logger"
-      ; local "trust_system"
-      ; local "error_json"
-      ; local "transition_frontier_base"
-      ; local "network_pool"
-      ; local "staged_ledger_diff"
-      ; local "transaction_snark_work"
-      ; local "pickles"
-      ; local "snark_params"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "o1trace"
-      ; local "mina_net2"
-      ; local "internal_tracing"
-      ; local "mina_runtime_config"
-      ; local "mina_compile_config"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_mina"; "ppx_version"; "ppx_jane" ]) ;
+  ~deps:
+    [ async
+    ; core
+    ; Layer_base.mina_stdlib
+    ; Layer_base.mina_wire_types
+    ; Layer_domain.genesis_constants
+    ; Layer_base.mina_base_import
+    ; Layer_crypto.pickles_backend
+    ; Layer_base.one_or_two
+    ; transition_frontier_extensions
+    ; Layer_base.child_processes
+    ; Layer_domain.block_time
+    ; Layer_base.unsigned_extended
+    ; local "downloader"
 
-  (* -- downloader ---------------------------------------------------- *)
+    ; Layer_consensus.mina_state
+    ; Layer_protocol.protocol_version
+    ; Layer_service.verifier
+    ; Layer_base.with_hash
+    ; Layer_domain.data_hash_lib
+    ; Layer_consensus.precomputed_values
+    ; Layer_infra.mina_numbers
+    ; mina_networking
+    ; Layer_tooling.mina_metrics
+    ; Layer_base.pipe_lib
+    ; transition_handler
+    ; transition_frontier
+    ; Layer_consensus.consensus
+    ; Layer_base.mina_base
+    ; transition_chain_verifier
+    ; local "fake_network"
+
+    ; mina_block
+    ; Layer_domain.proof_carrying_data
+    ; Layer_infra.cache_lib
+    ; Layer_domain.network_peer
+    ; Layer_infra.logger
+    ; Layer_infra.trust_system
+    ; Layer_base.error_json
+    ; transition_frontier_base
+    ; network_pool
+    ; Layer_ledger.staged_ledger_diff
+    ; Layer_snark_worker.transaction_snark_work
+    ; Layer_crypto.pickles
+    ; Layer_crypto.snark_params
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_infra.o1trace
+    ; mina_net2
+    ; Layer_tooling.internal_tracing
+    ; local "mina_runtime_config"
+    ; Layer_base.mina_compile_config
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
+
+(* -- downloader ---------------------------------------------------- *)
+let downloader =
   library "downloader" ~path:"src/lib/downloader"
-    ~deps:
-      [ async
-      ; async_unix
-      ; core
-      ; core_kernel_pairing_heap
-      ; local "mina_stdlib"
-      ; local "logger"
-      ; local "network_peer"
-      ; local "o1trace"
-      ; local "pipe_lib"
-      ; local "trust_system"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_deriving.std"
-         ; "ppx_deriving_yojson"
-         ; "ppx_jane"
-         ; "ppx_mina"
-         ; "ppx_version"
-         ] ) ;
+  ~deps:
+    [ async
+    ; async_unix
+    ; core
+    ; core_kernel_pairing_heap
+    ; Layer_base.mina_stdlib
+    ; Layer_infra.logger
+    ; Layer_domain.network_peer
+    ; Layer_infra.o1trace
+    ; Layer_base.pipe_lib
+    ; Layer_infra.trust_system
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_deriving_std
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_jane
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ] )
 
-  (* -- block_producer ------------------------------------------------ *)
+(* -- block_producer ------------------------------------------------ *)
+let block_producer =
   library "block_producer" ~path:"src/lib/block_producer"
-    ~library_flags:[ "-linkall" ] ~inline_tests:true
-    ~deps:
-      [ async
-      ; async_kernel
-      ; core
-      ; core_kernel
-      ; integers
-      ; sexplib0
-      ; local "block_time"
-      ; local "blockchain_snark"
-      ; local "coda_genesis_proof"
-      ; local "consensus"
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "error_json"
-      ; local "genesis_constants"
-      ; local "internal_tracing"
-      ; local "interruptible"
-      ; local "kimchi_backend"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "ledger_proof"
-      ; local "logger"
-      ; local "mina_base"
-      ; local "mina_block"
-      ; local "mina_compile_config"
-      ; local "mina_intf"
-      ; local "mina_ledger"
-      ; local "mina_metrics"
-      ; local "mina_net2"
-      ; local "mina_networking"
-      ; local "mina_numbers"
-      ; local "mina_runtime_config"
-      ; local "mina_state"
-      ; local "mina_stdlib"
-      ; local "mina_transaction"
-      ; local "mina_transaction_logic"
-      ; local "mina_wire_types"
-      ; local "network_pool"
-      ; local "node_error_service"
-      ; local "o1trace"
-      ; local "otp_lib"
-      ; local "pasta_bindings"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pipe_lib"
-      ; local "precomputed_values"
-      ; local "protocol_version"
-      ; local "prover"
-      ; local "sgn"
-      ; local "sgn_type"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "staged_ledger"
-      ; local "staged_ledger_diff"
-      ; local "transaction_snark"
-      ; local "transaction_snark_scan_state"
-      ; local "transition_chain_prover"
-      ; local "transition_frontier"
-      ; local "transition_frontier_base"
-      ; local "transition_frontier_extensions"
-      ; local "unsigned_extended"
-      ; local "vrf_evaluator"
-      ; local "with_hash"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_jane"; "ppx_mina"; "ppx_register_event"; "ppx_version" ] )
-    ~synopsis:"Coda block producer" ;
+  ~library_flags:[ "-linkall" ] ~inline_tests:true
+  ~deps:
+    [ async
+    ; async_kernel
+    ; core
+    ; core_kernel
+    ; integers
+    ; sexplib0
+    ; Layer_domain.block_time
+    ; Layer_protocol.blockchain_snark
+    ; Layer_consensus.coda_genesis_proof
+    ; Layer_consensus.consensus
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_base.error_json
+    ; Layer_domain.genesis_constants
+    ; Layer_tooling.internal_tracing
+    ; Layer_concurrency.interruptible
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_snark_worker.ledger_proof
+    ; Layer_infra.logger
+    ; Layer_base.mina_base
+    ; mina_block
+    ; Layer_base.mina_compile_config
+    ; local "mina_intf"
+    ; Layer_ledger.mina_ledger
+    ; Layer_tooling.mina_metrics
+    ; mina_net2
+    ; mina_networking
+    ; Layer_infra.mina_numbers
+    ; local "mina_runtime_config"
+    ; Layer_consensus.mina_state
+    ; Layer_base.mina_stdlib
+    ; Layer_transaction.mina_transaction
+    ; Layer_transaction.mina_transaction_logic
+    ; Layer_base.mina_wire_types
+    ; network_pool
+    ; local "node_error_service"
+    ; Layer_infra.o1trace
+    ; Layer_base.otp_lib
+    ; local "pasta_bindings"
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_base.pipe_lib
+    ; Layer_consensus.precomputed_values
+    ; Layer_protocol.protocol_version
+    ; Layer_service.prover
+    ; Layer_crypto.sgn
+    ; Layer_base.sgn_type
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; staged_ledger
+    ; Layer_ledger.staged_ledger_diff
+    ; Layer_protocol.transaction_snark
+    ; Layer_snark_worker.transaction_snark_scan_state
+    ; transition_chain_prover
+    ; transition_frontier
+    ; transition_frontier_base
+    ; transition_frontier_extensions
+    ; Layer_base.unsigned_extended
+    ; vrf_evaluator
+    ; Layer_base.with_hash
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_register_event; Ppx_lib.ppx_version ] )
+  ~synopsis:"Coda block producer"
 
-  (* -- work_partitioner ---------------------------------------------- *)
-  library "work_partitioner" ~path:"src/lib/work_partitioner"
-    ~library_flags:[ "-linkall" ]
-    ~deps:
-      [ async
-      ; core_kernel
-      ; local "mina_base"
-      ; local "snark_work_lib"
-      ; local "transaction_snark"
-      ; local "transaction_witness"
-      ; local "work_selector"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_compare"
-         ; "ppx_custom_printf"
-         ; "ppx_deriving_yojson"
-         ; "ppx_let"
-         ; "ppx_mina"
-         ; "ppx_sexp_conv"
-         ; "ppx_version"
-         ] )
-    ~synopsis:
-      "Partition work returned by Work_selector and issue them to real Snark \
-       Worker" ;
-
-  (* -- work_selector ------------------------------------------------- *)
-  library "work_selector" ~path:"src/lib/work_selector"
-    ~library_flags:[ "-linkall" ] ~inline_tests:true
-    ~deps:
-      [ bin_prot_shape
-      ; sexplib0
-      ; core
-      ; async
-      ; core_kernel
-      ; base
-      ; base_caml
-      ; base_internalhash_types
-      ; async_kernel
-      ; ppx_inline_test_config
-      ; async_unix
-      ; local "transaction_protocol_state"
-      ; local "transaction_snark_work"
-      ; local "transition_frontier_base"
-      ; local "error_json"
-      ; local "ledger_proof"
-      ; local "precomputed_values"
-      ; local "transaction_witness"
-      ; local "snark_work_lib"
-      ; local "mina_state"
-      ; local "mina_base"
-      ; local "mina_transaction"
-      ; local "network_pool"
-      ; local "staged_ledger"
-      ; local "logger"
-      ; local "currency"
-      ; local "one_or_two"
-      ; local "transaction_snark"
-      ; local "pipe_lib"
-      ; local "transition_frontier"
-      ; local "with_hash"
-      ; local "mina_metrics"
-      ; local "transition_frontier_extensions"
-      ; local "mina_ledger"
-      ; local "ppx_version.runtime"
-      ; local "o1trace"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_mina"
-         ; "ppx_version"
-         ; "ppx_assert"
-         ; "ppx_base"
-         ; "ppx_let"
-         ; "ppx_deriving.std"
-         ; "ppx_deriving_yojson"
-         ; "ppx_sexp_conv"
-         ; "ppx_bin_prot"
-         ; "ppx_custom_printf"
-         ; "ppx_inline_test"
-         ] )
-    ~synopsis:"Selects work from the work pool" ;
-
-  (* -- fake_network -------------------------------------------------- *)
+(* -- fake_network -------------------------------------------------- *)
+let fake_network =
   library "fake_network" ~path:"src/lib/fake_network"
-    ~deps:
-      [ async
-      ; async_unix
-      ; core
-      ; core_uuid
-      ; local "block_time"
-      ; local "mina_stdlib"
-      ; local "coda_genesis_proof"
-      ; local "consensus"
-      ; local "data_hash_lib"
-      ; local "genesis_constants"
-      ; local "kimchi_bindings"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "kimchi_types"
-      ; local "logger"
-      ; local "mina_base"
-      ; local "mina_block"
-      ; local "mina_intf"
-      ; local "mina_ledger"
-      ; local "mina_networking"
-      ; local "mina_state"
-      ; local "network_peer"
-      ; local "network_pool"
-      ; local "pasta_bindings"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pipe_lib"
-      ; local "precomputed_values"
-      ; local "proof_carrying_data"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "staged_ledger"
-      ; local "sync_handler"
-      ; local "transition_chain_prover"
-      ; local "transition_frontier"
-      ; local "transition_handler"
-      ; local "trust_system"
-      ; local "verifier"
-      ; local "with_hash"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_deriving.std"; "ppx_jane"; "ppx_mina"; "ppx_version" ] ) ;
+  ~deps:
+    [ async
+    ; async_unix
+    ; core
+    ; core_uuid
+    ; Layer_domain.block_time
+    ; Layer_base.mina_stdlib
+    ; Layer_consensus.coda_genesis_proof
+    ; Layer_consensus.consensus
+    ; Layer_domain.data_hash_lib
+    ; Layer_domain.genesis_constants
+    ; local "kimchi_bindings"
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; local "kimchi_types"
+    ; Layer_infra.logger
+    ; Layer_base.mina_base
+    ; mina_block
+    ; local "mina_intf"
+    ; Layer_ledger.mina_ledger
+    ; mina_networking
+    ; Layer_consensus.mina_state
+    ; Layer_domain.network_peer
+    ; network_pool
+    ; local "pasta_bindings"
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_base.pipe_lib
+    ; Layer_consensus.precomputed_values
+    ; Layer_domain.proof_carrying_data
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; staged_ledger
+    ; sync_handler
+    ; transition_chain_prover
+    ; transition_frontier
+    ; transition_handler
+    ; Layer_infra.trust_system
+    ; Layer_service.verifier
+    ; Layer_base.with_hash
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_deriving_std; Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_version ] )
 
-  ()

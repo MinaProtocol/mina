@@ -1,246 +1,256 @@
 (** Product: rosetta — Mina Rosetta API implementation.
 
-    Provides the Coinbase Rosetta API for Mina, with testnet/mainnet
-    signature variants, a signing library, and an indexer test. *)
+  Provides the Coinbase Rosetta API for Mina, with testnet/mainnet
+  signature variants, a signing library, and an indexer test. *)
 
 open Manifest
 open Externals
 
-let register () =
-  (* -- rosetta (executable) ------------------------------------------- *)
+(* -- rosetta (executable) ------------------------------------------- *)
+let () =
   executable "rosetta" ~package:"rosetta" ~path:"src/app/rosetta"
-    ~modules:[ "rosetta" ] ~modes:[ "native" ]
-    ~deps:
-      [ async
-      ; async_command
-      ; async_kernel
-      ; base
-      ; core
-      ; core_kernel
-      ; local "genesis_constants"
-      ; local "lib"
-      ]
-    ~ppx:Ppx.minimal ;
+  ~modules:[ "rosetta" ] ~modes:[ "native" ]
+  ~deps:
+    [ async
+    ; async_command
+    ; async_kernel
+    ; base
+    ; core
+    ; core_kernel
+    ; Layer_domain.genesis_constants
+    ; local "lib"
 
-  (* -- rosetta-testnet (executable) ----------------------------------- *)
+    ]
+  ~ppx:Ppx.minimal
+
+(* -- rosetta-testnet (executable) ----------------------------------- *)
+let () =
   executable "rosetta-testnet" ~internal_name:"rosetta_testnet_signatures"
-    ~package:"rosetta" ~path:"src/app/rosetta"
-    ~modules:[ "rosetta_testnet_signatures" ]
-    ~modes:[ "native" ]
-    ~deps:
-      [ async
-      ; async_command
-      ; async_kernel
-      ; base
-      ; core
-      ; core_kernel
-      ; local "genesis_constants"
-      ; local "lib"
-      ; local "mina_signature_kind.testnet"
-      ]
-    ~ppx:Ppx.minimal ;
+  ~package:"rosetta" ~path:"src/app/rosetta"
+  ~modules:[ "rosetta_testnet_signatures" ]
+  ~modes:[ "native" ]
+  ~deps:
+    [ async
+    ; async_command
+    ; async_kernel
+    ; base
+    ; core
+    ; core_kernel
+    ; Layer_domain.genesis_constants
+    ; local "lib"
 
-  (* -- rosetta-mainnet (executable) ----------------------------------- *)
+    ; Layer_infra.mina_signature_kind_testnet
+    ]
+  ~ppx:Ppx.minimal
+
+(* -- rosetta-mainnet (executable) ----------------------------------- *)
+let () =
   executable "rosetta-mainnet" ~internal_name:"rosetta_mainnet_signatures"
-    ~package:"rosetta" ~path:"src/app/rosetta"
-    ~modules:[ "rosetta_mainnet_signatures" ]
-    ~modes:[ "native" ]
-    ~deps:
-      [ async
-      ; async_command
-      ; async_kernel
-      ; base
-      ; core
-      ; core_kernel
-      ; local "genesis_constants"
-      ; local "lib"
-      ; local "mina_signature_kind.mainnet"
-      ]
-    ~ppx:Ppx.minimal ;
+  ~package:"rosetta" ~path:"src/app/rosetta"
+  ~modules:[ "rosetta_mainnet_signatures" ]
+  ~modes:[ "native" ]
+  ~deps:
+    [ async
+    ; async_command
+    ; async_kernel
+    ; base
+    ; core
+    ; core_kernel
+    ; Layer_domain.genesis_constants
+    ; local "lib"
 
-  (* -- lib (rosetta library) ------------------------------------------ *)
+    ; Layer_infra.mina_signature_kind_mainnet
+    ]
+  ~ppx:Ppx.minimal
+
+(* -- lib (rosetta library) ------------------------------------------ *)
+let lib =
   library "lib" ~path:"src/app/rosetta/lib" ~inline_tests:true
-    ~deps:
-      [ archive_lib
-      ; async
-      ; async_kernel
-      ; async_unix
-      ; base
-      ; base_caml
-      ; caqti
-      ; caqti_async
-      ; cohttp
-      ; cohttp_async
-      ; core
-      ; core_kernel
-      ; integers
-      ; ppx_inline_test_config
-      ; result
-      ; sexplib0
-      ; uri
-      ; local "cli_lib"
-      ; local "currency"
-      ; local "genesis_constants"
-      ; local "graphql_lib"
-      ; local "hex"
-      ; local "interpolator_lib"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "logger"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_caqti"
-      ; local "mina_compile_config"
-      ; local "mina_numbers"
-      ; local "mina_runtime_config"
-      ; local "mina_signature_kind"
-      ; local "mina_transaction"
-      ; local "mina_version"
-      ; local "mina_wire_types"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "rosetta_coding"
-      ; local "rosetta_lib"
-      ; local "rosetta_models"
-      ; local "secrets"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "unsigned_extended"
-      ]
-    ~preprocessor_deps:
-      [ "../../../graphql-ppx-config.inc"; "../../../../graphql_schema.json" ]
-    ~ppx:
-      (Ppx.custom
-         [ "graphql_ppx"
-         ; "h_list.ppx"
-         ; "ppx_assert"
-         ; "ppx_bin_prot"
-         ; "ppx_compare"
-         ; "ppx_compare"
-         ; "ppx_custom_printf"
-         ; "ppx_deriving.make"
-         ; "ppx_deriving.show"
-         ; "ppx_deriving_yojson"
-         ; "ppx_fields_conv"
-         ; "ppx_hash"
-         ; "ppx_here"
-         ; "ppx_inline_test"
-         ; "ppx_let"
-         ; "ppx_mina"
-         ; "ppx_sexp_conv"
-         ; "ppx_string"
-         ; "ppx_version"
-         ; "--"
-         ; "%{read-lines:../../../graphql-ppx-config.inc}"
-         ] ) ;
+  ~deps:
+    [ archive_lib
+    ; async
+    ; async_kernel
+    ; async_unix
+    ; base
+    ; base_caml
+    ; caqti
+    ; caqti_async
+    ; cohttp
+    ; cohttp_async
+    ; core
+    ; core_kernel
+    ; integers
+    ; ppx_inline_test_config
+    ; result
+    ; sexplib0
+    ; uri
+    ; local "cli_lib"
+    ; Layer_base.currency
+    ; Layer_domain.genesis_constants
+    ; local "graphql_lib"
+    ; Layer_base.hex
+    ; Layer_base.interpolator_lib
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_infra.logger
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; local "mina_caqti"
+    ; Layer_base.mina_compile_config
+    ; Layer_infra.mina_numbers
+    ; local "mina_runtime_config"
+    ; Layer_infra.mina_signature_kind
+    ; Layer_transaction.mina_transaction
+    ; Layer_base.mina_version
+    ; Layer_base.mina_wire_types
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.random_oracle_input
+    ; Layer_base.rosetta_coding
+    ; Layer_network.rosetta_lib
+    ; Layer_base.rosetta_models
+    ; Layer_crypto.secrets
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; Layer_base.unsigned_extended
+    ]
+  ~preprocessor_deps:
+    [ "../../../graphql-ppx-config.inc"; "../../../../graphql_schema.json" ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.graphql_ppx
+       ; Ppx_lib.h_list_ppx
+       ; Ppx_lib.ppx_assert
+       ; Ppx_lib.ppx_bin_prot
+       ; Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_custom_printf
+       ; Ppx_lib.ppx_deriving_make
+       ; Ppx_lib.ppx_deriving_show
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_fields_conv
+       ; Ppx_lib.ppx_hash
+       ; Ppx_lib.ppx_here
+       ; Ppx_lib.ppx_inline_test
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_sexp_conv
+       ; Ppx_lib.ppx_string
+       ; Ppx_lib.ppx_version
+       ; "--"
+       ; "%{read-lines:../../../graphql-ppx-config.inc}"
+       ] )
 
-  (* -- signer_cli (library) ------------------------------------------- *)
+(* -- signer_cli (library) ------------------------------------------- *)
+let signer_cli =
   library "signer.cli" ~internal_name:"signer_cli"
-    ~path:"src/app/rosetta/ocaml-signer" ~modules:[ "signer_cli" ]
-    ~deps:
-      [ async
-      ; async_command
-      ; async_kernel
-      ; async_unix
-      ; base
-      ; core
-      ; core_kernel
-      ; lib
-      ; local "cli_lib"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "mina_base"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "rosetta_coding"
-      ; local "rosetta_lib"
-      ; local "secrets"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "string_sign"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "graphql_ppx"
-         ; "ppx_base"
-         ; "ppx_compare"
-         ; "ppx_deriving.show"
-         ; "ppx_deriving_yojson"
-         ; "ppx_let"
-         ; "ppx_mina"
-         ; "ppx_version"
-         ] ) ;
+  ~path:"src/app/rosetta/ocaml-signer" ~modules:[ "signer_cli" ]
+  ~deps:
+    [ async
+    ; async_command
+    ; async_kernel
+    ; async_unix
+    ; base
+    ; core
+    ; core_kernel
+    ; lib
+    ; local "cli_lib"
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_base.mina_base
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_base.rosetta_coding
+    ; Layer_network.rosetta_lib
+    ; Layer_crypto.secrets
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; Layer_crypto.string_sign
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.graphql_ppx
+       ; Ppx_lib.ppx_base
+       ; Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_deriving_show
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ] )
 
-  (* -- signer (executable) -------------------------------------------- *)
+(* -- signer (executable) -------------------------------------------- *)
+let () =
   executable "signer" ~package:"signer" ~path:"src/app/rosetta/ocaml-signer"
-    ~modules:[ "signer" ] ~modes:[ "native" ]
-    ~deps:[ async; base; core_kernel; local "signer_cli" ]
-    ~ppx:
-      (Ppx.custom
-         [ "graphql_ppx"
-         ; "ppx_base"
-         ; "ppx_compare"
-         ; "ppx_deriving.show"
-         ; "ppx_deriving_yojson"
-         ; "ppx_let"
-         ; "ppx_mina"
-         ; "ppx_version"
-         ] ) ;
+  ~modules:[ "signer" ] ~modes:[ "native" ]
+  ~deps:[ async; base; core_kernel; signer_cli ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.graphql_ppx
+       ; Ppx_lib.ppx_base
+       ; Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_deriving_show
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ] )
 
-  (* -- signer-testnet (executable) ------------------------------------ *)
+(* -- signer-testnet (executable) ------------------------------------ *)
+let () =
   executable "signer-testnet" ~internal_name:"signer_testnet_signatures"
-    ~package:"signer" ~path:"src/app/rosetta/ocaml-signer"
-    ~modules:[ "signer_testnet_signatures" ]
-    ~modes:[ "native" ]
-    ~deps:[ async; base; core_kernel; local "signer_cli" ]
-    ~ppx:
-      (Ppx.custom
-         [ "graphql_ppx"
-         ; "ppx_base"
-         ; "ppx_compare"
-         ; "ppx_deriving.show"
-         ; "ppx_deriving_yojson"
-         ; "ppx_let"
-         ; "ppx_mina"
-         ; "ppx_version"
-         ] ) ;
+  ~package:"signer" ~path:"src/app/rosetta/ocaml-signer"
+  ~modules:[ "signer_testnet_signatures" ]
+  ~modes:[ "native" ]
+  ~deps:[ async; base; core_kernel; signer_cli ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.graphql_ppx
+       ; Ppx_lib.ppx_base
+       ; Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_deriving_show
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ] )
 
-  (* -- signer-mainnet (executable) ------------------------------------ *)
+(* -- signer-mainnet (executable) ------------------------------------ *)
+let () =
   executable "signer-mainnet" ~internal_name:"signer_mainnet_signatures"
-    ~package:"signer" ~path:"src/app/rosetta/ocaml-signer"
-    ~modules:[ "signer_mainnet_signatures" ]
-    ~modes:[ "native" ]
-    ~deps:[ async; base; core_kernel; local "signer_cli" ]
-    ~ppx:
-      (Ppx.custom
-         [ "graphql_ppx"
-         ; "ppx_base"
-         ; "ppx_compare"
-         ; "ppx_deriving.show"
-         ; "ppx_deriving_yojson"
-         ; "ppx_let"
-         ; "ppx_mina"
-         ; "ppx_version"
-         ] ) ;
+  ~package:"signer" ~path:"src/app/rosetta/ocaml-signer"
+  ~modules:[ "signer_mainnet_signatures" ]
+  ~modes:[ "native" ]
+  ~deps:[ async; base; core_kernel; signer_cli ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.graphql_ppx
+       ; Ppx_lib.ppx_base
+       ; Ppx_lib.ppx_compare
+       ; Ppx_lib.ppx_deriving_show
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_version
+       ] )
 
-  (* -- indexer_test (test, disabled) ---------------------------------- *)
+(* -- indexer_test (test, disabled) ---------------------------------- *)
+let () =
   test "indexer_test" ~path:"src/app/rosetta/indexer_test" ~enabled_if:"false"
-    ~deps:
-      [ alcotest
-      ; alcotest_async
-      ; async
-      ; async_command
-      ; async_kernel
-      ; base
-      ; cmdliner
-      ; core
-      ; core_kernel
-      ; local "lib"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_deriving.make"; "ppx_jane"; "ppx_mina"; "ppx_string" ] ) ;
+  ~deps:
+    [ alcotest
+    ; alcotest_async
+    ; async
+    ; async_command
+    ; async_kernel
+    ; base
+    ; cmdliner
+    ; core
+    ; core_kernel
+    ; lib
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_deriving_make; Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_string ] )
 
-  ()

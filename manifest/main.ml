@@ -3,7 +3,6 @@ let () =
   Array.iter
     (fun arg -> if arg = "--check" then Manifest.check_mode := true)
     Sys.argv ;
-  (* Register all targets *)
-  Product_mina.register () ;
-  (* Generate (or check) dune files *)
+  (* All targets are registered at module load time.
+     Modules are linked as part of manifest_product. *)
   Manifest.generate ()

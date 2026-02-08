@@ -1,286 +1,290 @@
 (** Product: cli — Mina daemon command-line interface.
 
-    The main mina executable with testnet/mainnet signature variants. *)
+  The main mina executable with testnet/mainnet signature variants. *)
 
 open Manifest
 open Externals
 open Dune_s_expr
 
-let register () =
-  (* -- mina (executable) ---------------------------------------------- *)
+(* -- mina (executable) ---------------------------------------------- *)
+let () =
   executable "mina" ~package:"cli" ~path:"src/app/cli/src" ~modules:[ "mina" ]
-    ~modes:[ "native" ]
-    ~flags:[ atom ":standard"; atom "-warn-error"; atom "+a" ]
-    ~deps:[ local "disk_cache.lmdb"; local "mina_cli_entrypoint" ]
-    ~ppx:Ppx.minimal ;
+  ~modes:[ "native" ]
+  ~flags:[ atom ":standard"; atom "-warn-error"; atom "+a" ]
+  ~deps:[ Layer_storage.disk_cache_lmdb; local "mina_cli_entrypoint" ]
+  ~ppx:Ppx.minimal
 
-  (* -- mina-testnet (executable) -------------------------------------- *)
+(* -- mina-testnet (executable) -------------------------------------- *)
+let () =
   executable "mina-testnet" ~internal_name:"mina_testnet_signatures"
-    ~package:"cli" ~path:"src/app/cli/src"
-    ~modules:[ "mina_testnet_signatures" ]
-    ~modes:[ "native" ]
-    ~flags:[ atom ":standard"; atom "-warn-error"; atom "+a" ]
-    ~deps:
-      [ local "disk_cache.lmdb"
-      ; local "mina_cli_entrypoint"
-      ; local "mina_signature_kind.testnet"
-      ]
-    ~ppx:Ppx.minimal ;
+  ~package:"cli" ~path:"src/app/cli/src"
+  ~modules:[ "mina_testnet_signatures" ]
+  ~modes:[ "native" ]
+  ~flags:[ atom ":standard"; atom "-warn-error"; atom "+a" ]
+  ~deps:
+    [ Layer_storage.disk_cache_lmdb
+    ; local "mina_cli_entrypoint"
+    ; Layer_infra.mina_signature_kind_testnet
+    ]
+  ~ppx:Ppx.minimal
 
-  (* -- mina-mainnet (executable) -------------------------------------- *)
+(* -- mina-mainnet (executable) -------------------------------------- *)
+let () =
   executable "mina-mainnet" ~internal_name:"mina_mainnet_signatures"
-    ~package:"cli" ~path:"src/app/cli/src"
-    ~modules:[ "mina_mainnet_signatures" ]
-    ~modes:[ "native" ]
-    ~flags:[ atom ":standard"; atom "-warn-error"; atom "+a" ]
-    ~deps:
-      [ local "disk_cache.lmdb"
-      ; local "mina_cli_entrypoint"
-      ; local "mina_signature_kind.mainnet"
-      ]
-    ~ppx:Ppx.minimal ;
+  ~package:"cli" ~path:"src/app/cli/src"
+  ~modules:[ "mina_mainnet_signatures" ]
+  ~modes:[ "native" ]
+  ~flags:[ atom ":standard"; atom "-warn-error"; atom "+a" ]
+  ~deps:
+    [ Layer_storage.disk_cache_lmdb
+    ; local "mina_cli_entrypoint"
+    ; Layer_infra.mina_signature_kind_mainnet
+    ]
+  ~ppx:Ppx.minimal
 
-  (* -- init: rule for assets.ml generation ----------------------------- *)
+(* -- init: rule for assets.ml generation ----------------------------- *)
+let () =
   file_stanzas ~path:"src/app/cli/src/init"
-    (Dune_s_expr.parse_string
-       "(rule\n\
-       \ (targets assets.ml)\n\
-       \ (deps\n\
-       \  (source_tree assets))\n\
-       \ (action\n\
-       \  (run %{bin:ocaml-crunch} -m plain assets -o assets.ml)))" ) ;
+  (Dune_s_expr.parse_string
+     "(rule\n\
+     \ (targets assets.ml)\n\
+     \ (deps\n\
+     \  (source_tree assets))\n\
+     \ (action\n\
+     \  (run %{bin:ocaml-crunch} -m plain assets -o assets.ml)))" )
 
-  (* -- init (library) ------------------------------------------------- *)
+(* -- init (library) ------------------------------------------------- *)
+let init =
   library "init" ~path:"src/app/cli/src/init"
-    ~deps:
-      [ astring
-      ; async
-      ; async_command
-      ; async_rpc
-      ; async_kernel
-      ; async_rpc_kernel
-      ; async_ssl
-      ; async_unix
-      ; base
-      ; base_internalhash_types
-      ; base_caml
-      ; base_quickcheck
-      ; cohttp
-      ; cohttp_async
-      ; core
-      ; core_uuid
-      ; core_kernel
-      ; core_kernel_uuid
-      ; graphql
-      ; graphql_async
-      ; graphql_cohttp
-      ; graphql_parser
-      ; integers
-      ; mirage_crypto_ec
-      ; result
-      ; sexplib0
-      ; stdio
-      ; uri
-      ; local "allocation_functor"
-      ; local "archive_lib"
-      ; local "block_time"
-      ; local "blockchain_snark"
-      ; local "child_processes"
-      ; local "cli_lib"
-      ; local "coda_genesis_ledger"
-      ; local "coda_genesis_proof"
-      ; local "consensus"
-      ; local "currency"
-      ; local "daemon_rpcs"
-      ; local "data_hash_lib"
-      ; local "error_json"
-      ; local "generated_graphql_queries"
-      ; local "genesis_constants"
-      ; local "genesis_ledger_helper"
-      ; local "genesis_ledger_helper.lib"
-      ; local "graphql_lib"
-      ; local "group_map"
-      ; local "internal_tracing"
-      ; local "itn_crypto"
-      ; local "itn_logger"
-      ; local "kimchi_backend"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "logger"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_block"
-      ; local "mina_commands"
-      ; local "mina_compile_config"
-      ; local "mina_generators"
-      ; local "mina_graphql"
-      ; local "mina_ledger"
-      ; local "mina_lib"
-      ; local "mina_metrics"
-      ; local "mina_net2"
-      ; local "mina_networking"
-      ; local "mina_numbers"
-      ; local "mina_runtime_config"
-      ; local "mina_signature_kind"
-      ; local "mina_state"
-      ; local "mina_stdlib"
-      ; local "mina_stdlib_unix"
-      ; local "mina_transaction"
-      ; local "mina_transaction_logic"
-      ; local "mina_version"
-      ; local "mina_wire_types"
-      ; local "network_peer"
-      ; local "network_pool"
-      ; local "node_error_service"
-      ; local "o1trace"
-      ; local "o1trace_webkit_event"
-      ; local "one_or_two"
-      ; local "parallel"
-      ; local "participating_state"
-      ; local "perf_histograms"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_types"
-      ; local "precomputed_values"
-      ; local "protocol_version"
-      ; local "random_oracle"
-      ; local "secrets"
-      ; local "sgn"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "snark_profiler_lib"
-      ; local "snark_work_lib"
-      ; local "snark_worker"
-      ; local "staged_ledger"
-      ; local "string_sign"
-      ; local "test_util"
-      ; local "transaction_inclusion_status"
-      ; local "transaction_protocol_state"
-      ; local "transaction_snark"
-      ; local "transaction_snark_scan_state"
-      ; local "transaction_snark_tests"
-      ; local "trust_system"
-      ; local "unsigned_extended"
-      ; local "user_command_input"
-      ; local "verifier"
-      ; local "with_hash"
-      ; local "zkapp_command_builder"
-      ]
-    ~preprocessor_deps:
-      [ "../../../../../graphql_schema.json"
-      ; "../../../../graphql-ppx-config.inc"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_assert"
-         ; "ppx_base"
-         ; "ppx_bench"
-         ; "ppx_bin_prot"
-         ; "ppx_custom_printf"
-         ; "ppx_deriving_yojson"
-         ; "ppx_fields_conv"
-         ; "ppx_fixed_literal"
-         ; "ppx_here"
-         ; "ppx_inline_test"
-         ; "ppx_let"
-         ; "ppx_mina"
-         ; "ppx_module_timer"
-         ; "ppx_optional"
-         ; "ppx_pipebang"
-         ; "ppx_sexp_message"
-         ; "ppx_sexp_value"
-         ; "ppx_string"
-         ; "ppx_typerep_conv"
-         ; "ppx_variants_conv"
-         ; "ppx_version"
-         ; "graphql_ppx"
-         ; "--"
-         ; "%{read-lines:../../../../graphql-ppx-config.inc}"
-         ] ) ;
+  ~deps:
+    [ astring
+    ; async
+    ; async_command
+    ; async_rpc
+    ; async_kernel
+    ; async_rpc_kernel
+    ; async_ssl
+    ; async_unix
+    ; base
+    ; base_internalhash_types
+    ; base_caml
+    ; base_quickcheck
+    ; cohttp
+    ; cohttp_async
+    ; core
+    ; core_uuid
+    ; core_kernel
+    ; core_kernel_uuid
+    ; graphql
+    ; graphql_async
+    ; graphql_cohttp
+    ; graphql_parser
+    ; integers
+    ; mirage_crypto_ec
+    ; result
+    ; sexplib0
+    ; stdio
+    ; uri
+    ; Layer_base.allocation_functor
+    ; Product_archive.archive_lib
+    ; Layer_domain.block_time
+    ; Layer_protocol.blockchain_snark
+    ; Layer_base.child_processes
+    ; local "cli_lib"
+    ; Layer_consensus.coda_genesis_ledger
+    ; Layer_consensus.coda_genesis_proof
+    ; Layer_consensus.consensus
+    ; Layer_base.currency
+    ; local "daemon_rpcs"
+    ; Layer_domain.data_hash_lib
+    ; Layer_base.error_json
+    ; Layer_network.generated_graphql_queries
+    ; Layer_domain.genesis_constants
+    ; Layer_network.genesis_ledger_helper
+    ; Layer_network.genesis_ledger_helper_lib
+    ; local "graphql_lib"
+    ; local "group_map"
+    ; Layer_tooling.internal_tracing
+    ; local "itn_crypto"
+    ; local "itn_logger"
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_infra.logger
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; Layer_network.mina_block
+    ; local "mina_commands"
+    ; Layer_base.mina_compile_config
+    ; local "mina_generators"
+    ; local "mina_graphql"
+    ; Layer_ledger.mina_ledger
+    ; local "mina_lib"
+    ; Layer_tooling.mina_metrics
+    ; Layer_network.mina_net2
+    ; Layer_network.mina_networking
+    ; Layer_infra.mina_numbers
+    ; local "mina_runtime_config"
+    ; Layer_infra.mina_signature_kind
+    ; Layer_consensus.mina_state
+    ; Layer_base.mina_stdlib
+    ; Layer_infra.mina_stdlib_unix
+    ; Layer_transaction.mina_transaction
+    ; Layer_transaction.mina_transaction_logic
+    ; Layer_base.mina_version
+    ; Layer_base.mina_wire_types
+    ; Layer_domain.network_peer
+    ; Layer_network.network_pool
+    ; local "node_error_service"
+    ; Layer_infra.o1trace
+    ; Layer_infra.o1trace_webkit_event
+    ; Layer_base.one_or_two
+    ; Layer_infra.parallel
+    ; Layer_base.participating_state
+    ; Layer_base.perf_histograms
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_types
+    ; Layer_consensus.precomputed_values
+    ; Layer_protocol.protocol_version
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.secrets
+    ; Layer_crypto.sgn
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; Layer_network.snark_profiler_lib
+    ; Layer_snark_worker.snark_work_lib
+    ; Layer_snark_worker.snark_worker
+    ; Layer_network.staged_ledger
+    ; Layer_crypto.string_sign
+    ; Layer_test.test_util
+    ; local "transaction_inclusion_status"
+    ; Layer_protocol.transaction_protocol_state
+    ; Layer_protocol.transaction_snark
+    ; Layer_snark_worker.transaction_snark_scan_state
+    ; Layer_protocol.transaction_snark_tests
+    ; Layer_infra.trust_system
+    ; Layer_base.unsigned_extended
+    ; Layer_domain.user_command_input
+    ; Layer_service.verifier
+    ; Layer_base.with_hash
+    ; Layer_protocol.zkapp_command_builder
+    ]
+  ~preprocessor_deps:
+    [ "../../../../../graphql_schema.json"
+    ; "../../../../graphql-ppx-config.inc"
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_assert
+       ; Ppx_lib.ppx_base
+       ; Ppx_lib.ppx_bench
+       ; Ppx_lib.ppx_bin_prot
+       ; Ppx_lib.ppx_custom_printf
+       ; Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_fields_conv
+       ; Ppx_lib.ppx_fixed_literal
+       ; Ppx_lib.ppx_here
+       ; Ppx_lib.ppx_inline_test
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_module_timer
+       ; Ppx_lib.ppx_optional
+       ; Ppx_lib.ppx_pipebang
+       ; Ppx_lib.ppx_sexp_message
+       ; Ppx_lib.ppx_sexp_value
+       ; Ppx_lib.ppx_string
+       ; Ppx_lib.ppx_typerep_conv
+       ; Ppx_lib.ppx_variants_conv
+       ; Ppx_lib.ppx_version
+       ; Ppx_lib.graphql_ppx
+       ; "--"
+       ; "%{read-lines:../../../../graphql-ppx-config.inc}"
+       ] )
 
-  (* -- mina_cli_entrypoint (library) ---------------------------------- *)
+(* -- mina_cli_entrypoint (library) ---------------------------------- *)
+let cli_mina_cli_entrypoint =
   library "cli.mina_cli_entrypoint" ~internal_name:"mina_cli_entrypoint"
-    ~path:"src/app/cli/src/cli_entrypoint" ~modes:[ "native" ]
-    ~deps:
-      [ async
-      ; async_command
-      ; async_kernel
-      ; async_unix
-      ; base
-      ; base_caml
-      ; bin_prot
-      ; bin_prot_shape
-      ; core
-      ; core_daemon
-      ; core_kernel
-      ; init
-      ; memtrace
-      ; result
-      ; sexplib0
-      ; stdio
-      ; uri
-      ; local "blake2"
-      ; local "block_producer"
-      ; local "block_time"
-      ; local "blockchain_snark"
-      ; local "cache_dir"
-      ; local "child_processes"
-      ; local "cli_lib"
-      ; local "coda_genesis_proof"
-      ; local "consensus"
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "error_json"
-      ; local "genesis_constants"
-      ; local "genesis_ledger_helper"
-      ; local "gossip_net"
-      ; local "internal_tracing"
-      ; local "itn_logger"
-      ; local "ledger_proof"
-      ; local "logger"
-      ; local "logger.file_system"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_block"
-      ; local "mina_compile_config"
-      ; local "mina_ledger"
-      ; local "mina_lib"
-      ; local "mina_metrics"
-      ; local "mina_net2"
-      ; local "mina_networking"
-      ; local "mina_plugins"
-      ; local "mina_runtime_config"
-      ; local "mina_stdlib"
-      ; local "mina_stdlib_unix"
-      ; local "mina_version"
-      ; local "node_addrs_and_ports"
-      ; local "node_error_service"
-      ; local "o1trace"
-      ; local "parallel"
-      ; local "pipe_lib"
-      ; local "ppx_version.runtime"
-      ; local "precomputed_values"
-      ; local "protocol_version"
-      ; local "prover"
-      ; local "secrets"
-      ; local "signature_lib"
-      ; local "snarky.backendless"
-      ; local "snark_work_lib"
-      ; local "snark_worker"
-      ; local "transaction_snark"
-      ; local "transaction_witness"
-      ; local "trust_system"
-      ; local "verifier"
-      ; local "with_hash"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ "ppx_deriving_yojson"
-         ; "ppx_here"
-         ; "ppx_let"
-         ; "ppx_mina"
-         ; "ppx_sexp_conv"
-         ; "ppx_version"
-         ] ) ;
+  ~path:"src/app/cli/src/cli_entrypoint" ~modes:[ "native" ]
+  ~deps:
+    [ async
+    ; async_command
+    ; async_kernel
+    ; async_unix
+    ; base
+    ; base_caml
+    ; bin_prot
+    ; bin_prot_shape
+    ; core
+    ; core_daemon
+    ; core_kernel
+    ; init
+    ; memtrace
+    ; result
+    ; sexplib0
+    ; stdio
+    ; uri
+    ; Layer_crypto.blake2
+    ; Layer_network.block_producer
+    ; Layer_domain.block_time
+    ; Layer_protocol.blockchain_snark
+    ; Layer_storage.cache_dir
+    ; Layer_base.child_processes
+    ; local "cli_lib"
+    ; Layer_consensus.coda_genesis_proof
+    ; Layer_consensus.consensus
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_base.error_json
+    ; Layer_domain.genesis_constants
+    ; Layer_network.genesis_ledger_helper
+    ; Layer_network.gossip_net
+    ; Layer_tooling.internal_tracing
+    ; local "itn_logger"
+    ; Layer_snark_worker.ledger_proof
+    ; Layer_infra.logger
+    ; Layer_infra.logger_file_system
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; Layer_network.mina_block
+    ; Layer_base.mina_compile_config
+    ; Layer_ledger.mina_ledger
+    ; local "mina_lib"
+    ; Layer_tooling.mina_metrics
+    ; Layer_network.mina_net2
+    ; Layer_network.mina_networking
+    ; Layer_network.mina_plugins
+    ; local "mina_runtime_config"
+    ; Layer_base.mina_stdlib
+    ; Layer_infra.mina_stdlib_unix
+    ; Layer_base.mina_version
+    ; Layer_domain.node_addrs_and_ports
+    ; local "node_error_service"
+    ; Layer_infra.o1trace
+    ; Layer_infra.parallel
+    ; Layer_base.pipe_lib
+    ; Layer_ppx.ppx_version_runtime
+    ; Layer_consensus.precomputed_values
+    ; Layer_protocol.protocol_version
+    ; Layer_service.prover
+    ; Layer_crypto.secrets
+    ; Layer_crypto.signature_lib
+    ; local "snarky.backendless"
+    ; Layer_snark_worker.snark_work_lib
+    ; Layer_snark_worker.snark_worker
+    ; Layer_protocol.transaction_snark
+    ; Layer_transaction.transaction_witness
+    ; Layer_infra.trust_system
+    ; Layer_service.verifier
+    ; Layer_base.with_hash
+    ]
+  ~ppx:
+    (Ppx.custom
+       [ Ppx_lib.ppx_deriving_yojson
+       ; Ppx_lib.ppx_here
+       ; Ppx_lib.ppx_let
+       ; Ppx_lib.ppx_mina
+       ; Ppx_lib.ppx_sexp_conv
+       ; Ppx_lib.ppx_version
+       ] )
 
-  ()

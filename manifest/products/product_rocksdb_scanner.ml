@@ -3,11 +3,10 @@
 open Manifest
 open Externals
 
-let register () =
+let () =
   executable "mina_rocksdb_scanner" ~internal_name:"rocksdb_scanner"
-    ~package:"rocksdb_scanner" ~path:"src/app/rocksdb-scanner"
-    ~modes:[ "native" ]
-    ~deps:[ async; core; local "logger"; local "rocksdb" ]
-    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_mina"; "ppx_version" ]) ;
+  ~package:"rocksdb_scanner" ~path:"src/app/rocksdb-scanner"
+  ~modes:[ "native" ]
+  ~deps:[ async; core; Layer_infra.logger; Layer_storage.rocksdb ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])
 
-  ()

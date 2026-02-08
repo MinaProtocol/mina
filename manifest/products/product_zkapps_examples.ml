@@ -3,557 +3,571 @@
 open Manifest
 open Externals
 
-let register () =
-  (* -- zkapps_examples (library) -------------------------------------- *)
+(* -- zkapps_examples (library) -------------------------------------- *)
+let zkapps_examples =
   library "zkapps_examples" ~path:"src/app/zkapps_examples"
-    ~deps:
-      [ async_kernel
-      ; base
-      ; core_kernel
-      ; local "crypto_params"
-      ; local "currency"
-      ; local "kimchi_backend"
-      ; local "kimchi_backend_common"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_ledger"
-      ; local "mina_numbers"
-      ; local "mina_stdlib"
-      ; local "pasta_bindings"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_types"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "sgn"
-      ; local "signature_lib"
-      ; local "snarky.backendless"
-      ; local "snark_params"
-      ; local "tuple_lib"
-      ; local "with_hash"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_let"; "ppx_version" ]) ;
+  ~deps:
+    [ async_kernel
+    ; base
+    ; core_kernel
+    ; Layer_crypto.crypto_params
+    ; Layer_base.currency
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_backend_common
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; Layer_ledger.mina_ledger
+    ; Layer_infra.mina_numbers
+    ; Layer_base.mina_stdlib
+    ; local "pasta_bindings"
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.random_oracle_input
+    ; Layer_crypto.sgn
+    ; Layer_crypto.signature_lib
+    ; local "snarky.backendless"
+    ; Layer_crypto.snark_params
+    ; local "tuple_lib"
+    ; Layer_base.with_hash
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_let; Ppx_lib.ppx_version ])
 
-  (* -- zkapps_actions (library) --------------------------------------- *)
+(* -- zkapps_actions (library) --------------------------------------- *)
+let zkapps_actions =
   private_library "zkapps_actions" ~path:"src/app/zkapps_examples/actions"
-    ~deps:
-      [ base
-      ; core_kernel
-      ; local "crypto_params"
-      ; local "currency"
-      ; local "mina_base"
-      ; local "pickles"
-      ; local "pickles_types"
-      ; local "signature_lib"
-      ; local "snarky.backendless"
-      ; local "snark_params"
-      ; local "zkapps_examples"
-      ]
-    ~ppx:Ppx.minimal ;
+  ~deps:
+    [ base
+    ; core_kernel
+    ; Layer_crypto.crypto_params
+    ; Layer_base.currency
+    ; Layer_base.mina_base
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.signature_lib
+    ; local "snarky.backendless"
+    ; Layer_crypto.snark_params
+    ; zkapps_examples
+    ]
+  ~ppx:Ppx.minimal
 
-  (* -- zkapps_add_events (library) ------------------------------------ *)
+(* -- zkapps_add_events (library) ------------------------------------ *)
+let zkapps_add_events =
   private_library "zkapps_add_events" ~path:"src/app/zkapps_examples/add_events"
-    ~deps:
-      [ base
-      ; core_kernel
-      ; local "crypto_params"
-      ; local "currency"
-      ; local "mina_base"
-      ; local "pickles"
-      ; local "pickles_types"
-      ; local "signature_lib"
-      ; local "snarky.backendless"
-      ; local "snark_params"
-      ; local "zkapps_examples"
-      ]
-    ~ppx:Ppx.minimal ;
+  ~deps:
+    [ base
+    ; core_kernel
+    ; Layer_crypto.crypto_params
+    ; Layer_base.currency
+    ; Layer_base.mina_base
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.signature_lib
+    ; local "snarky.backendless"
+    ; Layer_crypto.snark_params
+    ; zkapps_examples
+    ]
+  ~ppx:Ppx.minimal
 
-  (* -- zkapps_big_circuit (library) ----------------------------------- *)
+(* -- zkapps_big_circuit (library) ----------------------------------- *)
+let zkapps_big_circuit =
   private_library "zkapps_big_circuit"
-    ~path:"src/app/zkapps_examples/big_circuit"
-    ~deps:
-      [ core_kernel
-      ; local "crypto_params"
-      ; local "currency"
-      ; local "kimchi_backend"
-      ; local "kimchi_backend_common"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "kimchi_pasta.constraint_system"
-      ; local "mina_base"
-      ; local "pasta_bindings"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_types"
-      ; local "random_oracle"
-      ; local "sgn"
-      ; local "signature_lib"
-      ; local "snarky.backendless"
-      ; local "snark_params"
-      ; local "tuple_lib"
-      ; local "zkapps_examples"
-      ]
-    ~ppx:Ppx.minimal ;
+  ~path:"src/app/zkapps_examples/big_circuit"
+  ~deps:
+    [ core_kernel
+    ; Layer_crypto.crypto_params
+    ; Layer_base.currency
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_backend_common
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_crypto.kimchi_pasta_constraint_system
+    ; Layer_base.mina_base
+    ; local "pasta_bindings"
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.sgn
+    ; Layer_crypto.signature_lib
+    ; local "snarky.backendless"
+    ; Layer_crypto.snark_params
+    ; local "tuple_lib"
+    ; zkapps_examples
+    ]
+  ~ppx:Ppx.minimal
 
-  (* -- zkapps_calls (library) ----------------------------------------- *)
+(* -- zkapps_calls (library) ----------------------------------------- *)
+let zkapps_calls =
   private_library "zkapps_calls" ~path:"src/app/zkapps_examples/calls"
-    ~deps:
-      [ base
-      ; core_kernel
-      ; local "crypto_params"
-      ; local "currency"
-      ; local "kimchi_backend"
-      ; local "kimchi_backend_common"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "pasta_bindings"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_types"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "sgn"
-      ; local "signature_lib"
-      ; local "snarky.backendless"
-      ; local "snark_params"
-      ; local "tuple_lib"
-      ; local "with_hash"
-      ; local "zkapps_examples"
-      ]
-    ~ppx:(Ppx.custom [ "h_list.ppx"; "ppx_version" ]) ;
+  ~deps:
+    [ base
+    ; core_kernel
+    ; Layer_crypto.crypto_params
+    ; Layer_base.currency
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_backend_common
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; local "pasta_bindings"
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.random_oracle_input
+    ; Layer_crypto.sgn
+    ; Layer_crypto.signature_lib
+    ; local "snarky.backendless"
+    ; Layer_crypto.snark_params
+    ; local "tuple_lib"
+    ; Layer_base.with_hash
+    ; zkapps_examples
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.h_list_ppx; Ppx_lib.ppx_version ])
 
-  (* -- zkapps_empty_update (library) ---------------------------------- *)
+(* -- zkapps_empty_update (library) ---------------------------------- *)
+let zkapps_empty_update =
   private_library "zkapps_empty_update"
-    ~path:"src/app/zkapps_examples/empty_update"
-    ~deps:
-      [ core_kernel
-      ; local "crypto_params"
-      ; local "currency"
-      ; local "kimchi_backend"
-      ; local "kimchi_backend_common"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "mina_base"
-      ; local "pasta_bindings"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_types"
-      ; local "random_oracle"
-      ; local "sgn"
-      ; local "signature_lib"
-      ; local "snarky.backendless"
-      ; local "snark_params"
-      ; local "tuple_lib"
-      ; local "zkapps_examples"
-      ]
-    ~ppx:Ppx.minimal ;
+  ~path:"src/app/zkapps_examples/empty_update"
+  ~deps:
+    [ core_kernel
+    ; Layer_crypto.crypto_params
+    ; Layer_base.currency
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_backend_common
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_base.mina_base
+    ; local "pasta_bindings"
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.sgn
+    ; Layer_crypto.signature_lib
+    ; local "snarky.backendless"
+    ; Layer_crypto.snark_params
+    ; local "tuple_lib"
+    ; zkapps_examples
+    ]
+  ~ppx:Ppx.minimal
 
-  (* -- zkapps_initialize_state (library) ------------------------------ *)
+(* -- zkapps_initialize_state (library) ------------------------------ *)
+let zkapps_initialize_state =
   private_library "zkapps_initialize_state"
-    ~path:"src/app/zkapps_examples/initialize_state"
-    ~deps:
-      [ base
-      ; core_kernel
-      ; local "crypto_params"
-      ; local "currency"
-      ; local "kimchi_backend"
-      ; local "kimchi_backend_common"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "mina_base"
-      ; local "pasta_bindings"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_types"
-      ; local "random_oracle"
-      ; local "sgn"
-      ; local "signature_lib"
-      ; local "snarky.backendless"
-      ; local "snark_params"
-      ; local "tuple_lib"
-      ; local "zkapps_examples"
-      ]
-    ~ppx:Ppx.minimal ;
+  ~path:"src/app/zkapps_examples/initialize_state"
+  ~deps:
+    [ base
+    ; core_kernel
+    ; Layer_crypto.crypto_params
+    ; Layer_base.currency
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_backend_common
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_base.mina_base
+    ; local "pasta_bindings"
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.sgn
+    ; Layer_crypto.signature_lib
+    ; local "snarky.backendless"
+    ; Layer_crypto.snark_params
+    ; local "tuple_lib"
+    ; zkapps_examples
+    ]
+  ~ppx:Ppx.minimal
 
-  (* -- zkapps_tokens (library) ---------------------------------------- *)
+(* -- zkapps_tokens (library) ---------------------------------------- *)
+let zkapps_tokens =
   private_library "zkapps_tokens" ~path:"src/app/zkapps_examples/tokens"
-    ~deps:
-      [ async
-      ; async_kernel
-      ; async_unix
-      ; base
-      ; core_kernel
-      ; yojson
-      ; local "cache_dir"
-      ; local "crypto_params"
-      ; local "currency"
-      ; local "genesis_constants"
-      ; local "kimchi_backend"
-      ; local "kimchi_backend_common"
-      ; local "kimchi_pasta"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "pasta_bindings"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_base"
-      ; local "pickles_types"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "sgn"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "snarky.backendless"
-      ; local "tuple_lib"
-      ; local "with_hash"
-      ; local "zkapps_examples"
-      ]
-    ~ppx:(Ppx.custom [ "h_list.ppx"; "ppx_let"; "ppx_version" ]) ;
+  ~deps:
+    [ async
+    ; async_kernel
+    ; async_unix
+    ; base
+    ; core_kernel
+    ; yojson
+    ; Layer_storage.cache_dir
+    ; Layer_crypto.crypto_params
+    ; Layer_base.currency
+    ; Layer_domain.genesis_constants
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_backend_common
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; local "pasta_bindings"
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_base
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.random_oracle_input
+    ; Layer_crypto.sgn
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; local "snarky.backendless"
+    ; local "tuple_lib"
+    ; Layer_base.with_hash
+    ; zkapps_examples
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.h_list_ppx; Ppx_lib.ppx_let; Ppx_lib.ppx_version ])
 
-  (* -- tokens (test library) ------------------------------------------ *)
+(* -- tokens (test library) ------------------------------------------ *)
+let tokens =
   private_library "tokens" ~path:"src/app/zkapps_examples/test/tokens"
-    ~inline_tests:true
-    ~deps:
-      [ async
-      ; async_kernel
-      ; async_unix
-      ; base
-      ; core
-      ; core_kernel
-      ; ppx_inline_test_config
-      ; yojson
-      ; local "cache_dir"
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "genesis_constants"
-      ; local "kimchi_backend"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "merkle_ledger"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_ledger"
-      ; local "mina_numbers"
-      ; local "mina_state"
-      ; local "mina_stdlib"
-      ; local "mina_transaction_logic"
-      ; local "pasta_bindings"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_types"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "sgn"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "snarky.backendless"
-      ; local "transaction_protocol_state"
-      ; local "transaction_snark"
-      ; local "transaction_snark_tests"
-      ; local "with_hash"
-      ; local "zkapps_examples"
-      ; local "zkapps_tokens"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_snarky"; "ppx_version" ]) ;
+  ~inline_tests:true
+  ~deps:
+    [ async
+    ; async_kernel
+    ; async_unix
+    ; base
+    ; core
+    ; core_kernel
+    ; ppx_inline_test_config
+    ; yojson
+    ; Layer_storage.cache_dir
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_domain.genesis_constants
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_ledger.merkle_ledger
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; Layer_ledger.mina_ledger
+    ; Layer_infra.mina_numbers
+    ; Layer_consensus.mina_state
+    ; Layer_base.mina_stdlib
+    ; Layer_transaction.mina_transaction_logic
+    ; local "pasta_bindings"
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.random_oracle_input
+    ; Layer_crypto.sgn
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; local "snarky.backendless"
+    ; Layer_protocol.transaction_protocol_state
+    ; Layer_protocol.transaction_snark
+    ; Layer_protocol.transaction_snark_tests
+    ; Layer_base.with_hash
+    ; zkapps_examples
+    ; zkapps_tokens
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_snarky; Ppx_lib.ppx_version ])
 
-  (* -- actions (test) ------------------------------------------------- *)
+(* -- actions (test) ------------------------------------------------- *)
+let () =
   test "actions" ~path:"src/app/zkapps_examples/test/actions"
-    ~deps:
-      [ alcotest
-      ; async
-      ; async_kernel
-      ; async_unix
-      ; core
-      ; core_kernel
-      ; yojson
-      ; local "cache_dir"
-      ; local "consensus"
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "genesis_constants"
-      ; local "kimchi_backend"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "merkle_ledger"
-      ; local "merkle_list_verifier"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_ledger"
-      ; local "mina_numbers"
-      ; local "mina_state"
-      ; local "mina_wire_types"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_base"
-      ; local "pickles_types"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "transaction_protocol_state"
-      ; local "transaction_snark"
-      ; local "transaction_snark_tests"
-      ; local "with_hash"
-      ; local "zkapps_actions"
-      ; local "zkapps_examples"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_version" ]) ;
+  ~deps:
+    [ alcotest
+    ; async
+    ; async_kernel
+    ; async_unix
+    ; core
+    ; core_kernel
+    ; yojson
+    ; Layer_storage.cache_dir
+    ; Layer_consensus.consensus
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_domain.genesis_constants
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_ledger.merkle_ledger
+    ; Layer_ledger.merkle_list_verifier
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; Layer_ledger.mina_ledger
+    ; Layer_infra.mina_numbers
+    ; Layer_consensus.mina_state
+    ; Layer_base.mina_wire_types
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_base
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.random_oracle_input
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; Layer_protocol.transaction_protocol_state
+    ; Layer_protocol.transaction_snark
+    ; Layer_protocol.transaction_snark_tests
+    ; Layer_base.with_hash
+    ; zkapps_actions
+    ; zkapps_examples
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version ])
 
-  (* -- add_events (test) ---------------------------------------------- *)
+(* -- add_events (test) ---------------------------------------------- *)
+let () =
   test "add_events" ~path:"src/app/zkapps_examples/test/add_events"
-    ~deps:
-      [ alcotest
-      ; async
-      ; async_kernel
-      ; async_unix
-      ; core
-      ; core_kernel
-      ; local "cache_dir"
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "genesis_constants"
-      ; local "kimchi_backend"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "merkle_ledger"
-      ; local "merkle_list_verifier"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_ledger"
-      ; local "mina_numbers"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_types"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "transaction_snark"
-      ; local "transaction_snark_tests"
-      ; local "with_hash"
-      ; local "zkapps_add_events"
-      ; local "zkapps_examples"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_version" ]) ;
+  ~deps:
+    [ alcotest
+    ; async
+    ; async_kernel
+    ; async_unix
+    ; core
+    ; core_kernel
+    ; Layer_storage.cache_dir
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_domain.genesis_constants
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_ledger.merkle_ledger
+    ; Layer_ledger.merkle_list_verifier
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; Layer_ledger.mina_ledger
+    ; Layer_infra.mina_numbers
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.random_oracle_input
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; Layer_protocol.transaction_snark
+    ; Layer_protocol.transaction_snark_tests
+    ; Layer_base.with_hash
+    ; zkapps_add_events
+    ; zkapps_examples
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version ])
 
-  (* -- big_circuit (test) --------------------------------------------- *)
+(* -- big_circuit (test) --------------------------------------------- *)
+let () =
   test "big_circuit" ~path:"src/app/zkapps_examples/test/big_circuit"
-    ~deps:
-      [ alcotest
-      ; async
-      ; async_kernel
-      ; async_unix
-      ; base
-      ; core
-      ; core_kernel
-      ; yojson
-      ; local "cache_dir"
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "genesis_constants"
-      ; local "kimchi_backend"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_ledger"
-      ; local "mina_numbers"
-      ; local "mina_state"
-      ; local "mina_transaction_logic"
-      ; local "pasta_bindings"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_base"
-      ; local "pickles_types"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "sgn"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "snarky.backendless"
-      ; local "transaction_protocol_state"
-      ; local "transaction_snark"
-      ; local "transaction_snark_tests"
-      ; local "with_hash"
-      ; local "zkapps_big_circuit"
-      ; local "zkapps_examples"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_snarky"; "ppx_version" ]) ;
+  ~deps:
+    [ alcotest
+    ; async
+    ; async_kernel
+    ; async_unix
+    ; base
+    ; core
+    ; core_kernel
+    ; yojson
+    ; Layer_storage.cache_dir
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_domain.genesis_constants
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; Layer_ledger.mina_ledger
+    ; Layer_infra.mina_numbers
+    ; Layer_consensus.mina_state
+    ; Layer_transaction.mina_transaction_logic
+    ; local "pasta_bindings"
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_base
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.random_oracle_input
+    ; Layer_crypto.sgn
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; local "snarky.backendless"
+    ; Layer_protocol.transaction_protocol_state
+    ; Layer_protocol.transaction_snark
+    ; Layer_protocol.transaction_snark_tests
+    ; Layer_base.with_hash
+    ; zkapps_big_circuit
+    ; zkapps_examples
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_snarky; Ppx_lib.ppx_version ])
 
-  (* -- calls (test) --------------------------------------------------- *)
+(* -- calls (test) --------------------------------------------------- *)
+let () =
   test "calls" ~path:"src/app/zkapps_examples/test/calls"
-    ~deps:
-      [ alcotest
-      ; async
-      ; async_kernel
-      ; async_unix
-      ; base
-      ; core
-      ; core_kernel
-      ; yojson
-      ; local "cache_dir"
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "genesis_constants"
-      ; local "kimchi_backend"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "merkle_ledger"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_ledger"
-      ; local "mina_numbers"
-      ; local "mina_state"
-      ; local "mina_transaction_logic"
-      ; local "pasta_bindings"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_types"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "sgn"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "snarky.backendless"
-      ; local "transaction_protocol_state"
-      ; local "transaction_snark"
-      ; local "transaction_snark_tests"
-      ; local "with_hash"
-      ; local "zkapps_calls"
-      ; local "zkapps_examples"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_snarky"; "ppx_version" ]) ;
+  ~deps:
+    [ alcotest
+    ; async
+    ; async_kernel
+    ; async_unix
+    ; base
+    ; core
+    ; core_kernel
+    ; yojson
+    ; Layer_storage.cache_dir
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_domain.genesis_constants
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_ledger.merkle_ledger
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; Layer_ledger.mina_ledger
+    ; Layer_infra.mina_numbers
+    ; Layer_consensus.mina_state
+    ; Layer_transaction.mina_transaction_logic
+    ; local "pasta_bindings"
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.random_oracle_input
+    ; Layer_crypto.sgn
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; local "snarky.backendless"
+    ; Layer_protocol.transaction_protocol_state
+    ; Layer_protocol.transaction_snark
+    ; Layer_protocol.transaction_snark_tests
+    ; Layer_base.with_hash
+    ; zkapps_calls
+    ; zkapps_examples
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_snarky; Ppx_lib.ppx_version ])
 
-  (* -- empty_update (test) -------------------------------------------- *)
+(* -- empty_update (test) -------------------------------------------- *)
+let () =
   test "empty_update" ~path:"src/app/zkapps_examples/test/empty_update"
-    ~deps:
-      [ alcotest
-      ; async
-      ; async_kernel
-      ; async_unix
-      ; base
-      ; core
-      ; core_kernel
-      ; yojson
-      ; local "cache_dir"
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "genesis_constants"
-      ; local "kimchi_backend"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_ledger"
-      ; local "mina_numbers"
-      ; local "mina_state"
-      ; local "mina_stdlib"
-      ; local "mina_transaction_logic"
-      ; local "pasta_bindings"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_base"
-      ; local "pickles_types"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "sgn"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "snarky.backendless"
-      ; local "transaction_protocol_state"
-      ; local "transaction_snark"
-      ; local "transaction_snark_tests"
-      ; local "with_hash"
-      ; local "zkapps_empty_update"
-      ; local "zkapps_examples"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_snarky"; "ppx_version" ]) ;
+  ~deps:
+    [ alcotest
+    ; async
+    ; async_kernel
+    ; async_unix
+    ; base
+    ; core
+    ; core_kernel
+    ; yojson
+    ; Layer_storage.cache_dir
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_domain.genesis_constants
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; Layer_ledger.mina_ledger
+    ; Layer_infra.mina_numbers
+    ; Layer_consensus.mina_state
+    ; Layer_base.mina_stdlib
+    ; Layer_transaction.mina_transaction_logic
+    ; local "pasta_bindings"
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_base
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.random_oracle_input
+    ; Layer_crypto.sgn
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; local "snarky.backendless"
+    ; Layer_protocol.transaction_protocol_state
+    ; Layer_protocol.transaction_snark
+    ; Layer_protocol.transaction_snark_tests
+    ; Layer_base.with_hash
+    ; zkapps_empty_update
+    ; zkapps_examples
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_snarky; Ppx_lib.ppx_version ])
 
-  (* -- initialize_state (test) ---------------------------------------- *)
+(* -- initialize_state (test) ---------------------------------------- *)
+let () =
   test "initialize_state" ~path:"src/app/zkapps_examples/test/initialize_state"
-    ~deps:
-      [ alcotest
-      ; async
-      ; async_kernel
-      ; async_unix
-      ; base
-      ; core
-      ; core_kernel
-      ; yojson
-      ; local "cache_dir"
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "genesis_constants"
-      ; local "kimchi_backend"
-      ; local "kimchi_pasta"
-      ; local "kimchi_pasta.basic"
-      ; local "merkle_ledger"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_ledger"
-      ; local "mina_numbers"
-      ; local "mina_state"
-      ; local "mina_transaction_logic"
-      ; local "pasta_bindings"
-      ; local "pickles"
-      ; local "pickles.backend"
-      ; local "pickles_types"
-      ; local "random_oracle"
-      ; local "random_oracle_input"
-      ; local "sgn"
-      ; local "signature_lib"
-      ; local "snark_params"
-      ; local "snarky.backendless"
-      ; local "transaction_protocol_state"
-      ; local "transaction_snark"
-      ; local "transaction_snark_tests"
-      ; local "with_hash"
-      ; local "zkapps_examples"
-      ; local "zkapps_initialize_state"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_snarky"; "ppx_version" ]) ;
+  ~deps:
+    [ alcotest
+    ; async
+    ; async_kernel
+    ; async_unix
+    ; base
+    ; core
+    ; core_kernel
+    ; yojson
+    ; Layer_storage.cache_dir
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_domain.genesis_constants
+    ; Layer_crypto.kimchi_backend
+    ; Layer_crypto.kimchi_pasta
+    ; Layer_crypto.kimchi_pasta_basic
+    ; Layer_ledger.merkle_ledger
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; Layer_ledger.mina_ledger
+    ; Layer_infra.mina_numbers
+    ; Layer_consensus.mina_state
+    ; Layer_transaction.mina_transaction_logic
+    ; local "pasta_bindings"
+    ; Layer_crypto.pickles
+    ; Layer_crypto.pickles_backend
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.random_oracle
+    ; Layer_crypto.random_oracle_input
+    ; Layer_crypto.sgn
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_params
+    ; local "snarky.backendless"
+    ; Layer_protocol.transaction_protocol_state
+    ; Layer_protocol.transaction_snark
+    ; Layer_protocol.transaction_snark_tests
+    ; Layer_base.with_hash
+    ; zkapps_examples
+    ; zkapps_initialize_state
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_snarky; Ppx_lib.ppx_version ])
 
-  (* -- zkapp_optional_custom_gates_tests (test) ----------------------- *)
+(* -- zkapp_optional_custom_gates_tests (test) ----------------------- *)
+let () =
   test "zkapp_optional_custom_gates_tests"
-    ~path:"src/app/zkapps_examples/test/optional_custom_gates"
-    ~deps:
-      [ alcotest
-      ; async
-      ; async_kernel
-      ; async_unix
-      ; base
-      ; base_caml
-      ; core
-      ; core_kernel
-      ; integers
-      ; result
-      ; sexplib0
-      ; local "currency"
-      ; local "data_hash_lib"
-      ; local "genesis_constants"
-      ; local "mina_base"
-      ; local "mina_base.import"
-      ; local "mina_generators"
-      ; local "mina_ledger"
-      ; local "mina_numbers"
-      ; local "mina_transaction_logic"
-      ; local "pickles"
-      ; local "pickles_optional_custom_gates_circuits"
-      ; local "pickles_types"
-      ; local "sgn"
-      ; local "signature_lib"
-      ; local "snark_keys_header"
-      ; local "snark_params"
-      ; local "test_util"
-      ; local "transaction_snark"
-      ; local "transaction_snark_tests"
-      ; local "zkapp_command_builder"
-      ; local "zkapps_examples"
-      ]
-    ~ppx:(Ppx.custom [ "ppx_jane"; "ppx_mina"; "ppx_snarky"; "ppx_version" ]) ;
+  ~path:"src/app/zkapps_examples/test/optional_custom_gates"
+  ~deps:
+    [ alcotest
+    ; async
+    ; async_kernel
+    ; async_unix
+    ; base
+    ; base_caml
+    ; core
+    ; core_kernel
+    ; integers
+    ; result
+    ; sexplib0
+    ; Layer_base.currency
+    ; Layer_domain.data_hash_lib
+    ; Layer_domain.genesis_constants
+    ; Layer_base.mina_base
+    ; Layer_base.mina_base_import
+    ; local "mina_generators"
+    ; Layer_ledger.mina_ledger
+    ; Layer_infra.mina_numbers
+    ; Layer_transaction.mina_transaction_logic
+    ; Layer_crypto.pickles
+    ; local "pickles_optional_custom_gates_circuits"
+    ; Layer_crypto.pickles_types
+    ; Layer_crypto.sgn
+    ; Layer_crypto.signature_lib
+    ; Layer_crypto.snark_keys_header
+    ; Layer_crypto.snark_params
+    ; Layer_test.test_util
+    ; Layer_protocol.transaction_snark
+    ; Layer_protocol.transaction_snark_tests
+    ; Layer_protocol.zkapp_command_builder
+    ; zkapps_examples
+    ]
+  ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_snarky; Ppx_lib.ppx_version ])
 
-  ()
