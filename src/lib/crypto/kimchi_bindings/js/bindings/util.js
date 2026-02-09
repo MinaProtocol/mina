@@ -1,14 +1,26 @@
 /* global UInt64, caml_int64_of_int32, caml_create_bytes,
     caml_bytes_unsafe_set, caml_bytes_unsafe_get, caml_ml_bytes_length,
-    plonk_wasm, getTsBindings
+    kimchi_ffi, getTsBindings
  */
 
 // Provides: tsBindings
 var tsBindings = globalThis.__snarkyTsBindings;
 
+// Provides: kimchi_backend
+// Requires: kimchi_ffi
+var kimchi_backend = kimchi_ffi ? kimchi_ffi.__kimchi_backend : 'wasm'; // default to wasm
+
+// Provides: kimchi_is_wasm
+// Requires: kimchi_backend
+var kimchi_is_wasm = kimchi_backend === 'wasm';
+
+// Provides: kimchi_is_native
+// Requires: kimchi_backend
+var kimchi_is_native = kimchi_backend === 'native';
+
 // Provides: tsRustConversion
-// Requires: tsBindings, plonk_wasm
-var tsRustConversion = tsBindings.rustConversion(plonk_wasm);
+// Requires: tsBindings, kimchi_ffi
+var tsRustConversion = tsBindings.rustConversion(kimchi_ffi);
 
 // Provides: getTsBindings
 // Requires: tsBindings
@@ -74,8 +86,12 @@ var free_finalization_registry = new globalThis.FinalizationRegistry(function (
 });
 
 // Provides: free_on_finalize
-// Requires: free_finalization_registry
+// Requires: free_finalization_registry, kimchi_is_native
 var free_on_finalize = function (x) {
+  // No-op for native backend
+  if (kimchi_is_native) {
+    return x;
+  }
   // This is an unfortunate hack: we're creating a second instance of the
   // class to be able to call free on it. We can't pass the value itself,
   // since the registry holds a strong reference to the representative value.

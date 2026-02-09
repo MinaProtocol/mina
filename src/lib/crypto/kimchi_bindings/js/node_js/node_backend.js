@@ -1,14 +1,12 @@
-// Provides: plonk_wasm
-var plonk_wasm = (function () {
-  var wasm = require('./plonk_wasm.js');
+// Provides: kimchi_ffi
+var kimchi_ffi = (function () {
+  var wasm = require('./kimchi_wasm.js');
 
   try {
-    var native = require('@o1js/native-' + process.platform + '-' + process.arch)
+    var native = require('@o1js/native-' + globalThis.process.platform + '-' + globalThis.process.arch)
 
-    // THIS IS A RUNTIME OVERRIDE
-    // YOU HAVE TO RUN IT TO SEE IF IT BREAKS
-    // IT WON'T CRASH UNLESS O1JS_REQUIRE_NATIVE_BINDINGS
-    // IS SET
+    // THIS IS A RUNTIME OVERRIDE, YOU HAVE TO RUN IT TO SEE IF IT BREAKS
+    // IT WON'T CRASH UNLESS O1JS_REQUIRE_NATIVE_BINDINGS IS SET
     var overrides = [
       "prover_to_json",
       "prover_index_fp_deserialize",
@@ -84,10 +82,6 @@ var plonk_wasm = (function () {
       "caml_pasta_fq_plonk_index_read",
       "caml_fp_srs_from_bytes",
       "caml_fq_srs_from_bytes",
-      "caml_fp_srs_to_bytes_external",
-      "caml_fq_srs_to_bytes_external",
-      "caml_fp_srs_from_bytes_external",
-      "caml_fq_srs_from_bytes_external",
       "caml_fp_srs_to_bytes",
       "caml_fq_srs_to_bytes",
       "caml_fp_srs_create",
@@ -178,11 +172,20 @@ var plonk_wasm = (function () {
         return new native[override](x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12);
       }
     });
-    wasm.native = true;
+    wasm.__kimchi_backend = 'native';
+    if (typeof globalThis !== 'undefined') {
+      globalThis.__kimchi_backend = 'native';
+    }
   } catch (e) {
     if (process.env.O1JS_REQUIRE_NATIVE_BINDINGS) {
       throw e
     }
+  }
+  if (!wasm.__kimchi_backend) {
+    wasm.__kimchi_backend = 'wasm';
+  }
+  if (typeof globalThis !== 'undefined' && !globalThis.__kimchi_backend) {
+    globalThis.__kimchi_backend = wasm.__kimchi_backend;
   }
   return wasm
 })()
