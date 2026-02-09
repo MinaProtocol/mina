@@ -3,8 +3,8 @@
 # Run a Buildkite job locally by name.
 #
 # This script sets up the full environment (mimicking what the Buildkite agent does),
-# generates pipeline YAMLs from Dhall, ensures buildkite-agent is installed,
-# syncs the legacy cache from Hetzner, and runs the specified job's commands.
+# generates pipeline YAMLs from Dhall, syncs the legacy cache from Hetzner, and
+# runs the specified job's commands.
 #
 # Usage:
 #   ./run_job.sh [options] <job-name>
@@ -21,7 +21,7 @@ BUILDKITE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 MINA_ROOT="$(cd "$BUILDKITE_DIR/.." && pwd)"
 
 # ==============================================================================
-# Hetzner / Cache config
+# Configuration
 # ==============================================================================
 HETZNER_KEY="${HETZNER_KEY:-$HOME/work/secrets/storagebox.key}"
 HETZNER_USER="${HETZNER_USER:-u434410}"
@@ -44,87 +44,114 @@ BUILD_ID=""
 LIST_JOBS=false
 LIST_STEPS=false
 
+# Populated by load_env_file, used by patch_docker_command
+USER_ENV_DOCKER_FLAGS=""
+USER_ENV_VARS=()
+
 # ==============================================================================
-# Helpers
+# Logging & Display
 # ==============================================================================
 log()  { echo -e "\033[1;34m=== $* ===\033[0m"; }
 warn() { echo -e "\033[1;33mWARN: $*\033[0m"; }
 err()  { echo -e "\033[1;31mERROR: $*\033[0m" >&2; }
 
-# Step banner - more prominent visual separator for major steps
-step_banner() {
-  local step_num="$1"
-  local step_title="$2"
-  local timestamp
-  timestamp=$(date '+%H:%M:%S')
+# Draw a colored box with arbitrary lines of text.
+# Usage: draw_box <ansi_color_code> <line1> [<line2> ...]
+draw_box() {
+  local color="$1"; shift
   echo ""
-  echo -e "\033[1;35m╔══════════════════════════════════════════════════════════════════════════════╗\033[0m"
-  echo -e "\033[1;35m║  STEP $step_num: $step_title\033[0m"
-  echo -e "\033[1;35m║  Started at: $timestamp\033[0m"
-  echo -e "\033[1;35m╚══════════════════════════════════════════════════════════════════════════════╝\033[0m"
+  echo -e "\033[1;${color}m╔══════════════════════════════════════════════════════════════════════════════╗\033[0m"
+  for line in "$@"; do
+    echo -e "\033[1;${color}m║  ${line}\033[0m"
+  done
+  echo -e "\033[1;${color}m╚══════════════════════════════════════════════════════════════════════════════╝\033[0m"
   echo ""
 }
 
-# Sub-step banner for pipeline steps within Step 5
+step_banner() {
+  draw_box 35 "STEP $1: $2" "Started at: $(date '+%H:%M:%S')"
+}
+
 substep_banner() {
-  local index="$1"
-  local total="$2"
-  local label="$3"
-  local key="$4"
-  local timestamp
-  timestamp=$(date '+%H:%M:%S')
   echo ""
   echo -e "\033[1;36m┌──────────────────────────────────────────────────────────────────────────────┐\033[0m"
-  echo -e "\033[1;36m│  ▶ RUNNING STEP [$index/$total]: $label\033[0m"
-  echo -e "\033[1;36m│    Key: $key\033[0m"
-  echo -e "\033[1;36m│    Time: $timestamp\033[0m"
+  echo -e "\033[1;36m│  ▶ RUNNING STEP [$1/$2]: $3\033[0m"
+  echo -e "\033[1;36m│    Key: $4 | Time: $(date '+%H:%M:%S')\033[0m"
   echo -e "\033[1;36m└──────────────────────────────────────────────────────────────────────────────┘\033[0m"
 }
 
-# Skip banner for filtered steps
 skip_banner() {
-  local index="$1"
-  local total="$2"
-  local label="$3"
-  local key="$4"
-  echo -e "\033[1;33m  ⏭  SKIP [$index/$total]: $label (key: $key)\033[0m"
+  echo -e "\033[1;33m  ⏭  SKIP [$1/$2]: $3 (key: $4)\033[0m"
 }
 
-# Success indicator after substep completes
 substep_complete() {
-  local index="$1"
-  local total="$2"
-  local label="$3"
-  local timestamp
-  timestamp=$(date '+%H:%M:%S')
   echo ""
-  echo -e "\033[1;32m  ✓ COMPLETED [$index/$total]: $label at $timestamp\033[0m"
+  echo -e "\033[1;32m  ✓ COMPLETED [$1/$2]: $3 at $(date '+%H:%M:%S')\033[0m"
 }
 
-# Final completion banner
 final_banner() {
-  local job_name="$1"
-  local timestamp
-  timestamp=$(date '+%H:%M:%S')
-  echo ""
-  echo -e "\033[1;32m╔══════════════════════════════════════════════════════════════════════════════╗\033[0m"
-  echo -e "\033[1;32m║  ✓ JOB COMPLETED: $job_name\033[0m"
-  echo -e "\033[1;32m║  Finished at: $timestamp\033[0m"
-  echo -e "\033[1;32m╚══════════════════════════════════════════════════════════════════════════════╝\033[0m"
+  draw_box 32 "✓ JOB COMPLETED: $1" "Finished at: $(date '+%H:%M:%S')"
 }
 
+# ==============================================================================
+# Utility functions
+# ==============================================================================
 gen_uuid() {
   if command -v uuidgen &>/dev/null; then
     uuidgen | tr '[:upper:]' '[:lower:]'
   elif [[ -f /proc/sys/kernel/random/uuid ]]; then
     cat /proc/sys/kernel/random/uuid
   else
-    # fallback: pseudo-random hex
     od -x /dev/urandom | head -1 | awk '{OFS="-"; print $2$3,$4,$5,$6,$7$8$9}'
   fi
 }
 
 to_lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+
+# Exit with an error if a directory doesn't exist or isn't writable.
+# Usage: require_dir_writable <path> <description>
+require_dir_writable() {
+  local dir="$1" desc="$2"
+  if [[ ! -d "$dir" ]]; then
+    err "$desc does not exist: $dir"
+    err "Create it with:"
+    err "  sudo mkdir -p $dir && sudo chown \$(id -u):\$(id -g) $dir"
+    exit 1
+  fi
+  if [[ ! -w "$dir" ]]; then
+    err "$desc is not writable: $dir"
+    err "Fix with:"
+    err "  sudo chown \$(id -u):\$(id -g) $dir"
+    exit 1
+  fi
+}
+
+# Print job names from pipeline YAML files in a directory.
+# Usage: list_jobs <jobs_dir>
+list_jobs() {
+  local jobs_dir="$1"
+  for file in "$jobs_dir"/*.yml; do
+    local name
+    name=$(yq -r '.spec.name // ""' "$file" 2>/dev/null)
+    if [[ -n "$name" && "$name" != "null" ]]; then
+      echo "  $name"
+    else
+      echo "  $(basename "$file" .yml)"
+    fi
+  done
+}
+
+# Print steps from a job YAML file.
+# Usage: list_steps <job_file> <step_count>
+list_steps() {
+  local job_file="$1" step_count="$2"
+  for i in $(seq 0 $((step_count - 1))); do
+    local key label
+    key=$(yq -r ".pipeline.steps[$i].key // \"step-$i\"" "$job_file")
+    label=$(yq -r ".pipeline.steps[$i].label // \"Step $i\"" "$job_file")
+    printf "  %2d. %-30s  (key: %s)\n" "$((i+1))" "$label" "$key"
+  done
+}
 
 usage() {
   cat <<EOF
@@ -167,231 +194,182 @@ EOF
 }
 
 # ==============================================================================
-# Parse arguments
+# Core workflow functions
 # ==============================================================================
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --dry-run)    DRY_RUN=true; shift;;
-    --skip-dump)  SKIP_DUMP=true; shift;;
-    --skip-sync)  SKIP_SYNC=true; shift;;
-    --jobs-dir)   JOBS_DIR="$2"; shift 2;;
-    --step)       STEP_FILTER="$2"; shift 2;;
-    --start-from) START_FROM="$2"; shift 2;;
-    --build-id)   BUILD_ID="$2"; shift 2;;
-    --env-file)   ENV_FILE="$2"; shift 2;;
-    --list)       LIST_JOBS=true; shift;;
-    --list-steps) LIST_STEPS=true; shift;;
-    -h|--help)    usage; exit 0;;
-    -*)           err "Unknown option: $1"; usage; exit 1;;
-    *)            JOB_NAME="$1"; shift;;
-  esac
-done
 
-if [[ "$LIST_JOBS" == false && -z "$JOB_NAME" ]]; then
-  err "Job name is required (or use --list)"
-  usage
-  exit 1
-fi
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --dry-run)    DRY_RUN=true; shift;;
+      --skip-dump)  SKIP_DUMP=true; shift;;
+      --skip-sync)  SKIP_SYNC=true; shift;;
+      --jobs-dir)   JOBS_DIR="$2"; shift 2;;
+      --step)       STEP_FILTER="$2"; shift 2;;
+      --start-from) START_FROM="$2"; shift 2;;
+      --build-id)   BUILD_ID="$2"; shift 2;;
+      --env-file)   ENV_FILE="$2"; shift 2;;
+      --list)       LIST_JOBS=true; shift;;
+      --list-steps) LIST_STEPS=true; shift;;
+      -h|--help)    usage; exit 0;;
+      -*)           err "Unknown option: $1"; usage; exit 1;;
+      *)            JOB_NAME="$1"; shift;;
+    esac
+  done
 
-if [[ "$LIST_STEPS" == true && -z "$JOB_NAME" ]]; then
-  err "--list-steps requires a job name"
-  usage
-  exit 1
-fi
+  if [[ "$LIST_JOBS" == false && -z "$JOB_NAME" ]]; then
+    err "Job name is required (or use --list)"
+    usage
+    exit 1
+  fi
 
-# ==============================================================================
-# Step 1: Source env-file & compute environment
-# ==============================================================================
-step_banner "1/5" "Setting up environment"
+  if [[ "$LIST_STEPS" == true && -z "$JOB_NAME" ]]; then
+    err "--list-steps requires a job name"
+    usage
+    exit 1
+  fi
+}
 
-# Parse user-provided env file. Variables are:
-#  - Exported to the shell environment (for non-Docker commands)
-#  - Collected into USER_ENV_DOCKER_FLAGS (for Docker --env flags)
-USER_ENV_DOCKER_FLAGS=""
-USER_ENV_VARS=()
+# Parse --env-file: export variables and collect Docker --env flags.
+load_env_file() {
+  [[ -z "$ENV_FILE" ]] && return
 
-if [[ -n "$ENV_FILE" ]]; then
-  if [[ -f "$ENV_FILE" ]]; then
-    echo "Loading env file: $ENV_FILE"
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      # Skip empty lines and comments
-      [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-      # Skip lines without =
-      [[ "$line" != *"="* ]] && continue
-      # Extract key (everything before first =) and value (everything after)
-      key="${line%%=*}"
-      value="${line#*=}"
-      # Skip if key is empty or contains spaces
-      [[ -z "$key" || "$key" =~ [[:space:]] ]] && continue
-      # Export the variable
-      export "$key=$value"
-      # Add to Docker flags
-      USER_ENV_DOCKER_FLAGS+=" --env $key"
-      USER_ENV_VARS+=("$key")
-    done < "$ENV_FILE"
-    echo "User env vars: ${USER_ENV_VARS[*]:-none}"
-  else
+  if [[ ! -f "$ENV_FILE" ]]; then
     err "Env file not found: $ENV_FILE"
     exit 1
   fi
-fi
 
-# --- Git-derived vars (Category 1) ---
-export BUILDKITE_BRANCH="${BUILDKITE_BRANCH:-$(git -C "$MINA_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")}"
-export BUILDKITE_COMMIT="${BUILDKITE_COMMIT:-$(git -C "$MINA_ROOT" rev-parse HEAD 2>/dev/null || echo "unknown")}"
-export BUILDKITE_MESSAGE="${BUILDKITE_MESSAGE:-$(git -C "$MINA_ROOT" log -1 --format=%s 2>/dev/null || echo "Local run")}"
-export BUILDKITE_BUILD_AUTHOR="${BUILDKITE_BUILD_AUTHOR:-$(git -C "$MINA_ROOT" log -1 --format=%an 2>/dev/null || echo "")}"
-export BUILDKITE_BUILD_AUTHOR_EMAIL="${BUILDKITE_BUILD_AUTHOR_EMAIL:-$(git -C "$MINA_ROOT" log -1 --format=%ae 2>/dev/null || echo "")}"
-export BUILDKITE_TAG="${BUILDKITE_TAG:-$(git -C "$MINA_ROOT" tag --points-at HEAD 2>/dev/null | head -1 || echo "")}"
-export BUILDKITE_REPO="${BUILDKITE_REPO:-$(git -C "$MINA_ROOT" remote get-url origin 2>/dev/null || echo "")}"
+  echo "Loading env file: $ENV_FILE"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ "$line" != *"="* ]] && continue
+    local key="${line%%=*}" value="${line#*=}"
+    [[ -z "$key" || "$key" =~ [[:space:]] ]] && continue
+    export "$key=$value"
+    USER_ENV_DOCKER_FLAGS+=" --env $key"
+    USER_ENV_VARS+=("$key")
+  done < "$ENV_FILE"
+  echo "User env vars: ${USER_ENV_VARS[*]:-none}"
+}
 
-# --- Generated per-run vars (Category 2) ---
-# Use --build-id if provided, otherwise generate a new UUID
-if [[ -n "$BUILD_ID" ]]; then
-  export BUILDKITE_BUILD_ID="$BUILD_ID"
-  echo "Using provided build ID: $BUILD_ID"
-else
-  export BUILDKITE_BUILD_ID="${BUILDKITE_BUILD_ID:-$(gen_uuid)}"
-fi
-export BUILDKITE_JOB_ID="${BUILDKITE_JOB_ID:-$(gen_uuid)}"
-export BUILDKITE_AGENT_ID="${BUILDKITE_AGENT_ID:-$(gen_uuid)}"
-export BUILDKITE_BUILD_NUMBER="${BUILDKITE_BUILD_NUMBER:-$(date +%s)}"
+# Step 1: Source env-file & export all Buildkite environment variables.
+setup_environment() {
+  step_banner "1/5" "Setting up environment"
 
-# --- Static constants (Category 4) ---
-export BUILDKITE="${BUILDKITE:-true}"
-export CI="${CI:-true}"
-export GIT_LFS_SKIP_SMUDGE=1
-export SKIP_DOCKER_PRUNE=1
-export BUILDKIT_PROGRESS="${BUILDKIT_PROGRESS:-plain}"
-export BUILDKITE_COMMIT_RESOLVED="${BUILDKITE_COMMIT_RESOLVED:-true}"
-export BUILDKITE_ORGANIZATION_SLUG="${BUILDKITE_ORGANIZATION_SLUG:-o-1-labs-2}"
-export BUILDKITE_ORGANIZATION_ID="${BUILDKITE_ORGANIZATION_ID:-7177201d-da06-437c-9246-e2b19acd1456}"
-export BUILDKITE_PIPELINE_PROVIDER="${BUILDKITE_PIPELINE_PROVIDER:-github}"
-export BUILDKITE_PIPELINE_DEFAULT_BRANCH="${BUILDKITE_PIPELINE_DEFAULT_BRANCH:-develop}"
-export BUILDKITE_SOURCE="${BUILDKITE_SOURCE:-local}"
-export BUILDKITE_PULL_REQUEST="${BUILDKITE_PULL_REQUEST:-false}"
-export BUILDKITE_PULL_REQUEST_BASE_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-}"
-export BUILDKITE_PULL_REQUEST_REPO="${BUILDKITE_PULL_REQUEST_REPO:-}"
-export BUILDKITE_PULL_REQUEST_LABELS="${BUILDKITE_PULL_REQUEST_LABELS:-}"
-export BUILDKITE_REBUILT_FROM_BUILD_ID="${BUILDKITE_REBUILT_FROM_BUILD_ID:-}"
-export BUILDKITE_REBUILT_FROM_BUILD_NUMBER="${BUILDKITE_REBUILT_FROM_BUILD_NUMBER:-}"
-export BUILDKITE_TRIGGERED_FROM_BUILD_ID="${BUILDKITE_TRIGGERED_FROM_BUILD_ID:-}"
-export BUILDKITE_TRIGGERED_FROM_BUILD_NUMBER="${BUILDKITE_TRIGGERED_FROM_BUILD_NUMBER:-}"
-export BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG="${BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG:-}"
-export BUILDKITE_RETRY_COUNT="${BUILDKITE_RETRY_COUNT:-0}"
-export BUILDKITE_COMPUTE_TYPE="${BUILDKITE_COMPUTE_TYPE:-self-hosted}"
-export BUILDKITE_AGENT_META_DATA_QUEUE="${BUILDKITE_AGENT_META_DATA_QUEUE:-default}"
-export BUILDKITE_AGENT_META_DATA_SIZE="${BUILDKITE_AGENT_META_DATA_SIZE:-generic}"
-export BUILDKITE_PROJECT_PROVIDER="${BUILDKITE_PROJECT_PROVIDER:-github}"
+  load_env_file
 
-# --- Derived vars (Category 5) ---
-export BUILDKITE_PIPELINE_SLUG="${BUILDKITE_PIPELINE_SLUG:-mina-o-1-labs}"
-export BUILDKITE_PIPELINE_NAME="${BUILDKITE_PIPELINE_NAME:-Mina O(1)Labs}"
-export BUILDKITE_PIPELINE_ID="${BUILDKITE_PIPELINE_ID:-8f4b7485-ef17-469a-bec2-221aef440bff}"
-export BUILDKITE_PROJECT_SLUG="${BUILDKITE_PROJECT_SLUG:-${BUILDKITE_ORGANIZATION_SLUG}/${BUILDKITE_PIPELINE_SLUG}}"
-export BUILDKITE_BUILD_URL="${BUILDKITE_BUILD_URL:-https://buildkite.com/${BUILDKITE_ORGANIZATION_SLUG}/${BUILDKITE_PIPELINE_SLUG}/builds/${BUILDKITE_BUILD_NUMBER}}"
-export BUILDKITE_BUILD_CREATOR="${BUILDKITE_BUILD_CREATOR:-$(git -C "$MINA_ROOT" config user.name 2>/dev/null || echo "local")}"
-export BUILDKITE_BUILD_CREATOR_EMAIL="${BUILDKITE_BUILD_CREATOR_EMAIL:-$(git -C "$MINA_ROOT" config user.email 2>/dev/null || echo "local@localhost")}"
-export BUILDKITE_AGENT_NAME="${BUILDKITE_AGENT_NAME:-$(hostname)}"
-export BUILDKITE_BUILD_CHECKOUT_PATH="${BUILDKITE_BUILD_CHECKOUT_PATH:-$MINA_ROOT}"
-export BUILDKITE_ARTIFACT_PATHS="${BUILDKITE_ARTIFACT_PATHS:-}"
-export BUILDKITE_TIMEOUT="${BUILDKITE_TIMEOUT:-false}"
+  # --- Git-derived vars ---
+  export BUILDKITE_BRANCH="${BUILDKITE_BRANCH:-$(git -C "$MINA_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")}"
+  export BUILDKITE_COMMIT="${BUILDKITE_COMMIT:-$(git -C "$MINA_ROOT" rev-parse HEAD 2>/dev/null || echo "unknown")}"
+  export BUILDKITE_MESSAGE="${BUILDKITE_MESSAGE:-$(git -C "$MINA_ROOT" log -1 --format=%s 2>/dev/null || echo "Local run")}"
+  export BUILDKITE_BUILD_AUTHOR="${BUILDKITE_BUILD_AUTHOR:-$(git -C "$MINA_ROOT" log -1 --format=%an 2>/dev/null || echo "")}"
+  export BUILDKITE_BUILD_AUTHOR_EMAIL="${BUILDKITE_BUILD_AUTHOR_EMAIL:-$(git -C "$MINA_ROOT" log -1 --format=%ae 2>/dev/null || echo "")}"
+  export BUILDKITE_TAG="${BUILDKITE_TAG:-$(git -C "$MINA_ROOT" tag --points-at HEAD 2>/dev/null | head -1 || echo "")}"
+  export BUILDKITE_REPO="${BUILDKITE_REPO:-$(git -C "$MINA_ROOT" remote get-url origin 2>/dev/null || echo "")}"
 
-# Local overrides for testing
-export LOCAL_BK_RUN="${LOCAL_BK_RUN:-1}"
-
-
-echo "BUILDKITE_BUILD_CHECKOUT_PATH=$BUILDKITE_BUILD_CHECKOUT_PATH"
-echo "BUILDKITE_BUILD_ID=$BUILDKITE_BUILD_ID"
-echo "BUILDKITE_BRANCH=$BUILDKITE_BRANCH"
-echo "BUILDKITE_COMMIT=$BUILDKITE_COMMIT"
-
-# ==============================================================================
-# Step 2: Generate pipeline YAMLs
-# ==============================================================================
-step_banner "2/5" "Generating pipeline YAMLs"
-
-# Auto-enable skip-dump when listing with --jobs-dir provided
-if [[ ( "$LIST_JOBS" == true || "$LIST_STEPS" == true ) && -n "$JOBS_DIR" ]]; then
-  SKIP_DUMP=true
-fi
-
-if [[ "$SKIP_DUMP" == true ]]; then
-  if [[ -z "$JOBS_DIR" ]]; then
-    err "--skip-dump requires --jobs-dir"
-    exit 1
+  # --- Per-run identifiers ---
+  if [[ -n "$BUILD_ID" ]]; then
+    export BUILDKITE_BUILD_ID="$BUILD_ID"
+    echo "Using provided build ID: $BUILD_ID"
+  else
+    export BUILDKITE_BUILD_ID="${BUILDKITE_BUILD_ID:-$(gen_uuid)}"
   fi
-  if [[ ! -d "$JOBS_DIR" ]]; then
-    err "Jobs directory not found: $JOBS_DIR"
-    exit 1
-  fi
-  echo "Skipping pipeline dump, using: $JOBS_DIR"
-else
-  JOBS_DIR="${JOBS_DIR:-$(mktemp -d)}"
-  echo "Dumping pipelines to: $JOBS_DIR"
-  # Run from buildkite dir with relative ./src path (matches Makefile invocation)
-  # This avoids Dhall parse errors in .dirtywhen generation caused by absolute paths
-  (cd "$BUILDKITE_DIR" && ./scripts/dhall/dump_dhall_to_pipelines.sh ./src "$JOBS_DIR")
-  echo ""
-  echo "Reuse with: --skip-dump --jobs-dir $JOBS_DIR"
-fi
+  export BUILDKITE_JOB_ID="${BUILDKITE_JOB_ID:-$(gen_uuid)}"
+  export BUILDKITE_AGENT_ID="${BUILDKITE_AGENT_ID:-$(gen_uuid)}"
+  export BUILDKITE_BUILD_NUMBER="${BUILDKITE_BUILD_NUMBER:-$(date +%s)}"
 
-# ==============================================================================
-# --list mode: print available jobs and exit
-# ==============================================================================
-if [[ "$LIST_JOBS" == true ]]; then
-  echo ""
-  log "Available jobs"
-  for file in "$JOBS_DIR"/*.yml; do
-    name=$(yq -r '.spec.name // ""' "$file" 2>/dev/null)
-    if [[ -n "$name" && "$name" != "null" ]]; then
-      echo "  $name"
-    else
-      basename "$file" .yml
+  # --- Static CI constants ---
+  export BUILDKITE="${BUILDKITE:-true}"
+  export CI="${CI:-true}"
+  export GIT_LFS_SKIP_SMUDGE=1
+  export SKIP_DOCKER_PRUNE=1
+  export BUILDKIT_PROGRESS="${BUILDKIT_PROGRESS:-plain}"
+  export BUILDKITE_COMMIT_RESOLVED="${BUILDKITE_COMMIT_RESOLVED:-true}"
+  export BUILDKITE_ORGANIZATION_SLUG="${BUILDKITE_ORGANIZATION_SLUG:-o-1-labs-2}"
+  export BUILDKITE_ORGANIZATION_ID="${BUILDKITE_ORGANIZATION_ID:-7177201d-da06-437c-9246-e2b19acd1456}"
+  export BUILDKITE_PIPELINE_PROVIDER="${BUILDKITE_PIPELINE_PROVIDER:-github}"
+  export BUILDKITE_PIPELINE_DEFAULT_BRANCH="${BUILDKITE_PIPELINE_DEFAULT_BRANCH:-develop}"
+  export BUILDKITE_SOURCE="${BUILDKITE_SOURCE:-local}"
+  export BUILDKITE_PULL_REQUEST="${BUILDKITE_PULL_REQUEST:-false}"
+  export BUILDKITE_PULL_REQUEST_BASE_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-}"
+  export BUILDKITE_PULL_REQUEST_REPO="${BUILDKITE_PULL_REQUEST_REPO:-}"
+  export BUILDKITE_PULL_REQUEST_LABELS="${BUILDKITE_PULL_REQUEST_LABELS:-}"
+  export BUILDKITE_REBUILT_FROM_BUILD_ID="${BUILDKITE_REBUILT_FROM_BUILD_ID:-}"
+  export BUILDKITE_REBUILT_FROM_BUILD_NUMBER="${BUILDKITE_REBUILT_FROM_BUILD_NUMBER:-}"
+  export BUILDKITE_TRIGGERED_FROM_BUILD_ID="${BUILDKITE_TRIGGERED_FROM_BUILD_ID:-}"
+  export BUILDKITE_TRIGGERED_FROM_BUILD_NUMBER="${BUILDKITE_TRIGGERED_FROM_BUILD_NUMBER:-}"
+  export BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG="${BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG:-}"
+  export BUILDKITE_RETRY_COUNT="${BUILDKITE_RETRY_COUNT:-0}"
+  export BUILDKITE_COMPUTE_TYPE="${BUILDKITE_COMPUTE_TYPE:-self-hosted}"
+  export BUILDKITE_AGENT_META_DATA_QUEUE="${BUILDKITE_AGENT_META_DATA_QUEUE:-default}"
+  export BUILDKITE_AGENT_META_DATA_SIZE="${BUILDKITE_AGENT_META_DATA_SIZE:-generic}"
+  export BUILDKITE_PROJECT_PROVIDER="${BUILDKITE_PROJECT_PROVIDER:-github}"
+
+  # --- Derived vars ---
+  export BUILDKITE_PIPELINE_SLUG="${BUILDKITE_PIPELINE_SLUG:-mina-o-1-labs}"
+  export BUILDKITE_PIPELINE_NAME="${BUILDKITE_PIPELINE_NAME:-Mina O(1)Labs}"
+  export BUILDKITE_PIPELINE_ID="${BUILDKITE_PIPELINE_ID:-8f4b7485-ef17-469a-bec2-221aef440bff}"
+  export BUILDKITE_PROJECT_SLUG="${BUILDKITE_PROJECT_SLUG:-${BUILDKITE_ORGANIZATION_SLUG}/${BUILDKITE_PIPELINE_SLUG}}"
+  export BUILDKITE_BUILD_URL="${BUILDKITE_BUILD_URL:-https://buildkite.com/${BUILDKITE_ORGANIZATION_SLUG}/${BUILDKITE_PIPELINE_SLUG}/builds/${BUILDKITE_BUILD_NUMBER}}"
+  export BUILDKITE_BUILD_CREATOR="${BUILDKITE_BUILD_CREATOR:-$(git -C "$MINA_ROOT" config user.name 2>/dev/null || echo "local")}"
+  export BUILDKITE_BUILD_CREATOR_EMAIL="${BUILDKITE_BUILD_CREATOR_EMAIL:-$(git -C "$MINA_ROOT" config user.email 2>/dev/null || echo "local@localhost")}"
+  export BUILDKITE_AGENT_NAME="${BUILDKITE_AGENT_NAME:-$(hostname)}"
+  export BUILDKITE_BUILD_CHECKOUT_PATH="${BUILDKITE_BUILD_CHECKOUT_PATH:-$MINA_ROOT}"
+  export BUILDKITE_ARTIFACT_PATHS="${BUILDKITE_ARTIFACT_PATHS:-}"
+  export BUILDKITE_TIMEOUT="${BUILDKITE_TIMEOUT:-false}"
+  export LOCAL_BK_RUN="${LOCAL_BK_RUN:-1}"
+
+  echo "BUILDKITE_BUILD_CHECKOUT_PATH=$BUILDKITE_BUILD_CHECKOUT_PATH"
+  echo "BUILDKITE_BUILD_ID=$BUILDKITE_BUILD_ID"
+  echo "BUILDKITE_BRANCH=$BUILDKITE_BRANCH"
+  echo "BUILDKITE_COMMIT=$BUILDKITE_COMMIT"
+}
+
+# Step 2: Generate pipeline YAMLs from Dhall (or reuse existing ones).
+generate_pipelines() {
+  step_banner "2/5" "Generating pipeline YAMLs"
+
+  # Auto-enable skip-dump when listing with --jobs-dir provided
+  if [[ ( "$LIST_JOBS" == true || "$LIST_STEPS" == true ) && -n "$JOBS_DIR" ]]; then
+    SKIP_DUMP=true
+  fi
+
+  if [[ "$SKIP_DUMP" == true ]]; then
+    if [[ -z "$JOBS_DIR" ]]; then
+      err "--skip-dump requires --jobs-dir"
+      exit 1
     fi
-  done
-  exit 0
-fi
+    if [[ ! -d "$JOBS_DIR" ]]; then
+      err "Jobs directory not found: $JOBS_DIR"
+      exit 1
+    fi
+    echo "Skipping pipeline dump, using: $JOBS_DIR"
+  else
+    JOBS_DIR="${JOBS_DIR:-$(mktemp -d)}"
+    echo "Dumping pipelines to: $JOBS_DIR"
+    # Run from buildkite dir with relative ./src path (matches Makefile invocation)
+    # This avoids Dhall parse errors in .dirtywhen generation caused by absolute paths
+    (cd "$BUILDKITE_DIR" && ./scripts/dhall/dump_dhall_to_pipelines.sh ./src "$JOBS_DIR")
+    echo ""
+    echo "Reuse with: --skip-dump --jobs-dir $JOBS_DIR"
+  fi
+}
 
-# ==============================================================================
-# Step 3: Sync legacy folder from hetzner
-# ==============================================================================
-# Skip sync and directory validation when just listing steps
-if [[ "$LIST_STEPS" == true ]]; then
-  echo "Skipping steps 3-4 (listing mode)"
-else
+# Step 3: Sync the legacy cache folder from Hetzner via rsync.
+sync_legacy_cache() {
+  step_banner "3/5" "Syncing legacy folder from Hetzner"
 
-step_banner "3/5" "Syncing legacy folder from Hetzner"
+  if [[ "$SKIP_SYNC" == true ]]; then
+    echo "Skipping legacy sync"
+    return
+  fi
 
-if [[ "$SKIP_SYNC" == true ]]; then
-  echo "Skipping legacy sync"
-else
   if [[ ! -f "$HETZNER_KEY" ]]; then
     err "Hetzner key not found at: $HETZNER_KEY"
     err "Set HETZNER_KEY env var or place the key at ~/work/secrets/storagebox.key"
     exit 1
   fi
 
-  # Ensure LOCAL_STORAGEBOX is writable.
-  # This directory mirrors the CI cache storage and receives rsync'd artifacts
-  # from Hetzner. The script creates per-build subdirectories and writes build
-  # outputs here, so it must be writable by the current user.
-  if [[ ! -d "$LOCAL_STORAGEBOX" ]]; then
-    err "Local storagebox directory does not exist: $LOCAL_STORAGEBOX"
-    err ""
-    err "This directory is used to cache build artifacts locally (mirroring CI cache)."
-    err "Create it with:"
-    err "  sudo mkdir -p $LOCAL_STORAGEBOX && sudo chown \$(id -u):\$(id -g) $LOCAL_STORAGEBOX"
-    exit 1
-  fi
-  if [[ ! -w "$LOCAL_STORAGEBOX" ]]; then
-    err "Local storagebox directory is not writable: $LOCAL_STORAGEBOX"
-    err ""
-    err "This directory is used to cache build artifacts locally (mirroring CI cache)."
-    err "Fix with:"
-    err "  sudo chown \$(id -u):\$(id -g) $LOCAL_STORAGEBOX"
-    exit 1
-  fi
+  require_dir_writable "$LOCAL_STORAGEBOX" "Local storagebox directory"
 
   echo "Syncing $HETZNER_USER@$HETZNER_HOST:$CI_CACHE_ROOT/legacy/ -> $LOCAL_STORAGEBOX/legacy/"
   rsync -avz --progress \
@@ -399,300 +377,261 @@ else
     "$HETZNER_USER@$HETZNER_HOST:$CI_CACHE_ROOT/legacy/" \
     "$LOCAL_STORAGEBOX/legacy/"
   echo "Legacy sync complete"
-fi
+}
 
-# ==============================================================================
-# Step 4: Ensure local storagebox directories are usable
-# ==============================================================================
-step_banner "4/5" "Validating local directories"
+# Step 4: Ensure local storagebox and shared directories are usable.
+validate_directories() {
+  step_banner "4/5" "Validating local directories"
 
-# The cache manager (scripts/cache/manager.sh) writes build artifacts into
-# $LOCAL_STORAGEBOX/$BUILDKITE_BUILD_ID/.  The base directory must be writable.
+  require_dir_writable "$LOCAL_STORAGEBOX" "Local storagebox directory"
 
-# Check LOCAL_STORAGEBOX is writable (may have been checked above, but needed if --skip-sync).
-# The cache manager (scripts/cache/manager.sh) writes build artifacts into
-# $LOCAL_STORAGEBOX/$BUILDKITE_BUILD_ID/ and expects subdirectories for legacy
-# cache entries. Without write access, builds will fail when trying to store
-# or retrieve cached artifacts.
-if [[ ! -d "$LOCAL_STORAGEBOX" ]]; then
-  err "Local storagebox directory does not exist: $LOCAL_STORAGEBOX"
-  err ""
-  err "This directory stores build artifacts and cached dependencies."
-  err "Create it with:"
-  err "  sudo mkdir -p $LOCAL_STORAGEBOX && sudo chown \$(id -u):\$(id -g) $LOCAL_STORAGEBOX"
-  exit 1
-fi
-if [[ ! -w "$LOCAL_STORAGEBOX" ]]; then
-  err "Local storagebox directory is not writable: $LOCAL_STORAGEBOX"
-  err ""
-  err "This directory stores build artifacts and cached dependencies."
-  err "Fix with:"
-  err "  sudo chown \$(id -u):\$(id -g) $LOCAL_STORAGEBOX"
-  exit 1
-fi
+  # Create per-build directory (world-writable so Docker's opam user can write)
+  mkdir -p "$LOCAL_STORAGEBOX/$BUILDKITE_BUILD_ID"
+  chmod 777 "$LOCAL_STORAGEBOX/$BUILDKITE_BUILD_ID"
+  mkdir -p "$LOCAL_STORAGEBOX/legacy"
 
-# Create build directories with world-writable permissions so Docker container
-# (running as opam user) can create subdirectories like debians/noble/
-mkdir -p "$LOCAL_STORAGEBOX/$BUILDKITE_BUILD_ID"
-chmod 777 "$LOCAL_STORAGEBOX/$BUILDKITE_BUILD_ID"
-mkdir -p "$LOCAL_STORAGEBOX/legacy"
+  require_dir_writable "/var/buildkite/shared" "Shared buildkite state directory"
 
-# Check /var/buildkite/shared is writable.
-# This directory is used by buildkite scripts for shared state between steps,
-# including lock files and inter-step communication. Build steps expect to
-# read and write files here during execution.
-if [[ ! -d /var/buildkite/shared ]]; then
-  err "Directory /var/buildkite/shared does not exist"
-  err ""
-  err "This directory is used for shared state between build steps (locks, temp files)."
-  err "Create it with:"
-  err "  sudo mkdir -p /var/buildkite/shared && sudo chown \$(id -u):\$(id -g) /var/buildkite/shared"
-  exit 1
-fi
-if [[ ! -w /var/buildkite/shared ]]; then
-  err "Directory /var/buildkite/shared is not writable"
-  err ""
-  err "This directory is used for shared state between build steps (locks, temp files)."
-  err "Fix with:"
-  err "  sudo chown \$(id -u):\$(id -g) /var/buildkite/shared"
-  exit 1
-fi
+  # Check ownership of _build if it was created by a previous Docker run as a
+  # different UID (e.g. root). Stale ownership causes permission errors inside
+  # the container which bind-mounts the workdir.
+  if [[ -d "$MINA_ROOT/_build" ]]; then
+    local build_owner
+    build_owner=$(stat -c '%u' "$MINA_ROOT/_build")
+    if [[ "$build_owner" != "$(id -u)" ]]; then
+      err "_build directory is owned by UID $build_owner (you are $(id -u))"
+      err "Fix with:"
+      err "  sudo chown -R \$(id -u):\$(id -g) $MINA_ROOT/_build"
+      exit 1
+    fi
 
-# Check ownership of _build if it was created by a previous Docker run as a
-# different UID (e.g. root).  The container bind-mounts the workdir and the
-# --user flag maps to the host UID, so stale ownership causes permission errors.
-if [[ -d "$MINA_ROOT/_build" ]]; then
-  BUILD_OWNER=$(stat -c '%u' "$MINA_ROOT/_build")
-  if [[ "$BUILD_OWNER" != "$(id -u)" ]]; then
-    err "_build directory is owned by UID $BUILD_OWNER (you are $(id -u))"
-    err ""
-    err "The _build directory contains compiled artifacts and is bind-mounted into"
-    err "Docker containers. When owned by a different user, the container cannot"
-    err "write build outputs, causing compilation failures."
-    err ""
-    err "Fix with:"
-    err "  sudo chown -R \$(id -u):\$(id -g) $MINA_ROOT/_build"
-    exit 1
-  fi
-
-  # dune-build-root files cache absolute paths (via realpath).  A host build
-  # writes host paths; a container build writes /workdir paths.  Stale paths
-  # from a host build cause cargo to fail inside the container.  Remove them
-  # so dune regenerates with the correct container paths.
-  stale=$(find "$MINA_ROOT/_build" -name dune-build-root -exec grep -L '^/workdir' {} +  2>/dev/null || true)
-  if [[ -n "$stale" ]]; then
-    warn "Removing stale dune-build-root files (contain host paths instead of /workdir)"
-    echo "$stale" | xargs rm -f
-  fi
-fi
-
-fi  # end of LIST_STEPS skip block
-
-# ==============================================================================
-# Step 5: Find and run the job
-# ==============================================================================
-if [[ "$LIST_STEPS" == true ]]; then
-  step_banner "5/5" "Listing steps for '$JOB_NAME'"
-else
-  step_banner "5/5" "Running job '$JOB_NAME'"
-fi
-
-# Ensure yq is available
-if ! command -v yq &>/dev/null; then
-  err "yq is required but not installed."
-  err "Install from: https://github.com/mikefarah/yq"
-  exit 1
-fi
-
-# Find job YAML by spec.name (case-insensitive) or filename
-JOB_FILE=""
-job_name_lower=$(to_lower "$JOB_NAME")
-
-for file in "$JOBS_DIR"/*.yml; do
-  name=$(yq -r '.spec.name // ""' "$file" 2>/dev/null)
-  if [[ "$(to_lower "$name")" == "$job_name_lower" ]]; then
-    JOB_FILE="$file"
-    break
-  fi
-done
-
-# Fallback: filename match
-if [[ -z "$JOB_FILE" ]]; then
-  candidate="$JOBS_DIR/$JOB_NAME.yml"
-  if [[ -f "$candidate" ]]; then
-    JOB_FILE="$candidate"
-  fi
-fi
-
-if [[ -z "$JOB_FILE" ]]; then
-  err "Job '$JOB_NAME' not found in $JOBS_DIR"
-  echo ""
-  echo "Available jobs:"
-  for file in "$JOBS_DIR"/*.yml; do
-    name=$(yq -r '.spec.name // ""' "$file" 2>/dev/null)
-    [[ -n "$name" && "$name" != "null" ]] && echo "  - $name"
-  done
-  exit 1
-fi
-
-echo "Found job: $JOB_FILE"
-echo ""
-
-# Extract and execute steps
-STEP_COUNT=$(yq '.pipeline.steps | length' "$JOB_FILE")
-
-# --list-steps mode: print steps in the job and exit
-if [[ "$LIST_STEPS" == true ]]; then
-  echo ""
-  log "Steps in job '$JOB_NAME' ($STEP_COUNT total)"
-  echo ""
-  for i in $(seq 0 $((STEP_COUNT - 1))); do
-    step_key=$(yq -r ".pipeline.steps[$i].key // \"step-$i\"" "$JOB_FILE")
-    step_label=$(yq -r ".pipeline.steps[$i].label // \"Step $i\"" "$JOB_FILE")
-    printf "  %2d. %-30s  (key: %s)\n" "$((i+1))" "$step_label" "$step_key"
-  done
-  echo ""
-  echo "Use --start-from <key> to start from a specific step"
-  echo "Use --step <key> to run only steps matching the key"
-  exit 0
-fi
-
-echo "Job has $STEP_COUNT step(s)"
-
-# Track whether we've reached the starting step (for --start-from)
-STARTED=false
-if [[ -z "$START_FROM" ]]; then
-  STARTED=true
-fi
-
-for i in $(seq 0 $((STEP_COUNT - 1))); do
-  STEP_KEY=$(yq -r ".pipeline.steps[$i].key // \"step-$i\"" "$JOB_FILE")
-  STEP_LABEL=$(yq -r ".pipeline.steps[$i].label // \"Step $i\"" "$JOB_FILE")
-
-  # Check if we've reached the start-from step
-  if [[ "$STARTED" == false ]]; then
-    if [[ "$STEP_KEY" == *"$START_FROM"* ]]; then
-      STARTED=true
-      echo ""
-      echo -e "\033[1;32m  ▶ Starting from step: $STEP_KEY\033[0m"
-    else
-      echo -e "\033[1;90m  ⏭  SKIP [$((i+1))/$STEP_COUNT]: $STEP_LABEL (before start-from)\033[0m"
-      continue
+    # dune-build-root files cache absolute paths. Stale host paths (instead of
+    # /workdir) cause cargo to fail inside the container. Remove them so dune
+    # regenerates with the correct container paths.
+    local stale
+    stale=$(find "$MINA_ROOT/_build" -name dune-build-root -exec grep -L '^/workdir' {} + 2>/dev/null || true)
+    if [[ -n "$stale" ]]; then
+      warn "Removing stale dune-build-root files (contain host paths instead of /workdir)"
+      echo "$stale" | xargs rm -f
     fi
   fi
+}
 
-  # Apply step filter if set
-  if [[ -n "$STEP_FILTER" && "$STEP_KEY" != *"$STEP_FILTER"* ]]; then
-    skip_banner "$((i+1))" "$STEP_COUNT" "$STEP_LABEL" "$STEP_KEY"
-    continue
-  fi
+# Extract commands from a pipeline step YAML node. Handles both array
+# (.commands[]) and scalar (.command / .commands) forms.
+# Outputs the joined command string on stdout.
+# Usage: extract_step_commands <job_file> <step_index>
+extract_step_commands() {
+  local job_file="$1" idx="$2"
+  yq -r "
+    .pipeline.steps[$idx] |
+    if .commands and (.commands | type == \"!!seq\") then .commands[]
+    elif .command                                    then .command
+    elif .commands                                   then .commands
+    else \"\"
+    end
+  " "$job_file" 2>/dev/null || true
+}
 
-  substep_banner "$((i+1))" "$STEP_COUNT" "$STEP_LABEL" "$STEP_KEY"
+# Patch a command string for local Docker execution:
+#  - Unescape Dhall's \$ → $ so shell variables expand correctly
+#  - Inject extra --env flags for local overrides and user env vars
+#  - Drop -t flag when no TTY is available
+# Outputs patched command on stdout.
+# Usage: patch_docker_command <command_string>
+patch_docker_command() {
+  local cmd="$1"
 
-  # Set step-specific env vars (Category 3)
-  export BUILDKITE_LABEL="$STEP_LABEL"
-  export BUILDKITE_STEP_KEY="$STEP_KEY"
-  BUILDKITE_STEP_ID="$(gen_uuid)"
-  export BUILDKITE_STEP_ID
-  export BUILDKITE_STEP_IDENTIFIER="$STEP_KEY"
-  BUILDKITE_TIMEOUT=$(yq -r ".pipeline.steps[$i].timeout_in_minutes // \"false\"" "$JOB_FILE")
-  export BUILDKITE_TIMEOUT
-  BUILDKITE_ARTIFACT_PATHS=$(yq -r ".pipeline.steps[$i].artifact_paths // \"\"" "$JOB_FILE")
-  export BUILDKITE_ARTIFACT_PATHS
+  cmd=$(printf '%s' "$cmd" | sed 's/\\\$/$/g')
 
-  # Extract commands - handle both array (commands) and string (command)
-  COMMANDS_TYPE=$(yq -r ".pipeline.steps[$i].commands | type" "$JOB_FILE" 2>/dev/null || echo "")
+  # Note: We intentionally do NOT use --user flag. The container runs as opam
+  # (UID 1000) which typically matches the host user's UID, allowing sudo to
+  # work inside the container for apt operations.
+  local docker_flags="--env GIT_LFS_SKIP_SMUDGE=1 --env APTLY_ROOT=/tmp/aptly --env LOCAL_BK_RUN=${LOCAL_BK_RUN}${USER_ENV_DOCKER_FLAGS}"
+  cmd=$(printf '%s\n' "$cmd" | sed "s|docker run -it|docker run -it ${docker_flags}|g")
 
-  FULL_CMD=""
-  if [[ "$COMMANDS_TYPE" == "!!seq" ]]; then
-    CMD_COUNT=$(yq ".pipeline.steps[$i].commands | length" "$JOB_FILE")
-    for j in $(seq 0 $((CMD_COUNT - 1))); do
-      line=$(yq -r ".pipeline.steps[$i].commands[$j]" "$JOB_FILE")
-      if [[ -n "$FULL_CMD" ]]; then
-        FULL_CMD+=$'\n'
-      fi
-      FULL_CMD+="$line"
-    done
-  else
-    # Try single command field
-    FULL_CMD=$(yq -r ".pipeline.steps[$i].command // \"\"" "$JOB_FILE" 2>/dev/null || echo "")
-    if [[ -z "$FULL_CMD" || "$FULL_CMD" == "null" ]]; then
-      FULL_CMD=$(yq -r ".pipeline.steps[$i].commands // \"\"" "$JOB_FILE" 2>/dev/null || echo "")
-    fi
-  fi
-
-  if [[ -z "$FULL_CMD" || "$FULL_CMD" == "null" ]]; then
-    warn "No commands found for step $STEP_KEY, skipping"
-    continue
-  fi
-
-  # Dhall escapes $ as \$ (to avoid string interpolation). The YAML preserves
-  # the backslash, but at execution time we need plain $ so the shell expands
-  # variables like $BUILDKITE_BUILD_CHECKOUT_PATH in docker volume mounts.
-  FULL_CMD=$(printf '%s' "$FULL_CMD" | sed 's/\\\$/$/g')
-
-  # Patch docker commands for local execution:
-  #  - GIT_LFS_SKIP_SMUDGE: not in the Dhall --env list, lfs ops fail without it
-  #  - APTLY_ROOT: redirect aptly database to writable /tmp/aptly
-  #  - USER_ENV_DOCKER_FLAGS: custom user variables from --env-file
-  #
-  # Note: We intentionally do NOT use --user flag. The container runs as opam (UID 1000)
-  # which typically matches the host user's UID. This allows sudo to work inside the
-  # container for apt operations. If your host UID differs from 1000, you may see
-  # permission issues with _build directory (the script checks for this at startup).
-  DOCKER_EXTRA_FLAGS="--env GIT_LFS_SKIP_SMUDGE=1 --env APTLY_ROOT=/tmp/aptly --env LOCAL_BK_RUN=${LOCAL_BK_RUN}${USER_ENV_DOCKER_FLAGS}"
-  FULL_CMD=$(printf '%s\n' "$FULL_CMD" | sed "s|docker run -it|docker run -it ${DOCKER_EXTRA_FLAGS}|g")
-
-  # Replace "docker run -it" with "docker run -i" when no TTY is available.
-  # The -t flag allocates a pseudo-TTY which fails in non-interactive contexts.
   if ! [ -t 0 ]; then
-    FULL_CMD=$(printf '%s\n' "$FULL_CMD" | sed 's|docker run -it |docker run -i |g')
+    cmd=$(printf '%s\n' "$cmd" | sed 's|docker run -it |docker run -i |g')
   fi
 
-  export BUILDKITE_COMMAND="$FULL_CMD"
-  export BUILDKITE_SCRIPT_PATH="$FULL_CMD"
+  printf '%s' "$cmd"
+}
+
+# Execute (or dry-run) a single step's command string.
+# Usage: execute_step <command> <step_label> <step_key>
+execute_step() {
+  local full_cmd="$1" step_label="$2" step_key="$3"
 
   if [[ "$DRY_RUN" == true ]]; then
     echo ""
     echo -e "\033[1;33m--- DRY RUN commands ---\033[0m"
-    echo "$FULL_CMD"
+    echo "$full_cmd"
     echo -e "\033[1;33m--- end ---\033[0m"
-  else
-    echo ""
-    echo -e "\033[1;37m  ⚙ Executing commands...\033[0m"
-    echo ""
-    # Disable nounset (-u) inside eval.  CI commands reference variables
-    # (e.g. MINA_DOCKER_TAG) in echo lines before they are set by later
-    # sourced scripts; CI doesn't use `set -u` so this is expected.
-    #
-    # Capture exit code via `|| rc=$?` so that the parent's `set -e`
-    # does not terminate the entire script when a step fails.  Without
-    # this, any non-zero return/exit from a sourced script or command
-    # inside the eval'd FULL_CMD propagates through the subshell and
-    # immediately kills the whole pipeline — no error message, no
-    # cleanup, and remaining steps never execute.
-    rc=0
-    (cd "$BUILDKITE_BUILD_CHECKOUT_PATH" && set +u && set -x && eval "$FULL_CMD") || rc=$?
-    if [[ $rc -ne 0 ]]; then
-      echo ""
-      err "Step '$STEP_LABEL' (key: $STEP_KEY) failed with exit code $rc"
-      exit $rc
-    fi
-    substep_complete "$((i+1))" "$STEP_COUNT" "$STEP_LABEL"
+    return
   fi
-done
 
-# Warn if --start-from was specified but never matched
-if [[ -n "$START_FROM" && "$STARTED" == false ]]; then
-  err "Step matching '$START_FROM' was not found in job '$JOB_NAME'"
   echo ""
-  echo "Available steps:"
-  for i in $(seq 0 $((STEP_COUNT - 1))); do
+  echo -e "\033[1;37m  ⚙ Executing commands...\033[0m"
+  echo ""
+  # Disable nounset (-u) inside eval: CI commands reference variables
+  # (e.g. MINA_DOCKER_TAG) before they are set by later sourced scripts.
+  #
+  # Capture exit code via || so set -e doesn't kill the whole script
+  # before we can print which step failed.
+  local rc=0
+  (cd "$BUILDKITE_BUILD_CHECKOUT_PATH" && set +u && set -x && eval "$full_cmd") || rc=$?
+  if [[ $rc -ne 0 ]]; then
+    echo ""
+    err "Step '$step_label' (key: $step_key) failed with exit code $rc"
+    exit $rc
+  fi
+}
+
+# Find job YAML file by spec.name (case-insensitive) or filename.
+# Sets the global JOB_FILE variable or exits with an error.
+find_job_file() {
+  JOB_FILE=""
+  local job_name_lower
+  job_name_lower=$(to_lower "$JOB_NAME")
+
+  for file in "$JOBS_DIR"/*.yml; do
+    local name
+    name=$(yq -r '.spec.name // ""' "$file" 2>/dev/null)
+    if [[ "$(to_lower "$name")" == "$job_name_lower" ]]; then
+      JOB_FILE="$file"
+      return
+    fi
+  done
+
+  # Fallback: filename match
+  local candidate="$JOBS_DIR/$JOB_NAME.yml"
+  if [[ -f "$candidate" ]]; then
+    JOB_FILE="$candidate"
+    return
+  fi
+
+  err "Job '$JOB_NAME' not found in $JOBS_DIR"
+  echo ""
+  echo "Available jobs:"
+  list_jobs "$JOBS_DIR"
+  exit 1
+}
+
+# Step 5: Locate the job, iterate its steps, and execute them.
+run_job() {
+  if [[ "$LIST_STEPS" == true ]]; then
+    step_banner "5/5" "Listing steps for '$JOB_NAME'"
+  else
+    step_banner "5/5" "Running job '$JOB_NAME'"
+  fi
+
+  if ! command -v yq &>/dev/null; then
+    err "yq is required but not installed."
+    err "Install from: https://github.com/mikefarah/yq"
+    exit 1
+  fi
+
+  find_job_file
+  echo "Found job: $JOB_FILE"
+  echo ""
+
+  local step_count
+  step_count=$(yq '.pipeline.steps | length' "$JOB_FILE")
+
+  if [[ "$LIST_STEPS" == true ]]; then
+    echo ""
+    log "Steps in job '$JOB_NAME' ($step_count total)"
+    echo ""
+    list_steps "$JOB_FILE" "$step_count"
+    echo ""
+    echo "Use --start-from <key> to start from a specific step"
+    echo "Use --step <key> to run only steps matching the key"
+    exit 0
+  fi
+
+  echo "Job has $step_count step(s)"
+
+  local started=false
+  [[ -z "$START_FROM" ]] && started=true
+
+  for i in $(seq 0 $((step_count - 1))); do
+    local step_key step_label
     step_key=$(yq -r ".pipeline.steps[$i].key // \"step-$i\"" "$JOB_FILE")
     step_label=$(yq -r ".pipeline.steps[$i].label // \"Step $i\"" "$JOB_FILE")
-    printf "  %2d. %-30s  (key: %s)\n" "$((i+1))" "$step_label" "$step_key"
+
+    # Handle --start-from filtering
+    if [[ "$started" == false ]]; then
+      if [[ "$step_key" == *"$START_FROM"* ]]; then
+        started=true
+        echo ""
+        echo -e "\033[1;32m  ▶ Starting from step: $step_key\033[0m"
+      else
+        echo -e "\033[1;90m  ⏭  SKIP [$((i+1))/$step_count]: $step_label (before start-from)\033[0m"
+        continue
+      fi
+    fi
+
+    # Handle --step filtering
+    if [[ -n "$STEP_FILTER" && "$step_key" != *"$STEP_FILTER"* ]]; then
+      skip_banner "$((i+1))" "$step_count" "$step_label" "$step_key"
+      continue
+    fi
+
+    substep_banner "$((i+1))" "$step_count" "$step_label" "$step_key"
+
+    # Per-step environment
+    export BUILDKITE_LABEL="$step_label"
+    export BUILDKITE_STEP_KEY="$step_key"
+    BUILDKITE_STEP_ID="$(gen_uuid)"; export BUILDKITE_STEP_ID
+    export BUILDKITE_STEP_IDENTIFIER="$step_key"
+    BUILDKITE_TIMEOUT=$(yq -r ".pipeline.steps[$i].timeout_in_minutes // \"false\"" "$JOB_FILE"); export BUILDKITE_TIMEOUT
+    BUILDKITE_ARTIFACT_PATHS=$(yq -r ".pipeline.steps[$i].artifact_paths // \"\"" "$JOB_FILE"); export BUILDKITE_ARTIFACT_PATHS
+
+    # Extract and patch commands
+    local full_cmd
+    full_cmd=$(extract_step_commands "$JOB_FILE" "$i")
+    if [[ -z "$full_cmd" || "$full_cmd" == "null" ]]; then
+      warn "No commands found for step $step_key, skipping"
+      continue
+    fi
+
+    full_cmd=$(patch_docker_command "$full_cmd")
+    export BUILDKITE_COMMAND="$full_cmd"
+    export BUILDKITE_SCRIPT_PATH="$full_cmd"
+
+    execute_step "$full_cmd" "$step_label" "$step_key"
+    [[ "$DRY_RUN" == false ]] && substep_complete "$((i+1))" "$step_count" "$step_label"
   done
-  exit 1
+
+  # Warn if --start-from never matched any step
+  if [[ -n "$START_FROM" && "$started" == false ]]; then
+    err "Step matching '$START_FROM' was not found in job '$JOB_NAME'"
+    echo ""
+    echo "Available steps:"
+    list_steps "$JOB_FILE" "$step_count"
+    exit 1
+  fi
+
+  final_banner "$JOB_NAME"
+}
+
+# ==============================================================================
+# Main
+# ==============================================================================
+parse_args "$@"
+setup_environment
+generate_pipelines
+
+if [[ "$LIST_JOBS" == true ]]; then
+  echo ""
+  log "Available jobs"
+  list_jobs "$JOBS_DIR"
+  exit 0
 fi
 
-final_banner "$JOB_NAME"
+if [[ "$LIST_STEPS" != true ]]; then
+  sync_legacy_cache
+  validate_directories
+fi
+
+run_job

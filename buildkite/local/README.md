@@ -123,6 +123,8 @@ These are derived from your local git state:
 | `BUILDKITE_BRANCH` | Current branch |
 | `BUILDKITE_COMMIT` | HEAD commit SHA |
 | `BUILDKITE_MESSAGE` | Last commit message |
+| `BUILDKITE_BUILD_AUTHOR` | Last commit author name |
+| `BUILDKITE_BUILD_AUTHOR_EMAIL` | Last commit author email |
 | `BUILDKITE_TAG` | Tag pointing at HEAD (if any) |
 | `BUILDKITE_REPO` | Origin remote URL |
 
@@ -132,6 +134,7 @@ These are derived from your local git state:
 |----------|-------------|
 | `BUILDKITE_BUILD_ID` | Random UUID for this build (or value from `--build-id`) |
 | `BUILDKITE_JOB_ID` | Random UUID for this job |
+| `BUILDKITE_AGENT_ID` | Random UUID for this agent |
 | `BUILDKITE_BUILD_NUMBER` | Unix timestamp |
 
 ### Local-only Variables
@@ -150,6 +153,7 @@ These are derived from your local git state:
 | `HETZNER_KEY` | `~/work/secrets/storagebox.key` | SSH key for Hetzner |
 | `HETZNER_USER` | `u434410` | Hetzner username |
 | `HETZNER_HOST` | `u434410-sub2.your-storagebox.de` | Hetzner host |
+| `CI_CACHE_ROOT` | `/home/o1labs-generic/pvc-4d294645-...` | Remote cache path on Hetzner |
 | `CACHE_BASE_URL` | `/var/storagebox` | Local cache directory |
 
 ### Custom Environment Variables (--env-file)
