@@ -1099,7 +1099,7 @@ build_delegation_verify_deb () {
 # Utility for creating legacy genesis ledgers for post-hardfork verification.
 # Contains the runtime_genesis_ledger tool for Mina protocol.
 #
-build_create_legacy_genesis_deb() {
+build_prefork_genesis_ledger_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building Mina Generic testnet create legacy genesis tool:"
 
@@ -1111,8 +1111,8 @@ build_create_legacy_genesis_deb() {
 
   # Binaries
   cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-    "${BUILDDIR}/usr/local/bin/mina-create-legacy-genesis"
+    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
 
-  build_deb mina-create-legacy-genesis
+  build_deb mina-create-prefork-genesis
 }
 ## END CREATE LEGACY GENESIS PACKAGE ##
