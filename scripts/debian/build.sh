@@ -18,15 +18,7 @@ if [[ ! -d "$BUILD_DIR" ]]; then
   exit 1
 fi
 
-# In case of running this script on detached head, script has difficulties in finding out
-# what is the current branch.
-if [[ -n "$BRANCH_NAME" ]]; then
-  # shellcheck disable=SC1090
-  BRANCH_NAME="$BRANCH_NAME" source "${SCRIPTPATH}/../export-git-env-vars.sh"
-else
-  # shellcheck disable=SC1090
-  source "${SCRIPTPATH}"/../export-git-env-vars.sh
-fi
+source "${SCRIPTPATH}"/../export-git-env-vars.sh
 
 # shellcheck disable=SC1090
 BUILD_DIR="${BUILD_DIR}" source "${SCRIPTPATH}/builder-helpers.sh"

@@ -12,7 +12,8 @@ echo " Includes mina daemon, archive-node, rosetta"
 
 
 echo "--- Prepare debian packages"
-BRANCH_NAME="$BUILDKITE_BRANCH" ./scripts/debian/build.sh "$@"
+export BRANCH_NAME="$BUILDKITE_BRANCH"
+./scripts/debian/build.sh "$@"
 
 if [[ -z "${LOCAL_BK_RUN+x}" ]]; then
 	echo "--- Git diff after build is complete:"
