@@ -76,7 +76,6 @@ RUN case "${TARGETARCH}" in \
     esac; \
     curl -sSfL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${GCLOUD_ARCH}.tar.gz" | \
     tar -xz -C /opt/ && \
-    /opt/google-cloud-sdk/install.sh --quiet && \
     /opt/google-cloud-sdk/bin/gcloud components install kubectl --quiet
 
 ENV PATH="/opt/google-cloud-sdk/bin:${PATH}"
