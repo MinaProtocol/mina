@@ -707,7 +707,7 @@ build_daemon_devnet_pre_hardfork_deb() {
   NAME="mina-devnet-pre-hardfork-mesa"
 
   echo "------------------------------------------------------------"
-  echo "--- Building testnet berkeley legacy deb for hardfork automode :"
+  echo "--- Building testnet devnet legacy deb for hardfork automode :"
 
   create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
@@ -716,7 +716,7 @@ build_daemon_devnet_pre_hardfork_deb() {
 
   build_deb $NAME
 }
-## END DEVNET LEGACY PACKAGE ##
+## END DEVNET PRE HF PACKAGE ##
 
 ## TESTNET GENERIC PACKAGE ##
 
