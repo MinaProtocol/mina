@@ -27,7 +27,7 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
-          , S.exactly "buildkite/src/Jobs/Test/HardForkTest" "dhall"
+          , S.exactly "buildkite/src/Jobs/Test/HardForkTestLegacy" "dhall"
           , S.strictlyStart (S.contains "scripts/hardfork")
           , S.strictlyStart (S.contains "nix")
           , S.exactly "flake" "nix"
