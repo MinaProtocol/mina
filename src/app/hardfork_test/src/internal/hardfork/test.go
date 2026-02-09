@@ -118,24 +118,22 @@ func (t *HardforkTest) Run() error {
 
 	// Phase 1: Run and validate main network
 	t.Logger.Info("Phase 1: Running main network...")
-	forkDataChan := make(chan ForkData, 1)
 
 	beforeShutdown := func(t *HardforkTest, analysis *BlockAnalysisResult) error {
 		t.Logger.Info("Phase 2: Forking with fork method `%s`...", t.Config.ForkMethod.String())
 
-		var forkData *ForkData
 		var err error
 		switch t.Config.ForkMethod {
 		case config.Legacy:
-			forkData, err = t.LegacyForkPhase(analysis, mainGenesisTs)
+			err = t.LegacyForkPhase(analysis, mainGenesisTs)
 		case config.Advanced:
-			forkData, err = t.AdvancedForkPhase(analysis, mainGenesisTs)
+			err = t.AdvancedForkPhase(analysis, mainGenesisTs)
 		}
 
 		if err != nil {
 			return err
 		}
-		forkDataChan <- *forkData
+		// forkDataChan <- *forkData
 		return nil
 	}
 
@@ -145,7 +143,7 @@ func (t *HardforkTest) Run() error {
 	}
 
 	t.Logger.Info("Phase 3: Running fork network...")
-	if err := t.RunForkNetworkPhase(analysis.LastBlockBeforeTxEnd.BlockHeight, <-forkDataChan, mainGenesisTs); err != nil {
+	if err := t.RunForkNetworkPhase(analysis.LastBlockBeforeTxEnd.BlockHeight, mainGenesisTs); err != nil {
 		return err
 	}
 
