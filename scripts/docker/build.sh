@@ -83,10 +83,10 @@ if [[ -z "$INPUT_NETWORK" ]]; then
   NETWORK="--build-arg network=devnet"
 fi
 
-LEGACY_VERSION="--build-arg deb_legacy_version=$INPUT_LEGACY_VERSION"
-
 if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
   LEGACY_VERSION=""
+else
+  LEGACY_VERSION="--build-arg deb_legacy_version=$INPUT_LEGACY_VERSION"
 fi
 
 BRANCH="--build-arg MINA_BRANCH=$INPUT_BRANCH"
