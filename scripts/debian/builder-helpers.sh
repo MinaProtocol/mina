@@ -685,7 +685,7 @@ build_daemon_mesa_pre_hardfork_deb() {
   create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_apps mesa $AUTOMODE_PRE_HF_DIR
+  copy_common_daemon_apps testnet $AUTOMODE_PRE_HF_DIR
 
   build_deb $NAME
 }
