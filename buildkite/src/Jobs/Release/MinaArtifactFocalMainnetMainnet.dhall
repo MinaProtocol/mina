@@ -25,7 +25,8 @@ in  Pipeline.build
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
-            , Artifacts.Type.CreateLegacyGenesis
+            , Artifacts.Type.PreforkGenesisLedger
+            , Artifacts.Type.PreforkDaemon
             ]
           , debVersion = DebianVersions.DebVersion.Focal
           , network = Network.Type.Mainnet

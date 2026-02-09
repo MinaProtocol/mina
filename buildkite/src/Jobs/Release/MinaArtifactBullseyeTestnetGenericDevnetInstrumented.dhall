@@ -17,7 +17,7 @@ in  Pipeline.build
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.FunctionalTestSuite
-            , Artifacts.Type.CreateLegacyGenesis
+            , Artifacts.Type.PreforkDaemon
             ]
           , buildFlags = BuildFlags.Type.Instrumented
           , tags =

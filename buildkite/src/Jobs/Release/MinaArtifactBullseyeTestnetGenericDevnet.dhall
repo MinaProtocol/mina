@@ -17,7 +17,7 @@ in  Pipeline.build
             , Artifacts.Type.TestExecutive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
-            , Artifacts.Type.CreateLegacyGenesis
+            , Artifacts.Type.PreforkGenesisLedger
             ]
           , tags =
             [ PipelineTag.Type.Long

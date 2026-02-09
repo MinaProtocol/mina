@@ -20,11 +20,13 @@ in  Pipeline.build
           , artifacts =
             [ Artifacts.Type.Daemon
             , Artifacts.Type.DaemonConfig
+            , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.PreforkDaemon
+            , Artifacts.Type.PreforkGenesisLedger
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
-            , Artifacts.Type.CreateLegacyGenesis
             ]
           , debVersion = DebianVersions.DebVersion.Bookworm
           , network = Network.Type.Mainnet
