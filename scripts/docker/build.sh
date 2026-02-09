@@ -199,7 +199,7 @@ case "${SERVICE}" in
           echo "Please provide the --deb-legacy-version argument."
           exit 1
         fi
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon-hardfork"
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon-auto-hardfork"
         DOCKER_CONTEXT="dockerfiles/"
         ;;
     mina-toolchain)
