@@ -18,12 +18,13 @@ in  Pipeline.build
           , artifacts =
             [ Artifacts.Type.Daemon
             , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.PreforkDaemon
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
-            , Artifacts.Type.CreateLegacyGenesis
+            , Artifacts.Type.PreforkGenesisLedger
             ]
           , network = Network.Type.Mainnet
           , tags =
