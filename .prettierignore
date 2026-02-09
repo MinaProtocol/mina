@@ -1,0 +1,11 @@
+# Build directories
+_build/
+_opam/
+
+# Git submodules
+src/lib/crypto/kimchi_bindings/stubs/kimchi-stubs-vendors/
+src/lib/crypto/proof-systems/
+src/lib/snarky/
+
+# Other
+node_modules/

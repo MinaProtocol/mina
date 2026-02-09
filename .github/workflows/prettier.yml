@@ -1,0 +1,29 @@
+name: Prettier
+
+on:
+  pull_request:
+    paths:
+      - '**/*.md'
+      - '.prettierrc'
+      - '.prettierignore'
+      - 'package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  prettier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Check formatting
+        run: make check-markdown

@@ -15,6 +15,7 @@ associated parameters.
 ### Header Format
 
 The header consists of:
+
 - A fixed prefix string to identify the file type
 - A JSON-encoded metadata structure containing:
   - Version information

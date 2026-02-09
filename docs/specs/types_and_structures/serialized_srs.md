@@ -2,7 +2,7 @@
 
 This describes the SRS binary file format
 
-| Field | Type              | Description |
-| - | - | - |
+| Field | Type              | Description                |
+| ----- | ----------------- | -------------------------- |
 | `g`   | `Vector<GAffine>` | For committing polynomials |
-| `h `  | `GAffine`         | Blinding factor |
+| `h `  | `GAffine`         | Blinding factor            |

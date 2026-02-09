@@ -1,10 +1,15 @@
 # Debian Package Session Scripts
 
-A suite of bash scripts for modifying Debian packages in a session-based workflow. These scripts enable opening a `.deb` package, performing various modifications (insert, replace, remove, move files, and rename the package), and saving the modified package.
+A suite of bash scripts for modifying Debian packages in a session-based
+workflow. These scripts enable opening a `.deb` package, performing various
+modifications (insert, replace, remove, move files, and rename the package), and
+saving the modified package.
 
 ## Overview
 
-These scripts provide a safe, session-based approach to modifying Debian packages without permanently altering the original file until you're ready. The workflow follows three main steps:
+These scripts provide a safe, session-based approach to modifying Debian
+packages without permanently altering the original file until you're ready. The
+workflow follows three main steps:
 
 1. **Open** - Extract a .deb package into a session directory
 2. **Modify** - Make changes using the provided helper scripts
@@ -41,19 +46,23 @@ my-session/
 
 ### deb-session-open.sh
 
-Opens a Debian package for modification by extracting it into a session directory.
+Opens a Debian package for modification by extracting it into a session
+directory.
 
 **Usage:**
+
 ```bash
 ./deb-session-open.sh <input.deb> <session-dir>
 ```
 
 **Example:**
+
 ```bash
 ./deb-session-open.sh mina-devnet_3.3.0_amd64.deb ./hardfork-session
 ```
 
 **Notes:**
+
 - Session directory will be created if it doesn't exist
 - If session directory exists, it will be cleaned first
 - Cannot be a symlink (security restriction)
@@ -65,16 +74,19 @@ Opens a Debian package for modification by extracting it into a session director
 Saves a session by repacking the modified files into a `.deb` package.
 
 **Usage:**
+
 ```bash
 ./deb-session-save.sh <session-dir> <output.deb> [--verify]
 ```
 
 **Example:**
+
 ```bash
 ./deb-session-save.sh ./hardfork-session mina-devnet-hardfork_3.3.0_amd64.deb --verify
 ```
 
 **Notes:**
+
 - Preserves original compression formats (gz, xz, zst)
 - Normalizes file ownership to root:root
 - Use `--verify` to validate the package after creation (recommended)
@@ -86,11 +98,13 @@ Saves a session by repacking the modified files into a `.deb` package.
 Inserts one or more files into the package.
 
 **Usage:**
+
 ```bash
 ./deb-session-insert.sh [-d] <session-dir> <dest-path> <source-file> [<source-file2> ...]
 ```
 
 **Examples:**
+
 ```bash
 # Insert multiple files into a directory (trailing / indicates directory)
 ./deb-session-insert.sh ./my-session /var/lib/coda/ ledger1.tar.gz ledger2.tar.gz
@@ -106,6 +120,7 @@ Inserts one or more files into the package.
 ```
 
 **Notes:**
+
 - Use `-d` flag or trailing `/` to treat destination as a directory
 - Files keep their original names when inserted into a directory
 - Destination directories are created automatically
@@ -118,11 +133,13 @@ Inserts one or more files into the package.
 Replaces existing files in the package with a new file.
 
 **Usage:**
+
 ```bash
 ./deb-session-replace.sh <session-dir> <path-in-package> <replacement-file>
 ```
 
 **Examples:**
+
 ```bash
 # Replace a specific file
 ./deb-session-replace.sh ./my-session /var/lib/coda/config.json new-config.json
@@ -135,6 +152,7 @@ Replaces existing files in the package with a new file.
 ```
 
 **Notes:**
+
 - Supports wildcard patterns (e.g., `config_*.json`)
 - All matching files will be replaced with the same replacement file
 - File permissions are set to 0644
@@ -146,11 +164,13 @@ Replaces existing files in the package with a new file.
 Removes files matching a pattern from the package.
 
 **Usage:**
+
 ```bash
 ./deb-session-remove.sh <session-dir> <path-pattern>
 ```
 
 **Examples:**
+
 ```bash
 # Remove a specific file
 ./deb-session-remove.sh ./my-session /var/lib/coda/devnet.json
@@ -166,6 +186,7 @@ Removes files matching a pattern from the package.
 ```
 
 **Notes:**
+
 - Supports glob patterns including `**` for recursive matching (Bash 4.0+)
 - Only files are removed, not directories
 - Removed files cannot be recovered from the session
@@ -177,11 +198,13 @@ Removes files matching a pattern from the package.
 Moves or renames a file within the package.
 
 **Usage:**
+
 ```bash
 ./deb-session-move.sh <session-dir> <source-path> <dest-path>
 ```
 
 **Examples:**
+
 ```bash
 # Rename a file
 ./deb-session-move.sh ./my-session /var/lib/coda/devnet.json /var/lib/coda/devnet.old.json
@@ -194,6 +217,7 @@ Moves or renames a file within the package.
 ```
 
 **Notes:**
+
 - Both paths should be absolute as they appear when package is installed
 - Source file must exist
 - Destination directory will be created if it doesn't exist
@@ -205,11 +229,13 @@ Moves or renames a file within the package.
 Renames the Debian package by updating the Package field in the control file.
 
 **Usage:**
+
 ```bash
 ./deb-session-rename-package.sh <session-dir> <new-package-name>
 ```
 
 **Examples:**
+
 ```bash
 # Add hardfork suffix
 ./deb-session-rename-package.sh ./my-session mina-devnet-hardfork
@@ -222,6 +248,7 @@ Renames the Debian package by updating the Package field in the control file.
 ```
 
 **Notes:**
+
 - Only modifies the Package field in the control file
 - Version, architecture, and all other metadata remain unchanged
 - Package name must follow Debian naming conventions:
@@ -232,7 +259,8 @@ Renames the Debian package by updating the Package field in the control file.
 
 ## Manual Modifications (Advanced)
 
-For advanced users who prefer direct control, you can work directly with the unpacked files using standard shell utilities instead of the helper scripts.
+For advanced users who prefer direct control, you can work directly with the
+unpacked files using standard shell utilities instead of the helper scripts.
 
 ### Working Directly in the Session Directory
 
@@ -301,24 +329,31 @@ cd ../..
 ### Important Notes for Manual Modifications
 
 **Path Handling:**
+
 - Work from inside `session/data/` directory
 - Use **relative paths** (e.g., `./var/lib/coda/file.txt`)
 - **Do NOT use absolute paths** with leading `/` when using shell utilities
-- Package paths like `/var/lib/coda/file.txt` become `./var/lib/coda/file.txt` in the session
+- Package paths like `/var/lib/coda/file.txt` become `./var/lib/coda/file.txt`
+  in the session
 
 **Safety Considerations:**
+
 - Stay within the `session/data/` directory to avoid modifying system files
-- Be careful with wildcards (`rm *.txt`) - they operate on session files, not your system
-- The helper scripts include built-in validation; manual approach requires more care
+- Be careful with wildcards (`rm *.txt`) - they operate on session files, not
+  your system
+- The helper scripts include built-in validation; manual approach requires more
+  care
 - Test in a temporary session first if you're unsure
 
 **When to Use Manual Approach:**
+
 - You need complex file operations not covered by helper scripts
 - You're comfortable with bash and prefer direct control
 - You want to use advanced shell features (find, xargs, etc.)
 - You need to batch process many files efficiently
 
 **When to Use Helper Scripts:**
+
 - You want automatic path validation and security checks
 - You prefer clear, documented operations
 - You're less familiar with bash utilities
@@ -415,9 +450,11 @@ set -e
 
 All scripts include security protections:
 
-- **Directory Traversal Protection**: Paths with `..` sequences are detected and rejected
+- **Directory Traversal Protection**: Paths with `..` sequences are detected and
+  rejected
 - **Symlink Protection**: Session directory cannot be a symlink
-- **Path Validation**: All paths are normalized and validated to stay within session directory
+- **Path Validation**: All paths are normalized and validated to stay within
+  session directory
 - **Safe Defaults**: Scripts use `set -eux -o pipefail` for error handling
 
 ## Requirements
@@ -435,6 +472,7 @@ Run the test suite to verify all scripts work correctly:
 ```
 
 The test suite covers:
+
 - Opening and closing sessions
 - File insertion (directory and file targets)
 - File replacement with wildcards
@@ -451,11 +489,13 @@ Make sure you've opened a session first using `deb-session-open.sh`.
 
 ### Error: Path escapes session data directory
 
-This is a security protection. Ensure your paths don't contain `..` sequences or other escape attempts.
+This is a security protection. Ensure your paths don't contain `..` sequences or
+other escape attempts.
 
 ### Error: No files found matching pattern
 
 Check that:
+
 - The path is absolute (starts with `/`)
 - The pattern matches actual files in the package
 - You're using the correct wildcard syntax
@@ -463,6 +503,7 @@ Check that:
 ### Compression errors
 
 Ensure you have the required compression tools installed:
+
 ```bash
 # For gzip
 sudo apt-get install gzip

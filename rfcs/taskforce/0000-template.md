@@ -4,8 +4,7 @@
 
 # Goal
 
-What is the impact this change is intented to have?
-What problems does it solve?
+What is the impact this change is intented to have? What problems does it solve?
 
 # Design
 
@@ -18,4 +17,3 @@ What do I do about X?
 # Epic Link
 
 Issue #0000
-
