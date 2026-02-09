@@ -34,12 +34,11 @@ var caml_pasta_fp_plonk_index_create = function (
     );
     var gate_vec = gates;
     var urs_ser = urs;
-    if (kimchi_is_native) {
+     if (kimchi_is_native) {
         globalThis.console.time("conversion plonk index create")
-        gate_vec = kimchi_ffi.caml_pasta_fp_plonk_gate_vector_from_bytes(gates.serialize())
         urs_ser = kimchi_ffi.caml_fp_srs_from_bytes_external(urs.serialize())
         globalThis.console.timeEnd("conversion plonk index create")
-    }
+    } 
     var t = kimchi_ffi.caml_pasta_fp_plonk_index_create(
         gate_vec,
         public_inputs,
@@ -170,12 +169,11 @@ var caml_pasta_fq_plonk_index_create = function (
 
     var gate_vec = gates;
     var urs_ser = urs;
-    if (kimchi_is_native) {
+     if (kimchi_is_native) {
         globalThis.console.time("conversion plonk index create")
-        gate_vec = kimchi_ffi.caml_pasta_fq_plonk_gate_vector_from_bytes(gates.serialize())
         urs_ser = kimchi_ffi.caml_fq_srs_from_bytes_external(urs.serialize())
         globalThis.console.timeEnd("conversion plonk index create")
-    }
+    } 
 
     var t = kimchi_ffi.caml_pasta_fq_plonk_index_create(
         gate_vec,
