@@ -11,4 +11,6 @@ source buildkite/scripts/debian/install.sh "mina-test-suite,mina-testnet-generic
 export MINA_LIBP2P_PASS="naughty blue worm"
 export MINA_PRIVKEY_PASS="naughty blue worm"
 
+export MINA_PROFILE=devnet
+
 mina-command-line-tests test -v

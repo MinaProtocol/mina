@@ -428,18 +428,22 @@ end
 
 module For_unit_tests = Make (Node_config_for_unit_tests)
 
-module Compiled : sig
+module type Profiled_S = sig
   val genesis_constants : t
 
   val constraint_constants : Constraint_constants.t
 
   val proof_level : Proof_level.t
-end = struct
-  include Make (Node_config)
-
-  let genesis_constants = t
-
-  let constraint_constants = Constraint_constants.t
-
-  let proof_level = Proof_level.t
 end
+
+let profiled =
+  Memo.unit (fun () : (module Profiled_S) ->
+      ( module struct
+        include Make (Node_config)
+
+        let genesis_constants = t
+
+        let constraint_constants = Constraint_constants.t
+
+        let proof_level = Proof_level.t
+      end ) )

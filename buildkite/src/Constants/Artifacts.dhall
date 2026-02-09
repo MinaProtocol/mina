@@ -12,7 +12,8 @@ let Repo = ./DockerRepo.dhall
 
 let Artifact
     : Type
-    = < Daemon
+    = < Profile
+      | Daemon
       | DaemonLegacyHardfork
       | DaemonAutoHardfork
       | DaemonConfig
@@ -26,10 +27,12 @@ let Artifact
       | Toolchain
       | CreateLegacyGenesis
       | DelegationVerifier
+      | Profile
       >
 
 let AllButTests =
-      [ Artifact.Daemon
+      [ Artifact.Profile
+      , Artifact.Daemon
       , Artifact.DaemonLegacyHardfork
       , Artifact.DaemonAutoHardfork
       , Artifact.DaemonConfig
@@ -45,7 +48,8 @@ let AllButTests =
       ]
 
 let Main =
-      [ Artifact.Daemon
+      [ Artifact.Profile
+      , Artifact.Daemon
       , Artifact.DaemonConfig
       , Artifact.LogProc
       , Artifact.Archive
@@ -57,7 +61,8 @@ let All = AllButTests # [ Artifact.FunctionalTestSuite ]
 let capitalName =
           \(artifact : Artifact)
       ->  merge
-            { Daemon = "Daemon"
+            { Profile = "Profile"
+            , Daemon = "Daemon"
             , DaemonLegacyHardfork = "DaemonLegacyHardfork"
             , DaemonAutoHardfork = "DaemonAutoHardfork"
             , DaemonConfig = "DaemonConfig"
@@ -77,7 +82,8 @@ let capitalName =
 let lowerName =
           \(artifact : Artifact)
       ->  merge
-            { Daemon = "daemon"
+            { Profile = "profile"
+            , Daemon = "daemon"
             , DaemonLegacyHardfork = "daemon_hardfork"
             , DaemonAutoHardfork = "daemon_auto_hardfork"
             , DaemonConfig = "daemon_config"
@@ -97,7 +103,8 @@ let lowerName =
 let dockerName =
           \(artifact : Artifact)
       ->  merge
-            { Daemon = "mina-daemon"
+            { Profile = ""
+            , Daemon = "mina-daemon"
             , DaemonLegacyHardfork = "mina-daemon-pre-hardfork"
             , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
             , Archive = "mina-archive"
@@ -126,7 +133,8 @@ let toDebianName =
           \(artifact : Artifact)
       ->  \(network : Network.Type)
       ->  merge
-            { Daemon = "daemon_${Network.lowerName network}"
+            { Profile = "profile_${Network.lowerName network}"
+            , Daemon = "daemon_${Network.lowerName network}"
             , DaemonLegacyHardfork =
                 "daemon_${Network.lowerName network}_hardfork_config"
             , DaemonAutoHardfork =
@@ -154,7 +162,8 @@ let toDebianNames =
                   (List Text)
                   (     \(a : Artifact)
                     ->  merge
-                          { Daemon = [ toDebianName a network ]
+                          { Profile = [ toDebianName a network ]
+                          , Daemon = [ toDebianName a network ]
                           , DaemonLegacyHardfork = [ toDebianName a network ]
                           , DaemonAutoHardfork = [ toDebianName a network ]
                           , DaemonConfig = [ toDebianName a network ]
@@ -220,7 +229,8 @@ let dockerTag =
                   spec.buildFlags
 
           in  merge
-                { Daemon =
+                { Profile = "${spec.version}"
+                , Daemon =
                     "${spec.version}-${Network.debianSuffix
                                          spec.network}${profile_part}${build_flags_part}"
                 , DaemonLegacyHardfork =

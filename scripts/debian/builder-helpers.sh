@@ -250,7 +250,7 @@ copy_common_daemon_configs() {
 
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_configs inputs:"
-  echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
+  echo "Network Name: ${1} (like mainnet, devnet, testnet-generic)"
 
   local NETWORK_NAME="${1}"
 
@@ -416,7 +416,7 @@ build_rosetta_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building ${network} rosetta deb"
 
-  create_control_file "mina-rosetta-${network}" "${SHARED_DEPS}" \
+  create_control_file "mina-rosetta-${network}" "${SHARED_DEPS}, mina-profile-${network} (>= ${MINA_DEB_VERSION})" \
     'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
 
   local signature
@@ -446,6 +446,37 @@ build_rosetta_deb() {
   build_deb "mina-rosetta-${network}"
 }
 ## END ROSETTA PACKAGE ##
+
+## PROFILE PACKAGE ##
+build_profile_deb() {
+
+  local network="${1}"
+
+  local package_name="mina-profile-${network}"
+
+  echo "--- Building package ${package_name}"
+  echo "------------------------------------------------------------"
+  echo "build_profile_deb inputs:"
+  echo "Network Name: ${1} (like mainnet, devnet, testnet-generic)"
+
+  create_control_file "${package_name}" "" \
+    "Mina profile for network ${network}" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
+
+  # Store node config hint (based on NETWORK_NAME)
+  mkdir -p "${BUILDDIR}/etc/coda/build_config"
+  case "${network}" in
+    mainnet)
+      printf "mainnet" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
+      ;;
+    devnet|testnet-generic)
+      printf "devnet" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
+      ;;
+  esac
+
+  build_deb "${package_name}"
+}
+
+## END PROFILE PACKAGE ##
 
 ## CONFIG PACKAGE ##
 build_daemon_config_deb() {
@@ -506,7 +537,7 @@ build_daemon_deb() {
       ;;
   esac
 
-  create_control_file "${deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network}-config (>=${MINA_DEB_VERSION})" \
+  create_control_file "${deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network}-config (>=${MINA_DEB_VERSION}), mina-profile-${network} (>= ${MINA_DEB_VERSION})" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "${deb_name} (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_apps "${network}"
@@ -666,7 +697,7 @@ build_archive_deb () {
   echo "------------------------------------------------------------"
   echo "--- Building archive devnet deb"
 
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process Compatible with Mina Daemon'
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}, mina-profile-${network} (>= ${MINA_DEB_VERSION})" 'Mina Archive Process Compatible with Mina Daemon'
 
   mkdir -p "${BUILDDIR}/usr/local/bin"
 

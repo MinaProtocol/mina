@@ -41,7 +41,7 @@ resolve_and_build_package() {
     return
   fi
 
-  if [[ "$package" =~ ^(archive|daemon|rosetta)_(mainnet|devnet|testnet_generic)$ ]]; then
+  if [[ "$package" =~ ^(archive|daemon|profile|rosetta)_(mainnet|devnet|testnet_generic)$ ]]; then
     local network_name
     case "${BASH_REMATCH[2]}" in
       testnet_generic)
@@ -75,6 +75,8 @@ resolve_and_build_package() {
 }
 
 default_targets=(
+  profile_mainnet
+  profile_devnet
   logproc
   archive_testnet_generic
   archive_devnet

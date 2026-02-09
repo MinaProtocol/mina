@@ -7,7 +7,8 @@ let DockerPublish
 let isEssential =
           \(service : Artifacts.Type)
       ->  merge
-            { Daemon = True
+            { Profile = True
+            , Daemon = True
             , DaemonConfig = False
             , LogProc = False
             , Archive = True
