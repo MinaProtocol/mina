@@ -82,8 +82,6 @@ var kimchi_ffi = (function () {
       "caml_pasta_fq_plonk_index_read",
       "caml_fp_srs_from_bytes",
       "caml_fq_srs_from_bytes",
-      "caml_fp_srs_from_bytes_external",
-      "caml_fq_srs_from_bytes_external",
       "caml_fp_srs_to_bytes",
       "caml_fq_srs_to_bytes",
       "caml_fp_srs_create",

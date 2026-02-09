@@ -51,17 +51,6 @@ var caml_fq_srs_lagrange_commitments_whole_domain = tsSrs.fq.lagrangeCommitments
 // Requires: tsSrs
 var caml_fp_srs_lagrange_commitment = tsSrs.fp.lagrangeCommitment;
 
-// Provides: caml_fp_srs_from_bytes_external
-// Requires: kimchi_ffi, kimchi_is_native
-var caml_fp_srs_from_bytes_external = function (bytes) {
-    // Call only from native
-    if (kimchi_is_native) {
-        return kimchi_ffi.caml_fp_srs_from_bytes_external(bytes);
-    } else {
-        throw new Error("caml_fp_srs_from_bytes_external can be called only in native backend");
-    }
-};
-
 // Provides: caml_fp_srs_maybe_lagrange_commitment
 // Requires: kimchi_ffi, tsRustConversion
 var caml_fp_srs_maybe_lagrange_commitment = function (srs, domain_size, i) {

@@ -17,7 +17,7 @@ var caml_pasta_fp_plonk_index_deserialize = function (index) {
 };
 
 // Provides: caml_pasta_fp_plonk_index_create
-// Requires: kimchi_ffi, tsRustConversion, kimchi_is_native, free_on_finalize
+// Requires: kimchi_ffi, tsRustConversion, free_on_finalize
 var caml_pasta_fp_plonk_index_create = function (
     gates,
     public_inputs,
@@ -32,20 +32,13 @@ var caml_pasta_fp_plonk_index_create = function (
     var rust_runtime_table_cfgs = tsRustConversion.fp.runtimeTableCfgsToRust(
         caml_runtime_table_cfgs
     );
-    var gate_vec = gates;
-    var urs_ser = urs;
-     if (kimchi_is_native) {
-        globalThis.console.time("conversion plonk index create")
-        urs_ser = kimchi_ffi.caml_fp_srs_from_bytes_external(urs.serialize())
-        globalThis.console.timeEnd("conversion plonk index create")
-    } 
     var t = kimchi_ffi.caml_pasta_fp_plonk_index_create(
-        gate_vec,
+        gates,
         public_inputs,
         rust_lookup_tables,
         rust_runtime_table_cfgs,
         prev_challenges,
-        urs_ser,
+        urs,
         lazy_mode
     );
 
@@ -151,7 +144,7 @@ var caml_pasta_fq_plonk_index_deserialize = function (index) {
 };
 
 // Provides: caml_pasta_fq_plonk_index_create
-// Requires: kimchi_ffi, tsRustConversion, kimchi_is_native, free_on_finalize
+// Requires: kimchi_ffi, tsRustConversion, free_on_finalize
 var caml_pasta_fq_plonk_index_create = function (
     gates,
     public_inputs,
@@ -167,21 +160,13 @@ var caml_pasta_fq_plonk_index_create = function (
         caml_runtime_table_cfgs
     );
 
-    var gate_vec = gates;
-    var urs_ser = urs;
-     if (kimchi_is_native) {
-        globalThis.console.time("conversion plonk index create")
-        urs_ser = kimchi_ffi.caml_fq_srs_from_bytes_external(urs.serialize())
-        globalThis.console.timeEnd("conversion plonk index create")
-    } 
-
     var t = kimchi_ffi.caml_pasta_fq_plonk_index_create(
-        gate_vec,
+        gates,
         public_inputs,
         rust_lookup_tables,
         rust_runtime_table_cfgs,
         prev_challenges,
-        urs_ser,
+        urs,
         lazy_mode
     );
 
