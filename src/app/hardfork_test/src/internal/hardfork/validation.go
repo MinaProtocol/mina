@@ -1,7 +1,6 @@
 package hardfork
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -16,7 +15,6 @@ type BlockAnalysisResult struct {
 	RecentSnarkedHashPerEpoch map[int]string // map from epoch to snarked ledger hash
 	LastBlockBeforeTxEnd      client.BlockData
 	GenesisBlock              client.BlockData
-	CandidatePortBasesForFork []int
 }
 
 func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool, predDescription string, timeout time.Duration) error {
@@ -173,13 +171,8 @@ func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
 	return state, nil
 }
 
-func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, []int, error) {
+func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, error) {
 	allRestPorts := t.Config.AllPortOfType(config.PORT_REST)
-	consensusStateVote := make(map[string][]int)
-
-	var majorityConsensusState ConsensusState
-	// majorityKey := "<none>"
-	majorityCount := 0
 
 	var wg sync.WaitGroup
 
@@ -200,45 +193,30 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, []int, error) {
 
 	for i, port := range allRestPorts {
 		if errors[i] != nil {
-			return nil, nil, fmt.Errorf("Failed to query consensus state on port %d: %w", port, errors[i])
+			return nil, fmt.Errorf("Failed to query consensus state on port %d: %w", port, errors[i])
 		}
 	}
 
-	for i, port := range allRestPorts {
-		state := states[i]
-
-		keyBytes, err := json.Marshal(state.LastBlockBeforeTxEnd)
-
-		if err != nil {
-			return nil, nil, fmt.Errorf("Failed to marshal consensus state on port %d: %w", port, err)
+	for i := range allRestPorts {
+		if i == 0 {
+			continue
 		}
 
-		key := string(keyBytes)
+		state := states[i]
+		last_state := states[i-1]
 
-		consensusStateVote[key] = append(consensusStateVote[key], port-int(config.PORT_REST))
-
-		if len(consensusStateVote[key]) > majorityCount {
-			majorityCount = len(consensusStateVote[key])
-			majorityConsensusState = *state
+		if state.LastBlockBeforeTxEnd != last_state.LastBlockBeforeTxEnd {
+			return nil, fmt.Errorf(
+				"Port %d and %d doesn't agree on last block seen before tx end! The previous has %v while the later has %v",
+				allRestPorts[i-1], allRestPorts[i], last_state, state)
 		}
 	}
 
 	if len(allRestPorts) == 0 {
-		return nil, nil, fmt.Errorf("Unreachable: no nodes are running!")
+		return nil, fmt.Errorf("Unreachable: no nodes are running!")
 	}
 
-	if float64(majorityCount)/float64(len(allRestPorts)) <= 0.5 {
-		return nil, nil, fmt.Errorf(
-			"The majority state hash at slot_tx_end %d is less than 50%%: %v",
-			t.Config.SlotTxEnd, consensusStateVote)
-	}
-	majorityKeyBytes, err := json.Marshal(majorityConsensusState.LastBlockBeforeTxEnd)
-	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to marshal majority consensus state to string!")
-	}
-	candidateRestPortsForFork := consensusStateVote[string(majorityKeyBytes)]
-
-	return &majorityConsensusState, candidateRestPortsForFork, nil
+	return states[0], nil
 }
 
 // AnalyzeBlocks performs comprehensive block analysis including finding genesis epoch hashes
@@ -251,7 +229,7 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 	}
 	t.Logger.Info("Genesis block: %v", genesisBlock)
 
-	consensus, candidatePortBasesForFork, err := t.ConsensusAcrossNodes()
+	consensus, err := t.ConsensusAcrossNodes()
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +239,6 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 		RecentSnarkedHashPerEpoch: consensus.RecentSnarkedHashPerEpoch,
 		LastBlockBeforeTxEnd:      consensus.LastBlockBeforeTxEnd,
 		GenesisBlock:              *genesisBlock,
-		CandidatePortBasesForFork: candidatePortBasesForFork,
 	}, nil
 }
 
