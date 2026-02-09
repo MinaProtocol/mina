@@ -605,9 +605,21 @@ debian-build-rosetta-devnet: ## Build the Debian Rosetta package for devnet
 debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
 	$(call build_debian_package,rosetta_mainnet)
 
-.PHONY: debian-build-daemon-devnet-hardfork
-debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devnet hardfork
-	$(call build_debian_package,daemon_devnet_hardfork)
+.PHONY: debian-build-daemon-devnet-post-hardfork
+debian-build-daemon-devnet-post-hardfork: ## Build the Debian daemon package for automote devnet post hardfork
+	$(call build_debian_package,daemon_post_hardfork_devnet)
+
+.PHONY: debian-build-daemon-mainnet-post-hardfork
+debian-build-daemon-mainnet-post-hardfork: ## Build the Debian daemon package for automote mainnet post hardfork
+	$(call build_debian_package,daemon_post_hardfork_mainnet)
+
+.PHONY: debian-build-daemon-devnet-prefork
+debian-build-daemon-devnet-prefork: ## Build the Debian daemon package for automote devnet pre hardfork
+	$(call build_debian_package,daemon_prefork_devnet)
+
+.PHONY: debian-build-daemon-mainnet-prefork
+debian-build-daemon-mainnet-prefork: ## Build the Debian daemon package for automote mainnet pre hardfork
+	$(call build_debian_package,daemon_prefork_mainnet)
 
 .PHONY: debian-build-daemon-devnet-pre-hardfork
 debian-build-daemon-devnet-pre-hardfork: ## Build the Debian daemon package for automote devnet pre hardfork
@@ -657,6 +669,8 @@ define build_docker_image
 		--service $(1) \
 		--version "$$MINA_DEB_VERSION" \
 		--branch "$$GITBRANCH" \
+		--deb-legacy-version "$$MINA_DEB_LEGACY_VERSION" \
+		--docker-registry "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo" \
 		--network $(2) \
 		--no-cache
 
@@ -703,6 +717,17 @@ docker-build-daemon-mainnet: SHELL := /bin/bash
 docker-build-daemon-mainnet: start-local-debian-repo ## Build the daemon Docker image for mainnet
 	$(call build_docker_image,mina-daemon,mainnet)
 
+
+.PHONY: docker-build-daemon-devnet-automode-hardfork
+docker-build-daemon-devnet-automode-hardfork: SHELL := /bin/bash
+docker-build-daemon-devnet-automode-hardfork: start-local-debian-repo ## Build the daemon Docker image for automode devnet post hardfork
+	$(call build_docker_image,mina-daemon-auto-hardfork,devnet)
+
+.PHONY: docker-build-daemon-mainnet-automode-hardfork
+docker-build-daemon-mainnet-automode-hardfork: SHELL := /bin/bash
+docker-build-daemon-mainnet-automode-hardfork: start-local-debian-repo ## Build the daemon Docker image for automode mainnet post hardfork
+	$(call build_docker_image,mina-daemon-auto-hardfork,mainnet)
+
 .PHONY: docker-build-rosetta
 docker-build-rosetta-testnet-generic: SHELL := /bin/bash
 docker-build-rosetta-testnet-generic: start-local-debian-repo ## Build the Rosetta Docker image
@@ -723,7 +748,7 @@ docker-build-rosetta-mainnet: start-local-debian-repo ## Build the Rosetta Docke
 
 .PHONY: hardfork-debian
 hardfork-debian: SHELL := /bin/bash
-hardfork-debian: ocaml_checks ## Generate hardfork packages
+hardfork-debian: #ocaml_checks ## Generate hardfork packages
 	$(info 📦 Generating hardfork packages for network $(NETWORK_NAME))
 
 	@BUILD_DIR=./_build \
@@ -735,7 +760,7 @@ hardfork-debian: ocaml_checks ## Generate hardfork packages
 
 .PHONY: hardfork-docker
 hardfork-docker: SHELL := /bin/bash
-hardfork-docker: ocaml_checks ## Generate hardfork packages
+hardfork-docker: #ocaml_checks ## Generate hardfork packages
 	$(info 📦 Generating hardfork docker for network $(NETWORK_NAME))
 
 	$(MAKE) hardfork-debian
