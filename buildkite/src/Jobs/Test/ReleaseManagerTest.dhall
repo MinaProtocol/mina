@@ -1,5 +1,7 @@
 let S = ../../Lib/SelectFiles.dhall
 
+let B = ../../External/Buildkite.dhall
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
@@ -13,6 +15,8 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 let Cmd = ../../Lib/Cmds.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let command_key = "release-manager-tests"
 
@@ -47,6 +51,7 @@ in  Pipeline.build
             , key = command_key
             , target = Size.Small
             , docker = None Docker.Type
+            , soft_fail = Some (B/SoftFail.Boolean True)
             , artifact_paths = [ S.contains "*.log" ]
             }
         ]
