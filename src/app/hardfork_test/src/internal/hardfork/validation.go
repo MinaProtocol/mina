@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
 
 // BlockAnalysisResult holds the results of analyzing blocks
@@ -173,7 +174,7 @@ func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
 }
 
 func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, []int, error) {
-	allRestPorts := t.AllPortOfType(PORT_REST)
+	allRestPorts := t.Config.AllPortOfType(config.PORT_REST)
 	consensusStateVote := make(map[string][]int)
 
 	var majorityConsensusState ConsensusState
@@ -214,7 +215,7 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, []int, error) {
 
 		key := string(keyBytes)
 
-		consensusStateVote[key] = append(consensusStateVote[key], port-int(PORT_REST))
+		consensusStateVote[key] = append(consensusStateVote[key], port-int(config.PORT_REST))
 
 		if len(consensusStateVote[key]) > majorityCount {
 			majorityCount = len(consensusStateVote[key])
@@ -243,7 +244,7 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, []int, error) {
 // AnalyzeBlocks performs comprehensive block analysis including finding genesis epoch hashes
 func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 
-	portUsed := t.AnyPortOfType(PORT_REST)
+	portUsed := t.Config.AnyPortOfType(config.PORT_REST)
 	genesisBlock, err := t.Client.GenesisBlock(portUsed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get genesis block on port %d: %w", portUsed, err)

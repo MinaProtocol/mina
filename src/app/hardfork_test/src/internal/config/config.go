@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -98,6 +100,72 @@ func DefaultConfig() *Config {
 
 		ForkMethod: Legacy,
 	}
+}
+
+// TODO: ensure integrity of ports in hf-test-go and mina-local-network
+
+type PortType int
+
+const (
+	PORT_CLIENT PortType = iota
+	PORT_REST
+	PORT_EXTERNAL
+	PORT_DAEMON_METRICS
+	PORT_LIBP2P_METRICS
+)
+const PORT_PER_NODE = 6
+
+type DaemonInfo struct {
+	StartPort int
+	NodeDir   string
+}
+
+func (c *Config) AllDaemonInfos() []DaemonInfo {
+	nodesBase := filepath.Join(c.Root, "nodes")
+
+	result := []DaemonInfo{
+		{StartPort: c.SeedStartPort, NodeDir: filepath.Join(nodesBase, "seed")},
+		{StartPort: c.SnarkCoordinatorPort, NodeDir: filepath.Join(nodesBase, "snark_coordinator")},
+	}
+
+	for whale_id := 0; whale_id < c.NumWhales; whale_id++ {
+		result = append(result, DaemonInfo{
+			StartPort: c.WhaleStartPort + whale_id*PORT_PER_NODE,
+			NodeDir:   filepath.Join(nodesBase, fmt.Sprintf("whale_%d", whale_id)),
+		})
+	}
+
+	for fish_id := 0; fish_id < c.NumWhales; fish_id++ {
+		result = append(result, DaemonInfo{
+			StartPort: c.FishStartPort + fish_id*PORT_PER_NODE,
+			NodeDir:   filepath.Join(nodesBase, fmt.Sprintf("fish_%d", fish_id)),
+		})
+	}
+
+	for node_id := 0; node_id < c.NumNodes; node_id++ {
+		result = append(result, DaemonInfo{
+			StartPort: c.NodeStartPort + node_id*PORT_PER_NODE,
+			NodeDir:   filepath.Join(nodesBase, fmt.Sprintf("plain_%d", node_id)),
+		})
+	}
+
+	return result
+}
+
+func (c *Config) AllPortOfType(ty PortType) []int {
+	all_ports := []int{}
+
+	for _, info := range c.AllDaemonInfos() {
+		all_ports = append(all_ports, info.StartPort+int(ty))
+	}
+	return all_ports
+}
+
+func (c *Config) AnyPortOfType(ty PortType) int {
+	candidates_ports := c.AllPortOfType(ty)
+
+	idx := rand.Intn(len(candidates_ports))
+	return candidates_ports[idx]
 }
 
 func (c *Config) ForkGenesisTsGivenMainGenesisTs(mainGenesisTs int64) int64 {
