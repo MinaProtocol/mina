@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
 
 type HFHandler func(*HardforkTest, *BlockAnalysisResult) error
@@ -24,7 +25,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 
 	defer t.gracefulShutdown(mainNetCmd, "Main network")
 
-	t.WaitForBestTip(t.AnyPortOfType(PORT_REST), func(block client.BlockData) bool {
+	t.WaitForBestTip(t.Config.AnyPortOfType(config.PORT_REST), func(block client.BlockData) bool {
 		return block.Slot >= 1
 	}, fmt.Sprintf("best tip reached slot 1"),
 		time.Until(
@@ -51,7 +52,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 		return nil, err
 	}
 
-	if err := t.ValidateNoNewBlocks(t.AnyPortOfType(PORT_REST)); err != nil {
+	if err := t.ValidateNoNewBlocks(t.Config.AnyPortOfType(config.PORT_REST)); err != nil {
 		return nil, err
 	}
 
@@ -84,20 +85,20 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData For
 	t.Logger.Info("Fork network genesis slot: %d", expectedGenesisSlot)
 
 	// Validate fork network blocks
-	if err := t.ValidateFirstBlockOfForkChain(t.AnyPortOfType(PORT_REST), latestPreForkHeight, expectedGenesisSlot); err != nil {
+	if err := t.ValidateFirstBlockOfForkChain(t.Config.AnyPortOfType(config.PORT_REST), latestPreForkHeight, expectedGenesisSlot); err != nil {
 		return err
 	}
 
 	// Wait until best chain query time
 	t.WaitUntilBestChainQuery(t.Config.ForkSlot, int(expectedGenesisSlot))
 
-	genesisBlock, err := t.Client.GenesisBlock(t.AnyPortOfType(PORT_REST))
+	genesisBlock, err := t.Client.GenesisBlock(t.Config.AnyPortOfType(config.PORT_REST))
 	if err != nil {
 		return err
 	}
 
 	// Check block height at slot BestChainQueryFrom
-	bestTip, err := t.Client.BestTip(t.AnyPortOfType(PORT_REST))
+	bestTip, err := t.Client.BestTip(t.Config.AnyPortOfType(config.PORT_REST))
 	if err != nil {
 		return err
 	}
@@ -110,7 +111,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData For
 	}
 
 	// Validate user commands in blocks
-	if err := t.ValidateBlockWithUserCommandCreatedForkNetwork(t.AnyPortOfType(PORT_REST)); err != nil {
+	if err := t.ValidateBlockWithUserCommandCreatedForkNetwork(t.Config.AnyPortOfType(config.PORT_REST)); err != nil {
 		return err
 	}
 
@@ -120,7 +121,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData For
 func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) (*ForkData, error) {
 
 	idx := rand.Intn(len(analysis.CandidatePortBasesForFork))
-	forkConfigBytes, err := t.GetForkConfig(analysis.CandidatePortBasesForFork[idx] + int(PORT_REST))
+	forkConfigBytes, err := t.GetForkConfig(analysis.CandidatePortBasesForFork[idx] + int(config.PORT_REST))
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +202,7 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 	forkDataPath := fmt.Sprintf("%s/fork_data", cwd)
 
 	idx := rand.Intn(len(analysis.CandidatePortBasesForFork))
-	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, analysis.CandidatePortBasesForFork[idx]+int(PORT_CLIENT)); err != nil {
+	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, analysis.CandidatePortBasesForFork[idx]+int(config.PORT_CLIENT)); err != nil {
 		return nil, err
 	}
 
