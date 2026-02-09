@@ -75,7 +75,6 @@ WHALE_PIDS=()
 SNARK_WORKERS_PIDS=()
 FISH_PIDS=()
 NODE_PIDS=()
-OVERRIDE_GENSIS_LEDGER=""
 ON_EXIT="grace_exit_all"
 REDIRECT_LOGS=false
 NODE_STATUS_URL=""
@@ -143,7 +142,7 @@ help() {
                                          |   Default: ${LOG_PRECOMPUTED_BLOCKS}
 -pl  |--proof-level <proof-level>        | Proof level
                                          |   Default: ${PROOF_LEVEL}
--c   |--config                           | Config to use. Set to 'reset' to generate a new config, new keypairs and new ledgers, 'inherit' to reuse the one found in previously deployed networks, 'inherit_with:CONFIG_PATH,GENESIS_LEDGER_PATH' to inherit keys with new config & genesis ledgers overridden. Note that any config parameters that should alter the config have priority over the passed in config
+-c   |--config                           | Config to use. Set to 'reset' to generate a new config, new keypairs and new ledgers, 'inherit' to reuse the one found in previously deployed networks
                                          |   Default: ${CONFIG_MODE}
 -u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument). Set to 'fixed:TIMESTAMP' to be a fixed time, 'delay_sec:SECONDS' to be set genesis to be SECONDS in the future, or 'no' to do nothing.
                                          |   Default: ${UPDATE_GENESIS_TIMESTAMP}
@@ -298,15 +297,6 @@ exec-daemon() {
 
 
   local extra_opts=()
-  local copied_override_genesis_ledger="${FOLDER}/override_genesis_ledger"
-
-  if [ -d "$OVERRIDE_GENSIS_LEDGER" ]; then
-    cp -r "$OVERRIDE_GENSIS_LEDGER" "$copied_override_genesis_ledger"
-  fi
-
-  if [ -d "$copied_override_genesis_ledger" ]; then
-    extra_opts+=( --genesis-ledger-dir "$copied_override_genesis_ledger")
-  fi
 
   # ITN features: only enabled when ITN_KEYS is provided
   # This only takes effect for daemons
@@ -490,7 +480,7 @@ jq-inplace() {
 }
 
 config_mode_is_inherit() {
-  [[ "$1" == "inherit" || "$1" == inherit_with:* ]]
+  [[ "$1" == "inherit" ]]
 }
 
 is_process_running() {
@@ -866,8 +856,8 @@ load_config() {
       echo "Inheriting config file ${config_file}:"
       cat "${config_file}"
       ;;
-    reset)
 
+    reset)
       echo "Making the Ledger..." 
       python3 scripts/mina-local-network/generate-mina-local-network-ledger.py \
         --num-whale-accounts "${WHALES}" \
@@ -883,27 +873,10 @@ load_config() {
       echo "Using freshly generated config file ${config_file}:"
       cat "${config_file}"
       ;;
-    inherit_with:*)
-      local replaced_config_file
-      IFS=',' read -r replaced_config_file OVERRIDE_GENSIS_LEDGER <<< "${config_mode#inherit_with:}"
-      if [ ! -f "${replaced_config_file}" ]; then
-        echo "Error: Config file '${replaced_config_file}' does not exist, can't inherit_with." >&2
-        exit 1
-      else
-        echo "Inheriting config at ${replaced_config_file}:"
-        cat "${replaced_config_file}"
-      fi
-      cp -f "${replaced_config_file}" "${config_file}"
-      ;;
   esac
 }
 
 load_config "${CONFIG_MODE}" "${CONFIG}"
-
-if [ -n "$OVERRIDE_GENSIS_LEDGER" ]; then
-  echo "Inherited genesis ledgers: "
-  ls -1 "$OVERRIDE_GENSIS_LEDGER"
-fi
 
 update_genesis_timestamp() {
   case "$1" in
