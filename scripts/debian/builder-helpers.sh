@@ -733,6 +733,7 @@ build_daemon_devnet_pre_hardfork_deb() {
 create_symlinks_for_shared_apps() {
   local NETWORK_NAME=${1}
 
+  mkdir -p "${BUILDDIR}/usr/local/bin"
 
   cp ../scripts/hardfork/dispatcher.sh \
     "${BUILDDIR}/usr/local/bin/mina-dispatch"
