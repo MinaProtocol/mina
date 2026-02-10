@@ -263,8 +263,9 @@ let spawn ?(allow_multiple_instances = false) ~logger ~pids ~conf_dir
            MINA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper."
   | Ok process ->
       Child_processes.register_process pids process Libp2p_helper ;
-      Mina_metrics.Process_memory.Libp2p_helper.set_pid
-        (Child_processes.pid process) ;
+      let pid = Child_processes.pid process in
+      [%log info] "Libp2p helper process has PID %d" (Pid.to_int pid) ;
+      Mina_metrics.Process_memory.Libp2p_helper.set_pid pid ;
       let t =
         { process
         ; logger

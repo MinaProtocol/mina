@@ -54,6 +54,11 @@ in  Pipeline.build
               { ancestor = MainlineBranch.Type.Mesa
               , reason = "Mesa does not have mainnet network yet"
               }
+          , Expr.Type.DescendantOf
+              { ancestor = MainlineBranch.Type.Develop
+              , reason =
+                  "Develop branch is incompatible with current mainnet network"
+              }
           ]
         }
       , steps =
