@@ -1368,6 +1368,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           let if_ b ~then_ ~else_ =
             run_checked (Public_key.Compressed.Checked.if_ b ~then_ ~else_)
+
+          let empty = Public_key.Compressed.var_of_t Public_key.Compressed.empty
         end
 
         module Protocol_state_precondition = struct
