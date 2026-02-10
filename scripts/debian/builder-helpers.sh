@@ -177,6 +177,8 @@ copy_common_daemon_utils() {
   echo "copy_common_daemon_configs inputs:"
   echo "Seed List URL path: ${1} (like seed-lists/berkeley_seeds.txt)"
 
+  local MINA_BIN="${2:-${BUILDDIR}/usr/local/bin/mina}"
+
   cp ../scripts/hardfork/create_runtime_config.sh \
     "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
   cp ../scripts/hardfork/mina-verify-packaged-fork-config \
@@ -191,7 +193,7 @@ copy_common_daemon_utils() {
   # NOTE: We do not list bash-completion as a required package,
   #       but it needs to be present for this to be effective
   mkdir -p "${BUILDDIR}/etc/bash_completion.d"
-  env COMMAND_OUTPUT_INSTALLATION_BASH=1 "${BUILDDIR}/usr/local/bin/mina" > \
+  env COMMAND_OUTPUT_INSTALLATION_BASH=1 "${MINA_BIN}" > \
     "${BUILDDIR}/etc/bash_completion.d/mina"
 
 }
@@ -761,7 +763,7 @@ build_daemon_mesa_postfork_deb() {
 
   copy_common_daemon_apps testnet $AUTOMODE_POST_HF_DIR
 
-  copy_common_daemon_utils 'o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
+  copy_common_daemon_utils 'o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt' "${AUTOMODE_POST_HF_DIR}/mina"
 
   copy_dispatcher mesa
 
@@ -780,9 +782,9 @@ build_daemon_devnet_postfork_deb() {
 
   copy_common_daemon_apps testnet $AUTOMODE_POST_HF_DIR
 
-  copy_dispatcher devnet
+  copy_common_daemon_utils 'seed-lists/devnet_seeds.txt' "${AUTOMODE_POST_HF_DIR}/mina"
 
-  copy_common_daemon_utils 'seed-lists/devnet_seeds.txt'
+  copy_dispatcher devnet
 
   build_deb $NAME
 }
