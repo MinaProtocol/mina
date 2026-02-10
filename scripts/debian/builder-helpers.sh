@@ -722,6 +722,8 @@ build_daemon_devnet_pre_hardfork_deb() {
 copy_dispatcher() {
   local NETWORK_NAME="${1}"
 
+  mkdir -p "${BUILDDIR}/etc/default"
+
   #Create env vars for the dispatcher
     cat << EOF > "${BUILDDIR}/etc/default/mina-dispatch"
 MINA_NETWORK=${NETWORK_NAME}
@@ -729,6 +731,8 @@ RUNTIMES_BASE_PATH="/usr/lib/mina"
 MINA_PROFILE=${DUNE_PROFILE}
 MINA_LIBP2P_ENVVAR_NAME="MINA_LIBP2P_HELPER_PATH"
 EOF
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
 
   cp ./scripts/hardfork/dispatcher.sh "${BUILDDIR}/usr/local/bin/mina-dispatch"
 
