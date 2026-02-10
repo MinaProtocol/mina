@@ -80,8 +80,8 @@ BUILDDIR="deb_build"
 
 
 # For automode purpose. We need to control location for both runtimes
-AUTOMODE_PRE_HF_DIR=${BUILDDIR}/usr/lib/mina/bin/berkeley
-AUTOMODE_POST_HF_DIR=${BUILDDIR}/usr/lib/mina/bin/mesa
+AUTOMODE_PRE_HF_DIR=${BUILDDIR}/usr/lib/mina/berkeley
+AUTOMODE_POST_HF_DIR=${BUILDDIR}/usr/lib/mina/mesa
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -615,7 +615,7 @@ build_daemon_mesa_deb() {
 
   create_control_file "mina-mesa" "${SHARED_DEPS}${DAEMON_DEPS}, mina-mesa-config (>=${MINA_DEB_VERSION})" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}" "mina-mesa (<< ${MINA_DEB_VERSION})"
-   
+
   copy_common_daemon_apps testnet
 
   copy_common_daemon_utils 'o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
@@ -719,6 +719,30 @@ build_daemon_devnet_pre_hardfork_deb() {
 }
 ## END DEVNET PRE HF PACKAGE ##
 
+copy_dispatcher() {
+  local NETWORK_NAME="${1}"
+
+  #Create env vars for the dispatcher
+    cat << EOF > "${BUILDDIR}/etc/default/mina-dispatch"
+MINA_NETWORK=${NETWORK_NAME}
+RUNTIMES_BASE_PATH="/usr/lib/mina"
+MINA_PROFILE=${DUNE_PROFILE}
+MINA_LIBP2P_ENVVAR_NAME="MINA_LIBP2P_HELPER_PATH"
+EOF
+
+  cp ./scripts/hardfork/dispatcher.sh "${BUILDDIR}/usr/local/bin/mina-dispatch"
+
+  # Create actual symlinks in the package (not using DEBIAN/links which is not standard)
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-create-genesis"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-rocksdb-scanner"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina"
+}
+
+
 build_daemon_mesa_postfork_deb() {
 
   NAME="mina-mesa-post-hardfork-mesa"
@@ -730,6 +754,8 @@ build_daemon_mesa_postfork_deb() {
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_apps testnet $AUTOMODE_POST_HF_DIR
+
+  copy_dispatcher mesa
 
   build_deb $NAME
 }
@@ -745,6 +771,8 @@ build_daemon_devnet_postfork_deb() {
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_apps testnet $AUTOMODE_POST_HF_DIR
+
+  copy_dispatcher devnet
 
   build_deb $NAME
 }
