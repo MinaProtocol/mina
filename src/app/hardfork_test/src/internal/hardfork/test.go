@@ -141,7 +141,13 @@ func (t *HardforkTest) Run() error {
 		return err
 	}
 
-	t.Logger.Info("Phase 3: Running fork network...")
+	t.Logger.Info("Phase 3: Cleaning up main config and moving fork config into correct location...")
+
+	if err := t.CleanUpNetworkForForkPhase(); err != nil {
+		return err
+	}
+
+	t.Logger.Info("Phase 4: Running fork network...")
 	if err := t.RunForkNetworkPhase(analysis.Consensus.LastBlockBeforeTxEnd.BlockHeight, mainGenesisTs); err != nil {
 		return err
 	}

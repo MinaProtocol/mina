@@ -273,3 +273,62 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 
 	return nil
 }
+
+func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
+	// ===========================================================================
+	t.Logger.Info("Cleaning up deamon.json generate by mina-local-network so we're not using prefork genesis info...")
+	networkDaemonConfig := filepath.Join(t.Config.Root, "daemon.json")
+	data, err := os.ReadFile(networkDaemonConfig)
+	if err != nil {
+		return fmt.Errorf("Error reading daemon.json: %v", err)
+	}
+
+	var config map[string]any
+	if err := json.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("Error parsing daemon.json: %v", err)
+	}
+
+	delete(config, "ledger")
+	t.Logger.Info("Removed .ledger from daemon.json")
+
+	if genesis, ok := config["genesis"].(map[string]any); ok {
+		delete(genesis, "genesis_state_timestamp")
+		t.Logger.Info("Removed .genesis.genesis_state_timestamp from daemon.json")
+	} else {
+		t.Logger.Debug(".genesis section not found in daemon.json!")
+	}
+
+	updatedData, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("Error encoding daemon.json: %v", err)
+	}
+
+	if err := os.WriteFile(networkDaemonConfig, updatedData, 0644); err != nil {
+		return fmt.Errorf("Error writing daemon.json: %v", err)
+	}
+	fmt.Println("daemon.json successfully sanitized!")
+
+	// ===========================================================================
+	t.Logger.Info("Moving fork config & ledgers in place for fork network")
+	filesToMove := []string{"daemon.json", "genesis"}
+	for _, info := range t.Config.AllDaemonInfos() {
+		for _, fileToMove := range filesToMove {
+			// NOTE: all *Fork functions will generate a "fork_data/{daemon.json, genesis}"
+			oldPath := filepath.Join(info.NodeDir, "fork_data", fileToMove)
+			newPath := filepath.Join(info.NodeDir, fileToMove)
+
+			if _, err = os.Stat(newPath); err == nil {
+				t.Logger.Info("Target file/folder %s exists, removing it first", newPath)
+				err = os.RemoveAll(newPath)
+				if err != nil {
+					return fmt.Errorf("Failed to remove existing file/folder %s: %v", newPath, err)
+				}
+			}
+			err := os.Rename(oldPath, newPath)
+			if err != nil {
+				return fmt.Errorf("Error moving fork data %s -> %s on node %s: %v", oldPath, newPath, info.NodeDir, err)
+			}
+		}
+	}
+	return nil
+}
