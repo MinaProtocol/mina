@@ -1,14 +1,22 @@
 package hardfork
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
+	"path/filepath"
 	"time"
+
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
+
+type HFHandler func(*HardforkTest, *BlockAnalysisResult) error
 
 // RunMainNetworkPhase runs the main network and validates its operation
 // and returns the fork config bytes and block analysis result
-func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) ([]byte, *BlockAnalysisResult, error) {
+func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) (*BlockAnalysisResult, *ForkData, error) {
 	// Start the main network
 	mainNetCmd, err := t.RunMainNetwork(mainGenesisTs)
 	if err != nil {
@@ -18,18 +26,18 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) ([]byte, *BlockA
 	defer t.gracefulShutdown(mainNetCmd, "Main network")
 
 	// Wait until best chain query time
-	t.WaitUntilBestChainQuery(t.Config.MainSlot, t.Config.MainDelay)
+	t.WaitUntilBestChainQuery(t.Config.MainSlot, 0)
 
 	// Check block height at slot BestChainQueryFrom
-	blockHeight, err := t.Client.GetHeight(t.AnyPortOfType(PORT_REST))
+	bestTip, err := t.Client.BestTip(t.AnyPortOfType(PORT_REST))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	t.Logger.Info("Block height is %d at slot %d.", blockHeight, t.Config.BestChainQueryFrom)
+	t.Logger.Info("Block height is %d at slot %d.", bestTip.BlockHeight, bestTip.Slot)
 
 	// Validate slot occupancy
-	if err := t.ValidateSlotOccupancy(0, blockHeight); err != nil {
+	if err := t.ValidateSlotOccupancy(0, bestTip.BlockHeight); err != nil {
 		return nil, nil, err
 	}
 
@@ -39,40 +47,79 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) ([]byte, *BlockA
 		return nil, nil, err
 	}
 
+	t.Logger.Info("Network analayze result: %v", analysis)
+
 	// Validate max slot
-	if err := t.ValidateLatestOccupiedSlot(analysis.LatestOccupiedSlot); err != nil {
+	if err := t.ValidateLatestOccupiedSlot(analysis.LastOccupiedSlot); err != nil {
 		return nil, nil, err
 	}
 
 	// Validate latest block slot
-	if err := t.ValidateLatestNonEmptyBlockSlot(analysis.LatestNonEmptyBlock); err != nil {
+	if err := t.ValidateLatestLastBlockBeforeTxEndSlot(analysis.LastBlockBeforeTxEnd); err != nil {
 		return nil, nil, err
 	}
 
-	// Validate no new blocks are created after chain end
-	if err := t.ValidateNoNewBlocks(t.AnyPortOfType(PORT_REST)); err != nil {
-		return nil, nil, err
+	// On auto mode node shutdown itself at slot-chain-end as long as it heards
+	// from block at slot-tx-end, so it's not guaranteed we can still connect to
+	// nodes here.
+	if t.Config.ForkMethod != config.Auto {
+		// Validate no new blocks are created after chain end
+		if err := t.ValidateNoNewBlocks(t.AnyPortOfType(PORT_REST)); err != nil {
+			return nil, nil, err
+		}
 	}
 
-	// Extract fork config before nodes shutdown
-	forkConfigBytes, err := t.GetForkConfig(t.AnyPortOfType(PORT_REST))
+	t.Logger.Info("Phase 2: Forking with fork method `%s`...", t.Config.ForkMethod.String())
+
+	var forkData *ForkData
+	switch t.Config.ForkMethod {
+	case config.Legacy:
+		forkData, err = t.LegacyForkPhase(analysis, mainGenesisTs)
+	case config.Advanced:
+		forkData, err = t.AdvancedForkPhase(analysis, mainGenesisTs)
+	case config.Auto:
+		forkData, err = t.AutoForkPhase(analysis, mainGenesisTs)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
+	return analysis, forkData, nil
+}
 
-	return forkConfigBytes, analysis, nil
+type ForkDataAndUsage interface {
+	generateLocalNetworkParam() string
+}
+
+type ConfigWithLedgers struct {
+	config     string
+	ledgersDir string
+}
+
+func (c ConfigWithLedgers) generateLocalNetworkParam() string {
+	return fmt.Sprintf("inherit_with:%s,%s", c.config, c.ledgersDir)
+}
+
+type Inherit struct{}
+
+func (c Inherit) generateLocalNetworkParam() string {
+	return fmt.Sprintf("inherit")
 }
 
 type ForkData struct {
-	config     string
-	ledgersDir string
-	genesis    int64
+	data    ForkDataAndUsage
+	genesis int64
 }
 
 // RunForkNetworkPhase runs the fork network and validates its operation
 func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData ForkData, mainGenesisTs int64) error {
+	forkGenesisInstant := time.Unix(forkData.genesis, 0)
+
+	if time.Now().After(forkGenesisInstant) {
+		return fmt.Errorf("Now is %s, fork genesis %s happened in the past! We should bump up hf-slot-delta!", time.Now(), forkGenesisInstant)
+	}
+
 	// Start fork network
-	forkCmd, err := t.RunForkNetwork(forkData.config, forkData.ledgersDir)
+	forkCmd, err := t.RunForkNetwork(forkData.data)
 	if err != nil {
 		return err
 	}
@@ -82,80 +129,254 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData For
 	// Calculate expected genesis slot
 	expectedGenesisSlot := (forkData.genesis - mainGenesisTs) / int64(t.Config.MainSlot)
 
+	t.Logger.Info("Fork network genesis slot: %d", expectedGenesisSlot)
+
 	// Validate fork network blocks
 	if err := t.ValidateFirstBlockOfForkChain(t.AnyPortOfType(PORT_REST), latestPreForkHeight, expectedGenesisSlot); err != nil {
 		return err
 	}
 
 	// Wait until best chain query time
-	t.WaitUntilBestChainQuery(t.Config.ForkSlot, t.Config.ForkDelay)
+	t.WaitUntilBestChainQuery(t.Config.ForkSlot, int(expectedGenesisSlot))
 
 	// Check block height at slot BestChainQueryFrom
-	blockHeight, err := t.Client.GetHeight(t.AnyPortOfType(PORT_REST))
+	bestTip, err := t.Client.BestTip(t.AnyPortOfType(PORT_REST))
 	if err != nil {
 		return err
 	}
 
-	t.Logger.Info("Block height is %d at estimated slot %d.", blockHeight, expectedGenesisSlot+int64(t.Config.BestChainQueryFrom))
+	t.Logger.Info("Block height is %d at slot %d.", bestTip.BlockHeight, bestTip.Slot)
 
 	// Validate slot occupancy
-	if err := t.ValidateSlotOccupancy(latestPreForkHeight+1, blockHeight); err != nil {
+	if err := t.ValidateSlotOccupancy(latestPreForkHeight+1, bestTip.BlockHeight); err != nil {
 		return err
 	}
 
 	// Validate user commands in blocks
-	if err := t.ValidateBlockWithUserCommandCreated(t.AnyPortOfType(PORT_REST)); err != nil {
+	if err := t.ValidateBlockWithUserCommandCreatedForkNetwork(t.AnyPortOfType(PORT_REST)); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, forkConfigBytes []byte, mainGenesisTs int64) (*ForkData, error) {
+func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) (*ForkData, error) {
 
-	// Define all localnet file paths
-	if err := os.MkdirAll("fork_data/prefork", 0755); err != nil {
+	idx := rand.Intn(len(analysis.CandidatePortBasesForFork))
+	forkConfigBytes, err := t.GetForkConfig(analysis.CandidatePortBasesForFork[idx] + int(PORT_REST))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := os.MkdirAll("fork_data/prepatch", 0755); err != nil {
 		return nil, err
 	}
 
 	// Define all fork_data file paths
-	preforkConfig := "fork_data/prefork/config.json"
+	prepatchConfigFile := "fork_data/prepatch/config.json"
+
+	var prepatchConfig LegacyPrepatchForkConfigView
+	dec := json.NewDecoder(bytes.NewReader(forkConfigBytes))
+	dec.DisallowUnknownFields()
+
+	if err := dec.Decode(&prepatchConfig); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal legacy prepatch fork config: %w", err)
+	}
 
 	// Validate fork config data
-	if err := t.ValidateForkConfigData(analysis.LatestNonEmptyBlock, forkConfigBytes); err != nil {
+	if err := t.ValidateLegacyPrepatchForkConfig(analysis.LastBlockBeforeTxEnd, prepatchConfig); err != nil {
 		return nil, err
 	}
 	// Write fork config to file
-	if err := os.WriteFile(preforkConfig, forkConfigBytes, 0644); err != nil {
-		return nil, err
-	}
-	{
-		preforkLedgersDir := "fork_data/prefork/hf_ledgers"
-		preforkHashesFile := "fork_data/prefork/hf_ledger_hashes.json"
-		if err := t.GenerateAndValidatePreforkLedgers(analysis, preforkConfig, preforkLedgersDir, preforkHashesFile); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := os.MkdirAll("fork_data/postfork", 0755); err != nil {
+	if err := os.WriteFile(prepatchConfigFile, forkConfigBytes, 0644); err != nil {
 		return nil, err
 	}
 
-	postforkConfig := "fork_data/postfork/config.json"
-	forkLedgersDir := "fork_data/postfork/hf_ledgers"
-
-	// Calculate fork genesis timestamp relative to now (before starting fork network)
-	forkGenesisTs := time.Now().Unix() + int64(t.Config.ForkDelay*60)
-
-	t.Logger.Info("Phase 3: Generating fork configuration and ledgers...")
-	{
-		preforkGenesisConfigFile := fmt.Sprintf("%s/daemon.json", t.Config.Root)
-		forkHashesFile := "fork_data/hf_ledger_hashes.json"
-		if err := t.GenerateForkConfigAndLedgers(analysis, preforkConfig, forkLedgersDir, forkHashesFile, postforkConfig, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs); err != nil {
-			return nil, err
-		}
+	prepatchLedgersDir := "fork_data/prepatch/hf_ledgers"
+	prepatchHashesFile := "fork_data/prepatch/hf_ledger_hashes.json"
+	if err := t.GenerateAndValidateHashesAndLedgers(analysis, prepatchConfigFile, prepatchLedgersDir, prepatchHashesFile); err != nil {
+		return nil, err
 	}
 
-	return &ForkData{config: postforkConfig, ledgersDir: forkLedgersDir, genesis: forkGenesisTs}, nil
+	if err := os.MkdirAll("fork_data/postpatch", 0755); err != nil {
+		return nil, err
+	}
 
+	patchedConfigFile := "fork_data/postpatch/config.json"
+	patchedLedgersDir := "fork_data/postpatch/hf_ledgers"
+
+	forkGenesisTs := t.Config.ForkGenesisTsGivenMainGenesisTs(mainGenesisTs)
+
+	preforkGenesisConfigFile := fmt.Sprintf("%s/daemon.json", t.Config.Root)
+	forkHashesFile := "fork_data/hf_ledger_hashes.json"
+
+	patchedConfigBytes, err := t.PatchForkConfigAndGenerateLedgersLegacy(analysis, prepatchConfigFile, patchedLedgersDir, forkHashesFile, patchedConfigFile, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs)
+	if err != nil {
+		return nil, err
+	}
+
+	var config FinalForkConfigView
+	err = config.UnmarshalFromJsonBytes(patchedConfigBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.ValidateFinalForkConfig(analysis.LastBlockBeforeTxEnd, config, forkGenesisTs, mainGenesisTs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ForkData{
+			data:    ConfigWithLedgers{config: patchedConfigFile, ledgersDir: patchedLedgersDir},
+			genesis: forkGenesisTs},
+		nil
+
+}
+
+// Uses `mina advanced generate-hardfork-config CLI`
+func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) (*ForkData, error) {
+
+	cwd := ""
+	var err error = nil
+	if cwd, err = os.Getwd(); err != nil {
+		return nil, err
+	}
+
+	forkDataPath := fmt.Sprintf("%s/fork_data", cwd)
+
+	idx := rand.Intn(len(analysis.CandidatePortBasesForFork))
+	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, analysis.CandidatePortBasesForFork[idx]+int(PORT_CLIENT)); err != nil {
+		return nil, err
+	}
+
+	forkConfig := fmt.Sprintf("%s/daemon.json", forkDataPath)
+
+	forkConfigBytes, err := os.ReadFile(forkConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	forkGenesisTs := t.Config.ForkGenesisTsGivenMainGenesisTs(mainGenesisTs)
+
+	var config FinalForkConfigView
+	err = config.UnmarshalFromJsonBytes(forkConfigBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.ValidateFinalForkConfig(analysis.LastBlockBeforeTxEnd, config, forkGenesisTs, mainGenesisTs)
+	if err != nil {
+		return nil, err
+	}
+
+	forkLedgersDir := fmt.Sprintf("%s/genesis", forkDataPath)
+	return &ForkData{
+		data:    ConfigWithLedgers{config: forkConfig, ledgersDir: forkLedgersDir},
+		genesis: forkGenesisTs,
+	}, nil
+}
+
+func (t *HardforkTest) AutoForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) (*ForkData, error) {
+
+	// NOTE: Auto mode differs from either Legacy/Advanced fork mode in that each
+	// node tries to generate their own fork config, and we try to boot each node
+	// with the data they generated on their own. This is more decentralized
+	// compared to the other methods
+
+	nodesDir := t.Config.Root + "/nodes"
+
+	var err error = nil
+
+	seenForkConfig := false
+	var commonForkConfig FinalForkConfigView
+
+	entries, err := os.ReadDir(nodesDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2 is the buffering param we wait for hf config to be generated
+	timeOutInstant := time.Unix(mainGenesisTs+int64((t.Config.SlotChainEnd+2)*t.Config.MainSlot), 0)
+
+	for _, e := range entries {
+		if !e.IsDir() {
+			return nil, fmt.Errorf("Unexpected file %s in node directory %s", e.Name(), nodesDir)
+		}
+		if e.Name() == "snark_workers" {
+			// SNARK workers doesn't participate in fork
+			continue
+		}
+		nodeDir := filepath.Join(nodesDir, e.Name())
+		forkConfigBase := filepath.Join(nodeDir, "auto-fork-mesa-devnet")
+
+		activatedFile := filepath.Join(forkConfigBase, "activated")
+
+		_, err = os.Stat(activatedFile)
+		for err != nil {
+			if time.Now().After(timeOutInstant) {
+				return nil, fmt.Errorf("Node %s haven't create activated file, meaning it's not completed auto config generation: %w", e.Name(), err)
+			}
+			t.Logger.Info("No auto fork config is completed for node %s, waiting to poll again...", e.Name())
+			time.Sleep(10 * time.Second)
+			_, err = os.Stat(activatedFile)
+		}
+
+		currentForkConfigBytes, err := os.ReadFile(filepath.Join(forkConfigBase, "daemon.json"))
+		if err != nil {
+			return nil, err
+		}
+
+		var currentForkConfig FinalForkConfigView
+		err = currentForkConfig.UnmarshalFromJsonBytes(currentForkConfigBytes)
+		if err != nil {
+			return nil, fmt.Errorf("Node %s generated fork config that's not valid: %w", e.Name(), err)
+		}
+
+		if !seenForkConfig {
+			seenForkConfig = true
+			commonForkConfig = currentForkConfig
+		} else if !commonForkConfig.IsCompatibleWith(&currentForkConfig) {
+			// NOTE: we're using a single fork config across different nodes, it's fine
+			// even if the s3_data_hash generated by different don't match up, because
+			// the daemon does not check for it if it has a ledger tar locally which is
+			// guaranteed by auto mode.
+			return nil, fmt.Errorf("Node %s generated fork config '%v' not same as the commonly agreed one '%v'",
+				e.Name(), currentForkConfig, commonForkConfig)
+		}
+
+		err = os.Rename(filepath.Join(forkConfigBase, "genesis"), filepath.Join(nodeDir, "override_genesis_ledger"))
+		if err != nil {
+			return nil, err
+		}
+
+		t.Logger.Info("Node %s has successfully generated an auto fork config", e.Name())
+	}
+
+	if !seenForkConfig {
+		return nil, fmt.Errorf("No fork config has been found after auto mode has been used!")
+	}
+
+	forkGenesisTs := t.Config.ForkGenesisTsGivenMainGenesisTs(mainGenesisTs)
+	err = t.ValidateFinalForkConfig(analysis.LastBlockBeforeTxEnd, commonForkConfig, forkGenesisTs, mainGenesisTs)
+	if err != nil {
+		return nil, err
+	}
+
+	forkConfigBytes, err := json.Marshal(commonForkConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	forkConfigFile := filepath.Join(t.Config.Root, "daemon.json")
+	err = os.WriteFile(forkConfigFile, forkConfigBytes, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	// genesis ledgers has been overriden and each node will use a different one generated during auto fork phase
+	return &ForkData{
+			data:    Inherit{},
+			genesis: forkGenesisTs,
+		},
+		nil
 }
