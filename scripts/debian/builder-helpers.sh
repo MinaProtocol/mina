@@ -755,6 +755,8 @@ build_daemon_mesa_postfork_deb() {
 
   copy_common_daemon_apps testnet $AUTOMODE_POST_HF_DIR
 
+  copy_common_daemon_utils 'o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
+
   copy_dispatcher mesa
 
   build_deb $NAME
@@ -773,6 +775,8 @@ build_daemon_devnet_postfork_deb() {
   copy_common_daemon_apps testnet $AUTOMODE_POST_HF_DIR
 
   copy_dispatcher devnet
+
+  copy_common_daemon_utils 'seed-lists/devnet_seeds.txt'
 
   build_deb $NAME
 }
