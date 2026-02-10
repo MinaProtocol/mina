@@ -1460,13 +1460,13 @@ let start t =
   let () =
     match t.config.node_status_url with
     | Some node_status_url ->
+        let block_producer_public_key_base58 =
+          Option.map ~f:(fun (_, pk) ->
+              Public_key.Compressed.to_base58_check pk )
+          @@ Keypair.And_compressed_pk.Set.choose
+               t.config.block_production_keypairs
+        in
         if t.config.simplified_node_stats then
-          let block_producer_public_key_base58 =
-            Option.map ~f:(fun (_, pk) ->
-                Public_key.Compressed.to_base58_check pk )
-            @@ Keypair.And_compressed_pk.Set.choose
-                 t.config.block_production_keypairs
-          in
           Node_status_service.start_simplified ~commit_id:t.commit_id
             ~logger:t.config.logger ~node_status_url ~network:t.components.net
             ~chain_id:t.config.chain_id
@@ -1487,6 +1487,7 @@ let start t =
               (Block_time.Span.to_time_span
                  t.config.precomputed_values.consensus_constants
                    .slot_duration_ms )
+            ~block_producer_public_key_base58
     | None ->
         ()
   in
