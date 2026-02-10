@@ -124,15 +124,15 @@ let Config =
 let targetToAgent =
           \(target : Size)
       ->  merge
-            { XLarge = toMap { size = "generic", generic = "true" }
-            , Large = toMap { size = "generic", generic = "true" }
-            , Medium = toMap { size = "generic", generic = "true" }
-            , Small = toMap { size = "generic", generic = "true" }
-            , Integration = toMap { size = "integration", integration = "true" }
-            , QA = toMap { size = "qa", qa = "true" }
-            , Perf = toMap { size = "performance", performance = "true" }
-            , Multi = toMap { size = "generic-multi", generic_multi = "true" }
-            , Arm64 = toMap { size = "arm64-static", arm64_static = "true" }
+            { XLarge = toMap { generic = "true" }
+            , Large = toMap { generic = "true" }
+            , Medium = toMap { generic = "true" }
+            , Small = toMap { generic = "true" }
+            , Integration = toMap { integration = "true" }
+            , QA = toMap { qa = "true" }
+            , Perf = toMap { performance = "true" }
+            , Multi = toMap { generic_multi = "true" }
+            , Arm64 = toMap { arm64_static = "true" }
             }
             target
 
