@@ -1,16 +1,16 @@
-/* global kimchi_ffi, tsRustConversion, caml_jsstring_of_string, kimchi_is_native */
+/* global kimchi_ffi, tsRustConversion, caml_jsstring_of_string, kimchi_is_native, kimchi_is_wasm */
 
 // FP
 
 // Provides: caml_pasta_fp_plonk_index_serialize
-// Requires: kimchi_ffi
+// Requires: kimchi_ffi, kimchi_is_wasm
 var caml_pasta_fp_plonk_index_serialize = function (index) {
     // Workaround for Napi issue where methods on External objects are not accessible
     return kimchi_is_wasm ? index.serialize() : kimchi_ffi.prover_index_fp_serialize(index);
 };
 
 // Provides: caml_pasta_fp_plonk_index_deserialize
-// Requires: kimchi_ffi
+// Requires: kimchi_ffi, kimchi_is_wasm
 var caml_pasta_fp_plonk_index_deserialize = function (index) {
     // Workaround for Napi issue where methods on External objects are not accessible
     return kimchi_is_wasm ? index.deserialize() : kimchi_ffi.prover_index_fp_deserialize(index);
@@ -130,14 +130,14 @@ var caml_pasta_fp_plonk_index_write = function (append, t, path) {
 //////// FQ ////////
 
 // Provides: caml_pasta_fq_plonk_index_serialize
-// Requires: kimchi_ffi
+// Requires: kimchi_ffi, kimchi_is_wasm
 var caml_pasta_fq_plonk_index_serialize = function (index) {
     // Workaround for Napi issue where methods on External objects are not accessible
     return kimchi_is_wasm ? index.serialize() : kimchi_ffi.prover_index_fq_serialize(index);
 };
 
 // Provides: caml_pasta_fq_plonk_index_deserialize
-// Requires: kimchi_ffi
+// Requires: kimchi_ffi, kimchi_is_wasm
 var caml_pasta_fq_plonk_index_deserialize = function (index) {
     // Workaround for Napi issue where methods on External objects are not accessible
     return kimchi_is_wasm ? index.deserialize() : kimchi_ffi.prover_index_fq_deserialize(index);

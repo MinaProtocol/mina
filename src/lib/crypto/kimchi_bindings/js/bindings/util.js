@@ -18,6 +18,26 @@ var kimchi_is_wasm = kimchi_backend === 'wasm';
 // Requires: kimchi_backend
 var kimchi_is_native = kimchi_backend === 'native';
 
+// Internal timing helper: 
+// Intentionally not exposed as a JSOO primitive. Use only for debugging
+var _report_kimchi_timing = function (label, fn) {
+  var now =
+    globalThis.performance && globalThis.performance.now
+      ? function () {
+        return globalThis.performance.now();
+      }
+      : Date.now;
+  var t0 = now();
+  try {
+    return fn();
+  } finally {
+    var dt = now() - t0;
+    if (globalThis.console && globalThis.console.log) {
+      globalThis.console.log('[kimchi timing] ' + label + ': ' + dt.toFixed(3) + 'ms');
+    }
+  }
+};
+
 // Provides: tsRustConversion
 // Requires: tsBindings, kimchi_ffi
 var tsRustConversion = tsBindings.rustConversion(kimchi_ffi);
