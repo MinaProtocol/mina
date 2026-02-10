@@ -111,6 +111,8 @@ in {
     in {
       lockFileContents =
         fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
+      outputHashes =
+        narHashesFromCargoLock ../src/lib/crypto/proof-systems/Cargo.lock;
     };
     buildPhase = ''
       cargo build -p kimchi-stubs --release --lib
