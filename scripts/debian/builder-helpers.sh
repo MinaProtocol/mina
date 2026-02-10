@@ -171,6 +171,15 @@ build_deb() {
   echo "--- Built ${1}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
 }
 
+copy_hf_related_scripts() {
+
+  cp ../scripts/hardfork/create_runtime_config.sh \
+    "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
+  cp ../scripts/hardfork/mina-verify-packaged-fork-config \
+    "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
+
+}
+
 # Copies scripts and build utilities to debian package
 copy_common_daemon_utils() {
   echo "------------------------------------------------------------"
@@ -179,10 +188,8 @@ copy_common_daemon_utils() {
 
   local MINA_BIN="${2:-${BUILDDIR}/usr/local/bin/mina}"
 
-  cp ../scripts/hardfork/create_runtime_config.sh \
-    "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
-  cp ../scripts/hardfork/mina-verify-packaged-fork-config \
-    "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
+  copy_hf_related_scripts
+
   # Update the mina.service with a new default PEERS_URL based on Seed List \
   # URL $1
   mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
@@ -721,24 +728,25 @@ build_daemon_devnet_pre_hardfork_deb() {
 }
 ## END DEVNET PRE HF PACKAGE ##
 
-copy_dispatcher() {
-  local NETWORK_NAME="${1}"
+# Function to DRY creating symlinks for shared apps in deb packages
+# for automode runtimes that share the same dispatcher but different runtimes
+create_symlinks_for_shared_apps() {
+  local NETWORK_NAME=${1}
+
+
+  cp ../scripts/hardfork/dispatcher.sh \
+    "${BUILDDIR}/usr/local/bin/mina-dispatch"
 
   mkdir -p "${BUILDDIR}/etc/default"
 
-  MINA_DISPATCH_ENV_FILE="${BUILDDIR}/etc/default/mina-dispatch"
-
-  #Create default env vars for the dispatcher
-    cat << EOF > ${MINA_DISPATCH_ENV_FILE}
+  #Create env vars for the dispatcher
+    cat << EOF > "${BUILDDIR}/etc/default/mina-dispatch"
 MINA_NETWORK=${NETWORK_NAME}
+MINA_PROFILE="${DUNE_PROFILE}"
 RUNTIMES_BASE_PATH="/usr/lib/mina"
-MINA_PROFILE=${DUNE_PROFILE}
 MINA_LIBP2P_ENVVAR_NAME="MINA_LIBP2P_HELPER_PATH"
 EOF
 
-  mkdir -p "${BUILDDIR}/usr/local/bin"
-
-  cp ../scripts/hardfork/dispatcher.sh "${BUILDDIR}/usr/local/bin/mina-dispatch"
 
   # Create actual symlinks in the package (not using DEBIAN/links which is not standard)
   ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
@@ -748,6 +756,43 @@ EOF
   ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
   ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-rocksdb-scanner"
   ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina"
+
+  # Create directory for legacy binaries symlink if needed
+  mkdir -p "${BUILDDIR}/usr/lib/mina/berkeley"
+  ln -sf ../../lib/mina/berkeley/mina-create-genesis "${BUILDDIR}/usr/local/bin/mina-create-legacy-genesis"
+
+  echo "------------------------------------------------------------"
+  echo "Created symlinks in ${BUILDDIR}/usr/local/bin:"
+  find "${BUILDDIR}/usr/local/bin/" -type l -exec ls -la {} \;
+
+}
+
+# Copies common binaries and configuration for post-hardfork automode packages
+# Includes only binaries without configuration files or genesis ledgers
+# Places binaries in /usr/lib/mina/<network_name> directory
+copy_common_daemon_post_automode_apps_and_configs() {
+
+  echo "------------------------------------------------------------"
+  echo "copy_common_daemon_post_automode_configs inputs:"
+  echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
+  echo "Signature Type: ${2} (mainnet or testnet)"
+  echo "Seed List URL path: ${3} (like seed-lists/berkeley_seeds.txt)"
+
+  # Copy binaries to separate directory as we need both berkeley and mesa binaries for automode packages
+  # and they share the same dispatcher and some common apps,
+  mkdir -p "${AUTOMODE_POST_HF_DIR}"
+  copy_common_daemon_apps "${2}" $AUTOMODE_POST_HF_DIR
+
+  # Create symlinks for shared apps in the main bin directory that
+  # dispatch to the correct runtime based on env var set in /etc/default/mina-dispatch
+  create_symlinks_for_shared_apps "${1}"
+
+  copy_common_daemon_configs "${1}"
+
+  # Copy seed list with correct URL for post-hardfork runtime and
+  # bash completion that points to the correct seed list URL
+  copy_common_daemon_utils "${3}" "${AUTOMODE_POST_HF_DIR}/mina"
+
 }
 
 
@@ -761,11 +806,10 @@ build_daemon_mesa_postfork_deb() {
   create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_apps testnet $AUTOMODE_POST_HF_DIR
-
-  copy_common_daemon_utils 'o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt' "${AUTOMODE_POST_HF_DIR}/mina"
-
-  copy_dispatcher mesa
+  copy_common_daemon_post_automode_apps_and_configs \
+    "mesa" \
+    "testnet" \
+    'o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
 
   build_deb $NAME
 }
@@ -780,11 +824,10 @@ build_daemon_devnet_postfork_deb() {
   create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_apps testnet $AUTOMODE_POST_HF_DIR
-
-  copy_common_daemon_utils 'seed-lists/devnet_seeds.txt' "${AUTOMODE_POST_HF_DIR}/mina"
-
-  copy_dispatcher devnet
+  copy_common_daemon_post_automode_apps_and_configs \
+    "devnet" \
+    "testnet" \
+    'seed-lists/devnet_seeds.txt'
 
   build_deb $NAME
 }
