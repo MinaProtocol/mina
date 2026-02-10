@@ -734,6 +734,22 @@ build_daemon_mesa_postfork_deb() {
   build_deb $NAME
 }
 
+build_daemon_devnet_postfork_deb() {
+
+  NAME="mina-devnet-post-hardfork-mesa"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building devnet post-hardfork deb for hardfork automode :"
+
+  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_apps testnet $AUTOMODE_POST_HF_DIR
+
+  build_deb $NAME
+}
+
+
 ## TESTNET GENERIC PACKAGE ##
 
 #
