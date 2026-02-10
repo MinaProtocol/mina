@@ -2610,7 +2610,7 @@ module Queries = struct
         in
         let%bind { source_ledgers
                  ; global_slot_since_genesis
-                 ; genesis_state_timestamp = _
+                 ; genesis_state_timestamp
                  ; state_hash
                  ; staking_epoch_seed
                  ; next_epoch_seed
@@ -2629,7 +2629,8 @@ module Queries = struct
         in
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger
-            ~global_slot_since_genesis ~state_hash ~staking_ledger
+            ~genesis_state_timestamp ~global_slot_since_genesis ~state_hash
+            ~staking_ledger
             ~staking_epoch_seed:(Epoch_seed.to_base58_check staking_epoch_seed)
             ~next_epoch_ledger:(Some next_epoch_ledger)
             ~next_epoch_seed:(Epoch_seed.to_base58_check next_epoch_seed)

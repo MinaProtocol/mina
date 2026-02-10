@@ -55,7 +55,7 @@ let debianSuffix =
 let requiresMainnetBuild =
           \(network : Network)
       ->  merge
-            { Devnet = True
+            { Devnet = False
             , Mainnet = True
             , TestnetGeneric = True
             , DevnetLegacy = True
