@@ -734,7 +734,7 @@ EOF
 
   mkdir -p "${BUILDDIR}/usr/local/bin"
 
-  cp ./scripts/hardfork/dispatcher.sh "${BUILDDIR}/usr/local/bin/mina-dispatch"
+  cp ../scripts/hardfork/dispatcher.sh "${BUILDDIR}/usr/local/bin/mina-dispatch"
 
   # Create actual symlinks in the package (not using DEBIAN/links which is not standard)
   ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
