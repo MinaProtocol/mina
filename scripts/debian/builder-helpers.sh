@@ -81,6 +81,7 @@ BUILDDIR="deb_build"
 
 # For automode purpose. We need to control location for both runtimes
 AUTOMODE_PRE_HF_DIR=${BUILDDIR}/usr/lib/mina/bin/berkeley
+AUTOMODE_POST_HF_DIR=${BUILDDIR}/usr/lib/mina/bin/mesa
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -717,6 +718,21 @@ build_daemon_devnet_pre_hardfork_deb() {
   build_deb $NAME
 }
 ## END DEVNET PRE HF PACKAGE ##
+
+build_daemon_mesa_postfork_deb() {
+
+  NAME="mina-mesa-post-hardfork-mesa"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building mesa post-hardfork deb for hardfork automode :"
+
+  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_apps testnet $AUTOMODE_POST_HF_DIR
+
+  build_deb $NAME
+}
 
 ## TESTNET GENERIC PACKAGE ##
 
