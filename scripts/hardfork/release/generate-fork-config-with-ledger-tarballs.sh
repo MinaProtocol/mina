@@ -48,13 +48,28 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
+      echo "Unknown argument: $1" >&2
       usage
       exit 1
       ;;
   esac
 done
 
-if [[ -z "$NETWORK_NAME" || -z "$CONFIG_JSON_GZ_URL" || -z "$RUNTIME_GENESIS_LEDGER" ]]; then
+
+if [[ -z "$NETWORK_NAME" ]]; then
+  echo "[ERROR] --network argument is required."
+  usage
+  exit 1
+fi
+
+if [[ -z "$CONFIG_JSON_GZ_URL" ]]; then
+  echo "[ERROR] --config-url argument is required."
+  usage
+  exit 1
+fi
+
+if [[ -z "$RUNTIME_GENESIS_LEDGER" ]]; then
+  echo "[ERROR] --runtime-ledger argument is required."
   usage
   exit 1
 fi
@@ -78,8 +93,7 @@ if [ ! -f "${FORKING_FROM_CONFIG_JSON}" ]; then
 fi
 
 echo "--- Download and extract previous network config"
-curl -o config.json.gz "$CONFIG_JSON_GZ_URL"
-gunzip config.json.gz
+curl -sL "$CONFIG_JSON_GZ_URL" | gunzip > config.json
 
 echo "--- Generate hardfork ledger tarballs"
 mkdir "$OUTPUT_DIR"
