@@ -31,9 +31,11 @@ in  { pipeline =
               Pipeline.Config::{
               , spec = JobSpec::{
                 , dirtyWhen =
-                  [ S.strictlyStart (S.contains "src")
+                  [ S.strictlyStart (S.contains "src/app/hardfork_test")
+                  , S.exactly "buildkite/src/Command/HardForkTest" "dhall"
                   , S.exactly ("buildkite/src/Jobs/Test/" ++ name) "dhall"
-                  , S.strictlyStart (S.contains "scripts/hardfork")
+                  , S.exactly "scripts/hardfork/build-and-test" "sh"
+                  , S.strictlyStart (S.contains "scripts/mina-local-network")
                   , S.strictlyStart (S.contains "nix")
                   , S.exactly "flake" "nix"
                   , S.exactly "flake" "lock"
