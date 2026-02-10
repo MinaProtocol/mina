@@ -46,13 +46,13 @@ echo "Package size: $(du -h "$INPUT_DEB" | cut -f1)"
 echo ""
 echo "=== Step 2: Running local conversion script ==="
 
-if [[ ! -f scripts/hardfork/convert-debian-to-hf-local.sh ]]; then
-    echo "ERROR: Local conversion script not found at scripts/hardfork/convert-debian-to-hf-local.sh" >&2
+if [[ ! -f scripts/hardfork/release/tests/convert-debian-to-hf-local.sh ]]; then
+    echo "ERROR: Local conversion script not found at scripts/hardfork/release/tests/convert-debian-to-hf-local.sh" >&2
     exit 1
 fi
 
 # Run the local script
-./scripts/hardfork/convert-debian-to-hf-local.sh \
+./scripts/hardfork/release/tests/convert-debian-to-hf-local.sh \
     --deb-file "$INPUT_DEB" \
     --network "$NETWORK_NAME" \
     --output-dir "." \
