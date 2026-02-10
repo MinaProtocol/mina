@@ -73,7 +73,7 @@ let command
                       , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
                                                                              spec.network} --tag \\\${MINA_DOCKER_TAG} --timeout ${Natural/show
                                                                                                                                      spec.timeout} --repo ${DockerRepo.show
-                                                                                                                                                              spec.repo} --run-compatibility-test develop --run-load-test --branch \\\${BUILDKITE_BRANCH} --metrics-mode --perf-output-file /workdir/rosetta.perf"
+                                                                                                                                                              spec.repo} --run-compatibility-test develop --run-load-test --branch \\\${BUILDKITE_BRANCH} --commit \\\${BUILDKITE_COMMIT} --metrics-mode --perf-output-file /workdir/rosetta.perf"
                       ]
                   ]
                 # RunInToolchain.runInToolchain

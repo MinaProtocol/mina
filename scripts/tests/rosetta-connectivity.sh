@@ -54,6 +54,7 @@ LOAD_TEST_DURATION=600
 RUN_LOAD_TEST=false
 METRICS_MODE=""
 BRANCH=""
+COMMIT=""
 PERF_OUTPUT_FILE="rosetta.perf"
 
 USAGE="Usage: $0 [-t docker-tag] [-n network]
@@ -65,12 +66,14 @@ USAGE="Usage: $0 [-t docker-tag] [-n network]
   --run-load-test           Enable load testing
   --metrics-mode            Enable metrics collection mode (collects data instead of asserting on thresholds)
   --branch                  Git branch name (for CI/CD contexts where git branch detection doesn't work)
+  --commit                  Git commit hash (for CI/CD contexts where git commit detection doesn't work)
   -h, --help                Show help
 
 Example: $0 --network devnet --tag 3.0.3-bullseye-devnet
 Example: $0 --network devnet --tag 3.0.3 --run-compatibility-test develop
 Example: $0 --network devnet --tag 3.0.3 --run-compatibility-test develop --upgrade-scripts-workdir /custom/path
 Example: $0 --network devnet --tag 3.0.3 --run-load-test --metrics-mode --branch main
+Example: $0 --network devnet --tag 3.0.3 --run-load-test --metrics-mode --branch main --commit 0123abcd
 
 Warning:
 Please execute this script from the root of the mina repository.
@@ -94,6 +97,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
     --upgrade-scripts-workdir) UPGRADE_SCRIPTS_WORKDIR="$2"; shift;;
     --metrics-mode) METRICS_MODE="--metrics-mode" ;;
     --branch) BRANCH="$2"; shift;;
+    --commit) COMMIT="$2"; shift;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown parameter passed: $1"; usage; exit 1;;
 esac; shift; done
@@ -182,6 +186,11 @@ if [[ "$RUN_LOAD_TEST" == true ]]; then
         # Add branch if specified
         if [[ -n "$BRANCH" ]]; then
                 load_test_cmd="$load_test_cmd --branch $BRANCH"
+        fi
+
+        # Add commit if specified
+        if [[ -n "$COMMIT" ]]; then
+                load_test_cmd="$load_test_cmd --commit $COMMIT"
         fi
 
         if docker exec $container_id bash -c "$load_test_cmd"; then

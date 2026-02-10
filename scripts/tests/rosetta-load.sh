@@ -99,6 +99,9 @@ METRICS_MODE="false"
 # Optional git branch name (for CI/CD contexts where git branch detection doesn't work)
 GIT_BRANCH=""
 
+# Optional git commit hash (for CI/CD contexts where git commit detection doesn't work)
+GIT_COMMIT=""
+
 # Performance metrics output file (for InfluxDB line protocol)
 PERF_OUTPUT_FILE="rosetta.perf"
 
@@ -147,6 +150,7 @@ function usage() {
     echo "Metrics collection:"
     echo "  --metrics-mode                   Enable metrics collection mode (collects data instead of asserting on thresholds)"
     echo "  --branch <branch_name>           Git branch name (for InfluxDB tagging; auto-detected if not specified)"
+    echo "  --commit <commit_hash>           Git commit hash (for InfluxDB tagging; auto-detected if not specified)"
     echo "  --perf-output-file <file>        Performance metrics output file (default: rosetta.perf)"
     echo ""
     echo "Examples:"
@@ -155,6 +159,7 @@ function usage() {
     echo "  $0 --postgres-memory-threshold 4096 --rosetta-memory-threshold 2048"
     echo "  $0 --metrics-mode --duration 300"
     echo "  $0 --metrics-mode --branch main --duration 300"
+    echo "  $0 --metrics-mode --branch main --commit 0123abcd --duration 300"
     echo "  $0 --metrics-mode --perf-output-file my-metrics.perf --duration 300"
 }
 
@@ -223,6 +228,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --branch)
             GIT_BRANCH="$2"
+            shift 2
+            ;;
+        --commit)
+            GIT_COMMIT="$2"
             shift 2
             ;;
         --perf-output-file)
@@ -742,7 +751,14 @@ function print_influxdb_line() {
         git_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
     fi
 
-    git_commit=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    if [[ -n "$GIT_COMMIT" ]]; then
+        git_commit="$GIT_COMMIT"
+    else
+        git_commit=$(git rev-parse --short HEAD 2>/dev/null || true)
+        if [[ -z "$git_commit" ]]; then
+            git_commit="unknown"
+        fi
+    fi
 
     # Generate timestamp in nanoseconds
     local timestamp_ns
