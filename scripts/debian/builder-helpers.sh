@@ -724,8 +724,10 @@ copy_dispatcher() {
 
   mkdir -p "${BUILDDIR}/etc/default"
 
-  #Create env vars for the dispatcher
-    cat << EOF > "${BUILDDIR}/etc/default/mina-dispatch"
+  MINA_DISPATCH_ENV_FILE="${BUILDDIR}/etc/default/mina-dispatch"
+
+  #Create default env vars for the dispatcher
+    cat << EOF > ${MINA_DISPATCH_ENV_FILE}
 MINA_NETWORK=${NETWORK_NAME}
 RUNTIMES_BASE_PATH="/usr/lib/mina"
 MINA_PROFILE=${DUNE_PROFILE}
