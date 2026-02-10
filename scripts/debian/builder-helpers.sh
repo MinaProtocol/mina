@@ -80,7 +80,7 @@ BUILDDIR="deb_build"
 
 
 # For automode purpose. We need to control location for both runtimes
-AUTOMODE_PRE_HF_DIR=${BUILDDIR}/usr/lib/mina/bin/berkeley
+AUTOMODE_PRE_HF_DIR=${BUILDDIR}/usr/lib/mina/berkeley
 
 # Function to ease creation of Debian package control files
 create_control_file() {
