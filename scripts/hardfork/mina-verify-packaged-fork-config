@@ -38,6 +38,8 @@ Inputs:
 - PRECOMPUTED_FORK_BLOCK (default: fetches with gsutil)
 - GSUTIL (default: gsutil)
   the Google Cloud Storage utility if the PRECOMPUTED_FORK_BLOCK isn't a file
+- MINA_LOG_LEVEL (default: info)
+  the log level to run the Mina node at when exporting ledgers
 
 Ensures:
 - The accounts listed in config.json are the ones in the PACKAGED_DAEMON_CONFIG
@@ -282,13 +284,13 @@ else
     echo "Skipping config validation as per --checks option" >&2
 fi
 
-FORK_CONFIG_JSON="$FORK_CONFIG" \
-LEDGER_HASHES_JSON="$WORKDIR/hashes.json" \
-GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$PACKAGED_DAEMON_CONFIG") \
-"$CREATE_RUNTIME_CONFIG" > "$WORKDIR/config-substituted.json"
-
 if checks_contains ledgers; then
     restore_or_generate_hardfork_data
+
+    FORK_CONFIG_JSON="$FORK_CONFIG" \
+    LEDGER_HASHES_JSON="$WORKDIR/hashes.json" \
+    GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$PACKAGED_DAEMON_CONFIG") \
+    "$CREATE_RUNTIME_CONFIG" > "$WORKDIR/config-substituted.json"
 
     echo "exporting ledgers from running node ... (this may take a while)" >&2
 
@@ -386,5 +388,4 @@ if [ $error -ne 0 ]; then
     exit 1
 else
     echo "Validation successful" >&2
-    exit 0
 fi
