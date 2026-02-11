@@ -9,6 +9,7 @@ FORCE_VERSION="*"
 CACHED_BUILDKITE_BUILD_ID="${CACHED_BUILDKITE_BUILD_ID:-}"
 CONFIG_JSON_GZ_URL=""
 HARD_FORK_SHIFT_SLOT_DELTA=""
+PREFORK_GENESIS_CONFIG=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -36,6 +37,10 @@ while [[ $# -gt 0 ]]; do
       HARD_FORK_SHIFT_SLOT_DELTA="$2"
       shift 2
       ;;
+    --prefork-genesis-config)
+      PREFORK_GENESIS_CONFIG="$2"
+      shift 2
+      ;;
     *)
       echo "Unknown argument: $1"
       echo "Usage: $0 --network <network> --config-json-gz-url <url> [--version <version>] --codename <codename> [--cached-buildkite-build-id <id>]"
@@ -51,7 +56,7 @@ fi
 
 HARD_FORK_SHIFT_SLOT_DELTA_ARG=""
 if [[ -n "$HARD_FORK_SHIFT_SLOT_DELTA" ]]; then
-  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-shift-slot-delta $HARD_FORK_SHIFT_SLOT_DELTA"
+  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-shift-slot-delta $HARD_FORK_SHIFT_SLOT_DELTA --prefork-genesis-config $PREFORK_GENESIS_CONFIG"
 fi
 
 # Install mina-logproc from cached build if available, else from current build

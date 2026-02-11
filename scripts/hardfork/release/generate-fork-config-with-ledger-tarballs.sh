@@ -23,6 +23,7 @@ OUTPUT_DIR="hardfork_ledgers"
 
 # Default value for the hard fork shift slot delta, which can be overridden by the --hardfork-shift-slot-delta argument
 HARD_FORK_SHIFT_SLOT_DELTA=0
+PREFORK_GENESIS_CONFIG=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -40,6 +41,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --hardfork-shift-slot-delta)
       HARD_FORK_SHIFT_SLOT_DELTA="$2"
+      shift 2
+      ;;
+    --prefork-genesis-config)
+      PREFORK_GENESIS_CONFIG="$2"
       shift 2
       ;;
     --logproc)
@@ -107,7 +112,7 @@ mkdir "$OUTPUT_DIR"
 
 HARD_FORK_SHIFT_SLOT_DELTA_ARG=""
 if [[ "$HARD_FORK_SHIFT_SLOT_DELTA" -ne 0 ]]; then
-  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-slot $HARD_FORK_SHIFT_SLOT_DELTA"
+  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-slot $HARD_FORK_SHIFT_SLOT_DELTA --prefork-genesis-config $PREFORK_GENESIS_CONFIG"
 fi
 
 "$RUNTIME_GENESIS_LEDGER" --pad-app-state --config-file config.json $HARD_FORK_SHIFT_SLOT_DELTA_ARG --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC

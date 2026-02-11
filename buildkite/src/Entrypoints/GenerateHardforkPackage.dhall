@@ -81,11 +81,14 @@ let generateReferenceTarballsCommand =
                   }
                   spec.use_artifacts_from_buildkite_build
 
-           let hardforkShiftSlotDeltaArg =
+          let hardforkShiftSlotDeltaArg =
                 merge
                   { Some =
                           \(delta : Natural)
-                      ->  "--hardfork-shift-slot-delta " ++ Natural/show delta
+                      ->      "--hardfork-shift-slot-delta "
+                          ++  Natural/show delta
+                          ++  " --prefork-genesis-config /workdir/genesis_ledgers/${Network.lowerName
+                                                                                      spec.network}.json"
                   , None = ""
                   }
                   spec.hardfork_shift_slot_delta
@@ -100,7 +103,7 @@ let generateReferenceTarballsCommand =
                       [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
                       "./buildkite/scripts/hardfork/release/generate-fork-config-and-ledger-tarballs-using-legacy-app.sh --network ${Network.lowerName
                                                                                                                                        spec.network} --version ${spec.mina_create_legacy_genesis_version}  --codename ${DebianVersions.lowerName
-                                                                                                                                                                                             codename} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg} ${hardforkShiftSlotDeltaArg}"
+                                                                                                                                                                                                                          codename} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg} ${hardforkShiftSlotDeltaArg}"
                 , label =
                     "Generate hardfork reference tarballs for ${DebianVersions.lowerName
                                                                   codename}"
@@ -126,11 +129,13 @@ let generateTarballsCommand =
                 merge
                   { Some =
                           \(delta : Natural)
-                      ->  "--hardfork-shift-slot-delta " ++ Natural/show delta
+                      ->      "--hardfork-shift-slot-delta "
+                          ++  Natural/show delta
+                          ++  " --prefork-genesis-config /workdir/genesis_ledgers/${Network.lowerName
+                                                                                      spec.network}.json"
                   , None = ""
                   }
                   spec.hardfork_shift_slot_delta
-
 
           in  Command.build
                 Command.Config::{

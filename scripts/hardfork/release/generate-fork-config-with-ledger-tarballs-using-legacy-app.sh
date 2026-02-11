@@ -9,6 +9,7 @@ LEDGER_NAME="legacy_ledgers"
 HASH_NAME="legacy_hashes.json"
 MINA_LEGACY_GENESIS_EXE="mina-create-legacy-genesis"
 HARD_FORK_SHIFT_SLOT_DELTA=""
+PREFORK_GENESIS_CONFIG=""
 
 # Parse CLI args
 while [[ $# -gt 0 ]]; do
@@ -35,6 +36,10 @@ while [[ $# -gt 0 ]]; do
 			;;
 		--hardfork-shift-slot-delta)
 			HARD_FORK_SHIFT_SLOT_DELTA="$2"
+			shift 2
+			;;
+		--prefork-genesis-config)
+			PREFORK_GENESIS_CONFIG="$2"
 			shift 2
 			;;
 		*)
@@ -66,7 +71,7 @@ echo "generating genesis ledgers ... (this may take a while)" >&2
 
 HARD_FORK_SHIFT_SLOT_DELTA_ARG=""
 if [[ -n "$HARD_FORK_SHIFT_SLOT_DELTA" ]]; then
-  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-slot $HARD_FORK_SHIFT_SLOT_DELTA"
+  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-slot $HARD_FORK_SHIFT_SLOT_DELTA --prefork-genesis-config $PREFORK_GENESIS_CONFIG"
 fi
 
 "$MINA_LEGACY_GENESIS_EXE" --pad-app-state --config-file "$FORK_CONFIG" --genesis-dir "$LEDGER_PATH" --hash-output-file "$HASH_PATH" $HARD_FORK_SHIFT_SLOT_DELTA_ARG

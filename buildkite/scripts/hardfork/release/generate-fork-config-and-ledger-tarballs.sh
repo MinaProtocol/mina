@@ -12,6 +12,7 @@ CONFIG_JSON_GZ_URL=""
 CODENAME=""
 CACHED_BUILDKITE_BUILD_ID=""
 HARD_FORK_SHIFT_SLOT_DELTA=""
+PREFORK_GENESIS_CONFIG=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -34,6 +35,13 @@ while [[ $# -gt 0 ]]; do
     --hardfork-shift-slot-delta)
       HARD_FORK_SHIFT_SLOT_DELTA="$2"
       shift 2
+      ;;
+    --prefork-genesis-config)
+      PREFORK_GENESIS_CONFIG="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
       ;;
     *)
       echo "Unknown argument: $1" >&2
@@ -59,7 +67,7 @@ fi
 
 HARD_FORK_SHIFT_SLOT_DELTA_ARG=""
 if [[ -n "$HARD_FORK_SHIFT_SLOT_DELTA" ]]; then
-  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-shift-slot-delta $HARD_FORK_SHIFT_SLOT_DELTA"
+  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-shift-slot-delta $HARD_FORK_SHIFT_SLOT_DELTA --prefork-genesis-config $PREFORK_GENESIS_CONFIG"
 fi
 
 echo "--- Restoring cached build artifacts for apps/${CODENAME}/"
