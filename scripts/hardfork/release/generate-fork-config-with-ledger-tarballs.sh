@@ -110,7 +110,7 @@ if [[ "$HARD_FORK_SHIFT_SLOT_DELTA" -ne 0 ]]; then
   HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-slot $HARD_FORK_SHIFT_SLOT_DELTA"
 fi
 
-"$RUNTIME_GENESIS_LEDGER" -pad-app-state --config-file config.json $HARD_FORK_SHIFT_SLOT_DELTA_ARG --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
+"$RUNTIME_GENESIS_LEDGER" --pad-app-state --config-file config.json $HARD_FORK_SHIFT_SLOT_DELTA_ARG --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
 
 echo "--- Create hardfork config"
 FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
