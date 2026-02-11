@@ -9,15 +9,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
-	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/graphql"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/utils"
 )
 
 // HardforkTest represents the main hardfork test logic
 type HardforkTest struct {
 	Config         *config.Config
-	Client         *graphql.Client
+	Client         *client.Client
 	Logger         *utils.Logger
 	ScriptDir      string
 	runningCmds    []*exec.Cmd
@@ -31,7 +31,7 @@ func NewHardforkTest(cfg *config.Config) *HardforkTest {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &HardforkTest{
 		Config:      cfg,
-		Client:      graphql.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.GraphQLMaxRetries),
+		Client:      client.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.ClientMaxRetries),
 		Logger:      utils.NewLogger(),
 		ScriptDir:   cfg.ScriptDir,
 		runningCmds: make([]*exec.Cmd, 0),
@@ -114,24 +114,38 @@ func (t *HardforkTest) Run() error {
 	t.Logger.Info("===== Starting Hardfork Test =====")
 
 	// Calculate main network genesis timestamp
-	mainGenesisTs := time.Now().Unix() + int64(t.Config.MainDelay*60)
+	mainGenesisTs := time.Now().Unix() + int64(t.Config.MainDelayMin*60)
 
 	// Phase 1: Run and validate main network
 	t.Logger.Info("Phase 1: Running main network...")
-	forkConfigBytes, analysis, err := t.RunMainNetworkPhase(mainGenesisTs)
-	if err != nil {
-		return err
+	forkDataChan := make(chan ForkData, 1)
+
+	beforeShutdown := func(t *HardforkTest, analysis *BlockAnalysisResult) error {
+		t.Logger.Info("Phase 2: Forking with fork method `%s`...", t.Config.ForkMethod.String())
+
+		var forkData *ForkData
+		var err error
+		switch t.Config.ForkMethod {
+		case config.Legacy:
+			forkData, err = t.LegacyForkPhase(analysis, mainGenesisTs)
+		case config.Advanced:
+			forkData, err = t.AdvancedForkPhase(analysis, mainGenesisTs)
+		}
+
+		if err != nil {
+			return err
+		}
+		forkDataChan <- *forkData
+		return nil
 	}
 
-	t.Logger.Info("Phase 2: Forking the legacy way...")
-
-	forkData, err := t.LegacyForkPhase(analysis, forkConfigBytes, mainGenesisTs)
+	analysis, err := t.RunMainNetworkPhase(mainGenesisTs, beforeShutdown)
 	if err != nil {
 		return err
 	}
 
 	t.Logger.Info("Phase 3: Running fork network...")
-	if err := t.RunForkNetworkPhase(analysis.LatestNonEmptyBlock.BlockHeight, *forkData, mainGenesisTs); err != nil {
+	if err := t.RunForkNetworkPhase(analysis.LastBlockBeforeTxEnd.BlockHeight, <-forkDataChan, mainGenesisTs); err != nil {
 		return err
 	}
 
