@@ -86,7 +86,7 @@ let MinaBuildSpec =
           , debianRepo = DebianRepo.Type.Unstable
           , extraBuildEnvs = [] : List Text
           , suffix = None Text
-          , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
+          , deb_legacy_version = "3.3.0-2b689c8"
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
           , if_ = None B/If
@@ -253,7 +253,8 @@ let docker_step
                   ]
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
                 , LogProc = [] : List DockerImage.ReleaseSpec.Type
-                , CreateLegacyGenesis = [] : List DockerImage.ReleaseSpec.Type
+                , PreforkDaemon = [] : List DockerImage.ReleaseSpec.Type
+                , PreforkGenesisLedger = [] : List DockerImage.ReleaseSpec.Type
                 , BatchTxn =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps

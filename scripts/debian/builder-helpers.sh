@@ -80,7 +80,8 @@ BUILDDIR="deb_build"
 
 
 # For automode purpose. We need to control location for both runtimes
-AUTOMODE_PRE_HF_DIR=${BUILDDIR}/usr/lib/mina/bin/berkeley
+AUTOMODE_PRE_HF_DIR=${BUILDDIR}/usr/lib/mina/berkeley
+AUTOMODE_POST_HF_DIR=${BUILDDIR}/usr/lib/mina/mesa
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -170,16 +171,25 @@ build_deb() {
   echo "--- Built ${1}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
 }
 
+copy_hf_related_scripts() {
+
+  cp ../scripts/hardfork/create_runtime_config.sh \
+    "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
+  cp ../scripts/hardfork/mina-verify-packaged-fork-config \
+    "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
+
+}
+
 # Copies scripts and build utilities to debian package
 copy_common_daemon_utils() {
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_configs inputs:"
   echo "Seed List URL path: ${1} (like seed-lists/berkeley_seeds.txt)"
 
-  cp ../scripts/hardfork/create_runtime_config.sh \
-    "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
-  cp ../scripts/hardfork/mina-verify-packaged-fork-config \
-    "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
+  local MINA_BIN="${2:-${BUILDDIR}/usr/local/bin/mina}"
+
+  copy_hf_related_scripts
+
   # Update the mina.service with a new default PEERS_URL based on Seed List \
   # URL $1
   mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
@@ -190,7 +200,7 @@ copy_common_daemon_utils() {
   # NOTE: We do not list bash-completion as a required package,
   #       but it needs to be present for this to be effective
   mkdir -p "${BUILDDIR}/etc/bash_completion.d"
-  env COMMAND_OUTPUT_INSTALLATION_BASH=1 "${BUILDDIR}/usr/local/bin/mina" > \
+  env COMMAND_OUTPUT_INSTALLATION_BASH=1 "${MINA_BIN}" > \
     "${BUILDDIR}/etc/bash_completion.d/mina"
 
 }
@@ -614,7 +624,7 @@ build_daemon_mesa_deb() {
 
   create_control_file "mina-mesa" "${SHARED_DEPS}${DAEMON_DEPS}, mina-mesa-config (>=${MINA_DEB_VERSION})" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}" "mina-mesa (<< ${MINA_DEB_VERSION})"
-   
+
   copy_common_daemon_apps testnet
 
   copy_common_daemon_utils 'o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
@@ -707,7 +717,7 @@ build_daemon_devnet_pre_hardfork_deb() {
   NAME="mina-devnet-pre-hardfork-mesa"
 
   echo "------------------------------------------------------------"
-  echo "--- Building testnet berkeley legacy deb for hardfork automode :"
+  echo "--- Building testnet devnet legacy deb for hardfork automode :"
 
   create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
@@ -716,7 +726,116 @@ build_daemon_devnet_pre_hardfork_deb() {
 
   build_deb $NAME
 }
-## END DEVNET LEGACY PACKAGE ##
+## END DEVNET PRE HF PACKAGE ##
+
+# Function to DRY creating symlinks for shared apps in deb packages
+# for automode runtimes that share the same dispatcher but different runtimes
+create_symlinks_for_shared_apps() {
+  local NETWORK_NAME=${1}
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  cp ../scripts/hardfork/dispatcher.sh \
+    "${BUILDDIR}/usr/local/bin/mina-dispatch"
+
+  mkdir -p "${BUILDDIR}/etc/default"
+
+  #Create env vars for the dispatcher
+    cat << EOF > "${BUILDDIR}/etc/default/mina-dispatch"
+MINA_NETWORK=${NETWORK_NAME}
+MINA_PROFILE="${DUNE_PROFILE}"
+RUNTIMES_BASE_PATH="/usr/lib/mina"
+MINA_LIBP2P_ENVVAR_NAME="MINA_LIBP2P_HELPER_PATH"
+EOF
+
+
+  # Create actual symlinks in the package (not using DEBIAN/links which is not standard)
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-create-genesis"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-rocksdb-scanner"
+  ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina"
+
+  ln -sf "${AUTOMODE_PRE_HF_DIR}/mina" mina-berkeley
+  ln -sf "${AUTOMODE_POST_HF_DIR}/mina" mina-mesa
+
+  # Create directory for legacy binaries symlink if needed
+  mkdir -p "${BUILDDIR}/usr/lib/mina/berkeley"
+  ln -sf ../../lib/mina/berkeley/mina-create-genesis "${BUILDDIR}/usr/local/bin/mina-create-legacy-genesis"
+
+  echo "------------------------------------------------------------"
+  echo "Created symlinks in ${BUILDDIR}/usr/local/bin:"
+  find "${BUILDDIR}/usr/local/bin/" -type l -exec ls -la {} \;
+
+}
+
+# Copies common binaries and configuration for post-hardfork automode packages
+# Includes only binaries without configuration files or genesis ledgers
+# Places binaries in /usr/lib/mina/<network_name> directory
+copy_common_daemon_post_automode_apps_and_configs() {
+
+  echo "------------------------------------------------------------"
+  echo "copy_common_daemon_post_automode_configs inputs:"
+  echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
+  echo "Signature Type: ${2} (mainnet or testnet)"
+  echo "Seed List URL path: ${3} (like seed-lists/berkeley_seeds.txt)"
+
+  # Copy binaries to separate directory as we need both berkeley and mesa binaries for automode packages
+  # and they share the same dispatcher and some common apps,
+  mkdir -p "${AUTOMODE_POST_HF_DIR}"
+  copy_common_daemon_apps "${2}" $AUTOMODE_POST_HF_DIR
+
+  # Create symlinks for shared apps in the main bin directory that
+  # dispatch to the correct runtime based on env var set in /etc/default/mina-dispatch
+  create_symlinks_for_shared_apps "${1}"
+
+  copy_common_daemon_configs "${1}"
+
+  # Copy seed list with correct URL for post-hardfork runtime and
+  # bash completion that points to the correct seed list URL
+  copy_common_daemon_utils "${3}" "${AUTOMODE_POST_HF_DIR}/mina"
+
+}
+
+
+build_daemon_mesa_postfork_deb() {
+
+  NAME="mina-mesa-post-hardfork-mesa"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building mesa post-hardfork deb for hardfork automode :"
+
+  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_post_automode_apps_and_configs \
+    "mesa" \
+    "testnet" \
+    'o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
+
+  build_deb $NAME
+}
+
+build_daemon_devnet_postfork_deb() {
+
+  NAME="mina-devnet-post-hardfork-mesa"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building devnet post-hardfork deb for hardfork automode :"
+
+  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_post_automode_apps_and_configs \
+    "devnet" \
+    "testnet" \
+    'seed-lists/devnet_seeds.txt'
+
+  build_deb $NAME
+}
+
 
 ## TESTNET GENERIC PACKAGE ##
 
@@ -1099,7 +1218,7 @@ build_delegation_verify_deb () {
 # Utility for creating legacy genesis ledgers for post-hardfork verification.
 # Contains the runtime_genesis_ledger tool for Mina protocol.
 #
-build_create_legacy_genesis_deb() {
+build_prefork_genesis_ledger_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building Mina Generic testnet create legacy genesis tool:"
 
@@ -1111,8 +1230,8 @@ build_create_legacy_genesis_deb() {
 
   # Binaries
   cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-    "${BUILDDIR}/usr/local/bin/mina-create-legacy-genesis"
+    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
 
-  build_deb mina-create-legacy-genesis
+  build_deb mina-create-prefork-genesis
 }
 ## END CREATE LEGACY GENESIS PACKAGE ##
