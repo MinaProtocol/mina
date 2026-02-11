@@ -98,7 +98,7 @@ curl -sL "$CONFIG_JSON_GZ_URL" | gunzip > config.json
 echo "--- Generate hardfork ledger tarballs"
 mkdir "$OUTPUT_DIR"
 
-"$RUNTIME_GENESIS_LEDGER" --config-file config.json --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
+"$RUNTIME_GENESIS_LEDGER" --pad-app-state --config-file config.json --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
 
 echo "--- Create hardfork config"
 FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
