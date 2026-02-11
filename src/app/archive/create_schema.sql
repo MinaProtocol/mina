@@ -544,3 +544,30 @@ CREATE TABLE blocks_zkapp_commands
 CREATE INDEX idx_blocks_zkapp_commands_block_id ON blocks_zkapp_commands(block_id);
 CREATE INDEX idx_blocks_zkapp_commands_zkapp_command_id ON blocks_zkapp_commands(zkapp_command_id);
 CREATE INDEX idx_blocks_zkapp_commands_sequence_no ON blocks_zkapp_commands(sequence_no);
+
+CREATE TYPE migration_status AS ENUM ('starting', 'applied', 'failed');
+CREATE TABLE migration_history (
+    commit_start_at   timestamptz NOT NULL DEFAULT now() PRIMARY KEY,
+    protocol_version  text NOT NULL,
+    migration_version text NOT NULL,
+    description       text NOT NULL,
+    status            migration_status NOT NULL
+);
+
+-- WARN: we're using mesa as current protocol version!
+SET archive.current_protocol_version = '4.0.0';
+
+DO $$
+DECLARE
+    protocol_version text := current_setting('archive.current_protocol_version');
+BEGIN
+    INSERT INTO migration_history(
+        protocol_version, migration_version, description, status
+    ) VALUES (
+        protocol_version,
+        'fresh',
+        'Initialized by create_schema.sql',
+        'applied'::migration_status
+    );
+END
+$$;
