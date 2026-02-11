@@ -24,6 +24,7 @@
 set -euox pipefail
 
 INPUT_FOLDER=${1:-hardfork_ledgers}  # Folder to scan for ledger tarballs
+NEW_CONFIG=${2:-new_config.json}  # Path to the new_config.json file to update with new hashes
 LEDGER_S3_BUCKET=${LEDGER_S3_BUCKET:-"s3://snark-keys.o1test.net"}
 
 check_aws_cli() {
@@ -66,8 +67,8 @@ for file in "$INPUT_FOLDER"/*; do
     aws s3 cp "$LEDGER_S3_BUCKET/$filename" "$file"
     printf "Computing new hash for %s...\n" "$filename"
     newhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
-    printf "Updating hash in new_config.json for %s...\n" "$filename"
-    sed -i "s/$oldhash/$newhash/g" new_config.json
+    printf "Updating hash in %s for %s...\n" "$NEW_CONFIG" "$filename"
+    sed -i "s/$oldhash/$newhash/g" "$NEW_CONFIG"
     printf "Done updating %s.\n" "$filename"
   else
     printf "Uploading %s to S3...\n" "$filename"
