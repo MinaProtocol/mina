@@ -1588,9 +1588,9 @@ let ledger_of_hashes ~root_hash ~s3_data_hash () =
     ; add_genesis_winner = Some false
     }
 
-let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
-    ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
-    ~next_epoch_seed =
+let make_fork_config ~staged_ledger ~genesis_state_timestamp
+    ~global_slot_since_genesis ~state_hash ~blockchain_length ~staking_ledger
+    ~staking_epoch_seed ~next_epoch_ledger ~next_epoch_seed =
   let open Async.Deferred.Or_error.Let_syntax in
   let global_slot_since_genesis =
     Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
@@ -1639,13 +1639,21 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     }
   in
   make
-  (* add_genesis_winner must be set to false, because this
-     config effectively creates a continuation of the current
-     blockchain state and therefore the genesis ledger already
-     contains the winner of the previous block. No need to
-     artificially add it. In fact, it wouldn't work at all,
-     because the new node would try to create this account at
-     startup, even though it already exists, leading to an error.*)
+    ~genesis:
+      { genesis_state_timestamp = Some genesis_state_timestamp
+      ; k = None
+      ; delta = None
+      ; slots_per_epoch = None
+      ; slots_per_sub_window = None
+      ; grace_period_slots = None
+      }
+      (* add_genesis_winner must be set to false, because this
+         config effectively creates a continuation of the current
+         blockchain state and therefore the genesis ledger already
+         contains the winner of the previous block. No need to
+         artificially add it. In fact, it wouldn't work at all,
+         because the new node would try to create this account at
+         startup, even though it already exists, leading to an error.*)
     ~epoch_data
     ~ledger:
       { base = Accounts accounts

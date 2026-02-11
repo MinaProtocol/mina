@@ -81,9 +81,7 @@ let mk_scan_state_base_node
     let state_hash = get Mina_base.State_hash.gen in
     let state_body_hash = get Mina_base.State_body_hash.gen in
     let statement = get Transaction_snark.Statement.gen in
-    let init_stack =
-      Transaction_snark.Pending_coinbase_stack_state.Init_stack.Merge
-    in
+    let init_stack = Mina_base.Pending_coinbase.Stack.empty in
     let ledger_witness =
       let depth = constraint_constants.ledger_depth in
       let account_access_statuses =
@@ -128,7 +126,9 @@ let mk_scan_state_base_node
     in
     let job : Transaction_snark_scan_state.Transaction_with_witness.t =
       Transaction_snark_scan_state.Transaction_with_witness.create
-        ~transaction_with_info
+        ~transaction_with_status:
+          (Mina_transaction_logic.Transaction_applied.transaction_with_status
+             transaction_with_info )
         ~state_hash:(state_hash, state_body_hash)
         ~statement ~init_stack ~first_pass_ledger_witness:ledger_witness
         ~second_pass_ledger_witness:ledger_witness
@@ -227,12 +227,12 @@ let scan_state_base_node_zkapp ~constraint_constants ~zkapp_command =
   mk_scan_state_base_node varying ~constraint_constants
 
 let scan_state_merge_node ~proof_cache_db :
-    Transaction_snark_scan_state.Ledger_proof_with_sok_message.t
-    Parallel_scan.Merge.t =
+    Transaction_snark_scan_state.Ledger_proof_with_hash.t Parallel_scan.Merge.t
+    =
   let weight1 : Parallel_scan.Weight.t = { base = 42; merge = 99 } in
   let weight2 : Parallel_scan.Weight.t = { base = 88; merge = 77 } in
   let job :
-      Transaction_snark_scan_state.Ledger_proof_with_sok_message.t
+      Transaction_snark_scan_state.Ledger_proof_with_hash.t
       Parallel_scan.Merge.Job.t =
     let left =
       let sok_msg : Mina_base.Sok_message.t =
@@ -247,10 +247,8 @@ let scan_state_merge_node ~proof_cache_db :
         { without_sok with sok_digest = Mina_base.Sok_message.digest sok_msg }
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
-      Transaction_snark_scan_state.Ledger_proof_with_sok_message.create
-        ~proof:
-          (Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof)
-        ~sok_msg
+      Transaction_snark_scan_state.Ledger_proof_with_hash.create
+        (Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof)
     in
     let right =
       let sok_msg : Mina_base.Sok_message.t =
@@ -266,10 +264,8 @@ let scan_state_merge_node ~proof_cache_db :
         { without_sok with sok_digest = Mina_base.Sok_message.digest sok_msg }
       in
       let ledger_proof = Transaction_snark.create ~statement ~proof in
-      Transaction_snark_scan_state.Ledger_proof_with_sok_message.create
-        ~proof:
-          (Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof)
-        ~sok_msg
+      Transaction_snark_scan_state.Ledger_proof_with_hash.create
+        (Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db ledger_proof)
     in
     Full { left; right; seq_no = 1; status = Todo }
   in
