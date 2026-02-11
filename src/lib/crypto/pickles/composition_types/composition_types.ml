@@ -1312,9 +1312,6 @@ module Step = struct
     let spec unfinalized_proofs messages_for_next_step_proof =
       Spec.T.Struct [ unfinalized_proofs; messages_for_next_step_proof ]
 
-    include struct
-      open Hlist.HlistId
-
     let[@warning "-60"] wrap_typ (type n) ~assert_16_bits
         (proofs_verified : (Opt.Flag.t Plonk_types.Features.t, n) Vector.t) fq :
         (((_, _) Vector.t, _) t, ((_, _) Vector.t, _) t) Wrap_impl.Typ.t =
