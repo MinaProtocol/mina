@@ -48,6 +48,7 @@ let Spec =
           , suffix : Text
           , precomputed_block_prefix : Optional Text
           , use_artifacts_from_buildkite_build : Optional Text
+          , hardfork_shift_slot_delta : Optional Natural
           , size : Size
           }
       , default =
@@ -60,6 +61,7 @@ let Spec =
           , version = "\\\$MINA_DEB_VERSION"
           , precomputed_block_prefix = None Text
           , use_artifacts_from_buildkite_build = None Text
+          , hardfork_shift_slot_delta = None Natural
           , size = Size.XLarge
           }
       }
@@ -109,6 +111,15 @@ let generateTarballsCommand =
                   }
                   spec.use_artifacts_from_buildkite_build
 
+          let hardforkShiftSlotDeltaArg =
+                merge
+                  { Some =
+                          \(delta : Natural)
+                      ->  "--hardfork-shift-slot-delta " ++ Natural/show delta
+                  , None = ""
+                  }
+                  spec.hardfork_shift_slot_delta
+
           in  Command.build
                 Command.Config::{
                 , commands =
@@ -121,6 +132,7 @@ let generateTarballsCommand =
                         ++  "--network ${Network.lowerName spec.network} "
                         ++  "--config-url ${spec.config_json_gz_url} "
                         ++  "--codename ${DebianVersions.lowerName codename} "
+                        ++  "${hardforkShiftSlotDeltaArg} "
                         ++  "${cacheArg}"
                       )
                 , label =
@@ -424,6 +436,7 @@ let generate_hardfork_package =
       ->  \(version : Optional Text)
       ->  \(precomputed_block_prefix : Optional Text)
       ->  \(use_artifacts_from_buildkite_build : Optional Text)
+      ->  \(hardfork_shift_slot_delta : Optional Natural)
       ->  ( pipeline
               Spec::{
               , codenames = codenames
@@ -438,6 +451,7 @@ let generate_hardfork_package =
               , precomputed_block_prefix = precomputed_block_prefix
               , use_artifacts_from_buildkite_build =
                   use_artifacts_from_buildkite_build
+              , hardfork_shift_slot_delta = hardfork_shift_slot_delta
               }
           ).pipeline
 
