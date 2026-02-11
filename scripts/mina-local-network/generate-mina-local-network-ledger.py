@@ -384,7 +384,8 @@ def generate_ledger(generate_remainder,
             .format(num_whale_accounts,
                     len(ledger_public_keys["online_whale_keys"])))
 
-    whale_offline_balance = 66000 * 175 * (10**9)
+    whale_offline_balance = encode_nanominas(66000 * 175 * (10**9))
+    whale_online_balance = encode_nanominas(499 * (10**9))
 
     # Whale Accounts
     for index, offline_whale in enumerate(
@@ -396,14 +397,14 @@ def generate_ledger(generate_remainder,
                 "sk":
                 None,
                 "balance":
-                encode_nanominas(whale_offline_balance),
+                whale_offline_balance,
                 "delegate":
                 ledger_public_keys["online_whale_keys"][index]
             })
             ledger.append({
                 "pk": ledger_public_keys["online_whale_keys"][index],
                 "sk": None,
-                "balance": encode_nanominas(0),
+                "balance": whale_online_balance,
                 "delegate": None
             })
 
@@ -413,7 +414,7 @@ def generate_ledger(generate_remainder,
                 "sk":
                 None,
                 "balance":
-                encode_nanominas(whale_offline_balance),
+                whale_offline_balance,
                 "delegate":
                 ledger_public_keys["online_whale_keys"][index],
                 "delegate_discord_username":
@@ -425,7 +426,7 @@ def generate_ledger(generate_remainder,
                 "sk":
                 None,
                 "balance":
-                encode_nanominas(0),
+                whale_online_balance,
                 "delegate":
                 None,
                 "discord_username":
