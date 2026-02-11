@@ -7,6 +7,7 @@ set -e
 # Default values
 LEDGER_NAME="legacy_ledgers"
 HASH_NAME="legacy_hashes.json"
+MINA_LEGACY_GENESIS_EXE="mina-create-legacy-genesis"
 
 # Parse CLI args
 while [[ $# -gt 0 ]]; do
@@ -38,8 +39,18 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-if [[ -z "$MINA_LEGACY_GENESIS_EXE" || -z "$FORK_CONFIG" || -z "$WORKDIR" ]]; then
-	echo "Missing required arguments. Usage: $0 --exe <mina_legacy_genesis_exe> --config <fork_config> --workdir <workdir> [--ledger-name <ledger_name>] [--hash-name <hash_name>]" >&2
+if [[ -z "$MINA_LEGACY_GENESIS_EXE" ]]; then
+	echo "Missing required argument: --exe <mina_legacy_genesis_exe>" >&2
+	exit 1
+fi
+
+if [[ -z "$FORK_CONFIG" ]]; then
+	echo "Missing required argument: --config <fork_config>" >&2
+	exit 1
+fi
+
+if [[ -z "$WORKDIR" ]]; then
+	echo "Missing required argument: --workdir <workdir>" >&2
 	exit 1
 fi
 
