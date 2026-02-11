@@ -142,7 +142,7 @@ for var in "${required_vars[@]}"; do
   fi
 done
 
-if [[ -z "$MINA_HARDFORK_STATE_DIR" ]]; then
+if [[ -z "${MINA_HARDFORK_STATE_DIR:-}" ]]; then
   echo "mina-dispatch ERROR: MINA_HARDFORK_STATE_DIR is not defined" >&2
   echo "  This variable should be set in your environment and point" >&2
   echo "  to the mina config directory (usually ${HOME}/.mina-config)." >&2
