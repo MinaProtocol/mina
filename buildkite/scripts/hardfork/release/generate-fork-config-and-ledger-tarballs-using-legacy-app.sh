@@ -8,6 +8,7 @@ WORKDIR=$(pwd)
 FORCE_VERSION="*"
 CACHED_BUILDKITE_BUILD_ID="${CACHED_BUILDKITE_BUILD_ID:-}"
 CONFIG_JSON_GZ_URL=""
+HARD_FORK_SHIFT_SLOT_DELTA=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -31,6 +32,10 @@ while [[ $# -gt 0 ]]; do
       CONFIG_JSON_GZ_URL="$2"
       shift 2
       ;;
+    --hardfork-shift-slot-delta)
+      HARD_FORK_SHIFT_SLOT_DELTA="$2"
+      shift 2
+      ;;
     *)
       echo "Unknown argument: $1"
       echo "Usage: $0 --network <network> --config-json-gz-url <url> [--version <version>] --codename <codename> [--cached-buildkite-build-id <id>]"
@@ -44,6 +49,11 @@ if [ -z "$NETWORK" ] || [ -z "$CODENAME" ]; then
   exit 1
 fi
 
+HARD_FORK_SHIFT_SLOT_DELTA_ARG=""
+if [[ -n "$HARD_FORK_SHIFT_SLOT_DELTA" ]]; then
+  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-shift-slot-delta $HARD_FORK_SHIFT_SLOT_DELTA"
+fi
+
 # Install mina-logproc from cached build if available, else from current build
 if [[ -n "${CACHED_BUILDKITE_BUILD_ID:-}" ]]; then
   MINA_DEB_CODENAME=$CODENAME FORCE_VERSION="*" ROOT="$CACHED_BUILDKITE_BUILD_ID" ./buildkite/scripts/debian/install.sh mina-logproc 1
@@ -55,7 +65,7 @@ MINA_DEB_CODENAME=$CODENAME FORCE_VERSION=$FORCE_VERSION ROOT="legacy" ./buildki
 
 curl "${CONFIG_JSON_GZ_URL}" > config.json.gz && gunzip config.json.gz
 
-./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe mina-create-legacy-genesis --config "config.json" --workdir "$WORKDIR"
+./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe mina-create-legacy-genesis --config "config.json" --workdir "$WORKDIR" $HARD_FORK_SHIFT_SLOT_DELTA_ARG
 
 echo "--- Caching legacy ledger tarballs and hashes"
 

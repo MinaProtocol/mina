@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Usage: generate-fork-config-with-ledger-tarballs-using-legacy-app.sh.sh --exe <mina_legacy_genesis_exe> --config <fork_config> --workdir <workdir> --ledger-name <ledger_name> --hash-name <hash_name>
+# Usage: generate-fork-config-with-ledger-tarballs-using-legacy-app.sh.sh --exe <mina_legacy_genesis_exe> --config <fork_config> --workdir <workdir> --ledger-name <ledger_name> --hash-name <hash_name> --hardfork-shift-slot-delta <hardfork_shift_slot_delta>
 
 set -e
 
@@ -8,7 +8,7 @@ set -e
 LEDGER_NAME="legacy_ledgers"
 HASH_NAME="legacy_hashes.json"
 MINA_LEGACY_GENESIS_EXE="mina-create-legacy-genesis"
-HARD_FORK_GENESIS_SLOT_DELTA=""
+HARD_FORK_SHIFT_SLOT_DELTA=""
 
 # Parse CLI args
 while [[ $# -gt 0 ]]; do
@@ -33,8 +33,8 @@ while [[ $# -gt 0 ]]; do
 			HASH_NAME="$2"
 			shift 2
 			;;
-		--hard-fork-genesis-slot-delta)
-			HARD_FORK_GENESIS_SLOT_DELTA="$2"
+		--hardfork-shift-slot-delta)
+			HARD_FORK_SHIFT_SLOT_DELTA="$2"
 			shift 2
 			;;
 		*)
@@ -64,9 +64,9 @@ HASH_PATH="$WORKDIR/$HASH_NAME"
 
 echo "generating genesis ledgers ... (this may take a while)" >&2
 
-HARD_FORK_GENESIS_SLOT_DELTA_ARG=""
-if [[ -n "$HARD_FORK_GENESIS_SLOT_DELTA" ]]; then
-  HARD_FORK_GENESIS_SLOT_DELTA_ARG="--hardfork-slot $HARD_FORK_GENESIS_SLOT_DELTA"
+HARD_FORK_SHIFT_SLOT_DELTA_ARG=""
+if [[ -n "$HARD_FORK_SHIFT_SLOT_DELTA" ]]; then
+  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-slot $HARD_FORK_SHIFT_SLOT_DELTA"
 fi
 
-"$MINA_LEGACY_GENESIS_EXE" --pad-app-state --config-file "$FORK_CONFIG" --genesis-dir "$LEDGER_PATH" --hash-output-file "$HASH_PATH" $HARD_FORK_GENESIS_SLOT_DELTA_ARG
+"$MINA_LEGACY_GENESIS_EXE" --pad-app-state --config-file "$FORK_CONFIG" --genesis-dir "$LEDGER_PATH" --hash-output-file "$HASH_PATH" $HARD_FORK_SHIFT_SLOT_DELTA_ARG
