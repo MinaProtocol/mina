@@ -231,21 +231,37 @@ fi
 # Argument Processing
 # =============================================================================
 
+# Detailed explanation of the argument processing logic
+function print_argument_warning() {
+  echo "  Automatic argument adjustments are only implemented for the 'daemon' subcommand." >&2
+  echo "  Please ensure you are invoking the correct runtime binary directly if needed." >&2
+  echo "  For example, use 'mina-berkeley' or 'mina-mesa' instead of relying on the dispatcher (mina)." >&2
+  echo "  If you want to call others utility daemon apps using specific version need to be called by full path /usr/lib/mina/berkeley/... or /usr/lib/mina/mesa/..." >&2
+}
+
+
+
+first_arg=""
+
 # Copy arguments to a new array for processing
 # Handle empty arguments case safely with set -u
 if [[ $# -gt 0 ]]; then
   args=("$@")
+  first_arg="${args[0]}"
 else
   args=()
 fi
 
-first_arg="${args[0]}"
+if [[ -z "$first_arg" ]]; then
+  echo "mina-dispatch ERROR: no subcommand provided for automatic hardfork handling" >&2
+  print_argument_warning
+  exit 1
+fi
 
 if [[ "$first_arg" != "daemon" ]]; then
   echo "mina-dispatch ERROR: unsupported subcommand '$first_arg' for automatic hardfork handling" >&2
-  echo "  Automatic argument adjustments are only implemented for the 'daemon' subcommand." >&2
-  echo "  Please ensure you are invoking the correct runtime binary directly if needed." >&2
-  echo "  For example, use 'mina-berkeley' or 'mina-mesa' instead of relying on the dispatcher (mina)." >&2
+  print_argument_warning
+  exit 1
 fi
 
 if [[ "$runtime" == "mesa" ]]; then

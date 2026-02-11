@@ -758,6 +758,9 @@ EOF
   ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina-rocksdb-scanner"
   ln -sf mina-dispatch "${BUILDDIR}/usr/local/bin/mina"
 
+  ln -sf "${AUTOMODE_PRE_HF_DIR}/mina" mina-berkeley
+  ln -sf "${AUTOMODE_POST_HF_DIR}/mina" mina-mesa
+
   # Create directory for legacy binaries symlink if needed
   mkdir -p "${BUILDDIR}/usr/lib/mina/berkeley"
   ln -sf ../../lib/mina/berkeley/mina-create-genesis "${BUILDDIR}/usr/local/bin/mina-create-legacy-genesis"
