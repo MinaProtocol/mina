@@ -29,6 +29,7 @@ set -euo pipefail
 
 MODE="default"
 COMPARISION_BRANCH="develop"
+
 source "$(dirname "$0")/../export-git-env-vars.sh"
 
 # Parse command line arguments

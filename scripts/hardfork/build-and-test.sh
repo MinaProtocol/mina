@@ -105,7 +105,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 if [ -n "${BUILDKITE:-}" ]; then
   # This is a CI run, ensure nix docker has everything what we want.
-  nix-env -iA unstable.{curl,git-lfs,gnused,jq,python311}
+  nix-env -iA unstable.{curl,gawk,git-lfs,gnused,jq,python311}
 
   python -m venv .venv
   source .venv/bin/activate

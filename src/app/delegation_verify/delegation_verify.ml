@@ -10,8 +10,8 @@ let get_filenames =
   | filenames ->
       filenames
 
-let verify_snark_work ~verify_transaction_snarks ~proof ~message =
-  verify_transaction_snarks [ (proof, message) ]
+let verify_snark_work ~verify_transaction_snarks ~proof =
+  verify_transaction_snarks [ proof ]
 
 let config_flag =
   let open Command.Param in
@@ -108,7 +108,19 @@ module Make_verifier (Source : Submission.Data_source) = struct
               Mina_base.Sok_message.create ~fee:snark_work_fee
                 ~prover:(Source.submitter submission)
             in
-            verify_snark_work ~verify_transaction_snarks ~proof ~message
+            let%bind () =
+              Deferred.return
+              @@
+              if
+                Sok_message.Digest.equal
+                  (Sok_message.digest message)
+                  (Ledger_proof.sok_digest proof)
+              then Ok ()
+              else
+                Or_error.error_string
+                  "proof's sok message digest does not match the sok message"
+            in
+            verify_snark_work ~verify_transaction_snarks ~proof
       else return ()
     in
     let header = Mina_block.Stable.Latest.header block in

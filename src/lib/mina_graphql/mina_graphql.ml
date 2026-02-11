@@ -2610,7 +2610,7 @@ module Queries = struct
         in
         let%bind { source_ledgers
                  ; global_slot_since_genesis
-                 ; genesis_state_timestamp = _
+                 ; genesis_state_timestamp
                  ; state_hash
                  ; staking_epoch_seed
                  ; next_epoch_seed
@@ -2629,7 +2629,8 @@ module Queries = struct
         in
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger
-            ~global_slot_since_genesis ~state_hash ~staking_ledger
+            ~genesis_state_timestamp ~global_slot_since_genesis ~state_hash
+            ~staking_ledger
             ~staking_epoch_seed:(Epoch_seed.to_base58_check staking_epoch_seed)
             ~next_epoch_ledger:(Some next_epoch_ledger)
             ~next_epoch_seed:(Epoch_seed.to_base58_check next_epoch_seed)
@@ -2806,7 +2807,7 @@ module Queries = struct
         match encoding_opt with
         | Some `BASE64 ->
             Bin_prot.Writer.to_string
-              Mina_state.Protocol_state.Value.Stable.V2.bin_t.writer
+              Mina_state.Protocol_state.Value.Stable.Latest.bin_t.writer
               protocol_state
             |> Base64.encode_exn
         | Some `JSON | None ->

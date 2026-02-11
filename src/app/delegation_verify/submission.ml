@@ -28,13 +28,12 @@ module type Data_source = sig
   val load_block : submission -> t -> string Deferred.Or_error.t
 
   val verify_blockchain_snarks :
-       (Mina_wire_types.Mina_state_protocol_state.Value.V2.t * Mina_base.Proof.t)
+       (Mina_wire_types.Mina_state_protocol_state.Value.V3.t * Mina_base.Proof.t)
        list
     -> unit Async_kernel__Deferred_or_error.t
 
   val verify_transaction_snarks :
-       (Ledger_proof.t * Mina_base.Sok_message.t) list
-    -> (unit, Error.t) Deferred.Result.t
+    Ledger_proof.t list -> (unit, Error.t) Deferred.Result.t
 
   val output :
     t -> submission -> Output.t Or_error.t -> unit Deferred.Or_error.t
