@@ -20,7 +20,7 @@ function find_most_recent_numeric_tag() {
     echo $TAG
 }
 
-GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
+GITHASH_CONFIG=${OVERRIDE_GITHASH:-$(git rev-parse --short=8 --verify HEAD)}
 # Remove last character to get 7-character short hash
 GITHASH=${GITHASH_CONFIG%?}
 THIS_COMMIT_TAG=${OVERRIDE_TAG:-$(git tag --points-at HEAD)}
@@ -32,7 +32,7 @@ else
    GITBRANCH=$(git name-rev --name-only $GITHASH | sed "s/remotes\/origin\///g" | sed 's!/!-!g; s!_!-!g; s!#!-!g' )
 fi
 
-GITTAG=$(find_most_recent_numeric_tag HEAD)
+GITTAG=${OVERRIDE_TAG:-$(find_most_recent_numeric_tag HEAD)}
 
 
 if [[ "${SKIP_GITBRANCH:-0}" == "1" ]]; then
