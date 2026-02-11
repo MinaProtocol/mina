@@ -79,6 +79,15 @@ let generateReferenceTarballsCommand =
                   }
                   spec.use_artifacts_from_buildkite_build
 
+           let hardforkShiftSlotDeltaArg =
+                merge
+                  { Some =
+                          \(delta : Natural)
+                      ->  "--hardfork-shift-slot-delta " ++ Natural/show delta
+                  , None = ""
+                  }
+                  spec.hardfork_shift_slot_delta
+
           in  Command.build
                 Command.Config::{
                 , commands =
@@ -89,7 +98,7 @@ let generateReferenceTarballsCommand =
                       [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
                       "./buildkite/scripts/hardfork/release/generate-fork-config-and-ledger-tarballs-using-legacy-app.sh --network ${Network.lowerName
                                                                                                                                        spec.network} --version 3.2.0-f77c8c9  --codename ${DebianVersions.lowerName
-                                                                                                                                                                                             codename} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg}"
+                                                                                                                                                                                             codename} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg} ${hardforkShiftSlotDeltaArg}"
                 , label =
                     "Generate hardfork reference tarballs for ${DebianVersions.lowerName
                                                                   codename}"
@@ -119,6 +128,7 @@ let generateTarballsCommand =
                   , None = ""
                   }
                   spec.hardfork_shift_slot_delta
+
 
           in  Command.build
                 Command.Config::{

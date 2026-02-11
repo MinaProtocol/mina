@@ -8,6 +8,7 @@ set -e
 LEDGER_NAME="legacy_ledgers"
 HASH_NAME="legacy_hashes.json"
 MINA_LEGACY_GENESIS_EXE="mina-create-legacy-genesis"
+HARD_FORK_GENESIS_SLOT_DELTA=""
 
 # Parse CLI args
 while [[ $# -gt 0 ]]; do
@@ -30,6 +31,10 @@ while [[ $# -gt 0 ]]; do
 			;;
 		--hash-name)
 			HASH_NAME="$2"
+			shift 2
+			;;
+		--hard-fork-genesis-slot-delta)
+			HARD_FORK_GENESIS_SLOT_DELTA="$2"
 			shift 2
 			;;
 		*)
@@ -59,4 +64,9 @@ HASH_PATH="$WORKDIR/$HASH_NAME"
 
 echo "generating genesis ledgers ... (this may take a while)" >&2
 
-"$MINA_LEGACY_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$LEDGER_PATH" --hash-output-file "$HASH_PATH"
+HARD_FORK_GENESIS_SLOT_DELTA_ARG=""
+if [[ -n "$HARD_FORK_GENESIS_SLOT_DELTA" ]]; then
+  HARD_FORK_GENESIS_SLOT_DELTA_ARG="--hardfork-slot $HARD_FORK_GENESIS_SLOT_DELTA"
+fi
+
+"$MINA_LEGACY_GENESIS_EXE" --pad-app-state --config-file "$FORK_CONFIG" --genesis-dir "$LEDGER_PATH" --hash-output-file "$HASH_PATH" $HARD_FORK_GENESIS_SLOT_DELTA_ARG
