@@ -4289,21 +4289,20 @@ module Block = struct
           height < ? ORDER BY height DESC LIMIT 1" )
       height
 
-  let mark_as_canonical (module Conn : Mina_caqti.CONNECTION) ~state_hash =
-    Conn.exec
-      (Mina_caqti.exec_req Caqti_type.string
-         "UPDATE blocks SET chain_status='canonical' WHERE state_hash = ?" )
-      state_hash
-
-  let mark_as_orphaned (module Conn : Mina_caqti.CONNECTION) ~state_hash ~height
-      =
+  let decide_canonical_at_height (module Conn : Mina_caqti.CONNECTION)
+      ~state_hash ~height =
     Conn.exec
       (Mina_caqti.exec_req
          Caqti_type.(t2 string int64)
-         {sql| UPDATE blocks SET chain_status='orphaned'
-               WHERE height = $2
-               AND state_hash <> $1
-         |sql} )
+         {sql|
+         UPDATE blocks
+         SET chain_status =
+           CASE
+             WHEN state_hash = $1 THEN 'canonical'
+             ELSE 'orphaned'
+           END
+         WHERE height = $2;
+       |sql} )
       (state_hash, height)
 
   (* update chain_status for blocks now known to be canonical or orphaned *)
@@ -4340,10 +4339,7 @@ module Block = struct
             ~logger (fun () ->
               Mina_caqti.deferred_result_list_fold canonical_blocks ~init:()
                 ~f:(fun () block ->
-                  let%bind () =
-                    mark_as_canonical (module Conn) ~state_hash:block.state_hash
-                  in
-                  mark_as_orphaned
+                  decide_canonical_at_height
                     (module Conn)
                     ~state_hash:block.state_hash ~height:block.height ) )
         else if Int64.( < ) block.height greatest_canonical_height then
@@ -4363,6 +4359,7 @@ module Block = struct
           let%bind canonical_blocks =
             Metrics.time ~label:"get_subchain (< canonical_height)" ~logger
               (fun () ->
+                (* NOTE: we some how assumed blocks are continuous here *)
                 get_subchain
                   (module Conn)
                   ~start_block_id:canonical_block_below_id
@@ -4372,10 +4369,7 @@ module Block = struct
             (fun () ->
               Mina_caqti.deferred_result_list_fold canonical_blocks ~init:()
                 ~f:(fun () block ->
-                  let%bind () =
-                    mark_as_canonical (module Conn) ~state_hash:block.state_hash
-                  in
-                  mark_as_orphaned
+                  decide_canonical_at_height
                     (module Conn)
                     ~state_hash:block.state_hash ~height:block.height ) )
         else
