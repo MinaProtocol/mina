@@ -11,6 +11,7 @@ ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
 ARG deb_profile
 ARG deb_suffix
+ARG apt_cache_url=""
 
 ARG GCLOUD_VERSION=476.0.0
 
@@ -32,6 +33,11 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libprocps8
 #    libjemalloc2
 #    libssl
+
+# Optional: configure APT caching proxy
+RUN if [ -n "$apt_cache_url" ]; then \
+  echo "Acquire::http::Proxy \"${apt_cache_url}\";" > /etc/apt/apt.conf.d/01proxy; \
+fi
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \
