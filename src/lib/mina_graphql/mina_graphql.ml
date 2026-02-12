@@ -2757,6 +2757,71 @@ module Queries = struct
             (* Prefix string to disambiguate *)
             "other network: " ^ s )
 
+  let get_ancestry_proof_impl ~mina ~depth block_state_hash_base58 =
+    (* Parse the state hash *)
+    let%bind.Or_error block_state_hash =
+      match block_state_hash_base58 with
+      | None ->
+          Or_error.return None
+      | Some v ->
+          State_hash.of_base58_check v |> Or_error.map ~f:Option.some
+    in
+    (* Get the transition frontier *)
+    let%bind.Or_error frontier =
+      match
+        Pipe_lib.Broadcast_pipe.Reader.peek (Mina_lib.transition_frontier mina)
+      with
+      | Some frontier ->
+          Or_error.return frontier
+      | None ->
+          Or_error.error_string
+            "Transition frontier not available (node may be bootstrapping)"
+    in
+    let target_state_hash =
+      match block_state_hash with
+      | None ->
+          Transition_frontier.best_tip frontier
+          |> Transition_frontier.Breadcrumb.state_hash
+      | Some v ->
+          v
+    in
+    (* Use the transition frontier function to get the proof *)
+    let%map.Or_error init_hash, state_body_hashes =
+      Transition_chain_prover.prove ?length:depth ~frontier target_state_hash
+      |> Result.of_option
+           ~error:(Error.of_string "failed to create ancestry proof")
+    in
+    let state_body_hash_string_list =
+      (* Convert state body hashes to base58check format *)
+      List.map state_body_hashes ~f:State_body_hash.to_base58_check
+    in
+    let init_hash_string = State_hash.to_base58_check init_hash in
+    (init_hash_string, state_body_hash_string_list)
+
+  let ancestry_proof =
+    io_field "ancestryProof"
+      ~doc:
+        "Get state body hashes for ancestor blocks to prove ancestry \
+         relationships. The returned array of state body hashes, when folded \
+         with Poseidon, produces the input state hash. Useful for proving that \
+         a block is an nth-degree descendant of an ancestor block."
+      ~typ:(non_null Types.ancestry_proof)
+      ~args:
+        Arg.
+          [ arg "stateHash" ~typ:string
+              ~doc:
+                "State hash of the block to start from (best tip will be used \
+                 if not provided)"
+          ; arg "depth" ~typ:int
+              ~doc:
+                "Number of ancestor blocks to traverse (depth of ancestry \
+                 proof)"
+          ]
+      ~resolve:(fun { ctx = mina; _ } () block_state_hash_base58 depth ->
+        get_ancestry_proof_impl ~mina block_state_hash_base58 ~depth
+        |> Result.map_error ~f:Error.to_string_hum
+        |> Deferred.return )
+
   let protocol_state =
     io_field "protocolState"
       ~doc:
@@ -2857,6 +2922,7 @@ module Queries = struct
     ; network_id
     ; signature_kind
     ; protocol_state
+    ; ancestry_proof
     ; account_actions
     ]
 
