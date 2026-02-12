@@ -1,8 +1,9 @@
-(**
-  Mina_lib contains the core logic of the Mina protocol, including the
-  ledger, consensus, SNARK workers, networking, and state management. It
-  provides the foundational components used by Mina_run, CLI tools, and
-  other services to operate a Mina node. *)
+(** Core logic of the Mina protocol daemon.
+
+    This module orchestrates ledger, consensus, networking, and state management.
+    Used by [Mina_run], CLI tools, and other services to operate a Mina node.
+
+    See {!val:create} for initialization and subprocess details. *)
 
 open Async_kernel
 open Core
@@ -224,6 +225,31 @@ val start_with_precomputed_blocks :
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
+(** Create and initialize the Mina daemon.
+
+    {2 Subprocesses}
+
+    Spawns child processes via [Rpc_parallel]:
+
+    - {b Prover} ([Prover.t]): Generates SNARK proofs for transactions and blocks.
+      Runs in separate process due to high memory/CPU requirements.
+    - {b Verifier} ([Verifier.t]): Verifies signatures, transaction SNARKs, and
+      blockchain SNARKs. See [Verifier] module for architecture details.
+    - {b VRF evaluator} ([Vrf_evaluator.t]): Evaluates VRF for block production
+      slot determination.
+    - {b Snark worker} (optional): Generates SNARK proofs for the snark pool.
+      Can be enabled/disabled at runtime.
+    - {b Uptime snark worker} (optional): Specialized worker for uptime service.
+
+    These are stored in the [processes] record and passed to components like
+    [Block_producer], [Transaction_pool], [Snark_pool], and [Transition_frontier].
+
+    {2 Components initialized}
+
+    - [Transaction_pool]: Mempool for pending transactions
+    - [Snark_pool]: Pool of completed SNARK work
+    - [Transition_frontier]: Recent block history for consensus
+    - Networking via [Mina_networking] *)
 val create :
   commit_id:string -> ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
