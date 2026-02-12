@@ -10,15 +10,6 @@ let sponge_params_constant = Kimchi_pasta_basic.poseidon_params_fp
 let tick_field_random_oracle ?(length = Tick.Field.size_in_bits - 1) s =
   Tick.Field.of_bits (Ro.bits_random_oracle ~length s)
 
-let _unrelated_g =
-  let group_map =
-    unstage
-      (group_map
-         (module Tick.Field)
-         ~a:Tick.Inner_curve.Params.a ~b:Tick.Inner_curve.Params.b )
-  and str = Fn.compose bits_to_bytes Tick.Field.to_bits in
-  fun (x, y) -> group_map (tick_field_random_oracle (str x ^ str y))
-
 open Impl
 
 (* Debug helper to convert step circuit field element to a hex string *)
@@ -37,19 +28,6 @@ end
 
 let sponge_params =
   Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
-
-(* module Unsafe = struct
-     let _unpack_unboolean ?(length = Field.size_in_bits) x =
-       let res =
-         exists
-           (Typ.list Boolean.typ_unchecked ~length)
-           ~compute:
-             As_prover.(
-               fun () -> List.take (Field.Constant.unpack (read_var x)) length)
-       in
-       Field.Assert.equal x (Field.project res) ;
-       res
-   end *)
 
 module Sponge = struct
   module Permutation =
@@ -85,24 +63,6 @@ module Sponge = struct
     | `Bits bs ->
         absorb t (Field.pack bs)
 end
-
-(* module Input_domain = struct
-     let domain = Import.Domain.Pow_2_roots_of_unity 6
-
-     let _lagrange_commitments =
-       lazy
-         (let domain_size = Import.Domain.size domain in
-          Common.time "lagrange" (fun () ->
-              Array.init domain_size ~f:(fun i ->
-                  let v =
-                    (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment
-                       (Backend.Tock.Keypair.load_urs ())
-                       domain_size i )
-                      .unshifted
-                  in
-                  assert (Array.length v = 1) ;
-                  v.(0) |> Common.finite_exn ) ) )
-   end *)
 
 module Inner_curve = struct
   module C = Kimchi_pasta.Pasta.Pallas
