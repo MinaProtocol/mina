@@ -46,7 +46,7 @@ ENV MINA_ROSETTA_DEB=mina-rosetta-${network}
 # Optional: configure APT caching proxy (bypass proxy for deb_repo)
 RUN if [ -n "$apt_cache_url" ]; then \
   echo "Acquire::http::Proxy \"${apt_cache_url}\";" > /etc/apt/apt.conf.d/01proxy; \
-  DEB_REPO_HOST=$(echo "$deb_repo" | sed -E 's|https?://([^:/]+).*|\1|'); \
+  DEB_REPO_HOST=${deb_repo#*://}; DEB_REPO_HOST=${DEB_REPO_HOST%%[:/]*}; \
   echo "Acquire::http::Proxy::${DEB_REPO_HOST} \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
 fi
 
