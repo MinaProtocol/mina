@@ -101,7 +101,6 @@ RUN curl -sL https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHE
     | tar --extract --file=- --xz --strip-components=1 --directory=/usr/bin shellcheck-v$SHELLCHECK_VERSION/shellcheck
 
 # --- AWS
-
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-${CANONICAL_ARCH}.zip" -o "awscliv2.zip" \
   && unzip awscliv2.zip \
   && ./aws/install \
