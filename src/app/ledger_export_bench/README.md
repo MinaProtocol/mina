@@ -1,4 +1,4 @@
-Ledger export benckmark
+Ledger export benchmark
 =======================
 
 This package provides a couple of simple benchmarks for the most

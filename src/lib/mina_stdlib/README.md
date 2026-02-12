@@ -3,7 +3,7 @@
 A collection of reusable utility modules and data structures that can be used
 independently of the Mina blockchain protocol. This library provides
 fundamental building blocks that are useful across various OCaml projects.
-The library should be platform indepedent, i.e. it should not depend on UNIX
+The library should be platform independent, i.e. it should not depend on UNIX
 related packages and should be compilable into JavaScript.
 It is recommended to move UNIX related modules into the UNIX version of Mina
 standard library, `mina_stdlib_unix`.

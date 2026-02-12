@@ -5,7 +5,7 @@ OCaml we need to generate bindings.
 These bindings are written in Rust with the help of two libraries:
 
 * [OCaml-rs](https://github.com/zshipko/ocaml-rs) to facilitate exporting a Rust
-  library to a static library that can be used from within OCaml. Insead of
+  library to a static library that can be used from within OCaml. Instead of
   exporting code directly to a C interface, it makes use of the OCaml runtime
   directly and can also store values and custom types on the OCaml heap.
 * [ocaml-gen](https://github.com/o1-labs/proof-systems) to generate the
