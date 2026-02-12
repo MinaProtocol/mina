@@ -69,11 +69,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run ~config:(Test_config.{ signature_kind; _ } as config) network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let all_mina_nodes = Network.all_mina_nodes network in
+    let all_daemon_nodes = Network.all_daemon_nodes network in
     let%bind () =
       wait_for t
         (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
+           (Core.String.Map.data all_daemon_nodes) )
     in
     let untimed_node_a = Network.block_producer_exn network "untimed-node-a" in
     let untimed_node_b = Network.block_producer_exn network "untimed-node-b" in

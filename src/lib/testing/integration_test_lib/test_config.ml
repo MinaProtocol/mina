@@ -1,12 +1,7 @@
 open Core_kernel
 
 module Container_images = struct
-  type t =
-    { mina : string
-    ; archive_node : string
-    ; user_agent : string
-    ; points : string
-    }
+  type t = { mina : string; archive_node : string }
 end
 
 module Test_account = struct

@@ -1,9 +1,11 @@
 open Core_kernel
 open Mina_base
 
-let all_equal ~equal ~compare ls =
-  Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
-      List.equal equal [ h ] (List.find_all_dups ~compare ls) )
+let all_equal ~equal = function
+  | [] ->
+      true
+  | hd :: rest ->
+      List.for_all ~f:(equal hd) rest
 
 module Make
     (Engine : Intf.Engine.S)
@@ -118,13 +120,13 @@ struct
         , state.num_transition_frontier_loaded_from_persistence )
     in
 
-    let check init state =
+    let check condition state =
       let ( num_init_persisted_frontier_loaded
           , num_init_persisted_frontier_fresh_boot
           , num_init_bootstrap_required
           , num_init_persisted_frontier_dropped
           , num_init_transition_frontier_loaded_from_persistence ) =
-        init
+        condition
       in
 
       let fresh_data_condition =
@@ -151,13 +153,7 @@ struct
         && state.num_transition_frontier_loaded_from_persistence
            > num_init_transition_frontier_loaded_from_persistence
       then Predicate_passed
-      else
-        Predicate_continuation
-          ( num_init_persisted_frontier_loaded
-          , num_init_persisted_frontier_fresh_boot
-          , num_init_bootstrap_required
-          , num_init_persisted_frontier_dropped
-          , num_init_transition_frontier_loaded_from_persistence )
+      else Predicate_continuation condition
     in
     { id = Transition_frontier_loaded_from_persistence
     ; description =
@@ -171,7 +167,9 @@ struct
     }
 
   let block_height_growth ~height_growth =
-    (* block height is an objective measurement for the whole chain.  block height growth checks that the block height increased by the desired_height since the wait condition was called *)
+    (* block height is an objective measurement for the whole chain.  block
+       this condition checks that the block height increased by [height_growth]
+       since the wait condition was called *)
     let init state = Predicate_continuation state.block_height in
     let check initial_height (state : Network_state.t) =
       if state.block_height - initial_height >= height_growth then
@@ -193,7 +191,6 @@ struct
     let check () state =
       let all_best_tips_equal =
         all_equal ~equal:[%equal: State_hash.t option]
-          ~compare:[%compare: State_hash.t option]
       in
       let best_tips =
         List.map nodes ~f:(fun node ->
