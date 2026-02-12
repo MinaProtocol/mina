@@ -69,9 +69,13 @@ HASH_PATH="$WORKDIR/$HASH_NAME"
 
 echo "generating genesis ledgers ... (this may take a while)" >&2
 
+# make sure files does not have genesis key
+jq 'del(.genesis)' "$FORK_CONFIG" > tmp/fork_config_no_genesis.json
+
 HARD_FORK_SHIFT_SLOT_DELTA_ARG=""
 if [[ -n "$HARD_FORK_SHIFT_SLOT_DELTA" ]]; then
-  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-slot $HARD_FORK_SHIFT_SLOT_DELTA --prefork-genesis-config $PREFORK_GENESIS_CONFIG"
+  jq 'del(.genesis)' "$PREFORK_GENESIS_CONFIG" > tmp/config_no_genesis.json
+  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-slot $HARD_FORK_SHIFT_SLOT_DELTA --prefork-genesis-config tmp/config_no_genesis.json"
 fi
 
-"$MINA_LEGACY_GENESIS_EXE" --pad-app-state --config-file "$FORK_CONFIG" --genesis-dir "$LEDGER_PATH" --hash-output-file "$HASH_PATH" $HARD_FORK_SHIFT_SLOT_DELTA_ARG
+"$MINA_LEGACY_GENESIS_EXE" --pad-app-state --config-file tmp/fork_config_no_genesis.json --genesis-dir "$LEDGER_PATH" --hash-output-file "$HASH_PATH" $HARD_FORK_SHIFT_SLOT_DELTA_ARG
