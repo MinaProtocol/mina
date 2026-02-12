@@ -735,22 +735,6 @@ build_daemon_testnet_generic_hardfork_config_deb() {
   build_deb "${__deb_name}"
 }
 
-build_daemon_berkeley_hardfork_deb() {
-  local __deb_name=mina-berkeley
-
-  echo "------------------------------------------------------------"
-  echo "--- Building hardfork Berkeley testnet signatures deb without keys:"
-
-  create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}, ${__deb_name}-config (>=${MINA_DEB_VERSION}) " \
-    'Mina Protocol Client and Daemon for the Berkeley Network' \
-    "${SUGGESTED_DEPS}" "mina-berkeley (<< ${MINA_DEB_VERSION})"
-
-
-  replace_runtime_config_and_ledgers_with_hardforked_ones testnet-generic
-  build_deb "${__deb_name}"
-
-}
-
 ## END TESTNET GENERIC HARDFORK PACKAGE ##
 
 ## MAINNET HARDFORK PACKAGE ##
