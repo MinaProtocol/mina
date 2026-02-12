@@ -4,29 +4,8 @@
 #################################################################################################
 # Supports europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim, and europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
 ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
-# Use the image argument to select the base image for this stage
-# This allows us to use the same Dockerfile for different base images
-# This arg is defined here globally and does not need to be redefined in
-# any other stages.
-ARG deb_codename
 
 FROM ${image} AS build-deps
-
-ARG TARGETPLATFORM
-ARG BUILDPLATFORM
-
-# Unfortunately we cannot use the same naming convention for all architectures
-# for all tooling, therefore we need to define couple of naming conventions
-
-# Canonical style naming convention
-# : aarch/x86_64
-ARG CANONICAL_ARCH
-# Debian style naming convention
-# : arm64/amd64
-ARG DEBIAN_ARCH
-
-# We need to define the target architecture as it is still different from CANONICAL_ARCH
-# For example: Canonical names are aarch64/x86_64 while TARGETARCH: aarch64/amd64
 ARG TARGETARCH
 
 # OCaml Version
@@ -127,8 +106,13 @@ RUN adduser --uid 65533 --disabled-password --gecos '' opam \
 RUN git config --global advice.detachedHead false
 
 # --- Opam install of a given OPAM_VERSION from github release
-RUN curl -sL \
-  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-${DEBIAN_ARCH}-linux" \
+RUN case "${TARGETARCH}" in \
+        "amd64") OPAM_ARCH="x86_64" ;; \
+        "arm64") OPAM_ARCH="arm64" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    curl -sL \
+  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-${OPAM_ARCH}-linux" \
   -o /usr/bin/opam \
   && chmod +x /usr/bin/opam
 
@@ -144,9 +128,14 @@ RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz
 # In addition to that, we also install cargo-xtask as it is used to build the
 # WebAssembly artefacts.
 USER opam
-RUN curl --proto "=https" \
+RUN case "${TARGETARCH}" in \
+        "amd64") RUSTUP_ARCH="x86_64" ;; \
+        "arm64") RUSTUP_ARCH="aarch64" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+  curl --proto "=https" \
   --tlsv1.2 -sSf -o /tmp/rustup-init \
-  https://static.rust-lang.org/rustup/dist/${CANONICAL_ARCH}-unknown-linux-gnu/rustup-init \
+  https://static.rust-lang.org/rustup/dist/${RUSTUP_ARCH}-unknown-linux-gnu/rustup-init \
   && chmod +x /tmp/rustup-init \
   && /tmp/rustup-init -y --default-toolchain \
     "${RUST_VERSION}" \

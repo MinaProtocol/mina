@@ -115,33 +115,11 @@ fi
 
 PLATFORM="--platform ${INPUT_PLATFORM}"
 
-# Unfortunately we cannot use the same naming convention for all architectures
-# for all tooling in toolchain or mina docker
-# therefore we need to define couple of naming conventions
-
-# Canonical style naming convention : aarch/x86_64
-# Debian style naming convention : arm64/amd64
-case "${INPUT_PLATFORM}" in
-      linux/amd64)
-        CANONICAL_ARCH="x86_64"
-        DEBIAN_ARCH="x86_64"
-        ;;
-      linux/arm64)
-        CANONICAL_ARCH="aarch64"
-        DEBIAN_ARCH="arm64"
-        ;;
-      *)
-        echo "unsupported platform"; exit 1
-        ;;
-esac
-
 if [[ -z "${DOCKER_REGISTRY:-}" ]]; then
   echo "Docker registry is not set. Using the default ($USER/mina-protocol)"
   DOCKER_REGISTRY="$USER/mina-protocol"
 fi
 
-CANONICAL_ARCH_ARG="--build-arg CANONICAL_ARCH=$CANONICAL_ARCH"
-DEBIAN_ARCH_ARG="--build-arg DEBIAN_ARCH=$DEBIAN_ARCH"
 DOCKER_REPO_ARG="--build-arg docker_repo=$DOCKER_REGISTRY"
 
 if [[ -z "${INPUT_RELEASE:-}" ]]; then
@@ -265,9 +243,9 @@ BUILD_NETWORK="--allow=network.host"
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT:-}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
-  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -t "$HASHTAG" -
+  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -t "$HASHTAG" -
 else
-  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."
