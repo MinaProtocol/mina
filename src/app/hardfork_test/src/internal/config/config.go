@@ -73,7 +73,7 @@ func DefaultConfig() *Config {
 		SlotTxEnd:                     30,
 		SlotChainEnd:                  38, // SlotTxEnd + 8
 		BestChainQueryFrom:            25,
-		MainSlot:                      30,
+		MainSlot:                      45,
 		ForkSlot:                      30,
 		MainDelayMin:                  7,
 		HfSlotDelta:                   30, // if this is too small and fork network is spawned after fork genesis, it'll fail to create any block
