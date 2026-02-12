@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"os"
+	"path/filepath"
+	"sync"
+
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
 
 type HFHandler func(*HardforkTest, *BlockAnalysisResult) error
@@ -25,7 +28,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 	t.WaitUntilBestChainQuery(t.Config.MainSlot, 0)
 
 	// Check block height at slot BestChainQueryFrom
-	bestTip, err := t.Client.BestTip(t.AnyPortOfType(PORT_REST))
+	bestTip, err := t.Client.BestTip(t.Config.AnyPortOfType(config.PORT_REST))
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +59,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 	}
 
 	// Validate no new blocks are created after chain end
-	if err := t.ValidateNoNewBlocks(t.AnyPortOfType(PORT_REST)); err != nil {
+	if err := t.ValidateNoNewBlocks(t.Config.AnyPortOfType(config.PORT_REST)); err != nil {
 		return nil, err
 	}
 
@@ -74,9 +77,9 @@ type ForkData struct {
 }
 
 // RunForkNetworkPhase runs the fork network and validates its operation
-func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData ForkData, mainGenesisTs int64) error {
+func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisTs int64) error {
 	// Start fork network
-	forkCmd, err := t.RunForkNetwork(forkData.config, forkData.ledgersDir)
+	forkCmd, err := t.RunForkNetwork()
 	if err != nil {
 		return err
 	}
@@ -84,12 +87,13 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData For
 	defer t.gracefulShutdown(forkCmd, "Fork network")
 
 	// Calculate expected genesis slot
-	expectedGenesisSlot := (forkData.genesis - mainGenesisTs) / int64(t.Config.MainSlot)
+	forkGenesisTs := t.Config.ForkGenesisTsGivenMainGenesisTs(mainGenesisTs)
+	expectedGenesisSlot := (forkGenesisTs - mainGenesisTs) / int64(t.Config.MainSlot)
 
 	t.Logger.Info("Fork network genesis slot: %d", expectedGenesisSlot)
 
 	// Validate fork network blocks
-	if err := t.ValidateFirstBlockOfForkChain(t.AnyPortOfType(PORT_REST), latestPreForkHeight, expectedGenesisSlot); err != nil {
+	if err := t.ValidateFirstBlockOfForkChain(t.Config.AnyPortOfType(config.PORT_REST), latestPreForkHeight, expectedGenesisSlot); err != nil {
 		return err
 	}
 
@@ -97,7 +101,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData For
 	t.WaitUntilBestChainQuery(t.Config.ForkSlot, int(expectedGenesisSlot))
 
 	// Check block height at slot BestChainQueryFrom
-	bestTip, err := t.Client.BestTip(t.AnyPortOfType(PORT_REST))
+	bestTip, err := t.Client.BestTip(t.Config.AnyPortOfType(config.PORT_REST))
 	if err != nil {
 		return err
 	}
@@ -110,66 +114,66 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData For
 	}
 
 	// Validate user commands in blocks
-	if err := t.ValidateBlockWithUserCommandCreatedForkNetwork(t.AnyPortOfType(PORT_REST)); err != nil {
+	if err := t.ValidateBlockWithUserCommandCreatedForkNetwork(t.Config.AnyPortOfType(config.PORT_REST)); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) (*ForkData, error) {
+// NOTE: all *Fork functions will generate a "fork_data/{config.json, genesis}"
+// structure under node's directory, after shutdown we need to move those files
+// in place before genesis of fork network
+func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalysisResult, mainGenesisTs int64) error {
 
-	idx := rand.Intn(len(analysis.CandidatePortBasesForFork))
-	forkConfigBytes, err := t.GetForkConfig(analysis.CandidatePortBasesForFork[idx] + int(PORT_REST))
+	forkConfigBytes, err := t.GetForkConfig(daemon.StartPort + int(config.PORT_REST))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	if err := os.MkdirAll("fork_data/prepatch", 0755); err != nil {
-		return nil, err
+	forkDataPrepatchPath := filepath.Join(daemon.NodeDir, "fork_data_prepatch")
+
+	if err := os.MkdirAll(forkDataPrepatchPath, 0755); err != nil {
+		return err
 	}
 
-	// Define all fork_data file paths
-	prepatchConfigFile := "fork_data/prepatch/config.json"
+	prepatchConfigFile := filepath.Join(forkDataPrepatchPath, "config.json")
 
 	var prepatchConfig LegacyPrepatchForkConfigView
 	dec := json.NewDecoder(bytes.NewReader(forkConfigBytes))
 	dec.DisallowUnknownFields()
 
 	if err := dec.Decode(&prepatchConfig); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal legacy prepatch fork config: %w", err)
+		return fmt.Errorf("failed to unmarshal legacy prepatch fork config: %w", err)
 	}
 
 	// Validate fork config data
 	if err := t.ValidateLegacyPrepatchForkConfig(analysis.LastBlockBeforeTxEnd, prepatchConfig); err != nil {
-		return nil, err
+		return err
 	}
 	// Write fork config to file
 	if err := os.WriteFile(prepatchConfigFile, forkConfigBytes, 0644); err != nil {
-		return nil, err
+		return err
 	}
 
-	prepatchLedgersDir := "fork_data/prepatch/hf_ledgers"
-	prepatchHashesFile := "fork_data/prepatch/hf_ledger_hashes.json"
-	if err := t.GenerateAndValidateHashesAndLedgers(analysis, prepatchConfigFile, prepatchLedgersDir, prepatchHashesFile); err != nil {
-		return nil, err
+	prepatchLedgersDir := filepath.Join(forkDataPrepatchPath, "ledgers")
+	prepatchHashesFile := filepath.Join(forkDataPrepatchPath, "ledger_hashes.json")
+	if err := t.GenerateAndValidateHashesAndLedgers(&analysis, prepatchConfigFile, prepatchLedgersDir, prepatchHashesFile); err != nil {
+		return err
 	}
 
-	if err := os.MkdirAll("fork_data/postpatch", 0755); err != nil {
-		return nil, err
-	}
-
-	patchedConfigFile := "fork_data/postpatch/config.json"
-	patchedLedgersDir := "fork_data/postpatch/hf_ledgers"
+	forkDataPath := filepath.Join(daemon.NodeDir, "fork_data")
+	patchedConfigFile := filepath.Join(forkDataPath, "config.json")
+	patchedLedgersDir := filepath.Join(forkDataPath, "genesis")
 
 	forkGenesisTs := t.Config.ForkGenesisTsGivenMainGenesisTs(mainGenesisTs)
 
-	preforkGenesisConfigFile := fmt.Sprintf("%s/daemon.json", t.Config.Root)
-	forkHashesFile := "fork_data/hf_ledger_hashes.json"
+	preforkGenesisConfigFile := filepath.Join(t.Config.Root, "daemon.json")
+	forkHashesFile := filepath.Join(forkDataPath, "ledger_hashes.json")
 
-	patchedConfigBytes, err := t.PatchForkConfigAndGenerateLedgersLegacy(analysis, prepatchConfigFile, patchedLedgersDir, forkHashesFile, patchedConfigFile, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs)
+	patchedConfigBytes, err := t.PatchForkConfigAndGenerateLedgersLegacy(&analysis, prepatchConfigFile, patchedLedgersDir, forkHashesFile, patchedConfigFile, preforkGenesisConfigFile, forkGenesisTs, mainGenesisTs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var patchedConfig FinalForkConfigView
@@ -177,39 +181,56 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, mainGenesi
 	dec.DisallowUnknownFields()
 
 	if err := dec.Decode(&patchedConfig); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal fork config: %w", err)
+		return fmt.Errorf("failed to unmarshal fork config: %w", err)
 	}
 
 	err = t.ValidateFinalForkConfig(analysis.LastBlockBeforeTxEnd, patchedConfig, forkGenesisTs, mainGenesisTs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &ForkData{config: patchedConfigFile, ledgersDir: patchedLedgersDir, genesis: forkGenesisTs}, nil
-
+	return nil
 }
 
-// Uses `mina advanced generate-hardfork-config CLI`
-func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) (*ForkData, error) {
+func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) error {
+	daemonInfos := t.Config.AllDaemonInfos()
+	errors := make([]error, len(daemonInfos))
 
-	cwd := ""
-	var err error = nil
-	if cwd, err = os.Getwd(); err != nil {
-		return nil, err
+	var wg sync.WaitGroup
+	for idx, info := range daemonInfos {
+		wg.Add(1)
+		go func(idx int, info config.DaemonInfo) {
+			defer wg.Done()
+			errors[idx] = t.legacyFork(info, *analysis, mainGenesisTs)
+		}(idx, info)
+	}
+	wg.Wait()
+
+	for i, info := range daemonInfos {
+		if errors[i] != nil {
+			return fmt.Errorf("Legacy fork on daemon %v failed: %v", info, errors[i])
+		}
 	}
 
-	forkDataPath := fmt.Sprintf("%s/fork_data", cwd)
+	return nil
+}
 
-	idx := rand.Intn(len(analysis.CandidatePortBasesForFork))
-	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, analysis.CandidatePortBasesForFork[idx]+int(PORT_CLIENT)); err != nil {
-		return nil, err
+func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnalysisResult, mainGenesisTs int64) error {
+
+	forkDataPath := filepath.Join(daemon.NodeDir, "fork_data")
+	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, daemon.StartPort+int(config.PORT_CLIENT)); err != nil {
+		return err
 	}
 
-	forkConfig := fmt.Sprintf("%s/daemon.json", forkDataPath)
+	forkConfigFile := filepath.Join(forkDataPath, "daemon.json")
 
-	forkConfigBytes, err := os.ReadFile(forkConfig)
+	if _, err := os.Stat(filepath.Join(forkDataPath, "activated")); err != nil {
+		return fmt.Errorf("failed to check on activated file for advanced generate fork config: %w", err)
+	}
+
+	forkConfigBytes, err := os.ReadFile(forkConfigFile)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	forkGenesisTs := t.Config.ForkGenesisTsGivenMainGenesisTs(mainGenesisTs)
@@ -219,14 +240,88 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 	dec.DisallowUnknownFields()
 
 	if err := dec.Decode(&config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal fork config: %w", err)
+		return fmt.Errorf("failed to unmarshal fork config: %w", err)
 	}
 
 	err = t.ValidateFinalForkConfig(analysis.LastBlockBeforeTxEnd, config, forkGenesisTs, mainGenesisTs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	forkLedgersDir := fmt.Sprintf("%s/genesis", forkDataPath)
-	return &ForkData{config: forkConfig, ledgersDir: forkLedgersDir, genesis: forkGenesisTs}, nil
+	return nil
+}
+
+// Uses `mina advanced generate-hardfork-config CLI`
+func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) error {
+	daemonInfos := t.Config.AllDaemonInfos()
+	errors := make([]error, len(daemonInfos))
+
+	var wg sync.WaitGroup
+	for idx, info := range daemonInfos {
+		wg.Add(1)
+		go func(idx int, info config.DaemonInfo) {
+			defer wg.Done()
+			errors[idx] = t.advancedFork(info, *analysis, mainGenesisTs)
+		}(idx, info)
+	}
+	wg.Wait()
+
+	for i, info := range daemonInfos {
+		if errors[i] != nil {
+			return fmt.Errorf("Advanced fork on daemon %v failed: %v", info, errors[i])
+		}
+	}
+
+	return nil
+}
+
+func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
+	// ===========================================================================
+	t.Logger.Info("Cleaning up deamon.json generate by mina-local-network so we're not using prefork genesis info...")
+	networkDaemonConfig := filepath.Join(t.Config.Root, "daemon.json")
+	data, err := os.ReadFile(networkDaemonConfig)
+	if err != nil {
+		return fmt.Errorf("Error reading daemon.json: %v", err)
+	}
+
+	var config map[string]any
+	if err := json.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("Error parsing daemon.json: %v", err)
+	}
+
+	delete(config, "ledger")
+	t.Logger.Info("Removed .ledger from daemon.json")
+
+	if genesis, ok := config["genesis"].(map[string]any); ok {
+		delete(genesis, "genesis_state_timestamp")
+		t.Logger.Info("Removed .genesis.genesis_state_timestamp from daemon.json")
+	} else {
+		t.Logger.Debug(".genesis section not found in daemon.json!")
+	}
+
+	updatedData, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("Error encoding daemon.json: %v", err)
+	}
+
+	if err := os.WriteFile(networkDaemonConfig, updatedData, 0644); err != nil {
+		return fmt.Errorf("Error writing daemon.json: %v", err)
+	}
+	fmt.Println("daemon.json successfully sanitized!")
+
+	// ===========================================================================
+	t.Logger.Info("Moving fork config & ledgers in place for fork network")
+	filesToMove := []string{"daemon.json", "genesis"}
+	for _, info := range t.Config.AllDaemonInfos() {
+		for _, fileToMove := range filesToMove {
+			// NOTE: all *Fork functions will generate a "fork_data/{config.json, genesis}"
+			oldPath := filepath.Join(info.NodeDir, "fork_data", fileToMove)
+			newPath := filepath.Join(info.NodeDir, fileToMove)
+			err := os.Rename(oldPath, newPath)
+			if err != nil {
+				return fmt.Errorf("Error moving fork data %s on node %s: %v", fileToMove, info.NodeDir, err)
+			}
+		}
+	}
+	return nil
 }

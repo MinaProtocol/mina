@@ -100,11 +100,6 @@ The `--config` parameter supports three modes:
    ./scripts/mina-local-network/mina-local-network.sh -c inherit
    ```
 
-3. **`inherit_with`** - Inherit keys but override config & genesis ledgers:
-   ```shell
-   ./scripts/mina-local-network/mina-local-network.sh -c "inherit_with:/path/to/config.json,/path/to/genesis_ledger"
-   ```
-
 ### Hardfork Testing
 
 Support for hardfork testing with new parameters:
