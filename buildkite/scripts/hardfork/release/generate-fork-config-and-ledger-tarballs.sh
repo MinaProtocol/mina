@@ -68,6 +68,7 @@ fi
 HARD_FORK_SHIFT_SLOT_DELTA_ARG=""
 if [[ -n "$HARD_FORK_SHIFT_SLOT_DELTA" ]]; then
   jq '.ledger' "$PREFORK_GENESIS_CONFIG" > prefork_ledger.json
+  cat prefork_ledger.json
   HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-shift-slot-delta $HARD_FORK_SHIFT_SLOT_DELTA --prefork-genesis-config prefork_ledger.json"
 fi
 
