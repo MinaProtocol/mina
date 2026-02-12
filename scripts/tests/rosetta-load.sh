@@ -93,6 +93,18 @@ DURATION=""
 # Optional maximum number of total requests before stopping
 MAX_REQUESTS=""
 
+# Metrics mode flag - when enabled, collect metrics instead of asserting on thresholds
+METRICS_MODE="false"
+
+# Optional git branch name (for CI/CD contexts where git branch detection doesn't work)
+GIT_BRANCH=""
+
+# Optional git commit hash (for CI/CD contexts where git commit detection doesn't work)
+GIT_COMMIT=""
+
+# Performance metrics output file (for InfluxDB line protocol)
+PERF_OUTPUT_FILE="rosetta.perf"
+
 ################################################################################
 # Help and Usage Functions
 ################################################################################
@@ -135,10 +147,20 @@ function usage() {
     echo "  --postgres-memory-threshold N    PostgreSQL memory threshold (default: $DEFAULT_POSTGRES_MEMORY_THRESHOLD)"
     echo "  --rosetta-memory-threshold N     Rosetta memory threshold (default: $DEFAULT_ROSETTA_MEMORY_THRESHOLD)"
     echo ""
+    echo "Metrics collection:"
+    echo "  --metrics-mode                   Enable metrics collection mode (collects data instead of asserting on thresholds)"
+    echo "  --branch <branch_name>           Git branch name (for InfluxDB tagging; auto-detected if not specified)"
+    echo "  --commit <commit_hash>           Git commit hash (for InfluxDB tagging; auto-detected if not specified)"
+    echo "  --perf-output-file <file>        Performance metrics output file (default: rosetta.perf)"
+    echo ""
     echo "Examples:"
     echo "  $0 --network mainnet --duration 300 --max-requests 1000"
     echo "  $0 --network devnet --address http://localhost:3087 --block-interval 5"
     echo "  $0 --postgres-memory-threshold 4096 --rosetta-memory-threshold 2048"
+    echo "  $0 --metrics-mode --duration 300"
+    echo "  $0 --metrics-mode --branch main --duration 300"
+    echo "  $0 --metrics-mode --branch main --commit 0123abcd --duration 300"
+    echo "  $0 --metrics-mode --perf-output-file my-metrics.perf --duration 300"
 }
 
 # Argument parsing
@@ -200,6 +222,22 @@ while [[ $# -gt 0 ]]; do
             ROSETTA_MEMORY_THRESHOLD="$2"
             shift 2
             ;;
+        --metrics-mode)
+            METRICS_MODE="true"
+            shift 1
+            ;;
+        --branch)
+            GIT_BRANCH="$2"
+            shift 2
+            ;;
+        --commit)
+            GIT_COMMIT="$2"
+            shift 2
+            ;;
+        --perf-output-file)
+            PERF_OUTPUT_FILE="$2"
+            shift 2
+            ;;
         *)
             echo "Unknown option: $1"
             usage
@@ -212,6 +250,7 @@ echo "Running Rosetta load tests with the following parameters:"
 echo "  Network: $NETWORK"
 echo "  Address: $ADDRESS"
 echo "  DB Connection String: $DB_CONN_STR"
+echo "  Metrics Mode: $METRICS_MODE"
 if [[ -n "$DURATION" ]]; then
     echo "  Duration: ${DURATION}s"
 fi
@@ -349,6 +388,16 @@ load_payment_transactions_from_db "$DB_CONN_STR" "payment_transactions"
 load_zkapp_transactions_from_db "$DB_CONN_STR" "zkapp_transactions"
 
 ################################################################################
+# Metrics Collection Arrays
+################################################################################
+
+# Arrays to store metrics measurements when in metrics mode
+# Each measurement is stored as: "timestamp,tps,memory_mb"
+declare -a POSTGRES_METRICS=()
+declare -a ARCHIVE_METRICS=()
+declare -a ROSETTA_METRICS=()
+
+################################################################################
 # System Monitoring Functions
 ################################################################################
 
@@ -402,6 +451,49 @@ function print_memory_usage() {
     fi
 }
 
+# Collect metrics data for each application when in metrics mode
+#
+# This function measures memory consumption and TPS for PostgreSQL, Archive,
+# and Rosetta processes, storing the measurements in global arrays for later
+# analysis. Each measurement includes timestamp, current TPS, and memory usage.
+#
+# Globals:
+#   POSTGRES_METRICS (array) - Modified to append new measurements
+#   ARCHIVE_METRICS (array) - Modified to append new measurements
+#   ROSETTA_METRICS (array) - Modified to append new measurements
+#
+# Arguments:
+#   $1 - Current TPS (transactions per second)
+#
+# Returns:
+#   None (modifies global metric arrays)
+function collect_metrics_data() {
+    local current_tps="$1"
+    local timestamp
+    timestamp=$(date +%s)
+
+    # Collect PostgreSQL metrics
+    local postgres_memory
+    postgres_memory=$(ps -u postgres -o rss= 2>/dev/null | awk '{sum+=$1} END {print sum/1024}')
+    if [[ -n "$postgres_memory" && "$postgres_memory" != "0" ]]; then
+        POSTGRES_METRICS+=("$timestamp,$current_tps,$postgres_memory")
+    fi
+
+    # Collect Archive metrics
+    local archive_memory
+    archive_memory=$(ps -p $(pgrep -f mina-archive 2>/dev/null) -o rss= 2>/dev/null | awk '{print $1/1024}')
+    if [[ -n "$archive_memory" && "$archive_memory" != "0" ]]; then
+        ARCHIVE_METRICS+=("$timestamp,$current_tps,$archive_memory")
+    fi
+
+    # Collect Rosetta metrics
+    local rosetta_memory
+    rosetta_memory=$(ps -p $(pgrep -d, -f mina-rosetta 2>/dev/null) -o rss= 2>/dev/null | awk '{sum+=$1} END {print sum/1024}')
+    if [[ -n "$rosetta_memory" && "$rosetta_memory" != "0" ]]; then
+        ROSETTA_METRICS+=("$timestamp,$current_tps,$rosetta_memory")
+    fi
+}
+
 # Print comprehensive load test performance statistics
 #
 # This function calculates and displays current and cumulative performance
@@ -452,8 +544,14 @@ function print_load_test_statistics() {
 
     print_memory_usage
 
-    # Assert memory usage is within thresholds
-    assert_memory_usage_within_thresholds "$POSTGRES_MEMORY_THRESHOLD" "$ROSETTA_MEMORY_THRESHOLD"
+    # Collect metrics or assert thresholds based on mode
+    if [[ "$METRICS_MODE" == "true" ]]; then
+        # In metrics mode, collect data for later analysis
+        collect_metrics_data "$current_tps"
+    else
+        # In normal mode, assert memory usage is within thresholds
+        assert_memory_usage_within_thresholds "$POSTGRES_MEMORY_THRESHOLD" "$ROSETTA_MEMORY_THRESHOLD"
+    fi
 }
 
 ################################################################################
@@ -504,6 +602,188 @@ function assert_memory_usage_within_thresholds() {
             exit 1
         fi
     fi
+}
+
+################################################################################
+# Metrics Analysis Functions
+################################################################################
+
+# Compute statistics for a single metric array
+#
+# This function analyzes an array of metric measurements and computes
+# statistical values including max, p95 (95th percentile), p99 (99th percentile),
+# and median memory consumption.
+#
+# Arguments:
+#   $1 - Application name (for display purposes)
+#   $2 - Name of the metrics array (passed by reference)
+#
+# Returns:
+#   Prints comma-separated values: app,max,p95,p99,median
+function analyze_metric_array() {
+    local app_name="$1"
+    local -n metrics_array="$2"
+
+    if [[ ${#metrics_array[@]} -eq 0 ]]; then
+        echo "$app_name,0,0,0,0"
+        return
+    fi
+
+    # Extract memory values from the metrics (third field in CSV)
+    local memory_values=()
+    for metric in "${metrics_array[@]}"; do
+        local memory
+        memory=$(echo "$metric" | cut -d',' -f3)
+        memory_values+=("$memory")
+    done
+
+    # Sort memory values
+    local sorted=()
+    mapfile -t sorted < <(printf '%s\n' "${memory_values[@]}" | sort -n)
+
+    # Calculate statistics
+    local count=${#sorted[@]}
+    local max="${sorted[$((count-1))]}"
+
+    # Calculate p95 (95th percentile)
+    local p95_index
+    p95_index=$(echo "scale=0; ($count * 0.95) / 1" | bc)
+    p95_index=${p95_index%.*}
+    local p95="${sorted[$p95_index]}"
+
+    # Calculate p99 (99th percentile)
+    local p99_index
+    p99_index=$(echo "scale=0; ($count * 0.99) / 1" | bc)
+    p99_index=${p99_index%.*}
+    local p99="${sorted[$p99_index]}"
+
+    # Calculate median
+    local median_index=$((count / 2))
+    local median="${sorted[$median_index]}"
+
+    echo "$app_name,$max,$p95,$p99,$median"
+}
+
+# Analyze all collected metrics and print summary
+#
+# This function processes all collected metrics arrays and generates
+# a comprehensive statistical summary for each application. It computes
+# max, p95, p99, and median values for memory consumption.
+#
+# Globals:
+#   POSTGRES_METRICS (array) - Read to analyze PostgreSQL metrics
+#   ARCHIVE_METRICS (array) - Read to analyze Archive metrics
+#   ROSETTA_METRICS (array) - Read to analyze Rosetta metrics
+#
+# Returns:
+#   None (prints analysis to stdout)
+function analyze_and_print_metrics() {
+    echo ""
+    echo "================================================================================"
+    echo "📊 METRICS ANALYSIS SUMMARY"
+    echo "================================================================================"
+    echo ""
+    echo "Application      | Max (MB) | P95 (MB) | P99 (MB) | Median (MB)"
+    echo "-----------------------------------------------------------------------------"
+
+    # Analyze PostgreSQL metrics
+    local postgres_stats
+    postgres_stats=$(analyze_metric_array "postgres" POSTGRES_METRICS)
+    IFS=',' read -r _app max p95 p99 median <<< "$postgres_stats"
+    printf "%-16s | %8.2f | %8.2f | %8.2f | %11.2f\n" "PostgreSQL" "$max" "$p95" "$p99" "$median"
+
+    # Analyze Archive metrics
+    local archive_stats
+    archive_stats=$(analyze_metric_array "archive" ARCHIVE_METRICS)
+    IFS=',' read -r _app max p95 p99 median <<< "$archive_stats"
+    printf "%-16s | %8.2f | %8.2f | %8.2f | %11.2f\n" "Mina-Archive" "$max" "$p95" "$p99" "$median"
+
+    # Analyze Rosetta metrics
+    local rosetta_stats
+    rosetta_stats=$(analyze_metric_array "rosetta" ROSETTA_METRICS)
+    IFS=',' read -r _app max p95 p99 median <<< "$rosetta_stats"
+    printf "%-16s | %8.2f | %8.2f | %8.2f | %11.2f\n" "Mina-Rosetta" "$max" "$p95" "$p99" "$median"
+
+    echo "================================================================================"
+    echo ""
+}
+
+# Generate InfluxDB line protocol output and save to file
+#
+# This function generates a single line in InfluxDB line protocol format
+# containing the key memory consumption metric (p95) for uploading to
+# a time-series database. The p95 value is used as it represents a good
+# balance between typical usage and peak consumption.
+#
+# Format: rosetta_load_test,network=<network>,branch=<branch>,commit=<hash> field1=value1,field2=value2 <timestamp>
+#
+# Globals:
+#   POSTGRES_METRICS (array) - Read to compute PostgreSQL p95
+#   ARCHIVE_METRICS (array) - Read to compute Archive p95
+#   ROSETTA_METRICS (array) - Read to compute Rosetta p95
+#   NETWORK - Network name used as tag
+#   PERF_OUTPUT_FILE - Output file path for InfluxDB line protocol
+#
+# Returns:
+#   None (writes InfluxDB line protocol to file)
+function print_influxdb_line() {
+    # Analyze metrics to get p95 values
+    local postgres_stats
+    postgres_stats=$(analyze_metric_array "postgres" POSTGRES_METRICS)
+    IFS=',' read -r _app postgres_max postgres_p95 postgres_p99 postgres_median <<< "$postgres_stats"
+
+    local archive_stats
+    archive_stats=$(analyze_metric_array "archive" ARCHIVE_METRICS)
+    IFS=',' read -r _app archive_max archive_p95 archive_p99 archive_median <<< "$archive_stats"
+
+    local rosetta_stats
+    rosetta_stats=$(analyze_metric_array "rosetta" ROSETTA_METRICS)
+    IFS=',' read -r _app rosetta_max rosetta_p95 rosetta_p99 rosetta_median <<< "$rosetta_stats"
+
+    # Get git branch and commit information
+    local git_branch
+    local git_commit
+
+    # Use provided branch name if available, otherwise auto-detect
+    if [[ -n "$GIT_BRANCH" ]]; then
+        git_branch="$GIT_BRANCH"
+    else
+        git_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+    fi
+
+    if [[ -n "$GIT_COMMIT" ]]; then
+        git_commit="$GIT_COMMIT"
+    else
+        git_commit=$(git rev-parse --short HEAD 2>/dev/null || true)
+        if [[ -z "$git_commit" ]]; then
+            git_commit="unknown"
+        fi
+    fi
+
+    # Generate timestamp in nanoseconds
+    local timestamp_ns
+    timestamp_ns=$(date +%s%N)
+
+    # Generate InfluxDB line protocol
+    local influx_line="rosetta_load_test,network=${NETWORK},branch=${git_branch},commit=${git_commit} postgres_max=${postgres_max},postgres_p95=${postgres_p95},postgres_p99=${postgres_p99},postgres_median=${postgres_median},archive_max=${archive_max},archive_p95=${archive_p95},archive_p99=${archive_p99},archive_median=${archive_median},rosetta_max=${rosetta_max},rosetta_p95=${rosetta_p95},rosetta_p99=${rosetta_p99},rosetta_median=${rosetta_median} ${timestamp_ns}"
+
+    # Write to file
+    echo "$influx_line" > "$PERF_OUTPUT_FILE"
+
+    # Print confirmation
+    local absolute_path
+    absolute_path=$(cd "$(dirname "$PERF_OUTPUT_FILE")" && pwd)/$(basename "$PERF_OUTPUT_FILE")
+    echo ""
+    echo "================================================================================"
+    echo "📈 INFLUXDB LINE PROTOCOL OUTPUT"
+    echo "================================================================================"
+    echo "Performance metrics written to: ${PERF_OUTPUT_FILE}"
+    echo "Absolute location: ${absolute_path}"
+    echo ""
+    echo "Content:"
+    echo "$influx_line"
+    echo "================================================================================"
+    echo ""
 }
 
 ################################################################################
@@ -596,6 +876,12 @@ function run_all_tests_custom_intervals() {
     echo "  Duration: ${DURATION:-none}"
     echo "  Max Requests: ${MAX_REQUESTS:-none}"
     echo "  Statistics Reporting Interval: ${STATS_REPORTING_INTERVAL}s"
+    echo "  Metrics Mode: ${METRICS_MODE}"
+    if [[ "$METRICS_MODE" == "true" ]]; then
+        echo "  (Metrics collection enabled - will collect data instead of asserting on thresholds)"
+    else
+        echo "  Memory Thresholds: PostgreSQL=${POSTGRES_MEMORY_THRESHOLD}MB, Rosetta=${ROSETTA_MEMORY_THRESHOLD}MB"
+    fi
     echo "  Initial Memory Usage:"
     # Print initial memory usage before starting the load test
     print_memory_usage
@@ -613,6 +899,13 @@ function run_all_tests_custom_intervals() {
             if (( $(echo "$elapsed >= $DURATION" | bc -l) )); then
                 echo "Duration limit reached (${DURATION}s). Stopping load test."
                 print_load_test_statistics "$now" "$start_time" "$total_requests" "$requests_since_last_metric" "$last_metric_time" "true"
+
+                # If in metrics mode, analyze and print results
+                if [[ "$METRICS_MODE" == "true" ]]; then
+                    analyze_and_print_metrics
+                    print_influxdb_line
+                fi
+
                 exit 0
             fi
         fi
@@ -621,6 +914,13 @@ function run_all_tests_custom_intervals() {
         if [[ -n "$MAX_REQUESTS" && $total_requests -ge $MAX_REQUESTS ]]; then
             echo "Request limit reached ($MAX_REQUESTS). Stopping load test."
             print_load_test_statistics "$now" "$start_time" "$total_requests" "$requests_since_last_metric" "$last_metric_time" "true"
+
+            # If in metrics mode, analyze and print results
+            if [[ "$METRICS_MODE" == "true" ]]; then
+                analyze_and_print_metrics
+                print_influxdb_line
+            fi
+
             exit 0
         fi
 

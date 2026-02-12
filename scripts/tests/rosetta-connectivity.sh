@@ -52,6 +52,10 @@ UPGRADE_SCRIPTS_WORKDIR="src/app/archive"
 
 LOAD_TEST_DURATION=600
 RUN_LOAD_TEST=false
+METRICS_MODE=""
+BRANCH=""
+COMMIT=""
+PERF_OUTPUT_FILE="rosetta.perf"
 
 USAGE="Usage: $0 [-t docker-tag] [-n network]
   -t, --version             The version to be used in the docker image tag
@@ -59,11 +63,17 @@ USAGE="Usage: $0 [-t docker-tag] [-n network]
   --timeout                 The timeout duration in seconds. Default=$TIMEOUT
   --run-compatibility-test  Enable compatibility testing with specified branch
   --upgrade-scripts-workdir Working directory for upgrade/downgrade scripts. Default=$UPGRADE_SCRIPTS_WORKDIR
+  --run-load-test           Enable load testing
+  --metrics-mode            Enable metrics collection mode (collects data instead of asserting on thresholds)
+  --branch                  Git branch name (for CI/CD contexts where git branch detection doesn't work)
+  --commit                  Git commit hash (for CI/CD contexts where git commit detection doesn't work)
   -h, --help                Show help
 
 Example: $0 --network devnet --tag 3.0.3-bullseye-devnet
 Example: $0 --network devnet --tag 3.0.3 --run-compatibility-test develop
 Example: $0 --network devnet --tag 3.0.3 --run-compatibility-test develop --upgrade-scripts-workdir /custom/path
+Example: $0 --network devnet --tag 3.0.3 --run-load-test --metrics-mode --branch main
+Example: $0 --network devnet --tag 3.0.3 --run-load-test --metrics-mode --branch main --commit 0123abcd
 
 Warning:
 Please execute this script from the root of the mina repository.
@@ -79,11 +89,15 @@ function usage() {
 while [[ "$#" -gt 0 ]]; do case $1 in
     -n|--network) NETWORK="$2"; shift;;
     --run-load-test) RUN_LOAD_TEST=true ;;
+    --perf-output-file) PERF_OUTPUT_FILE="$2"; shift;;
     --run-compatibility-test) COMPATIBILITY_BRANCH="$2"; shift;;
     -t|--tag) TAG="$2"; shift;;
     -r|--repo) REPO="$2"; shift;;
     --timeout) TIMEOUT="$2"; shift;;
     --upgrade-scripts-workdir) UPGRADE_SCRIPTS_WORKDIR="$2"; shift;;
+    --metrics-mode) METRICS_MODE="--metrics-mode" ;;
+    --branch) BRANCH="$2"; shift;;
+    --commit) COMMIT="$2"; shift;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown parameter passed: $1"; usage; exit 1;;
 esac; shift; done
@@ -160,7 +174,26 @@ sleep 5
 # Run load test
 if [[ "$RUN_LOAD_TEST" == true ]]; then
         echo "Running load test for $LOAD_TEST_DURATION seconds..."
-        if docker exec $container_id bash -c "/workdir/scripts/tests/rosetta-load.sh --address \"http://localhost:3087\" --db-conn-str $DB_CONN_STR --duration $LOAD_TEST_DURATION --network $NETWORK "; then
+
+        # Build the command with optional parameters
+        load_test_cmd="/workdir/scripts/tests/rosetta-load.sh --address \"http://localhost:3087\" --db-conn-str $DB_CONN_STR --duration $LOAD_TEST_DURATION --network $NETWORK --perf-output-file $PERF_OUTPUT_FILE"
+
+        # Add metrics mode if specified
+        if [[ -n "$METRICS_MODE" ]]; then
+                load_test_cmd="$load_test_cmd $METRICS_MODE"
+        fi
+
+        # Add branch if specified
+        if [[ -n "$BRANCH" ]]; then
+                load_test_cmd="$load_test_cmd --branch $BRANCH"
+        fi
+
+        # Add commit if specified
+        if [[ -n "$COMMIT" ]]; then
+                load_test_cmd="$load_test_cmd --commit $COMMIT"
+        fi
+
+        if docker exec $container_id bash -c "$load_test_cmd"; then
                 echo -e "${GREEN}Load test completed successfully.${CLEAR}"
         else
                 echo -e "${RED}Load test failed.${CLEAR}"

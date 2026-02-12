@@ -150,8 +150,7 @@ fi
 # Extract dependency step keys from a pipeline file.
 list_dep_steps() {
   local file="$1"
-  yq -r '.pipeline.steps[].depends_on[]? | select(type == "object") | .step' "$file"
-  yq -r '.pipeline.steps[].depends_on[]? | select(type == "string")' "$file"
+  yq -r '.pipeline.steps[].depends_on[]? | .step' "$file"
 }
 
 # Map dependency step keys to job names and return unique deps.
