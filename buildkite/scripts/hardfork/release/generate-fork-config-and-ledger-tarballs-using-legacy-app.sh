@@ -49,6 +49,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+APP_NAME="mina-$NETWORK-pre-hardfork-mesa"
+
 if [ -z "$NETWORK" ] || [ -z "$CODENAME" ]; then
   echo "Usage: $0 --network <network> [--version <version>] --codename <codename>"
   exit 1
@@ -66,12 +68,11 @@ else
   MINA_DEB_CODENAME=$CODENAME ./buildkite/scripts/debian/install.sh mina-logproc 1
 fi
 
-MINA_DEB_CODENAME=$CODENAME FORCE_VERSION=$FORCE_VERSION ROOT="legacy" ./buildkite/scripts/debian/install.sh mina-create-legacy-genesis 1
+MINA_DEB_CODENAME=$CODENAME FORCE_VERSION=$FORCE_VERSION ROOT="legacy" ./buildkite/scripts/debian/install.sh "$APP_NAME" 1
 
 curl "${CONFIG_JSON_GZ_URL}" > config.json.gz && gunzip config.json.gz
 
-./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe mina-create-legacy-genesis --config "config.json" --workdir "$WORKDIR" $HARD_FORK_SHIFT_SLOT_DELTA_ARG
-
+./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe "$APP_NAME" --config "config.json" --workdir "$WORKDIR" $HARD_FORK_SHIFT_SLOT_DELTA_ARG
 echo "--- Caching legacy ledger tarballs and hashes"
 
 ls -lh $WORKDIR/legacy_ledgers/
