@@ -67,7 +67,16 @@ ARG RUST_NIGHTLY=2024-09-05
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update --quiet \
+RUN CODENAME=$(grep "VERSION_CODENAME" /etc/os-release | cut -d= -f2); \
+  case "${CODENAME}" in \
+    bookworm) LIBSSL="libssl-dev"; LIBPROCPS="libproc2-0" ;; \
+    bullseye) LIBSSL="libssl-dev"; LIBPROCPS="libprocps-dev" ;; \
+    focal) LIBSSL="libssl-dev"; LIBPROCPS="libprocps-dev" ;; \
+    jammy) LIBSSL="libssl3"; LIBPROCPS="libprocps8";; \
+    noble) LIBSSL="libssl3t64"; LIBPROCPS="libproc2-0";; \
+    *) echo "Unsupported codename: ${CODENAME}"; exit 1 ;; \
+  esac; \
+  apt-get update --quiet \
   && apt-get upgrade --quiet --yes \
   && apt-get install --no-install-recommends --quiet --yes \
   adduser \
@@ -84,6 +93,8 @@ RUN apt-get update --quiet \
   liblmdb0 \
   libpq-dev \
   libsodium-dev \
+  "$LIBSSL" \
+  "$LIBPROCPS" \
   build-essential \
   ca-certificates \
   capnproto \
