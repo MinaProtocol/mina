@@ -630,6 +630,68 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
         [ ("max_canonical_slot", `String (Int64.to_string max_canonical_slot)) ] ;
     Deferred.unit )
 
+let fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash ~block_ids
+    ~global_slot_hashes_tbl =
+  let slots = Int64.Table.keys global_slot_hashes_tbl in
+  let chain_oldest_slot =
+    Option.value ~default:Int64.minus_one
+      (List.min_elt slots ~compare:Int64.compare)
+  in
+  let chain_newest_slot =
+    Option.value ~default:Int64.minus_one
+      (List.max_elt slots ~compare:Int64.compare)
+  in
+  let state_hash_at_slot slot =
+    Option.value_map (Int64.Table.find global_slot_hashes_tbl slot)
+      ~default:"<none>" ~f:(fun (sh, _, _) -> State_hash.to_base58_check sh)
+  in
+  let query_parent_state_hash state_hash =
+    match%map
+      Mina_caqti.Pool.use
+        (fun db -> Sql.Parent_block.get_parent_state_hash db state_hash)
+        pool
+    with
+    | Ok hash ->
+        hash
+    | Error _ ->
+        "<parent not in database>"
+  in
+  let chain_oldest_state_hash = state_hash_at_slot chain_oldest_slot in
+  let chain_newest_state_hash = state_hash_at_slot chain_newest_slot in
+  let%bind chain_oldest_parent_state_hash =
+    query_parent_state_hash chain_oldest_state_hash
+  in
+  let%bind blocks_at_preceding_height =
+    match%map
+      Mina_caqti.Pool.use
+        (fun db ->
+          let%bind.Deferred.Result height =
+            Sql.Block.get_height_by_state_hash db chain_oldest_state_hash
+          in
+          Sql.Block.get_state_hashes_by_height db (Int64.pred height) )
+        pool
+    with
+    | Ok hashes ->
+        hashes
+    | Error _ ->
+        []
+  in
+  [%log fatal]
+    "Block chain leading to target state hash does not include genesis block"
+    ~metadata:
+      [ ("target_state_hash", `String target_state_hash)
+      ; ("chain_length", `Int (Int.Set.length block_ids))
+      ; ("chain_oldest_slot", `String (Int64.to_string chain_oldest_slot))
+      ; ("chain_oldest_state_hash", `String chain_oldest_state_hash)
+      ; ( "chain_oldest_parent_state_hash"
+        , `String chain_oldest_parent_state_hash )
+      ; ( "blocks_at_preceding_height"
+        , `List (List.map blocks_at_preceding_height ~f:(fun h -> `String h)) )
+      ; ("chain_newest_slot", `String (Int64.to_string chain_newest_slot))
+      ; ("chain_newest_state_hash", `String chain_newest_state_hash)
+      ] ;
+  Core_kernel.exit 1
+
 let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
     ~checkpoint_interval ~checkpoint_output_folder_opt ~checkpoint_file_prefix
     ~genesis_dir_opt ~log_json ~log_level ~log_filename ~file_log_level
@@ -746,20 +808,23 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             in
             return (Int.Set.of_list ids, oldest_block_id) )
       in
-      if Int64.equal input.start_slot_since_genesis 0L then
-        (* check that genesis block is in chain to target hash                                                                                                                                                                                          assumption: genesis block occupies global slot 0
+      let%bind () =
+        if Int64.equal input.start_slot_since_genesis 0L then
+          (* check that genesis block is in chain to target hash
+             assumption: genesis block occupies global slot 0
 
-           if nonzero start slot, can't assume there's a block at that slot *)
-        if Int64.Table.mem global_slot_hashes_tbl Int64.zero then
-          [%log info]
-            "Block chain leading to target state hash includes genesis block, \
-             length = %d"
-            (Int.Set.length block_ids)
-        else (
-          [%log fatal]
-            "Block chain leading to target state hash does not include genesis \
-             block" ;
-          Core_kernel.exit 1 ) ;
+             if nonzero start slot, can't assume there's a block at that slot *)
+          if Int64.Table.mem global_slot_hashes_tbl Int64.zero then (
+            [%log info]
+              "Block chain leading to target state hash includes genesis \
+               block, length = %d"
+              (Int.Set.length block_ids) ;
+            Deferred.unit )
+          else
+            fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
+              ~block_ids ~global_slot_hashes_tbl
+        else Deferred.unit
+      in
       (* some mutable state, less painful than passing epoch ledgers throughout *)
       let staking_epoch_ledger = ref ledger in
       let next_epoch_ledger = ref ledger in
