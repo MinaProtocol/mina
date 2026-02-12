@@ -266,7 +266,9 @@ run_apt_update() {
     fi
     
     log "Running apt-get update..."
-    if ! ${SUDO_CMD} apt-get update; then
+    if ! ${SUDO_CMD} apt-get update \
+      -o Acquire::http::Proxy::localhost="DIRECT" \
+      -o Acquire::https::Proxy::localhost="DIRECT"; then
         error "apt-get update failed"
         return 1
     fi
