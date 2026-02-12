@@ -16,7 +16,7 @@ let Size = ../../Command/Size.dhall
 
 let Cmd = ../../Lib/Cmds.dhall
 
-let command_key = "release-manager-tests"
+let command_key = "release-manager-tests-e2e"
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -27,27 +27,27 @@ in  Pipeline.build
           , S.strictlyStart (S.contains "scripts/docker")
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/ReleaseManagerTest")
-          , S.exactly "buildkite/scripts/tests/release-manager/test" "sh"
+          , S.exactly "buildkite/scripts/tests/release-manager/test-e2e" "sh"
           , S.exactly "buildkite/scripts/tests/release-manager/lib" "sh"
           ]
         , path = "Test"
-        , name = "ReleaseManagerTest"
+        , name = "ReleaseManagerTestE2E"
         , tags =
-          [ PipelineTag.Type.Fast
+          [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
           , PipelineTag.Type.Release
           ]
-        , scope = PipelineScope.PullRequestOnly
+        , scope = PipelineScope.AllButPullRequest
         }
       , steps =
         [ Command.build
             Command.Config::{
             , commands =
               [ Cmd.run
-                  "AWS_DEFAULT_REGION=us-west-2 ./buildkite/scripts/tests/release-manager/test.sh"
+                  "AWS_DEFAULT_REGION=us-west-2 ./buildkite/scripts/tests/release-manager/test-e2e.sh"
               ]
-            , label = "Release Manager Tests"
+            , label = "Release Manager Tests E2E"
             , key = command_key
             , target = Size.Small
             , docker = None Docker.Type
