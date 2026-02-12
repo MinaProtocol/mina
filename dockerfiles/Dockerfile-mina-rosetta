@@ -21,6 +21,7 @@ ARG ROSETTA_CLI_VERSION=v0.10.1
 ENV DEBIAN_FRONTEND noninteractive
 
 ARG deb_suffix
+ARG apt_cache_url=""
 
 # if --build-arg deb_suffix is defined, add hypen at beginning.
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
@@ -41,6 +42,15 @@ ENV MINA_ROSETTA_DEB=mina-rosetta-${network}
 #    libprocps8
 #    libjemalloc2
 #    libssl
+
+# Optional: configure APT caching proxy (bypass proxy for deb_repo)
+RUN if [ -n "$apt_cache_url" ]; then \
+  echo "Acquire::http::Proxy \"${apt_cache_url}\";" > /etc/apt/apt.conf.d/01proxy; \
+  echo "Acquire::https::Proxy \"${apt_cache_url}\";" >> /etc/apt/apt.conf.d/01proxy; \
+  DEB_REPO_HOST=${deb_repo#*://}; DEB_REPO_HOST=${DEB_REPO_HOST%%[:/]*}; \
+  echo "Acquire::http::Proxy::${DEB_REPO_HOST} \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
+  echo "Acquire::https::Proxy::${DEB_REPO_HOST} \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
+fi
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \

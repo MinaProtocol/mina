@@ -12,12 +12,20 @@ ARG deb_codename=bullseye
 ARG deb_release=unstable
 ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
+ARG apt_cache_url=""
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_codename $deb_release $deb_version"
 
-# Install ca-certificates using HTTP
-RUN apt-get update --quiet --yes \
+# Optional: configure APT caching proxy (bypass proxy for deb_repo); install ca-certificates
+RUN if [ -n "$apt_cache_url" ]; then \
+  echo "Acquire::http::Proxy \"${apt_cache_url}\";" > /etc/apt/apt.conf.d/01proxy; \
+  echo "Acquire::https::Proxy \"${apt_cache_url}\";" >> /etc/apt/apt.conf.d/01proxy; \
+  DEB_REPO_HOST=${deb_repo#*://}; DEB_REPO_HOST=${DEB_REPO_HOST%%[:/]*}; \
+  echo "Acquire::http::Proxy::${DEB_REPO_HOST} \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
+  echo "Acquire::https::Proxy::${DEB_REPO_HOST} \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
+fi \
+  && apt-get update --quiet --yes \
   && apt-get install --quiet --yes --no-install-recommends ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 

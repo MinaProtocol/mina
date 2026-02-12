@@ -11,6 +11,7 @@ ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
 ARG deb_profile
 ARG deb_suffix
+ARG apt_cache_url=""
 
 ARG GCLOUD_VERSION=476.0.0
 
@@ -28,8 +29,15 @@ RUN echo "Building image with version $deb_codename $deb_release $deb_version"
 COPY scripts/archive-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Install ca-certificates using HTTP
-RUN apt-get update --quiet --yes \
+# Optional: configure APT caching proxy (bypass proxy for deb_repo); install ca-certificates
+RUN if [ -n "$apt_cache_url" ]; then \
+  echo "Acquire::http::Proxy \"${apt_cache_url}\";" > /etc/apt/apt.conf.d/01proxy; \
+  echo "Acquire::https::Proxy \"${apt_cache_url}\";" >> /etc/apt/apt.conf.d/01proxy; \
+  DEB_REPO_HOST=${deb_repo#*://}; DEB_REPO_HOST=${DEB_REPO_HOST%%[:/]*}; \
+  echo "Acquire::http::Proxy::${DEB_REPO_HOST} \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
+  echo "Acquire::https::Proxy::${DEB_REPO_HOST} \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
+fi \
+  && apt-get update --quiet --yes \
   && apt-get install --quiet --yes --no-install-recommends ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
@@ -73,7 +81,6 @@ RUN case "${TARGETARCH}" in \
     esac; \
     curl -sSfL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${GCLOUD_ARCH}.tar.gz" | \
     tar -xz -C /opt/ && \
-    /opt/google-cloud-sdk/install.sh --quiet && \
     /opt/google-cloud-sdk/bin/gcloud components install gke-gcloud-auth-plugin kubectl --quiet
 
 ENV PATH="/opt/google-cloud-sdk/bin:${PATH}"

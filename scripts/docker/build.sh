@@ -176,6 +176,17 @@ else
   DEB_REPO="--build-arg deb_repo=$CONVERTED_REPO"
 fi
 
+APT_CACHE_ARG=""
+if [[ -n "${APT_CACHE_PROXY:-}" ]]; then
+  CONVERTED_PROXY=$(echo "$APT_CACHE_PROXY" | sed "s/localhost/$LOCALHOST_REPLACEMENT/g")
+  # Probe proxy reachability before passing to Docker build; fall back to direct if unreachable
+  if curl -so /dev/null --connect-timeout 2 --max-time 4 "$CONVERTED_PROXY" 2>/dev/null; then
+    APT_CACHE_ARG="--build-arg apt_cache_url=$CONVERTED_PROXY"
+  else
+    echo "WARNING: APT cache proxy ($CONVERTED_PROXY) is unreachable, building without proxy"
+  fi
+fi
+
 if [[ $(echo "${VALID_SERVICES[@]}" | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
 
 export_base_image
@@ -267,9 +278,9 @@ BUILD_NETWORK="--allow=network.host"
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT:-}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
-  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -t "$HASHTAG" -
+  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -t "$HASHTAG" -
 else
-  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."

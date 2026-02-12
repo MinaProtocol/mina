@@ -9,6 +9,7 @@ ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:foca
 # This arg is defined here globally and does not need to be redefined in
 # any other stages.
 ARG deb_codename
+ARG apt_cache_url=""
 
 FROM ${image} AS build-deps
 
@@ -28,6 +29,8 @@ ARG DEBIAN_ARCH
 # We need to define the target architecture as it is still different from CANONICAL_ARCH
 # For example: Canonical names are aarch64/x86_64 while TARGETARCH: aarch64/amd64
 ARG TARGETARCH
+
+ARG apt_cache_url
 
 # OCaml Version
 # The version must be the same as the version used in:
@@ -67,6 +70,13 @@ ARG RUST_NIGHTLY=2024-09-05
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
+
+# Optional: configure APT caching proxy
+RUN if [ -n "$apt_cache_url" ]; then \
+  echo "Acquire::http::Proxy \"${apt_cache_url}\";" > /etc/apt/apt.conf.d/01proxy; \
+  echo "Acquire::https::Proxy \"${apt_cache_url}\";" >> /etc/apt/apt.conf.d/01proxy; \
+fi
+
 RUN apt-get update --quiet \
   && apt-get upgrade --quiet --yes \
   && apt-get install --no-install-recommends --quiet --yes \

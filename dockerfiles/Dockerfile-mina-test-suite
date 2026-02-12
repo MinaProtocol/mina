@@ -12,6 +12,7 @@ ARG network=mainnet
 ARG psql_version=13
 
 ARG GCLOUD_VERSION=476.0.0
+ARG apt_cache_url=""
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -22,6 +23,15 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libffi7
 #    libprocps8
 #    libjemalloc2
+
+# Optional: configure APT caching proxy (bypass proxy for deb_repo)
+RUN if [ -n "$apt_cache_url" ]; then \
+  echo "Acquire::http::Proxy \"${apt_cache_url}\";" > /etc/apt/apt.conf.d/01proxy; \
+  echo "Acquire::https::Proxy \"${apt_cache_url}\";" >> /etc/apt/apt.conf.d/01proxy; \
+  DEB_REPO_HOST=${deb_repo#*://}; DEB_REPO_HOST=${DEB_REPO_HOST%%[:/]*}; \
+  echo "Acquire::http::Proxy::${DEB_REPO_HOST} \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
+  echo "Acquire::https::Proxy::${DEB_REPO_HOST} \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
+fi
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \
@@ -67,7 +77,6 @@ RUN case "${TARGETARCH}" in \
     esac; \
     curl -sSfL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${GCLOUD_ARCH}.tar.gz" | \
     tar -xz -C /opt/ && \
-    /opt/google-cloud-sdk/install.sh --quiet && \
     /opt/google-cloud-sdk/bin/gcloud components install gke-gcloud-auth-plugin kubectl --quiet
 
 ENV PATH="/opt/google-cloud-sdk/bin:${PATH}"
