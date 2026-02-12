@@ -63,6 +63,7 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 		"--slot-transaction-end", strconv.Itoa(t.Config.SlotTxEnd),
 		"--slot-chain-end", strconv.Itoa(t.Config.SlotChainEnd),
 		"--hardfork-genesis-slot-delta", strconv.Itoa(t.Config.HfSlotDelta),
+		"--log-level", "Trace",
 	}
 
 	return t.startLocalNetwork(t.Config.MainMinaExe, "main", args)
