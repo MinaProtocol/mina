@@ -2,7 +2,7 @@ let ledger_depth = 35
 
 let curve_size = 255
 
-let coinbase = "720"
+let coinbase = "360"
 
 let k = 30
 

@@ -43,6 +43,7 @@ let fromNetwork =
             , DevnetLegacy = Profile.Devnet
             , MainnetLegacy = Profile.Mainnet
             , PreMesa1 = Profile.Devnet
+            , Mesa = Profile.Devnet
             }
             network
 

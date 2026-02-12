@@ -891,8 +891,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           module Permissions = struct
             type controller = Permissions.Auth_required.Checked.t
 
-            type txn_version = Mina_numbers.Txn_version.Checked.t
-
             let edit_state : t -> controller =
              fun a -> a.data.permissions.edit_state
 
@@ -910,9 +908,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let set_verification_key_auth : t -> controller =
              fun a -> fst a.data.permissions.set_verification_key
-
-            let set_verification_key_txn_version : t -> txn_version =
-             fun a -> snd a.data.permissions.set_verification_key
 
             let set_zkapp_uri : t -> controller =
              fun a -> a.data.permissions.set_zkapp_uri
@@ -1064,10 +1059,25 @@ module Make_str (A : Wire_types.Concrete) = struct
           let set_voting_for voting_for ({ data = a; hash } : t) : t =
             { data = { a with voting_for }; hash }
 
+          type txn_version = Mina_numbers.Txn_version.Checked.t
+
+          let txn_version ({ data = a; _ } : t) =
+            snd a.permissions.set_verification_key
+
           let permissions (a : t) = a.data.permissions
 
-          let set_permissions permissions ({ data = a; hash } : t) : t =
+          let set_permissions (permissions : Permissions.t)
+              ({ data = a; hash } : t) : t =
             { data = { a with permissions }; hash }
+
+          let set_txn_version_to_current ({ data = a; hash } : t) : t =
+            let set_verification_key =
+              ( fst a.permissions.set_verification_key
+              , Mina_numbers.Txn_version.current_checked )
+            in
+            let permissions = { a.permissions with set_verification_key } in
+            let data = { a with permissions } in
+            { data; hash }
         end
 
         module Opt = struct
@@ -1473,6 +1483,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             let verification_key_perm_fallback_to_signature_with_older_version =
               Permissions.Auth_required.Checked
               .verification_key_perm_fallback_to_signature_with_older_version
+
+            let access_perm_fallback_to_signature_with_older_version =
+              Permissions.Auth_required.Checked
+              .access_perm_fallback_to_signature_with_older_version
           end
 
           module Txn_version = struct

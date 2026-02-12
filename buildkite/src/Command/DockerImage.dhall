@@ -150,7 +150,8 @@ let generateStep =
                 else  ""
 
           let pruneDockerImages =
-                    "docker system prune --all --force "
+                    "if [ -z \"\\\${SKIP_DOCKER_PRUNE:-}\" ]; then "
+                ++  "docker system prune --all --force "
                 ++  merge
                       { Arm64 = ""
                       , XLarge = "--filter until=24h"
@@ -163,6 +164,7 @@ let generateStep =
                       , Perf = "--filter until=24h"
                       }
                       spec.size
+                ++  "; else echo 'Skipping docker prune due to SKIP_DOCKER_PRUNE'; fi"
 
           let loadOnlyArg =
                       if DockerPublish.shouldPublish

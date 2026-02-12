@@ -52,7 +52,7 @@ esac
 
 MINA_DEB_NAME="mina-testnet-generic"
 MINA_DEVNET_DEB_NAME="mina-devnet"
-DUNE_PROFILE="${DUNE_PROFILE}"
+DUNE_PROFILE="${DUNE_PROFILE:-dev}"
 DEB_SUFFIX=""
 
 # Add suffix to debian to distinguish different profiles
@@ -246,7 +246,7 @@ copy_common_daemon_configs() {
   # In case of testnet-generic we only copy the devnet ledger without magic one
   # as testnet-generic should be testnet agnostic.
   case "${NETWORK_NAME}" in
-    devnet|mainnet)
+    devnet|mainnet|mesa)
       cp ../genesis_ledgers/"${NETWORK_NAME}".json \
         "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
       cp ../genesis_ledgers/${NETWORK_NAME}.json "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
@@ -479,6 +479,30 @@ build_rosetta_testnet_generic_deb() {
 }
 ## END GENERIC TESTNET PACKAGE ##
 
+## ROSETTA MESA PACKAGE ##
+
+#
+# Builds mina-rosetta-mesa package for Mesa testnet Rosetta API
+#
+# Output: mina-rosetta-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}
+#
+# Rosetta API implementation for Mesa testnet with testnet signature binaries.
+#
+build_rosetta_mesa_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building mesa rosetta deb"
+
+  create_control_file mina-rosetta-mesa "${SHARED_DEPS}" \
+    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_configs "testnet"
+
+  build_deb mina-rosetta-mesa
+}
+## END ROSETTA MESA PACKAGE ##
+
 ## MAINNET PACKAGE ##
 
 #
@@ -566,6 +590,53 @@ build_daemon_devnet_config_deb() {
 }
 ## END DEVNET PACKAGE ##
 
+## MESA PACKAGE ##
+
+#
+# Builds mesa daemon package with profile-aware naming
+#
+# Output: ${MINA_DEVNET_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Where MINA_DEVNET_DEB_NAME can be:
+#   - "mina-mesa" (default)
+#   - "mina-mesa-lightnet" (if DUNE_PROFILE=lightnet)
+#   - "mina-mesa-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#   - "mina-mesa-lightnet-instrumented" (both conditions)
+#
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Mesa daemon with testnet signatures and devnet genesis ledger as default.
+# Package name includes suffixes for different profiles and instrumentation.
+#
+build_daemon_mesa_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building testnet signatures deb without keys:"
+
+  create_control_file "mina-mesa" "${SHARED_DEPS}${DAEMON_DEPS}, mina-mesa-config (>=${MINA_DEB_VERSION})" \
+    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}" "mina-mesa (<< ${MINA_DEB_VERSION})"
+   
+  copy_common_daemon_apps testnet
+
+  copy_common_daemon_utils 'o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
+
+  build_deb "mina-mesa"
+}
+
+build_daemon_mesa_config_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building testnet signatures config deb without keys:"
+
+  create_control_file mina-mesa-config "" \
+    'Mina Protocol Client and Daemon for the Mesa Network' "${SUGGESTED_DEPS}" "mina-mesa (<< ${MINA_DEB_VERSION})"
+
+  copy_common_daemon_configs mesa
+
+  build_deb mina-mesa-config
+}
+
+## END MESA PACKAGE ##
+
 ## MAINNET LEGACY PACKAGE ##
 
 #
@@ -592,6 +663,33 @@ build_daemon_mainnet_pre_hardfork_deb() {
   build_deb $NAME
 }
 ## END MAINNET LEGACY PACKAGE ##
+
+## MESA LEGACY PACKAGE ##
+
+#
+# Builds mina-mesa-pre-hardfork-mesa tailored package for automode package
+#
+# Output: mina-mesa-pre-hardfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Contains only the legacy mesa binaries places in "/usr/lib/mina/berkeley" without
+# configuration files or genesis ledgers.
+#
+build_daemon_mesa_pre_hardfork_deb() {
+
+  NAME="mina-mesa-pre-hardfork-mesa"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building mesa berkeley deb for hardfork automode :"
+
+  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_apps testnet $AUTOMODE_PRE_HF_DIR
+
+  build_deb $NAME
+}
+## END MESA LEGACY PACKAGE ##
 
 ## DEVNET LEGACY PACKAGE ##
 
@@ -873,7 +971,38 @@ build_archive_testnet_generic_deb () {
   copy_common_archive_configs "$ARCHIVE_DEB"
 
 }
-## END ARCHIVE PACKAGE ##
+## END ARCHIVE BERKELEY PACKAGE ##
+
+## ARCHIVE MESA PACKAGE ##
+
+#
+# Builds Mesa archive package with profile-aware naming
+#
+# Output: mina-archive-mesa${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Where DEB_SUFFIX can be:
+#   - "" (empty, default)
+#   - "-lightnet" (if DUNE_PROFILE=lightnet)
+#   - "-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#   - "-lightnet-instrumented" (both conditions)
+#
+# Dependencies: ${ARCHIVE_DEPS}
+#
+# Archive node package for Mesa with suffix-aware naming for different profiles.
+#
+build_archive_mesa_deb () {
+  ARCHIVE_DEB=mina-archive-mesa${DEB_SUFFIX}
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive mesa deb"
+
+
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
+ Compatible with Mina Daemon'
+
+  copy_common_archive_configs "$ARCHIVE_DEB"
+
+}
+## END ARCHIVE MESA PACKAGE ##
 
 ## ARCHIVE MAINNET PACKAGE ##
 
@@ -898,7 +1027,6 @@ build_archive_mainnet_deb () {
 
 }
 ## END ARCHIVE MAINNET PACKAGE ##
-
 
 ## ZKAPP TEST TXN ##
 

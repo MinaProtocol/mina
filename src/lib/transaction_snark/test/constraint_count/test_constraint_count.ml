@@ -62,22 +62,22 @@ let dev_expected_values =
       ; digest = "740db2397b0b01806a48f061a2e2b063"
       }
   ; zkapp_opt_signed_opt_signed =
-      { constraints = 14537
+      { constraints = 16314
       ; public_input_size = 300
-      ; auxiliary_input_size = 56588
-      ; digest = "bf6e31ff58a18638715ced1521ff540b"
+      ; auxiliary_input_size = 73512
+      ; digest = "20f96be9061c1e15e49e4605b82eda14"
       }
   ; zkapp_opt_signed =
-      { constraints = 8026
+      { constraints = 8915
       ; public_input_size = 300
-      ; auxiliary_input_size = 32166
-      ; digest = "107286d7281652f1e24cde752383d172"
+      ; auxiliary_input_size = 40628
+      ; digest = "3bec20ed2f245ab5bf831112efbd6b47"
       }
   ; zkapp_proved =
-      { constraints = 4249
+      { constraints = 5137
       ; public_input_size = 300
-      ; auxiliary_input_size = 30732
-      ; digest = "c8e741c536932ff2c548ee50e2f2c6ff"
+      ; auxiliary_input_size = 39194
+      ; digest = "69d2537da34047df00f856641b63e255"
       }
   }
 
@@ -95,22 +95,22 @@ let devnet_expected_values =
       ; digest = "3bf6bb8a97665fe7a9df6fc146e4f942"
       }
   ; zkapp_opt_signed_opt_signed =
-      { constraints = 16206
+      { constraints = 17983
       ; public_input_size = 300
-      ; auxiliary_input_size = 74242
-      ; digest = "59194a40cac76f4efac8e9bee3121fb2"
+      ; auxiliary_input_size = 91166
+      ; digest = "4f386c1183e5eb2339448af2b3561147"
       }
   ; zkapp_opt_signed =
-      { constraints = 8883
+      { constraints = 9772
       ; public_input_size = 300
-      ; auxiliary_input_size = 41170
-      ; digest = "68002a554cdf2ca30d01b3f734038cc9"
+      ; auxiliary_input_size = 49632
+      ; digest = "f3a4815da42338a36753a9a70316b0da"
       }
   ; zkapp_proved =
-      { constraints = 5106
+      { constraints = 5994
       ; public_input_size = 300
-      ; auxiliary_input_size = 39736
-      ; digest = "7c9da8ee19a2dc6c466cff78ff3b867c"
+      ; auxiliary_input_size = 48198
+      ; digest = "0ae9ea554906e54b70040aca15b59b76"
       }
   }
 
@@ -128,22 +128,22 @@ let lightnet_expected_values =
       ; digest = "3bf6bb8a97665fe7a9df6fc146e4f942"
       }
   ; zkapp_opt_signed_opt_signed =
-      { constraints = 16206
+      { constraints = 17983
       ; public_input_size = 300
-      ; auxiliary_input_size = 74242
-      ; digest = "59194a40cac76f4efac8e9bee3121fb2"
+      ; auxiliary_input_size = 91166
+      ; digest = "4f386c1183e5eb2339448af2b3561147"
       }
   ; zkapp_opt_signed =
-      { constraints = 8883
+      { constraints = 9772
       ; public_input_size = 300
-      ; auxiliary_input_size = 41170
-      ; digest = "68002a554cdf2ca30d01b3f734038cc9"
+      ; auxiliary_input_size = 49632
+      ; digest = "f3a4815da42338a36753a9a70316b0da"
       }
   ; zkapp_proved =
-      { constraints = 5106
+      { constraints = 5994
       ; public_input_size = 300
-      ; auxiliary_input_size = 39736
-      ; digest = "7c9da8ee19a2dc6c466cff78ff3b867c"
+      ; auxiliary_input_size = 48198
+      ; digest = "0ae9ea554906e54b70040aca15b59b76"
       }
   }
 
@@ -161,22 +161,22 @@ let mainnet_expected_values =
       ; digest = "d31948e661cc662675b0c079458f714a"
       }
   ; zkapp_opt_signed_opt_signed =
-      { constraints = 16206
+      { constraints = 17983
       ; public_input_size = 300
-      ; auxiliary_input_size = 74242
-      ; digest = "59358dd489c5148f4ab669d6c6511578"
+      ; auxiliary_input_size = 91166
+      ; digest = "72c5328778d608cfb3dcebbf21bdc34e"
       }
   ; zkapp_opt_signed =
-      { constraints = 8883
+      { constraints = 9772
       ; public_input_size = 300
-      ; auxiliary_input_size = 41170
-      ; digest = "d643ccd8853e5f87517b62c945494b11"
+      ; auxiliary_input_size = 49632
+      ; digest = "56902d7807c649e45e6442c923030cbf"
       }
   ; zkapp_proved =
-      { constraints = 5106
+      { constraints = 5994
       ; public_input_size = 300
-      ; auxiliary_input_size = 39736
-      ; digest = "882f2125bf4ce05b4cbd5ab18569e38c"
+      ; auxiliary_input_size = 48198
+      ; digest = "9c4689245850e55ac1fe69647992462b"
       }
   }
 
