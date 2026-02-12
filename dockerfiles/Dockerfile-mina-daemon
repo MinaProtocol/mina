@@ -41,6 +41,7 @@ RUN if [ -n "$apt_cache_url" ]; then \
   DEB_REPO_HOST=${deb_repo#*://}; DEB_REPO_HOST=${DEB_REPO_HOST%%[:/]*}; \
   echo "Acquire::http::Proxy::${DEB_REPO_HOST} \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
   echo "Acquire::https::Proxy::${DEB_REPO_HOST} \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
+  echo "--- APT proxy config ---"; cat /etc/apt/apt.conf.d/01proxy; echo "---"; \
 fi
 
 # Install ca-certificates using HTTP
