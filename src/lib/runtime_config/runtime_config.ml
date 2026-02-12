@@ -804,9 +804,11 @@ module Accounts = struct
       }
 
     let gen =
-      Quickcheck.Generator.map Mina_base.Account.gen ~f:(fun a ->
+      Quickcheck.Generator.map
+        ~f:(fun a ->
           (* This will never fail with a proper account generator. *)
           of_account a |> Or_error.ok_exn )
+        Mina_base.Account.gen
   end
 
   type single = Single.t =
