@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 
-# Usage: generate-fork-config-with-ledger-tarballs-using-legacy-app.sh.sh --exe <mina_legacy_genesis_exe> --config <fork_config> --workdir <workdir> --ledger-name <ledger_name> --hash-name <hash_name>
+# Usage: generate-fork-config-with-ledger-tarballs-using-legacy-app.sh.sh --exe <mina_legacy_genesis_exe> --config <fork_config> --workdir <workdir> --ledger-name <ledger_name> --hash-name <hash_name> --hardfork-shift-slot-delta <hardfork_shift_slot_delta>
 
 set -e
 
 # Default values
 LEDGER_NAME="legacy_ledgers"
 HASH_NAME="legacy_hashes.json"
+MINA_LEGACY_GENESIS_EXE="mina-create-legacy-genesis"
+HARD_FORK_SHIFT_SLOT_DELTA=""
+PREFORK_GENESIS_CONFIG=""
 
 # Parse CLI args
 while [[ $# -gt 0 ]]; do
@@ -31,6 +34,14 @@ while [[ $# -gt 0 ]]; do
 			HASH_NAME="$2"
 			shift 2
 			;;
+		--hardfork-shift-slot-delta)
+			HARD_FORK_SHIFT_SLOT_DELTA="$2"
+			shift 2
+			;;
+		--prefork-genesis-config)
+			PREFORK_GENESIS_CONFIG="$2"
+			shift 2
+			;;
 		*)
 			echo "Unknown argument: $1" >&2
 			exit 1
@@ -38,8 +49,18 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-if [[ -z "$MINA_LEGACY_GENESIS_EXE" || -z "$FORK_CONFIG" || -z "$WORKDIR" ]]; then
-	echo "Missing required arguments. Usage: $0 --exe <mina_legacy_genesis_exe> --config <fork_config> --workdir <workdir> [--ledger-name <ledger_name>] [--hash-name <hash_name>]" >&2
+if [[ -z "$MINA_LEGACY_GENESIS_EXE" ]]; then
+	echo "Missing required argument: --exe <mina_legacy_genesis_exe>" >&2
+	exit 1
+fi
+
+if [[ -z "$FORK_CONFIG" ]]; then
+	echo "Missing required argument: --config <fork_config>" >&2
+	exit 1
+fi
+
+if [[ -z "$WORKDIR" ]]; then
+	echo "Missing required argument: --workdir <workdir>" >&2
 	exit 1
 fi
 
@@ -48,4 +69,9 @@ HASH_PATH="$WORKDIR/$HASH_NAME"
 
 echo "generating genesis ledgers ... (this may take a while)" >&2
 
-"$MINA_LEGACY_GENESIS_EXE" --config-file "$FORK_CONFIG" --genesis-dir "$LEDGER_PATH" --hash-output-file "$HASH_PATH"
+HARD_FORK_SHIFT_SLOT_DELTA_ARG=""
+if [[ -n "$HARD_FORK_SHIFT_SLOT_DELTA" ]]; then
+  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-slot $HARD_FORK_SHIFT_SLOT_DELTA --prefork-genesis-config $PREFORK_GENESIS_CONFIG"
+fi
+
+"$MINA_LEGACY_GENESIS_EXE" --pad-app-state --config-file "$FORK_CONFIG" --genesis-dir "$LEDGER_PATH" --hash-output-file "$HASH_PATH" $HARD_FORK_SHIFT_SLOT_DELTA_ARG

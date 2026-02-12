@@ -3,7 +3,7 @@
 set -e
 
 usage() {
-  echo "Usage: $0 --network NETWORK_NAME --config-url CONFIG_JSON_GZ_URL --runtime-ledger RUNTIME_GENESIS_LEDGER --logproc LOGPROC --output-dir OUTPUT_DIR"
+  echo "Usage: $0 --network NETWORK_NAME --config-url CONFIG_JSON_GZ_URL --runtime-ledger RUNTIME_GENESIS_LEDGER --hard-fork-genesis-slot-delta HARD_FORK_GENESIS_SLOT_DELTA --logproc LOGPROC --output-dir OUTPUT_DIR"
   echo ""
   echo "Generates hardfork ledger tarballs and runtime config for the specified network."
   echo ""
@@ -21,6 +21,10 @@ RUNTIME_GENESIS_LEDGER=""
 LOGPROC="cat"
 OUTPUT_DIR="hardfork_ledgers"
 
+# Default value for the hard fork shift slot delta, which can be overridden by the --hardfork-shift-slot-delta argument
+HARD_FORK_SHIFT_SLOT_DELTA=0
+PREFORK_GENESIS_CONFIG=""
+
 while [[ $# -gt 0 ]]; do
   case $1 in
     --network)
@@ -33,6 +37,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --runtime-ledger)
       RUNTIME_GENESIS_LEDGER="$2"
+      shift 2
+      ;;
+    --hardfork-shift-slot-delta)
+      HARD_FORK_SHIFT_SLOT_DELTA="$2"
+      shift 2
+      ;;
+    --prefork-genesis-config)
+      PREFORK_GENESIS_CONFIG="$2"
       shift 2
       ;;
     --logproc)
@@ -48,13 +60,28 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
+      echo "Unknown argument: $1" >&2
       usage
       exit 1
       ;;
   esac
 done
 
-if [[ -z "$NETWORK_NAME" || -z "$CONFIG_JSON_GZ_URL" || -z "$RUNTIME_GENESIS_LEDGER" ]]; then
+
+if [[ -z "$NETWORK_NAME" ]]; then
+  echo "[ERROR] --network argument is required."
+  usage
+  exit 1
+fi
+
+if [[ -z "$CONFIG_JSON_GZ_URL" ]]; then
+  echo "[ERROR] --config-url argument is required."
+  usage
+  exit 1
+fi
+
+if [[ -z "$RUNTIME_GENESIS_LEDGER" ]]; then
+  echo "[ERROR] --runtime-ledger argument is required."
   usage
   exit 1
 fi
@@ -78,13 +105,17 @@ if [ ! -f "${FORKING_FROM_CONFIG_JSON}" ]; then
 fi
 
 echo "--- Download and extract previous network config"
-curl -o config.json.gz "$CONFIG_JSON_GZ_URL"
-gunzip config.json.gz
+curl -sL "$CONFIG_JSON_GZ_URL" | gunzip > config.json
 
 echo "--- Generate hardfork ledger tarballs"
 mkdir "$OUTPUT_DIR"
 
-"$RUNTIME_GENESIS_LEDGER" --config-file config.json --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
+HARD_FORK_SHIFT_SLOT_DELTA_ARG=""
+if [[ "$HARD_FORK_SHIFT_SLOT_DELTA" -ne 0 ]]; then
+  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-slot $HARD_FORK_SHIFT_SLOT_DELTA --prefork-genesis-config $PREFORK_GENESIS_CONFIG"
+fi
+
+"$RUNTIME_GENESIS_LEDGER" --pad-app-state --config-file config.json $HARD_FORK_SHIFT_SLOT_DELTA_ARG --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
 
 echo "--- Create hardfork config"
 FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json

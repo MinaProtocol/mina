@@ -37,7 +37,7 @@ mkdir -p $LOCAL_DEB_FOLDER
 
 # Download required debians from bucket locally
 if [ -z "$DEBS" ]; then 
-    echo "DEBS env var is empty. It should contains comma separated names of debians to install"
+    echo "DEBS env var is empty. It should contain comma separated names of debians to install"
     exit 1
 else
   # shellcheck disable=SC2206
@@ -46,12 +46,12 @@ else
     case $i in
       mina-testnet-generic*)
         # Download mina-logproc too
-        ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
+          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
       ;;
-      mina-devnet|mina-mainnet|mina-mesa)
-        # Downaload mina-logproc and sub debians (apps and config) too
-        ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
-        ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/${i}-config*" $LOCAL_DEB_FOLDER
+      mina-devnet|mina-mainnet)
+        # Download mina-logproc and sub debians (apps and config) too
+          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
+          ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/${i}-config*" $LOCAL_DEB_FOLDER
       ;;
       mina-devnet-legacy|mina-mainnet-legacy)
         # Download mina-logproc legacy too
@@ -82,3 +82,5 @@ $SUDO apt-get install --yes --allow-downgrades "${debs_with_version[@]}"
 
 # Cleaning up
 source ./scripts/debian/aptly.sh stop  --clean
+
+rm -rf $LOCAL_DEB_FOLDER

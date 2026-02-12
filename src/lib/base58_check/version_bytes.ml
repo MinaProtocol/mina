@@ -12,14 +12,18 @@ let secret_box_byteswr : t = '\x02'
 
 let fee_transfer_single : t = '\x03'
 
+(* unused *)
 let frontier_hash : t = '\x04'
 
 let ledger_hash : t = '\x05'
 
+(* unused *)
 let lite_precomputed : t = '\x06'
 
+(* unused *)
 let proof : t = '\x0A'
 
+(* unused *)
 let random_oracle_base : t = '\x0B'
 
 let receipt_chain_hash : t = '\x0C'
@@ -44,14 +48,17 @@ let user_command_memo : t = '\x14'
 
 let vrf_truncated_output : t = '\x15'
 
+(* unused *)
 let web_pipe : t = '\x16'
 
 let coinbase_stack_data : t = '\x17'
 
 let coinbase_stack_hash : t = '\x18'
 
+(* unused; Pending_coinbase.Hash_builder reuses receipt_chain_hash instead *)
 let pending_coinbase_hash_builder : t = '\x19'
 
+(* unused *)
 let zkapp_command : t = '\x1A'
 
 let verification_key : t = '\x1B'

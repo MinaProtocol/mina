@@ -34,9 +34,8 @@ type Config struct {
 	MainSlot int
 	ForkSlot int
 
-	// Delay before genesis slot in minutes
-	MainDelay int
-	ForkDelay int
+	MainDelayMin int
+	HfSlotDelta  int
 
 	// Configuration for network sizes
 	NumWhales int
@@ -60,7 +59,9 @@ type Config struct {
 	UserCommandCheckMaxIterations int // Max iterations to check for user commands in blocks
 	ForkEarliestBlockMaxRetries   int // Max retries to wait for earliest block in fork network
 	HTTPClientTimeoutSeconds      int // HTTP client timeout for GraphQL requests
-	GraphQLMaxRetries             int // Max number of retries for GraphQL requests
+	ClientMaxRetries              int // Max number of retries for client requests
+
+	ForkMethod ForkMethod
 }
 
 // DefaultConfig returns the default configuration with values
@@ -72,14 +73,14 @@ func DefaultConfig() *Config {
 		BestChainQueryFrom:            25,
 		MainSlot:                      30,
 		ForkSlot:                      30,
-		MainDelay:                     8,
-		ForkDelay:                     8,
+		MainDelayMin:                  7,
+		HfSlotDelta:                   30, // if this is too small and fork network is spawned after fork genesis, it'll fail to create any block
 		NumWhales:                     2,
 		NumFish:                       1,
-		NumNodes:                      1,
-		PaymentInterval:               10,
+		NumNodes:                      0,
+		PaymentInterval:               20,
 		ShutdownTimeoutMinutes:        10,
-		PollingIntervalSeconds:        5,
+		PollingIntervalSeconds:        8,
 		ForkConfigRetryDelaySeconds:   60,
 		ForkConfigMaxRetries:          15,
 		NoNewBlocksWaitSeconds:        300, // 5 minutes
@@ -87,14 +88,21 @@ func DefaultConfig() *Config {
 		ForkEarliestBlockMaxRetries:   10,
 		HTTPClientTimeoutSeconds:      600,
 		// ^ fork config take really long time to complete (2-3 minutes)
-		GraphQLMaxRetries: 5,
+		ClientMaxRetries: 5,
 
 		SeedStartPort:        3000,
 		SnarkCoordinatorPort: 7000,
 		WhaleStartPort:       4000,
 		FishStartPort:        5000,
 		NodeStartPort:        6000,
+
+		ForkMethod: Legacy,
 	}
+}
+
+func (c *Config) ForkGenesisTsGivenMainGenesisTs(mainGenesisTs int64) int64 {
+	forkGenesisSlot := c.SlotChainEnd + c.HfSlotDelta
+	return mainGenesisTs + int64(forkGenesisSlot*c.MainSlot)
 }
 
 // Validate checks if the configuration is valid
@@ -143,7 +151,7 @@ func (c *Config) Validate() error {
 // FormatTimestamp formats a UNIX timestamp into the format used by the shell script
 func FormatTimestamp(unixTs int64) string {
 	t := time.Unix(unixTs, 0).UTC()
-	return t.Format("2006-01-02 15:04:05+00:00")
+	return t.Format(time.RFC3339)
 }
 
 // validateExecutable checks if a file exists and has executable permissions

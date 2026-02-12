@@ -16,6 +16,9 @@ declare CLI_NAME='aptly.sh';
 declare PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 
 PORT=8080
+# APTLY_ROOT can be set via environment to override default ~/.aptly
+# This is useful for local builds where ~/.aptly may not be writable
+APTLY_ROOT="${APTLY_ROOT:-$HOME/.aptly}"
 
 # functions
 
@@ -37,23 +40,31 @@ function start_aptly() {
     local __wait=$8
 
     if [ "${__clean}" = 1 ]; then
-        rm -rf ~/.aptly
+        rm -rf "$APTLY_ROOT"
     fi
 
-    aptly repo list | grep -q "^${__repo}$" && aptly repo drop "${__repo}" || true
+    # Create aptly config pointing to APTLY_ROOT if it doesn't use default
+    mkdir -p "$APTLY_ROOT"
+    APTLY_CONF="$APTLY_ROOT/aptly.conf"
+    if [[ ! -f "$APTLY_CONF" ]]; then
+        echo "{\"rootDir\": \"$APTLY_ROOT\"}" > "$APTLY_CONF"
+    fi
+    export APTLY_CONFIG="$APTLY_CONF"
 
-    aptly repo create -component "${__component}" -distribution "${__distribution}" -architectures "${__archs}" "${__repo}"
+    aptly -config="$APTLY_CONF" repo list | grep -q "^${__repo}$" && aptly -config="$APTLY_CONF" repo drop "${__repo}" || true
 
-    aptly repo add -architectures "${__archs}" "${__repo}" "${__debs}"
+    aptly -config="$APTLY_CONF" repo create -component "${__component}" -distribution "${__distribution}" -architectures "${__archs}" "${__repo}"
 
-    aptly snapshot create -architectures "${__archs}" "${__component}" from repo "${__repo}"
+    aptly -config="$APTLY_CONF" repo add -architectures "${__archs}" "${__repo}" "${__debs}"
 
-    aptly publish snapshot -architectures "${__archs}" -distribution "${__distribution}" -skip-signing "${__component}"
+    aptly -config="$APTLY_CONF" snapshot create -architectures "${__archs}" "${__component}" from repo "${__repo}"
+
+    aptly -config="$APTLY_CONF" publish snapshot -architectures "${__archs}" -distribution "${__distribution}" -skip-signing "${__component}"
 
     if [ "${__background}" = 1 ]; then
-        aptly serve -listen 0.0.0.0:"${__port}" &
+        aptly -config="$APTLY_CONF" serve -listen 0.0.0.0:"${__port}" &
     else
-        aptly serve -listen 0.0.0.0:"${__port}"
+        aptly -config="$APTLY_CONF" serve -listen 0.0.0.0:"${__port}"
     fi
 
     if [ $__wait = 1 ]; then
@@ -201,9 +212,9 @@ function stop(){
         esac
     done
 
-    pkill aptly
+    pkill aptly || true
     if [ "${__clean}" = 1 ]; then
-        rm -rf ~/.aptly
+        rm -rf "$APTLY_ROOT"
     fi
 }
 
