@@ -179,7 +179,12 @@ fi
 APT_CACHE_ARG=""
 if [[ -n "${APT_CACHE_PROXY:-}" ]]; then
   CONVERTED_PROXY=$(echo "$APT_CACHE_PROXY" | sed "s/localhost/$LOCALHOST_REPLACEMENT/g")
-  APT_CACHE_ARG="--build-arg apt_cache_url=$CONVERTED_PROXY"
+  # Probe proxy reachability before passing to Docker build; fall back to direct if unreachable
+  if curl -so /dev/null --connect-timeout 2 --max-time 4 "$CONVERTED_PROXY" 2>/dev/null; then
+    APT_CACHE_ARG="--build-arg apt_cache_url=$CONVERTED_PROXY"
+  else
+    echo "WARNING: APT cache proxy ($CONVERTED_PROXY) is unreachable, building without proxy"
+  fi
 fi
 
 if [[ $(echo "${VALID_SERVICES[@]}" | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
