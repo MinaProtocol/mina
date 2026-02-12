@@ -21,7 +21,8 @@ RUNTIME_GENESIS_LEDGER=""
 LOGPROC="cat"
 OUTPUT_DIR="hardfork_ledgers"
 
-# Default value for the hard fork shift slot delta, which can be overridden by the --hardfork-shift-slot-delta argument
+TMP=$(mktemp -d)
+
 HARD_FORK_SHIFT_SLOT_DELTA=0
 PREFORK_GENESIS_CONFIG=""
 
@@ -105,10 +106,10 @@ if [ ! -f "${FORKING_FROM_CONFIG_JSON}" ]; then
 fi
 
 echo "--- Download and extract previous network config"
-curl -sL "$CONFIG_JSON_GZ_URL" | gunzip > config.json
+curl -sL "$CONFIG_JSON_GZ_URL" | gunzip > "$TMP/config.json"
 
 # make sure files does not have genesis key
-jq 'del(.genesis)' "$FORK_CONFIG" > tmp/fork_config_no_genesis.json
+jq 'del(.genesis)' "$TMP/config.json" > "$TMP/fork_config_no_genesis.json"
 
 
 echo "--- Generate hardfork ledger tarballs"
@@ -116,15 +117,15 @@ mkdir "$OUTPUT_DIR"
 
 HARD_FORK_SHIFT_SLOT_DELTA_ARG=""
 if [[ "$HARD_FORK_SHIFT_SLOT_DELTA" -ne 0 ]]; then
-  jq 'del(.genesis)' "$PREFORK_GENESIS_CONFIG" > tmp/config_no_genesis.json
+  jq 'del(.genesis)' "$PREFORK_GENESIS_CONFIG" > "$TMP/config_no_genesis.json"
 
-  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-slot $HARD_FORK_SHIFT_SLOT_DELTA --prefork-genesis-config tmp/config_no_genesis.json"
+  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-slot $HARD_FORK_SHIFT_SLOT_DELTA --prefork-genesis-config $TMP/config_no_genesis.json"
 fi
 
-"$RUNTIME_GENESIS_LEDGER" --pad-app-state --config-file tmp/fork_config_no_genesis.json $HARD_FORK_SHIFT_SLOT_DELTA_ARG --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
+"$RUNTIME_GENESIS_LEDGER" --pad-app-state --config-file "$TMP/fork_config_no_genesis.json" $HARD_FORK_SHIFT_SLOT_DELTA_ARG --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
 
 echo "--- Create hardfork config"
-FORK_CONFIG_JSON=tmp/fork_config_no_genesis.json LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
+FORK_CONFIG_JSON="$TMP/fork_config_no_genesis.json" LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
 
 echo "--- New genesis config"
 cat new_config.json
