@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Mina_transaction
 open Mina_stdlib
 module Ledger = Mina_ledger.Ledger
 
@@ -19,14 +18,8 @@ let dummy_transaction_pool_proxy : transaction_pool_proxy =
    command verification *)
 let verify_command_with_transaction_pool_proxy
     ~(transaction_pool_proxy : transaction_pool_proxy)
+    ~(cmd_hash : Mina_transaction.Transaction_hash.t)
     (cmd_with_status : User_command.Verifiable.t With_status.t) =
-  let With_status.{ data = verifiable_cmd; _ } = cmd_with_status in
-  let cmd_hash =
-    (* PERF: `hash_command` is slow, so we may need to investigate if we could
-       reuse hashes from transition verification. *)
-    User_command.of_verifiable verifiable_cmd
-    |> Transaction_hash.hash_command_with_hashes
-  in
   match transaction_pool_proxy.find_by_hash cmd_hash with
   | None ->
       `No_fast_forward
@@ -35,7 +28,8 @@ let verify_command_with_transaction_pool_proxy
 
 let check_commands ledger ~verifier
     ~(transaction_pool_proxy : transaction_pool_proxy)
-    (cs : User_command.t With_status.t list) =
+    (cs : User_command.t With_status.t list)
+    (hashes : Mina_transaction.Transaction_hash.t list) =
   let open Deferred.Or_error.Let_syntax in
   let%bind cs =
     User_command.Applied_sequence.to_all_verifiable cs
@@ -46,10 +40,11 @@ let check_commands ledger ~verifier
           ~get_batch:(Ledger.get_batch ledger) )
     |> Deferred.return
   in
-  let partitioner cmd =
+  let partitioner (cmd, cmd_hash) =
     let open Core_kernel.Either in
     match
-      verify_command_with_transaction_pool_proxy ~transaction_pool_proxy cmd
+      verify_command_with_transaction_pool_proxy ~transaction_pool_proxy
+        ~cmd_hash cmd
     with
     | `No_fast_forward ->
         Second cmd
@@ -63,7 +58,7 @@ let check_commands ledger ~verifier
       ~finalizer:(fun left right_m ~f ->
         let%map.Deferred.Or_error right = right_m in
         f left right )
-      cs
+      (List.zip_exn cs hashes)
   in
   Result.all
     (List.map xs ~f:(function

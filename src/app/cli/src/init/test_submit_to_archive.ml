@@ -423,7 +423,10 @@ let mk_payment ~(valid_until : Mina_numbers.Global_slot_since_genesis.t)
   { Signed_command.Poly.signer = signer_keypair.public_key; signature; payload }
 
 let generate_txs ~valid_until ~init_nonce ~n_zkapp_txs ~n_payments ~n_blocks
-    ~constraint_constants keypair : User_command.Valid.t Sequence.t list =
+    ~constraint_constants keypair :
+    Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
+    Sequence.t
+    list =
   let signer_pk = Public_key.compress keypair.Keypair.public_key in
   let event_elements = 12 in
   let action_elements = 12 in
@@ -452,7 +455,8 @@ let generate_txs ~valid_until ~init_nonce ~n_zkapp_txs ~n_payments ~n_blocks
               valid_command ) =
           User_command.to_valid_unsafe command
         in
-        valid_command )
+        Mina_transaction.Transaction_hash.User_command_with_valid_signature
+        .create valid_command )
   in
   List.init n_blocks ~f:generate_payments
 

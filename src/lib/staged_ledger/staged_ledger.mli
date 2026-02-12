@@ -231,13 +231,14 @@ val create_diff :
   -> logger:Logger.t
   -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> zkapp_cmd_limit:int option
-  -> transactions_by_fee:User_command.Valid.t Sequence.t
+  -> transactions_by_fee:
+       Transaction_hash.User_command_with_valid_signature.t Sequence.t
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t
         -> Transaction_snark_work.Checked.t option )
   -> supercharge_coinbase:bool
   -> ( Staged_ledger_diff.With_valid_signatures_and_proofs.t
-       * (User_command.Valid.t * Error.t) list
+       * (Transaction_hash.User_command_with_valid_signature.t * Error.t) list
      , Pre_diff_info.Error.t )
      Result.t
 

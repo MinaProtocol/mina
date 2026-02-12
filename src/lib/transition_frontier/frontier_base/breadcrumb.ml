@@ -83,6 +83,34 @@ T.
   , staged_ledger_hash
   , accounts_created )]
 
+let command_hashes
+    { T.validated_transition
+    ; staged_ledger = _
+    ; just_emitted_a_proof = _
+    ; transition_receipt_time = _
+    ; staged_ledger_hash = _
+    ; accounts_created = _
+    } =
+  Mina_block.Validated.body validated_transition
+  |> Body.staged_ledger_diff |> Staged_ledger_diff.command_hashes
+
+let valid_commands_hashed (t : T.t) =
+  List.map2_exn (Mina_block.Validated.valid_commands t.validated_transition)
+    (command_hashes t) ~f:(fun command hash ->
+      With_status.map command
+        ~f:
+          (Fn.flip
+             Mina_transaction.Transaction_hash.User_command_with_valid_signature
+             .make hash ) )
+
+(* TODO: for better efficiency, add set of tx hashes to `maps_t`
+   and use existing mechanism of mask handling to get accumulated lookups,
+   then in transaction_status it will be necessary to only traverse
+   all of the tips instead of all of the breadcrumbs. *)
+let contains_transaction_by_hash t hash =
+  List.exists (command_hashes t)
+    ~f:(Mina_transaction.Transaction_hash.equal hash)
+
 include Allocation_functor.Make.Basic (T)
 
 let compute_block_trace_metadata transition_with_validation =
@@ -366,7 +394,10 @@ module For_tests = struct
       let transactions =
         gen_payments ~send_to_random_pk parent_staged_ledger
           accounts_with_secret_keys
-        |> Sequence.map ~f:(fun x -> User_command.Signed_command x)
+        |> Sequence.map ~f:(fun x ->
+               Mina_transaction.Transaction_hash
+               .User_command_with_valid_signature
+               .create @@ User_command.Signed_command x )
       in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys
