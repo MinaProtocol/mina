@@ -12,6 +12,7 @@ ARG network=mainnet
 ARG psql_version=13
 
 ARG GCLOUD_VERSION=476.0.0
+ARG apt_cache_url=""
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -22,6 +23,11 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libffi7
 #    libprocps8
 #    libjemalloc2
+
+# Optional: configure APT caching proxy
+RUN if [ -n "$apt_cache_url" ]; then \
+  echo "Acquire::http::Proxy \"${apt_cache_url}\";" > /etc/apt/apt.conf.d/01proxy; \
+fi
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \

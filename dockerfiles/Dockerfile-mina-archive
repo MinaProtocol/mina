@@ -11,6 +11,7 @@ ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
 ARG deb_profile
 ARG deb_suffix
+ARG apt_cache_url=""
 
 ARG GCLOUD_VERSION=476.0.0
 
@@ -27,6 +28,11 @@ RUN echo "Building image with version $deb_codename $deb_release $deb_version"
 
 COPY scripts/archive-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+# Optional: configure APT caching proxy
+RUN if [ -n "$apt_cache_url" ]; then \
+  echo "Acquire::http::Proxy \"${apt_cache_url}\";" > /etc/apt/apt.conf.d/01proxy; \
+fi
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \
@@ -54,6 +60,7 @@ RUN apt-get update --quiet --yes \
         apt-transport-https \
         dnsutils \
         tzdata \
+        python3 \
         postgresql \
         postgresql-contrib \
         apt-utils \

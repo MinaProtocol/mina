@@ -4,9 +4,13 @@
 #################################################################################################
 # Supports europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim, and europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
 ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
+ARG deb_codename
+ARG apt_cache_url=""
 
 FROM ${image} AS build-deps
 ARG TARGETARCH
+
+ARG apt_cache_url
 
 # OCaml Version
 # The version must be the same as the version used in:
@@ -47,6 +51,12 @@ ARG RUST_NIGHTLY=2024-09-05
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# Optional: configure APT caching proxy
+RUN if [ -n "$apt_cache_url" ]; then \
+  echo "Acquire::http::Proxy \"${apt_cache_url}\";" > /etc/apt/apt.conf.d/01proxy; \
+fi
+
 RUN CODENAME=$(grep "VERSION_CODENAME" /etc/os-release | cut -d= -f2); \
   case "${CODENAME}" in \
     bookworm) LIBSSL="libssl-dev"; LIBPROCPS="libproc2-0" ;; \
