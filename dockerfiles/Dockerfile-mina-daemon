@@ -34,9 +34,11 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libjemalloc2
 #    libssl
 
-# Optional: configure APT caching proxy
+# Optional: configure APT caching proxy (bypass proxy for deb_repo)
 RUN if [ -n "$apt_cache_url" ]; then \
   echo "Acquire::http::Proxy \"${apt_cache_url}\";" > /etc/apt/apt.conf.d/01proxy; \
+  DEB_REPO_HOST=$(echo "$deb_repo" | sed -E 's|https?://([^:/]+).*|\1|'); \
+  echo "Acquire::http::Proxy::${DEB_REPO_HOST} \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
 fi
 
 # Install ca-certificates using HTTP
