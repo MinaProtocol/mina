@@ -14,12 +14,14 @@
 #   --wait-for-sync               Wait for Rosetta node to sync before running tests
 #   --timeout <seconds>           Timeout for sync wait in seconds (default: 900)
 #   --address <url>               Override the default Rosetta endpoint address
+#   --daemon-graphql-address <url> Override the default daemon GraphQL endpoint address
 #   -h, --help                    Display this help message
 #
 # EXAMPLES:
 #   ./rosetta-sanity.sh --network mainnet
 #   ./rosetta-sanity.sh --network devnet --wait-for-sync --timeout 1200
 #   ./rosetta-sanity.sh --address http://localhost:3087 --network mainnet
+#   ./rosetta-sanity.sh --address http://localhost:3087 --daemon-graphql-address http://localhost:3085/graphql --network mainnet
 #
 # TEST COVERAGE:
 #   1. Network status endpoint validation
@@ -49,6 +51,7 @@ declare -A mainnet
 mainnet[id]="mainnet"
 mainnet[block]="3NLaE5ygWrgssHjchYR7auQTZHveVV5au5cv5VhbWWYPdbdSm4FA"
 mainnet[address]="http://rosetta-mainnet.gcp.o1test.net"
+mainnet[daemon_graphql_address]="http://localhost:3085/graphql"
 mainnet[account]="B62qrQKS9ghd91shs73TCmBJRW9GzvTJK443DPx2YbqcyoLc56g1ny9"
 mainnet[payment_transaction]="5JvGLZ22Pt5co9ikFhHVcewsrGNx9xwPx16oKvJ42oujZRU7Ymfh"
 mainnet[zkapp_transaction]="5Ju42hSKHMPFFuH2iar8V1scHdWET2TV8ocaazRbEea5yFWDe7RH"
@@ -56,6 +59,7 @@ mainnet[zkapp_transaction]="5Ju42hSKHMPFFuH2iar8V1scHdWET2TV8ocaazRbEea5yFWDe7RH
 declare -A devnet
 devnet[id]="devnet"
 devnet[address]="http://rosetta-devnet.gcp.o1test.net"
+devnet[daemon_graphql_address]="http://localhost:3085/graphql"
 devnet[block]="3NLX177ZPMRfgYX6sX6tEnhb97gvjWKiivk9Fk2q8M6vHHjAQPYk"
 devnet[account]="B62qizKV19RgCtdosaEnoJRF72YjTSDyfJ5Nrdu8ygKD3q2eZcqUp7B"
 devnet[payment_transaction]="5Jumdze53X3k8rVaNQpJKdt8voGXRgVcFBZugg21FE1K7QkJBhLb"
@@ -67,15 +71,21 @@ while [[ "$#" -gt 0 ]]; do
         --network) NETWORK="$2"; shift ;;
         --wait-for-sync) WAIT_FOR_SYNC=true ;;
         --timeout) TIMEOUT="$2"; shift ;;
-        --address) 
-                   
+        --address)
                    # shellcheck disable=SC2034
                    mainnet[address]="$2"
                    # shellcheck disable=SC2034
                    devnet[address]="$2"
                    shift
                    ;;
-        -h|--help) echo "Usage: $0 [--network mainnet|devnet] [--address <address>]"; exit 0 ;;
+        --daemon-graphql-address)
+                   # shellcheck disable=SC2034
+                   mainnet[daemon_graphql_address]="$2"
+                   # shellcheck disable=SC2034
+                   devnet[daemon_graphql_address]="$2"
+                   shift
+                   ;;
+        -h|--help) echo "Usage: $0 [--network mainnet|devnet] [--address <address>] [--daemon-graphql-address <address>]"; exit 0 ;;
         *) echo "❌  Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
