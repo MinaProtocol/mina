@@ -1,17 +1,21 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name mina_stdlib_unix)
  (public_name mina_stdlib_unix)
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   async_kernel
   async_unix
   core
   core_kernel
   ptime
-  ;; local libraries
+  ; local libraries
   logger)
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

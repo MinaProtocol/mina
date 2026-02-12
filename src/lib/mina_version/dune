@@ -1,10 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name mina_version)
+ (public_name mina_version)
  (libraries core_kernel)
+ (virtual_modules mina_version)
+ (default_implementation mina_version.normal)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
- (public_name mina_version)
- (virtual_modules mina_version)
- (default_implementation mina_version.normal))
+  (pps ppx_version)))

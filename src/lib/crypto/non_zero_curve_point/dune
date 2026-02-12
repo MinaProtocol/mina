@@ -1,12 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name non_zero_curve_point)
  (public_name non_zero_curve_point)
- (flags :standard -short-paths)
  (inline_tests
   (flags -verbose -show-counts))
- (library_flags -linkall)
+ (flags :standard -short-paths)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   ppx_inline_test.config
   base.caml
   sexplib0
@@ -14,7 +17,7 @@
   bin_prot.shape
   base
   base.base_internalhash_types
-  ;; local libraries
+  ; local libraries
   mina_wire_types
   snarky.backendless
   random_oracle_input
@@ -30,6 +33,9 @@
   kimchi_pasta.basic
   test_util
   ppx_version.runtime)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_snarky
@@ -44,6 +50,4 @@
    ppx_deriving_yojson
    ppx_compare
    h_list.ppx
-   ppx_custom_printf))
- (instrumentation
-  (backend bisect_ppx)))
+   ppx_custom_printf)))

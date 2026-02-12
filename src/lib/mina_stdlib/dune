@@ -1,9 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name mina_stdlib)
  (public_name mina_stdlib)
  (inline_tests
   (flags -verbose -show-counts))
- (modules_without_implementation generic_set sigs)
  (flags
   (:standard -w a -warn-error +a)
   -open
@@ -32,4 +35,5 @@
    ppx_jane
    ppx_mina
    ppx_version))
- (synopsis "Mina standard library"))
+ (synopsis "Mina standard library")
+ (modules_without_implementation generic_set sigs))

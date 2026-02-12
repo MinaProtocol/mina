@@ -1,61 +1,65 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (package heap_usage)
  (name heap_usage)
  (public_name heap_usage)
  (libraries
-  ;; opam libraries
-  async_unix
-  core
-  result
-  async_kernel
-  stdio
+  ; opam libraries
   async
-  core_kernel
-  base
-  base.caml
-  base.base_internalhash_types
   async.async_command
-  yojson
+  async_kernel
+  async_unix
+  base
+  base.base_internalhash_types
+  base.caml
+  core
+  core_kernel
+  result
   sexplib0
-  ;; local libraries
-  mina_block ; temp
+  stdio
+  yojson
+  ; local libraries
+  blake2
+  currency
+  crypto_params
+  data_hash_lib
+  genesis_constants
+  kimchi_backend
+  kimchi_bindings
+  kimchi_pasta
+  kimchi_pasta.basic
+  ledger_proof
+  merkle_ledger
   mina_base
   mina_base.import
-  mina_numbers
-  currency
-  mina_stdlib
-  data_hash_lib
-  signature_lib
-  merkle_ledger
+  mina_block
   mina_compile_config
+  mina_generators
   mina_ledger
+  mina_numbers
   mina_state
+  mina_stdlib
   mina_transaction_logic
-  genesis_constants
-  staged_ledger_diff
   parallel_scan
+  pasta_bindings
   pickles
   pickles.backend
   pickles_types
+  proof_cache_tag
+  random_oracle
+  signature_lib
+  snark_params
+  snark_profiler_lib
+  staged_ledger_diff
   transaction_snark
   transaction_snark_scan_state
-  ledger_proof
-  blake2
-  mina_generators
-  with_hash
-  random_oracle
-  snark_params
-  crypto_params
-  kimchi_bindings
-  kimchi_backend
-  kimchi_pasta
-  kimchi_pasta.basic
-  pasta_bindings
-  zkapp_command_builder
   transaction_snark_tests
-  snark_profiler_lib
-  proof_cache_tag)
+  with_hash
+  zkapp_command_builder)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv)))
+  (pps ppx_compare ppx_hash ppx_let ppx_mina ppx_sexp_conv ppx_version)))

@@ -1,9 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (public_name hash_prefix_create.js)
  (name hash_prefix_create_js)
- (libraries pickles random_oracle js_of_ocaml base core_kernel)
+ (public_name hash_prefix_create.js)
+ (libraries
+  ; opam libraries
+  js_of_ocaml
+  base
+  core_kernel
+  ; local libraries
+  pickles
+  random_oracle)
+ (implements hash_prefix_create)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
- (implements hash_prefix_create))
+  (pps ppx_version)))

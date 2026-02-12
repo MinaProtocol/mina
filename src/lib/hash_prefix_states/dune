@@ -1,20 +1,26 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name hash_prefix_states)
  (public_name hash_prefix_states)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   core_kernel
   base
-  ;; local libraries
+  ; local libraries
   snark_params
   random_oracle
   mina_signature_kind
   hash_prefixes
   hash_prefix_create
   pickles)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_custom_printf
@@ -23,7 +29,5 @@
    ppx_inline_test
    ppx_compare
    ppx_deriving_yojson))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis
   "Values corresponding to the internal state of the Pedersen hash function on the prefixes used in Coda"))

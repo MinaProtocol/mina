@@ -1,4 +1,6 @@
-;; Don't build tests automatically
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
 
 (vendored_dirs test)
 
@@ -7,7 +9,6 @@
  (public_name ppx_version)
  (kind ppx_deriver)
  (libraries
-  ;; opam libs
   compiler-libs.common
   ppxlib
   ppxlib.astlib

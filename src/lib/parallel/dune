@@ -1,17 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name parallel)
  (public_name parallel)
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
   async_rpc_kernel
   async
   core
   rpc_parallel
   async.async_rpc
   core_kernel)
- (preprocess
-  (pps ppx_version ppx_jane ppx_compare))
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_compare))
  (synopsis "Template code to run programs that rely Rpc_parallel.Expert"))

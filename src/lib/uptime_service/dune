@@ -1,7 +1,8 @@
 (library
  (name uptime_service)
  (public_name uptime_service)
- (flags (:standard -w +26))
+ (flags
+  (:standard -w +26))
  (inline_tests
   (flags -verbose -show-counts))
  (libraries

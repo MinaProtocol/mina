@@ -1,9 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
- (name run_snark_worker)
  (package mina_snark_worker)
+ (name run_snark_worker)
  (public_name mina-standalone-snark-worker)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   async.async_command
   async_kernel
@@ -14,7 +18,7 @@
   core_kernel
   sexplib0
   uri
-  ;; local libraries
+  ; local libraries
   currency
   genesis_constants
   graphql_lib

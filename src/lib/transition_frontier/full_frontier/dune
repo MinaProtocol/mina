@@ -1,8 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name full_frontier)
  (public_name transition_frontier_full_frontier)
  (libraries
-  ;;opam libraries
+  ; opam libraries
   integers
   core
   base.caml
@@ -10,7 +14,12 @@
   sexplib0
   base.base_internalhash_types
   stdio
-  ;;local libraries
+  async
+  async_kernel
+  async_unix
+  core.uuid
+  core_kernel.uuid
+  ; local libraries
   mina_wire_types
   unsigned_extended
   o1trace
@@ -33,14 +42,8 @@
   staged_ledger_diff
   mina_numbers
   internal_tracing
-  ; for tests
-  async
-  async_kernel
-  async_unix
   child_processes
   coda_genesis_ledger
-  core.uuid
-  core_kernel.uuid
   genesis_constants
   merkle_ledger
   protocol_version

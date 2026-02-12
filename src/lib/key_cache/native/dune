@@ -1,6 +1,10 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (public_name key_cache.native)
  (name key_cache_native)
+ (public_name key_cache.native)
  (libraries key_cache key_cache.async key_cache.sync)
  (instrumentation
   (backend bisect_ppx))

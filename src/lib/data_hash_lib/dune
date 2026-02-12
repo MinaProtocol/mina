@@ -1,15 +1,18 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name data_hash_lib)
  (public_name data_hash_lib)
  (inline_tests
   (flags -verbose -show-counts))
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   base
   core_kernel
   ppx_inline_test.config
-  ;; local libraries
+  ; local libraries
   base58_check
   bignum_bigint
   bitstring_lib
@@ -30,6 +33,9 @@
   snarky.backendless
   snarky.intf
   test_util)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_bench
@@ -41,6 +47,4 @@
    ppx_sexp_conv
    ppx_snarky
    ppx_version))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "Data hash"))

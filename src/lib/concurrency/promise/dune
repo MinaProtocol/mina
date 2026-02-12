@@ -1,10 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (public_name promise)
  (name promise)
+ (public_name promise)
  (libraries base async_kernel)
+ (virtual_modules promise)
+ (default_implementation promise.native)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
- (virtual_modules promise)
- (default_implementation promise.native))
+  (pps ppx_version)))

@@ -1,18 +1,24 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (test
  (name indexer_test)
  (enabled_if false)
  (libraries
-  lib
-  async
-  core_kernel
-  base
-  async.async_command
-  core
-  async_kernel
+  ; opam libraries
   alcotest
   alcotest-async
-  cmdliner)
+  async
+  async.async_command
+  async_kernel
+  base
+  cmdliner
+  core
+  core_kernel
+  ; local libraries
+  lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_jane ppx_string ppx_deriving.make)))
+  (pps ppx_deriving.make ppx_jane ppx_mina ppx_string)))

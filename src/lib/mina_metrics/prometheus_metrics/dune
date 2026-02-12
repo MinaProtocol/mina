@@ -1,8 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (public_name mina_metrics.prometheus)
  (name mina_metrics_prometheus)
+ (public_name mina_metrics.prometheus)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   conduit-async
   ppx_hash.runtime-lib
   fmt
@@ -19,12 +23,12 @@
   uri
   async_unix
   base.caml
-  ;; local libraries
+  ; local libraries
   logger
   o1trace
   mina_node_config)
+ (implements mina_metrics)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_let ppx_version ppx_pipebang ppx_custom_printf ppx_here))
- (implements mina_metrics))
+  (pps ppx_mina ppx_let ppx_version ppx_pipebang ppx_custom_printf ppx_here)))

@@ -1,0 +1,40 @@
+name: Manifest check
+
+on:
+  pull_request:
+    paths:
+      - 'manifest/**'
+      - 'src/**/dune'
+      - '.github/workflows/manifest.yml'
+  push:
+    branches:
+      - compatible
+      - develop
+    paths:
+      - 'manifest/**'
+      - 'src/**/dune'
+
+permissions:
+  contents: read
+
+jobs:
+  manifest-check:
+    name: Check dune files match manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 4.14.2
+          dune-cache: true
+
+      - name: Build manifest
+        run: make manifest-build
+
+      - name: Check dune files
+        run: make manifest-check
+
+      - name: Run manifest tests
+        run: make manifest-test

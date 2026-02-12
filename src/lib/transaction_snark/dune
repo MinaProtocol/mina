@@ -1,17 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name transaction_snark)
  (public_name transaction_snark)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   async_unix
   bignum
   core
   splittable_random
-  ;; local libraries
+  ; local libraries
   bitstring_lib
   mina_stdlib
   cache_dir
@@ -60,6 +63,9 @@
   transaction_witness
   tuple_lib
   with_hash)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    h_list.ppx
@@ -69,6 +75,4 @@
    ppx_mina
    ppx_snarky
    ppx_version))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "Transaction state transition snarking library"))

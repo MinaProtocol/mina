@@ -1,9 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name sgn)
  (public_name sgn)
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   ppx_deriving_yojson.runtime
   core_kernel
   yojson
@@ -11,12 +14,15 @@
   base
   bin_prot.shape
   base.caml
-  ;; local libraries
+  ; local libraries
   snark_params
   sgn_type
   pickles
   snarky.backendless
   ppx_version.runtime)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_version
@@ -26,6 +32,4 @@
    ppx_hash
    ppx_compare
    ppx_deriving_yojson))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "sgn library"))

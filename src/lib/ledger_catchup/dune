@@ -1,17 +1,17 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name ledger_catchup)
  (public_name ledger_catchup)
  (inline_tests
   (flags -verbose -show-counts))
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_mina ppx_version ppx_jane))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   core
-  ;; local libraries
+  ; local libraries
   mina_stdlib
   mina_wire_types
   genesis_constants
@@ -58,4 +58,8 @@
   mina_net2
   internal_tracing
   mina_runtime_config
-  mina_compile_config))
+  mina_compile_config)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane)))

@@ -1,25 +1,29 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (package missing_blocks_auditor)
  (name missing_blocks_auditor)
  (public_name missing_blocks_auditor)
  (libraries
-  ;; opam libraries
-  core
-  async_kernel
-  uri
-  caqti-driver-postgresql
-  caqti
+  ; opam libraries
   async
-  core_kernel
-  caqti-async
-  base
-  async_unix
   async.async_command
-  ;; local libraries
+  async_kernel
+  async_unix
+  base
+  caqti
+  caqti-async
+  caqti-driver-postgresql
+  core
+  core_kernel
+  uri
+  ; local libraries
   logger
-  mina_stdlib
-  mina_caqti)
+  mina_caqti
+  mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_let)))
+  (pps ppx_let ppx_mina ppx_version)))

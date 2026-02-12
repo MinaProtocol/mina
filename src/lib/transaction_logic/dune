@@ -1,8 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name mina_transaction_logic)
  (public_name mina_transaction_logic)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async_kernel
   result
   bin_prot.shape
@@ -16,7 +20,7 @@
   base.base_internalhash_types
   integers
   base_quickcheck
-  ;; local libraries
+  ; local libraries
   mina_stdlib
   mina_wire_types
   block_time

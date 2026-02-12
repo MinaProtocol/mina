@@ -1,9 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (package archive_blocks)
  (name archive_blocks)
  (public_name archive_blocks)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   async.async_command
   async_kernel
@@ -18,13 +22,13 @@
   result
   stdio
   uri
-  ;; local libraries
+  ; local libraries
   archive_lib
-  mina_stdlib
   genesis_constants
   logger
-  mina_block)
+  mina_block
+  mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv)))
+  (pps ppx_compare ppx_hash ppx_let ppx_mina ppx_sexp_conv ppx_version)))

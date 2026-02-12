@@ -1,10 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name one_or_two)
  (public_name one_or_two)
  (flags :standard -short-paths)
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
   bin_prot.shape
   base
   async_kernel
@@ -13,6 +15,9 @@
   sexplib0
   base.caml
   ppx_version.runtime)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_base
@@ -20,6 +25,4 @@
    ppx_version
    ppx_deriving.std
    ppx_deriving_yojson
-   ppx_let))
- (instrumentation
-  (backend bisect_ppx)))
+   ppx_let)))

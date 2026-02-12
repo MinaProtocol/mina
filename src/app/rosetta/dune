@@ -1,3 +1,7 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (package rosetta)
  (name rosetta)
@@ -5,14 +9,16 @@
  (modules rosetta)
  (modes native)
  (libraries
-  lib
+  ; opam libraries
   async
-  core_kernel
-  base
   async.async_command
-  core
   async_kernel
-  genesis_constants)
+  base
+  core
+  core_kernel
+  ; local libraries
+  genesis_constants
+  lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -25,15 +31,17 @@
  (modules rosetta_testnet_signatures)
  (modes native)
  (libraries
-  lib
-  mina_signature_kind.testnet
+  ; opam libraries
   async
-  core_kernel
-  base
   async.async_command
-  core
   async_kernel
-  genesis_constants)
+  base
+  core
+  core_kernel
+  ; local libraries
+  genesis_constants
+  lib
+  mina_signature_kind.testnet)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -46,15 +54,17 @@
  (modules rosetta_mainnet_signatures)
  (modes native)
  (libraries
-  lib
-  mina_signature_kind.mainnet
+  ; opam libraries
   async
-  core_kernel
-  base
   async.async_command
-  core
   async_kernel
-  genesis_constants)
+  base
+  core
+  core_kernel
+  ; local libraries
+  genesis_constants
+  lib
+  mina_signature_kind.mainnet)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

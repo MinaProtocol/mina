@@ -1,16 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name transaction_witness)
  (public_name transaction_witness)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   base.caml
   bin_prot.shape
   sexplib0
   core_kernel
   core
-  ;; local libraries
+  ; local libraries
   currency
   signature_lib
   mina_ledger

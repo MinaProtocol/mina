@@ -1,26 +1,30 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name zkapps_initialize_state)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   base
   core_kernel
-  ;; local libraries
+  ; local libraries
   crypto_params
   currency
-  pasta_bindings
   kimchi_backend
   kimchi_backend_common
   kimchi_pasta
   kimchi_pasta.basic
   mina_base
+  pasta_bindings
   pickles
   pickles.backend
   pickles_types
   random_oracle
-  snarky.backendless
-  snark_params
   sgn
   signature_lib
+  snarky.backendless
+  snark_params
   tuple_lib
   zkapps_examples)
  (instrumentation

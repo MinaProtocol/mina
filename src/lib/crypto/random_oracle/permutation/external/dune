@@ -1,19 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name random_oracle_permutation_external)
  (public_name random_oracle.permutation.external)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_version ppx_inline_test ppx_assert))
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   ppx_inline_test.config
   base
   core_kernel
   sexplib0
-  ;; local libraries
+  ; local libraries
   sponge
   pickles
   pickles.backend
@@ -23,4 +23,8 @@
   kimchi_backend_common
   kimchi_pasta
   kimchi_pasta.basic)
- (implements random_oracle.permutation))
+ (implements random_oracle.permutation)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_inline_test ppx_assert)))

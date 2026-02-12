@@ -1,13 +1,16 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name zkapp_command_builder)
  (public_name zkapp_command_builder)
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async_kernel
   async_unix
   core_kernel
-  ;; local libraries
+  ; local libraries
   mina_base
   currency
   kimchi_backend
@@ -22,8 +25,9 @@
   sgn
   snark_params
   snarky.backendless)
- (preprocess
-  (pps ppx_jane ppx_annot ppx_snarky ppx_here ppx_mina ppx_version))
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_annot ppx_snarky ppx_here ppx_mina ppx_version))
  (synopsis "Builder Zkapp_command.t via combinators"))

@@ -1,8 +1,17 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name mina_incremental)
  (public_name mina_incremental)
+ (libraries
+  ; opam libraries
+  incremental
+  async_kernel
+  ; local libraries
+  pipe_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
- (libraries incremental pipe_lib async_kernel))
+  (pps ppx_version)))

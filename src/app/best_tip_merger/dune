@@ -1,49 +1,53 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (package best_tip_merger)
  (name best_tip_merger)
  (public_name best_tip_merger)
  (modes native)
  (libraries
-  ;; opam libraries
+  ; opam libraries
+  async
   async.async_command
   async_kernel
-  stdio
-  base.caml
-  yojson
-  lib
-  core_kernel
-  async
-  ppx_deriving_yojson.runtime
-  core
-  sexplib0
-  result
-  base.base_internalhash_types
   async_unix
-  ;; local libraries
-  visualization
+  base.base_internalhash_types
+  base.caml
+  core
+  core_kernel
+  lib
+  ppx_deriving_yojson.runtime
+  result
+  sexplib0
+  stdio
+  yojson
+  ; local libraries
+  cli_lib
+  consensus
+  data_hash_lib
+  kimchi_pasta
+  logger
+  logger.file_system
+  mina_base
   mina_numbers
   mina_state
-  transition_frontier_extensions
-  mina_base
-  logger.file_system
-  logger
-  cli_lib
-  transition_frontier
-  data_hash_lib
   mina_stdlib
-  consensus
   mina_wire_types
+  pickles
   pickles.backend
   snark_params
-  pickles
-  kimchi_pasta)
+  transition_frontier
+  transition_frontier_extensions
+  visualization)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_mina
+   ppx_compare
    ppx_deriving.show
    ppx_deriving_yojson
    ppx_jane
-   ppx_version
-   ppx_compare)))
+   ppx_mina
+   ppx_version)))

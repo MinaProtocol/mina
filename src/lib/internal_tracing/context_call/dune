@@ -1,17 +1,16 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name internal_tracing_context_call)
  (public_name internal_tracing.context_call)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
- (libraries
-  ;; opam libraries
-  base.base_internalhash_types
-  core_kernel
-  sexplib0
-  async_kernel)
- (preprocess
-  (pps ppx_jane ppx_mina ppx_version ppx_deriving_yojson))
+ (libraries base.base_internalhash_types core_kernel sexplib0 async_kernel)
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_mina ppx_version ppx_deriving_yojson))
  (synopsis "Internal tracing context call ID helper"))

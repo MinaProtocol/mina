@@ -1,11 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name unsigned_extended)
  (public_name unsigned_extended)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   base.caml
   result
   base
@@ -16,11 +19,14 @@
   base.base_internalhash_types
   bin_prot.shape
   ppx_inline_test.config
-  ;; local libraries
+  ; local libraries
   bignum_bigint
   snark_params
   test_util
   ppx_version.runtime)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_mina
@@ -32,6 +38,4 @@
    ppx_inline_test
    ppx_deriving.std
    ppx_deriving_yojson))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "Unsigned integer functions"))

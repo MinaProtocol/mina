@@ -1,12 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (package cli)
  (name mina)
  (public_name mina)
  (modules mina)
  (modes native)
- (flags
-  (:standard -warn-error +a))
- (libraries mina_cli_entrypoint disk_cache.lmdb)
+ (flags :standard -warn-error +a)
+ (libraries disk_cache.lmdb mina_cli_entrypoint)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -18,9 +21,8 @@
  (public_name mina-testnet)
  (modules mina_testnet_signatures)
  (modes native)
- (flags
-  (:standard -warn-error +a))
- (libraries mina_cli_entrypoint mina_signature_kind.testnet disk_cache.lmdb)
+ (flags :standard -warn-error +a)
+ (libraries disk_cache.lmdb mina_cli_entrypoint mina_signature_kind.testnet)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -32,9 +34,8 @@
  (public_name mina-mainnet)
  (modules mina_mainnet_signatures)
  (modes native)
- (flags
-  (:standard -warn-error +a))
- (libraries mina_cli_entrypoint mina_signature_kind.mainnet disk_cache.lmdb)
+ (flags :standard -warn-error +a)
+ (libraries disk_cache.lmdb mina_cli_entrypoint mina_signature_kind.mainnet)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

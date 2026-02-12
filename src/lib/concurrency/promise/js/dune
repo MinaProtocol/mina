@@ -1,11 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (public_name promise.js)
  (name promise_js)
- (js_of_ocaml
-  (javascript_files promise.js))
+ (public_name promise.js)
  (libraries base async_kernel)
+ (implements promise)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version))
- (implements promise))
+ (js_of_ocaml
+  (javascript_files promise.js)))

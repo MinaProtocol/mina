@@ -1,56 +1,60 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (package extract_blocks)
  (name extract_blocks)
  (public_name extract_blocks)
  (libraries
-  ;; opam libraries
+  ; opam libraries
+  async
+  async.async_command
+  async_kernel
   async_unix
   base
   base64
-  integers
+  caqti
   caqti-async
   caqti-driver-postgresql
-  async
   core_kernel
-  caqti
-  async_kernel
+  integers
   uri
-  async.async_command
-  ;; local libraries
+  ; local libraries
+  archive_lib
+  block_time
   consensus.vrf
-  mina_wire_types
-  mina_stdlib
-  mina_base
-  mina_base.import
+  currency
+  data_hash_lib
+  error_json
   kimchi_pasta
   kimchi_pasta.basic
+  logger
+  mina_base
+  mina_base.import
+  mina_caqti
+  mina_numbers
+  mina_stdlib
+  mina_transaction
+  mina_wire_types
   pasta_bindings
   pickles
-  pickles_types
   pickles.backend
-  archive_lib
-  data_hash_lib
-  signature_lib
-  logger
-  mina_caqti
-  block_time
-  mina_numbers
-  mina_transaction
+  pickles_types
   protocol_version
-  snark_params
-  currency
-  unsigned_extended
   sgn
-  with_hash
-  error_json)
+  signature_lib
+  snark_params
+  unsigned_extended
+  with_hash)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_version
-   ppx_mina
-   ppx_let
-   ppx_hash
+   h_list.ppx
    ppx_compare
+   ppx_hash
+   ppx_let
+   ppx_mina
    ppx_sexp_conv
-   h_list.ppx)))
+   ppx_version)))

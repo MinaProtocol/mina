@@ -1,17 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name vrf_lib_tests)
  (public_name vrf_lib_tests)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   core
   core_kernel
   ppx_inline_test.config
   sexplib0
   ppx_deriving.runtime
-  ;; local libraries
+  ; local libraries
   snark_params
   signature_lib
   snarky_curves
@@ -35,7 +38,8 @@
   snarky_field_extensions
   tuple_lib
   genesis_constants)
- (preprocess
-  (pps h_list.ppx ppx_bench ppx_compare ppx_jane ppx_version))
+ (library_flags -linkall)
  (instrumentation
-  (backend bisect_ppx)))
+  (backend bisect_ppx))
+ (preprocess
+  (pps h_list.ppx ppx_bench ppx_compare ppx_jane ppx_version)))

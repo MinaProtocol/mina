@@ -1,8 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name archive_lib)
  (public_name archive_lib)
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-  ;;opam libraries
+  ; opam libraries
   async
   async.async_rpc
   async_kernel
@@ -23,9 +29,8 @@
   ppx_version.runtime
   sexplib0
   uri
-  ;;local libraries
+  ; local libraries
   block_time
-  mina_stdlib
   child_processes
   coda_genesis_ledger
   consensus
@@ -51,6 +56,7 @@
   mina_numbers
   mina_runtime_config
   mina_state
+  mina_stdlib
   mina_transaction
   mina_wire_types
   o1trace
@@ -74,8 +80,6 @@
   verifier
   with_hash
   zkapp_command_builder)
- (inline_tests
-  (flags -verbose -show-counts))
  (modes native)
  (instrumentation
   (backend bisect_ppx --bisect-sigterm))

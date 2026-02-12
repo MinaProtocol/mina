@@ -1,6 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name random_oracle_input)
  (public_name random_oracle_input)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries core_kernel sexplib0 base.caml ppx_inline_test.config)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -10,7 +17,4 @@
    ppx_inline_test
    ppx_let
    ppx_version
-   ppx_deriving_yojson))
- (inline_tests
-  (flags -verbose -show-counts))
- (libraries core_kernel sexplib0 base.caml ppx_inline_test.config))
+   ppx_deriving_yojson)))

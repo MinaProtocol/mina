@@ -1,11 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name precomputed_values)
  (public_name precomputed_values)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   core
   core_kernel
-  ;; local libraries
+  ; local libraries
   genesis_constants
   mina_state
   coda_genesis_proof
@@ -18,8 +22,8 @@
   mina_runtime_config
   test_genesis_ledger
   staged_ledger_diff)
- (ppx_runtime_libraries base)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))
- (instrumentation
-  (backend bisect_ppx)))
+ (ppx_runtime_libraries base))

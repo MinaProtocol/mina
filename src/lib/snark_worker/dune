@@ -1,9 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name snark_worker)
  (public_name snark_worker)
- (library_flags -linkall)
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   async.async_command
   async.async_rpc
@@ -21,7 +24,7 @@
   ppx_version.runtime
   result
   sexplib0
-  ;; local libraries
+  ; local libraries
   mina_stdlib
   cli_lib
   currency
@@ -46,6 +49,9 @@
   transaction_snark
   transaction_snark_work
   transaction_witness)
+ (library_flags -linkall)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps
    ppx_bin_prot
@@ -58,6 +64,4 @@
    ppx_register_event
    ppx_sexp_conv
    ppx_version))
- (instrumentation
-  (backend bisect_ppx))
  (synopsis "Lib powering the snark_worker interactions with the daemon"))

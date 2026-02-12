@@ -1,10 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name hash_prefix_create)
  (public_name hash_prefix_create)
  (libraries hash_prefixes random_oracle)
+ (virtual_modules hash_prefix_create)
+ (default_implementation hash_prefix_create.native)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
- (virtual_modules hash_prefix_create)
- (default_implementation hash_prefix_create.native))
+  (pps ppx_version)))

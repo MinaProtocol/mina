@@ -1,12 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name perf_histograms)
  (public_name perf_histograms)
- (library_flags -linkall)
- (modules perf_histograms0 perf_histograms histogram rpc intf)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   ppx_inline_test.config
   bin_prot.shape
   async_rpc_kernel
@@ -18,10 +20,12 @@
   async.async_rpc
   base.caml
   async_kernel
-  ;; local libraries
+  ; local libraries
   mina_metrics)
- (preprocess
-  (pps ppx_version ppx_jane ppx_compare ppx_deriving_yojson))
+ (library_flags -linkall)
  (instrumentation
   (backend bisect_ppx))
- (synopsis "Performance monitoring with histograms"))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_compare ppx_deriving_yojson))
+ (synopsis "Performance monitoring with histograms")
+ (modules perf_histograms0 perf_histograms histogram rpc intf))

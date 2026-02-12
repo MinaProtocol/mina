@@ -1,14 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (public_name disk_cache.identity)
  (name disk_cache_identity)
- (implements disk_cache)
- (libraries
-  ;; opam libraries
-  async_kernel
-  core_kernel)
- (preprocess
-  (pps ppx_version ppx_jane))
+ (public_name disk_cache.identity)
  (inline_tests
   (flags -verbose -show-counts))
+ (libraries async_kernel core_kernel)
+ (implements disk_cache)
  (instrumentation
-  (backend bisect_ppx)))
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))

@@ -1,8 +1,16 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name key_gen)
  (public_name key_gen)
+ (libraries
+  ; opam libraries
+  core_kernel
+  ; local libraries
+  signature_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
- (libraries core_kernel signature_lib))
+  (pps ppx_version)))

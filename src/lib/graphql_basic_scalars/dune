@@ -1,13 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
  (name graphql_basic_scalars)
  (public_name graphql_basic_scalars)
- ;; This should be removed when the effort of moving from inline tests to
- ;; alcotest is finished. The library in graphql_lib still uses Make_test and
- ;; relies on an inline test definition in testing.ml.
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   async
   async_unix
   async_kernel
@@ -19,7 +20,7 @@
   graphql_parser
   yojson
   sexplib0
-  ;; local libraries
+  ; local libraries
   base_quickcheck
   graphql_wrapper
   quickcheck_lib
@@ -27,4 +28,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_version)))
+  (pps ppx_version ppx_jane)))

@@ -1,50 +1,55 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
  (name delegation_verify)
  (libraries
-  core_kernel
+  ; opam libraries
   async
+  async.async_command
   async_kernel
   async_unix
-  core
-  stdio
   base
   base.caml
-  ppx_deriving_yojson.runtime
-  yojson
   base64
-  integers
-  async.async_command
-  sexplib0
-  sexplib
+  core
+  core_kernel
   hex
-  ; mina libs
-  signature_lib
-  mina_block
-  transaction_snark
+  integers
+  ppx_deriving_yojson.runtime
+  sexplib
+  sexplib0
+  stdio
+  yojson
+  ; local libraries
   blockchain_snark
-  mina_base
-  genesis_constants
-  uptime_service
-  currency
-  ledger_proof
-  mina_base.import
-  mina_state
-  mina_wire_types
   consensus
+  currency
   data_hash_lib
-  mina_numbers
-  snark_params
+  genesis_constants
+  genesis_ledger_helper
   kimchi_pasta
   kimchi_pasta.basic
+  ledger_proof
+  logger
+  mina_base
+  mina_base.import
+  mina_block
+  mina_numbers
+  mina_runtime_config
+  mina_state
+  mina_wire_types
   pasta_bindings
   pickles
-  pickles_types
   pickles.backend
-  genesis_ledger_helper
-  mina_runtime_config
+  pickles_types
   precomputed_values
-  logger)
+  signature_lib
+  snark_params
+  transaction_snark
+  uptime_service)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx)))
+  (pps h_list.ppx ppx_custom_printf ppx_jane ppx_mina ppx_version)))

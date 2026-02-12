@@ -1,36 +1,40 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (executable
- (name batch_txn_tool)
  (package mina_batch_txn)
+ (name batch_txn_tool)
  (public_name mina-batch-txn)
  (libraries
-  ;; opam libraries
-  async.async_command
-  integers
-  base
-  uri
-  core_kernel
-  core
+  ; opam libraries
   async
+  async.async_command
   async_kernel
-  yojson
   async_unix
-  ;; local libraries
+  base
+  core
+  core_kernel
+  integers
+  uri
+  yojson
+  ; local libraries
   currency
-  mina_base.import
   graphql_lib
-  signature_lib
-  mina_base
-  secrets
-  mina_numbers
-  snark_params
-  unsigned_extended
-  mina_compile_config
-  mina_wire_types
   integration_test_lib
   logger
-  mina_stdlib)
+  mina_base
+  mina_base.import
+  mina_compile_config
+  mina_numbers
+  mina_stdlib
+  mina_wire_types
+  secrets
+  signature_lib
+  snark_params
+  unsigned_extended)
  (instrumentation
   (backend bisect_ppx))
  (preprocessor_deps ../../../graphql_schema.json)
  (preprocess
-  (pps ppx_version ppx_let ppx_mina)))
+  (pps ppx_let ppx_mina ppx_version)))

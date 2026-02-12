@@ -1,10 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit the manifest in manifest/product_mina.ml and run
+; manifest/main.exe to update.
+
 (library
- (public_name genesis_ledger_helper)
  (name genesis_ledger_helper)
+ (public_name genesis_ledger_helper)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
-  ;; opam libraries
+  ; opam libraries
   ppx_inline_test.config
   core_kernel.uuid
   async_unix
@@ -16,7 +20,7 @@
   base.caml
   sexplib0
   digestif
-  ;; local libraries
+  ; local libraries
   mina_ledger
   with_hash
   mina_stdlib
