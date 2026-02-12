@@ -64,7 +64,7 @@ let Spec =
           , use_artifacts_from_buildkite_build = None Text
           , hardfork_shift_slot_delta = None Natural
           , size = Size.XLarge
-          , mina_create_legacy_genesis_version = "3.3.0-compatible-560d3a9"
+          , mina_create_legacy_genesis_version = "3.3.0-2b689c8"
           }
       }
 

@@ -49,7 +49,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-APP_NAME="mina-$NETWORK-pre-hardfork-mesa"
+APP_NAME="mina-create-legacy-genesis"
 
 if [ -z "$NETWORK" ] || [ -z "$CODENAME" ]; then
   echo "Usage: $0 --network <network> [--version <version>] --codename <codename>"
