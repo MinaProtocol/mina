@@ -67,6 +67,7 @@ ARG RUST_NIGHTLY=2024-09-05
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN CODENAME=$(grep "VERSION_CODENAME" /etc/os-release | cut -d= -f2); \
   case "${CODENAME}" in \
     bookworm) LIBSSL="libssl-dev"; LIBPROCPS="libproc2-0" ;; \
