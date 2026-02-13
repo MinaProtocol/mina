@@ -183,7 +183,8 @@ let compute_completed_work ~proof_level ~proof_cache_db ~signature_kind
     |> Result.of_option ~error:(Error.of_string "state not found")
   in
   let work_specs =
-    Staged_ledger.all_work_pairs staged_ledger ~get_state |> Or_error.ok_exn
+    Staged_ledger.work_pairs_for_new_diff staged_ledger ~get_state
+    |> Or_error.ok_exn
   in
   let sok_digest = Sok_message.Digest.default in
   let%map proved_work =
