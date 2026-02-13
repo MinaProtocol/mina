@@ -372,12 +372,20 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
     Frontier_base.Breadcrumb.staged_ledger previous
   in
   let prover = Public_key.compress slot_won.producer.public_key in
+  let get_state hash =
+    State_hash.Map.find protocol_states hash
+    |> Result.of_option ~error:(Error.of_string "state not found")
+  in
+  let work_specs =
+    Staged_ledger.work_pairs_for_new_diff previous_staged_ledger ~get_state
+    |> Or_error.ok_exn
+  in
   let%bind get_completed_work =
     Snark_work.compute
       ~proof_level:precomputed_values.Precomputed_values.proof_level
-      ~proof_cache_db ~signature_kind ~logger ~protocol_states ~prover
+      ~proof_cache_db ~signature_kind ~logger ~prover
       (module Keys.T)
-      previous_staged_ledger
+      work_specs
   in
   let%bind ( protocol_state
            , internal_transition

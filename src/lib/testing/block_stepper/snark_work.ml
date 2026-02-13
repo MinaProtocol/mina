@@ -98,17 +98,8 @@ let prove_single ~proof_level ~proof_cache_db ~signature_kind ~sok_digest
           in
           Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof )
 
-let compute ~proof_level ~proof_cache_db ~signature_kind ~logger
-    ~protocol_states ~prover (module T : Transaction_snark.S)
-    (staged_ledger : Staged_ledger.t) =
-  let get_state hash =
-    State_hash.Map.find protocol_states hash
-    |> Result.of_option ~error:(Error.of_string "state not found")
-  in
-  let work_specs =
-    Staged_ledger.work_pairs_for_new_diff staged_ledger ~get_state
-    |> Or_error.ok_exn
-  in
+let compute ~proof_level ~proof_cache_db ~signature_kind ~logger ~prover
+    (module T : Transaction_snark.S) work_specs =
   let sok_digest = Sok_message.Digest.default in
   let%map proved_work =
     Deferred.List.map work_specs ~how:`Sequential ~f:(fun one_or_two ->
