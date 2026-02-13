@@ -271,7 +271,7 @@ let create_genesis_breadcrumb ~logger ~precomputed_values () =
     ~just_emitted_a_proof:false ~accounts_created
 
 let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
-    ~precomputed_values ~n_slots ~keypair ~start_slot
+    ~precomputed_values ~n_slots ~keypair ~start_slot ~epoch_ledger_location
     (breadcrumb : Frontier_base.Breadcrumb.t) =
   let public_key_compressed = Public_key.compress keypair.Keypair.public_key in
   let logger = Context.logger in
@@ -282,7 +282,7 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
       ~context:(module Context)
       ~genesis_ledger:precomputed_values.Precomputed_values.genesis_ledger
       ~genesis_epoch_data:precomputed_values.genesis_epoch_data
-      ~epoch_ledger_location:"epoch_ledger"
+      ~epoch_ledger_location
       (Public_key.Compressed.Set.singleton public_key_compressed)
       ~genesis_state_hash:
         precomputed_values.protocol_state_with_hashes.hash.state_hash
@@ -491,7 +491,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
   >>| Or_error.ok_exn
 
 let initialize_verifier_and_components ~logger
-    ~(precomputed_values : Precomputed_values.t) =
+    ~(precomputed_values : Precomputed_values.t) ~conf_dir =
   let signature_kind = precomputed_values.signature_kind in
   let module Context = struct
     let logger = logger
@@ -511,13 +511,19 @@ let initialize_verifier_and_components ~logger
     Lazy.force Keys.B.Proof.verification_key
   in
   let%bind transaction_verification_key = Lazy.force Keys.T.verification_key in
-  let%bind cwd = Sys.getcwd () in
+  let%bind verifier_dir =
+    match conf_dir with
+    | Some dir ->
+        return (Filename.concat dir "verifier")
+    | None ->
+        let%map cwd = Sys.getcwd () in
+        Filename.concat cwd "verifier"
+  in
   let%map verifier =
     Verifier.create ~logger ~commit_id:"" ~blockchain_verification_key
       ~transaction_verification_key ~proof_level:precomputed_values.proof_level
       ~pids:(Child_processes.Termination.create_pid_table ())
-      ~conf_dir:(Some (Filename.concat cwd "verifier"))
-      ~signature_kind ()
+      ~conf_dir:(Some verifier_dir) ~signature_kind ()
   in
   ((module Context : Consensus.Intf.CONTEXT), (module Keys : Keys_S), verifier)
 
@@ -536,6 +542,7 @@ type t =
   ; next_search_slot : int
   ; proof_cache_db : Proof_cache_tag.cache_db
   ; protocol_states : Protocol_state.value State_hash.Map.t
+  ; epoch_ledger_location : string
   }
 
 type start_state =
@@ -559,15 +566,23 @@ let precomputed_values t = t.precomputed_values
 
 let verifier t = t.verifier
 
-let create ~precomputed_values ~keypair ~start ~logger ?(n_slots = 100) () =
+let create ~precomputed_values ~keypair ~start ~logger ?conf_dir
+    ?(n_slots = 100) () =
   let start_block = start.breadcrumb in
+  let epoch_ledger_location =
+    match conf_dir with
+    | Some dir ->
+        Filename.concat dir "epoch_ledger"
+    | None ->
+        "epoch_ledger"
+  in
   let%bind context, keys_module, verifier =
-    initialize_verifier_and_components ~logger ~precomputed_values
+    initialize_verifier_and_components ~logger ~precomputed_values ~conf_dir
   in
   [%log info] "Computing VRF to find %d winning slots" n_slots ;
   let%map remaining_winning_slots, next_search_slot =
     find_winning_slots ~context ~precomputed_values ~n_slots ~keypair
-      ~start_slot:1 start_block
+      ~start_slot:1 ~epoch_ledger_location start_block
   in
   [%log info] "Found %d winning slots" (List.length remaining_winning_slots) ;
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
@@ -582,6 +597,7 @@ let create ~precomputed_values ~keypair ~start ~logger ?(n_slots = 100) () =
   ; next_search_slot
   ; proof_cache_db
   ; protocol_states = start.protocol_states
+  ; epoch_ledger_location
   }
 
 let step t ~transactions =
@@ -599,7 +615,8 @@ let step t ~transactions =
         let%map remaining_winning_slots, next_search_slot =
           find_winning_slots ~context:t.context
             ~precomputed_values:t.precomputed_values ~n_slots ~keypair:t.keypair
-            ~start_slot:t.next_search_slot t.current
+            ~start_slot:t.next_search_slot
+            ~epoch_ledger_location:t.epoch_ledger_location t.current
         in
         { t with remaining_winning_slots; next_search_slot }
   in

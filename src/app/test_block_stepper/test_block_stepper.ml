@@ -8,7 +8,7 @@ let blockchain_of_breadcrumb breadcrumb =
     ~state:(Mina_block.Header.protocol_state header)
     ~proof:(Mina_block.Header.protocol_state_proof header)
 
-let load_and_initialize_config ~logger ~config_file =
+let load_and_initialize_config ~logger ~config_file ~genesis_dir =
   let%bind runtime_config_json =
     Genesis_ledger_helper.load_config_json config_file >>| Or_error.ok_exn
   in
@@ -22,12 +22,12 @@ let load_and_initialize_config ~logger ~config_file =
   let proof_level = Genesis_constants.Compiled.proof_level in
   Genesis_ledger_helper.init_from_config_file ~genesis_constants
     ~constraint_constants ~logger ~proof_level ~cli_proof_level:None
-    ~genesis_dir:"genesis" runtime_config
+    ~genesis_dir runtime_config
   >>| Or_error.ok_exn
 
-let run ~logger ~keypair ~config_file ~num_blocks =
+let run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~conf_dir =
   let%bind precomputed_values =
-    load_and_initialize_config ~logger ~config_file
+    load_and_initialize_config ~logger ~config_file ~genesis_dir
   in
   [%log info] "Creating genesis breadcrumb (this involves proving)" ;
   let%bind genesis_breadcrumb =
@@ -37,7 +37,8 @@ let run ~logger ~keypair ~config_file ~num_blocks =
   let start = Block_stepper.start_state_of_genesis genesis_breadcrumb in
   [%log info] "Initializing block stepper" ;
   let%bind stepper =
-    Block_stepper.create ~precomputed_values ~keypair ~start ~logger ()
+    Block_stepper.create ~precomputed_values ~keypair ~start ~logger ?conf_dir
+      ()
   in
   let verifier = Block_stepper.verifier stepper in
   [%log info] "Verifying genesis block proof" ;
@@ -102,11 +103,41 @@ let command =
       flag "--num-blocks"
         ~doc:"NUM Number of blocks to generate and verify (default: 3)"
         (optional_with_default 3 int)
+    and working_dir =
+      flag "--working-dir"
+        ~doc:
+          "DIR Directory for all stepper state (verifier, epoch ledger, \
+           internal tracing). Created if absent."
+        (optional string)
+    and genesis_ledger_dir =
+      flag "--genesis-ledger-dir"
+        ~doc:
+          "DIR Directory containing genesis ledger tarballs (default: \
+           \"genesis\")"
+        (optional string)
     in
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let logger = Logger.create ~id:Logger.Logger_id.mina () in
+    let conf_dir = working_dir in
+    let genesis_dir =
+      match (genesis_ledger_dir, working_dir) with
+      | Some dir, _ ->
+          dir
+      | None, Some dir ->
+          dir
+      | None, None ->
+          "genesis"
+    in
+    let%bind () =
+      match working_dir with
+      | Some dir ->
+          let%map () = Unix.mkdir ~p:() dir in
+          ()
+      | None ->
+          return ()
+    in
     [%log info] "Starting block stepper verification test"
       ~metadata:
         [ ("config_file", `String config_file)
@@ -124,11 +155,18 @@ let command =
       ~id:Logger.Logger_id.mina ~processor:log_processor
       ~transport:(Logger.Transport.stdout ())
       () ;
+    let internal_tracing_directory =
+      match working_dir with
+      | Some dir ->
+          Filename.concat dir "internal-tracing"
+      | None ->
+          "internal-tracing"
+    in
     Logger.Consumer_registry.register ~commit_id:"" ~id:Logger.Logger_id.mina
       ~processor:Internal_tracing.For_logger.processor
       ~transport:
         (Internal_tracing.For_logger.json_lines_rotate_transport
-           ~directory:"internal-tracing" () )
+           ~directory:internal_tracing_directory () )
       () ;
     let%bind () = Internal_tracing.toggle ~commit_id:"" ~logger `Enabled in
     [%log info] "Loading keypair from %s" privkey_path ;
@@ -136,6 +174,6 @@ let command =
       Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair" privkey_path
     in
     Parallel.init_master () ;
-    run ~logger ~keypair ~config_file ~num_blocks)
+    run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~conf_dir)
 
 let () = Command.run command

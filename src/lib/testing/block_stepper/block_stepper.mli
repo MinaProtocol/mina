@@ -34,6 +34,7 @@ val create :
   -> keypair:Keypair.t
   -> start:start_state
   -> logger:Logger.t
+  -> ?conf_dir:string
   -> ?n_slots:int
   -> unit
   -> t Deferred.t
