@@ -41,6 +41,17 @@ module Stable = struct
   end
 end]
 
+module Serializable_type = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t = User_command.Serializable_type.Stable.V2.t Poly.Stable.V2.t
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 type t = User_command.t Poly.t [@@deriving sexp_of, to_yojson]
 
 type ('a, 'b, 'c) with_forest = ('a, 'b, 'c) User_command.with_forest Poly.t

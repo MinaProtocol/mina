@@ -82,6 +82,19 @@ module Pre_diff_with_at_most_two_coinbase : sig
 
     module Latest = V2
   end
+
+  module Serializable_type : sig
+    [%%versioned:
+    module Stable : sig
+      module V2 : sig
+        type t =
+          ( Transaction_snark_work.Serializable_type.Stable.V2.t
+          , User_command.Serializable_type.Stable.V2.t With_status.Stable.V2.t
+          )
+          Pre_diff_two.Stable.V2.t
+      end
+    end]
+  end
 end
 
 module Pre_diff_with_at_most_one_coinbase : sig
@@ -100,6 +113,19 @@ module Pre_diff_with_at_most_one_coinbase : sig
     end
 
     module Latest = V2
+  end
+
+  module Serializable_type : sig
+    [%%versioned:
+    module Stable : sig
+      module V2 : sig
+        type t =
+          ( Transaction_snark_work.Serializable_type.Stable.V2.t
+          , User_command.Serializable_type.Stable.V2.t With_status.Stable.V2.t
+          )
+          Pre_diff_one.Stable.V2.t
+      end
+    end]
   end
 end
 
@@ -126,6 +152,24 @@ module Diff : sig
     module Latest = V2
   end
 
+  module Serializable_type : sig
+    [%%versioned:
+    module Stable : sig
+      module V2 : sig
+        type t =
+          Pre_diff_with_at_most_two_coinbase.Serializable_type.Stable.V2.t
+          * Pre_diff_with_at_most_one_coinbase.Serializable_type.Stable.V2.t
+            option
+      end
+    end]
+
+    val coinbase :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> supercharge_coinbase:bool
+      -> t
+      -> Currency.Amount.t option
+  end
+
   val coinbase :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> supercharge_coinbase:bool
@@ -150,6 +194,17 @@ module Stable : sig
   module Latest = V2
 end
 
+module Serializable_type : sig
+  [%%versioned:
+  module Stable : sig
+    module V2 : sig
+      type t = { diff : Diff.Serializable_type.Stable.V2.t }
+    end
+  end]
+
+  val empty_diff : t
+end
+
 val write_all_proofs_to_disk :
      signature_kind:Mina_signature_kind.t
   -> proof_cache_db:Proof_cache_tag.cache_db
@@ -157,6 +212,8 @@ val write_all_proofs_to_disk :
   -> t
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+val to_serializable_type : t -> Serializable_type.t
 
 module With_valid_signatures_and_proofs : sig
   type pre_diff_with_at_most_two_coinbase =

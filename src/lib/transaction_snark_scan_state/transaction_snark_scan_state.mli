@@ -15,6 +15,21 @@ module Stable : sig
   end
 end]
 
+module Serializable_type : sig
+  type raw_serializable := Stable.Latest.t
+
+  [%%versioned:
+  module Stable : sig
+    module V2 : sig
+      type t
+
+      val hash : t -> Staged_ledger_hash.Aux_hash.t
+    end
+  end]
+
+  val to_raw_serializable : Stable.Latest.t -> raw_serializable
+end
+
 type t
 
 module Transaction_with_witness : sig
@@ -229,3 +244,5 @@ val write_all_proofs_to_disk :
   -> t
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+val to_serializable_type : t -> Serializable_type.Stable.Latest.t

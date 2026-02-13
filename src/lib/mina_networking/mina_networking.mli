@@ -53,7 +53,7 @@ module Rpcs : sig
     type query = State_hash.t
 
     type response =
-      ( Staged_ledger.Scan_state.Stable.Latest.t
+      ( Staged_ledger.Scan_state.Serializable_type.Stable.Latest.t
       * Ledger_hash.t
       * Pending_coinbase.t
       * Mina_state.Protocol_state.value list )

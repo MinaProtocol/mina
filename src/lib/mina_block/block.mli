@@ -19,6 +19,24 @@ module Stable : sig
   end
 end]
 
+module Serializable_type : sig
+  [%%versioned:
+  module Stable : sig
+    module V2 : sig
+      type t
+
+      val header : t -> Header.Stable.V2.t
+
+      val body : t -> Staged_ledger_diff.Body.Serializable_type.t
+
+      val transactions :
+           constraint_constants:Genesis_constants.Constraint_constants.t
+        -> t
+        -> Transaction.Serializable_type.t With_status.t list
+    end
+  end]
+end
+
 type t
 
 val to_logging_yojson : Header.t -> Yojson.Safe.t
@@ -58,3 +76,5 @@ val write_all_proofs_to_disk :
   -> t
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+val to_serializable_type : t -> Serializable_type.t

@@ -47,6 +47,57 @@ module Transaction_with_witness = struct
     end
   end]
 
+  module Serializable_type = struct
+    type raw_serializable = Stable.Latest.t
+
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          { transaction_with_info :
+              Mina_transaction_logic.Transaction_applied.Serializable_type
+              .Stable
+              .V2
+              .t
+          ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
+          ; statement : Transaction_snark.Statement.Stable.V2.t
+          ; init_stack :
+              Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable
+              .V1
+              .t
+          ; first_pass_ledger_witness :
+              (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+          ; second_pass_ledger_witness :
+              (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+          ; block_global_slot :
+              Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+          }
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let to_raw_serializable
+        { transaction_with_info
+        ; state_hash
+        ; statement
+        ; init_stack
+        ; first_pass_ledger_witness
+        ; second_pass_ledger_witness
+        ; block_global_slot
+        } : raw_serializable =
+      { transaction_with_info =
+          Mina_transaction_logic.Transaction_applied.Serializable_type
+          .to_raw_serializable transaction_with_info
+      ; state_hash
+      ; statement
+      ; init_stack
+      ; first_pass_ledger_witness
+      ; second_pass_ledger_witness
+      ; block_global_slot
+      }
+  end
+
   type t =
     { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
     ; state_hash : State_hash.t * State_body_hash.t
@@ -96,6 +147,26 @@ module Transaction_with_witness = struct
     ; second_pass_ledger_witness
     ; block_global_slot
     }
+
+  let to_serializable_type
+      { transaction_with_info
+      ; state_hash
+      ; statement
+      ; init_stack
+      ; first_pass_ledger_witness
+      ; second_pass_ledger_witness
+      ; block_global_slot
+      } : Serializable_type.t =
+    { transaction_with_info =
+        Mina_transaction_logic.Transaction_applied.to_serializable_type
+          transaction_with_info
+    ; state_hash
+    ; statement
+    ; init_stack
+    ; first_pass_ledger_witness
+    ; second_pass_ledger_witness
+    ; block_global_slot
+    }
 end
 
 module Ledger_proof_with_sok_message = struct
@@ -110,6 +181,18 @@ module Ledger_proof_with_sok_message = struct
       let to_latest = Fn.id
     end
   end]
+
+  module Serializable_type = struct
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          Ledger_proof.Serializable_type.Stable.V2.t * Sok_message.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
 
   type t = Ledger_proof.Cached.t * Sok_message.t
 end
@@ -240,6 +323,74 @@ module Stable = struct
       |> Digestif.SHA256.get |> Staged_ledger_hash.Aux_hash.of_sha256
   end
 end]
+
+module Serializable_type = struct
+  type raw_serializable = Stable.Latest.t
+
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t =
+        { scan_state :
+            ( Ledger_proof_with_sok_message.Serializable_type.Stable.V2.t
+            , Transaction_with_witness.Serializable_type.Stable.V2.t )
+            Parallel_scan.State.Stable.V1.t
+        ; previous_incomplete_zkapp_updates :
+            Transaction_with_witness.Serializable_type.Stable.V2.t list
+            * [ `Border_block_continued_in_the_next_tree of bool ]
+        }
+
+      let to_latest = Fn.id
+
+      let hash (t : t) =
+        let state_hash =
+          Parallel_scan.State.hash t.scan_state
+            (Binable.to_string
+               (module Ledger_proof_with_sok_message.Serializable_type.Stable.V2) )
+            (Binable.to_string
+               (module Transaction_with_witness.Serializable_type.Stable.V2) )
+        in
+        let ( previous_incomplete_zkapp_updates
+            , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
+          t.previous_incomplete_zkapp_updates
+        in
+        let incomplete_updates =
+          List.fold ~init:(Digestif.SHA256.init ())
+            previous_incomplete_zkapp_updates ~f:(fun h t ->
+              Digestif.SHA256.feed_string h
+              @@ Binable.to_string
+                   (module Transaction_with_witness.Serializable_type.Stable.V2)
+                   t )
+          |> Digestif.SHA256.get
+        in
+        let continue_in_next_tree =
+          Digestif.SHA256.digest_string (Bool.to_string continue_in_next_tree)
+        in
+        [ state_hash; incomplete_updates; continue_in_next_tree ]
+        |> List.fold ~init:(Digestif.SHA256.init ()) ~f:(fun h t ->
+               Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string t) )
+        |> Digestif.SHA256.get |> Staged_ledger_hash.Aux_hash.of_sha256
+    end
+  end]
+
+  let to_raw_serializable : Stable.Latest.t -> raw_serializable =
+   fun { scan_state
+       ; previous_incomplete_zkapp_updates = tx_list, border_status
+       } ->
+    let f1 (p, v) = (Ledger_proof.Serializable_type.to_raw_serializable p, v) in
+    let scan_state =
+      Parallel_scan.State.map ~f1
+        ~f2:Transaction_with_witness.Serializable_type.to_raw_serializable
+        scan_state
+    in
+    { scan_state
+    ; previous_incomplete_zkapp_updates =
+        ( List.map
+            ~f:Transaction_with_witness.Serializable_type.to_raw_serializable
+            tx_list
+        , border_status )
+    }
+end
 
 type t =
   { scan_state :
@@ -1500,3 +1651,16 @@ let read_all_proofs_from_disk
         ( List.map ~f:Transaction_with_witness.read_all_proofs_from_disk tx_list
         , border_status )
     }
+
+let to_serializable_type : t -> Serializable_type.Stable.Latest.t =
+ fun { scan_state; previous_incomplete_zkapp_updates = tx_list, border_status } ->
+  let f1 (p, v) = (Ledger_proof.Cached.to_serializable_type p, v) in
+  let scan_state =
+    Parallel_scan.State.map ~f1
+      ~f2:Transaction_with_witness.to_serializable_type scan_state
+  in
+  { scan_state
+  ; previous_incomplete_zkapp_updates =
+      ( List.map ~f:Transaction_with_witness.to_serializable_type tx_list
+      , border_status )
+  }

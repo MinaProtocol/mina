@@ -87,6 +87,29 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end]
 
+  module Serializable_type = struct
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          ( Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
+          , Proof_cache_tag.Serializable_type.Stable.V2.t )
+          Proof_carrying_data.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let create ~statement ~proof : t =
+      { Proof_carrying_data.data = statement; proof }
+
+    let statement (t : t) = { t.data with sok_digest = () }
+
+    let to_raw_serializable =
+      Proof_carrying_data.map_proof
+        ~f:Proof_cache_tag.Serializable_type.to_proof
+  end
+
   let proof t = t.Proof_carrying_data.proof
 
   let statement

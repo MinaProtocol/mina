@@ -414,7 +414,8 @@ module T = struct
       ; pending_coinbase_collection
       } : Staged_ledger_hash.t =
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-      Scan_state.(Stable.Latest.hash @@ read_all_proofs_from_disk scan_state)
+      Scan_state.(
+        Serializable_type.Stable.Latest.hash @@ to_serializable_type scan_state)
       (Ledger.merkle_root ledger)
       pending_coinbase_collection
 

@@ -69,6 +69,35 @@ module Zkapp_command_applied = struct
     end
   end]
 
+  module Serializable_type = struct
+    type raw_serializable = Stable.Latest.t
+
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          { accounts :
+              (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
+          ; command :
+              Zkapp_command.Serializable_type.Stable.V1.t
+              With_status.Stable.V2.t
+          ; new_accounts : Account_id.Stable.V2.t list
+          }
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let to_raw_serializable : t -> raw_serializable =
+     fun { accounts; command; new_accounts } ->
+      { accounts
+      ; command =
+          With_status.map ~f:Zkapp_command.Serializable_type.to_raw_serializable
+            command
+      ; new_accounts
+      }
+  end
+
   type t =
     { accounts : (Account_id.t * Account.t option) list
     ; command : Zkapp_command.t With_status.t
@@ -94,6 +123,13 @@ module Zkapp_command_applied = struct
         With_status.map ~f:Zkapp_command.read_all_proofs_from_disk command
     ; new_accounts
     }
+
+  let to_serializable_type : t -> Serializable_type.t =
+   fun { accounts; command; new_accounts } ->
+    { accounts
+    ; command = With_status.map ~f:Zkapp_command.to_serializable_type command
+    ; new_accounts
+    }
 end
 
 module Command_applied = struct
@@ -110,6 +146,29 @@ module Command_applied = struct
       let to_latest = Fn.id
     end
   end]
+
+  module Serializable_type = struct
+    type toplevel = Stable.Latest.t
+
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          | Signed_command of Signed_command_applied.Stable.V2.t
+          | Zkapp_command of Zkapp_command_applied.Serializable_type.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let to_raw_serializable : t -> toplevel = function
+      | Signed_command signed_command ->
+          Signed_command signed_command
+      | Zkapp_command zkapp_command ->
+          Zkapp_command
+            (Zkapp_command_applied.Serializable_type.to_raw_serializable
+               zkapp_command )
+  end
 
   type t =
     | Signed_command of Signed_command_applied.t
@@ -129,6 +188,12 @@ module Command_applied = struct
         Signed_command c
     | Zkapp_command c ->
         Zkapp_command (Zkapp_command_applied.read_all_proofs_from_disk c)
+
+  let to_serializable_type : t -> Serializable_type.t = function
+    | Signed_command signed_command ->
+        Signed_command signed_command
+    | Zkapp_command zkapp_command ->
+        Zkapp_command (Zkapp_command_applied.to_serializable_type zkapp_command)
 end
 
 module Fee_transfer_applied = struct
@@ -173,6 +238,19 @@ module Varying : sig
     end
   end]
 
+  module Serializable_type : sig
+    type raw_serializable := Stable.Latest.t
+
+    [%%versioned:
+    module Stable : sig
+      module V2 : sig
+        type t
+      end
+    end]
+
+    val to_raw_serializable : t -> raw_serializable
+  end
+
   type t =
     | Command of Command_applied.t
     | Fee_transfer of Fee_transfer_applied.t
@@ -185,6 +263,8 @@ module Varying : sig
     -> t
 
   val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+  val to_serializable_type : t -> Serializable_type.t
 end = struct
   [%%versioned
   module Stable = struct
@@ -200,6 +280,31 @@ end = struct
       let to_latest = Fn.id
     end
   end]
+
+  module Serializable_type = struct
+    type raw_serializable = Stable.Latest.t
+
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          | Command of Command_applied.Serializable_type.Stable.V2.t
+          | Fee_transfer of Fee_transfer_applied.Stable.V2.t
+          | Coinbase of Coinbase_applied.Stable.V2.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let to_raw_serializable : t -> raw_serializable = function
+      | Command command ->
+          Command
+            (Command_applied.Serializable_type.to_raw_serializable command)
+      | Fee_transfer fee_transfer ->
+          Fee_transfer fee_transfer
+      | Coinbase coinbase ->
+          Coinbase coinbase
+  end
 
   type t =
     | Command of Command_applied.t
@@ -224,6 +329,14 @@ end = struct
         Fee_transfer f
     | Coinbase c ->
         Coinbase c
+
+  let to_serializable_type : t -> Serializable_type.t = function
+    | Command command ->
+        Command (Command_applied.to_serializable_type command)
+    | Fee_transfer fee_transfer ->
+        Fee_transfer fee_transfer
+    | Coinbase coinbase ->
+        Coinbase coinbase
 end
 
 [%%versioned
@@ -238,6 +351,27 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+module Serializable_type = struct
+  type toplevel = Stable.Latest.t
+
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t =
+        { previous_hash : Ledger_hash.Stable.V1.t
+        ; varying : Varying.Serializable_type.Stable.V2.t
+        }
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let to_raw_serializable { previous_hash; varying } : toplevel =
+    { previous_hash
+    ; varying = Varying.Serializable_type.to_raw_serializable varying
+    }
+end
 
 type t = { previous_hash : Ledger_hash.t; varying : Varying.t }
 
@@ -365,3 +499,6 @@ let read_all_proofs_from_disk { previous_hash; varying } =
   { Stable.Latest.previous_hash
   ; varying = Varying.read_all_proofs_from_disk varying
   }
+
+let to_serializable_type { previous_hash; varying } : Serializable_type.t =
+  { previous_hash; varying = Varying.to_serializable_type varying }

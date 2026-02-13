@@ -134,6 +134,32 @@ module T = struct
   end]
 end
 
+module Serializable_type = struct
+  type raw_serializable = T.Stable.Latest.t
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( Account_update.Serializable_type.Stable.V1.t
+        , unit
+        , unit )
+        Call_forest.Stable.V1.t
+        Poly.Stable.V1.t
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let to_raw_serializable (w : t) : raw_serializable =
+    { fee_payer = w.fee_payer
+    ; memo = w.memo
+    ; account_updates =
+        Call_forest.map ~f:Account_update.Serializable_type.to_raw_serializable
+          w.account_updates
+    }
+end
+
 include T
 
 let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
@@ -154,6 +180,14 @@ let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
   ; account_updates =
       Call_forest.map ~f:Account_update.read_all_proofs_from_disk
       @@ Call_forest.forget_hashes t.account_updates
+  }
+
+let to_serializable_type (w : t) : Serializable_type.t =
+  { fee_payer = w.fee_payer
+  ; memo = w.memo
+  ; account_updates =
+      Call_forest.map ~f:Account_update.to_serializable_type
+        (Call_forest.forget_hashes w.account_updates)
   }
 
 let forget_digests_and_proofs_and_aux
