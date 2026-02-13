@@ -491,7 +491,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
   >>| Or_error.ok_exn
 
 let initialize_verifier_and_components ~logger
-    ~(precomputed_values : Precomputed_values.t) ~conf_dir =
+    ~(precomputed_values : Precomputed_values.t) ~state_dir =
   let signature_kind = precomputed_values.signature_kind in
   let module Context = struct
     let logger = logger
@@ -511,14 +511,7 @@ let initialize_verifier_and_components ~logger
     Lazy.force Keys.B.Proof.verification_key
   in
   let%bind transaction_verification_key = Lazy.force Keys.T.verification_key in
-  let%bind verifier_dir =
-    match conf_dir with
-    | Some dir ->
-        return (Filename.concat dir "verifier")
-    | None ->
-        let%map cwd = Sys.getcwd () in
-        Filename.concat cwd "verifier"
-  in
+  let verifier_dir = Filename.concat state_dir "verifier" in
   let%map verifier =
     Verifier.create ~logger ~commit_id:"" ~blockchain_verification_key
       ~transaction_verification_key ~proof_level:precomputed_values.proof_level
@@ -566,18 +559,12 @@ let precomputed_values t = t.precomputed_values
 
 let verifier t = t.verifier
 
-let create ~precomputed_values ~keypair ~start ~logger ?conf_dir
+let create ~precomputed_values ~keypair ~start ~logger ~state_dir
     ?(n_slots = 100) () =
   let start_block = start.breadcrumb in
-  let epoch_ledger_location =
-    match conf_dir with
-    | Some dir ->
-        Filename.concat dir "epoch_ledger"
-    | None ->
-        "epoch_ledger"
-  in
+  let epoch_ledger_location = Filename.concat state_dir "epoch_ledger" in
   let%bind context, keys_module, verifier =
-    initialize_verifier_and_components ~logger ~precomputed_values ~conf_dir
+    initialize_verifier_and_components ~logger ~precomputed_values ~state_dir
   in
   [%log info] "Computing VRF to find %d winning slots" n_slots ;
   let%map remaining_winning_slots, next_search_slot =

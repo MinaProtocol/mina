@@ -25,7 +25,7 @@ let load_and_initialize_config ~logger ~config_file ~genesis_dir =
     ~genesis_dir runtime_config
   >>| Or_error.ok_exn
 
-let run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~conf_dir =
+let run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~state_dir =
   let%bind precomputed_values =
     load_and_initialize_config ~logger ~config_file ~genesis_dir
   in
@@ -37,7 +37,7 @@ let run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~conf_dir =
   let start = Block_stepper.start_state_of_genesis genesis_breadcrumb in
   [%log info] "Initializing block stepper" ;
   let%bind stepper =
-    Block_stepper.create ~precomputed_values ~keypair ~start ~logger ?conf_dir
+    Block_stepper.create ~precomputed_values ~keypair ~start ~logger ~state_dir
       ()
   in
   let verifier = Block_stepper.verifier stepper in
@@ -103,41 +103,35 @@ let command =
       flag "--num-blocks"
         ~doc:"NUM Number of blocks to generate and verify (default: 3)"
         (optional_with_default 3 int)
-    and working_dir =
-      flag "--working-dir"
+    and state_dir_flag =
+      flag "--state-dir"
         ~doc:
           "DIR Directory for all stepper state (verifier, epoch ledger, \
-           internal tracing). Created if absent."
+           internal tracing). Created if absent. Defaults to current \
+           directory."
         (optional string)
     and genesis_ledger_dir =
       flag "--genesis-ledger-dir"
         ~doc:
           "DIR Directory containing genesis ledger tarballs (default: \
-           \"genesis\")"
+           <state-dir>/genesis)"
         (optional string)
     in
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let logger = Logger.create ~id:Logger.Logger_id.mina () in
-    let conf_dir = working_dir in
+    let%bind state_dir =
+      match state_dir_flag with Some dir -> return dir | None -> Sys.getcwd ()
+    in
     let genesis_dir =
-      match (genesis_ledger_dir, working_dir) with
-      | Some dir, _ ->
-          dir
-      | None, Some dir ->
-          dir
-      | None, None ->
-          "genesis"
-    in
-    let%bind () =
-      match working_dir with
+      match genesis_ledger_dir with
       | Some dir ->
-          let%map () = Unix.mkdir ~p:() dir in
-          ()
+          dir
       | None ->
-          return ()
+          Filename.concat state_dir "genesis"
     in
+    let%bind () = Unix.mkdir ~p:() state_dir in
     [%log info] "Starting block stepper verification test"
       ~metadata:
         [ ("config_file", `String config_file)
@@ -156,11 +150,7 @@ let command =
       ~transport:(Logger.Transport.stdout ())
       () ;
     let internal_tracing_directory =
-      match working_dir with
-      | Some dir ->
-          Filename.concat dir "internal-tracing"
-      | None ->
-          "internal-tracing"
+      Filename.concat state_dir "internal-tracing"
     in
     Logger.Consumer_registry.register ~commit_id:"" ~id:Logger.Logger_id.mina
       ~processor:Internal_tracing.For_logger.processor
@@ -174,6 +164,6 @@ let command =
       Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair" privkey_path
     in
     Parallel.init_master () ;
-    run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~conf_dir)
+    run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~state_dir)
 
 let () = Command.run command
