@@ -6,9 +6,11 @@
   async_kernel
   core
   ;; local libraries
+  base_quickcheck
   block_stepper
   blockchain_snark
   cli_lib
+  currency
   genesis_constants
   genesis_ledger_helper
   genesis_ledger_helper.lib
@@ -16,12 +18,19 @@
   logger
   mina_base
   mina_block
+  mina_ledger
+  mina_numbers
   mina_runtime_config
+  mina_signature_kind
   mina_state
+  mina_transaction
   parallel
   precomputed_values
   secrets
   signature_lib
+  snark_params
+  staged_ledger
+  transaction_snark
   transition_frontier_base
   verifier
   with_hash
