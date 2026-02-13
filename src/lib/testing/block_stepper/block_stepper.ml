@@ -152,8 +152,8 @@ let create_genesis_breadcrumb ~logger ~precomputed_values () =
     ~just_emitted_a_proof:false ~accounts_created
 
 let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
-    ~precomputed_values ~n_slots ~keypair (genesis : Frontier_base.Breadcrumb.t)
-    =
+    ~precomputed_values ~n_slots ~keypair ~start_slot
+    (genesis : Frontier_base.Breadcrumb.t) =
   let public_key_compressed = Public_key.compress keypair.Keypair.public_key in
   let logger = Context.logger in
   [%log info] "Loaded keypair for public key: %s"
@@ -201,10 +201,10 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
     (Mina_numbers.Global_slot_since_hard_fork.to_string epoch_start_hf)
     (Mina_numbers.Global_slot_since_genesis.to_string epoch_start) ;
   let search_bound = max 100 (n_slots * 3) in
-  Deferred.repeat_until_finished (1, [], search_bound)
+  Deferred.repeat_until_finished (start_slot, [], search_bound)
   @@ fun (current_slot, found_slots, attempts_left) ->
   if List.length found_slots >= n_slots then
-    return (`Finished (List.rev found_slots))
+    return (`Finished (List.rev found_slots, current_slot))
   else if attempts_left <= 0 then (
     [%log error] "Could not find enough winning slots after many attempts" ;
     failwith "Could not find enough winning slots" )
@@ -395,6 +395,9 @@ type t =
       * Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t )
       list
   ; logger : Logger.t
+  ; keypair : Keypair.t
+  ; start_block : Frontier_base.Breadcrumb.t
+  ; next_search_slot : int
   }
 
 let current_block t = t.current
@@ -411,9 +414,9 @@ let create ~precomputed_values ~keypair ~start_block ~logger ?(n_slots = 100) ()
     initialize_verifier_and_components ~logger ~precomputed_values
   in
   [%log info] "Computing VRF to find %d winning slots" n_slots ;
-  let%map remaining_winning_slots =
+  let%map remaining_winning_slots, next_search_slot =
     find_winning_slots ~context ~precomputed_values ~n_slots ~keypair
-      start_block
+      ~start_slot:1 start_block
   in
   [%log info] "Found %d winning slots" (List.length remaining_winning_slots) ;
   { precomputed_values
@@ -423,9 +426,30 @@ let create ~precomputed_values ~keypair ~start_block ~logger ?(n_slots = 100) ()
   ; current = start_block
   ; remaining_winning_slots
   ; logger
+  ; keypair
+  ; start_block
+  ; next_search_slot
   }
 
 let step t ~transactions =
+  let logger = t.logger in
+  let%bind t =
+    match t.remaining_winning_slots with
+    | _ :: _ ->
+        return t
+    | [] ->
+        let n_slots = 100 in
+        [%log info]
+          "No remaining winning slots, searching for %d more starting from \
+           slot %d"
+          n_slots t.next_search_slot ;
+        let%map remaining_winning_slots, next_search_slot =
+          find_winning_slots ~context:t.context
+            ~precomputed_values:t.precomputed_values ~n_slots ~keypair:t.keypair
+            ~start_slot:t.next_search_slot t.start_block
+        in
+        { t with remaining_winning_slots; next_search_slot }
+  in
   match t.remaining_winning_slots with
   | [] ->
       failwith "No remaining winning slots"
