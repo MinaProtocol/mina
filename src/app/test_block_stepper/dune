@@ -1,0 +1,33 @@
+(executable
+ (name test_block_stepper)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  core
+  ;; local libraries
+  block_stepper
+  blockchain_snark
+  cli_lib
+  genesis_constants
+  genesis_ledger_helper
+  genesis_ledger_helper.lib
+  interpolator_lib
+  logger
+  mina_base
+  mina_block
+  mina_runtime_config
+  mina_state
+  parallel
+  precomputed_values
+  secrets
+  signature_lib
+  transition_frontier_base
+  verifier
+  with_hash
+  internal_tracing
+  mina_version)
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane))
+ (instrumentation
+  (backend bisect_ppx)))
