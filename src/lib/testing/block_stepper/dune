@@ -27,18 +27,26 @@
   mina_signature_kind
   mina_state
   mina_stdlib
+  mina_transaction
+  one_or_two
   parallel
   pipe_lib
   precomputed_values
+  proof_cache_tag
   prover
   signature_lib
+  snark_work_lib
   staged_ledger
   staged_ledger_diff
+  transaction_protocol_state
   transaction_snark
+  transaction_snark_work
+  transaction_witness
   transition_frontier_base
   trust_system
   verifier
-  with_hash)
+  with_hash
+  work_partitioner)
  (preprocess
   (pps ppx_version ppx_mina ppx_jane))
  (instrumentation

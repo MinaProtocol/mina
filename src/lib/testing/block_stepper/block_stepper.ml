@@ -3,6 +3,7 @@ open Async
 open Signature_lib
 open Mina_base
 open Mina_state
+open Mina_transaction
 
 (* Helpers for extend_blockchain, copied from prover.ml *)
 let ledger_proof_opt next_state = function
@@ -87,6 +88,124 @@ let trust_system =
        (Trust_system.upcall_pipe s)
        ~f:(const Deferred.unit) ) ;
   s
+
+let prove_single ~proof_level ~proof_cache_db ~signature_kind ~sok_digest
+    (module T : Transaction_snark.S)
+    (spec :
+      ( Transaction_witness.t
+      , Ledger_proof.Cached.t )
+      Snark_work_lib.Work.Single.Spec.t ) =
+  match (proof_level : Genesis_constants.Proof_level.t) with
+  | Check | No_check ->
+      let statement = Snark_work_lib.Work.Single.Spec.statement spec in
+      Deferred.return (Ledger_proof.For_tests.Cached.mk_dummy_proof statement)
+  | Full -> (
+      (* Convert spec to stable types: Transaction_witness.t ->
+         Stable.V2.t, Ledger_proof.Cached.t -> Ledger_proof.t *)
+      let single_spec =
+        Snark_work_lib.Spec.Single.read_all_proofs_from_disk spec
+      in
+      match single_spec with
+      | Transition (input, w) -> (
+          match w.transaction with
+          | Command (Zkapp_command zkapp_command) ->
+              let witnesses_specs_stmts =
+                Work_partitioner.Snark_worker_shared.extract_zkapp_segment_works
+                  ~m:(module T)
+                  ~input ~witness:w
+                  ~zkapp_command:
+                    (Zkapp_command.write_all_proofs_to_disk ~signature_kind
+                       ~proof_cache_db zkapp_command )
+                |> Result.map_error
+                     ~f:
+                       Work_partitioner.Snark_worker_shared
+                       .Failed_to_generate_inputs
+                       .error_of_t
+                |> Or_error.ok_exn
+              in
+              let (witness, segment_spec, statement), rest =
+                Mina_stdlib.Nonempty_list.uncons witnesses_specs_stmts
+              in
+              let%bind p1 =
+                T.of_zkapp_command_segment_exn
+                  ~statement:{ statement with sok_digest }
+                  ~witness ~spec:segment_spec
+              in
+              let%map p =
+                Deferred.List.fold ~init:p1 rest
+                  ~f:(fun prev (witness, segment_spec, statement) ->
+                    let%bind curr =
+                      T.of_zkapp_command_segment_exn
+                        ~statement:{ statement with sok_digest }
+                        ~witness ~spec:segment_spec
+                    in
+                    T.merge prev curr ~sok_digest >>| Or_error.ok_exn )
+              in
+              Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db p
+          | _ ->
+              let validated_txn =
+                match w.transaction with
+                | Command (Signed_command cmd) -> (
+                    match Signed_command.check ~signature_kind cmd with
+                    | Some cmd ->
+                        (Command (Signed_command cmd) : Transaction.Valid.t)
+                    | None ->
+                        failwith "Command has an invalid signature" )
+                | Command (Zkapp_command _) ->
+                    assert false
+                | Fee_transfer ft ->
+                    Fee_transfer ft
+                | Coinbase cb ->
+                    Coinbase cb
+              in
+              let%map proof =
+                T.of_non_zkapp_command_transaction
+                  ~statement:{ input with sok_digest } ~init_stack:w.init_stack
+                  { Transaction_protocol_state.Poly.transaction = validated_txn
+                  ; block_data = w.protocol_state_body
+                  ; global_slot = w.block_global_slot
+                  }
+                  (unstage
+                     (Mina_ledger.Sparse_ledger.handler w.first_pass_ledger) )
+              in
+              Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof )
+      | Merge (_, proof1, proof2) ->
+          let%map proof =
+            T.merge proof1 proof2 ~sok_digest >>| Or_error.ok_exn
+          in
+          Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof )
+
+let compute_completed_work ~proof_level ~proof_cache_db ~signature_kind
+    ~protocol_states ~prover (module T : Transaction_snark.S)
+    (staged_ledger : Staged_ledger.t) =
+  let get_state hash =
+    State_hash.Map.find protocol_states hash
+    |> Result.of_option ~error:(Error.of_string "state not found")
+  in
+  let work_specs =
+    Staged_ledger.all_work_pairs staged_ledger ~get_state |> Or_error.ok_exn
+  in
+  let sok_digest = Sok_message.Digest.default in
+  let%map proved_work =
+    Deferred.List.map work_specs ~how:`Sequential ~f:(fun one_or_two ->
+        let%map proofs =
+          One_or_two.Deferred.map one_or_two ~f:(fun spec ->
+              prove_single ~proof_level ~proof_cache_db ~signature_kind
+                ~sok_digest
+                (module T)
+                spec )
+        in
+        let statement =
+          One_or_two.map one_or_two ~f:Snark_work_lib.Work.Single.Spec.statement
+        in
+        ( statement
+        , Transaction_snark_work.Checked.create_unsafe
+            { fee = Currency.Fee.zero; proofs; prover } ) )
+  in
+  let table = Transaction_snark_work.Statement.Table.create () in
+  List.iter proved_work ~f:(fun (stmt, work) ->
+      Transaction_snark_work.Statement.Table.set table ~key:stmt ~data:work ) ;
+  Transaction_snark_work.Statement.Table.find table
 
 let create_genesis_breadcrumb ~logger ~precomputed_values () =
   let signature_kind = precomputed_values.Precomputed_values.signature_kind in
@@ -259,8 +378,8 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
           , attempts_left - 1 )
 
 let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
-    ~signature_kind (module Keys : Keys_S) (slot_won, ledger_snapshot)
-    (previous : Frontier_base.Breadcrumb.t) =
+    ~signature_kind ~proof_cache_db ~protocol_states (module Keys : Keys_S)
+    (slot_won, ledger_snapshot) (previous : Frontier_base.Breadcrumb.t) =
   let module V = Mina_block.Validation in
   let (module Context : V.CONTEXT) = context in
   let open Context in
@@ -288,12 +407,22 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
     |> Mina_block.header |> Mina_block.Header.protocol_state_proof
   in
   let winner_pk = fst slot_won.delegator in
+  let previous_staged_ledger =
+    Frontier_base.Breadcrumb.staged_ledger previous
+  in
+  let prover = Public_key.compress slot_won.producer.public_key in
+  let%bind get_completed_work =
+    compute_completed_work
+      ~proof_level:precomputed_values.Precomputed_values.proof_level
+      ~proof_cache_db ~signature_kind ~protocol_states ~prover
+      (module Keys.T)
+      previous_staged_ledger
+  in
   let%bind protocol_state, internal_transition, pending_coinbase_witness =
     Block_producer.generate_next_state ~commit_id:"" ~constraint_constants
       ~scheduled_time ~block_data ~previous_protocol_state ~time_controller
-      ~staged_ledger:(Frontier_base.Breadcrumb.staged_ledger previous)
-      ~transactions ~get_completed_work:(const None) ~logger
-      ~log_block_creation:false ~winner_pk ~block_reward_threshold:None
+      ~staged_ledger:previous_staged_ledger ~transactions ~get_completed_work
+      ~logger ~log_block_creation:false ~winner_pk ~block_reward_threshold:None
       ~zkapp_cmd_limit:None ~zkapp_cmd_limit_hardcap:128 ~slot_tx_end:None
       ~slot_chain_end:None ~signature_kind
     |> Interruptible.force
@@ -356,9 +485,8 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
   let transition_receipt_time = Some (Time.now ()) in
   [%log info] "Building breadcrumb" ;
   Frontier_base.Breadcrumb.build ~logger ~precomputed_values ~verifier
-    ~get_completed_work:(Fn.const None) ~trust_system ~parent:previous
-    ~transition ~sender:None ~skip_staged_ledger_verification:`All
-    ~transition_receipt_time ()
+    ~get_completed_work ~trust_system ~parent:previous ~transition ~sender:None
+    ~skip_staged_ledger_verification:`All ~transition_receipt_time ()
   >>| Result.map_error ~f:(const @@ Error.of_string "failed to build breadcrumb")
   >>| Or_error.ok_exn
 
@@ -406,6 +534,8 @@ type t =
   ; logger : Logger.t
   ; keypair : Keypair.t
   ; next_search_slot : int
+  ; proof_cache_db : Proof_cache_tag.cache_db
+  ; protocol_states : Protocol_state.value State_hash.Map.t
   }
 
 let current_block t = t.current
@@ -427,6 +557,14 @@ let create ~precomputed_values ~keypair ~start_block ~logger ?(n_slots = 100) ()
       ~start_slot:1 start_block
   in
   [%log info] "Found %d winning slots" (List.length remaining_winning_slots) ;
+  let proof_cache_db = Proof_cache_tag.create_identity_db () in
+  let genesis_state_hash = Frontier_base.Breadcrumb.state_hash start_block in
+  let genesis_protocol_state =
+    Frontier_base.Breadcrumb.protocol_state start_block
+  in
+  let protocol_states =
+    State_hash.Map.singleton genesis_state_hash genesis_protocol_state
+  in
   { precomputed_values
   ; context
   ; keys_module
@@ -436,6 +574,8 @@ let create ~precomputed_values ~keypair ~start_block ~logger ?(n_slots = 100) ()
   ; logger
   ; keypair
   ; next_search_slot
+  ; proof_cache_db
+  ; protocol_states
   }
 
 let step t ~transactions =
@@ -465,9 +605,20 @@ let step t ~transactions =
       let%map breadcrumb =
         build_breadcrumb ~transactions ~context:t.context
           ~precomputed_values:t.precomputed_values ~verifier:t.verifier
-          ~signature_kind t.keys_module
+          ~signature_kind ~proof_cache_db:t.proof_cache_db
+          ~protocol_states:t.protocol_states t.keys_module
           (slot_won, ledger_snapshot)
           t.current
       in
+      let state_hash = Frontier_base.Breadcrumb.state_hash breadcrumb in
+      let protocol_state = Frontier_base.Breadcrumb.protocol_state breadcrumb in
+      let protocol_states =
+        State_hash.Map.set t.protocol_states ~key:state_hash
+          ~data:protocol_state
+      in
       ( breadcrumb
-      , { t with current = breadcrumb; remaining_winning_slots = rest } )
+      , { t with
+          current = breadcrumb
+        ; remaining_winning_slots = rest
+        ; protocol_states
+        } )
