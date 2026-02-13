@@ -19,6 +19,19 @@ let prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger:_
   let%map proof =
     match single_spec with
     | Transition (input, w) -> (
+        let non_zkapp_proof valid_transaction =
+          Deferred.Or_error.try_with ~here:[%here] (fun () ->
+              T.of_non_zkapp_command_transaction
+                ~statement:{ input with sok_digest }
+                { Transaction_protocol_state.Poly.transaction =
+                    valid_transaction
+                ; block_data = w.protocol_state_body
+                ; global_slot = w.block_global_slot
+                }
+                ~init_stack:w.init_stack
+                (unstage
+                   (Mina_ledger.Sparse_ledger.handler w.first_pass_ledger) ) )
+        in
         match w.transaction with
         | Mina_transaction.Transaction.Command (Zkapp_command zkapp_command) ->
             let%bind witnesses_specs_stmts =
@@ -81,36 +94,18 @@ let prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger:_
               Deferred.Or_error.error_string
                 "Zkapp_command transaction final statement mismatch"
             else Deferred.Or_error.return proof
-        | _ ->
-            let%bind t =
+        | Command (Signed_command cmd) ->
+            let%bind cmd =
               Deferred.return
-              @@
-              match w.transaction with
-              | Mina_transaction.Transaction.Command (Signed_command cmd) -> (
-                  match Signed_command.check ~signature_kind cmd with
-                  | Some cmd ->
-                      ( Ok (Command (Signed_command cmd))
-                        : Mina_transaction.Transaction.Valid.t Or_error.t )
-                  | None ->
-                      Or_error.errorf "Command has an invalid signature" )
-              | Command (Zkapp_command _) ->
-                  assert false
-              | Fee_transfer ft ->
-                  Ok (Fee_transfer ft)
-              | Coinbase cb ->
-                  Ok (Coinbase cb)
+              @@ Result.of_option
+                   (Signed_command.check ~signature_kind cmd)
+                   ~error:(Error.of_string "Command has an invalid signature")
             in
-            Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                T.of_non_zkapp_command_transaction
-                  ~statement:{ input with sok_digest }
-                  { Transaction_protocol_state.Poly.transaction = t
-                  ; block_data = w.protocol_state_body
-                  ; global_slot = w.block_global_slot
-                  }
-                  ~init_stack:w.init_stack
-                  (unstage
-                     (Mina_ledger.Sparse_ledger.handler w.first_pass_ledger) ) )
-        )
+            non_zkapp_proof (Command (Signed_command cmd))
+        | Fee_transfer ft ->
+            non_zkapp_proof (Fee_transfer ft)
+        | Coinbase cb ->
+            non_zkapp_proof (Coinbase cb) )
     | Merge (_, proof1, proof2) ->
         T.merge proof1 proof2 ~sok_digest
   in
