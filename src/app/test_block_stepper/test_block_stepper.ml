@@ -177,13 +177,34 @@ let run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~state_dir
     Block_stepper.create_genesis_breadcrumb ~logger ~precomputed_values ()
   in
   [%log info] "Genesis breadcrumb created" ;
-  let start = Block_stepper.start_state_of_genesis genesis_breadcrumb in
+  let module Keys = Block_stepper.Keys (struct
+    let signature_kind = precomputed_values.Precomputed_values.signature_kind
+
+    let constraint_constants = precomputed_values.constraint_constants
+
+    let proof_level = precomputed_values.proof_level
+  end) in
+  let keys_module = (module Keys : Block_stepper.Keys_S) in
+  let%bind blockchain_verification_key =
+    Lazy.force Keys.B.Proof.verification_key
+  in
+  let%bind transaction_verification_key = Lazy.force Keys.T.verification_key in
+  let verifier_dir = Filename.concat state_dir "verifier" in
+  let%bind verifier =
+    Verifier.create ~logger ~commit_id:"" ~blockchain_verification_key
+      ~transaction_verification_key ~proof_level:precomputed_values.proof_level
+      ~pids:(Child_processes.Termination.create_pid_table ())
+      ~conf_dir:(Some verifier_dir)
+      ~signature_kind:precomputed_values.signature_kind ()
+  in
+  let start =
+    Block_stepper.start_state_of_genesis genesis_breadcrumb ~keys_module
+  in
   [%log info] "Initializing block stepper" ;
-  let%bind stepper =
+  let stepper =
     Block_stepper.create ~precomputed_values ~keypair ~start ~logger ~state_dir
       ()
   in
-  let verifier = Block_stepper.verifier stepper in
   [%log info] "Verifying genesis block proof" ;
   let genesis_blockchain = blockchain_of_breadcrumb genesis_breadcrumb in
   let%bind genesis_result =

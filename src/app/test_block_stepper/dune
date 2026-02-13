@@ -9,6 +9,7 @@
   base_quickcheck
   block_stepper
   blockchain_snark
+  child_processes
   cli_lib
   currency
   genesis_constants

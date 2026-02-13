@@ -579,41 +579,10 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
        ~transition_receipt_time:(Some (Time.now ()))
        ~accounts_created )
 
-let initialize_verifier_and_components ~logger
-    ~(precomputed_values : Precomputed_values.t) ~state_dir =
-  let signature_kind = precomputed_values.signature_kind in
-  let module Context = struct
-    let logger = logger
-
-    let constraint_constants = precomputed_values.constraint_constants
-
-    let consensus_constants = precomputed_values.consensus_constants
-
-    let proof_level = precomputed_values.proof_level
-  end in
-  let module Keys = Keys (struct
-    let signature_kind = signature_kind
-
-    include Context
-  end) in
-  let%bind blockchain_verification_key =
-    Lazy.force Keys.B.Proof.verification_key
-  in
-  let%bind transaction_verification_key = Lazy.force Keys.T.verification_key in
-  let verifier_dir = Filename.concat state_dir "verifier" in
-  let%map verifier =
-    Verifier.create ~logger ~commit_id:"" ~blockchain_verification_key
-      ~transaction_verification_key ~proof_level:precomputed_values.proof_level
-      ~pids:(Child_processes.Termination.create_pid_table ())
-      ~conf_dir:(Some verifier_dir) ~signature_kind ()
-  in
-  ((module Context : Consensus.Intf.CONTEXT), (module Keys : Keys_S), verifier)
-
 type t =
   { precomputed_values : Precomputed_values.t
   ; context : (module Consensus.Intf.CONTEXT)
   ; keys_module : (module Keys_S)
-  ; verifier : Verifier.t
   ; current : Frontier_base.Breadcrumb.t
   ; logger : Logger.t
   ; keypair : Keypair.t
@@ -629,26 +598,37 @@ type t =
 type start_state =
   { breadcrumb : Frontier_base.Breadcrumb.t
   ; protocol_states : Protocol_state.value State_hash.Map.t
+  ; keys_module : (module Keys_S)
   }
 
-let start_state_of_genesis breadcrumb =
+let start_state_of_genesis breadcrumb ~keys_module =
   let hash = Frontier_base.Breadcrumb.state_hash breadcrumb in
   let protocol_state = Frontier_base.Breadcrumb.protocol_state breadcrumb in
-  { breadcrumb; protocol_states = State_hash.Map.singleton hash protocol_state }
+  { breadcrumb
+  ; protocol_states = State_hash.Map.singleton hash protocol_state
+  ; keys_module
+  }
 
-let start_state_of_breadcrumb breadcrumb ~protocol_states =
-  { breadcrumb; protocol_states }
+let start_state_of_breadcrumb breadcrumb ~protocol_states ~keys_module =
+  { breadcrumb; protocol_states; keys_module }
 
 let current_block t = t.current
 
 let precomputed_values t = t.precomputed_values
 
-let verifier t = t.verifier
-
 let create ~precomputed_values ~keypair ~start ~logger ~state_dir () =
   let start_block = start.breadcrumb in
-  let%map context, keys_module, verifier =
-    initialize_verifier_and_components ~logger ~precomputed_values ~state_dir
+  let keys_module = start.keys_module in
+  let context =
+    let module Context = struct
+      let logger = logger
+
+      let constraint_constants =
+        precomputed_values.Precomputed_values.constraint_constants
+
+      let consensus_constants = precomputed_values.consensus_constants
+    end in
+    (module Context : Consensus.Intf.CONTEXT)
   in
   let (module Context : Consensus.Intf.CONTEXT) = context in
   let next_search_slot =
@@ -678,7 +658,6 @@ let create ~precomputed_values ~keypair ~start ~logger ~state_dir () =
   { precomputed_values
   ; context
   ; keys_module
-  ; verifier
   ; current = start_block
   ; logger
   ; keypair

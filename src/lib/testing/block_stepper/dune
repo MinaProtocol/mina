@@ -11,7 +11,6 @@
   ;; local libraries
   block_time
   blockchain_snark
-  child_processes
   coda_genesis_proof
   consensus
   currency
@@ -42,7 +41,6 @@
   transaction_snark_work
   transaction_witness
   transition_frontier_base
-  verifier
   with_hash
   work_partitioner)
  (preprocess
