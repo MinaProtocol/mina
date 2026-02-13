@@ -9,17 +9,22 @@ import (
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 )
 
-// BlockAnalysisResult holds the results of analyzing blocks
+type ConsensusState struct {
+	LastOccupiedSlot     int              `json:"last_occupied_slot"`
+	LastBlockBeforeTxEnd client.BlockData `json:"last_block_before_tx_end"`
+}
+
 type BlockAnalysisResult struct {
-	LastOccupiedSlot          int
-	RecentSnarkedHashPerEpoch map[int]string // map from epoch to snarked ledger hash
-	LastBlockBeforeTxEnd      client.BlockData
+	Consensus                 ConsensusState
 	GenesisBlock              client.BlockData
+	SnarkedHashByEpoch        SnarkedHashByEpoch
 	CandidatePortBasesForFork []int
 }
 
 func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool, predDescription string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
+
+	t.Logger.Info("Waiting for best tip at port %d to satisfy condition: %s", port, predDescription)
 
 	for time.Now().Before(deadline) {
 		bestTip, err := t.Client.BestTip(port)
@@ -39,9 +44,19 @@ func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool
 }
 
 // ValidateSlotOccupancy checks if block occupancy is above 50%
-func (t *HardforkTest) ValidateSlotOccupancy(startingHeight, blockHeight int) error {
-	if 2*blockHeight < t.Config.BestChainQueryFrom {
-		return fmt.Errorf("slot occupancy (%d/%d) is below 50%%", blockHeight, t.Config.BestChainQueryFrom)
+func (t *HardforkTest) ValidateSlotOccupancy(startBlock, lastBlock client.BlockData) error {
+	expectedOccupancy := 0.5
+
+	t.Logger.Info("Calculating slot occupancy between block %v and %v", startBlock, lastBlock)
+
+	if startBlock.BlockHeight == lastBlock.BlockHeight {
+		return fmt.Errorf("starting block has same height as last block, can't calculate slot occupancy!")
+	}
+
+	actualOccupancy := float64(lastBlock.BlockHeight-startBlock.BlockHeight) / float64(lastBlock.Slot-startBlock.Slot)
+
+	if actualOccupancy < expectedOccupancy {
+		return fmt.Errorf("slot occupancy (%f) is below expected (%f)", actualOccupancy, expectedOccupancy)
 	}
 	return nil
 }
@@ -56,12 +71,12 @@ func (t *HardforkTest) ValidateLatestOccupiedSlot(latestOccupiedSlot int) error 
 	return nil
 }
 
+// Validate last block before slot tx end
 func (t *HardforkTest) ValidateLatestLastBlockBeforeTxEndSlot(lastBlockBeforeTxEnd client.BlockData) error {
 	t.Logger.Info("Last block before slot-tx-end: %s, height: %d, slot: %d",
 		lastBlockBeforeTxEnd.StateHash, lastBlockBeforeTxEnd.BlockHeight, lastBlockBeforeTxEnd.Slot)
 
 	if lastBlockBeforeTxEnd.Slot >= t.Config.SlotTxEnd {
-		t.Logger.Error("Assertion failed: non-empty block with slot %d created after slot tx end", lastBlockBeforeTxEnd.Slot)
 		return fmt.Errorf("non-empty block with slot %d created after slot tx end", lastBlockBeforeTxEnd.Slot)
 	}
 	return nil
@@ -90,36 +105,6 @@ func (t *HardforkTest) ValidateNoNewBlocks(port int) error {
 	return nil
 }
 
-// NOTE: this is a weird implementation.
-// CollectBlocks gathers blocks from multiple slots across different ports
-func (t *HardforkTest) CollectBlocks(portUsed int, startSlot, endSlot int) ([]client.BlockData, error) {
-	var allBlocks []client.BlockData
-	collectedSlot := startSlot - 1
-
-	for thisSlot := startSlot; thisSlot <= endSlot; thisSlot++ {
-		t.WaitForBestTip(portUsed, func(block client.BlockData) bool {
-			return block.Slot >= thisSlot
-		}, fmt.Sprintf("best tip reached slot %d", startSlot),
-			2*time.Duration(t.Config.MainSlot)*time.Second,
-		)
-
-		// this query returns recent blocks(closer to best tip) in increasing order.
-		recentBlocks, err := t.Client.RecentBlocks(portUsed, 5)
-		if err != nil {
-			t.Logger.Debug("Failed to get blocks at slot %d: %v from port %d", thisSlot, err, portUsed)
-		} else {
-			for _, block := range recentBlocks {
-				if block.Slot > collectedSlot {
-					allBlocks = append(allBlocks, block)
-					collectedSlot = block.Slot
-				}
-			}
-		}
-	}
-
-	return allBlocks, nil
-}
-
 func (t *HardforkTest) ReportBlocksInfo(port int, blocks []client.BlockData) {
 	t.Logger.Info("================================================")
 	for _, block := range blocks {
@@ -127,36 +112,30 @@ func (t *HardforkTest) ReportBlocksInfo(port int, blocks []client.BlockData) {
 	}
 }
 
+// WARN: ensure we're always using the same consensus param here and in mina-local-network!
+const ProtocolK = 10
+
 func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
 
 	state := new(ConsensusState)
 
-	blocks, err := t.CollectBlocks(port, t.Config.BestChainQueryFrom, t.Config.SlotChainEnd)
+	recentBlocks, err := t.Client.RecentBlocks(port, ProtocolK)
 
-	t.ReportBlocksInfo(port, blocks)
+	t.ReportBlocksInfo(port, recentBlocks)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect blocks at port %d: %w", port, err)
 	}
 
-	if len(blocks) == 0 {
+	if len(recentBlocks) == 0 {
 		return nil, fmt.Errorf("no blocks is tracked at port %d!", port)
 	}
 
-	state.RecentSnarkedHashPerEpoch = make(map[int]string)
-	latestSlotPerEpoch := make(map[int]int)
-
 	// Process each block
-	for _, block := range blocks {
+	for _, block := range recentBlocks {
 		// Update max slot
 		if block.Slot > state.LastOccupiedSlot {
 			state.LastOccupiedSlot = block.Slot
-		}
-
-		// Track snarked ledger hash per epoch
-		if block.Slot > latestSlotPerEpoch[block.Epoch] {
-			state.RecentSnarkedHashPerEpoch[block.Epoch] = block.SnarkedHash
-			latestSlotPerEpoch[block.Epoch] = block.Slot
 		}
 
 		// Track latest non-empty block
@@ -172,12 +151,52 @@ func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
 	return state, nil
 }
 
+type SnarkedHashByEpoch map[int]string
+
+func (t *HardforkTest) CollectEpochHashes(mainGenesisTs int64) (*SnarkedHashByEpoch, error) {
+	// NOTE: we're only tracking epoch ledgers on a single node, we're relying that
+	// epoch hashes having stronger consensus guarantee because it's updated much
+	// slower than blocks
+	checkPerSlot := ProtocolK / 2
+	// Very unlikely to happen but we have it here for fail-safe
+	if checkPerSlot < 1 {
+		checkPerSlot = 1
+	}
+
+	slotChainEnd := t.Config.MainSlotChainEnd(mainGenesisTs)
+	sleepDuration := time.Duration(t.Config.MainSlot*checkPerSlot) * time.Second
+
+	snarkedHashByEpoch := make(SnarkedHashByEpoch)
+	lastSlotPerEpoch := make(map[int]int)
+	for time.Now().Before(slotChainEnd) {
+		recentBlocks, err := t.Client.RecentBlocks(t.AnyPortOfType(PORT_REST), ProtocolK)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, block := range recentBlocks {
+			// NOTE: If it's equal, we're likely to have a chain-reorg, so always accept
+			// new data.
+			if block.Slot >= lastSlotPerEpoch[block.Epoch] {
+				snarkedHashByEpoch[block.Epoch] = block.SnarkedHash
+				lastSlotPerEpoch[block.Epoch] = block.Slot
+			}
+		}
+
+		actualSleepDuration := time.Until(slotChainEnd)
+		if sleepDuration < actualSleepDuration {
+			actualSleepDuration = sleepDuration
+		}
+		time.Sleep(actualSleepDuration)
+	}
+	return &snarkedHashByEpoch, nil
+}
+
 func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, []int, error) {
 	allRestPorts := t.AllPortOfType(PORT_REST)
 	consensusStateVote := make(map[string][]int)
 
 	var majorityConsensusState ConsensusState
-	// majorityKey := "<none>"
 	majorityCount := 0
 
 	var wg sync.WaitGroup
@@ -241,7 +260,7 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, []int, error) {
 }
 
 // AnalyzeBlocks performs comprehensive block analysis including finding genesis epoch hashes
-func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
+func (t *HardforkTest) AnalyzeBlocks(mainGenesisTs int64) (*BlockAnalysisResult, error) {
 
 	portUsed := t.AnyPortOfType(PORT_REST)
 	genesisBlock, err := t.Client.GenesisBlock(portUsed)
@@ -250,40 +269,45 @@ func (t *HardforkTest) AnalyzeBlocks() (*BlockAnalysisResult, error) {
 	}
 	t.Logger.Info("Genesis block: %v", genesisBlock)
 
+	snarkedHashByEpoch, err := t.CollectEpochHashes(mainGenesisTs)
+	if err != nil {
+		return nil, err
+	}
+
+	// NOTE: We should already be at slot chain end given how `CollectEpochHashes`
+	// is implemented
+	t.Logger.Info("Sleeping till slot chain end before start querying block info on chain..")
+
+	// NOTE: We sleep because the chain might not produce a block exactly at the
+	// slot chain end; sleeping ensures we have definitely reached that instant.
+	time.Sleep(time.Until(t.Config.MainSlotChainEnd(mainGenesisTs)))
+
 	consensus, candidatePortBasesForFork, err := t.ConsensusAcrossNodes()
 	if err != nil {
 		return nil, err
 	}
 
 	return &BlockAnalysisResult{
-		LastOccupiedSlot:          consensus.LastOccupiedSlot,
-		RecentSnarkedHashPerEpoch: consensus.RecentSnarkedHashPerEpoch,
-		LastBlockBeforeTxEnd:      consensus.LastBlockBeforeTxEnd,
+		Consensus:                 *consensus,
 		GenesisBlock:              *genesisBlock,
+		SnarkedHashByEpoch:        *snarkedHashByEpoch,
 		CandidatePortBasesForFork: candidatePortBasesForFork,
 	}, nil
-}
-
-type ConsensusState struct {
-	LastOccupiedSlot          int              `json:"last_occupied_slot"`
-	RecentSnarkedHashPerEpoch map[int]string   `json:"recent_snarked_hash_per_epoch"`
-	LastBlockBeforeTxEnd      client.BlockData `json:"last_block_before_tx_end"`
 }
 
 // FindStakingHash finds the staking ledger hash for the given epoch
 func (t *HardforkTest) FindStakingHash(
 	epoch int,
-	genesisEpochStakingHash string,
-	genesisEpochNextHash string,
+	genesisBlock client.BlockData,
 	epochs map[int]string,
 ) (string, error) {
 	// Handle special cases for genesis epochs
 	if epoch == 0 {
-		return genesisEpochStakingHash, nil
+		return genesisBlock.CurEpochHash, nil
 	}
 
 	if epoch == 1 {
-		return genesisEpochNextHash, nil
+		return genesisBlock.NextEpochHash, nil
 	}
 
 	// For other epochs, look up in the map

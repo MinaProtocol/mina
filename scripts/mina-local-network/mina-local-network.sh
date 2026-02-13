@@ -441,6 +441,7 @@ reset-genesis-ledger() {
   echo 'Resetting Genesis Ledger...'
   printf "\n"
 
+  # WARN: ensure we're always using the same consensus param here and in hard fork test!
   jq --arg timestamp "$(date +"%Y-%m-%dT%H:%M:%S%z")" \
      --arg proof_level "$PROOF_LEVEL" \
   '
