@@ -2,9 +2,11 @@ open Core
 open Async
 open Mina_base
 
-let prove_dummy spec =
+let prove_dummy ~proof_cache_db:_ ~signature_kind:_ ~sok_digest:_ ~logger:_
+    (module _ : Transaction_snark.S) spec =
   let statement = Snark_work_lib.Work.Single.Spec.statement spec in
-  Ledger_proof.For_tests.Cached.mk_dummy_proof statement
+  Deferred.Or_error.return
+    (Ledger_proof.For_tests.Cached.mk_dummy_proof statement)
 
 let prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger
     (module T : Transaction_snark.S)
@@ -100,43 +102,30 @@ let prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger
 let compute ~proof_level ~proof_cache_db ~signature_kind ~logger ~fee
     ~prover_key (module T : Transaction_snark.S) work_specs =
   let sok_digest = Sok_message.Digest.default in
-  let build_table proved_work =
-    let table = Transaction_snark_work.Statement.Table.create () in
-    List.iter proved_work ~f:(fun (stmt, work) ->
-        Transaction_snark_work.Statement.Table.set table ~key:stmt ~data:work ) ;
-    Transaction_snark_work.Statement.Table.find table
+  let prove_single =
+    match (proof_level : Genesis_constants.Proof_level.t) with
+    | Check | No_check ->
+        prove_dummy
+    | Full ->
+        prove_full
   in
-  match (proof_level : Genesis_constants.Proof_level.t) with
-  | Check | No_check ->
-      let proved_work =
-        List.map work_specs ~f:(fun one_or_two ->
-            let proofs = One_or_two.map one_or_two ~f:prove_dummy in
-            let statement =
-              One_or_two.map one_or_two
-                ~f:Snark_work_lib.Work.Single.Spec.statement
-            in
-            ( statement
-            , Transaction_snark_work.Checked.create_unsafe
-                { fee; proofs; prover = prover_key } ) )
-      in
-      Deferred.Or_error.return (build_table proved_work)
-  | Full ->
-      let open Deferred.Or_error.Let_syntax in
-      let%map proved_work =
-        Deferred.Or_error.List.map work_specs ~how:`Sequential
-          ~f:(fun one_or_two ->
-            let%map proofs =
-              One_or_two.Deferred_result.map one_or_two ~f:(fun spec ->
-                  prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger
-                    (module T)
-                    spec )
-            in
-            let statement =
-              One_or_two.map one_or_two
-                ~f:Snark_work_lib.Work.Single.Spec.statement
-            in
-            ( statement
-            , Transaction_snark_work.Checked.create_unsafe
-                { fee; proofs; prover = prover_key } ) )
-      in
-      build_table proved_work
+  let open Deferred.Or_error.Let_syntax in
+  let%map proved_work =
+    Deferred.Or_error.List.map work_specs ~how:`Sequential ~f:(fun one_or_two ->
+        let%map proofs =
+          One_or_two.Deferred_result.map one_or_two
+            ~f:
+              (prove_single ~proof_cache_db ~signature_kind ~sok_digest ~logger
+                 (module T) )
+        in
+        let statement =
+          One_or_two.map one_or_two ~f:Snark_work_lib.Work.Single.Spec.statement
+        in
+        ( statement
+        , Transaction_snark_work.Checked.create_unsafe
+            { fee; proofs; prover = prover_key } ) )
+  in
+  let table = Transaction_snark_work.Statement.Table.create () in
+  List.iter proved_work ~f:(fun (stmt, work) ->
+      Transaction_snark_work.Statement.Table.set table ~key:stmt ~data:work ) ;
+  Transaction_snark_work.Statement.Table.find table
