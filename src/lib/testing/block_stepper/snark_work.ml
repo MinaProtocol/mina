@@ -8,7 +8,7 @@ let prove_dummy ~proof_cache_db:_ ~signature_kind:_ ~sok_digest:_ ~logger:_
   Deferred.Or_error.return
     (Ledger_proof.For_tests.Cached.mk_dummy_proof statement)
 
-let prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger
+let prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger:_
     (module T : Transaction_snark.S)
     (spec :
       ( Transaction_witness.t
@@ -82,15 +82,37 @@ let prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger
                 "Zkapp_command transaction final statement mismatch"
             else Deferred.Or_error.return proof
         | _ ->
-            (* Non-zkapp transitions: delegate to worker *)
-            Snark_worker.Impl.perform_single_untimed
-              ~m:(module T)
-              ~logger ~proof_cache_db ~single_spec ~signature_kind ~sok_digest
-              () )
-    | Merge _ ->
-        Snark_worker.Impl.perform_single_untimed
-          ~m:(module T)
-          ~logger ~proof_cache_db ~single_spec ~signature_kind ~sok_digest ()
+            let%bind t =
+              Deferred.return
+              @@
+              match w.transaction with
+              | Mina_transaction.Transaction.Command (Signed_command cmd) -> (
+                  match Signed_command.check ~signature_kind cmd with
+                  | Some cmd ->
+                      ( Ok (Command (Signed_command cmd))
+                        : Mina_transaction.Transaction.Valid.t Or_error.t )
+                  | None ->
+                      Or_error.errorf "Command has an invalid signature" )
+              | Command (Zkapp_command _) ->
+                  assert false
+              | Fee_transfer ft ->
+                  Ok (Fee_transfer ft)
+              | Coinbase cb ->
+                  Ok (Coinbase cb)
+            in
+            Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                T.of_non_zkapp_command_transaction
+                  ~statement:{ input with sok_digest }
+                  { Transaction_protocol_state.Poly.transaction = t
+                  ; block_data = w.protocol_state_body
+                  ; global_slot = w.block_global_slot
+                  }
+                  ~init_stack:w.init_stack
+                  (unstage
+                     (Mina_ledger.Sparse_ledger.handler w.first_pass_ledger) ) )
+        )
+    | Merge (_, proof1, proof2) ->
+        T.merge proof1 proof2 ~sok_digest
   in
   Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
 
