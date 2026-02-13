@@ -388,6 +388,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
       ~coinbase_receiver:`Producer
   in
   Block_time.Controller.enable_setting_offset () ;
+  Block_time.Controller.set_time_offset Time.Span.zero ;
   let scheduled_time =
     Consensus.Data.Consensus_time.(
       start_time ~constants:consensus_constants

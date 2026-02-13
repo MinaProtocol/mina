@@ -166,4 +166,9 @@ let command =
     Parallel.init_master () ;
     run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~state_dir)
 
-let () = Command.run command
+let () =
+  Command.group ~summary:"Block stepper test"
+    [ ("run", command)
+    ; (Parallel.worker_command_name, Parallel.worker_command)
+    ]
+  |> Command.run
