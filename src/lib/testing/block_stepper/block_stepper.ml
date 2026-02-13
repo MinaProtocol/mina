@@ -3,7 +3,6 @@ open Async
 open Signature_lib
 open Mina_base
 open Mina_state
-open Mina_transaction
 
 (* Helpers for extend_blockchain, copied from prover.ml *)
 let ledger_proof_opt next_state = function
@@ -90,7 +89,7 @@ let trust_system =
   s
 
 let prove_single ~proof_level ~proof_cache_db ~signature_kind ~sok_digest
-    (module T : Transaction_snark.S)
+    ~logger (module T : Transaction_snark.S)
     (spec :
       ( Transaction_witness.t
       , Ledger_proof.Cached.t )
@@ -99,83 +98,19 @@ let prove_single ~proof_level ~proof_cache_db ~signature_kind ~sok_digest
   | Check | No_check ->
       let statement = Snark_work_lib.Work.Single.Spec.statement spec in
       Deferred.return (Ledger_proof.For_tests.Cached.mk_dummy_proof statement)
-  | Full -> (
-      (* Convert spec to stable types: Transaction_witness.t ->
-         Stable.V2.t, Ledger_proof.Cached.t -> Ledger_proof.t *)
+  | Full ->
       let single_spec =
         Snark_work_lib.Spec.Single.read_all_proofs_from_disk spec
       in
-      match single_spec with
-      | Transition (input, w) -> (
-          match w.transaction with
-          | Command (Zkapp_command zkapp_command) ->
-              let witnesses_specs_stmts =
-                Work_partitioner.Snark_worker_shared.extract_zkapp_segment_works
-                  ~m:(module T)
-                  ~input ~witness:w
-                  ~zkapp_command:
-                    (Zkapp_command.write_all_proofs_to_disk ~signature_kind
-                       ~proof_cache_db zkapp_command )
-                |> Result.map_error
-                     ~f:
-                       Work_partitioner.Snark_worker_shared
-                       .Failed_to_generate_inputs
-                       .error_of_t
-                |> Or_error.ok_exn
-              in
-              let (witness, segment_spec, statement), rest =
-                Mina_stdlib.Nonempty_list.uncons witnesses_specs_stmts
-              in
-              let%bind p1 =
-                T.of_zkapp_command_segment_exn
-                  ~statement:{ statement with sok_digest }
-                  ~witness ~spec:segment_spec
-              in
-              let%map p =
-                Deferred.List.fold ~init:p1 rest
-                  ~f:(fun prev (witness, segment_spec, statement) ->
-                    let%bind curr =
-                      T.of_zkapp_command_segment_exn
-                        ~statement:{ statement with sok_digest }
-                        ~witness ~spec:segment_spec
-                    in
-                    T.merge prev curr ~sok_digest >>| Or_error.ok_exn )
-              in
-              Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db p
-          | _ ->
-              let validated_txn =
-                match w.transaction with
-                | Command (Signed_command cmd) -> (
-                    match Signed_command.check ~signature_kind cmd with
-                    | Some cmd ->
-                        (Command (Signed_command cmd) : Transaction.Valid.t)
-                    | None ->
-                        failwith "Command has an invalid signature" )
-                | Command (Zkapp_command _) ->
-                    assert false
-                | Fee_transfer ft ->
-                    Fee_transfer ft
-                | Coinbase cb ->
-                    Coinbase cb
-              in
-              let%map proof =
-                T.of_non_zkapp_command_transaction
-                  ~statement:{ input with sok_digest } ~init_stack:w.init_stack
-                  { Transaction_protocol_state.Poly.transaction = validated_txn
-                  ; block_data = w.protocol_state_body
-                  ; global_slot = w.block_global_slot
-                  }
-                  (unstage
-                     (Mina_ledger.Sparse_ledger.handler w.first_pass_ledger) )
-              in
-              Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof )
-      | Merge (_, proof1, proof2) ->
-          let%map proof =
-            T.merge proof1 proof2 ~sok_digest >>| Or_error.ok_exn
-          in
-          Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof )
+      let%map proof =
+        Snark_worker.Impl.perform_single_untimed
+          ~m:(module T)
+          ~logger ~proof_cache_db ~single_spec ~signature_kind ~sok_digest ()
+        >>| Or_error.ok_exn
+      in
+      Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
 
-let compute_completed_work ~proof_level ~proof_cache_db ~signature_kind
+let compute_completed_work ~proof_level ~proof_cache_db ~signature_kind ~logger
     ~protocol_states ~prover (module T : Transaction_snark.S)
     (staged_ledger : Staged_ledger.t) =
   let get_state hash =
@@ -192,7 +127,7 @@ let compute_completed_work ~proof_level ~proof_cache_db ~signature_kind
         let%map proofs =
           One_or_two.Deferred.map one_or_two ~f:(fun spec ->
               prove_single ~proof_level ~proof_cache_db ~signature_kind
-                ~sok_digest
+                ~sok_digest ~logger
                 (module T)
                 spec )
         in
@@ -379,7 +314,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
   let%bind get_completed_work =
     compute_completed_work
       ~proof_level:precomputed_values.Precomputed_values.proof_level
-      ~proof_cache_db ~signature_kind ~protocol_states ~prover
+      ~proof_cache_db ~signature_kind ~logger ~protocol_states ~prover
       (module Keys.T)
       previous_staged_ledger
   in

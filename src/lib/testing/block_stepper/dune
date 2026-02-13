@@ -36,6 +36,7 @@
   prover
   signature_lib
   snark_work_lib
+  snark_worker
   staged_ledger
   staged_ledger_diff
   transaction_protocol_state
