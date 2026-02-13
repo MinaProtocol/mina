@@ -21,41 +21,33 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 
 	defer t.gracefulShutdown(mainNetCmd, "Main network")
 
-	// Wait until best chain query time
 	t.WaitUntilBestChainQuery(t.Config.MainSlot, 0)
 
-	// Check block height at slot BestChainQueryFrom
 	bestTip, err := t.Client.BestTip(t.AnyPortOfType(PORT_REST))
 	if err != nil {
 		return nil, err
 	}
-
 	t.Logger.Info("Block height is %d at slot %d.", bestTip.BlockHeight, bestTip.Slot)
 
-	// Validate slot occupancy
-	if err := t.ValidateSlotOccupancy(0, bestTip.BlockHeight); err != nil {
-		return nil, err
-	}
-
-	// Analyze blocks and get genesis epoch data
-	analysis, err := t.AnalyzeBlocks()
+	analysis, err := t.AnalyzeBlocks(mainGenesisTs)
 	if err != nil {
 		return nil, err
 	}
 
 	t.Logger.Info("Network analayze result: %v", analysis)
 
-	// Validate max slot
-	if err := t.ValidateLatestOccupiedSlot(analysis.LastOccupiedSlot); err != nil {
+	if err := t.ValidateSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd); err != nil {
 		return nil, err
 	}
 
-	// Validate latest block slot
-	if err := t.ValidateLatestLastBlockBeforeTxEndSlot(analysis.LastBlockBeforeTxEnd); err != nil {
+	if err := t.ValidateLatestOccupiedSlot(analysis.Consensus.LastOccupiedSlot); err != nil {
 		return nil, err
 	}
 
-	// Validate no new blocks are created after chain end
+	if err := t.ValidateLatestLastBlockBeforeTxEndSlot(analysis.Consensus.LastBlockBeforeTxEnd); err != nil {
+		return nil, err
+	}
+
 	if err := t.ValidateNoNewBlocks(t.AnyPortOfType(PORT_REST)); err != nil {
 		return nil, err
 	}
@@ -96,6 +88,11 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData For
 	// Wait until best chain query time
 	t.WaitUntilBestChainQuery(t.Config.ForkSlot, int(expectedGenesisSlot))
 
+	genesisBlock, err := t.Client.GenesisBlock(t.AnyPortOfType(PORT_REST))
+	if err != nil {
+		return err
+	}
+
 	// Check block height at slot BestChainQueryFrom
 	bestTip, err := t.Client.BestTip(t.AnyPortOfType(PORT_REST))
 	if err != nil {
@@ -105,7 +102,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData For
 	t.Logger.Info("Block height is %d at slot %d.", bestTip.BlockHeight, bestTip.Slot)
 
 	// Validate slot occupancy
-	if err := t.ValidateSlotOccupancy(latestPreForkHeight+1, bestTip.BlockHeight); err != nil {
+	if err := t.ValidateSlotOccupancy(*genesisBlock, *bestTip); err != nil {
 		return err
 	}
 
@@ -141,7 +138,7 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, mainGenesi
 	}
 
 	// Validate fork config data
-	if err := t.ValidateLegacyPrepatchForkConfig(analysis.LastBlockBeforeTxEnd, prepatchConfig); err != nil {
+	if err := t.ValidateLegacyPrepatchForkConfig(analysis.Consensus.LastBlockBeforeTxEnd, prepatchConfig); err != nil {
 		return nil, err
 	}
 	// Write fork config to file
@@ -180,7 +177,7 @@ func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, mainGenesi
 		return nil, fmt.Errorf("failed to unmarshal fork config: %w", err)
 	}
 
-	err = t.ValidateFinalForkConfig(analysis.LastBlockBeforeTxEnd, patchedConfig, forkGenesisTs, mainGenesisTs)
+	err = t.ValidateFinalForkConfig(analysis.Consensus.LastBlockBeforeTxEnd, patchedConfig, forkGenesisTs, mainGenesisTs)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +219,7 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 		return nil, fmt.Errorf("failed to unmarshal fork config: %w", err)
 	}
 
-	err = t.ValidateFinalForkConfig(analysis.LastBlockBeforeTxEnd, config, forkGenesisTs, mainGenesisTs)
+	err = t.ValidateFinalForkConfig(analysis.Consensus.LastBlockBeforeTxEnd, config, forkGenesisTs, mainGenesisTs)
 	if err != nil {
 		return nil, err
 	}

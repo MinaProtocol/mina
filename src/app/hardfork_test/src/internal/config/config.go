@@ -105,6 +105,10 @@ func (c *Config) ForkGenesisTsGivenMainGenesisTs(mainGenesisTs int64) int64 {
 	return mainGenesisTs + int64(forkGenesisSlot*c.MainSlot)
 }
 
+func (c *Config) MainSlotChainEnd(mainGenesisTs int64) time.Time {
+	return time.Unix(mainGenesisTs+int64(c.SlotChainEnd*c.MainSlot), 0)
+}
+
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
 	// Check if required paths are specified
