@@ -270,41 +270,22 @@ let create_genesis_breadcrumb ~logger ~precomputed_values () =
     ~transition_receipt_time:(Some (Time.now ()))
     ~just_emitted_a_proof:false ~accounts_created
 
+let get_epoch_data_at_slot ~context:(module Context : Consensus.Intf.CONTEXT)
+    ~consensus_state ~local_state ~slot =
+  let global_slot = Mina_numbers.Global_slot_since_hard_fork.of_int slot in
+  let time =
+    Consensus.Data.Consensus_time.(
+      start_time ~constants:Context.consensus_constants
+        (of_global_slot ~constants:Context.consensus_constants global_slot))
+  in
+  let now = Block_time.Span.to_ms (Block_time.to_span_since_epoch time) in
+  Consensus.Hooks.get_epoch_data_for_vrf ~constants:Context.consensus_constants
+    now consensus_state ~local_state ~logger:Context.logger
+
 let find_next_winning_slot ~context:(module Context : Consensus.Intf.CONTEXT)
-    ~precomputed_values ~keypair ~start_slot ~epoch_ledger_location
-    (breadcrumb : Frontier_base.Breadcrumb.t) =
+    ~keypair ~start_slot ~epoch_data_for_vrf ~ledger_snapshot =
   let public_key_compressed = Public_key.compress keypair.Keypair.public_key in
   let logger = Context.logger in
-  let consensus_local_state =
-    Consensus.Data.Local_state.create
-      ~context:(module Context)
-      ~genesis_ledger:precomputed_values.Precomputed_values.genesis_ledger
-      ~genesis_epoch_data:precomputed_values.genesis_epoch_data
-      ~epoch_ledger_location
-      (Public_key.Compressed.Set.singleton public_key_compressed)
-      ~genesis_state_hash:
-        precomputed_values.protocol_state_with_hashes.hash.state_hash
-      ~epoch_ledger_backing_type:Stable_db
-  in
-  let breadcrumb_protocol_state =
-    Frontier_base.Breadcrumb.protocol_state breadcrumb
-  in
-  let consensus_state =
-    Mina_state.Protocol_state.consensus_state breadcrumb_protocol_state
-  in
-  let time_to_ms =
-    Fn.compose Block_time.Span.to_ms Block_time.to_span_since_epoch
-  in
-  let breadcrumb_timestamp =
-    Blockchain_state.timestamp @@ Protocol_state.blockchain_state
-    @@ breadcrumb_protocol_state
-  in
-  let epoch_data_for_vrf, ledger_snapshot =
-    Consensus.Hooks.get_epoch_data_for_vrf
-      ~constants:Context.consensus_constants
-      (time_to_ms @@ breadcrumb_timestamp)
-      consensus_state ~local_state:consensus_local_state ~logger
-  in
   let { Consensus.Data.Epoch_data_for_vrf.epoch_ledger
       ; epoch_seed
       ; epoch = _
@@ -317,17 +298,10 @@ let find_next_winning_slot ~context:(module Context : Consensus.Intf.CONTEXT)
   let slots_per_epoch =
     Mina_numbers.Length.to_int Context.consensus_constants.slots_per_epoch
   in
-  let start_epoch = start_slot / slots_per_epoch in
-  Deferred.repeat_until_finished (start_slot, slots_per_epoch)
-  @@ fun (current_slot, attempts_left) ->
-  let current_epoch = current_slot / slots_per_epoch in
-  if current_epoch > start_epoch then (
-    [%log error] "Reached epoch boundary at slot %d without finding a winner"
-      current_slot ;
-    failwith "Could not find a winning slot in this epoch" )
-  else if attempts_left <= 0 then (
-    [%log error] "Could not find a winning slot after many attempts" ;
-    failwith "Could not find a winning slot" )
+  let epoch_end_slot = ((start_slot / slots_per_epoch) + 1) * slots_per_epoch in
+  Deferred.repeat_until_finished start_slot
+  @@ fun current_slot ->
+  if current_slot >= epoch_end_slot then return (`Finished None)
   else
     let global_slot =
       Mina_numbers.Global_slot_since_hard_fork.of_int current_slot
@@ -346,7 +320,7 @@ let find_next_winning_slot ~context:(module Context : Consensus.Intf.CONTEXT)
         [%log fatal] "VRF check failed" ;
         failwith "VRF check failed"
     | Ok None ->
-        `Repeat (current_slot + 1, attempts_left - 1)
+        `Repeat (current_slot + 1)
     | Ok
         (Some
           (`Vrf_eval _vrf_eval, `Vrf_output vrf_result, `Delegator delegator) )
@@ -364,7 +338,7 @@ let find_next_winning_slot ~context:(module Context : Consensus.Intf.CONTEXT)
           ; vrf_result
           }
         in
-        `Finished ((slot_won, ledger_snapshot), current_slot + 1)
+        `Finished (Some ((slot_won, ledger_snapshot), current_slot + 1))
 
 let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
     ~signature_kind ~proof_cache_db ~protocol_states (module Keys : Keys_S)
@@ -521,7 +495,10 @@ type t =
   ; next_search_slot : int
   ; proof_cache_db : Proof_cache_tag.cache_db
   ; protocol_states : Protocol_state.value State_hash.Map.t
-  ; epoch_ledger_location : string
+  ; consensus_local_state : Consensus.Data.Local_state.t
+  ; epoch_data :
+      Consensus.Data.Epoch_data_for_vrf.t
+      * Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
   }
 
 type start_state =
@@ -545,16 +522,34 @@ let verifier t = t.verifier
 
 let create ~precomputed_values ~keypair ~start ~logger ~state_dir () =
   let start_block = start.breadcrumb in
-  let epoch_ledger_location = Filename.concat state_dir "epoch_ledger" in
   let%map context, keys_module, verifier =
     initialize_verifier_and_components ~logger ~precomputed_values ~state_dir
   in
+  let (module Context : Consensus.Intf.CONTEXT) = context in
   let next_search_slot =
     Frontier_base.Breadcrumb.consensus_state start_block
     |> Consensus.Data.Consensus_state.curr_global_slot
     |> Mina_numbers.Global_slot_since_hard_fork.to_int |> ( + ) 1
   in
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
+  let consensus_local_state =
+    Consensus.Data.Local_state.create
+      ~context:(module Context)
+      ~genesis_ledger:precomputed_values.Precomputed_values.genesis_ledger
+      ~genesis_epoch_data:precomputed_values.genesis_epoch_data
+      ~epoch_ledger_location:(Filename.concat state_dir "epoch_ledger")
+      (Public_key.Compressed.Set.singleton
+         (Public_key.compress keypair.Keypair.public_key) )
+      ~genesis_state_hash:
+        precomputed_values.protocol_state_with_hashes.hash.state_hash
+      ~epoch_ledger_backing_type:Stable_db
+  in
+  let consensus_state = Frontier_base.Breadcrumb.consensus_state start_block in
+  let epoch_data =
+    get_epoch_data_at_slot
+      ~context:(module Context)
+      ~consensus_state ~local_state:consensus_local_state ~slot:next_search_slot
+  in
   { precomputed_values
   ; context
   ; keys_module
@@ -565,17 +560,46 @@ let create ~precomputed_values ~keypair ~start ~logger ~state_dir () =
   ; next_search_slot
   ; proof_cache_db
   ; protocol_states = start.protocol_states
-  ; epoch_ledger_location
+  ; consensus_local_state
+  ; epoch_data
   }
 
 let step t ~transactions =
   let logger = t.logger in
+  let (module Context : Consensus.Intf.CONTEXT) = t.context in
+  let slots_per_epoch =
+    Mina_numbers.Length.to_int Context.consensus_constants.slots_per_epoch
+  in
+  let max_search_slots = 2 * slots_per_epoch in
+  let consensus_state = Frontier_base.Breadcrumb.consensus_state t.current in
+  let rec find_slot ~epoch_data ~start_slot ~slots_searched =
+    if slots_searched >= max_search_slots then
+      failwith "Could not find winning slot within 2 epochs" ;
+    let epoch_data_for_vrf, ledger_snapshot = epoch_data in
+    let epoch_end_slot =
+      ((start_slot / slots_per_epoch) + 1) * slots_per_epoch
+    in
+    match%bind
+      find_next_winning_slot ~context:t.context ~keypair:t.keypair ~start_slot
+        ~epoch_data_for_vrf ~ledger_snapshot
+    with
+    | Some (winner, next_slot) ->
+        return (winner, next_slot, epoch_data)
+    | None ->
+        [%log info] "Epoch exhausted at slot %d, recomputing for next epoch"
+          epoch_end_slot ;
+        let new_epoch_data =
+          get_epoch_data_at_slot ~context:t.context ~consensus_state
+            ~local_state:t.consensus_local_state ~slot:epoch_end_slot
+        in
+        let slots_in_this_epoch = epoch_end_slot - start_slot in
+        find_slot ~epoch_data:new_epoch_data ~start_slot:epoch_end_slot
+          ~slots_searched:(slots_searched + slots_in_this_epoch)
+  in
   [%log info] "Searching for next winning slot from slot %d" t.next_search_slot ;
-  let%bind (slot_won, ledger_snapshot), next_search_slot =
-    find_next_winning_slot ~context:t.context
-      ~precomputed_values:t.precomputed_values ~keypair:t.keypair
-      ~start_slot:t.next_search_slot
-      ~epoch_ledger_location:t.epoch_ledger_location t.current
+  let%bind (slot_won, ledger_snapshot), next_search_slot, epoch_data =
+    find_slot ~epoch_data:t.epoch_data ~start_slot:t.next_search_slot
+      ~slots_searched:0
   in
   let signature_kind = t.precomputed_values.signature_kind in
   let%map breadcrumb =
@@ -592,4 +616,9 @@ let step t ~transactions =
     State_hash.Map.set t.protocol_states ~key:state_hash ~data:protocol_state
   in
   ( breadcrumb
-  , { t with current = breadcrumb; next_search_slot; protocol_states } )
+  , { t with
+      current = breadcrumb
+    ; next_search_slot
+    ; protocol_states
+    ; epoch_data
+    } )
