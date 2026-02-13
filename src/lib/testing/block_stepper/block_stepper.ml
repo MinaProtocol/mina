@@ -153,7 +153,7 @@ let create_genesis_breadcrumb ~logger ~precomputed_values () =
 
 let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
     ~precomputed_values ~n_slots ~keypair ~start_slot
-    (genesis : Frontier_base.Breadcrumb.t) =
+    (breadcrumb : Frontier_base.Breadcrumb.t) =
   let public_key_compressed = Public_key.compress keypair.Keypair.public_key in
   let logger = Context.logger in
   [%log info] "Loaded keypair for public key: %s"
@@ -169,23 +169,23 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
         precomputed_values.protocol_state_with_hashes.hash.state_hash
       ~epoch_ledger_backing_type:Stable_db
   in
-  let genesis_protocol_state =
-    Frontier_base.Breadcrumb.protocol_state genesis
+  let breadcrumb_protocol_state =
+    Frontier_base.Breadcrumb.protocol_state breadcrumb
   in
   let consensus_state =
-    Mina_state.Protocol_state.consensus_state genesis_protocol_state
+    Mina_state.Protocol_state.consensus_state breadcrumb_protocol_state
   in
   let time_to_ms =
     Fn.compose Block_time.Span.to_ms Block_time.to_span_since_epoch
   in
-  let genesis_timestamp =
+  let breadcrumb_timestamp =
     Blockchain_state.timestamp @@ Protocol_state.blockchain_state
-    @@ genesis_protocol_state
+    @@ breadcrumb_protocol_state
   in
   let epoch_data_for_vrf, ledger_snapshot =
     Consensus.Hooks.get_epoch_data_for_vrf
       ~constants:Context.consensus_constants
-      (time_to_ms @@ genesis_timestamp)
+      (time_to_ms @@ breadcrumb_timestamp)
       consensus_state ~local_state:consensus_local_state ~logger
   in
   let { Consensus.Data.Epoch_data_for_vrf.epoch_ledger
@@ -200,10 +200,19 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
   [%log info] "Generated epoch data for vrf: global slot %s, since genesis: %s"
     (Mina_numbers.Global_slot_since_hard_fork.to_string epoch_start_hf)
     (Mina_numbers.Global_slot_since_genesis.to_string epoch_start) ;
+  let slots_per_epoch =
+    Mina_numbers.Length.to_int Context.consensus_constants.slots_per_epoch
+  in
+  let start_epoch = start_slot / slots_per_epoch in
   let search_bound = max 100 (n_slots * 3) in
   Deferred.repeat_until_finished (start_slot, [], search_bound)
   @@ fun (current_slot, found_slots, attempts_left) ->
-  if List.length found_slots >= n_slots then
+  let current_epoch = current_slot / slots_per_epoch in
+  if current_epoch > start_epoch then (
+    [%log info] "Reached epoch boundary at slot %d, stopping search"
+      current_slot ;
+    return (`Finished (List.rev found_slots, current_slot)) )
+  else if List.length found_slots >= n_slots then
     return (`Finished (List.rev found_slots, current_slot))
   else if attempts_left <= 0 then (
     [%log error] "Could not find enough winning slots after many attempts" ;
@@ -396,7 +405,6 @@ type t =
       list
   ; logger : Logger.t
   ; keypair : Keypair.t
-  ; start_block : Frontier_base.Breadcrumb.t
   ; next_search_slot : int
   }
 
@@ -427,7 +435,6 @@ let create ~precomputed_values ~keypair ~start_block ~logger ?(n_slots = 100) ()
   ; remaining_winning_slots
   ; logger
   ; keypair
-  ; start_block
   ; next_search_slot
   }
 
@@ -446,7 +453,7 @@ let step t ~transactions =
         let%map remaining_winning_slots, next_search_slot =
           find_winning_slots ~context:t.context
             ~precomputed_values:t.precomputed_values ~n_slots ~keypair:t.keypair
-            ~start_slot:t.next_search_slot t.start_block
+            ~start_slot:t.next_search_slot t.current
         in
         { t with remaining_winning_slots; next_search_slot }
   in
