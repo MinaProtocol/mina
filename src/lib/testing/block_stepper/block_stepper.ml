@@ -350,6 +350,127 @@ let find_next_winning_slot ~context:(module Context : Consensus.Intf.CONTEXT)
         in
         `Finished (Some ((slot_won, ledger_snapshot), current_slot + 1))
 
+let generate_next_state ~constraint_constants ~previous_protocol_state
+    ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
+    ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
+    ~zkapp_cmd_limit_hardcap ~signature_kind =
+  let open Deferred.Let_syntax in
+  let previous_protocol_state_body_hash =
+    Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
+  in
+  let previous_protocol_state_hash =
+    (Protocol_state.hashes_with_body
+       ~body_hash:previous_protocol_state_body_hash previous_protocol_state )
+      .state_hash
+  in
+  let previous_state_view =
+    Protocol_state.body previous_protocol_state
+    |> Mina_state.Protocol_state.Body.view
+  in
+  let global_slot =
+    Consensus.Data.Block_data.global_slot_since_genesis block_data
+  in
+  let supercharge_coinbase =
+    let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
+    Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
+      ~epoch_ledger ~global_slot
+  in
+  let coinbase_receiver =
+    Consensus.Data.Block_data.coinbase_receiver block_data
+  in
+  let diff =
+    Staged_ledger.create_diff ~constraint_constants ~global_slot staged_ledger
+      ~coinbase_receiver ~logger ~current_state_view:previous_state_view
+      ~transactions_by_fee:transactions ~get_completed_work
+      ~log_block_creation:false ~supercharge_coinbase ~zkapp_cmd_limit:None
+    |> Result.map_error ~f:(fun err ->
+           Staged_ledger.Staged_ledger_error.Pre_diff err )
+    |> Result.map_error ~f:Staged_ledger.Staged_ledger_error.to_error
+    |> Or_error.ok_exn |> fst
+  in
+  let%bind ( `Ledger_proof ledger_proof_opt
+           , `Staged_ledger transitioned_staged_ledger
+           , `Accounts_created _
+           , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) )
+      =
+    Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
+      ~global_slot diff ~logger ~current_state_view:previous_state_view
+      ~state_and_body_hash:
+        (previous_protocol_state_hash, previous_protocol_state_body_hash)
+      ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
+      ~signature_kind
+    >>| Result.map_error ~f:Staged_ledger.Staged_ledger_error.to_error
+    >>| Or_error.ok_exn
+  in
+  let staged_ledger_hash = Staged_ledger.hash transitioned_staged_ledger in
+  ignore
+  @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
+       (Staged_ledger.ledger transitioned_staged_ledger) ;
+  let diff_unwrapped =
+    Staged_ledger_diff.read_all_proofs_from_disk
+    @@ Staged_ledger_diff.forget diff
+  in
+  let previous_ledger_hash =
+    previous_protocol_state |> Protocol_state.blockchain_state
+    |> Blockchain_state.snarked_ledger_hash
+  in
+  let ledger_proof_statement =
+    match ledger_proof_opt with
+    | Some proof ->
+        Ledger_proof.Cached.statement proof
+    | None ->
+        previous_protocol_state |> Protocol_state.blockchain_state
+        |> Blockchain_state.ledger_proof_statement
+  in
+  let genesis_ledger_hash =
+    previous_protocol_state |> Protocol_state.blockchain_state
+    |> Blockchain_state.genesis_ledger_hash
+  in
+  let supply_increase =
+    Option.value_map ledger_proof_opt
+      ~f:(fun proof -> (Ledger_proof.Cached.statement proof).supply_increase)
+      ~default:Currency.Amount.Signed.zero
+  in
+  let body_reference =
+    Staged_ledger_diff.Body.compute_reference
+      ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
+      (Mina_block.Body.Stable.Latest.create diff_unwrapped)
+  in
+  let blockchain_state =
+    Blockchain_state.create_value ~timestamp:scheduled_time ~genesis_ledger_hash
+      ~staged_ledger_hash ~body_reference ~ledger_proof_statement
+  in
+  let current_time =
+    Block_time.now time_controller
+    |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
+  in
+  let protocol_state, consensus_transition_data =
+    Consensus_state_hooks.generate_transition ~previous_protocol_state
+      ~blockchain_state ~current_time ~block_data ~supercharge_coinbase
+      ~snarked_ledger_hash:previous_ledger_hash ~genesis_ledger_hash
+      ~supply_increase ~logger ~constraint_constants
+  in
+  let snark_transition =
+    Snark_transition.create_value
+      ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
+      ~consensus_transition:consensus_transition_data ~pending_coinbase_update
+      ()
+  in
+  let internal_transition =
+    Mina_block.Internal_transition.create ~snark_transition
+      ~prover_state:(Consensus.Data.Block_data.prover_state block_data)
+      ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
+      ~ledger_proof:
+        (Option.map ledger_proof_opt ~f:Ledger_proof.Cached.read_proof_from_disk)
+  in
+  let pending_coinbase_witness =
+    { Pending_coinbase_witness.pending_coinbases =
+        Staged_ledger.pending_coinbase_collection staged_ledger
+    ; is_new_stack
+    }
+  in
+  return (protocol_state, internal_transition, pending_coinbase_witness)
+
 let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
     ~signature_kind ~proof_cache_db ~protocol_states (module Keys : Keys_S)
     (slot_won, ledger_snapshot) (previous : Frontier_base.Breadcrumb.t) =
@@ -393,18 +514,10 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
       previous_staged_ledger
   in
   let%bind protocol_state, internal_transition, pending_coinbase_witness =
-    Block_producer.generate_next_state ~commit_id:"" ~constraint_constants
-      ~scheduled_time ~block_data ~previous_protocol_state ~time_controller
+    generate_next_state ~constraint_constants ~scheduled_time ~block_data
+      ~previous_protocol_state ~time_controller
       ~staged_ledger:previous_staged_ledger ~transactions ~get_completed_work
-      ~logger ~log_block_creation:false ~winner_pk ~block_reward_threshold:None
-      ~zkapp_cmd_limit:None ~zkapp_cmd_limit_hardcap:128 ~slot_tx_end:None
-      ~slot_chain_end:None ~signature_kind
-    |> Interruptible.force
-    >>| Result.map_error ~f:(fun () ->
-            Error.of_string "unexpected interruption" )
-    >>| Or_error.ok_exn
-    >>| Option.value_exn ?here:None ?error:None
-          ~message:"generate_next_state failed"
+      ~logger ~winner_pk ~zkapp_cmd_limit_hardcap:128 ~signature_kind
   in
   [%log info]
     "Generated protocol state and internal transition with %d commands"

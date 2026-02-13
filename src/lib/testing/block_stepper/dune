@@ -10,19 +10,18 @@
   sexplib0
   ;; local libraries
   block_time
-  block_producer
   blockchain_snark
   child_processes
   coda_genesis_proof
   consensus
   currency
   genesis_constants
-  interruptible
   ledger_proof
   logger
   mina_base
   mina_block
   mina_ledger
+  mina_net2
   mina_numbers
   mina_signature_kind
   mina_state
