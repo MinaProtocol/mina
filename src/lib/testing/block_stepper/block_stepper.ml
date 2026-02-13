@@ -383,7 +383,8 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
   let%bind get_completed_work =
     Snark_work.compute
       ~proof_level:precomputed_values.Precomputed_values.proof_level
-      ~proof_cache_db ~signature_kind ~logger ~prover
+      ~proof_cache_db ~signature_kind ~logger ~fee:Currency.Fee.zero
+      ~prover_key:prover
       (module Keys.T)
       work_specs
   in

@@ -3,7 +3,8 @@ val compute :
   -> proof_cache_db:Proof_cache_tag.cache_db
   -> signature_kind:Mina_signature_kind.t
   -> logger:Logger.t
-  -> prover:Signature_lib.Public_key.Compressed.t
+  -> fee:Currency.Fee.t
+  -> prover_key:Signature_lib.Public_key.Compressed.t
   -> (module Transaction_snark.S)
   -> ( Transaction_witness.t
      , Ledger_proof.Cached.t )

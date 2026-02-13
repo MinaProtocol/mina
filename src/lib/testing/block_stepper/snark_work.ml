@@ -98,8 +98,8 @@ let prove_single ~proof_level ~proof_cache_db ~signature_kind ~sok_digest
           in
           Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof )
 
-let compute ~proof_level ~proof_cache_db ~signature_kind ~logger ~prover
-    (module T : Transaction_snark.S) work_specs =
+let compute ~proof_level ~proof_cache_db ~signature_kind ~logger ~fee
+    ~prover_key (module T : Transaction_snark.S) work_specs =
   let sok_digest = Sok_message.Digest.default in
   let%map proved_work =
     Deferred.List.map work_specs ~how:`Sequential ~f:(fun one_or_two ->
@@ -115,7 +115,7 @@ let compute ~proof_level ~proof_cache_db ~signature_kind ~logger ~prover
         in
         ( statement
         , Transaction_snark_work.Checked.create_unsafe
-            { fee = Currency.Fee.zero; proofs; prover } ) )
+            { fee; proofs; prover = prover_key } ) )
   in
   let table = Transaction_snark_work.Statement.Table.create () in
   List.iter proved_work ~f:(fun (stmt, work) ->
