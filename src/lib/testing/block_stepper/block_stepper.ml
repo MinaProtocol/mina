@@ -387,6 +387,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
       ~prover_key:prover
       (module Keys.T)
       work_specs
+    >>| Or_error.ok_exn
   in
   let%bind ( protocol_state
            , internal_transition

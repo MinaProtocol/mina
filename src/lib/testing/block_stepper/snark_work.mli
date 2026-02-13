@@ -13,4 +13,4 @@ val compute :
      list
   -> (   Transaction_snark_work.Statement.t
       -> Transaction_snark_work.Checked.t option )
-     Async.Deferred.t
+     Async.Deferred.Or_error.t
