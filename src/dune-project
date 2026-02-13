@@ -14,6 +14,7 @@
 (package (name blake2))
 (package (name blockchain_snark))
 (package (name block_producer))
+(package (name block_stepper))
 (package (name block_time))
 (package (name bootstrap_controller))
 (package (name bowe_gabizon_hash))

@@ -1,0 +1,45 @@
+(library
+ (name block_stepper)
+ (public_name block_stepper)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  core
+  core_kernel
+  sexplib0
+  ;; local libraries
+  block_time
+  block_producer
+  blockchain_snark
+  child_processes
+  coda_genesis_proof
+  consensus
+  currency
+  genesis_constants
+  interruptible
+  ledger_proof
+  logger
+  mina_base
+  mina_block
+  mina_ledger
+  mina_numbers
+  mina_signature_kind
+  mina_state
+  parallel
+  pipe_lib
+  precomputed_values
+  prover
+  signature_lib
+  snark_params
+  staged_ledger
+  staged_ledger_diff
+  transaction_snark
+  transition_frontier_base
+  trust_system
+  verifier
+  with_hash)
+ (preprocess
+  (pps ppx_version ppx_mina ppx_jane))
+ (instrumentation
+  (backend bisect_ppx)))
