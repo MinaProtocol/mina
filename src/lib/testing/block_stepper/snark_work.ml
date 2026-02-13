@@ -80,30 +80,6 @@ let prove_zkapp ~proof_cache_db ~signature_kind ~sok_digest
       "Zkapp_command transaction final statement mismatch"
   else Deferred.Or_error.return proof
 
-let prove_transition ~proof_cache_db ~signature_kind ~sok_digest
-    (module T : Transaction_snark.S) input (w : Transaction_witness.Stable.V2.t)
-    =
-  let open Deferred.Or_error.Let_syntax in
-  match w.transaction with
-  | Mina_transaction.Transaction.Command (Zkapp_command zkapp_command) ->
-      prove_zkapp ~proof_cache_db ~signature_kind ~sok_digest
-        (module T)
-        input w zkapp_command
-  | Command (Signed_command cmd) ->
-      let%bind cmd =
-        Deferred.return
-        @@ Result.of_option
-             (Signed_command.check ~signature_kind cmd)
-             ~error:(Error.of_string "Command has an invalid signature")
-      in
-      prove_non_zkapp ~sok_digest
-        (module T)
-        input w (Command (Signed_command cmd))
-  | Fee_transfer ft ->
-      prove_non_zkapp ~sok_digest (module T) input w (Fee_transfer ft)
-  | Coinbase cb ->
-      prove_non_zkapp ~sok_digest (module T) input w (Coinbase cb)
-
 let prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger:_
     (module T : Transaction_snark.S)
     (spec :
@@ -114,10 +90,26 @@ let prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger:_
   let single_spec = Snark_work_lib.Spec.Single.read_all_proofs_from_disk spec in
   let%map proof =
     match single_spec with
-    | Transition (input, w) ->
-        prove_transition ~proof_cache_db ~signature_kind ~sok_digest
-          (module T)
-          input w
+    | Transition (input, w) -> (
+        match w.transaction with
+        | Mina_transaction.Transaction.Command (Zkapp_command zkapp_command) ->
+            prove_zkapp ~proof_cache_db ~signature_kind ~sok_digest
+              (module T)
+              input w zkapp_command
+        | Command (Signed_command cmd) ->
+            let%bind cmd =
+              Deferred.return
+              @@ Result.of_option
+                   (Signed_command.check ~signature_kind cmd)
+                   ~error:(Error.of_string "Command has an invalid signature")
+            in
+            prove_non_zkapp ~sok_digest
+              (module T)
+              input w (Command (Signed_command cmd))
+        | Fee_transfer ft ->
+            prove_non_zkapp ~sok_digest (module T) input w (Fee_transfer ft)
+        | Coinbase cb ->
+            prove_non_zkapp ~sok_digest (module T) input w (Coinbase cb) )
     | Merge (_, proof1, proof2) ->
         T.merge proof1 proof2 ~sok_digest
   in
