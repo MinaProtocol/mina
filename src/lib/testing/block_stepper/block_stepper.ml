@@ -538,6 +538,19 @@ type t =
   ; protocol_states : Protocol_state.value State_hash.Map.t
   }
 
+type start_state =
+  { breadcrumb : Frontier_base.Breadcrumb.t
+  ; protocol_states : Protocol_state.value State_hash.Map.t
+  }
+
+let start_state_of_genesis breadcrumb =
+  let hash = Frontier_base.Breadcrumb.state_hash breadcrumb in
+  let protocol_state = Frontier_base.Breadcrumb.protocol_state breadcrumb in
+  { breadcrumb; protocol_states = State_hash.Map.singleton hash protocol_state }
+
+let start_state_of_breadcrumb breadcrumb ~protocol_states =
+  { breadcrumb; protocol_states }
+
 let current_block t = t.current
 
 let remaining_slots t = List.length t.remaining_winning_slots
@@ -546,8 +559,8 @@ let precomputed_values t = t.precomputed_values
 
 let verifier t = t.verifier
 
-let create ~precomputed_values ~keypair ~start_block ~logger ?(n_slots = 100) ()
-    =
+let create ~precomputed_values ~keypair ~start ~logger ?(n_slots = 100) () =
+  let start_block = start.breadcrumb in
   let%bind context, keys_module, verifier =
     initialize_verifier_and_components ~logger ~precomputed_values
   in
@@ -558,13 +571,6 @@ let create ~precomputed_values ~keypair ~start_block ~logger ?(n_slots = 100) ()
   in
   [%log info] "Found %d winning slots" (List.length remaining_winning_slots) ;
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
-  let genesis_state_hash = Frontier_base.Breadcrumb.state_hash start_block in
-  let genesis_protocol_state =
-    Frontier_base.Breadcrumb.protocol_state start_block
-  in
-  let protocol_states =
-    State_hash.Map.singleton genesis_state_hash genesis_protocol_state
-  in
   { precomputed_values
   ; context
   ; keys_module
@@ -575,7 +581,7 @@ let create ~precomputed_values ~keypair ~start_block ~logger ?(n_slots = 100) ()
   ; keypair
   ; next_search_slot
   ; proof_cache_db
-  ; protocol_states
+  ; protocol_states = start.protocol_states
   }
 
 let step t ~transactions =

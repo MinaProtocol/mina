@@ -2,6 +2,7 @@ open Core
 open Async
 open Signature_lib
 open Mina_base
+open Mina_state
 
 val create_genesis_breadcrumb :
      logger:Logger.t
@@ -10,6 +11,15 @@ val create_genesis_breadcrumb :
   -> Frontier_base.Breadcrumb.t Deferred.t
 
 type t
+
+type start_state
+
+val start_state_of_genesis : Frontier_base.Breadcrumb.t -> start_state
+
+val start_state_of_breadcrumb :
+     Frontier_base.Breadcrumb.t
+  -> protocol_states:Protocol_state.value State_hash.Map.t
+  -> start_state
 
 val current_block : t -> Frontier_base.Breadcrumb.t
 
@@ -22,7 +32,7 @@ val verifier : t -> Verifier.t
 val create :
      precomputed_values:Precomputed_values.t
   -> keypair:Keypair.t
-  -> start_block:Frontier_base.Breadcrumb.t
+  -> start:start_state
   -> logger:Logger.t
   -> ?n_slots:int
   -> unit
