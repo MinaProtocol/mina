@@ -126,6 +126,8 @@ module Compressed = struct
       and is_odd = Boolean.if_ cond ~then_:t1.is_odd ~else_:t2.is_odd in
       Poly.{ x; is_odd }
 
+    let empty = var_of_t empty
+
     module Assert = struct
       let equal t1 t2 =
         let%map () = Field.Checked.Assert.equal t1.Poly.x t2.Poly.x

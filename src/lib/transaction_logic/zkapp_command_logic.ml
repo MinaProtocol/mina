@@ -766,7 +766,11 @@ module type Inputs_intf = sig
        and type amount := Amount.t
        and type signed_amount := Amount.Signed.t
 
-  module Public_key : Iffable with type bool := Bool.t
+  module Public_key : sig
+    include Iffable with type bool := Bool.t
+
+    val empty : t
+  end
 
   module Token_id : Token_id_intf with type bool := Bool.t
 
@@ -1284,20 +1288,10 @@ module Make (Inputs : Inputs_intf) = struct
         (Account_update.token_id account_update)
         (a, inclusion_proof)
     in
-    (* delegate to public key if new account using default token *)
+    (* Ensure new accounts have no delegate. *)
     let a =
-      let self_delegate =
-        let account_update_token_id = Account_update.token_id account_update in
-        Bool.(
-          account_is_new
-          &&& Token_id.equal account_update_token_id Token_id.default)
-      in
-      (* in-SNARK, a new account has the empty public key here
-         in that case, use the public key from the account update, not the account
-      *)
       Account.set_delegate
-        (Public_key.if_ self_delegate
-           ~then_:(Account_update.public_key account_update)
+        (Public_key.if_ account_is_new ~then_:Public_key.empty
            ~else_:(Account.delegate a) )
         a
     in
@@ -1712,9 +1706,7 @@ module Make (Inputs : Inputs_intf) = struct
     (* Update delegate. *)
     let a, local_state =
       let delegate = Account_update.Update.delegate account_update in
-      (* for new accounts using the default token, we've already
-         set the delegate to the public key
-      *)
+      (* for new accounts, we've already initialized the delegate to None *)
       let base_delegate = Account.delegate a in
       let has_permission =
         Controller.check ~proof_verifies ~signature_verifies

@@ -627,7 +627,7 @@ let%test_module "Account precondition tests" =
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
 
-    let mk_delegate_precondition pk : Account_update.Account_precondition.t =
+    let delegate_precondition : Account_update.Account_precondition.t =
       let open Zkapp_basic.Or_ignore in
       let state =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
@@ -636,7 +636,7 @@ let%test_module "Account precondition tests" =
       { balance = Ignore
       ; nonce = Ignore
       ; receipt_chain_hash = Ignore
-      ; delegate = Check pk
+      ; delegate = Check Public_key.Compressed.empty
       ; state
       ; action_state = Ignore
       ; proved_state = Ignore
@@ -696,9 +696,6 @@ let%test_module "Account precondition tests" =
                   (* add delegate precondition for new account *)
                   let%bind zkapp_command =
                     let zkapp_pk = Public_key.compress new_kp.public_key in
-                    let delegate_precondition =
-                      mk_delegate_precondition zkapp_pk
-                    in
                     let zkapp =
                       { zkapp_command0 with
                         account_updates =
@@ -719,7 +716,7 @@ let%test_module "Account precondition tests" =
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
 
-    let%test_unit "unsatisfied delegate precondition, custom token" =
+    let%test_unit "custom tokens have empty delegation" =
       (* when new account has a custom token, it doesn't get a self-delegation *)
       let constraint_constants = U.constraint_constants in
       let signature_kind = U.signature_kind in
@@ -746,9 +743,6 @@ let%test_module "Account precondition tests" =
                   let custom_token_id =
                     Account_id.derive_token_id
                       ~owner:(Account_id.create token_owner_pk Token_id.default)
-                  in
-                  let token_account_pk =
-                    Public_key.compress token_account.public_key
                   in
                   let keymap =
                     List.fold [ token_owner; token_account ]
@@ -777,9 +771,6 @@ let%test_module "Account precondition tests" =
                            ~fee_payer_nonce:nonce
                     in
                     let zkapp_dummy_signatures =
-                      let delegate_precondition =
-                        mk_delegate_precondition token_account_pk
-                      in
                       { zkapp0 with
                         account_updates =
                           add_account_precondition ~at:1 delegate_precondition
@@ -791,8 +782,6 @@ let%test_module "Account precondition tests" =
                     replace_authorizations ~keymap zkapp_dummy_signatures
                   in
                   U.check_zkapp_command_with_merges_exn
-                    ~expected_failure:
-                      (Account_delegate_precondition_unsatisfied, U.Pass_2)
                     ledger
                     [ mint_token_zkapp_command ] ) ) )
 

@@ -968,6 +968,8 @@ module Make (L : Ledger_intf.S) :
       type t = Public_key.Compressed.t
 
       let if_ = value_if
+
+      let empty = Public_key.Compressed.empty
     end
 
     module Controller = struct
