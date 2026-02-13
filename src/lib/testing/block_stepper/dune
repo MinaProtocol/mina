@@ -29,7 +29,6 @@
   mina_transaction
   one_or_two
   parallel
-  pipe_lib
   precomputed_values
   proof_cache_tag
   prover
@@ -43,7 +42,6 @@
   transaction_snark_work
   transaction_witness
   transition_frontier_base
-  trust_system
   verifier
   with_hash
   work_partitioner)

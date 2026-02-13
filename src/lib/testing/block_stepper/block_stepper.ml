@@ -79,15 +79,6 @@ end) : Keys_S = struct
   end)
 end
 
-(* Null trust system stub, copied from tests *)
-let trust_system =
-  let s = Trust_system.null () in
-  don't_wait_for
-    (Pipe_lib.Strict_pipe.Reader.iter
-       (Trust_system.upcall_pipe s)
-       ~f:(const Deferred.unit) ) ;
-  s
-
 let prove_single ~proof_level ~proof_cache_db ~signature_kind ~sok_digest
     ~logger (module T : Transaction_snark.S)
     (spec :
@@ -390,7 +381,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
   in
   let%bind ( `Ledger_proof ledger_proof_opt
            , `Staged_ledger transitioned_staged_ledger
-           , `Accounts_created _
+           , `Accounts_created accounts_created
            , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) )
       =
     Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
@@ -403,9 +394,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     >>| Or_error.ok_exn
   in
   let staged_ledger_hash = Staged_ledger.hash transitioned_staged_ledger in
-  ignore
-  @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
-       (Staged_ledger.ledger transitioned_staged_ledger) ;
+  let just_emitted_a_proof = Option.is_some ledger_proof_opt in
   let diff_unwrapped =
     Staged_ledger_diff.read_all_proofs_from_disk
     @@ Staged_ledger_diff.forget diff
@@ -469,10 +458,16 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     ; is_new_stack
     }
   in
-  return (protocol_state, internal_transition, pending_coinbase_witness)
+  return
+    ( protocol_state
+    , internal_transition
+    , pending_coinbase_witness
+    , transitioned_staged_ledger
+    , accounts_created
+    , just_emitted_a_proof )
 
-let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
-    ~signature_kind ~proof_cache_db ~protocol_states (module Keys : Keys_S)
+let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
+    ~proof_cache_db ~protocol_states (module Keys : Keys_S)
     (slot_won, ledger_snapshot) (previous : Frontier_base.Breadcrumb.t) =
   let module V = Mina_block.Validation in
   let (module Context : V.CONTEXT) = context in
@@ -513,7 +508,12 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
       (module Keys.T)
       previous_staged_ledger
   in
-  let%bind protocol_state, internal_transition, pending_coinbase_witness =
+  let%bind ( protocol_state
+           , internal_transition
+           , pending_coinbase_witness
+           , transitioned_staged_ledger
+           , accounts_created
+           , just_emitted_a_proof ) =
     generate_next_state ~constraint_constants ~scheduled_time ~block_data
       ~previous_protocol_state ~time_controller
       ~staged_ledger:previous_staged_ledger ~transactions ~get_completed_work
@@ -565,17 +565,19 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
           ~root_consensus_state:
             (Frontier_base.Breadcrumb.consensus_state_with_hashes previous)
           ~is_block_in_frontier:(State_hash.equal previous_state_hash)
+    >>| V.skip_staged_ledger_diff_validation
+          `This_block_has_a_trusted_staged_ledger
     |> Result.map_error
          ~f:(const (Error.of_string "failed to validate just created block"))
     |> Or_error.ok_exn
   in
-  let transition_receipt_time = Some (Time.now ()) in
   [%log info] "Building breadcrumb" ;
-  Frontier_base.Breadcrumb.build ~logger ~precomputed_values ~verifier
-    ~get_completed_work ~trust_system ~parent:previous ~transition ~sender:None
-    ~skip_staged_ledger_verification:`All ~transition_receipt_time ()
-  >>| Result.map_error ~f:(const @@ Error.of_string "failed to build breadcrumb")
-  >>| Or_error.ok_exn
+  return
+    (Frontier_base.Breadcrumb.create
+       ~validated_transition:(Mina_block.Validated.lift transition)
+       ~staged_ledger:transitioned_staged_ledger ~just_emitted_a_proof
+       ~transition_receipt_time:(Some (Time.now ()))
+       ~accounts_created )
 
 let initialize_verifier_and_components ~logger
     ~(precomputed_values : Precomputed_values.t) ~state_dir =
@@ -727,9 +729,9 @@ let step t ~transactions =
   let signature_kind = t.precomputed_values.signature_kind in
   let%map breadcrumb =
     build_breadcrumb ~transactions ~context:t.context
-      ~precomputed_values:t.precomputed_values ~verifier:t.verifier
-      ~signature_kind ~proof_cache_db:t.proof_cache_db
-      ~protocol_states:t.protocol_states t.keys_module
+      ~precomputed_values:t.precomputed_values ~signature_kind
+      ~proof_cache_db:t.proof_cache_db ~protocol_states:t.protocol_states
+      t.keys_module
       (slot_won, ledger_snapshot)
       t.current
   in
