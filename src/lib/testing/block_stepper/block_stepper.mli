@@ -23,8 +23,6 @@ val start_state_of_breadcrumb :
 
 val current_block : t -> Frontier_base.Breadcrumb.t
 
-val remaining_slots : t -> int
-
 val precomputed_values : t -> Precomputed_values.t
 
 val verifier : t -> Verifier.t
@@ -35,7 +33,6 @@ val create :
   -> start:start_state
   -> logger:Logger.t
   -> state_dir:string
-  -> ?n_slots:int
   -> unit
   -> t Deferred.t
 

@@ -270,13 +270,11 @@ let create_genesis_breadcrumb ~logger ~precomputed_values () =
     ~transition_receipt_time:(Some (Time.now ()))
     ~just_emitted_a_proof:false ~accounts_created
 
-let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
-    ~precomputed_values ~n_slots ~keypair ~start_slot ~epoch_ledger_location
+let find_next_winning_slot ~context:(module Context : Consensus.Intf.CONTEXT)
+    ~precomputed_values ~keypair ~start_slot ~epoch_ledger_location
     (breadcrumb : Frontier_base.Breadcrumb.t) =
   let public_key_compressed = Public_key.compress keypair.Keypair.public_key in
   let logger = Context.logger in
-  [%log info] "Loaded keypair for public key: %s"
-    (Public_key.Compressed.to_base58_check public_key_compressed) ;
   let consensus_local_state =
     Consensus.Data.Local_state.create
       ~context:(module Context)
@@ -316,26 +314,20 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
       } =
     epoch_data_for_vrf
   in
-  [%log info] "Generated epoch data for vrf: global slot %s, since genesis: %s"
-    (Mina_numbers.Global_slot_since_hard_fork.to_string epoch_start_hf)
-    (Mina_numbers.Global_slot_since_genesis.to_string epoch_start) ;
   let slots_per_epoch =
     Mina_numbers.Length.to_int Context.consensus_constants.slots_per_epoch
   in
   let start_epoch = start_slot / slots_per_epoch in
-  let search_bound = max 100 (n_slots * 3) in
-  Deferred.repeat_until_finished (start_slot, [], search_bound)
-  @@ fun (current_slot, found_slots, attempts_left) ->
+  Deferred.repeat_until_finished (start_slot, slots_per_epoch)
+  @@ fun (current_slot, attempts_left) ->
   let current_epoch = current_slot / slots_per_epoch in
   if current_epoch > start_epoch then (
-    [%log info] "Reached epoch boundary at slot %d, stopping search"
+    [%log error] "Reached epoch boundary at slot %d without finding a winner"
       current_slot ;
-    return (`Finished (List.rev found_slots, current_slot)) )
-  else if List.length found_slots >= n_slots then
-    return (`Finished (List.rev found_slots, current_slot))
+    failwith "Could not find a winning slot in this epoch" )
   else if attempts_left <= 0 then (
-    [%log error] "Could not find enough winning slots after many attempts" ;
-    failwith "Could not find enough winning slots" )
+    [%log error] "Could not find a winning slot after many attempts" ;
+    failwith "Could not find a winning slot" )
   else
     let global_slot =
       Mina_numbers.Global_slot_since_hard_fork.of_int current_slot
@@ -354,7 +346,7 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
         [%log fatal] "VRF check failed" ;
         failwith "VRF check failed"
     | Ok None ->
-        `Repeat (current_slot + 1, found_slots, attempts_left - 1)
+        `Repeat (current_slot + 1, attempts_left - 1)
     | Ok
         (Some
           (`Vrf_eval _vrf_eval, `Vrf_output vrf_result, `Delegator delegator) )
@@ -372,10 +364,7 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
           ; vrf_result
           }
         in
-        `Repeat
-          ( current_slot + 1
-          , (slot_won, ledger_snapshot) :: found_slots
-          , attempts_left - 1 )
+        `Finished ((slot_won, ledger_snapshot), current_slot + 1)
 
 let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
     ~signature_kind ~proof_cache_db ~protocol_states (module Keys : Keys_S)
@@ -527,10 +516,6 @@ type t =
   ; keys_module : (module Keys_S)
   ; verifier : Verifier.t
   ; current : Frontier_base.Breadcrumb.t
-  ; remaining_winning_slots :
-      ( Consensus.Data.Slot_won.t
-      * Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t )
-      list
   ; logger : Logger.t
   ; keypair : Keypair.t
   ; next_search_slot : int
@@ -554,32 +539,27 @@ let start_state_of_breadcrumb breadcrumb ~protocol_states =
 
 let current_block t = t.current
 
-let remaining_slots t = List.length t.remaining_winning_slots
-
 let precomputed_values t = t.precomputed_values
 
 let verifier t = t.verifier
 
-let create ~precomputed_values ~keypair ~start ~logger ~state_dir
-    ?(n_slots = 100) () =
+let create ~precomputed_values ~keypair ~start ~logger ~state_dir () =
   let start_block = start.breadcrumb in
   let epoch_ledger_location = Filename.concat state_dir "epoch_ledger" in
-  let%bind context, keys_module, verifier =
+  let%map context, keys_module, verifier =
     initialize_verifier_and_components ~logger ~precomputed_values ~state_dir
   in
-  [%log info] "Computing VRF to find %d winning slots" n_slots ;
-  let%map remaining_winning_slots, next_search_slot =
-    find_winning_slots ~context ~precomputed_values ~n_slots ~keypair
-      ~start_slot:1 ~epoch_ledger_location start_block
+  let next_search_slot =
+    Frontier_base.Breadcrumb.consensus_state start_block
+    |> Consensus.Data.Consensus_state.curr_global_slot
+    |> Mina_numbers.Global_slot_since_hard_fork.to_int |> ( + ) 1
   in
-  [%log info] "Found %d winning slots" (List.length remaining_winning_slots) ;
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
   { precomputed_values
   ; context
   ; keys_module
   ; verifier
   ; current = start_block
-  ; remaining_winning_slots
   ; logger
   ; keypair
   ; next_search_slot
@@ -590,46 +570,26 @@ let create ~precomputed_values ~keypair ~start ~logger ~state_dir
 
 let step t ~transactions =
   let logger = t.logger in
-  let%bind t =
-    match t.remaining_winning_slots with
-    | _ :: _ ->
-        return t
-    | [] ->
-        let n_slots = 100 in
-        [%log info]
-          "No remaining winning slots, searching for %d more starting from \
-           slot %d"
-          n_slots t.next_search_slot ;
-        let%map remaining_winning_slots, next_search_slot =
-          find_winning_slots ~context:t.context
-            ~precomputed_values:t.precomputed_values ~n_slots ~keypair:t.keypair
-            ~start_slot:t.next_search_slot
-            ~epoch_ledger_location:t.epoch_ledger_location t.current
-        in
-        { t with remaining_winning_slots; next_search_slot }
+  [%log info] "Searching for next winning slot from slot %d" t.next_search_slot ;
+  let%bind (slot_won, ledger_snapshot), next_search_slot =
+    find_next_winning_slot ~context:t.context
+      ~precomputed_values:t.precomputed_values ~keypair:t.keypair
+      ~start_slot:t.next_search_slot
+      ~epoch_ledger_location:t.epoch_ledger_location t.current
   in
-  match t.remaining_winning_slots with
-  | [] ->
-      failwith "No remaining winning slots"
-  | (slot_won, ledger_snapshot) :: rest ->
-      let signature_kind = t.precomputed_values.signature_kind in
-      let%map breadcrumb =
-        build_breadcrumb ~transactions ~context:t.context
-          ~precomputed_values:t.precomputed_values ~verifier:t.verifier
-          ~signature_kind ~proof_cache_db:t.proof_cache_db
-          ~protocol_states:t.protocol_states t.keys_module
-          (slot_won, ledger_snapshot)
-          t.current
-      in
-      let state_hash = Frontier_base.Breadcrumb.state_hash breadcrumb in
-      let protocol_state = Frontier_base.Breadcrumb.protocol_state breadcrumb in
-      let protocol_states =
-        State_hash.Map.set t.protocol_states ~key:state_hash
-          ~data:protocol_state
-      in
-      ( breadcrumb
-      , { t with
-          current = breadcrumb
-        ; remaining_winning_slots = rest
-        ; protocol_states
-        } )
+  let signature_kind = t.precomputed_values.signature_kind in
+  let%map breadcrumb =
+    build_breadcrumb ~transactions ~context:t.context
+      ~precomputed_values:t.precomputed_values ~verifier:t.verifier
+      ~signature_kind ~proof_cache_db:t.proof_cache_db
+      ~protocol_states:t.protocol_states t.keys_module
+      (slot_won, ledger_snapshot)
+      t.current
+  in
+  let state_hash = Frontier_base.Breadcrumb.state_hash breadcrumb in
+  let protocol_state = Frontier_base.Breadcrumb.protocol_state breadcrumb in
+  let protocol_states =
+    State_hash.Map.set t.protocol_states ~key:state_hash ~data:protocol_state
+  in
+  ( breadcrumb
+  , { t with current = breadcrumb; next_search_slot; protocol_states } )
