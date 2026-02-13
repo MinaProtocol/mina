@@ -26,12 +26,12 @@
   mina_numbers
   mina_signature_kind
   mina_state
+  mina_stdlib
   parallel
   pipe_lib
   precomputed_values
   prover
   signature_lib
-  snark_params
   staged_ledger
   staged_ledger_diff
   transaction_snark

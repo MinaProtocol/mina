@@ -88,81 +88,72 @@ let trust_system =
        ~f:(const Deferred.unit) ) ;
   s
 
-module Block = struct
-  type t =
-    { breadcrumb : Frontier_base.Breadcrumb.t
-    ; staged_ledger : Staged_ledger.t
-    ; proof : Proof.t
-    }
+let create_genesis_breadcrumb ~logger ~precomputed_values () =
+  let signature_kind = precomputed_values.Precomputed_values.signature_kind in
+  let constraint_constants = precomputed_values.constraint_constants in
+  let module Params = struct
+    let signature_kind = signature_kind
 
-  let protocol_state t = Frontier_base.Breadcrumb.protocol_state t.breadcrumb
+    let constraint_constants = constraint_constants
 
-  let consensus_state_with_hashes t =
-    Frontier_base.Breadcrumb.consensus_state_with_hashes t.breadcrumb
-
-  let state_timestamp t =
-    Blockchain_state.timestamp @@ Protocol_state.blockchain_state
-    @@ protocol_state t
-
-  let state_hash t = Frontier_base.Breadcrumb.state_hash t.breadcrumb
-
-  let breadcrumb t = t.breadcrumb
-
-  let staged_ledger t = t.staged_ledger
-
-  let block_with_hash t = Frontier_base.Breadcrumb.block_with_hash t.breadcrumb
-
-  let compute_genesis ~logger ~precomputed_values (module Keys : Keys_S) =
-    let genesis_block_with_hash, genesis_validation =
-      Mina_block.genesis ~precomputed_values
-    in
-    let validated =
-      Mina_block.Validated.lift (genesis_block_with_hash, genesis_validation)
-    in
-    let constraint_constants = precomputed_values.constraint_constants in
-    let genesis_ledger =
-      Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
-    in
-    let mask =
-      Mina_ledger.Ledger.Mask.create ~depth:constraint_constants.ledger_depth ()
-    in
-    let ledger = Mina_ledger.Ledger.register_mask genesis_ledger mask in
-    let staged_ledger =
-      Staged_ledger.create_exn ~constraint_constants ~ledger
-    in
-    let accounts_created =
-      Precomputed_values.accounts precomputed_values
-      |> Lazy.force
-      |> List.map ~f:Precomputed_values.id_of_account_record
-    in
-    [%log info] "Generating genesis breadcrumb" ;
-    let breadcrumb =
-      Frontier_base.Breadcrumb.create ~validated_transition:validated
-        ~staged_ledger
-        ~transition_receipt_time:(Some (Time.now ()))
-        ~just_emitted_a_proof:false ~accounts_created
-    in
-    [%log info] "Generating genesis proof" ;
-    let%map proof =
-      create_genesis_proof
-        (module Keys.B)
-        ~constraint_constants
-        (Genesis_proof.to_inputs precomputed_values)
-      >>| Or_error.ok_exn >>| Blockchain_snark.Blockchain.proof
-    in
-    { breadcrumb; staged_ledger; proof }
-
-  let of_breadcrumb breadcrumb =
-    let staged_ledger = Frontier_base.Breadcrumb.staged_ledger breadcrumb in
-    let proof =
-      Frontier_base.Breadcrumb.block breadcrumb
-      |> Mina_block.header |> Mina_block.Header.protocol_state_proof
-    in
-    { breadcrumb; staged_ledger; proof }
-end
+    let proof_level = precomputed_values.proof_level
+  end in
+  let module Keys = Keys (Params) in
+  [%log info] "Generating genesis proof" ;
+  let%map real_proof =
+    create_genesis_proof
+      (module Keys.B)
+      ~constraint_constants
+      (Genesis_proof.to_inputs precomputed_values)
+    >>| Or_error.ok_exn >>| Blockchain_snark.Blockchain.proof
+  in
+  let genesis_state =
+    Precomputed_values.genesis_state_with_hashes precomputed_values
+  in
+  let protocol_state = With_hash.data genesis_state in
+  let header =
+    Mina_block.Header.create ~protocol_state ~protocol_state_proof:real_proof
+      ~delta_block_chain_proof:
+        (Protocol_state.previous_state_hash protocol_state, [])
+      ()
+  in
+  let body = Mina_block.Body.create Staged_ledger_diff.empty_diff in
+  let block = Mina_block.create ~header ~body in
+  let block_with_hash = With_hash.map genesis_state ~f:(Fn.const block) in
+  let validation =
+    ( (`Time_received, Mina_stdlib.Truth.True ())
+    , (`Genesis_state, Mina_stdlib.Truth.True ())
+    , (`Proof, Mina_stdlib.Truth.True ())
+    , ( `Delta_block_chain
+      , Mina_stdlib.Truth.True
+          ( Mina_stdlib.Nonempty_list.singleton
+          @@ Protocol_state.previous_state_hash protocol_state ) )
+    , (`Frontier_dependencies, Mina_stdlib.Truth.True ())
+    , (`Staged_ledger_diff, Mina_stdlib.Truth.True ())
+    , (`Protocol_versions, Mina_stdlib.Truth.True ()) )
+  in
+  let validated = Mina_block.Validated.lift (block_with_hash, validation) in
+  let genesis_ledger =
+    Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
+  in
+  let mask =
+    Mina_ledger.Ledger.Mask.create ~depth:constraint_constants.ledger_depth ()
+  in
+  let ledger = Mina_ledger.Ledger.register_mask genesis_ledger mask in
+  let staged_ledger = Staged_ledger.create_exn ~constraint_constants ~ledger in
+  let accounts_created =
+    Precomputed_values.accounts precomputed_values
+    |> Lazy.force
+    |> List.map ~f:Precomputed_values.id_of_account_record
+  in
+  [%log info] "Creating genesis breadcrumb" ;
+  Frontier_base.Breadcrumb.create ~validated_transition:validated ~staged_ledger
+    ~transition_receipt_time:(Some (Time.now ()))
+    ~just_emitted_a_proof:false ~accounts_created
 
 let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
-    ~precomputed_values ~n_slots ~keypair (genesis : Block.t) =
+    ~precomputed_values ~n_slots ~keypair (genesis : Frontier_base.Breadcrumb.t)
+    =
   let public_key_compressed = Public_key.compress keypair.Keypair.public_key in
   let logger = Context.logger in
   [%log info] "Loaded keypair for public key: %s"
@@ -178,16 +169,23 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
         precomputed_values.protocol_state_with_hashes.hash.state_hash
       ~epoch_ledger_backing_type:Stable_db
   in
+  let genesis_protocol_state =
+    Frontier_base.Breadcrumb.protocol_state genesis
+  in
   let consensus_state =
-    Mina_state.Protocol_state.consensus_state (Block.protocol_state genesis)
+    Mina_state.Protocol_state.consensus_state genesis_protocol_state
   in
   let time_to_ms =
     Fn.compose Block_time.Span.to_ms Block_time.to_span_since_epoch
   in
+  let genesis_timestamp =
+    Blockchain_state.timestamp @@ Protocol_state.blockchain_state
+    @@ genesis_protocol_state
+  in
   let epoch_data_for_vrf, ledger_snapshot =
     Consensus.Hooks.get_epoch_data_for_vrf
       ~constants:Context.consensus_constants
-      (time_to_ms @@ Block.state_timestamp genesis)
+      (time_to_ms @@ genesis_timestamp)
       consensus_state ~local_state:consensus_local_state ~logger
   in
   let { Consensus.Data.Epoch_data_for_vrf.epoch_ledger
@@ -252,8 +250,8 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
           , attempts_left - 1 )
 
 let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
-    ~signature_kind (module Keys : Keys_S) (slot_won, ledger_snapshot) previous
-    =
+    ~signature_kind (module Keys : Keys_S) (slot_won, ledger_snapshot)
+    (previous : Frontier_base.Breadcrumb.t) =
   let module V = Mina_block.Validation in
   let (module Context : V.CONTEXT) = context in
   let open Context in
@@ -273,16 +271,22 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
          (Block_time.now @@ Block_time.Controller.basic ~logger)
          scheduled_time ) ;
   let time_controller = Block_time.Controller.basic ~logger in
-  let previous_protocol_state = Block.protocol_state previous in
+  let previous_protocol_state =
+    Frontier_base.Breadcrumb.protocol_state previous
+  in
+  let previous_proof =
+    Frontier_base.Breadcrumb.block previous
+    |> Mina_block.header |> Mina_block.Header.protocol_state_proof
+  in
   let winner_pk = fst slot_won.delegator in
   let%bind protocol_state, internal_transition, pending_coinbase_witness =
     Block_producer.generate_next_state ~commit_id:"" ~constraint_constants
       ~scheduled_time ~block_data ~previous_protocol_state ~time_controller
-      ~staged_ledger:previous.staged_ledger ~transactions
-      ~get_completed_work:(const None) ~logger ~log_block_creation:false
-      ~winner_pk ~block_reward_threshold:None ~zkapp_cmd_limit:None
-      ~zkapp_cmd_limit_hardcap:128 ~slot_tx_end:None ~slot_chain_end:None
-      ~signature_kind
+      ~staged_ledger:(Frontier_base.Breadcrumb.staged_ledger previous)
+      ~transactions ~get_completed_work:(const None) ~logger
+      ~log_block_creation:false ~winner_pk ~block_reward_threshold:None
+      ~zkapp_cmd_limit:None ~zkapp_cmd_limit_hardcap:128 ~slot_tx_end:None
+      ~slot_chain_end:None ~signature_kind
     |> Interruptible.force
     >>| Result.map_error ~f:(fun () ->
             Error.of_string "unexpected interruption" )
@@ -298,7 +302,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
     extend_blockchain
       (module Keys.B)
       ~constraint_constants
-      (Blockchain_snark.Blockchain.create ~proof:previous.proof
+      (Blockchain_snark.Blockchain.create ~proof:previous_proof
          ~state:previous_protocol_state )
       protocol_state
       (Mina_block.Internal_transition.snark_transition internal_transition)
@@ -307,7 +311,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
       pending_coinbase_witness
     >>| Or_error.ok_exn >>| Blockchain_snark.Blockchain.proof
   in
-  let previous_state_hash = Block.state_hash previous in
+  let previous_state_hash = Frontier_base.Breadcrumb.state_hash previous in
   let delta_block_chain_proof = (previous_state_hash, []) in
   let header =
     Mina_block.Header.create ~protocol_state ~protocol_state_proof
@@ -333,7 +337,8 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
               ~state_hash:(Some previous_state_hash) previous_protocol_state )
     >>| V.skip_proof_validation `This_block_was_generated_internally
     >>= V.validate_frontier_dependencies ~to_header:Mina_block.header ~context
-          ~root_consensus_state:(Block.consensus_state_with_hashes previous)
+          ~root_consensus_state:
+            (Frontier_base.Breadcrumb.consensus_state_with_hashes previous)
           ~is_block_in_frontier:(State_hash.equal previous_state_hash)
     |> Result.map_error
          ~f:(const (Error.of_string "failed to validate just created block"))
@@ -342,9 +347,9 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
   let transition_receipt_time = Some (Time.now ()) in
   [%log info] "Building breadcrumb" ;
   Frontier_base.Breadcrumb.build ~logger ~precomputed_values ~verifier
-    ~get_completed_work:(Fn.const None) ~trust_system
-    ~parent:previous.breadcrumb ~transition ~sender:None
-    ~skip_staged_ledger_verification:`All ~transition_receipt_time ()
+    ~get_completed_work:(Fn.const None) ~trust_system ~parent:previous
+    ~transition ~sender:None ~skip_staged_ledger_verification:`All
+    ~transition_receipt_time ()
   >>| Result.map_error ~f:(const @@ Error.of_string "failed to build breadcrumb")
   >>| Or_error.ok_exn
 
@@ -384,16 +389,13 @@ type t =
   ; context : (module Consensus.Intf.CONTEXT)
   ; keys_module : (module Keys_S)
   ; verifier : Verifier.t
-  ; genesis : Block.t
-  ; current : Block.t
+  ; current : Frontier_base.Breadcrumb.t
   ; remaining_winning_slots :
       ( Consensus.Data.Slot_won.t
       * Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t )
       list
   ; logger : Logger.t
   }
-
-let genesis_block t = t.genesis
 
 let current_block t = t.current
 
@@ -403,25 +405,22 @@ let precomputed_values t = t.precomputed_values
 
 let verifier t = t.verifier
 
-let create ~precomputed_values ~keypair ~logger ?(n_slots = 100) () =
+let create ~precomputed_values ~keypair ~start_block ~logger ?(n_slots = 100) ()
+    =
   let%bind context, keys_module, verifier =
     initialize_verifier_and_components ~logger ~precomputed_values
   in
-  [%log info] "Generating genesis block" ;
-  let%bind genesis =
-    Block.compute_genesis keys_module ~precomputed_values ~logger
-  in
   [%log info] "Computing VRF to find %d winning slots" n_slots ;
   let%map remaining_winning_slots =
-    find_winning_slots ~context ~precomputed_values ~n_slots ~keypair genesis
+    find_winning_slots ~context ~precomputed_values ~n_slots ~keypair
+      start_block
   in
   [%log info] "Found %d winning slots" (List.length remaining_winning_slots) ;
   { precomputed_values
   ; context
   ; keys_module
   ; verifier
-  ; genesis
-  ; current = genesis
+  ; current = start_block
   ; remaining_winning_slots
   ; logger
   }
@@ -439,5 +438,5 @@ let step t ~transactions =
           (slot_won, ledger_snapshot)
           t.current
       in
-      let current = Block.of_breadcrumb breadcrumb in
-      (breadcrumb, { t with current; remaining_winning_slots = rest })
+      ( breadcrumb
+      , { t with current = breadcrumb; remaining_winning_slots = rest } )
