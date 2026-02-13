@@ -285,6 +285,17 @@ val all_work_pairs :
      list
      Or_error.t
 
+(** Work pairs with full specs for just the work needed by the next diff *)
+val work_pairs_for_new_diff :
+     t
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> ( Transaction_witness.t
+     , Ledger_proof.Cached.t )
+     Snark_work_lib.Work.Single.Spec.t
+     One_or_two.t
+     list
+     Or_error.t
+
 (** Statements of all the pending work in t*)
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 

@@ -248,6 +248,11 @@ module T = struct
       =
     Scan_state.all_work_pairs t.scan_state ~get_state
 
+  let work_pairs_for_new_diff t
+      ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+      =
+    Scan_state.work_pairs_for_new_diff t.scan_state ~get_state
+
   let all_work_statements_exn t =
     Scan_state.all_work_statements_exn t.scan_state
 
