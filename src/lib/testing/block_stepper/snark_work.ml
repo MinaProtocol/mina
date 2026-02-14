@@ -19,7 +19,7 @@ let prove_non_zkapp ~sok_digest (module T : Transaction_snark.S) input
         ~init_stack:w.init_stack
         (unstage (Mina_ledger.Sparse_ledger.handler w.first_pass_ledger)) )
 
-let prove_zkapp ~proof_cache_db ~signature_kind ~sok_digest
+let prove_zkapp ~proof_cache_db ~signature_kind ~sok_digest ~logger
     (module T : Transaction_snark.S) input (w : Transaction_witness.Stable.V2.t)
     zkapp_command =
   let open Deferred.Or_error.Let_syntax in
@@ -37,14 +37,22 @@ let prove_zkapp ~proof_cache_db ~signature_kind ~sok_digest
     |> Deferred.return
   in
   (* Prove all segments *)
+  let num_segments = Mina_stdlib.Nonempty_list.length witnesses_specs_stmts in
+  [%log internal] "Snark_work_zkapp_prove"
+    ~metadata:[ ("zkapp_work_segments", `Int num_segments) ] ;
   let%bind segment_proofs =
     Deferred.Or_error.List.map ~how:`Sequential
       (Mina_stdlib.Nonempty_list.to_list witnesses_specs_stmts)
       ~f:(fun (witness, segment_spec, statement) ->
-        Deferred.Or_error.try_with ~here:[%here] (fun () ->
-            T.of_zkapp_command_segment_exn
-              ~statement:{ statement with sok_digest }
-              ~witness ~spec:segment_spec ) )
+        [%log internal] "Snark_work_zkapp_segment" ;
+        let%map.Deferred.Or_error proof =
+          Deferred.Or_error.try_with ~here:[%here] (fun () ->
+              T.of_zkapp_command_segment_exn
+                ~statement:{ statement with sok_digest }
+                ~witness ~spec:segment_spec )
+        in
+        [%log internal] "Snark_work_zkapp_segment_done" ;
+        proof )
   in
   (* Binary tree merge: pairwise rounds until one proof remains.
      Odd elements carried forward, matching the partitioner's
@@ -67,11 +75,15 @@ let prove_zkapp ~proof_cache_db ~signature_kind ~sok_digest
         in
         let%bind merged =
           Deferred.Or_error.List.map ~how:`Sequential pairs ~f:(fun (a, b) ->
-              T.merge a b ~sok_digest )
+              [%log internal] "Snark_work_zkapp_merge" ;
+              let%map.Deferred.Or_error proof = T.merge a b ~sok_digest in
+              [%log internal] "Snark_work_zkapp_merge_done" ;
+              proof )
         in
         merge_rounds (merged @ leftover)
   in
   let%bind proof = merge_rounds segment_proofs in
+  [%log internal] "Snark_work_zkapp_prove_done" ;
   (* Statement mismatch check, same as perform_single_untimed *)
   if
     not (Transaction_snark.Statement.equal (Ledger_proof.statement proof) input)
@@ -80,7 +92,7 @@ let prove_zkapp ~proof_cache_db ~signature_kind ~sok_digest
       "Zkapp_command transaction final statement mismatch"
   else Deferred.Or_error.return proof
 
-let prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger:_
+let prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger
     (module T : Transaction_snark.S)
     (spec :
       ( Transaction_witness.t
@@ -93,25 +105,48 @@ let prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger:_
     | Transition (input, w) -> (
         match w.transaction with
         | Mina_transaction.Transaction.Command (Zkapp_command zkapp_command) ->
-            prove_zkapp ~proof_cache_db ~signature_kind ~sok_digest
-              (module T)
-              input w zkapp_command
+            [%log internal] "Snark_work_zkapp_proof" ;
+            let%map.Deferred.Or_error proof =
+              prove_zkapp ~proof_cache_db ~signature_kind ~sok_digest ~logger
+                (module T)
+                input w zkapp_command
+            in
+            [%log internal] "Snark_work_zkapp_proof_done" ;
+            proof
         | Command (Signed_command cmd) ->
+            [%log internal] "Snark_work_base_proof" ;
             let%bind cmd =
               Deferred.return
               @@ Result.of_option
                    (Signed_command.check ~signature_kind cmd)
                    ~error:(Error.of_string "Command has an invalid signature")
             in
-            prove_non_zkapp ~sok_digest
-              (module T)
-              input w (Command (Signed_command cmd))
+            let%map.Deferred.Or_error proof =
+              prove_non_zkapp ~sok_digest
+                (module T)
+                input w (Command (Signed_command cmd))
+            in
+            [%log internal] "Snark_work_base_proof_done" ;
+            proof
         | Fee_transfer ft ->
-            prove_non_zkapp ~sok_digest (module T) input w (Fee_transfer ft)
+            [%log internal] "Snark_work_base_proof" ;
+            let%map.Deferred.Or_error proof =
+              prove_non_zkapp ~sok_digest (module T) input w (Fee_transfer ft)
+            in
+            [%log internal] "Snark_work_base_proof_done" ;
+            proof
         | Coinbase cb ->
-            prove_non_zkapp ~sok_digest (module T) input w (Coinbase cb) )
+            [%log internal] "Snark_work_base_proof" ;
+            let%map.Deferred.Or_error proof =
+              prove_non_zkapp ~sok_digest (module T) input w (Coinbase cb)
+            in
+            [%log internal] "Snark_work_base_proof_done" ;
+            proof )
     | Merge (_, proof1, proof2) ->
-        T.merge proof1 proof2 ~sok_digest
+        [%log internal] "Snark_work_merge" ;
+        let%map.Deferred.Or_error proof = T.merge proof1 proof2 ~sok_digest in
+        [%log internal] "Snark_work_merge_done" ;
+        proof
   in
   Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
 
@@ -127,15 +162,22 @@ let compute ~proof_level ~proof_cache_db ~signature_kind ~logger ~fee
     | Full ->
         prove_full
   in
+  [%log internal] "Snark_work_compute"
+    ~metadata:
+      [ ( "snark_work_items"
+        , `Int (List.sum (module Int) work_specs ~f:One_or_two.length) )
+      ] ;
   let open Deferred.Or_error.Let_syntax in
   let%map proved_work =
     Deferred.Or_error.List.map work_specs ~how:`Sequential ~f:(fun one_or_two ->
+        [%log internal] "Snark_work_bundle" ;
         let%map proofs =
           One_or_two.Deferred_result.map one_or_two
             ~f:
               (prove_single ~proof_cache_db ~signature_kind ~sok_digest ~logger
                  (module T) )
         in
+        [%log internal] "Snark_work_bundle_done" ;
         let statement =
           One_or_two.map one_or_two ~f:Snark_work_lib.Work.Single.Spec.statement
         in
@@ -143,6 +185,7 @@ let compute ~proof_level ~proof_cache_db ~signature_kind ~logger ~fee
         , Transaction_snark_work.Checked.create_unsafe
             { fee; proofs; prover = prover_key } ) )
   in
+  [%log internal] "Snark_work_compute_done" ;
   let table = Transaction_snark_work.Statement.Table.create () in
   List.iter proved_work ~f:(fun (stmt, work) ->
       Transaction_snark_work.Statement.Table.set table ~key:stmt ~data:work ) ;
