@@ -172,11 +172,6 @@ let run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~state_dir
   let%bind precomputed_values =
     load_and_initialize_config ~logger ~config_file ~genesis_dir
   in
-  [%log info] "Creating genesis breadcrumb (this involves proving)" ;
-  let%bind genesis_breadcrumb =
-    Block_stepper.create_genesis_breadcrumb ~logger ~precomputed_values ()
-  in
-  [%log info] "Genesis breadcrumb created" ;
   let module Keys = Block_stepper.Keys (struct
     let signature_kind = precomputed_values.Precomputed_values.signature_kind
 
@@ -197,14 +192,12 @@ let run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~state_dir
       ~conf_dir:(Some verifier_dir)
       ~signature_kind:precomputed_values.signature_kind ()
   in
-  let start =
-    Block_stepper.start_state_of_genesis genesis_breadcrumb ~keys_module
-  in
-  [%log info] "Initializing block stepper" ;
+  [%log info] "Initializing block stepper (this involves proving)" ;
   let%bind stepper =
-    Block_stepper.create ~precomputed_values ~keypair ~start ~logger ~state_dir
-      ()
+    Block_stepper.create_from_genesis ~precomputed_values ~keypair ~keys_module
+      ~logger ~state_dir ()
   in
+  let genesis_breadcrumb = Block_stepper.current_block stepper in
   [%log info] "Verifying genesis block proof" ;
   let genesis_blockchain = blockchain_of_breadcrumb genesis_breadcrumb in
   let%bind genesis_result =

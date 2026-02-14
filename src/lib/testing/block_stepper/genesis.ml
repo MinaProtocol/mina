@@ -17,17 +17,12 @@ let create_genesis_proof m ~constraint_constants
     protocol_state snark_transition ledger_proof_opt prover_state
     pending_coinbase
 
-let create_genesis_breadcrumb ~logger ~precomputed_values () =
-  let signature_kind = precomputed_values.Precomputed_values.signature_kind in
-  let constraint_constants = precomputed_values.constraint_constants in
-  let module Params = struct
-    let signature_kind = signature_kind
-
-    let constraint_constants = constraint_constants
-
-    let proof_level = precomputed_values.proof_level
-  end in
-  let module Keys = Block_builder.Keys (Params) in
+let create_genesis_breadcrumb ~logger ~precomputed_values ~root_ledger
+    keys_module () =
+  let constraint_constants =
+    precomputed_values.Precomputed_values.constraint_constants
+  in
+  let (module Keys : Block_builder.Keys_S) = keys_module in
   [%log info] "Generating genesis proof" ;
   let%map real_proof =
     create_genesis_proof
@@ -62,13 +57,10 @@ let create_genesis_breadcrumb ~logger ~precomputed_values () =
     , (`Protocol_versions, Mina_stdlib.Truth.True ()) )
   in
   let validated = Mina_block.Validated.lift (block_with_hash, validation) in
-  let genesis_ledger =
-    Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
-  in
   let mask =
     Mina_ledger.Ledger.Mask.create ~depth:constraint_constants.ledger_depth ()
   in
-  let ledger = Mina_ledger.Ledger.register_mask genesis_ledger mask in
+  let ledger = Mina_ledger.Ledger.Maskable.register_mask root_ledger mask in
   let staged_ledger = Staged_ledger.create_exn ~constraint_constants ~ledger in
   let accounts_created =
     Precomputed_values.accounts precomputed_values

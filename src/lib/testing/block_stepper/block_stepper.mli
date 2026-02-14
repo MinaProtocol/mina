@@ -2,13 +2,6 @@ open Core
 open Async
 open Signature_lib
 open Mina_base
-open Mina_state
-
-val create_genesis_breadcrumb :
-     logger:Logger.t
-  -> precomputed_values:Precomputed_values.t
-  -> unit
-  -> Frontier_base.Breadcrumb.t Deferred.t
 
 module type Keys_S = sig
   module T : Transaction_snark.S
@@ -26,25 +19,14 @@ end) : Keys_S
 
 type t
 
-type start_state
-
-val start_state_of_genesis :
-  Frontier_base.Breadcrumb.t -> keys_module:(module Keys_S) -> start_state
-
-val start_state_of_breadcrumb :
-     Frontier_base.Breadcrumb.t
-  -> protocol_states:Protocol_state.value State_hash.Map.t
-  -> keys_module:(module Keys_S)
-  -> start_state
-
 val current_block : t -> Frontier_base.Breadcrumb.t
 
 val precomputed_values : t -> Precomputed_values.t
 
-val create :
+val create_from_genesis :
      precomputed_values:Precomputed_values.t
   -> keypair:Keypair.t
-  -> start:start_state
+  -> keys_module:(module Keys_S)
   -> logger:Logger.t
   -> state_dir:string
   -> unit
