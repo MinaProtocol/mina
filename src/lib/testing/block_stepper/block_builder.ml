@@ -240,7 +240,9 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
   in
   (* TODO: The returned transition_staged_ledger here contains a new mask. In
      the success path, the returned breadcrumb has ownership of it, but on
-     failure it currently leaks. Fix this. *)
+     failure it currently leaks. Add cleanup for it. Note: the block_producer
+     does not have to deal with this because it immediately unregisters the
+     mask and has the real frontier reconstruct it. *)
   let%bind ( protocol_state
            , internal_transition
            , pending_coinbase_witness
