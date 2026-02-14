@@ -100,6 +100,7 @@ let step t ~transactions =
       let epoch_end_slot =
         ((start_slot / slots_per_epoch) + 1) * slots_per_epoch
       in
+      let open Async.Deferred.Let_syntax in
       match%bind
         Vrf.find_next_winning_slot ~context ~keypair:t.keypair ~start_slot
           ~epoch_data_for_vrf ~ledger_snapshot
@@ -132,7 +133,8 @@ let step t ~transactions =
       (slot_won, ledger_snapshot)
       current
   in
-  let%map breadcrumb, frontier =
-    Linear_frontier.add_breadcrumb t.frontier raw_breadcrumb |> Deferred.return
+  let breadcrumb, frontier =
+    Linear_frontier.add_breadcrumb t.frontier raw_breadcrumb
   in
-  (breadcrumb, { t with frontier; next_search_slot; epoch_data })
+  Deferred.Or_error.return
+    (breadcrumb, { t with frontier; next_search_slot; epoch_data })

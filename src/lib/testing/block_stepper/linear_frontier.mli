@@ -22,6 +22,4 @@ val protocol_states :
   t -> Mina_state.Protocol_state.value Mina_base.State_hash.Map.t
 
 val add_breadcrumb :
-     t
-  -> Frontier_base.Breadcrumb.t
-  -> (Frontier_base.Breadcrumb.t * t) Core.Or_error.t
+  t -> Frontier_base.Breadcrumb.t -> Frontier_base.Breadcrumb.t * t
