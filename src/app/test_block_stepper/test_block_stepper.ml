@@ -201,7 +201,7 @@ let run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~state_dir
     Block_stepper.start_state_of_genesis genesis_breadcrumb ~keys_module
   in
   [%log info] "Initializing block stepper" ;
-  let stepper =
+  let%bind stepper =
     Block_stepper.create ~precomputed_values ~keypair ~start ~logger ~state_dir
       ()
   in

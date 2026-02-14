@@ -48,7 +48,7 @@ val create :
   -> logger:Logger.t
   -> state_dir:string
   -> unit
-  -> t
+  -> t Deferred.t
 
 val step :
      t

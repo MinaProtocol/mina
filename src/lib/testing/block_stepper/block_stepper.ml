@@ -517,7 +517,11 @@ let create ~precomputed_values ~keypair ~start ~logger ~state_dir () =
     |> Consensus.Data.Consensus_state.curr_global_slot
     |> Mina_numbers.Global_slot_since_hard_fork.to_int |> ( + ) 1
   in
-  let proof_cache_db = Proof_cache_tag.create_identity_db () in
+  let%bind proof_cache_db =
+    Proof_cache_tag.create_db (Filename.concat state_dir "proof_cache") ~logger
+    >>| Result.map_error ~f:(fun (`Initialization_error e) -> e)
+    >>| Or_error.ok_exn
+  in
   let consensus_local_state =
     Consensus.Data.Local_state.create
       ~context:(module Context)
@@ -536,18 +540,19 @@ let create ~precomputed_values ~keypair ~start ~logger ~state_dir () =
       ~context:(module Context)
       ~consensus_state ~local_state:consensus_local_state ~slot:next_search_slot
   in
-  { precomputed_values
-  ; context
-  ; keys_module
-  ; current = start_block
-  ; logger
-  ; keypair
-  ; next_search_slot
-  ; proof_cache_db
-  ; protocol_states = start.protocol_states
-  ; consensus_local_state
-  ; epoch_data
-  }
+  return
+    { precomputed_values
+    ; context
+    ; keys_module
+    ; current = start_block
+    ; logger
+    ; keypair
+    ; next_search_slot
+    ; proof_cache_db
+    ; protocol_states = start.protocol_states
+    ; consensus_local_state
+    ; epoch_data
+    }
 
 let step t ~transactions =
   let logger = t.logger in
