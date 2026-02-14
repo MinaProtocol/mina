@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
 
 type ConsensusState struct {
@@ -112,14 +113,11 @@ func (t *HardforkTest) ReportBlocksInfo(port int, blocks []client.BlockData) {
 	}
 }
 
-// WARN: ensure we're always using the same consensus param here and in mina-local-network!
-const ProtocolK = 10
-
 func (t *HardforkTest) ConsensusStateOnNode(port int) (*ConsensusState, error) {
 
 	state := new(ConsensusState)
 
-	recentBlocks, err := t.Client.RecentBlocks(port, ProtocolK)
+	recentBlocks, err := t.Client.RecentBlocks(port, config.ProtocolK)
 
 	t.ReportBlocksInfo(port, recentBlocks)
 
@@ -157,7 +155,7 @@ func (t *HardforkTest) CollectEpochHashes(mainGenesisTs int64) (*SnarkedHashByEp
 	// NOTE: we're only tracking epoch ledgers on a single node, we're relying that
 	// epoch hashes having stronger consensus guarantee because it's updated much
 	// slower than blocks
-	checkPerSlot := ProtocolK / 2
+	checkPerSlot := config.ProtocolK / 2
 	// Very unlikely to happen but we have it here for fail-safe
 	if checkPerSlot < 1 {
 		checkPerSlot = 1
@@ -169,7 +167,7 @@ func (t *HardforkTest) CollectEpochHashes(mainGenesisTs int64) (*SnarkedHashByEp
 	snarkedHashByEpoch := make(SnarkedHashByEpoch)
 	lastSlotPerEpoch := make(map[int]int)
 	for time.Now().Before(slotChainEnd) {
-		recentBlocks, err := t.Client.RecentBlocks(t.AnyPortOfType(PORT_REST), ProtocolK)
+		recentBlocks, err := t.Client.RecentBlocks(t.AnyPortOfType(PORT_REST), config.ProtocolK)
 		if err != nil {
 			return nil, err
 		}
