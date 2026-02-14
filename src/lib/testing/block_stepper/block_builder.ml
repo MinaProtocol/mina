@@ -154,7 +154,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       ~staged_ledger_hash ~body_reference ~ledger_proof_statement
   in
   (* This current_time is used in the [generate_transition] method for the sole
-     purpose of logging if the block was created ater the slot was over. The
+     purpose of logging if the block was created after the slot was over. The
      stepper is not expected to run at the exact wall clock time implied by the
      genesis timestamp and slot, so this warning is useless or us. By using the
      scheduled time, we pretend we created the block instantly and so suppress
