@@ -252,7 +252,9 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
     generate_next_state ~constraint_constants ~scheduled_time ~block_data
       ~previous_protocol_state ~staged_ledger:previous_staged_ledger
       ~transactions ~get_completed_work ~logger ~winner_pk
-      ~zkapp_cmd_limit_hardcap:128 ~signature_kind
+      ~zkapp_cmd_limit_hardcap:
+        precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
+      ~signature_kind
   in
   [%log info]
     "Generated protocol state and internal transition with %d commands"
