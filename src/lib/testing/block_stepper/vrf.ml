@@ -21,7 +21,7 @@ let find_next_winning_slot ~context:(module Context : Consensus.Intf.CONTEXT)
   let epoch_end_slot = ((start_slot / slots_per_epoch) + 1) * slots_per_epoch in
   Deferred.repeat_until_finished start_slot
   @@ fun current_slot ->
-  if current_slot >= epoch_end_slot then return (`Finished None)
+  if current_slot >= epoch_end_slot then return (`Finished (Ok None))
   else
     let global_slot =
       Mina_numbers.Global_slot_since_hard_fork.of_int current_slot
@@ -38,7 +38,7 @@ let find_next_winning_slot ~context:(module Context : Consensus.Intf.CONTEXT)
     with
     | Error _ ->
         [%log fatal] "VRF check failed" ;
-        failwith "VRF check failed"
+        `Finished (Or_error.error_string "VRF check failed")
     | Ok None ->
         `Repeat (current_slot + 1)
     | Ok
@@ -46,16 +46,23 @@ let find_next_winning_slot ~context:(module Context : Consensus.Intf.CONTEXT)
           (`Vrf_eval _vrf_eval, `Vrf_output vrf_result, `Delegator delegator) )
       ->
         [%log info] "Found winning slot at global slot %d" current_slot ;
+        let open Or_error.Let_syntax in
         let slot_won =
+          let%map global_slot_since_genesis =
+            Mina_numbers.Global_slot_since_hard_fork.diff global_slot
+              epoch_start_hf
+            |> Result.of_option
+                 ~error:(Error.of_string "failed to diff global slots")
+            |> Result.map ~f:(fun diff ->
+                   Mina_numbers.Global_slot_since_genesis.add epoch_start diff )
+          in
           { Consensus.Data.Slot_won.delegator
           ; producer = keypair
           ; global_slot
-          ; global_slot_since_genesis =
-              Mina_numbers.Global_slot_since_genesis.add epoch_start
-                ( Mina_numbers.Global_slot_since_hard_fork.diff global_slot
-                    epoch_start_hf
-                |> Option.value_exn ~message:"failed to diff global slots" )
+          ; global_slot_since_genesis
           ; vrf_result
           }
         in
-        `Finished (Some ((slot_won, ledger_snapshot), current_slot + 1))
+        `Finished
+          (Result.map slot_won ~f:(fun sw ->
+               Some ((sw, ledger_snapshot), current_slot + 1) ) )

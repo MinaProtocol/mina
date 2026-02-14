@@ -30,9 +30,9 @@ val create_from_genesis :
   -> logger:Logger.t
   -> state_dir:string
   -> unit
-  -> t Deferred.t
+  -> t Deferred.Or_error.t
 
 val step :
      t
   -> transactions:User_command.Valid.t Sequence.t
-  -> (Frontier_base.Breadcrumb.t * t) Deferred.t
+  -> (Frontier_base.Breadcrumb.t * t) Deferred.Or_error.t

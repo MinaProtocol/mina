@@ -4,4 +4,4 @@ val create_genesis_breadcrumb :
   -> root_ledger:Mina_ledger.Ledger.Any_ledger.witness
   -> (module Block_builder.Keys_S)
   -> unit
-  -> Frontier_base.Breadcrumb.t Async.Deferred.t
+  -> Frontier_base.Breadcrumb.t Async.Deferred.Or_error.t

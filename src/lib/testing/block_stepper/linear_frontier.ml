@@ -26,6 +26,7 @@ let protocol_states t = t.protocol_states
 let create ~precomputed_values ~context ~keys_module ~keypair ~logger ~state_dir
     () =
   let open Async in
+  let open Deferred.Or_error.Let_syntax in
   let (module Context : Consensus.Intf.CONTEXT) = context in
   let constraint_constants = Context.constraint_constants in
   let depth = constraint_constants.ledger_depth in
@@ -36,7 +37,6 @@ let create ~precomputed_values ~context ~keys_module ~keypair ~logger ~state_dir
   let%bind snarked_root =
     Precomputed_values.create_root precomputed_values
       ~config:snarked_root_config ~depth ()
-    >>| Or_error.ok_exn
   in
   let root_ledger = Mina_ledger.Root.as_unmasked snarked_root in
   let%map genesis_breadcrumb =
@@ -97,69 +97,85 @@ let perform_root_transition t ~prev_breadcrumb ~new_breadcrumb =
   in
   Mina_ledger.Ledger.remove_and_reparent_exn m1 m1 ;
   (* STEPS 4-7: update snarked ledger if a proof was emitted *)
-  if Frontier_base.Breadcrumb.just_emitted_a_proof new_breadcrumb then (
-    let s = t.root_ledger in
-    (* STEP 4: create temp mask on snarked ledger *)
-    let mt =
-      Mina_ledger.Ledger.Maskable.register_mask s
-        (Mina_ledger.Ledger.Mask.create
-           ~depth:(Mina_ledger.Ledger.Any_ledger.M.depth s)
-           () )
-    in
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
-    (* STEP 5: apply transactions to bring snarked ledger up to date *)
-    let apply_first_pass =
-      Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind
-        ~constraint_constants:Context.constraint_constants
-    in
-    let apply_second_pass = Mina_ledger.Ledger.apply_transaction_second_pass in
-    let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
-        sparse_ledger txn =
-      let open Or_error.Let_syntax in
-      let%map _ledger, partial_txn =
-        Mina_ledger.Sparse_ledger.apply_transaction_first_pass
-          ~constraint_constants:Context.constraint_constants ~txn_state_view
-          ~global_slot sparse_ledger txn
+  let open Or_error.Let_syntax in
+  let%bind () =
+    if Frontier_base.Breadcrumb.just_emitted_a_proof new_breadcrumb then (
+      let s = t.root_ledger in
+      (* STEP 4: create temp mask on snarked ledger *)
+      let mt =
+        Mina_ledger.Ledger.Maskable.register_mask s
+          (Mina_ledger.Ledger.Mask.create
+             ~depth:(Mina_ledger.Ledger.Any_ledger.M.depth s)
+             () )
       in
-      partial_txn
-    in
-    let get_protocol_state state_hash =
-      match State_hash.Map.find t.protocol_states state_hash with
-      | Some s ->
-          Ok s
-      | None ->
-          Or_error.errorf "Failed to find protocol state for hash %s"
-            (State_hash.to_base58_check state_hash)
-    in
-    Or_error.ok_exn
-      (Staged_ledger.Scan_state.get_snarked_ledger_sync ~ledger:mt
-         ~get_protocol_state ~apply_first_pass ~apply_second_pass
-         ~apply_first_pass_sparse_ledger ~signature_kind
-         (Staged_ledger.scan_state new_staged_ledger) ) ;
-    (* Verify the new snarked ledger hash matches what's expected *)
-    let new_snarked_ledger_hash = Mina_ledger.Ledger.merkle_root mt in
-    let expected_snarked_ledger_hash =
-      Frontier_base.Breadcrumb.protocol_state new_breadcrumb
-      |> Protocol_state.blockchain_state |> Blockchain_state.snarked_ledger_hash
-    in
-    assert (
-      Ledger_hash.equal new_snarked_ledger_hash expected_snarked_ledger_hash ) ;
-    (* STEP 6: commit temp mask into snarked ledger *)
-    Mina_ledger.Ledger.commit mt ;
-    (* STEP 7: unregister temp mask *)
-    ignore
-      ( Mina_ledger.Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mt
-        : Mina_ledger.Ledger.unattached_mask ) ) ;
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      (* STEP 5: apply transactions to bring snarked ledger up to date *)
+      let apply_first_pass =
+        Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind
+          ~constraint_constants:Context.constraint_constants
+      in
+      let apply_second_pass =
+        Mina_ledger.Ledger.apply_transaction_second_pass
+      in
+      let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
+          sparse_ledger txn =
+        let%map _ledger, partial_txn =
+          Mina_ledger.Sparse_ledger.apply_transaction_first_pass
+            ~constraint_constants:Context.constraint_constants ~txn_state_view
+            ~global_slot sparse_ledger txn
+        in
+        partial_txn
+      in
+      let get_protocol_state state_hash =
+        match State_hash.Map.find t.protocol_states state_hash with
+        | Some s ->
+            Ok s
+        | None ->
+            Or_error.errorf "Failed to find protocol state for hash %s"
+              (State_hash.to_base58_check state_hash)
+      in
+      let%bind () =
+        Staged_ledger.Scan_state.get_snarked_ledger_sync ~ledger:mt
+          ~get_protocol_state ~apply_first_pass ~apply_second_pass
+          ~apply_first_pass_sparse_ledger ~signature_kind
+          (Staged_ledger.scan_state new_staged_ledger)
+      in
+      (* Verify the new snarked ledger hash matches what's expected *)
+      let new_snarked_ledger_hash = Mina_ledger.Ledger.merkle_root mt in
+      let expected_snarked_ledger_hash =
+        Frontier_base.Breadcrumb.protocol_state new_breadcrumb
+        |> Protocol_state.blockchain_state
+        |> Blockchain_state.snarked_ledger_hash
+      in
+      let%bind () =
+        if
+          Ledger_hash.equal new_snarked_ledger_hash expected_snarked_ledger_hash
+        then Ok ()
+        else
+          Or_error.errorf "Snarked ledger hash mismatch: got %s, expected %s"
+            (Ledger_hash.to_base58_check new_snarked_ledger_hash)
+            (Ledger_hash.to_base58_check expected_snarked_ledger_hash)
+      in
+      (* STEP 6: commit temp mask into snarked ledger *)
+      Mina_ledger.Ledger.commit mt ;
+      (* STEP 7: unregister temp mask *)
+      ignore
+        ( Mina_ledger.Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mt
+          : Mina_ledger.Ledger.unattached_mask ) ;
+      Ok () )
+    else Ok ()
+  in
   (* Recreate the breadcrumb with the reparented staged ledger *)
-  Frontier_base.Breadcrumb.create
-    ~validated_transition:
-      (Frontier_base.Breadcrumb.validated_transition new_breadcrumb)
-    ~staged_ledger:new_staged_ledger
-    ~just_emitted_a_proof:
-      (Frontier_base.Breadcrumb.just_emitted_a_proof new_breadcrumb)
-    ~transition_receipt_time:
-      (Frontier_base.Breadcrumb.transition_receipt_time new_breadcrumb)
-    ~accounts_created:[]
+  Ok
+    (Frontier_base.Breadcrumb.create
+       ~validated_transition:
+         (Frontier_base.Breadcrumb.validated_transition new_breadcrumb)
+       ~staged_ledger:new_staged_ledger
+       ~just_emitted_a_proof:
+         (Frontier_base.Breadcrumb.just_emitted_a_proof new_breadcrumb)
+       ~transition_receipt_time:
+         (Frontier_base.Breadcrumb.transition_receipt_time new_breadcrumb)
+       ~accounts_created:[] )
 
 let add_breadcrumb t raw_breadcrumb =
   let state_hash = Frontier_base.Breadcrumb.state_hash raw_breadcrumb in
@@ -168,7 +184,8 @@ let add_breadcrumb t raw_breadcrumb =
     State_hash.Map.set t.protocol_states ~key:state_hash ~data:protocol_state
   in
   let t = { t with protocol_states } in
-  let breadcrumb =
+  let open Or_error.Let_syntax in
+  let%map breadcrumb =
     perform_root_transition t ~prev_breadcrumb:t.current
       ~new_breadcrumb:raw_breadcrumb
   in

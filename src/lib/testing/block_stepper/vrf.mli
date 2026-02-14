@@ -8,4 +8,4 @@ val find_next_winning_slot :
        * Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t )
      * int )
      option
-     Async.Deferred.t
+     Async.Deferred.Or_error.t

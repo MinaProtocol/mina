@@ -69,7 +69,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     ~staged_ledger ~transactions ~get_completed_work ~logger
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
     ~zkapp_cmd_limit_hardcap ~signature_kind =
-  let open Deferred.Let_syntax in
+  let open Deferred.Or_error.Let_syntax in
   let previous_protocol_state_body_hash =
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
   in
@@ -93,7 +93,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
   let coinbase_receiver =
     Consensus.Data.Block_data.coinbase_receiver block_data
   in
-  let diff =
+  let%bind diff =
     Staged_ledger.create_diff ~constraint_constants ~global_slot staged_ledger
       ~coinbase_receiver ~logger ~current_state_view:previous_state_view
       ~transactions_by_fee:transactions ~get_completed_work
@@ -101,7 +101,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     |> Result.map_error ~f:(fun err ->
            Staged_ledger.Staged_ledger_error.Pre_diff err )
     |> Result.map_error ~f:Staged_ledger.Staged_ledger_error.to_error
-    |> Or_error.ok_exn |> fst
+    |> Result.map ~f:fst |> Deferred.return
   in
   let%bind ( `Ledger_proof ledger_proof_opt
            , `Staged_ledger transitioned_staged_ledger
@@ -114,8 +114,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
         (previous_protocol_state_hash, previous_protocol_state_body_hash)
       ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
       ~signature_kind
-    >>| Result.map_error ~f:Staged_ledger.Staged_ledger_error.to_error
-    >>| Or_error.ok_exn
+    |> Deferred.Result.map_error ~f:Staged_ledger.Staged_ledger_error.to_error
   in
   let staged_ledger_hash = Staged_ledger.hash transitioned_staged_ledger in
   let just_emitted_a_proof = Option.is_some ledger_proof_opt in
@@ -187,7 +186,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     ; is_new_stack
     }
   in
-  return
+  Deferred.Or_error.return
     ( protocol_state
     , internal_transition
     , pending_coinbase_witness
@@ -201,6 +200,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
   let module V = Mina_block.Validation in
   let (module Context : V.CONTEXT) = context in
   let open Context in
+  let open Deferred.Or_error.Let_syntax in
   let block_data =
     Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
       ~coinbase_receiver:`Producer
@@ -226,9 +226,9 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
     State_hash.Map.find protocol_states hash
     |> Result.of_option ~error:(Error.of_string "state not found")
   in
-  let work_specs =
+  let%bind work_specs =
     Staged_ledger.work_pairs_for_new_diff previous_staged_ledger ~get_state
-    |> Or_error.ok_exn
+    |> Deferred.return
   in
   let%bind get_completed_work =
     Snark_work.compute
@@ -237,7 +237,6 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
       ~prover_key:prover
       (module Keys.T)
       work_specs
-    >>| Or_error.ok_exn
   in
   let%bind ( protocol_state
            , internal_transition
@@ -265,7 +264,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
       (Mina_block.Internal_transition.ledger_proof internal_transition)
       (Mina_block.Internal_transition.prover_state internal_transition)
       pending_coinbase_witness
-    >>| Or_error.ok_exn >>| Blockchain_snark.Blockchain.proof
+    >>|? Blockchain_snark.Blockchain.proof
   in
   let previous_state_hash = Frontier_base.Breadcrumb.state_hash previous in
   let delta_block_chain_proof = (previous_state_hash, []) in
@@ -277,7 +276,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
     Mina_block.Body.create
     @@ Mina_block.Internal_transition.staged_ledger_diff internal_transition
   in
-  let transition =
+  let%bind transition =
     let open Result.Let_syntax in
     V.wrap_header
       { With_hash.hash = Protocol_state.hashes protocol_state; data = header }
@@ -300,10 +299,10 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
           `This_block_has_a_trusted_staged_ledger
     |> Result.map_error
          ~f:(const (Error.of_string "failed to validate just created block"))
-    |> Or_error.ok_exn
+    |> Deferred.return
   in
   [%log info] "Building breadcrumb" ;
-  return
+  Deferred.Or_error.return
     (Frontier_base.Breadcrumb.create
        ~validated_transition:(Mina_block.Validated.lift transition)
        ~staged_ledger:transitioned_staged_ledger ~just_emitted_a_proof

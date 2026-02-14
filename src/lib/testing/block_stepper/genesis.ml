@@ -24,12 +24,13 @@ let create_genesis_breadcrumb ~logger ~precomputed_values ~root_ledger
   in
   let (module Keys : Block_builder.Keys_S) = keys_module in
   [%log info] "Generating genesis proof" ;
+  let open Deferred.Or_error.Let_syntax in
   let%map real_proof =
     create_genesis_proof
       (module Keys.B)
       ~constraint_constants
       (Genesis_proof.to_inputs precomputed_values)
-    >>| Or_error.ok_exn >>| Blockchain_snark.Blockchain.proof
+    >>|? Blockchain_snark.Blockchain.proof
   in
   let genesis_state =
     Precomputed_values.genesis_state_with_hashes precomputed_values

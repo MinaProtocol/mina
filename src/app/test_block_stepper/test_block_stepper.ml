@@ -196,6 +196,7 @@ let run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~state_dir
   let%bind stepper =
     Block_stepper.create_from_genesis ~precomputed_values ~keypair ~keys_module
       ~logger ~state_dir ()
+    >>| Or_error.ok_exn
   in
   let genesis_breadcrumb = Block_stepper.current_block stepper in
   [%log info] "Verifying genesis block proof" ;
@@ -236,7 +237,7 @@ let run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~state_dir
           num_blocks
           (Sequence.length transactions) ;
         let%bind breadcrumb, stepper =
-          Block_stepper.step stepper ~transactions
+          Block_stepper.step stepper ~transactions >>| Or_error.ok_exn
         in
         [%log info] "Block %d produced, verifying proof" block_num ;
         let blockchain = blockchain_of_breadcrumb breadcrumb in

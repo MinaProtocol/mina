@@ -8,7 +8,7 @@ val create :
   -> logger:Logger.t
   -> state_dir:string
   -> unit
-  -> t Async.Deferred.t
+  -> t Async.Deferred.Or_error.t
 
 val current : t -> Frontier_base.Breadcrumb.t
 
@@ -22,4 +22,6 @@ val protocol_states :
   t -> Mina_state.Protocol_state.value Mina_base.State_hash.Map.t
 
 val add_breadcrumb :
-  t -> Frontier_base.Breadcrumb.t -> Frontier_base.Breadcrumb.t * t
+     t
+  -> Frontier_base.Breadcrumb.t
+  -> (Frontier_base.Breadcrumb.t * t) Core.Or_error.t

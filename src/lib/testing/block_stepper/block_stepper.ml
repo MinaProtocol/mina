@@ -35,6 +35,7 @@ let get_epoch_data_at_slot ~context:(module Context : Consensus.Intf.CONTEXT)
 
 let create_from_genesis ~precomputed_values ~keypair ~keys_module ~logger
     ~state_dir () =
+  let open Deferred.Or_error.Let_syntax in
   let context =
     let module Context = struct
       let logger = logger
@@ -58,8 +59,7 @@ let create_from_genesis ~precomputed_values ~keypair ~keys_module ~logger
   in
   let%map proof_cache_db =
     Proof_cache_tag.create_db (Filename.concat state_dir "proof_cache") ~logger
-    >>| Result.map_error ~f:(fun (`Initialization_error e) -> e)
-    >>| Or_error.ok_exn
+    |> Deferred.Result.map_error ~f:(fun (`Initialization_error e) -> e)
   in
   let consensus_state =
     Frontier_base.Breadcrumb.consensus_state genesis_breadcrumb
@@ -78,6 +78,7 @@ let create_from_genesis ~precomputed_values ~keypair ~keys_module ~logger
   }
 
 let step t ~transactions =
+  let open Deferred.Or_error.Let_syntax in
   let context = Linear_frontier.context t.frontier in
   let (module Context : Consensus.Intf.CONTEXT) = context in
   let logger = Context.logger in
@@ -92,27 +93,29 @@ let step t ~transactions =
   in
   let rec find_slot ~epoch_data ~start_slot ~slots_searched =
     if slots_searched >= max_search_slots then
-      failwith "Could not find winning slot within 2 epochs" ;
-    let epoch_data_for_vrf, ledger_snapshot = epoch_data in
-    let epoch_end_slot =
-      ((start_slot / slots_per_epoch) + 1) * slots_per_epoch
-    in
-    match%bind
-      Vrf.find_next_winning_slot ~context ~keypair:t.keypair ~start_slot
-        ~epoch_data_for_vrf ~ledger_snapshot
-    with
-    | Some (winner, next_slot) ->
-        return (winner, next_slot, epoch_data)
-    | None ->
-        [%log info] "Epoch exhausted at slot %d, recomputing for next epoch"
-          epoch_end_slot ;
-        let new_epoch_data =
-          get_epoch_data_at_slot ~context ~consensus_state
-            ~local_state:consensus_local_state ~slot:epoch_end_slot
-        in
-        let slots_in_this_epoch = epoch_end_slot - start_slot in
-        find_slot ~epoch_data:new_epoch_data ~start_slot:epoch_end_slot
-          ~slots_searched:(slots_searched + slots_in_this_epoch)
+      Deferred.Or_error.error_string
+        "Could not find winning slot within 2 epochs"
+    else
+      let epoch_data_for_vrf, ledger_snapshot = epoch_data in
+      let epoch_end_slot =
+        ((start_slot / slots_per_epoch) + 1) * slots_per_epoch
+      in
+      match%bind
+        Vrf.find_next_winning_slot ~context ~keypair:t.keypair ~start_slot
+          ~epoch_data_for_vrf ~ledger_snapshot
+      with
+      | Some (winner, next_slot) ->
+          Deferred.Or_error.return (winner, next_slot, epoch_data)
+      | None ->
+          [%log info] "Epoch exhausted at slot %d, recomputing for next epoch"
+            epoch_end_slot ;
+          let new_epoch_data =
+            get_epoch_data_at_slot ~context ~consensus_state
+              ~local_state:consensus_local_state ~slot:epoch_end_slot
+          in
+          let slots_in_this_epoch = epoch_end_slot - start_slot in
+          find_slot ~epoch_data:new_epoch_data ~start_slot:epoch_end_slot
+            ~slots_searched:(slots_searched + slots_in_this_epoch)
   in
   [%log info] "Searching for next winning slot from slot %d" t.next_search_slot ;
   let%bind (slot_won, ledger_snapshot), next_search_slot, epoch_data =
@@ -122,14 +125,14 @@ let step t ~transactions =
   let precomputed_values = Linear_frontier.precomputed_values t.frontier in
   let signature_kind = precomputed_values.signature_kind in
   let protocol_states = Linear_frontier.protocol_states t.frontier in
-  let%map raw_breadcrumb =
+  let%bind raw_breadcrumb =
     Block_builder.build_breadcrumb ~transactions ~context ~precomputed_values
       ~signature_kind ~proof_cache_db:t.proof_cache_db ~protocol_states
       t.keys_module
       (slot_won, ledger_snapshot)
       current
   in
-  let breadcrumb, frontier =
-    Linear_frontier.add_breadcrumb t.frontier raw_breadcrumb
+  let%map breadcrumb, frontier =
+    Linear_frontier.add_breadcrumb t.frontier raw_breadcrumb |> Deferred.return
   in
   (breadcrumb, { t with frontier; next_search_slot; epoch_data })
