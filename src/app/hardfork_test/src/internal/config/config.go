@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+// WARN: ensure we're always using the same consensus param here and in mina-local-network!
+// TODO: make these configurable
+const ProtocolK = 10
+const ProtocolSlotPerEpoch = 48
+
 // Config represents the application configuration parameters
 type Config struct {
 	// Executable paths
