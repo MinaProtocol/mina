@@ -169,7 +169,7 @@ let compute ~proof_level ~proof_cache_db ~signature_kind ~logger ~fee
       ] ;
   let open Deferred.Or_error.Let_syntax in
   let%map proved_work =
-    Deferred.Or_error.List.map work_specs ~how:`Parallel ~f:(fun one_or_two ->
+    Deferred.Or_error.List.map work_specs ~how:`Sequential ~f:(fun one_or_two ->
         [%log internal] "Snark_work_bundle" ;
         let%map proofs =
           One_or_two.Deferred_result.map one_or_two
