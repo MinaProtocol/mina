@@ -203,7 +203,9 @@ on-exit() {
   for pid in "${SNARK_WORKERS_PIDS[@]}"; do
     {
       echo "Killing SNARK worker at $pid"
-      kill "$pid"
+      # NOTE: SNARK workers are spawned in a whole pipeline so using processes 
+      # group kill instead of regular killing
+      kill -- -"$pid"
     } &
     job_pids+=("$!")
   done
