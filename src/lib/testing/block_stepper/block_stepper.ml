@@ -213,7 +213,7 @@ let find_next_winning_slot ~context:(module Context : Consensus.Intf.CONTEXT)
         `Finished (Some ((slot_won, ledger_snapshot), current_slot + 1))
 
 let generate_next_state ~constraint_constants ~previous_protocol_state
-    ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
+    ~staged_ledger ~transactions ~get_completed_work ~logger
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
     ~zkapp_cmd_limit_hardcap ~signature_kind =
   let open Deferred.Let_syntax in
@@ -300,9 +300,14 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     Blockchain_state.create_value ~timestamp:scheduled_time ~genesis_ledger_hash
       ~staged_ledger_hash ~body_reference ~ledger_proof_statement
   in
+  (* This current_time is used in the [generate_transition] method for the sole
+     purpose of logging if the block was created ater the slot was over. The
+     stepper is not expected to run at the exact wall clock time implied by the
+     genesis timestamp and slot, so this warning is useless or us. By using the
+     scheduled time, we pretend we created the block instantly and so suppress
+     this warning. *)
   let current_time =
-    Block_time.now time_controller
-    |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
+    scheduled_time |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
   in
   let protocol_state, consensus_transition_data =
     Consensus_state_hooks.generate_transition ~previous_protocol_state
@@ -347,19 +352,11 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
     Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
       ~coinbase_receiver:`Producer
   in
-  Block_time.Controller.enable_setting_offset () ;
-  Block_time.Controller.set_time_offset Time.Span.zero ;
   let scheduled_time =
     Consensus.Data.Consensus_time.(
       start_time ~constants:consensus_constants
         (of_global_slot ~constants:consensus_constants slot_won.global_slot))
   in
-  Block_time.Controller.set_time_offset
-    ( Block_time.Span.to_time_span
-    @@ Block_time.diff
-         (Block_time.now @@ Block_time.Controller.basic ~logger)
-         scheduled_time ) ;
-  let time_controller = Block_time.Controller.basic ~logger in
   let previous_protocol_state =
     Frontier_base.Breadcrumb.protocol_state previous
   in
@@ -396,9 +393,9 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
            , accounts_created
            , just_emitted_a_proof ) =
     generate_next_state ~constraint_constants ~scheduled_time ~block_data
-      ~previous_protocol_state ~time_controller
-      ~staged_ledger:previous_staged_ledger ~transactions ~get_completed_work
-      ~logger ~winner_pk ~zkapp_cmd_limit_hardcap:128 ~signature_kind
+      ~previous_protocol_state ~staged_ledger:previous_staged_ledger
+      ~transactions ~get_completed_work ~logger ~winner_pk
+      ~zkapp_cmd_limit_hardcap:128 ~signature_kind
   in
   [%log info]
     "Generated protocol state and internal transition with %d commands"
