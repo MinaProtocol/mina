@@ -2,18 +2,6 @@ open Core
 open Async
 open Signature_lib
 
-let get_epoch_data_at_slot ~context:(module Context : Consensus.Intf.CONTEXT)
-    ~consensus_state ~local_state ~slot =
-  let global_slot = Mina_numbers.Global_slot_since_hard_fork.of_int slot in
-  let time =
-    Consensus.Data.Consensus_time.(
-      start_time ~constants:Context.consensus_constants
-        (of_global_slot ~constants:Context.consensus_constants global_slot))
-  in
-  let now = Block_time.Span.to_ms (Block_time.to_span_since_epoch time) in
-  Consensus.Hooks.get_epoch_data_for_vrf ~constants:Context.consensus_constants
-    now consensus_state ~local_state ~logger:Context.logger
-
 let find_next_winning_slot ~context:(module Context : Consensus.Intf.CONTEXT)
     ~keypair ~start_slot ~epoch_data_for_vrf ~ledger_snapshot =
   let public_key_compressed = Public_key.compress keypair.Keypair.public_key in

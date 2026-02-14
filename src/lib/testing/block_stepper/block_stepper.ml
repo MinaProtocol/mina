@@ -47,6 +47,18 @@ let current_block t = t.current
 
 let precomputed_values t = t.precomputed_values
 
+let get_epoch_data_at_slot ~context:(module Context : Consensus.Intf.CONTEXT)
+    ~consensus_state ~local_state ~slot =
+  let global_slot = Mina_numbers.Global_slot_since_hard_fork.of_int slot in
+  let time =
+    Consensus.Data.Consensus_time.(
+      start_time ~constants:Context.consensus_constants
+        (of_global_slot ~constants:Context.consensus_constants global_slot))
+  in
+  let now = Block_time.Span.to_ms (Block_time.to_span_since_epoch time) in
+  Consensus.Hooks.get_epoch_data_for_vrf ~constants:Context.consensus_constants
+    now consensus_state ~local_state ~logger:Context.logger
+
 let create ~precomputed_values ~keypair ~start ~logger ~state_dir () =
   let start_block = start.breadcrumb in
   let keys_module = start.keys_module in
@@ -86,7 +98,7 @@ let create ~precomputed_values ~keypair ~start ~logger ~state_dir () =
   in
   let consensus_state = Frontier_base.Breadcrumb.consensus_state start_block in
   let epoch_data =
-    Vrf.get_epoch_data_at_slot
+    get_epoch_data_at_slot
       ~context:(module Context)
       ~consensus_state ~local_state:consensus_local_state ~slot:next_search_slot
   in
@@ -129,7 +141,7 @@ let step t ~transactions =
         [%log info] "Epoch exhausted at slot %d, recomputing for next epoch"
           epoch_end_slot ;
         let new_epoch_data =
-          Vrf.get_epoch_data_at_slot ~context:t.context ~consensus_state
+          get_epoch_data_at_slot ~context:t.context ~consensus_state
             ~local_state:t.consensus_local_state ~slot:epoch_end_slot
         in
         let slots_in_this_epoch = epoch_end_slot - start_slot in
