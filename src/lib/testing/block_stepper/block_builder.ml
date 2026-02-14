@@ -238,6 +238,9 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
       (module Keys.T)
       work_specs
   in
+  (* TODO: The returned transition_staged_ledger here contains a new mask. In
+     the success path, the returned breadcrumb has ownership of it, but on
+     failure it currently leaks. Fix this. *)
   let%bind ( protocol_state
            , internal_transition
            , pending_coinbase_witness
