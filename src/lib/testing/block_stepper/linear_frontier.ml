@@ -106,7 +106,7 @@ let perform_root_transition t ~prev_breadcrumb ~new_breadcrumb =
            ~depth:(Mina_ledger.Ledger.Any_ledger.M.depth s)
            () )
     in
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    let signature_kind = t.precomputed_values.signature_kind in
     (* STEP 5: apply transactions to bring snarked ledger up to date *)
     let apply_first_pass =
       Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind
