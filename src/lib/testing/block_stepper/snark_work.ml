@@ -118,6 +118,8 @@ let prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger:_
 let compute ~proof_level ~proof_cache_db ~signature_kind ~logger ~fee
     ~prover_key (module T : Transaction_snark.S) work_specs =
   let sok_digest = Sok_message.Digest.default in
+  [%log info] "Computing %d snark work items"
+    (List.sum (module Int) work_specs ~f:One_or_two.length) ;
   let prove_single =
     match (proof_level : Genesis_constants.Proof_level.t) with
     | Check | No_check ->
