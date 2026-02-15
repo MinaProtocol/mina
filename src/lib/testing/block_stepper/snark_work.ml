@@ -247,14 +247,23 @@ let compute provider ~fee ~prover_key work_specs =
           | `One a ->
               let%map a' = provider.prove_single a in
               `One a'
-          | `Two (a, b) ->
-              (* Dispatch both items concurrently — no dependency between
-                 sibling work items in the scan state. *)
-              let da = provider.prove_single a in
-              let db = provider.prove_single b in
-              let%bind a' = da in
-              let%map b' = db in
-              `Two (a', b')
+          | `Two (a, b) -> (
+              match provider.how with
+              | `Parallel | `Max_concurrent_jobs _ ->
+                  (* Dispatch both items concurrently — no dependency between
+                     sibling work items in the scan state. Safe because each
+                     item goes to a separate worker process. *)
+                  let da = provider.prove_single a in
+                  let db = provider.prove_single b in
+                  let%bind a' = da in
+                  let%map b' = db in
+                  `Two (a', b')
+              | `Sequential ->
+                  (* Must be sequential in-process: snarky has mutable state,
+                     so two concurrent proofs would corrupt it. *)
+                  let%bind a' = provider.prove_single a in
+                  let%map b' = provider.prove_single b in
+                  `Two (a', b') )
         in
         [%log internal] "Snark_work_bundle_done" ;
         let statement =
