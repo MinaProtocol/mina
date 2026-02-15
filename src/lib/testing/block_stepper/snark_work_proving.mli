@@ -1,16 +1,10 @@
-(** Core proving functions that work with Stable types (no proof caching).
-    These are shared between the direct in-process provider and the
-    Rpc_parallel worker processes. *)
+(** Core proving function for non-zkapp transactions.
+    Used by the direct in-process provider's prove_base implementation. *)
 
-val prove_from_stable_spec :
-     proof_cache_db:Proof_cache_tag.cache_db
-  -> signature_kind:Mina_signature_kind.t
-  -> sok_digest:Mina_base.Sok_message.Digest.t
-  -> logger:Logger.t
+val prove_non_zkapp :
+     sok_digest:Mina_base.Sok_message.Digest.t
   -> (module Transaction_snark.S)
-  -> Snark_work_lib.Spec.Single.Stable.Latest.t
-  -> Ledger_proof.t Async.Deferred.Or_error.t
-
-val prove_dummy_from_stable_spec :
-     Snark_work_lib.Spec.Single.Stable.Latest.t
+  -> Mina_state.Snarked_ledger_state.With_sok.t
+  -> Transaction_witness.Stable.V2.t
+  -> Mina_transaction.Transaction.Valid.t
   -> Ledger_proof.t Async.Deferred.Or_error.t

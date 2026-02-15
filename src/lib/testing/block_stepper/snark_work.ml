@@ -8,22 +8,6 @@ let prove_dummy ~proof_cache_db:_ ~signature_kind:_ ~sok_digest:_ ~logger:_
   Deferred.Or_error.return
     (Ledger_proof.For_tests.Cached.mk_dummy_proof statement)
 
-let prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger
-    (module T : Transaction_snark.S)
-    (spec :
-      ( Transaction_witness.t
-      , Ledger_proof.Cached.t )
-      Snark_work_lib.Work.Single.Spec.t ) =
-  let single_spec = Snark_work_lib.Spec.Single.read_all_proofs_from_disk spec in
-  let open Deferred.Or_error.Let_syntax in
-  let%map proof =
-    Snark_work_proving.prove_from_stable_spec ~proof_cache_db ~signature_kind
-      ~sok_digest ~logger
-      (module T)
-      single_spec
-  in
-  Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
-
 type provider =
   { prove_single :
          ( Transaction_witness.t
@@ -34,33 +18,36 @@ type provider =
   ; how : Monad_sequence.how
   }
 
-let create_direct ~proof_level ~proof_cache_db ~signature_kind ~logger
-    (module T : Transaction_snark.S) =
-  let sok_digest = Sok_message.Digest.default in
-  let prove_single =
-    match (proof_level : Genesis_constants.Proof_level.t) with
-    | Check | No_check ->
-        prove_dummy ~proof_cache_db ~signature_kind ~sok_digest ~logger
-          (module T)
-    | Full ->
-        prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger (module T)
-  in
-  (* We'd really like to use Parallel here, obviously. Even with the global
-     lock in ocaml 4 it would at least let us schedule a lot of rust kimchi
-     proof generation in parallel. The issue is that snarky's Run.Make creates
-     a stateful module with a single mutable state ref in it. Thus you would
-     need to create/modify .Make variants of the transaction snark modules all
-     the way down to snarky, so that they could reinstantiate everything down
-     to snarky itself.
+module Snark_work_prover = struct
+  type prove_base_input =
+    { statement : Mina_state.Snarked_ledger_state.With_sok.t
+    ; witness : Transaction_witness.Stable.V2.t
+    }
 
-     Alternatively, we could ditch the "imperative" interface on top of the
-     snarky's internal Internal_Basic (a.k.a. Snark) interface, and just use
-     the internal pure interface. I would argue that this is much more honest
-     about what these functions are doing. This would require
-     zkapp_command_logic.ml to be parametrized by monad, however, if we wanted
-     to keep the same structure where we instantiate it twice for checked and
-     unchecked proving. *)
-  { prove_single; logger; how = `Sequential }
+  type prove_zkapp_segment_input =
+    { statement : Mina_state.Snarked_ledger_state.With_sok.t
+    ; witness : Transaction_snark.Zkapp_command_segment.Witness.t
+    ; spec : Transaction_snark.Zkapp_command_segment.Basic.t
+    }
+
+  type prove_merge_input = { proof1 : Ledger_proof.t; proof2 : Ledger_proof.t }
+
+  type t =
+    { prove_base : prove_base_input -> Ledger_proof.t Deferred.Or_error.t
+    ; prove_zkapp_segment :
+        prove_zkapp_segment_input -> Ledger_proof.t Deferred.Or_error.t
+    ; prove_merge : prove_merge_input -> Ledger_proof.t Deferred.Or_error.t
+    ; how : Monad_sequence.how
+    }
+
+  let prove_base t input = t.prove_base input
+
+  let prove_zkapp_segment t input = t.prove_zkapp_segment input
+
+  let prove_merge t input = t.prove_merge input
+
+  let how t = t.how
+end
 
 (* Local copy of segment extraction — avoids needing (module T : S) on the
    host. Identical logic to
@@ -99,8 +86,8 @@ let extract_zkapp_segment_works ~signature_kind ~constraint_constants
 
 (* Binary tree merge: pairwise rounds until one proof remains.
    Odd elements are carried forward. Each round's merges are dispatched
-   in parallel via the worker pool. *)
-let rec parallel_merge_rounds proofs ~dispatch_merge =
+   via ~how. *)
+let rec merge_rounds proofs ~how ~dispatch_merge =
   match proofs with
   | [] ->
       Deferred.Or_error.error_string "empty segment proofs"
@@ -119,10 +106,136 @@ let rec parallel_merge_rounds proofs ~dispatch_merge =
       in
       let open Deferred.Or_error.Let_syntax in
       let%bind merged =
-        Deferred.Or_error.List.map ~how:`Parallel pairs ~f:(fun (a, b) ->
+        Deferred.Or_error.List.map ~how pairs ~f:(fun (a, b) ->
             dispatch_merge a b )
       in
-      parallel_merge_rounds (merged @ leftover) ~dispatch_merge
+      merge_rounds (merged @ leftover) ~how ~dispatch_merge
+
+let prove_single_with_prover ~prover ~sok_digest ~proof_cache_db ~signature_kind
+    ~constraint_constants ~logger spec =
+  let stable_spec = Snark_work_lib.Spec.Single.read_all_proofs_from_disk spec in
+  let open Deferred.Or_error.Let_syntax in
+  let%map proof =
+    match stable_spec with
+    | Transition (input, w) -> (
+        let stmt_with_sok = { input with sok_digest } in
+        match w.transaction with
+        | Command (Zkapp_command zkapp_command) ->
+            [%log internal] "Snark_work_zkapp_proof" ;
+            let zkapp_cmd =
+              Zkapp_command.write_all_proofs_to_disk ~signature_kind
+                ~proof_cache_db zkapp_command
+            in
+            let%bind segments =
+              extract_zkapp_segment_works ~signature_kind ~constraint_constants
+                ~input ~witness:w ~zkapp_command:zkapp_cmd
+              |> Deferred.return
+            in
+            let segment_list = Mina_stdlib.Nonempty_list.to_list segments in
+            [%log internal] "Snark_work_zkapp_prove"
+              ~metadata:
+                [ ("zkapp_work_segments", `Int (List.length segment_list)) ] ;
+            let%bind segment_proofs =
+              Deferred.Or_error.List.map ~how:(Snark_work_prover.how prover)
+                segment_list ~f:(fun (witness, seg_spec, stmt) ->
+                  [%log internal] "Snark_work_zkapp_segment" ;
+                  Snark_work_prover.prove_zkapp_segment prover
+                    { statement = { stmt with sok_digest }
+                    ; witness
+                    ; spec = seg_spec
+                    } )
+            in
+            let%bind proof =
+              merge_rounds segment_proofs ~how:(Snark_work_prover.how prover)
+                ~dispatch_merge:(fun p1 p2 ->
+                  [%log internal] "Snark_work_zkapp_merge" ;
+                  Snark_work_prover.prove_merge prover
+                    { proof1 = p1; proof2 = p2 } )
+            in
+            [%log internal] "Snark_work_zkapp_proof_done" ;
+            if
+              not
+                (Transaction_snark.Statement.equal
+                   (Ledger_proof.statement proof)
+                   input )
+            then
+              Deferred.Or_error.error_string
+                "Zkapp_command transaction final statement mismatch"
+            else Deferred.Or_error.return proof
+        | _ ->
+            Snark_work_prover.prove_base prover
+              { statement = stmt_with_sok; witness = w } )
+    | Merge (_, p1, p2) ->
+        Snark_work_prover.prove_merge prover { proof1 = p1; proof2 = p2 }
+  in
+  Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
+
+let create_direct ~proof_level ~proof_cache_db ~signature_kind ~logger
+    (module T : Transaction_snark.S) =
+  let sok_digest = Sok_message.Digest.default in
+  let prove_single =
+    match (proof_level : Genesis_constants.Proof_level.t) with
+    | Check | No_check ->
+        prove_dummy ~proof_cache_db ~signature_kind ~sok_digest ~logger
+          (module T)
+    | Full ->
+        let constraint_constants = T.constraint_constants in
+        let prover : Snark_work_prover.t =
+          { prove_base =
+              (fun { statement; witness } ->
+                match witness.transaction with
+                | Command (Signed_command cmd) ->
+                    let open Deferred.Or_error.Let_syntax in
+                    let%bind cmd =
+                      Deferred.return
+                      @@ Result.of_option
+                           (Signed_command.check ~signature_kind cmd)
+                           ~error:
+                             (Error.of_string "Command has an invalid signature")
+                    in
+                    Snark_work_proving.prove_non_zkapp ~sok_digest
+                      (module T)
+                      statement witness (Command (Signed_command cmd))
+                | Fee_transfer ft ->
+                    Snark_work_proving.prove_non_zkapp ~sok_digest
+                      (module T)
+                      statement witness (Fee_transfer ft)
+                | Coinbase cb ->
+                    Snark_work_proving.prove_non_zkapp ~sok_digest
+                      (module T)
+                      statement witness (Coinbase cb)
+                | Command (Zkapp_command _) ->
+                    Deferred.Or_error.error_string
+                      "Zkapp_command should not reach prove_base" )
+          ; prove_zkapp_segment =
+              (fun { statement; witness; spec } ->
+                Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                    T.of_zkapp_command_segment_exn ~statement ~witness ~spec )
+                )
+          ; prove_merge =
+              (fun { proof1; proof2 } -> T.merge proof1 proof2 ~sok_digest)
+          ; how = `Sequential
+          }
+        in
+        prove_single_with_prover ~prover ~sok_digest ~proof_cache_db
+          ~signature_kind ~constraint_constants ~logger
+  in
+  (* We'd really like to use Parallel here, obviously. Even with the global
+     lock in ocaml 4 it would at least let us schedule a lot of rust kimchi
+     proof generation in parallel. The issue is that snarky's Run.Make creates
+     a stateful module with a single mutable state ref in it. Thus you would
+     need to create/modify .Make variants of the transaction snark modules all
+     the way down to snarky, so that they could reinstantiate everything down
+     to snarky itself.
+
+     Alternatively, we could ditch the "imperative" interface on top of the
+     snarky's internal Internal_Basic (a.k.a. Snark) interface, and just use
+     the internal pure interface. I would argue that this is much more honest
+     about what these functions are doing. This would require
+     zkapp_command_logic.ml to be parametrized by monad, however, if we wanted
+     to keep the same structure where we instantiate it twice for checked and
+     unchecked proving. *)
+  { prove_single; logger; how = `Sequential }
 
 let create_parallel ~num_workers ~proof_level ~proof_cache_db ~signature_kind
     ~constraint_constants ~logger =
@@ -156,75 +269,30 @@ let create_parallel ~num_workers ~proof_level ~proof_cache_db ~signature_kind
           ~metadata:[ ("worker", `Int worker_idx) ] ;
         result )
   in
-  let prove_single spec =
-    let stable_spec =
-      Snark_work_lib.Spec.Single.read_all_proofs_from_disk spec
-    in
-    [%log internal] "Snark_work_parallel_enqueue" ;
-    let open Deferred.Or_error.Let_syntax in
-    let%map proof =
-      match stable_spec with
-      | Transition (input, w) -> (
-          let stmt_with_sok = { input with sok_digest } in
-          match w.transaction with
-          | Command (Zkapp_command zkapp_command) ->
-              [%log internal] "Snark_work_zkapp_proof" ;
-              (* 1. Extract segments locally on host (fast, ~ms, no proving) *)
-              let zkapp_cmd =
-                Zkapp_command.write_all_proofs_to_disk ~signature_kind
-                  ~proof_cache_db zkapp_command
-              in
-              let%bind segments =
-                extract_zkapp_segment_works ~signature_kind
-                  ~constraint_constants ~input ~witness:w
-                  ~zkapp_command:zkapp_cmd
-                |> Deferred.return
-              in
-              let segment_list = Mina_stdlib.Nonempty_list.to_list segments in
-              [%log internal] "Snark_work_zkapp_prove"
-                ~metadata:
-                  [ ("zkapp_work_segments", `Int (List.length segment_list)) ] ;
-              (* 2. Prove ALL segments in parallel via pool *)
-              let%bind segment_proofs =
-                Deferred.Or_error.List.map ~how:`Parallel segment_list
-                  ~f:(fun (witness, seg_spec, stmt) ->
-                    let witness_stable =
-                      Transaction_snark.Zkapp_command_segment.Witness
-                      .read_all_proofs_from_disk witness
-                    in
-                    [%log internal] "Snark_work_zkapp_segment" ;
-                    dispatch_to_pool (fun worker ->
-                        Snark_work_worker.prove_zkapp_segment worker
-                          { stmt with sok_digest } witness_stable seg_spec ) )
-              in
-              (* 3. Merge in parallel rounds *)
-              let%bind proof =
-                parallel_merge_rounds segment_proofs
-                  ~dispatch_merge:(fun p1 p2 ->
-                    [%log internal] "Snark_work_zkapp_merge" ;
-                    dispatch_to_pool (fun worker ->
-                        Snark_work_worker.prove_merge worker p1 p2 sok_digest ) )
-              in
-              [%log internal] "Snark_work_zkapp_proof_done" ;
-              (* Statement mismatch check *)
-              if
-                not
-                  (Transaction_snark.Statement.equal
-                     (Ledger_proof.statement proof)
-                     input )
-              then
-                Deferred.Or_error.error_string
-                  "Zkapp_command transaction final statement mismatch"
-              else Deferred.Or_error.return proof
-          | _ ->
-              dispatch_to_pool (fun worker ->
-                  Snark_work_worker.prove_base worker stmt_with_sok w ) )
-      | Merge (_, p1, p2) ->
+  let prover : Snark_work_prover.t =
+    { prove_base =
+        (fun { statement; witness } ->
           dispatch_to_pool (fun worker ->
-              Snark_work_worker.prove_merge worker p1 p2 sok_digest )
-    in
-    [%log internal] "Snark_work_parallel_enqueue_done" ;
-    Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
+              Snark_work_worker.prove_base worker statement witness ) )
+    ; prove_zkapp_segment =
+        (fun { statement; witness; spec } ->
+          let witness_stable =
+            Transaction_snark.Zkapp_command_segment.Witness
+            .read_all_proofs_from_disk witness
+          in
+          dispatch_to_pool (fun worker ->
+              Snark_work_worker.prove_zkapp_segment worker statement
+                witness_stable spec ) )
+    ; prove_merge =
+        (fun { proof1; proof2 } ->
+          dispatch_to_pool (fun worker ->
+              Snark_work_worker.prove_merge worker proof1 proof2 sok_digest ) )
+    ; how = `Parallel
+    }
+  in
+  let prove_single =
+    prove_single_with_prover ~prover ~sok_digest ~proof_cache_db ~signature_kind
+      ~constraint_constants ~logger
   in
   { prove_single; logger; how = `Parallel }
 
