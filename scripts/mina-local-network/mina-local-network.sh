@@ -203,7 +203,9 @@ on-exit() {
   for pid in "${SNARK_WORKERS_PIDS[@]}"; do
     {
       echo "Killing SNARK worker at $pid"
-      kill "$pid"
+      # NOTE: SNARK workers are spawned in a whole pipeline so using processes 
+      # group kill instead of regular killing
+      kill -- -"$pid"
     } &
     job_pids+=("$!")
   done
@@ -441,6 +443,7 @@ reset-genesis-ledger() {
   echo 'Resetting Genesis Ledger...'
   printf "\n"
 
+  # WARN: ensure we're always using the same consensus param here and in hard fork test!
   jq --arg timestamp "$(date +"%Y-%m-%dT%H:%M:%S%z")" \
      --arg proof_level "$PROOF_LEVEL" \
   '

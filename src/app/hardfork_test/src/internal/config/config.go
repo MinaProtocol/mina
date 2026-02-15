@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+// WARN: ensure we're always using the same consensus param here and in mina-local-network!
+// TODO: make these configurable
+const ProtocolK = 10
+const ProtocolSlotPerEpoch = 48
+
 // Config represents the application configuration parameters
 type Config struct {
 	// Executable paths
@@ -103,6 +108,10 @@ func DefaultConfig() *Config {
 func (c *Config) ForkGenesisTsGivenMainGenesisTs(mainGenesisTs int64) int64 {
 	forkGenesisSlot := c.SlotChainEnd + c.HfSlotDelta
 	return mainGenesisTs + int64(forkGenesisSlot*c.MainSlot)
+}
+
+func (c *Config) MainSlotChainEnd(mainGenesisTs int64) time.Time {
+	return time.Unix(mainGenesisTs+int64(c.SlotChainEnd*c.MainSlot), 0)
 }
 
 // Validate checks if the configuration is valid
