@@ -2,10 +2,46 @@ open Core
 open Async
 open Mina_base
 
+(* RPC argument types — bin_io required by rpc_parallel *)
+
+type prove_base_input =
+  { statement : Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
+  ; witness : Transaction_witness.Stable.V2.t
+  }
+[@@deriving bin_io_unversioned]
+
+type prove_zkapp_segment_input =
+  { statement : Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
+  ; witness : Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
+  ; spec : Transaction_snark.Zkapp_command_segment.Basic.Stable.V1.t
+  }
+[@@deriving bin_io_unversioned]
+
+type prove_merge_input =
+  { proof1 : Ledger_proof.Stable.V2.t
+  ; proof2 : Ledger_proof.Stable.V2.t
+  ; sok_digest : Sok_message.Digest.Stable.V1.t
+  }
+[@@deriving bin_io_unversioned]
+
 module Worker_state = struct
+  (* The module type uses stable types matching the RPC boundary. *)
   module type S = sig
-    val prove :
-         Snark_work_lib.Spec.Single.Stable.Latest.t
+    val prove_base :
+         Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
+      -> Transaction_witness.Stable.V2.t
+      -> Ledger_proof.t Deferred.Or_error.t
+
+    val prove_zkapp_segment :
+         Mina_state.Snarked_ledger_state.With_sok.Stable.V2.t
+      -> Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
+      -> Transaction_snark.Zkapp_command_segment.Basic.Stable.V1.t
+      -> Ledger_proof.t Deferred.Or_error.t
+
+    val prove_merge :
+         Ledger_proof.Stable.V2.t
+      -> Ledger_proof.Stable.V2.t
+      -> sok_digest:Sok_message.Digest.Stable.V1.t
       -> Ledger_proof.t Deferred.Or_error.t
   end
 
@@ -21,7 +57,6 @@ module Worker_state = struct
 
   let create { proof_level; constraint_constants; signature_kind } :
       t Deferred.t =
-    let sok_digest = Sok_message.Digest.default in
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
         let module T = Transaction_snark.Make (struct
@@ -31,23 +66,90 @@ module Worker_state = struct
 
           let proof_level = proof_level
         end) in
-        (* The worker uses an identity cache since proofs are sent back to the
-           host and don't need persistent caching in the worker process. *)
+        (* Identity cache: proofs are sent back to the host, no persistent
+           caching needed in the worker process. *)
         let proof_cache_db = Proof_cache_tag.create_identity_db () in
-        let logger = Logger.null () in
         Deferred.return
           ( module struct
-            let prove spec =
-              Snark_work_proving.prove_from_stable_spec ~proof_cache_db
-                ~signature_kind ~sok_digest ~logger
-                (module T)
-                spec
+            let prove_base statement (w : Transaction_witness.Stable.V2.t) =
+              let open Deferred.Or_error.Let_syntax in
+              match w.transaction with
+              | Command (Signed_command cmd) ->
+                  let%bind cmd =
+                    Deferred.return
+                    @@ Result.of_option
+                         (Signed_command.check ~signature_kind cmd)
+                         ~error:
+                           (Error.of_string "Command has an invalid signature")
+                  in
+                  Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                      T.of_non_zkapp_command_transaction ~statement
+                        { Transaction_protocol_state.Poly.transaction =
+                            Command (Signed_command cmd)
+                        ; block_data = w.protocol_state_body
+                        ; global_slot = w.block_global_slot
+                        }
+                        ~init_stack:w.init_stack
+                        (unstage
+                           (Mina_ledger.Sparse_ledger.handler
+                              w.first_pass_ledger ) ) )
+              | Fee_transfer ft ->
+                  Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                      T.of_non_zkapp_command_transaction ~statement
+                        { Transaction_protocol_state.Poly.transaction =
+                            Fee_transfer ft
+                        ; block_data = w.protocol_state_body
+                        ; global_slot = w.block_global_slot
+                        }
+                        ~init_stack:w.init_stack
+                        (unstage
+                           (Mina_ledger.Sparse_ledger.handler
+                              w.first_pass_ledger ) ) )
+              | Coinbase cb ->
+                  Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                      T.of_non_zkapp_command_transaction ~statement
+                        { Transaction_protocol_state.Poly.transaction =
+                            Coinbase cb
+                        ; block_data = w.protocol_state_body
+                        ; global_slot = w.block_global_slot
+                        }
+                        ~init_stack:w.init_stack
+                        (unstage
+                           (Mina_ledger.Sparse_ledger.handler
+                              w.first_pass_ledger ) ) )
+              | Command (Zkapp_command _) ->
+                  Deferred.Or_error.error_string
+                    "prove_base called with zkapp command"
+
+            let prove_zkapp_segment statement witness_stable spec =
+              let witness =
+                Transaction_snark.Zkapp_command_segment.Witness
+                .write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+                  witness_stable
+              in
+              Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                  T.of_zkapp_command_segment_exn ~statement ~witness ~spec )
+
+            let prove_merge proof1 proof2 ~sok_digest =
+              T.merge proof1 proof2 ~sok_digest
           end : S )
     | Check | No_check ->
         Deferred.return
           ( module struct
-            let prove spec =
-              Snark_work_proving.prove_dummy_from_stable_spec spec
+            let prove_base statement _w =
+              Deferred.Or_error.return
+                (Ledger_proof.For_tests.mk_dummy_proof
+                   { statement with sok_digest = () } )
+
+            let prove_zkapp_segment statement _witness _spec =
+              Deferred.Or_error.return
+                (Ledger_proof.For_tests.mk_dummy_proof
+                   { statement with sok_digest = () } )
+
+            let prove_merge proof1 _proof2 ~sok_digest:_ =
+              Deferred.Or_error.return
+                (Ledger_proof.For_tests.mk_dummy_proof
+                   (Ledger_proof.statement proof1) )
           end : S )
 
   let get = Fn.id
@@ -61,11 +163,26 @@ module Functions = struct
 
   let create input output f : ('i, 'o) t = (input, output, f)
 
-  let prove_single =
-    create Snark_work_lib.Spec.Single.Stable.Latest.bin_t
-      [%bin_type_class: Ledger_proof.Stable.Latest.t Or_error.t] (fun w spec ->
+  let prove_base =
+    create bin_prove_base_input
+      [%bin_type_class: Ledger_proof.Stable.Latest.t Or_error.t]
+      (fun w { statement; witness } ->
         let (module W) = Worker_state.get w in
-        W.prove spec )
+        W.prove_base statement witness )
+
+  let prove_zkapp_segment =
+    create bin_prove_zkapp_segment_input
+      [%bin_type_class: Ledger_proof.Stable.Latest.t Or_error.t]
+      (fun w { statement; witness; spec } ->
+        let (module W) = Worker_state.get w in
+        W.prove_zkapp_segment statement witness spec )
+
+  let prove_merge =
+    create bin_prove_merge_input
+      [%bin_type_class: Ledger_proof.Stable.Latest.t Or_error.t]
+      (fun w { proof1; proof2; sok_digest } ->
+        let (module W) = Worker_state.get w in
+        W.prove_merge proof1 proof2 ~sok_digest )
 end
 
 module Worker = struct
@@ -73,11 +190,10 @@ module Worker = struct
     module F = Rpc_parallel.Function
 
     type 'w functions =
-      { prove_single :
-          ( 'w
-          , Snark_work_lib.Spec.Single.Stable.Latest.t
-          , Ledger_proof.t Or_error.t )
-          F.t
+      { prove_base : ('w, prove_base_input, Ledger_proof.t Or_error.t) F.t
+      ; prove_zkapp_segment :
+          ('w, prove_zkapp_segment_input, Ledger_proof.t Or_error.t) F.t
+      ; prove_merge : ('w, prove_merge_input, Ledger_proof.t Or_error.t) F.t
       }
 
     module Worker_state = Worker_state
@@ -100,7 +216,10 @@ module Worker = struct
             ~f:(fun ~worker_state ~conn_state:_ i -> f worker_state i)
             ~bin_input:i ~bin_output:o ()
         in
-        { prove_single = f Functions.prove_single }
+        { prove_base = f Functions.prove_base
+        ; prove_zkapp_segment = f Functions.prove_zkapp_segment
+        ; prove_merge = f Functions.prove_merge
+        }
 
       let init_worker_state
           Worker_state.{ proof_level; constraint_constants; signature_kind } =
@@ -141,8 +260,19 @@ let create ~logger ~proof_level ~constraint_constants ~signature_kind =
               ~metadata:[ ("stderr", `String stderr) ] ) ;
   { connection; process; logger }
 
-let prove_single t spec =
-  Worker.Connection.run t.connection ~f:Worker.functions.prove_single ~arg:spec
+let prove_base t statement witness =
+  Worker.Connection.run t.connection ~f:Worker.functions.prove_base
+    ~arg:{ statement; witness }
+  >>| Or_error.join
+
+let prove_zkapp_segment t statement witness spec =
+  Worker.Connection.run t.connection ~f:Worker.functions.prove_zkapp_segment
+    ~arg:{ statement; witness; spec }
+  >>| Or_error.join
+
+let prove_merge t proof1 proof2 sok_digest =
+  Worker.Connection.run t.connection ~f:Worker.functions.prove_merge
+    ~arg:{ proof1; proof2; sok_digest }
   >>| Or_error.join
 
 let close t =
