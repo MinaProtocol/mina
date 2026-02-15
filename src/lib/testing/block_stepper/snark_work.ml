@@ -74,6 +74,13 @@ let create_parallel ~num_workers ~proof_level ~proof_cache_db ~signature_kind
   in
   let workers = Array.of_list workers in
   let num_workers = Array.length workers in
+  (* Each worker process has its own snarky mutable state, so concurrent
+     RPCs to the same worker would clobber it. A sequencer per worker
+     ensures at most one proof computation at a time per process. *)
+  let sequencers =
+    Array.init num_workers ~f:(fun _ ->
+        Throttle.Sequencer.create ~continue_on_error:true () )
+  in
   let next_worker = ref 0 in
   let prove_single spec =
     let stable_spec =
@@ -81,11 +88,12 @@ let create_parallel ~num_workers ~proof_level ~proof_cache_db ~signature_kind
     in
     let worker_idx = !next_worker in
     next_worker := (worker_idx + 1) mod num_workers ;
-    let open Deferred.Or_error.Let_syntax in
-    let%map proof =
-      Snark_work_worker.prove_single workers.(worker_idx) stable_spec
-    in
-    Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
+    Throttle.enqueue sequencers.(worker_idx) (fun () ->
+        let open Deferred.Or_error.Let_syntax in
+        let%map proof =
+          Snark_work_worker.prove_single workers.(worker_idx) stable_spec
+        in
+        Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof )
   in
   { prove_single; logger; how = `Parallel }
 
