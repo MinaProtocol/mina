@@ -74,25 +74,30 @@ let create_parallel ~num_workers ~proof_level ~proof_cache_db ~signature_kind
   in
   let workers = Array.of_list workers in
   let num_workers = Array.length workers in
-  (* Each worker process has its own snarky mutable state, so concurrent
-     RPCs to the same worker would clobber it. A sequencer per worker
-     ensures at most one proof computation at a time per process. *)
-  let sequencers =
-    Array.init num_workers ~f:(fun _ ->
-        Throttle.Sequencer.create ~continue_on_error:true () )
+  (* A throttle with worker indices as resources. Each worker can only
+     run one proof at a time (snarky mutable state), and the throttle
+     dynamically assigns items to the first available worker — no
+     pre-assignment, no idle workers while items are waiting. *)
+  let worker_pool =
+    Throttle.create_with ~continue_on_error:true
+      (Array.to_list (Array.init num_workers ~f:Fn.id))
   in
-  let next_worker = ref 0 in
   let prove_single spec =
     let stable_spec =
       Snark_work_lib.Spec.Single.read_all_proofs_from_disk spec
     in
-    let worker_idx = !next_worker in
-    next_worker := (worker_idx + 1) mod num_workers ;
-    Throttle.enqueue sequencers.(worker_idx) (fun () ->
+    [%log internal] "Snark_work_parallel_enqueue" ;
+    Throttle.enqueue worker_pool (fun worker_idx ->
+        [%log internal] "Snark_work_parallel_enqueue_done"
+          ~metadata:[ ("worker", `Int worker_idx) ] ;
+        [%log internal] "Snark_work_parallel_rpc"
+          ~metadata:[ ("worker", `Int worker_idx) ] ;
         let open Deferred.Or_error.Let_syntax in
         let%map proof =
           Snark_work_worker.prove_single workers.(worker_idx) stable_spec
         in
+        [%log internal] "Snark_work_parallel_rpc_done"
+          ~metadata:[ ("worker", `Int worker_idx) ] ;
         Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof )
   in
   { prove_single; logger; how = `Parallel }
@@ -112,7 +117,18 @@ let compute provider ~fee ~prover_key work_specs =
       ~f:(fun one_or_two ->
         [%log internal] "Snark_work_bundle" ;
         let%map proofs =
-          One_or_two.Deferred_result.map one_or_two ~f:provider.prove_single
+          match one_or_two with
+          | `One a ->
+              let%map a' = provider.prove_single a in
+              `One a'
+          | `Two (a, b) ->
+              (* Dispatch both items concurrently — no dependency between
+                 sibling work items in the scan state. *)
+              let da = provider.prove_single a in
+              let db = provider.prove_single b in
+              let%bind a' = da in
+              let%map b' = db in
+              `Two (a', b')
         in
         [%log internal] "Snark_work_bundle_done" ;
         let statement =
