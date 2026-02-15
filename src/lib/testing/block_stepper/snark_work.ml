@@ -45,6 +45,21 @@ let create_direct ~proof_level ~proof_cache_db ~signature_kind ~logger
     | Full ->
         prove_full ~proof_cache_db ~signature_kind ~sok_digest ~logger (module T)
   in
+  (* We'd really like to use Parallel here, obviously. Even with the global
+     lock in ocaml 4 it would at least let us schedule a lot of rust kimchi
+     proof generation in parallel. The issue is that snarky's Run.Make creates
+     a stateful module with a single mutable state ref in it. Thus you would
+     need to create/modify .Make variants of the transaction snark modules all
+     the way down to snarky, so that they could reinstantiate everything down
+     to snarky itself.
+
+     Alternatively, we could ditch the "imperative" interface on top of the
+     snarky's internal Internal_Basic (a.k.a. Snark) interface, and just use
+     the internal pure interface. I would argue that this is much more honest
+     about what these functions are doing. This would require
+     zkapp_command_logic.ml to be parametrized by monad, however, if we wanted
+     to keep the same structure where we instantiate it twice for checked and
+     unchecked proving. *)
   { prove_single; logger; how = `Sequential }
 
 let create_parallel ~num_workers ~proof_level ~proof_cache_db ~signature_kind
