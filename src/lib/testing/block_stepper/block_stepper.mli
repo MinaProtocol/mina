@@ -29,6 +29,7 @@ val create_from_genesis :
   -> keys_module:(module Keys_S)
   -> logger:Logger.t
   -> state_dir:string
+  -> ?parallel_workers:int
   -> unit
   -> t Deferred.Or_error.t
 

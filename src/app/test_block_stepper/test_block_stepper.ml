@@ -168,7 +168,7 @@ let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
     ~constraint_constants:precomputed_values.constraint_constants keypair
 
 let run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~state_dir
-    ~n_payments ~n_zkapp_txs =
+    ~n_payments ~n_zkapp_txs ~parallel_workers =
   let%bind precomputed_values =
     load_and_initialize_config ~logger ~config_file ~genesis_dir
   in
@@ -195,7 +195,7 @@ let run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~state_dir
   [%log info] "Initializing block stepper (this involves proving)" ;
   let%bind stepper =
     Block_stepper.create_from_genesis ~precomputed_values ~keypair ~keys_module
-      ~logger ~state_dir ()
+      ~logger ~state_dir ?parallel_workers ()
     >>| Or_error.ok_exn
   in
   let genesis_breadcrumb = Block_stepper.current_block stepper in
@@ -296,6 +296,12 @@ let command =
       flag "--num-zkapp-txs"
         ~doc:"NUM Number of zkApp transactions per block (default: 0)"
         (optional_with_default 0 int)
+    and parallel_workers =
+      flag "--parallel-workers"
+        ~doc:
+          "NUM Number of parallel worker processes for snark proving (default: \
+           0, sequential)"
+        (optional int)
     in
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
@@ -345,7 +351,7 @@ let command =
     in
     Parallel.init_master () ;
     run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~state_dir
-      ~n_payments ~n_zkapp_txs)
+      ~n_payments ~n_zkapp_txs ~parallel_workers)
 
 let () =
   Command.group ~summary:"Block stepper test"

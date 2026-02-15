@@ -30,8 +30,7 @@ val build_breadcrumb :
      transactions:User_command.Valid.t Core.Sequence.t
   -> context:(module Mina_block.Validation.CONTEXT)
   -> precomputed_values:Precomputed_values.t
-  -> signature_kind:Mina_signature_kind.t
-  -> proof_cache_db:Proof_cache_tag.cache_db
+  -> snark_work_provider:Snark_work.provider
   -> protocol_states:Protocol_state.value State_hash.Map.t
   -> (module Keys_S)
   -> Consensus.Data.Slot_won.t

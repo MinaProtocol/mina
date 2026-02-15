@@ -11,7 +11,7 @@ type t =
   ; keys_module : (module Keys_S)
   ; keypair : Keypair.t
   ; next_search_slot : int
-  ; proof_cache_db : Proof_cache_tag.cache_db
+  ; snark_work_provider : Snark_work.provider
   ; epoch_data :
       Consensus.Data.Epoch_data_for_vrf.t
       * Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
@@ -34,7 +34,7 @@ let get_epoch_data_at_slot ~context:(module Context : Consensus.Intf.CONTEXT)
     now consensus_state ~local_state ~logger:Context.logger
 
 let create_from_genesis ~precomputed_values ~keypair ~keys_module ~logger
-    ~state_dir () =
+    ~state_dir ?parallel_workers () =
   let open Deferred.Or_error.Let_syntax in
   let context =
     let module Context = struct
@@ -57,9 +57,25 @@ let create_from_genesis ~precomputed_values ~keypair ~keys_module ~logger
     |> Consensus.Data.Consensus_state.curr_global_slot
     |> Mina_numbers.Global_slot_since_hard_fork.to_int |> ( + ) 1
   in
-  let%map proof_cache_db =
+  let%bind proof_cache_db =
     Proof_cache_tag.create_db (Filename.concat state_dir "proof_cache") ~logger
     |> Deferred.Result.map_error ~f:(fun (`Initialization_error e) -> e)
+  in
+  let (module Keys : Keys_S) = keys_module in
+  let proof_level = precomputed_values.Precomputed_values.proof_level in
+  let signature_kind = precomputed_values.signature_kind in
+  let%map snark_work_provider =
+    match parallel_workers with
+    | Some n when n > 0 ->
+        Snark_work.create_parallel ~num_workers:n ~proof_level ~proof_cache_db
+          ~signature_kind
+          ~constraint_constants:precomputed_values.constraint_constants ~logger
+        |> Deferred.map ~f:Or_error.return
+    | _ ->
+        Deferred.Or_error.return
+          (Snark_work.create_direct ~proof_level ~proof_cache_db ~signature_kind
+             ~logger
+             (module Keys.T) )
   in
   let consensus_state =
     Frontier_base.Breadcrumb.consensus_state genesis_breadcrumb
@@ -73,7 +89,7 @@ let create_from_genesis ~precomputed_values ~keypair ~keys_module ~logger
   ; keys_module
   ; keypair
   ; next_search_slot
-  ; proof_cache_db
+  ; snark_work_provider
   ; epoch_data
   }
 
@@ -124,12 +140,10 @@ let step t ~transactions =
       ~slots_searched:0
   in
   let precomputed_values = Linear_frontier.precomputed_values t.frontier in
-  let signature_kind = precomputed_values.signature_kind in
   let protocol_states = Linear_frontier.protocol_states t.frontier in
   let%bind raw_breadcrumb =
     Block_builder.build_breadcrumb ~transactions ~context ~precomputed_values
-      ~signature_kind ~proof_cache_db:t.proof_cache_db ~protocol_states
-      t.keys_module
+      ~snark_work_provider:t.snark_work_provider ~protocol_states t.keys_module
       (slot_won, ledger_snapshot)
       current
   in

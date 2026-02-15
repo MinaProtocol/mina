@@ -194,13 +194,14 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     , accounts_created
     , just_emitted_a_proof )
 
-let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
-    ~proof_cache_db ~protocol_states (module Keys : Keys_S)
+let build_breadcrumb ~transactions ~context ~precomputed_values
+    ~snark_work_provider ~protocol_states (module Keys : Keys_S)
     (slot_won, ledger_snapshot) (previous : Frontier_base.Breadcrumb.t) =
   let module V = Mina_block.Validation in
   let (module Context : V.CONTEXT) = context in
   let open Context in
   let open Deferred.Or_error.Let_syntax in
+  let signature_kind = precomputed_values.Precomputed_values.signature_kind in
   let block_data =
     Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
       ~coinbase_receiver:`Producer
@@ -231,12 +232,8 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~signature_kind
     |> Deferred.return
   in
   let%bind get_completed_work =
-    Snark_work.compute
-      ~proof_level:precomputed_values.Precomputed_values.proof_level
-      ~proof_cache_db ~signature_kind ~logger ~fee:Currency.Fee.zero
-      ~prover_key:prover
-      (module Keys.T)
-      work_specs
+    Snark_work.compute snark_work_provider ~fee:Currency.Fee.zero
+      ~prover_key:prover work_specs
   in
   (* TODO: The returned transition_staged_ledger here contains a new mask. In
      the success path, the returned breadcrumb has ownership of it, but on
