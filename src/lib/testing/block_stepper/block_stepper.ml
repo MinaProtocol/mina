@@ -93,6 +93,98 @@ let create_from_genesis ~precomputed_values ~keypair ~keys_module ~logger
   ; epoch_data
   }
 
+let step_at_slot t ~global_slot_since_genesis ~block_stake_winner ~transactions
+    =
+  let open Deferred.Or_error.Let_syntax in
+  let context = Linear_frontier.context t.frontier in
+  let (module Context : Consensus.Intf.CONTEXT) = context in
+  let logger = Context.logger in
+  let current = Linear_frontier.current t.frontier in
+  let consensus_state = Frontier_base.Breadcrumb.consensus_state current in
+  let consensus_local_state =
+    Linear_frontier.consensus_local_state t.frontier
+  in
+  (* For non-hard-fork networks (fresh genesis), global_slot_since_genesis
+     equals global_slot_since_hard_fork numerically. *)
+  let slot_int =
+    Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
+  in
+  let global_slot = Mina_numbers.Global_slot_since_hard_fork.of_int slot_int in
+  (* Get epoch data for the target slot *)
+  let epoch_data_for_vrf, ledger_snapshot =
+    get_epoch_data_at_slot ~context ~consensus_state
+      ~local_state:consensus_local_state ~slot:slot_int
+  in
+  let { Consensus.Data.Epoch_data_for_vrf.epoch_seed
+      ; delegatee_table
+      ; epoch_ledger
+      ; global_slot = epoch_start_hf
+      ; global_slot_since_genesis = epoch_start
+      ; epoch = _
+      } =
+    epoch_data_for_vrf
+  in
+  let public_key_compressed =
+    Public_key.compress t.keypair.Keypair.public_key
+  in
+  (* Run VRF check at the specific slot *)
+  let%bind `Vrf_eval _vrf_eval, `Vrf_output vrf_result, `Delegator delegator =
+    Consensus.Data.Vrf.check
+      ~context:(module Context)
+      ~global_slot ~seed:epoch_seed
+      ~get_delegators:(Public_key.Compressed.Table.find delegatee_table)
+      ~producer_private_key:t.keypair.private_key
+      ~producer_public_key:public_key_compressed
+      ~total_stake:epoch_ledger.total_currency
+    |> Interruptible.force
+    |> Deferred.map ~f:(function
+         | Error () ->
+             Or_error.error_string "VRF check failed"
+         | Ok None ->
+             Or_error.errorf "VRF did not win at slot %d" slot_int
+         | Ok (Some result) ->
+             Ok result )
+  in
+  (* Verify the delegator matches the expected block_stake_winner *)
+  let winner_pk = fst delegator in
+  let%bind () =
+    if Public_key.Compressed.equal winner_pk block_stake_winner then
+      Deferred.Or_error.ok_unit
+    else
+      Deferred.Or_error.errorf
+        "VRF delegator mismatch at slot %d: expected %s, got %s" slot_int
+        (Public_key.Compressed.to_base58_check block_stake_winner)
+        (Public_key.Compressed.to_base58_check winner_pk)
+  in
+  [%log info] "VRF verified at slot %d, building block" slot_int ;
+  let slot_won =
+    { Consensus.Data.Slot_won.delegator
+    ; producer = t.keypair
+    ; global_slot
+    ; global_slot_since_genesis =
+        Mina_numbers.Global_slot_since_genesis.add epoch_start
+          ( Mina_numbers.Global_slot_since_hard_fork.diff global_slot
+              epoch_start_hf
+          |> Option.value_exn ~message:"failed to diff global slots" )
+    ; vrf_result
+    }
+  in
+  let precomputed_values = Linear_frontier.precomputed_values t.frontier in
+  let protocol_states = Linear_frontier.protocol_states t.frontier in
+  let%bind raw_breadcrumb =
+    Block_builder.build_breadcrumb ~transactions ~context ~precomputed_values
+      ~snark_work_provider:t.snark_work_provider ~protocol_states t.keys_module
+      (slot_won, ledger_snapshot)
+      current
+  in
+  let breadcrumb, frontier =
+    Linear_frontier.add_breadcrumb t.frontier raw_breadcrumb
+  in
+  let next_search_slot = slot_int + 1 in
+  let epoch_data = (epoch_data_for_vrf, ledger_snapshot) in
+  Deferred.Or_error.return
+    (breadcrumb, { t with frontier; next_search_slot; epoch_data })
+
 let step t ~transactions =
   let open Deferred.Or_error.Let_syntax in
   let context = Linear_frontier.context t.frontier in

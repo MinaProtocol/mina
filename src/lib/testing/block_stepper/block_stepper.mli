@@ -37,3 +37,10 @@ val step :
      t
   -> transactions:User_command.Valid.t Sequence.t
   -> (Frontier_base.Breadcrumb.t * t) Deferred.Or_error.t
+
+val step_at_slot :
+     t
+  -> global_slot_since_genesis:Mina_numbers.Global_slot_since_genesis.t
+  -> block_stake_winner:Public_key.Compressed.t
+  -> transactions:User_command.Valid.t Sequence.t
+  -> (Frontier_base.Breadcrumb.t * t) Deferred.Or_error.t
