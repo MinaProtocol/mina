@@ -68,8 +68,7 @@ let make ~signature_kind (module T : Transaction_snark.S) =
         | Coinbase cb ->
             prove_non_zkapp ~statement witness (Coinbase cb)
         | Command (Zkapp_command _) ->
-            Deferred.Or_error.error_string
-              "Zkapp_command should not reach prove_base" )
+            assert false )
   ; prove_zkapp_segment =
       (fun { statement; witness; spec } ->
         Deferred.Or_error.try_with ~here:[%here] (fun () ->
