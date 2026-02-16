@@ -399,7 +399,10 @@ let extract_daemon_transitions ~logger ~best_tip_log ~output_file =
     in
     [%log info] "Extracted %d added_transitions from daemon best-tip log"
       (List.length all_transitions) ;
-    Yojson.Safe.to_file output_file (`List all_transitions) ;
+    Out_channel.write_all output_file
+      ~data:
+        (String.concat ~sep:"\n"
+           (List.map all_transitions ~f:Yojson.Safe.to_string) ) ;
     [%log info] "Wrote daemon transitions to %s" output_file )
   else [%log warn] "No best-tip log found at %s" best_tip_log
 
@@ -664,7 +667,7 @@ let run ~logger ~seed ~state_dir =
   (* Extract daemon transitions from best-tip log *)
   let best_tip_log = daemon_config.dirs.conf ^/ "mina-best-tip.log" in
   extract_daemon_transitions ~logger ~best_tip_log
-    ~output_file:(state_dir ^/ "daemon_transitions.json") ;
+    ~output_file:(state_dir ^/ "daemon_transitions.jsonl") ;
   (* Phase 3: Stepper replay *)
   [%log info] "Phase 3: Replaying blocks through stepper" ;
   let stepper_state_dir = daemon_config.dirs.root_path ^/ "stepper" in
@@ -761,8 +764,11 @@ let run ~logger ~seed ~state_dir =
         failwith "Stepper replay failed"
   in
   (* Write stepper transitions *)
-  let stepper_transitions_file = state_dir ^/ "stepper_transitions.json" in
-  Yojson.Safe.to_file stepper_transitions_file (`List stepper_transitions) ;
+  let stepper_transitions_file = state_dir ^/ "stepper_transitions.jsonl" in
+  Out_channel.write_all stepper_transitions_file
+    ~data:
+      (String.concat ~sep:"\n"
+         (List.map stepper_transitions ~f:Yojson.Safe.to_string) ) ;
   [%log info] "Wrote %d stepper transitions to %s"
     (List.length stepper_transitions)
     stepper_transitions_file ;
