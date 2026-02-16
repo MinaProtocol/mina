@@ -1,82 +1,109 @@
-#!/bin/bash
-set -eox pipefail
+#!/usr/bin/env bash
 
-CLEAR='\033[0m'
-RED='\033[0;31m'
+set -eux -o pipefail
 
-function usage() {
-  if [[ -n "$1" ]]; then
-    echo -e "${RED}☞  $1${CLEAR}\n";
-  fi
-  echo "Usage: $0 [-d deb-name] [-v new-version] "
-  echo "  -d, --deb                 The Debian name"
-  echo "  --version                 The Current Debian version"
-  echo "  --arch                    The Debian architecture"
-  echo "  --new-version             The New Debian version"
-  echo "  --suite                   The Current Debian suite"
-  echo "  --repo                    The Source Debian repo"
-  echo "  --new-repo                The Target Debian repo. By default equal to '--repo'"
-  echo "  --new-suite               The New Debian suite"
-  echo "  --codename                The Debian codename"
-  echo "  --sign                    The Public Key id, which is used to sign package. Key must be stored locally"
-  echo "  --skip-cache-invalidation Skip CloudFront cache invalidation after publishing the debian"
-  echo "  --help                    Show this help message and exit"
-  echo ""
-  echo "Example: $0 --deb mina-archive --version 2.0.0-rc1-48efea4 --new-version 2.0.0-rc1 --codename bullseye --release unstable --new-release umt"
+SESSION_DIR_SCRIPTS="$(realpath "$(dirname "${BASH_SOURCE[0]}")")/session"
+
+usage() {
+  cat <<EOF
+Usage: $0 <input.deb> <new-version> [options]
+
+Reversion a Debian package: changes version, and optionally suite and package name.
+Orchestrates the deb-session-* scripts into a single pipeline.
+
+Arguments:
+  <input.deb>           Path to the input .deb file
+  <new-version>         New version string (e.g., "2.0.0-rc1")
+
+Options:
+  --suite <suite>       Replace suite (e.g., "stable", "unstable")
+  --name <name>         Rename the package (e.g., "mina-devnet-hardfork")
+  --output <path>       Output .deb path. If omitted, generates
+                        {dir}/{package}_{version}_{arch}.deb next to input
+
+Example:
+  $0 ./mina-devnet_1.0.0_amd64.deb 2.0.0-rc1 --suite stable --name mina-devnet-hardfork
+  $0 ./input.deb 3.0.0 --output /tmp/output.deb
+EOF
 }
 
-while [[ "$#" -gt 0 ]]; do case $1 in
-  -d|--deb) DEB="$2"; shift;;
-  --new-name) NEW_NAME="$2"; shift;;
-  --new-version) NEW_VERSION="$2"; shift;;
-  --new-suite) NEW_SUITE="$2"; shift;;
-  --new-repo) NEW_REPO="$2"; shift;;
-  --suite) SUITE="$2"; shift;;
-  --version) VERSION="$2"; shift;;
-  --arch) ARCH="$2"; shift;;
-  --repo) REPO="$2"; shift;;
-  --sign) SIGN="$2"; shift;;
-  --codename) CODENAME="$2"; shift;;
-  --skip-cache-invalidation) SKIP_CACHE_INVALIDATION="1";;
-  --help) usage; exit 0;;
-  *) echo "❌ Unknown parameter passed: $1"; usage exit 1;;
-esac; shift; done
-
-if [[ ! -v SUITE ]]; then echo "❌ No suite specified"; echo ""; usage "$0" "$1" ; exit 1; fi
-if [[ ! -v VERSION ]]; then echo "❌ No version specified"; echo ""; usage "$0" "$1" ; exit 1; fi
-if [[ ! -v REPO ]]; then echo "❌ No repo specified"; echo ""; usage "$0" "$1" ; exit 1; fi
-if [[ ! -v NEW_NAME ]]; then NEW_NAME=$DEB; fi;
-if [[ ! -v ARCH ]]; then ARCH=amd64; fi;
-if [[ ! -v NEW_VERSION ]]; then NEW_VERSION=$VERSION; fi;
-if [[ ! -v NEW_SUITE ]]; then NEW_SUITE=$SUITE; fi;
-if [[ ! -v NEW_REPO ]]; then NEW_REPO=$REPO; fi;
-if [[ ! -v DEB ]]; then NEW_NAME=$DEB; fi;
-if [[ ! -v SIGN ]]; then 
-  SIGN_ARG=""
-else 
-  SIGN_ARG="--sign $SIGN"
+if [[ $# -lt 2 ]]; then
+  usage
+  exit 1
 fi
 
-function rebuild_deb() {
-  source scripts/debian/reversion-helper.sh
+INPUT_DEB="$1"
+NEW_VERSION="$2"
+shift 2
 
-  wget https://s3.us-west-2.amazonaws.com/${REPO}/pool/${CODENAME}/m/mi/${DEB}_${VERSION}_${ARCH}.deb
-  reversion --deb ${DEB} \
-            --package ${DEB} \
-            --source-version ${VERSION} \
-            --new-version ${NEW_VERSION} \
-            --suite ${SUITE} \
-            --new-suite ${NEW_SUITE} \
-            --new-name ${NEW_NAME} \
-            --arch ${ARCH}
+NEW_SUITE=""
+NEW_NAME=""
+OUTPUT=""
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --suite)
+      NEW_SUITE="$2"
+      shift 2
+      ;;
+    --name)
+      NEW_NAME="$2"
+      shift 2
+      ;;
+    --output)
+      OUTPUT="$2"
+      shift 2
+      ;;
+    --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "ERROR: Unknown option: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [[ ! -f "$INPUT_DEB" ]]; then
+  echo "ERROR: Input file not found: $INPUT_DEB" >&2
+  exit 1
+fi
+
+# Create a temporary session directory with cleanup
+SESSION_DIR=$(mktemp -d -t deb-session-XXXXXX)
+cleanup() {
+  rm -rf "$SESSION_DIR"
 }
+trap cleanup EXIT
 
-rebuild_deb
+# Open session
+"$SESSION_DIR_SCRIPTS/deb-session-open.sh" "$INPUT_DEB" "$SESSION_DIR"
 
-if [[ -n "$SKIP_CACHE_INVALIDATION" ]]; then
-  SKIP_CACHE_INVALIDATION_ARG="--skip-cache-invalidation"
+# Always reversion
+"$SESSION_DIR_SCRIPTS/deb-session-reversion.sh" "$SESSION_DIR" "$NEW_VERSION"
+
+# Optionally replace suite
+if [[ -n "$NEW_SUITE" ]]; then
+  "$SESSION_DIR_SCRIPTS/deb-session-replace-suite.sh" "$SESSION_DIR" "$NEW_SUITE"
+fi
+
+# Optionally rename package
+if [[ -n "$NEW_NAME" ]]; then
+  "$SESSION_DIR_SCRIPTS/deb-session-rename-package.sh" "$SESSION_DIR" "$NEW_NAME"
+fi
+
+# Determine output path
+if [[ -n "$OUTPUT" ]]; then
+  OUT="$OUTPUT"
 else
-  SKIP_CACHE_INVALIDATION_ARG=""
+  PKG=$("$SESSION_DIR_SCRIPTS/deb-session-read-field.sh" "$SESSION_DIR" Package)
+  ARCH=$("$SESSION_DIR_SCRIPTS/deb-session-read-field.sh" "$SESSION_DIR" Architecture)
+  OUT="$(dirname "$INPUT_DEB")/${PKG}_${NEW_VERSION}_${ARCH}.deb"
 fi
 
-source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}_${ARCH}.deb" --arch "${ARCH}" --version "${NEW_VERSION}" --codename "${CODENAME}" --release "${NEW_SUITE}" --bucket "${NEW_REPO}" ${SIGN_ARG} ${SKIP_CACHE_INVALIDATION_ARG}
+# Save
+"$SESSION_DIR_SCRIPTS/deb-session-save.sh" "$SESSION_DIR" "$OUT"
+
+echo "✅ Reversioned package written to $OUT"
