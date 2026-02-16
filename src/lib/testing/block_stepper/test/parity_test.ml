@@ -246,6 +246,7 @@ let chain_monitor_wait_until monitor pred =
   if pred sorted then return sorted
   else
     let ivar = Ivar.create () in
+    (* TODO: need synchronization *)
     monitor.waiters <- (pred, ivar) :: monitor.waiters ;
     Ivar.read ivar
 
