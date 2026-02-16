@@ -171,7 +171,7 @@ let step_at_slot t ~global_slot_since_genesis ~block_stake_winner ~transactions
   in
   let precomputed_values = Linear_frontier.precomputed_values t.frontier in
   let protocol_states = Linear_frontier.protocol_states t.frontier in
-  let%bind raw_breadcrumb =
+  let%bind raw_breadcrumb, invalid_commands =
     Block_builder.build_breadcrumb ~transactions ~context ~precomputed_values
       ~snark_work_provider:t.snark_work_provider ~protocol_states t.keys_module
       (slot_won, ledger_snapshot)
@@ -183,7 +183,9 @@ let step_at_slot t ~global_slot_since_genesis ~block_stake_winner ~transactions
   let next_search_slot = slot_int + 1 in
   let epoch_data = (epoch_data_for_vrf, ledger_snapshot) in
   Deferred.Or_error.return
-    (breadcrumb, { t with frontier; next_search_slot; epoch_data })
+    ( breadcrumb
+    , { t with frontier; next_search_slot; epoch_data }
+    , invalid_commands )
 
 let step t ~transactions =
   let open Deferred.Or_error.Let_syntax in
@@ -233,7 +235,7 @@ let step t ~transactions =
   in
   let precomputed_values = Linear_frontier.precomputed_values t.frontier in
   let protocol_states = Linear_frontier.protocol_states t.frontier in
-  let%bind raw_breadcrumb =
+  let%bind raw_breadcrumb, invalid_commands =
     Block_builder.build_breadcrumb ~transactions ~context ~precomputed_values
       ~snark_work_provider:t.snark_work_provider ~protocol_states t.keys_module
       (slot_won, ledger_snapshot)
@@ -243,4 +245,6 @@ let step t ~transactions =
     Linear_frontier.add_breadcrumb t.frontier raw_breadcrumb
   in
   Deferred.Or_error.return
-    (breadcrumb, { t with frontier; next_search_slot; epoch_data })
+    ( breadcrumb
+    , { t with frontier; next_search_slot; epoch_data }
+    , invalid_commands )

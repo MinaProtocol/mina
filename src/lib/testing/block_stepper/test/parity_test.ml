@@ -231,9 +231,8 @@ let graphql_send_payment ~logger ~rest_port ~sender ~receiver ~amount ~fee
   let body_str =
     Yojson.Safe.to_string
       (`Assoc
-        [ ("query", `String send_payment_mutation)
-        ; ("variables", variables)
-        ] )
+        [ ("query", `String send_payment_mutation); ("variables", variables) ]
+        )
   in
   let headers =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
@@ -351,7 +350,8 @@ let run ~logger ~seed ~state_dir =
   let rest_port = daemon_config.rest_port in
   let%bind daemon_process =
     Mina_automation.Daemon.start daemon ~block_producer_key:bp_key_path
-      ~config_file (* ~run_snark_worker:bp_pk ~snark_worker_fee:"0" *)
+      ~config_file
+    (* ~run_snark_worker:bp_pk ~snark_worker_fee:"0" *)
   in
   (* Wait for bootstrap, racing against daemon process exit *)
   [%log info] "Waiting for daemon to bootstrap" ;
@@ -551,7 +551,18 @@ let run ~logger ~seed ~state_dir =
               Block_stepper.step_at_slot stepper ~global_slot_since_genesis:slot
                 ~block_stake_winner ~transactions:block_txns
             in
-            Result.map result ~f:(fun (bc, stepper) -> (stepper, Some bc)) )
+            Result.map result ~f:(fun (bc, stepper, invalid_commands) ->
+                if not (List.is_empty invalid_commands) then (
+                  List.iter invalid_commands ~f:(fun (cmd, err) ->
+                      [%log error] "Dropped transaction: %s (error: %s)"
+                        ( User_command.Valid.to_yojson cmd
+                        |> Yojson.Safe.to_string )
+                        (Error.to_string_hum err) ) ;
+                  failwithf "Slot %d: %d transactions were dropped"
+                    block.slot_since_genesis
+                    (List.length invalid_commands)
+                    () ) ;
+                (stepper, Some bc) ) )
   in
   let final_breadcrumb =
     match final_result with

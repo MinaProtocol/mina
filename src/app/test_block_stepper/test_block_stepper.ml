@@ -236,9 +236,17 @@ let run ~logger ~keypair ~config_file ~num_blocks ~genesis_dir ~state_dir
         [%log info] "Stepping block %d/%d with %d transactions" block_num
           num_blocks
           (Sequence.length transactions) ;
-        let%bind breadcrumb, stepper =
+        let%bind breadcrumb, stepper, invalid_commands =
           Block_stepper.step stepper ~transactions >>| Or_error.ok_exn
         in
+        if not (List.is_empty invalid_commands) then (
+          List.iter invalid_commands ~f:(fun (cmd, err) ->
+              [%log error] "Dropped transaction: %s (error: %s)"
+                (User_command.Valid.to_yojson cmd |> Yojson.Safe.to_string)
+                (Error.to_string_hum err) ) ;
+          failwithf "Block %d: %d transactions were dropped" block_num
+            (List.length invalid_commands)
+            () ) ;
         [%log info] "Block %d produced, verifying proof" block_num ;
         let blockchain = blockchain_of_breadcrumb breadcrumb in
         let%map result =

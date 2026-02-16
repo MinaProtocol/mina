@@ -93,7 +93,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
   let coinbase_receiver =
     Consensus.Data.Block_data.coinbase_receiver block_data
   in
-  let%bind diff =
+  let%bind diff, invalid_commands =
     Staged_ledger.create_diff ~constraint_constants ~global_slot staged_ledger
       ~coinbase_receiver ~logger ~current_state_view:previous_state_view
       ~transactions_by_fee:transactions ~get_completed_work
@@ -101,7 +101,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     |> Result.map_error ~f:(fun err ->
            Staged_ledger.Staged_ledger_error.Pre_diff err )
     |> Result.map_error ~f:Staged_ledger.Staged_ledger_error.to_error
-    |> Result.map ~f:fst |> Deferred.return
+    |> Deferred.return
   in
   let%bind ( `Ledger_proof ledger_proof_opt
            , `Staged_ledger transitioned_staged_ledger
@@ -192,7 +192,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     , pending_coinbase_witness
     , transitioned_staged_ledger
     , accounts_created
-    , just_emitted_a_proof )
+    , just_emitted_a_proof
+    , invalid_commands )
 
 let build_breadcrumb ~transactions ~context ~precomputed_values
     ~snark_work_provider ~protocol_states (module Keys : Keys_S)
@@ -245,7 +246,8 @@ let build_breadcrumb ~transactions ~context ~precomputed_values
            , pending_coinbase_witness
            , transitioned_staged_ledger
            , accounts_created
-           , just_emitted_a_proof ) =
+           , just_emitted_a_proof
+           , invalid_commands ) =
     generate_next_state ~constraint_constants ~scheduled_time ~block_data
       ~previous_protocol_state ~staged_ledger:previous_staged_ledger
       ~transactions ~get_completed_work ~logger ~winner_pk
@@ -315,7 +317,8 @@ let build_breadcrumb ~transactions ~context ~precomputed_values
      scheduled time to receipt time, even). *)
   let transition_receipt_time = Some (Time.now ()) in
   Deferred.Or_error.return
-    (Frontier_base.Breadcrumb.create
-       ~validated_transition:(Mina_block.Validated.lift transition)
-       ~staged_ledger:transitioned_staged_ledger ~just_emitted_a_proof
-       ~transition_receipt_time ~accounts_created )
+    ( Frontier_base.Breadcrumb.create
+        ~validated_transition:(Mina_block.Validated.lift transition)
+        ~staged_ledger:transitioned_staged_ledger ~just_emitted_a_proof
+        ~transition_receipt_time ~accounts_created
+    , invalid_commands )
