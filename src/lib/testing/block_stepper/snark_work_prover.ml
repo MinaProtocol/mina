@@ -52,6 +52,10 @@ let make ~signature_kind (module T : Transaction_snark.S) =
         match witness.transaction with
         | Command (Signed_command cmd) ->
             let open Deferred.Or_error.Let_syntax in
+            (* TODO: This check is included because the daemon's
+               [snark_worker/prod.ml] also includes it. However, it seems
+               completely redundant, given that our input is already a validated
+               command. *)
             let%bind cmd =
               Deferred.return
               @@ Result.of_option
