@@ -15,8 +15,6 @@ let num_transactions = 5
 
 let payment_amount_mina = 3
 
-let payment_fee_nanomina = 1_000_000
-
 let max_poll_attempts = 60
 
 let poll_interval_sec = 5.0
@@ -103,9 +101,10 @@ let best_chain_query =
       consensusState { slotSinceGenesis blockStakeWinner }
       blockchainState { stagedLedgerHash date }
     }
-    transactions { userCommands {
-      hash from to amount fee nonce validUntil memo
-    } }
+    transactions {
+      userCommands { hash from to amount fee nonce validUntil memo }
+      zkappCommands { hash }
+    }
   } } |}
 
 (* ---- JSON parsing helpers ---- *)
@@ -128,6 +127,7 @@ type block_info =
   ; staged_ledger_hash : string
   ; timestamp : string
   ; user_commands : daemon_command_info list
+  ; zkapp_command_hashes : string list
   }
 
 let parse_block_info json =
@@ -160,6 +160,9 @@ let parse_block_info json =
              ; cmd_memo = cmd |> member "memo" |> to_string
              } )
       |> List.rev
+  ; zkapp_command_hashes =
+      json |> member "transactions" |> member "zkappCommands" |> to_list
+      |> List.map ~f:(fun cmd -> cmd |> member "hash" |> to_string)
   }
 
 let parse_best_chain response =
@@ -254,7 +257,8 @@ let chain_monitor_blocks monitor = chain_monitor_sorted_blocks !(monitor.blocks)
 
 (* ---- Transaction generation ---- *)
 
-let generate_payments ~seed ~signature_kind ~valid_until ~bp_keypair ~n =
+let generate_payments ~seed ~signature_kind ~valid_until ~bp_keypair
+    ~payment_fee_nanomina ~n =
   let bp_pk = Public_key.compress bp_keypair.Keypair.public_key in
   List.init n ~f:(fun i ->
       let receiver_keypair =
@@ -301,6 +305,70 @@ let generate_payments ~seed ~signature_kind ~valid_until ~bp_keypair ~n =
         User_command.to_valid_unsafe user_cmd
       in
       valid_cmd )
+
+let generate_event =
+  Snark_params.Tick.Field.gen |> Quickcheck.Generator.map ~f:(fun x -> [| x |])
+
+let mk_zkapp_tx ~seed ~constraint_constants ~zkapp_fee_nanomina keypair nonce =
+  let num_acc_updates = 8 in
+  (* TODO: source actions/events from the limits in the precomuted values too *)
+  let event_elements = 10 in
+  let action_elements = 10 in
+  let signaturespec : Transaction_snark.For_tests.Signature_transfers_spec.t =
+    let fee_payer = None in
+    let generated_values =
+      let open Base_quickcheck.Generator.Let_syntax in
+      let%bind receivers =
+        Base_quickcheck.Generator.list_with_length ~length:num_acc_updates
+        @@ let%map kp = Keypair.gen in
+           (First kp, Currency.Amount.zero)
+      in
+      let%bind events =
+        Quickcheck.Generator.list_with_length event_elements generate_event
+      in
+      let%map actions =
+        Quickcheck.Generator.list_with_length action_elements generate_event
+      in
+      (receivers, events, actions)
+    in
+    let receivers, events, actions =
+      Quickcheck.random_value
+        ~seed:
+          (`Deterministic
+            (sprintf "%s-zkapp-%s" seed (Unsigned.UInt32.to_string nonce)) )
+        generated_values
+    in
+    let zkapp_account_keypairs = [] in
+    let new_zkapp_account = false in
+    let snapp_update = Account_update.Update.dummy in
+    let call_data = Snark_params.Tick.Field.zero in
+    let preconditions = Some Account_update.Preconditions.accept in
+    { fee = Currency.Fee.of_nanomina_int_exn zkapp_fee_nanomina
+    ; sender = (keypair, nonce)
+    ; fee_payer
+    ; receivers
+    ; amount =
+        Currency.Amount.(
+          scale
+            (of_fee
+               constraint_constants
+                 .Genesis_constants.Constraint_constants.account_creation_fee )
+            num_acc_updates)
+        |> Option.value_exn ~here:[%here]
+    ; zkapp_account_keypairs
+    ; memo = Signed_command_memo.empty
+    ; new_zkapp_account
+    ; snapp_update
+    ; actions
+    ; events
+    ; transfer_parties_get_actions_events = true
+    ; call_data
+    ; preconditions
+    }
+  in
+  let receiver_auth = Some Control.Tag.Signature in
+  Transaction_snark.For_tests.signature_transfers ?receiver_auth
+    ~constraint_constants signaturespec
 
 (* ---- Config loading (shared by daemon setup and stepper) ---- *)
 
@@ -370,6 +438,46 @@ let graphql_send_payment ~logger ~rest_port ~sender ~receiver ~amount ~fee
       failwith "sendPayment failed" ) ;
   json |> member "data" |> member "sendPayment" |> member "payment"
   |> member "hash" |> to_string
+
+let send_zkapp_mutation =
+  {| mutation($input: SendZkappInput!) {
+    sendZkapp(input: $input) {
+      zkapp { hash }
+    }
+  } |}
+
+let graphql_send_zkapp ~logger ~rest_port zkapp_cmd =
+  let uri = Uri.of_string (sprintf "http://localhost:%d/graphql" rest_port) in
+  let zkapp_json =
+    Zkapp_command.read_all_proofs_from_disk zkapp_cmd |> Zkapp_command.to_json
+  in
+  let variables =
+    `Assoc [ ("input", `Assoc [ ("zkappCommand", zkapp_json) ]) ]
+  in
+  let body_str =
+    Yojson.Safe.to_string
+      (`Assoc
+        [ ("query", `String send_zkapp_mutation); ("variables", variables) ] )
+  in
+  let headers =
+    Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
+  in
+  let%bind _resp, body =
+    Cohttp_async.Client.post ~headers
+      ~body:(Cohttp_async.Body.of_string body_str)
+      uri
+  in
+  let%map body_str = Cohttp_async.Body.to_string body in
+  let json = Yojson.Safe.from_string body_str in
+  let open Yojson.Safe.Util in
+  ( match json |> member "errors" with
+  | `Null ->
+      ()
+  | errors ->
+      [%log error] "GraphQL sendZkapp error: %s" (Yojson.Safe.to_string errors) ;
+      failwith "sendZkapp failed" ) ;
+  json |> member "data" |> member "sendZkapp" |> member "zkapp" |> member "hash"
+  |> to_string
 
 (* ---- Account-level ledger comparison ---- *)
 
@@ -482,10 +590,38 @@ let run ~logger ~seed ~state_dir =
   in
   (* Generate transactions *)
   let signature_kind = precomputed_values.Precomputed_values.signature_kind in
+  let constraint_constants = precomputed_values.constraint_constants in
+  (* Zkapp fees are set to the minimum_user_command_fee. Payment fees are
+     1 nanomina higher so the daemon's fee-ordered staged ledger diff always
+     places payments before zkapps. This lets us reconstruct correct
+     transaction ordering without precise ordering information from the
+     daemon's GraphQL API. *)
+  let zkapp_fee_nanomina =
+    Currency.Fee.to_nanomina_int
+      precomputed_values.genesis_constants.minimum_user_command_fee
+  in
+  let payment_fee_nanomina = zkapp_fee_nanomina + 1 in
   let valid_until = Mina_numbers.Global_slot_since_genesis.of_int 1000 in
   let transactions =
     generate_payments ~seed ~signature_kind ~valid_until ~bp_keypair
-      ~n:num_transactions
+      ~payment_fee_nanomina ~n:num_transactions
+  in
+  let zkapp_nonce = Mina_numbers.Account_nonce.of_int num_transactions in
+  let zkapp_cmd =
+    mk_zkapp_tx ~seed ~constraint_constants ~zkapp_fee_nanomina bp_keypair
+      zkapp_nonce
+  in
+  let zkapp_valid =
+    (* Transactions are constructed from known-good keypairs via
+       signature_transfers, so to_valid_unsafe is justified. *)
+    let (`If_this_is_used_it_should_have_a_comment_justifying_it valid_cmd) =
+      User_command.to_valid_unsafe (Zkapp_command zkapp_cmd)
+    in
+    valid_cmd
+  in
+  let zkapp_hash =
+    Mina_transaction.Transaction_hash.hash_zkapp_command_with_hashes zkapp_cmd
+    |> Mina_transaction.Transaction_hash.to_base58_check
   in
   (* Phase 2: Start daemon *)
   [%log info] "Phase 2: Starting daemon" ;
@@ -644,15 +780,27 @@ let run ~logger ~seed ~state_dir =
           num_transactions nonce hash ;
         hash )
   in
+  (* Submit zkapp transaction *)
+  [%log info] "Submitting zkapp transaction" ;
+  let%bind daemon_zkapp_hash =
+    graphql_send_zkapp ~logger ~rest_port zkapp_cmd
+  in
+  if not (String.equal daemon_zkapp_hash zkapp_hash) then
+    failwithf "Zkapp hash mismatch: daemon=%s local=%s" daemon_zkapp_hash
+      zkapp_hash () ;
+  [%log info] "Submitted zkapp (hash=%s)" zkapp_hash ;
   (* Wait for inclusion via chain monitor *)
   [%log info] "Waiting for transactions to be included in best chain" ;
-  let expected_hashes = String.Set.of_list tx_hashes in
+  let expected_hashes = String.Set.of_list (tx_hashes @ [ zkapp_hash ]) in
   let inclusion_pred blocks =
-    let included =
+    let included_payments =
       List.concat_map blocks ~f:(fun b ->
           List.map b.user_commands ~f:(fun c -> c.cmd_hash) )
-      |> String.Set.of_list
     in
+    let included_zkapps =
+      List.concat_map blocks ~f:(fun b -> b.zkapp_command_hashes)
+    in
+    let included = String.Set.of_list (included_payments @ included_zkapps) in
     Set.is_subset expected_hashes ~of_:included
   in
   let%bind daemon_blocks =
@@ -747,8 +895,10 @@ let run ~logger ~seed ~state_dir =
   [%log info] "Genesis state hashes match" ;
   (* Build a hash-to-transaction lookup *)
   let tx_by_hash =
-    List.map2_exn transactions tx_hashes ~f:(fun cmd hash -> (hash, cmd))
-    |> String.Map.of_alist_exn
+    let payment_entries =
+      List.map2_exn transactions tx_hashes ~f:(fun cmd hash -> (hash, cmd))
+    in
+    String.Map.of_alist_exn ((zkapp_hash, zkapp_valid) :: payment_entries)
   in
   (* Verify daemon commands match locally-generated transactions *)
   let all_daemon_commands =
@@ -813,6 +963,16 @@ let run ~logger ~seed ~state_dir =
             failwithf "Transaction payload mismatch for hash %s" dc.cmd_hash ()
             ) ) ;
   [%log info] "All daemon transaction payloads match local transactions" ;
+  (* Verify zkapp commands from daemon *)
+  let all_daemon_zkapp_hashes =
+    List.concat_map daemon_blocks ~f:(fun b -> b.zkapp_command_hashes)
+  in
+  List.iter all_daemon_zkapp_hashes ~f:(fun h ->
+      if not (String.Map.mem tx_by_hash h) then
+        [%log warn] "Unknown zkapp command hash from daemon: %s" h ) ;
+  if not (List.mem all_daemon_zkapp_hashes zkapp_hash ~equal:String.equal) then
+    failwithf "Submitted zkapp hash %s not found in daemon blocks" zkapp_hash () ;
+  [%log info] "Zkapp command hash verified in daemon blocks" ;
   (* Skip genesis block (first in bestChain list), replay the rest *)
   let non_genesis_blocks =
     match daemon_blocks with
@@ -837,10 +997,22 @@ let run ~logger ~seed ~state_dir =
             let block_stake_winner =
               Public_key.Compressed.of_base58_check_exn block.block_stake_winner
             in
+            (* Transactions are ordered: user commands first, then zkapp commands.
+               This works because zkapp fees (900_000 nanomina) are intentionally
+               lower than payment fees (1_000_000 nanomina), so the daemon's
+               fee-ordered staged ledger diff always places payments before zkapps.
+               TODO: Get precise transaction ordering from the daemon to remove
+               this fee-based ordering assumption. *)
             let block_txns =
-              List.filter_map block.user_commands ~f:(fun c ->
-                  String.Map.find tx_by_hash c.cmd_hash )
-              |> Sequence.of_list
+              let payment_txns =
+                List.filter_map block.user_commands ~f:(fun c ->
+                    String.Map.find tx_by_hash c.cmd_hash )
+              in
+              let zkapp_txns =
+                List.filter_map block.zkapp_command_hashes ~f:(fun h ->
+                    String.Map.find tx_by_hash h )
+              in
+              Sequence.of_list (payment_txns @ zkapp_txns)
             in
             let scheduled_time =
               Block_time.of_span_since_epoch
@@ -904,9 +1076,12 @@ let run ~logger ~seed ~state_dir =
     [%log error] "  Daemon:  %s" daemon_final_hash ;
     [%log error] "  Stepper: %s" stepper_ledger_hash ;
     List.iter daemon_blocks ~f:(fun b ->
-        [%log error] "  Slot %d: %d user commands, staged_ledger_hash=%s"
+        [%log error]
+          "  Slot %d: %d user commands, %d zkapp commands, \
+           staged_ledger_hash=%s"
           b.slot_since_genesis
           (List.length b.user_commands)
+          (List.length b.zkapp_command_hashes)
           b.staged_ledger_hash ) ;
     let stepper_accounts_json =
       Frontier_base.Breadcrumb.staged_ledger final_breadcrumb
