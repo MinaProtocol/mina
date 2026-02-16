@@ -371,6 +371,50 @@ let compare_ledger_accounts ~logger ~label ~stepper_accounts_json
         failwithf "%s: account count mismatch" label () )
       else [%log info] "%s: all %d accounts match" label common_len
 
+(* ---- Transition extraction helpers ---- *)
+
+let extract_daemon_transitions ~logger ~best_tip_log ~output_file =
+  if Stdlib.Sys.file_exists best_tip_log then (
+    let lines = In_channel.read_lines best_tip_log in
+    let all_transitions =
+      List.concat_map lines ~f:(fun line ->
+          let json =
+            try Yojson.Safe.from_string line
+            with exn ->
+              [%log error] "Failed to parse best-tip log line: %s" line ;
+              failwithf "Best-tip log JSON parse error: %s" (Exn.to_string exn)
+                ()
+          in
+          let open Yojson.Safe.Util in
+          try json |> member "metadata" |> member "added_transitions" |> to_list
+          with exn ->
+            [%log error]
+              "Failed to extract added_transitions from best-tip log line: %s"
+              line ;
+            failwithf "Best-tip log added_transitions extraction error: %s"
+              (Exn.to_string exn) () )
+    in
+    [%log info] "Extracted %d added_transitions from daemon best-tip log"
+      (List.length all_transitions) ;
+    Yojson.Safe.to_file output_file (`List all_transitions) ;
+    [%log info] "Wrote daemon transitions to %s" output_file )
+  else [%log warn] "No best-tip log found at %s" best_tip_log
+
+let breadcrumb_to_transition_json bc =
+  let protocol_state =
+    Frontier_base.Breadcrumb.protocol_state bc
+    |> Mina_state.Protocol_state.value_to_yojson
+  in
+  let state_hash =
+    Frontier_base.Breadcrumb.state_hash bc |> State_hash.to_yojson
+  in
+  let just_emitted_a_proof = Frontier_base.Breadcrumb.just_emitted_a_proof bc in
+  `Assoc
+    [ ("protocol_state", protocol_state)
+    ; ("state_hash", state_hash)
+    ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
+    ]
+
 (* ---- Main test ---- *)
 
 let run ~logger ~seed ~state_dir =
@@ -614,6 +658,10 @@ let run ~logger ~seed ~state_dir =
   let%bind () = Mina_automation.Daemon.Client.stop_daemon client in
   let%bind () = after (Time.Span.of_sec 5.0) in
   let%bind _ = Mina_automation.Daemon.Process.force_kill daemon_process in
+  (* Extract daemon transitions from best-tip log *)
+  let best_tip_log = daemon_config.dirs.conf ^/ "mina-best-tip.log" in
+  extract_daemon_transitions ~logger ~best_tip_log
+    ~output_file:(state_dir ^/ "daemon_transitions.json") ;
   (* Phase 3: Stepper replay *)
   [%log info] "Phase 3: Replaying blocks through stepper" ;
   let stepper_state_dir = daemon_config.dirs.root_path ^/ "stepper" in
@@ -659,12 +707,12 @@ let run ~logger ~seed ~state_dir =
   [%log info] "Replaying %d non-genesis blocks" (List.length non_genesis_blocks) ;
   let%bind final_result =
     Deferred.List.fold non_genesis_blocks
-      ~init:(Ok (stepper, None))
+      ~init:(Ok (stepper, None, []))
       ~f:(fun acc block ->
         match acc with
         | Error e ->
             return (Error e)
-        | Ok (stepper, _) ->
+        | Ok (stepper, _, stepper_transitions_acc) ->
             let slot =
               Mina_numbers.Global_slot_since_genesis.of_int
                 block.slot_since_genesis
@@ -695,18 +743,26 @@ let run ~logger ~seed ~state_dir =
                     block.slot_since_genesis
                     (List.length invalid_commands)
                     () ) ;
-                (stepper, Some bc) ) )
+                let transition_json = breadcrumb_to_transition_json bc in
+                (stepper, Some bc, transition_json :: stepper_transitions_acc) )
+        )
   in
-  let final_breadcrumb =
+  let final_breadcrumb, stepper_transitions =
     match final_result with
-    | Ok (_, Some bc) ->
-        bc
-    | Ok (_, None) ->
+    | Ok (_, Some bc, transitions) ->
+        (bc, List.rev transitions)
+    | Ok (_, None, _) ->
         failwith "no blocks replayed"
     | Error e ->
         [%log error] "Stepper replay failed: %s" (Error.to_string_hum e) ;
         failwith "Stepper replay failed"
   in
+  (* Write stepper transitions *)
+  let stepper_transitions_file = state_dir ^/ "stepper_transitions.json" in
+  Yojson.Safe.to_file stepper_transitions_file (`List stepper_transitions) ;
+  [%log info] "Wrote %d stepper transitions to %s"
+    (List.length stepper_transitions)
+    stepper_transitions_file ;
   (* Phase 4: Compare ledger hashes *)
   [%log info] "Phase 4: Comparing ledger hashes" ;
   let stepper_ledger_hash =
