@@ -129,8 +129,13 @@ let parse_block_info json =
   ; staged_ledger_hash =
       blockchain_state |> member "stagedLedgerHash" |> to_string
   ; user_command_hashes =
+      (* The daemon's GraphQL resolver (Filtered_external_transition.of_transition)
+         builds the commands list using List.fold with cons, which reverses the
+         application order from the staged ledger diff. Reverse here to restore
+         the original order so the stepper applies them with correct nonces. *)
       json |> member "transactions" |> member "userCommands" |> to_list
       |> List.map ~f:(fun cmd -> cmd |> member "hash" |> to_string)
+      |> List.rev
   }
 
 let parse_best_chain response =
@@ -374,11 +379,21 @@ let run ~logger ~seed ~state_dir =
       ~retry_delay:10. ~retry_attempts:60 ()
   in
   let%bind bootstrap_result = Deferred.any [ daemon_exited; bootstrap_poll ] in
-  let%bind () =
+  let%bind daemon_genesis_hash =
     match bootstrap_result with
     | Ok () ->
         [%log info] "Daemon bootstrapped successfully" ;
-        return ()
+        (* Query daemon genesis state hash *)
+        let%bind daemon_genesis_response =
+          graphql_query ~rest_port "{ genesisBlock { stateHash } }"
+        in
+        let daemon_genesis_hash =
+          Yojson.Safe.Util.(
+            daemon_genesis_response |> member "data" |> member "genesisBlock"
+            |> member "stateHash" |> to_string)
+        in
+        [%log info] "Daemon genesis state hash: %s" daemon_genesis_hash ;
+        return daemon_genesis_hash
     | Error e ->
         [%log error] "Bootstrap failed: %s" (Error.to_string_hum e) ;
         let%bind _ = Mina_automation.Daemon.Process.force_kill daemon_process in
@@ -487,6 +502,23 @@ let run ~logger ~seed ~state_dir =
   in
   let daemon_final_hash = (List.last_exn daemon_blocks).staged_ledger_hash in
   [%log info] "Daemon final staged ledger hash: %s" daemon_final_hash ;
+  (* Export daemon staged ledger for account-level comparison *)
+  [%log info] "Exporting daemon staged ledger" ;
+  let%bind daemon_ledger_json =
+    Mina_automation.Daemon.Executor.run daemon.executor
+      ~args:
+        [ "ledger"
+        ; "export"
+        ; "staged-ledger"
+        ; "--daemon-port"
+        ; string_of_int client_port
+        ]
+      ()
+  in
+  let daemon_accounts_json =
+    Yojson.Safe.from_string daemon_ledger_json |> Yojson.Safe.Util.to_list
+  in
+  [%log info] "Daemon ledger: %d accounts" (List.length daemon_accounts_json) ;
   (* Stop daemon *)
   [%log info] "Stopping daemon" ;
   let%bind () = Mina_automation.Daemon.Client.stop_daemon client in
@@ -510,6 +542,17 @@ let run ~logger ~seed ~state_dir =
       ~keys_module ~logger ~state_dir:stepper_state_dir ()
     >>| Or_error.ok_exn
   in
+  let stepper_genesis_hash =
+    State_hash.With_state_hashes.state_hash
+      precomputed_values.protocol_state_with_hashes
+    |> State_hash.to_base58_check
+  in
+  [%log info] "Stepper genesis state hash: %s" stepper_genesis_hash ;
+  if not (String.equal daemon_genesis_hash stepper_genesis_hash) then (
+    [%log error] "Genesis state hash mismatch! Daemon=%s Stepper=%s"
+      daemon_genesis_hash stepper_genesis_hash ;
+    failwith "Genesis state hash mismatch" ) ;
+  [%log info] "Genesis state hashes match" ;
   (* Build a hash-to-transaction lookup *)
   let tx_by_hash =
     List.map2_exn transactions tx_hashes ~f:(fun cmd hash -> (hash, cmd))
@@ -595,6 +638,42 @@ let run ~logger ~seed ~state_dir =
           b.slot_since_genesis
           (List.length b.user_command_hashes)
           b.staged_ledger_hash ) ;
+    (* Account-level diff to diagnose the mismatch *)
+    let stepper_accounts_json =
+      Frontier_base.Breadcrumb.staged_ledger final_breadcrumb
+      |> Staged_ledger.ledger |> Mina_ledger.Ledger.to_list_sequential
+      |> List.map ~f:(fun acct ->
+             Genesis_ledger_helper.Accounts.Single.of_account acct None
+             |> Runtime_config.Accounts.Single.to_yojson )
+    in
+    [%log error] "Stepper ledger: %d accounts, Daemon ledger: %d accounts"
+      (List.length stepper_accounts_json)
+      (List.length daemon_accounts_json) ;
+    let stepper_len = List.length stepper_accounts_json in
+    let daemon_len = List.length daemon_accounts_json in
+    let common_len = min stepper_len daemon_len in
+    let stepper_prefix = List.take stepper_accounts_json common_len in
+    let daemon_prefix = List.take daemon_accounts_json common_len in
+    let mismatch =
+      List.findi (List.zip_exn stepper_prefix daemon_prefix)
+        ~f:(fun _i (s, d) -> not (Yojson.Safe.equal s d))
+    in
+    ( match mismatch with
+    | Some (i, (stepper_acct, daemon_acct)) ->
+        [%log error] "First mismatch at index %d:" i ;
+        [%log error] "  Stepper: %s" (Yojson.Safe.to_string stepper_acct) ;
+        [%log error] "  Daemon:  %s" (Yojson.Safe.to_string daemon_acct)
+    | None ->
+        if stepper_len <> daemon_len then
+          [%log error]
+            "All %d common accounts match, but lengths differ (stepper=%d, \
+             daemon=%d)"
+            common_len stepper_len daemon_len
+        else
+          [%log error]
+            "All %d accounts match element-by-element — mismatch may be in \
+             empty slots or tree structure"
+            common_len ) ;
     failwith "Ledger hash mismatch" )
 
 (* ---- Command-line interface ---- *)
