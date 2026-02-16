@@ -306,9 +306,16 @@ let build_breadcrumb ~transactions ~context ~precomputed_values
     |> Deferred.return
   in
   [%log info] "Building breadcrumb" ;
+  (* This transition receipt time mirrors what the block producer does; the
+     producer says that the block was received now because it was, in a sense.
+     TODO: we're pretending this block was produced at its scheduled_time, which
+     is very much not [Time.now ()] in general. We could pretend it was received
+     at scheduled_time too, or in the middle of the slot. It should be
+     deterministic regardless. (Caller could pass in a desired delta from
+     scheduled time to receipt time, even). *)
+  let transition_receipt_time = Some (Time.now ()) in
   Deferred.Or_error.return
     (Frontier_base.Breadcrumb.create
        ~validated_transition:(Mina_block.Validated.lift transition)
        ~staged_ledger:transitioned_staged_ledger ~just_emitted_a_proof
-       ~transition_receipt_time:(Some (Time.now ()))
-       ~accounts_created )
+       ~transition_receipt_time ~accounts_created )
