@@ -103,10 +103,23 @@ let best_chain_query =
       consensusState { slotSinceGenesis blockStakeWinner }
       blockchainState { stagedLedgerHash date }
     }
-    transactions { userCommands { hash } }
+    transactions { userCommands {
+      hash from to amount fee nonce validUntil memo
+    } }
   } } |}
 
 (* ---- JSON parsing helpers ---- *)
+
+type daemon_command_info =
+  { cmd_hash : string
+  ; cmd_from : string
+  ; cmd_to : string
+  ; cmd_amount : string
+  ; cmd_fee : string
+  ; cmd_nonce : string
+  ; cmd_valid_until : string
+  ; cmd_memo : string
+  }
 
 type block_info =
   { state_hash : string
@@ -114,7 +127,7 @@ type block_info =
   ; block_stake_winner : string
   ; staged_ledger_hash : string
   ; timestamp : string
-  ; user_command_hashes : string list
+  ; user_commands : daemon_command_info list
   }
 
 let parse_block_info json =
@@ -130,13 +143,22 @@ let parse_block_info json =
   ; staged_ledger_hash =
       blockchain_state |> member "stagedLedgerHash" |> to_string
   ; timestamp = blockchain_state |> member "date" |> to_string
-  ; user_command_hashes =
+  ; user_commands =
       (* The daemon's GraphQL resolver (Filtered_external_transition.of_transition)
          builds the commands list using List.fold with cons, which reverses the
          application order from the staged ledger diff. Reverse here to restore
          the original order so the stepper applies them with correct nonces. *)
       json |> member "transactions" |> member "userCommands" |> to_list
-      |> List.map ~f:(fun cmd -> cmd |> member "hash" |> to_string)
+      |> List.map ~f:(fun cmd ->
+             { cmd_hash = cmd |> member "hash" |> to_string
+             ; cmd_from = cmd |> member "from" |> to_string
+             ; cmd_to = cmd |> member "to" |> to_string
+             ; cmd_amount = cmd |> member "amount" |> to_string
+             ; cmd_fee = cmd |> member "fee" |> to_string
+             ; cmd_nonce = cmd |> member "nonce" |> to_int |> Int.to_string
+             ; cmd_valid_until = cmd |> member "validUntil" |> to_string
+             ; cmd_memo = cmd |> member "memo" |> to_string
+             } )
       |> List.rev
   }
 
@@ -301,14 +323,14 @@ let load_and_initialize_config ~logger ~config_file ~genesis_dir =
 (* ---- Transaction submission via GraphQL ---- *)
 
 let send_payment_mutation =
-  {| mutation($from: PublicKey!, $to: PublicKey!, $amount: UInt64!, $fee: UInt64!, $nonce: UInt32!) {
-    sendPayment(input: { from: $from, to: $to, amount: $amount, fee: $fee, nonce: $nonce }) {
+  {| mutation($from: PublicKey!, $to: PublicKey!, $amount: UInt64!, $fee: UInt64!, $nonce: UInt32!, $validUntil: UInt32, $memo: String) {
+    sendPayment(input: { from: $from, to: $to, amount: $amount, fee: $fee, nonce: $nonce, validUntil: $validUntil, memo: $memo }) {
       payment { hash }
     }
   } |}
 
 let graphql_send_payment ~logger ~rest_port ~sender ~receiver ~amount ~fee
-    ~nonce =
+    ~nonce ~valid_until ~memo =
   let uri = Uri.of_string (sprintf "http://localhost:%d/graphql" rest_port) in
   let variables =
     `Assoc
@@ -317,6 +339,8 @@ let graphql_send_payment ~logger ~rest_port ~sender ~receiver ~amount ~fee
       ; ("amount", `String amount)
       ; ("fee", `String fee)
       ; ("nonce", `String (string_of_int nonce))
+      ; ("validUntil", `String valid_until)
+      ; ("memo", `String memo)
       ]
   in
   let body_str =
@@ -606,9 +630,14 @@ let run ~logger ~seed ~state_dir =
           Int.to_string (Currency.Fee.to_nanomina_int payload.common.fee)
         in
         let nonce = Mina_numbers.Account_nonce.to_int payload.common.nonce in
+        let valid_until =
+          Mina_numbers.Global_slot_since_genesis.to_string
+            payload.common.valid_until
+        in
+        let memo = Signed_command_memo.to_string_hum payload.common.memo in
         let%map hash =
           graphql_send_payment ~logger ~rest_port ~sender:bp_pk
-            ~receiver:receiver_pk ~amount ~fee ~nonce
+            ~receiver:receiver_pk ~amount ~fee ~nonce ~valid_until ~memo
         in
         [%log info] "Submitted transaction %d/%d (nonce=%d, hash=%s)" (i + 1)
           num_transactions nonce hash ;
@@ -619,7 +648,8 @@ let run ~logger ~seed ~state_dir =
   let expected_hashes = String.Set.of_list tx_hashes in
   let inclusion_pred blocks =
     let included =
-      List.concat_map blocks ~f:(fun b -> b.user_command_hashes)
+      List.concat_map blocks ~f:(fun b ->
+          List.map b.user_commands ~f:(fun c -> c.cmd_hash) )
       |> String.Set.of_list
     in
     Set.is_subset expected_hashes ~of_:included
@@ -661,11 +691,26 @@ let run ~logger ~seed ~state_dir =
     Yojson.Safe.from_string daemon_ledger_json |> Yojson.Safe.Util.to_list
   in
   [%log info] "Daemon ledger: %d accounts" (List.length daemon_accounts_json) ;
-  (* Stop daemon *)
+  (* Stop daemon and save its stdout/stderr *)
   [%log info] "Stopping daemon" ;
   let%bind () = Mina_automation.Daemon.Client.stop_daemon client in
   let%bind () = after (Time.Span.of_sec 5.0) in
   let%bind _ = Mina_automation.Daemon.Process.force_kill daemon_process in
+  let%bind daemon_stdout =
+    Reader.contents (Process.stdout daemon_process.process)
+  in
+  let%bind daemon_stderr =
+    Reader.contents (Process.stderr daemon_process.process)
+  in
+  let%bind () =
+    Writer.save (state_dir ^/ "daemon_stdout.log") ~contents:daemon_stdout
+  in
+  let%bind () =
+    Writer.save (state_dir ^/ "daemon_stderr.log") ~contents:daemon_stderr
+  in
+  [%log info] "Saved daemon stdout (%d bytes) and stderr (%d bytes)"
+    (String.length daemon_stdout)
+    (String.length daemon_stderr) ;
   (* Extract daemon transitions from best-tip log *)
   let best_tip_log = daemon_config.dirs.conf ^/ "mina-best-tip.log" in
   extract_daemon_transitions ~logger ~best_tip_log
@@ -704,6 +749,69 @@ let run ~logger ~seed ~state_dir =
     List.map2_exn transactions tx_hashes ~f:(fun cmd hash -> (hash, cmd))
     |> String.Map.of_alist_exn
   in
+  (* Verify daemon commands match locally-generated transactions *)
+  let all_daemon_commands =
+    List.concat_map daemon_blocks ~f:(fun b -> b.user_commands)
+  in
+  List.iter all_daemon_commands ~f:(fun dc ->
+      match String.Map.find tx_by_hash dc.cmd_hash with
+      | None ->
+          ()
+      | Some local_cmd ->
+          let payload =
+            match User_command.forget_check local_cmd with
+            | Signed_command sc ->
+                sc.payload
+            | Zkapp_command _ ->
+                failwith "unexpected zkapp command"
+          in
+          let local_from =
+            Public_key.Compressed.to_base58_check payload.common.fee_payer_pk
+          in
+          let local_fee =
+            Currency.Fee.to_nanomina_int payload.common.fee |> Int.to_string
+          in
+          let local_nonce =
+            Mina_numbers.Account_nonce.to_int payload.common.nonce
+            |> Int.to_string
+          in
+          let local_valid_until =
+            Mina_numbers.Global_slot_since_genesis.to_string
+              payload.common.valid_until
+          in
+          let local_memo =
+            Signed_command_memo.to_base58_check payload.common.memo
+          in
+          let local_to, local_amount =
+            match payload.body with
+            | Payment { receiver_pk; amount } ->
+                ( Public_key.Compressed.to_base58_check receiver_pk
+                , Currency.Amount.to_nanomina_int amount |> Int.to_string )
+            | _ ->
+                failwith "unexpected command body"
+          in
+          let mismatches = ref [] in
+          let check field_name daemon_val local_val =
+            if not (String.equal daemon_val local_val) then
+              mismatches :=
+                sprintf "  %s: daemon=%s stepper=%s" field_name daemon_val
+                  local_val
+                :: !mismatches
+          in
+          check "from" dc.cmd_from local_from ;
+          check "to" dc.cmd_to local_to ;
+          check "amount" dc.cmd_amount local_amount ;
+          check "fee" dc.cmd_fee local_fee ;
+          check "nonce" dc.cmd_nonce local_nonce ;
+          check "valid_until" dc.cmd_valid_until local_valid_until ;
+          check "memo" dc.cmd_memo local_memo ;
+          if not (List.is_empty !mismatches) then (
+            [%log error] "Transaction payload mismatch for hash %s:\n%s"
+              dc.cmd_hash
+              (String.concat ~sep:"\n" (List.rev !mismatches)) ;
+            failwithf "Transaction payload mismatch for hash %s" dc.cmd_hash ()
+            ) ) ;
+  [%log info] "All daemon transaction payloads match local transactions" ;
   (* Skip genesis block (first in bestChain list), replay the rest *)
   let non_genesis_blocks =
     match daemon_blocks with
@@ -729,8 +837,8 @@ let run ~logger ~seed ~state_dir =
               Public_key.Compressed.of_base58_check_exn block.block_stake_winner
             in
             let block_txns =
-              List.filter_map block.user_command_hashes ~f:(fun h ->
-                  String.Map.find tx_by_hash h )
+              List.filter_map block.user_commands ~f:(fun c ->
+                  String.Map.find tx_by_hash c.cmd_hash )
               |> Sequence.of_list
             in
             let scheduled_time =
@@ -797,7 +905,7 @@ let run ~logger ~seed ~state_dir =
     List.iter daemon_blocks ~f:(fun b ->
         [%log error] "  Slot %d: %d user commands, staged_ledger_hash=%s"
           b.slot_since_genesis
-          (List.length b.user_command_hashes)
+          (List.length b.user_commands)
           b.staged_ledger_hash ) ;
     let stepper_accounts_json =
       Frontier_base.Breadcrumb.staged_ledger final_breadcrumb
