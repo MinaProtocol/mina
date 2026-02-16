@@ -301,6 +301,36 @@ let wait_for_inclusion ~logger ~rest_port ~expected_hashes =
   in
   poll 0 String.Map.empty
 
+(* ---- Account-level ledger comparison ---- *)
+
+let compare_ledger_accounts ~logger ~label ~stepper_accounts_json
+    ~daemon_accounts_json =
+  let stepper_len = List.length stepper_accounts_json in
+  let daemon_len = List.length daemon_accounts_json in
+  [%log info] "%s: stepper %d accounts, daemon %d accounts" label stepper_len
+    daemon_len ;
+  let common_len = min stepper_len daemon_len in
+  let stepper_prefix = List.take stepper_accounts_json common_len in
+  let daemon_prefix = List.take daemon_accounts_json common_len in
+  let mismatch =
+    List.findi (List.zip_exn stepper_prefix daemon_prefix) ~f:(fun _i (s, d) ->
+        not (Yojson.Safe.equal s d) )
+  in
+  match mismatch with
+  | Some (i, (stepper_acct, daemon_acct)) ->
+      [%log error] "%s: first mismatch at index %d:" label i ;
+      [%log error] "  Stepper: %s" (Yojson.Safe.to_string stepper_acct) ;
+      [%log error] "  Daemon:  %s" (Yojson.Safe.to_string daemon_acct) ;
+      failwithf "%s: account mismatch at index %d" label i ()
+  | None ->
+      if stepper_len <> daemon_len then (
+        [%log error]
+          "%s: all %d common accounts match, but lengths differ (stepper=%d, \
+           daemon=%d)"
+          label common_len stepper_len daemon_len ;
+        failwithf "%s: account count mismatch" label () )
+      else [%log info] "%s: all %d accounts match" label common_len
+
 (* ---- Main test ---- *)
 
 let run ~logger ~seed ~state_dir =
@@ -638,7 +668,6 @@ let run ~logger ~seed ~state_dir =
           b.slot_since_genesis
           (List.length b.user_command_hashes)
           b.staged_ledger_hash ) ;
-    (* Account-level diff to diagnose the mismatch *)
     let stepper_accounts_json =
       Frontier_base.Breadcrumb.staged_ledger final_breadcrumb
       |> Staged_ledger.ledger |> Mina_ledger.Ledger.to_list_sequential
@@ -646,34 +675,8 @@ let run ~logger ~seed ~state_dir =
              Genesis_ledger_helper.Accounts.Single.of_account acct None
              |> Runtime_config.Accounts.Single.to_yojson )
     in
-    [%log error] "Stepper ledger: %d accounts, Daemon ledger: %d accounts"
-      (List.length stepper_accounts_json)
-      (List.length daemon_accounts_json) ;
-    let stepper_len = List.length stepper_accounts_json in
-    let daemon_len = List.length daemon_accounts_json in
-    let common_len = min stepper_len daemon_len in
-    let stepper_prefix = List.take stepper_accounts_json common_len in
-    let daemon_prefix = List.take daemon_accounts_json common_len in
-    let mismatch =
-      List.findi (List.zip_exn stepper_prefix daemon_prefix)
-        ~f:(fun _i (s, d) -> not (Yojson.Safe.equal s d))
-    in
-    ( match mismatch with
-    | Some (i, (stepper_acct, daemon_acct)) ->
-        [%log error] "First mismatch at index %d:" i ;
-        [%log error] "  Stepper: %s" (Yojson.Safe.to_string stepper_acct) ;
-        [%log error] "  Daemon:  %s" (Yojson.Safe.to_string daemon_acct)
-    | None ->
-        if stepper_len <> daemon_len then
-          [%log error]
-            "All %d common accounts match, but lengths differ (stepper=%d, \
-             daemon=%d)"
-            common_len stepper_len daemon_len
-        else
-          [%log error]
-            "All %d accounts match element-by-element — mismatch may be in \
-             empty slots or tree structure"
-            common_len ) ;
+    compare_ledger_accounts ~logger ~label:"Final ledger" ~stepper_accounts_json
+      ~daemon_accounts_json ;
     failwith "Ledger hash mismatch" )
 
 (* ---- Command-line interface ---- *)
