@@ -83,31 +83,33 @@ if [[ -z "$INPUT_NETWORK" ]]; then
   NETWORK="--build-arg network=devnet"
 fi
 
-LEGACY_VERSION="--build-arg deb_legacy_version=$INPUT_LEGACY_VERSION"
-
-if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
-  LEGACY_VERSION=""
+LEGACY_VERSION=""
+if [[ -n "${INPUT_LEGACY_VERSION:-}" ]]; then
+  LEGACY_VERSION="--build-arg deb_legacy_version=$INPUT_LEGACY_VERSION"
 fi
 
-BRANCH="--build-arg MINA_BRANCH=$INPUT_BRANCH"
-if [[ -z "$INPUT_BRANCH" ]]; then
+if [[ -z "${INPUT_BRANCH:-}" ]]; then
   echo "Branch is not set. Using the default (compatible)"
   BRANCH="--build-arg MINA_BRANCH=compatible"
+else
+  BRANCH="--build-arg MINA_BRANCH=$INPUT_BRANCH"
 fi
 
-REPO="--build-arg MINA_REPO=${MINA_REPO}"
-if [[ -z "${MINA_REPO}" ]]; then
+if [[ -z "${MINA_REPO:-}" ]]; then
   echo "Repository is not set. Using the default (https://github.com/MinaProtocol/mina)"
   REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
+else
+  REPO="--build-arg MINA_REPO=$MINA_REPO"
 fi
 
-DEB_CODENAME="--build-arg deb_codename=$INPUT_CODENAME"
-if [[ -z "$INPUT_CODENAME" ]]; then
+if [[ -z "${INPUT_CODENAME:-}" ]]; then
   echo "Debian codename is not set. Using the default (bullseye)"
   DEB_CODENAME="--build-arg deb_codename=bullseye"
+else
+  DEB_CODENAME="--build-arg deb_codename=$INPUT_CODENAME"
 fi
 
-if [[ -z "$INPUT_PLATFORM" ]]; then
+if [[ -z "${INPUT_PLATFORM:-}" ]]; then
   INPUT_PLATFORM="linux/amd64"
 fi
 
@@ -132,28 +134,36 @@ case "${INPUT_PLATFORM}" in
         echo "unsupported platform"; exit 1
         ;;
 esac
+
+if [[ -z "${DOCKER_REGISTRY:-}" ]]; then
+  echo "Docker registry is not set. Using the default ($USER/mina-protocol)"
+  DOCKER_REGISTRY="$USER/mina-protocol"
+fi
+
 CANONICAL_ARCH_ARG="--build-arg CANONICAL_ARCH=$CANONICAL_ARCH"
 DEBIAN_ARCH_ARG="--build-arg DEBIAN_ARCH=$DEBIAN_ARCH"
 DOCKER_REPO_ARG="--build-arg docker_repo=$DOCKER_REGISTRY"
 
-DEB_RELEASE="--build-arg deb_release=$INPUT_RELEASE"
-if [[ -z "$INPUT_RELEASE" ]]; then
+if [[ -z "${INPUT_RELEASE:-}" ]]; then
   echo "Debian release is not set. Using the default (unstable)"
   DEB_RELEASE="--build-arg deb_release=unstable"
+else
+  DEB_RELEASE="--build-arg deb_release=$INPUT_RELEASE"
 fi
 
-DEB_VERSION="--build-arg deb_version=$INPUT_VERSION"
-if [[ -z "$INPUT_VERSION" ]]; then
+if [[ -z "${INPUT_VERSION:-}" ]]; then
   echo "Debian version is not set. Using the default ($VERSION)"
   DEB_VERSION="--build-arg deb_version=$VERSION"
+else
+  DEB_VERSION="--build-arg deb_version=$INPUT_VERSION"
 fi
 
-if [[ -z "$DEB_PROFILE" ]]; then
+if [[ -z "${DEB_PROFILE:-}" ]]; then
   echo "Debian profile is not set. Using the default (devnet)"
   DEB_PROFILE="devnet"
 fi
 
-if [[ -z "$DEB_BUILD_FLAGS" ]]; then
+if [[ -z "${DEB_BUILD_FLAGS:-}" ]]; then
   DEB_BUILD_FLAGS=""
 fi
 
@@ -164,10 +174,17 @@ else
   CACHE="--cache-from $INPUT_CACHE"
 fi
 
-DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
+if [[ -z "${INPUT_REPO:-}" ]]; then
+  echo "Debian repository is not set. Using the default (http://localhost:8080)"
+  DEB_REPO="--build-arg deb_repo=http://localhost:8080"
+else
+  echo "Using provided Debian repository: $INPUT_REPO"
+  DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
+fi
+
 GW=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')
 LOCALHOST_REPLACEMENT=$GW
-if [[ -z "$INPUT_REPO" ]]; then
+if [[ -z "${INPUT_REPO:-}" ]]; then
   echo "Debian repository is not set. Using the default (http://$LOCALHOST_REPLACEMENT:8080)"
   DEB_REPO="--build-arg deb_repo=http://$LOCALHOST_REPLACEMENT:8080"
 else
@@ -256,6 +273,10 @@ case "${SERVICE}" in
     mina-test-suite)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-test-suite"
         DOCKER_CONTEXT="dockerfiles/"
+        ;;
+    *)
+        echo "Unsupported service: $SERVICE"
+        exit 1
         ;;
 esac
 
