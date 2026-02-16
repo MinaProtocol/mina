@@ -143,6 +143,87 @@ let parse_best_chain response =
   response |> member "data" |> member "bestChain" |> to_list
   |> List.map ~f:parse_block_info
 
+(* ---- Chain monitor ---- *)
+
+type chain_monitor =
+  { blocks : block_info String.Map.t ref
+  ; stop_ivar : unit Ivar.t
+  ; mutable waiters : ((block_info list -> bool) * block_info list Ivar.t) list
+  ; rest_port : int
+  ; poll_interval : Time.Span.t
+  ; logger : Logger.t
+  }
+
+let chain_monitor_sorted_blocks map =
+  Map.data map
+  |> List.sort ~compare:(fun a b ->
+         Int.compare a.slot_since_genesis b.slot_since_genesis )
+
+let create_chain_monitor ~logger ~rest_port ~poll_interval =
+  { blocks = ref String.Map.empty
+  ; stop_ivar = Ivar.create ()
+  ; waiters = []
+  ; rest_port
+  ; poll_interval
+  ; logger
+  }
+
+let start_chain_monitor monitor =
+  don't_wait_for
+    (let logger = monitor.logger in
+     let rec loop () =
+       if Ivar.is_full monitor.stop_ivar then return ()
+       else
+         let%bind () =
+           match%bind
+             Monitor.try_with ~here:[%here] (fun () ->
+                 graphql_query ~rest_port:monitor.rest_port best_chain_query )
+           with
+           | Error _exn ->
+               (* daemon not ready yet, silently retry *)
+               return ()
+           | Ok response ->
+               let new_blocks = parse_best_chain response in
+               let old_map = !(monitor.blocks) in
+               let new_map =
+                 List.fold new_blocks ~init:old_map ~f:(fun acc b ->
+                     Map.set acc ~key:b.state_hash ~data:b )
+               in
+               let new_count = Map.length new_map - Map.length old_map in
+               if new_count > 0 then
+                 [%log info]
+                   "Chain monitor: discovered %d new block(s) (%d total)"
+                   new_count (Map.length new_map) ;
+               monitor.blocks := new_map ;
+               let sorted = chain_monitor_sorted_blocks new_map in
+               monitor.waiters <-
+                 List.filter monitor.waiters ~f:(fun (pred, ivar) ->
+                     if pred sorted then (
+                       Ivar.fill_if_empty ivar sorted ;
+                       false )
+                     else true ) ;
+               return ()
+         in
+         let%bind () =
+           Deferred.any_unit
+             [ after monitor.poll_interval; Ivar.read monitor.stop_ivar ]
+         in
+         loop ()
+     in
+     loop () )
+
+let stop_chain_monitor monitor = Ivar.fill_if_empty monitor.stop_ivar ()
+
+let chain_monitor_wait_until monitor pred =
+  let sorted = chain_monitor_sorted_blocks !(monitor.blocks) in
+  if pred sorted then return sorted
+  else
+    let ivar = Ivar.create () in
+    monitor.waiters <- (pred, ivar) :: monitor.waiters ;
+    Ivar.read ivar
+
+let chain_monitor_blocks monitor = chain_monitor_sorted_blocks !(monitor.blocks)
+
 (* ---- Transaction generation ---- *)
 
 let generate_payments ~seed ~signature_kind ~valid_until ~bp_keypair ~n =
@@ -260,47 +341,6 @@ let graphql_send_payment ~logger ~rest_port ~sender ~receiver ~amount ~fee
   json |> member "data" |> member "sendPayment" |> member "payment"
   |> member "hash" |> to_string
 
-(* ---- Poll daemon for transaction inclusion ---- *)
-
-let wait_for_inclusion ~logger ~rest_port ~expected_hashes =
-  let expected = String.Set.of_list expected_hashes in
-  let rec poll attempts seen_blocks =
-    if attempts >= max_poll_attempts then
-      Deferred.Or_error.error_string
-        "Timed out waiting for transaction inclusion"
-    else
-      let%bind response = graphql_query ~rest_port best_chain_query in
-      let blocks = parse_best_chain response in
-      (* Merge new blocks into the accumulated map (keyed by state_hash) *)
-      let seen_blocks =
-        List.fold blocks ~init:seen_blocks ~f:(fun acc b ->
-            Map.set acc ~key:b.state_hash ~data:b )
-      in
-      (* Check if all expected tx hashes appear somewhere in seen blocks *)
-      let included_hashes =
-        Map.data seen_blocks
-        |> List.concat_map ~f:(fun b -> b.user_command_hashes)
-        |> String.Set.of_list
-      in
-      if Set.is_subset expected ~of_:included_hashes then (
-        [%log info] "All %d transactions included in best chain"
-          (Set.length expected) ;
-        (* Return blocks sorted by slot for replay *)
-        let sorted =
-          Map.data seen_blocks
-          |> List.sort ~compare:(fun a b ->
-                 Int.compare a.slot_since_genesis b.slot_since_genesis )
-        in
-        Deferred.Or_error.return sorted )
-      else (
-        [%log info] "Waiting for transactions: %d/%d included (attempt %d/%d)"
-          (Set.length (Set.inter expected included_hashes))
-          (Set.length expected) attempts max_poll_attempts ;
-        let%bind () = after (Time.Span.of_sec poll_interval_sec) in
-        poll (attempts + 1) seen_blocks )
-  in
-  poll 0 String.Map.empty
-
 (* ---- Account-level ledger comparison ---- *)
 
 let compare_ledger_accounts ~logger ~label ~stepper_accounts_json
@@ -388,6 +428,11 @@ let run ~logger ~seed ~state_dir =
       ~config_file
     (* ~run_snark_worker:bp_pk ~snark_worker_fee:"0" *)
   in
+  let monitor =
+    create_chain_monitor ~logger ~rest_port
+      ~poll_interval:(Time.Span.of_sec poll_interval_sec)
+  in
+  start_chain_monitor monitor ;
   (* Wait for bootstrap, racing against daemon process exit *)
   [%log info] "Waiting for daemon to bootstrap" ;
   let client = Mina_automation.Daemon.Client.create ~port:client_port () in
@@ -517,19 +562,34 @@ let run ~logger ~seed ~state_dir =
           num_transactions nonce hash ;
         hash )
   in
-  (* Wait for inclusion *)
+  (* Wait for inclusion via chain monitor *)
   [%log info] "Waiting for transactions to be included in best chain" ;
-  let%bind daemon_blocks_result =
-    wait_for_inclusion ~logger ~rest_port ~expected_hashes:tx_hashes
+  let expected_hashes = String.Set.of_list tx_hashes in
+  let inclusion_pred blocks =
+    let included =
+      List.concat_map blocks ~f:(fun b -> b.user_command_hashes)
+      |> String.Set.of_list
+    in
+    Set.is_subset expected_hashes ~of_:included
   in
-  let daemon_blocks =
-    match daemon_blocks_result with
-    | Ok blocks ->
-        blocks
-    | Error e ->
-        [%log error] "Failed waiting for inclusion: %s" (Error.to_string_hum e) ;
-        failwith "Transaction inclusion timeout"
+  let%bind daemon_blocks =
+    match%bind
+      Clock.with_timeout
+        (Time.Span.of_sec
+           (Float.of_int max_poll_attempts *. poll_interval_sec) )
+        (chain_monitor_wait_until monitor inclusion_pred)
+    with
+    | `Result blocks ->
+        [%log info] "All %d transactions included in best chain"
+          (Set.length expected_hashes) ;
+        return blocks
+    | `Timeout ->
+        stop_chain_monitor monitor ;
+        failwith "Timed out waiting for transaction inclusion"
   in
+  ignore (daemon_blocks : block_info list) ;
+  stop_chain_monitor monitor ;
+  let daemon_blocks = chain_monitor_blocks monitor in
   let daemon_final_hash = (List.last_exn daemon_blocks).staged_ledger_hash in
   [%log info] "Daemon final staged ledger hash: %s" daemon_final_hash ;
   (* Export daemon staged ledger for account-level comparison *)
