@@ -188,11 +188,6 @@ let generate_payments ~seed ~signature_kind ~valid_until ~bp_keypair ~n =
       in
       valid_cmd )
 
-let hash_valid_command (cmd : User_command.Valid.t) =
-  Mina_transaction.Transaction_hash.hash_command
-    (User_command.read_all_proofs_from_disk @@ User_command.forget_check cmd)
-  |> Mina_transaction.Transaction_hash.to_base58_check
-
 (* ---- Config loading (shared by daemon setup and stepper) ---- *)
 
 let load_and_initialize_config ~logger ~config_file ~genesis_dir =
@@ -212,27 +207,54 @@ let load_and_initialize_config ~logger ~config_file ~genesis_dir =
     ~genesis_dir runtime_config
   >>| Or_error.ok_exn
 
-(* ---- Transaction submission via CLI ---- *)
+(* ---- Transaction submission via GraphQL ---- *)
 
-let submit_payment ~executor ~rest_port ~sender ~receiver ~amount ~fee ~nonce =
-  Mina_automation.Daemon.Executor.run executor
-    ~args:
-      [ "client"
-      ; "send-payment"
-      ; "--rest-server"
-      ; string_of_int rest_port
-      ; "-sender"
-      ; sender
-      ; "-receiver"
-      ; receiver
-      ; "-amount"
-      ; amount
-      ; "-fee"
-      ; fee
-      ; "-nonce"
-      ; string_of_int nonce
+let send_payment_mutation =
+  {| mutation($from: PublicKey!, $to: PublicKey!, $amount: UInt64!, $fee: UInt64!, $nonce: UInt32!) {
+    sendPayment(input: { from: $from, to: $to, amount: $amount, fee: $fee, nonce: $nonce }) {
+      payment { hash }
+    }
+  } |}
+
+let graphql_send_payment ~logger ~rest_port ~sender ~receiver ~amount ~fee
+    ~nonce =
+  let uri = Uri.of_string (sprintf "http://localhost:%d/graphql" rest_port) in
+  let variables =
+    `Assoc
+      [ ("from", `String sender)
+      ; ("to", `String receiver)
+      ; ("amount", `String amount)
+      ; ("fee", `String fee)
+      ; ("nonce", `String (string_of_int nonce))
       ]
-    ()
+  in
+  let body_str =
+    Yojson.Safe.to_string
+      (`Assoc
+        [ ("query", `String send_payment_mutation)
+        ; ("variables", variables)
+        ] )
+  in
+  let headers =
+    Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
+  in
+  let%bind _resp, body =
+    Cohttp_async.Client.post ~headers
+      ~body:(Cohttp_async.Body.of_string body_str)
+      uri
+  in
+  let%map body_str = Cohttp_async.Body.to_string body in
+  let json = Yojson.Safe.from_string body_str in
+  let open Yojson.Safe.Util in
+  ( match json |> member "errors" with
+  | `Null ->
+      ()
+  | errors ->
+      [%log error] "GraphQL sendPayment error: %s"
+        (Yojson.Safe.to_string errors) ;
+      failwith "sendPayment failed" ) ;
+  json |> member "data" |> member "sendPayment" |> member "payment"
+  |> member "hash" |> to_string
 
 (* ---- Poll daemon for transaction inclusion ---- *)
 
@@ -279,8 +301,11 @@ let run ~logger ~seed ~state_dir =
   (* Write config to file *)
   let config_file = state_dir ^/ "daemon.json" in
   Yojson.Safe.to_file config_file (Runtime_config.to_yojson runtime_config) ;
-  (* Write block producer keypair *)
-  let bp_key_path = state_dir ^/ "bp_key" in
+  (* Write block producer keypair into a keys/ subdirectory with 0700 perms *)
+  let keys_dir = state_dir ^/ "keys" in
+  Core.Unix.mkdir_p ~perm:0o700 keys_dir ;
+  Core.Unix.chmod keys_dir ~perm:0o700 ;
+  let bp_key_path = keys_dir ^/ "bp_key" in
   let%bind () =
     Secrets.Keypair.write_exn bp_keypair ~privkey_path:bp_key_path
       ~password:(lazy (Deferred.return (Bytes.of_string "naughty blue worm")))
@@ -298,7 +323,6 @@ let run ~logger ~seed ~state_dir =
     generate_payments ~seed ~signature_kind ~valid_until ~bp_keypair
       ~n:num_transactions
   in
-  let tx_hashes = List.map transactions ~f:hash_valid_command in
   (* Phase 2: Start daemon *)
   [%log info] "Phase 2: Starting daemon" ;
   let daemon_config =
@@ -314,7 +338,7 @@ let run ~logger ~seed ~state_dir =
   let rest_port = daemon_config.rest_port in
   let%bind daemon_process =
     Mina_automation.Daemon.start daemon ~block_producer_key:bp_key_path
-      ~config_file ~run_snark_worker:bp_pk ~snark_worker_fee:"0"
+      ~config_file (* ~run_snark_worker:bp_pk ~snark_worker_fee:"0" *)
   in
   (* Wait for bootstrap, racing against daemon process exit *)
   [%log info] "Waiting for daemon to bootstrap" ;
@@ -404,10 +428,10 @@ let run ~logger ~seed ~state_dir =
         ]
       ()
   in
-  (* Submit transactions *)
+  (* Submit transactions via GraphQL and collect daemon-returned hashes *)
   [%log info] "Submitting %d transactions" num_transactions ;
-  let%bind () =
-    Deferred.List.iteri transactions ~f:(fun i cmd ->
+  let%bind tx_hashes =
+    Deferred.List.mapi transactions ~f:(fun i cmd ->
         let payload =
           match User_command.forget_check cmd with
           | Signed_command sc ->
@@ -419,18 +443,21 @@ let run ~logger ~seed ~state_dir =
           match payload.body with
           | Payment { receiver_pk; amount } ->
               ( Public_key.Compressed.to_base58_check receiver_pk
-              , Currency.Amount.to_mina_string amount )
+              , Int.to_string (Currency.Amount.to_nanomina_int amount) )
           | _ ->
               failwith "unexpected command body"
         in
-        let fee = "0.001" in
+        let fee =
+          Int.to_string (Currency.Fee.to_nanomina_int payload.common.fee)
+        in
         let nonce = Mina_numbers.Account_nonce.to_int payload.common.nonce in
-        let%map _output =
-          submit_payment ~executor:daemon.executor ~rest_port ~sender:bp_pk
+        let%map hash =
+          graphql_send_payment ~logger ~rest_port ~sender:bp_pk
             ~receiver:receiver_pk ~amount ~fee ~nonce
         in
-        [%log info] "Submitted transaction %d/%d (nonce=%d)" (i + 1)
-          num_transactions nonce )
+        [%log info] "Submitted transaction %d/%d (nonce=%d, hash=%s)" (i + 1)
+          num_transactions nonce hash ;
+        hash )
   in
   (* Wait for inclusion *)
   [%log info] "Waiting for transactions to be included in best chain" ;
