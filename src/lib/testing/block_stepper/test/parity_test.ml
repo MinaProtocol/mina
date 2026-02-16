@@ -260,29 +260,42 @@ let graphql_send_payment ~logger ~rest_port ~sender ~receiver ~amount ~fee
 
 let wait_for_inclusion ~logger ~rest_port ~expected_hashes =
   let expected = String.Set.of_list expected_hashes in
-  let rec poll attempts =
+  let rec poll attempts seen_blocks =
     if attempts >= max_poll_attempts then
       Deferred.Or_error.error_string
         "Timed out waiting for transaction inclusion"
     else
       let%bind response = graphql_query ~rest_port best_chain_query in
       let blocks = parse_best_chain response in
+      (* Merge new blocks into the accumulated map (keyed by state_hash) *)
+      let seen_blocks =
+        List.fold blocks ~init:seen_blocks ~f:(fun acc b ->
+            Map.set acc ~key:b.state_hash ~data:b )
+      in
+      (* Check if all expected tx hashes appear somewhere in seen blocks *)
       let included_hashes =
-        List.concat_map blocks ~f:(fun b -> b.user_command_hashes)
+        Map.data seen_blocks
+        |> List.concat_map ~f:(fun b -> b.user_command_hashes)
         |> String.Set.of_list
       in
       if Set.is_subset expected ~of_:included_hashes then (
         [%log info] "All %d transactions included in best chain"
           (Set.length expected) ;
-        Deferred.Or_error.return blocks )
+        (* Return blocks sorted by slot for replay *)
+        let sorted =
+          Map.data seen_blocks
+          |> List.sort ~compare:(fun a b ->
+                 Int.compare a.slot_since_genesis b.slot_since_genesis )
+        in
+        Deferred.Or_error.return sorted )
       else (
         [%log info] "Waiting for transactions: %d/%d included (attempt %d/%d)"
           (Set.length (Set.inter expected included_hashes))
           (Set.length expected) attempts max_poll_attempts ;
         let%bind () = after (Time.Span.of_sec poll_interval_sec) in
-        poll (attempts + 1) )
+        poll (attempts + 1) seen_blocks )
   in
-  poll 0
+  poll 0 String.Map.empty
 
 (* ---- Main test ---- *)
 
