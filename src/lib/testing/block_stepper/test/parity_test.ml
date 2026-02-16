@@ -101,7 +101,7 @@ let best_chain_query =
     stateHash
     protocolState {
       consensusState { slotSinceGenesis blockStakeWinner }
-      blockchainState { stagedLedgerHash }
+      blockchainState { stagedLedgerHash date }
     }
     transactions { userCommands { hash } }
   } } |}
@@ -113,6 +113,7 @@ type block_info =
   ; slot_since_genesis : int
   ; block_stake_winner : string
   ; staged_ledger_hash : string
+  ; timestamp : string
   ; user_command_hashes : string list
   }
 
@@ -128,6 +129,7 @@ let parse_block_info json =
       consensus_state |> member "blockStakeWinner" |> to_string
   ; staged_ledger_hash =
       blockchain_state |> member "stagedLedgerHash" |> to_string
+  ; timestamp = blockchain_state |> member "date" |> to_string
   ; user_command_hashes =
       (* The daemon's GraphQL resolver (Filtered_external_transition.of_transition)
          builds the commands list using List.fold with cons, which reverses the
@@ -731,12 +733,16 @@ let run ~logger ~seed ~state_dir =
                   String.Map.find tx_by_hash h )
               |> Sequence.of_list
             in
+            let scheduled_time =
+              Block_time.of_span_since_epoch
+                (Block_time.Span.of_ms (Int64.of_string block.timestamp))
+            in
             [%log info] "Stepping at slot %d with %d transactions"
               block.slot_since_genesis
               (Sequence.length block_txns) ;
             let%map result =
               Block_stepper.step_at_slot stepper ~global_slot_since_genesis:slot
-                ~block_stake_winner ~transactions:block_txns
+                ~block_stake_winner ~transactions:block_txns ~scheduled_time
             in
             Result.map result ~f:(fun (bc, stepper, invalid_commands) ->
                 if not (List.is_empty invalid_commands) then (

@@ -155,7 +155,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
   (* This current_time is used in the [generate_transition] method for the sole
      purpose of logging if the block was created after the slot was over. The
      stepper is not expected to run at the exact wall clock time implied by the
-     genesis timestamp and slot, so this warning is useless or us. By using the
+     genesis timestamp and slot, so this warning is useless for us. By using the
      scheduled time, we pretend we created the block instantly and so suppress
      this warning. *)
   let current_time =
@@ -196,7 +196,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     , invalid_commands )
 
 let build_breadcrumb ~transactions ~context ~precomputed_values
-    ~snark_work_provider ~protocol_states (module Keys : Keys_S)
+    ~snark_work_provider ~protocol_states ?scheduled_time (module Keys : Keys_S)
     (slot_won, ledger_snapshot) (previous : Frontier_base.Breadcrumb.t) =
   let module V = Mina_block.Validation in
   let (module Context : V.CONTEXT) = context in
@@ -207,10 +207,13 @@ let build_breadcrumb ~transactions ~context ~precomputed_values
     Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
       ~coinbase_receiver:`Producer
   in
-  let scheduled_time =
+  let slot_start_time =
     Consensus.Data.Consensus_time.(
       start_time ~constants:consensus_constants
         (of_global_slot ~constants:consensus_constants slot_won.global_slot))
+  in
+  let scheduled_time =
+    match scheduled_time with Some t -> t | None -> slot_start_time
   in
   let previous_protocol_state =
     Frontier_base.Breadcrumb.protocol_state previous

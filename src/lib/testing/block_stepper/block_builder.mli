@@ -32,6 +32,7 @@ val build_breadcrumb :
   -> precomputed_values:Precomputed_values.t
   -> snark_work_provider:Snark_work.provider
   -> protocol_states:Protocol_state.value State_hash.Map.t
+  -> ?scheduled_time:Block_time.t
   -> (module Keys_S)
   -> Consensus.Data.Slot_won.t
      * Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t

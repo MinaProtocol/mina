@@ -39,10 +39,14 @@ val step :
   -> (Frontier_base.Breadcrumb.t * t * (User_command.Valid.t * Error.t) list)
      Deferred.Or_error.t
 
+(* TODO: consider exposing the scheduled_time override as an enum - maybe start
+   of slot, offset into slot, or explicit override. Also could warn/error if
+   given scheduled time isn't actually within the desired slot. *)
 val step_at_slot :
      t
   -> global_slot_since_genesis:Mina_numbers.Global_slot_since_genesis.t
   -> block_stake_winner:Public_key.Compressed.t
   -> transactions:User_command.Valid.t Sequence.t
+  -> ?scheduled_time:Block_time.t
   -> (Frontier_base.Breadcrumb.t * t * (User_command.Valid.t * Error.t) list)
      Deferred.Or_error.t
