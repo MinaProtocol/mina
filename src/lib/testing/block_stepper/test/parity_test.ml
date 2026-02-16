@@ -638,8 +638,7 @@ let run ~logger ~seed ~state_dir =
   let rest_port = daemon_config.rest_port in
   let%bind daemon_process =
     Mina_automation.Daemon.start daemon ~block_producer_key:bp_key_path
-      ~config_file
-    (* ~run_snark_worker:bp_pk ~snark_worker_fee:"0" *)
+      ~config_file ~run_snark_worker:bp_pk ~snark_worker_fee:"0"
   in
   let monitor =
     create_chain_monitor ~logger ~rest_port
