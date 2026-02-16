@@ -227,6 +227,7 @@ struct
 
       let xs = mk (fun () -> !!xq2 + square !!s4 - !!s3_squared) in
       let ys = mk (fun () -> ((!!xr - !!xs) * !!s4) - !!yr) in
+      let inv = mk (fun () -> inv ((!!xp - !!xr) * (!!xr - !!xs))) in
       acc := (xs, ys) ;
       n_acc :=
         mk (fun () ->
@@ -246,6 +247,7 @@ struct
         ; b2
         ; b3
         ; b4
+        ; inv
         }
         :: !rounds_rev
     done ;

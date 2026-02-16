@@ -1927,7 +1927,7 @@ end = struct
           let row =
             [| Some round.xt
              ; Some round.yt
-             ; None
+             ; Some round.inv
              ; None
              ; Some round.xp
              ; Some round.yp

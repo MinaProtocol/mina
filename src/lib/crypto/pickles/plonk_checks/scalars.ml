@@ -669,7 +669,12 @@ module Tick : S = struct
                     + cell (var (Witness 12, Curr)) )
                 + cell (var (Witness 13, Curr)) )
             + cell (var (Witness 14, Curr))
-            - cell (var (Witness 6, Next)) ) )
+            - cell (var (Witness 6, Next)) )
+        + alpha_pow 11
+          * ( (x_37 * x_38 * cell (var (Witness 2, Curr)))
+            - field
+                "0x0000000000000000000000000000000000000000000000000000000000000001"
+            ) )
     + cell (var (Index EndoMulScalar, Curr))
       * ( double
             (double
@@ -3944,7 +3949,12 @@ module Tock : S = struct
                     + cell (var (Witness 12, Curr)) )
                 + cell (var (Witness 13, Curr)) )
             + cell (var (Witness 14, Curr))
-            - cell (var (Witness 6, Next)) ) )
+            - cell (var (Witness 6, Next)) )
+        + alpha_pow 11
+          * ( (x_37 * x_38 * cell (var (Witness 2, Curr)))
+            - field
+                "0x0000000000000000000000000000000000000000000000000000000000000001"
+            ) )
     + cell (var (Index EndoMulScalar, Curr))
       * ( double
             (double
