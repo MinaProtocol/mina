@@ -140,8 +140,11 @@ let parse_block_info json =
 
 let parse_best_chain response =
   let open Yojson.Safe.Util in
-  response |> member "data" |> member "bestChain" |> to_list
-  |> List.map ~f:parse_block_info
+  match response |> member "data" |> member "bestChain" with
+  | `Null ->
+      []
+  | json ->
+      json |> to_list |> List.map ~f:parse_block_info
 
 (* ---- Chain monitor ---- *)
 
