@@ -18,37 +18,6 @@ type provider =
   ; how : Monad_sequence.how
   }
 
-module Snark_work_prover = struct
-  type prove_base_input =
-    { statement : Mina_state.Snarked_ledger_state.With_sok.t
-    ; witness : Transaction_witness.Stable.V2.t
-    }
-
-  type prove_zkapp_segment_input =
-    { statement : Mina_state.Snarked_ledger_state.With_sok.t
-    ; witness : Transaction_snark.Zkapp_command_segment.Witness.t
-    ; spec : Transaction_snark.Zkapp_command_segment.Basic.t
-    }
-
-  type prove_merge_input = { proof1 : Ledger_proof.t; proof2 : Ledger_proof.t }
-
-  type t =
-    { prove_base : prove_base_input -> Ledger_proof.t Deferred.Or_error.t
-    ; prove_zkapp_segment :
-        prove_zkapp_segment_input -> Ledger_proof.t Deferred.Or_error.t
-    ; prove_merge : prove_merge_input -> Ledger_proof.t Deferred.Or_error.t
-    ; how : Monad_sequence.how
-    }
-
-  let prove_base t input = t.prove_base input
-
-  let prove_zkapp_segment t input = t.prove_zkapp_segment input
-
-  let prove_merge t input = t.prove_merge input
-
-  let how t = t.how
-end
-
 (* Local copy of segment extraction — avoids needing (module T : S) on the
    host. Identical logic to
    Work_partitioner.Snark_worker_shared.extract_zkapp_segment_works but
@@ -150,7 +119,7 @@ let prove_single_with_prover ~prover ~sok_digest ~proof_cache_db ~signature_kind
                 ~dispatch_merge:(fun p1 p2 ->
                   [%log internal] "Snark_work_zkapp_merge" ;
                   Snark_work_prover.prove_merge prover
-                    { proof1 = p1; proof2 = p2 } )
+                    { proof1 = p1; proof2 = p2; sok_digest } )
             in
             [%log internal] "Snark_work_zkapp_proof_done" ;
             if
@@ -166,7 +135,8 @@ let prove_single_with_prover ~prover ~sok_digest ~proof_cache_db ~signature_kind
             Snark_work_prover.prove_base prover
               { statement = stmt_with_sok; witness = w } )
     | Merge (_, p1, p2) ->
-        Snark_work_prover.prove_merge prover { proof1 = p1; proof2 = p2 }
+        Snark_work_prover.prove_merge prover
+          { proof1 = p1; proof2 = p2; sok_digest }
   in
   Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
 
@@ -180,43 +150,7 @@ let create_direct ~proof_level ~proof_cache_db ~signature_kind ~logger
           (module T)
     | Full ->
         let constraint_constants = T.constraint_constants in
-        let prover : Snark_work_prover.t =
-          { prove_base =
-              (fun { statement; witness } ->
-                match witness.transaction with
-                | Command (Signed_command cmd) ->
-                    let open Deferred.Or_error.Let_syntax in
-                    let%bind cmd =
-                      Deferred.return
-                      @@ Result.of_option
-                           (Signed_command.check ~signature_kind cmd)
-                           ~error:
-                             (Error.of_string "Command has an invalid signature")
-                    in
-                    Snark_work_proving.prove_non_zkapp ~sok_digest
-                      (module T)
-                      statement witness (Command (Signed_command cmd))
-                | Fee_transfer ft ->
-                    Snark_work_proving.prove_non_zkapp ~sok_digest
-                      (module T)
-                      statement witness (Fee_transfer ft)
-                | Coinbase cb ->
-                    Snark_work_proving.prove_non_zkapp ~sok_digest
-                      (module T)
-                      statement witness (Coinbase cb)
-                | Command (Zkapp_command _) ->
-                    Deferred.Or_error.error_string
-                      "Zkapp_command should not reach prove_base" )
-          ; prove_zkapp_segment =
-              (fun { statement; witness; spec } ->
-                Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                    T.of_zkapp_command_segment_exn ~statement ~witness ~spec )
-                )
-          ; prove_merge =
-              (fun { proof1; proof2 } -> T.merge proof1 proof2 ~sok_digest)
-          ; how = `Sequential
-          }
-        in
+        let prover = Snark_work_prover.make ~signature_kind (module T) in
         prove_single_with_prover ~prover ~sok_digest ~proof_cache_db
           ~signature_kind ~constraint_constants ~logger
   in
@@ -284,7 +218,7 @@ let create_parallel ~num_workers ~proof_level ~proof_cache_db ~signature_kind
               Snark_work_worker.prove_zkapp_segment worker statement
                 witness_stable spec ) )
     ; prove_merge =
-        (fun { proof1; proof2 } ->
+        (fun { proof1; proof2; sok_digest } ->
           dispatch_to_pool (fun worker ->
               Snark_work_worker.prove_merge worker proof1 proof2 sok_digest ) )
     ; how = `Parallel

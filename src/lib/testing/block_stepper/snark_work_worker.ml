@@ -69,57 +69,11 @@ module Worker_state = struct
         (* Identity cache: proofs are sent back to the host, no persistent
            caching needed in the worker process. *)
         let proof_cache_db = Proof_cache_tag.create_identity_db () in
+        let prover = Snark_work_prover.make ~signature_kind (module T) in
         Deferred.return
           ( module struct
-            let prove_base statement (w : Transaction_witness.Stable.V2.t) =
-              let open Deferred.Or_error.Let_syntax in
-              match w.transaction with
-              | Command (Signed_command cmd) ->
-                  let%bind cmd =
-                    Deferred.return
-                    @@ Result.of_option
-                         (Signed_command.check ~signature_kind cmd)
-                         ~error:
-                           (Error.of_string "Command has an invalid signature")
-                  in
-                  Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                      T.of_non_zkapp_command_transaction ~statement
-                        { Transaction_protocol_state.Poly.transaction =
-                            Command (Signed_command cmd)
-                        ; block_data = w.protocol_state_body
-                        ; global_slot = w.block_global_slot
-                        }
-                        ~init_stack:w.init_stack
-                        (unstage
-                           (Mina_ledger.Sparse_ledger.handler
-                              w.first_pass_ledger ) ) )
-              | Fee_transfer ft ->
-                  Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                      T.of_non_zkapp_command_transaction ~statement
-                        { Transaction_protocol_state.Poly.transaction =
-                            Fee_transfer ft
-                        ; block_data = w.protocol_state_body
-                        ; global_slot = w.block_global_slot
-                        }
-                        ~init_stack:w.init_stack
-                        (unstage
-                           (Mina_ledger.Sparse_ledger.handler
-                              w.first_pass_ledger ) ) )
-              | Coinbase cb ->
-                  Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                      T.of_non_zkapp_command_transaction ~statement
-                        { Transaction_protocol_state.Poly.transaction =
-                            Coinbase cb
-                        ; block_data = w.protocol_state_body
-                        ; global_slot = w.block_global_slot
-                        }
-                        ~init_stack:w.init_stack
-                        (unstage
-                           (Mina_ledger.Sparse_ledger.handler
-                              w.first_pass_ledger ) ) )
-              | Command (Zkapp_command _) ->
-                  Deferred.Or_error.error_string
-                    "prove_base called with zkapp command"
+            let prove_base statement witness =
+              Snark_work_prover.prove_base prover { statement; witness }
 
             let prove_zkapp_segment statement witness_stable spec =
               let witness =
@@ -127,11 +81,12 @@ module Worker_state = struct
                 .write_all_proofs_to_disk ~signature_kind ~proof_cache_db
                   witness_stable
               in
-              Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                  T.of_zkapp_command_segment_exn ~statement ~witness ~spec )
+              Snark_work_prover.prove_zkapp_segment prover
+                { statement; witness; spec }
 
             let prove_merge proof1 proof2 ~sok_digest =
-              T.merge proof1 proof2 ~sok_digest
+              Snark_work_prover.prove_merge prover
+                { proof1; proof2; sok_digest }
           end : S )
     | Check | No_check ->
         Deferred.return
