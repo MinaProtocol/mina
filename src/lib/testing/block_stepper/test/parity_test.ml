@@ -3,6 +3,17 @@ open Async
 open Signature_lib
 open Mina_base
 
+(*
+Currently I'm running the test like this:
+
+DUNE_PROFILE="devnet" dune exec src/lib/testing/block_stepper/test/parity_test.exe -- run --seed test-seed-1 --state-dir /tmp/parity_test_run --num-batches 3 --payments-per-batch 5 --zkapps-per-batch 1 2>&1
+
+but remember that the test needs a clean state directory.
+
+Test needs to be run on devnet to have access to all the proof levels, and also
+because the zkapp generator hard-codes the Testnet signature kind.
+*)
+
 (* ---- Configuration constants ---- *)
 
 let num_genesis_accounts = 10
