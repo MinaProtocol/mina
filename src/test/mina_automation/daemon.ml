@@ -228,7 +228,7 @@ let default () = { config = Config.default (); executor = Executor.AutoDetect }
 let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
 let start ?hardfork_handling ?block_producer_key ?config_file ?run_snark_worker
-    ?snark_worker_fee t =
+    ?snark_worker_fee ?precomputed_blocks_file t =
   let open Deferred.Let_syntax in
   let base_args =
     [ "daemon"
@@ -261,6 +261,7 @@ let start ?hardfork_handling ?block_producer_key ?config_file ?run_snark_worker
     @ opt_arg "--config-file" config_file
     @ opt_arg "--run-snark-worker" run_snark_worker
     @ opt_arg "--snark-worker-fee" snark_worker_fee
+    @ opt_arg "--precomputed-blocks-file" precomputed_blocks_file
   in
   [%log debug] "Starting daemon" ;
 
