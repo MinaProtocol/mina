@@ -12,6 +12,15 @@ but remember that the test needs a clean state directory.
 
 Test needs to be run on devnet to have access to all the proof levels, and also
 because the zkapp generator hard-codes the Testnet signature kind.
+
+The test can be run with --proof-level full, but it takes quite a while and is
+decently resource-intensive.
+
+Note that the transaction capacity and work delay are directly related to how
+many transactions can be included in a block, the time until which snark work
+starts gets demanded in the blocks, and the steady-state total snark work
+demanded by blocks. (With a transaction capacity of 2^3, you get 15 works max
+needed - actual work needed varies a bit).
 *)
 
 (* ---- Configuration constants ---- *)
