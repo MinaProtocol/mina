@@ -11,12 +11,6 @@ let bp_balance_mina = "10000000"
 
 let other_balance_mina = "1000"
 
-let num_batches = 1
-
-let payments_per_batch = 5
-
-let zkapps_per_batch = 1
-
 let payment_amount_mina = 3
 
 let max_poll_attempts = 60
@@ -563,7 +557,8 @@ let breadcrumb_to_transition_json bc =
 
 (* ---- Main test ---- *)
 
-let run ~logger ~seed ~state_dir =
+let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
+    ~zkapps_per_batch =
   let open Deferred.Let_syntax in
   (* Phase 1: Generate config and keys *)
   [%log info] "Phase 1: Generating config with seed '%s'" seed ;
@@ -1172,6 +1167,17 @@ let command =
           "DIR Directory for all test state (default: \
            /tmp/parity_test_<timestamp>)"
         (optional string)
+    and num_batches =
+      flag "--num-batches" ~doc:"INT Number of transaction batches (default: 1)"
+        (optional_with_default 1 int)
+    and payments_per_batch =
+      flag "--payments-per-batch"
+        ~doc:"INT Number of payments per batch (default: 5)"
+        (optional_with_default 5 int)
+    and zkapps_per_batch =
+      flag "--zkapps-per-batch"
+        ~doc:"INT Number of zkapp transactions per batch (default: 1)"
+        (optional_with_default 1 int)
     in
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
@@ -1211,7 +1217,8 @@ let command =
     in
     printf "Seed: %s\nState dir: %s\n" seed state_dir ;
     Parallel.init_master () ;
-    run ~logger ~seed ~state_dir)
+    run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
+      ~zkapps_per_batch)
 
 let () =
   Command.group ~summary:"Block stepper parity test"
