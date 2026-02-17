@@ -884,34 +884,50 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
                 (List.length zkapps) local_hash ;
               local_hash )
         in
-        (* Wait for this batch to be included *)
+        (* Wait for this batch to be included, with progress-based timeout *)
         let batch_hashes = String.Set.of_list (payment_hashes @ zkapp_hashes) in
+        let total = Set.length batch_hashes in
         [%log info] "Waiting for batch %d/%d (%d txns) to be included" (b + 1)
-          num_batches (Set.length batch_hashes) ;
-        let inclusion_pred blocks =
-          let included_payments =
-            List.concat_map blocks ~f:(fun b ->
-                List.map b.user_commands ~f:(fun c -> c.cmd_hash) )
-          in
-          let included_zkapps =
-            List.concat_map blocks ~f:(fun b -> b.zkapp_command_hashes)
-          in
-          let included =
-            String.Set.of_list (included_payments @ included_zkapps)
-          in
-          Set.is_subset batch_hashes ~of_:included
+          num_batches total ;
+        let inclusion_timeout =
+          Time.Span.of_sec (Float.of_int max_poll_attempts *. poll_interval_sec)
         in
-        let%bind _daemon_blocks =
+        let rec wait_for_inclusion ~remaining =
+          let inclusion_pred blocks =
+            let included =
+              List.concat_map blocks ~f:(fun b ->
+                  List.map b.user_commands ~f:(fun c -> c.cmd_hash)
+                  @ b.zkapp_command_hashes )
+              |> String.Set.of_list
+            in
+            let still_remaining = Set.diff remaining included in
+            Set.length still_remaining < Set.length remaining
+          in
           match%bind
-            Clock.with_timeout
-              (Time.Span.of_sec
-                 (Float.of_int max_poll_attempts *. poll_interval_sec) )
+            Clock.with_timeout inclusion_timeout
               (chain_monitor_wait_until monitor inclusion_pred)
           with
           | `Result (Ok blocks) ->
-              [%log info] "Batch %d/%d: all %d transactions included" (b + 1)
-                num_batches (Set.length batch_hashes) ;
-              return blocks
+              let included =
+                List.concat_map blocks ~f:(fun b ->
+                    List.map b.user_commands ~f:(fun c -> c.cmd_hash)
+                    @ b.zkapp_command_hashes )
+                |> String.Set.of_list
+              in
+              let still_remaining = Set.diff remaining included in
+              if Set.is_empty still_remaining then (
+                [%log info] "Batch %d/%d: all %d transactions included" (b + 1)
+                  num_batches total ;
+                return blocks )
+              else (
+                [%log info]
+                  "Batch %d/%d: %d/%d transactions included so far, waiting \
+                   for %d more"
+                  (b + 1) num_batches
+                  (total - Set.length still_remaining)
+                  total
+                  (Set.length still_remaining) ;
+                wait_for_inclusion ~remaining:still_remaining )
           | `Result (Error err) ->
               stop_chain_monitor monitor ;
               [%log error] "Chain monitor failed while waiting for batch %d: %s"
@@ -923,14 +939,20 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
                 (b + 1) (Error.to_string_hum err) ()
           | `Timeout ->
               stop_chain_monitor monitor ;
+              let included_so_far = total - Set.length remaining in
               [%log error]
-                "Timed out waiting for batch %d transaction inclusion" (b + 1) ;
+                "Timed out waiting for batch %d transaction inclusion (%d/%d \
+                 included)"
+                (b + 1) included_so_far total ;
               let%bind _ =
                 Mina_automation.Daemon.Process.force_kill daemon_process
               in
-              failwithf "Timed out waiting for batch %d transaction inclusion"
-                (b + 1) ()
+              failwithf
+                "Timed out waiting for batch %d transaction inclusion (%d/%d \
+                 included)"
+                (b + 1) included_so_far total ()
         in
+        let%bind _daemon_blocks = wait_for_inclusion ~remaining:batch_hashes in
         return ((payment_hashes, payments, zkapps) :: acc) )
   in
   let batches_with_hashes = List.rev batches_with_hashes in
