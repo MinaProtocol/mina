@@ -17,6 +17,8 @@ let max_poll_attempts = 60
 
 let poll_interval_sec = 5.0
 
+let graphql_timeout = Time.Span.of_sec 5.0
+
 (* ---- Account and config generation ---- *)
 
 let generate_keypairs ~seed ~n =
@@ -84,13 +86,24 @@ let graphql_query ~rest_port query_string =
   let headers =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in
-  let%bind _resp, body =
-    Cohttp_async.Client.post ~headers
-      ~body:(Cohttp_async.Body.of_string body_str)
-      uri
-  in
-  let%map body_str = Cohttp_async.Body.to_string body in
-  Yojson.Safe.from_string body_str
+  match%bind
+    Clock.with_timeout graphql_timeout
+      (Monitor.try_with ~here:[%here] (fun () ->
+           let%bind _resp, body =
+             Cohttp_async.Client.post ~headers
+               ~body:(Cohttp_async.Body.of_string body_str)
+               uri
+           in
+           Cohttp_async.Body.to_string body ) )
+  with
+  | `Result (Ok body_str) ->
+      return (Ok (Yojson.Safe.from_string body_str))
+  | `Result (Error exn) ->
+      return (Or_error.error_string (Exn.to_string exn))
+  | `Timeout ->
+      return
+        (Or_error.errorf "GraphQL query timed out after %s"
+           (Time.Span.to_short_string graphql_timeout) )
 
 let best_chain_query =
   {| { bestChain(maxLength: 100) {
@@ -173,9 +186,12 @@ let parse_best_chain response =
 
 (* ---- Chain monitor ---- *)
 
+
+(* TODO: both ivars and the mutable state handling here are not good *)
 type chain_monitor =
   { blocks : block_info String.Map.t ref
   ; stop_ivar : unit Ivar.t
+  ; fatal_error : Error.t Ivar.t
   ; mutable waiters : ((block_info list -> bool) * block_info list Ivar.t) list
   ; rest_port : int
   ; poll_interval : Time.Span.t
@@ -190,6 +206,7 @@ let chain_monitor_sorted_blocks map =
 let create_chain_monitor ~logger ~rest_port ~poll_interval =
   { blocks = ref String.Map.empty
   ; stop_ivar = Ivar.create ()
+  ; fatal_error = Ivar.create ()
   ; waiters = []
   ; rest_port
   ; poll_interval
@@ -204,10 +221,17 @@ let start_chain_monitor monitor =
        else
          let%bind () =
            match%bind
-             Monitor.try_with ~here:[%here] (fun () ->
-                 graphql_query ~rest_port:monitor.rest_port best_chain_query )
+             graphql_query ~rest_port:monitor.rest_port best_chain_query
            with
-           | Error _exn ->
+           | Error err when not (Map.is_empty !(monitor.blocks)) ->
+               (* Daemon was previously responsive but now failing *)
+               [%log error]
+                 "Chain monitor: query failed after daemon was responsive: %s"
+                 (Error.to_string_hum err) ;
+               Ivar.fill_if_empty monitor.stop_ivar () ;
+               Ivar.fill_if_empty monitor.fatal_error err ;
+               return ()
+           | Error _err ->
                (* daemon not ready yet, silently retry *)
                return ()
            | Ok response ->
@@ -249,7 +273,8 @@ let chain_monitor_wait_until monitor pred =
     let ivar = Ivar.create () in
     (* TODO: need synchronization *)
     monitor.waiters <- (pred, ivar) :: monitor.waiters ;
-    Ivar.read ivar
+    Deferred.any
+      [ Ivar.read ivar; Ivar.read monitor.fatal_error >>| Error.raise ]
 
 let chain_monitor_blocks monitor = chain_monitor_sorted_blocks !(monitor.blocks)
 
@@ -420,23 +445,35 @@ let graphql_send_payment ~logger ~rest_port ~sender ~receiver ~amount ~fee
   let headers =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in
-  let%bind _resp, body =
-    Cohttp_async.Client.post ~headers
-      ~body:(Cohttp_async.Body.of_string body_str)
-      uri
-  in
-  let%map body_str = Cohttp_async.Body.to_string body in
-  let json = Yojson.Safe.from_string body_str in
-  let open Yojson.Safe.Util in
-  ( match json |> member "errors" with
-  | `Null ->
-      ()
-  | errors ->
-      [%log error] "GraphQL sendPayment error: %s"
-        (Yojson.Safe.to_string errors) ;
-      failwith "sendPayment failed" ) ;
-  json |> member "data" |> member "sendPayment" |> member "payment"
-  |> member "hash" |> to_string
+  match%bind
+    Clock.with_timeout graphql_timeout
+      (Monitor.try_with ~here:[%here] (fun () ->
+           let%bind _resp, body =
+             Cohttp_async.Client.post ~headers
+               ~body:(Cohttp_async.Body.of_string body_str)
+               uri
+           in
+           Cohttp_async.Body.to_string body ) )
+  with
+  | `Result (Ok body_str) -> (
+      let json = Yojson.Safe.from_string body_str in
+      let open Yojson.Safe.Util in
+      match json |> member "errors" with
+      | `Null ->
+          return
+            (Ok
+               ( json |> member "data" |> member "sendPayment"
+               |> member "payment" |> member "hash" |> to_string ) )
+      | errors ->
+          [%log error] "GraphQL sendPayment error: %s"
+            (Yojson.Safe.to_string errors) ;
+          return (Or_error.error_string "sendPayment failed") )
+  | `Result (Error exn) ->
+      return (Or_error.error_string (Exn.to_string exn))
+  | `Timeout ->
+      return
+        (Or_error.errorf "GraphQL sendPayment timed out after %s"
+           (Time.Span.to_short_string graphql_timeout) )
 
 let send_zkapp_mutation =
   {| mutation($input: SendZkappInput!) {
@@ -461,22 +498,35 @@ let graphql_send_zkapp ~logger ~rest_port zkapp_cmd =
   let headers =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in
-  let%bind _resp, body =
-    Cohttp_async.Client.post ~headers
-      ~body:(Cohttp_async.Body.of_string body_str)
-      uri
-  in
-  let%map body_str = Cohttp_async.Body.to_string body in
-  let json = Yojson.Safe.from_string body_str in
-  let open Yojson.Safe.Util in
-  ( match json |> member "errors" with
-  | `Null ->
-      ()
-  | errors ->
-      [%log error] "GraphQL sendZkapp error: %s" (Yojson.Safe.to_string errors) ;
-      failwith "sendZkapp failed" ) ;
-  json |> member "data" |> member "sendZkapp" |> member "zkapp" |> member "hash"
-  |> to_string
+  match%bind
+    Clock.with_timeout graphql_timeout
+      (Monitor.try_with ~here:[%here] (fun () ->
+           let%bind _resp, body =
+             Cohttp_async.Client.post ~headers
+               ~body:(Cohttp_async.Body.of_string body_str)
+               uri
+           in
+           Cohttp_async.Body.to_string body ) )
+  with
+  | `Result (Ok body_str) -> (
+      let json = Yojson.Safe.from_string body_str in
+      let open Yojson.Safe.Util in
+      match json |> member "errors" with
+      | `Null ->
+          return
+            (Ok
+               ( json |> member "data" |> member "sendZkapp" |> member "zkapp"
+               |> member "hash" |> to_string ) )
+      | errors ->
+          [%log error] "GraphQL sendZkapp error: %s"
+            (Yojson.Safe.to_string errors) ;
+          return (Or_error.error_string "sendZkapp failed") )
+  | `Result (Error exn) ->
+      return (Or_error.error_string (Exn.to_string exn))
+  | `Timeout ->
+      return
+        (Or_error.errorf "GraphQL sendZkapp timed out after %s"
+           (Time.Span.to_short_string graphql_timeout) )
 
 (* ---- Account-level ledger comparison ---- *)
 
@@ -721,6 +771,7 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
         (* Query daemon genesis state hash *)
         let%bind daemon_genesis_response =
           graphql_query ~rest_port "{ genesisBlock { stateHash } }"
+          >>| Or_error.ok_exn
         in
         let daemon_genesis_hash =
           Yojson.Safe.Util.(
@@ -806,6 +857,7 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
               let%map hash =
                 graphql_send_payment ~logger ~rest_port ~sender:bp_pk
                   ~receiver:receiver_pk ~amount ~fee ~nonce ~valid_until ~memo
+                >>| Or_error.ok_exn
               in
               [%log info] "  Submitted payment %d/%d (nonce=%d, hash=%s)"
                 (i + 1) (List.length payments) nonce hash ;
@@ -816,6 +868,7 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
           Deferred.List.mapi zkapps ~f:(fun i (zkapp_cmd, _valid, local_hash) ->
               let%map daemon_hash =
                 graphql_send_zkapp ~logger ~rest_port zkapp_cmd
+                >>| Or_error.ok_exn
               in
               if not (String.equal daemon_hash local_hash) then
                 failwithf "Zkapp hash mismatch: daemon=%s local=%s" daemon_hash
