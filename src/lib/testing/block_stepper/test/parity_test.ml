@@ -11,7 +11,11 @@ let bp_balance_mina = "10000000"
 
 let other_balance_mina = "1000"
 
-let num_transactions = 5
+let num_batches = 1
+
+let payments_per_batch = 5
+
+let zkapps_per_batch = 1
 
 let payment_amount_mina = 3
 
@@ -258,18 +262,19 @@ let chain_monitor_blocks monitor = chain_monitor_sorted_blocks !(monitor.blocks)
 (* ---- Transaction generation ---- *)
 
 let generate_payments ~seed ~signature_kind ~valid_until ~bp_keypair
-    ~payment_fee_nanomina ~n =
+    ~payment_fee_nanomina ~nonce_start ~n =
   let bp_pk = Public_key.compress bp_keypair.Keypair.public_key in
   List.init n ~f:(fun i ->
       let receiver_keypair =
         Quickcheck.random_value
-          ~seed:(`Deterministic (sprintf "%s-receiver-%d" seed i))
+          ~seed:
+            (`Deterministic (sprintf "%s-receiver-%d" seed (nonce_start + i)))
           Keypair.gen
       in
       let receiver_pk =
         Public_key.compress receiver_keypair.Keypair.public_key
       in
-      let nonce = Mina_numbers.Account_nonce.of_int i in
+      let nonce = Mina_numbers.Account_nonce.of_int (nonce_start + i) in
       let common =
         { Signed_command_payload.Common.Poly.fee =
             Currency.Fee.of_nanomina_int_exn payment_fee_nanomina
@@ -602,26 +607,40 @@ let run ~logger ~seed ~state_dir =
   in
   let payment_fee_nanomina = zkapp_fee_nanomina + 1 in
   let valid_until = Mina_numbers.Global_slot_since_genesis.of_int 1000 in
-  let transactions =
-    generate_payments ~seed ~signature_kind ~valid_until ~bp_keypair
-      ~payment_fee_nanomina ~n:num_transactions
-  in
-  let zkapp_nonce = Mina_numbers.Account_nonce.of_int num_transactions in
-  let zkapp_cmd =
-    mk_zkapp_tx ~seed ~constraint_constants ~zkapp_fee_nanomina bp_keypair
-      zkapp_nonce
-  in
-  let zkapp_valid =
-    (* Transactions are constructed from known-good keypairs via
-       signature_transfers, so to_valid_unsafe is justified. *)
-    let (`If_this_is_used_it_should_have_a_comment_justifying_it valid_cmd) =
-      User_command.to_valid_unsafe (Zkapp_command zkapp_cmd)
-    in
-    valid_cmd
-  in
-  let zkapp_hash =
-    Mina_transaction.Transaction_hash.hash_zkapp_command_with_hashes zkapp_cmd
-    |> Mina_transaction.Transaction_hash.to_base58_check
+  let batches =
+    List.init num_batches ~f:(fun b ->
+        let nonce_start = b * (payments_per_batch + zkapps_per_batch) in
+        let payments =
+          generate_payments ~seed ~signature_kind ~valid_until ~bp_keypair
+            ~payment_fee_nanomina ~nonce_start ~n:payments_per_batch
+        in
+        let zkapps =
+          List.init zkapps_per_batch ~f:(fun z ->
+              let nonce =
+                Mina_numbers.Account_nonce.of_int
+                  (nonce_start + payments_per_batch + z)
+              in
+              let zkapp_cmd =
+                mk_zkapp_tx ~seed ~constraint_constants ~zkapp_fee_nanomina
+                  bp_keypair nonce
+              in
+              let zkapp_valid =
+                (* Transactions are constructed from known-good keypairs via
+                   signature_transfers, so to_valid_unsafe is justified. *)
+                let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                      valid_cmd ) =
+                  User_command.to_valid_unsafe (Zkapp_command zkapp_cmd)
+                in
+                valid_cmd
+              in
+              let zkapp_hash =
+                Mina_transaction.Transaction_hash.hash_zkapp_command_with_hashes
+                  zkapp_cmd
+                |> Mina_transaction.Transaction_hash.to_base58_check
+              in
+              (zkapp_cmd, zkapp_valid, zkapp_hash) )
+        in
+        (payments, zkapps) )
   in
   (* Phase 2: Start daemon *)
   [%log info] "Phase 2: Starting daemon" ;
@@ -743,81 +762,103 @@ let run ~logger ~seed ~state_dir =
         ]
       ()
   in
-  (* Submit transactions via GraphQL and collect daemon-returned hashes *)
-  [%log info] "Submitting %d transactions" num_transactions ;
-  let%bind tx_hashes =
-    Deferred.List.mapi transactions ~f:(fun i cmd ->
-        let payload =
-          match User_command.forget_check cmd with
-          | Signed_command sc ->
-              sc.payload
-          | Zkapp_command _ ->
-              failwith "unexpected zkapp command"
+  (* Submit transactions in batches, waiting for each batch to be included *)
+  let total_txns = num_batches * (payments_per_batch + zkapps_per_batch) in
+  [%log info]
+    "Submitting %d transactions in %d batch(es) (%d payments + %d zkapps each)"
+    total_txns num_batches payments_per_batch zkapps_per_batch ;
+  let%bind batches_with_hashes =
+    Deferred.List.foldi batches ~init:[] ~f:(fun b acc (payments, zkapps) ->
+        [%log info] "Batch %d/%d: submitting %d payments + %d zkapps" (b + 1)
+          num_batches (List.length payments) (List.length zkapps) ;
+        (* Submit payments *)
+        let%bind payment_hashes =
+          Deferred.List.mapi payments ~f:(fun i cmd ->
+              let payload =
+                match User_command.forget_check cmd with
+                | Signed_command sc ->
+                    sc.payload
+                | Zkapp_command _ ->
+                    failwith "unexpected zkapp command"
+              in
+              let receiver_pk, amount =
+                match payload.body with
+                | Payment { receiver_pk; amount } ->
+                    ( Public_key.Compressed.to_base58_check receiver_pk
+                    , Int.to_string (Currency.Amount.to_nanomina_int amount) )
+                | _ ->
+                    failwith "unexpected command body"
+              in
+              let fee =
+                Int.to_string (Currency.Fee.to_nanomina_int payload.common.fee)
+              in
+              let nonce =
+                Mina_numbers.Account_nonce.to_int payload.common.nonce
+              in
+              let valid_until =
+                Mina_numbers.Global_slot_since_genesis.to_string
+                  payload.common.valid_until
+              in
+              let memo =
+                Signed_command_memo.to_string_hum payload.common.memo
+              in
+              let%map hash =
+                graphql_send_payment ~logger ~rest_port ~sender:bp_pk
+                  ~receiver:receiver_pk ~amount ~fee ~nonce ~valid_until ~memo
+              in
+              [%log info] "  Submitted payment %d/%d (nonce=%d, hash=%s)"
+                (i + 1) (List.length payments) nonce hash ;
+              hash )
         in
-        let receiver_pk, amount =
-          match payload.body with
-          | Payment { receiver_pk; amount } ->
-              ( Public_key.Compressed.to_base58_check receiver_pk
-              , Int.to_string (Currency.Amount.to_nanomina_int amount) )
-          | _ ->
-              failwith "unexpected command body"
+        (* Submit zkapps *)
+        let%bind zkapp_hashes =
+          Deferred.List.mapi zkapps ~f:(fun i (zkapp_cmd, _valid, local_hash) ->
+              let%map daemon_hash =
+                graphql_send_zkapp ~logger ~rest_port zkapp_cmd
+              in
+              if not (String.equal daemon_hash local_hash) then
+                failwithf "Zkapp hash mismatch: daemon=%s local=%s" daemon_hash
+                  local_hash () ;
+              [%log info] "  Submitted zkapp %d/%d (hash=%s)" (i + 1)
+                (List.length zkapps) local_hash ;
+              local_hash )
         in
-        let fee =
-          Int.to_string (Currency.Fee.to_nanomina_int payload.common.fee)
+        (* Wait for this batch to be included *)
+        let batch_hashes = String.Set.of_list (payment_hashes @ zkapp_hashes) in
+        [%log info] "Waiting for batch %d/%d (%d txns) to be included" (b + 1)
+          num_batches (Set.length batch_hashes) ;
+        let inclusion_pred blocks =
+          let included_payments =
+            List.concat_map blocks ~f:(fun b ->
+                List.map b.user_commands ~f:(fun c -> c.cmd_hash) )
+          in
+          let included_zkapps =
+            List.concat_map blocks ~f:(fun b -> b.zkapp_command_hashes)
+          in
+          let included =
+            String.Set.of_list (included_payments @ included_zkapps)
+          in
+          Set.is_subset batch_hashes ~of_:included
         in
-        let nonce = Mina_numbers.Account_nonce.to_int payload.common.nonce in
-        let valid_until =
-          Mina_numbers.Global_slot_since_genesis.to_string
-            payload.common.valid_until
+        let%bind _daemon_blocks =
+          match%bind
+            Clock.with_timeout
+              (Time.Span.of_sec
+                 (Float.of_int max_poll_attempts *. poll_interval_sec) )
+              (chain_monitor_wait_until monitor inclusion_pred)
+          with
+          | `Result blocks ->
+              [%log info] "Batch %d/%d: all %d transactions included" (b + 1)
+                num_batches (Set.length batch_hashes) ;
+              return blocks
+          | `Timeout ->
+              stop_chain_monitor monitor ;
+              failwithf "Timed out waiting for batch %d transaction inclusion"
+                (b + 1) ()
         in
-        let memo = Signed_command_memo.to_string_hum payload.common.memo in
-        let%map hash =
-          graphql_send_payment ~logger ~rest_port ~sender:bp_pk
-            ~receiver:receiver_pk ~amount ~fee ~nonce ~valid_until ~memo
-        in
-        [%log info] "Submitted transaction %d/%d (nonce=%d, hash=%s)" (i + 1)
-          num_transactions nonce hash ;
-        hash )
+        return ((payment_hashes, payments, zkapps) :: acc) )
   in
-  (* Submit zkapp transaction *)
-  [%log info] "Submitting zkapp transaction" ;
-  let%bind daemon_zkapp_hash =
-    graphql_send_zkapp ~logger ~rest_port zkapp_cmd
-  in
-  if not (String.equal daemon_zkapp_hash zkapp_hash) then
-    failwithf "Zkapp hash mismatch: daemon=%s local=%s" daemon_zkapp_hash
-      zkapp_hash () ;
-  [%log info] "Submitted zkapp (hash=%s)" zkapp_hash ;
-  (* Wait for inclusion via chain monitor *)
-  [%log info] "Waiting for transactions to be included in best chain" ;
-  let expected_hashes = String.Set.of_list (tx_hashes @ [ zkapp_hash ]) in
-  let inclusion_pred blocks =
-    let included_payments =
-      List.concat_map blocks ~f:(fun b ->
-          List.map b.user_commands ~f:(fun c -> c.cmd_hash) )
-    in
-    let included_zkapps =
-      List.concat_map blocks ~f:(fun b -> b.zkapp_command_hashes)
-    in
-    let included = String.Set.of_list (included_payments @ included_zkapps) in
-    Set.is_subset expected_hashes ~of_:included
-  in
-  let%bind daemon_blocks =
-    match%bind
-      Clock.with_timeout
-        (Time.Span.of_sec
-           (Float.of_int max_poll_attempts *. poll_interval_sec) )
-        (chain_monitor_wait_until monitor inclusion_pred)
-    with
-    | `Result blocks ->
-        [%log info] "All %d transactions included in best chain"
-          (Set.length expected_hashes) ;
-        return blocks
-    | `Timeout ->
-        stop_chain_monitor monitor ;
-        failwith "Timed out waiting for transaction inclusion"
-  in
-  ignore (daemon_blocks : block_info list) ;
+  let batches_with_hashes = List.rev batches_with_hashes in
   stop_chain_monitor monitor ;
   let daemon_blocks = chain_monitor_blocks monitor in
   let daemon_final_hash = (List.last_exn daemon_blocks).staged_ledger_hash in
@@ -894,10 +935,19 @@ let run ~logger ~seed ~state_dir =
   [%log info] "Genesis state hashes match" ;
   (* Build a hash-to-transaction lookup *)
   let tx_by_hash =
-    let payment_entries =
-      List.map2_exn transactions tx_hashes ~f:(fun cmd hash -> (hash, cmd))
+    let entries =
+      List.concat_map batches_with_hashes
+        ~f:(fun (payment_hashes, payments, zkapps) ->
+          let payment_entries =
+            List.map2_exn payments payment_hashes ~f:(fun cmd hash ->
+                (hash, cmd) )
+          in
+          let zkapp_entries =
+            List.map zkapps ~f:(fun (_cmd, valid, hash) -> (hash, valid))
+          in
+          payment_entries @ zkapp_entries )
     in
-    String.Map.of_alist_exn ((zkapp_hash, zkapp_valid) :: payment_entries)
+    String.Map.of_alist_exn entries
   in
   (* Verify daemon commands match locally-generated transactions *)
   let all_daemon_commands =
@@ -969,9 +1019,18 @@ let run ~logger ~seed ~state_dir =
   List.iter all_daemon_zkapp_hashes ~f:(fun h ->
       if not (String.Map.mem tx_by_hash h) then
         [%log warn] "Unknown zkapp command hash from daemon: %s" h ) ;
-  if not (List.mem all_daemon_zkapp_hashes zkapp_hash ~equal:String.equal) then
-    failwithf "Submitted zkapp hash %s not found in daemon blocks" zkapp_hash () ;
-  [%log info] "Zkapp command hash verified in daemon blocks" ;
+  let all_submitted_zkapp_hashes =
+    List.concat_map batches_with_hashes
+      ~f:(fun (_payment_hashes, _payments, zkapps) ->
+        List.map zkapps ~f:(fun (_cmd, _valid, hash) -> hash) )
+  in
+  List.iter all_submitted_zkapp_hashes ~f:(fun zkapp_hash ->
+      if not (List.mem all_daemon_zkapp_hashes zkapp_hash ~equal:String.equal)
+      then
+        failwithf "Submitted zkapp hash %s not found in daemon blocks"
+          zkapp_hash () ) ;
+  [%log info] "All %d zkapp command hash(es) verified in daemon blocks"
+    (List.length all_submitted_zkapp_hashes) ;
   (* Skip genesis block (first in bestChain list), replay the rest *)
   let non_genesis_blocks =
     match daemon_blocks with
