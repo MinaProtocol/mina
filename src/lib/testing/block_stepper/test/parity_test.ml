@@ -964,6 +964,8 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
   let daemon_blocks = chain_monitor_blocks monitor in
   let daemon_final_hash = (List.last_exn daemon_blocks).staged_ledger_hash in
   [%log info] "Daemon final staged ledger hash: %s" daemon_final_hash ;
+  let daemon_final_state_hash = (List.last_exn daemon_blocks).state_hash in
+  [%log info] "Daemon final state hash: %s" daemon_final_state_hash ;
   (* Export daemon staged ledger for account-level comparison *)
   [%log info] "Exporting daemon staged ledger" ;
   let%bind daemon_ledger_json =
@@ -1212,13 +1214,28 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
   in
   [%log info] "Stepper ledger hash: %s" stepper_ledger_hash ;
   [%log info] "Daemon ledger hash:  %s" daemon_final_hash ;
-  if String.equal daemon_final_hash stepper_ledger_hash then (
-    [%log info] "PASS: Ledger hashes match!" ;
+  let stepper_final_state_hash =
+    Frontier_base.Breadcrumb.state_hash final_breadcrumb
+    |> State_hash.to_base58_check
+  in
+  [%log info] "Stepper state hash: %s" stepper_final_state_hash ;
+  [%log info] "Daemon state hash:  %s" daemon_final_state_hash ;
+  let ledger_match = String.equal daemon_final_hash stepper_ledger_hash in
+  let state_match =
+    String.equal daemon_final_state_hash stepper_final_state_hash
+  in
+  if ledger_match && state_match then (
+    [%log info] "PASS: Ledger hashes and state hashes match!" ;
     return () )
   else (
-    [%log error] "FAIL: Ledger hash mismatch!" ;
-    [%log error] "  Daemon:  %s" daemon_final_hash ;
-    [%log error] "  Stepper: %s" stepper_ledger_hash ;
+    if not ledger_match then (
+      [%log error] "FAIL: Ledger hash mismatch!" ;
+      [%log error] "  Daemon:  %s" daemon_final_hash ;
+      [%log error] "  Stepper: %s" stepper_ledger_hash ) ;
+    if not state_match then (
+      [%log error] "FAIL: State hash mismatch!" ;
+      [%log error] "  Daemon:  %s" daemon_final_state_hash ;
+      [%log error] "  Stepper: %s" stepper_final_state_hash ) ;
     List.iter daemon_blocks ~f:(fun b ->
         [%log error]
           "  Slot %d: %d user commands, %d zkapp commands, \
@@ -1236,7 +1253,7 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
     in
     compare_ledger_accounts ~logger ~label:"Final ledger" ~stepper_accounts_json
       ~daemon_accounts_json ;
-    failwith "Ledger hash mismatch" )
+    failwith "Hash mismatch" )
 
 (* ---- Command-line interface ---- *)
 
