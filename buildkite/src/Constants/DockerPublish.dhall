@@ -9,6 +9,7 @@ let isEssential =
       ->  merge
             { Daemon = True
             , DaemonConfig = False
+            , DaemonPrefork = True
             , LogProc = False
             , Archive = True
             , TestExecutive = False

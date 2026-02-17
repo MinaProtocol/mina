@@ -80,7 +80,7 @@ BUILDDIR="deb_build"
 
 
 # For automode purpose. We need to control location for both runtimes
-AUTOMODE_PRE_HF_DIR=${BUILDDIR}/usr/lib/mina/bin/berkeley
+AUTOMODE_PRE_HF_DIR=${BUILDDIR}/usr/lib/mina/berkeley
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -170,16 +170,25 @@ build_deb() {
   echo "--- Built ${1}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
 }
 
-# Copies scripts and build utilities to debian package
-copy_common_daemon_utils() {
-  echo "------------------------------------------------------------"
-  echo "copy_common_daemon_configs inputs:"
-  echo "Seed List URL path: ${1} (like seed-lists/berkeley_seeds.txt)"
+copy_hf_related_scripts() {
 
   cp ../scripts/hardfork/create_runtime_config.sh \
     "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
   cp ../scripts/hardfork/mina-verify-packaged-fork-config \
     "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
+
+}
+
+# Copies scripts and build utilities to debian package
+copy_common_daemon_utils() {
+  echo "------------------------------------------------------------"
+  echo "copy_common_daemon_utils inputs:"
+  echo "Seed List URL path: ${1} (like seed-lists/berkeley_seeds.txt)"
+
+  local MINA_BIN="${2:-${BUILDDIR}/usr/local/bin/mina}"
+
+  copy_hf_related_scripts
+
   # Update the mina.service with a new default PEERS_URL based on Seed List \
   # URL $1
   mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
@@ -190,7 +199,7 @@ copy_common_daemon_utils() {
   # NOTE: We do not list bash-completion as a required package,
   #       but it needs to be present for this to be effective
   mkdir -p "${BUILDDIR}/etc/bash_completion.d"
-  env COMMAND_OUTPUT_INSTALLATION_BASH=1 "${BUILDDIR}/usr/local/bin/mina" > \
+  env COMMAND_OUTPUT_INSTALLATION_BASH=1 "${MINA_BIN}" > \
     "${BUILDDIR}/etc/bash_completion.d/mina"
 
 }
@@ -566,23 +575,23 @@ build_daemon_devnet_config_deb() {
 }
 ## END DEVNET PACKAGE ##
 
-## MAINNET LEGACY PACKAGE ##
+## MAINNET PREFORK PACKAGE ##
 
 #
-# Builds mina-mainnet-pre-hardfork-mesa tailored package for automode package
+# Builds mina-mainnet-prefork-mesa tailored package for automode package
 #
-# Output: mina-mainnet-pre-hardfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-mainnet-prefork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Contains only the legacy mainnet binaries places in "/usr/lib/mina/berkeley" without
 # configuration files or genesis ledgers.
 #
-build_daemon_mainnet_pre_hardfork_deb() {
+build_daemon_mainnet_prefork_deb() {
 
-  NAME="mina-mainnet-pre-hardfork-mesa"
+  NAME="mina-mainnet-prefork-mesa"
 
   echo "------------------------------------------------------------"
-  echo "--- Building mainnet berkeley deb for hardfork automode :"
+  echo "--- Building mainnet berkeley deb for prefork automode :"
 
   create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
@@ -591,25 +600,25 @@ build_daemon_mainnet_pre_hardfork_deb() {
 
   build_deb $NAME
 }
-## END MAINNET LEGACY PACKAGE ##
+## END MAINNET PREFORK PACKAGE ##
 
-## DEVNET LEGACY PACKAGE ##
+## DEVNET PREFORK PACKAGE ##
 
 #
-# Builds mina-devnet-pre-hardfork-mesa tailored package for automode package
+# Builds mina-devnet-prefork-mesa tailored package for automode package
 #
-# Output: mina-devnet-pre-hardfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-devnet-prefork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Contains only the legacy mainnet binaries places in "/usr/lib/mina/berkeley" without
+# Contains only the prefork devnet binaries places in "/usr/lib/mina/berkeley" without
 # configuration files or genesis ledgers.
 #
-build_daemon_devnet_pre_hardfork_deb() {
+build_daemon_devnet_prefork_deb() {
 
-  NAME="mina-devnet-pre-hardfork-mesa"
+  NAME="mina-devnet-prefork-mesa"
 
   echo "------------------------------------------------------------"
-  echo "--- Building testnet berkeley legacy deb for hardfork automode :"
+  echo "--- Building testnet berkeley prefork deb for automode :"
 
   create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
@@ -618,7 +627,7 @@ build_daemon_devnet_pre_hardfork_deb() {
 
   build_deb $NAME
 }
-## END DEVNET LEGACY PACKAGE ##
+## END DEVNET PREFORK PACKAGE ##
 
 ## TESTNET GENERIC PACKAGE ##
 

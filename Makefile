@@ -577,6 +577,14 @@ debian-build-daemon-mainnet: ## Build the Debian daemon package for mainnet
 debian-build-config-devnet: ## Build the Debian config package for devnet
 	$(call build_debian_package,daemon_devnet_config)
 
+.PHONY: debian-build-daemon-devnet-prefork
+debian-build-daemon-devnet-prefork: ## Build the Debian daemon package for automote devnet pre hardfork
+	$(call build_debian_package,daemon_devnet_prefork)
+
+.PHONY: debian-build-daemon-mainnet-prefork
+debian-build-daemon-mainnet-prefork: ## Build the Debian daemon package for automote mainnet pre hardfork
+	$(call build_debian_package,daemon_mainnet_prefork)
+
 .PHONY: debian-build-config-mainnet
 debian-build-config-mainnet: ## Build the Debian config package for mainnet
 	$(call build_debian_package,daemon_mainnet_config)
