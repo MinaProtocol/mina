@@ -51,6 +51,7 @@
  (modules
   layer_consensus
   layer_domain
+  layer_graphql
   layer_ledger
   layer_network
   layer_protocol

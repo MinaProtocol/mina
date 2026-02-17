@@ -44,17 +44,17 @@ let rosetta_lib =
       ; rosetta_models
       ; sexplib0
       ; uri
-      ; Layer_base.currency
       ; Layer_base.hex
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
-      ; Layer_base.unsigned_extended
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
+      ; Layer_node.mina_numbers
+      ; Layer_transaction.currency
+      ; Layer_transaction.unsigned_extended
       ]
     ~ppx:
       (Ppx.custom

@@ -79,11 +79,11 @@ let transaction_protocol_state =
       ; core
       ; core_kernel
       ; sexplib0
-      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_crypto.sgn
       ; Layer_crypto.snark_params
       ; Layer_domain.genesis_constants
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_ppx.ppx_version_runtime
       ; Snarky_lib.snarky_backendless
@@ -105,7 +105,6 @@ let zkapp_command_builder =
       [ async_kernel
       ; async_unix
       ; core_kernel
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
@@ -118,6 +117,7 @@ let zkapp_command_builder =
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
+      ; Layer_transaction.currency
       ; Snarky_lib.snarky_backendless
       ]
     ~ppx:
@@ -142,10 +142,8 @@ let transaction_snark =
       ; mina_signature_kind
       ; splittable_random
       ; transaction_protocol_state
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_util
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
@@ -172,6 +170,7 @@ let transaction_snark =
       ; Layer_ledger.mina_ledger
       ; Layer_logging.logger
       ; Layer_logging.o1trace
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_base
@@ -181,6 +180,7 @@ let transaction_snark =
       ; Layer_storage.cache_dir
       ; Layer_test.quickcheck_lib
       ; Layer_test.test_util
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ; Layer_transaction.transaction_witness
@@ -216,7 +216,6 @@ let blockchain_snark =
       ; sexplib0
       ; transaction_snark
       ; Layer_base.allocation_functor
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_consensus.consensus
       ; Layer_consensus.mina_state
@@ -236,6 +235,7 @@ let blockchain_snark =
       ; Layer_ppx.ppx_version_runtime
       ; Layer_snarky.snark_keys_header
       ; Layer_storage.cache_dir
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ; Snarky_lib.snarky_backendless
       ]
@@ -338,10 +338,8 @@ let transaction_snark_tests =
       ; transaction_protocol_state
       ; transaction_snark
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.sgn_type
@@ -364,12 +362,14 @@ let transaction_snark_tests =
       ; Layer_ledger.mina_ledger
       ; Layer_ledger.staged_ledger_diff
       ; Layer_logging.logger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_base
       ; Layer_pickles.pickles_types
       ; Layer_storage.cache_dir
       ; Layer_test.test_util
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ; Layer_transaction.transaction_witness
@@ -422,10 +422,8 @@ let transaction_snark_tests_access_permission =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.with_hash
       ; Layer_consensus.mina_state
@@ -440,10 +438,12 @@ let transaction_snark_tests_access_permission =
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
       ; Layer_storage.cache_dir
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ; Snarky_lib.snarky_backendless
       ; local "pasta_bindings"
@@ -476,11 +476,8 @@ let account_timing_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_compile_config
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
@@ -499,10 +496,13 @@ let account_timing_tests =
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_compile_config
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
       ; Layer_test.test_util
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ; Snarky_lib.snarky_backendless
@@ -528,10 +528,8 @@ let account_update_network_id =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_consensus.mina_state
       ; Layer_crypto.sgn
@@ -542,10 +540,12 @@ let account_update_network_id =
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
       ; Layer_logging.logger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
       ; Layer_test.test_util
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ]
@@ -574,18 +574,18 @@ let app_state_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
       ; Layer_domain.genesis_constants
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_types
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ]
     ~ppx:
@@ -608,18 +608,18 @@ let delegate_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
       ; Layer_domain.genesis_constants
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_types
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ]
     ~ppx:
@@ -645,10 +645,8 @@ let fee_payer_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
@@ -657,9 +655,11 @@ let fee_payer_tests =
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ]
@@ -684,10 +684,8 @@ let multisig_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.with_hash
@@ -705,11 +703,13 @@ let multisig_tests =
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_base
       ; Layer_pickles.pickles_types
       ; Layer_storage.cache_dir
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ; Snarky_lib.snarky_backendless
       ]
@@ -733,18 +733,18 @@ let permissions_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
       ; Layer_domain.genesis_constants
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_types
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ]
     ~ppx:
@@ -767,10 +767,8 @@ let token_symbol_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_consensus.mina_state
       ; Layer_crypto.sgn
@@ -778,8 +776,10 @@ let token_symbol_tests =
       ; Layer_crypto.snark_params
       ; Layer_domain.genesis_constants
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_types
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ]
     ~ppx:
@@ -801,10 +801,8 @@ let transaction_union_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
@@ -820,11 +818,13 @@ let transaction_union_tests =
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
       ; Layer_ledger.staged_ledger_diff
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
       ; Layer_test.quickcheck_lib
       ; Layer_test.test_util
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ; local "sexplib0"
@@ -849,10 +849,8 @@ let verification_key_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.with_hash
       ; Layer_consensus.mina_state
       ; Layer_crypto.random_oracle
@@ -863,9 +861,11 @@ let verification_key_tests =
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ]
     ~ppx:
@@ -890,18 +890,18 @@ let verification_key_permission_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
       ; Layer_domain.genesis_constants
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_types
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ]
     ~ppx:
@@ -923,10 +923,8 @@ let transaction_snark_tests_verify_simple_test =
       ; transaction_protocol_state
       ; transaction_snark
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
       ; Layer_base.sgn_type
       ; Layer_base.with_hash
@@ -947,12 +945,14 @@ let transaction_snark_tests_verify_simple_test =
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
       ; Layer_ledger.staged_ledger_diff
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_base
       ; Layer_pickles.pickles_types
       ; Layer_storage.cache_dir
       ; Layer_test.test_util
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ; Layer_transaction.transaction_witness
@@ -984,10 +984,8 @@ let voting_for_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.with_hash
       ; Layer_consensus.mina_state
       ; Layer_crypto.random_oracle
@@ -998,9 +996,11 @@ let voting_for_tests =
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ]
     ~ppx:
@@ -1024,10 +1024,8 @@ let zkapp_deploy_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
@@ -1036,9 +1034,11 @@ let zkapp_deploy_tests =
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ]
     ~ppx:
@@ -1062,10 +1062,8 @@ let () =
       ; transaction_snark_tests
       ; yojson
       ; zkapp_command_builder
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.with_hash
       ; Layer_consensus.mina_state
@@ -1079,10 +1077,12 @@ let () =
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
       ; Layer_logging.logger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
       ; Layer_test.test_util
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ; local "mina_generators"
       ; local "sexplib0"
@@ -1115,10 +1115,8 @@ let zkapp_payments_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
@@ -1128,10 +1126,12 @@ let zkapp_payments_tests =
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
       ; Layer_logging.logger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
       ; Layer_test.test_util
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ]
@@ -1163,10 +1163,8 @@ let account_update_precondition_tests =
       ; transaction_snark_tests
       ; yojson
       ; zkapp_command_builder
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_consensus.mina_state
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
@@ -1180,9 +1178,11 @@ let account_update_precondition_tests =
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ; local "mina_generators"
@@ -1206,16 +1206,16 @@ let zkapp_tokens_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; zkapp_command_builder
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_domain.genesis_constants
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_test.test_util
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ; local "mina_generators"
       ]
@@ -1244,10 +1244,8 @@ let zkapp_uri_tests =
       ; transaction_snark
       ; transaction_snark_tests
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_consensus.mina_state
       ; Layer_crypto.sgn
@@ -1255,8 +1253,10 @@ let zkapp_uri_tests =
       ; Layer_crypto.snark_params
       ; Layer_domain.genesis_constants
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_types
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ]
     ~ppx:

@@ -19,11 +19,8 @@ let () =
       ; sexplib0
       ; stdio
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_compile_config
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.with_hash
       ; Layer_consensus.mina_state
@@ -43,6 +40,8 @@ let () =
       ; Layer_ledger.staged_ledger_diff
       ; Layer_network.mina_block
       ; Layer_network.snark_profiler_lib
+      ; Layer_node.mina_compile_config
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
@@ -52,6 +51,7 @@ let () =
       ; Layer_protocol.zkapp_command_builder
       ; Layer_snark_worker.ledger_proof
       ; Layer_snark_worker.transaction_snark_scan_state
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ; local "kimchi_bindings"
       ; local "mina_generators"

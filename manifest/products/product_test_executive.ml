@@ -21,14 +21,11 @@ let () =
       ; unsigned_extended
       ; uri
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_stdlib_unix
       ; Layer_base.participating_state
-      ; Layer_base.visualization
       ; Layer_base.with_hash
       ; Layer_concurrency.pipe_lib
       ; Layer_crypto.key_gen
@@ -46,6 +43,7 @@ let () =
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_logging.logger
       ; Layer_network.network_pool
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
@@ -54,6 +52,8 @@ let () =
       ; Layer_protocol.transaction_snark
       ; Layer_protocol.zkapp_command_builder
       ; Layer_storage.cache_dir
+      ; Layer_tooling.visualization
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.user_command_input
       ; Product_zkapps_examples.zkapps_examples

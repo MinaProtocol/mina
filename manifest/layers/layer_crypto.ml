@@ -392,10 +392,10 @@ let secrets =
       ; Layer_base.error_json
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_stdlib_unix
       ; Layer_logging.logger
+      ; Layer_node.mina_numbers
       ; Snarky_lib.snarky_backendless
       ; local "mina_net2"
       ; local "network_peer"

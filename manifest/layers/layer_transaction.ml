@@ -6,6 +6,89 @@
 open Manifest
 open Externals
 
+let unsigned_extended =
+  library "unsigned_extended" ~path:"src/lib/unsigned_extended"
+    ~synopsis:"Unsigned integer functions" ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ base
+      ; base_caml
+      ; base_internalhash_types
+      ; bignum_bigint
+      ; bin_prot_shape
+      ; core_kernel
+      ; integers
+      ; ppx_inline_test_config
+      ; result
+      ; sexplib0
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_test.test_util
+      ; local "bignum_bigint"
+      ; local "snark_params"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_bin_prot
+         ; Ppx_lib.ppx_compare
+         ; Ppx_lib.ppx_deriving_std
+         ; Ppx_lib.ppx_deriving_yojson
+         ; Ppx_lib.ppx_hash
+         ; Ppx_lib.ppx_inline_test
+         ; Ppx_lib.ppx_mina
+         ; Ppx_lib.ppx_sexp_conv
+         ; Ppx_lib.ppx_version
+         ] )
+    ~inline_tests:true
+
+let currency =
+  library "currency" ~path:"src/lib/currency" ~synopsis:"Currency types"
+    ~deps:
+      [ base
+      ; base_caml
+      ; base_internalhash_types
+      ; bin_prot_shape
+      ; core_kernel
+      ; integers
+      ; ppx_inline_test_config
+      ; result
+      ; sexplib0
+      ; unsigned_extended
+      ; zarith
+      ; Layer_base.codable
+      ; Layer_base.mina_wire_types
+      ; Layer_ppx.ppx_version_runtime
+      ; Layer_snarky.snark_bits
+      ; Layer_test.test_util
+      ; Snarky_lib.bitstring_lib
+      ; Snarky_lib.snarky_backendless
+      ; local "bignum_bigint"
+      ; local "kimchi_backend_common"
+      ; local "mina_numbers"
+      ; local "pickles"
+      ; local "random_oracle"
+      ; local "random_oracle_input"
+      ; local "sgn"
+      ; local "snark_params"
+      ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.h_list_ppx
+         ; Ppx_lib.ppx_annot
+         ; Ppx_lib.ppx_assert
+         ; Ppx_lib.ppx_bin_prot
+         ; Ppx_lib.ppx_compare
+         ; Ppx_lib.ppx_custom_printf
+         ; Ppx_lib.ppx_deriving_std
+         ; Ppx_lib.ppx_deriving_yojson
+         ; Ppx_lib.ppx_fields_conv
+         ; Ppx_lib.ppx_hash
+         ; Ppx_lib.ppx_inline_test
+         ; Ppx_lib.ppx_let
+         ; Ppx_lib.ppx_mina
+         ; Ppx_lib.ppx_sexp_conv
+         ; Ppx_lib.ppx_version
+         ] )
+    ~inline_tests:true ~library_flags:[ "-linkall" ]
+
 let user_command_input =
   library "user_command_input" ~path:"src/lib/user_command_input"
     ~deps:
@@ -15,17 +98,17 @@ let user_command_input =
       ; bin_prot_shape
       ; core
       ; core_kernel
+      ; currency
       ; sexplib0
-      ; Layer_base.currency
+      ; unsigned_extended
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.participating_state
-      ; Layer_base.unsigned_extended
       ; Layer_crypto.secrets
       ; Layer_crypto.signature_lib
       ; Layer_domain.genesis_constants
       ; Layer_logging.logger
+      ; Layer_node.mina_numbers
       ; Layer_ppx.ppx_version_runtime
       ]
     ~ppx:
@@ -46,15 +129,14 @@ let mina_transaction =
       ; base_internalhash_types
       ; bin_prot_shape
       ; core_kernel
+      ; currency
       ; ppx_inline_test_config
       ; result
       ; sexplib0
       ; Layer_base.base58_check
       ; Layer_base.codable
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
       ; Layer_base.with_hash
@@ -63,6 +145,7 @@ let mina_transaction =
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_ppx.ppx_version_runtime
       ; Snarky_lib.snarky_backendless
@@ -89,21 +172,20 @@ let mina_transaction_logic =
       ; base_quickcheck
       ; bin_prot_shape
       ; core_kernel
+      ; currency
       ; integers
       ; mina_transaction
       ; ppx_inline_test_config
       ; result
       ; sexp_diff_kernel
       ; sexplib0
+      ; unsigned_extended
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
@@ -117,6 +199,7 @@ let mina_transaction_logic =
       ; Layer_kimchi.kimchi_backend_common
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
@@ -151,16 +234,15 @@ let transaction_logic_tests =
       ; base_internalhash_types
       ; core
       ; core_kernel
+      ; currency
       ; integers
       ; mina_transaction
       ; mina_transaction_logic
       ; ppx_inline_test_config
       ; sexplib0
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.monad_lib
@@ -177,6 +259,7 @@ let transaction_logic_tests =
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
       ; Layer_ledger.mina_ledger_test_helpers
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
@@ -201,12 +284,11 @@ let transaction_witness =
       ; bin_prot_shape
       ; core
       ; core_kernel
+      ; currency
       ; mina_transaction
       ; mina_transaction_logic
       ; sexplib0
-      ; Layer_base.currency
       ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
       ; Layer_base.with_hash
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
@@ -214,6 +296,7 @@ let transaction_witness =
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_ppx.ppx_version_runtime
       ; local "mina_state"
       ]

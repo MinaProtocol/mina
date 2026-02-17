@@ -22,10 +22,8 @@ let () =
       ; stdio
       ; yojson
       ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
-      ; Layer_base.visualization
       ; Layer_consensus.consensus
       ; Layer_consensus.mina_state
       ; Layer_crypto.snark_params
@@ -35,8 +33,10 @@ let () =
       ; Layer_logging.logger_file_system
       ; Layer_network.transition_frontier
       ; Layer_network.transition_frontier_extensions
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
+      ; Layer_tooling.visualization
       ; local "cli_lib"
       ]
     ~ppx:

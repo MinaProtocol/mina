@@ -77,16 +77,12 @@ let lib =
       ; result
       ; sexplib0
       ; uri
-      ; Layer_base.currency
       ; Layer_base.hex
       ; Layer_base.interpolator_lib
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_compile_config
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_version
       ; Layer_base.mina_wire_types
-      ; Layer_base.unsigned_extended
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.secrets
@@ -96,13 +92,17 @@ let lib =
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_logging.logger
+      ; Layer_node.mina_compile_config
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_protocol.mina_signature_kind
       ; Layer_rosetta.rosetta_coding
       ; Layer_rosetta.rosetta_lib
       ; Layer_rosetta.rosetta_models
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
+      ; Layer_transaction.unsigned_extended
       ; local "cli_lib"
       ; local "graphql_lib"
       ; local "mina_caqti"

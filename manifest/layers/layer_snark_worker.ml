@@ -38,7 +38,6 @@ let transaction_snark_work =
       ; core_kernel
       ; ledger_proof
       ; sexplib0
-      ; Layer_base.currency
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
       ; Layer_consensus.mina_state
@@ -50,6 +49,7 @@ let transaction_snark_work =
       ; Layer_pickles.pickles_backend
       ; Layer_ppx.ppx_version_runtime
       ; Layer_protocol.transaction_snark
+      ; Layer_transaction.currency
       ]
     ~ppx:
       (Ppx.custom
@@ -78,10 +78,8 @@ let transaction_snark_scan_state =
       ; sexplib0
       ; transaction_snark_work
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
@@ -95,9 +93,11 @@ let transaction_snark_scan_state =
       ; Layer_ledger.mina_ledger
       ; Layer_logging.logger
       ; Layer_logging.o1trace
+      ; Layer_node.mina_numbers
       ; Layer_ppx.ppx_version_runtime
       ; Layer_protocol.transaction_snark
       ; Layer_tooling.internal_tracing
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ; Layer_transaction.transaction_witness
@@ -127,13 +127,13 @@ let snark_work_lib =
       ; core_kernel
       ; ledger_proof
       ; sexplib0
-      ; Layer_base.currency
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
       ; Layer_consensus.mina_state
       ; Layer_crypto.signature_lib
       ; Layer_ppx.ppx_version_runtime
       ; Layer_protocol.transaction_snark
+      ; Layer_transaction.currency
       ]
     ~ppx:
       (Ppx.custom
@@ -168,7 +168,6 @@ let snark_worker =
       ; sexplib0
       ; snark_work_lib
       ; transaction_snark_work
-      ; Layer_base.currency
       ; Layer_base.error_json
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
@@ -185,6 +184,7 @@ let snark_worker =
       ; Layer_protocol.transaction_snark
       ; Layer_tooling.mina_metrics
       ; Layer_tooling.perf_histograms
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.transaction_witness
       ; local "cli_lib"
@@ -223,7 +223,6 @@ let work_selector =
       ; sexplib0
       ; snark_work_lib
       ; transaction_snark_work
-      ; Layer_base.currency
       ; Layer_base.error_json
       ; Layer_base.mina_base
       ; Layer_base.one_or_two
@@ -238,6 +237,7 @@ let work_selector =
       ; Layer_protocol.transaction_protocol_state
       ; Layer_protocol.transaction_snark
       ; Layer_tooling.mina_metrics
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.transaction_witness
       ; local "network_pool"

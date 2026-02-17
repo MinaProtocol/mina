@@ -114,20 +114,20 @@ let block_time =
       ; core_kernel
       ; integers
       ; sexplib0
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
-      ; Layer_base.unsigned_extended
       ; Layer_concurrency.timeout_lib
       ; Layer_crypto.crypto_params
       ; Layer_crypto.random_oracle
       ; Layer_crypto.random_oracle_input
       ; Layer_crypto.snark_params
       ; Layer_logging.logger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_ppx.ppx_version_runtime
       ; Layer_snarky.snark_bits
       ; Snarky_lib.bitstring_lib
       ; Snarky_lib.snarky_backendless
+      ; local "unsigned_extended"
       ]
     ~ppx:
       (Ppx.custom
@@ -171,21 +171,21 @@ let genesis_constants =
       ; integers
       ; ppx_inline_test_config
       ; sexplib0
-      ; Layer_base.currency
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
-      ; Layer_base.unsigned_extended
       ; Layer_crypto.blake2
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_node.mina_node_config
       ; Layer_node.mina_node_config_for_unit_tests
       ; Layer_node.mina_node_config_intf
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_ppx.ppx_version_runtime
       ; Layer_snarky.snark_keys_header
       ; Layer_test.test_util
+      ; local "currency"
+      ; local "unsigned_extended"
       ]
     ~ppx:
       (Ppx.custom
@@ -267,30 +267,6 @@ let fields_derivers_json =
          ; Ppx_lib.ppx_version
          ] )
 
-let fields_derivers_graphql =
-  library "fields_derivers.graphql" ~internal_name:"fields_derivers_graphql"
-    ~path:"src/lib/fields_derivers_graphql" ~inline_tests:true
-    ~deps:
-      [ async_kernel
-      ; core_kernel
-      ; fields_derivers
-      ; fieldslib
-      ; graphql
-      ; graphql_async
-      ; graphql_parser
-      ; ppx_inline_test_config
-      ; yojson
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ Ppx_lib.ppx_annot
-         ; Ppx_lib.ppx_custom_printf
-         ; Ppx_lib.ppx_fields_conv
-         ; Ppx_lib.ppx_inline_test
-         ; Ppx_lib.ppx_jane
-         ; Ppx_lib.ppx_let
-         ; Ppx_lib.ppx_version
-         ] )
 
 let fields_derivers_zkapps =
   library "fields_derivers.zkapps" ~internal_name:"fields_derivers_zkapps"
@@ -300,7 +276,6 @@ let fields_derivers_zkapps =
       ; base_caml
       ; core_kernel
       ; fields_derivers
-      ; fields_derivers_graphql
       ; fields_derivers_json
       ; fieldslib
       ; graphql
@@ -308,14 +283,15 @@ let fields_derivers_zkapps =
       ; integers
       ; result
       ; sexplib0
-      ; Layer_base.currency
-      ; Layer_base.mina_numbers
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_crypto.sgn
       ; Layer_crypto.signature_lib
       ; Layer_crypto.snark_params
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
+      ; local "currency"
+      ; local "fields_derivers_graphql"
+      ; local "unsigned_extended"
       ]
     ~ppx:
       (Ppx.custom
@@ -426,12 +402,12 @@ let mina_base_test_helpers =
       ; integers
       ; sexplib0
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.monad_lib
       ; Layer_crypto.signature_lib
+      ; Layer_node.mina_numbers
+      ; local "currency"
       ]
     ~ppx:
       (Ppx.custom

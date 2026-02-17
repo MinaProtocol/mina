@@ -61,16 +61,13 @@ let archive_lib =
       ; ppx_version_runtime
       ; sexplib0
       ; uri
-      ; Layer_base.currency
       ; Layer_base.error_json
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_base.mina_base_util
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_concurrency.child_processes
       ; Layer_concurrency.pipe_lib
@@ -99,6 +96,7 @@ let archive_lib =
       ; Layer_network.staged_ledger
       ; Layer_network.transition_frontier
       ; Layer_network.transition_frontier_base
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
@@ -107,7 +105,9 @@ let archive_lib =
       ; Layer_service.verifier
       ; Layer_test.quickcheck_lib
       ; Layer_tooling.mina_metrics
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
+      ; Layer_transaction.unsigned_extended
       ; local "mina_caqti"
       ; local "mina_generators"
       ; local "mina_runtime_config"

@@ -81,19 +81,15 @@ let init =
       ; stdio
       ; uri
       ; Layer_base.allocation_functor
-      ; Layer_base.currency
       ; Layer_base.error_json
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_compile_config
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_stdlib_unix
       ; Layer_base.mina_version
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
       ; Layer_base.participating_state
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_concurrency.child_processes
       ; Layer_concurrency.parallel
@@ -111,6 +107,7 @@ let init =
       ; Layer_domain.block_time
       ; Layer_domain.data_hash_lib
       ; Layer_domain.genesis_constants
+      ; Layer_graphql.generated_graphql_queries
       ; Layer_kimchi.kimchi_backend
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
@@ -118,7 +115,6 @@ let init =
       ; Layer_logging.logger
       ; Layer_logging.o1trace
       ; Layer_logging.o1trace_webkit_event
-      ; Layer_network.generated_graphql_queries
       ; Layer_network.genesis_ledger_helper
       ; Layer_network.genesis_ledger_helper_lib
       ; Layer_network.mina_block
@@ -129,6 +125,8 @@ let init =
       ; Layer_network.snark_profiler_lib
       ; Layer_network.staged_ledger
       ; Layer_network.trust_system
+      ; Layer_node.mina_compile_config
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
@@ -147,8 +145,10 @@ let init =
       ; Layer_tooling.internal_tracing
       ; Layer_tooling.mina_metrics
       ; Layer_tooling.perf_histograms
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
+      ; Layer_transaction.unsigned_extended
       ; Layer_transaction.user_command_input
       ; Product_archive.archive_lib
       ; Snarky_lib.group_map
@@ -218,11 +218,9 @@ let cli_mina_cli_entrypoint =
       ; sexplib0
       ; stdio
       ; uri
-      ; Layer_base.currency
       ; Layer_base.error_json
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_compile_config
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_stdlib_unix
       ; Layer_base.mina_version
@@ -252,6 +250,7 @@ let cli_mina_cli_entrypoint =
       ; Layer_network.mina_networking
       ; Layer_network.mina_plugins
       ; Layer_network.trust_system
+      ; Layer_node.mina_compile_config
       ; Layer_ppx.ppx_version_runtime
       ; Layer_protocol.blockchain_snark
       ; Layer_protocol.protocol_version
@@ -264,6 +263,7 @@ let cli_mina_cli_entrypoint =
       ; Layer_storage.cache_dir
       ; Layer_tooling.internal_tracing
       ; Layer_tooling.mina_metrics
+      ; Layer_transaction.currency
       ; Layer_transaction.transaction_witness
       ; Snarky_lib.snarky_backendless
       ; local "cli_lib"

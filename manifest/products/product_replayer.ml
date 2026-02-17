@@ -26,14 +26,11 @@ let () =
       ; uri
       ; yojson
       ; Layer_base.codable
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_version
       ; Layer_base.mina_wire_types
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_consensus.coda_genesis_ledger
       ; Layer_consensus.mina_state
@@ -53,12 +50,15 @@ let () =
       ; Layer_logging.logger
       ; Layer_network.genesis_ledger_helper
       ; Layer_network.genesis_ledger_helper_lib
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
       ; Layer_ppx.ppx_version_runtime
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
+      ; Layer_transaction.unsigned_extended
       ; Product_archive.archive_lib
       ; local "cli_lib"
       ; local "mina_caqti"

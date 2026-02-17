@@ -6,6 +6,17 @@
 open Manifest
 open Externals
 
+let visualization =
+  library "visualization" ~path:"src/lib/visualization"
+    ~deps:[ async_kernel; core_kernel; ocamlgraph; sexplib0; yojson ]
+    ~ppx:
+      (Ppx.custom
+         [ Ppx_lib.ppx_deriving_yojson
+         ; Ppx_lib.ppx_jane
+         ; Ppx_lib.ppx_sexp_conv
+         ; Ppx_lib.ppx_version
+         ] )
+
 let perf_histograms =
   library "perf_histograms" ~path:"src/lib/perf_histograms"
     ~synopsis:"Performance monitoring with histograms"

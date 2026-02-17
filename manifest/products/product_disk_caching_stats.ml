@@ -16,10 +16,8 @@ let () =
       ; digestif
       ; sexplib0
       ; splittable_random
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
       ; Layer_base.with_hash
@@ -37,12 +35,14 @@ let () =
       ; Layer_ledger.mina_ledger
       ; Layer_network.network_pool
       ; Layer_network.snark_profiler_lib
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
       ; Layer_protocol.transaction_snark
       ; Layer_snark_worker.ledger_proof
       ; Layer_snark_worker.transaction_snark_scan_state
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_version ])

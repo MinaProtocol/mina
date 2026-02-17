@@ -22,10 +22,8 @@ let () =
       ; sexplib0
       ; stdio
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
       ; Layer_consensus.consensus
       ; Layer_consensus.mina_state
@@ -39,12 +37,14 @@ let () =
       ; Layer_logging.logger
       ; Layer_network.genesis_ledger_helper
       ; Layer_network.mina_block
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
       ; Layer_protocol.blockchain_snark
       ; Layer_protocol.transaction_snark
       ; Layer_snark_worker.ledger_proof
+      ; Layer_transaction.currency
       ; local "mina_runtime_config"
       ; local "pasta_bindings"
       ; local "uptime_service"

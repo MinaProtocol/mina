@@ -85,12 +85,9 @@ let mina_block =
       ; core
       ; integers
       ; Layer_base.allocation_functor
-      ; Layer_base.currency
       ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_consensus.coda_genesis_proof
       ; Layer_consensus.consensus
@@ -111,6 +108,7 @@ let mina_block =
       ; Layer_ledger.mina_ledger
       ; Layer_ledger.staged_ledger_diff
       ; Layer_logging.logger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_ppx.ppx_version_runtime
@@ -120,7 +118,9 @@ let mina_block =
       ; Layer_snark_worker.ledger_proof
       ; Layer_snark_worker.transaction_snark_work
       ; Layer_tooling.internal_tracing
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
+      ; Layer_transaction.unsigned_extended
       ; local "mina_net2"
       ; local "pasta_bindings"
       ; local "staged_ledger"
@@ -191,10 +191,8 @@ let staged_ledger =
       ; integers
       ; lens
       ; ppx_hash_runtime_lib
-      ; Layer_base.currency
       ; Layer_base.error_json
       ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
@@ -218,6 +216,7 @@ let staged_ledger =
       ; Layer_ledger.staged_ledger_diff
       ; Layer_logging.logger
       ; Layer_logging.o1trace
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
@@ -234,6 +233,7 @@ let staged_ledger =
       ; Layer_test.quickcheck_lib
       ; Layer_tooling.internal_tracing
       ; Layer_tooling.mina_metrics
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ; Layer_transaction.transaction_witness
@@ -273,7 +273,6 @@ let () =
       ; core_kernel
       ; sexplib0
       ; uri
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_crypto.key_gen
@@ -281,6 +280,7 @@ let () =
       ; Layer_domain.genesis_constants
       ; Layer_protocol.transaction_snark
       ; Layer_snark_worker.snark_worker
+      ; Layer_transaction.currency
       ; local "graphql_lib"
       ; local "mina_graphql"
       ]
@@ -306,13 +306,10 @@ let genesis_ledger_helper_lib =
       ; integers
       ; sexplib0
       ; splittable_random
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_consensus.coda_genesis_proof
       ; Layer_crypto.random_oracle
@@ -323,10 +320,13 @@ let genesis_ledger_helper_lib =
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_logging.logger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
       ; Layer_storage.key_cache_native
+      ; Layer_transaction.currency
+      ; Layer_transaction.unsigned_extended
       ; local "mina_runtime_config"
       ; local "ppx_inline_test.config"
       ]
@@ -358,14 +358,11 @@ let genesis_ledger_helper =
       ; genesis_ledger_helper_lib
       ; ppx_inline_test_config
       ; sexplib0
-      ; Layer_base.currency
       ; Layer_base.error_json
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_stdlib_unix
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_consensus.coda_genesis_ledger
       ; Layer_consensus.coda_genesis_proof
@@ -381,9 +378,12 @@ let genesis_ledger_helper =
       ; Layer_ledger.mina_ledger
       ; Layer_ledger.staged_ledger_diff
       ; Layer_logging.logger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_protocol.blockchain_snark
       ; Layer_storage.cache_dir
+      ; Layer_transaction.currency
+      ; Layer_transaction.unsigned_extended
       ; local "cli_lib"
       ; local "mina_runtime_config"
       ]
@@ -454,13 +454,9 @@ let vrf_evaluator =
       ; integers
       ; rpc_parallel
       ; sexplib0
-      ; Layer_base.currency
       ; Layer_base.error_json
       ; Layer_base.mina_base
-      ; Layer_base.mina_compile_config
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
-      ; Layer_base.unsigned_extended
       ; Layer_concurrency.child_processes
       ; Layer_concurrency.interruptible
       ; Layer_consensus.consensus
@@ -468,7 +464,11 @@ let vrf_evaluator =
       ; Layer_domain.genesis_constants
       ; Layer_logging.logger
       ; Layer_logging.logger_file_system
+      ; Layer_node.mina_compile_config
+      ; Layer_node.mina_numbers
       ; Layer_ppx.ppx_version_runtime
+      ; Layer_transaction.currency
+      ; Layer_transaction.unsigned_extended
       ]
     ~ppx:
       (Ppx.custom [ Ppx_lib.ppx_mina; Ppx_lib.ppx_version; Ppx_lib.ppx_jane ])
@@ -490,14 +490,10 @@ let snark_profiler_lib =
       ; integers
       ; result
       ; sexplib0
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_compile_config
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_concurrency.child_processes
       ; Layer_concurrency.parallel
@@ -515,6 +511,8 @@ let snark_profiler_lib =
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
       ; Layer_logging.logger
+      ; Layer_node.mina_compile_config
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
@@ -526,8 +524,10 @@ let snark_profiler_lib =
       ; Layer_snark_worker.snark_work_lib
       ; Layer_snark_worker.snark_worker
       ; Layer_test.test_util
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
+      ; Layer_transaction.unsigned_extended
       ; local "generated_graphql_queries"
       ; local "mina_generators"
       ]
@@ -555,65 +555,6 @@ let snark_profiler_lib =
          ; Ppx_lib.ppx_variants_conv
          ] )
 
-let generated_graphql_queries =
-  library "generated_graphql_queries" ~path:"src/lib/generated_graphql_queries"
-    ~preprocessor_deps:
-      [ "../../../graphql_schema.json"; "../../graphql-ppx-config.inc" ]
-    ~deps:
-      [ async
-      ; base
-      ; cohttp
-      ; cohttp_async
-      ; core
-      ; graphql_async
-      ; graphql_cohttp
-      ; yojson
-      ; Layer_base.mina_base
-      ; local "graphql_lib"
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ Ppx_lib.ppx_base
-         ; Ppx_lib.ppx_version
-         ; Ppx_lib.graphql_ppx
-         ; "--"
-         ; {|%{read-lines:../../graphql-ppx-config.inc}|}
-         ] )
-    ~extra_stanzas:
-      [ Dune_s_expr.parse_string
-          {|(rule
- (targets generated_graphql_queries.ml)
- (deps
-(:< gen/gen.exe))
- (action
-(run %{<} %{targets})))|}
-        |> List.hd
-      ]
-
-let () =
-  private_executable ~path:"src/lib/generated_graphql_queries/gen"
-    ~modes:[ "native" ]
-    ~deps:
-      [ base
-      ; base_caml
-      ; compiler_libs
-      ; core_kernel
-      ; ocaml_migrate_parsetree
-      ; ppxlib
-      ; ppxlib_ast
-      ; ppxlib_astlib
-      ; stdio
-      ; yojson
-      ; Layer_base.mina_base
-      ]
-    ~ppx:
-      (Ppx.custom
-         [ Ppx_lib.ppx_base
-         ; Ppx_lib.ppx_version
-         ; Ppx_lib.ppxlib_metaquot
-         ; Ppx_lib.graphql_ppx
-         ] )
-    "gen"
 
 let mina_incremental =
   library "mina_incremental" ~path:"src/lib/mina_incremental"
@@ -765,11 +706,11 @@ let mina_net2_tests =
       ; network_peer
       ; ppx_inline_test_config
       ; sexplib0
-      ; Layer_base.mina_compile_config
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_stdlib_unix
       ; Layer_concurrency.child_processes
       ; Layer_logging.logger
+      ; Layer_node.mina_compile_config
       ]
     ~ppx:
       (Ppx.custom [ Ppx_lib.ppx_jane; Ppx_lib.ppx_mina; Ppx_lib.ppx_version ])
@@ -859,10 +800,8 @@ let network_pool =
       ; staged_ledger
       ; stdio
       ; trust_system
-      ; Layer_base.currency
       ; Layer_base.error_json
       ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
@@ -892,6 +831,7 @@ let network_pool =
       ; Layer_ledger.staged_ledger_diff
       ; Layer_logging.logger
       ; Layer_logging.o1trace
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
@@ -906,6 +846,7 @@ let network_pool =
       ; Layer_storage.zkapp_vk_cache_tag
       ; Layer_test.quickcheck_lib
       ; Layer_tooling.mina_metrics
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
       ; local "transition_frontier"
@@ -949,12 +890,12 @@ let syncable_ledger =
       ; sexplib0
       ; trust_system
       ; Layer_base.error_json
-      ; Layer_base.mina_compile_config
       ; Layer_base.mina_stdlib
       ; Layer_concurrency.pipe_lib
       ; Layer_ledger.merkle_address
       ; Layer_ledger.merkle_ledger
       ; Layer_logging.logger
+      ; Layer_node.mina_compile_config
       ; Layer_ppx.ppx_version_runtime
       ]
     ~ppx:
@@ -985,11 +926,8 @@ let syncable_ledger_test =
       ; sexplib0
       ; syncable_ledger
       ; trust_system
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_compile_config
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_concurrency.pipe_lib
       ; Layer_crypto.signature_lib
@@ -998,6 +936,9 @@ let syncable_ledger_test =
       ; Layer_ledger.merkle_ledger
       ; Layer_ledger.merkle_ledger_tests
       ; Layer_logging.logger
+      ; Layer_node.mina_compile_config
+      ; Layer_node.mina_numbers
+      ; Layer_transaction.currency
       ]
     ~ppx:
       (Ppx.custom
@@ -1101,16 +1042,12 @@ let transition_frontier_base =
       ; staged_ledger
       ; trust_system
       ; Layer_base.allocation_functor
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
       ; Layer_base.sgn_type
-      ; Layer_base.unsigned_extended
-      ; Layer_base.visualization
       ; Layer_base.with_hash
       ; Layer_consensus.coda_genesis_proof
       ; Layer_consensus.consensus
@@ -1129,6 +1066,7 @@ let transition_frontier_base =
       ; Layer_ledger.staged_ledger_diff
       ; Layer_logging.logger
       ; Layer_logging.o1trace
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_ppx.ppx_version_runtime
@@ -1138,7 +1076,10 @@ let transition_frontier_base =
       ; Layer_snark_worker.ledger_proof
       ; Layer_snark_worker.transaction_snark_work
       ; Layer_tooling.internal_tracing
+      ; Layer_tooling.visualization
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
+      ; Layer_transaction.unsigned_extended
       ]
     ~ppx:
       (Ppx.custom
@@ -1169,11 +1110,8 @@ let transition_frontier_full_frontier =
       ; stdio
       ; transition_frontier_base
       ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
-      ; Layer_base.unsigned_extended
-      ; Layer_base.visualization
       ; Layer_base.with_hash
       ; Layer_concurrency.child_processes
       ; Layer_consensus.coda_genesis_ledger
@@ -1192,13 +1130,16 @@ let transition_frontier_full_frontier =
       ; Layer_ledger.staged_ledger_diff
       ; Layer_logging.logger
       ; Layer_logging.o1trace
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_protocol.protocol_version
       ; Layer_service.verifier
       ; Layer_tooling.internal_tracing
       ; Layer_tooling.mina_metrics
+      ; Layer_tooling.visualization
       ; Layer_transaction.mina_transaction_logic
+      ; Layer_transaction.unsigned_extended
       ; local "transition_frontier_persistent_root"
       ]
     ~ppx:
@@ -1251,9 +1192,7 @@ let transition_frontier_persistent_frontier =
       ; transition_frontier_full_frontier
       ; transition_frontier_persistent_root
       ; trust_system
-      ; Layer_base.currency
       ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_stdlib_unix
       ; Layer_base.mina_wire_types
@@ -1274,6 +1213,7 @@ let transition_frontier_persistent_frontier =
       ; Layer_ledger.mina_ledger
       ; Layer_logging.logger
       ; Layer_logging.o1trace
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_ppx.ppx_version_runtime
@@ -1281,6 +1221,7 @@ let transition_frontier_persistent_frontier =
       ; Layer_storage.rocksdb
       ; Layer_tooling.internal_tracing
       ; Layer_tooling.mina_metrics
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ; local "transition_frontier_extensions"
       ]
@@ -1339,10 +1280,8 @@ let transition_frontier =
       ; transition_frontier_persistent_root
       ; trust_system
       ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_consensus.consensus
       ; Layer_consensus.mina_state
@@ -1355,6 +1294,7 @@ let transition_frontier =
       ; Layer_ledger.mina_ledger
       ; Layer_logging.logger
       ; Layer_logging.o1trace
+      ; Layer_node.mina_numbers
       ; Layer_protocol.protocol_version
       ; Layer_service.verifier
       ; Layer_storage.cache_lib
@@ -1362,6 +1302,7 @@ let transition_frontier =
       ; Layer_tooling.internal_tracing
       ; Layer_tooling.mina_metrics
       ; Layer_transaction.mina_transaction
+      ; Layer_transaction.unsigned_extended
       ; local "downloader"
       ]
     ~ppx:
@@ -1471,7 +1412,6 @@ let transition_handler =
       ; trust_system
       ; Layer_base.error_json
       ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.otp_lib
@@ -1490,6 +1430,7 @@ let transition_handler =
       ; Layer_ledger.staged_ledger_diff
       ; Layer_logging.logger
       ; Layer_logging.o1trace
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_service.verifier
@@ -1526,10 +1467,8 @@ let transition_router =
       ; trust_system
       ; Layer_base.error_json
       ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_concurrency.interruptible
       ; Layer_concurrency.pipe_lib
@@ -1543,8 +1482,10 @@ let transition_router =
       ; Layer_domain.proof_carrying_data
       ; Layer_logging.logger
       ; Layer_logging.o1trace
+      ; Layer_node.mina_numbers
       ; Layer_tooling.internal_tracing
       ; Layer_tooling.mina_metrics
+      ; Layer_transaction.unsigned_extended
       ; local "best_tip_prover"
       ; local "bootstrap_controller"
       ; local "ledger_catchup"
@@ -1581,11 +1522,9 @@ let bootstrap_controller =
       ; transition_frontier_persistent_frontier
       ; transition_frontier_persistent_root
       ; trust_system
-      ; Layer_base.currency
       ; Layer_base.error_json
       ; Layer_base.mina_base
       ; Layer_base.mina_base_util
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.sgn_type
@@ -1608,10 +1547,12 @@ let bootstrap_controller =
       ; Layer_ledger.mina_ledger
       ; Layer_logging.logger
       ; Layer_logging.o1trace
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_service.verifier
       ; Layer_tooling.mina_metrics
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ; local "fake_network"
       ; local "mina_intf"
@@ -1681,12 +1622,9 @@ let ledger_catchup =
       ; Layer_base.error_json
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_compile_config
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_concurrency.child_processes
       ; Layer_concurrency.pipe_lib
@@ -1703,6 +1641,8 @@ let ledger_catchup =
       ; Layer_ledger.staged_ledger_diff
       ; Layer_logging.logger
       ; Layer_logging.o1trace
+      ; Layer_node.mina_compile_config
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_protocol.protocol_version
@@ -1711,6 +1651,7 @@ let ledger_catchup =
       ; Layer_storage.cache_lib
       ; Layer_tooling.internal_tracing
       ; Layer_tooling.mina_metrics
+      ; Layer_transaction.unsigned_extended
       ; local "downloader"
       ; local "fake_network"
       ; local "mina_runtime_config"
@@ -1761,16 +1702,12 @@ let block_producer =
       ; transition_frontier_base
       ; transition_frontier_extensions
       ; vrf_evaluator
-      ; Layer_base.currency
       ; Layer_base.error_json
       ; Layer_base.mina_base
-      ; Layer_base.mina_compile_config
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
       ; Layer_base.otp_lib
       ; Layer_base.sgn_type
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_concurrency.interruptible
       ; Layer_concurrency.pipe_lib
@@ -1791,6 +1728,8 @@ let block_producer =
       ; Layer_ledger.staged_ledger_diff
       ; Layer_logging.logger
       ; Layer_logging.o1trace
+      ; Layer_node.mina_compile_config
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_protocol.blockchain_snark
@@ -1801,8 +1740,10 @@ let block_producer =
       ; Layer_snark_worker.transaction_snark_scan_state
       ; Layer_tooling.internal_tracing
       ; Layer_tooling.mina_metrics
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
       ; Layer_transaction.mina_transaction_logic
+      ; Layer_transaction.unsigned_extended
       ; local "mina_intf"
       ; local "mina_runtime_config"
       ; local "node_error_service"

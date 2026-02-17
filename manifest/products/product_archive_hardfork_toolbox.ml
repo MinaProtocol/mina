@@ -24,13 +24,10 @@ let archive_hardfork_toolbox_lib =
       ; result
       ; stdio
       ; uri
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_consensus.consensus
       ; Layer_consensus.consensus_vrf
@@ -41,8 +38,11 @@ let archive_hardfork_toolbox_lib =
       ; Layer_logging.logger
       ; Layer_network.genesis_ledger_helper
       ; Layer_network.mina_block
+      ; Layer_node.mina_numbers
       ; Layer_protocol.protocol_version
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
+      ; Layer_transaction.unsigned_extended
       ; Product_archive.archive_lib
       ; local "mina_caqti"
       ; local "runtime_config"
@@ -80,13 +80,10 @@ let () =
       ; result
       ; stdio
       ; uri
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_consensus.consensus
       ; Layer_consensus.consensus_vrf
@@ -97,8 +94,11 @@ let () =
       ; Layer_logging.logger
       ; Layer_network.genesis_ledger_helper
       ; Layer_network.mina_block
+      ; Layer_node.mina_numbers
       ; Layer_protocol.protocol_version
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
+      ; Layer_transaction.unsigned_extended
       ; Product_archive.archive_lib
       ; local "mina_caqti"
       ; local "runtime_config"
@@ -134,13 +134,10 @@ let () =
       ; stdio
       ; threads_posix
       ; uri
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
       ; Layer_base.one_or_two
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_consensus.consensus
       ; Layer_consensus.consensus_vrf
@@ -151,8 +148,11 @@ let () =
       ; Layer_logging.logger
       ; Layer_network.genesis_ledger_helper
       ; Layer_network.mina_block
+      ; Layer_node.mina_numbers
       ; Layer_protocol.protocol_version
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction
+      ; Layer_transaction.unsigned_extended
       ; Product_archive.archive_lib
       ; local "mina_caqti"
       ; local "runtime_config"

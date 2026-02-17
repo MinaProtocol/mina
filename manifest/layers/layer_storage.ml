@@ -7,6 +7,26 @@ open Manifest
 open Externals
 open Dune_s_expr
 
+let storage =
+  library "storage" ~path:"src/lib/storage"
+    ~synopsis:"Storage module checksums data and stores it"
+    ~library_flags:[ "-linkall" ]
+    ~deps:
+      [ async
+      ; async_kernel
+      ; async_unix
+      ; base
+      ; base_caml
+      ; bin_prot
+      ; bin_prot_shape
+      ; core
+      ; core_kernel
+      ; sexplib0
+      ; Layer_logging.logger
+      ; Layer_ppx.ppx_version_runtime
+      ]
+    ~ppx:Ppx.standard ~inline_tests:true
+
 let key_value_database =
   library "key_value_database" ~path:"src/lib/key_value_database"
     ~synopsis:"Collection of key-value databases used in Coda"

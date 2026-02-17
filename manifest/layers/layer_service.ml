@@ -73,11 +73,8 @@ let prover =
       ; core_kernel
       ; rpc_parallel
       ; sexplib0
-      ; Layer_base.currency
       ; Layer_base.error_json
       ; Layer_base.mina_base
-      ; Layer_base.mina_compile_config
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
       ; Layer_base.sgn_type
       ; Layer_base.with_hash
@@ -97,6 +94,8 @@ let prover =
       ; Layer_ledger.staged_ledger_diff
       ; Layer_logging.logger
       ; Layer_logging.logger_file_system
+      ; Layer_node.mina_compile_config
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
@@ -106,6 +105,7 @@ let prover =
       ; Layer_snark_worker.ledger_proof
       ; Layer_tooling.internal_tracing
       ; Layer_tooling.mina_metrics
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ; Snarky_lib.snarky_backendless
       ; local "itn_logger"

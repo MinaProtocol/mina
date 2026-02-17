@@ -55,13 +55,10 @@ let consensus_vrf =
       ; vrf_lib
       ; Layer_base.base58_check
       ; Layer_base.codable
-      ; Layer_base.currency
       ; Layer_base.mina_base
       ; Layer_base.mina_base_util
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_wire_types
-      ; Layer_base.unsigned_extended
       ; Layer_crypto.bignum_bigint
       ; Layer_crypto.blake2
       ; Layer_crypto.crypto_params
@@ -75,11 +72,14 @@ let consensus_vrf =
       ; Layer_kimchi.kimchi_backend
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_ppx.ppx_version_runtime
       ; Layer_snarky.snarky_taylor
       ; Layer_test.test_util
+      ; Layer_transaction.currency
+      ; Layer_transaction.unsigned_extended
       ; Snarky_lib.fold_lib
       ; Snarky_lib.snarky_backendless
       ; Snarky_lib.snarky_integer
@@ -126,16 +126,13 @@ let consensus =
       ; sexplib0
       ; vrf_lib
       ; yojson
-      ; Layer_base.currency
       ; Layer_base.error_json
       ; Layer_base.mina_base
       ; Layer_base.mina_base_import
       ; Layer_base.mina_base_util
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_base.mina_stdlib_unix
       ; Layer_base.mina_wire_types
-      ; Layer_base.unsigned_extended
       ; Layer_base.with_hash
       ; Layer_concurrency.interruptible
       ; Layer_concurrency.pipe_lib
@@ -160,6 +157,7 @@ let consensus =
       ; Layer_ledger.sparse_ledger_lib
       ; Layer_logging.logger
       ; Layer_logging.o1trace
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_ppx.ppx_version_runtime
@@ -169,7 +167,9 @@ let consensus =
       ; Layer_tooling.internal_tracing
       ; Layer_tooling.mina_metrics
       ; Layer_tooling.perf_histograms
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
+      ; Layer_transaction.unsigned_extended
       ; Snarky_lib.fold_lib
       ; Snarky_lib.snarky_backendless
       ; local "coda_genesis_ledger"
@@ -217,15 +217,11 @@ let mina_state =
     ~deps:
       [ consensus
       ; core
-      ; Layer_base.currency
       ; Layer_base.linked_tree
       ; Layer_base.mina_base
       ; Layer_base.mina_base_util
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
       ; Layer_base.sgn_type
-      ; Layer_base.unsigned_extended
-      ; Layer_base.visualization
       ; Layer_base.with_hash
       ; Layer_crypto.blake2
       ; Layer_crypto.crypto_params
@@ -242,10 +238,14 @@ let mina_state =
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_ppx.ppx_version_runtime
+      ; Layer_tooling.visualization
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
+      ; Layer_transaction.unsigned_extended
       ; Snarky_lib.bitstring_lib
       ; Snarky_lib.fold_lib
       ; Snarky_lib.snarky_backendless
@@ -276,15 +276,15 @@ let coda_genesis_ledger =
     ~path:"src/lib/genesis_ledger"
     ~deps:
       [ core
-      ; Layer_base.currency
       ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_stdlib
       ; Layer_crypto.key_gen
       ; Layer_crypto.signature_lib
       ; Layer_domain.data_hash_lib
       ; Layer_domain.genesis_constants
       ; Layer_ledger.mina_ledger
+      ; Layer_node.mina_numbers
+      ; Layer_transaction.currency
       ]
     ~ppx:(Ppx.custom [ Ppx_lib.ppx_version; Ppx_lib.ppx_let ])
 
@@ -324,9 +324,7 @@ let coda_genesis_proof =
       ; core
       ; core_kernel
       ; mina_state
-      ; Layer_base.currency
       ; Layer_base.mina_base
-      ; Layer_base.mina_numbers
       ; Layer_base.mina_wire_types
       ; Layer_base.sgn_type
       ; Layer_base.with_hash
@@ -337,9 +335,11 @@ let coda_genesis_proof =
       ; Layer_kimchi.kimchi_backend
       ; Layer_kimchi.kimchi_pasta
       ; Layer_kimchi.kimchi_pasta_basic
+      ; Layer_node.mina_numbers
       ; Layer_pickles.pickles
       ; Layer_pickles.pickles_backend
       ; Layer_pickles.pickles_types
+      ; Layer_transaction.currency
       ; Layer_transaction.mina_transaction_logic
       ; Snarky_lib.snarky_backendless
       ; local "blockchain_snark"
