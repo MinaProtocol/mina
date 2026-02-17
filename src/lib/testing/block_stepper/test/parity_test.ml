@@ -555,6 +555,39 @@ let breadcrumb_to_transition_json bc =
     ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
     ]
 
+let save_daemon_logs ~logger ~state_dir ~daemon_config ~daemon_process =
+  let%bind daemon_stdout =
+    Reader.contents
+      (Process.stdout daemon_process.Mina_automation.Daemon.Process.process)
+  in
+  let%bind daemon_stderr =
+    Reader.contents
+      (Process.stderr daemon_process.Mina_automation.Daemon.Process.process)
+  in
+  let%bind () =
+    Writer.save (state_dir ^/ "daemon_stdout.log") ~contents:daemon_stdout
+  in
+  let%bind () =
+    Writer.save (state_dir ^/ "daemon_stderr.log") ~contents:daemon_stderr
+  in
+  [%log info] "Saved daemon stdout (%d bytes) and stderr (%d bytes)"
+    (String.length daemon_stdout)
+    (String.length daemon_stderr) ;
+  let mina_log =
+    Mina_automation.Daemon.Config.ConfigDirs.mina_log
+      daemon_config.Mina_automation.Daemon.Config.dirs
+  in
+  match%bind Sys.file_exists mina_log with
+  | `Yes ->
+      let%bind contents = Reader.file_contents mina_log in
+      let dest = state_dir ^/ "daemon_mina.log" in
+      let%bind () = Writer.save dest ~contents in
+      [%log info] "Daemon mina.log saved to %s" dest ;
+      return ()
+  | _ ->
+      [%log info] "No mina.log found at %s" mina_log ;
+      return ()
+
 (* ---- Main test ---- *)
 
 let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
@@ -698,36 +731,8 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
     | Error e ->
         [%log error] "Bootstrap failed: %s" (Error.to_string_hum e) ;
         let%bind _ = Mina_automation.Daemon.Process.force_kill daemon_process in
-        let%bind daemon_stdout =
-          Reader.contents (Process.stdout daemon_process.process)
-        in
-        let%bind daemon_stderr =
-          Reader.contents (Process.stderr daemon_process.process)
-        in
         let%bind () =
-          Writer.save (state_dir ^/ "daemon_stdout.log") ~contents:daemon_stdout
-        in
-        let%bind () =
-          Writer.save (state_dir ^/ "daemon_stderr.log") ~contents:daemon_stderr
-        in
-        [%log error] "Daemon stdout saved to %s"
-          (state_dir ^/ "daemon_stdout.log") ;
-        [%log error] "Daemon stderr saved to %s"
-          (state_dir ^/ "daemon_stderr.log") ;
-        let mina_log =
-          Mina_automation.Daemon.Config.ConfigDirs.mina_log daemon_config.dirs
-        in
-        let%bind () =
-          match%bind Sys.file_exists mina_log with
-          | `Yes ->
-              let%bind contents = Reader.file_contents mina_log in
-              let dest = state_dir ^/ "daemon_mina.log" in
-              let%bind () = Writer.save dest ~contents in
-              [%log error] "Daemon mina.log saved to %s" dest ;
-              return ()
-          | _ ->
-              [%log error] "No mina.log found at %s" mina_log ;
-              return ()
+          save_daemon_logs ~logger ~state_dir ~daemon_config ~daemon_process
         in
         failwith "Daemon failed to bootstrap"
   in
@@ -848,6 +853,15 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
               return blocks
           | `Timeout ->
               stop_chain_monitor monitor ;
+              [%log error]
+                "Timed out waiting for batch %d transaction inclusion" (b + 1) ;
+              let%bind _ =
+                Mina_automation.Daemon.Process.force_kill daemon_process
+              in
+              let%bind () =
+                save_daemon_logs ~logger ~state_dir ~daemon_config
+                  ~daemon_process
+              in
               failwithf "Timed out waiting for batch %d transaction inclusion"
                 (b + 1) ()
         in
@@ -880,21 +894,9 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
   let%bind () = Mina_automation.Daemon.Client.stop_daemon client in
   let%bind () = after (Time.Span.of_sec 5.0) in
   let%bind _ = Mina_automation.Daemon.Process.force_kill daemon_process in
-  let%bind daemon_stdout =
-    Reader.contents (Process.stdout daemon_process.process)
-  in
-  let%bind daemon_stderr =
-    Reader.contents (Process.stderr daemon_process.process)
-  in
   let%bind () =
-    Writer.save (state_dir ^/ "daemon_stdout.log") ~contents:daemon_stdout
+    save_daemon_logs ~logger ~state_dir ~daemon_config ~daemon_process
   in
-  let%bind () =
-    Writer.save (state_dir ^/ "daemon_stderr.log") ~contents:daemon_stderr
-  in
-  [%log info] "Saved daemon stdout (%d bytes) and stderr (%d bytes)"
-    (String.length daemon_stdout)
-    (String.length daemon_stderr) ;
   (* Extract daemon transitions from best-tip log *)
   let best_tip_log = daemon_config.dirs.conf ^/ "mina-best-tip.log" in
   extract_daemon_transitions ~logger ~best_tip_log
