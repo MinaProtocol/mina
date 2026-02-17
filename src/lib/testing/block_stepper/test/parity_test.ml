@@ -17,7 +17,8 @@ The test can be run with --proof-level full, but it takes quite a while and is
 decently resource-intensive. Run it with a higher --slot-time-ms too, otherwise
 the daemon's block proving competes with the snark worker's snark work proving
 for resources far too much. (Slot time is irrelevant for the stepper, because
-it's not tied to wall clock time at all).
+it's not tied to wall clock time at all). The example above with --proof-level
+full still completes on my laptop with --slot-time-ms 90000 (90s).
 
 Note that the transaction capacity and work delay are directly related to how
 many transactions can be included in a block, the time until which snark work
