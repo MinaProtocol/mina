@@ -7,6 +7,7 @@ val create :
   -> keypair:Signature_lib.Keypair.t
   -> logger:Logger.t
   -> state_dir:string
+  -> ?genesis_mode:[ `Simple | `Full ]
   -> unit
   -> t Async.Deferred.Or_error.t
 

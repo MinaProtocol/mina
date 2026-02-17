@@ -23,6 +23,8 @@ val current_block : t -> Frontier_base.Breadcrumb.t
 
 val precomputed_values : t -> Precomputed_values.t
 
+val precomputed_blocks_path : t -> string option
+
 val create_from_genesis :
      precomputed_values:Precomputed_values.t
   -> keypair:Keypair.t
@@ -30,6 +32,8 @@ val create_from_genesis :
   -> logger:Logger.t
   -> state_dir:string
   -> ?parallel_workers:int
+  -> ?genesis_mode:[ `Simple | `Full ]
+  -> ?log_precomputed_blocks:bool
   -> unit
   -> t Deferred.Or_error.t
 

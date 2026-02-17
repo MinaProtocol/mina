@@ -1008,9 +1008,6 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
   (* Phase 3: Stepper replay *)
   [%log info] "Phase 3: Replaying blocks through stepper" ;
   let stepper_state_dir = daemon_config.dirs.root_path ^/ "stepper" in
-  let stepper_precomputed_blocks_path =
-    state_dir ^/ "stepper_precomputed_blocks.jsonl"
-  in
   let%bind () = Unix.mkdir ~p:() stepper_state_dir in
   let module Keys = Block_stepper.Keys (struct
     let signature_kind = precomputed_values.Precomputed_values.signature_kind
@@ -1023,7 +1020,8 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
   [%log info] "Initializing block stepper from genesis" ;
   let%bind stepper =
     Block_stepper.create_from_genesis ~precomputed_values ~keypair:bp_keypair
-      ~keys_module ~logger ~state_dir:stepper_state_dir ()
+      ~keys_module ~logger ~state_dir:stepper_state_dir ~genesis_mode:`Simple
+      ~log_precomputed_blocks:true ()
     >>| Or_error.ok_exn
   in
   let stepper_genesis_hash =
@@ -1205,22 +1203,6 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
                     block.slot_since_genesis
                     (List.length invalid_commands)
                     () ) ;
-                (* Save precomputed block for comparison with daemon *)
-                let precomputed =
-                  Mina_block.Precomputed.of_block ~logger ~constraint_constants
-                    ~scheduled_time
-                    ~staged_ledger:(Frontier_base.Breadcrumb.staged_ledger bc)
-                    ~accounts_created:
-                      (Frontier_base.Breadcrumb.accounts_created bc)
-                    (Frontier_base.Breadcrumb.block_with_hash bc)
-                in
-                let precomputed_json =
-                  Yojson.Safe.to_string
-                    (Mina_block.Precomputed.to_yojson precomputed)
-                in
-                Out_channel.with_file ~append:true
-                  stepper_precomputed_blocks_path ~f:(fun oc ->
-                    Out_channel.output_lines oc [ precomputed_json ] ) ;
                 let transition_json = breadcrumb_to_transition_json bc in
                 (stepper, Some bc, transition_json :: stepper_transitions_acc) )
         )

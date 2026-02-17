@@ -17,7 +17,7 @@ let create_genesis_proof m ~proof_level ~constraint_constants
     blockchain protocol_state snark_transition ledger_proof_opt prover_state
     pending_coinbase
 
-let create_genesis_breadcrumb ~logger ~precomputed_values ~root_ledger
+let create_genesis_breadcrumb_full ~logger ~precomputed_values ~root_ledger
     keys_module () =
   let constraint_constants =
     precomputed_values.Precomputed_values.constraint_constants
@@ -73,3 +73,39 @@ let create_genesis_breadcrumb ~logger ~precomputed_values ~root_ledger
   Frontier_base.Breadcrumb.create ~validated_transition:validated ~staged_ledger
     ~transition_receipt_time:(Some (Time.now ()))
     ~just_emitted_a_proof:false ~accounts_created
+
+let create_genesis_breadcrumb_simple ~logger ~precomputed_values ~root_ledger ()
+    =
+  let constraint_constants =
+    precomputed_values.Precomputed_values.constraint_constants
+  in
+  [%log info] "Generating genesis breadcrumb with dummy proof" ;
+  let block_with_hash, validation = Mina_block.genesis ~precomputed_values in
+  let validated = Mina_block.Validated.lift (block_with_hash, validation) in
+  let mask =
+    Mina_ledger.Ledger.Mask.create ~depth:constraint_constants.ledger_depth ()
+  in
+  let ledger = Mina_ledger.Ledger.Maskable.register_mask root_ledger mask in
+  let staged_ledger = Staged_ledger.create_exn ~constraint_constants ~ledger in
+  let accounts_created =
+    Precomputed_values.accounts precomputed_values
+    |> Lazy.force
+    |> List.map ~f:Precomputed_values.id_of_account_record
+  in
+  [%log info] "Creating genesis breadcrumb" ;
+  Deferred.Or_error.return
+    (Frontier_base.Breadcrumb.create ~validated_transition:validated
+       ~staged_ledger
+       ~transition_receipt_time:(Some (Time.now ()))
+       ~just_emitted_a_proof:false ~accounts_created )
+
+let create_genesis_breadcrumb ~logger ~precomputed_values ~root_ledger
+    ~genesis_mode keys_module () =
+  let proof_level = precomputed_values.Precomputed_values.proof_level in
+  match (proof_level, genesis_mode) with
+  | Full, _ | _, `Full ->
+      create_genesis_breadcrumb_full ~logger ~precomputed_values ~root_ledger
+        keys_module ()
+  | _, `Simple ->
+      create_genesis_breadcrumb_simple ~logger ~precomputed_values ~root_ledger
+        ()

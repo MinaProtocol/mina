@@ -2,15 +2,17 @@ open Core
 open Async
 open Mina_base
 
-let prove_dummy ~proof_cache_db:_ ~signature_kind:_ ~sok_digest:_ ~logger:_
+let prove_dummy ~proof_cache_db:_ ~signature_kind:_ ~sok_digest ~logger:_
     (module _ : Transaction_snark.S) spec =
   let statement = Snark_work_lib.Work.Single.Spec.statement spec in
   Deferred.Or_error.return
-    (Ledger_proof.For_tests.Cached.mk_dummy_proof statement)
+    (Ledger_proof.Cached.create ~statement ~sok_digest
+       ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag) )
 
 type provider =
   { prove_single :
-         ( Transaction_witness.t
+         sok_digest:Sok_message.Digest.t
+      -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t
       -> Ledger_proof.Cached.t Deferred.Or_error.t
@@ -142,17 +144,18 @@ let prove_single_with_prover ~prover ~sok_digest ~proof_cache_db ~signature_kind
 
 let create_direct ~proof_level ~proof_cache_db ~signature_kind ~logger
     (module T : Transaction_snark.S) =
-  let sok_digest = Sok_message.Digest.default in
   let prove_single =
     match (proof_level : Genesis_constants.Proof_level.t) with
     | Check | No_check ->
-        prove_dummy ~proof_cache_db ~signature_kind ~sok_digest ~logger
-          (module T)
+        fun ~sok_digest ->
+          prove_dummy ~proof_cache_db ~signature_kind ~sok_digest ~logger
+            (module T)
     | Full ->
         let constraint_constants = T.constraint_constants in
         let prover = Snark_work_prover.make ~signature_kind (module T) in
-        prove_single_with_prover ~prover ~sok_digest ~proof_cache_db
-          ~signature_kind ~constraint_constants ~logger
+        fun ~sok_digest ->
+          prove_single_with_prover ~prover ~sok_digest ~proof_cache_db
+            ~signature_kind ~constraint_constants ~logger
   in
   (* We'd really like to use Parallel here, obviously. Even with the global
      lock in ocaml 4 it would at least let us schedule a lot of rust kimchi
@@ -191,7 +194,6 @@ let create_parallel ~num_workers ~proof_level ~proof_cache_db ~signature_kind
     Throttle.create_with ~continue_on_error:true
       (Array.to_list (Array.init num_workers ~f:Fn.id))
   in
-  let sok_digest = Sok_message.Digest.default in
   (* Dispatch a single operation to the pool, return proof *)
   let dispatch_to_pool rpc_fn =
     Throttle.enqueue worker_pool (fun worker_idx ->
@@ -224,13 +226,16 @@ let create_parallel ~num_workers ~proof_level ~proof_cache_db ~signature_kind
     ; how = `Parallel
     }
   in
-  let prove_single =
+  let prove_single ~sok_digest =
     prove_single_with_prover ~prover ~sok_digest ~proof_cache_db ~signature_kind
       ~constraint_constants ~logger
   in
   { prove_single; logger; how = `Parallel }
 
 let compute provider ~fee ~prover_key work_specs =
+  let sok_digest =
+    Sok_message.(digest (create ~fee ~prover:prover_key))
+  in
   let logger = provider.logger in
   [%log info] "Computing %d snark work items"
     (List.sum (module Int) work_specs ~f:One_or_two.length) ;
@@ -247,7 +252,7 @@ let compute provider ~fee ~prover_key work_specs =
         let%map proofs =
           match one_or_two with
           | `One a ->
-              let%map a' = provider.prove_single a in
+              let%map a' = provider.prove_single ~sok_digest a in
               `One a'
           | `Two (a, b) -> (
               match provider.how with
@@ -255,16 +260,16 @@ let compute provider ~fee ~prover_key work_specs =
                   (* Dispatch both items concurrently — no dependency between
                      sibling work items in the scan state. Safe because each
                      item goes to a separate worker process. *)
-                  let da = provider.prove_single a in
-                  let db = provider.prove_single b in
+                  let da = provider.prove_single ~sok_digest a in
+                  let db = provider.prove_single ~sok_digest b in
                   let%bind a' = da in
                   let%map b' = db in
                   `Two (a', b')
               | `Sequential ->
                   (* Must be sequential in-process: snarky has mutable state,
                      so two concurrent proofs would corrupt it. *)
-                  let%bind a' = provider.prove_single a in
-                  let%map b' = provider.prove_single b in
+                  let%bind a' = provider.prove_single ~sok_digest a in
+                  let%map b' = provider.prove_single ~sok_digest b in
                   `Two (a', b') )
         in
         [%log internal] "Snark_work_bundle_done" ;

@@ -389,4 +389,5 @@ let build_breadcrumb ~transactions ~context ~precomputed_values
         ~validated_transition:(Mina_block.Validated.lift transition)
         ~staged_ledger:transitioned_staged_ledger ~just_emitted_a_proof
         ~transition_receipt_time ~accounts_created
+    , scheduled_time
     , invalid_commands )

@@ -1,5 +1,6 @@
 (executable
  (name parity_test)
+ (modules parity_test)
  (libraries
   ;; opam libraries
   async
@@ -42,6 +43,43 @@
   verifier
   with_hash
   internal_tracing
+  mina_version)
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane ppx_deriving_yojson))
+ (instrumentation
+  (backend bisect_ppx)))
+
+(executable
+ (name stepper_crash_test)
+ (modules stepper_crash_test)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  async_unix
+  core
+  core_kernel
+  ;; local libraries
+  block_stepper
+  blockchain_snark
+  cli_lib
+  currency
+  genesis_constants
+  genesis_ledger_helper
+  genesis_ledger_helper.lib
+  interpolator_lib
+  logger
+  mina_base
+  mina_numbers
+  mina_runtime_config
+  parallel
+  precomputed_values
+  secrets
+  signature_lib
+  snark_params
+  staged_ledger
+  transaction_snark
+  transition_frontier_base
   mina_version)
  (preprocess
   (pps ppx_mina ppx_version ppx_jane ppx_deriving_yojson))

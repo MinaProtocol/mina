@@ -39,5 +39,7 @@ val build_breadcrumb :
   -> Consensus.Data.Slot_won.t
      * Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
   -> Frontier_base.Breadcrumb.t
-  -> (Frontier_base.Breadcrumb.t * (User_command.Valid.t * Core.Error.t) list)
+  -> ( Frontier_base.Breadcrumb.t
+     * Block_time.t
+     * (User_command.Valid.t * Core.Error.t) list )
      Async.Deferred.Or_error.t

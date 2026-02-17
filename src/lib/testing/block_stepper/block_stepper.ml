@@ -15,11 +15,31 @@ type t =
   ; epoch_data :
       Consensus.Data.Epoch_data_for_vrf.t
       * Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
+  ; precomputed_blocks_path : string option
   }
 
 let current_block t = Linear_frontier.current t.frontier
 
 let precomputed_values t = Linear_frontier.precomputed_values t.frontier
+
+let precomputed_blocks_path t = t.precomputed_blocks_path
+
+let maybe_log_precomputed_block t ~logger ~constraint_constants ~scheduled_time
+    raw_breadcrumb =
+  Option.iter t.precomputed_blocks_path ~f:(fun path ->
+      let precomputed =
+        Mina_block.Precomputed.of_block ~logger ~constraint_constants
+          ~scheduled_time
+          ~staged_ledger:(Frontier_base.Breadcrumb.staged_ledger raw_breadcrumb)
+          ~accounts_created:
+            (Frontier_base.Breadcrumb.accounts_created raw_breadcrumb)
+          (Frontier_base.Breadcrumb.block_with_hash raw_breadcrumb)
+      in
+      let json =
+        Yojson.Safe.to_string (Mina_block.Precomputed.to_yojson precomputed)
+      in
+      Out_channel.with_file ~append:true path ~f:(fun oc ->
+          Out_channel.output_lines oc [ json ] ) )
 
 let get_epoch_data_at_slot ~context:(module Context : Consensus.Intf.CONTEXT)
     ~consensus_state ~local_state ~slot =
@@ -34,7 +54,8 @@ let get_epoch_data_at_slot ~context:(module Context : Consensus.Intf.CONTEXT)
     now consensus_state ~local_state ~logger:Context.logger
 
 let create_from_genesis ~precomputed_values ~keypair ~keys_module ~logger
-    ~state_dir ?parallel_workers () =
+    ~state_dir ?parallel_workers ?(genesis_mode = `Full)
+    ?(log_precomputed_blocks = false) () =
   let open Deferred.Or_error.Let_syntax in
   let context =
     let module Context = struct
@@ -49,7 +70,7 @@ let create_from_genesis ~precomputed_values ~keypair ~keys_module ~logger
   in
   let%bind frontier =
     Linear_frontier.create ~precomputed_values ~context ~keys_module ~keypair
-      ~logger ~state_dir ()
+      ~logger ~state_dir ~genesis_mode ()
   in
   let genesis_breadcrumb = Linear_frontier.current frontier in
   let next_search_slot =
@@ -85,12 +106,18 @@ let create_from_genesis ~precomputed_values ~keypair ~keys_module ~logger
     get_epoch_data_at_slot ~context ~consensus_state
       ~local_state:consensus_local_state ~slot:next_search_slot
   in
+  let precomputed_blocks_path =
+    if log_precomputed_blocks then
+      Some (Filename.concat state_dir "precomputed_blocks.jsonl")
+    else None
+  in
   { frontier
   ; keys_module
   ; keypair
   ; next_search_slot
   ; snark_work_provider
   ; epoch_data
+  ; precomputed_blocks_path
   }
 
 let step_at_slot t ~global_slot_since_genesis ~block_stake_winner ~transactions
@@ -171,13 +198,16 @@ let step_at_slot t ~global_slot_since_genesis ~block_stake_winner ~transactions
   in
   let precomputed_values = Linear_frontier.precomputed_values t.frontier in
   let protocol_states = Linear_frontier.protocol_states t.frontier in
-  let%bind raw_breadcrumb, invalid_commands =
+  let%bind raw_breadcrumb, scheduled_time, invalid_commands =
     Block_builder.build_breadcrumb ~transactions ~context ~precomputed_values
       ~snark_work_provider:t.snark_work_provider ~protocol_states
       ?snark_work_count ?scheduled_time t.keys_module
       (slot_won, ledger_snapshot)
       current
   in
+  maybe_log_precomputed_block t ~logger
+    ~constraint_constants:precomputed_values.constraint_constants
+    ~scheduled_time raw_breadcrumb ;
   let breadcrumb, frontier =
     Linear_frontier.add_breadcrumb t.frontier raw_breadcrumb
   in
@@ -236,12 +266,15 @@ let step t ~transactions =
   in
   let precomputed_values = Linear_frontier.precomputed_values t.frontier in
   let protocol_states = Linear_frontier.protocol_states t.frontier in
-  let%bind raw_breadcrumb, invalid_commands =
+  let%bind raw_breadcrumb, scheduled_time, invalid_commands =
     Block_builder.build_breadcrumb ~transactions ~context ~precomputed_values
       ~snark_work_provider:t.snark_work_provider ~protocol_states t.keys_module
       (slot_won, ledger_snapshot)
       current
   in
+  maybe_log_precomputed_block t ~logger
+    ~constraint_constants:precomputed_values.constraint_constants
+    ~scheduled_time raw_breadcrumb ;
   let breadcrumb, frontier =
     Linear_frontier.add_breadcrumb t.frontier raw_breadcrumb
   in
