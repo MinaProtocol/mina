@@ -18,9 +18,9 @@ in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
-          [ S.strictlyStart (S.contains "scripts/debian/builder-helpers")
+          [ S.exactly "scripts/debian/builder-helpers" "sh"
           , S.strictlyStart (S.contains "scripts/debian/tests")
-          , S.strictlyStart (S.contains "scripts/export-git-env-vars")
+          , S.exactly "scripts/export-git-env-vars" "sh"
           , S.exactly "buildkite/src/Jobs/Test/BuilderHelpersTest" "dhall"
           ]
         , path = "Test"
