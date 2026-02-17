@@ -573,6 +573,7 @@ let save_daemon_logs ~logger ~state_dir ~daemon_config ~daemon_process =
   [%log info] "Saved daemon stdout (%d bytes) and stderr (%d bytes)"
     (String.length daemon_stdout)
     (String.length daemon_stderr) ;
+  (* TODO: get rid of this *)
   let mina_log =
     Mina_automation.Daemon.Config.ConfigDirs.mina_log
       daemon_config.Mina_automation.Daemon.Config.dirs
