@@ -66,8 +66,8 @@ assert_not_contains() {
 }
 
 assert_file_captured() {
-    local path="$1"
-    if echo "$CAPTURED_FILES" | grep -qF "./${path}"; then
+    local captured_files="$1" path="$2"
+    if echo "$captured_files" | grep -qF "./${path}"; then
         log_pass
     else
         log_fail "Expected file '${path}' in package"
@@ -75,8 +75,8 @@ assert_file_captured() {
 }
 
 assert_file_not_captured() {
-    local path="$1"
-    if ! echo "$CAPTURED_FILES" | grep -qF "./${path}"; then
+    local captured_files="$1" path="$2"
+    if ! echo "$captured_files" | grep -qF "./${path}"; then
         log_pass
     else
         log_fail "Unexpected file '${path}' in package"
@@ -136,43 +136,47 @@ assert_captured_file_contains() {
 # Shared assertions for common file sets
 
 assert_common_daemon_binaries() {
-    local root="${1:-usr/local/bin}"
-    assert_file_captured "${root}/coda-libp2p_helper"
-    assert_file_captured "${root}/mina-create-genesis"
-    assert_file_captured "${root}/mina-generate-keypair"
-    assert_file_captured "${root}/mina-validate-keypair"
-    assert_file_captured "${root}/mina-standalone-snark-worker"
-    assert_file_captured "${root}/mina-rocksdb-scanner"
-    assert_file_captured "${root}/mina"
+    local captured_files="$1" root="${2:-usr/local/bin}"
+    assert_file_captured "$captured_files" "${root}/coda-libp2p_helper"
+    assert_file_captured "$captured_files" "${root}/mina-create-genesis"
+    assert_file_captured "$captured_files" "${root}/mina-generate-keypair"
+    assert_file_captured "$captured_files" "${root}/mina-validate-keypair"
+    assert_file_captured "$captured_files" "${root}/mina-standalone-snark-worker"
+    assert_file_captured "$captured_files" "${root}/mina-rocksdb-scanner"
+    assert_file_captured "$captured_files" "${root}/mina"
 }
 
 assert_daemon_utils() {
-    assert_file_captured "usr/local/bin/mina-hf-create-runtime-config"
-    assert_file_captured "usr/local/bin/mina-verify-packaged-fork-config"
-    assert_file_captured "usr/lib/systemd/user/mina.service"
-    assert_file_captured "etc/bash_completion.d/mina"
+    local captured_files="$1"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-hf-create-runtime-config"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-verify-packaged-fork-config"
+    assert_file_captured "$captured_files" "usr/lib/systemd/user/mina.service"
+    assert_file_captured "$captured_files" "etc/bash_completion.d/mina"
 }
 
 assert_archive_binaries() {
-    assert_file_captured "usr/local/bin/mina-archive"
-    assert_file_captured "usr/local/bin/mina-archive-blocks"
-    assert_file_captured "usr/local/bin/mina-extract-blocks"
-    assert_file_captured "usr/local/bin/mina-archive-hardfork-toolbox"
-    assert_file_captured "usr/local/bin/mina-missing-blocks-guardian"
-    assert_file_captured "usr/local/bin/mina-missing-blocks-auditor"
-    assert_file_captured "usr/local/bin/mina-replayer"
+    local captured_files="$1"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-archive"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-archive-blocks"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-extract-blocks"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-archive-hardfork-toolbox"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-missing-blocks-guardian"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-missing-blocks-auditor"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-replayer"
 }
 
 assert_rosetta_binaries() {
-    assert_file_captured "usr/local/bin/mina-rosetta"
-    assert_file_captured "usr/local/bin/mina-ocaml-signer"
-    assert_file_captured "usr/local/bin/mina-rosetta-indexer-test"
+    local captured_files="$1"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-ocaml-signer"
+    assert_file_captured "$captured_files" "usr/local/bin/mina-rosetta-indexer-test"
 }
 
 assert_rosetta_configs() {
-    assert_file_captured "etc/mina/rosetta/scripts/run.sh"
-    assert_file_captured "etc/mina/rosetta/rosetta-cli-config/config.json"
-    assert_file_captured "etc/mina/rosetta/rosetta-cli-config/check.ros"
+    local captured_files="$1"
+    assert_file_captured "$captured_files" "etc/mina/rosetta/scripts/run.sh"
+    assert_file_captured "$captured_files" "etc/mina/rosetta/rosetta-cli-config/config.json"
+    assert_file_captured "$captured_files" "etc/mina/rosetta/rosetta-cli-config/check.ros"
 }
 
 # Load captured state from files written by build_deb override
@@ -514,8 +518,8 @@ test_build_logproc_deb() {
     assert_control_no_field "Replaces"
 
     # Files
-    assert_file_captured "usr/local/bin/mina-logproc"
-    assert_file_captured "DEBIAN/control"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-logproc"
+    assert_file_captured "$CAPTURED_FILES" "DEBIAN/control"
 }
 
 test_build_test_executive_deb() {
@@ -530,7 +534,7 @@ test_build_test_executive_deb() {
     assert_control_contains "Depends" "python3"
     assert_control_contains "Depends" "docker-ce"
 
-    assert_file_captured "usr/local/bin/mina-test-executive"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-test-executive"
 }
 
 test_build_batch_txn_deb() {
@@ -541,7 +545,7 @@ test_build_batch_txn_deb() {
     assert_control_field "Package" "mina-batch-txn"
     assert_control_contains "Depends" "libssl1.1"
 
-    assert_file_captured "usr/local/bin/mina-batch-txn"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-batch-txn"
 }
 
 ################################################################################
@@ -556,18 +560,18 @@ test_build_functional_test_suite_deb() {
     assert_control_field "Package" "mina-test-suite"
 
     # Test binaries
-    assert_file_captured "usr/local/bin/mina-command-line-tests"
-    assert_file_captured "usr/local/bin/mina-benchmarks"
-    assert_file_captured "usr/local/bin/mina-ledger-export-benchmark"
-    assert_file_captured "usr/local/bin/mina-disk-caching-stats"
-    assert_file_captured "usr/local/bin/mina-heap-usage"
-    assert_file_captured "usr/local/bin/mina-zkapp-limits"
-    assert_file_captured "usr/local/bin/mina-patch-archive-test"
-    assert_file_captured "usr/local/bin/mina-archive-node-test"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-command-line-tests"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-benchmarks"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-ledger-export-benchmark"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-disk-caching-stats"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-heap-usage"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-zkapp-limits"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-patch-archive-test"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-archive-node-test"
 
     # Archive test data (copied via cp -r and rsync)
-    assert_file_captured "etc/mina/test/archive/test_config.txt"
-    assert_file_captured "etc/mina/test/archive/sample_db/data.txt"
+    assert_file_captured "$CAPTURED_FILES" "etc/mina/test/archive/test_config.txt"
+    assert_file_captured "$CAPTURED_FILES" "etc/mina/test/archive/sample_db/data.txt"
 }
 
 ################################################################################
@@ -584,8 +588,8 @@ test_build_rosetta_mainnet_deb() {
     assert_control_contains "Suggests" "jq"
     assert_control_contains "Suggests" "curl"
 
-    assert_rosetta_binaries
-    assert_rosetta_configs
+    assert_rosetta_binaries "$CAPTURED_FILES"
+    assert_rosetta_configs "$CAPTURED_FILES"
 }
 
 test_build_rosetta_devnet_deb() {
@@ -596,8 +600,8 @@ test_build_rosetta_devnet_deb() {
     assert_control_field "Package" "mina-rosetta-devnet"
     assert_control_contains "Suggests" "jq"
 
-    assert_rosetta_binaries
-    assert_rosetta_configs
+    assert_rosetta_binaries "$CAPTURED_FILES"
+    assert_rosetta_configs "$CAPTURED_FILES"
 }
 
 test_build_rosetta_testnet_generic_deb() {
@@ -608,8 +612,8 @@ test_build_rosetta_testnet_generic_deb() {
     assert_control_field "Package" "mina-rosetta-testnet-generic"
     assert_control_contains "Suggests" "jq"
 
-    assert_rosetta_binaries
-    assert_rosetta_configs
+    assert_rosetta_binaries "$CAPTURED_FILES"
+    assert_rosetta_configs "$CAPTURED_FILES"
 }
 
 ################################################################################
@@ -634,9 +638,9 @@ test_build_daemon_mainnet_deb() {
     assert_control_has_field "Breaks"
 
     # Daemon binaries (mainnet signatures)
-    assert_common_daemon_binaries
+    assert_common_daemon_binaries "$CAPTURED_FILES"
     # Daemon utils
-    assert_daemon_utils
+    assert_daemon_utils "$CAPTURED_FILES"
 
     # Verify service file has mainnet seed URL
     assert_captured_file_contains \
@@ -661,11 +665,11 @@ test_build_daemon_mainnet_config_deb() {
     assert_control_has_field "Breaks"
 
     # Genesis ledger files
-    assert_file_captured "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
-    assert_file_captured "var/lib/coda/mainnet.json"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/mainnet.json"
 
     # Should NOT have binaries
-    assert_file_not_captured "usr/local/bin/mina"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
 
     # Verify genesis content
     assert_captured_file_contains "var/lib/coda/mainnet.json" "mainnet"
@@ -682,8 +686,8 @@ test_build_daemon_devnet_deb() {
     assert_control_contains "Suggests" "jq"
     assert_control_contains "Replaces" "mina-devnet"
 
-    assert_common_daemon_binaries
-    assert_daemon_utils
+    assert_common_daemon_binaries "$CAPTURED_FILES"
+    assert_daemon_utils "$CAPTURED_FILES"
 
     # Verify devnet seed URL in service file
     assert_captured_file_contains \
@@ -699,9 +703,9 @@ test_build_daemon_devnet_config_deb() {
     assert_control_field "Package" "mina-devnet-config"
     assert_control_no_field "Depends"
 
-    assert_file_captured "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
-    assert_file_captured "var/lib/coda/devnet.json"
-    assert_file_not_captured "usr/local/bin/mina"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/devnet.json"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
 
     assert_captured_file_contains "var/lib/coda/devnet.json" "devnet"
 }
@@ -720,14 +724,14 @@ test_build_daemon_mainnet_pre_hardfork_deb() {
     assert_control_contains "Suggests" "jq"
 
     # Binaries in alternate directory (for automode)
-    assert_common_daemon_binaries "usr/lib/mina/bin/berkeley"
+    assert_common_daemon_binaries "$CAPTURED_FILES" "usr/lib/mina/bin/berkeley"
 
     # Should NOT have binaries in default location
-    assert_file_not_captured "usr/local/bin/mina"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
     # Should NOT have config files
-    assert_file_not_captured "var/lib/coda/mainnet.json"
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/mainnet.json"
     # Should NOT have service file
-    assert_file_not_captured "usr/lib/systemd/user/mina.service"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/lib/systemd/user/mina.service"
 }
 
 test_build_daemon_devnet_pre_hardfork_deb() {
@@ -739,8 +743,8 @@ test_build_daemon_devnet_pre_hardfork_deb() {
     assert_control_contains "Depends" "libssl1.1"
 
     # Binaries in alternate directory
-    assert_common_daemon_binaries "usr/lib/mina/bin/berkeley"
-    assert_file_not_captured "usr/local/bin/mina"
+    assert_common_daemon_binaries "$CAPTURED_FILES" "usr/lib/mina/bin/berkeley"
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
 }
 
 ################################################################################
@@ -759,12 +763,12 @@ test_build_daemon_testnet_generic_deb() {
     assert_control_contains "Suggests" "jq"
     assert_control_contains "Replaces" "mina-devnet"
 
-    assert_common_daemon_binaries
-    assert_daemon_utils
+    assert_common_daemon_binaries "$CAPTURED_FILES"
+    assert_daemon_utils "$CAPTURED_FILES"
 
     # testnet-generic gets devnet.json but NOT as magic config
-    assert_file_captured "var/lib/coda/devnet.json"
-    assert_file_not_captured "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/devnet.json"
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
 }
 
 ################################################################################
@@ -783,10 +787,10 @@ test_build_archive_devnet_deb() {
     # Archive packages should NOT depend on DAEMON_DEPS
     assert_not_contains "archive deps no libffi" "$CAPTURED_CONTROL" "libffi"
 
-    assert_archive_binaries
+    assert_archive_binaries "$CAPTURED_FILES"
     # SQL migration scripts
-    assert_file_captured "etc/mina/archive/create_schema.sql"
-    assert_file_captured "etc/mina/archive/migrations.sql"
+    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
+    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/migrations.sql"
 }
 
 test_build_archive_testnet_generic_deb() {
@@ -798,8 +802,8 @@ test_build_archive_testnet_generic_deb() {
     assert_control_field "Package" "mina-archive-testnet-generic"
     assert_control_contains "Depends" "libpq-dev"
 
-    assert_archive_binaries
-    assert_file_captured "etc/mina/archive/create_schema.sql"
+    assert_archive_binaries "$CAPTURED_FILES"
+    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
 }
 
 test_build_archive_mainnet_deb() {
@@ -810,9 +814,9 @@ test_build_archive_mainnet_deb() {
     assert_control_field "Package" "mina-archive-mainnet"
     assert_control_contains "Depends" "libpq-dev"
 
-    assert_archive_binaries
-    assert_file_captured "etc/mina/archive/create_schema.sql"
-    assert_file_captured "etc/mina/archive/migrations.sql"
+    assert_archive_binaries "$CAPTURED_FILES"
+    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
+    assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/migrations.sql"
 }
 
 ################################################################################
@@ -832,20 +836,20 @@ test_build_daemon_devnet_hardfork_config_deb() {
     assert_control_no_field "Depends"
 
     # Hardfork runtime config replaces the standard one
-    assert_file_captured "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
     assert_captured_file_contains \
         "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json" '{"fork": true}'
 
     # Ledger tarballs copied
-    assert_file_captured "var/lib/coda/ledger1.tar.gz"
-    assert_file_captured "var/lib/coda/ledger2.tar.gz"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/ledger1.tar.gz"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/ledger2.tar.gz"
 
     # Old genesis ledger backup
-    assert_file_captured "var/lib/coda/devnet.old.json"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/devnet.old.json"
     assert_captured_file_contains "var/lib/coda/devnet.old.json" "devnet"
 
     # devnet.json replaced with fork config
-    assert_file_captured "var/lib/coda/devnet.json"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/devnet.json"
     assert_captured_file_contains "var/lib/coda/devnet.json" '{"fork": true}'
 
     unset RUNTIME_CONFIG_JSON LEDGER_TARBALLS
@@ -878,17 +882,17 @@ test_build_daemon_mainnet_hardfork_config_deb() {
     assert_control_no_field "Depends"
     assert_control_contains "Replaces" "mina-mainnet"
 
-    assert_file_captured "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
     assert_captured_file_contains \
         "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json" '{"fork": true}'
 
-    assert_file_captured "var/lib/coda/ledger1.tar.gz"
-    assert_file_captured "var/lib/coda/ledger2.tar.gz"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/ledger1.tar.gz"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/ledger2.tar.gz"
 
-    assert_file_captured "var/lib/coda/mainnet.old.json"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/mainnet.old.json"
     assert_captured_file_contains "var/lib/coda/mainnet.old.json" "mainnet"
 
-    assert_file_captured "var/lib/coda/mainnet.json"
+    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/mainnet.json"
     assert_captured_file_contains "var/lib/coda/mainnet.json" '{"fork": true}'
 
     unset RUNTIME_CONFIG_JSON LEDGER_TARBALLS
@@ -908,7 +912,7 @@ test_build_zkapp_test_transaction_deb() {
     assert_control_contains "Depends" "libffi7"
     assert_control_no_field "Suggests"
 
-    assert_file_captured "usr/local/bin/mina-zkapp-test-transaction"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-zkapp-test-transaction"
 }
 
 test_build_delegation_verify_deb() {
@@ -919,8 +923,8 @@ test_build_delegation_verify_deb() {
     assert_control_field "Package" "mina-delegation-verify"
     assert_control_contains "Depends" "libssl1.1"
 
-    assert_file_captured "usr/local/bin/mina-delegation-verify"
-    assert_file_captured "etc/mina/aws/authenticate.sh"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-delegation-verify"
+    assert_file_captured "$CAPTURED_FILES" "etc/mina/aws/authenticate.sh"
 }
 
 test_build_create_legacy_genesis_deb() {
@@ -931,7 +935,7 @@ test_build_create_legacy_genesis_deb() {
     assert_control_field "Package" "mina-create-legacy-genesis"
     assert_control_contains "Depends" "libssl1.1"
 
-    assert_file_captured "usr/local/bin/mina-create-legacy-genesis"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-create-legacy-genesis"
 }
 
 ################################################################################
