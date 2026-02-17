@@ -16,29 +16,60 @@ let ledger_proof_opt next_state = function
         }
       , Lazy.force Proof.transaction_dummy )
 
-let extend_blockchain (module B : Blockchain_snark.Blockchain_snark_state.S)
-    ~constraint_constants (chain : Blockchain_snark.Blockchain.t)
+let extend_blockchain ~proof_level
+    (module B : Blockchain_snark.Blockchain_snark_state.S) ~constraint_constants
+    (chain : Blockchain_snark.Blockchain.t)
     (next_state : Protocol_state.Value.t) (block : Snark_transition.value)
     (t : Ledger_proof.t option) state_for_handler pending_coinbase =
-  (* Copied from prover.ml *)
-  Deferred.Or_error.try_with ~here:[%here] (fun () ->
-      let txn_snark_statement, txn_snark_proof =
+  (* Matches the daemon prover's behaviour at each proof level.
+     At Check/No_check the daemon substitutes deterministic dummy proofs,
+     so we must do the same to keep state hashes in sync. *)
+  match (proof_level : Genesis_constants.Proof_level.t) with
+  | Full ->
+      Deferred.Or_error.try_with ~here:[%here] (fun () ->
+          let txn_snark_statement, txn_snark_proof =
+            ledger_proof_opt next_state t
+          in
+          let%map (), (), proof =
+            B.step
+              ~handler:
+                (Consensus.Data.Prover_state.handler ~constraint_constants
+                   state_for_handler ~pending_coinbase )
+              { transition = block
+              ; prev_state = Blockchain_snark.Blockchain.state chain
+              ; prev_state_proof = Blockchain_snark.Blockchain.proof chain
+              ; txn_snark = txn_snark_statement
+              ; txn_snark_proof
+              }
+              next_state
+          in
+          Blockchain_snark.Blockchain.create ~state:next_state ~proof )
+  | Check ->
+      let txn_snark_statement, _txn_snark_proof =
         ledger_proof_opt next_state t
       in
-      let%map (), (), proof =
-        B.step
-          ~handler:
-            (Consensus.Data.Prover_state.handler ~constraint_constants
-               state_for_handler ~pending_coinbase )
-          { transition = block
-          ; prev_state = Blockchain_snark.Blockchain.state chain
-          ; prev_state_proof = Blockchain_snark.Blockchain.proof chain
-          ; txn_snark = txn_snark_statement
-          ; txn_snark_proof
-          }
-          next_state
-      in
-      Blockchain_snark.Blockchain.create ~state:next_state ~proof )
+      Blockchain_snark.Blockchain_snark_state.check ~proof_level
+        ~constraint_constants
+        { transition = block
+        ; prev_state = Blockchain_snark.Blockchain.state chain
+        ; prev_state_proof = Lazy.force Proof.blockchain_dummy
+        ; txn_snark = txn_snark_statement
+        ; txn_snark_proof = Lazy.force Proof.transaction_dummy
+        }
+        ~handler:
+          (Consensus.Data.Prover_state.handler ~constraint_constants
+             state_for_handler ~pending_coinbase )
+        next_state
+      |> Or_error.map ~f:(fun () ->
+             Blockchain_snark.Blockchain.create ~state:next_state
+               ~proof:(Lazy.force Proof.blockchain_dummy) )
+      |> Deferred.return
+  | No_check ->
+      Deferred.return
+        (Ok
+           (Blockchain_snark.Blockchain.create
+              ~proof:(Lazy.force Proof.blockchain_dummy)
+              ~state:next_state ) )
 
 module type Keys_S = sig
   module T : Transaction_snark.S
@@ -295,8 +326,9 @@ let build_breadcrumb ~transactions ~context ~precomputed_values
     "Generated protocol state and internal transition with %d commands"
     ( Mina_block.Internal_transition.staged_ledger_diff internal_transition
     |> Staged_ledger_diff.commands |> List.length ) ;
+  let proof_level = precomputed_values.Precomputed_values.proof_level in
   let%bind protocol_state_proof =
-    extend_blockchain
+    extend_blockchain ~proof_level
       (module Keys.B)
       ~constraint_constants
       (Blockchain_snark.Blockchain.create ~proof:previous_proof

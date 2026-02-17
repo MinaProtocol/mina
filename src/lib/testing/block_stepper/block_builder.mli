@@ -16,7 +16,8 @@ module Keys (Params : sig
 end) : Keys_S
 
 val extend_blockchain :
-     (module Blockchain_snark.Blockchain_snark_state.S)
+     proof_level:Genesis_constants.Proof_level.t
+  -> (module Blockchain_snark.Blockchain_snark_state.S)
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> Blockchain_snark.Blockchain.t
   -> Protocol_state.Value.t

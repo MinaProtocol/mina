@@ -2,7 +2,7 @@ open Core
 open Async
 open Mina_state
 
-let create_genesis_proof m ~constraint_constants
+let create_genesis_proof m ~proof_level ~constraint_constants
     (genesis_inputs : Genesis_proof.Inputs.t) =
   (* Copied from block_producer.ml *)
   let ( blockchain
@@ -13,8 +13,8 @@ let create_genesis_proof m ~constraint_constants
       , pending_coinbase ) =
     Prover.create_genesis_block_inputs genesis_inputs
   in
-  Block_builder.extend_blockchain m ~constraint_constants blockchain
-    protocol_state snark_transition ledger_proof_opt prover_state
+  Block_builder.extend_blockchain ~proof_level m ~constraint_constants
+    blockchain protocol_state snark_transition ledger_proof_opt prover_state
     pending_coinbase
 
 let create_genesis_breadcrumb ~logger ~precomputed_values ~root_ledger
@@ -25,10 +25,11 @@ let create_genesis_breadcrumb ~logger ~precomputed_values ~root_ledger
   let (module Keys : Block_builder.Keys_S) = keys_module in
   [%log info] "Generating genesis proof" ;
   let open Deferred.Or_error.Let_syntax in
+  let proof_level = precomputed_values.Precomputed_values.proof_level in
   let%map real_proof =
     create_genesis_proof
       (module Keys.B)
-      ~constraint_constants
+      ~proof_level ~constraint_constants
       (Genesis_proof.to_inputs precomputed_values)
     >>|? Blockchain_snark.Blockchain.proof
   in

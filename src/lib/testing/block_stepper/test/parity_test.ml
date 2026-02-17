@@ -1209,8 +1209,7 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
                 let precomputed =
                   Mina_block.Precomputed.of_block ~logger ~constraint_constants
                     ~scheduled_time
-                    ~staged_ledger:
-                      (Frontier_base.Breadcrumb.staged_ledger bc)
+                    ~staged_ledger:(Frontier_base.Breadcrumb.staged_ledger bc)
                     ~accounts_created:
                       (Frontier_base.Breadcrumb.accounts_created bc)
                     (Frontier_base.Breadcrumb.block_with_hash bc)
