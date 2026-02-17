@@ -186,7 +186,6 @@ let parse_best_chain response =
 
 (* ---- Chain monitor ---- *)
 
-
 (* TODO: both ivars and the mutable state handling here are not good *)
 type chain_monitor =
   { blocks : block_info String.Map.t ref
@@ -268,13 +267,15 @@ let stop_chain_monitor monitor = Ivar.fill_if_empty monitor.stop_ivar ()
 
 let chain_monitor_wait_until monitor pred =
   let sorted = chain_monitor_sorted_blocks !(monitor.blocks) in
-  if pred sorted then return sorted
+  if pred sorted then return (Ok sorted)
   else
     let ivar = Ivar.create () in
     (* TODO: need synchronization *)
     monitor.waiters <- (pred, ivar) :: monitor.waiters ;
     Deferred.any
-      [ Ivar.read ivar; Ivar.read monitor.fatal_error >>| Error.raise ]
+      [ (Ivar.read ivar >>| fun blocks -> Ok blocks)
+      ; (Ivar.read monitor.fatal_error >>| fun err -> Error err)
+      ]
 
 let chain_monitor_blocks monitor = chain_monitor_sorted_blocks !(monitor.blocks)
 
@@ -901,10 +902,23 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
                  (Float.of_int max_poll_attempts *. poll_interval_sec) )
               (chain_monitor_wait_until monitor inclusion_pred)
           with
-          | `Result blocks ->
+          | `Result (Ok blocks) ->
               [%log info] "Batch %d/%d: all %d transactions included" (b + 1)
                 num_batches (Set.length batch_hashes) ;
               return blocks
+          | `Result (Error err) ->
+              stop_chain_monitor monitor ;
+              [%log error] "Chain monitor failed while waiting for batch %d: %s"
+                (b + 1) (Error.to_string_hum err) ;
+              let%bind _ =
+                Mina_automation.Daemon.Process.force_kill daemon_process
+              in
+              let%bind () =
+                save_daemon_logs ~logger ~state_dir ~daemon_config
+                  ~daemon_process
+              in
+              failwithf "Chain monitor failed while waiting for batch %d: %s"
+                (b + 1) (Error.to_string_hum err) ()
           | `Timeout ->
               stop_chain_monitor monitor ;
               [%log error]
