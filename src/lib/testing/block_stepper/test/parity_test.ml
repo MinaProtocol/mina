@@ -38,7 +38,8 @@ let generate_keypairs ~seed ~n =
         ~seed:(`Deterministic (sprintf "%s-keypair-%d" seed i))
         Keypair.gen )
 
-let generate_runtime_config ~seed ~proof_level ~slot_time_ms ~delta =
+let generate_runtime_config ~seed ~proof_level ~slot_time_ms ~delta ~work_delay
+    ~transaction_capacity_log2 =
   let keypairs = generate_keypairs ~seed ~n:num_genesis_accounts in
   let bp_keypair = List.hd_exn keypairs in
   let accounts =
@@ -65,7 +66,8 @@ let generate_runtime_config ~seed ~proof_level ~slot_time_ms ~delta =
   in
   let proof =
     Runtime_config.Proof_keys.make ~level:proof_level
-      ~block_window_duration_ms:slot_time_ms ()
+      ~block_window_duration_ms:slot_time_ms ~work_delay
+      ~transaction_capacity:(Log_2 transaction_capacity_log2) ()
   in
   let genesis : Runtime_config.Genesis.t =
     { k = Some 4
@@ -620,12 +622,14 @@ let breadcrumb_to_transition_json bc =
 (* ---- Main test ---- *)
 
 let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
-    ~zkapps_per_batch ~proof_level ~slot_time_ms ~delta =
+    ~zkapps_per_batch ~proof_level ~slot_time_ms ~delta ~work_delay
+    ~transaction_capacity_log2 =
   let open Deferred.Let_syntax in
   (* Phase 1: Generate config and keys *)
   [%log info] "Phase 1: Generating config with seed '%s'" seed ;
   let bp_keypair, _keypairs, runtime_config =
-    generate_runtime_config ~seed ~proof_level ~slot_time_ms ~delta
+    generate_runtime_config ~seed ~proof_level ~slot_time_ms ~delta ~work_delay
+      ~transaction_capacity_log2
   in
   let bp_pk =
     Public_key.Compressed.to_base58_check
@@ -1250,6 +1254,13 @@ let command =
       flag "--delta"
         ~doc:"INT Max permissible network delay in slots (default: 1)"
         (optional_with_default 1 int)
+    and work_delay =
+      flag "--work-delay" ~doc:"INT Scan state work delay (default: 1)"
+        (optional_with_default 1 int)
+    and transaction_capacity_log2 =
+      flag "--transaction-capacity-log2"
+        ~doc:"INT Log2 of transaction capacity per block (default: 3)"
+        (optional_with_default 3 int)
     in
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
@@ -1290,7 +1301,8 @@ let command =
     printf "Seed: %s\nState dir: %s\n" seed state_dir ;
     Parallel.init_master () ;
     run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
-      ~zkapps_per_batch ~proof_level ~slot_time_ms ~delta)
+      ~zkapps_per_batch ~proof_level ~slot_time_ms ~delta ~work_delay
+      ~transaction_capacity_log2)
 
 let () =
   Command.group ~summary:"Block stepper parity test"
