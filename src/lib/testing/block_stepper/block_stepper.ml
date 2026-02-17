@@ -94,7 +94,7 @@ let create_from_genesis ~precomputed_values ~keypair ~keys_module ~logger
   }
 
 let step_at_slot t ~global_slot_since_genesis ~block_stake_winner ~transactions
-    ?scheduled_time =
+    ?snark_work_count ?scheduled_time =
   let open Deferred.Or_error.Let_syntax in
   let context = Linear_frontier.context t.frontier in
   let (module Context : Consensus.Intf.CONTEXT) = context in
@@ -174,7 +174,7 @@ let step_at_slot t ~global_slot_since_genesis ~block_stake_winner ~transactions
   let%bind raw_breadcrumb, invalid_commands =
     Block_builder.build_breadcrumb ~transactions ~context ~precomputed_values
       ~snark_work_provider:t.snark_work_provider ~protocol_states
-      ?scheduled_time t.keys_module
+      ?snark_work_count ?scheduled_time t.keys_module
       (slot_won, ledger_snapshot)
       current
   in

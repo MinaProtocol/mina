@@ -47,6 +47,7 @@ val step_at_slot :
   -> global_slot_since_genesis:Mina_numbers.Global_slot_since_genesis.t
   -> block_stake_winner:Public_key.Compressed.t
   -> transactions:User_command.Valid.t Sequence.t
+  -> ?snark_work_count:int
   -> ?scheduled_time:Block_time.t
   -> (Frontier_base.Breadcrumb.t * t * (User_command.Valid.t * Error.t) list)
      Deferred.Or_error.t

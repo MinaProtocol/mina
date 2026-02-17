@@ -196,8 +196,9 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     , invalid_commands )
 
 let build_breadcrumb ~transactions ~context ~precomputed_values
-    ~snark_work_provider ~protocol_states ?scheduled_time (module Keys : Keys_S)
-    (slot_won, ledger_snapshot) (previous : Frontier_base.Breadcrumb.t) =
+    ~snark_work_provider ~protocol_states ?snark_work_count ?scheduled_time
+    (module Keys : Keys_S) (slot_won, ledger_snapshot)
+    (previous : Frontier_base.Breadcrumb.t) =
   let module V = Mina_block.Validation in
   let (module Context : V.CONTEXT) = context in
   let open Context in
@@ -234,6 +235,38 @@ let build_breadcrumb ~transactions ~context ~precomputed_values
   let%bind work_specs =
     Staged_ledger.work_pairs_for_new_diff previous_staged_ledger ~get_state
     |> Deferred.return
+  in
+  let%bind work_specs =
+    match snark_work_count with
+    | Some n ->
+        (* If a particular number of snark works are requested, match daemon
+           block producer behaviour by taking from the head of the work
+           required. This option exists because the daemon fetches the completed
+           work for the work_pairs_for_new_diff in order, and stops once it
+           finds a work spec that doesn't have work completed for it (or it's
+           fetched them all). It can then further discard work depending on fee
+           equation balancing. If the daemon ever did something different, we'd
+           have to pass in the actual work IDs included in a block to guarantee
+           that we replay the exact block the daemon generated. *)
+        let taken, remaining =
+          List.fold work_specs ~init:([], n) ~f:(fun (acc, remaining) spec ->
+              if remaining <= 0 then (acc, remaining)
+              else (spec :: acc, remaining - One_or_two.length spec) )
+        in
+        let taken = List.rev taken in
+        let taken_count = List.sum (module Int) taken ~f:One_or_two.length in
+        if remaining <> 0 then
+          Deferred.Or_error.errorf
+            "snark_work_count mismatch: requested %d items but took %d from %d \
+             available specs"
+            n taken_count (List.length work_specs)
+        else (
+          [%log info]
+            "Selected %d work specs (%d items) matching snark_work_count"
+            (List.length taken) taken_count ;
+          Deferred.Or_error.return taken )
+    | None ->
+        Deferred.Or_error.return work_specs
   in
   let%bind get_completed_work =
     Snark_work.compute snark_work_provider ~fee:Currency.Fee.zero

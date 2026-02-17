@@ -138,6 +138,7 @@ let best_chain_query =
       consensusState { slotSinceGenesis blockStakeWinner }
       blockchainState { stagedLedgerHash date }
     }
+    snarkJobs { workIds }
     transactions {
       userCommands { hash from to amount fee nonce validUntil memo }
       zkappCommands { hash }
@@ -165,6 +166,7 @@ type block_info =
   ; timestamp : string
   ; user_commands : daemon_command_info list
   ; zkapp_command_hashes : string list
+  ; snark_job_count : int
   }
 
 let parse_block_info json =
@@ -200,6 +202,11 @@ let parse_block_info json =
   ; zkapp_command_hashes =
       json |> member "transactions" |> member "zkappCommands" |> to_list
       |> List.map ~f:(fun cmd -> cmd |> member "hash" |> to_string)
+  ; snark_job_count =
+      json |> member "snarkJobs" |> to_list
+      |> List.sum
+           (module Int)
+           ~f:(fun job -> job |> member "workIds" |> to_list |> List.length)
   }
 
 let parse_best_chain response =
@@ -1164,12 +1171,15 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
               Block_time.of_span_since_epoch
                 (Block_time.Span.of_ms (Int64.of_string block.timestamp))
             in
-            [%log info] "Stepping at slot %d with %d transactions"
+            [%log info]
+              "Stepping at slot %d with %d transactions, snark_job_count=%d"
               block.slot_since_genesis
-              (Sequence.length block_txns) ;
+              (Sequence.length block_txns)
+              block.snark_job_count ;
             let%map result =
               Block_stepper.step_at_slot stepper ~global_slot_since_genesis:slot
-                ~block_stake_winner ~transactions:block_txns ~scheduled_time
+                ~block_stake_winner ~transactions:block_txns
+                ~snark_work_count:block.snark_job_count ~scheduled_time
             in
             Result.map result ~f:(fun (bc, stepper, invalid_commands) ->
                 if not (List.is_empty invalid_commands) then (
