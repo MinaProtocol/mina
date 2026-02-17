@@ -606,40 +606,6 @@ let breadcrumb_to_transition_json bc =
     ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
     ]
 
-let save_daemon_logs ~logger ~state_dir ~daemon_config ~daemon_process =
-  let%bind daemon_stdout =
-    Reader.contents
-      (Process.stdout daemon_process.Mina_automation.Daemon.Process.process)
-  in
-  let%bind daemon_stderr =
-    Reader.contents
-      (Process.stderr daemon_process.Mina_automation.Daemon.Process.process)
-  in
-  let%bind () =
-    Writer.save (state_dir ^/ "daemon_stdout.log") ~contents:daemon_stdout
-  in
-  let%bind () =
-    Writer.save (state_dir ^/ "daemon_stderr.log") ~contents:daemon_stderr
-  in
-  [%log info] "Saved daemon stdout (%d bytes) and stderr (%d bytes)"
-    (String.length daemon_stdout)
-    (String.length daemon_stderr) ;
-  (* TODO: get rid of this *)
-  let mina_log =
-    Mina_automation.Daemon.Config.ConfigDirs.mina_log
-      daemon_config.Mina_automation.Daemon.Config.dirs
-  in
-  match%bind Sys.file_exists mina_log with
-  | `Yes ->
-      let%bind contents = Reader.file_contents mina_log in
-      let dest = state_dir ^/ "daemon_mina.log" in
-      let%bind () = Writer.save dest ~contents in
-      [%log info] "Daemon mina.log saved to %s" dest ;
-      return ()
-  | _ ->
-      [%log info] "No mina.log found at %s" mina_log ;
-      return ()
-
 (* ---- Main test ---- *)
 
 let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
@@ -739,6 +705,23 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
     Mina_automation.Daemon.start daemon ~block_producer_key:bp_key_path
       ~config_file ~run_snark_worker:bp_pk ~snark_worker_fee:"0"
   in
+  (* Drain daemon stdout/stderr to files in the background to prevent pipe
+     buffer deadlock. The daemon's logger uses synchronous writes to stdout;
+     if the pipe fills up the entire Async scheduler blocks. *)
+  let stdout_log_path = state_dir ^/ "daemon_stdout.log" in
+  let stderr_log_path = state_dir ^/ "daemon_stderr.log" in
+  let%bind stdout_writer = Writer.open_file stdout_log_path in
+  let%bind stderr_writer = Writer.open_file stderr_log_path in
+  don't_wait_for
+    (Pipe.iter_without_pushback
+       (Reader.pipe
+          (Process.stdout daemon_process.Mina_automation.Daemon.Process.process) )
+       ~f:(fun s -> Writer.write stdout_writer s) ) ;
+  don't_wait_for
+    (Pipe.iter_without_pushback
+       (Reader.pipe
+          (Process.stderr daemon_process.Mina_automation.Daemon.Process.process) )
+       ~f:(fun s -> Writer.write stderr_writer s) ) ;
   let monitor =
     create_chain_monitor ~logger ~rest_port
       ~poll_interval:(Time.Span.of_sec poll_interval_sec)
@@ -784,9 +767,6 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
     | Error e ->
         [%log error] "Bootstrap failed: %s" (Error.to_string_hum e) ;
         let%bind _ = Mina_automation.Daemon.Process.force_kill daemon_process in
-        let%bind () =
-          save_daemon_logs ~logger ~state_dir ~daemon_config ~daemon_process
-        in
         failwith "Daemon failed to bootstrap"
   in
   (* Import and unlock block producer key *)
@@ -913,10 +893,6 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
               let%bind _ =
                 Mina_automation.Daemon.Process.force_kill daemon_process
               in
-              let%bind () =
-                save_daemon_logs ~logger ~state_dir ~daemon_config
-                  ~daemon_process
-              in
               failwithf "Chain monitor failed while waiting for batch %d: %s"
                 (b + 1) (Error.to_string_hum err) ()
           | `Timeout ->
@@ -925,10 +901,6 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
                 "Timed out waiting for batch %d transaction inclusion" (b + 1) ;
               let%bind _ =
                 Mina_automation.Daemon.Process.force_kill daemon_process
-              in
-              let%bind () =
-                save_daemon_logs ~logger ~state_dir ~daemon_config
-                  ~daemon_process
               in
               failwithf "Timed out waiting for batch %d transaction inclusion"
                 (b + 1) ()
@@ -962,9 +934,6 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
   let%bind () = Mina_automation.Daemon.Client.stop_daemon client in
   let%bind () = after (Time.Span.of_sec 5.0) in
   let%bind _ = Mina_automation.Daemon.Process.force_kill daemon_process in
-  let%bind () =
-    save_daemon_logs ~logger ~state_dir ~daemon_config ~daemon_process
-  in
   (* Extract daemon transitions from best-tip log *)
   let best_tip_log = daemon_config.dirs.conf ^/ "mina-best-tip.log" in
   extract_daemon_transitions ~logger ~best_tip_log
