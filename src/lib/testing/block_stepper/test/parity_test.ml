@@ -38,7 +38,7 @@ let generate_keypairs ~seed ~n =
         ~seed:(`Deterministic (sprintf "%s-keypair-%d" seed i))
         Keypair.gen )
 
-let generate_runtime_config ~seed =
+let generate_runtime_config ~seed ~proof_level ~slot_time_ms ~delta =
   let keypairs = generate_keypairs ~seed ~n:num_genesis_accounts in
   let bp_keypair = List.hd_exn keypairs in
   let accounts =
@@ -64,12 +64,12 @@ let generate_runtime_config ~seed =
     }
   in
   let proof =
-    Runtime_config.Proof_keys.make ~level:Check ~block_window_duration_ms:20_000
-      ()
+    Runtime_config.Proof_keys.make ~level:proof_level
+      ~block_window_duration_ms:slot_time_ms ()
   in
   let genesis : Runtime_config.Genesis.t =
     { k = Some 4
-    ; delta = Some 1
+    ; delta = Some delta
     ; slots_per_epoch = Some 48
     ; slots_per_sub_window = Some 2
     ; grace_period_slots = Some 8
@@ -620,11 +620,13 @@ let breadcrumb_to_transition_json bc =
 (* ---- Main test ---- *)
 
 let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
-    ~zkapps_per_batch =
+    ~zkapps_per_batch ~proof_level ~slot_time_ms ~delta =
   let open Deferred.Let_syntax in
   (* Phase 1: Generate config and keys *)
   [%log info] "Phase 1: Generating config with seed '%s'" seed ;
-  let bp_keypair, _keypairs, runtime_config = generate_runtime_config ~seed in
+  let bp_keypair, _keypairs, runtime_config =
+    generate_runtime_config ~seed ~proof_level ~slot_time_ms ~delta
+  in
   let bp_pk =
     Public_key.Compressed.to_base58_check
       (Public_key.compress bp_keypair.public_key)
@@ -1228,6 +1230,26 @@ let command =
       flag "--zkapps-per-batch"
         ~doc:"INT Number of zkapp transactions per batch (default: 1)"
         (optional_with_default 1 int)
+    and proof_level =
+      flag "--proof-level"
+        ~doc:"LEVEL Proof level: full, check, or none (default: check)"
+        (optional_with_default Runtime_config.Proof_keys.Level.Check
+           (Command.Arg_type.create (fun s ->
+                match Runtime_config.Proof_keys.Level.of_string s with
+                | Ok level ->
+                    level
+                | Error msg ->
+                    failwith msg ) ) )
+    and slot_time_ms =
+      flag "--slot-time-ms"
+        ~doc:
+          "INT Slot time / block window duration in milliseconds (default: \
+           20000)"
+        (optional_with_default 20_000 int)
+    and delta =
+      flag "--delta"
+        ~doc:"INT Max permissible network delay in slots (default: 1)"
+        (optional_with_default 1 int)
     in
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
@@ -1268,7 +1290,7 @@ let command =
     printf "Seed: %s\nState dir: %s\n" seed state_dir ;
     Parallel.init_master () ;
     run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
-      ~zkapps_per_batch)
+      ~zkapps_per_batch ~proof_level ~slot_time_ms ~delta)
 
 let () =
   Command.group ~summary:"Block stepper parity test"
