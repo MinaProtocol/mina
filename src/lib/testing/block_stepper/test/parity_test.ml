@@ -14,7 +14,10 @@ Test needs to be run on devnet to have access to all the proof levels, and also
 because the zkapp generator hard-codes the Testnet signature kind.
 
 The test can be run with --proof-level full, but it takes quite a while and is
-decently resource-intensive.
+decently resource-intensive. Run it with a higher --slot-time-ms too, otherwise
+the daemon's block proving competes with the snark worker's snark work proving
+far too much. (Slot time is irrelevant for the stepper, because it's not tied to
+wall clock time at all).
 
 Note that the transaction capacity and work delay are directly related to how
 many transactions can be included in a block, the time until which snark work
