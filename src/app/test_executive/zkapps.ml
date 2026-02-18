@@ -968,10 +968,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;
-    section_hard "Running replayer"
-      (let%bind logs =
-         Network.Node.run_replayer ~target_state_hash:proof_state_hash ~logger
-           (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
-       in
-       check_replayer_logs ~logger logs )
+    let archive_node =
+      List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data)
+    in
+    let replayer_result =
+      section_hard "Running replayer"
+        (let%bind logs =
+           Network.Node.run_replayer ~target_state_hash:proof_state_hash ~logger
+             archive_node
+         in
+         check_replayer_logs ~logger logs )
+    in
+    let open Deferred.Let_syntax in
+    match%bind replayer_result with
+    | Ok _ as ok ->
+        Deferred.return ok
+    | Error _ as err ->
+        [%log info] "Final network state on replayer failure"
+          ~metadata:
+            [ ("network_state", network_state t |> Network_state.to_yojson) ] ;
+        Deferred.return err
 end
