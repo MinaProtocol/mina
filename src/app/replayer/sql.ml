@@ -104,6 +104,14 @@ module Block = struct
   let get_height (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.find get_height_query block_id
 
+  let get_height_by_state_hash_query =
+    Mina_caqti.find_req Caqti_type.string Caqti_type.int64
+      {sql| SELECT height FROM blocks WHERE state_hash = $1 |sql}
+
+  let get_height_by_state_hash (module Conn : Mina_caqti.CONNECTION) state_hash
+      =
+    Conn.find get_height_by_state_hash_query state_hash
+
   let max_slot_query =
     Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
       {sql| SELECT MAX(global_slot_since_genesis) FROM blocks |sql}
