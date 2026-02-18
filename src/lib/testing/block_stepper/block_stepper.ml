@@ -54,8 +54,7 @@ let get_epoch_data_at_slot ~context:(module Context : Consensus.Intf.CONTEXT)
     now consensus_state ~local_state ~logger:Context.logger
 
 let create_from_genesis ~precomputed_values ~keypair ~keys_module ~logger
-    ~state_dir ?parallel_workers ?(genesis_mode = `Full)
-    ?(log_precomputed_blocks = false) () =
+    ~state_dir ?parallel_workers ?(log_precomputed_blocks = false) () =
   let open Deferred.Or_error.Let_syntax in
   let context =
     let module Context = struct
@@ -70,7 +69,7 @@ let create_from_genesis ~precomputed_values ~keypair ~keys_module ~logger
   in
   let%bind frontier =
     Linear_frontier.create ~precomputed_values ~context ~keys_module ~keypair
-      ~logger ~state_dir ~genesis_mode ()
+      ~logger ~state_dir ()
   in
   let genesis_breadcrumb = Linear_frontier.current frontier in
   let next_search_slot =

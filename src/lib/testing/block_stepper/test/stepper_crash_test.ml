@@ -294,7 +294,7 @@ let run ~logger ~seed ~state_dir ~payments_per_batch ~zkapps_per_batch
   let _tp = Lazy.force Mina_base.Proof.transaction_dummy in
   let%bind stepper =
     Block_stepper.create_from_genesis ~precomputed_values ~keypair:bp_keypair
-      ~keys_module ~logger ~state_dir:stepper_state_dir ~genesis_mode:`Simple ()
+      ~keys_module ~logger ~state_dir:stepper_state_dir ()
     >>| Or_error.ok_exn
   in
   let stepper_genesis_hash =

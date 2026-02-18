@@ -32,7 +32,6 @@ val create_from_genesis :
   -> logger:Logger.t
   -> state_dir:string
   -> ?parallel_workers:int
-  -> ?genesis_mode:[ `Simple | `Full ]
   -> ?log_precomputed_blocks:bool
   -> unit
   -> t Deferred.Or_error.t

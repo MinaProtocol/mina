@@ -1066,7 +1066,7 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
   [%log info] "Initializing block stepper from genesis" ;
   let%bind stepper =
     Block_stepper.create_from_genesis ~precomputed_values ~keypair:bp_keypair
-      ~keys_module ~logger ~state_dir:stepper_state_dir ~genesis_mode:`Simple
+      ~keys_module ~logger ~state_dir:stepper_state_dir
       ~log_precomputed_blocks:true ()
     >>| Or_error.ok_exn
   in

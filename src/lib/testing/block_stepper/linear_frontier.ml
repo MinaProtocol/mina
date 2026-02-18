@@ -24,7 +24,7 @@ let consensus_local_state t = t.consensus_local_state
 let protocol_states t = t.protocol_states
 
 let create ~precomputed_values ~context ~keys_module ~keypair ~logger ~state_dir
-    ?(genesis_mode = `Full) () =
+    () =
   let open Async in
   let open Deferred.Or_error.Let_syntax in
   let (module Context : Consensus.Intf.CONTEXT) = context in
@@ -41,7 +41,7 @@ let create ~precomputed_values ~context ~keys_module ~keypair ~logger ~state_dir
   let root_ledger = Mina_ledger.Root.as_unmasked snarked_root in
   let%map genesis_breadcrumb =
     Genesis.create_genesis_breadcrumb ~logger ~precomputed_values ~root_ledger
-      ~genesis_mode keys_module ()
+      keys_module ()
   in
   let consensus_local_state =
     Consensus.Data.Local_state.create

@@ -233,9 +233,7 @@ let create_parallel ~num_workers ~proof_level ~proof_cache_db ~signature_kind
   { prove_single; logger; how = `Parallel }
 
 let compute provider ~fee ~prover_key work_specs =
-  let sok_digest =
-    Sok_message.(digest (create ~fee ~prover:prover_key))
-  in
+  let sok_digest = Sok_message.(digest (create ~fee ~prover:prover_key)) in
   let logger = provider.logger in
   [%log info] "Computing %d snark work items"
     (List.sum (module Int) work_specs ~f:One_or_two.length) ;

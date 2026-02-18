@@ -100,12 +100,12 @@ let create_genesis_breadcrumb_simple ~logger ~precomputed_values ~root_ledger ()
        ~just_emitted_a_proof:false ~accounts_created )
 
 let create_genesis_breadcrumb ~logger ~precomputed_values ~root_ledger
-    ~genesis_mode keys_module () =
+    keys_module () =
   let proof_level = precomputed_values.Precomputed_values.proof_level in
-  match (proof_level, genesis_mode) with
-  | Full, _ | _, `Full ->
+  match proof_level with
+  | Full ->
       create_genesis_breadcrumb_full ~logger ~precomputed_values ~root_ledger
         keys_module ()
-  | _, `Simple ->
+  | Check | No_check ->
       create_genesis_breadcrumb_simple ~logger ~precomputed_values ~root_ledger
         ()
