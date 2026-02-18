@@ -178,6 +178,7 @@ func (t *HardforkTest) CollectEpochHashes(mainGenesisTs int64) (*SnarkedHashByEp
 			if block.Slot >= lastSlotPerEpoch[block.Epoch] {
 				snarkedHashByEpoch[block.Epoch] = block.SnarkedHash
 				lastSlotPerEpoch[block.Epoch] = block.Slot
+				t.Logger.Info("Updated last seen snarked ledger hash within epoch %d at slot %d: %s", block.Epoch, block.Slot, block.SnarkedHash)
 			}
 		}
 
