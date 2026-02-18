@@ -355,6 +355,49 @@ let%test_module "Archive node unit tests" =
           | Error e ->
               failwith @@ Caqti_error.show e )
 
+    let%test_unit "Token: insert nested custom tokens in dependency order" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      (* Create keypairs for token owners *)
+      let owner1_kp = Keypair.create () in
+      let owner2_kp = Keypair.create () in
+      let owner1_pk = Public_key.compress owner1_kp.public_key in
+      let owner2_pk = Public_key.compress owner2_kp.public_key in
+      (* Build token ownership chain:
+         - owner1 holds default token and owns custom_token_1
+         - owner2 holds custom_token_1 and owns custom_token_2
+         So custom_token_2 depends on custom_token_1 depends on default. *)
+      let owner1_acct_id = Account_id.create owner1_pk Token_id.default in
+      let custom_token_1 = Account_id.derive_token_id ~owner:owner1_acct_id in
+      let owner2_acct_id = Account_id.create owner2_pk custom_token_1 in
+      let custom_token_2 = Account_id.derive_token_id ~owner:owner2_acct_id in
+      (* Populate Token_owners table *)
+      Processor.Token_owners.add_if_doesn't_exist custom_token_1 owner1_acct_id ;
+      Processor.Token_owners.add_if_doesn't_exist custom_token_2 owner2_acct_id ;
+      (* Tokens in reverse dependency order — inserting in this order without
+         the toposort would fail because Token.add_if_doesn't_exist calls
+         Token.find for the owner's token, which doesn't exist yet.
+         To reproduce the bug, comment out the toposort_tokens line below
+         and use tokens_to_insert directly. *)
+      let tokens_to_insert =
+        [ custom_token_2; custom_token_1; Token_id.default ]
+      in
+      let sorted = Processor.Token_owners.toposort_tokens tokens_to_insert in
+      (* Insert tokens in topologically sorted order into the database *)
+      match%map
+        let open Deferred.Result.Let_syntax in
+        Mina_stdlib.Deferred.Result.List.iter sorted ~f:(fun token_id ->
+            let%bind (_ : int) =
+              Processor.Token.add_if_doesn't_exist conn token_id
+            in
+            return () )
+      with
+      | Ok () ->
+          ()
+      | Error e ->
+          failwith @@ Caqti_error.show e
+
     (*
     let%test_unit "Block: read and write with pruning" =
       let conn = Lazy.force conn_lazy in

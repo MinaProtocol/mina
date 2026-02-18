@@ -84,6 +84,38 @@ module Token_owners = struct
         ()
 
   let find_owner token_id = Token_id.Table.find owner_tbl token_id
+
+  (** Topologically sort a list of token_ids so that owner tokens appear
+      before the tokens they own. Uses [owner_tbl] to look up dependencies.
+      Tokens without owners (or whose owner's token is not in the input set)
+      come first. *)
+  let toposort_tokens (token_ids : Token_id.t list) =
+    let token_set = Set.of_list (module Token_id) token_ids in
+    let parent_in_set tid =
+      match Token_id.Table.find owner_tbl tid with
+      | Some acct_id ->
+          let parent = Account_id.token_id acct_id in
+          if Set.mem token_set parent then Some parent else None
+      | None ->
+          None
+    in
+    let rec visit (visited, acc) tid =
+      if Set.mem visited tid then (visited, acc)
+      else
+        let visited = Set.add visited tid in
+        let visited, acc =
+          match parent_in_set tid with
+          | Some parent ->
+              visit (visited, acc) parent
+          | None ->
+              (visited, acc)
+        in
+        (visited, tid :: acc)
+    in
+    let _, sorted =
+      List.fold token_ids ~init:(Set.empty (module Token_id), []) ~f:visit
+    in
+    List.rev sorted
 end
 
 module Token = struct
@@ -4503,7 +4535,21 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
             O1trace.thread "archive_processor.add_block"
             @@ fun () ->
             Metrics.time ~label:"add_block" ~logger
-            @@ fun () -> add_block (module Conn : Mina_caqti.CONNECTION) block
+            @@ fun () ->
+            (* Pre-insert tokens in topological order so that owner tokens
+               exist in the DB before the tokens they own. *)
+            let sorted_token_ids =
+              Token_owners.toposort_tokens (List.map tokens_used ~f:fst)
+            in
+            let%bind () =
+              Mina_stdlib.Deferred.Result.List.iter sorted_token_ids
+                ~f:(fun token_id ->
+                  let%bind (_ : int) =
+                    Token.add_if_doesn't_exist (module Conn) token_id
+                  in
+                  return () )
+            in
+            add_block (module Conn : Mina_caqti.CONNECTION) block
           in
           (* if an existing block has a parent hash that's for the block just added,
              set its parent id
