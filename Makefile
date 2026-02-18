@@ -617,14 +617,6 @@ debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
 debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devnet hardfork
 	$(call build_debian_package,daemon_devnet_hardfork)
 
-.PHONY: debian-build-daemon-devnet-pre-hardfork
-debian-build-daemon-devnet-pre-hardfork: ## Build the Debian daemon package for automote devnet pre hardfork
-	$(call build_debian_package,daemon_devnet_pre_hardfork)
-
-.PHONY: debian-build-daemon-mainnet-pre-hardfork
-debian-build-daemon-mainnet-pre-hardfork: ## Build the Debian daemon package for automote mainnet pre hardfork
-	$(call build_debian_package,daemon_mainnet_pre_hardfork)
-
 .PHONY: debian-download-create-legacy-hardfork
 debian-download-create-legacy-hardfork: ## Download and create legacy hardfork Debian packages
 	$(info 📦 Downloading legacy hardfork Debian packages for debian $(CODENAME))
