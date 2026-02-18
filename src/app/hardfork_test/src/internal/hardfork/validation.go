@@ -155,14 +155,14 @@ func (t *HardforkTest) CollectEpochHashes(mainGenesisTs int64) (*SnarkedHashByEp
 	// NOTE: we're only tracking epoch ledgers on a single node, we're relying that
 	// epoch hashes having stronger consensus guarantee because it's updated much
 	// slower than blocks
-	checkPerSlot := config.ProtocolK / 2
+	slotPerCheck := config.ProtocolK / 2
 	// Very unlikely to happen but we have it here for fail-safe
-	if checkPerSlot < 1 {
-		checkPerSlot = 1
+	if slotPerCheck < 1 {
+		slotPerCheck = 1
 	}
 
 	slotChainEnd := t.Config.MainSlotChainEnd(mainGenesisTs)
-	sleepDuration := time.Duration(t.Config.MainSlot*checkPerSlot) * time.Second
+	sleepDuration := time.Duration(t.Config.MainSlot*slotPerCheck) * time.Second
 
 	snarkedHashByEpoch := make(SnarkedHashByEpoch)
 	lastSlotPerEpoch := make(map[int]int)
