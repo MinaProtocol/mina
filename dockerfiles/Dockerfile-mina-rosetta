@@ -44,13 +44,9 @@ ENV MINA_ROSETTA_DEB=mina-rosetta-${network}
 #    libssl
 
 # Optional: configure APT caching proxy (bypass proxy for deb_repo)
-RUN if [ -n "$apt_cache_url" ]; then \
-  echo "Acquire::http::Proxy \"${apt_cache_url}\";" > /etc/apt/apt.conf.d/01proxy; \
-  echo "Acquire::https::Proxy \"${apt_cache_url}\";" >> /etc/apt/apt.conf.d/01proxy; \
-  DEB_REPO_HOST=${deb_repo#*://}; DEB_REPO_HOST=${DEB_REPO_HOST%%[:/]*}; \
-  echo "Acquire::http::Proxy::${DEB_REPO_HOST} \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
-  echo "Acquire::https::Proxy::${DEB_REPO_HOST} \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy; \
-fi
+COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
+RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \
