@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"time"
+
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/client"
 )
 
 type HFHandler func(*HardforkTest, *BlockAnalysisResult) error
@@ -21,13 +24,13 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 
 	defer t.gracefulShutdown(mainNetCmd, "Main network")
 
-	t.WaitUntilBestChainQuery(t.Config.MainSlot, 0)
-
-	bestTip, err := t.Client.BestTip(t.AnyPortOfType(PORT_REST))
-	if err != nil {
-		return nil, err
-	}
-	t.Logger.Info("Block height is %d at slot %d.", bestTip.BlockHeight, bestTip.Slot)
+	t.WaitForBestTip(t.AnyPortOfType(PORT_REST), func(block client.BlockData) bool {
+		return block.Slot >= 1
+	}, fmt.Sprintf("best tip reached slot 1"),
+		time.Until(
+			time.Unix(mainGenesisTs, 0).
+				Add(time.Duration(2*t.Config.MainSlot)*time.Second)),
+	)
 
 	analysis, err := t.AnalyzeBlocks(mainGenesisTs)
 	if err != nil {

@@ -116,8 +116,6 @@ func (t *HardforkTest) RunForkNetwork(configFile, forkLedgersDir string) (*exec.
 }
 
 // WaitUntilBestChainQuery calculates and waits until it's time to query the best chain
-// TODO: refactor away chainStartDelayMin as it's not used at all, unify behavior of legacy/advanced mode
-// to use HfSlotDelta
 func (t *HardforkTest) WaitUntilBestChainQuery(slotDurationSec int, genesisSlot int) {
 	t.WaitForBestTip(t.AnyPortOfType(PORT_REST), func(block client.BlockData) bool {
 		return block.Slot >= t.Config.BestChainQueryFrom+genesisSlot
