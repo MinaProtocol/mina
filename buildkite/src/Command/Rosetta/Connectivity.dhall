@@ -77,6 +77,7 @@ let command
             , key =
                 "rosetta-${Network.lowerName spec.network}-connectivity-test"
             , target = Size.XLarge
+            , artifact_paths = [ S.contains "test_output/artifacts/**/*" ]
             , soft_fail = Some spec.softFail
             , if_ = Some spec.if_
             , depends_on =
