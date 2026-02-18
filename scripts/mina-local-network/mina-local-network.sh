@@ -401,8 +401,9 @@ spawn-daemon() {
   shift 2
 
   # shellcheck disable=SC2068
-  exec-daemon $@ --config-directory "$FOLDER" 2>&1 \
-    | log-file | tag-stdout "$tag" &
+  exec-daemon $@ \
+    --config-directory "$FOLDER" \
+    > >(log-file | tag-stdout "$tag") 2>&1 &
 }
 
 # Spawns worker in background
@@ -413,8 +414,9 @@ spawn-snark-worker() {
   shift 2
 
   # shellcheck disable=SC2068
-  exec-snark-worker $@ --config-directory "${FOLDER}" 2>&1 \
-    | log-file "$REDIRECT_WORKER_LOGS" | tag-stdout "$tag" &
+  exec-snark-worker $@ \
+    --config-directory "${FOLDER}" \
+    > >(log-file "$REDIRECT_WORKER_LOGS" | tag-stdout "$tag") 2>&1 &
 }
 
 # Spawns the Archive Node in background
@@ -423,7 +425,8 @@ spawn-archive-node() {
   shift
 
   # shellcheck disable=SC2068
-  exec-archive-node $@ 2>&1 | log-file | tag-stdout "archive" &
+  exec-archive-node $@ \
+    > >(log-file | tag-stdout "archive") 2>&1 &
 }
 
 spawn-rosetta-server() {
@@ -431,7 +434,8 @@ spawn-rosetta-server() {
   shift
 
   # shellcheck disable=SC2068
-  exec-rosetta-node $@ 2>&1 | log-file | tag-stdout "rosetta" &
+  exec-rosetta-node $@ \
+    > >(log-file | tag-stdout "rosetta") 2>&1 &
 }
 
 # Resets genesis ledger
