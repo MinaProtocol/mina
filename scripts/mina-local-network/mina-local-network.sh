@@ -400,6 +400,13 @@ spawn-daemon() {
   FOLDER=${2}
   shift 2
 
+  # NOTE:
+  # Process Substitution >(...): This creates a "named pipe" under the hood. 
+  # `exec-daemon` treats it like a file output, but the data is actually being 
+  # piped into the logging functions.
+  # The `&` placement: By putting the & immediately after the exec-daemon 
+  # command (and its redirections), $! specifically tracks that process.
+
   # shellcheck disable=SC2068
   exec-daemon $@ \
     --config-directory "$FOLDER" \
