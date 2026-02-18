@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"os"
 	"time"
 
@@ -120,8 +119,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, forkData For
 
 func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) (*ForkData, error) {
 
-	idx := rand.Intn(len(analysis.CandidatePortBasesForFork))
-	forkConfigBytes, err := t.GetForkConfig(analysis.CandidatePortBasesForFork[idx] + int(config.PORT_REST))
+	forkConfigBytes, err := t.GetForkConfig(t.Config.AnyPortOfType(config.PORT_REST))
 	if err != nil {
 		return nil, err
 	}
@@ -201,8 +199,7 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 
 	forkDataPath := fmt.Sprintf("%s/fork_data", cwd)
 
-	idx := rand.Intn(len(analysis.CandidatePortBasesForFork))
-	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, analysis.CandidatePortBasesForFork[idx]+int(config.PORT_CLIENT)); err != nil {
+	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, t.Config.AnyPortOfType(config.PORT_CLIENT)); err != nil {
 		return nil, err
 	}
 
