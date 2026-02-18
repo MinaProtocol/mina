@@ -116,7 +116,7 @@ module Make
                             List.cons block_produced.state_hash ls )
                   in
                   { state with
-                    epoch = block_produced.global_slot
+                    epoch = block_produced.epoch
                   ; global_slot = block_produced.global_slot
                   ; block_height = block_produced.block_height
                   ; blocks_generated = state.blocks_generated + 1
