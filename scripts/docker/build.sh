@@ -258,6 +258,7 @@ case "${SERVICE}" in
         ;;
     mina-rosetta)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
+        DOCKER_CONTEXT="dockerfiles/"
         ;;
     mina-rosetta-configured)
         DOCKERFILE_PATH="dockerfiles/stages/install-config"
@@ -267,6 +268,7 @@ case "${SERVICE}" in
         ;;
     mina-zkapp-test-transaction)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
+        DOCKER_CONTEXT="dockerfiles/"
         ;;
     leaderboard)
         DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
