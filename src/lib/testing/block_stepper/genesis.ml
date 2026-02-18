@@ -2,21 +2,6 @@ open Core
 open Async
 open Mina_state
 
-let create_genesis_proof m ~proof_level ~constraint_constants
-    (genesis_inputs : Genesis_proof.Inputs.t) =
-  (* Copied from block_producer.ml *)
-  let ( blockchain
-      , protocol_state
-      , snark_transition
-      , ledger_proof_opt
-      , prover_state
-      , pending_coinbase ) =
-    Prover.create_genesis_block_inputs genesis_inputs
-  in
-  Block_builder.extend_blockchain ~proof_level m ~constraint_constants
-    blockchain protocol_state snark_transition ledger_proof_opt prover_state
-    pending_coinbase
-
 let create_genesis_breadcrumb_full ~logger ~precomputed_values ~root_ledger
     keys_module () =
   let constraint_constants =
@@ -27,10 +12,19 @@ let create_genesis_breadcrumb_full ~logger ~precomputed_values ~root_ledger
   let open Deferred.Or_error.Let_syntax in
   let proof_level = precomputed_values.Precomputed_values.proof_level in
   let%map real_proof =
-    create_genesis_proof
+    let genesis_inputs = Genesis_proof.to_inputs precomputed_values in
+    let ( blockchain
+        , protocol_state
+        , snark_transition
+        , ledger_proof_opt
+        , prover_state
+        , pending_coinbase ) =
+      Prover.create_genesis_block_inputs genesis_inputs
+    in
+    Block_builder.extend_blockchain ~proof_level
       (module Keys.B)
-      ~proof_level ~constraint_constants
-      (Genesis_proof.to_inputs precomputed_values)
+      ~constraint_constants blockchain protocol_state snark_transition
+      ledger_proof_opt prover_state pending_coinbase
     >>|? Blockchain_snark.Blockchain.proof
   in
   let genesis_state =
@@ -74,7 +68,7 @@ let create_genesis_breadcrumb_full ~logger ~precomputed_values ~root_ledger
     ~transition_receipt_time:(Some (Time.now ()))
     ~just_emitted_a_proof:false ~accounts_created
 
-let create_genesis_breadcrumb_simple ~logger ~precomputed_values ~root_ledger ()
+let create_genesis_breadcrumb_dummy ~logger ~precomputed_values ~root_ledger ()
     =
   let constraint_constants =
     precomputed_values.Precomputed_values.constraint_constants
@@ -107,5 +101,5 @@ let create_genesis_breadcrumb ~logger ~precomputed_values ~root_ledger
       create_genesis_breadcrumb_full ~logger ~precomputed_values ~root_ledger
         keys_module ()
   | Check | No_check ->
-      create_genesis_breadcrumb_simple ~logger ~precomputed_values ~root_ledger
+      create_genesis_breadcrumb_dummy ~logger ~precomputed_values ~root_ledger
         ()
