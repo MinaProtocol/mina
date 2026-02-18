@@ -77,6 +77,9 @@ module Engine = struct
       val dump_mina_logs :
         logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t
 
+      val tail_mina_logs_to_file :
+        logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t
+
       val dump_precomputed_blocks :
         logger:Logger.t -> t -> unit Malleable_error.t
     end

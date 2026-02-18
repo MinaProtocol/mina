@@ -86,6 +86,29 @@ module Node = struct
     Out_channel.with_file log_file ~f:(fun out_ch ->
         Out_channel.output_string out_ch logs )
 
+  let tail_mina_logs_to_file ~logger (t : t) ~log_file =
+    let open Malleable_error.Let_syntax in
+    let%bind container_id = get_container_id t.config.service_id in
+    [%log info] "Tailing logs from (node: %s, container: %s) to file %s"
+      t.config.service_id container_id log_file ;
+    let%bind.Deferred cwd = Unix.getcwd () in
+    let%bind.Deferred process =
+      Process.create_exn ~working_dir:cwd ~prog:"docker"
+        ~args:[ "logs"; "--follow"; container_id ]
+        ()
+    in
+    don't_wait_for
+      (let%bind.Deferred writer = Writer.open_file log_file in
+       let pipe_w = Writer.pipe writer in
+       let%bind.Deferred () =
+         Deferred.all_unit
+           [ Reader.transfer (Process.stdout process) pipe_w
+           ; Reader.transfer (Process.stderr process) pipe_w
+           ]
+       in
+       Writer.close writer ) ;
+    return ()
+
   let cp_string_to_container_file container_id ~str ~dest =
     let tmp_file, oc =
       Caml.Filename.open_temp_file ~temp_dir:Filename.temp_dir_name
