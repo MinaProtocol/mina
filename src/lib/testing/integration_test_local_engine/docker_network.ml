@@ -98,7 +98,8 @@ module Node = struct
     Integration_test_lib.Util.run_cmd_or_error cwd "docker"
       [ "cp"; tmp_file; dest_file ]
 
-  let run_replayer ?(start_slot_since_genesis = 0) ~logger (t : t) =
+  let run_replayer ?(start_slot_since_genesis = 0) ?target_state_hash ~logger
+      (t : t) =
     let open Malleable_error.Let_syntax in
     let%bind container_id = get_container_id t.config.service_id in
     [%log info] "Running replayer on (node: %s, container: %s)"
@@ -107,18 +108,24 @@ module Node = struct
       run_in_container container_id
         ~cmd:[ "jq"; "-c"; ".ledger.accounts"; "/root/runtime_config.json" ]
     in
+    let target_hash_json =
+      match target_state_hash with
+      | None ->
+          ""
+      | Some hash ->
+          sprintf {|, "target_epoch_ledgers_state_hash": "%s"|}
+            (Mina_base.State_hash.to_base58_check hash)
+    in
     let replayer_input =
       sprintf
         {| { "start_slot_since_genesis": %d,
-             "genesis_ledger": { "accounts": %s, "add_genesis_winner": true }} |}
-        start_slot_since_genesis accounts
+             "genesis_ledger": { "accounts": %s, "add_genesis_winner": true }%s} |}
+        start_slot_since_genesis accounts target_hash_json
     in
-    let dest = "replayer-input.json" in
-    let%bind archive_container_id = get_container_id "archive" in
+    let dest = "/root/replayer-input.json" in
     let%bind () =
       Deferred.bind ~f:Malleable_error.return
-        (cp_string_to_container_file archive_container_id ~str:replayer_input
-           ~dest )
+        (cp_string_to_container_file container_id ~str:replayer_input ~dest)
       >>| ignore
     in
     let postgres_url = Option.value_exn t.config.postgres_connection_uri in
