@@ -984,7 +984,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     | Ok _ as ok ->
         Deferred.return ok
     | Error _ as err ->
-        [%log info] "Final network state on replayer failure"
+        [%log info] "Final network state on replayer failure: $network_state"
           ~metadata:
             [ ("network_state", network_state t |> Network_state.to_yojson) ] ;
         Deferred.return err
