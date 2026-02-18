@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+SCRIPTPATH="${SCRIPTPATH:-"$( cd "$(dirname "$0")" ; pwd -P )"}"
 BUILD_DIR=${BUILD_DIR:-"${SCRIPTPATH}/../../_build"}
 BUILD_URL=${BUILD_URL:-${BUILDKITE_BUILD_URL:-"local build from '$(hostname)' \
   host"}}
@@ -153,6 +153,19 @@ build_deb() {
   echo "------------------------------------------------------------"
   echo "Deb Contents:"
   find "${BUILDDIR}"
+
+  # If BUILD_DEB_CAPTURE_DIR is set (used by tests), capture the staging
+  # directory state to that directory instead of invoking fakeroot/dpkg-deb.
+  if [[ -n "${BUILD_DEB_CAPTURE_DIR:-}" ]]; then
+    echo "${1}" > "${BUILD_DEB_CAPTURE_DIR}/deb_name"
+    cp "${BUILDDIR}/DEBIAN/control" "${BUILD_DEB_CAPTURE_DIR}/control"
+    (cd "${BUILDDIR}" && find . -type f | sort) > "${BUILD_DEB_CAPTURE_DIR}/files"
+    rm -rf "${BUILD_DEB_CAPTURE_DIR}/last_build"
+    cp -a "${BUILDDIR}" "${BUILD_DEB_CAPTURE_DIR}/last_build"
+    rm -rf "${BUILDDIR}"
+    echo "--- Captured ${1} staging directory to ${BUILD_DEB_CAPTURE_DIR}"
+    return 0
+  fi
 
   # Build the package
   echo "------------------------------------------------------------"

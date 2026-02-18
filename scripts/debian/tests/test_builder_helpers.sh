@@ -11,7 +11,6 @@ set -euo pipefail
 # - Creates a temporary directory with mock source files (executables, configs)
 # - Mocks external tools (git, fakeroot, dpkg-deb)
 # - Sources builder-helpers.sh in the mocked environment
-# - Overrides build_deb() to capture the staging directory state to files
 # - Runs each test in a subshell (to survive exit 1 from build functions)
 # - Verifies each build_*_deb function produces correct package layout
 ################################################################################
@@ -84,9 +83,9 @@ assert_file_not_captured() {
 }
 
 assert_control_field() {
-    local field="$1" expected="$2"
+    local captured_control="$1" field="$2" expected="$3"
     local actual
-    actual=$(echo "$CAPTURED_CONTROL" | grep "^${field}:" | head -1 | sed "s/^${field}: *//")
+    actual=$(echo "$captured_control" | grep "^${field}:" | head -1 | sed "s/^${field}: *//")
     if [[ "$actual" == "$expected" ]]; then
         log_pass
     else
@@ -95,9 +94,9 @@ assert_control_field() {
 }
 
 assert_control_contains() {
-    local field="$1" needle="$2"
+    local captured_control="$1" field="$2" needle="$3"
     local line
-    line=$(echo "$CAPTURED_CONTROL" | grep "^${field}:" | head -1 || true)
+    line=$(echo "$captured_control" | grep "^${field}:" | head -1 || true)
     if echo "$line" | grep -qF "$needle"; then
         log_pass
     else
@@ -106,8 +105,8 @@ assert_control_contains() {
 }
 
 assert_control_has_field() {
-    local field="$1"
-    if echo "$CAPTURED_CONTROL" | grep -q "^${field}:"; then
+    local captured_control="$1" field="$2"
+    if echo "$captured_control" | grep -q "^${field}:"; then
         log_pass
     else
         log_fail "Control file missing field '${field}'"
@@ -115,8 +114,8 @@ assert_control_has_field() {
 }
 
 assert_control_no_field() {
-    local field="$1"
-    if ! echo "$CAPTURED_CONTROL" | grep -q "^${field}:"; then
+    local captured_control="$1" field="$2"
+    if ! echo "$captured_control" | grep -q "^${field}:"; then
         log_pass
     else
         log_fail "Control file should NOT have field '${field}'"
@@ -124,8 +123,8 @@ assert_control_no_field() {
 }
 
 assert_captured_file_contains() {
-    local path="$1" pattern="$2"
-    local file="${CAPTURE_DIR}/last_build/${path}"
+    local last_build_dir="$1" path="$2" pattern="$3"
+    local file="${last_build_dir}/${path}"
     if [[ -f "$file" ]] && grep -qF "$pattern" "$file"; then
         log_pass
     else
@@ -184,6 +183,8 @@ load_captured_state() {
     CAPTURED_DEB_NAME=""
     CAPTURED_CONTROL=""
     CAPTURED_FILES=""
+    CAPTURED_LAST_BUILD_DIR=""
+    [[ -d "${CAPTURE_DIR}" ]] || return 0
     if [[ -f "${CAPTURE_DIR}/deb_name" ]]; then
         CAPTURED_DEB_NAME=$(cat "${CAPTURE_DIR}/deb_name")
     fi
@@ -193,25 +194,31 @@ load_captured_state() {
     if [[ -f "${CAPTURE_DIR}/files" ]]; then
         CAPTURED_FILES=$(cat "${CAPTURE_DIR}/files")
     fi
+    if [[ -d "${CAPTURE_DIR}/last_build" ]]; then
+        CAPTURED_LAST_BUILD_DIR="${CAPTURE_DIR}/last_build"
+    fi
 }
 
 # Run a build function safely in a subshell (protects against exit 1).
 # Returns the exit code of the build function.
 safe_build() {
-    rm -f "${CAPTURE_DIR}/deb_name" "${CAPTURE_DIR}/control" "${CAPTURE_DIR}/files" 2>/dev/null || true
-    rm -rf "${CAPTURE_DIR}/last_build" 2>/dev/null || true
-    rm -rf "${BUILDDIR}" 2>/dev/null || true
+    rm -rf "${CAPTURE_DIR}"/{deb_name,control,files,last_build} "${BUILDDIR}"
 
     # NOTE: The subshell must NOT be followed by || true (or any || / &&),
     # because bash disables set -e inside subshells that are part of a
     # conditional list, making it impossible to detect build failures.
-    # Callers (run_test, run_test_expect_fail) use set +e before invoking
-    # test functions, so a non-zero exit here won't kill the script.
+    # Callers (run_test, run_test_expect_fail) use || true / || build_rc=$?
+    # so a non-zero exit here won't kill the script.
+    local rc
     (
         set -e
-        "$@" > /dev/null 2>&1
-    ) 2>/dev/null
-    return $?
+        "$@"
+    )
+    rc=$?
+    if [[ $rc -ne 0 ]]; then
+        echo "  [safe_build] '$*' exited with code ${rc}" >&2
+    fi
+    return $rc
 }
 
 # Run a test function directly (NOT in a subshell).
@@ -224,9 +231,7 @@ run_test() {
 
     echo -n "TEST: ${test_name} ... "
 
-    set +e
-    "$test_name"
-    set -e
+    "$test_name" || true
 
     if [[ ${TESTS_FAILED} -eq ${failures_before} ]]; then
         echo "OK"
@@ -245,10 +250,7 @@ run_test_expect_fail() {
     echo -n "TEST: ${test_name} (expect fail) ... "
 
     local build_rc=0
-    set +e
-    "$test_name"
-    build_rc=$?
-    set -e
+    "$test_name" || build_rc=$?
 
     if [[ $build_rc -ne 0 ]]; then
         log_pass  # Expected failure
@@ -269,7 +271,7 @@ setup_test_environment() {
 
     # Determine real repo paths
     TEST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    REAL_REPO_ROOT="$(cd "${TEST_SCRIPT_DIR}/../../.." && pwd)"
+    REAL_REPO_ROOT="$(git -C "${TEST_SCRIPT_DIR}" rev-parse --show-toplevel)"
     REAL_SCRIPTS_DIR="${REAL_REPO_ROOT}/scripts/debian"
 
     #---------------------------------------------------------------------------
@@ -299,21 +301,6 @@ esac
 MOCKGIT
     chmod +x "${MOCK_BIN_DIR}/git"
 
-    # Mock fakeroot: just execute the command
-    cat > "${MOCK_BIN_DIR}/fakeroot" << 'EOF'
-#!/bin/bash
-"$@"
-EOF
-    chmod +x "${MOCK_BIN_DIR}/fakeroot"
-
-    # Mock dpkg-deb: create a dummy .deb file
-    cat > "${MOCK_BIN_DIR}/dpkg-deb" << 'EOF'
-#!/bin/bash
-# Last argument is the output file
-touch "${@: -1}" 2>/dev/null || true
-EOF
-    chmod +x "${MOCK_BIN_DIR}/dpkg-deb"
-
     export PATH="${MOCK_BIN_DIR}:${PATH}"
 
     #---------------------------------------------------------------------------
@@ -322,11 +309,14 @@ EOF
     export BUILD_DIR="${PROJECT_ROOT}/_build"
     mkdir -p "$BUILD_DIR"
 
-    # Helper: create a mock executable
+    # Helper: create a mock executable.
+    # Usage: create_mock_exe <relative-path> [base-dir]
+    # base-dir defaults to BUILD_DIR.
     create_mock_exe() {
         local path="$1"
-        mkdir -p "$(dirname "${BUILD_DIR}/${path}")"
-        cat > "${BUILD_DIR}/${path}" << 'MOCKEXE'
+        local base="${2:-${BUILD_DIR}}"
+        mkdir -p "$(dirname "${base}/${path}")"
+        cat > "${base}/${path}" << 'MOCKEXE'
 #!/bin/bash
 if [[ "${COMMAND_OUTPUT_INSTALLATION_BASH:-}" == "1" ]]; then
     echo "# mock bash completion for mina"
@@ -334,7 +324,7 @@ if [[ "${COMMAND_OUTPUT_INSTALLATION_BASH:-}" == "1" ]]; then
 fi
 echo "mock binary"
 MOCKEXE
-        chmod +x "${BUILD_DIR}/${path}"
+        chmod +x "${base}/${path}"
     }
 
     # All .exe files referenced by builder-helpers.sh (relative to BUILD_DIR)
@@ -375,21 +365,14 @@ MOCKEXE
     #---------------------------------------------------------------------------
 
     # libp2p_helper
-    mkdir -p "${PROJECT_ROOT}/src/app/libp2p_helper/result/bin"
-    echo "mock-libp2p" > "${PROJECT_ROOT}/src/app/libp2p_helper/result/bin/libp2p_helper"
-    chmod +x "${PROJECT_ROOT}/src/app/libp2p_helper/result/bin/libp2p_helper"
+    create_mock_exe "src/app/libp2p_helper/result/bin/libp2p_helper" "$PROJECT_ROOT"
 
     # hardfork scripts
-    mkdir -p "${PROJECT_ROOT}/scripts/hardfork"
-    echo "#!/bin/bash" > "${PROJECT_ROOT}/scripts/hardfork/create_runtime_config.sh"
-    echo "#!/bin/bash" > "${PROJECT_ROOT}/scripts/hardfork/mina-verify-packaged-fork-config"
-    chmod +x "${PROJECT_ROOT}/scripts/hardfork/create_runtime_config.sh"
-    chmod +x "${PROJECT_ROOT}/scripts/hardfork/mina-verify-packaged-fork-config"
+    create_mock_exe "scripts/hardfork/create_runtime_config.sh" "$PROJECT_ROOT"
+    create_mock_exe "scripts/hardfork/mina-verify-packaged-fork-config" "$PROJECT_ROOT"
 
     # archive scripts
-    mkdir -p "${PROJECT_ROOT}/scripts/archive"
-    echo "#!/bin/bash" > "${PROJECT_ROOT}/scripts/archive/missing-blocks-guardian.sh"
-    chmod +x "${PROJECT_ROOT}/scripts/archive/missing-blocks-guardian.sh"
+    create_mock_exe "scripts/archive/missing-blocks-guardian.sh" "$PROJECT_ROOT"
 
     # systemd service template
     mkdir -p "${PROJECT_ROOT}/scripts"
@@ -414,8 +397,7 @@ SVCEOF
     echo '{"genesis": "devnet"}' > "${PROJECT_ROOT}/genesis_ledgers/devnet.json"
 
     # rosetta scripts and configs
-    mkdir -p "${PROJECT_ROOT}/src/app/rosetta/scripts"
-    echo "#!/bin/bash" > "${PROJECT_ROOT}/src/app/rosetta/scripts/run.sh"
+    create_mock_exe "src/app/rosetta/scripts/run.sh" "$PROJECT_ROOT"
 
     mkdir -p "${PROJECT_ROOT}/src/app/rosetta/rosetta-cli-config"
     echo '{}' > "${PROJECT_ROOT}/src/app/rosetta/rosetta-cli-config/config.json"
@@ -432,8 +414,7 @@ SVCEOF
     echo "archive-test-file" > "${PROJECT_ROOT}/src/test/archive/test_config.txt"
 
     # delegation verify scripts
-    mkdir -p "${PROJECT_ROOT}/src/app/delegation_verify/scripts"
-    echo "#!/bin/bash" > "${PROJECT_ROOT}/src/app/delegation_verify/scripts/authenticate.sh"
+    create_mock_exe "src/app/delegation_verify/scripts/authenticate.sh" "$PROJECT_ROOT"
 
     # hardfork runtime config and ledger tarballs (for hardfork tests)
     echo '{"fork": true}' > "${TEST_TMPDIR}/fork_config.json"
@@ -446,6 +427,7 @@ SVCEOF
     CAPTURE_DIR="${TEST_TMPDIR}/captures"
     mkdir -p "$CAPTURE_DIR"
     export CAPTURE_DIR
+    export BUILD_DEB_CAPTURE_DIR="${CAPTURE_DIR}"
 
     #---------------------------------------------------------------------------
     # Set environment variables
@@ -459,36 +441,15 @@ SVCEOF
     unset DUNE_INSTRUMENT_WITH 2>/dev/null || true
 
     #---------------------------------------------------------------------------
-    # Create modified builder-helpers.sh with fixed SCRIPTPATH
-    #---------------------------------------------------------------------------
-    MODIFIED_SCRIPT="${TEST_TMPDIR}/builder-helpers-modified.sh"
-    sed "s|^SCRIPTPATH=.*|SCRIPTPATH=\"${REAL_SCRIPTS_DIR}\"|" \
-        "${REAL_SCRIPTS_DIR}/builder-helpers.sh" > "$MODIFIED_SCRIPT"
-
-    #---------------------------------------------------------------------------
     # Source builder-helpers.sh (changes CWD to BUILD_DIR, sets up variables)
+    # SCRIPTPATH is exported so builder-helpers.sh uses our real scripts dir.
     #---------------------------------------------------------------------------
-    source "$MODIFIED_SCRIPT"
+    export SCRIPTPATH="${REAL_SCRIPTS_DIR}"
+    source "${REAL_SCRIPTS_DIR}/builder-helpers.sh"
 
     # Store expected values set by export-git-env-vars.sh via our mock git
     export EXPECTED_VERSION="${MINA_DEB_VERSION}"       # 1.0.0-test-branch-abcd123
     export EXPECTED_GITHASH_CONFIG="${GITHASH_CONFIG}"   # abcd1234
-
-    #---------------------------------------------------------------------------
-    # Override build_deb to capture staging directory state to files
-    #---------------------------------------------------------------------------
-    build_deb() {
-        echo "${1}" > "${CAPTURE_DIR}/deb_name"
-        cat "${BUILDDIR}/DEBIAN/control" > "${CAPTURE_DIR}/control" 2>/dev/null || true
-        (cd "${BUILDDIR}" && find . -type f | sort) > "${CAPTURE_DIR}/files"
-
-        # Save a copy for content inspection
-        rm -rf "${CAPTURE_DIR}/last_build"
-        cp -a "${BUILDDIR}" "${CAPTURE_DIR}/last_build"
-
-        # Clean up like the original
-        rm -rf "${BUILDDIR}"
-    }
 
     echo "Environment ready. MINA_DEB_VERSION=${MINA_DEB_VERSION}"
     echo ""
@@ -508,14 +469,14 @@ test_build_logproc_deb() {
     assert_eq "deb name" "mina-logproc" "$CAPTURED_DEB_NAME"
 
     # Control file
-    assert_control_field "Package" "mina-logproc"
-    assert_control_contains "Depends" "libssl1.1"
-    assert_control_contains "Depends" "libgmp10"
-    assert_control_contains "Depends" "libgomp1"
-    assert_control_contains "Depends" "tzdata"
-    assert_control_contains "Depends" "liblmdb0"
-    assert_control_no_field "Suggests"
-    assert_control_no_field "Replaces"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-logproc"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libgmp10"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libgomp1"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "tzdata"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "liblmdb0"
+    assert_control_no_field "$CAPTURED_CONTROL" "Suggests"
+    assert_control_no_field "$CAPTURED_CONTROL" "Replaces"
 
     # Files
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-logproc"
@@ -528,11 +489,11 @@ test_build_test_executive_deb() {
     load_captured_state
     assert_eq "deb name" "mina-test-executive" "$CAPTURED_DEB_NAME"
 
-    assert_control_field "Package" "mina-test-executive"
-    assert_control_contains "Depends" "libssl1.1"
-    assert_control_contains "Depends" "mina-logproc"
-    assert_control_contains "Depends" "python3"
-    assert_control_contains "Depends" "docker-ce"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-test-executive"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "python3"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "docker-ce"
 
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-test-executive"
 }
@@ -542,8 +503,8 @@ test_build_batch_txn_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-batch-txn" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-batch-txn"
-    assert_control_contains "Depends" "libssl1.1"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-batch-txn"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
 
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-batch-txn"
 }
@@ -557,7 +518,7 @@ test_build_functional_test_suite_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-test-suite" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-test-suite"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-test-suite"
 
     # Test binaries
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-command-line-tests"
@@ -583,10 +544,10 @@ test_build_rosetta_mainnet_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-rosetta-mainnet" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-rosetta-mainnet"
-    assert_control_contains "Depends" "libssl1.1"
-    assert_control_contains "Suggests" "jq"
-    assert_control_contains "Suggests" "curl"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-rosetta-mainnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
+    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
+    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "curl"
 
     assert_rosetta_binaries "$CAPTURED_FILES"
     assert_rosetta_configs "$CAPTURED_FILES"
@@ -597,8 +558,8 @@ test_build_rosetta_devnet_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-rosetta-devnet" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-rosetta-devnet"
-    assert_control_contains "Suggests" "jq"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-rosetta-devnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
 
     assert_rosetta_binaries "$CAPTURED_FILES"
     assert_rosetta_configs "$CAPTURED_FILES"
@@ -609,8 +570,8 @@ test_build_rosetta_testnet_generic_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-rosetta-testnet-generic" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-rosetta-testnet-generic"
-    assert_control_contains "Suggests" "jq"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-rosetta-testnet-generic"
+    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
 
     assert_rosetta_binaries "$CAPTURED_FILES"
     assert_rosetta_configs "$CAPTURED_FILES"
@@ -627,15 +588,15 @@ test_build_daemon_mainnet_deb() {
     assert_eq "deb name" "mina-mainnet" "$CAPTURED_DEB_NAME"
 
     # Control file
-    assert_control_field "Package" "mina-mainnet"
-    assert_control_contains "Depends" "libssl1.1"
-    assert_control_contains "Depends" "libffi7"
-    assert_control_contains "Depends" "libjemalloc2"
-    assert_control_contains "Depends" "mina-logproc"
-    assert_control_contains "Depends" "mina-mainnet-config"
-    assert_control_contains "Suggests" "jq"
-    assert_control_contains "Replaces" "mina-mainnet"
-    assert_control_has_field "Breaks"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libffi7"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libjemalloc2"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-config"
+    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
+    assert_control_has_field "$CAPTURED_CONTROL" "Breaks"
 
     # Daemon binaries (mainnet signatures)
     assert_common_daemon_binaries "$CAPTURED_FILES"
@@ -643,12 +604,12 @@ test_build_daemon_mainnet_deb() {
     assert_daemon_utils "$CAPTURED_FILES"
 
     # Verify service file has mainnet seed URL
-    assert_captured_file_contains \
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
         "usr/lib/systemd/user/mina.service" \
         "https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt"
 
     # Bash completion was generated
-    assert_captured_file_contains "etc/bash_completion.d/mina" "mock bash completion"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "etc/bash_completion.d/mina" "mock bash completion"
 }
 
 test_build_daemon_mainnet_config_deb() {
@@ -656,13 +617,13 @@ test_build_daemon_mainnet_config_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-mainnet-config" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-mainnet-config"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-config"
 
     # Config-only package: no Depends on libraries
-    assert_control_no_field "Depends"
-    assert_control_contains "Suggests" "jq"
-    assert_control_has_field "Replaces"
-    assert_control_has_field "Breaks"
+    assert_control_no_field "$CAPTURED_CONTROL" "Depends"
+    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
+    assert_control_has_field "$CAPTURED_CONTROL" "Replaces"
+    assert_control_has_field "$CAPTURED_CONTROL" "Breaks"
 
     # Genesis ledger files
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
@@ -672,7 +633,7 @@ test_build_daemon_mainnet_config_deb() {
     assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
 
     # Verify genesis content
-    assert_captured_file_contains "var/lib/coda/mainnet.json" "mainnet"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/mainnet.json" "mainnet"
 }
 
 test_build_daemon_devnet_deb() {
@@ -680,17 +641,17 @@ test_build_daemon_devnet_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-devnet" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-devnet"
-    assert_control_contains "Depends" "mina-devnet-config"
-    assert_control_contains "Depends" "mina-logproc"
-    assert_control_contains "Suggests" "jq"
-    assert_control_contains "Replaces" "mina-devnet"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-config"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
+    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-devnet"
 
     assert_common_daemon_binaries "$CAPTURED_FILES"
     assert_daemon_utils "$CAPTURED_FILES"
 
     # Verify devnet seed URL in service file
-    assert_captured_file_contains \
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
         "usr/lib/systemd/user/mina.service" \
         "https://storage.googleapis.com/seed-lists/devnet_seeds.txt"
 }
@@ -700,14 +661,14 @@ test_build_daemon_devnet_config_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-config" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-devnet-config"
-    assert_control_no_field "Depends"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-config"
+    assert_control_no_field "$CAPTURED_CONTROL" "Depends"
 
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/devnet.json"
     assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
 
-    assert_captured_file_contains "var/lib/coda/devnet.json" "devnet"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/devnet.json" "devnet"
 }
 
 ################################################################################
@@ -719,9 +680,9 @@ test_build_daemon_mainnet_pre_hardfork_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-mainnet-pre-hardfork-mesa" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-mainnet-pre-hardfork-mesa"
-    assert_control_contains "Depends" "libssl1.1"
-    assert_control_contains "Suggests" "jq"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-pre-hardfork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
+    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
 
     # Binaries in alternate directory (for automode)
     assert_common_daemon_binaries "$CAPTURED_FILES" "usr/lib/mina/bin/berkeley"
@@ -739,8 +700,8 @@ test_build_daemon_devnet_pre_hardfork_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-pre-hardfork-mesa" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-devnet-pre-hardfork-mesa"
-    assert_control_contains "Depends" "libssl1.1"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-pre-hardfork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
 
     # Binaries in alternate directory
     assert_common_daemon_binaries "$CAPTURED_FILES" "usr/lib/mina/bin/berkeley"
@@ -757,11 +718,11 @@ test_build_daemon_testnet_generic_deb() {
     load_captured_state
     # Default name (no lightnet, no instrumentation)
     assert_eq "deb name" "mina-testnet-generic" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-testnet-generic"
-    assert_control_contains "Depends" "libssl1.1"
-    assert_control_contains "Depends" "mina-logproc"
-    assert_control_contains "Suggests" "jq"
-    assert_control_contains "Replaces" "mina-devnet"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-testnet-generic"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-logproc"
+    assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-devnet"
 
     assert_common_daemon_binaries "$CAPTURED_FILES"
     assert_daemon_utils "$CAPTURED_FILES"
@@ -780,10 +741,10 @@ test_build_archive_devnet_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-archive-devnet" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-archive-devnet"
-    assert_control_contains "Depends" "libssl1.1"
-    assert_control_contains "Depends" "libpq-dev"
-    assert_control_contains "Depends" "libjemalloc2"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-archive-devnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libpq-dev"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libjemalloc2"
     # Archive packages should NOT depend on DAEMON_DEPS
     assert_not_contains "archive deps no libffi" "$CAPTURED_CONTROL" "libffi"
 
@@ -799,8 +760,8 @@ test_build_archive_testnet_generic_deb() {
     load_captured_state
     # Default name (no suffix)
     assert_eq "deb name" "mina-archive-testnet-generic" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-archive-testnet-generic"
-    assert_control_contains "Depends" "libpq-dev"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-archive-testnet-generic"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libpq-dev"
 
     assert_archive_binaries "$CAPTURED_FILES"
     assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
@@ -811,8 +772,8 @@ test_build_archive_mainnet_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-archive-mainnet" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-archive-mainnet"
-    assert_control_contains "Depends" "libpq-dev"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-archive-mainnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libpq-dev"
 
     assert_archive_binaries "$CAPTURED_FILES"
     assert_file_captured "$CAPTURED_FILES" "etc/mina/archive/create_schema.sql"
@@ -832,12 +793,12 @@ test_build_daemon_devnet_hardfork_config_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-config" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-devnet-config"
-    assert_control_no_field "Depends"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-config"
+    assert_control_no_field "$CAPTURED_CONTROL" "Depends"
 
     # Hardfork runtime config replaces the standard one
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
-    assert_captured_file_contains \
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
         "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json" '{"fork": true}'
 
     # Ledger tarballs copied
@@ -846,11 +807,11 @@ test_build_daemon_devnet_hardfork_config_deb() {
 
     # Old genesis ledger backup
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/devnet.old.json"
-    assert_captured_file_contains "var/lib/coda/devnet.old.json" "devnet"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/devnet.old.json" "devnet"
 
     # devnet.json replaced with fork config
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/devnet.json"
-    assert_captured_file_contains "var/lib/coda/devnet.json" '{"fork": true}'
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/devnet.json" '{"fork": true}'
 
     unset RUNTIME_CONFIG_JSON LEDGER_TARBALLS
 }
@@ -878,22 +839,22 @@ test_build_daemon_mainnet_hardfork_config_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-mainnet-config" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-mainnet-config"
-    assert_control_no_field "Depends"
-    assert_control_contains "Replaces" "mina-mainnet"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-config"
+    assert_control_no_field "$CAPTURED_CONTROL" "Depends"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
 
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
-    assert_captured_file_contains \
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
         "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json" '{"fork": true}'
 
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/ledger1.tar.gz"
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/ledger2.tar.gz"
 
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/mainnet.old.json"
-    assert_captured_file_contains "var/lib/coda/mainnet.old.json" "mainnet"
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/mainnet.old.json" "mainnet"
 
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/mainnet.json"
-    assert_captured_file_contains "var/lib/coda/mainnet.json" '{"fork": true}'
+    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/mainnet.json" '{"fork": true}'
 
     unset RUNTIME_CONFIG_JSON LEDGER_TARBALLS
 }
@@ -907,10 +868,10 @@ test_build_zkapp_test_transaction_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-zkapp-test-transaction" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-zkapp-test-transaction"
-    assert_control_contains "Depends" "libssl1.1"
-    assert_control_contains "Depends" "libffi7"
-    assert_control_no_field "Suggests"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-zkapp-test-transaction"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libffi7"
+    assert_control_no_field "$CAPTURED_CONTROL" "Suggests"
 
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-zkapp-test-transaction"
 }
@@ -920,8 +881,8 @@ test_build_delegation_verify_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-delegation-verify" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-delegation-verify"
-    assert_control_contains "Depends" "libssl1.1"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-delegation-verify"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
 
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-delegation-verify"
     assert_file_captured "$CAPTURED_FILES" "etc/mina/aws/authenticate.sh"
@@ -932,8 +893,8 @@ test_build_create_legacy_genesis_deb() {
 
     load_captured_state
     assert_eq "deb name" "mina-create-legacy-genesis" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-create-legacy-genesis"
-    assert_control_contains "Depends" "libssl1.1"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-create-legacy-genesis"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
 
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-create-legacy-genesis"
 }
@@ -951,7 +912,7 @@ test_build_daemon_devnet_lightnet_naming() {
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-lightnet" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-devnet-lightnet"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-lightnet"
 
     MINA_DEVNET_DEB_NAME="${saved_name}"
 }
@@ -964,7 +925,7 @@ test_build_daemon_testnet_generic_lightnet_naming() {
 
     load_captured_state
     assert_eq "deb name" "mina-testnet-generic-lightnet" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-testnet-generic-lightnet"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-testnet-generic-lightnet"
 
     MINA_DEB_NAME="${saved_name}"
 }
@@ -977,7 +938,7 @@ test_build_archive_testnet_generic_suffix_naming() {
 
     load_captured_state
     assert_eq "deb name" "mina-archive-testnet-generic-lightnet" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-archive-testnet-generic-lightnet"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-archive-testnet-generic-lightnet"
 
     DEB_SUFFIX="${saved_suffix}"
 }
@@ -990,7 +951,7 @@ test_build_daemon_devnet_instrumented_naming() {
 
     load_captured_state
     assert_eq "deb name" "mina-devnet-instrumented" "$CAPTURED_DEB_NAME"
-    assert_control_field "Package" "mina-devnet-instrumented"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-instrumented"
 
     MINA_DEVNET_DEB_NAME="${saved_name}"
 }
@@ -999,6 +960,11 @@ test_build_daemon_devnet_instrumented_naming() {
 # Tests: Codename-specific dependencies
 ################################################################################
 
+# Noble codename dep strings (mirrors the 'noble' case in builder-helpers.sh)
+NOBLE_SHARED_DEPS="libssl3t64, libgmp10, libgomp1, tzdata, liblmdb0"
+NOBLE_DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0, mina-logproc"
+NOBLE_ARCHIVE_DEPS="libssl3t64, libgomp1, libpq-dev, libjemalloc2"
+
 test_codename_noble_deps() {
     # Save current deps
     local saved_shared="${SHARED_DEPS}"
@@ -1006,14 +972,14 @@ test_codename_noble_deps() {
     local saved_archive="${ARCHIVE_DEPS}"
 
     # Simulate noble codename deps
-    SHARED_DEPS="libssl3t64, libgmp10, libgomp1, tzdata, liblmdb0"
-    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0, mina-logproc"
-    ARCHIVE_DEPS="libssl3t64, libgomp1, libpq-dev, libjemalloc2"
+    SHARED_DEPS="${NOBLE_SHARED_DEPS}"
+    DAEMON_DEPS="${NOBLE_DAEMON_DEPS}"
+    ARCHIVE_DEPS="${NOBLE_ARCHIVE_DEPS}"
 
     safe_build build_logproc_deb || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_control_contains "Depends" "libssl3t64"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl3t64"
     assert_not_contains "noble should not have libssl1.1" "$CAPTURED_CONTROL" "libssl1.1"
 
     # Restore
@@ -1024,12 +990,12 @@ test_codename_noble_deps() {
 
 test_codename_noble_archive_deps() {
     local saved_archive="${ARCHIVE_DEPS}"
-    ARCHIVE_DEPS="libssl3t64, libgomp1, libpq-dev, libjemalloc2"
+    ARCHIVE_DEPS="${NOBLE_ARCHIVE_DEPS}"
 
     safe_build build_archive_devnet_deb || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_control_contains "Depends" "libssl3t64"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl3t64"
 
     ARCHIVE_DEPS="${saved_archive}"
 }
@@ -1042,15 +1008,15 @@ test_control_file_common_fields() {
     safe_build build_logproc_deb || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_control_field "Version" "${EXPECTED_VERSION}"
-    assert_control_field "Architecture" "amd64"
-    assert_control_field "License" "Apache-2.0"
-    assert_control_field "Origin" "MinaProtocol"
-    assert_control_field "Label" "MinaProtocol"
-    assert_control_field "Codename" "bullseye"
-    assert_control_field "Suite" "unstable"
-    assert_control_field "Section" "base"
-    assert_control_field "Priority" "optional"
+    assert_control_field "$CAPTURED_CONTROL" "Version" "${EXPECTED_VERSION}"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
+    assert_control_field "$CAPTURED_CONTROL" "License" "Apache-2.0"
+    assert_control_field "$CAPTURED_CONTROL" "Origin" "MinaProtocol"
+    assert_control_field "$CAPTURED_CONTROL" "Label" "MinaProtocol"
+    assert_control_field "$CAPTURED_CONTROL" "Codename" "bullseye"
+    assert_control_field "$CAPTURED_CONTROL" "Suite" "unstable"
+    assert_control_field "$CAPTURED_CONTROL" "Section" "base"
+    assert_control_field "$CAPTURED_CONTROL" "Priority" "optional"
     assert_contains "control has description" "$CAPTURED_CONTROL" "Description:"
     assert_contains "control has git hash" "$CAPTURED_CONTROL" "${GITHASH}"
 }
