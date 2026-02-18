@@ -4536,8 +4536,10 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
             @@ fun () ->
             Metrics.time ~label:"add_block" ~logger
             @@ fun () ->
-            (* Pre-insert tokens in topological order so that owner tokens
+            (* Temporarily disabled to reproduce broken-chain replayer failure.
+               Pre-insert tokens in topological order so that owner tokens
                exist in the DB before the tokens they own. *)
+            (*
             let sorted_token_ids =
               Token_owners.toposort_tokens (List.map tokens_used ~f:fst)
             in
@@ -4549,6 +4551,7 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
                   in
                   return () )
             in
+            *)
             add_block (module Conn : Mina_caqti.CONNECTION) block
           in
           (* if an existing block has a parent hash that's for the block just added,
