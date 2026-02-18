@@ -78,12 +78,52 @@ module Token_owners = struct
   (* hash table of token owners, updated for each block *)
   let owner_tbl : Account_id.t Token_id.Table.t = Token_id.Table.create ()
 
-  let add_if_doesn't_exist token_id owner =
+  let add_to_owner_tbl token_id owner =
     match Token_id.Table.add owner_tbl ~key:token_id ~data:owner with
     | `Ok | `Duplicate ->
         ()
 
+  let populate_owner_tbl tokens_used =
+    List.iter tokens_used ~f:(fun (token_id, owner) ->
+        match owner with
+        | None ->
+            ()
+        | Some acct_id ->
+            add_to_owner_tbl token_id acct_id )
+
   let find_owner token_id = Token_id.Table.find owner_tbl token_id
+
+  (** Topologically sort a list of token_ids so that owner tokens appear
+      before the tokens they own. Uses [owner_tbl] to look up dependencies.
+      Tokens without owners (or whose owner's token is not in the input set)
+      come first. *)
+  let toposort_tokens (token_ids : Token_id.t list) =
+    let token_set = Set.of_list (module Token_id) token_ids in
+    let parent_in_set tid =
+      match Token_id.Table.find owner_tbl tid with
+      | Some acct_id ->
+          let parent = Account_id.token_id acct_id in
+          if Set.mem token_set parent then Some parent else None
+      | None ->
+          None
+    in
+    let rec visit (visited, acc) tid =
+      if Set.mem visited tid then (visited, acc)
+      else
+        let visited = Set.add visited tid in
+        let visited, acc =
+          match parent_in_set tid with
+          | Some parent ->
+              visit (visited, acc) parent
+          | None ->
+              (visited, acc)
+        in
+        (visited, tid :: acc)
+    in
+    let _, sorted =
+      List.fold token_ids ~init:(Set.empty (module Token_id), []) ~f:visit
+    in
+    List.rev sorted
 end
 
 module Token = struct
@@ -184,6 +224,16 @@ module Token = struct
               ~table_name ~cols:(Fields.names, typ)
               (module Conn)
               { value; owner_public_key_id; owner_token_id } )
+
+  let add_all_if_don't_exist (module Conn : CONNECTION) tokens_used =
+    let open Deferred.Result.Let_syntax in
+    Token_owners.populate_owner_tbl tokens_used ;
+    let sorted_token_ids =
+      Token_owners.toposort_tokens (List.map tokens_used ~f:fst)
+    in
+    Mina_stdlib.Deferred.Result.List.iter sorted_token_ids ~f:(fun token_id ->
+        let%bind (_ : int) = add_if_doesn't_exist (module Conn) token_id in
+        return () )
 end
 
 module Voting_for = struct
@@ -4482,15 +4532,6 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
     ~hash ~delete_older_than ~tokens_used block =
   let state_hash = hash block in
   let add () =
-    [%log info]
-      "Populating token owners table for block with state hash $state_hash"
-      ~metadata:[ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
-    List.iter tokens_used ~f:(fun (token_id, owner) ->
-        match owner with
-        | None ->
-            ()
-        | Some acct_id ->
-            Token_owners.add_if_doesn't_exist token_id acct_id ) ;
     Mina_caqti.Pool.use
       (fun (module Conn : Mina_caqti.CONNECTION) ->
         let%bind res =
@@ -4503,7 +4544,11 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
             O1trace.thread "archive_processor.add_block"
             @@ fun () ->
             Metrics.time ~label:"add_block" ~logger
-            @@ fun () -> add_block (module Conn : Mina_caqti.CONNECTION) block
+            @@ fun () ->
+            let%bind () =
+              Token.add_all_if_don't_exist (module Conn) tokens_used
+            in
+            add_block (module Conn : Mina_caqti.CONNECTION) block
           in
           (* if an existing block has a parent hash that's for the block just added,
              set its parent id
