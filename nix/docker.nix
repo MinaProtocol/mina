@@ -1,7 +1,7 @@
 { lib, dockerTools, buildEnv, ocamlPackages_mina, runCommand, dumb-init
 , coreutils, findutils, bashInteractive, python3, libp2p_helper, procps
 , postgresql, curl, jq, stdenv, rsync, bash, gnutar, gzip, currentTime
-, flockenzeit, }:
+, flockenzeit, fakeNss }:
 let
   created = flockenzeit.lib.ISO-8601 currentTime;
 
@@ -27,11 +27,12 @@ let
     pname = "mina-archive-scripts";
     version = "dev";
     buildCommand = ''
-      mkdir -p $out/entrypoint.d $out/healthcheck
+      mkdir -p $out/entrypoint.d $out/healthcheck $out/etc/mina/archive
       cp ${../dockerfiles/scripts/archive-entrypoint.sh} $out/entrypoint.sh
       cp ${
         ../dockerfiles/scripts/healthcheck-utilities.sh
       } $out/healthcheck/utilities.sh
+      cp ${../src/app/archive}/*.sql $out/etc/mina/archive/
       chmod -R +x $out
     '';
   };
@@ -41,6 +42,7 @@ let
       name = "${name}-full";
       inherit created;
       contents = [
+        fakeNss
         dumb-init
         coreutils
         findutils
@@ -56,7 +58,7 @@ let
         chmod 777 tmp
       '';
       config = {
-        env = [ "MINA_TIME_OFFSET=0" ] ++ additional_envs;
+        env = [ "MINA_TIME_OFFSET=0" "HOME=/root" ] ++ additional_envs;
         WorkingDir = "/root";
         cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
       };
@@ -74,7 +76,7 @@ in {
     mina.out
     mina.mainnet
     mina.genesis
-  ]);
+  ]) [];
 
   # Image with enhanced binary capable of generating coverage report on mina exit
   # For more details please visit: https://github.com/aantron/bisect_ppx/blob/master/doc/advanced.md#sigterm-handling
@@ -93,5 +95,22 @@ in {
       gzip
 
       mina.archive
-    ]);
+    ]) [];
+
+  mina-image-devnet-full = mkFullImage "mina-devnet" (with ocamlPackages_mina; [
+    mina-daemon-scripts
+
+    devnet.out
+    devnet.mainnet
+    devnet.genesis
+  ]) [];
+
+  mina-archive-image-devnet-full = mkFullImage "mina-archive-devnet"
+    (with ocamlPackages_mina; [
+      mina-archive-scripts
+      gnutar
+      gzip
+
+      devnet.archive
+    ]) [];
 }

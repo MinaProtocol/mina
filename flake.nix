@@ -385,7 +385,8 @@
             zkapp-cli hardfork_test;
           inherit (dockerImages)
             mina-image-slim mina-image-full mina-archive-image-full
-            mina-image-instr-full;
+            mina-image-instr-full mina-image-devnet-full
+            mina-archive-image-devnet-full;
           mina-deb = debianPackages.mina;
           impure-shell = (import ./nix/impure-shell.nix pkgs).inputDerivation;
         }) // {
