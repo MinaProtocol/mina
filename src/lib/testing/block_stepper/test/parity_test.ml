@@ -4,6 +4,16 @@ open Signature_lib
 open Mina_base
 
 (*
+Please excuse the messiness of this test. Also note that the state hash parity
+testing is impossible to have succeed with proof level full - there is no option
+(yet!) to have kimchi use a prng with a fixed seed. We'd also need a debug
+option to have the daemon use this prng, and log its seeds for us to harvest
+from its logs in this test. Also it's not entirely obvious that the kimchi code
+is written so that using a seeded prng would even work, if the calls to it end
+up getting reordered. It does use a library that claims to have some amount of
+support for multithreading for this kind of thing, so it's perhaps not utterly
+hopeless.
+
 Currently I'm running the test like this:
 
 DUNE_PROFILE="devnet" dune exec src/lib/testing/block_stepper/test/parity_test.exe -- run --seed test-seed-1 --state-dir /tmp/parity_test_run --num-batches 3 --payments-per-batch 5 --zkapps-per-batch 1 2>&1
