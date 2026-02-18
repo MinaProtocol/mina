@@ -221,6 +221,7 @@ module Dsl = struct
           State_hash.Set.t Mina_transaction.Transaction_hash.Map.t
       ; proof_block_state_hashes : State_hash.t list
       }
+    [@@deriving to_yojson]
 
     val listen :
          logger:Logger.t
