@@ -69,6 +69,7 @@ module Engine = struct
 
       val run_replayer :
            ?start_slot_since_genesis:int
+        -> ?target_state_hash:State_hash.t
         -> logger:Logger.t
         -> t
         -> string Malleable_error.t
@@ -218,6 +219,7 @@ module Dsl = struct
       ; blocks_seen_by_node : State_hash.Set.t String.Map.t
       ; blocks_including_txn :
           State_hash.Set.t Mina_transaction.Transaction_hash.Map.t
+      ; proof_block_state_hashes : State_hash.t list
       }
 
     val listen :
