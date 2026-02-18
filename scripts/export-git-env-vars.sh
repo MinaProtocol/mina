@@ -4,6 +4,17 @@ set -euo pipefail
 # If enabled, keep my tags intact, it won't run git fetch --prune
 KEEP_MY_TAGS_INTACT=${KEEP_MY_TAGS_INTACT:-1}
 
+# Explicit warnings for override environment variables
+if [[ -v SKIP_GITBRANCH ]]; then
+    echo "⚠️  WARNING: SKIP_GITBRANCH is defined - will override GITBRANCH in package version" >&2
+fi
+if [[ -v OVERRIDE_TAG ]]; then
+    echo "⚠️  WARNING: OVERRIDE_TAG is defined - will override GITTAG to '${OVERRIDE_TAG}' in package version" >&2
+fi
+if [[ -v OVERRIDE_GITHASH ]]; then
+    echo "⚠️  WARNING: OVERRIDE_GITHASH is defined - will override GITHASH to '${OVERRIDE_GITHASH}' in package version" >&2
+fi
+
 function find_most_recent_numeric_tag() {
 
     local keep_tags_values=("1" "true" "t" "T" "y" "yes" "Y" "YES")
