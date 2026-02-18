@@ -4,15 +4,51 @@ open Signature_lib
 open Mina_base
 
 (*
-Please excuse the messiness of this test. Also note that the state hash parity
-testing is impossible to have succeed with proof level full - there is no option
-(yet!) to have kimchi use a prng with a fixed seed. We'd also need a debug
-option to have the daemon use this prng, and log its seeds for us to harvest
-from its logs in this test. Also it's not entirely obvious that the kimchi code
-is written so that using a seeded prng would even work, if the calls to it end
-up getting reordered. It does use a library that claims to have some amount of
-support for multithreading for this kind of thing, so it's perhaps not utterly
-hopeless.
+Test that the stepper produces exactly the same blocks as a daemon does, by
+sending batched transactions to a daemon, then replaying the same transactions
+itself and comparing the results.
+
+The test monitors the daemon's best tip to get the actual transactions and
+amount of snark work included in each block, because this is not deterministic -
+the daemon is entitled to include less snark work than necessary if it's not
+available yet, at the cost of potentially dropping transactions it would
+otherwise include in the block. The stepper doesn't need any more information
+than this.
+
+I've even added checking of the precomputed blocks the daemon produces. (I log
+both, but have only done the checking manually). Current status of matching:
+everything but:
+
+- scheduled_time: daemon doesn't report this through graphql - we'd need to get
+  this from, e.g., the precomputed blocks to set it correctly. (the test
+  currently queries the date field of blocks to attempt to do this, but that's
+  wrong - the date field is the block timestamp). the scheduled time is purely
+  advisory anyway, and doesn't matter for consensus.
+
+- the proofs themselves at full proof level, and thus the state hashes. this is
+  impossible to have succeed with proof level full - there is no option (yet!)
+  to have kimchi use a prng with a fixed seed. We'd also need a debug option to
+  have the daemon use this prng, and log its seeds for us to harvest from its
+  logs in this test. Also it's not entirely obvious that the kimchi code is
+  written so that using a seeded prng would even work, if the calls to it end up
+  getting reordered. It does use a library that claims to have some amount of
+  support for multithreading for this kind of thing, so it's perhaps not utterly
+  hopeless. (Kimchi is hard-coded to use the OS's RNG for its witness blinding).
+
+the stepper does appear to produce valid proofs, though. just not byte-for-byte
+identical to the ones that the daemon produces.
+
+We can actually guarantee parity at proof level check or none as long as we're
+using the same build to run the stepper and daemon, because the particular dummy
+proofs used at those levels are evaluated once and baked into the binary. Note
+that this does not mean that dummy proofs are deterministic. You can observe
+through the stepper that multiple dummy proof evaluations give you different
+results, whether evaluating on different runs or the same run. (I think we get
+parity at those levels - have to re-run the test).
+
+Also, I haven't run it long enough to ensure that it handles epoch transitions
+correctly. But so far the consensus data is identical except for the actual
+proofs and the scheduled_time metadata.
 
 Currently I'm running the test like this:
 
