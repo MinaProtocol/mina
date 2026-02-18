@@ -624,9 +624,9 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         raise (Error.to_exn (Error.of_string "Invalid pubsub topic mode"))
   in
   fun () ->
+    let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
     O1trace.thread "mina" (fun () ->
         let open Deferred.Let_syntax in
-        let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
         let%bind () = Mina_stdlib_unix.File_system.create_dir conf_dir in
         let () =
           if is_background then (
