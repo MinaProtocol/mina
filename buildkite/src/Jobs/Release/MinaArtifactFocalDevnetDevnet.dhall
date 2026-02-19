@@ -18,6 +18,7 @@ in  Pipeline.build
           , artifacts =
             [ Artifacts.Type.Daemon
             , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonPrefork
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
