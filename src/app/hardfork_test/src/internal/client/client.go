@@ -148,37 +148,6 @@ genesisBlock {
 }
 `
 
-// Blocks gets blocks data as in the original shell script
-const blocksQuery = `
-bestChain {
-  commandTransactionCount
-  protocolState {
-    consensusState {
-      blockHeight
-      slotSinceGenesis
-      epoch
-      stakingEpochData {
-        ledger { hash }
-        seed
-      }
-      nextEpochData {
-        ledger { hash }
-        seed
-      }
-    }
-    blockchainState {
-      stagedLedgerHash
-      snarkedLedgerHash
-    }
-  }
-  transactions {
-    coinbase
-    feeTransfer { fee }
-  }
-  stateHash
-}
-`
-
 const blocksQueryWithLimit = `
 bestChain (maxLength: %d){
   commandTransactionCount
@@ -263,24 +232,6 @@ func (c *Client) BestTip(port int) (*BlockData, error) {
 	}
 
 	return &blocks[0], nil
-}
-
-// NOTE: This only returns the block in a node's best chain, if a node has age
-// over k-slot it won't be present.
-func (c *Client) GetAllBlocks(port int) ([]BlockData, error) {
-	result, err := c.query(port, blocksQuery)
-	if err != nil {
-		return nil, err
-	}
-
-	var blocks []BlockData
-
-	result.Get("data.bestChain").ForEach(func(_, value gjson.Result) bool {
-		blocks = append(blocks, *parseBlock(value))
-		return true
-	})
-
-	return blocks, nil
 }
 
 func (c *Client) ForkConfig(port int) (gjson.Result, error) {
