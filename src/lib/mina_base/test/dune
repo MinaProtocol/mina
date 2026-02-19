@@ -21,6 +21,7 @@
   kimchi_pasta
   kimchi_pasta.basic
   mina_base
+  mina_transaction
   mina_numbers
   mina_stdlib
   mina_wire_types

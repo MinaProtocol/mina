@@ -466,28 +466,6 @@ module Hardfork = struct
     Poly.Stable.Latest.t
   [@@deriving sexp, equal, hash, compare, yojson, bin_io_unversioned]
 
-  let of_stable (account : Stable.Latest.t) : t =
-    { app_state = Zkapp_state.Hardfork.Value.of_stable account.app_state
-    ; verification_key = account.verification_key
-    ; zkapp_version = account.zkapp_version
-    ; action_state = account.action_state
-    ; last_action_slot = account.last_action_slot
-    ; proved_state = account.proved_state
-    ; zkapp_uri = account.zkapp_uri
-    }
-
-  (** Convert a Mesa zkApp account to a stable Berkeley zkApp account. Raises if
-    we can't convert back to stable Berkeley zkApp account. *)
-  let to_stable_exn (account : t) : Stable.Latest.t =
-    { app_state = Zkapp_state.Hardfork.Value.to_stable_exn account.app_state
-    ; verification_key = account.verification_key
-    ; zkapp_version = account.zkapp_version
-    ; action_state = account.action_state
-    ; last_action_slot = account.last_action_slot
-    ; proved_state = account.proved_state
-    ; zkapp_uri = account.zkapp_uri
-    }
-
   let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
     let open Random_oracle.Input.Chunked in
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
@@ -511,8 +489,6 @@ module Hardfork = struct
   let digest (t : t) =
     Random_oracle.(
       hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
-
-  let default = of_stable default
 
   let default_digest = lazy (digest default)
 end

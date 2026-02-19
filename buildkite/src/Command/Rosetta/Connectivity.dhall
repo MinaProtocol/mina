@@ -26,6 +26,12 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let DockerRepo = ../../Constants/DockerRepo.dhall
 
+let Expr = ../../Pipeline/Expr.dhall
+
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
+let Benchmarks = ../../Constants/Benchmarks.dhall
+
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let B/If = B.definitions/commandStep/properties/if/Type
@@ -41,6 +47,8 @@ let Spec =
           , scope : List PipelineScope.Type
           , repo : DockerRepo.Type
           , if_ : B/If
+          , excludeIf : List Expr.Type
+          , includeIf : List Expr.Type
           }
       , default =
           { dockerType = Dockers.Type.Bullseye
@@ -51,6 +59,8 @@ let Spec =
           , profile = Profiles.Type.Devnet
           , scope = PipelineScope.Full
           , repo = DockerRepo.Type.InternalEurope
+          , includeIf = [] : List Expr.Type
+          , excludeIf = [] : List Expr.Type
           , if_ =
               "build.pull_request.base_branch != \"develop\" && build.branch != \"develop\""
           }
@@ -62,21 +72,25 @@ let command
       ->  Command.build
             Command.Config::{
             , commands =
-              [ Cmd.chain
-                  [ "export MINA_DEB_CODENAME=${Dockers.lowerName
-                                                  spec.dockerType}"
-                  , "source ./buildkite/scripts/export-git-env-vars.sh"
-                  , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
-                                                                         spec.network} --tag \\\${MINA_DOCKER_TAG} --timeout ${Natural/show
-                                                                                                                                 spec.timeout} --repo ${DockerRepo.show
-                                                                                                                                                          spec.repo} --run-compatibility-test develop --run-load-test "
+                  [ Cmd.chain
+                      [ "export MINA_DEB_CODENAME=${Dockers.lowerName
+                                                      spec.dockerType}"
+                      , "source ./buildkite/scripts/export-git-env-vars.sh"
+                      , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
+                                                                             spec.network} --tag \\\${MINA_DOCKER_TAG} --timeout ${Natural/show
+                                                                                                                                     spec.timeout} --repo ${DockerRepo.show
+                                                                                                                                                              spec.repo} --run-compatibility-test develop --run-load-test --branch \\\${BUILDKITE_BRANCH} --commit \\\${BUILDKITE_COMMIT} --metrics-mode --perf-output-file /workdir/rosetta.perf"
+                      ]
                   ]
-              ]
+                # RunInToolchain.runInToolchain
+                    (Benchmarks.toEnvList Benchmarks.Type::{=})
+                    "./buildkite/scripts/bench/send.sh"
             , label =
                 "Rosetta ${Network.lowerName spec.network} connectivity test "
             , key =
                 "rosetta-${Network.lowerName spec.network}-connectivity-test"
             , target = Size.XLarge
+            , artifact_paths = [ S.contains "test_output/artifacts/**/*" ]
             , soft_fail = Some spec.softFail
             , if_ = Some spec.if_
             , depends_on =
@@ -115,6 +129,8 @@ let pipeline
             , path = "Test"
             , name = "Rosetta${Network.capitalName spec.network}Connect"
             , scope = spec.scope
+            , excludeIf = spec.excludeIf
+            , includeIf = spec.includeIf
             , tags =
               [ PipelineTag.Type.Long
               , PipelineTag.Type.Test

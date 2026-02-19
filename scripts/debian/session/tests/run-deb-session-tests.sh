@@ -12,6 +12,8 @@
 #   - Moving files within the session
 #   - Replacing files matching a glob pattern
 #   - Removing files matching a glob pattern
+#   - Replacing the version (reversion)
+#   - Replacing the suite
 #   - Renaming the package
 #   - Saving the session back to a .deb file and verifying its contents
 #
@@ -84,6 +86,7 @@ Version: 1.0
 Section: utils
 Priority: optional
 Architecture: amd64
+Suite: unstable
 Maintainer: Mina Protocol <test@example.com>
 Description: Sample package for deb-session tests
 EOF
@@ -182,6 +185,34 @@ assert_not_exists "$SESSION_DIR/data/var/lib/coda/moved-ledger.tar.gz"
 assert_not_exists "$SESSION_DIR/data/var/lib/coda/new-ledger2.tar.gz"
 
 # ------------------------------------------------------------------------------
+# Test replacing the version (reversion)
+# ------------------------------------------------------------------------------
+log "Testing deb-session-reversion.sh"
+"$SESSION_SCRIPTS_DIR/deb-session-reversion.sh" \
+  "$SESSION_DIR" \
+  "2.0.0-rc1"
+
+# Verify the control file was updated
+CURRENT_VERSION=$(awk '/^Version:/ {print $2}' "$SESSION_DIR/control/control")
+if [[ "$CURRENT_VERSION" != "2.0.0-rc1" ]]; then
+  fail "control file not updated with new version (got: $CURRENT_VERSION)"
+fi
+
+# ------------------------------------------------------------------------------
+# Test replacing the suite
+# ------------------------------------------------------------------------------
+log "Testing deb-session-replace-suite.sh"
+"$SESSION_SCRIPTS_DIR/deb-session-replace-suite.sh" \
+  "$SESSION_DIR" \
+  "stable"
+
+# Verify the control file was updated
+CURRENT_SUITE=$(awk '/^Suite:/ {print $2}' "$SESSION_DIR/control/control")
+if [[ "$CURRENT_SUITE" != "stable" ]]; then
+  fail "control file not updated with new suite (got: $CURRENT_SUITE)"
+fi
+
+# ------------------------------------------------------------------------------
 # Test renaming the package
 # ------------------------------------------------------------------------------
 log "Testing deb-session-rename-package.sh"
@@ -205,6 +236,16 @@ OUTPUT_DEB="$WORKDIR/output.deb"
 NEW_PACKAGE_NAME="$(dpkg-deb --field "$OUTPUT_DEB" Package)"
 if [[ "$NEW_PACKAGE_NAME" != "mina-devnet-hardfork" ]]; then
   fail "Saved package has unexpected name: $NEW_PACKAGE_NAME"
+fi
+
+NEW_VERSION="$(dpkg-deb --field "$OUTPUT_DEB" Version)"
+if [[ "$NEW_VERSION" != "2.0.0-rc1" ]]; then
+  fail "Saved package has unexpected version: $NEW_VERSION"
+fi
+
+NEW_SUITE="$(dpkg-deb --field "$OUTPUT_DEB" Suite)"
+if [[ "$NEW_SUITE" != "stable" ]]; then
+  fail "Saved package has unexpected suite: $NEW_SUITE"
 fi
 
 # Extract the resulting .deb and verify its contents

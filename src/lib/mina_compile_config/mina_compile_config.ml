@@ -20,10 +20,7 @@ module Inputs = struct
     ; rpc_handshake_timeout_sec : float
     ; rpc_heartbeat_timeout_sec : float
     ; rpc_heartbeat_send_every_sec : float
-    ; zkapp_proof_update_cost : float
-    ; zkapp_signed_pair_update_cost : float
-    ; zkapp_signed_single_update_cost : float
-    ; zkapp_transaction_cost_limit : float
+    ; max_zkapp_segment_per_transaction : int
     ; max_event_elements : int
     ; max_action_elements : int
     ; zkapp_cmd_limit_hardcap : int
@@ -47,10 +44,7 @@ type t =
   ; rpc_handshake_timeout : Time.Span.t
   ; rpc_heartbeat_timeout : Time.Span.t
   ; rpc_heartbeat_send_every : Time.Span.t
-  ; zkapp_proof_update_cost : float
-  ; zkapp_signed_pair_update_cost : float
-  ; zkapp_signed_single_update_cost : float
-  ; zkapp_transaction_cost_limit : float
+  ; max_zkapp_segment_per_transaction : int
   ; max_event_elements : int
   ; max_action_elements : int
   ; zkapp_cmd_limit_hardcap : int
@@ -80,10 +74,7 @@ let make (inputs : Inputs.t) =
   ; rpc_heartbeat_timeout = Time.Span.of_sec inputs.rpc_heartbeat_timeout_sec
   ; rpc_heartbeat_send_every =
       Time.Span.of_sec inputs.rpc_heartbeat_send_every_sec
-  ; zkapp_proof_update_cost = inputs.zkapp_proof_update_cost
-  ; zkapp_signed_pair_update_cost = inputs.zkapp_signed_pair_update_cost
-  ; zkapp_signed_single_update_cost = inputs.zkapp_signed_single_update_cost
-  ; zkapp_transaction_cost_limit = inputs.zkapp_transaction_cost_limit
+  ; max_zkapp_segment_per_transaction = inputs.max_zkapp_segment_per_transaction
   ; max_event_elements = inputs.max_event_elements
   ; max_action_elements = inputs.max_action_elements
   ; network_id = inputs.network_id
@@ -115,11 +106,8 @@ let to_yojson t =
       , `Float (Time.Span.to_sec t.rpc_heartbeat_timeout) )
     ; ( "rpc_heartbeat_send_every"
       , `Float (Time.Span.to_sec t.rpc_heartbeat_send_every) )
-    ; ("zkapp_proof_update_cost", `Float t.zkapp_proof_update_cost)
-    ; ("zkapp_signed_pair_update_cost", `Float t.zkapp_signed_pair_update_cost)
-    ; ( "zkapp_signed_single_update_cost"
-      , `Float t.zkapp_signed_single_update_cost )
-    ; ("zkapp_transaction_cost_limit", `Float t.zkapp_transaction_cost_limit)
+    ; ( "max_zkapp_segment_per_transaction"
+      , `Int t.max_zkapp_segment_per_transaction )
     ; ("max_event_elements", `Int t.max_event_elements)
     ; ("max_action_elements", `Int t.max_action_elements)
     ; ("network_id", `String t.network_id)
@@ -147,12 +135,8 @@ module Compiled = struct
       ; rpc_handshake_timeout_sec = Node_config.rpc_handshake_timeout_sec
       ; rpc_heartbeat_timeout_sec = Node_config.rpc_heartbeat_timeout_sec
       ; rpc_heartbeat_send_every_sec = Node_config.rpc_heartbeat_send_every_sec
-      ; zkapp_proof_update_cost = Node_config.zkapp_proof_update_cost
-      ; zkapp_signed_pair_update_cost =
-          Node_config.zkapp_signed_pair_update_cost
-      ; zkapp_signed_single_update_cost =
-          Node_config.zkapp_signed_single_update_cost
-      ; zkapp_transaction_cost_limit = Node_config.zkapp_transaction_cost_limit
+      ; max_zkapp_segment_per_transaction =
+          Node_config.max_zkapp_segment_per_transaction
       ; max_event_elements = Node_config.max_event_elements
       ; max_action_elements = Node_config.max_action_elements
       ; network_id = Node_config.network
@@ -188,14 +172,8 @@ module For_unit_tests = struct
           Node_config_for_unit_tests.rpc_heartbeat_timeout_sec
       ; rpc_heartbeat_send_every_sec =
           Node_config_for_unit_tests.rpc_heartbeat_send_every_sec
-      ; zkapp_proof_update_cost =
-          Node_config_for_unit_tests.zkapp_proof_update_cost
-      ; zkapp_signed_pair_update_cost =
-          Node_config_for_unit_tests.zkapp_signed_pair_update_cost
-      ; zkapp_signed_single_update_cost =
-          Node_config_for_unit_tests.zkapp_signed_single_update_cost
-      ; zkapp_transaction_cost_limit =
-          Node_config_for_unit_tests.zkapp_transaction_cost_limit
+      ; max_zkapp_segment_per_transaction =
+          Node_config_for_unit_tests.max_zkapp_segment_per_transaction
       ; max_event_elements = Node_config_for_unit_tests.max_event_elements
       ; max_action_elements = Node_config_for_unit_tests.max_action_elements
       ; network_id = Node_config_for_unit_tests.network

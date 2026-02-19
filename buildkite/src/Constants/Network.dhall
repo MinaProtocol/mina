@@ -10,6 +10,7 @@ let Network
       | DevnetLegacy
       | MainnetLegacy
       | PreMesa1
+      | Mesa
       >
 
 let capitalName =
@@ -21,6 +22,7 @@ let capitalName =
             , DevnetLegacy = "DevnetLegacy"
             , MainnetLegacy = "MainnetLegacy"
             , PreMesa1 = "PreMesa1"
+            , Mesa = "Mesa"
             }
             network
 
@@ -33,6 +35,7 @@ let lowerName =
             , DevnetLegacy = "devnet_pre_hardfork"
             , MainnetLegacy = "mainnet_pre_hardfork"
             , PreMesa1 = "hetzner-pre-mesa-1"
+            , Mesa = "mesa"
             }
             network
 
@@ -45,18 +48,20 @@ let debianSuffix =
             , DevnetLegacy = "devnet-pre-hardfork"
             , MainnetLegacy = "mainnet-pre-hardfork"
             , PreMesa1 = "hetzner-pre-mesa-1"
+            , Mesa = "mesa"
             }
             network
 
 let requiresMainnetBuild =
           \(network : Network)
       ->  merge
-            { Devnet = True
+            { Devnet = False
             , Mainnet = True
             , TestnetGeneric = True
             , DevnetLegacy = True
             , MainnetLegacy = True
             , PreMesa1 = False
+            , Mesa = False
             }
             network
 

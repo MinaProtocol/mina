@@ -33,7 +33,6 @@ set -E # inherit -e
 set -e # exit immediately on errors
 set -u # exit on not assigned variables
 set -o pipefail # exit on pipe failure
-set -x
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -94,9 +93,8 @@ mkdir -p $DEBIAN_CACHE_FOLDER
 ################################################################################
 # imports
 ################################################################################
-# shellcheck disable=SC1090
-. $SCRIPTPATH/../../../scripts/debian/reversion-helper.sh
 
+SESSION_SCRIPTS=$SCRIPTPATH/../../../scripts/debian/session
 
 ################################################################################
 # functions
@@ -345,6 +343,14 @@ function storage_upload() {
 
     case $backend in
         local)
+            # Check if remote_path is a directory or a file by extension
+            if [[ -d "$remote_path" || "${remote_path: -1}" == "/" || ! "$remote_path" =~ \.[^/]+$ ]]; then
+                # remote_path is a directory (ends with / or is a dir or has no extension)
+                mkdir -p "$remote_path"
+            else
+                # remote_path is a file (has an extension)
+                mkdir -p "$(dirname "$remote_path")"
+            fi
             cp $local_path "$remote_path"
             ;;
         gs)
@@ -365,7 +371,7 @@ function storage_root() {
 
     case $backend in
         local)
-            echo "/var/storagebox/"
+            echo "/var/storagebox"
             ;;
         gs)
             echo "gs://buildkite_k8s/coda/shared"
@@ -456,14 +462,19 @@ function publish_debian() {
 
     if [[ $__source_version != "$__target_version" ]]; then
         echo " 🗃️  Rebuilding $__artifact debian from $__source_version to $__target_version"
-        prefix_cmd "$SUBCOMMAND_TAB" reversion --deb ${__deb} \
-                --package ${__artifact_full_name} \
-                --source-version ${__source_version} \
-                --new-version ${__target_version} \
-                --suite "unstable" \
-                --new-suite ${__channel} \
-                --new-name ${__new_artifact_name} \
-                --arch ${__arch}
+        local __session_dir
+        __session_dir=$(mktemp -d -t deb-session-XXXXXX)
+        local __input_deb="${__deb}_${__source_version}_${__arch}.deb"
+        local __output_deb="$DEBIAN_CACHE_FOLDER/$__codename/${__new_artifact_name}_${__target_version}_${__arch}.deb"
+
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-open.sh" "$__input_deb" "$__session_dir"
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-reversion.sh" "$__session_dir" "$__target_version"
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-replace-suite.sh" "$__session_dir" "$__channel"
+        if [[ "$__new_artifact_name" != "$__artifact_full_name" ]]; then
+            prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-rename-package.sh" "$__session_dir" "$__new_artifact_name"
+        fi
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-save.sh" "$__session_dir" "$__output_deb"
+        rm -rf "$__session_dir"
     fi
 
     echo " 🍥  Publishing $__artifact debian to $__channel channel with $__target_version version"
@@ -580,34 +591,47 @@ function promote_debian() {
 
     local __new_artifact_name=$__artifact_full_name
 
-    local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
-
     if [[ $__dry_run == 0 ]]; then
         echo "    🗃️  Promoting $__artifact debian from $__codename/$__source_version to $__codename/$__target_version"
         local __debian_bucket
         __debian_bucket=$(extract_bucket_name "$__debian_repo")
 
+        # Download the .deb from S3
+        mkdir -p "$DEBIAN_CACHE_FOLDER/$__codename"
+        local __input_deb="$DEBIAN_CACHE_FOLDER/$__codename/${__artifact_full_name}_${__source_version}_${__arch}.deb"
+        wget "https://s3.us-west-2.amazonaws.com/${__debian_bucket}/pool/${__codename}/m/mi/${__artifact_full_name}_${__source_version}_${__arch}.deb" \
+            -O "$__input_deb"
 
+        # Open session and modify
+        local __session_dir
+        __session_dir=$(mktemp -d -t deb-session-XXXXXX)
+        local __output_deb="$DEBIAN_CACHE_FOLDER/$__codename/${__new_artifact_name}_${__target_version}_${__arch}.deb"
 
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-open.sh" "$__input_deb" "$__session_dir"
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-reversion.sh" "$__session_dir" "$__target_version"
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-replace-suite.sh" "$__session_dir" "$__target_channel"
+        if [[ "$__new_artifact_name" != "$__artifact_full_name" ]]; then
+            prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-rename-package.sh" "$__session_dir" "$__new_artifact_name"
+        fi
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-save.sh" "$__session_dir" "$__output_deb"
+        rm -rf "$__session_dir"
+
+        # Publish the modified .deb
         # shellcheck disable=SC2068,SC2046
-        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/reversion.sh \
-                --deb ${__artifact_full_name} \
-                --version ${__source_version} \
-                --new-version ${__target_version} \
-                --suite ${__source_channel} \
-                --repo ${__debian_bucket} \
-                --arch ${__arch} \
-                --codename ${__codename} \
-                --new-suite ${__target_channel} \
-                --new-name ${__new_artifact_name} \
-                $(if [[ $__skip_cache_invalidation == 1 ]]; then echo "--skip-cache-invalidation"; fi) \
-                --codename ${__codename}
-
+        prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/publish.sh \
+            --names "$__output_deb" \
+            --version $__target_version \
+            --bucket $__debian_bucket \
+            -c $__codename \
+            $(if [[ $__skip_cache_invalidation == 1 ]]; then echo "--skip-cache-invalidation"; fi) \
+            -r $__target_channel \
+            --arch $__arch \
+            ${__sign_arg[@]}
 
         if [[ $__verify == 1 ]]; then
             echo "     📋 Verifying: $__artifact debian to $__target_channel channel with $__target_version version"
 
-            prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
+            prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/verify.sh \
                 -p $__new_artifact_name \
                 --version $__target_version \
                 -m $__codename \
@@ -1778,11 +1802,13 @@ function persist_help(){
     printf "  %-25s %s\n" "--backend" "[string] backend to persist artifacts. e.g gs,hetzner";
     printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to persist. e.g mina-logproc,mina-archive,mina-rosetta";
     printf "  %-25s %s\n" "--buildkite-build-id" "[string] buildkite build id to persist artifacts";
+    printf "  %-25s %s\n" "--local-debian-path" "[string] path to local .deb file or directory (exclusive with --buildkite-build-id)";
     printf "  %-25s %s\n" "--target" "[string] target location to persist artifacts";
     echo ""
     echo "Example:"
     echo ""
     echo "  " $CLI_NAME persist --backend gs --artifacts mina-logproc,mina-archive,mina-rosetta --buildkite-build-id 123 --target /debians_legacy
+    echo "  " $CLI_NAME persist --backend gs --artifacts mina-archive --local-debian-path /path/to/debs --target /debians_legacy
     echo ""
     echo " Above command will persist mina-logproc,mina-archive,mina-rosetta artifacts to {backend root}/debians_legacy"
     echo ""
@@ -1796,7 +1822,9 @@ function persist(){
 
     local __backend="hetzner"
     local __artifacts="$DEFAULT_ARTIFACTS"
+    local __artifacts_set=0
     local __buildkite_build_id
+    local __local_debian_path
     local __target
     local __codename
     local __new_version
@@ -1815,6 +1843,7 @@ function persist(){
             ;;
             --artifacts )
                 __artifacts=${2:?$error_message}
+                __artifacts_set=1
                 shift 2;
             ;;
             --codename )
@@ -1823,6 +1852,10 @@ function persist(){
             ;;
             --buildkite-build-id )
                 __buildkite_build_id=${2:?$error_message}
+                shift 2;
+            ;;
+            --local-debian-path )
+                __local_debian_path=${2:?$error_message}
                 shift 2;
             ;;
             --new-version )
@@ -1849,8 +1882,13 @@ function persist(){
         esac
     done
 
-    if [[ -z ${__buildkite_build_id+x} ]]; then
-        echo -e "❌ ${RED} !! Buildkite build id (--buildkite-build-id) is required${CLEAR}\n";
+    if [[ -n ${__buildkite_build_id+x} && -n ${__local_debian_path+x} ]]; then
+        echo -e "❌ ${RED} !! --buildkite-build-id and --local-debian-path are mutually exclusive${CLEAR}\n";
+        persist_help; exit 1;
+    fi
+
+    if [[ -z ${__buildkite_build_id+x} && -z ${__local_debian_path+x} ]]; then
+        echo -e "❌ ${RED} !! Either --buildkite-build-id or --local-debian-path is required${CLEAR}\n";
         persist_help; exit 1;
     fi
 
@@ -1864,8 +1902,57 @@ function persist(){
         persist_help; exit 1;
     fi
 
-    if [[ -z ${__artifacts+x} ]]; then
+    if [[ -n ${__local_debian_path+x} ]]; then
+        if [[ -f "$__local_debian_path" ]]; then
+            :
+        elif [[ -d "$__local_debian_path" ]]; then
+            :
+        else
+            echo -e "❌ ${RED} !! --local-debian-path does not exist: $__local_debian_path${CLEAR}\n";
+            persist_help; exit 1;
+        fi
+    fi
+
+    if [[ -n ${__local_debian_path+x} && $__artifacts_set -eq 0 ]]; then
+        if [[ -f "$__local_debian_path" ]]; then
+            local __base
+            __base=$(basename "$__local_debian_path" .deb)
+            __artifacts="${__base%%_*}"
+        else
+            local __files=()
+            local __f
+            while IFS= read -r -d '' __f; do
+                __files+=("$__f")
+            done < <(find "$__local_debian_path" -maxdepth 1 -type f -name "*_*_${__arch}.deb" -print0)
+
+            if [[ ${#__files[@]} -eq 0 ]]; then
+                echo -e "❌ ${RED} !! No debs found in $__local_debian_path for arch $__arch${CLEAR}\n";
+                exit 1;
+            fi
+
+            declare -A __artifact_seen=()
+            local __artifact_list=()
+            for __f in "${__files[@]}"; do
+                local __name
+                __name=$(basename "$__f" .deb)
+                __name="${__name%%_*}"
+                if [[ -z ${__artifact_seen[$__name]+x} ]]; then
+                    __artifact_list+=("$__name")
+                    __artifact_seen[$__name]=1
+                fi
+            done
+
+            __artifacts=$(IFS=','; echo "${__artifact_list[*]}")
+        fi
+    fi
+
+    if [[ -z "$__artifacts" ]]; then
         echo -e "❌ ${RED} !! Artifacts (--artifacts) is required${CLEAR}\n";
+        persist_help; exit 1;
+    fi
+
+    if [[ -n ${__local_debian_path+x} && -f "$__local_debian_path" && "$__artifacts" == *","* ]]; then
+        echo -e "❌ ${RED} !! --local-debian-path file requires a single artifact${CLEAR}\n";
         persist_help; exit 1;
     fi
 
@@ -1873,7 +1960,12 @@ function persist(){
     echo " ℹ️  Persisting mina artifacts with following parameters:"
     echo " - Backend: $__backend"
     echo " - Artifacts: $__artifacts"
-    echo " - Buildkite build id: $__buildkite_build_id"
+    if [[ -n ${__buildkite_build_id+x} ]]; then
+        echo " - Buildkite build id: $__buildkite_build_id"
+    fi
+    if [[ -n ${__local_debian_path+x} ]]; then
+        echo " - Local debian path: $__local_debian_path"
+    fi
     echo " - Codename: $__codename"
     echo " - Suite: $__suite"
     echo " - Architecture: $__arch"
@@ -1890,7 +1982,21 @@ function persist(){
     echo ""
 
     for __artifact in "${__artifacts_arr[@]}"; do
-        storage_download "$__backend" "$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact}_*_${__arch}.deb" "$tmp_dir"
+        if [[ -n ${__local_debian_path+x} ]]; then
+            if [[ -f "$__local_debian_path" ]]; then
+                cp "$__local_debian_path" "$tmp_dir/"
+            else
+                local __source_pattern="$__local_debian_path/${__artifact}_*_${__arch}.deb"
+                if compgen -G "$__source_pattern" > /dev/null; then
+                    cp $__source_pattern "$tmp_dir/"
+                else
+                    echo -e "❌ ${RED} !! No debs found for $__artifact ($__arch) in $__local_debian_path${CLEAR}\n";
+                    exit 1;
+                fi
+            fi
+        else
+            storage_download "$__backend" "$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact}_*_${__arch}.deb" "$tmp_dir"
+        fi
 
         if [[ -n ${__new_version+x} ]]; then
             local __source_version
