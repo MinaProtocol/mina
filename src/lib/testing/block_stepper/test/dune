@@ -1,6 +1,6 @@
 (executable
  (name parity_test)
- (modules parity_test)
+ (modules parity_test parity_graphql)
  (libraries
   ;; opam libraries
   async
@@ -8,8 +8,6 @@
   async_unix
   core
   core_kernel
-  cohttp
-  cohttp-async
   yojson
   uri
   ;; local libraries
@@ -21,11 +19,13 @@
   genesis_constants
   genesis_ledger_helper
   genesis_ledger_helper.lib
+  graphql_lib
   interpolator_lib
   logger
   mina_automation
   mina_base
   mina_block
+  mina_graphql
   mina_ledger
   mina_numbers
   mina_runtime_config
@@ -44,8 +44,14 @@
   with_hash
   internal_tracing
   mina_version)
+ (preprocessor_deps
+  ../../../../graphql-ppx-config.inc
+  ../../../../../graphql_schema.json)
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane ppx_deriving_yojson))
+  (per_module
+   ((pps ppx_mina ppx_version ppx_jane ppx_deriving_yojson) parity_test)
+   ((pps graphql_ppx -- %{read-lines:../../../../graphql-ppx-config.inc})
+    parity_graphql)))
  (instrumentation
   (backend bisect_ppx)))
 

@@ -176,11 +176,14 @@ let create_direct ~proof_level ~proof_cache_db ~signature_kind ~logger
 
 let create_parallel ~num_workers ~proof_level ~proof_cache_db ~signature_kind
     ~constraint_constants ~logger =
-  [%log info] "Spawning %d snark work worker processes" num_workers ;
+  [%log info] "Spawning $num_workers snark work worker processes"
+    ~metadata:[ ("num_workers", `Int num_workers) ] ;
   let%map workers =
     Deferred.List.map (List.init num_workers ~f:Fn.id) ~how:`Parallel
       ~f:(fun i ->
-        [%log info] "Spawning snark work worker %d/%d" (i + 1) num_workers ;
+        [%log info] "Spawning snark work worker $worker_num/$num_workers"
+          ~metadata:
+            [ ("worker_num", `Int (i + 1)); ("num_workers", `Int num_workers) ] ;
         Snark_work_worker.create ~logger ~proof_level ~constraint_constants
           ~signature_kind )
   in
@@ -235,8 +238,11 @@ let create_parallel ~num_workers ~proof_level ~proof_cache_db ~signature_kind
 let compute provider ~fee ~prover_key work_specs =
   let sok_digest = Sok_message.(digest (create ~fee ~prover:prover_key)) in
   let logger = provider.logger in
-  [%log info] "Computing %d snark work items"
-    (List.sum (module Int) work_specs ~f:One_or_two.length) ;
+  [%log info] "Computing $num_items snark work items"
+    ~metadata:
+      [ ( "num_items"
+        , `Int (List.sum (module Int) work_specs ~f:One_or_two.length) )
+      ] ;
   [%log internal] "Snark_work_compute"
     ~metadata:
       [ ( "snark_work_items"

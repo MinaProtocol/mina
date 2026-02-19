@@ -182,7 +182,8 @@ let step_at_slot t ~global_slot_since_genesis ~block_stake_winner ~transactions
         (Public_key.Compressed.to_base58_check block_stake_winner)
         (Public_key.Compressed.to_base58_check winner_pk)
   in
-  [%log info] "VRF verified at slot %d, building block" slot_int ;
+  [%log info] "VRF verified at slot $slot, building block"
+    ~metadata:[ ("slot", `Int slot_int) ] ;
   let slot_won =
     { Consensus.Data.Slot_won.delegator
     ; producer = t.keypair
@@ -248,8 +249,9 @@ let step t ~transactions =
       | Some (winner, next_slot) ->
           Deferred.Or_error.return (winner, next_slot, epoch_data)
       | None ->
-          [%log info] "Epoch exhausted at slot %d, recomputing for next epoch"
-            epoch_end_slot ;
+          [%log info]
+            "Epoch exhausted at slot $slot, recomputing for next epoch"
+            ~metadata:[ ("slot", `Int epoch_end_slot) ] ;
           let new_epoch_data =
             get_epoch_data_at_slot ~context ~consensus_state
               ~local_state:consensus_local_state ~slot:epoch_end_slot
@@ -258,7 +260,8 @@ let step t ~transactions =
           find_slot ~epoch_data:new_epoch_data ~start_slot:epoch_end_slot
             ~slots_searched:(slots_searched + slots_in_this_epoch)
   in
-  [%log info] "Searching for next winning slot from slot %d" t.next_search_slot ;
+  [%log info] "Searching for next winning slot from slot $slot"
+    ~metadata:[ ("slot", `Int t.next_search_slot) ] ;
   let%bind (slot_won, ledger_snapshot), next_search_slot, epoch_data =
     find_slot ~epoch_data:t.epoch_data ~start_slot:t.next_search_slot
       ~slots_searched:0

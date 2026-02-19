@@ -45,7 +45,8 @@ let find_next_winning_slot ~context:(module Context : Consensus.Intf.CONTEXT)
         (Some
           (`Vrf_eval _vrf_eval, `Vrf_output vrf_result, `Delegator delegator) )
       ->
-        [%log info] "Found winning slot at global slot %d" current_slot ;
+        [%log info] "Found winning slot at global slot $slot"
+          ~metadata:[ ("slot", `Int current_slot) ] ;
         let slot_won =
           { Consensus.Data.Slot_won.delegator
           ; producer = keypair

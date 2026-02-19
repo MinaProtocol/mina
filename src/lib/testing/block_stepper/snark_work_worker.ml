@@ -204,8 +204,8 @@ let create ~logger ~proof_level ~constraint_constants ~signature_kind =
       ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
       { proof_level; constraint_constants; signature_kind }
   in
-  [%log info] "Snark work worker started with pid %d"
-    (Process.pid process |> Pid.to_int) ;
+  [%log info] "Snark work worker started with pid $pid"
+    ~metadata:[ ("pid", `Int (Process.pid process |> Pid.to_int)) ] ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stderr process |> Reader.pipe)

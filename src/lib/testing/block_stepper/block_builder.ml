@@ -293,8 +293,12 @@ let build_breadcrumb ~transactions ~context ~precomputed_values
             n taken_count (List.length work_specs)
         else (
           [%log info]
-            "Selected %d work specs (%d items) matching snark_work_count"
-            (List.length taken) taken_count ;
+            "Selected $num_specs work specs ($num_items items) matching \
+             snark_work_count"
+            ~metadata:
+              [ ("num_specs", `Int (List.length taken))
+              ; ("num_items", `Int taken_count)
+              ] ;
           Deferred.Or_error.return taken )
     | None ->
         Deferred.Or_error.return work_specs
@@ -323,9 +327,15 @@ let build_breadcrumb ~transactions ~context ~precomputed_values
       ~signature_kind
   in
   [%log info]
-    "Generated protocol state and internal transition with %d commands"
-    ( Mina_block.Internal_transition.staged_ledger_diff internal_transition
-    |> Staged_ledger_diff.commands |> List.length ) ;
+    "Generated protocol state and internal transition with $num_commands \
+     commands"
+    ~metadata:
+      [ ( "num_commands"
+        , `Int
+            ( Mina_block.Internal_transition.staged_ledger_diff
+                internal_transition
+            |> Staged_ledger_diff.commands |> List.length ) )
+      ] ;
   let proof_level = precomputed_values.Precomputed_values.proof_level in
   let%bind protocol_state_proof =
     extend_blockchain ~proof_level

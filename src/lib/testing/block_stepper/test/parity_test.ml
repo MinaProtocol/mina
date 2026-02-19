@@ -150,46 +150,57 @@ let generate_runtime_config ~seed ~proof_level ~slot_time_ms ~delta ~work_delay
 
 (* ---- GraphQL helpers ---- *)
 
-let graphql_query ~rest_port query_string =
-  let uri = Uri.of_string (sprintf "http://localhost:%d/graphql" rest_port) in
-  let body_str =
-    Yojson.Safe.to_string (`Assoc [ ("query", `String query_string) ])
-  in
-  let headers =
-    Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
+let graphql_uri rest_port =
+  Uri.of_string (sprintf "http://localhost:%d/graphql" rest_port)
+
+(* For [%graphql] typed queries via Parity_graphql *)
+let graphql_query_typed ~rest_port query_obj =
+  match%bind
+    Clock.with_timeout graphql_timeout
+      (Graphql_lib.Client.query query_obj (graphql_uri rest_port))
+  with
+  | `Result (Ok result) ->
+      return (Ok result)
+  | `Result (Error (`Failed_request msg)) ->
+      return (Or_error.error_string msg)
+  | `Result (Error (`Graphql_error msg)) ->
+      return (Or_error.error_string msg)
+  | `Timeout ->
+      return
+        (Or_error.errorf "GraphQL query timed out after %s"
+           (Time.Span.to_short_string graphql_timeout) )
+
+(* For raw query strings — wraps string + variables into a query object
+   and uses Graphql_lib.Client.query_json for transport.
+   Returns the "data" JSON (already unwrapped by query_json). *)
+let graphql_query_raw ~rest_port query_string variables =
+  let query_obj =
+    object
+      method query = query_string
+
+      method variables : Yojson.Basic.t = variables
+    end
   in
   match%bind
     Clock.with_timeout graphql_timeout
-      (Monitor.try_with ~here:[%here] (fun () ->
-           let%bind _resp, body =
-             Cohttp_async.Client.post ~headers
-               ~body:(Cohttp_async.Body.of_string body_str)
-               uri
-           in
-           Cohttp_async.Body.to_string body ) )
+      (Graphql_lib.Client.query_json query_obj (graphql_uri rest_port))
   with
-  | `Result (Ok body_str) ->
-      return (Ok (Yojson.Safe.from_string body_str))
-  | `Result (Error exn) ->
-      return (Or_error.error_string (Exn.to_string exn))
+  | `Result (Ok json) ->
+      return (Ok json)
+  | `Result (Error (`Failed_request msg)) ->
+      return (Or_error.error_string msg)
+  | `Result (Error (`Graphql_error msg)) ->
+      return (Or_error.error_string msg)
   | `Timeout ->
       return
         (Or_error.errorf "GraphQL query timed out after %s"
            (Time.Span.to_short_string graphql_timeout) )
 
 let best_chain_query =
-  {| { bestChain(maxLength: 100) {
-    stateHash
-    protocolState {
-      consensusState { slotSinceGenesis blockStakeWinner }
-      blockchainState { stagedLedgerHash date }
-    }
-    snarkJobs { workIds fee prover }
-    transactions {
-      userCommands { hash from to amount fee nonce validUntil memo }
-      zkappCommands { hash }
-    }
-  } } |}
+  "{ bestChain(maxLength: 100) { stateHash protocolState { consensusState { \
+   slotSinceGenesis blockStakeWinner } blockchainState { stagedLedgerHash date \
+   } } snarkJobs { workIds fee prover } transactions { userCommands { hash \
+   from to amount fee nonce validUntil memo } zkappCommands { hash } } } }"
 
 (* ---- JSON parsing helpers ---- *)
 
@@ -259,7 +270,7 @@ let parse_block_info json =
 
 let parse_best_chain response =
   let open Yojson.Safe.Util in
-  match response |> member "data" |> member "bestChain" with
+  match response |> member "bestChain" with
   | `Null ->
       []
   | json ->
@@ -301,13 +312,15 @@ let start_chain_monitor monitor =
        else
          let%bind () =
            match%bind
-             graphql_query ~rest_port:monitor.rest_port best_chain_query
+             graphql_query_raw ~rest_port:monitor.rest_port best_chain_query
+               `Null
            with
            | Error err when not (Map.is_empty !(monitor.blocks)) ->
                (* Daemon was previously responsive but now failing *)
                [%log error]
-                 "Chain monitor: query failed after daemon was responsive: %s"
-                 (Error.to_string_hum err) ;
+                 "Chain monitor: query failed after daemon was responsive: \
+                  $error"
+                 ~metadata:[ ("error", `String (Error.to_string_hum err)) ] ;
                Ivar.fill_if_empty monitor.stop_ivar () ;
                Ivar.fill_if_empty monitor.fatal_error err ;
                return ()
@@ -324,8 +337,12 @@ let start_chain_monitor monitor =
                let new_count = Map.length new_map - Map.length old_map in
                if new_count > 0 then
                  [%log info]
-                   "Chain monitor: discovered %d new block(s) (%d total)"
-                   new_count (Map.length new_map) ;
+                   "Chain monitor: discovered $new_count new block(s) ($total \
+                    total)"
+                   ~metadata:
+                     [ ("new_count", `Int new_count)
+                     ; ("total", `Int (Map.length new_map))
+                     ] ;
                monitor.blocks := new_map ;
                let sorted = chain_monitor_sorted_blocks new_map in
                monitor.waiters <-
@@ -497,118 +514,42 @@ let load_and_initialize_config ~logger ~config_file ~genesis_dir =
 
 (* ---- Transaction submission via GraphQL ---- *)
 
-let send_payment_mutation =
-  {| mutation($from: PublicKey!, $to: PublicKey!, $amount: UInt64!, $fee: UInt64!, $nonce: UInt32!, $validUntil: UInt32, $memo: String) {
-    sendPayment(input: { from: $from, to: $to, amount: $amount, fee: $fee, nonce: $nonce, validUntil: $validUntil, memo: $memo }) {
-      payment { hash }
-    }
-  } |}
-
-let graphql_send_payment ~logger ~rest_port ~sender ~receiver ~amount ~fee
+let graphql_send_payment ~logger:_ ~rest_port ~sender ~receiver ~amount ~fee
     ~nonce ~valid_until ~memo =
-  let uri = Uri.of_string (sprintf "http://localhost:%d/graphql" rest_port) in
-  let variables =
-    `Assoc
-      [ ("from", `String sender)
-      ; ("to", `String receiver)
-      ; ("amount", `String amount)
-      ; ("fee", `String fee)
-      ; ("nonce", `String (string_of_int nonce))
-      ; ("validUntil", `String valid_until)
-      ; ("memo", `String memo)
-      ]
+  let input =
+    Mina_graphql.Types.Input.SendPaymentInput.make_input
+      ~from:(Public_key.Compressed.of_base58_check_exn sender)
+      ~to_:(Public_key.Compressed.of_base58_check_exn receiver)
+      ~amount:(Currency.Amount.of_nanomina_int_exn (Int.of_string amount))
+      ~fee:(Currency.Fee.of_nanomina_int_exn (Int.of_string fee))
+      ~nonce:(Mina_numbers.Account_nonce.of_int nonce)
+      ~valid_until:(Unsigned.UInt32.of_string valid_until)
+      ~memo ()
   in
-  let body_str =
-    Yojson.Safe.to_string
-      (`Assoc
-        [ ("query", `String send_payment_mutation); ("variables", variables) ]
-        )
+  let query_obj =
+    Parity_graphql.Send_payment.(make @@ makeVariables ~input ())
   in
-  let headers =
-    Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
-  in
-  match%bind
-    Clock.with_timeout graphql_timeout
-      (Monitor.try_with ~here:[%here] (fun () ->
-           let%bind _resp, body =
-             Cohttp_async.Client.post ~headers
-               ~body:(Cohttp_async.Body.of_string body_str)
-               uri
-           in
-           Cohttp_async.Body.to_string body ) )
-  with
-  | `Result (Ok body_str) -> (
-      let json = Yojson.Safe.from_string body_str in
-      let open Yojson.Safe.Util in
-      match json |> member "errors" with
-      | `Null ->
-          return
-            (Ok
-               ( json |> member "data" |> member "sendPayment"
-               |> member "payment" |> member "hash" |> to_string ) )
-      | errors ->
-          [%log error] "GraphQL sendPayment error: %s"
-            (Yojson.Safe.to_string errors) ;
-          return (Or_error.error_string "sendPayment failed") )
-  | `Result (Error exn) ->
-      return (Or_error.error_string (Exn.to_string exn))
-  | `Timeout ->
-      return
-        (Or_error.errorf "GraphQL sendPayment timed out after %s"
-           (Time.Span.to_short_string graphql_timeout) )
+  graphql_query_typed ~rest_port query_obj
+  >>|? fun result ->
+  Mina_transaction.Transaction_hash.to_base58_check
+    result.sendPayment.payment.hash
 
 let send_zkapp_mutation =
-  {| mutation($input: SendZkappInput!) {
-    sendZkapp(input: $input) {
-      zkapp { hash }
-    }
-  } |}
+  "mutation($input: SendZkappInput!) { sendZkapp(input: $input) { zkapp { hash \
+   } } }"
 
-let graphql_send_zkapp ~logger ~rest_port zkapp_cmd =
-  let uri = Uri.of_string (sprintf "http://localhost:%d/graphql" rest_port) in
+let graphql_send_zkapp ~logger:_ ~rest_port zkapp_cmd =
   let zkapp_json =
     Zkapp_command.read_all_proofs_from_disk zkapp_cmd |> Zkapp_command.to_json
   in
   let variables =
     `Assoc [ ("input", `Assoc [ ("zkappCommand", zkapp_json) ]) ]
+    |> Yojson.Safe.to_basic
   in
-  let body_str =
-    Yojson.Safe.to_string
-      (`Assoc
-        [ ("query", `String send_zkapp_mutation); ("variables", variables) ] )
-  in
-  let headers =
-    Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
-  in
-  match%bind
-    Clock.with_timeout graphql_timeout
-      (Monitor.try_with ~here:[%here] (fun () ->
-           let%bind _resp, body =
-             Cohttp_async.Client.post ~headers
-               ~body:(Cohttp_async.Body.of_string body_str)
-               uri
-           in
-           Cohttp_async.Body.to_string body ) )
-  with
-  | `Result (Ok body_str) -> (
-      let json = Yojson.Safe.from_string body_str in
-      let open Yojson.Safe.Util in
-      match json |> member "errors" with
-      | `Null ->
-          return
-            (Ok
-               ( json |> member "data" |> member "sendZkapp" |> member "zkapp"
-               |> member "hash" |> to_string ) )
-      | errors ->
-          [%log error] "GraphQL sendZkapp error: %s"
-            (Yojson.Safe.to_string errors) ;
-          return (Or_error.error_string "sendZkapp failed") )
-  | `Result (Error exn) ->
-      return (Or_error.error_string (Exn.to_string exn))
-  | `Timeout ->
-      return
-        (Or_error.errorf "GraphQL sendZkapp timed out after %s"
-           (Time.Span.to_short_string graphql_timeout) )
+  graphql_query_raw ~rest_port send_zkapp_mutation variables
+  >>|? fun json ->
+  Yojson.Safe.Util.(
+    json |> member "sendZkapp" |> member "zkapp" |> member "hash" |> to_string)
 
 (* ---- Account-level ledger comparison ---- *)
 
@@ -616,8 +557,13 @@ let compare_ledger_accounts ~logger ~label ~stepper_accounts_json
     ~daemon_accounts_json =
   let stepper_len = List.length stepper_accounts_json in
   let daemon_len = List.length daemon_accounts_json in
-  [%log info] "%s: stepper %d accounts, daemon %d accounts" label stepper_len
-    daemon_len ;
+  [%log info]
+    "$label: stepper $stepper_len accounts, daemon $daemon_len accounts"
+    ~metadata:
+      [ ("label", `String label)
+      ; ("stepper_len", `Int stepper_len)
+      ; ("daemon_len", `Int daemon_len)
+      ] ;
   let common_len = min stepper_len daemon_len in
   let stepper_prefix = List.take stepper_accounts_json common_len in
   let daemon_prefix = List.take daemon_accounts_json common_len in
@@ -627,18 +573,29 @@ let compare_ledger_accounts ~logger ~label ~stepper_accounts_json
   in
   match mismatch with
   | Some (i, (stepper_acct, daemon_acct)) ->
-      [%log error] "%s: first mismatch at index %d:" label i ;
-      [%log error] "  Stepper: %s" (Yojson.Safe.to_string stepper_acct) ;
-      [%log error] "  Daemon:  %s" (Yojson.Safe.to_string daemon_acct) ;
+      [%log error] "$label: first mismatch at index $index"
+        ~metadata:
+          [ ("label", `String label)
+          ; ("index", `Int i)
+          ; ("stepper_account", `String (Yojson.Safe.to_string stepper_acct))
+          ; ("daemon_account", `String (Yojson.Safe.to_string daemon_acct))
+          ] ;
       failwithf "%s: account mismatch at index %d" label i ()
   | None ->
       if stepper_len <> daemon_len then (
         [%log error]
-          "%s: all %d common accounts match, but lengths differ (stepper=%d, \
-           daemon=%d)"
-          label common_len stepper_len daemon_len ;
+          "$label: all $common_len common accounts match, but lengths differ \
+           (stepper=$stepper_len, daemon=$daemon_len)"
+          ~metadata:
+            [ ("label", `String label)
+            ; ("common_len", `Int common_len)
+            ; ("stepper_len", `Int stepper_len)
+            ; ("daemon_len", `Int daemon_len)
+            ] ;
         failwithf "%s: account count mismatch" label () )
-      else [%log info] "%s: all %d accounts match" label common_len
+      else
+        [%log info] "$label: all $count accounts match"
+          ~metadata:[ ("label", `String label); ("count", `Int common_len) ]
 
 (* ---- Transition extraction helpers ---- *)
 
@@ -650,7 +607,8 @@ let extract_daemon_transitions ~logger ~best_tip_log ~output_file =
           let json =
             try Yojson.Safe.from_string line
             with exn ->
-              [%log error] "Failed to parse best-tip log line: %s" line ;
+              [%log error] "Failed to parse best-tip log line: $line"
+                ~metadata:[ ("line", `String line) ] ;
               failwithf "Best-tip log JSON parse error: %s" (Exn.to_string exn)
                 ()
           in
@@ -658,19 +616,23 @@ let extract_daemon_transitions ~logger ~best_tip_log ~output_file =
           try json |> member "metadata" |> member "added_transitions" |> to_list
           with exn ->
             [%log error]
-              "Failed to extract added_transitions from best-tip log line: %s"
-              line ;
+              "Failed to extract added_transitions from best-tip log line: \
+               $line"
+              ~metadata:[ ("line", `String line) ] ;
             failwithf "Best-tip log added_transitions extraction error: %s"
               (Exn.to_string exn) () )
     in
-    [%log info] "Extracted %d added_transitions from daemon best-tip log"
-      (List.length all_transitions) ;
+    [%log info] "Extracted $count added_transitions from daemon best-tip log"
+      ~metadata:[ ("count", `Int (List.length all_transitions)) ] ;
     Out_channel.write_all output_file
       ~data:
         (String.concat ~sep:"\n"
            (List.map all_transitions ~f:Yojson.Safe.to_string) ) ;
-    [%log info] "Wrote daemon transitions to %s" output_file )
-  else [%log warn] "No best-tip log found at %s" best_tip_log
+    [%log info] "Wrote daemon transitions to $path"
+      ~metadata:[ ("path", `String output_file) ] )
+  else
+    [%log warn] "No best-tip log found at $path"
+      ~metadata:[ ("path", `String best_tip_log) ]
 
 let breadcrumb_to_transition_json bc =
   let protocol_state =
@@ -694,7 +656,8 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
     ~transaction_capacity_log2 =
   let open Deferred.Let_syntax in
   (* Phase 1: Generate config and keys *)
-  [%log info] "Phase 1: Generating config with seed '%s'" seed ;
+  [%log info] "Phase 1: Generating config with seed '$seed'"
+    ~metadata:[ ("seed", `String seed) ] ;
   let bp_keypair, _keypairs, runtime_config =
     generate_runtime_config ~seed ~proof_level ~slot_time_ms ~delta ~work_delay
       ~transaction_capacity_log2
@@ -842,19 +805,18 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
     | Ok () ->
         [%log info] "Daemon bootstrapped successfully" ;
         (* Query daemon genesis state hash *)
-        let%bind daemon_genesis_response =
-          graphql_query ~rest_port "{ genesisBlock { stateHash } }"
+        let%bind daemon_genesis_hash =
+          graphql_query_typed ~rest_port
+            Parity_graphql.Genesis_block.(make @@ makeVariables ())
           >>| Or_error.ok_exn
+          >>| fun result -> result.genesisBlock.stateHash
         in
-        let daemon_genesis_hash =
-          Yojson.Safe.Util.(
-            daemon_genesis_response |> member "data" |> member "genesisBlock"
-            |> member "stateHash" |> to_string)
-        in
-        [%log info] "Daemon genesis state hash: %s" daemon_genesis_hash ;
+        [%log info] "Daemon genesis state hash: $hash"
+          ~metadata:[ ("hash", `String daemon_genesis_hash) ] ;
         return daemon_genesis_hash
     | Error e ->
-        [%log error] "Bootstrap failed: %s" (Error.to_string_hum e) ;
+        [%log error] "Bootstrap failed: $error"
+          ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
         let%bind _ = Mina_automation.Daemon.Process.force_kill daemon_process in
         failwith "Daemon failed to bootstrap"
   in
@@ -887,12 +849,25 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
   (* Submit transactions in batches, waiting for each batch to be included *)
   let total_txns = num_batches * (payments_per_batch + zkapps_per_batch) in
   [%log info]
-    "Submitting %d transactions in %d batch(es) (%d payments + %d zkapps each)"
-    total_txns num_batches payments_per_batch zkapps_per_batch ;
+    "Submitting $total_txns transactions in $num_batches batch(es) \
+     ($payments_per_batch payments + $zkapps_per_batch zkapps each)"
+    ~metadata:
+      [ ("total_txns", `Int total_txns)
+      ; ("num_batches", `Int num_batches)
+      ; ("payments_per_batch", `Int payments_per_batch)
+      ; ("zkapps_per_batch", `Int zkapps_per_batch)
+      ] ;
   let%bind batches_with_hashes =
     Deferred.List.foldi batches ~init:[] ~f:(fun b acc (payments, zkapps) ->
-        [%log info] "Batch %d/%d: submitting %d payments + %d zkapps" (b + 1)
-          num_batches (List.length payments) (List.length zkapps) ;
+        [%log info]
+          "Batch $batch_num/$num_batches: submitting $num_payments payments + \
+           $num_zkapps zkapps"
+          ~metadata:
+            [ ("batch_num", `Int (b + 1))
+            ; ("num_batches", `Int num_batches)
+            ; ("num_payments", `Int (List.length payments))
+            ; ("num_zkapps", `Int (List.length zkapps))
+            ] ;
         (* Submit payments *)
         let%bind payment_hashes =
           Deferred.List.mapi payments ~f:(fun i cmd ->
@@ -929,8 +904,15 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
                   ~receiver:receiver_pk ~amount ~fee ~nonce ~valid_until ~memo
                 >>| Or_error.ok_exn
               in
-              [%log info] "  Submitted payment %d/%d (nonce=%d, hash=%s)"
-                (i + 1) (List.length payments) nonce hash ;
+              [%log info]
+                "  Submitted payment $payment_num/$total_payments \
+                 (nonce=$nonce, hash=$hash)"
+                ~metadata:
+                  [ ("payment_num", `Int (i + 1))
+                  ; ("total_payments", `Int (List.length payments))
+                  ; ("nonce", `Int nonce)
+                  ; ("hash", `String hash)
+                  ] ;
               hash )
         in
         (* Submit zkapps *)
@@ -943,15 +925,26 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
               if not (String.equal daemon_hash local_hash) then
                 failwithf "Zkapp hash mismatch: daemon=%s local=%s" daemon_hash
                   local_hash () ;
-              [%log info] "  Submitted zkapp %d/%d (hash=%s)" (i + 1)
-                (List.length zkapps) local_hash ;
+              [%log info]
+                "  Submitted zkapp $zkapp_num/$total_zkapps (hash=$hash)"
+                ~metadata:
+                  [ ("zkapp_num", `Int (i + 1))
+                  ; ("total_zkapps", `Int (List.length zkapps))
+                  ; ("hash", `String local_hash)
+                  ] ;
               local_hash )
         in
         (* Wait for this batch to be included, with progress-based timeout *)
         let batch_hashes = String.Set.of_list (payment_hashes @ zkapp_hashes) in
         let total = Set.length batch_hashes in
-        [%log info] "Waiting for batch %d/%d (%d txns) to be included" (b + 1)
-          num_batches total ;
+        [%log info]
+          "Waiting for batch $batch_num/$num_batches ($total txns) to be \
+           included"
+          ~metadata:
+            [ ("batch_num", `Int (b + 1))
+            ; ("num_batches", `Int num_batches)
+            ; ("total", `Int total)
+            ] ;
         let inclusion_timeout =
           Time.Span.of_sec (Float.of_int max_poll_attempts *. poll_interval_sec)
         in
@@ -979,22 +972,36 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
               in
               let still_remaining = Set.diff remaining included in
               if Set.is_empty still_remaining then (
-                [%log info] "Batch %d/%d: all %d transactions included" (b + 1)
-                  num_batches total ;
+                [%log info]
+                  "Batch $batch_num/$num_batches: all $total transactions \
+                   included"
+                  ~metadata:
+                    [ ("batch_num", `Int (b + 1))
+                    ; ("num_batches", `Int num_batches)
+                    ; ("total", `Int total)
+                    ] ;
                 return blocks )
               else (
                 [%log info]
-                  "Batch %d/%d: %d/%d transactions included so far, waiting \
-                   for %d more"
-                  (b + 1) num_batches
-                  (total - Set.length still_remaining)
-                  total
-                  (Set.length still_remaining) ;
+                  "Batch $batch_num/$num_batches: $included/$total \
+                   transactions included so far, waiting for $remaining more"
+                  ~metadata:
+                    [ ("batch_num", `Int (b + 1))
+                    ; ("num_batches", `Int num_batches)
+                    ; ("included", `Int (total - Set.length still_remaining))
+                    ; ("total", `Int total)
+                    ; ("remaining", `Int (Set.length still_remaining))
+                    ] ;
                 wait_for_inclusion ~remaining:still_remaining )
           | `Result (Error err) ->
               stop_chain_monitor monitor ;
-              [%log error] "Chain monitor failed while waiting for batch %d: %s"
-                (b + 1) (Error.to_string_hum err) ;
+              [%log error]
+                "Chain monitor failed while waiting for batch $batch_num: \
+                 $error"
+                ~metadata:
+                  [ ("batch_num", `Int (b + 1))
+                  ; ("error", `String (Error.to_string_hum err))
+                  ] ;
               let%bind _ =
                 Mina_automation.Daemon.Process.force_kill daemon_process
               in
@@ -1004,9 +1011,13 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
               stop_chain_monitor monitor ;
               let included_so_far = total - Set.length remaining in
               [%log error]
-                "Timed out waiting for batch %d transaction inclusion (%d/%d \
-                 included)"
-                (b + 1) included_so_far total ;
+                "Timed out waiting for batch $batch_num transaction inclusion \
+                 ($included/$total included)"
+                ~metadata:
+                  [ ("batch_num", `Int (b + 1))
+                  ; ("included", `Int included_so_far)
+                  ; ("total", `Int total)
+                  ] ;
               let%bind _ =
                 Mina_automation.Daemon.Process.force_kill daemon_process
               in
@@ -1022,9 +1033,11 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
   stop_chain_monitor monitor ;
   let daemon_blocks = chain_monitor_blocks monitor in
   let daemon_final_hash = (List.last_exn daemon_blocks).staged_ledger_hash in
-  [%log info] "Daemon final staged ledger hash: %s" daemon_final_hash ;
+  [%log info] "Daemon final staged ledger hash: $hash"
+    ~metadata:[ ("hash", `String daemon_final_hash) ] ;
   let daemon_final_state_hash = (List.last_exn daemon_blocks).state_hash in
-  [%log info] "Daemon final state hash: %s" daemon_final_state_hash ;
+  [%log info] "Daemon final state hash: $hash"
+    ~metadata:[ ("hash", `String daemon_final_state_hash) ] ;
   (* Export daemon staged ledger for account-level comparison *)
   [%log info] "Exporting daemon staged ledger" ;
   let%bind daemon_ledger_json =
@@ -1041,7 +1054,8 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
   let daemon_accounts_json =
     Yojson.Safe.from_string daemon_ledger_json |> Yojson.Safe.Util.to_list
   in
-  [%log info] "Daemon ledger: %d accounts" (List.length daemon_accounts_json) ;
+  [%log info] "Daemon ledger: $count accounts"
+    ~metadata:[ ("count", `Int (List.length daemon_accounts_json)) ] ;
   (* Stop daemon and save its stdout/stderr *)
   [%log info] "Stopping daemon" ;
   let%bind () = Mina_automation.Daemon.Client.stop_daemon client in
@@ -1075,10 +1089,14 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
       precomputed_values.protocol_state_with_hashes
     |> State_hash.to_base58_check
   in
-  [%log info] "Stepper genesis state hash: %s" stepper_genesis_hash ;
+  [%log info] "Stepper genesis state hash: $hash"
+    ~metadata:[ ("hash", `String stepper_genesis_hash) ] ;
   if not (String.equal daemon_genesis_hash stepper_genesis_hash) then (
-    [%log error] "Genesis state hash mismatch! Daemon=%s Stepper=%s"
-      daemon_genesis_hash stepper_genesis_hash ;
+    [%log error] "Genesis state hash mismatch! Daemon=$daemon Stepper=$stepper"
+      ~metadata:
+        [ ("daemon", `String daemon_genesis_hash)
+        ; ("stepper", `String stepper_genesis_hash)
+        ] ;
     failwith "Genesis state hash mismatch" ) ;
   [%log info] "Genesis state hashes match" ;
   (* Build a hash-to-transaction lookup *)
@@ -1154,9 +1172,12 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
           check "valid_until" dc.cmd_valid_until local_valid_until ;
           check "memo" dc.cmd_memo local_memo ;
           if not (List.is_empty !mismatches) then (
-            [%log error] "Transaction payload mismatch for hash %s:\n%s"
-              dc.cmd_hash
-              (String.concat ~sep:"\n" (List.rev !mismatches)) ;
+            [%log error] "Transaction payload mismatch for hash $hash: $details"
+              ~metadata:
+                [ ("hash", `String dc.cmd_hash)
+                ; ( "details"
+                  , `String (String.concat ~sep:"\n" (List.rev !mismatches)) )
+                ] ;
             failwithf "Transaction payload mismatch for hash %s" dc.cmd_hash ()
             ) ) ;
   [%log info] "All daemon transaction payloads match local transactions" ;
@@ -1166,7 +1187,8 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
   in
   List.iter all_daemon_zkapp_hashes ~f:(fun h ->
       if not (String.Map.mem tx_by_hash h) then
-        [%log warn] "Unknown zkapp command hash from daemon: %s" h ) ;
+        [%log warn] "Unknown zkapp command hash from daemon: $hash"
+          ~metadata:[ ("hash", `String h) ] ) ;
   let all_submitted_zkapp_hashes =
     List.concat_map batches_with_hashes
       ~f:(fun (_payment_hashes, _payments, zkapps) ->
@@ -1177,8 +1199,8 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
       then
         failwithf "Submitted zkapp hash %s not found in daemon blocks"
           zkapp_hash () ) ;
-  [%log info] "All %d zkapp command hash(es) verified in daemon blocks"
-    (List.length all_submitted_zkapp_hashes) ;
+  [%log info] "All $count zkapp command hash(es) verified in daemon blocks"
+    ~metadata:[ ("count", `Int (List.length all_submitted_zkapp_hashes)) ] ;
   (* Skip genesis block (first in bestChain list), replay the rest *)
   let non_genesis_blocks =
     match daemon_blocks with
@@ -1187,7 +1209,8 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
     | _ :: rest ->
         rest
   in
-  [%log info] "Replaying %d non-genesis blocks" (List.length non_genesis_blocks) ;
+  [%log info] "Replaying $count non-genesis blocks"
+    ~metadata:[ ("count", `Int (List.length non_genesis_blocks)) ] ;
   let%bind final_result =
     Deferred.List.fold non_genesis_blocks
       ~init:(Ok (stepper, None, []))
@@ -1225,14 +1248,20 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
                 (Block_time.Span.of_ms (Int64.of_string block.timestamp))
             in
             [%log info]
-              "Stepping at slot %d with %d transactions, snark_job_count=%d"
-              block.slot_since_genesis
-              (Sequence.length block_txns)
-              block.snark_job_count ;
+              "Stepping at slot $slot with $num_transactions transactions, \
+               snark_job_count=$snark_job_count"
+              ~metadata:
+                [ ("slot", `Int block.slot_since_genesis)
+                ; ("num_transactions", `Int (Sequence.length block_txns))
+                ; ("snark_job_count", `Int block.snark_job_count)
+                ] ;
             List.iteri block.snark_jobs_json ~f:(fun i job_json ->
-                [%log info] "Daemon slot %d work %d: %s"
-                  block.slot_since_genesis i
-                  (Yojson.Safe.to_string job_json) ) ;
+                [%log info] "Daemon slot $slot work $index: $job"
+                  ~metadata:
+                    [ ("slot", `Int block.slot_since_genesis)
+                    ; ("index", `Int i)
+                    ; ("job", `String (Yojson.Safe.to_string job_json))
+                    ] ) ;
             let%map result =
               Block_stepper.step_at_slot stepper ~global_slot_since_genesis:slot
                 ~block_stake_winner ~transactions:block_txns
@@ -1241,10 +1270,15 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
             Result.map result ~f:(fun (bc, stepper, invalid_commands) ->
                 if not (List.is_empty invalid_commands) then (
                   List.iter invalid_commands ~f:(fun (cmd, err) ->
-                      [%log error] "Dropped transaction: %s (error: %s)"
-                        ( User_command.Valid.to_yojson cmd
-                        |> Yojson.Safe.to_string )
-                        (Error.to_string_hum err) ) ;
+                      [%log error]
+                        "Dropped transaction: $command (error: $error)"
+                        ~metadata:
+                          [ ( "command"
+                            , `String
+                                ( User_command.Valid.to_yojson cmd
+                                |> Yojson.Safe.to_string ) )
+                          ; ("error", `String (Error.to_string_hum err))
+                          ] ) ;
                   failwithf "Slot %d: %d transactions were dropped"
                     block.slot_since_genesis
                     (List.length invalid_commands)
@@ -1260,7 +1294,8 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
     | Ok (_, None, _) ->
         failwith "no blocks replayed"
     | Error e ->
-        [%log error] "Stepper replay failed: %s" (Error.to_string_hum e) ;
+        [%log error] "Stepper replay failed: $error"
+          ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
         failwith "Stepper replay failed"
   in
   (* Write stepper transitions *)
@@ -1269,9 +1304,11 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
     ~data:
       (String.concat ~sep:"\n"
          (List.map stepper_transitions ~f:Yojson.Safe.to_string) ) ;
-  [%log info] "Wrote %d stepper transitions to %s"
-    (List.length stepper_transitions)
-    stepper_transitions_file ;
+  [%log info] "Wrote $count stepper transitions to $path"
+    ~metadata:
+      [ ("count", `Int (List.length stepper_transitions))
+      ; ("path", `String stepper_transitions_file)
+      ] ;
   (* Phase 4: Compare ledger hashes *)
   [%log info] "Phase 4: Comparing ledger hashes" ;
   let stepper_ledger_hash =
@@ -1279,14 +1316,18 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
     |> Staged_ledger.ledger |> Mina_ledger.Ledger.merkle_root
     |> Ledger_hash.to_base58_check
   in
-  [%log info] "Stepper ledger hash: %s" stepper_ledger_hash ;
-  [%log info] "Daemon ledger hash:  %s" daemon_final_hash ;
+  [%log info] "Stepper ledger hash: $hash"
+    ~metadata:[ ("hash", `String stepper_ledger_hash) ] ;
+  [%log info] "Daemon ledger hash: $hash"
+    ~metadata:[ ("hash", `String daemon_final_hash) ] ;
   let stepper_final_state_hash =
     Frontier_base.Breadcrumb.state_hash final_breadcrumb
     |> State_hash.to_base58_check
   in
-  [%log info] "Stepper state hash: %s" stepper_final_state_hash ;
-  [%log info] "Daemon state hash:  %s" daemon_final_state_hash ;
+  [%log info] "Stepper state hash: $hash"
+    ~metadata:[ ("hash", `String stepper_final_state_hash) ] ;
+  [%log info] "Daemon state hash: $hash"
+    ~metadata:[ ("hash", `String daemon_final_state_hash) ] ;
   let ledger_match = String.equal daemon_final_hash stepper_ledger_hash in
   let state_match =
     String.equal daemon_final_state_hash stepper_final_state_hash
@@ -1297,20 +1338,28 @@ let run ~logger ~seed ~state_dir ~num_batches ~payments_per_batch
   else (
     if not ledger_match then (
       [%log error] "FAIL: Ledger hash mismatch!" ;
-      [%log error] "  Daemon:  %s" daemon_final_hash ;
-      [%log error] "  Stepper: %s" stepper_ledger_hash ) ;
+      [%log error] "  Daemon: $daemon  Stepper: $stepper"
+        ~metadata:
+          [ ("daemon", `String daemon_final_hash)
+          ; ("stepper", `String stepper_ledger_hash)
+          ] ) ;
     if not state_match then (
       [%log error] "FAIL: State hash mismatch!" ;
-      [%log error] "  Daemon:  %s" daemon_final_state_hash ;
-      [%log error] "  Stepper: %s" stepper_final_state_hash ) ;
+      [%log error] "  Daemon: $daemon  Stepper: $stepper"
+        ~metadata:
+          [ ("daemon", `String daemon_final_state_hash)
+          ; ("stepper", `String stepper_final_state_hash)
+          ] ) ;
     List.iter daemon_blocks ~f:(fun b ->
         [%log error]
-          "  Slot %d: %d user commands, %d zkapp commands, \
-           staged_ledger_hash=%s"
-          b.slot_since_genesis
-          (List.length b.user_commands)
-          (List.length b.zkapp_command_hashes)
-          b.staged_ledger_hash ) ;
+          "  Slot $slot: $num_user_commands user commands, $num_zkapp_commands \
+           zkapp commands, staged_ledger_hash=$staged_ledger_hash"
+          ~metadata:
+            [ ("slot", `Int b.slot_since_genesis)
+            ; ("num_user_commands", `Int (List.length b.user_commands))
+            ; ("num_zkapp_commands", `Int (List.length b.zkapp_command_hashes))
+            ; ("staged_ledger_hash", `String b.staged_ledger_hash)
+            ] ) ;
     let stepper_accounts_json =
       Frontier_base.Breadcrumb.staged_ledger final_breadcrumb
       |> Staged_ledger.ledger |> Mina_ledger.Ledger.to_list_sequential

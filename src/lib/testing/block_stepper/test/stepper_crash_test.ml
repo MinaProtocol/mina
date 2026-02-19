@@ -228,7 +228,8 @@ let run ~logger ~seed ~state_dir ~payments_per_batch ~zkapps_per_batch
     ~proof_level ~slot_time_ms ~delta ~work_delay ~transaction_capacity_log2 =
   let open Deferred.Let_syntax in
   (* Phase 1: Generate config *)
-  [%log info] "Phase 1: Generating config with seed '%s'" seed ;
+  [%log info] "Phase 1: Generating config with seed '$seed'"
+    ~metadata:[ ("seed", `String seed) ] ;
   let bp_keypair, _keypairs, runtime_config =
     generate_runtime_config ~seed ~proof_level ~slot_time_ms ~delta ~work_delay
       ~transaction_capacity_log2
@@ -276,8 +277,11 @@ let run ~logger ~seed ~state_dir ~payments_per_batch ~zkapps_per_batch
         valid_cmd )
   in
   let transactions = Sequence.of_list (payments @ zkapps) in
-  [%log info] "Generated %d payments + %d zkapps" (List.length payments)
-    (List.length zkapps) ;
+  [%log info] "Generated $num_payments payments + $num_zkapps zkapps"
+    ~metadata:
+      [ ("num_payments", `Int (List.length payments))
+      ; ("num_zkapps", `Int (List.length zkapps))
+      ] ;
   (* Phase 3: Create stepper and step *)
   [%log info] "Phase 3: Creating stepper from genesis" ;
   let stepper_state_dir = state_dir ^/ "stepper" in
@@ -302,9 +306,10 @@ let run ~logger ~seed ~state_dir ~payments_per_batch ~zkapps_per_batch
       precomputed_values.protocol_state_with_hashes
     |> State_hash.to_base58_check
   in
-  [%log info] "Stepper genesis state hash: %s" stepper_genesis_hash ;
-  [%log info] "Stepping at slot 1 with %d transactions"
-    (Sequence.length transactions) ;
+  [%log info] "Stepper genesis state hash: $hash"
+    ~metadata:[ ("hash", `String stepper_genesis_hash) ] ;
+  [%log info] "Stepping at slot 1 with $num_transactions transactions"
+    ~metadata:[ ("num_transactions", `Int (Sequence.length transactions)) ] ;
   let bp_pk = Public_key.compress bp_keypair.public_key in
   let slot = Mina_numbers.Global_slot_since_genesis.of_int 1 in
   let scheduled_time =
@@ -320,13 +325,15 @@ let run ~logger ~seed ~state_dir ~payments_per_batch ~zkapps_per_batch
       let state_hash =
         Frontier_base.Breadcrumb.state_hash bc |> State_hash.to_base58_check
       in
-      [%log info] "Step succeeded! State hash: %s" state_hash ;
+      [%log info] "Step succeeded! State hash: $hash"
+        ~metadata:[ ("hash", `String state_hash) ] ;
       if not (List.is_empty invalid_commands) then
-        [%log warn] "%d transactions were dropped"
-          (List.length invalid_commands) ;
+        [%log warn] "$count transactions were dropped"
+          ~metadata:[ ("count", `Int (List.length invalid_commands)) ] ;
       return ()
   | Error e ->
-      [%log error] "Step failed: %s" (Error.to_string_hum e) ;
+      [%log error] "Step failed: $error"
+        ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
       failwith "Stepper step_at_slot failed"
 
 (* ---- Command-line interface ---- *)
