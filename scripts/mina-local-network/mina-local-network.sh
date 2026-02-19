@@ -400,9 +400,17 @@ spawn-daemon() {
   FOLDER=${2}
   shift 2
 
+  # NOTE:
+  # Process Substitution >(...): This creates a "named pipe" under the hood. 
+  # `exec-daemon` treats it like a file output, but the data is actually being 
+  # piped into the logging functions.
+  # The `&` placement: By putting the & immediately after the exec-daemon 
+  # command (and its redirections), $! specifically tracks that process.
+
   # shellcheck disable=SC2068
-  exec-daemon $@ --config-directory "$FOLDER" 2>&1 \
-    | log-file | tag-stdout "$tag" &
+  exec-daemon $@ \
+    --config-directory "$FOLDER" \
+    > >(log-file | tag-stdout "$tag") 2>&1 &
 }
 
 # Spawns worker in background
@@ -413,8 +421,9 @@ spawn-snark-worker() {
   shift 2
 
   # shellcheck disable=SC2068
-  exec-snark-worker $@ --config-directory "${FOLDER}" 2>&1 \
-    | log-file "$REDIRECT_WORKER_LOGS" | tag-stdout "$tag" &
+  exec-snark-worker $@ \
+    --config-directory "${FOLDER}" \
+    > >(log-file "$REDIRECT_WORKER_LOGS" | tag-stdout "$tag") 2>&1 &
 }
 
 # Spawns the Archive Node in background
@@ -423,7 +432,8 @@ spawn-archive-node() {
   shift
 
   # shellcheck disable=SC2068
-  exec-archive-node $@ 2>&1 | log-file | tag-stdout "archive" &
+  exec-archive-node $@ \
+    > >(log-file | tag-stdout "archive") 2>&1 &
 }
 
 spawn-rosetta-server() {
@@ -431,7 +441,8 @@ spawn-rosetta-server() {
   shift
 
   # shellcheck disable=SC2068
-  exec-rosetta-node $@ 2>&1 | log-file | tag-stdout "rosetta" &
+  exec-rosetta-node $@ \
+    > >(log-file | tag-stdout "rosetta") 2>&1 &
 }
 
 # Resets genesis ledger
