@@ -20,7 +20,7 @@ let isEssential =
             , Toolchain = True
             , DaemonAutoHardfork = True
             , DaemonLegacyHardfork = True
-            , CreateLegacyGenesis = False
+            , CreatePreforkGenesis = False
             , DelegationVerifier = True
             }
             service

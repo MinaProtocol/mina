@@ -25,7 +25,7 @@ let Artifact
       | ZkappTestTransaction
       | FunctionalTestSuite
       | Toolchain
-      | CreateLegacyGenesis
+      | CreatePreforkGenesis
       | DelegationVerifier
       >
 
@@ -42,7 +42,7 @@ let AllButTests =
       , Artifact.Rosetta
       , Artifact.ZkappTestTransaction
       , Artifact.Toolchain
-      , Artifact.CreateLegacyGenesis
+      , Artifact.CreatePreforkGenesis
       , Artifact.DelegationVerifier
       ]
 
@@ -73,7 +73,7 @@ let capitalName =
             , DelegationVerifier = "DelegationVerifier"
             , FunctionalTestSuite = "FunctionalTestSuite"
             , Toolchain = "Toolchain"
-            , CreateLegacyGenesis = "CreateLegacyGenesis"
+            , CreatePreforkGenesis = "CreatePreforkGenesis"
             }
             artifact
 
@@ -92,7 +92,7 @@ let lowerName =
             , Rosetta = "rosetta"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
-            , CreateLegacyGenesis = "create_legacy_genesis"
+            , CreatePreforkGenesis = "create_prefork_genesis"
             , Toolchain = "toolchain"
             , DelegationVerifier = "delegation_verifier"
             }
@@ -113,7 +113,7 @@ let dockerName =
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
             , FunctionalTestSuite = "mina-test-suite"
             , Toolchain = "mina-toolchain"
-            , CreateLegacyGenesis = "mina-create-legacy-genesis"
+            , CreatePreforkGenesis = ""
             , DelegationVerifier = "mina-delegation-verifier"
             , DaemonConfig = ""
             }
@@ -145,7 +145,8 @@ let toDebianName =
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = ""
             , DelegationVerifier = "delegation_verifier"
-            , CreateLegacyGenesis = "create_legacy_genesis"
+            , CreatePreforkGenesis =
+                "prefork_${Network.lowerName network}_genesis_ledger"
             , DaemonConfig = "daemon_${Network.lowerName network}_config"
             }
             artifact
@@ -171,7 +172,7 @@ let toDebianNames =
                           , Rosetta = [ toDebianName a network ]
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
-                          , CreateLegacyGenesis = [ "create_legacy_genesis" ]
+                          , CreatePreforkGenesis = [ toDebianName a network ]
                           , DelegationVerifier = [ "delegation_verify" ]
                           , Toolchain = [] : List Text
                           }
@@ -246,7 +247,7 @@ let dockerTag =
                 , FunctionalTestSuite = "${spec.version}${build_flags_part}"
                 , Toolchain = "${spec.version}"
                 , DelegationVerifier = "${spec.version}"
-                , CreateLegacyGenesis = "${spec.version}"
+                , CreatePreforkGenesis = "${spec.version}"
                 , DaemonConfig = "${spec.version}"
                 }
                 spec.artifact
