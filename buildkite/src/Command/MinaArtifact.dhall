@@ -46,6 +46,8 @@ let Toolchain = ../Constants/Toolchain.dhall
 
 let Arch = ../Constants/Arch.dhall
 
+let Expr = ../Pipeline/Expr.dhall
+
 let MinaBuildSpec =
       { Type =
           { prefix : Text
@@ -66,6 +68,8 @@ let MinaBuildSpec =
           , docker_publish : DockerPublish.Type
           , suffix : Optional Text
           , if_ : Optional B/If
+          , includeIf : List Expr.Type
+          , excludeIf : List Expr.Type
           }
       , default =
           { prefix = "MinaArtifact"
@@ -86,6 +90,8 @@ let MinaBuildSpec =
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
           , if_ = None B/If
+          , includeIf = [] : List Expr.Type
+          , excludeIf = [] : List Expr.Type
           }
       }
 
@@ -388,6 +394,8 @@ let pipelineBuilder
             , name = "${spec.prefix}${nameSuffix spec}"
             , tags = spec.tags
             , scope = spec.scope
+            , includeIf = spec.includeIf
+            , excludeIf = spec.excludeIf
             }
           , steps = steps
           }

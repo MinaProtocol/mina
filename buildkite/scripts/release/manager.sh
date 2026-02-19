@@ -345,6 +345,14 @@ function storage_upload() {
 
     case $backend in
         local)
+            # Check if remote_path is a directory or a file by extension
+            if [[ -d "$remote_path" || "${remote_path: -1}" == "/" || ! "$remote_path" =~ \.[^/]+$ ]]; then
+                # remote_path is a directory (ends with / or is a dir or has no extension)
+                mkdir -p "$remote_path"
+            else
+                # remote_path is a file (has an extension)
+                mkdir -p "$(dirname "$remote_path")"
+            fi
             cp $local_path "$remote_path"
             ;;
         gs)
@@ -365,7 +373,7 @@ function storage_root() {
 
     case $backend in
         local)
-            echo "/var/storagebox/"
+            echo "/var/storagebox"
             ;;
         gs)
             echo "gs://buildkite_k8s/coda/shared"
