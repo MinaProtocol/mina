@@ -106,20 +106,6 @@ end
 
 module Domains = struct
   include V.Domains
-
-  let _typ =
-    let open Impls.Step in
-    let dom =
-      Typ.transport Typ.field
-        ~there:(fun (Plonk_checks.Domain.Pow_2_roots_of_unity n) ->
-          Field.Constant.of_int n )
-        ~back:(fun _ -> assert false)
-      |> Typ.transport_var
-           ~there:(fun (Domain.Pow_2_roots_of_unity n) -> n)
-           ~back:(fun n -> Domain.Pow_2_roots_of_unity n)
-    in
-    Typ.of_hlistable [ dom ] ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
-      ~var_of_hlist:of_hlist ~value_of_hlist:of_hlist
 end
 
 let max_domains =
@@ -243,10 +229,6 @@ module Stable = struct
       let sexp_of_t t = R.sexp_of_t (to_repr t)
 
       let t_of_sexp sexp = of_repr (R.t_of_sexp sexp)
-
-      let _to_yojson t = R.to_yojson (to_repr t)
-
-      let _of_yojson json = Result.map ~f:of_repr (R.of_yojson json)
 
       let equal x y = R.equal (to_repr x) (to_repr y)
 
@@ -378,9 +360,6 @@ module Checked = struct
           *)
     }
   [@@deriving hlist, fields]
-
-  (** [log_2] of the width. *)
-  let _width_size = Nat.to_int Width.Length.n
 
   let to_input =
     let open Random_oracle_input.Chunked in

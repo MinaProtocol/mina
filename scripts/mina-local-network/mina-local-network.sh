@@ -400,9 +400,17 @@ spawn-daemon() {
   FOLDER=${2}
   shift 2
 
+  # NOTE:
+  # Process Substitution >(...): This creates a "named pipe" under the hood. 
+  # `exec-daemon` treats it like a file output, but the data is actually being 
+  # piped into the logging functions.
+  # The `&` placement: By putting the & immediately after the exec-daemon 
+  # command (and its redirections), $! specifically tracks that process.
+
   # shellcheck disable=SC2068
-  exec-daemon $@ --config-directory "$FOLDER" 2>&1 \
-    | log-file | tag-stdout "$tag" &
+  exec-daemon $@ \
+    --config-directory "$FOLDER" \
+    > >(log-file | tag-stdout "$tag") 2>&1 &
 }
 
 # Spawns worker in background
@@ -413,8 +421,9 @@ spawn-snark-worker() {
   shift 2
 
   # shellcheck disable=SC2068
-  exec-snark-worker $@ --config-directory "${FOLDER}" 2>&1 \
-    | log-file "$REDIRECT_WORKER_LOGS" | tag-stdout "$tag" &
+  exec-snark-worker $@ \
+    --config-directory "${FOLDER}" \
+    > >(log-file "$REDIRECT_WORKER_LOGS" | tag-stdout "$tag") 2>&1 &
 }
 
 # Spawns the Archive Node in background
@@ -423,7 +432,8 @@ spawn-archive-node() {
   shift
 
   # shellcheck disable=SC2068
-  exec-archive-node $@ 2>&1 | log-file | tag-stdout "archive" &
+  exec-archive-node $@ \
+    > >(log-file | tag-stdout "archive") 2>&1 &
 }
 
 spawn-rosetta-server() {
@@ -431,7 +441,8 @@ spawn-rosetta-server() {
   shift
 
   # shellcheck disable=SC2068
-  exec-rosetta-node $@ 2>&1 | log-file | tag-stdout "rosetta" &
+  exec-rosetta-node $@ \
+    > >(log-file | tag-stdout "rosetta") 2>&1 &
 }
 
 # Resets genesis ledger
@@ -1055,35 +1066,19 @@ printf "$SEED_PEER_ID" > "${ROOT}/seed_peer_id.txt"
 
 #---------- Starting snark coordinator
 
-if [ "${SNARK_WORKERS_COUNT}" -eq "0" ]; then
-  echo "Skipping snark coordinator because SNARK_WORKERS_COUNT is 0"
-  SNARK_COORDINATOR_PID=""
 
-elif [[ -z "${SNARK_COORDINATOR_PORT}" ]]; then
+if [[ -z "${SNARK_COORDINATOR_PORT}" ]]; then
   echo "Skipping snark coordinator because no SNARK_COORDINATOR_PORT is provided"
-  SNARK_COORDINATOR_PID=""
-else
+elif [ "${SNARK_WORKERS_COUNT}" -eq "0" ]; then
+  echo "Skipping snark coordinator because SNARK_WORKERS_COUNT is 0"
+  SNARK_COORDINATOR_PORT=""
+fi
 
+if [[ -n "${SNARK_COORDINATOR_PORT}" ]]; then
   SNARK_COORDINATOR_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-coordinator ${SNARK_COORDINATOR_PUBKEY} -work-selection seq"
   spawn-daemon snark_coordinator "${NODES_FOLDER}"/snark_coordinator "${SNARK_COORDINATOR_PORT}" -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} ${SNARK_COORDINATOR_FLAGS}
   SNARK_COORDINATOR_PID=$!
-
-  echo 'Waiting for snark coordinator to go up...'
-  printf "\n"
-
-  until ${MINA_EXE} client status -daemon-port "${SNARK_COORDINATOR_PORT}" &>/dev/null; do
-    sleep ${POLL_INTERVAL}
-  done
 fi
-
-#---------- Starting snark workers
-
-for ((i = 0; i < SNARK_WORKERS_COUNT; i++)); do
-  FOLDER=${NODES_FOLDER}/snark_workers/worker_${i}
-  mkdir -p "${FOLDER}"
-  spawn-snark-worker "snark_worker_${i}" "${FOLDER}" "${SNARK_COORDINATOR_PORT}"
-  SNARK_WORKERS_PIDS[${i}]=$!
-done
 
 # ----------
 
@@ -1116,6 +1111,25 @@ for ((i = 0; i < NODES; i++)); do
     -libp2p-keypair "${ROOT}"/libp2p_keys/node_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   NODE_PIDS[${i}]=$!
 done
+
+#---------- Starting snark workers
+
+
+if [[ -n "${SNARK_COORDINATOR_PORT}" ]]; then
+  echo 'Waiting for snark coordinator to go up before spawning snark workers...'
+  printf "\n"
+
+  until ${MINA_EXE} client status -daemon-port "${SNARK_COORDINATOR_PORT}" &>/dev/null; do
+    sleep ${POLL_INTERVAL}
+  done
+
+  for ((i = 0; i < SNARK_WORKERS_COUNT; i++)); do
+    FOLDER=${NODES_FOLDER}/snark_workers/worker_${i}
+    mkdir -p "${FOLDER}"
+    spawn-snark-worker "snark_worker_${i}" "${FOLDER}" "${SNARK_COORDINATOR_PORT}"
+    SNARK_WORKERS_PIDS[${i}]=$!
+  done
+fi
 
 # ================================================
 

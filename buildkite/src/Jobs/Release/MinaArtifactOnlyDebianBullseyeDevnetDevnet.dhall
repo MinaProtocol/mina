@@ -8,6 +8,8 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let DebianChannel = ../../Constants/DebianChannel.dhall
 
+let Network = ../../Constants/Network.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.onlyDebianPipeline
           ArtifactPipelines.MinaBuildSpec::{
@@ -21,6 +23,7 @@ in  Pipeline.build
             , Artifacts.Type.Rosetta
             ]
           , tags = [ PipelineTag.Type.Docker ]
+          , network = Network.Type.Devnet
           , channel = DebianChannel.Type.Experimental
           , prefix = "MinaArtifactOnlyDebian"
           }

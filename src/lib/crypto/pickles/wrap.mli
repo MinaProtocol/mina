@@ -163,6 +163,9 @@ val combined_inner_product :
   -> zetaw:Backend.Tick.Field.t
   -> Backend.Tick.Field.t
 
+(** Evaluates the challenge polynomial [b(X) = prod_i (1 + u_i * X^{2^{k-1-i}})]
+    specialized for Tick field. Used for out-of-circuit computation.
+    See {!module:Pickles} glossary for details on the challenge polynomial. *)
 val challenge_polynomial :
      Backend.Tick.Field.t array
   -> (Backend.Tick.Field.t -> Backend.Tick.Field.t) Core_kernel.Staged.t
