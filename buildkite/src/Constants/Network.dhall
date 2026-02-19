@@ -4,7 +4,7 @@ let List/any = Prelude.List.any
 
 let Network
     : Type
-    = < Devnet | Mainnet | TestnetGeneric | PreMesa1 >
+    = < Devnet | Mainnet | TestnetGeneric | PreMesa1 | Mesa >
 
 let capitalName =
           \(network : Network)
