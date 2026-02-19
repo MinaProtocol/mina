@@ -218,19 +218,19 @@ case "${SERVICE}" in
         DOCKERFILE_PATH_SCRIPT_2_AND_MORE="dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
         case "${INPUT_CODENAME}" in
           bullseye)
-            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-bullseye $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+            COMBINED_STAGES="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-bullseye $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
             ;;
           focal)
-            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-focal $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+            COMBINED_STAGES="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-focal $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
             ;;
           jammy)
-              DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-jammy $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
-              ;;
+            COMBINED_STAGES="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-jammy $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+            ;;
           noble)
-            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-noble $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+            COMBINED_STAGES="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-noble $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
             ;;
           bookworm)
-            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-bookworm $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+            COMBINED_STAGES="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-bookworm $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
             ;;
           *)
             echo "Unsupported debian codename: $INPUT_CODENAME"
@@ -238,6 +238,11 @@ case "${SERVICE}" in
             exit 1
             ;;
         esac
+        # Create temp combined Dockerfile so we can use a build context (needed for COPY)
+        TEMP_DOCKERFILE=$(mktemp /tmp/Dockerfile-toolchain.XXXXXX)
+        cat $COMBINED_STAGES > "$TEMP_DOCKERFILE"
+        DOCKERFILE_PATH="$TEMP_DOCKERFILE"
+        DOCKER_CONTEXT="dockerfiles/"
         ;;
     mina-batch-txn)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-txn-burst"
@@ -283,6 +288,11 @@ if [[ -z "${DOCKER_CONTEXT:-}" ]]; then
   --"$DOCKER_ACTION" --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -t "$HASHTAG" -
 else
   docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $APT_CACHE_ARG $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+fi
+
+# Clean up temp Dockerfile if one was created
+if [[ -n "${TEMP_DOCKERFILE:-}" ]]; then
+  rm -f "$TEMP_DOCKERFILE"
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."

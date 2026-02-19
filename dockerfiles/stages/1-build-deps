@@ -31,6 +31,7 @@ ARG DEBIAN_ARCH
 ARG TARGETARCH
 
 ARG apt_cache_url
+ARG deb_repo=""
 
 # OCaml Version
 # The version must be the same as the version used in:
@@ -71,11 +72,10 @@ ARG RUST_NIGHTLY=2024-09-05
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Optional: configure APT caching proxy
-RUN if [ -n "$apt_cache_url" ]; then \
-  echo "Acquire::http::Proxy \"${apt_cache_url}\";" > /etc/apt/apt.conf.d/01proxy; \
-  echo "Acquire::https::Proxy \"${apt_cache_url}\";" >> /etc/apt/apt.conf.d/01proxy; \
-fi
+# Optional: configure APT caching proxy (bypass proxy for deb_repo)
+COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
+RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
 
 RUN apt-get update --quiet \
   && apt-get upgrade --quiet --yes \

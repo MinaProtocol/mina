@@ -73,17 +73,18 @@ source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $
 echo "Installing mina packages: $DEBS"
 echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | $SUDO tee /etc/apt/sources.list.d/mina.list
 
+# Bypass any configured APT proxy for localhost (where aptly serves packages)
+eval "$(./buildkite/scripts/debian/apt-proxy-bypass.sh localhost)"
+
 # Update apt packages for the new repo, preserving all others
 $SUDO apt-get update --yes \
   -o Dir::Etc::sourcelist="sources.list.d/mina.list" \
   -o Dir::Etc::sourceparts="-" \
   -o APT::Get::List-Cleanup="0" \
-  -o Acquire::http::Proxy::localhost="DIRECT" \
-  -o Acquire::https::Proxy::localhost="DIRECT"
+  $APT_PROXY_BYPASS_OPTS
 $SUDO apt-get remove --yes "${debs[@]}"
 $SUDO apt-get install --yes --allow-downgrades \
-  -o Acquire::http::Proxy::localhost="DIRECT" \
-  -o Acquire::https::Proxy::localhost="DIRECT" \
+  $APT_PROXY_BYPASS_OPTS \
   "${debs_with_version[@]}"
 
 
