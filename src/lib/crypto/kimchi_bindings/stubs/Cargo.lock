@@ -470,11 +470,10 @@ dependencies = [
 
 [[package]]
 name = "groupmap"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "ark-ec",
  "ark-ff",
- "rand",
 ]
 
 [[package]]
@@ -561,7 +560,7 @@ dependencies = [
 
 [[package]]
 name = "internal-tracing"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "ocaml",
  "ocaml-gen",
@@ -603,7 +602,7 @@ dependencies = [
 
 [[package]]
 name = "kimchi"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "ark-bn254",
  "ark-ec",
@@ -634,13 +633,11 @@ dependencies = [
  "strum",
  "strum_macros",
  "thiserror 2.0.12",
- "tikv-jemalloc-ctl",
- "tikv-jemallocator",
 ]
 
 [[package]]
 name = "kimchi-stubs"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -679,17 +676,18 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "mina-curves"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "ark-bn254",
  "ark-ec",
  "ark-ff",
+ "ark-std",
  "num-bigint",
 ]
 
 [[package]]
 name = "mina-poseidon"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -744,7 +742,7 @@ dependencies = [
 
 [[package]]
 name = "o1-utils"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -758,13 +756,12 @@ dependencies = [
  "rand_core",
  "rayon",
  "rmp-serde",
+ "rustversion",
  "serde",
  "serde_json",
  "serde_with",
  "sha2",
  "thiserror 2.0.12",
- "tikv-jemalloc-ctl",
- "tikv-jemallocator",
 ]
 
 [[package]]
@@ -858,7 +855,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "poly-commitment"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -874,7 +871,6 @@ dependencies = [
  "o1-utils",
  "ocaml",
  "ocaml-gen",
- "once_cell",
  "rand",
  "rand_core",
  "rayon",
@@ -1093,9 +1089,9 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "strum"
-version = "0.26.3"
+version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06"
+checksum = "af23d6f6c1a224baef9d3f61e287d2761385a5b88fdab4eb4c6f11aeb54c4bcf"
 
 [[package]]
 name = "strum_macros"
@@ -1188,37 +1184,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.100",
-]
-
-[[package]]
-name = "tikv-jemalloc-ctl"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "619bfed27d807b54f7f776b9430d4f8060e66ee138a28632ca898584d462c31c"
-dependencies = [
- "libc",
- "paste",
- "tikv-jemalloc-sys",
-]
-
-[[package]]
-name = "tikv-jemalloc-sys"
-version = "0.5.4+5.3.0-patched"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9402443cb8fd499b6f327e40565234ff34dbda27460c5b47db0db77443dd85d1"
-dependencies = [
- "cc",
- "libc",
-]
-
-[[package]]
-name = "tikv-jemallocator"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "965fe0c26be5c56c94e38ba547249074803efd52adfb66de62107d95aab3eaca"
-dependencies = [
- "libc",
- "tikv-jemalloc-sys",
 ]
 
 [[package]]
