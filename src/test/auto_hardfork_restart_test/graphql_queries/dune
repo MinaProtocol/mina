@@ -1,0 +1,16 @@
+(library
+ (name auto_hardfork_graphql_queries)
+ (wrapped false)
+ (libraries graphql_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocessor_deps
+  ../../../graphql-ppx-config.inc
+  ../../../../graphql_schema.json)
+ (preprocess
+  (pps
+   ppx_base
+   ppx_version
+   graphql_ppx
+   --
+   %{read-lines:../../../graphql-ppx-config.inc})))
