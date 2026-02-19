@@ -461,5 +461,17 @@
         inherit checks;
 
         formatter = pkgs.nixfmt-classic;
+
+        lib = {
+          mkAutoHardforkDocker = { prefork, postfork }:
+            pkgs.callPackage ./nix/auto-hardfork-docker.nix {
+              inherit flockenzeit;
+              currentTime = self.sourceInfo.lastModified or 0;
+              preforkDevnet = prefork.packages.${system}.devnet;
+              postforkDevnet = postfork.packages.${system}.devnet;
+              preforkLibp2p = prefork.packages.${system}.libp2p_helper;
+              postforkLibp2p = postfork.packages.${system}.libp2p_helper;
+            };
+        };
       });
 }
