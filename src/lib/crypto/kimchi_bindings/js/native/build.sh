@@ -7,7 +7,7 @@ PROOF_SYSTEMS_ROOT=$(cd "${SCRIPT_DIR}/../../../proof-systems" && pwd)
 
 napi build \
     --manifest-path $PROOF_SYSTEMS_ROOT/Cargo.toml \
-    --package plonk-napi \
+    --package kimchi-napi \
     --output-dir ./ \
     --release \
     --esm
