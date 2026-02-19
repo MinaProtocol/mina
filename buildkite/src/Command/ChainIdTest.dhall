@@ -67,6 +67,10 @@ let makeTest =
                     { ancestor = MainlineBranch.Type.Mesa
                     , reason = "Mesa does not support this test yet"
                     }
+                , Expr.Type.DescendantOf
+                    { ancestor = MainlineBranch.Type.Develop
+                    , reason = "Develop does not support this test"
+                    }
                 ]
               }
             , steps = [ buildTestStep network expectedChainId deps ]

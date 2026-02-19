@@ -52,6 +52,10 @@ UPGRADE_SCRIPTS_WORKDIR="src/app/archive"
 
 LOAD_TEST_DURATION=600
 RUN_LOAD_TEST=false
+METRICS_MODE=""
+BRANCH=""
+COMMIT=""
+PERF_OUTPUT_FILE="rosetta.perf"
 
 USAGE="Usage: $0 [-t docker-tag] [-n network]
   -t, --version             The version to be used in the docker image tag
@@ -59,11 +63,17 @@ USAGE="Usage: $0 [-t docker-tag] [-n network]
   --timeout                 The timeout duration in seconds. Default=$TIMEOUT
   --run-compatibility-test  Enable compatibility testing with specified branch
   --upgrade-scripts-workdir Working directory for upgrade/downgrade scripts. Default=$UPGRADE_SCRIPTS_WORKDIR
+  --run-load-test           Enable load testing
+  --metrics-mode            Enable metrics collection mode (collects data instead of asserting on thresholds)
+  --branch                  Git branch name (for CI/CD contexts where git branch detection doesn't work)
+  --commit                  Git commit hash (for CI/CD contexts where git commit detection doesn't work)
   -h, --help                Show help
 
 Example: $0 --network devnet --tag 3.0.3-bullseye-devnet
 Example: $0 --network devnet --tag 3.0.3 --run-compatibility-test develop
 Example: $0 --network devnet --tag 3.0.3 --run-compatibility-test develop --upgrade-scripts-workdir /custom/path
+Example: $0 --network devnet --tag 3.0.3 --run-load-test --metrics-mode --branch main
+Example: $0 --network devnet --tag 3.0.3 --run-load-test --metrics-mode --branch main --commit 0123abcd
 
 Warning:
 Please execute this script from the root of the mina repository.
@@ -79,11 +89,15 @@ function usage() {
 while [[ "$#" -gt 0 ]]; do case $1 in
     -n|--network) NETWORK="$2"; shift;;
     --run-load-test) RUN_LOAD_TEST=true ;;
+    --perf-output-file) PERF_OUTPUT_FILE="$2"; shift;;
     --run-compatibility-test) COMPATIBILITY_BRANCH="$2"; shift;;
     -t|--tag) TAG="$2"; shift;;
     -r|--repo) REPO="$2"; shift;;
     --timeout) TIMEOUT="$2"; shift;;
     --upgrade-scripts-workdir) UPGRADE_SCRIPTS_WORKDIR="$2"; shift;;
+    --metrics-mode) METRICS_MODE="--metrics-mode" ;;
+    --branch) BRANCH="$2"; shift;;
+    --commit) COMMIT="$2"; shift;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown parameter passed: $1"; usage; exit 1;;
 esac; shift; done
@@ -103,15 +117,43 @@ fi
 
 if [[ -z "$TAG" ]]; then usage "Docker tag is not set!"; usage; exit 1; fi;
 
-set -x
+set -eox pipefail
 
-container_id=$(docker run -v .:/workdir -p 3087:3087 -d --env MINA_NETWORK=$NETWORK $REPO/mina-rosetta:$TAG-$NETWORK )
+container_id=$(docker run -v .:/workdir -p 3087:3087 -p 3085:3085 -d --env MINA_NETWORK=$NETWORK $REPO/mina-rosetta:$TAG-$NETWORK )
+
+# Function to collect logs from the Docker container (called on exit or error)
+collect_logs() {
+    echo "========================= COLLECTING LOGS ==========================="
+    mkdir -p test_output/artifacts
+
+    # Container stdout/stderr (includes rosetta, archive output)
+    docker logs "$container_id" > test_output/artifacts/container-stdout.log 2> test_output/artifacts/container-stderr.log
+
+    # Copy top-level .log files from mina config directory (excludes binary LevelDB logs in subdirs)
+    mkdir -p test_output/artifacts/mina-logs
+    docker exec "$container_id" bash -c "cd /data/.mina-config && find . -maxdepth 1 -name '*.log' | tar -cf - -T -" | tar -xf - -C test_output/artifacts/mina-logs 2>/dev/null || true
+
+    # Daemon status at end of test
+    docker exec "$container_id" mina client status --json > test_output/artifacts/daemon-status.json 2>/dev/null || echo "Could not get daemon status" > test_output/artifacts/daemon-status.json
+
+    echo "Logs collected in test_output/artifacts/"
+}
 
 stop_docker() {
         { docker stop "$container_id" ; docker rm "$container_id" ; } || true
 }
 
-trap stop_docker ERR
+cleanup() {
+    local exit_code=$?
+    # Only collect logs on failure
+    if [[ $exit_code -ne 0 ]]; then
+        collect_logs
+    fi
+    stop_docker
+    exit $exit_code
+}
+
+trap cleanup EXIT
 
 # Function to wait for new blocks
 wait_for_new_blocks() {
@@ -155,12 +197,31 @@ execute_script() {
 # Wait for the container to start
 sleep 5
 #run sanity test
-./scripts/tests/rosetta-sanity.sh --address "http://localhost:3087" --network $NETWORK --wait-for-sync --timeout $TIMEOUT
+./scripts/tests/rosetta-sanity.sh --address "http://localhost:3087" --daemon-graphql-address "http://localhost:3085/graphql" --network $NETWORK --wait-for-sync --timeout $TIMEOUT
 
 # Run load test
 if [[ "$RUN_LOAD_TEST" == true ]]; then
         echo "Running load test for $LOAD_TEST_DURATION seconds..."
-        if docker exec $container_id bash -c "/workdir/scripts/tests/rosetta-load.sh --address \"http://localhost:3087\" --db-conn-str $DB_CONN_STR --duration $LOAD_TEST_DURATION --network $NETWORK "; then
+
+        # Build the command with optional parameters
+        load_test_cmd="/workdir/scripts/tests/rosetta-load.sh --address \"http://localhost:3087\" --db-conn-str $DB_CONN_STR --duration $LOAD_TEST_DURATION --network $NETWORK --perf-output-file $PERF_OUTPUT_FILE"
+
+        # Add metrics mode if specified
+        if [[ -n "$METRICS_MODE" ]]; then
+                load_test_cmd="$load_test_cmd $METRICS_MODE"
+        fi
+
+        # Add branch if specified
+        if [[ -n "$BRANCH" ]]; then
+                load_test_cmd="$load_test_cmd --branch $BRANCH"
+        fi
+
+        # Add commit if specified
+        if [[ -n "$COMMIT" ]]; then
+                load_test_cmd="$load_test_cmd --commit $COMMIT"
+        fi
+
+        if docker exec $container_id bash -c "$load_test_cmd"; then
                 echo -e "${GREEN}Load test completed successfully.${CLEAR}"
         else
                 echo -e "${RED}Load test failed.${CLEAR}"
@@ -205,4 +266,4 @@ else
         echo "Skipping compatibility test."
 fi
 
-stop_docker
+# cleanup is called automatically on EXIT via trap

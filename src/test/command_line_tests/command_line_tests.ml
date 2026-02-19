@@ -450,6 +450,43 @@ module AutoHardforkConfigGeneration = struct
                     (Core.Signal.to_string signal) ) ) )
 end
 
+module HardforkStateDirMismatch = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let test_case (test : t) =
+    let daemon = Daemon.of_config test.config in
+    let%bind () = Daemon.Config.generate_keys test.config in
+    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+    let%bind () =
+      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+    in
+    let%bind process =
+      Daemon.start
+        ~env:(`Extend [ ("MINA_HARDFORK_STATE_DIR", "/nonexistent") ])
+        daemon
+    in
+    match%bind
+      Async.Clock.with_timeout (Core.Time.Span.of_sec 5.)
+        (Process.wait process.process)
+    with
+    | `Timeout ->
+        let%bind _ = Daemon.Process.force_kill process in
+        Deferred.Or_error.return
+          (Mina_automation_fixture.Intf.Failed
+             "Daemon did not exit within 5 seconds" )
+    | `Result (Ok ()) ->
+        Deferred.Or_error.return
+          (Mina_automation_fixture.Intf.Failed
+             "Daemon exited with code 0, expected non-zero" )
+    | `Result (Error (`Exit_non_zero _)) ->
+        Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+    | `Result (Error (`Signal signal)) ->
+        Deferred.Or_error.return
+          (Mina_automation_fixture.Intf.Failed
+             (sprintf "Daemon terminated by signal: %s"
+                (Core.Signal.to_string signal) ) )
+end
+
 let () =
   let open Alcotest in
   run "Test commadline."
@@ -517,5 +554,15 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (AutoHardforkConfigGeneration) ) )
+        ] )
+    ; ( "hardfork-state-dir-mismatch"
+      , [ test_case
+            "The mina daemon fails when MINA_HARDFORK_STATE_DIR mismatches \
+             config dir"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (HardforkStateDirMismatch) ) )
         ] )
     ]

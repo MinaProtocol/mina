@@ -1312,21 +1312,6 @@ module Step = struct
     let spec unfinalized_proofs messages_for_next_step_proof =
       Spec.T.Struct [ unfinalized_proofs; messages_for_next_step_proof ]
 
-    include struct
-      open Hlist.HlistId
-
-      let _to_data { unfinalized_proofs; messages_for_next_step_proof } =
-        [ Vector.map unfinalized_proofs ~f:Per_proof.In_circuit.to_data
-        ; messages_for_next_step_proof
-        ]
-
-      let _of_data [ unfinalized_proofs; messages_for_next_step_proof ] =
-        { unfinalized_proofs =
-            Vector.map unfinalized_proofs ~f:Per_proof.In_circuit.of_data
-        ; messages_for_next_step_proof
-        }
-    end [@@warning "-45"]
-
     let[@warning "-60"] wrap_typ (type n) ~assert_16_bits
         (proofs_verified : (Opt.Flag.t Plonk_types.Features.t, n) Vector.t) fq :
         (((_, _) Vector.t, _) t, ((_, _) Vector.t, _) t) Wrap_impl.Typ.t =
