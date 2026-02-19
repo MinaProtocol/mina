@@ -446,7 +446,7 @@ reset-genesis-ledger() {
   '
   {
     genesis: {
-      slot_per_epoch: 48,
+      slots_per_epoch: 48,
       k: 10,
       grace_period_slots: 3,
       genesis_state_timestamp: $timestamp
