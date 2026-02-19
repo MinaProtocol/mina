@@ -67,19 +67,23 @@ module Client = struct
     { id : string [@key "Id"]; warnings : string list [@key "Warnings"] }
   [@@deriving yojson]
 
-  let create_container t ~image ~cmd ~workdir ~volume ~network =
+  let create_container t ~image ~cmd ?workdir ~volume ~network =
     let open Deferred.Let_syntax in
+    let workdir_fields =
+      match workdir with Some w -> [ ("WorkingDir", `String w) ] | None -> []
+    in
     let json =
       `Assoc
-        [ ("Image", `String image)
-        ; ("Cmd", `List (List.map cmd ~f:(fun x -> `String x)))
-        ; ("WorkingDir", `String workdir)
-        ; ( "HostConfig"
-          , `Assoc
-              [ ("Binds", `List [ `String volume ])
-              ; ("NetworkMode", `String network)
-              ] )
-        ]
+        ( [ ("Image", `String image)
+          ; ("Cmd", `List (List.map cmd ~f:(fun x -> `String x)))
+          ]
+        @ workdir_fields
+        @ [ ( "HostConfig"
+            , `Assoc
+                [ ("Binds", `List [ `String volume ])
+                ; ("NetworkMode", `String network)
+                ] )
+          ] )
     in
     let json = Yojson.to_string json in
     let path = HttpPath.container_create t.http_path in
@@ -122,11 +126,11 @@ module Client = struct
     let path = HttpPath.container_logs t.http_path ~id in
     Requests.post_no_data t.requests ~path
 
-  let run_cmd_in_image t ~image ~cmd ~workdir ~volume ~network =
+  let run_cmd_in_image t ~image ~cmd ?workdir ~volume ~network =
     let open Deferred.Let_syntax in
     let%bind _ = pull_image t ~img:image in
     let%bind result =
-      create_container t ~image ~cmd ~workdir ~volume ~network
+      create_container t ~image ~cmd ?workdir ~volume ~network
     in
     let%bind _ = start_container t ~id:result.id in
     let%bind _ = wait_for_container t ~id:result.id in
