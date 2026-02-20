@@ -203,3 +203,14 @@ let to_inputs (t : t) : Inputs.t =
       else None )
   ; signature_kind = t.signature_kind
   }
+
+module Light = struct
+  type t =
+    { constraint_constants : Genesis_constants.Constraint_constants.t
+    ; proof_level : Genesis_constants.Proof_level.t
+    ; genesis_constants : Genesis_constants.t
+    ; genesis_body_reference : Consensus.Body_reference.t
+    ; consensus_constants : Consensus.Constants.t
+    ; signature_kind : Mina_signature_kind.t
+    }
+end

@@ -696,32 +696,31 @@ module Epoch_data = struct
 end
 
 module Genesis_proof = struct
-  let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
-      ~constraint_constants ~(genesis_constants : Genesis_constants.t) =
-    let consensus_constants =
-      Consensus.Constants.create ~constraint_constants
-        ~protocol_constants:genesis_constants.protocol
-    in
-    let open Staged_ledger_diff in
+  module Light = Genesis_proof.Light
+
+  let generate_inputs ~(light_proof : Light.t) ~runtime_config ~ledger
+      ~genesis_epoch_data =
     let protocol_state_with_hashes =
       let genesis_ledger = Consensus.Genesis_data.Ledger.to_hashed ledger in
       let genesis_epoch_data =
         Consensus.Genesis_data.Epoch.to_hashed genesis_epoch_data
       in
       Mina_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_epoch_data
-        ~constraint_constants ~consensus_constants ~genesis_body_reference
+        ~constraint_constants:light_proof.constraint_constants
+        ~consensus_constants:light_proof.consensus_constants
+        ~genesis_body_reference:light_proof.genesis_body_reference
     in
     { Genesis_proof.Inputs.runtime_config
-    ; constraint_constants
-    ; proof_level
+    ; constraint_constants = light_proof.constraint_constants
+    ; proof_level = light_proof.proof_level
     ; genesis_ledger = ledger
     ; genesis_epoch_data
-    ; consensus_constants
+    ; consensus_constants = light_proof.consensus_constants
     ; protocol_state_with_hashes
     ; constraint_system_digests = None
-    ; genesis_constants
-    ; genesis_body_reference
-    ; signature_kind = Mina_signature_kind.t_DEPRECATED
+    ; genesis_constants = light_proof.genesis_constants
+    ; genesis_body_reference = light_proof.genesis_body_reference
+    ; signature_kind = light_proof.signature_kind
     }
 
   let create_values_no_proof = Genesis_proof.create_values_no_proof
@@ -760,12 +759,56 @@ let print_config ~logger config =
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
     ~metadata
 
-let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~proof_level:compiled_proof_level ?overwrite_version
+let fill_in_ledger_data ?(genesis_dir = Cache_dir.autogen_path) ~logger
+    ~(light_proof : Genesis_proof.Light.t) ?overwrite_version
     (config : Runtime_config.t) =
-  print_config ~logger config ;
+  let open Deferred.Or_error.Let_syntax in
+  (* If the backing type were set to Converting_db here, then the daemon would
+     be forced to keep a migrated copy of the genesis ledgers around on disk the
+     entire time it operated. This is a waste of disk space; the daemon only
+     ever uses the genesis ledgers to populate Root ledgers when bootstrapping
+     from genesis, which should happen quite infrequently (usually only once
+     during startup, and only if the transition frontier on disk is too far
+     behind the network).
+
+     To avoid keeping migrated genesis ledgers around on disk, the backing here
+     is set to [Stable_db] even if the daemon is configured to maintain synced
+     ledgers for an upcoming hard fork. As a result, if the daemon does need to
+     bootstrap from genesis, it will migrate its genesis ledgers on-demand while
+     executing one of the implementations of [create_root] from
+     genesis_ledger/intf.ml. *)
+  let genesis_backing_type = Mina_ledger.Root.Config.Stable_db in
+  let%bind genesis_ledger, ledger_config, ledger_file =
+    match config.ledger with
+    | Some ledger ->
+        Ledger.load ~proof_level:light_proof.proof_level ~genesis_dir ~logger
+          ~constraint_constants:light_proof.constraint_constants
+          ~genesis_backing_type ?overwrite_version ledger
+    | None ->
+        [%log fatal] "No ledger was provided in the runtime configuration" ;
+        Deferred.Or_error.errorf
+          "No ledger was provided in the runtime configuration"
+  in
+  [%log info] "Loaded genesis ledger from $ledger_file"
+    ~metadata:[ ("ledger_file", `String ledger_file) ] ;
+  let%map genesis_epoch_data, genesis_epoch_data_config =
+    Epoch_data.load ~proof_level:light_proof.proof_level ~genesis_dir ~logger
+      ~constraint_constants:light_proof.constraint_constants
+      ~genesis_backing_type config.epoch_data
+  in
+  let config =
+    { config with
+      ledger = Option.map config.ledger ~f:(fun _ -> ledger_config)
+    ; epoch_data = genesis_epoch_data_config
+    }
+  in
+  Genesis_proof.generate_inputs ~light_proof ~runtime_config:config
+    ~ledger:genesis_ledger ~genesis_epoch_data
+
+let light_proof_from_runtime_config ~logger ~cli_proof_level
+    ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~proof_level:compiled_proof_level (config : Runtime_config.t) =
   let open Deferred.Or_error.Let_syntax in
   let proof_level =
     List.find_map_exn ~f:Fn.id
@@ -808,58 +851,36 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           "Proof level %s is not compatible with compile-time proof level %s"
           (str proof_level) (str compiled)
   in
-  (* If the backing type were set to Converting_db here, then the daemon would
-     be forced to keep a migrated copy of the genesis ledgers around on disk the
-     entire time it operated. This is a waste of disk space; the daemon only
-     ever uses the genesis ledgers to populate Root ledgers when bootstrapping
-     from genesis, which should happen quite infrequently (usually only once
-     during startup, and only if the transition frontier on disk is too far
-     behind the network).
-
-     To avoid keeping migrated genesis ledgers around on disk, the backing here
-     is set to [Stable_db] even if the daemon is configured to maintain synced
-     ledgers for an upcoming hard fork. As a result, if the daemon does need to
-     bootstrap from genesis, it will migrate its genesis ledgers on-demand while
-     executing one of the implementations of [create_root] from
-     genesis_ledger/intf.ml. *)
-  let genesis_backing_type = Mina_ledger.Root.Config.Stable_db in
-  let%bind genesis_ledger, ledger_config, ledger_file =
-    match config.ledger with
-    | Some ledger ->
-        Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-          ~genesis_backing_type ?overwrite_version ledger
-    | None ->
-        [%log fatal] "No ledger was provided in the runtime configuration" ;
-        Deferred.Or_error.errorf
-          "No ledger was provided in the runtime configuration"
-  in
-  [%log info] "Loaded genesis ledger from $ledger_file"
-    ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-  let%bind genesis_epoch_data, genesis_epoch_data_config =
-    Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      ~genesis_backing_type config.epoch_data
-  in
-  let config =
-    { config with
-      ledger = Option.map config.ledger ~f:(fun _ -> ledger_config)
-    ; epoch_data = genesis_epoch_data_config
-    }
-  in
   let%map genesis_constants =
     Deferred.return
     @@ make_genesis_constants ~logger ~default:genesis_constants config
   in
-  Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
-    ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
-    ~genesis_epoch_data
+  let consensus_constants =
+    Consensus.Constants.create ~constraint_constants
+      ~protocol_constants:genesis_constants.protocol
+  in
+  { Genesis_proof.Light.constraint_constants
+  ; proof_level
+  ; genesis_constants
+  ; genesis_body_reference = Staged_ledger_diff.genesis_body_reference
+  ; consensus_constants
+  ; signature_kind = Mina_signature_kind.t_DEPRECATED
+  }
 
 let init_from_config_file ~cli_proof_level ~genesis_constants
     ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
     (config : Runtime_config.t) : Precomputed_values.t Deferred.Or_error.t =
-  inputs_from_config_file ~cli_proof_level ~genesis_constants
-    ~constraint_constants ~logger ~proof_level ?overwrite_version ?genesis_dir
-    config
-  |> Deferred.Or_error.map ~f:Genesis_proof.create_values_no_proof
+  let open Deferred.Or_error.Let_syntax in
+  print_config ~logger config ;
+  let%bind light_proof =
+    light_proof_from_runtime_config ~logger ~cli_proof_level ~genesis_constants
+      ~constraint_constants ~proof_level config
+  in
+  let%map genesis_proof =
+    fill_in_ledger_data ~light_proof ?genesis_dir ~logger ?overwrite_version
+      config
+  in
+  Genesis_proof.create_values_no_proof genesis_proof
 
 (* TODO: The old-style config format appears to date from before 2020. Also,
    unconditionally updating in-place feels strange. Consider removing this
