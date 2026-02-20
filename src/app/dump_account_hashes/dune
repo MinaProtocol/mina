@@ -4,6 +4,7 @@
   core_kernel
   mina_base
   snark_params
+  random_oracle
   yojson)
  (instrumentation
   (backend bisect_ppx))
