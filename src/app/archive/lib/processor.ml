@@ -228,12 +228,13 @@ module Token = struct
   let add_all_if_don't_exist (module Conn : CONNECTION) tokens_used =
     let open Deferred.Result.Let_syntax in
     Token_owners.populate_owner_tbl tokens_used ;
-    let sorted_token_ids =
-      Token_owners.toposort_tokens (List.map tokens_used ~f:fst)
-    in
-    Mina_stdlib.Deferred.Result.List.iter sorted_token_ids ~f:(fun token_id ->
-        let%bind (_ : int) = add_if_doesn't_exist (module Conn) token_id in
-        return () )
+    (* let sorted_token_ids = *)
+    (*   Token_owners.toposort_tokens (List.map tokens_used ~f:fst) *)
+    (* in *)
+    (* Mina_stdlib.Deferred.Result.List.iter sorted_token_ids ~f:(fun token_id -> *)
+    (*     let%bind (_ : int) = add_if_doesn't_exist (module Conn) token_id in *)
+    (*     return () ) *)
+    return ()
 end
 
 module Voting_for = struct
