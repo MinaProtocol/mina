@@ -577,6 +577,14 @@ debian-build-daemon-mainnet: ## Build the Debian daemon package for mainnet
 debian-build-config-devnet: ## Build the Debian config package for devnet
 	$(call build_debian_package,daemon_devnet_config)
 
+.PHONY: debian-build-daemon-devnet-prefork
+debian-build-daemon-devnet-prefork: ## Build the Debian daemon package for automote devnet pre hardfork
+	$(call build_debian_package,daemon_devnet_prefork)
+
+.PHONY: debian-build-daemon-mainnet-prefork
+debian-build-daemon-mainnet-prefork: ## Build the Debian daemon package for automote mainnet pre hardfork
+	$(call build_debian_package,daemon_mainnet_prefork)
+
 .PHONY: debian-build-config-mainnet
 debian-build-config-mainnet: ## Build the Debian config package for mainnet
 	$(call build_debian_package,daemon_mainnet_config)
@@ -608,14 +616,6 @@ debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
 .PHONY: debian-build-daemon-devnet-hardfork
 debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devnet hardfork
 	$(call build_debian_package,daemon_devnet_hardfork)
-
-.PHONY: debian-build-daemon-devnet-pre-hardfork
-debian-build-daemon-devnet-pre-hardfork: ## Build the Debian daemon package for automote devnet pre hardfork
-	$(call build_debian_package,daemon_devnet_pre_hardfork)
-
-.PHONY: debian-build-daemon-mainnet-pre-hardfork
-debian-build-daemon-mainnet-pre-hardfork: ## Build the Debian daemon package for automote mainnet pre hardfork
-	$(call build_debian_package,daemon_mainnet_pre_hardfork)
 
 .PHONY: debian-download-create-legacy-hardfork
 debian-download-create-legacy-hardfork: ## Download and create legacy hardfork Debian packages
