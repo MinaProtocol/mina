@@ -4,8 +4,6 @@ open Backend
 open Composition_types
 open Common
 
-let _wrap_domains = Common.wrap_domains
-
 let evals =
   lazy
     (let open Plonk_types in

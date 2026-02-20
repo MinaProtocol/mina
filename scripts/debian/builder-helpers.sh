@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+SCRIPTPATH="${SCRIPTPATH:-"$( cd "$(dirname "$0")" ; pwd -P )"}"
 BUILD_DIR=${BUILD_DIR:-"${SCRIPTPATH}/../../_build"}
 BUILD_URL=${BUILD_URL:-${BUILDKITE_BUILD_URL:-"local build from '$(hostname)' \
   host"}}
@@ -80,7 +80,7 @@ BUILDDIR="deb_build"
 
 
 # For automode purpose. We need to control location for both runtimes
-AUTOMODE_PRE_HF_DIR=${BUILDDIR}/usr/lib/mina/bin/berkeley
+AUTOMODE_PRE_HF_DIR=${BUILDDIR}/usr/lib/mina/berkeley
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -154,6 +154,19 @@ build_deb() {
   echo "Deb Contents:"
   find "${BUILDDIR}"
 
+  # If BUILD_DEB_CAPTURE_DIR is set (used by tests), capture the staging
+  # directory state to that directory instead of invoking fakeroot/dpkg-deb.
+  if [[ -n "${BUILD_DEB_CAPTURE_DIR:-}" ]]; then
+    echo "${1}" > "${BUILD_DEB_CAPTURE_DIR}/deb_name"
+    cp "${BUILDDIR}/DEBIAN/control" "${BUILD_DEB_CAPTURE_DIR}/control"
+    (cd "${BUILDDIR}" && find . -type f | sort) > "${BUILD_DEB_CAPTURE_DIR}/files"
+    rm -rf "${BUILD_DEB_CAPTURE_DIR}/last_build"
+    cp -a "${BUILDDIR}" "${BUILD_DEB_CAPTURE_DIR}/last_build"
+    rm -rf "${BUILDDIR}"
+    echo "--- Captured ${1} staging directory to ${BUILD_DEB_CAPTURE_DIR}"
+    return 0
+  fi
+
   # Build the package
   echo "------------------------------------------------------------"
   # NOTE: the reason for `-Zgzip` is we might be building on newer Ubuntu, e.g.
@@ -170,16 +183,25 @@ build_deb() {
   echo "--- Built ${1}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
 }
 
-# Copies scripts and build utilities to debian package
-copy_common_daemon_utils() {
-  echo "------------------------------------------------------------"
-  echo "copy_common_daemon_configs inputs:"
-  echo "Seed List URL path: ${1} (like seed-lists/berkeley_seeds.txt)"
+copy_hf_related_scripts() {
 
   cp ../scripts/hardfork/create_runtime_config.sh \
     "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
   cp ../scripts/hardfork/mina-verify-packaged-fork-config \
     "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
+
+}
+
+# Copies scripts and build utilities to debian package
+copy_common_daemon_utils() {
+  echo "------------------------------------------------------------"
+  echo "copy_common_daemon_utils inputs:"
+  echo "Seed List URL path: ${1} (like seed-lists/berkeley_seeds.txt)"
+
+  local MINA_BIN="${2:-${BUILDDIR}/usr/local/bin/mina}"
+
+  copy_hf_related_scripts
+
   # Update the mina.service with a new default PEERS_URL based on Seed List \
   # URL $1
   mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
@@ -190,7 +212,7 @@ copy_common_daemon_utils() {
   # NOTE: We do not list bash-completion as a required package,
   #       but it needs to be present for this to be effective
   mkdir -p "${BUILDDIR}/etc/bash_completion.d"
-  env COMMAND_OUTPUT_INSTALLATION_BASH=1 "${BUILDDIR}/usr/local/bin/mina" > \
+  env COMMAND_OUTPUT_INSTALLATION_BASH=1 "${MINA_BIN}" > \
     "${BUILDDIR}/etc/bash_completion.d/mina"
 
 }
@@ -566,23 +588,23 @@ build_daemon_devnet_config_deb() {
 }
 ## END DEVNET PACKAGE ##
 
-## MAINNET LEGACY PACKAGE ##
+## MAINNET PREFORK PACKAGE ##
 
 #
-# Builds mina-mainnet-pre-hardfork-mesa tailored package for automode package
+# Builds mina-mainnet-prefork-mesa tailored package for automode package
 #
-# Output: mina-mainnet-pre-hardfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-mainnet-prefork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Contains only the legacy mainnet binaries places in "/usr/lib/mina/berkeley" without
 # configuration files or genesis ledgers.
 #
-build_daemon_mainnet_pre_hardfork_deb() {
+build_daemon_mainnet_prefork_deb() {
 
-  NAME="mina-mainnet-pre-hardfork-mesa"
+  NAME="mina-mainnet-prefork-mesa"
 
   echo "------------------------------------------------------------"
-  echo "--- Building mainnet berkeley deb for hardfork automode :"
+  echo "--- Building mainnet berkeley deb for prefork automode :"
 
   create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
@@ -591,25 +613,25 @@ build_daemon_mainnet_pre_hardfork_deb() {
 
   build_deb $NAME
 }
-## END MAINNET LEGACY PACKAGE ##
+## END MAINNET PREFORK PACKAGE ##
 
-## DEVNET LEGACY PACKAGE ##
+## DEVNET PREFORK PACKAGE ##
 
 #
-# Builds mina-devnet-pre-hardfork-mesa tailored package for automode package
+# Builds mina-devnet-prefork-mesa tailored package for automode package
 #
-# Output: mina-devnet-pre-hardfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-devnet-prefork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Contains only the legacy mainnet binaries places in "/usr/lib/mina/berkeley" without
+# Contains only the prefork devnet binaries places in "/usr/lib/mina/berkeley" without
 # configuration files or genesis ledgers.
 #
-build_daemon_devnet_pre_hardfork_deb() {
+build_daemon_devnet_prefork_deb() {
 
-  NAME="mina-devnet-pre-hardfork-mesa"
+  NAME="mina-devnet-prefork-mesa"
 
   echo "------------------------------------------------------------"
-  echo "--- Building testnet berkeley legacy deb for hardfork automode :"
+  echo "--- Building testnet berkeley prefork deb for automode :"
 
   create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
@@ -618,7 +640,7 @@ build_daemon_devnet_pre_hardfork_deb() {
 
   build_deb $NAME
 }
-## END DEVNET LEGACY PACKAGE ##
+## END DEVNET PREFORK PACKAGE ##
 
 ## TESTNET GENERIC PACKAGE ##
 
@@ -733,22 +755,6 @@ build_daemon_testnet_generic_hardfork_config_deb() {
   copy_common_daemon_hardfork_configs berkeley
 
   build_deb "${__deb_name}"
-}
-
-build_daemon_berkeley_hardfork_deb() {
-  local __deb_name=mina-berkeley
-
-  echo "------------------------------------------------------------"
-  echo "--- Building hardfork Berkeley testnet signatures deb without keys:"
-
-  create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}, ${__deb_name}-config (>=${MINA_DEB_VERSION}) " \
-    'Mina Protocol Client and Daemon for the Berkeley Network' \
-    "${SUGGESTED_DEPS}" "mina-berkeley (<< ${MINA_DEB_VERSION})"
-
-
-  replace_runtime_config_and_ledgers_with_hardforked_ones testnet-generic
-  build_deb "${__deb_name}"
-
 }
 
 ## END TESTNET GENERIC HARDFORK PACKAGE ##
@@ -960,22 +966,24 @@ build_delegation_verify_deb () {
 ## END DELEGATION VERIFY PACKAGE ##
 
 
-## CREATE LEGACY GENESIS PACKAGE ##
+## CREATE PREFORK GENESIS PACKAGE ##
 
 #
-# Builds mina-create-legacy-genesis package for legacy genesis creation
+# Builds mina-create-prefork-genesis package for prefork genesis creation
 #
-# Output: mina-create-legacy-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-create-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Utility for creating legacy genesis ledgers for post-hardfork verification.
+# Utility for creating prefork genesis ledgers for post-hardfork verification.
 # Contains the runtime_genesis_ledger tool for Mina protocol.
 #
-build_create_legacy_genesis_deb() {
+build_prefork_devnet_genesis_ledger_deb() {
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Generic testnet create legacy genesis tool:"
+  echo "--- Building Mina Generic devnet create prefork genesis tool:"
 
-  create_control_file mina-create-legacy-genesis \
+  DEB_NAME="mina-create-devnet-prefork-genesis-ledger"
+
+  create_control_file "$DEB_NAME" \
     "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Utility to verify post hardfork ledger for Mina'
 
@@ -983,8 +991,65 @@ build_create_legacy_genesis_deb() {
 
   # Binaries
   cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-    "${BUILDDIR}/usr/local/bin/mina-create-legacy-genesis"
+    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
 
-  build_deb mina-create-legacy-genesis
+  build_deb "$DEB_NAME"
 }
-## END CREATE LEGACY GENESIS PACKAGE ##
+
+#
+# Builds mina-create-mainnet-prefork-genesis package for prefork genesis creation
+#
+# Output: mina-create-mainnet-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Utility for creating prefork genesis ledgers for post-hardfork verification.
+# Contains the runtime_genesis_ledger tool for Mina protocol.
+#
+build_prefork_mainnet_genesis_ledger_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Generic mainnet create prefork genesis tool:"
+
+  DEB_NAME="mina-create-mainnet-prefork-genesis-ledger"
+
+  create_control_file "$DEB_NAME" \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Utility to verify post hardfork ledger for Mina'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binaries
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
+
+  build_deb "$DEB_NAME"
+}
+
+#
+# Builds mina-create-testnet-generic-prefork-genesis package for prefork genesis creation
+#
+# Output: mina-create-testnet-generic-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Utility for creating prefork genesis ledgers for post-hardfork verification.
+# Contains the runtime_genesis_ledger tool for Mina protocol.
+#
+build_prefork_testnet_generic_genesis_ledger_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Generic testnet create prefork genesis tool:"
+
+  DEB_NAME="mina-create-testnet-generic-prefork-genesis-ledger"
+
+  create_control_file "$DEB_NAME" \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Utility to verify post hardfork ledger for Mina'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binaries
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
+
+  build_deb "$DEB_NAME"
+}
+
+## END CREATE PREFORK GENESIS PACKAGE ##

@@ -698,7 +698,7 @@ module Export_logs = struct
   let export_locally =
     let run ~tarfile ~conf_dir =
       let open Mina_lib in
-      let conf_dir = Conf_dir.compute_conf_dir conf_dir in
+      let conf_dir = Conf_dir.compute_conf_dir_exn conf_dir in
       fun () ->
         match%map Conf_dir.export_logs_to_tar ?basename:tarfile ~conf_dir with
         | Ok result ->
@@ -1360,7 +1360,7 @@ let import_key =
            | Ok res ->
                Deferred.return (print_result res)
            | Error _res ->
-               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn None in
                eprintf
                  "%sWarning: Could not connect to a running daemon.\n\
                   Importing to local directory %s%s\n"
@@ -1532,7 +1532,7 @@ let list_accounts =
            | Ok () ->
                Deferred.unit
            | Error _res ->
-               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn None in
                eprintf
                  "%sWarning: Could not connect to a running daemon.\n\
                   Listing from local directory %s%s\n"

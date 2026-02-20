@@ -1,10 +1,10 @@
 let S = ../../Lib/SelectFiles.dhall
 
-let B = ../../External/Buildkite.dhall
-
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
+
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
@@ -15,8 +15,6 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 let Cmd = ../../Lib/Cmds.dhall
-
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let command_key = "release-manager-tests"
 
@@ -29,7 +27,8 @@ in  Pipeline.build
           , S.strictlyStart (S.contains "scripts/docker")
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/ReleaseManagerTest")
-          , S.exactly "buildkite/scripts/tests/release-manager-test" "sh"
+          , S.exactly "buildkite/scripts/tests/release-manager/test" "sh"
+          , S.exactly "buildkite/scripts/tests/release-manager/lib" "sh"
           ]
         , path = "Test"
         , name = "ReleaseManagerTest"
@@ -39,19 +38,19 @@ in  Pipeline.build
           , PipelineTag.Type.Stable
           , PipelineTag.Type.Release
           ]
+        , scope = PipelineScope.PullRequestOnly
         }
       , steps =
         [ Command.build
             Command.Config::{
             , commands =
               [ Cmd.run
-                  "AWS_DEFAULT_REGION=us-west-2 ./buildkite/scripts/tests/release-manager-test.sh"
+                  "AWS_DEFAULT_REGION=us-west-2 ./buildkite/scripts/tests/release-manager/test.sh"
               ]
             , label = "Release Manager Tests"
             , key = command_key
             , target = Size.Small
             , docker = None Docker.Type
-            , soft_fail = Some (B/SoftFail.Boolean True)
             , artifact_paths = [ S.contains "*.log" ]
             }
         ]

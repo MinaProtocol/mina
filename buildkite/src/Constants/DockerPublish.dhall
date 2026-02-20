@@ -9,6 +9,7 @@ let isEssential =
       ->  merge
             { Daemon = True
             , DaemonConfig = False
+            , DaemonPrefork = True
             , LogProc = False
             , Archive = True
             , TestExecutive = False
@@ -19,7 +20,7 @@ let isEssential =
             , Toolchain = True
             , DaemonAutoHardfork = True
             , DaemonLegacyHardfork = True
-            , CreateLegacyGenesis = False
+            , CreatePreforkGenesis = False
             , DelegationVerifier = True
             }
             service
