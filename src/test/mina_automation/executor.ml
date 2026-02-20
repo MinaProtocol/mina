@@ -29,10 +29,11 @@ module DockerContext = struct
     ; workdir : string option
     ; volumes : string list
     ; network : string
+    ; rm : bool
     }
 
-  let create ~image ?workdir ~volumes ~network () =
-    { image; workdir; volumes; network }
+  let create ~image ?workdir ~volumes ~network ?(rm = false) () =
+    { image; workdir; volumes; network; rm }
 end
 
 let logger = Logger.create ()
@@ -131,9 +132,10 @@ module Make (P : AppPaths) = struct
       match ctx.workdir with Some w -> [ "-w"; w ] | None -> []
     in
     let volume_args = List.concat_map ctx.volumes ~f:(fun v -> [ "-v"; v ]) in
+    let rm_args = if ctx.rm then [ "--rm" ] else [] in
     let docker_args =
       [ "run"; "--network"; ctx.network ]
-      @ volume_args @ workdir_args @ env_args
+      @ rm_args @ volume_args @ workdir_args @ env_args
       @ [ ctx.image; P.official_name ]
       @ args
     in

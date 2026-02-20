@@ -20,6 +20,7 @@ module DockerContext : sig
     -> ?workdir:string
     -> volumes:string list
     -> network:string
+    -> ?rm:bool
     -> unit
     -> t
 end
