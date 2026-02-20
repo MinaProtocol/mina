@@ -40,8 +40,6 @@ let fromNetwork =
             { Devnet = Profile.Devnet
             , Mainnet = Profile.Mainnet
             , TestnetGeneric = Profile.Devnet
-            , DevnetLegacy = Profile.Devnet
-            , MainnetLegacy = Profile.Mainnet
             , PreMesa1 = Profile.Devnet
             , Mesa = Profile.Devnet
             }

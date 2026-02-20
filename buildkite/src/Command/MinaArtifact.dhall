@@ -251,6 +251,7 @@ let docker_step
                     , size = size
                     }
                   ]
+                , DaemonPrefork = [] : List DockerImage.ReleaseSpec.Type
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
                 , LogProc = [] : List DockerImage.ReleaseSpec.Type
                 , CreateLegacyGenesis = [] : List DockerImage.ReleaseSpec.Type
