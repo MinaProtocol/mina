@@ -27,12 +27,12 @@ module DockerContext = struct
   type t =
     { image : string
     ; workdir : string option
-    ; volume : string
+    ; volumes : string list
     ; network : string
     }
 
-  let create ~image ?workdir ~volume ~network () =
-    { image; workdir; volume; network }
+  let create ~image ?workdir ~volumes ~network () =
+    { image; workdir; volumes; network }
 end
 
 let logger = Logger.create ()
@@ -130,9 +130,10 @@ module Make (P : AppPaths) = struct
     let workdir_args =
       match ctx.workdir with Some w -> [ "-w"; w ] | None -> []
     in
+    let volume_args = List.concat_map ctx.volumes ~f:(fun v -> [ "-v"; v ]) in
     let docker_args =
-      [ "run"; "--network"; ctx.network; "-v"; ctx.volume ]
-      @ workdir_args @ env_args
+      [ "run"; "--network"; ctx.network ]
+      @ volume_args @ workdir_args @ env_args
       @ [ ctx.image; P.official_name ]
       @ args
     in
@@ -143,7 +144,7 @@ module Make (P : AppPaths) = struct
     let docker = Docker.Client.default in
     let cmd = [ P.official_name ] @ args in
     Docker.Client.run_cmd_in_image docker ~image:ctx.image ~cmd
-      ?workdir:ctx.workdir ~volume:ctx.volume ~network:ctx.network
+      ?workdir:ctx.workdir ~volumes:ctx.volumes ~network:ctx.network
 
   let run_impl t ~(args : string list) ?env ~f_local ~f_debian ~f_dune ~f_docker
       () =

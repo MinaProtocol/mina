@@ -18,7 +18,7 @@ module DockerContext : sig
   val create :
        image:string
     -> ?workdir:string
-    -> volume:string
+    -> volumes:string list
     -> network:string
     -> unit
     -> t
