@@ -249,7 +249,7 @@ let generateHfRelatedStepsForCodename =
 
           let tarballGenKey = "generate-hardfork-tarballs-${lowerNameCodename}"
 
-          let buildHfDebian = "build-hf-debian-${lowerNameCodename}"
+          let buildHfDebian = "build-hf-debian"
 
           let dependsOnTarballs =
                 [ { name = pipelineName, key = tarballGenKey } ]
