@@ -11,7 +11,11 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
-          , artifacts = [ Artifacts.Type.Daemon, Artifacts.Type.LogProc ]
+          , artifacts =
+            [ Artifacts.Type.Daemon
+            , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.LogProc
+            ]
           , profile = Profiles.Type.Lightnet
           , tags =
             [ PipelineTag.Type.Long

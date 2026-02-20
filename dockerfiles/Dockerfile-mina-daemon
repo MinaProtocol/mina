@@ -22,6 +22,12 @@ ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
 # - mina-devnet-lightnet etc.
 ENV MINA_DEB=mina-${network}${SUFFIX}
 
+# Prefork genesis ledger package name and version.
+# Create genesis debian is used for post hf verification.
+# It contains only runtime-genesis-ledger app which is moderately small
+ENV MINA_CREATE_GENESIS_DEB=mina-create-legacy-genesis
+ENV MINA_CREATE_GENESIS_DEB_VERSION=3.2.0-f77c8c9
+
 ENV DEBIAN_FRONTEND noninteractive
 
 # We do not install the below platform-specific dependencies,
@@ -87,7 +93,7 @@ RUN echo "Building image with version $deb_version from repo $deb_release $deb_c
   && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
   && apt-get install --no-install-recommends --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version" \
-  && apt-get install --no-install-recommends --quiet --yes --allow-downgrades "mina-create-legacy-genesis=3.2.0-f77c8c9" \
+  && apt-get install --no-install-recommends --quiet --yes --allow-downgrades "${MINA_CREATE_GENESIS_DEB}=${MINA_CREATE_GENESIS_DEB_VERSION}" \
   && rm -rf /var/lib/apt/lists/*
 
 
