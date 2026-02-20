@@ -8,4 +8,4 @@
 #   HOST - hostname to bypass (default: localhost)
 
 APT_PROXY_BYPASS_HOST="${1:-localhost}"
-APT_PROXY_BYPASS_OPTS="-o Acquire::http::Proxy::${APT_PROXY_BYPASS_HOST}=DIRECT -o Acquire::https::Proxy::${APT_PROXY_BYPASS_HOST}=DIRECT"
+echo "APT_PROXY_BYPASS_OPTS=\"-o Acquire::http::Proxy::${APT_PROXY_BYPASS_HOST}=DIRECT -o Acquire::https::Proxy::${APT_PROXY_BYPASS_HOST}=DIRECT\""
