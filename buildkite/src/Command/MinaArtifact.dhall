@@ -248,7 +248,7 @@ let docker_step
                 , DaemonPrefork = [] : List DockerImage.ReleaseSpec.Type
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
                 , LogProc = [] : List DockerImage.ReleaseSpec.Type
-                , CreateLegacyGenesis = [] : List DockerImage.ReleaseSpec.Type
+                , CreatePreforkGenesis = [] : List DockerImage.ReleaseSpec.Type
                 , BatchTxn =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps

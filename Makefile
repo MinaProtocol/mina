@@ -1,4 +1,12 @@
 ########################################
+## Functions
+
+# Check that a required environment variable is defined
+define check_env_var
+	@if [ -z "$($(1))" ]; then echo "Error: $(1) env var is not defined" >&2; exit 1; fi
+endef
+
+########################################
 ## Configuration
 
 # Current OCaml version
@@ -12,6 +20,8 @@ ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
 endif
 
+########################################
+## Branch and versioning
 # Default branch name
 # This is used for versioning and release purposes when building docker or debian
 # For example when BRANCH_NAME=fix-branch:
@@ -597,9 +607,10 @@ debian-build-logproc: ## Build the Debian logproc package
 debian-build-functional-tests: ## Build the Debian Functional tests package
 	$(call build_debian_package,functional_test_suite)
 
-.PHONY: debian-build-create-legacy-genesis
-debian-build-create-legacy-genesis: ## Build the Debian Create Legacy Genesis package
-	$(call build_debian_package,create_legacy_genesis)
+.PHONY: debian-build-prefork-genesis-ledger
+debian-build-prefork-genesis-ledger: ## Build the Debian Create Legacy Genesis package
+	$(call check_env_var,NETWORK_NAME)
+	$(call build_debian_package,prefork_$(NETWORK_NAME)_genesis_ledger)
 
 .PHONY: debian-build-rosetta-testnet-generic
 debian-build-rosetta-testnet-generic: ## Build the Debian Rosetta package
@@ -621,6 +632,39 @@ debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devn
 debian-download-create-legacy-hardfork: ## Download and create legacy hardfork Debian packages
 	$(info 📦 Downloading legacy hardfork Debian packages for debian $(CODENAME))
 	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-legacy-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend hetzner --target _build
+
+.PHONY: debian-reversion
+debian-reversion: ## Reversion a .deb package (DEB, NEW_VERSION required; NEW_SUITE, NEW_NAME, OUTPUT optional)
+	$(call check_env_var,DEB)
+	$(call check_env_var,NEW_VERSION)
+	@./scripts/debian/reversion.sh "$(DEB)" "$(NEW_VERSION)" \
+		$(if $(NEW_SUITE),--suite "$(NEW_SUITE)") \
+		$(if $(NEW_NAME),--name "$(NEW_NAME)") \
+		$(if $(OUTPUT),--output "$(OUTPUT)")
+
+########################################
+# Release management
+
+.PHONY: cache-get-prefork-debians
+cache-get-prefork-debians: ## Download debian packages for prefork genesis creation
+	$(info 📦 Downloading prefork Debian packages for debian $(CODENAME))
+
+	$(call check_env_var,NETWORK_NAME)
+
+	@./buildkite/scripts/release/manager.sh pull --artifacts mina-$(NETWORK_NAME)-prefork  --from-special-folder berkeley/debians/$(CODENAME)  --backend hetzner --target _build
+
+.PHONY: cache-get-create-prefork-genesis-debians
+cache-get-create-prefork-genesis-debians: ## Download debian packages for prefork genesis creation
+	$(info 📦 Downloading prefork genesis creation Debian packages for debian $(CODENAME))
+	$(call check_env_var,NETWORK_NAME)
+	@./buildkite/scripts/release/manager.sh pull --artifacts mina-$(NETWORK_NAME)-create-genesis-ledger  --from-special-folder berkeley/debians/$(CODENAME)  --backend hetzner --target _build
+
+.PHONY: cache-put-debian
+cache-put-debian: ## Upload debian packages for prefork genesis creation
+	$(info 📦 Uploading Debian packages for debian $(CODENAME) to CI cache)
+	$(call check_env_var,TARGET)
+	$(call check_env_var,DEB_PATH)
+	@./buildkite/scripts/release/manager.sh persist --codename $(CODENAME)  --target $(TARGET)  --backend hetzner --local-debian-path $(DEB_PATH)
 
 ########################################
 # Docker images
