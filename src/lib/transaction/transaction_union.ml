@@ -15,10 +15,9 @@ type t = (Payload.t, Public_key.t, Signature.t) t_
 type var = (Payload.var, Public_key.var, Signature.var) t_
 
 let typ : (var, t) Typ.t =
-  let spec =
-    Data_spec.[ Payload.typ; Public_key.typ; Schnorr.Chunked.Signature.typ ]
-  in
-  Typ.of_hlistable spec ~var_to_hlist:t__to_hlist ~var_of_hlist:t__of_hlist
+  Typ.of_hlistable
+    [ Payload.typ; Public_key.typ; Schnorr.Chunked.Signature.typ ]
+    ~var_to_hlist:t__to_hlist ~var_of_hlist:t__of_hlist
     ~value_to_hlist:t__to_hlist ~value_of_hlist:t__of_hlist
 
 (** For SNARK purposes, we inject [Transaction.t]s into a single-variant 'tagged-union' record capable of
@@ -52,7 +51,7 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
               ; fee_token = Token_id.default
               ; fee_payer_pk = other_pk
               ; nonce = Account.Nonce.zero
-              ; valid_until = Mina_numbers.Global_slot.max_value
+              ; valid_until = Mina_numbers.Global_slot_since_genesis.max_value
               ; memo = Signed_command_memo.empty
               }
           ; body =
@@ -61,7 +60,6 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
               ; token_id = Token_id.default
               ; amount
               ; tag = Tag.Coinbase
-              ; token_locked = false
               }
           }
       ; signer = Public_key.decompress_exn other_pk
@@ -77,7 +75,7 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
                 ; fee_token
                 ; fee_payer_pk = pk2
                 ; nonce = Account.Nonce.zero
-                ; valid_until = Mina_numbers.Global_slot.max_value
+                ; valid_until = Mina_numbers.Global_slot_since_genesis.max_value
                 ; memo = Signed_command_memo.empty
                 }
             ; body =
@@ -86,7 +84,6 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
                 ; token_id
                 ; amount = Amount.of_fee fee1
                 ; tag = Tag.Fee_transfer
-                ; token_locked = false
                 }
             }
         ; signer = Public_key.decompress_exn pk2
@@ -102,5 +99,5 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
 
 let fee_excess (t : t) = Transaction_union_payload.fee_excess t.payload
 
-let supply_increase (t : t) =
-  Transaction_union_payload.supply_increase t.payload
+let expected_supply_increase (t : t) =
+  Transaction_union_payload.expected_supply_increase t.payload

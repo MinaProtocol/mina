@@ -34,6 +34,8 @@ let protocol { protocol; _ } = protocol
 
 let remote_peer { peer; _ } = peer
 
+let state { state; _ } = state
+
 let pipes { incoming_r; outgoing_w; _ } = (incoming_r, outgoing_w)
 
 let data_received { incoming_w; _ } data =
@@ -124,7 +126,38 @@ let stream_closed ~logger ~who_closed t =
         [ ("who_closed", `String (name_of_participant who_closed))
         ; ("old_stream_state", `String (show_state old_state))
         ] ;
-  `Stream_should_be_released (equal_state FullyOpen t.state)
+  `Stream_should_be_released (equal_state FullyClosed t.state)
+
+let max_chunk_size = 16777216 (* 16 MiB *)
+
+let split_string ~every b =
+  let blen = String.length b in
+  let num_chunks = (blen + every - 1) / every in
+  List.init num_chunks ~f:(fun i ->
+      let pos = i * every in
+      let len = if i + 1 = num_chunks then blen - pos else every in
+      String.sub ~pos ~len b )
+
+let%test_unit "split_string" =
+  let gen =
+    let module Gen = Quickcheck.Generator in
+    let%bind.Gen every = Gen.small_positive_int in
+    let%bind.Gen total = Gen.small_non_negative_int in
+    let%bind.Gen last =
+      if total % every = 0 then Gen.return []
+      else
+        let%map.Gen s = String.gen_with_length (total % every) Gen.char_print in
+        [ s ]
+    in
+    let%map.Gen rest =
+      Gen.list_with_length (total / every)
+        (String.gen_with_length every Gen.char_print)
+    in
+    (every, List.append rest last)
+  in
+  Quickcheck.test gen ~f:(fun (every, expected) ->
+      let s = String.concat expected in
+      assert (List.equal String.equal expected @@ split_string ~every s) )
 
 let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
     ~release_stream =
@@ -141,21 +174,29 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
     }
   in
   let send_outgoing_messages_task =
-    Pipe.iter outgoing_r ~f:(fun msg ->
-        match%map
-          Libp2p_helper.do_rpc helper
-            (module Libp2p_ipc.Rpcs.SendStream)
-            (Libp2p_ipc.Rpcs.SendStream.create_request ~stream_id ~data:msg)
-        with
-        | Ok _ ->
-            ()
-        | Error e ->
-            [%log error] "error sending message on stream $idx: $error"
-              ~metadata:
-                [ ("idx", `String (Libp2p_ipc.stream_id_to_string stream_id))
-                ; ("error", Error_json.error_to_yojson e)
-                ] ;
-            Pipe.close outgoing_w)
+    Pipe.fold ~init:false outgoing_r ~f:(fun encountered_error msg ->
+        if encountered_error then
+          (* The stream has already failed, no need to process this message. *)
+          Deferred.return encountered_error
+        else
+          let parts = split_string msg ~every:max_chunk_size in
+          match%map
+            Deferred.Or_error.List.iter parts ~f:(fun data ->
+                Deferred.Or_error.ignore_m
+                @@ Libp2p_helper.do_rpc helper
+                     (module Libp2p_ipc.Rpcs.SendStream)
+                     (Libp2p_ipc.Rpcs.SendStream.create_request ~stream_id ~data) )
+          with
+          | Ok _ ->
+              false
+          | Error e ->
+              [%log error] "error sending message on stream $idx: $error"
+                ~metadata:
+                  [ ("idx", `String (Libp2p_ipc.stream_id_to_string stream_id))
+                  ; ("error", Error_json.error_to_yojson e)
+                  ] ;
+              Pipe.close outgoing_w ;
+              true )
     (* TODO implement proper stream closing *)
     (* >>= ( fun () ->
        match%map Libp2p_helper.do_rpc helper
@@ -171,11 +212,11 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
                ] ;
              ) *)
   in
-  upon send_outgoing_messages_task (fun () ->
+  upon send_outgoing_messages_task (fun _encountered_error ->
       let (`Stream_should_be_released should_release) =
         stream_closed ~logger ~who_closed:Us t
       in
-      if should_release then release_stream t.id) ;
+      if should_release then release_stream t.id ) ;
   t
 
 (* TODO: should we really even be parsing the peer back from the client here?

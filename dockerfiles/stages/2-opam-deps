@@ -5,20 +5,30 @@
 # - Includes the entire mina codebase and submodules in "${MINA_DIR}" (must be writable by opam user)
 # - Largely mirrors/replaces ./scripts/setup-opam.sh
 #################################################################################################
-FROM build-deps AS opam-deps
+FROM build-deps-$deb_codename AS opam-deps
 
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
 # branch to checkout for opam dependencies
 ARG MINA_BRANCH=compatible
+# mina repository to pull from
+ARG MINA_REPO=https://github.com/MinaProtocol/mina
 
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
 
-# don't keep sources, to force reinstall of pinned packages from Mina sources
+# don't keep build directories
+# to force reinstall of pinned packages from Mina sources
 # and to keep Docker image reasonable size
 ENV OPAMKEEPBUILDDIR false
 ENV OPAMREUSEBUILDDIR false
+# Limit logs for opam install errors to 20 lines per error
+ENV OPAMERRLOGLEN 20
+
+ENV GIT_LFS_SKIP_SMUDGE 1
+
+
+USER opam
 
 # --- Shallow clone the Mina repo, only focused on the given MINA_BRANCH
 # git will clone into an empty dir, but this also helps us set the workdir in advance
@@ -27,18 +37,23 @@ RUN git clone \
   --depth 1 \
   --shallow-submodules \
   --recurse-submodules \
-  https://github.com/MinaProtocol/mina ${HOME}/${MINA_DIR}
+  "${MINA_REPO}" "${HOME}/${MINA_DIR}"
 
 WORKDIR $HOME/$MINA_DIR
 
-ENV OPAMYES 1
+# Set environment variables *before* running OPAM commands
+ENV OPAMYES=1
 
-# --- Import Opam Switch
-# TODO: handle this opam work without cloning the full repository (directly pull src/opam.export)
-RUN opam switch import src/opam.export
+# --- Use alternative ocamlfind location since download.camlcity.org is not available
+RUN opam pin add ocamlfind.1.9.3 http://download2.camlcity.org/download/findlib-1.9.3.tar.gz
+
+# Update repo and install the switch (sources must be available locally!)
+RUN opam update && \
+    opam switch import opam.export --yes
 
 # --- Pin external packages / submodules
-# TODO: Would be really nice to pull this script, the git submodules, and src/opam.export exclusively in this stage
-RUN eval $(opam config env) \
+# TODO: Would be really nice to pull this script, the git submodules, and opam.export exclusively in this stage
+# Remove .ppx and the .ppx-cache so they can be built on each run
+RUN eval "$(opam config env)" \
   && scripts/pin-external-packages.sh \
-  && opam clean --logs -cs
+  && opam clean --logs -cs --quiet

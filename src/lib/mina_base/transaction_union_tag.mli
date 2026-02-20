@@ -1,22 +1,8 @@
 (* transaction_union_tag.ml *)
-
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
 
-[%%endif]
-
-type t =
-  | Payment
-  | Stake_delegation
-  | Create_account
-  | Mint_tokens
-  | Fee_transfer
-  | Coinbase
+type t = Payment | Stake_delegation | Fee_transfer | Coinbase
 [@@deriving enum, equal, sexp]
 
 val to_string : t -> string
@@ -26,8 +12,6 @@ val gen : t Quickcheck.Generator.t
 val to_bits : t -> bool list
 
 val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
-
-[%%ifdef consensus_mechanism]
 
 module Bits : sig
   (** Bits-only representation. To be used for hashing, where the actual value
@@ -55,10 +39,6 @@ module Unpacked : sig
 
   val is_stake_delegation : var -> Boolean.var
 
-  val is_create_account : var -> Boolean.var
-
-  val is_mint_tokens : var -> Boolean.var
-
   val is_fee_transfer : var -> Boolean.var
 
   val is_coinbase : var -> Boolean.var
@@ -74,5 +54,3 @@ end
 val unpacked_of_t : t -> Unpacked.var
 
 val unpacked_typ : (Unpacked.var, t) Typ.t
-
-[%%endif]

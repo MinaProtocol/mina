@@ -88,7 +88,7 @@ module Plain = struct
         ]
       in
       List.iter observations ~f:(fun (histogram, value) ->
-          Network.Rpc_size_histogram.observe histogram value) ;
+          Network.Rpc_size_histogram.observe histogram value ) ;
       response
 
     let bin_reader_response =
@@ -110,7 +110,7 @@ module Plain = struct
         ]
       in
       List.iter observations ~f:(fun (histogram, value) ->
-          Network.Rpc_size_histogram.observe histogram value) ;
+          Network.Rpc_size_histogram.observe histogram value ) ;
       bin_write_response buf ~pos response
 
     let bin_writer_response =

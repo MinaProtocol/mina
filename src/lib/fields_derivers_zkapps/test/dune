@@ -1,0 +1,40 @@
+(test
+ (name test_fields_derivers_zkapps)
+ (libraries
+  ;; opam libraries
+  alcotest
+  base
+  core_kernel
+  fieldslib
+  graphql
+  graphql_parser
+  integers
+  sexplib0
+  yojson
+  result
+  ;; local libraries
+  currency
+  fields_derivers
+  fields_derivers.graphql
+  fields_derivers.json
+  fields_derivers.zkapps
+  mina_numbers
+  pickles
+  sgn
+  signature_lib
+  snark_params
+  unsigned_extended
+  with_hash)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_annot
+   ppx_assert
+   ppx_base
+   ppx_custom_printf
+   ppx_deriving_yojson
+   ppx_fields_conv
+   ppx_let
+   ppx_sexp_conv
+   ppx_version)))

@@ -49,6 +49,19 @@ type block =
   }
 [@@deriving to_yojson]
 
+type sysinfo =
+  { uptime : string
+  ; load : int
+  ; total_ram : int64
+  ; free_ram : int64
+  ; total_swap : int64
+  ; free_swap : int64
+  ; procs : int
+  }
+[@@deriving to_yojson]
+
+let node_status_version = 2
+
 type node_status_data =
   { version : int
   ; block_height_at_best_tip : int
@@ -60,7 +73,7 @@ type node_status_data =
   ; libp2p_output_bandwidth : float
   ; libp2p_cpu_usage : float
   ; commit_hash : string
-  ; git_branch : string
+  ; chain_id : string
   ; peer_id : string
   ; ip_address : string
   ; timestamp : string
@@ -71,27 +84,45 @@ type node_status_data =
   ; pubsub_msg_received : gossip_count
   ; pubsub_msg_broadcasted : gossip_count
   ; received_blocks : block list
+  ; sysinfo : sysinfo
+  ; block_producer_public_key : string option
   }
 [@@deriving to_yojson]
 
-let send_node_status_data ~logger ~url node_status_data =
+module Simplified = struct
+  type t =
+    { max_observed_block_height : int
+    ; commit_hash : string
+    ; chain_id : string
+    ; peer_id : string
+    ; peer_count : int
+    ; timestamp : string
+    ; block_producer_public_key : string option
+    }
+  [@@deriving to_yojson]
+end
+
+let send_node_status_data (type data) ~logger ~url (node_status_data : data)
+    (node_status_data_to_yojson : data -> Yojson.Safe.t) =
   let node_status_json = node_status_data_to_yojson node_status_data in
   let json = `Assoc [ ("data", node_status_json) ] in
   let headers =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in
   match%map
-    Async.try_with (fun () ->
+    Async.try_with ~here:[%here] (fun () ->
         Cohttp_async.Client.post ~headers
           ~body:(Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
-          url)
+          url )
   with
   | Ok ({ status; _ }, body) ->
       let metadata =
         [ ("data", node_status_json); ("url", `String (Uri.to_string url)) ]
       in
-      if Cohttp.Code.code_of_status status = 200 then
-        [%log info] "Sent node status data to URL $url" ~metadata
+      if
+        Cohttp.Code.(
+          code_of_status status >= 200 && code_of_status status < 300)
+      then [%log info] "Sent node status data to URL $url" ~metadata
       else
         let extra_metadata =
           match body with
@@ -150,8 +181,9 @@ let reset_gauges () =
   Queue.clear Transition_frontier.validated_blocks ;
   Queue.clear Transition_frontier.rejected_blocks
 
-let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
-    ~addrs_and_ports ~start_time ~slot_duration =
+let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
+    ~chain_id ~network ~addrs_and_ports ~start_time ~slot_duration
+    ~block_producer_public_key_base58 =
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("url", `String node_status_url) ] ;
   let five_slots = Time.Span.scale slot_duration 5. in
@@ -159,23 +191,48 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
   every ~start:(after five_slots) ~continue_on_error:true five_slots
   @@ fun () ->
   don't_wait_for
-  @@
+  @@ O1trace.thread "node_status_service"
+  @@ fun () ->
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       [%log info] "Transition frontier not available for node status service" ;
       Deferred.unit
   | Some tf -> (
       let catchup_job_states =
-        match Transition_frontier.catchup_tree tf with
-        | Full catchup_tree ->
+        match Transition_frontier.catchup_state tf with
+        | Full catchup_state ->
             Some
               (Transition_frontier.Full_catchup_tree.to_node_status_report
-                 catchup_tree)
-        | _ ->
-            None
+                 catchup_state )
       in
       let sync_status =
         sync_status |> Mina_incremental.Status.Observer.value_exn
+      in
+      let sysinfo =
+        match Linux_ext.Sysinfo.sysinfo with
+        | Ok sysinfo ->
+            let open Int64 in
+            let info = sysinfo () in
+            let mem_unit = of_int info.mem_unit in
+            { uptime = Time.Span.to_string info.uptime
+            ; load = info.load15
+            ; total_ram = of_int info.total_ram * mem_unit
+            ; free_ram = of_int info.free_ram * mem_unit
+            ; total_swap = of_int info.total_swap * mem_unit
+            ; free_swap = of_int info.free_swap * mem_unit
+            ; procs = info.procs
+            }
+        | Error e ->
+            [%log error] "Failed to get sysinfo: $error"
+              ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
+            { uptime = ""
+            ; load = 0
+            ; total_ram = 0L
+            ; free_ram = 0L
+            ; total_swap = 0L
+            ; free_swap = 0L
+            ; procs = 0
+            }
       in
       [%log info] "About to send bandwidth request to libp2p" ;
       match%bind Mina_networking.bandwidth_info network with
@@ -185,11 +242,12 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
           , `Cpu_usage libp2p_cpu_usage ) ->
           let%bind peers = Mina_networking.peers network in
           let node_status_data =
-            { version = 1
+            { version = node_status_version
             ; block_height_at_best_tip =
                 Transition_frontier.best_tip tf
-                |> Transition_frontier.Breadcrumb.blockchain_length
-                |> Unsigned.UInt32.to_int
+                |> Transition_frontier.Breadcrumb.consensus_state
+                |> Consensus.Data.Consensus_state.blockchain_length
+                |> Mina_numbers.Length.to_uint32 |> Unsigned.UInt32.to_int
             ; max_observed_block_height =
                 !Mina_metrics.Transition_frontier.max_blocklength_observed
             ; max_observed_unvalidated_block_height =
@@ -200,14 +258,14 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
             ; libp2p_input_bandwidth
             ; libp2p_output_bandwidth
             ; libp2p_cpu_usage
-            ; commit_hash = Mina_version.commit_id
-            ; git_branch = Mina_version.branch
+            ; commit_hash = commit_id
+            ; chain_id
             ; peer_id =
                 (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
             ; ip_address =
                 Node_addrs_and_ports.external_ip addrs_and_ports
                 |> Core.Unix.Inet_addr.to_string
-            ; timestamp = Rfc3339_time.get_rfc3339_time ()
+            ; timestamp = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
             ; uptime_of_node =
                 Time.Span.to_sec @@ Time.diff (Time.now ()) start_time
             ; peer_count = List.length peers
@@ -335,27 +393,53 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
                     { hash
                     ; sender
                     ; received_at =
-                        Time.to_string (Block_time.to_time received_at)
+                        Time.to_string (Block_time.to_time_exn received_at)
                     ; is_valid = false
                     ; reason_for_rejection = Some reason_for_rejection
-                    })
+                    } )
                 @ List.map (Queue.to_list Transition_frontier.validated_blocks)
                     ~f:(fun (hash, sender, received_at) ->
                       { hash
                       ; sender
                       ; received_at =
-                          Time.to_string (Block_time.to_time received_at)
+                          Time.to_string (Block_time.to_time_exn received_at)
                       ; is_valid = true
                       ; reason_for_rejection = None
-                      })
+                      } )
+            ; sysinfo
+            ; block_producer_public_key = block_producer_public_key_base58
             }
           in
           reset_gauges () ;
           send_node_status_data ~logger
             ~url:(Uri.of_string node_status_url)
-            node_status_data
+            node_status_data node_status_data_to_yojson
       | Error e ->
           [%log info]
             ~metadata:[ ("error", `String (Error.to_string_hum e)) ]
             "Failed to get bandwidth info from libp2p" ;
           Deferred.unit )
+
+let start_simplified ~commit_id ~logger ~node_status_url ~chain_id ~network
+    ~addrs_and_ports ~slot_duration ~block_producer_public_key_base58 =
+  [%log info] "Starting simplified node status service using URL $url"
+    ~metadata:[ ("url", `String node_status_url) ] ;
+  let five_slots = Time.Span.scale slot_duration 5. in
+  every ~start:(after five_slots) ~continue_on_error:true five_slots
+  @@ fun () ->
+  don't_wait_for
+  @@ let%bind peers = Mina_networking.peers network in
+     let node_status_data =
+       { Simplified.max_observed_block_height =
+           !Mina_metrics.Transition_frontier.max_blocklength_observed
+       ; commit_hash = commit_id
+       ; chain_id
+       ; peer_id = (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
+       ; peer_count = List.length peers
+       ; timestamp = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
+       ; block_producer_public_key = block_producer_public_key_base58
+       }
+     in
+     send_node_status_data ~logger
+       ~url:(Uri.of_string node_status_url)
+       node_status_data Simplified.to_yojson

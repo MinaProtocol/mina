@@ -11,9 +11,9 @@ module Stable = struct
       [@@deriving fields, sexp, yojson]
     end
 
-    let to_latest = Fn.id
-
     include T
+
+    let to_latest = Fn.id
 
     include (
       Allocation_functor.Make.Bin_io_and_sexp (struct
@@ -30,7 +30,7 @@ module Stable = struct
         Allocation_functor.Intf.Output.Bin_io_and_sexp_intf
           with type t := T.t
            and type 'a creator :=
-                state:Protocol_state.Value.t -> proof:Proof.t -> 'a )
+            state:Protocol_state.Value.t -> proof:Proof.t -> 'a )
   end
 end]
 

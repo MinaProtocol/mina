@@ -11,7 +11,7 @@ let of_time_exn ~(constants : Constants.t) t : t =
   if Time.(t < constants.genesis_state_timestamp) then
     raise
       (Invalid_argument
-         "Epoch.of_time: time is earlier than genesis block timestamp") ;
+         "Epoch.of_time: time is earlier than genesis block timestamp" ) ;
   let time_since_genesis = Time.diff t constants.genesis_state_timestamp in
   uint32_of_int64
     Int64.Infix.(
@@ -35,7 +35,7 @@ let slot_start_time ~(constants : Constants.t) (epoch : t) (slot : Slot.t) =
     (start_time epoch ~constants)
     (Block_time.Span.of_ms
        Int64.Infix.(
-         int64_of_uint32 slot * Time.Span.to_ms constants.slot_duration_ms))
+         int64_of_uint32 slot * Time.Span.to_ms constants.slot_duration_ms) )
 
 let slot_end_time ~(constants : Constants.t) (epoch : t) (slot : Slot.t) =
   Time.add (slot_start_time epoch slot ~constants) constants.slot_duration_ms

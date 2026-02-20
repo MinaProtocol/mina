@@ -5,12 +5,12 @@ module Setup_test (Backend : Snarky_backendless.Backend_intf.S) = struct
   let main x () =
     let y =
       exists Field.typ ~compute:(fun () ->
-          Field.Constant.sqrt (As_prover.read_var x))
+          Field.Constant.sqrt (As_prover.read_var x) )
     in
     assert_r1cs y y x ;
     let z =
       exists Field.typ ~compute:(fun () ->
-          Field.Constant.square (As_prover.read_var x))
+          Field.Constant.square (As_prover.read_var x) )
     in
     assert_r1cs x x z
 end
@@ -24,8 +24,6 @@ let%test_unit "of_affine" =
     | Infinity ->
         assert false
   in
-  Pasta_bindings.Fp.print x ;
-  Pasta_bindings.Fp.print y ;
   Pasta_bindings.Pallas.(ignore (of_affine_coordinates x y : t))
 
 let%test_unit "vector test" =
@@ -48,9 +46,12 @@ let%test_module "pallas" =
 
     let%test_unit "test snarky instance" =
       Kimchi_pasta.Pallas_based_plonk.Keypair.set_urs_info [] ;
-      let _cs = Impl.constraint_system ~exposing:[ Field.typ ] main in
-      let _witness =
-        Impl.generate_witness [ Field.typ ] main (Field.Constant.of_int 4)
+      let (_ : Impl.R1CS_constraint_system.t) =
+        Impl.constraint_system ~input_typ:Field.typ ~return_typ:Typ.unit main
+      in
+      let (_ : Impl.Proof_inputs.t) =
+        Impl.generate_witness ~input_typ:Field.typ ~return_typ:Typ.unit main
+          (Field.Constant.of_int 4)
       in
       ()
   end )
@@ -62,9 +63,12 @@ let%test_module "vesta" =
 
     let%test_unit "test snarky instance" =
       Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] ;
-      let _cs = Impl.constraint_system ~exposing:[ Field.typ ] main in
-      let _witness =
-        Impl.generate_witness [ Field.typ ] main (Field.Constant.of_int 4)
+      let (_ : Impl.R1CS_constraint_system.t) =
+        Impl.constraint_system ~input_typ:Field.typ ~return_typ:Typ.unit main
+      in
+      let (_ : Impl.Proof_inputs.t) =
+        Impl.generate_witness ~input_typ:Field.typ ~return_typ:Typ.unit main
+          (Field.Constant.of_int 4)
       in
       ()
   end )

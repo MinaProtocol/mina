@@ -15,7 +15,7 @@ import (
 
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	ipld "github.com/ipfs/go-ipld-format"
 	"github.com/stretchr/testify/require"
 )
 
@@ -610,6 +610,7 @@ func TestProcessDownloadedBlockStep(t *testing.T) {
 type testBitswapState struct {
 	r                  *rand.Rand
 	statuses           map[BitswapBlockLink]codanet.RootBlockStatus
+	refs               map[BitswapBlockLink]map[root]struct{}
 	blocks             map[cid.Cid][]byte
 	nodeDownloadParams map[cid.Cid]map[root][]NodeIndex
 	rootDownloadStates map[root]*RootDownloadState
@@ -670,7 +671,7 @@ func (bs *testBitswapState) RegisterDeadlineTracker(root_ root, downloadTimeout 
 		downloadTimeout time.Duration
 	}{root: root_, downloadTimeout: downloadTimeout})
 }
-func (bs *testBitswapState) SendResourceUpdate(type_ ipc.ResourceUpdateType, root root) {
+func (bs *testBitswapState) SendResourceUpdate(type_ ipc.ResourceUpdateType, _tag BitswapDataTag, root root) {
 	type1, has := bs.resourceUpdates[root]
 	if has && type1 != type_ {
 		panic("duplicate resource update")
@@ -688,18 +689,48 @@ func (bs *testBitswapState) DeleteStatus(key [32]byte) error {
 	delete(bs.statuses, BitswapBlockLink(key))
 	return nil
 }
+
 func (bs *testBitswapState) DeleteBlocks(keys [][32]byte) error {
 	for _, key := range keys {
-		delete(bs.blocks, codanet.BlockHashToCid(key))
+		if len(bs.refs[key]) == 0 {
+			delete(bs.blocks, codanet.BlockHashToCid(key))
+		}
 	}
 	return nil
 }
+
+func (bs *testBitswapState) UpdateReferences(root_ [32]byte, exists bool, keys ...[32]byte) error {
+	for _, key := range keys {
+		keyRefs, hasKeyRefs := bs.refs[key]
+		if exists {
+			if !hasKeyRefs {
+				keyRefs = make(map[root]struct{})
+				bs.refs[key] = keyRefs
+			}
+			keyRefs[root_] = struct{}{}
+		} else {
+			if hasKeyRefs {
+				delete(keyRefs, root_)
+				if len(keyRefs) == 0 {
+					delete(bs.refs, key)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (bs *testBitswapState) ViewBlock(key [32]byte, callback func([]byte) error) error {
-	b, has := bs.blocks[codanet.BlockHashToCid(key)]
+	cid := codanet.BlockHashToCid(key)
+	b, has := bs.blocks[cid]
 	if !has {
-		return blockstore.ErrNotFound
+		return ipld.ErrNotFound{Cid: cid}
 	}
 	return callback(b)
+}
+func (bs *testBitswapState) StoreDownloadedBlock(block blocks.Block) error {
+	bs.blocks[block.Cid()] = block.RawData()
+	return nil
 }
 
 func (bg1 *blockGroup) add(bg blockGroup) {
@@ -712,6 +743,9 @@ func (bg1 *blockGroup) add(bg blockGroup) {
 	bg1.starts = append(bg1.starts, bg.starts...)
 }
 
+func (bs *testBitswapState) Context() context.Context {
+	return context.Background()
+}
 func (bs *testBitswapState) CheckInvariants() {
 	if !bs.checkInvariantsNow() {
 		return
@@ -726,7 +760,7 @@ func (bs *testBitswapState) CheckInvariants() {
 	}
 }
 
-func testBitswapDownloadDo(t *testing.T, r *rand.Rand, bg blockGroup, prepopulatedBlocks *cid.Set, removedBlocks map[cid.Cid]root, expectedToFail []root) {
+func testBitswapDownloadDo(t *testing.T, r *rand.Rand, bg blockGroup, prepopulatedBlocks *cid.Set, removedBlocks map[cid.Cid]root, expectedToFail []root) *testBitswapState {
 	expectedToTimeout := map[root]bool{}
 	for _, b := range removedBlocks {
 		expectedToTimeout[b] = true
@@ -741,6 +775,7 @@ func testBitswapDownloadDo(t *testing.T, r *rand.Rand, bg blockGroup, prepopulat
 	bs := &testBitswapState{
 		r:                  r,
 		statuses:           map[BitswapBlockLink]codanet.RootBlockStatus{},
+		refs:               map[BitswapBlockLink]map[root]struct{}{},
 		blocks:             initBlocks,
 		nodeDownloadParams: map[cid.Cid]map[root][]NodeIndex{},
 		rootDownloadStates: map[root]*RootDownloadState{},
@@ -849,6 +884,7 @@ loop:
 	if expectedToTimeoutTotal != len(bs.rootDownloadStates) {
 		t.Error("Unexpected number of root download states")
 	}
+	return bs
 }
 
 func genLargeBlockGroup(r *rand.Rand) (blockGroup, map[cid.Cid]root, []root) {
@@ -931,7 +967,7 @@ func TestBitswapDownload(t *testing.T) {
 	}
 }
 
-func TestBitswapDownloadPrepoluated(t *testing.T) {
+func TestBitswapDownloadPrepopulated(t *testing.T) {
 	seed := time.Now().Unix()
 	t.Logf("Seed: %d", seed)
 	r := rand.New(rand.NewSource(seed))

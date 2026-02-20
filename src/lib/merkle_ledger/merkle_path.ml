@@ -8,6 +8,8 @@ module type S = sig
   val elem_hash : elem -> hash
 
   type t = elem list [@@deriving sexp, equal]
+  (* In the absense of hash clashing, a merkle path uniquely identifies a node
+     in a merkle tree, and how to reach such path from the merkle root. *)
 
   val implied_root : t -> hash -> hash
 
@@ -36,7 +38,7 @@ end) : S with type hash := Hash.t = struct
           | `Right h ->
               Hash.merge ~height h acc
         in
-        (acc, height + 1))
+        (acc, height + 1) )
     |> fst
 
   let check_path t leaf_hash root_hash =

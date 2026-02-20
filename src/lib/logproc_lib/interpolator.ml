@@ -38,7 +38,7 @@ let parser =
       (choice
          [ (take_while1 (not_f (Char.equal '$')) >>| fun x -> `Raw x)
          ; (interpolation >>| fun x -> `Interpolate x)
-         ])
+         ] )
   in
   message <* end_of_input
 
@@ -60,7 +60,7 @@ let render ~max_interpolation_length ~format_json metadata items =
             let str = format_json json in
             if String.length str > max_interpolation_length then
               (msg_acc ^ "$" ^ id, (id, str) :: extra_acc)
-            else (msg_acc ^ str, extra_acc))
+            else (msg_acc ^ str, extra_acc) )
   in
   (msg, List.rev extra)
 
@@ -80,4 +80,4 @@ let interpolate { mode; max_interpolation_length; pretty_print } msg metadata =
       Ok
         ( msg
         , List.map (String.Map.to_alist metadata) ~f:(fun (k, v) ->
-              (k, format_json v)) )
+              (k, format_json v) ) )

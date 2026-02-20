@@ -1,41 +1,21 @@
-#!/bin/bash
-set -e
-
-commit_id_short=$(git rev-parse --short=8 --verify HEAD)
-CWD=$PWD
-
-if [ -n "$MINA_BRANCH" ]; then
-  branch="$MINA_BRANCH"
-else
-  branch=$(git rev-parse --verify --abbrev-ref HEAD || echo "<none found>")
-fi
+#!/usr/bin/env bash
+set -euo pipefail
 
 # we are nested 6 directories deep (_build/<context>/src/lib/mina_version/normal)
-pushd ../../../../../..
-  if [ -n "$MINA_COMMIT_SHA1" ]; then
-    # pull from env var if set
-    id="$MINA_COMMIT_SHA1"
-  else
-    if [ ! -e .git ]; then echo 'Error: git repository not found'; exit 1; fi
-    id=$(git rev-parse --verify HEAD)
-    if [ -n "$(git diff --stat)" ]; then id="[DIRTY]$id"; fi
-  fi
-  commit_date=$(git show HEAD -s --format="%cI")
-  pushd src/lib/crypto/proof-systems
-    marlin_commit_id=$(git rev-parse --verify HEAD)
-    if [ -n "$(git diff --stat)" ]; then marlin_commit_id="[DIRTY]$id"; fi
-    marlin_commit_id_short=$(git rev-parse --short=8 --verify HEAD)
-    marlin_commit_date=$(git show HEAD -s --format="%cI")
-  popd
-popd
+if [ -z ${MINA_COMMIT_SHA1+x} ]; then
+  root="${MINA_ROOT-$(git rev-parse --show-toplevel || echo ../../../../../..)}"
+  pushd "$root" > /dev/null
+  id="${MINA_COMMIT_SHA1-$(git rev-parse --verify HEAD || echo "<unknown>")}"
+  popd > /dev/null
+else
+  id="${MINA_COMMIT_SHA1}"
+fi
 
-echo "let commit_id = \"$id\"" > "$1"
-echo "let commit_id_short = \"$commit_id_short\"" >> "$1"
-echo "let branch = \"$branch\"" >> "$1"
-echo "let commit_date = \"$commit_date\"" >> "$1"
+id_short="$(printf "%s" "$id" | cut -c1-8)"
 
-echo "let marlin_commit_id = \"$marlin_commit_id\"" >> "$1"
-echo "let marlin_commit_id_short = \"$marlin_commit_id_short\"" >> "$1"
-echo "let marlin_commit_date = \"$marlin_commit_date\"" >> "$1"
+{
+    printf 'let commit_id = "%s"\n' "$id"
+    printf 'let commit_id_short = "%s"\n' "$id_short"
 
-echo "let print_version () = Core_kernel.printf \"Commit %s on branch %s\n\" commit_id branch" >> "$1"
+    printf 'let print_version () = Core_kernel.printf "Commit %%s\\n%%!" commit_id\n'
+} > "$1"

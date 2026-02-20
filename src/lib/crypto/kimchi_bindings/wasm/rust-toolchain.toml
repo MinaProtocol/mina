@@ -1,2 +1,6 @@
+# A nightly is necessary to enable the use of #![feature]
 [toolchain]
-channel = "nightly-2021-11-16"
+# This should stay in line with the value of the variable NIGHTLY_RUST_VERSION
+# defined in src/lib/crypto/proof-systems/Makefile
+# For now, the file is only used to build with Nix.
+channel = "nightly-2024-09-05"

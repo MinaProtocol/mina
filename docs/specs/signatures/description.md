@@ -115,7 +115,9 @@ The following convention is used, with constants as defined for Mina's version o
     -   *`poseidon_3w`* - [Poseidon cryptographic hash function for Mina](https://github.com/o1-labs/cryptography-rfcs/blob/master/mina/001-poseidon-sponge.md)
     -   *`scalar(r)`* refers to the scalar field element obtained from random bytes *`r`* by dropping two MSB bits
     -   *`s(σ)`* refers to scalar field component of signature *`σ`*
-    -   *`x(σ)`* refers to base field component of signature *`σ`*
+    -   *`b(σ)`* refers to base field component of signature *`σ`*
+    -   *`x(P)`* refers to x-coordinate of point *`P`*
+    -   *`y(P)`* refers to y-coordinate of point *`P`*
     -   *`odd(e)`* - true if base field element *`e`* is odd, false otherwise
     -   *`negate(s)`* - negation of scalar field element *`s`*
     -   *`fields(m)`* - vector containing components of message *`m`* that are base field elements
@@ -153,7 +155,7 @@ There following helper functions are required.
     -   Message *`m`*: message to be signed
     -   Network id *`id`*: blockchain instance identifier
 -   Definition: *`derive_nonce(d, P, m, id) = `*
-    -   Let *`bytes = pack(fields(m)) || pack(x(P)) || pack(y(P)) || pack(bits(m)) || pack(d) || pack(id)`*
+    -   Let *`bytes = pack(fields(m)) || pack(x(P)) || pack(y(P)) || pack(d) || pack(id)`*
     -   Let *`digest = blake2b(bytes)`*
 -   Output: *`scalar(digest)`*
 
@@ -179,9 +181,9 @@ The signing and verification algorithms are as follows.
   - Signature *`σ`*: signature on *`m`*
   - Network id *`id`*: blockchain instance identifier
 - The signature is valid if and only if the algorithm below does not fail.
-  - Let *`e = message_hash(P, x(R), m, id)`*
+  - Let *`e = message_hash(P, b(σ), m, id)`*
   - Let *`R = [s(σ)]G - [e]P`*
-  - Fail if *`infinite(R) OR odd(y(R)) OR x(R) != x(σ)`*
+  - Fail if *`infinite(R) OR odd(y(R)) OR x(R) != b(σ)`*
 
 ### **Signature generation**
 

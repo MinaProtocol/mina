@@ -102,7 +102,7 @@ let () =
   let res =
     Async.Thread_safe.block_on_async_exn (fun () ->
         Graphql_async.Schema.execute Mina_graphql.schema fake_mina_lib
-          introspection_query)
+          introspection_query )
   in
   let response =
     match res with

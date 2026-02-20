@@ -1,35 +1,42 @@
 (library
  (name merkle_ledger)
  (public_name merkle_ledger)
+ (flags
+  (:standard -warn-error +a))
  (library_flags -linkall)
+ (modules_without_implementation location_intf)
  (libraries
-   ;; opam libraries
-   bitstring
-   async_kernel
-   core_kernel.uuid
-   bin_prot.shape
-   sexplib0
-   integers
-   core.uuid
-   async
-   core
-   extlib
-   rocks
-   core_kernel
-   base.caml
-   base.base_internalhash_types
-   async_unix
-   ;; local libraries
-   merkle_address
-   immutable_array
-   direction
-   cache_dir
-   empty_hashes
-   key_value_database
-   non_empty_list
-   visualization
-   )
+  ;; opam libraries
+  async
+  async_kernel
+  async_unix
+  base.base_internalhash_types
+  base.caml
+  bin_prot.shape
+  bitstring
+  core
+  core.uuid
+  core_kernel
+  core_kernel.uuid
+  integers
+  rocks
+  sexplib0
+  ;; local libraries
+  cache_dir
+  mina_stdlib
+  mina_stdlib_unix
+  key_value_database
+  merkle_address
+  ppx_version.runtime
+  visualization)
  (preprocess
-  (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))
- (instrumentation (backend bisect_ppx))
+  (pps
+   ppx_mina
+   ppx_version
+   ppx_jane
+   ppx_compare
+   ppx_deriving.show
+   ppx_deriving_yojson))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "Implementation of different account databases"))

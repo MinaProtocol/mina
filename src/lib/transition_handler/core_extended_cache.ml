@@ -97,7 +97,7 @@ struct
 
   let touch_key cache key =
     List.iter (Strat.touch cache.strat key) ~f:(fun k ->
-        clear_from_store cache k)
+        clear_from_store cache k )
 
   let find cache k =
     let res = Store.find cache.store k in
@@ -112,17 +112,17 @@ struct
     Option.iter (Store.find cache.store key) ~f:(fun v ->
         Strat.remove cache.strat key ;
         Option.call ~f:cache.destruct v ;
-        Store.remove cache.store key)
+        Store.remove cache.store key )
 
   let clear cache =
     Option.iter cache.destruct ~f:(fun destruct ->
-        List.iter (Store.data cache.store) ~f:destruct) ;
+        List.iter (Store.data cache.store) ~f:destruct ) ;
     Strat.clear cache.strat ;
     Store.clear cache.store
 
   let create ~destruct =
     Strat.cps_create ~f:(fun strat ->
-        Store.cps_create ~f:(fun store -> { strat; destruct; store }))
+        Store.cps_create ~f:(fun store -> { strat; destruct; store }) )
 
   let call_with_cache ~cache f arg =
     match find cache arg with
@@ -140,7 +140,7 @@ struct
             let destruct = Option.map destruct ~f:(fun f -> Result.iter ~f) in
             let cache = { strat; destruct; store } in
             let memd_f arg = call_with_cache ~cache f arg in
-            (cache, memd_f)))
+            (cache, memd_f) ) )
 end
 
 module Strategy = struct
@@ -183,7 +183,7 @@ module Strategy = struct
     let remove lru x =
       Option.iter (Hashtbl.find lru.table x) ~f:(fun el ->
           Doubly_linked.remove lru.list el ;
-          Hashtbl.remove lru.table x)
+          Hashtbl.remove lru.table x )
 
     let create maxsize =
       { list = Doubly_linked.create ()

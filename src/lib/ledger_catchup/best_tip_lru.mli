@@ -1,9 +1,8 @@
 open Mina_base
-open Mina_transition
 
 type elt =
-  ( External_transition.Initial_validated.t
-  , State_body_hash.t list * External_transition.t )
+  ( State_hash.t
+  , State_body_hash.t list * Mina_block.Header.t )
   Proof_carrying_data.t
 
 val add : elt -> unit

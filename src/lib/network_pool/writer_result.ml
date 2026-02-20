@@ -67,7 +67,7 @@ module T = struct
   let bind (type a b x e) (t : (a, x, e) t) ~(f : a -> (b, x, e) t) :
       (b, x, e) t =
     Result.bind t ~f:(fun (a, w1) ->
-        Result.map (f a) ~f:(fun (b, w2) -> (b, Tree.append w1 w2)))
+        Result.map (f a) ~f:(fun (b, w2) -> (b, Tree.append w1 w2)) )
 end
 
 include T
@@ -133,7 +133,7 @@ module Deferred = struct
              | Undeferred rb ->
                  Deferred.return (Result.map rb ~f:(g w1))
              | Deferred drb ->
-                 Deferred.Result.map drb ~f:(g w1))
+                 Deferred.Result.map drb ~f:(g w1) )
 
     let lift (type a x e) (t : (a, x, e) T.t) : (a, x, e) t = Undeferred t
   end
@@ -149,7 +149,8 @@ module Deferred = struct
     | Deferred t ->
         Deferred
           (Async.Deferred.bind t ~f:(fun t ->
-               match f t with Undeferred t -> Async.return t | Deferred t -> t))
+               match f t with Undeferred t -> Async.return t | Deferred t -> t )
+          )
 
   let write x = lift (write x)
 

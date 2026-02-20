@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Fold_lib
 open Tuple_lib
@@ -14,9 +12,6 @@ module type S_unchecked = sig
 
   include Hashable.S with type t := t
 
-  (* not automatically derived *)
-  val dhall_type : Ppx_dhall_type.Dhall_type.t
-
   val max_value : t
 
   val length_in_bits : int
@@ -26,6 +21,8 @@ module type S_unchecked = sig
   val gen_incl : t -> t -> t Quickcheck.Generator.t
 
   val zero : t
+
+  val one : t
 
   val succ : t -> t
 
@@ -52,6 +49,8 @@ module type S_unchecked = sig
 
   val of_bits : bool list -> t
 
+  val to_field : t -> Field.t
+
   val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
   val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t
@@ -59,12 +58,8 @@ module type S_unchecked = sig
   val fold : t -> bool Triple.t Fold.t
 end
 
-[%%ifdef consensus_mechanism]
-
 module type S_checked = sig
   type unchecked
-
-  open Snark_params.Tick
 
   type var
 
@@ -133,27 +128,22 @@ module type S_checked = sig
   end
 end
 
-[%%endif]
-
 module type S = sig
   include S_unchecked
-
-  [%%ifdef consensus_mechanism]
 
   module Checked : S_checked with type unchecked := t
 
   (** warning: this typ does not work correctly with the generic if_ *)
   val typ : (Checked.t, t) Snark_params.Tick.Typ.t
-
-  [%%endif]
 end
 
-module type UInt32 = sig
+module type UInt32_A = sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = Unsigned_extended.UInt32.t
-      [@@deriving sexp, equal, compare, hash, yojson]
+      [@@@with_all_version_tags]
+
+      type t [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -165,12 +155,15 @@ module type UInt32 = sig
 end
 [@@warning "-32"]
 
-module type UInt64 = sig
+module type UInt32 = UInt32_A with type Stable.V1.t = Unsigned_extended.UInt32.t
+
+module type UInt64_A = sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = Unsigned_extended.UInt64.t
-      [@@deriving sexp, equal, compare, hash, yojson]
+      [@@@with_all_version_tags]
+
+      type t [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -181,6 +174,8 @@ module type UInt64 = sig
   val of_uint64 : uint64 -> t
 end
 [@@warning "-32"]
+
+module type UInt64 = UInt64_A with type Stable.V1.t = Unsigned_extended.UInt64.t
 
 module type F = functor
   (N : sig
@@ -193,12 +188,8 @@ module type F = functor
   (Bits : Bits_intf.Convertible_bits with type t := N.t)
   -> S with type t := N.t and module Bits := Bits
 
-[%%ifdef consensus_mechanism]
-
 module type F_checked = functor
   (N : Unsigned_extended.S)
   (Bits : Bits_intf.Convertible_bits with type t := N.t)
   -> S_checked with type unchecked := N.t
 [@@warning "-67"]
-
-[%%endif]

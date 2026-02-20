@@ -1,12 +1,10 @@
-[%%import "../../config.mlh"]
-
 open Core_kernel
 open Async
 open Unsigned
 open Signature_lib
 open Mina_base
 open Mina_state
-open Mina_transition
+open Mina_block
 open Snark_params
 open Blockchain_snark
 open Consensus
@@ -30,8 +28,8 @@ module Vrf_distribution = struct
   open Staker
 
   type t =
-    { start_slot : Global_slot.t
-    ; term_slot : Global_slot.t
+    { start_slot : Global_slot_since_genesis.t
+    ; term_slot : Global_slot_since_genesis.t
     ; proposal_table : Block_data.t Public_key.Compressed.Map.t Int.Table.t
     }
 
@@ -56,20 +54,23 @@ module Vrf_distribution = struct
     let open UInt32.Infix in
     let open Option.Let_syntax in
     assert (
-      Global_slot.epoch @@ Consensus_state.global_slot initial_consensus_state
+      Global_slot_since_genesis.epoch
+      @@ Consensus_state.global_slot initial_consensus_state
       = epoch ) ;
     let start_slot =
-      if epoch = zero then Global_slot.zero ~constants
+      if epoch = zero then Global_slot_since_genesis.zero ~constants
       else
-        Global_slot.of_epoch_and_slot ~constants
+        Global_slot_since_genesis.of_epoch_and_slot ~constants
           (epoch - of_int 1, of_int 2 * constants.slots_per_epoch)
     in
     let term_slot =
-      Global_slot.of_epoch_and_slot ~constants
+      Global_slot_since_genesis.of_epoch_and_slot ~constants
         (epoch, (of_int 2 * constants.slots_per_epoch) - of_int 1)
     in
-    let start_time = Global_slot.start_time ~constants start_slot in
-    let term_time = Global_slot.start_time ~constants term_slot in
+    let start_time =
+      Global_slot_since_genesis.start_time ~constants start_slot
+    in
+    let term_time = Global_slot_since_genesis.start_time ~constants term_slot in
     let proposal_table = Int.Table.create () in
     let record_proposal ~staker ~proposal_data =
       let _, pk = staker.keypair in
@@ -78,7 +79,7 @@ module Vrf_distribution = struct
         | None ->
             Public_key.Compressed.Map.of_alist_exn [ (pk, proposal_data) ]
         | Some map ->
-            Map.add_exn map ~key:pk ~data:proposal_data)
+            Map.add_exn map ~key:pk ~data:proposal_data )
     in
     List.iter stakers ~f:(fun staker ->
         ignore
@@ -94,8 +95,7 @@ module Vrf_distribution = struct
                      |> Block_time.Span.to_ms )
                      dummy_consensus_state ~local_state:staker.local_state
                      ~keypairs:
-                       (Keypair.And_compressed_pk.Set.of_list
-                          [ staker.keypair ])
+                       (Keypair.And_compressed_pk.Set.of_list [ staker.keypair ])
                      ~logger:(Logger.null ())
                  with
                  | `Check_again _ ->
@@ -112,22 +112,22 @@ module Vrf_distribution = struct
                in
                record_proposal ~staker ~proposal_data ;
                let increase_epoch_count =
-                 Global_slot.epoch
+                 Global_slot_since_genesis.epoch
                    (Consensus_state.global_slot dummy_consensus_state)
-                 < Global_slot.(
+                 < Global_slot_since_genesis.(
                      epoch
                        (of_slot_number ~constants
-                          (Block_data.global_slot proposal_data)))
+                          (Block_data.global_slot proposal_data) ))
                in
                let new_global_slot =
-                 Global_slot.of_slot_number ~constants
+                 Global_slot_since_genesis.of_slot_number ~constants
                    (Block_data.global_slot proposal_data)
                in
                let next_dummy_consensus_state =
                  Consensus_state.Unsafe.dummy_advance dummy_consensus_state
                    ~increase_epoch_count ~new_global_slot
                in
-               (next_dummy_consensus_state, proposal_time))) ;
+               (next_dummy_consensus_state, proposal_time) ) ) ;
     { start_slot; term_slot; proposal_table }
 
   (** Picks a single chain of proposals from a distribution. Does not attempt
@@ -138,29 +138,33 @@ module Vrf_distribution = struct
     let rec find_potential_proposals acc_proposals window_depth slot =
       let slot_in_dist_range = slot < dist.term_slot in
       let window_expired =
-        window_depth >= default_window_size && List.length acc_proposals > 0
+        window_depth >= default_window_size
+        && Mina_stdlib.List.Length.(acc_proposals > 0)
       in
       if (not slot_in_dist_range) || window_expired then acc_proposals
       else
-        let slot_number = Global_slot.slot_number slot in
+        let slot_number = Global_slot_since_genesis.slot_number slot in
         let slot_proposals =
           Hashtbl.find dist.proposal_table (UInt32.to_int slot_number)
           |> Option.map ~f:Map.to_alist |> Option.value ~default:[]
         in
         find_potential_proposals
           (acc_proposals @ slot_proposals)
-          (window_depth + 1) (Global_slot.succ slot)
+          (window_depth + 1)
+          (Global_slot_since_genesis.succ slot)
     in
     let rec extend_proposal_chain acc_chain slot =
       let potential_proposals = find_potential_proposals [] 0 slot in
-      if List.length potential_proposals = 0 then acc_chain
-      else
-        let ((_, proposal_data) as proposal) =
-          List.random_element_exn potential_proposals
-        in
-        extend_proposal_chain (proposal :: acc_chain)
-          (Global_slot.of_slot_number ~constants
-             (UInt32.succ @@ Block_data.global_slot proposal_data))
+      match potential_proposals with
+      | [] ->
+          acc_chain
+      | _ :: _ ->
+          let ((_, proposal_data) as proposal) =
+            List.random_element_exn potential_proposals
+          in
+          extend_proposal_chain (proposal :: acc_chain)
+            (Global_slot_since_genesis.of_slot_number ~constants
+               (UInt32.succ @@ Block_data.global_slot proposal_data) )
     in
     extend_proposal_chain [] dist.start_slot |> List.rev
 
@@ -172,8 +176,8 @@ module Vrf_distribution = struct
 
   let all_possible_chains dist ~base =
     let this_epoch = Consensus_state.epoch base + 1 in
-    let start_slot = Global_slot.of_epoch_and_slot this_epoch 0 in
-    let term_slot = Global_slot.of_epoch_and_slot (this_epoch + 1) 0 in
+    let start_slot = Global_slot_since_genesis.of_epoch_and_slot this_epoch 0 in
+    let term_slot = Global_slot_since_genesis.of_epoch_and_slot (this_epoch + 1) 0 in
     let rec check_slot slot pred =
       if slot >= term_slot then
         []
@@ -216,7 +220,7 @@ let fuzz_vrf_round ~stakers ~base_chains =
   Deferred.List.bind base_chains ~f:(fun base ->
     let all_possible_chains = Vrf_distribution.compute_all_possible_chains vrf_dist ~base in
     let chains_to_traverse = limit_chains_to_traverse all_possible_chains in
-    Rose_tree.Deferred.fold_to_leaves_and_save all_possible_chains ~init:base ~f:(fun pred pending_block ->
+    Mina_stdlib.Rose_tree.Deferred.fold_to_leaves_and_save all_possible_chains ~init:base ~f:(fun pred pending_block ->
       let blocks = generate_blocks pending_block in
       let%map () = Deferred.List.iter blocks ~f:check_block in
       blocks))
@@ -258,7 +262,7 @@ let create_genesis_data () =
     }
   in
   let genesis_transition =
-    External_transition.create
+    Mina_block.create
       ~protocol_state:(With_hash.data genesis_protocol_state)
       ~protocol_state_proof:precomputed_values.base_proof
       ~staged_ledger_diff:empty_diff
@@ -278,97 +282,85 @@ let create_genesis_data () =
   in
   (genesis_transition, Or_error.ok_exn genesis_staged_ledger_res)
 
-[%%if proof_level = "full"]
-
 let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
     (chain : Blockchain.t) (next_state : Protocol_state.Value.t)
     (block : Snark_transition.value) state_for_handler pending_coinbase =
-  let wrap hash proof =
-    let module Wrap = Keys.Wrap in
-    Tock.prove
-      (Tock.Keypair.pk Wrap.keys)
-      Wrap.input
-      { Wrap.Prover_state.proof }
-      Wrap.main
-      (Wrap_input.of_tick_field hash)
-  in
-  let next_state_top_hash = Keys.Step.instance_hash next_state in
-  let prover_state =
-    { Keys.Step.Prover_state.prev_proof = chain.proof
-    ; wrap_vk = Tock.Keypair.vk Keys.Wrap.keys
-    ; prev_state = chain.state
-    ; expected_next_state = Some next_state
-    ; update = block
-    }
-  in
-  let main x =
-    Tick.handle (Keys.Step.main ~logger x)
-      (Consensus.Data.Prover_state.handler state_for_handler ~pending_coinbase)
-  in
-  let res =
-    Or_error.try_with (fun () ->
-        let prev_proof =
-          Tick.prove
-            (Tick.Keypair.pk Keys.Step.keys)
-            (Keys.Step.input ()) prover_state main next_state_top_hash
-        in
-        { Blockchain.state = next_state
-        ; proof = wrap next_state_top_hash prev_proof
-        })
-  in
-  Or_error.iter_error res ~f:(fun e ->
-      [%log error]
-        ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-        "Prover threw an error while extending block: $error") ;
-  res
-
-[%%elif proof_level = "check"]
-
-let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
-    (chain : Blockchain.t) (next_state : Protocol_state.Value.t)
-    (block : Snark_transition.value) state_for_handler pending_coinbase =
-  let next_state_top_hash = Keys.Step.instance_hash next_state in
-  let prover_state =
-    { Keys.Step.Prover_state.prev_proof = chain.proof
-    ; wrap_vk = Tock.Keypair.vk Keys.Wrap.keys
-    ; prev_state = chain.state
-    ; expected_next_state = Some next_state
-    ; update = block
-    ; genesis_state_hash = With_hash.hash genesis_protocol_state
-    }
-  in
-  let main x =
-    Tick.handle (Keys.Step.main ~logger x)
-      (Consensus.Data.Prover_state.handler state_for_handler ~pending_coinbase)
-  in
-  let res =
-    Or_error.map
-      (Tick.check
-         (main @@ Tick.Field.Var.constant next_state_top_hash)
-         prover_state)
-      ~f:(fun () ->
-        { Blockchain.state = next_state
-        ; proof = precomputed_values.genesis_proof
-        })
-  in
-  Or_error.iter_error res ~f:(fun e ->
-      [%log error]
-        ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-        "Prover threw an error while extending block: $error") ;
-  res
-
-[%%elif proof_level = "none"]
-
-let prove_blockchain ~logger:_ _ _ _ _ _ _ =
-  failwith "cannot run fuzzer with proof_level = \"none\""
-
-[%%else]
-
-[%%show proof_level]
-
-[%%error "invalid proof_level"]
-
-[%%endif]
+  match Node_config.proof_level with
+  | "full" ->
+      let wrap hash proof =
+        let module Wrap = Keys.Wrap in
+        Tock.prove
+          (Tock.Keypair.pk Wrap.keys)
+          Wrap.input
+          { Wrap.Prover_state.proof }
+          Wrap.main
+          (Wrap_input.of_tick_field hash)
+      in
+      let next_state_top_hash = Keys.Step.instance_hash next_state in
+      let prover_state =
+        { Keys.Step.Prover_state.prev_proof = chain.proof
+        ; wrap_vk = Tock.Keypair.vk Keys.Wrap.keys
+        ; prev_state = chain.state
+        ; expected_next_state = Some next_state
+        ; update = block
+        }
+      in
+      let main x =
+        Tick.handle (Keys.Step.main ~logger x)
+          (Consensus.Data.Prover_state.handler state_for_handler
+             ~pending_coinbase )
+      in
+      let res =
+        Or_error.try_with ~here:[%here] (fun () ->
+            let prev_proof =
+              Tick.prove
+                (Tick.Keypair.pk Keys.Step.keys)
+                (Keys.Step.input ()) prover_state main next_state_top_hash
+            in
+            { Blockchain.state = next_state
+            ; proof = wrap next_state_top_hash prev_proof
+            } )
+      in
+      Or_error.iter_error res ~f:(fun e ->
+          [%log error]
+            ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+            "Prover threw an error while extending block: $error" ) ;
+      res
+  | "check" ->
+      let next_state_top_hash = Keys.Step.instance_hash next_state in
+      let prover_state =
+        { Keys.Step.Prover_state.prev_proof = chain.proof
+        ; wrap_vk = Tock.Keypair.vk Keys.Wrap.keys
+        ; prev_state = chain.state
+        ; expected_next_state = Some next_state
+        ; update = block
+        ; genesis_state_hash = With_hash.hash genesis_protocol_state
+        }
+      in
+      let main x =
+        Tick.handle (Keys.Step.main ~logger x)
+          (Consensus.Data.Prover_state.handler state_for_handler
+             ~pending_coinbase )
+      in
+      let res =
+        Or_error.map
+          (Tick.check
+             (main @@ Tick.Field.Var.constant next_state_top_hash)
+             prover_state )
+          ~f:(fun () ->
+            { Blockchain.state = next_state
+            ; proof = precomputed_values.genesis_proof
+            } )
+      in
+      Or_error.iter_error res ~f:(fun e ->
+          [%log error]
+            ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+            "Prover threw an error while extending block: $error" ) ;
+      res
+  | "none" ->
+      failwith "cannot run fuzzer with proof_level = \"none\""
+  | _ ->
+      failwith "invalid proof_level"
 
 (* TODO: update stakers' relative local_states *)
 let propose_block_onto_chain ~logger ~keys
@@ -376,14 +368,15 @@ let propose_block_onto_chain ~logger ~keys
   let consensus_constants = Constants.compiled in
   let open Deferred.Let_syntax in
   let proposal_slot =
-    Global_slot.of_slot_number ~constants:consensus_constants
+    Global_slot_since_genesis.of_slot_number ~constants:consensus_constants
       (Block_data.global_slot block_data)
   in
   let proposal_time =
-    Global_slot.start_time ~constants:consensus_constants proposal_slot
+    Global_slot_since_genesis.start_time ~constants:consensus_constants
+      proposal_slot
   in
   let previous_protocol_state =
-    External_transition.protocol_state previous_transition
+    Header.protocol_state @@ Mina_block.header previous_transition
   in
   let previous_protocol_state_body_hash =
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
@@ -393,7 +386,7 @@ let propose_block_onto_chain ~logger ~keys
     |> Blockchain_state.snarked_ledger_hash
   in
   let previous_protocol_state_proof =
-    External_transition.protocol_state_proof previous_transition
+    Header.protocol_state_proof @@ Mina_block.header previous_transition
   in
   (* TODO: insert random txns into the pool every block *)
   let transactions_by_fee = Sequence.empty in
@@ -418,7 +411,7 @@ let propose_block_onto_chain ~logger ~keys
   let next_ledger_hash =
     Option.value_map ledger_proof_opt
       ~f:(fun (proof, _) ->
-        Ledger_proof.statement proof |> Ledger_proof.statement_target)
+        Ledger_proof.statement proof |> Ledger_proof.statement_target )
       ~default:previous_ledger_hash
   in
   let blockchain_state =
@@ -447,14 +440,14 @@ let propose_block_onto_chain ~logger ~keys
     Snark_transition.create_value
       ?sok_digest:
         (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
-             Ledger_proof.sok_digest proof))
+             Ledger_proof.sok_digest proof ) )
       ?ledger_proof:
         (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
-             Ledger_proof.underlying_proof proof))
+             Ledger_proof.underlying_proof proof ) )
       ~supply_increase:
         (Option.value_map ~default:Currency.Amount.zero
            ~f:(fun (proof, _) -> (Ledger_proof.statement proof).supply_increase)
-           ledger_proof_opt)
+           ledger_proof_opt )
       ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
       ~consensus_transition ~pending_coinbase_update ()
   in
@@ -472,7 +465,7 @@ let propose_block_onto_chain ~logger ~keys
   let { Blockchain.proof = protocol_state_proof; _ } =
     prove_blockchain ~logger keys
       (Blockchain.create ~proof:previous_protocol_state_proof
-         ~state:previous_protocol_state)
+         ~state:previous_protocol_state )
       protocol_state
       (Internal_transition.snark_transition internal_transition)
       (Internal_transition.prover_state internal_transition)
@@ -481,7 +474,7 @@ let propose_block_onto_chain ~logger ~keys
   in
   let dummy_delta_transition_chain_proof = (State_hash.dummy, []) in
   let external_transition =
-    External_transition.create ~protocol_state ~protocol_state_proof
+    Mina_block.create ~protocol_state ~protocol_state_proof
       ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
       ~delta_transition_chain_proof:dummy_delta_transition_chain_proof
       ~validation_callback:Fn.ignore ()
@@ -497,7 +490,7 @@ let main () =
         (Transport_file_system.dumb_logrotate ~directory:"fuzz_logs"
            ~log_filename:"log"
            ~max_size:(500 * 1024 * 1024)
-           ~num_rotate:1)) ;
+           ~num_rotate:1 )) ;
   don't_wait_for
     (let%bind genesis_transition, genesis_staged_ledger =
        create_genesis_data ()
@@ -515,13 +508,12 @@ let main () =
                (Public_key.Compressed.Set.of_list [ compressed_pk ])
                ~genesis_ledger:Genesis_ledger.t
            in
-           Staker.{ keypair; local_state })
+           Staker.{ keypair; local_state } )
      in
      let rec loop epoch (base_transition, base_staged_ledger) =
        let dist =
          Vrf_distribution.create ~stakers ~epoch
-           ~initial_consensus_state:
-             (External_transition.consensus_state base_transition)
+           ~initial_consensus_state:(Mina_block.consensus_state base_transition)
        in
        let proposal_chain = Vrf_distribution.pick_chain_unrealistically dist in
        Core_kernel.Printf.printf
@@ -531,25 +523,25 @@ let main () =
        (*
       Core.Printf.printf !"%s\n%!"
         (String.concat ~sep:":" @@ List.map proposal_chain ~f:(fun (_, block_data) ->
-          UInt32.to_string @@ Global_slot.slot @@ Block_data.global_slot block_data));
+          UInt32.to_string @@ Global_slot_since_genesis.slot @@ Block_data.global_slot block_data));
       *)
        let%bind final_chain =
          Deferred.List.fold proposal_chain
            ~init:(base_transition, base_staged_ledger)
            ~f:(fun previous_chain ((_, block_data) as proposal) ->
              Core.Printf.printf !"[%d] %d --> %d\n%!" (UInt32.to_int epoch)
-               ( UInt32.to_int @@ Global_slot.slot_number
-               @@ Consensus_state.global_slot
-               @@ External_transition.consensus_state @@ fst previous_chain )
+               ( UInt32.to_int @@ Global_slot_since_genesis.slot_number
+               @@ Consensus_state.global_slot @@ Mina_block.consensus_state
+               @@ fst previous_chain )
                ( UInt32.to_int
-               @@ Global_slot.(
+               @@ Global_slot_since_genesis.(
                     slot
                       (of_slot_number ~constants:consensus_constants
-                         (Block_data.global_slot block_data))) ) ;
-             propose_block_onto_chain ~logger ~keys previous_chain proposal)
+                         (Block_data.global_slot block_data) )) ) ;
+             propose_block_onto_chain ~logger ~keys previous_chain proposal )
        in
        loop (UInt32.succ epoch) final_chain
      in
-     loop UInt32.zero (genesis_transition, genesis_staged_ledger))
+     loop UInt32.zero (genesis_transition, genesis_staged_ledger) )
 
 let _ = Async.Scheduler.go_main ~main ()

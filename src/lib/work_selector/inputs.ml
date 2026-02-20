@@ -2,10 +2,21 @@ open Core_kernel
 open Currency
 
 module Test_inputs = struct
-  module Transaction_witness = Int
+  module Transaction_witness = struct
+    type t = Int.t
+
+    let transaction = Fn.id
+  end
+
   module Ledger_hash = Int
   module Sparse_ledger = Int
-  module Transaction = Int
+
+  module Transaction = struct
+    type t = Int.t
+
+    let yojson_summary t = `Int t
+  end
+
   module Ledger_proof_statement = Fee
 
   module Transaction_protocol_state = struct
@@ -14,12 +25,30 @@ module Test_inputs = struct
 
   module Ledger_proof = struct
     type t = Fee.t [@@deriving hash, compare, sexp]
+
+    module Stable = struct
+      module Latest = struct
+        type nonrec t = t
+      end
+    end
+
+    module Cached = struct
+      type nonrec t = t
+
+      let read_proof_from_disk = Fn.id
+    end
   end
 
   module Transaction_snark_work = struct
-    type t = Fee.t
+    module Checked = struct
+      type t = Fee.t
 
-    let fee = Fn.id
+      let fee = Fn.id
+
+      let prover _ = Key_gen.Sample_keypairs.genesis_winner |> fst
+    end
+
+    include Checked
 
     module Statement = struct
       type t = Transaction_snark.Statement.t One_or_two.t
@@ -52,7 +81,7 @@ module Test_inputs = struct
         | None ->
             fee
         | Some fee' ->
-            Currency.Fee.min fee fee')
+            Currency.Fee.min fee fee' )
   end
 
   module Staged_ledger = struct

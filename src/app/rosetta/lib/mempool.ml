@@ -1,7 +1,5 @@
-open Core_kernel
-open Async
-open Rosetta_lib
-open Rosetta_models
+module Scalars = Graphql_lib.Scalars
+module Serializing = Graphql_lib.Serializing
 
 module Get_all_transactions =
 [%graphql
@@ -12,7 +10,7 @@ module Get_all_transactions =
         chainId
       }
       pooledUserCommands(publicKey: null) {
-        hash
+        hash @ppxCustom(module: "Scalars.String_json")
       }
     }
 |}]
@@ -27,36 +25,48 @@ module Get_transactions_by_hash =
         peers { host }
       }
       pooledUserCommands(hashes: $hashes) {
-        hash
-        amount @bsDecoder(fn: "Decoders.uint64")
-        fee @bsDecoder(fn: "Decoders.uint64")
+        hash @ppxCustom(module: "Scalars.String_json")
+        amount @ppxCustom(module: "Scalars.UInt64")
+        fee @ppxCustom(module: "Scalars.UInt64")
         kind
-        feeToken @bsDecoder(fn: "Decoders.token_id")
-        validUntil @bsDecoder(fn: "Decoders.optional_uint32")
+        feeToken @ppxCustom(module: "Serializing.Token_s")
+        validUntil @ppxCustom(module: "Scalars.UInt32")
         memo
         feePayer {
-          publicKey
+          publicKey @ppxCustom(module: "Scalars.JSON")
         }
         nonce
         receiver {
-          publicKey
+          publicKey @ppxCustom(module: "Scalars.JSON")
         }
         source {
-          publicKey
+          publicKey @ppxCustom(module: "Scalars.JSON")
         }
-        token  @bsDecoder(fn: "Decoders.token_id")
+        token @ppxCustom(module: "Serializing.Token_s")
       }
     }
 |}]
-let _ = Decoders.uint32
+
+module Mina_currency = Currency
+
+(* Avoid shadowing graphql_ppx functions *)
+open Core_kernel
+open Async
+open Rosetta_lib
+open Rosetta_models
 
 module All = struct
   module Env = struct
     (* All side-effects go in the env so we can mock them out later *)
     module T (M : Monad_fail.S) = struct
       type 'gql t =
-        { gql: unit -> ('gql, Errors.t) M.t
-        ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
+        { gql : unit -> ('gql, Errors.t) M.t
+        ; validate_network_choice :
+               network_identifier:Network_identifier.t
+            -> minimum_user_command_fee:Mina_currency.Fee.t
+            -> graphql_uri:Uri.t
+            -> (unit, Errors.t) M.t
+        }
     end
 
     (* The real environment does things asynchronously *)
@@ -65,47 +75,51 @@ module All = struct
     (* But for tests, we want things to go fast *)
     module Mock = T (Result)
 
-    let real : graphql_uri:Uri.t -> 'gql Real.t =
-     fun ~graphql_uri ->
-      { gql=
-          (fun () -> Graphql.query (Get_all_transactions.make ()) graphql_uri)
-      ; validate_network_choice= Network.Validate_choice.Real.validate }
+    let real :
+           graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
+        -> 'gql Real.t =
+     fun ~graphql_uri ~minimum_user_command_fee ->
+      { gql =
+          (fun () ->
+            Graphql.query ~minimum_user_command_fee
+              (Get_all_transactions.make ())
+              graphql_uri )
+      ; validate_network_choice = Network.Validate_choice.Real.validate
+      }
 
     let mock : 'gql Mock.t =
-      { gql=
+      { gql =
           (fun () ->
             Result.return
-            @@ object
-                 method pooledUserCommands =
-                   [| `UserCommand
-                        (object
-                           method hash = "TXN_1"
-                        end)
-                    ; `UserCommand
-                        (object
-                           method hash = "TXN_2"
-                        end) |]
-               end )
-      ; validate_network_choice= Network.Validate_choice.Mock.succeed }
+              { Get_all_transactions.pooledUserCommands =
+                  [| { hash = "TXN_1" }; { hash = "TXN_2" } |]
+              ; initialPeers = [||]
+              ; daemonStatus = { chainId = "dummy" }
+              } )
+      ; validate_network_choice = Network.Validate_choice.Mock.succeed
+      }
   end
 
   module Impl (M : Monad_fail.S) = struct
     let handle :
-      graphql_uri:Uri.t
+           graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
         -> env:'gql Env.T(M).t
         -> Network_request.t
         -> (Mempool_response.t, Errors.t) M.t =
-     fun ~graphql_uri ~env req ->
+     fun ~graphql_uri ~minimum_user_command_fee ~env req ->
       let open M.Let_syntax in
       let%bind res = env.gql () in
       let%map () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~graphql_uri
+          ~graphql_uri ~minimum_user_command_fee
       in
-      { Mempool_response.transaction_identifiers=
-          res#pooledUserCommands |> Array.to_list
-          |> List.map ~f:(fun (`UserCommand obj) ->
-                 {Transaction_identifier.hash= obj#hash} ) }
+      let open Get_all_transactions in
+      { Mempool_response.transaction_identifiers =
+          res.pooledUserCommands |> Array.to_list
+          |> List.map ~f:(fun cmd -> { Transaction_identifier.hash = cmd.hash })
+      }
   end
 
   module Real = Impl (Deferred.Result)
@@ -116,12 +130,18 @@ module All = struct
 
       let%test_unit "succeeds" =
         Test.assert_ ~f:Mempool_response.to_yojson
-          ~expected:(Mock.handle ~graphql_uri:(Uri.of_string "https://minaprotocol.com") ~env:Env.mock Network.dummy_network_request)
+          ~expected:
+            (Mock.handle
+               ~graphql_uri:(Uri.of_string "https://minaprotocol.com")
+               ~minimum_user_command_fee:Mina_currency.Fee.one ~env:Env.mock
+               Network.dummy_network_request )
           ~actual:
             (Result.return
-               { Mempool_response.transaction_identifiers=
-                   [ {Transaction_identifier.hash= "TXN_1"}
-                   ; {Transaction_identifier.hash= "TXN_2"} ] })
+               { Mempool_response.transaction_identifiers =
+                   [ { Transaction_identifier.hash = "TXN_1" }
+                   ; { Transaction_identifier.hash = "TXN_2" }
+                   ]
+               } )
     end )
 end
 
@@ -129,22 +149,31 @@ module Transaction = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
-        { gql: hash:string -> ('gql, Errors.t) M.t
-        ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
-
+        { gql : hash:string -> ('gql, Errors.t) M.t
+        ; validate_network_choice :
+               network_identifier:Network_identifier.t
+            -> minimum_user_command_fee:Mina_currency.Fee.t
+            -> graphql_uri:Uri.t
+            -> (unit, Errors.t) M.t
+        }
     end
 
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
-    let real : graphql_uri:Uri.t -> 'gql Real.t =
-     fun ~graphql_uri ->
-      { gql=
+    let real :
+           graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
+        -> 'gql Real.t =
+     fun ~graphql_uri ~minimum_user_command_fee ->
+      { gql =
           (fun ~hash ->
-            Graphql.query
-              (Get_transactions_by_hash.make ~hashes:[|hash|] ())
+            Graphql.query ~minimum_user_command_fee
+              Get_transactions_by_hash.(
+                make @@ makeVariables ~hashes:[| hash |] ())
               graphql_uri )
-      ; validate_network_choice= Network.Validate_choice.Real.validate }
+      ; validate_network_choice = Network.Validate_choice.Real.validate
+      }
 
     let obj_of_user_command_info (user_command_info : User_command_info.t) =
       object
@@ -191,7 +220,7 @@ module Transaction = struct
       end
 
     let mock : 'gql Mock.t =
-      { gql=
+      { gql =
           (fun ~hash:_ ->
             Result.return
             @@ object
@@ -201,14 +230,15 @@ module Transaction = struct
                           `UserCommand (obj_of_user_command_info info) )
                    |> List.to_array
                end )
-      ; validate_network_choice= Network.Validate_choice.Mock.succeed }
+      ; validate_network_choice = Network.Validate_choice.Mock.succeed
+      }
   end
 
   module Impl (M : Monad_fail.S) = struct
     let user_command_info_of_obj obj =
       let open M.Let_syntax in
       let extract_public_key data =
-        match data#publicKey with
+        match data with
         | `String pk ->
             M.return (`Pk pk)
         | x ->
@@ -218,11 +248,11 @@ module Transaction = struct
                    (sprintf
                       "Received a public key of an unexpected shape %s when \
                        accessing the Mina GraphQL API."
-                      (Yojson.Basic.pretty_to_string x))
-                 `Invariant_violation)
+                      (Yojson.Basic.pretty_to_string x) )
+                 `Invariant_violation )
       in
       let%bind kind =
-        match obj#kind with
+        match obj.Get_transactions_by_hash.kind with
         | `String "PAYMENT" ->
             M.return `Payment
         | `String "STAKE_DELEGATION" ->
@@ -234,54 +264,60 @@ module Transaction = struct
                    (sprintf
                       "Received a user command of an unexpected kind %s when \
                        accessing the Mina GrpahQL API."
-                      (Yojson.Basic.pretty_to_string kind))
-                 `Invariant_violation)
+                      (Yojson.Basic.pretty_to_string kind) )
+                 `Invariant_violation )
       in
-      let%bind fee_payer = extract_public_key obj#feePayer in
-      let%bind source = extract_public_key obj#source in
-      let%map receiver = extract_public_key obj#receiver in
+      let%bind fee_payer = extract_public_key obj.feePayer.publicKey in
+      let%bind source = extract_public_key obj.source.publicKey in
+      let%map receiver = extract_public_key obj.receiver.publicKey in
       { User_command_info.kind
       ; fee_payer
       ; source
-      ; token= obj#token
-      ; fee= obj#fee
+      ; token = obj.token
+      ; fee = obj.fee
       ; receiver
-      ; fee_token= obj#feeToken
-      ; nonce= Unsigned.UInt32.of_int obj#nonce
-      ; amount= Some obj#amount
-      ; valid_until= obj#validUntil
-      ; memo = if String.equal obj#memo "" then None else Some obj#memo
-      ; failure_status= None
-      ; hash= obj#hash }
+      ; fee_token = obj.feeToken
+      ; nonce = Unsigned.UInt32.of_int obj.nonce
+      ; amount = Some obj.amount
+      ; valid_until = Some obj.validUntil
+      ; memo = (if String.equal obj.memo "" then None else Some obj.memo)
+      ; failure_status = None
+      ; hash = obj.hash
+      }
 
     let handle :
-      graphql_uri:Uri.t
+           graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
         -> env:'gql Env.T(M).t
         -> Mempool_transaction_request.t
         -> (Mempool_transaction_response.t, Errors.t) M.t =
-     fun ~graphql_uri ~env req ->
+     fun ~graphql_uri ~minimum_user_command_fee ~env req ->
       let open M.Let_syntax in
       let%bind res = env.gql ~hash:req.transaction_identifier.hash in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~graphql_uri
+          ~graphql_uri ~minimum_user_command_fee
       in
+      let open Get_transactions_by_hash in
       let%bind user_command_obj =
-        if Array.is_empty res#pooledUserCommands then
+        if Array.is_empty res.pooledUserCommands then
           M.fail
             (Errors.create
-               (`Transaction_not_found req.transaction_identifier.hash))
+               (`Transaction_not_found req.transaction_identifier.hash) )
         else
-          let (`UserCommand cmd) = res#pooledUserCommands.(0) in
+          let cmd = res.pooledUserCommands.(0) in
           M.return cmd
       in
       let%map user_command_info = user_command_info_of_obj user_command_obj in
-      { Mempool_transaction_response.transaction=
-          { Transaction.transaction_identifier=
-              {Transaction_identifier.hash= req.transaction_identifier.hash}
-          ; operations= user_command_info |> User_command_info.to_operations'
-          ; metadata= None }
-      ; metadata= None }
+      { Mempool_transaction_response.transaction =
+          { Transaction.transaction_identifier =
+              { Transaction_identifier.hash = req.transaction_identifier.hash }
+          ; operations = user_command_info |> User_command_info.to_operations'
+          ; metadata = None
+          ; related_transactions = []
+          }
+      ; metadata = None
+      }
   end
 
   module Real = Impl (Deferred.Result)
@@ -291,7 +327,7 @@ module Transaction = struct
       module Mock = Impl (Result)
 
       (* This test intentionally fails as there has not been time to implement
-     * it properly yet *)
+         * it properly yet *)
       (*
       let%test_unit "all dummies" =
         Test.assert_ ~f:Mempool_transaction_response.to_yojson
@@ -305,30 +341,35 @@ module Transaction = struct
     end )
 end
 
-let router ~graphql_uri ~logger (route : string list) body =
+let router ~graphql_uri ~minimum_user_command_fee ~logger (route : string list)
+    body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /mempool/ $route"
-    ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
-  [%log info] "Mempool query" ~metadata:[("query",body)];
+    ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
+  [%log info] "Mempool query" ~metadata:[ ("query", body) ] ;
   match route with
-  | [] | [""] ->
+  | [] | [ "" ] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request" @@ Network_request.of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
-        All.Real.handle ~graphql_uri ~env:(All.Env.real ~graphql_uri) req
+        All.Real.handle ~graphql_uri ~minimum_user_command_fee
+          ~env:(All.Env.real ~graphql_uri ~minimum_user_command_fee)
+          req
         |> Errors.Lift.wrap
       in
       Mempool_response.to_yojson res
-  | ["transaction"] ->
+  | [ "transaction" ] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
         @@ Mempool_transaction_request.of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
-        Transaction.Real.handle ~graphql_uri ~env:(Transaction.Env.real ~graphql_uri) req
+        Transaction.Real.handle ~graphql_uri ~minimum_user_command_fee
+          ~env:(Transaction.Env.real ~graphql_uri ~minimum_user_command_fee)
+          req
         |> Errors.Lift.wrap
       in
       Mempool_transaction_response.to_yojson res

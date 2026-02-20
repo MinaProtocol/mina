@@ -1,57 +1,10 @@
-open Core
 open Async
+open Core_kernel
 
-(** Visualizable_ledger shows a subgraph of a merkle_ledger using Graphviz *)
-module type S = sig
-  type addr
-
-  type ledger
-
-  type t
-
-  (* Visualize will enumerate through all edges of a subtree with a
-     initial_address. It will then interpret all of the edges and nodes into an
-     intermediate form that will be easy to write into a dot file *)
-  val visualize : ledger -> initial_address:addr -> t
-
-  (* Write will transform the intermediate form generate by visualize and save
-     the results into a dot file *)
-  val write : path:string -> name:string -> t -> unit Deferred.t
-end
-
-module type Inputs_intf = sig
-  module Key : Intf.Key
-
-  module Token_id : Intf.Token_id
-
-  module Account_id :
-    Intf.Account_id with type key := Key.t and type token_id := Token_id.t
-
-  module Balance : Intf.Balance
-
-  module Account :
-    Intf.Account
-      with type account_id := Account_id.t
-       and type balance := Balance.t
-
-  module Hash : Intf.Hash with type account := Account.t
-
-  module Location : Location_intf.S
-
-  module Ledger :
-    Base_ledger_intf.S
-      with module Addr = Location.Addr
-       and module Location = Location
-       and type account_id := Account_id.t
-       and type account_id_set := Account_id.Set.t
-       and type hash := Hash.t
-       and type root_hash := Hash.t
-       and type account := Account.t
-end
-
-module Make (Inputs : Inputs_intf) :
-  S with type addr := Inputs.Location.Addr.t and type ledger := Inputs.Ledger.t =
-struct
+module Make (Inputs : Intf.Graphviz.I) :
+  Intf.Graphviz.S
+    with type addr := Inputs.Location.Addr.t
+     and type ledger := Inputs.Ledger.t = struct
   open Inputs
 
   module Account = struct
@@ -88,7 +41,9 @@ struct
     |> Visualization.display_short_sexp (module Account_id)
 
   let empty_hash =
-    Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+    Mina_stdlib.Empty_hashes.extensible_cache
+      (module Hash)
+      ~init_hash:Hash.empty_account
 
   let visualize t ~(initial_address : Ledger.Addr.t) =
     let ledger_depth = Inputs.Ledger.depth t in
@@ -131,9 +86,11 @@ struct
                      current_hash
               then (
                 Queue.enqueue jobs
-                  (Addr.child_exn ~ledger_depth address Direction.Left) ;
+                  (Addr.child_exn ~ledger_depth address
+                     Mina_stdlib.Direction.Left ) ;
                 Queue.enqueue jobs
-                  (Addr.child_exn ~ledger_depth address Direction.Right) ;
+                  (Addr.child_exn ~ledger_depth address
+                     Mina_stdlib.Direction.Right ) ;
                 Hash current_hash )
               else Empty_hash
             in
@@ -145,9 +102,11 @@ struct
       bfs ~edges:[]
         ~accounts:(Set.empty (module Account))
         (Queue.of_list
-           [ Addr.child_exn ~ledger_depth initial_address Direction.Left
-           ; Addr.child_exn ~ledger_depth initial_address Direction.Right
-           ])
+           [ Addr.child_exn ~ledger_depth initial_address
+               Mina_stdlib.Direction.Left
+           ; Addr.child_exn ~ledger_depth initial_address
+               Mina_stdlib.Direction.Right
+           ] )
     in
     let edges =
       List.folding_map edges ~init:(0, 0)
@@ -176,7 +135,7 @@ struct
               ( (new_empty_account_counter, empty_hash_counter)
               , { source
                 ; target = Pretty_empty_account new_empty_account_counter
-                } ))
+                } ) )
     in
     edges
 
@@ -203,7 +162,7 @@ struct
             | Pretty_empty_hash count ->
                 write_empty_entry ~id:"HASH" source count
             | Pretty_empty_account count ->
-                write_empty_entry ~id:"ACCOUNT" source count)
+                write_empty_entry ~id:"ACCOUNT" source count )
         |> List.concat |> String.concat ~sep:"\n"
       in
       let code = wrapper ~name body in

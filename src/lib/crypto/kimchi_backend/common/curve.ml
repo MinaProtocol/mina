@@ -1,4 +1,4 @@
-open Intf
+open Kimchi_pasta_snarky_backend.Intf
 open Core_kernel
 
 module type Input_intf = sig
@@ -97,29 +97,33 @@ struct
       module V1 = struct
         module T = struct
           type t = BaseField.Stable.Latest.t * BaseField.Stable.Latest.t
-          [@@deriving
-            version { asserted }, equal, bin_io, sexp, compare, yojson, hash]
+          [@@deriving equal, bin_io, sexp, compare, yojson, hash]
         end
+
+        (* asserts the versioned-ness of V1
+           to do this properly, we'd move the Stable module outside the functor
+        *)
+        let __versioned__ = ()
 
         include T
 
         exception Invalid_curve_point of t
 
-        include Binable.Of_binable
-                  (T)
-                  (struct
-                    let on_curve (x, y) =
-                      BaseField.Stable.Latest.equal (y_squared x)
-                        (BaseField.square y)
+        include
+          Binable.Of_binable
+            (T)
+            (struct
+              let on_curve (x, y) =
+                BaseField.Stable.Latest.equal (y_squared x) (BaseField.square y)
 
-                    type t = T.t
+              type t = T.t
 
-                    let to_binable = Fn.id
+              let to_binable = Fn.id
 
-                    let of_binable t =
-                      if not (on_curve t) then raise (Invalid_curve_point t) ;
-                      t
-                  end)
+              let of_binable t =
+                if not (on_curve t) then raise (Invalid_curve_point t) ;
+                t
+            end)
       end
 
       module Latest = V1
@@ -155,15 +159,16 @@ struct
     include Stable.Latest
 
     let to_backend :
-        (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t -> Backend.t =
-      function
+           (Base_field.t * Base_field.t) Plonkish_prelude.Or_infinity.t
+        -> Backend.t = function
       | Infinity ->
           Infinity
       | Finite (x, y) ->
           Finite (x, y)
 
     let of_backend :
-        Backend.t -> (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t =
+           Backend.t
+        -> (Base_field.t * Base_field.t) Plonkish_prelude.Or_infinity.t =
       function
       | Infinity ->
           Infinity
@@ -182,15 +187,16 @@ struct
 
   let of_affine (x, y) = C.of_affine_coordinates x y
 
-  include Binable.Of_binable
-            (Affine)
-            (struct
-              type nonrec t = t
+  include
+    Binable.Of_binable
+      (Affine)
+      (struct
+        type nonrec t = t
 
-              let to_binable = to_affine_exn
+        let to_binable = to_affine_exn
 
-              let of_binable = of_affine
-            end)
+        let of_binable = of_affine
+      end)
 
   let ( + ) = add
 

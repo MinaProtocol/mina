@@ -1,7 +1,4 @@
 (* state_hash.ml -- defines the type for the protocol state hash *)
-
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params.Tick
 
@@ -13,24 +10,17 @@ end)
 
 let dummy = of_hash Outside_hash_image.t
 
-[%%ifdef consensus_mechanism]
-
 let zero = dummy
-
-[%%else]
-
-(* in the nonconsensus world, we don't have the Pedersen machinery available,
-   so just inline the value for zero
-*)
-let zero = Field.of_string "0"
-
-[%%endif]
 
 let raw_hash_bytes = to_bytes
 
 let to_bytes = `Use_to_base58_check_or_raw_hash_bytes
 
 let to_decimal_string = to_decimal_string
+
+let of_decimal_string = of_decimal_string
+
+let to_hex_string = Field.to_hex_string
 
 (* Data hash versioned boilerplate below *)
 
@@ -40,7 +30,7 @@ module Stable = struct
 
   module V1 = struct
     module T = struct
-      type t = Field.t [@@deriving sexp, compare, hash, version { asserted }]
+      type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]
     end
 
     include T
@@ -54,8 +44,30 @@ module Stable = struct
   end
 end]
 
-type _unused = unit constraint t = Stable.Latest.t
+let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
 let deriver obj =
-  Fields_derivers_zkapps.iso_string obj ~name:"StateHash"
-    ~to_string:to_base58_check ~of_string:of_base58_check_exn
+  Fields_derivers_zkapps.(
+    iso_string ~name:"StateHash" ~js_type:Field ~to_string:to_base58_check
+      ~of_string:of_base58_check_exn
+    |> needs_custom_js ~name:"StateHash" ~js_type:field)
+    obj
+
+include (
+  struct
+    (* Some inline benchmarks *)
+    let state_hash_for_bench =
+      lazy
+        (Base_quickcheck.Generator.generate gen ~size:1
+           ~random:(Splittable_random.State.create Random.State.default) )
+
+    let%bench "State_hash decimal encode" =
+      to_decimal_string (Lazy.force state_hash_for_bench)
+
+    let%bench "State_hash base58 encode" =
+      to_base58_check (Lazy.force state_hash_for_bench)
+
+    let%bench "State_hash hex encode" =
+      to_hex_string (Lazy.force state_hash_for_bench)
+  end :
+    sig end )

@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 
 (* We re-export a constrained subset of prometheus to keep consumers of this
@@ -12,8 +10,6 @@ open Metric_generators
 open Async_kernel
 
 let time_offset_sec = 1609459200.
-
-[%%inject "block_window_duration", block_window_duration]
 
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
@@ -94,10 +90,10 @@ module TextFormat_0_0_4 = struct
   let output f =
     MetricFamilyMap.iter (fun metric samples ->
         let { MetricInfo.name; metric_type; help; label_names } = metric in
-        Fmt.pf f "#HELP %a %a@.#TYPE %a %a@.%a" MetricName.pp name
+        Fmt.pf f "@[<v>#HELP %a %a@,#TYPE %a %a@,%a@]" MetricName.pp name
           output_unquoted help MetricName.pp name output_metric_type metric_type
           (LabelSetMap.pp ~sep:Fmt.nop (output_metric ~name ~label_names))
-          samples)
+          samples )
 end
 
 module type Histogram = sig
@@ -131,8 +127,6 @@ module Runtime = struct
 
   let current_gc = ref (Gc.stat ())
 
-  let current_jemalloc = ref (Jemalloc.get_memory_stats ())
-
   let gc_stat_interval_mins = ref 15.
 
   let gc_allocated_bytes = ref (Gc.allocated_bytes ())
@@ -140,7 +134,6 @@ module Runtime = struct
   let rec gc_stat () =
     let%bind () = after (Time_ns.Span.of_min !gc_stat_interval_mins) in
     current_gc := Gc.stat () ;
-    current_jemalloc := Jemalloc.get_memory_stats () ;
     gc_allocated_bytes := Gc.allocated_bytes () ;
     gc_stat ()
 
@@ -222,36 +215,13 @@ module Runtime = struct
       (fun () -> float_of_int !current_gc.Gc.Stat.stack_size)
       ~help:"Current stack size."
 
-  let jemalloc_active_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_active_bytes"
-      (fun () -> float_of_int !current_jemalloc.active)
-      ~help:"active memory in bytes"
-
-  let jemalloc_resident_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_resident_bytes"
-      (fun () -> float_of_int !current_jemalloc.resident)
-      ~help:
-        "resident memory in bytes (may be zero depending on jemalloc compile \
-         options)"
-
-  let jemalloc_allocated_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_allocated_bytes"
-      (fun () -> float_of_int !current_jemalloc.allocated)
-      ~help:"memory allocated to heap objects in bytes"
-
-  let jemalloc_mapped_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_mapped_bytes"
-      (fun () -> float_of_int !current_jemalloc.mapped)
-      ~help:"memory mapped into process address space in bytes"
-
   let process_cpu_seconds_total =
     simple_metric ~metric_type:Counter "process_cpu_seconds_total" Sys.time
       ~help:"Total user and system CPU time spent in seconds."
 
   let process_uptime_ms_total =
     simple_metric ~metric_type:Counter "process_uptime_ms_total"
-      (fun () ->
-        Core.Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time))
+      (fun () -> Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time))
       ~help:"Total time the process has been running for in milliseconds."
 
   let metrics =
@@ -267,10 +237,6 @@ module Runtime = struct
     ; ocaml_gc_largest_free
     ; ocaml_gc_fragments
     ; ocaml_gc_stack_size
-    ; jemalloc_active_bytes
-    ; jemalloc_resident_bytes
-    ; jemalloc_allocated_bytes
-    ; jemalloc_mapped_bytes
     ; process_cpu_seconds_total
     ; process_uptime_ms_total
     ]
@@ -278,7 +244,121 @@ module Runtime = struct
   let () =
     let open CollectorRegistry in
     List.iter metrics ~f:(fun (info, collector) ->
-        register default info collector)
+        register default info collector )
+end
+
+module Process_memory = struct
+  let subsystem = "Process_memory"
+
+  (* Read RSS (Resident Set Size) from /proc/<pid>/status *)
+  let read_rss_kb pid_opt =
+    try
+      let proc_file =
+        match pid_opt with
+        | None ->
+            "/proc/self/status"
+        | Some pid ->
+            Printf.sprintf "/proc/%d/status" (Pid.to_int pid)
+      in
+      let ic = In_channel.create proc_file in
+      let rec find_vmrss () =
+        let%bind.Option line = In_channel.input_line ic in
+        match
+          Option.try_with (fun () -> Scanf.sscanf line "VmRSS: %f" Fn.id)
+        with
+        | None ->
+            find_vmrss ()
+        | Some kb ->
+            Some kb
+      in
+      let result = find_vmrss () in
+      In_channel.close ic ; result
+    with _ -> None
+
+  (* Functor to create RSS gauge for a specific process type *)
+  module Make_rss_gauge (Config : sig
+    val process_name : string
+
+    val is_daemon : bool
+  end) =
+  struct
+    let process_pid : Pid.t option ref = ref None
+
+    let gauge =
+      let name = Printf.sprintf "rss_%s" Config.process_name in
+      let help =
+        Printf.sprintf "Resident Set Size (RSS) in kilobytes for %s process"
+          Config.process_name
+      in
+      Gauge.v name ~help ~namespace ~subsystem
+
+    let set_pid pid = process_pid := Some pid
+
+    let clear_pid () =
+      process_pid := None ;
+      Gauge.set gauge 0.
+
+    let update () =
+      if Config.is_daemon || Option.is_some !process_pid then
+        Option.iter (read_rss_kb !process_pid) ~f:(Gauge.set gauge)
+  end
+
+  module Daemon = Make_rss_gauge (struct
+    let process_name = "daemon"
+
+    let is_daemon = true
+  end)
+
+  module Prover = Make_rss_gauge (struct
+    let process_name = "prover"
+
+    let is_daemon = false
+  end)
+
+  module Verifier = Make_rss_gauge (struct
+    let process_name = "verifier"
+
+    let is_daemon = false
+  end)
+
+  module Snark_worker = Make_rss_gauge (struct
+    let process_name = "snark_worker"
+
+    let is_daemon = false
+  end)
+
+  module Uptime_snark_worker = Make_rss_gauge (struct
+    let process_name = "uptime_snark_worker"
+
+    let is_daemon = false
+  end)
+
+  module Vrf_evaluator = Make_rss_gauge (struct
+    let process_name = "vrf_evaluator"
+
+    let is_daemon = false
+  end)
+
+  module Libp2p_helper = Make_rss_gauge (struct
+    let process_name = "libp2p_helper"
+
+    let is_daemon = false
+  end)
+
+  (* Update interval for RSS metrics *)
+  let rss_update_interval_mins = ref 1.
+
+  (* Background loop to update all RSS metrics periodically *)
+  let rec update_rss_metrics () =
+    let%bind () = after (Time_ns.Span.of_min !rss_update_interval_mins) in
+    Daemon.update () ;
+    Prover.update () ;
+    Verifier.update () ;
+    Snark_worker.update () ;
+    Uptime_snark_worker.update () ;
+    Vrf_evaluator.update () ;
+    Libp2p_helper.update () ;
+    update_rss_metrics ()
 end
 
 module Cryptography = struct
@@ -303,10 +383,37 @@ module Cryptography = struct
     Snark_work_histogram.v "snark_work_merge_time_sec" ~help ~namespace
       ~subsystem
 
-  let snark_work_base_time_sec =
-    let help = "time elapsed while doing base proof" in
-    Snark_work_histogram.v "snark_work_base_time_sec" ~help ~namespace
-      ~subsystem
+  let snark_work_zkapp_base_time_sec =
+    let help = "time elapsed while doing base proof for a zkapp transaction" in
+    Counter.v "snark_work_zkapp_base_time_sec" ~help ~namespace ~subsystem
+
+  let snark_work_nonzkapp_base_time_sec =
+    let help =
+      "time elapsed while doing base proof for a non-zkapp transaction"
+    in
+    Counter.v "snark_work_nonzkapp_base_time_sec" ~help ~namespace ~subsystem
+
+  let snark_work_zkapp_base_submissions =
+    let help =
+      "Number of base transactions snarks for zkapp transactions submitted"
+    in
+    Counter.v "snark_work_zkapp_base_submissions" ~help ~namespace ~subsystem
+
+  let snark_work_nonzkapp_base_submissions =
+    let help =
+      "Number of base transactions snarks for non-zkapp transactions submitted"
+    in
+    Counter.v "snark_work_nonzkapp_base_submissions" ~help ~namespace ~subsystem
+
+  let zkapp_transaction_length =
+    let help = "Number of updates in a zkapp transaction" in
+    Counter.v "zkapp_transaction_length" ~help ~namespace ~subsystem
+
+  let zkapp_proof_updates =
+    let help =
+      "Number of updates with proof authorization in a zkapp transaction"
+    in
+    Counter.v "zkapp_proof_updates" ~help ~namespace ~subsystem
 
   (* TODO:
      let transaction_proving_time_ms =
@@ -321,6 +428,24 @@ module Bootstrap = struct
   let bootstrap_time_ms =
     let help = "time elapsed while bootstrapping" in
     Gauge.v "bootstrap_time_ms" ~help ~namespace ~subsystem
+
+  let staking_epoch_ledger_sync_ms =
+    let help = "time elapsed when sync staking epoch ledger in ms" in
+    Counter.v "staking_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let next_epoch_ledger_sync_ms =
+    let help = "time elapsed when sync next epoch ledger in ms" in
+    Counter.v "next_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let root_snarked_ledger_sync_ms =
+    let help = "time elapsed when sync root snarked ledger in ms" in
+    Counter.v "root_snarked_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let num_of_root_snarked_ledger_retargeted =
+    let help =
+      "number of times root_snarked_ledger retargeted during bootstrap"
+    in
+    Gauge.v "num_of_root_snarked_ledger_retargeted" ~help ~namespace ~subsystem
 end
 
 module Transaction_pool = struct
@@ -341,6 +466,33 @@ module Transaction_pool = struct
       "Number of transactions added to the pool since the node start"
     in
     Counter.v "transactions_added_to_pool" ~help ~namespace ~subsystem
+
+  let vk_refcount_table_size : Gauge.t =
+    let help = "Size of verification key refcount table" in
+    Gauge.v "vk_refcount_table_size" ~help ~namespace ~subsystem
+
+  let zkapp_transactions_added_to_pool : Counter.t =
+    let help =
+      "Number of zkapp transactions added to the pool since the node start"
+    in
+    Counter.v "zkapp_transactions_added_to_pool" ~help ~namespace ~subsystem
+
+  let zkapp_transaction_size : Counter.t =
+    let help = "Size of valid zkapp transaction received (bin_size_t)" in
+    Counter.v "zkapp_transaction_size" ~help ~namespace ~subsystem
+
+  let zkapp_updates : Counter.t =
+    let help =
+      "Number of account updates in a valid zkapp transaction received"
+    in
+    Counter.v "zkapp_updates" ~help ~namespace ~subsystem
+
+  let zkapp_proof_updates : Counter.t =
+    let help =
+      "Number of account updates with proof authorization in a zkapp \
+       transaction"
+    in
+    Counter.v "zkapp_proof_updates" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig
@@ -392,11 +544,9 @@ module Network = struct
     Counter.v "messages_received" ~help ~namespace ~subsystem
 
   module Delay_time_spec = struct
-    let tick_interval =
-      Core.Time.Span.of_ms (Int.to_float block_window_duration)
-
-    let rolling_interval =
-      Core.Time.Span.of_ms (Int.to_float (block_window_duration * 20))
+    let intervals block_window_duration =
+      Intervals.make ~rolling_interval:block_window_duration
+        ~tick_interval:block_window_duration
   end
 
   module Block = struct
@@ -418,19 +568,48 @@ module Network = struct
       let help = "# of blocks received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    module Validation_time =
-      Moving_time_average
-        (struct
-          include Delay_time_spec
+    module Gauge_map = Metric_map (struct
+      type t = Gauge.t
 
-          let subsystem = subsystem
+      let subsystem = subsystem
 
-          let name = "validation_time"
+      let v = Gauge.v
+    end)
 
-          let help =
-            "average time, in ms, for blocks to be validated and rebroadcasted"
-        end)
-        ()
+    module Validation_time = Moving_time_average (struct
+      include Delay_time_spec
+
+      let subsystem = subsystem
+
+      let name = "validation_time"
+
+      let help =
+        "average time, in ms, for blocks to be validated and rebroadcasted"
+    end)
+
+    module Processing_time = Moving_time_average (struct
+      include Delay_time_spec
+
+      let subsystem = subsystem
+
+      let name = "processing_time"
+
+      let help =
+        "average time, in ms, for blocks to be accepted after the OCaml \
+         process receives it"
+    end)
+
+    module Rejection_time = Moving_time_average (struct
+      include Delay_time_spec
+
+      let subsystem = subsystem
+
+      let name = "rejection_time"
+
+      let help =
+        "average time, in ms, for blocks to be rejected after the OCaml \
+         process receives it"
+    end)
   end
 
   module Snark_work = struct
@@ -452,20 +631,48 @@ module Network = struct
       let help = "# of snark work received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    module Validation_time =
-      Moving_time_average
-        (struct
-          include Delay_time_spec
+    module Gauge_map = Metric_map (struct
+      type t = Gauge.t
 
-          let subsystem = subsystem
+      let subsystem = subsystem
 
-          let name = "validation_time"
+      let v = Gauge.v
+    end)
 
-          let help =
-            "average delay, in ms, for snark work to be validated and \
-             rebroadcasted"
-        end)
-        ()
+    module Validation_time = Moving_time_average (struct
+      include Delay_time_spec
+
+      let subsystem = subsystem
+
+      let name = "validation_time"
+
+      let help =
+        "average delay, in ms, for snark work to be validated and rebroadcasted"
+    end)
+
+    module Processing_time = Moving_time_average (struct
+      include Delay_time_spec
+
+      let subsystem = subsystem
+
+      let name = "processing_time"
+
+      let help =
+        "average delay, in ms, for snark work to be accepted after the OCaml \
+         process receives it"
+    end)
+
+    module Rejection_time = Moving_time_average (struct
+      include Delay_time_spec
+
+      let subsystem = subsystem
+
+      let name = "rejection_time"
+
+      let help =
+        "average time, in ms, for snark work to be rejected after the OCaml \
+         process receives it"
+    end)
   end
 
   module Transaction = struct
@@ -487,20 +694,49 @@ module Network = struct
       let help = "# of transactions received" in
       Counter.v "received" ~help ~namespace ~subsystem
 
-    module Validation_time =
-      Moving_time_average
-        (struct
-          include Delay_time_spec
+    module Gauge_map = Metric_map (struct
+      type t = Gauge.t
 
-          let subsystem = subsystem
+      let subsystem = subsystem
 
-          let name = "validation_time"
+      let v = Gauge.v
+    end)
 
-          let help =
-            "average delay, in ms, for transactions to be validated and \
-             rebroadcasted"
-        end)
-        ()
+    module Validation_time = Moving_time_average (struct
+      include Delay_time_spec
+
+      let subsystem = subsystem
+
+      let name = "validation_time"
+
+      let help =
+        "average delay, in ms, for transactions to be validated and \
+         rebroadcasted"
+    end)
+
+    module Processing_time = Moving_time_average (struct
+      include Delay_time_spec
+
+      let subsystem = subsystem
+
+      let name = "processing_time"
+
+      let help =
+        "average delay, in ms, for transactions to be accepted after the OCaml \
+         process receives it"
+    end)
+
+    module Rejection_time = Moving_time_average (struct
+      include Delay_time_spec
+
+      let subsystem = subsystem
+
+      let name = "rejection_time"
+
+      let help =
+        "average time, in ms, for transactions to be rejected after the OCaml \
+         process receives it"
+    end)
   end
 
   let rpc_requests_received : Counter.t =
@@ -707,6 +943,28 @@ module Network = struct
     let help = "# of Get_ancestry rpc requests failed to respond" in
     Counter.v "get_ancestry_rpc_responses_failed" ~help ~namespace ~subsystem
 
+  let get_completed_snarks_rpcs_sent =
+    let help = "# of Get_completed_snarks rpc requests sent" in
+    let name = "get_completed_snarks_rpcs_sent" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
+
+  let get_completed_snarks_rpcs_received =
+    let help = "# of Get_completed_snarks rpc requests received" in
+    let name = "get_completed_snarks_rpcs_received" in
+    ( Counter.v name ~help ~namespace ~subsystem
+    , Gauge.v (name ^ surfix) ~help ~namespace ~subsystem )
+
+  let get_completed_snarks_rpc_requests_failed : Counter.t =
+    let help = "# of Get_completed_snarks rpc requests failed" in
+    Counter.v "get_completed_snarks_rpc_requests_failed" ~help ~namespace
+      ~subsystem
+
+  let get_completed_snarks_rpc_responses_failed : Counter.t =
+    let help = "# of Get_completed_snarks rpc requests failed to respond" in
+    Counter.v "get_completed_snarks_rpc_responses_failed" ~help ~namespace
+      ~subsystem
+
   let ban_notify_rpcs_sent =
     let help = "# of Ban_notify rpc requests sent" in
     let name = "ban_notify_rpcs_sent" in
@@ -867,10 +1125,6 @@ module Pipe = struct
   module Drop_on_overflow = struct
     let subsystem = subsystem ^ "_overflow"
 
-    let bootstrap_sync_ledger : Counter.t =
-      let help = "Overflow in sync ledger pipe when bootstrapping" in
-      Counter.v "bootstrap_sync_ledger_pipe" ~help ~namespace ~subsystem
-
     let verified_network_pool_diffs : Counter.t =
       let help =
         "Overflow in verified network pool diffs pipe (transactions or snark \
@@ -890,17 +1144,6 @@ module Pipe = struct
       let help = "Overflow in primary transitions pipe" in
       Counter.v "transition_frontier_primary_transitions" ~help ~namespace
         ~subsystem
-
-    let router_transition_frontier_controller : Counter.t =
-      let help =
-        "Overflow in transition frontier controller pipe in Transition_router"
-      in
-      Counter.v "router_transition_frontier_controller" ~help ~namespace
-        ~subsystem
-
-    let router_bootstrap_controller : Counter.t =
-      let help = "Overflow in bootstrap controller pipe in Transition_router" in
-      Counter.v "router_bootstrap_controller_pipe" ~help ~namespace ~subsystem
 
     let router_verified_transitions : Counter.t =
       let help = "Overflow in verified transitions pipe in Transition_router" in
@@ -939,6 +1182,10 @@ module Snark_work = struct
        value of the daemon flag work-reassignment-wait"
     in
     Counter.v "snark_work_timed_out_rpc" ~help ~namespace ~subsystem
+
+  let snark_work_failed_rpc : Counter.t =
+    let help = "# of snark work failures reported by snark workers" in
+    Counter.v "snark_work_failed_rpc" ~help ~namespace ~subsystem
 
   let snark_pool_size : Gauge.t =
     let help = "# of completed snark work bundles in the snark pool" in
@@ -1140,28 +1387,31 @@ module Transition_frontier = struct
     let help = "total # of staged txns that have been finalized" in
     Counter.v "finalized_staged_txns" ~help ~namespace ~subsystem
 
-  module TPS_30min =
-    Moving_bucketed_average
-      (struct
-        let bucket_interval = Core.Time.Span.of_min 3.0
+  module Gauge_map = Metric_map (struct
+    type t = Gauge.t
 
-        let num_buckets = 10
+    let subsystem = subsystem
 
-        let render_average buckets =
-          let total =
-            List.fold buckets ~init:0.0 ~f:(fun acc (n, _) -> acc +. n)
-          in
-          total /. Core.Time.Span.(of_min 30.0 |> to_sec)
+    let v = Gauge.v
+  end)
 
-        let subsystem = subsystem
+  module TPS_30min = Moving_bucketed_average (struct
+    let bucket_interval _ = Time.Span.of_min 3.0
 
-        let name = "tps_30min"
+    let num_buckets _ = 10
 
-        let help =
-          "moving average for transaction per second, the rolling interval is \
-           set to 30 min"
-      end)
-      ()
+    let render_average buckets =
+      let total = List.fold buckets ~init:0.0 ~f:(fun acc (n, _) -> acc +. n) in
+      total /. Time.Span.(of_min 30.0 |> to_sec)
+
+    let subsystem = subsystem
+
+    let name = "tps_30min"
+
+    let help =
+      "moving average for transaction per second, the rolling interval is set \
+       to 30 min"
+  end)
 
   let recently_finalized_staged_txns : Gauge.t =
     let help =
@@ -1173,6 +1423,10 @@ module Transition_frontier = struct
   let best_tip_user_txns : Gauge.t =
     let help = "# of transactions in the current best tip" in
     Gauge.v "best_tip_user_txns" ~help ~namespace ~subsystem
+
+  let best_tip_zkapp_txns : Gauge.t =
+    let help = "# of transactions in the current best tip" in
+    Gauge.v "best_tip_zkapp_txns" ~help ~namespace ~subsystem
 
   let best_tip_coinbase : Gauge.t =
     let help =
@@ -1304,82 +1558,76 @@ module Block_latency = struct
   end
 
   module Latency_time_spec = struct
-    let tick_interval =
-      Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
-
-    let rolling_interval =
-      Core.Time.Span.of_ms (Int.to_float (block_window_duration * 20))
+    let intervals block_window_duration =
+      Intervals.make
+        ~tick_interval:(Time.Span.scale block_window_duration 0.5)
+        ~rolling_interval:(Time.Span.scale block_window_duration 20.0)
   end
 
-  module Gossip_slots =
-    Moving_bucketed_average
-      (struct
-        let bucket_interval =
-          Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
+  module Gauge_map = Metric_map (struct
+    type t = Gauge.t
 
-        let num_buckets = 40
+    let subsystem = subsystem
 
-        let subsystem = subsystem
+    let v = Gauge.v
+  end)
 
-        let name = "gossip_slots"
+  module Gossip_slots = Moving_bucketed_average (struct
+    let bucket_interval block_window_duration =
+      Time.Span.scale block_window_duration 0.5
 
-        let help =
-          "average delay, in slots, after which produced blocks are received"
+    let num_buckets _ = 40
 
-        let render_average buckets =
-          let total_sum, count_sum =
-            List.fold buckets ~init:(0.0, 0)
-              ~f:(fun (total_sum, count_sum) (total, count) ->
-                (total_sum +. total, count_sum + count))
-          in
-          total_sum /. Float.of_int count_sum
-      end)
-      ()
+    let subsystem = subsystem
 
-  module Gossip_time =
-    Moving_time_average
-      (struct
-        include Latency_time_spec
+    let name = "gossip_slots"
 
-        let subsystem = subsystem
+    let help =
+      "average delay, in slots, after which produced blocks are received"
 
-        let name = "gossip_time"
+    let render_average buckets =
+      let total_sum, count_sum =
+        List.fold buckets ~init:(0.0, 0)
+          ~f:(fun (total_sum, count_sum) (total, count) ->
+            (total_sum +. total, count_sum + count) )
+      in
+      total_sum /. Float.of_int count_sum
+  end)
 
-        let help =
-          "average delay, in seconds, after which produced blocks are received"
-      end)
-      ()
+  module Gossip_time = Moving_time_average (struct
+    include Latency_time_spec
 
-  module Inclusion_time =
-    Moving_time_average
-      (struct
-        include Latency_time_spec
+    let subsystem = subsystem
 
-        let subsystem = subsystem
+    let name = "gossip_time"
 
-        let name = "inclusion_time"
+    let help =
+      "average delay, in seconds, after which produced blocks are received"
+  end)
 
-        let help =
-          "average delay, in seconds, after which produced blocks are included \
-           into our frontier"
-      end)
-      ()
+  module Inclusion_time = Moving_time_average (struct
+    include Latency_time_spec
 
-  module Validation_acceptance_time =
-    Moving_time_average
-      (struct
-        include Latency_time_spec
+    let subsystem = subsystem
 
-        let subsystem = subsystem
+    let name = "inclusion_time"
 
-        let name = "validation_acceptance_time"
+    let help =
+      "average delay, in seconds, after which produced blocks are included \
+       into our frontier"
+  end)
 
-        let help =
-          "average delay, in seconds, between the time blocks are initially \
-           received from the libp2p_helper, and when they are accepted as \
-           valid"
-      end)
-      ()
+  module Validation_acceptance_time = Moving_time_average (struct
+    include Latency_time_spec
+
+    let subsystem = subsystem
+
+    let name = "validation_acceptance_time"
+
+    let help =
+      "average delay, in seconds, between the time blocks are initially \
+       received from the libp2p_helper, and when they are accepted as valid"
+  end)
 end
 
 module Rejected_blocks = struct
@@ -1505,7 +1753,7 @@ module Execution_times = struct
     O1trace.Thread.iter_threads ~f:(fun thread ->
         let name = O1trace.Thread.name thread in
         if not (Hashtbl.mem tracked_metrics name) then
-          Hashtbl.add_exn tracked_metrics ~key:name ~data:(create_metric thread))
+          Hashtbl.add_exn tracked_metrics ~key:name ~data:(create_metric thread) )
 
   let () = CollectorRegistry.(register_pre_collect default sync_metrics)
 end
@@ -1524,20 +1772,33 @@ let generic_server ?forward_uri ~port ~logger ~registry () =
     | `GET, "/metrics" ->
         let%bind other_data =
           match forward_uri with
-          | Some uri ->
-              let%bind resp, body = Client.get uri in
-              let status = Response.status resp in
-              if Code.is_success (Code.code_of_status status) then
-                let%map body = Body.to_string body in
-                Some body
-              else (
-                [%log error] "Could not forward request to $url, got: $status"
-                  ~metadata:
-                    [ ("url", `String (Uri.to_string uri))
-                    ; ("status_code", `Int (Code.code_of_status status))
-                    ; ("status", `String (Code.string_of_status status))
-                    ] ;
-                return None )
+          | Some uri -> (
+              Monitor.try_with ~here:[%here] (fun () ->
+                  let%bind resp, body = Client.get uri in
+                  let status = Response.status resp in
+                  if Code.is_success (Code.code_of_status status) then
+                    let%map body = Body.to_string body in
+                    Some body
+                  else (
+                    [%log error]
+                      "Could not forward request to $url, got: $status"
+                      ~metadata:
+                        [ ("url", `String (Uri.to_string uri))
+                        ; ("status_code", `Int (Code.code_of_status status))
+                        ; ("status", `String (Code.string_of_status status))
+                        ] ;
+                    return None ) )
+              >>| function
+              | Ok a ->
+                  a
+              | Error e ->
+                  [%log error]
+                    "Could not forward request to $url, got error: $error"
+                    ~metadata:
+                      [ ("url", `String (Uri.to_string uri))
+                      ; ("error", `String (Exn.to_string_mach e))
+                      ] ;
+                  None )
           | None ->
               return None
         in
@@ -1565,9 +1826,11 @@ type t = (Async.Socket.Address.Inet.t, int) Cohttp_async.Server.t
 
 let server ?forward_uri ~port ~logger () =
   O1trace.background_thread "collect_gc_metrics" Runtime.gc_stat ;
+  O1trace.background_thread "collect_rss_metrics"
+    Process_memory.update_rss_metrics ;
   O1trace.thread "serve_metrics"
     (generic_server ?forward_uri ~port ~logger
-       ~registry:CollectorRegistry.default)
+       ~registry:CollectorRegistry.default )
 
 module Archive = struct
   type t =
@@ -1615,3 +1878,10 @@ module Archive = struct
     ; gauge_metrics = Hashtbl.create (module String)
     }
 end
+
+let initialize_all block_window_duration =
+  Transition_frontier.TPS_30min.initialize block_window_duration ;
+  Block_latency.Gossip_slots.initialize block_window_duration ;
+  Block_latency.Gossip_time.initialize block_window_duration ;
+  Block_latency.Inclusion_time.initialize block_window_duration ;
+  Block_latency.Validation_acceptance_time.initialize block_window_duration

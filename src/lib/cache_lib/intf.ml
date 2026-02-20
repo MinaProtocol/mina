@@ -110,8 +110,10 @@ module Cache = struct
     val create :
          name:string
       -> logger:Logger.t
+      -> cache_exceptions:bool
       -> on_add:('elt -> unit)
       -> on_remove:([ `Consumed | `Unconsumed | `Failure ] -> 'elt -> unit)
+      -> element_to_string:('elt -> string)
       -> (module Hashtbl.Key_plain with type t = 'elt)
       -> 'elt t
 
@@ -126,6 +128,8 @@ module Cache = struct
 
     val final_state : 'elt t -> 'elt -> 'elt final_state Option.t
 
+    val element_to_string : 'elt t -> 'elt -> string
+
     val to_list : 'elt t -> 'elt list
   end
 end
@@ -139,7 +143,11 @@ module Transmuter = struct
       type t
     end
 
-    module Target : Hash_set.Elt_plain
+    module Target : sig
+      include Hash_set.Elt_plain
+
+      val to_string : t -> string
+    end
 
     val transmute : Source.t -> Target.t
   end
@@ -164,7 +172,7 @@ module Transmuter_cache = struct
 
     type t = target Cache.t
 
-    val create : logger:Logger.t -> t
+    val create : logger:Logger.t -> cache_exceptions:bool -> t
 
     val register_exn : t -> source -> (source, target) Cached.t
 

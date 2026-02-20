@@ -1,8 +1,0 @@
-(executable
-  (package stitch_introspection)
-  (name stitch_introspection)
-  (public_name stitch_introspection)
-  (modes native)
-  (libraries core async yojson)
-  (preprocess (pps ppx_jane))
-  )

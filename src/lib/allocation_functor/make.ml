@@ -118,13 +118,9 @@ module Versioned_v1 = struct
       end
 
       module Latest = V1
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
-    type t = Stable.V1.t
+    type t = Stable.Latest.t
   end
 
   module Sexp (M : Intf.Input.Versioned_v1.Sexp_intf) : sig
@@ -147,13 +143,9 @@ module Versioned_v1 = struct
       end
 
       module Latest = V1
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
-    type t = Stable.V1.t
+    type t = Stable.Latest.t
   end
 
   module Yojson (M : Intf.Input.Versioned_v1.Yojson_intf) : sig
@@ -176,13 +168,9 @@ module Versioned_v1 = struct
       end
 
       module Latest = V1
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
-    type t = Stable.V1.t
+    type t = Stable.Latest.t
   end
 
   module Full_compare_eq_hash
@@ -214,13 +202,9 @@ module Versioned_v1 = struct
       end
 
       module Latest = V1
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
-    type t = Stable.V1.t
+    type t = Stable.Latest.t
 
     let equal = M.equal
 
@@ -251,13 +235,9 @@ module Versioned_v1 = struct
       end
 
       module Latest = V1
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
-    type t = Stable.V1.t
+    type t = Stable.Latest.t
   end
 end
 
@@ -298,12 +278,8 @@ module Versioned_v2 = struct
       end
 
       module Latest = V2
-
-      let versions = M.Stable.versions
-
-      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
-    type t = Stable.V2.t
+    type t = Stable.Latest.t
   end
 end

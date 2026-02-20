@@ -1,10 +1,7 @@
 open Frontier_base
 
 type create_args =
-  { db : Database.t
-  ; logger : Logger.t
-  ; persistent_root_instance : Persistent_root.Instance.t
-  }
+  { db : Database.t; logger : Logger.t; dequeue_snarked_ledger : unit -> unit }
 
 type input = Diff.Lite.E.t list
 

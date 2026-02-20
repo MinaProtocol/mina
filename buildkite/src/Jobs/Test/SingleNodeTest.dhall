@@ -1,0 +1,72 @@
+let PipelineTag = ../../Pipeline/Tag.dhall
+
+let S = ../../Lib/SelectFiles.dhall
+
+let Pipeline = ../../Pipeline/Dsl.dhall
+
+let JobSpec = ../../Pipeline/JobSpec.dhall
+
+let Command = ../../Command/Base.dhall
+
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
+let Profiles = ../../Constants/Profiles.dhall
+
+let Docker = ../../Command/Docker/Type.dhall
+
+let Size = ../../Command/Size.dhall
+
+let dependsOn =
+        DebianVersions.dependsOn
+          DebianVersions.DepsSpec::{ profile = Profiles.Type.Lightnet }
+      # DebianVersions.dependsOn
+          DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
+
+let buildTestCmd
+    : Size -> Command.Type
+    =     \(cmd_target : Size)
+      ->  let key = "single-node-tests"
+
+          in  Command.build
+                Command.Config::{
+                , commands =
+                    RunInToolchain.runInToolchain
+                      (   [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
+                          , "COVERALLS_TOKEN"
+                          ]
+                        # DebianVersions.overrideEnvs
+                      )
+                      "buildkite/scripts/single-node-tests.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
+                , label = "single-node-tests"
+                , key = key
+                , target = cmd_target
+                , docker = None Docker.Type
+                , depends_on = dependsOn
+                }
+
+in  Pipeline.build
+      Pipeline.Config::{
+      , spec =
+          let unitDirtyWhen =
+                [ S.strictlyStart (S.contains "src")
+                , S.strictly (S.contains "Makefile")
+                , S.exactly "buildkite/src/Jobs/Test/SingleNodeTest" "dhall"
+                , S.exactly "buildkite/scripts/single-node-tests" "sh"
+                ]
+
+          in  JobSpec::{
+              , dirtyWhen = unitDirtyWhen
+              , path = "Test"
+              , name = "SingleNodeTest"
+              , tags =
+                [ PipelineTag.Type.Long
+                , PipelineTag.Type.Test
+                , PipelineTag.Type.Stable
+                ]
+              }
+      , steps = [ buildTestCmd Size.XLarge ]
+      }

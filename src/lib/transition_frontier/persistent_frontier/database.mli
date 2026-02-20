@@ -10,14 +10,19 @@
 open Async_kernel
 open Core_kernel
 open Mina_base
-open Mina_transition
 open Frontier_base
 
 type t
 
+type batch_t
+
+val with_batch : t -> f:(batch_t -> 'a) -> 'a
+
 module Error : sig
   type not_found_member =
     [ `Root
+    | `Root_hash
+    | `Root_common
     | `Best_tip
     | `Frontier_hash
     | `Root_transition
@@ -66,26 +71,33 @@ val check :
 
 val initialize : t -> root_data:Root_data.Limited.t -> unit
 
-val add :
+val find_arcs_and_root :
      t
-  -> transition:External_transition.Validated.t
-  -> ( unit
-     , [> `Not_found of
-          [> `Parent_transition of State_hash.t | `Arcs of State_hash.t ] ] )
-     Result.t
+  -> arcs_cache:State_hash.t list State_hash.Table.t
+  -> parent_hashes:State_hash.t list
+  -> ( State_hash.t
+     , [> `Not_found of [> `Arcs of State_hash.t | `Old_root_transition ] ] )
+     result
+
+val add :
+     arcs_cache:State_hash.t list State_hash.Table.t
+  -> transition:Mina_block.Validated.t
+  -> batch_t
+  -> unit
 
 val move_root :
-     t
-  -> new_root:Root_data.Limited.t
+     old_root_hash:State_hash.t
+  -> new_root:Root_data.Limited.Stable.Latest.t
   -> garbage:State_hash.t list
-  -> ( State_hash.t
-     , [> `Not_found of [> `New_root_transition | `Old_root_transition ] ] )
-     Result.t
+  -> batch_t
+  -> unit
 
 val get_transition :
-     t
+     signature_kind:Mina_signature_kind.t
+  -> proof_cache_db:Proof_cache_tag.cache_db
+  -> t
   -> State_hash.t
-  -> ( External_transition.Validated.t
+  -> ( Mina_block.Validated.t
      , [> `Not_found of [> `Transition of State_hash.t ] ] )
      Result.t
 
@@ -95,7 +107,8 @@ val get_arcs :
   -> (State_hash.t list, [> `Not_found of [> `Arcs of State_hash.t ] ]) Result.t
 
 val get_root :
-  t -> (Root_data.Minimal.t, [> `Not_found of [> `Root ] ]) Result.t
+     t
+  -> (Root_data.Minimal.Stable.Latest.t, [> `Not_found of [> `Root ] ]) Result.t
 
 val get_protocol_states_for_root_scan_state :
      t
@@ -108,16 +121,16 @@ val get_root_hash : t -> (State_hash.t, [> `Not_found of [> `Root ] ]) Result.t
 val get_best_tip :
   t -> (State_hash.t, [> `Not_found of [> `Best_tip ] ]) Result.t
 
-val set_best_tip :
-     t
-  -> State_hash.t
-  -> (State_hash.t, [> `Not_found of [> `Best_tip ] ]) Result.t
+val set_best_tip : State_hash.t -> batch_t -> unit
 
 val crawl_successors :
-     t
-  -> State_hash.t
+     ?max_depth:int
+  -> signature_kind:Mina_signature_kind.t
+  -> proof_cache_db:Proof_cache_tag.cache_db
   -> init:'a
-  -> f:('a -> External_transition.Validated.t -> ('a, 'b) Deferred.Result.t)
+  -> f:('a -> Mina_block.Validated.t -> ('a, 'b) Deferred.Result.t)
+  -> t
+  -> State_hash.t
   -> ( unit
      , [> `Crawl_error of 'b
        | `Not_found of [> `Arcs of State_hash.t | `Transition of State_hash.t ]

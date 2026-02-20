@@ -32,9 +32,12 @@ end
 
 module Global_state = struct
   type t =
-    { ledger : sparse_ledger
+    { first_pass_ledger : sparse_ledger
+    ; second_pass_ledger : sparse_ledger
     ; fee_excess : Currency.Amount.Signed.t
+    ; supply_increase : Currency.Amount.Signed.t
     ; protocol_state : Zkapp_precondition.Protocol_state.View.t
+    ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }
   [@@deriving sexp, to_yojson]
 end
@@ -59,11 +62,17 @@ module L = struct
     Option.try_with (fun () ->
         let account = M.get_exn !t loc in
         if Public_key.Compressed.(equal empty account.public_key) then None
-        else Some account)
+        else Some account )
     |> Option.bind ~f:Fn.id
 
   let location_of_account : t -> Account_id.t -> location option =
-   fun t id -> Option.try_with (fun () -> M.find_index_exn !t id)
+   fun t id ->
+    try
+      let loc = M.find_index_exn !t id in
+      let account = M.get_exn !t loc in
+      if Public_key.Compressed.(equal empty account.public_key) then None
+      else Some loc
+    with _ -> None
 
   let set : t -> location -> Account.t -> unit =
    fun t loc a -> t := M.set_exn !t loc a
@@ -97,13 +106,10 @@ module L = struct
         if Public_key.Compressed.(equal empty a.public_key) then (
           set t loc to_set ;
           (`Added, loc) )
-        else (`Existed, loc))
+        else (`Existed, loc) )
 
   let create_new_account t id to_set =
     get_or_create_account t id to_set |> Or_error.map ~f:ignore
-
-  let remove_accounts_exn : t -> Account_id.t list -> unit =
-   fun _t _xs -> failwith "remove_accounts_exn: not implemented"
 
   let merkle_root : t -> Ledger_hash.t = fun t -> M.merkle_root !t
 
@@ -144,6 +150,7 @@ M.
   , set_exn
   , find_index_exn
   , add_path
+  , add_wide_path_unsafe
   , merkle_root
   , iteri )]
 
@@ -197,4 +204,4 @@ let handler t =
           let index = find_index_exn !ledger pk in
           respond (Provide index)
       | _ ->
-          unhandled)
+          unhandled )

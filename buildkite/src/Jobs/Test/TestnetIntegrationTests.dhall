@@ -1,38 +1,58 @@
 let S = ../../Lib/SelectFiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
+
 let Pipeline = ../../Pipeline/Dsl.dhall
+
+let PipelineTag = ../../Pipeline/Tag.dhall
+
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let TestExecutive = ../../Command/TestExecutive.dhall
 
-let dependsOn = [
-    { name = "TestnetIntegrationTests", key = "build-test-executive" },
-    { name = "MinaArtifactBuster", key = "daemon-devnet-buster-docker-image" },
-    { name = "MinaArtifactBuster", key = "archive-buster-docker-image" }
-]
+let Dockers = ../../Constants/DockerVersions.dhall
 
-in Pipeline.build Pipeline.Config::{
-  spec =
-    JobSpec::{
-    dirtyWhen = [
-        S.strictlyStart (S.contains "src"),
-        S.strictlyStart (S.contains "dockerfiles"),
-        S.strictlyStart (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest"),
-        S.strictlyStart (S.contains "buildkite/src/Jobs/Command/TestExecutive")
-    ],
-    path = "Test",
-    name = "TestnetIntegrationTests"
-  },
-  steps = [
-    TestExecutive.build "integration_tests",
-    TestExecutive.execute "peers-reliability" dependsOn,
-    TestExecutive.execute "chain-reliability" dependsOn,
-    TestExecutive.execute "payment" dependsOn,
-    TestExecutive.execute "delegation" dependsOn,
-    TestExecutive.execute "gossip-consis" dependsOn,
-    TestExecutive.execute "archive-node" dependsOn,
-    TestExecutive.execute "opt-block-prod" dependsOn,
-    TestExecutive.execute "zkapps" dependsOn,
-    TestExecutive.execute "zkapps-timing" dependsOn
-  ]
-}
+let Artifacts = ../../Constants/Artifacts.dhall
+
+let dependsOn =
+        Dockers.dependsOn Dockers.DepsSpec::{ artifact = Artifacts.Type.Daemon }
+      # Dockers.dependsOn
+          Dockers.DepsSpec::{ artifact = Artifacts.Type.Archive }
+
+in  Pipeline.build
+      Pipeline.Config::{
+      , spec = JobSpec::{
+        , dirtyWhen =
+          [ S.strictlyStart (S.contains "src")
+          , S.strictlyStart (S.contains "dockerfiles")
+          , S.strictlyStart
+              (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest")
+          , S.strictlyStart (S.contains "buildkite/src/Command/TestExecutive")
+          , S.strictlyStart
+              (S.contains "buildkite/scripts/run-test-executive-local")
+          ]
+        , path = "Test"
+        , name = "TestnetIntegrationTests"
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
+        , scope = PipelineScope.AllButPullRequest
+        }
+      , steps =
+        [ TestExecutive.executeLocal "block-prod-prio" dependsOn
+        , TestExecutive.executeLocal "block-reward" dependsOn
+        , TestExecutive.executeLocal "chain-reliability" dependsOn
+        , TestExecutive.executeLocal "epoch-ledger" dependsOn
+        , TestExecutive.executeLocal "gossip-consis" dependsOn
+        , TestExecutive.executeLocal "medium-bootstrap" dependsOn
+        , TestExecutive.executeLocal "payments" dependsOn
+        , TestExecutive.executeLocal "peers-reliability" dependsOn
+        , TestExecutive.executeLocal "slot-end" dependsOn
+        , TestExecutive.executeLocal "verification-key" dependsOn
+        , TestExecutive.executeLocal "zkapps" dependsOn
+        , TestExecutive.executeLocal "zkapps-timing" dependsOn
+        , TestExecutive.executeLocal "zkapps-nonce" dependsOn
+        ]
+      }

@@ -1,6 +1,4 @@
-(* account.ml *)
-
-[%%import "/src/config.mlh"]
+(* mina_base_import.ml *)
 
 module Public_key = Signature_lib.Public_key
 module Private_key = Signature_lib.Private_key

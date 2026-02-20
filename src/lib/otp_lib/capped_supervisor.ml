@@ -20,7 +20,7 @@ let create ?(buffer_capacity = 30) ~job_capacity f =
     don't_wait_for
       (let%map () = f job in
        decr active_jobs ;
-       Bvar.broadcast job_finished_bvar ())
+       Bvar.broadcast job_finished_bvar () )
   in
   let rec start_jobs n =
     if n <= 0 then ()
@@ -42,7 +42,7 @@ let create ?(buffer_capacity = 30) ~job_capacity f =
   don't_wait_for
     (Reader.iter_without_pushback job_reader ~f:(fun job ->
          if !active_jobs < job_capacity then run_job job
-         else pending_jobs := !pending_jobs @ [ job ])) ;
+         else pending_jobs := !pending_jobs @ [ job ] ) ) ;
   { job_writer; f }
 
 let dispatch t data = Writer.write t.job_writer data

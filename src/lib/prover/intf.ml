@@ -1,14 +1,23 @@
 open Async_kernel
 open Mina_base
 open Mina_state
-open Mina_transition
+open Mina_block
 open Blockchain_snark
 
 module type S = sig
   module Worker_state : sig
     type t
 
-    type init_arg
+    type init_arg =
+      { conf_dir : string
+      ; enable_internal_tracing : bool
+      ; internal_trace_filename : string option
+      ; logger : Logger.t
+      ; proof_level : Genesis_constants.Proof_level.t
+      ; constraint_constants : Genesis_constants.Constraint_constants.t
+      ; commit_id : string
+      ; signature_kind : Mina_signature_kind_type.t
+      }
 
     val create : init_arg -> t Deferred.t
   end
@@ -17,10 +26,15 @@ module type S = sig
 
   val create :
        logger:Logger.t
+    -> ?enable_internal_tracing:bool
+    -> ?internal_trace_filename:string
     -> pids:Child_processes.Termination.t
     -> conf_dir:string
     -> proof_level:Genesis_constants.Proof_level.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> commit_id:string
+    -> signature_kind:Mina_signature_kind_type.t
+    -> unit
     -> t Deferred.t
 
   val initialized : t -> [ `Initialized ] Deferred.Or_error.t
@@ -46,4 +60,17 @@ module type S = sig
 
   val create_genesis_block :
     t -> Genesis_proof.Inputs.t -> Blockchain.t Deferred.Or_error.t
+
+  val toggle_internal_tracing : t -> bool -> unit Deferred.Or_error.t
+
+  (* in ITN logger, sets the client port of daemon to send RPC requests to
+     sets the process kind for the Itn logger to "prover"
+  *)
+  val set_itn_logger_data : t -> daemon_port:int -> unit Deferred.Or_error.t
+
+  val get_blockchain_verification_key :
+    t -> Pickles.Verification_key.t Deferred.Or_error.t
+
+  val get_transaction_verification_key :
+    t -> Pickles.Verification_key.t Deferred.Or_error.t
 end

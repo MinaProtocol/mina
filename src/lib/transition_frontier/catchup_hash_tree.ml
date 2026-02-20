@@ -14,7 +14,7 @@ module Node = struct
       let to_yojson (t : t) =
         `List
           (List.map (Hash_set.to_list t) ~f:(fun x ->
-               `String (Catchup_job_id.to_string x)))
+               `String (Catchup_job_id.to_string x) ) )
     end
 
     type t = Have_breadcrumb | Part_of_catchups of Ids.t
@@ -42,7 +42,7 @@ module State_hash_table = struct
   let to_yojson f t : Yojson.Safe.t =
     `Assoc
       (List.map (State_hash.Table.to_alist t) ~f:(fun (h, x) ->
-           (State_hash.to_base58_check h, f x)))
+           (State_hash.to_base58_check h, f x) ) )
 end
 
 module State_hash_hash_set = struct
@@ -82,9 +82,9 @@ let max_catchup_chain_length t =
             missing_length (acc + 1) parent )
   in
   Hash_set.fold t.tips ~init:0 ~f:(fun acc tip ->
-      Int.max acc (missing_length 0 (Hashtbl.find_exn t.nodes tip)))
+      Int.max acc (missing_length 0 (Hashtbl.find_exn t.nodes tip)) )
 
-let create ~root =
+let create ~logger ~root =
   let root_hash = Breadcrumb.state_hash root in
   let parent = Breadcrumb.parent_hash root in
   let nodes =
@@ -97,7 +97,7 @@ let create ~root =
       State_hash.Table.of_alist_exn
         [ (parent, State_hash.Set.singleton root_hash) ]
   ; nodes
-  ; logger = Logger.create ()
+  ; logger
   }
 
 let check_for_parent t h ~parent:p ~check_has_breadcrumb =
@@ -128,7 +128,7 @@ let add_child t h ~parent =
     | None ->
         State_hash.Set.singleton h
     | Some s ->
-        Set.add s h)
+        Set.add s h )
 
 let add t h ~parent ~job =
   if Hashtbl.mem t.nodes h then
@@ -157,7 +157,7 @@ let breadcrumb_added (t : t) b =
         add_child t h ~parent ;
         { parent; state = Have_breadcrumb }
     | Some x ->
-        { x with state = Have_breadcrumb }) ;
+        { x with state = Have_breadcrumb } ) ;
   Hash_set.remove t.tips h
 
 let remove_node t h =
@@ -171,7 +171,7 @@ let remove_node t h =
             None
         | Some s ->
             let s' = Set.remove s h in
-            if Set.is_empty s' then None else Some s')
+            if Set.is_empty s' then None else Some s' )
 
 (* Remove everything not reachable from the root *)
 let prune t =
@@ -193,7 +193,7 @@ let prune t =
   in
   go [ t.root ] ;
   List.iter (Hashtbl.keys t.nodes) ~f:(fun h ->
-      if not (Hash_set.mem keep h) then remove_node t h)
+      if not (Hash_set.mem keep h) then remove_node t h )
 
 let catchup_failed t job =
   let to_remove =
@@ -203,7 +203,7 @@ let catchup_failed t job =
             acc
         | Part_of_catchups s ->
             Hash_set.remove s job ;
-            if Hash_set.is_empty s then key :: acc else acc)
+            if Hash_set.is_empty s then key :: acc else acc )
   in
   List.iter to_remove ~f:(remove_node t)
 
@@ -213,7 +213,7 @@ let apply_diffs t (ds : Diff.Full.E.t list) =
         breadcrumb_added t b
     | E (Root_transitioned { new_root; garbage = Full hs; _ }) ->
         List.iter (Diff.Node_list.to_lite hs) ~f:(remove_node t) ;
-        let h = (Root_data.Limited.hashes new_root).state_hash in
+        let h = (Root_data.Limited.Stable.Latest.hashes new_root).state_hash in
         Hashtbl.change t.nodes h ~f:(function
           | None ->
               [%log' debug t.logger]
@@ -224,7 +224,7 @@ let apply_diffs t (ds : Diff.Full.E.t list) =
               None
           | Some x ->
               t.root <- h ;
-              Some { x with state = Have_breadcrumb }) ;
+              Some { x with state = Have_breadcrumb } ) ;
         prune t
     | E (Best_tip_changed _) ->
-        ())
+        () )

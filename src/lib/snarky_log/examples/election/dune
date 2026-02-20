@@ -1,6 +1,0 @@
-(executables
- (names election_main)
- (modes native)
- (preprocess
-  (pps ppx_jane ppx_deriving.enum))
- (libraries snarky core snarky_log))

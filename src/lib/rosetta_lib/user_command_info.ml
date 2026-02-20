@@ -12,7 +12,7 @@ module Stake_delegation = Mina_base.Stake_delegation
 let pk_to_public_key ~context (`Pk pk) =
   Public_key.Compressed.of_base58_check pk
   |> Result.map_error ~f:(fun _ ->
-         Errors.create ~context `Public_key_format_not_valid)
+         Errors.create ~context `Public_key_format_not_valid )
 
 let account_id (`Pk pk) (`Token_id token_id) =
   { Account_identifier.address = pk
@@ -46,14 +46,15 @@ module Op = struct
             let related_operations =
               op.related_to
               |> Option.bind ~f:(fun relate ->
-                     List.findi plan ~f:(fun _ a -> a_eq relate a.label))
+                     List.findi plan ~f:(fun _ a -> a_eq relate a.label) )
               |> Option.map ~f:(fun (i, _) -> [ operation_identifier i ])
+              |> Option.value ~default:[]
             in
             let%map a =
               f ~related_operations
                 ~operation_identifier:(operation_identifier i) op
             in
-            (i + 1, a :: acc))
+            (i + 1, a :: acc) )
       in
       List.rev rev_data
   end
@@ -82,10 +83,7 @@ module Kind = struct
 end
 
 module Account_creation_fees_paid = struct
-  type t =
-    | By_no_one
-    | By_fee_payer of Unsigned_extended.UInt64.t
-    | By_receiver of Unsigned_extended.UInt64.t
+  type t = By_no_one | By_receiver of Unsigned_extended.UInt64.t
   [@@deriving equal, to_yojson, sexp, compare]
 end
 
@@ -137,6 +135,14 @@ module Partial = struct
     let%bind fee_payer_pk = pk_to_public_key ~context:"Fee payer" t.fee_payer in
     let%bind source_pk = pk_to_public_key ~context:"Source" t.source in
     let%bind receiver_pk = pk_to_public_key ~context:"Receiver" t.receiver in
+    let%bind () =
+      Result.ok_if_true
+        (Public_key.Compressed.equal fee_payer_pk source_pk)
+        ~error:
+          (Errors.create
+             (`Operations_not_valid
+               [ Errors.Partial_reason.Fee_payer_and_source_mismatch ] ) )
+    in
     let%bind memo =
       match t.memo with
       | Some memo -> (
@@ -153,19 +159,17 @@ module Partial = struct
               ~error:
                 (Errors.create
                    (`Operations_not_valid
-                     [ Errors.Partial_reason.Amount_not_some ]))
+                     [ Errors.Partial_reason.Amount_not_some ] ) )
           in
           let payload =
-            { Payment_payload.Poly.source_pk
-            ; receiver_pk
+            { Payment_payload.Poly.receiver_pk
             ; amount = Amount_currency.of_uint64 amount
             }
           in
           Signed_command.Payload.Body.Payment payload
       | `Delegation ->
           let payload =
-            Stake_delegation.Set_delegate
-              { delegator = source_pk; new_delegate = receiver_pk }
+            Stake_delegation.Set_delegate { new_delegate = receiver_pk }
           in
           Result.return @@ Signed_command.Payload.Body.Stake_delegation payload
     in
@@ -173,7 +177,8 @@ module Partial = struct
       ~fee:(Fee_currency.of_uint64 t.fee)
       ~fee_payer_pk ~nonce ~body ~memo
       ~valid_until:
-        (Option.map ~f:Mina_numbers.Global_slot.of_uint32 t.valid_until)
+        (Option.map ~f:Mina_numbers.Global_slot_since_genesis.of_uint32
+           t.valid_until )
 end
 
 let forget (t : t) : Partial.t =
@@ -208,7 +213,8 @@ let remember ~nonce ~hash t =
 let of_operations ?memo ?valid_until (ops : Operation.t list) :
     (Partial.t, Partial.Reason.t) Validation.t =
   (* TODO: If we care about DoS attacks, break early if length too large *)
-  (* Note: It's better to have nice errors with the validation than micro-optimize searching through a small list a minimal number of times. *)
+  (* Note: It's better to have nice errors with the validation than
+     micro-optimize searching through a small list a minimal number of times. *)
   let find_kind k (ops : Operation.t list) =
     let name = Operation_types.name k in
     List.find ops ~f:(fun op -> String.equal op.Operation._type name)
@@ -227,7 +233,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
   *)
   let payment =
     let%map () =
-      if Int.equal (List.length ops) 3 then V.return ()
+      if Mina_stdlib.List.Length.Compare.(ops = 3) then V.return ()
       else V.fail Length_mismatch
     and account_a =
       let open Result.Let_syntax in
@@ -272,7 +278,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
       if
         List.for_all ops ~f:(fun op ->
             let p = Option.equal String.equal op.status in
-            p None || p (Some ""))
+            p None || p (Some "") )
       then V.return ()
       else V.fail Status_not_pending
     and payment_amount_x =
@@ -290,8 +296,10 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
       let open Result.Let_syntax in
       let%bind { amount; _ } = find_kind `Fee_payment ops in
       match amount with
-      | Some x ->
+      | Some x when Amount_of.compare_to_int64 x 0L < 1 ->
           V.return (Amount_of.negated x)
+      | Some _ ->
+          V.fail Fee_not_negative
       | None ->
           V.fail Amount_not_some
     in
@@ -316,7 +324,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
   *)
   let delegation =
     let%map () =
-      if Int.equal (List.length ops) 2 then V.return ()
+      if Mina_stdlib.List.Length.Compare.(ops = 2) then V.return ()
       else V.fail Length_mismatch
     and account_a =
       let open Result.Let_syntax in
@@ -350,7 +358,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
       if
         List.for_all ops ~f:(fun op ->
             let p = Option.equal String.equal op.status in
-            p None || p (Some ""))
+            p None || p (Some "") )
       then V.return ()
       else V.fail Status_not_pending
     and payment_amount_y =
@@ -377,7 +385,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
     }
   in
   let partials = [ payment; delegation ] in
-  let oks, errs = List.partition_map partials ~f:Result.ok_fst in
+  let oks, errs = List.partition_map partials ~f:Result.to_either in
   match (oks, errs) with
   | [], errs ->
       (* no Oks *)
@@ -408,17 +416,13 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
             ; related_to = None
             }
           ]
-      | Some (`Applied (Account_creation_fees_paid.By_fee_payer amount)) ->
-          [ { Op.label = `Account_creation_fee_via_fee_payer amount
-            ; related_to = None
-            }
-          ]
       | _ ->
           [] )
     @
     match t.kind with
     | `Payment -> (
-        (* When amount is not none, we move the amount from source to receiver -- unless it's a failure, we will capture that below *)
+        (* When amount is not none, we move the amount from source to receiver
+           -- unless it's a failure, we will capture that below *)
         match t.amount with
         | Some amount ->
             [ { Op.label = `Payment_source_dec amount; related_to = None }
@@ -511,16 +515,6 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           ; coin_change = None
           ; metadata
           }
-      | `Account_creation_fee_via_fee_payer account_creation_fee ->
-          { Operation.operation_identifier
-          ; related_operations
-          ; status = Option.map ~f:Operation_statuses.name status
-          ; account = Some (account_id t.fee_payer t.fee_token)
-          ; _type = Operation_types.name `Account_creation_fee_via_fee_payer
-          ; amount = Some Amount_of.(negated @@ mina account_creation_fee)
-          ; coin_change = None
-          ; metadata
-          }
       | `Delegate_change ->
           { Operation.operation_identifier
           ; related_operations
@@ -537,60 +531,12 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
                      [ ( "delegate_change_target"
                        , `String
                            (let (`Pk r) = t.receiver in
-                            r) )
-                     ]))
-          })
+                            r ) )
+                     ] ) )
+          } )
 
 let to_operations' (t : t) : Operation.t list =
   to_operations ~failure_status:t.failure_status (forget t)
-
-let%test_unit "payment_round_trip" =
-  let start =
-    { kind = `Payment (* default token *)
-    ; fee_payer = `Pk "Alice"
-    ; source = `Pk "Alice"
-    ; token = `Token_id Amount_of.Token_id.default
-    ; fee = Unsigned.UInt64.of_int 2_000_000_000
-    ; receiver = `Pk "Bob"
-    ; fee_token = `Token_id Amount_of.Token_id.default
-    ; nonce = Unsigned.UInt32.of_int 3
-    ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
-    ; failure_status = None
-    ; hash = "TXN_1_HASH"
-    ; valid_until = Some (Unsigned.UInt32.of_int 10_000)
-    ; memo = Some "hello"
-    }
-  in
-  let ops = to_operations' start in
-  match of_operations ?valid_until:start.valid_until ?memo:start.memo ops with
-  | Ok partial ->
-      [%test_eq: Partial.t] partial (forget start)
-  | Error e ->
-      failwithf !"Mismatch because %{sexp: Partial.Reason.t list}" e ()
-
-let%test_unit "delegation_round_trip" =
-  let start =
-    { kind = `Delegation
-    ; fee_payer = `Pk "Alice"
-    ; source = `Pk "Alice"
-    ; token = `Token_id Amount_of.Token_id.default
-    ; fee = Unsigned.UInt64.of_int 1_000_000_000
-    ; receiver = `Pk "Bob"
-    ; fee_token = `Token_id Amount_of.Token_id.default
-    ; nonce = Unsigned.UInt32.of_int 42
-    ; amount = None
-    ; failure_status = None
-    ; hash = "TXN_2_HASH"
-    ; valid_until = Some (Unsigned.UInt32.of_int 867888)
-    ; memo = Some "hello"
-    }
-  in
-  let ops = to_operations' start in
-  match of_operations ops ?valid_until:start.valid_until ?memo:start.memo with
-  | Ok partial ->
-      [%test_eq: Partial.t] partial (forget start)
-  | Error e ->
-      failwithf !"Mismatch because %{sexp: Partial.Reason.t list}" e ()
 
 let non_default_token =
   `Token_id
@@ -624,7 +570,7 @@ let dummies =
         Some
           (`Applied
             (Account_creation_fees_paid.By_receiver
-               (Unsigned.UInt64.of_int 1_000_000)))
+               (Unsigned.UInt64.of_int 1_000_000) ) )
     ; hash = "TXN_1new_HASH"
     ; valid_until = None
     ; memo = Some "hello"

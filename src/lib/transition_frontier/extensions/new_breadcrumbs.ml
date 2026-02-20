@@ -6,6 +6,8 @@ module T = struct
 
   type view = Breadcrumb.t list
 
+  let name = "new_breadcrumbs"
+
   let create ~logger:_ frontier = ((), [ Full_frontier.root frontier ])
 
   let handle_diffs () _frontier diffs_with_mutants =
@@ -15,7 +17,7 @@ module T = struct
         | E (New_node (Full breadcrumb), _) ->
             Some breadcrumb
         | _ ->
-            None)
+            None )
     in
     Option.some_if (not @@ List.is_empty new_nodes) new_nodes
 end

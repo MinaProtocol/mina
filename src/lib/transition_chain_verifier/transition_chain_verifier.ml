@@ -9,7 +9,7 @@ module Merkle_list_verifier = Merkle_list_verifier.Make (struct
 
   let hash previous_state_hash state_body_hash =
     (Protocol_state.hashes_abstract ~hash_body:Fn.id
-       { previous_state_hash; body = state_body_hash })
+       { previous_state_hash; body = state_body_hash } )
       .state_hash
 end)
 

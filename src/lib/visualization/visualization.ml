@@ -22,7 +22,7 @@ let rec to_dot (json : Yojson.Safe.t) =
           | `Assoc subvalues ->
               sprintf !"{%s|{%s}}" key @@ to_dot (`Assoc subvalues)
           | subvalue ->
-              sprintf !"%s:%s" key (to_dot subvalue))
+              sprintf !"%s:%s" key (to_dot subvalue) )
       |> String.concat ~sep:"|"
   | `List values | `Tuple values ->
       List.map values ~f:(fun value -> to_dot value) |> String.concat ~sep:"|"
@@ -32,7 +32,7 @@ let rec to_dot (json : Yojson.Safe.t) =
       Bool.to_string value
   | `Variant (key, value) ->
       Option.value_map value ~default:key ~f:(fun some_value ->
-          sprintf !"%s:%s" key (to_dot some_value))
+          sprintf !"%s:%s" key (to_dot some_value) )
   | `Null ->
       "null"
 

@@ -10,8 +10,16 @@ git config http.sslVerify false
 git fetch origin
 git config http.sslVerify true
 
-if ! git rev-list origin/coda | grep -q $CURR; then
-  echo "Snarky submodule commit is not an ancestor of snarky/coda"
+function in_branch {
+  if git rev-list origin/"$1" | grep -q "${CURR}"; then
+    echo "Snarky submodule commit is an ancestor of snarky/$1"
+    true
+  else
+    false
+  fi
+}
+
+if (! in_branch "master"); then
   exit 1
 fi
 

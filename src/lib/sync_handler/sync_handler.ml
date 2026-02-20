@@ -2,10 +2,26 @@ open Core_kernel
 open Async
 open Mina_base
 module Ledger = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Root
 module Sync_ledger = Mina_ledger.Sync_ledger
-open Mina_transition
 open Frontier_base
 open Network_peer
+
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+
+  val ledger_sync_config : Syncable_ledger.daemon_config
+
+  val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
+end
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
@@ -36,7 +52,7 @@ module Make (Inputs : Inputs_intf) :
 
   let get_ledger_by_hash ~frontier ledger_hash =
     let root_ledger =
-      Ledger.Any_ledger.cast (module Ledger.Db)
+      Root_ledger.as_unmasked
       @@ Transition_frontier.root_snarked_ledger frontier
     in
     let staking_epoch_ledger =
@@ -54,46 +70,52 @@ module Make (Inputs : Inputs_intf) :
     else if
       Ledger_hash.equal ledger_hash
         (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
-           staking_epoch_ledger)
+           staking_epoch_ledger )
     then
       match staking_epoch_ledger with
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
           _ ->
           None
-      | Ledger_db ledger ->
-          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+      | Ledger_root ledger ->
+          Some (Root_ledger.as_unmasked ledger)
     else if
       Ledger_hash.equal ledger_hash
         (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
-           next_epoch_ledger)
+           next_epoch_ledger )
     then
       match next_epoch_ledger with
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
           _ ->
           None
-      | Ledger_db ledger ->
-          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+      | Ledger_root ledger ->
+          Some (Root_ledger.as_unmasked ledger)
     else None
 
   let answer_query :
          frontier:Inputs.Transition_frontier.t
       -> Ledger_hash.t
       -> Sync_ledger.Query.t Envelope.Incoming.t
-      -> logger:Logger.t
+      -> context:(module CONTEXT)
       -> trust_system:Trust_system.t
-      -> Sync_ledger.Answer.t Option.t Deferred.t =
-   fun ~frontier hash query ~logger ~trust_system ->
+      -> Sync_ledger.Answer.t Or_error.t Deferred.t =
+   fun ~frontier hash query ~context:(module Context) ~trust_system ->
     match get_ledger_by_hash ~frontier hash with
     | None ->
-        return None
+        return
+          (Or_error.error_string
+             (sprintf
+                !"Failed to find ledger for hash %{sexp:Ledger_hash.t}"
+                hash ) )
     | Some ledger ->
         let responder =
-          Sync_ledger.Any_ledger.Responder.create ledger ignore ~logger
+          Sync_ledger.Any_ledger.Responder.create ledger ignore
+            ~context:(module Context)
             ~trust_system
         in
         Sync_ledger.Any_ledger.Responder.answer_query responder query
 
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier state_hash =
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash ~logger ~frontier
+      state_hash =
     let open Option.Let_syntax in
     let protocol_states scan_state =
       Staged_ledger.Scan_state.required_state_hashes scan_state
@@ -108,7 +130,7 @@ module Make (Inputs : Inputs_intf) :
              | None ->
                  Stop None
              | Some acc' ->
-                 Continue (Some acc'))
+                 Continue (Some acc') )
            ~finish:Fn.id
     in
     match
@@ -117,13 +139,18 @@ module Make (Inputs : Inputs_intf) :
         Transition_frontier.Breadcrumb.staged_ledger breadcrumb
       in
       let scan_state = Staged_ledger.scan_state staged_ledger in
-      let merkle_root =
-        Staged_ledger.hash staged_ledger |> Staged_ledger_hash.ledger_hash
-      in
+      let staged_ledger_hash = Breadcrumb.staged_ledger_hash breadcrumb in
+      let merkle_root = Staged_ledger_hash.ledger_hash staged_ledger_hash in
       let%map scan_state_protocol_states = protocol_states scan_state in
       let pending_coinbase =
         Staged_ledger.pending_coinbase_collection staged_ledger
       in
+      [%log debug]
+        ~metadata:
+          [ ( "staged_ledger_hash"
+            , Staged_ledger_hash.to_yojson staged_ledger_hash )
+          ]
+        "sending scan state and pending coinbase" ;
       (scan_state, merkle_root, pending_coinbase, scan_state_protocol_states)
     with
     | Some res ->
@@ -157,18 +184,15 @@ module Make (Inputs : Inputs_intf) :
           Transition_frontier.(
             find frontier hash >>| Breadcrumb.validated_transition)
           ( find_in_root_history frontier hash
-          >>| fun x -> Root_data.Historical.transition x )
+          >>| Root_data.Historical.transition )
           ~f:Fn.const
       in
-      External_transition.Validation.forget_validation validated_transition
+      With_hash.data @@ Mina_block.Validated.forget validated_transition
     in
-    match Transition_frontier.catchup_tree frontier with
+    match Transition_frontier.catchup_state frontier with
     | Full _ ->
         (* Super catchup *)
         Option.return @@ List.filter_map hashes ~f:get
-    | Hash _ ->
-        (* Normal catchup *)
-        Option.all @@ List.map hashes ~f:get
 
   let best_tip_path ~frontier =
     let rec go acc b =
@@ -182,44 +206,59 @@ module Make (Inputs : Inputs_intf) :
     go [] (Transition_frontier.best_tip frontier)
 
   module Root = struct
-    let prove ~logger ~consensus_constants ~frontier seen_consensus_state =
+    let prove ~context:(module Context : CONTEXT) ~frontier seen_consensus_state
+        =
+      let module Context = struct
+        include Context
+
+        let logger =
+          Logger.extend logger [ ("selection_context", `String "Root.prove") ]
+      end in
       let open Option.Let_syntax in
-      let%bind best_tip_with_witness = Best_tip_prover.prove ~logger frontier in
+      let%bind best_tip_with_witness =
+        Best_tip_prover.prove ~context:(module Context) frontier
+      in
       let is_tip_better =
         Consensus.Hooks.equal_select_status
-          (Consensus.Hooks.select ~constants:consensus_constants
-             ~logger:
-               (Logger.extend logger
-                  [ ("selection_context", `String "Root.prove") ])
+          (Consensus.Hooks.select
+             ~context:(module Context)
              ~existing:
-               (With_hash.map ~f:External_transition.consensus_state
-                  best_tip_with_witness.data)
-             ~candidate:seen_consensus_state)
+               (Breadcrumb.consensus_state_with_hashes
+                  best_tip_with_witness.data )
+             ~candidate:seen_consensus_state )
           `Keep
       in
       let%map () = Option.some_if is_tip_better () in
-      { best_tip_with_witness with
-        data = With_hash.data best_tip_with_witness.data
-      }
+      best_tip_with_witness
 
-    let verify ~logger ~verifier ~consensus_constants ~genesis_constants
-        ~precomputed_values observed_state peer_root =
+    let verify ~context:(module Context : CONTEXT) ~verifier observed_state
+        peer_root =
+      let module Context = struct
+        include Context
+
+        let logger =
+          Logger.extend logger [ ("selection_context", `String "Root.verify") ]
+      end in
+      let open Context in
       let open Deferred.Result.Let_syntax in
+      (*TODO: use precomputed_values.genesis_constants that's already passed*)
       let%bind ( (`Root _, `Best_tip (best_tip_transition, _)) as
                verified_witness ) =
-        Best_tip_prover.verify ~verifier ~genesis_constants ~precomputed_values
-          peer_root
+        Best_tip_prover.verify ~verifier
+          ~genesis_constants:precomputed_values.genesis_constants
+          ~precomputed_values peer_root
       in
       let is_before_best_tip candidate =
         Consensus.Hooks.equal_select_status
-          (Consensus.Hooks.select ~constants:consensus_constants
-             ~logger:
-               (Logger.extend logger
-                  [ ("selection_context", `String "Root.verify") ])
+          (Consensus.Hooks.select
+             ~context:(module Context)
              ~existing:
-               (With_hash.map ~f:External_transition.consensus_state
-                  best_tip_transition)
-             ~candidate)
+               (With_hash.map
+                  ~f:
+                    (Fn.compose Mina_state.Protocol_state.consensus_state
+                       Mina_block.Header.protocol_state )
+                  best_tip_transition )
+             ~candidate )
           `Keep
       in
       let%map () =
@@ -229,7 +268,7 @@ module Make (Inputs : Inputs_intf) :
              ~error:
                (Error.createf
                   !"Peer lied about it's best tip %{sexp:State_hash.t}"
-                  (State_hash.With_state_hashes.state_hash best_tip_transition)))
+                  (State_hash.With_state_hashes.state_hash best_tip_transition) ) )
       in
       verified_witness
   end
@@ -307,7 +346,7 @@ let%test_module "Sync_handler" =
 
     let to_external_transition breadcrumb =
       Transition_frontier.Breadcrumb.validated_transition breadcrumb
-      |> External_transition.Validation.forget_validation
+      |> Mina_block.Validated.forget
 
     let%test "a node should be able to give a valid proof of their root" =
       heartbeat_flag := true ;
@@ -332,7 +371,7 @@ let%test_module "Sync_handler" =
               |> Breadcrumb.validated_transition)
           in
           let observed_state =
-            External_transition.Validated.protocol_state seen_transition
+            Mina_block.Validated.protocol_state seen_transition
             |> Protocol_state.consensus_state
           in
           let root_with_proof =
@@ -347,7 +386,7 @@ let%test_module "Sync_handler" =
             verify observed_state root_with_proof |> Deferred.Or_error.ok_exn
           in
           heartbeat_flag := false ;
-          External_transition.(
+          Mina_block.(
             equal
               (With_hash.data root_transition)
               (to_external_transition (Transition_frontier.root frontier))
