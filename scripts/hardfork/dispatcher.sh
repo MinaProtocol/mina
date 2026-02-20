@@ -269,6 +269,7 @@ if [[ "$runtime" == "mesa" ]]; then
   # This is safer than unsetting elements which creates sparse arrays
   new_args=()
   found_genesis_ledger_dir=false
+  config_file_arg_used=false
   skip_next=false
 
   i=0
@@ -356,13 +357,11 @@ if [[ "$runtime" == "mesa" ]]; then
       new_args+=("--genesis-ledger-dir" "$MESA_LEDGERS_DIR")
     fi
 
-    if [[ "$config_file_arg_used" == true ]]; then
-      # Prepend config file argument if not already provided
-      # This ensures mesa uses the correct config file
-      # As mina daemon subcommand accepts more than one config argument,
-      # we always append ours at end to override genesis ledger part.
-      new_args+=("-config-file" "$MESA_CONFIG")
-    fi
+    # Always append the mesa config file so the mesa runtime gets the
+    # auto-fork generated configuration. The mina daemon subcommand accepts
+    # multiple config arguments; appending ours last ensures it overrides
+    # earlier values via Runtime_config.combine.
+    new_args+=("-config-file" "$MESA_CONFIG")
   fi
   # Replace args with the processed continuous array
   args=("${new_args[@]}")
