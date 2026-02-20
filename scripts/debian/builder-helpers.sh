@@ -688,32 +688,6 @@ build_daemon_mainnet_prefork_deb() {
 ## DEVNET PREFORK PACKAGE ##
 
 #
-# Builds mina-mesa-pre-hardfork-mesa tailored package for automode package
-#
-# Output: mina-mesa-pre-hardfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Contains only the legacy mesa binaries places in "/usr/lib/mina/berkeley" without
-# configuration files or genesis ledgers.
-#
-build_daemon_mesa_prefork_deb() {
-
-  NAME="mina-mesa-prefork-mesa"
-
-  echo "------------------------------------------------------------"
-  echo "--- Building mesa berkeley deb for hardfork automode :"
-
-  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
-
-  copy_common_daemon_apps testnet $AUTOMODE_PRE_HF_DIR
-
-  build_deb $NAME
-}
-
-## DEVNET PREFORK PACKAGE ##
-
-#
 # Builds mina-devnet-prefork-mesa tailored package for automode package
 #
 # Output: mina-devnet-prefork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
@@ -731,6 +705,33 @@ build_daemon_devnet_prefork_deb() {
 
   create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_apps testnet $AUTOMODE_PRE_HF_DIR
+
+  build_deb $NAME
+}
+## END DEVNET PREFORK PACKAGE ##
+
+## DEVNET PREFORK PACKAGE ##
+
+#
+# Builds mina-devnet-prefork-mesa tailored package for automode package
+#
+# Output: mina-devnet-prefork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Contains only the prefork devnet binaries places in "/usr/lib/mina/berkeley" without
+# configuration files or genesis ledgers.
+#
+build_daemon_mesa_prefork_deb() {
+
+  NAME="mina-mesa-prefork-mesa"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building mesa berkeley prefork deb for automode :"
+
+  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon for the Mesa Network' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_apps testnet $AUTOMODE_PRE_HF_DIR
 
@@ -1108,6 +1109,38 @@ build_prefork_devnet_genesis_ledger_deb() {
   echo "--- Building Mina Generic devnet create prefork genesis tool:"
 
   DEB_NAME="mina-create-devnet-prefork-genesis-ledger"
+
+  create_control_file "$DEB_NAME" \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Utility to verify post hardfork ledger for Mina'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binaries
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
+
+  build_deb "$DEB_NAME"
+}
+
+## END CREATE DEVNET PREFORK GENESIS PACKAGE ##
+
+## CREATE MESA PREFORK GENESIS PACKAGE ##
+
+#
+# Builds mina-create-prefork-genesis package for prefork genesis creation
+#
+# Output: mina-create-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Utility for creating prefork genesis ledgers for post-hardfork verification.
+# Contains the runtime_genesis_ledger tool for Mina protocol.
+#
+build_prefork_mesa_genesis_ledger_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Generic mesa create prefork genesis tool:"
+
+  DEB_NAME="mina-create-mesa-prefork-genesis-ledger"
 
   create_control_file "$DEB_NAME" \
     "${SHARED_DEPS}${DAEMON_DEPS}" \
