@@ -672,20 +672,20 @@ test_build_daemon_devnet_config_deb() {
 }
 
 ################################################################################
-# Tests: Pre-hardfork (legacy) packages
+# Tests: Prefork packages
 ################################################################################
 
-test_build_daemon_mainnet_pre_hardfork_deb() {
-    safe_build build_daemon_mainnet_pre_hardfork_deb || { log_fail "build exited non-zero"; return; }
+test_build_daemon_mainnet_prefork_deb() {
+    safe_build build_daemon_mainnet_prefork_deb || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_eq "deb name" "mina-mainnet-pre-hardfork-mesa" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-pre-hardfork-mesa"
+    assert_eq "deb name" "mina-mainnet-prefork-mesa" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-prefork-mesa"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
     assert_control_contains "$CAPTURED_CONTROL" "Suggests" "jq"
 
     # Binaries in alternate directory (for automode)
-    assert_common_daemon_binaries "$CAPTURED_FILES" "usr/lib/mina/bin/berkeley"
+    assert_common_daemon_binaries "$CAPTURED_FILES" "usr/lib/mina/berkeley"
 
     # Should NOT have binaries in default location
     assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
@@ -695,16 +695,16 @@ test_build_daemon_mainnet_pre_hardfork_deb() {
     assert_file_not_captured "$CAPTURED_FILES" "usr/lib/systemd/user/mina.service"
 }
 
-test_build_daemon_devnet_pre_hardfork_deb() {
-    safe_build build_daemon_devnet_pre_hardfork_deb || { log_fail "build exited non-zero"; return; }
+test_build_daemon_devnet_prefork_deb() {
+    safe_build build_daemon_devnet_prefork_deb || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_eq "deb name" "mina-devnet-pre-hardfork-mesa" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-pre-hardfork-mesa"
+    assert_eq "deb name" "mina-devnet-prefork-mesa" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-prefork-mesa"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
 
     # Binaries in alternate directory
-    assert_common_daemon_binaries "$CAPTURED_FILES" "usr/lib/mina/bin/berkeley"
+    assert_common_daemon_binaries "$CAPTURED_FILES" "usr/lib/mina/berkeley"
     assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
 }
 
@@ -888,15 +888,37 @@ test_build_delegation_verify_deb() {
     assert_file_captured "$CAPTURED_FILES" "etc/mina/aws/authenticate.sh"
 }
 
-test_build_create_legacy_genesis_deb() {
-    safe_build build_create_legacy_genesis_deb || { log_fail "build exited non-zero"; return; }
+test_build_prefork_devnet_genesis_ledger_deb() {
+    safe_build build_prefork_devnet_genesis_ledger_deb || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
-    assert_eq "deb name" "mina-create-legacy-genesis" "$CAPTURED_DEB_NAME"
-    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-create-legacy-genesis"
+    assert_eq "deb name" "mina-create-devnet-prefork-genesis-ledger" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-create-devnet-prefork-genesis-ledger"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
 
-    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-create-legacy-genesis"
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-create-prefork-genesis"
+}
+
+test_build_prefork_mainnet_genesis_ledger_deb() {
+    safe_build build_prefork_mainnet_genesis_ledger_deb || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-create-mainnet-prefork-genesis-ledger" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-create-mainnet-prefork-genesis-ledger"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
+
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-create-prefork-genesis"
+}
+
+test_build_prefork_testnet_generic_genesis_ledger_deb() {
+    safe_build build_prefork_testnet_generic_genesis_ledger_deb || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-create-testnet-generic-prefork-genesis-ledger" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-create-testnet-generic-prefork-genesis-ledger"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "libssl1.1"
+
+    assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-create-prefork-genesis"
 }
 
 ################################################################################
@@ -1052,9 +1074,12 @@ main() {
     run_test test_build_daemon_devnet_deb
     run_test test_build_daemon_devnet_config_deb
 
-    # Pre-hardfork packages
-    run_test test_build_daemon_mainnet_pre_hardfork_deb
-    run_test test_build_daemon_devnet_pre_hardfork_deb
+    # Prefork packages
+    run_test test_build_daemon_mainnet_prefork_deb
+    run_test test_build_daemon_devnet_prefork_deb
+    run_test test_build_prefork_devnet_genesis_ledger_deb
+    run_test test_build_prefork_mainnet_genesis_ledger_deb
+    run_test test_build_prefork_testnet_generic_genesis_ledger_deb
 
     # Testnet generic
     run_test test_build_daemon_testnet_generic_deb
@@ -1071,7 +1096,6 @@ main() {
     # Utility packages
     run_test test_build_zkapp_test_transaction_deb
     run_test test_build_delegation_verify_deb
-    run_test test_build_create_legacy_genesis_deb
 
     # Naming variants
     run_test test_build_daemon_devnet_lightnet_naming
