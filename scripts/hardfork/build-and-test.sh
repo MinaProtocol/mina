@@ -102,6 +102,8 @@ fi
 
 pushd "$(git rev-parse --show-toplevel)"
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+TEST_COMMIT="$(git rev-parse HEAD)"
+
 
 if [ -n "${BUILDKITE:-}" ]; then
   # This is a CI run, ensure nix docker has everything what we want.
@@ -154,7 +156,7 @@ EOF
 fi
 
 # 4. Build hardfork_test on current branch;
-git checkout "$BUILDKITE_COMMIT"
+git checkout "$TEST_COMMIT"
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfork_test"
 
