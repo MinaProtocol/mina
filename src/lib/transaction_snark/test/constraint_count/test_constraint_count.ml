@@ -58,25 +58,25 @@ let dev_expected_values =
   ; transaction_base =
       { constraints = 12875
       ; public_input_size = 300
-      ; auxiliary_input_size = 37502
+      ; auxiliary_input_size = 37503
       ; digest = "740db2397b0b01806a48f061a2e2b063"
       }
   ; zkapp_opt_signed_opt_signed =
       { constraints = 16314
       ; public_input_size = 300
-      ; auxiliary_input_size = 73512
+      ; auxiliary_input_size = 73513
       ; digest = "20f96be9061c1e15e49e4605b82eda14"
       }
   ; zkapp_opt_signed =
       { constraints = 8915
       ; public_input_size = 300
-      ; auxiliary_input_size = 40628
+      ; auxiliary_input_size = 40629
       ; digest = "3bec20ed2f245ab5bf831112efbd6b47"
       }
   ; zkapp_proved =
       { constraints = 5137
       ; public_input_size = 300
-      ; auxiliary_input_size = 39194
+      ; auxiliary_input_size = 39195
       ; digest = "69d2537da34047df00f856641b63e255"
       }
   }
