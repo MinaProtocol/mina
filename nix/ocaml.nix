@@ -129,7 +129,9 @@ let
   info = dune-nix.info duneDescLoaded;
   allDeps = dune-nix.allDeps info;
   commonOverrides = {
-    DUNE_PROFILE = "dev";
+    # Tests won't work, but it's tolerable, as the goal is to unlock
+    # the devnet profile builds
+    DUNE_PROFILE = "devnet";
     buildInputs = [ base-libs ] ++ external-libs;
     nativeBuildInputs = [ ];
   };
