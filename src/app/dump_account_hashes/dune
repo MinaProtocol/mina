@@ -1,0 +1,11 @@
+(executable
+ (name dump_account_hashes)
+ (libraries
+  core_kernel
+  mina_base
+  snark_params
+  yojson)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
