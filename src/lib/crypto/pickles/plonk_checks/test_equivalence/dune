@@ -1,0 +1,12 @@
+(tests
+ (names test_equivalence)
+ (flags
+  (:standard -warn-error +a-4-70)
+  -open
+  Core_kernel)
+ (libraries
+  core_kernel
+  kimchi_pasta
+  kimchi_pasta.basic
+  pickles.plonk_checks
+  kimchi_types))
