@@ -187,6 +187,10 @@ module Token = struct
          |sql} )
       (id, owner_public_key_id, owner_token_id)
 
+  (** Look up a single token ID in the archive database, adding it if it doesn't
+      already exist. As a consequence of the archive database schema, this
+      method will fail if the token ID has an owner and that owner is not
+      already in the archive database. See [Token.add_all_if_don't_exist]. *)
   let add_if_doesn't_exist (module Conn : CONNECTION) token_id =
     let open Deferred.Result.Let_syntax in
     let value = Token_id.to_string token_id in
@@ -225,6 +229,18 @@ module Token = struct
               (module Conn)
               { value; owner_public_key_id; owner_token_id } )
 
+  (** Add a list of tokens to the [Token_owners] table, and insert them all into
+      the archive if they do not already exist. This method is careful to insert
+      the parent token IDs in the list before their children, to account for the
+      assumptions made by [Token.add_if_doesn't_exist]. This method will still
+      fail if there is a token in the [tokens_used] with an owner that has a
+      token ID that is (a) not in the archive already and (b) not somewhere else
+      in the [tokens_used] list.
+
+      The intended pattern of use for this method is to collect all the tokens
+      mentioned in the data to be added to the archive in a single [tokens_used]
+      list, then run this method so subsequent [Token.add_if_doesn't_exist]
+      calls during data processing will succeed. *)
   let add_all_if_don't_exist (module Conn : CONNECTION) tokens_used =
     let open Deferred.Result.Let_syntax in
     Token_owners.populate_owner_tbl tokens_used ;
