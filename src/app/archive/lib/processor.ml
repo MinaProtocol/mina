@@ -4561,6 +4561,11 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
             @@ fun () ->
             Metrics.time ~label:"add_block" ~logger
             @@ fun () ->
+            [%log info]
+              "Populating token owners table for block with state hash \
+               $state_hash"
+              ~metadata:
+                [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
             let%bind () =
               Token.add_all_if_don't_exist (module Conn) tokens_used
             in
