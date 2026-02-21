@@ -175,7 +175,32 @@ let generateDockerForCodename =
 
           let buildOrGetArtifacts =
                 merge
-                  { Some = \(build : Text) -> [] : List Command.Type
+                  { Some =
+                          \(cached_build_id : Text)
+                      ->  [ Command.build
+                              Command.Config::{
+                              , commands =
+                                  Toolchain.select
+                                    Toolchain.SelectionMode.ByDebianAndArch
+                                    codename.DebVersion
+                                    codename.Arch
+                                    ([] : List Text)
+                                    (     "./buildkite/scripts/release/manager.sh persist "
+                                      ++  " --backend local --artifacts mina-logproc,mina-${Network.lowerName
+                                                                                              spec.network},mina-archive-${Network.lowerName
+                                                                                                                             spec.network},mina-rosetta-${Network.lowerName
+                                                                                                                                                            spec.network},mina-zkapp-test-transaction "
+                                      ++  " --buildkite-build-id ${cached_build_id}"
+                                      ++  " --codename ${lowerNameCodename} "
+                                      ++  " --target \\\${BUILDKITE_BUILD_ID} "
+                                    )
+                              , label =
+                                  "Download cached packages for ${lowerNameCodename}"
+                              , key =
+                                  "download-cached-artifacts-${lowerNameCodename}"
+                              , target = Size.Multi
+                              }
+                          ]
                   , None =
                     [ MinaArtifact.buildArtifacts
                         MinaArtifact.MinaBuildSpec::{
@@ -340,23 +365,8 @@ let generateHfRelatedStepsForCodename =
                           [ "NETWORK_NAME=${Network.lowerName spec.network}"
                           , "MINA_DEB_CODENAME=${lowerNameCodename}"
                           ]
-                          (     "mkdir -p _build && ./buildkite/scripts/cache/manager.sh read hardfork /workdir && RUNTIME_CONFIG_JSON=/workdir/hardfork/new_config.json LEDGER_TARBALLS='/workdir/hardfork/ledgers/*.tar.gz' ./buildkite/scripts/debian/build.sh --codenames ${debianCodenamesList} --arch all daemon_${Network.lowerName
-                                                                                                                                                                                                                                                                                                                           spec.network}_hardfork_config"
-                            ++  merge
-                                  { Some =
-                                          \(cached_build_id : Text)
-                                      ->      "&& ./buildkite/scripts/release/manager.sh persist "
-                                          ++  " --backend local --artifacts mina-logproc,mina-${Network.lowerName
-                                                                                                  spec.network},mina-archive-${Network.lowerName
-                                                                                                                                 spec.network},mina-rosetta-${Network.lowerName
-                                                                                                                                                                spec.network},mina-zkapp-test-transaction "
-                                          ++  " --buildkite-build-id ${cached_build_id}"
-                                          ++  " --codename ${lowerNameCodename} "
-                                          ++  " --target \\\${BUILDKITE_BUILD_ID} "
-                                  , None = ""
-                                  }
-                                  spec.use_artifacts_from_buildkite_build
-                          )
+                          "mkdir -p _build && ./buildkite/scripts/cache/manager.sh read hardfork /workdir && RUNTIME_CONFIG_JSON=/workdir/hardfork/new_config.json LEDGER_TARBALLS='/workdir/hardfork/ledgers/*.tar.gz' ./buildkite/scripts/debian/build.sh --codenames ${debianCodenamesList} --arch all daemon_${Network.lowerName
+                                                                                                                                                                                                                                                                                                                     spec.network}_hardfork_config"
                     , label =
                         "Create hardfork packages for ${lowerNameCodename}"
                     , key = buildHfDebian
