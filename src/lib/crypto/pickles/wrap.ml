@@ -15,9 +15,7 @@ let challenge_polynomial =
 module Type1 =
   Plonk_checks.Make
     (Shifted_value.Type1)
-    (struct
-      let constant_term = Plonk_checks.Scalars.Tick.constant_term
-    end)
+    (Plonk_checks.Scalars_tokens_interpreter.Tick)
 
 let tick_rounds = Nat.to_int Tick.Rounds.n
 
