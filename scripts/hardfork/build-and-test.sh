@@ -3,7 +3,7 @@
 # This scripts builds a designated PREFORK branch and current branch with nix
 # 0. Prepare environment if needed
 # 1. Build PREFORK as a prefork build;
-# 2. Build "mesa" branch as a postfork build
+# 2. Build "develop" branch as a postfork build
 # 3. Upload to nix cache, the reason for not uploading cache for following 2 
 # steps is that they change for each PR. 
 # 4. Build hardfork_test on current branch;
@@ -102,6 +102,8 @@ fi
 
 pushd "$(git rev-parse --show-toplevel)"
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+TEST_COMMIT="$(git rev-parse HEAD)"
+
 
 if [ -n "${BUILDKITE:-}" ]; then
   # This is a CI run, ensure nix docker has everything what we want.
@@ -133,8 +135,8 @@ git checkout $PREFORK
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet"
 
-# 2. Build "mesa" branch as a postfork build
-git checkout mesa
+# 2. Build "develop" branch as a postfork build
+git checkout develop
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devnet"
 
@@ -154,7 +156,7 @@ EOF
 fi
 
 # 4. Build hardfork_test on current branch;
-git checkout "$BUILDKITE_COMMIT"
+git checkout "$TEST_COMMIT"
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfork_test"
 
