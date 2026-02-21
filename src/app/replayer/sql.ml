@@ -456,19 +456,11 @@ module Epoch_data = struct
 end
 
 module Parent_block = struct
-  (* fork block is parent of block with the given state hash *)
-  let query_parent_state_hash =
+  let query_parent_hash =
     Mina_caqti.find_req Caqti_type.string Caqti_type.string
-      {sql| SELECT parent.state_hash FROM blocks AS parent
-
-            INNER JOIN
-
-            (SELECT parent_id FROM blocks WHERE state_hash = ?) AS epoch_ledgers_block
-
-            ON epoch_ledgers_block.parent_id = parent.id
+      {sql| SELECT parent_hash FROM blocks WHERE state_hash = ?
       |sql}
 
-  let get_parent_state_hash (module Conn : Mina_caqti.CONNECTION)
-      epoch_ledgers_state_hash =
-    Conn.find query_parent_state_hash epoch_ledgers_state_hash
+  let get_parent_hash (module Conn : Mina_caqti.CONNECTION) state_hash =
+    Conn.find query_parent_hash state_hash
 end

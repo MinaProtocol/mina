@@ -644,8 +644,7 @@ let fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
   let%bind chain_oldest_parent_state_hash =
     match%map
       Mina_caqti.Pool.use
-        (fun db ->
-          Sql.Parent_block.get_parent_state_hash db chain_oldest_state_hash )
+        (fun db -> Sql.Parent_block.get_parent_hash db chain_oldest_state_hash)
         pool
     with
     | Ok hash ->
