@@ -650,7 +650,10 @@ let fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
     | Ok hash ->
         hash
     | Error _ ->
-        "<parent not in database>"
+        (* This is a separate database transaction, so technically we could have
+           lost connection or the block could have been deleted between now and
+           when the chain query was run. *)
+        "<chain endpoint data no longer retrievable>"
   in
   let%bind chain_oldest_height =
     match%map
