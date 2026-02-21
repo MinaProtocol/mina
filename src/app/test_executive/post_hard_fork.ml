@@ -216,11 +216,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Malleable_error.Let_syntax in
     let constraint_constants = Network.constraint_constants network in
     let logger = Logger.create () in
-    let all_mina_nodes = Network.all_mina_nodes network in
+    let all_daemon_nodes = Network.all_daemon_nodes network in
     let%bind () =
       wait_for t
         (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
+           (Core.String.Map.data all_daemon_nodes) )
     in
     let node_a = Network.block_producer_exn network "node-a" in
     let node_b = Network.block_producer_exn network "node-b" in
