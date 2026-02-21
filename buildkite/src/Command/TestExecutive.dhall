@@ -19,8 +19,7 @@ in  { executeLocal =
                                                                                                                                                                        DockerRepo.Type.InternalEurope}"
                 ]
               , artifact_paths =
-                [ SelectFiles.contains "${testName}*.local.test.log"
-                ]
+                [ SelectFiles.contains "${testName}*.local.test.log" ]
               , label = "${testName} integration test local"
               , key = "integration-test-${testName}-local"
               , target = Size.Integration
