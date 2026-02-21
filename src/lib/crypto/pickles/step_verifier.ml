@@ -775,9 +775,7 @@ struct
     include
       Plonk_checks.Make
         (Shifted_value.Type1)
-        (struct
-          let constant_term = Plonk_checks.Scalars.Tick.constant_term
-        end)
+        (Plonk_checks.Scalars_tokens_interpreter.Tick)
   end
 
   let domain_for_compiled (type branches)
