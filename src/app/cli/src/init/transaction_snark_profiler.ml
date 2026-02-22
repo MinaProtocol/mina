@@ -184,7 +184,7 @@ let command =
      in
      let proof_level = Genesis_constants.Proof_level.Full in
      let proof_cache_db = Proof_cache_tag.create_identity_db () in
-     let signature_kind = Mina_signature_kind.t_DEPRECATED in
+     let signature_kind = Mina_signature_kind.Testnet in
      if witness_only then
        witness ~proof_cache_db ~genesis_constants ~constraint_constants
          ~proof_level ~max_num_updates ~logger ~signature_kind ?min_num_updates

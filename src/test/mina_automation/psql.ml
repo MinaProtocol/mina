@@ -46,7 +46,11 @@ let create_credential_arg ~connection =
     match connection with
     | Conn_str conn_str ->
         let uri = conn_str |> Uri.of_string in
-        let password = uri |> Uri.password |> Option.value_exn in
+        let password =
+          uri |> Uri.password
+          |> Option.value_exn ~here:[%here]
+               ~message:"No password provided for postgres connection!"
+        in
         let user = uri |> Uri.user in
         let host = uri |> Uri.host in
         let port = uri |> Uri.port in
@@ -82,9 +86,10 @@ let run_command ~connection command =
   @return A deferred string containing the output of the command.
 *)
 
-let run_script ~connection ~db script =
+let run_script ~connection ?db script =
+  let maybe_db = Option.value_map db ~default:[] ~f:(fun db -> [ "-d"; db ]) in
   let creds = create_credential_arg ~connection in
-  Util.run_cmd_exn "." psql (creds @ [ "-d"; db; "-a"; "-f"; script ])
+  Util.run_cmd_exn "." psql (creds @ maybe_db @ [ "-a"; "-f"; script ])
 
 let create_empty_db ~connection ~db =
   run_command ~connection (sprintf "CREATE DATABASE %s;" db)

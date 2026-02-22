@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# NOTE: don't remove this just yet, there's some functionality unported yet.
+
 set -eo pipefail
 
 export MINA_LIBP2P_PASS=
@@ -37,9 +39,11 @@ GENESIS_LEDGER_DIR=${GENESIS_LEDGER_DIR:-}
 # Slot duration (a.k.a. block window duration), seconds
 SLOT=${SLOT:-30}
 
-echo "Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes" >&2
-echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-s|--slot $SLOT] [--develop] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
-echo "Consider reading script's code for information on optional arguments" >&2
+usage() {
+  echo "Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes" >&2
+  echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-s|--slot $SLOT] [--develop] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
+  echo "Consider reading script's code for information on optional arguments" >&2
+}
 
 ##########################################################
 # Parse arguments
@@ -47,6 +51,8 @@ echo "Consider reading script's code for information on optional arguments" >&2
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+    -h|--help)
+      usage; exit 0 ;;
     -d|--delay-min)
       DELAY_MIN="$2"; shift; shift ;;
     -i|--tx-interval)
@@ -66,7 +72,9 @@ while [[ $# -gt 0 ]]; do
     --genesis-ledger-dir)
       GENESIS_LEDGER_DIR="$2"; shift; shift ;;
     -*)
-      echo "Unknown option $1"; exit 1 ;;
+      echo "Unknown option $1" >&2
+      usage
+      exit 1 ;;
     *)
       KEYS+=("$1") ; shift ;;
   esac
@@ -74,6 +82,7 @@ done
 
 if [[ "$CONF_SUFFIX" != "" ]] && [[ "$CUSTOM_CONF" != "" ]]; then
   echo "Can't use both --develop and --config options" >&2
+  usage
   exit 1
 fi
 
@@ -161,6 +170,7 @@ rm -Rf localnet/runtime_1 localnet/runtime_2
   "${NODE_ARGS_1[@]}" \
   --block-producer-key "$PWD/$CONF_DIR/bp" \
   --config-directory "$PWD/localnet/runtime_1" \
+  --run-snark-worker "$(cat $CONF_DIR/bp.pub)" --work-selection seq \
   --client-port 10301 --external-port 10302 --rest-port 10303 &
 
 bp_pid=$!

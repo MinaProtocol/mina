@@ -10,9 +10,17 @@ let max_latency
     * of_ms 5L)
 
 module Capacity = struct
-  let flush = 30
+  type t =
+    { flush : int
+          (** The number of entries that will trigger a frontier buffer flush *)
+    ; max : int  (** The maximum capacity of the diff buffer *)
+    }
+  [@@deriving to_yojson]
 
-  let max = flush * 4
+  let make ?flush () =
+    let flush = Option.value ~default:30 flush in
+    let max = flush * 4 in
+    { flush; max }
 end
 
 (* TODO: lift up as Block_time utility *)
@@ -81,6 +89,7 @@ end
 
 type t =
   { diff_array : Diff.Lite.E.t Rev_dyn_array.t
+  ; capacity : Capacity.t
   ; worker : Worker.t
         (* timer unfortunately needs to be mutable to break recursion *)
   ; mutable timer : Timer.t option
@@ -89,10 +98,10 @@ type t =
   }
 
 let check_for_overflow t =
-  if Rev_dyn_array.length t.diff_array > Capacity.max then
+  if Rev_dyn_array.length t.diff_array > t.capacity.max then
     failwith "persistence buffer overflow"
 
-let should_flush t = Rev_dyn_array.length t.diff_array >= Capacity.flush
+let should_flush t = Rev_dyn_array.length t.diff_array >= t.capacity.flush
 
 let flush t =
   let rec flush_job t =
@@ -109,9 +118,10 @@ let flush t =
     t.flush_job <- Some (flush_job t)
 
 let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~time_controller ~worker =
+    ~time_controller ~worker ~capacity =
   let t =
     { diff_array = Rev_dyn_array.create ()
+    ; capacity
     ; worker
     ; timer = None
     ; flush_job = None

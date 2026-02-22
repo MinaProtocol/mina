@@ -4,7 +4,7 @@ set -eo pipefail
 
 buildkite/scripts/debian/update.sh --verbose
 
-TESTNET_NAME="berkeley"
+TESTNET_NAME="testnet-generic"
 
 git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh

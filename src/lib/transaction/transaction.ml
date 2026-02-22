@@ -48,8 +48,8 @@ type ('a, 'b, 'c) with_forest = ('a, 'b, 'c) User_command.with_forest Poly.t
 let read_all_proofs_from_disk : t -> Stable.Latest.t =
   Poly.Stable.Latest.map ~f:User_command.read_all_proofs_from_disk
 
-let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let write_all_proofs_to_disk ~signature_kind ~proof_cache_db :
+    Stable.Latest.t -> t =
   Poly.Stable.Latest.map
     ~f:(User_command.write_all_proofs_to_disk ~signature_kind ~proof_cache_db)
 

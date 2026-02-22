@@ -12,7 +12,7 @@
 
 let Prelude = ../External/Prelude.dhall
 
-let List/any = Prelude.List.any
+let Extensions = ../Lib/Extensions.dhall
 
 let Scope = < PullRequest | Nightly | MainlineNightly | Release >
 
@@ -36,33 +36,9 @@ let lowerName =
             }
             scope
 
-let toNatural =
-          \(scope : Scope)
-      ->  merge
-            { PullRequest = 0, Nightly = 1, MainlineNightly = 2, Release = 3 }
-            scope
-
-let equal
-    : Scope -> Scope -> Bool
-    =     \(left : Scope)
-      ->  \(right : Scope)
-      ->  Prelude.Natural.equal (toNatural left) (toNatural right)
-
-let hasAny
-    : Scope -> List Scope -> Bool
-    =     \(input : Scope)
-      ->  \(scopes : List Scope)
-      ->  List/any Scope (\(x : Scope) -> equal x input) scopes
-
-let hasPullRequest
-    : List Scope -> Bool
-    = \(scopes : List Scope) -> hasAny Scope.PullRequest scopes
-
-let contains
-    : List Scope -> List Scope -> Bool
-    =     \(input : List Scope)
-      ->  \(scopes : List Scope)
-      ->  List/any Scope (\(x : Scope) -> hasAny x scopes) input
+let join =
+          \(scopes : List Scope)
+      ->  Extensions.join "," (Prelude.List.map Scope Text lowerName scopes)
 
 let Full =
       [ Scope.PullRequest, Scope.Nightly, Scope.MainlineNightly, Scope.Release ]
@@ -75,11 +51,7 @@ in  { Type = Scope
     , Full = Full
     , PullRequestOnly = PullRequestOnly
     , AllButPullRequest = AllButPullRequest
-    , hasPullRequest = hasPullRequest
     , capitalName = capitalName
     , lowerName = lowerName
-    , toNatural = toNatural
-    , equal = equal
-    , hasAny = hasAny
-    , contains = contains
+    , join = join
     }

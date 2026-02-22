@@ -8,6 +8,14 @@ module type TestCase = sig
   val test_case : t -> test_result Deferred.Or_error.t
 end
 
+module type TestCaseWithSetup = sig
+  type t
+
+  val setup : unit -> t
+
+  val test_case : t -> test_result Deferred.Or_error.t
+end
+
 module type Fixture = sig
   type t
 

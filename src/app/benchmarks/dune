@@ -1,5 +1,3 @@
-(include ../../dune.flags.inc)
-
 (executable
  (name benchmarks)
  (public_name mina-benchmarks)
@@ -10,7 +8,8 @@
   core_kernel
   core
   base
-  mina_stdlib)
+  mina_stdlib
+  data_hash_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

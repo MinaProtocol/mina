@@ -1,0 +1,8 @@
+(library
+ (name node_config_profiled)
+ (public_name mina_node_config.profiled)
+ (libraries comptime core_kernel node_config_intf)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

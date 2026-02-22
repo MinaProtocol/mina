@@ -78,7 +78,10 @@ module Zkapp_command_segment_witness : sig
   val read_all_proofs_from_disk : t -> Stable.Latest.t
 
   val write_all_proofs_to_disk :
-    proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+       signature_kind:Mina_signature_kind.t
+    -> proof_cache_db:Proof_cache_tag.cache_db
+    -> Stable.Latest.t
+    -> t
 end
 
 [%%versioned:
@@ -108,9 +111,12 @@ type t =
   ; status : Mina_base.Transaction_status.t
   ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
   }
-[@@deriving sexp_of, to_yojson]
+[@@deriving fields, sexp_of, to_yojson]
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
 
 val write_all_proofs_to_disk :
-  proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+     signature_kind:Mina_signature_kind.t
+  -> proof_cache_db:Proof_cache_tag.cache_db
+  -> Stable.Latest.t
+  -> t

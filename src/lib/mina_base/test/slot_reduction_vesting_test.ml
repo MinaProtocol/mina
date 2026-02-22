@@ -210,190 +210,11 @@ let gen_any_at_hardfork =
   in
   (timing, hardfork_slot)
 
-module Vesting_record = struct
-  (** A form of [Account.Timing.As_record.t] where all the fields are lifted to
-      the same [UInt64.t] type, so the arithmetic in the vesting update
-      equations becomes simpler. *)
-  type t =
-    ( unit
-    , Unsigned_extended.UInt64.t
-    , Unsigned_extended.UInt64.t
-    , Unsigned_extended.UInt64.t
-    , Unsigned_extended.UInt64.t )
-    Account.Timing.As_record.t
-  [@@deriving equal, sexp_of]
-
-  let clamp_uint64_to_uint32 x =
-    UInt64.(
-      if compare x (of_uint32 UInt32.max_int) <= 0 then to_uint32 x
-      else UInt32.max_int)
-
-  let of_record (t : Account.Timing.as_record) : t =
-    { is_timed = ()
-    ; initial_minimum_balance = t.initial_minimum_balance |> Balance.to_uint64
-    ; cliff_time =
-        t.cliff_time |> Global_slot_since_genesis.to_uint32 |> UInt64.of_uint32
-    ; cliff_amount = t.cliff_amount |> Amount.to_uint64
-    ; vesting_period =
-        t.vesting_period |> Global_slot_span.to_uint32 |> UInt64.of_uint32
-    ; vesting_increment = t.vesting_increment |> Amount.to_uint64
-    }
-
-  (** Convert to a regular [Account.Timing.as_record] by clamping all the values
-      that might be out of range, as specified in the MIP *)
-  let to_record (t : t) : Account.Timing.as_record =
-    { is_timed = true
-    ; initial_minimum_balance = t.initial_minimum_balance |> Balance.of_uint64
-    ; cliff_time =
-        t.cliff_time |> clamp_uint64_to_uint32
-        |> Global_slot_since_genesis.of_uint32
-    ; cliff_amount = t.cliff_amount |> Amount.of_uint64
-    ; vesting_period =
-        t.vesting_period |> clamp_uint64_to_uint32 |> Global_slot_span.of_uint32
-    ; vesting_increment = t.vesting_increment |> Amount.of_uint64
-    }
-
-  (** Calculate the total number of iterations needed for this account to vest
-      completely, beyond the initial cliff unlock. This is [None] (undefined) if
-      the vesting increment is zero and the cliff amount is smaller than the
-      initial minimum balance. *)
-  let vesting_iterations (t : t) : UInt64.t option =
-    UInt64.(
-      if compare t.initial_minimum_balance t.cliff_amount <= 0 then
-        (* Account will complete vesting instantly at the cliff *)
-        Some zero
-      else if equal t.vesting_increment zero then
-        (* Number of iterations is undefined - account is permanently stuck with
-           a minimum balance *)
-        None
-      else
-        let balance_to_unlock =
-          Infix.(t.initial_minimum_balance - t.cliff_amount)
-        in
-        let full_increment_iterations =
-          Infix.(balance_to_unlock / t.vesting_increment)
-        in
-        if equal Infix.(balance_to_unlock mod t.vesting_increment) zero then
-          (* The account unlocks an equal amount of funds during each iteration *)
-          Some full_increment_iterations
-        else
-          (* The account needs one more iteration to unlock the last little bit
-             of funds. Note: if this happens, then full_increment_iterations
-             will necessarily be well below UInt64.max_int, because division by
-             t.vesting_increment will have decreased balance_to_unlock by a
-             factor of at least two. *)
-          Some Infix.(full_increment_iterations + one))
-
-  (** True if an account has started vesting but the slot at which it completes
-     vesting is still in the future *)
-  let is_partially_vested ~global_slot (t : t) =
-    let global_slot =
-      global_slot |> Global_slot_since_genesis.to_uint32 |> UInt64.of_uint32
-    in
-    match vesting_iterations t with
-    | None ->
-        false
-    | Some iterations ->
-        UInt64.(
-          compare global_slot t.cliff_time >= 0
-          && compare iterations
-               Infix.((global_slot - t.cliff_time) / t.vesting_period)
-             > 0)
-
-  (** True if an account has not started vesting *)
-  let not_yet_vesting ~global_slot (t : t) =
-    let global_slot =
-      global_slot |> Global_slot_since_genesis.to_uint32 |> UInt64.of_uint32
-    in
-    UInt64.compare global_slot t.cliff_time < 0
-
-  (** True if an account is actively vesting, as defined by the slot reduction
-      MIP. Note that this is (almost) equivalent to the minimum balance of the
-      account being positive at [global_slot].
-
-      One subtlety: this is not equivalent to the statement "the account
-      unlocked funds at [global_slot]". Once an account has a minimum balance of
-      zero, it is no longer considered to be participating in the vesting
-      system. In particular, at the [final_vesting_slot] of the timing the
-      account will have unlocked funds, and yet it will not be actively vesting
-      at that slot. (Unlocking funds happens between slots, so to speak).
-
-      Second subtlety: this isn't exactly equivalent to the minimum balance of
-      an account being positive. If an account has zero [vesting_increment] and
-      didn't vest completely at [cliff_time], then it will be stuck with a
-      permanent positive minimum balance. Such accounts are not actively
-      vesting. See [vesting_iterations]. *)
-  let is_actively_vesting ~global_slot (t : t) =
-    not_yet_vesting ~global_slot t || is_partially_vested ~global_slot t
-
-  (** Hardfork adjustment assuming that t is actively vesting *)
-  let actively_vesting_hardfork_adjustment ~hardfork_slot (t : t) =
-    let hardfork_slot =
-      hardfork_slot |> Global_slot_since_genesis.to_uint32 |> UInt64.of_uint32
-    in
-    UInt64.(
-      if compare hardfork_slot t.cliff_time < 0 then
-        (* t has not started vesting *)
-        { t with
-          cliff_time =
-            (* global_slot and cliff_time are in the uint32 range, so this will
-               not wrap *)
-            Infix.(hardfork_slot + ((t.cliff_time - hardfork_slot) * of_int 2))
-        ; vesting_period =
-            (* vesting period is in the uint32 range, so this will not wrap *)
-            Infix.(of_int 2 * t.vesting_period)
-        }
-      else
-        (* t is partially but not fully vested *)
-        { t with
-          initial_minimum_balance =
-            (let balance_after_cliff =
-               assert (compare t.initial_minimum_balance t.cliff_amount > 0) ;
-               Infix.(t.initial_minimum_balance - t.cliff_amount)
-             in
-             let elapsed_vesting_periods =
-               assert (compare t.vesting_period zero > 0) ;
-               Infix.((hardfork_slot - t.cliff_time) / t.vesting_period)
-             in
-             let incremental_unlocked_balance =
-               assert (
-                 equal elapsed_vesting_periods zero
-                 || compare t.vesting_increment
-                      (div max_int elapsed_vesting_periods)
-                    <= 0 ) ;
-               Infix.(t.vesting_increment * elapsed_vesting_periods)
-             in
-             assert (
-               compare balance_after_cliff incremental_unlocked_balance >= 0 ) ;
-             Infix.(balance_after_cliff - incremental_unlocked_balance) )
-        ; cliff_time =
-            (* All the times and spans are in the uint32 range, so none of this
-               will overflow *)
-            Infix.(
-              hardfork_slot
-              + of_int 2
-                * ( t.vesting_period
-                  - ((hardfork_slot - t.cliff_time) mod t.vesting_period) ))
-        ; cliff_amount = t.vesting_increment
-        ; vesting_period =
-            (* vesting_period is in the uint32 range, so this will not wrap *)
-            Infix.(of_int 2 * t.vesting_period)
-        })
-
-  (** Apply the hardfork adjustment to the given timing, doing nothing if it is
-      not actively vesting *)
-  let hardfork_adjustment ~hardfork_slot (t : t) =
-    if is_actively_vesting ~global_slot:hardfork_slot t then
-      actively_vesting_hardfork_adjustment ~hardfork_slot t
-    else t
-end
-
-let hardfork_adjustment ~hardfork_slot (t : Account.Timing.as_record) =
-  Vesting_record.(
-    t |> of_record |> hardfork_adjustment ~hardfork_slot |> to_record)
-
+(** True if a regular [Account.Timing.as_record] counts as actively vesting
+    according to [Account_timing.Slot_reduction_update.is_actively_vesting] *)
 let is_actively_vesting ~global_slot (t : Account.Timing.as_record) =
-  Vesting_record.(t |> of_record |> is_actively_vesting ~global_slot)
+  Account_timing.Slot_reduction_update.(
+    t |> of_record |> is_actively_vesting ~global_slot)
 
 (** Test that the generator for not-actively-vesting accounts produces accounts
     that aren't considered actively vesting *)
@@ -408,15 +229,18 @@ let not_vesting_after_vesting () =
 let vesting_before_vesting_end () =
   Quickcheck.test gen_actively_vesting_at_hardfork
     ~sexp_of:(fun (timing, global_slot) ->
-      [%sexp_of: Vesting_record.t * Global_slot_since_genesis.t]
-        (Vesting_record.of_record timing, global_slot) )
+      [%sexp_of:
+        Account_timing.Slot_reduction_update.t * Global_slot_since_genesis.t]
+        (Account_timing.Slot_reduction_update.of_record timing, global_slot) )
     ~f:(fun (timing, global_slot) ->
       assert (is_actively_vesting ~global_slot timing) )
 
 let record_conversion_roundtrip () =
   Quickcheck.test gen_any_at_hardfork ~f:(fun (timing, _global_slot) ->
-      let timing = Vesting_record.of_record timing in
-      assert (Vesting_record.(equal timing (of_record @@ to_record timing))) )
+      let timing = Account_timing.Slot_reduction_update.of_record timing in
+      assert (
+        Account_timing.Slot_reduction_update.(
+          equal timing (of_record @@ to_record timing)) ) )
 
 let half_max_global_slot =
   Global_slot_since_genesis.(
@@ -471,7 +295,9 @@ let fast_vesting_ends_as_expected () =
       let post_hardfork_vesting_end =
         Global_slot_since_genesis.add hardfork_slot post_hardfork_vesting_span
       in
-      let adjusted_timing = hardfork_adjustment ~hardfork_slot timing in
+      let adjusted_timing =
+        Account_timing.slot_reduction_update ~hardfork_slot timing
+      in
       (* Make sure that: (1) the funds unlocked at the adjusted vesting end slot
          are the same; (2) the minimum balance at the adjusted end slot are the
          same; (3) the minimum balance at the adjustend end slot is zero *)
@@ -491,7 +317,7 @@ let minimum_balance_unchanged_at_hardfork () =
       [%test_eq: Balance.t]
         (min_balance_at_slot ~global_slot:hardfork_slot timing)
         (min_balance_at_slot ~global_slot:hardfork_slot
-           (hardfork_adjustment ~hardfork_slot timing) ) )
+           (Account_timing.slot_reduction_update ~hardfork_slot timing) ) )
 
 (** The hardfork slot reduction will double the speed at which slots occur,
     starting at the hardfork slot itself. For that reason, slots of the form
@@ -561,7 +387,7 @@ let no_even_vesting_discrepancies () =
       [%test_eq: Balance.t]
         (funds_unlocked_at_slot ~global_slot:pre_hardfork_test_slot timing)
         (funds_unlocked_at_slot ~global_slot:post_hardfork_test_slot
-           (hardfork_adjustment ~hardfork_slot timing) ) )
+           (Account_timing.slot_reduction_update ~hardfork_slot timing) ) )
 
 (** The hardfork slot reduction will double the speed at which slots occur,
     starting at the hardfork slot itself. For that reason, slots of the form
@@ -614,14 +440,17 @@ let no_odd_vesting_discrepancies () =
     let test_slot =
       Global_slot_since_genesis.(add hardfork_slot post_hardfork_span)
     in
-    (timing, hardfork_adjustment ~hardfork_slot timing, test_slot, hardfork_slot))
+    ( timing
+    , Account_timing.slot_reduction_update ~hardfork_slot timing
+    , test_slot
+    , hardfork_slot ))
     ~sexp_of:(fun (timing, adjusted_timing, test_slot, hardfork_slot) ->
       [%sexp_of:
-        Vesting_record.t
-        * Vesting_record.t
+        Account_timing.Slot_reduction_update.t
+        * Account_timing.Slot_reduction_update.t
         * Global_slot_since_genesis.t
         * Global_slot_since_genesis.t]
-        Vesting_record.
+        Account_timing.Slot_reduction_update.
           (of_record timing, of_record adjusted_timing, test_slot, hardfork_slot)
       )
     ~f:(fun (_timing, adjusted_timing, test_slot, _hardfork_slot) ->

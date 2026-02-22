@@ -329,7 +329,6 @@ module Values (S : Sample) = struct
       ~authorization:(Mina_base.Control.Poly.Proof side_loaded_proof)
 
   let zkapp_command' () : Mina_base.Zkapp_command.t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     { fee_payer =
         Mina_base.Account_update.Fee_payer.make
           ~body:
@@ -342,7 +341,7 @@ module Values (S : Sample) = struct
     ; account_updates =
         List.init Params.max_zkapp_txn_account_updates ~f:(Fn.const ())
         |> List.fold_left ~init:[] ~f:(fun acc () ->
-               Mina_base.Zkapp_command.Call_forest.cons ~signature_kind
+               Mina_base.Zkapp_command.Call_forest.cons ~signature_kind:Testnet
                  (zkapp_account_update ()) acc )
     ; memo = signed_command_memo ()
     }
@@ -720,7 +719,7 @@ let () =
       ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
       ~genesis_constants ~constraint_constants ~min_num_updates:num_updates
       ~num_proof_updates:num_updates ~max_num_updates:num_updates
-      ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
+      ~signature_kind:Testnet ()
   in
   let%map.Async_kernel.Deferred vk =
     let `VK vk, `Prover _ =

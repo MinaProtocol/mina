@@ -440,10 +440,7 @@ let gen_uri =
 let gen : t Quickcheck.Generator.t =
   let open Quickcheck in
   let open Generator.Let_syntax in
-  let app_state =
-    Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
-        F.random () )
-  in
+  let%bind app_state = Zkapp_state.Value.gen in
   let%bind zkapp_version = Mina_numbers.Zkapp_version.gen in
   let%bind seq_state = Generator.list_with_length 5 Field.gen in
   let%map zkapp_uri = gen_uri in
@@ -471,6 +468,18 @@ module Hardfork = struct
 
   let of_stable (account : Stable.Latest.t) : t =
     { app_state = Zkapp_state.Hardfork.Value.of_stable account.app_state
+    ; verification_key = account.verification_key
+    ; zkapp_version = account.zkapp_version
+    ; action_state = account.action_state
+    ; last_action_slot = account.last_action_slot
+    ; proved_state = account.proved_state
+    ; zkapp_uri = account.zkapp_uri
+    }
+
+  (** Convert a Mesa zkApp account to a stable Berkeley zkApp account. Raises if
+    we can't convert back to stable Berkeley zkApp account. *)
+  let to_stable_exn (account : t) : Stable.Latest.t =
+    { app_state = Zkapp_state.Hardfork.Value.to_stable_exn account.app_state
     ; verification_key = account.verification_key
     ; zkapp_version = account.zkapp_version
     ; action_state = account.action_state

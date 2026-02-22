@@ -2,10 +2,21 @@ open Core_kernel
 open Currency
 
 module Test_inputs = struct
-  module Transaction_witness = Int
+  module Transaction_witness = struct
+    type t = Int.t
+
+    let transaction = Fn.id
+  end
+
   module Ledger_hash = Int
   module Sparse_ledger = Int
-  module Transaction = Int
+
+  module Transaction = struct
+    type t = Int.t
+
+    let yojson_summary t = `Int t
+  end
+
   module Ledger_proof_statement = Fee
 
   module Transaction_protocol_state = struct

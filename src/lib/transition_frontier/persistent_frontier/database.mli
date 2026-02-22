@@ -93,7 +93,8 @@ val move_root :
   -> unit
 
 val get_transition :
-     proof_cache_db:Proof_cache_tag.cache_db
+     signature_kind:Mina_signature_kind.t
+  -> proof_cache_db:Proof_cache_tag.cache_db
   -> t
   -> State_hash.t
   -> ( Mina_block.Validated.t
@@ -123,11 +124,13 @@ val get_best_tip :
 val set_best_tip : State_hash.t -> batch_t -> unit
 
 val crawl_successors :
-     proof_cache_db:Proof_cache_tag.cache_db
-  -> t
-  -> State_hash.t
+     ?max_depth:int
+  -> signature_kind:Mina_signature_kind.t
+  -> proof_cache_db:Proof_cache_tag.cache_db
   -> init:'a
   -> f:('a -> Mina_block.Validated.t -> ('a, 'b) Deferred.Result.t)
+  -> t
+  -> State_hash.t
   -> ( unit
      , [> `Crawl_error of 'b
        | `Not_found of [> `Arcs of State_hash.t | `Transition of State_hash.t ]

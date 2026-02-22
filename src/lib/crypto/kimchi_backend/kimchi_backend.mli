@@ -32,6 +32,8 @@ module Kimchi_backend_common : sig
 
       val hash : t -> Ppx_hash_lib.Std.Hash.hash_value
 
+      val to_hex_string : t -> string
+
       module Bigint : Kimchi_pasta_snarky_backend__.Bigint.Intf
 
       val to_bigint : t -> Bigint.t

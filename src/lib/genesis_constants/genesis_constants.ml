@@ -1,5 +1,17 @@
 open Core_kernel
 
+(** Proof level controls how proofs are handled during execution.
+
+    - [Full]: Generates and verifies actual proofs. This is used in production
+      and creates the real constraint systems. Circuit statistics (constraint
+      counts, public/auxiliary input sizes) are only meaningful with this level.
+
+    - [Check]: Runs the constraint system logic for verification but skips
+      actual proof generation. Useful for testing correctness without the
+      overhead of proof generation.
+
+    - [No_check]: Skips both proof generation and verification. Fastest mode,
+      used for quick testing where proofs are not needed. *)
 module Proof_level = struct
   type t = Full | Check | No_check [@@deriving bin_io_unversioned, equal]
 
@@ -92,18 +104,25 @@ module Helpers = struct
     t |> Int64.to_float |> Time.Span.of_ms |> Time.of_span_since_epoch
 
   let validate_time time_str =
-    match
-      Result.try_with (fun () ->
-          Option.value_map ~default:(Time.now ()) ~f:genesis_timestamp_of_string
-            time_str )
-    with
-    | Ok time ->
-        Ok (of_time time)
-    | Error _ ->
-        Error
-          "Invalid timestamp. Please specify timestamp in \"%Y-%m-%d \
-           %H:%M:%S%z\". For example, \"2019-01-30 12:00:00-0800\" for \
-           UTC-08:00 timezone"
+    match time_str with
+    | None ->
+        Ok (of_time (Time.now ()))
+    | Some time_str -> (
+        match
+          Result.try_with (fun () -> genesis_timestamp_of_string time_str)
+        with
+        | Ok time ->
+            Ok (of_time time)
+        | Error exn ->
+            let help_info =
+              "Please specify timestamp in \"%Y-%m-%d %H:%M:%S%z\". For \
+               example, \"2019-01-30 12:00:00-0800\" for UTC-08:00 timezone"
+            in
+            let err_message_verbose =
+              Printf.sprintf "Invalid timestamp `%s`: `%s`. %s" time_str
+                (Exn.to_string exn) help_info
+            in
+            Error err_message_verbose )
 
   let genesis_timestamp_to_string time =
     Int64.to_float time |> Time.Span.of_ms |> Time.of_span_since_epoch
@@ -331,38 +350,7 @@ module Make (Node_config : Node_config_intf.S) : S = struct
         *)
 
         let transaction_capacity_log_2 =
-          match
-            ( Node_config.scan_state_with_tps_goal
-            , Node_config.scan_state_tps_goal_x10 )
-          with
-          | true, Some tps_goal_x10 ->
-              let max_coinbases = 2 in
-
-              (* block_window_duration is in milliseconds, so divide by 1000 divide
-                 by 10 again because we have tps * 10
-              *)
-              let max_user_commands_per_block =
-                tps_goal_x10 * Node_config.block_window_duration / (1000 * 10)
-              in
-
-              (* Log of the capacity of transactions per transition.
-                    - 1 will only work if we don't have prover fees.
-                    - 2 will work with prover fees, but not if we want a transaction
-                      included in every block.
-                    - At least 3 ensures a transaction per block and the staged-ledger
-                      unit tests pass.
-              *)
-              1
-              + Core_kernel.Int.ceil_log2
-                  (max_user_commands_per_block + max_coinbases)
-          | _ -> (
-              match Node_config.scan_state_transaction_capacity_log_2 with
-              | Some a ->
-                  a
-              | None ->
-                  failwith
-                    "scan_state_transaction_capacity_log_2 must be set if \
-                     scan_state_with_tps_goal is false" )
+          Node_config.scan_state_transaction_capacity_log_2
 
         let supercharged_coinbase_factor =
           Node_config.supercharged_coinbase_factor

@@ -2,8 +2,6 @@
 
 set -eox pipefail
 
-# Don't prompt for answers during apt-get install
-
 YELLOW_THRESHOLD="0.1"
 RED_THRESHOLD="0.3"
 EXTRA_ARGS="${EXTRA_ARGS:-}"

@@ -436,6 +436,10 @@ let create ~constraint_constants ~pids ~consensus_constants ~conf_dir ~logger
       ] ;
   Child_processes.Termination.register_process pids process
     Child_processes.Termination.Vrf_evaluator ;
+
+  let pid = Process.pid process in
+  [%log info] "VRF evaluator process has PID %d" (Pid.to_int pid) ;
+  Mina_metrics.Process_memory.Vrf_evaluator.set_pid pid ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stdout process |> Reader.pipe)

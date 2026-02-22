@@ -9,19 +9,13 @@ module Inputs = struct
     ; proof_level : Genesis_constants.Proof_level.t
     ; genesis_constants : Genesis_constants.t
     ; genesis_ledger : Genesis_ledger.Packed.t
-    ; genesis_epoch_data : Consensus.Genesis_epoch_data.t
+    ; genesis_epoch_data :
+        Genesis_ledger.Packed.t Consensus.Genesis_data.Epoch.t
     ; genesis_body_reference : Consensus.Body_reference.t
     ; consensus_constants : Consensus.Constants.t
     ; protocol_state_with_hashes :
         Protocol_state.value State_hash.With_state_hashes.t
     ; constraint_system_digests : (string * Md5_lib.t) list option
-    ; blockchain_proof_system_id :
-        (* This is only used for calculating the hash to lookup the genesis
-           proof with. It is re-calculated when building the blockchain prover,
-           so it is always okay -- if less efficient at startup -- to pass
-           [None] here.
-        *)
-        Pickles.Verification_key.Id.t option
     ; signature_kind : Mina_signature_kind.t
     }
 
@@ -37,8 +31,6 @@ module Inputs = struct
 
   let ledger_depth { genesis_ledger; _ } =
     Genesis_ledger.Packed.depth genesis_ledger
-
-  include Genesis_ledger.Utils
 
   let genesis_ledger { genesis_ledger; _ } =
     Genesis_ledger.Packed.t genesis_ledger
@@ -74,10 +66,7 @@ module Inputs = struct
 end
 
 module Proof_data = struct
-  type t =
-    { blockchain_proof_system_id : Pickles.Verification_key.Id.t
-    ; genesis_proof : Proof.t
-    }
+  type t = { genesis_proof : Proof.t }
 end
 
 module T = struct
@@ -87,7 +76,8 @@ module T = struct
     ; genesis_constants : Genesis_constants.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; genesis_ledger : Genesis_ledger.Packed.t
-    ; genesis_epoch_data : Consensus.Genesis_epoch_data.t
+    ; genesis_epoch_data :
+        Genesis_ledger.Packed.t Consensus.Genesis_data.Epoch.t
     ; genesis_body_reference : Consensus.Body_reference.t
     ; consensus_constants : Consensus.Constants.t
     ; protocol_state_with_hashes :
@@ -115,8 +105,8 @@ module T = struct
   let genesis_ledger { genesis_ledger; _ } =
     Genesis_ledger.Packed.t genesis_ledger
 
-  let populate_root { genesis_ledger; _ } =
-    Genesis_ledger.Packed.populate_root genesis_ledger
+  let create_root { genesis_ledger; _ } =
+    Genesis_ledger.Packed.create_root genesis_ledger
 
   let genesis_epoch_data { genesis_epoch_data; _ } = genesis_epoch_data
 
@@ -211,11 +201,16 @@ let to_inputs (t : t) : Inputs.t =
       ( if Lazy.is_val t.constraint_system_digests then
         Some (Lazy.force t.constraint_system_digests)
       else None )
-  ; blockchain_proof_system_id =
-      ( match t.proof_data with
-      | Some { blockchain_proof_system_id; _ } ->
-          Some blockchain_proof_system_id
-      | None ->
-          None )
   ; signature_kind = t.signature_kind
   }
+
+module Light = struct
+  type t =
+    { constraint_constants : Genesis_constants.Constraint_constants.t
+    ; proof_level : Genesis_constants.Proof_level.t
+    ; genesis_constants : Genesis_constants.t
+    ; genesis_body_reference : Consensus.Body_reference.t
+    ; consensus_constants : Consensus.Constants.t
+    ; signature_kind : Mina_signature_kind.t
+    }
+end

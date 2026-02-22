@@ -23,6 +23,7 @@
   core
   sexplib0
   ;;local libraries
+  cli_lib
   mina_wire_types
   mina_signature_kind
   mina_base.import

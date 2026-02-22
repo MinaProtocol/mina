@@ -14,7 +14,10 @@
   alcotest
   cmdliner
   ;; mina libraries
-  init)
+  init
+  mina_automation
+  mina_automation.fixture
+  mina_automation.runner)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

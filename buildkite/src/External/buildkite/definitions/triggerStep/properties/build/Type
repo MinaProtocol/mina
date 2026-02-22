@@ -1,0 +1,10 @@
+\(var10 : Type) -> \(var11 : Type) -> { branch : Optional (./properties/branch/Type ) 
+, commit : Optional (./properties/commit/Type ) 
+, env : Optional (./properties/env/Type var10) 
+, label : Optional (./properties/label/Type ) 
+, message : Optional (./properties/message/Type ) 
+, meta_data : Optional (./properties/meta_data/Type var11) 
+, name : Optional (./properties/name/Type ) 
+, trigger : Optional (./properties/trigger/Type ) 
+, type : Optional (./properties/type/Type ) 
+}

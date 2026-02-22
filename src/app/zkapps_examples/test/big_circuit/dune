@@ -2,20 +2,19 @@
  (name big_circuit)
  (libraries
   ;; opam libraries
+  alcotest
   async
   async_kernel
   async_unix
   base
   core
   core_kernel
-  ppx_inline_test.config
   yojson
   ;; local libraries
   cache_dir
   currency
   data_hash_lib
   genesis_constants
-  pasta_bindings
   kimchi_backend
   kimchi_pasta
   kimchi_pasta.basic
@@ -25,12 +24,13 @@
   mina_numbers
   mina_state
   mina_transaction_logic
+  pasta_bindings
   pickles
   pickles.backend
   pickles_base
   pickles_types
-  random_oracle_input
   random_oracle
+  random_oracle_input
   sgn
   signature_lib
   snark_params

@@ -57,7 +57,7 @@ let tests : test list =
     , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
   ; ("epoch-ledger", (module Epoch_ledger.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
-  ; ("hard-fork", (module Hard_fork.Make : Intf.Test.Functor_intf))
+  ; ("post-hard-fork", (module Post_hard_fork.Make : Intf.Test.Functor_intf))
   ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
   ; ( "peers-reliability"
@@ -267,25 +267,7 @@ let main inputs =
    *   Exec.execute ~logger ~engine_cli_inputs ~images (module Test (Engine))
    *)
   let logger = Logger.create () in
-  let constants : Test_config.constants =
-    let protocol =
-      { Genesis_constants.Compiled.genesis_constants.protocol with
-        k = 20
-      ; delta = 0
-      ; slots_per_epoch = 3 * 8 * 20
-      ; slots_per_sub_window = 2
-      ; grace_period_slots = 140
-      }
-    in
-    { genesis_constants =
-        { Genesis_constants.Compiled.genesis_constants with
-          protocol
-        ; txpool_max_size = 3000
-        }
-    ; constraint_constants = Genesis_constants.Compiled.constraint_constants
-    ; compile_config = Mina_compile_config.Compiled.t
-    }
-  in
+  let constants = Test_config.default_constants in
   let images =
     { Test_config.Container_images.mina = inputs.mina_image
     ; archive_node =
@@ -419,6 +401,15 @@ let main inputs =
         in
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "Daemons started" ;
+        let archive_nodes =
+          Engine.Network.archive_nodes network |> Core.String.Map.data
+        in
+        let%bind () =
+          Malleable_error.List.iter archive_nodes ~f:(fun archive_node ->
+              let node_id = Engine.Network.Node.id archive_node in
+              Engine.Network.Node.tail_mina_logs_to_file ~logger archive_node
+                ~log_file:(sprintf "%s-%s.local.test.log" test_name node_id) )
+        in
         [%log trace] "executing test" ;
         T.run ~config:test_config network dsl )
   in

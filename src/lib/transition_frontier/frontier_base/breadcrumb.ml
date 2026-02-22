@@ -14,6 +14,7 @@ module T = struct
     ; just_emitted_a_proof : bool
     ; transition_receipt_time : Time.t option
     ; staged_ledger_hash : Staged_ledger_hash.t
+    ; accounts_created : Account_id.t list
     }
   [@@deriving fields]
 
@@ -22,16 +23,17 @@ module T = struct
     -> staged_ledger:Staged_ledger.t
     -> just_emitted_a_proof:bool
     -> transition_receipt_time:Time.t option
+    -> accounts_created:Account_id.t list
     -> 'a
 
   let map_creator creator ~f ~validated_transition ~staged_ledger
-      ~just_emitted_a_proof ~transition_receipt_time =
+      ~just_emitted_a_proof ~transition_receipt_time ~accounts_created =
     f
       (creator ~validated_transition ~staged_ledger ~just_emitted_a_proof
-         ~transition_receipt_time )
+         ~transition_receipt_time ~accounts_created )
 
   let create ~validated_transition ~staged_ledger ~just_emitted_a_proof
-      ~transition_receipt_time =
+      ~transition_receipt_time ~accounts_created =
     (* TODO This looks terrible, consider removing this in the hardfork by either
        removing staged_ledger_hash from the header or computing it consistently
        for the genesis block *)
@@ -48,6 +50,7 @@ module T = struct
     ; just_emitted_a_proof
     ; transition_receipt_time
     ; staged_ledger_hash
+    ; accounts_created
     }
 
   let to_yojson
@@ -56,6 +59,7 @@ module T = struct
       ; just_emitted_a_proof
       ; transition_receipt_time
       ; staged_ledger_hash = _
+      ; accounts_created = _
       } =
     `Assoc
       [ ( "validated_transition"
@@ -76,7 +80,8 @@ T.
   , just_emitted_a_proof
   , transition_receipt_time
   , to_yojson
-  , staged_ledger_hash )]
+  , staged_ledger_hash
+  , accounts_created )]
 
 include Allocation_functor.Make.Basic (T)
 
@@ -131,14 +136,15 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
       | Ok
           ( `Just_emitted_a_proof just_emitted_a_proof
           , `Block_with_validation fully_valid_block
-          , `Staged_ledger transitioned_staged_ledger ) ->
+          , `Staged_ledger transitioned_staged_ledger
+          , `Accounts_created accounts_created ) ->
           [%log internal] "Create_breadcrumb" ;
           Deferred.Result.return
             (create
                ~validated_transition:
                  (Mina_block.Validated.lift fully_valid_block)
-               ~staged_ledger:transitioned_staged_ledger ~just_emitted_a_proof
-               ~transition_receipt_time )
+               ~staged_ledger:transitioned_staged_ledger ~accounts_created
+               ~just_emitted_a_proof ~transition_receipt_time )
       | Error `Invalid_body_reference ->
           let message = "invalid body reference" in
           let%map () =
@@ -338,8 +344,7 @@ module For_tests = struct
             ~nonce ~valid_until:None ~memo:Signed_command_memo.dummy
             ~body:(Payment { receiver_pk; amount = send_amount })
         in
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
-        Signed_command.sign ~signature_kind sender_keypair payload )
+        Signed_command.sign ~signature_kind:Testnet sender_keypair payload )
 
   let gen ?(logger = Logger.null ()) ?(send_to_random_pk = false)
       ~(precomputed_values : Precomputed_values.t) ~verifier
@@ -414,9 +419,9 @@ module For_tests = struct
       let body =
         Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff
       in
-      let%bind ( `Hash_after_applying staged_ledger_hash
-               , `Ledger_proof ledger_proof_opt
-               , `Staged_ledger _
+      let%bind ( `Ledger_proof ledger_proof_opt
+               , `Staged_ledger transitioned_staged_ledger
+               , `Accounts_created _
                , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
@@ -426,7 +431,7 @@ module For_tests = struct
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase
             ~zkapp_cmd_limit_hardcap:
               precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
-            ~signature_kind:Mina_signature_kind.t_DEPRECATED
+            ~signature_kind:Testnet
         with
         | Ok r ->
             return r
@@ -442,14 +447,14 @@ module For_tests = struct
         |> Blockchain_state.ledger_proof_statement
       in
       let ledger_proof_statement =
-        Option.value_map ledger_proof_opt
-          ~f:(fun (proof, _) -> Ledger_proof.Cached.statement proof)
+        Option.value_map ledger_proof_opt ~f:Ledger_proof.Cached.statement
           ~default:previous_ledger_proof_stmt
       in
       let genesis_ledger_hash =
         previous_protocol_state |> Protocol_state.blockchain_state
         |> Blockchain_state.genesis_ledger_hash
       in
+      let staged_ledger_hash = Staged_ledger.hash transitioned_staged_ledger in
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)

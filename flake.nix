@@ -14,6 +14,7 @@
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11-small";
   inputs.nixpkgs-old.url = "github:nixos/nixpkgs/nixos-23.05-small";
+  inputs.nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
   inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
@@ -30,15 +31,16 @@
   inputs.describe-dune.inputs.nixpkgs.follows = "nixpkgs";
   inputs.describe-dune.inputs.flake-utils.follows = "utils";
 
-  inputs.o1-opam-repository.url = "github:o1-labs/opam-repository";
+  inputs.o1-opam-repository.url = "github:o1-labs/opam-repository/dd90c5c72b7b7caeca3db3224b2503924deea08a";
   inputs.o1-opam-repository.flake = false;
 
   # The version must be the same as the version used in:
   # - dockerfiles/1-build-deps
   # - flake.nix (and flake.lock after running
   #   `nix flake update opam-repository`).
-  # - scripts/update_opam_switch.sh
-  inputs.opam-repository.url = "github:ocaml/opam-repository/08d8c16c16dc6b23a5278b06dff0ac6c7a217356";
+  # - scripts/update-opam-switch.sh
+  inputs.opam-repository.url =
+    "github:ocaml/opam-repository/08d8c16c16dc6b23a5278b06dff0ac6c7a217356";
   inputs.opam-repository.flake = false;
 
   inputs.nixpkgs-mozilla.url = "github:mozilla/nixpkgs-mozilla";
@@ -60,7 +62,7 @@
 
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
     , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
-    , nix-utils, flockenzeit, nixpkgs-old, ... }:
+    , nix-utils, flockenzeit, nixpkgs-old, nixpkgs-unstable, ... }:
     let
       inherit (nixpkgs) lib;
 
@@ -103,9 +105,7 @@
         # Skip tests on nodejs dep due to known issue with nixpkgs 24.11 https://github.com/NixOS/nixpkgs/issues/402079
         # this can be removed after upgrading
         skipNodeTests = final: prev: {
-          nodejs = prev.nodejs.overrideAttrs(old: {
-            doCheck = false;
-          });
+          nodejs = prev.nodejs.overrideAttrs (old: { doCheck = false; });
         };
       };
       nixosModules.mina = import ./nix/modules/mina.nix inputs;
@@ -273,12 +273,47 @@
         };
     } // utils.lib.eachDefaultSystem (system:
       let
-        rocksdbOverlay = pkgs: prev:
-          if prev.stdenv.isx86_64 then {
-            rocksdb-mina = pkgs.rocksdb511;
-          } else {
-            rocksdb-mina = pkgs.rocksdb;
-          };
+        # Helper function to map dependencies to current nixpkgs equivalents
+        mapDepsToCurrentPkgs = pkgs: deps:
+          map (dep:
+            if pkgs ? ${dep.pname or dep.name or ""} then
+              pkgs.${dep.pname or dep.name or ""}
+            else
+              dep) deps;
+
+        # Helper function to disable compression libraries in cmake flags
+        disableCompressionLibs = flags:
+          builtins.filter (flag: flag != [ ]) (map (flag:
+            if builtins.isString flag
+            && builtins.match ".*WITH_(BZ2|LZ4|SNAPPY|ZLIB|ZSTD)=1.*" flag
+            != null then
+              builtins.replaceStrings [ "=1" ] [ "=0" ] flag
+            else
+              flag) flags);
+
+        rocksdbOverlay = pkgs: prev: {
+          rocksdb-mina = let
+            # Get the full derivation from unstable but build with current nixpkgs
+            unstableRocksdb =
+              (nixpkgs-unstable.legacyPackages.${system}.rocksdb.override {
+                enableShared = false;
+                enableLiburing = false;
+                bzip2 = null;
+                lz4 = null;
+                snappy = null;
+                zlib = null;
+                zstd = null;
+              });
+          in pkgs.stdenv.mkDerivation (unstableRocksdb.drvAttrs // {
+            cmakeFlags =
+              disableCompressionLibs unstableRocksdb.drvAttrs.cmakeFlags;
+            # Override the build environment to use current nixpkgs toolchain
+            nativeBuildInputs = mapDepsToCurrentPkgs pkgs
+              (unstableRocksdb.nativeBuildInputs or [ ]);
+            buildInputs =
+              mapDepsToCurrentPkgs pkgs (unstableRocksdb.buildInputs or [ ]);
+          });
+        };
         go119Overlay = (_: _: {
           inherit (nixpkgs-old.legacyPackages.${system})
             go_1_19 buildGo119Module;
@@ -326,7 +361,7 @@
           (pkgs.python3.withPackages
             (python-pkgs: [ python-pkgs.click python-pkgs.requests ]))
           jq
-          rocksdb.tools
+          rocksdb-mina.tools
         ];
       in {
 
@@ -347,7 +382,7 @@
           default = ocamlPackages.mina;
           inherit (pkgs)
             libp2p_helper kimchi_bindings_stubs snarky_js validation trace-tool
-            zkapp-cli;
+            zkapp-cli hardfork_test;
           inherit (dockerImages)
             mina-image-slim mina-image-full mina-archive-image-full
             mina-image-instr-full;

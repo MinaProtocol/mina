@@ -81,6 +81,8 @@ let setup (type n) ~context:(module Context : CONTEXT)
       let consensus_local_state = consensus_local_state
 
       let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
+      let signature_kind = Mina_signature_kind.Testnet
     end )
   in
   let config rpc_mocks peer =

@@ -1,20 +1,18 @@
 #!/usr/bin/env bash
-set -x
 
 # Exit script when commands fail
 set -e
-# Kill background process when script exits
-trap "killall background" EXIT
 
 # ================================================
 # Constants
 
+POLL_INTERVAL=10s
+
 MINA_EXE=${MINA_EXE:-_build/default/src/app/cli/src/mina.exe}
 ARCHIVE_EXE=${ARCHIVE_EXE:-_build/default/src/app/archive/archive.exe}
-LOGPROC_EXE=${LOGPROC_EXE:-_build/default/src/app/logproc/logproc.exe}
+ROSETTA_EXE=${ROSETTA_EXE:-_build/default/src/app/rosetta/rosetta.exe}
 ZKAPP_EXE=${ZKAPP_EXE:-_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe}
 
-export MINA_BP_PRIVKEY=
 export MINA_PRIVKEY_PASS='naughty blue worm'
 export MINA_LIBP2P_PASS="${MINA_PRIVKEY_PASS}"
 SEED_PEER_KEY="CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
@@ -26,27 +24,29 @@ SNARK_COORDINATOR_PEER_KEY="CAESQFjWdR18zKuCssN+Fi33fah9f5QGebOCc9xTITR8cdoyC+bk
 WHALES=2
 FISH=1
 NODES=1
-ARCHIVE=false
 LOG_LEVEL="Trace"
 FILE_LOG_LEVEL=${LOG_LEVEL}
 VALUE_TRANSFERS=false
-SNARK_WORKERS_COUNT=1
+SNARK_WORKERS_COUNT=2
 ZKAPP_TRANSACTIONS=false
-RESET=false
-UPDATE_GENESIS_TIMESTAMP=false
+CONFIG_MODE=inherit
+UPDATE_GENESIS_TIMESTAMP=no
 OVERRIDE_SLOT_TIME_MS=""
 PROOF_LEVEL="full"
 LOG_PRECOMPUTED_BLOCKS=false
 
 SNARK_WORKER_FEE=0.001
-TRANSACTION_FREQUENCY=10 # in seconds
+TRANSACTION_INTERVAL=10 # in seconds
 
-SEED_START_PORT=3000
-ARCHIVE_SERVER_PORT=3086
+SEED="spawn:3000"
+ARCHIVE_SERVER_PORT=
 SNARK_COORDINATOR_PORT=7000
 WHALE_START_PORT=4000
 FISH_START_PORT=5000
 NODE_START_PORT=6000
+ROSETTA_PORT=
+
+MINA_ROSETTA_MAX_DB_POOL_SIZE=64
 
 PG_HOST="localhost"
 PG_PORT="5432"
@@ -54,13 +54,17 @@ PG_USER="${USER}"
 PG_PASSWD=""
 PG_DB="archive"
 
-ARCHIVE_ADDRESS_CLI_ARG=""
 DEMO_MODE=false
+SLOT_TX_END=
+SLOT_CHAIN_END=
+HARDFORK_GENESIS_SLOT_DELTA=
+HARDFORK_HANDLING=
 
 # ================================================
 # Globals (assigned during execution of script)
 
-LEDGER_FOLDER=""
+ARCHIVE_ADDRESS_CLI_ARG=""
+ROOT="${HOME}/.mina-network"
 SNARK_COORDINATOR_PUBKEY=""
 NODES_FOLDER=""
 CONFIG=""
@@ -71,79 +75,196 @@ WHALE_PIDS=()
 SNARK_WORKERS_PIDS=()
 FISH_PIDS=()
 NODE_PIDS=()
+OVERRIDE_GENSIS_LEDGER=""
+ON_EXIT="grace_exit_all"
+REDIRECT_LOGS=false
+NODE_STATUS_URL=""
+
+
+# =================================================
+# ITN features flags
+
+ITN_KEYS=""
 
 # ================================================
 # Helper functions
 
 help() {
-  echo "-w   |--whales <#>                       | Number of BP Whale Nodes (bigger stake) to spin-up"
-  echo "                                         |   Default: ${WHALES}"
-  echo "-f   |--fish <#>                         | Number of BP Fish Nodes (less stake) to spin-up"
-  echo "                                         |   Default: ${FISH}"
-  echo "-n   |--nodes <#>                        | Number of non block-producing nodes to spin-up"
-  echo "                                         |   Default: ${NODES}"
-  echo "-a   |--archive                          | Whether to run the Archive Node (presence of argument)"
-  echo "                                         |   Default: ${ARCHIVE}"
-  echo "-sp  |--seed-start-port <#>              | Seed Node range start port"
-  echo "                                         |   Default: ${SEED_START_PORT}"
-  echo "-swp |--snark-coordinator-start-port <#> | Snark Worker Coordinator Node range start port"
-  echo "                                         |   Default: ${SNARK_COORDINATOR_PORT}"
-  echo "-swc |--snark-workers-count <#>          | Snark Workers count"
-  echo "                                         |   Default: ${SNARK_WORKERS_COUNT}"
-  echo "-wp  |--whale-start-port <#>             | Whale Nodes range start port"
-  echo "                                         |   Default: ${WHALE_START_PORT}"
-  echo "-fp  |--fish-start-port <#>              | Fish Nodes range start port"
-  echo "                                         |   Default: ${FISH_START_PORT}"
-  echo "-np  |--node-start-port <#>              | Non block-producing Nodes range start port"
-  echo "                                         |   Default: ${NODE_START_PORT}"
-  echo "-ap  |--archive-server-port <#>          | Archive Node server port"
-  echo "                                         |   Default: ${ARCHIVE_SERVER_PORT}"
-  echo "-ll  |--log-level <level>                | Console output logging level"
-  echo "                                         |   Default: ${LOG_LEVEL}"
-  echo "-fll |--file-log-level <level>           | File output logging level"
-  echo "                                         |   Default: ${FILE_LOG_LEVEL}"
-  echo "-ph  |--pg-host <host>                   | PostgreSQL host"
-  echo "                                         |   Default: ${PG_HOST}"
-  echo "-pp  |--pg-port <#>                      | PostgreSQL port"
-  echo "                                         |   Default: ${PG_PORT}"
-  echo "-pu  |--pg-user <user>                   | PostgreSQL user"
-  echo "                                         |   Default: ${PG_USER}"
-  echo "-ppw |--pg-passwd <password>             | PostgreSQL password"
-  echo "                                         |   Default: <empty_string>"
-  echo "-pd  |--pg-db <db>                       | PostgreSQL database name"
-  echo "                                         |   Default: ${PG_DB}"
-  echo "-vt  |--value-transfer-txns              | Whether to execute periodic value transfer transactions (presence of argument)"
-  echo "                                         |   Default: ${VALUE_TRANSFERS}"
-  echo "-zt  |--zkapp-transactions               | Whether to execute periodic zkapp transactions (presence of argument)"
-  echo "                                         |   Default: ${ZKAPP_TRANSACTIONS}"
-  echo "-tf  |--transactions-frequency <#>       | Frequency of periodic transactions execution (in seconds)"
-  echo "                                         |   Default: ${TRANSACTION_FREQUENCY}"
-  echo "-sf  |--snark-worker-fee <#>             | SNARK Worker fee"
-  echo "                                         |   Default: ${SNARK_WORKER_FEE}"
-  echo "-lp  |--log-precomputed-blocks           | Log precomputed blocks"
-  echo "                                         |   Default: ${LOG_PRECOMPUTED_BLOCKS}"
-  echo "-pl  |--proof-level <proof-level>        | Proof level (currently consumed by SNARK Workers only)"
-  echo "                                         |   Default: ${PROOF_LEVEL}"
-  echo "-r   |--reset                            | Whether to reset the Mina Local Network storage file-system (presence of argument)"
-  echo "                                         |   Default: ${RESET}"
-  echo "-u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument)"
-  echo "                                         |   Default: ${UPDATE_GENESIS_TIMESTAMP}"
-  echo "-st  |--override-slot-time <milliseconds>| Override the slot time for block production"
-  echo "                                         |   Default: value from executable"
-  echo "-d   |--demo                             | Whether to run the demo (presence of argument). Demo mode is used to run the single node which is already bootstrapped and synced with the network."
-  echo "                                         |   Default: false"
-  echo "-h   |--help                             | Displays this help message"
 
-  printf "\n"
-  echo "Available logging levels:"
-  echo "  Spam, Trace, Debug, Info, Warn, Error, Faulty_peer, Fatal"
-  printf "\n"
-  echo "Available proof levels:"
-  echo "  full, check, none"
-  printf "\n"
+  cat <<EOF
+
+-w   |--whales <#>                       | Number of BP Whale Nodes (bigger stake) to spin-up
+                                         |   Default: ${WHALES}
+-f   |--fish <#>                         | Number of BP Fish Nodes (less stake) to spin-up
+                                         |   Default: ${FISH}
+-n   |--nodes <#>                        | Number of non block-producing nodes to spin-up
+                                         |   Default: ${NODES}
+-s   |--seed                             | How to start the seed. Set to 'spawn:SEED_START_PORT' to spawn the seed in this script with Seed range start port, 'at:SEED_PEER_ID' to let the script discover the seed node at specific address. Regardless the option taken, this script will always store the seed peer ID used under ROOT/seed_peer_id.txt, when the seed node is/should be ready.
+                                         |   Default: ${SEED}
+-swp |--snark-coordinator-start-port <#> | Snark Worker Coordinator Node range start port. Set to empty to disable snark coodinator
+                                         |   Default: ${SNARK_COORDINATOR_PORT}
+-swc |--snark-workers-count <#>          | Snark Workers count
+                                         |   Default: ${SNARK_WORKERS_COUNT}
+-wp  |--whale-start-port <#>             | Whale Nodes range start port
+                                         |   Default: ${WHALE_START_PORT}
+-fp  |--fish-start-port <#>              | Fish Nodes range start port
+                                         |   Default: ${FISH_START_PORT}
+-np  |--node-start-port <#>              | Non block-producing Nodes range start port
+                                         |   Default: ${NODE_START_PORT}
+-ap  |--archive-server-port <#>          | Archive Node server port. Set to empty to disable archive node.
+                                         |   Default: ${ARCHIVE_SERVER_PORT}
+-rp  |--rosetta-port <#>                 | Rosetta server port. Set to empty to disable Rosetta server.
+                                         |   Default: ${ROSETTA_PORT}
+-rmps|--rosetta-max-pool-size <#>        | Rosetta Db max pool size
+                                         |   Default: ${MINA_ROSETTA_MAX_DB_POOL_SIZE}
+-ll  |--log-level <level>                | Console output logging level
+                                         |   Default: ${LOG_LEVEL}
+-fll |--file-log-level <level>           | File output logging level
+                                         |   Default: ${FILE_LOG_LEVEL}
+-ph  |--pg-host <host>                   | PostgreSQL host
+                                         |   Default: ${PG_HOST}
+-pp  |--pg-port <#>                      | PostgreSQL port
+                                         |   Default: ${PG_PORT}
+-pu  |--pg-user <user>                   | PostgreSQL user
+                                         |   Default: ${PG_USER}
+-ppw |--pg-passwd <password>             | PostgreSQL password
+                                         |   Default: <empty_string>
+-pd  |--pg-db <db>                       | PostgreSQL database name
+                                         |   Default: ${PG_DB}
+-vt  |--value-transfer-txns              | Whether to execute periodic value transfer transactions (presence of argument)
+                                         |   Default: ${VALUE_TRANSFERS}
+-zt  |--zkapp-transactions               | Whether to execute periodic zkapp transactions (presence of argument)
+                                         |   Default: ${ZKAPP_TRANSACTIONS}
+-ti  |--transaction-interval <#>         | Frequency of periodic transactions execution (in seconds)
+                                         |   Default: ${TRANSACTION_INTERVAL}
+-sf  |--snark-worker-fee <#>             | SNARK Worker fee
+                                         |   Default: ${SNARK_WORKER_FEE}
+-lp  |--log-precomputed-blocks           | Log precomputed blocks
+                                         |   Default: ${LOG_PRECOMPUTED_BLOCKS}
+-pl  |--proof-level <proof-level>        | Proof level
+                                         |   Default: ${PROOF_LEVEL}
+-c   |--config                           | Config to use. Set to 'reset' to generate a new config, new keypairs and new ledgers, 'inherit' to reuse the one found in previously deployed networks, 'inherit_with:CONFIG_PATH,GENESIS_LEDGER_PATH' to inherit keys with new config & genesis ledgers overridden. Note that any config parameters that should alter the config have priority over the passed in config
+                                         |   Default: ${CONFIG_MODE}
+-u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument). Set to 'fixed:TIMESTAMP' to be a fixed time, 'delay_sec:SECONDS' to be set genesis to be SECONDS in the future, or 'no' to do nothing.
+                                         |   Default: ${UPDATE_GENESIS_TIMESTAMP}
+-st  |--override-slot-time <milliseconds>| Override the slot time for block production
+                                         |   Default: value from executable
+-d   |--demo                             | Whether to run the demo (presence of argument). Demo mode is used to run the single node which is already bootstrapped and synced with the network.
+                                         |   Default: false
+-ste |--slot-transaction-end             | When set, stop adding transactions from this slot on.
+                                         |   Default: None
+-sce |--slot-chain-end                   | When set, stop producing blocks from this chain on.
+                                         |   Default: None
+--itn-keys <keys>                        | Use ITN keys for nodes authentication
+                                         |   Default: not set
+-hfd |--hardfork-genesis-slot-delta      | When set override the value 'hard_fork_genesis_slot_delta' in daemon config. 
+--hardfork-handling                      | When set, passed to daemons participating the network.
+                                         |   Default: not set
+-r   |--root                             | When set, override the root working folder (i.e. the value of ROOT) for this script. WARN: this script will clean up anything inside that folder when initializing any run!
+                                         |   Default: ${ROOT}
+--redirect-logs                          | When set, redirect logs for nodes (excluding workers) and archive to file instead of console output
+                                         |   Default: ${REDIRECT_LOGS}
+--on-exit                                | Possible Values : {grace_exit_all,kill_snark_workers} . Defines how script exit is handled. If set to 'grace_exit_all' mina CLI to stop all daemon nodes, and kill SNARK workers; If set to 'kill_snark_workers' to only kill SNARK workers but ignoring everything else.
+                                         |   Default: ${ON_EXIT}
+--node-status-url                        | Url of the node status collection service 
+                                         |   Default: not set
+-h   |--help                             | Displays this help message
+
+Available logging levels:
+  Spam, Trace, Debug, Info, Warn, Error, Faulty_peer, Fatal
+
+Available proof levels:
+  full, check, none
+
+EOF
 
   exit
 }
+
+stop-node() {
+    local tag="$1"
+    local port="$2"
+
+    echo "Stopping $tag at $port"
+
+    "$MINA_EXE" client stop-daemon --daemon-port "$port"
+    if [ $? -ne 0 ]; then
+        echo "Failed to stop $tag on port $port" >&2
+    fi
+}
+
+# Kill all processes when script exits
+on-exit() {
+  echo "Shutting down mina local network"
+
+  local job_pids=()
+
+  # 1. stop all SNARK workers
+  for pid in "${SNARK_WORKERS_PIDS[@]}"; do
+    {
+      echo "Killing SNARK worker at $pid"
+      kill "$pid"
+    } &
+    job_pids+=("$!")
+  done
+
+  for jpid in "${job_pids[@]}"; do
+    wait "$jpid"
+  done
+
+  job_pids=()
+
+  case "$ON_EXIT" in
+    grace_exit_all)
+      # 2. stop every non-seed nodes
+      if [[ -n "${SNARK_COORDINATOR_PORT}" ]]; then
+        stop-node "snark-coordinator" "$SNARK_COORDINATOR_PORT" &
+        job_pids+=("$!")
+      fi
+
+      for ((i=0; i<FISH; i++)); do
+        port=$((FISH_START_PORT + i*6))
+        stop-node "fish_${i}" "$port" &
+        job_pids+=("$!")
+      done
+
+      for ((i=0; i<NODES; i++)); do
+        port=$((NODE_START_PORT + i*6))
+        stop-node "node_${i}" "$port" &
+        job_pids+=("$!")
+      done
+
+      for ((i=0; i<WHALES; i++)); do
+        port=$((WHALE_START_PORT + i*6))
+        stop-node "whale_${i}" "$port" &
+        job_pids+=("$!")
+      done
+
+      for jpid in "${job_pids[@]}"; do
+        wait "$jpid"
+      done
+
+      if [[ -n "${ROSETTA_PORT}" ]]; then
+        kill "$ROSETTA_PID"
+        wait "$ROSETTA_PID"
+      fi
+
+      # 3. stop the seed node, if we've spawned it.
+      if [[ -n "${SEED_PID}" ]]; then
+        stop-node "seed" "$SEED_START_PORT"
+      fi
+      ;;
+    kill_snark_workers)
+      # NOTE: SNARK workers are already killed out of this case-statement. Hence
+      # no need to do anything here.
+      : ;;
+    *)
+      echo "Unknown ON_EXIT value: $1" >&2
+      return 1 ;;
+  esac
+}
+
+trap on-exit TERM INT
 
 clean-dir() {
   rm -rf "${1}"
@@ -151,11 +272,17 @@ clean-dir() {
 }
 
 generate-keypair() {
-  ${MINA_EXE} advanced generate-keypair -privkey-path "${1}"
+  if ! ${MINA_EXE} advanced generate-keypair -privkey-path "${1}"; then
+    echo "❌ Failed to generate daemon keypair at '${1}'." >&2
+    return 1
+  fi
 }
 
 generate-libp2p-keypair() {
-  ${MINA_EXE} libp2p generate-keypair -privkey-path "${1}"
+  if ! ${MINA_EXE} libp2p generate-keypair -privkey-path "${1}"; then
+    echo "❌ Failed to generate libp2p keypair at '${1}'." >&2
+    return 1
+  fi 
 }
 
 # Executes the Mina Daemon, exposing all 5 ports in
@@ -164,44 +291,70 @@ exec-daemon() {
   BASE_PORT=${1}
   shift
   CLIENT_PORT=${BASE_PORT}
-  # shellcheck disable=SC2004
-  REST_PORT=$((${BASE_PORT} + 1))
-  # shellcheck disable=SC2004
-  EXTERNAL_PORT=$((${BASE_PORT} + 2))
-  # shellcheck disable=SC2004
-  DAEMON_METRICS_PORT=$((${BASE_PORT} + 3))
-  # shellcheck disable=SC2004
-  LIBP2P_METRICS_PORT=$((${BASE_PORT} + 4))
+  REST_PORT=$((BASE_PORT + 1))
+  EXTERNAL_PORT=$((BASE_PORT + 2))
+  DAEMON_METRICS_PORT=$((BASE_PORT + 3))
+  LIBP2P_METRICS_PORT=$((BASE_PORT + 4))
+
+
+  local extra_opts=()
+  local copied_override_genesis_ledger="${FOLDER}/override_genesis_ledger"
+
+  if [ -d "$OVERRIDE_GENSIS_LEDGER" ]; then
+    cp -r "$OVERRIDE_GENSIS_LEDGER" "$copied_override_genesis_ledger"
+  fi
+
+  if [ -d "$copied_override_genesis_ledger" ]; then
+    extra_opts+=( --genesis-ledger-dir "$copied_override_genesis_ledger")
+  fi
+
+  # ITN features: only enabled when ITN_KEYS is provided
+  # This only takes effect for daemons
+  if [ -n "$ITN_KEYS" ]; then
+    ITN_GRAPHQL_PORT=$((BASE_PORT + 5))
+
+    extra_opts+=( --itn-keys "$ITN_KEYS" )
+    extra_opts+=( --itn-graphql-port "${ITN_GRAPHQL_PORT}" )
+  fi
+
+  if [ -n "$HARDFORK_HANDLING" ]; then
+    extra_opts+=( --hardfork-handling "$HARDFORK_HANDLING" )
+  fi
+
+  if [ -n "$NODE_STATUS_URL" ]; then
+    extra_opts+=( --node-status-url "$NODE_STATUS_URL" )
+  fi
 
   # shellcheck disable=SC2068
   exec ${MINA_EXE} daemon \
-    -client-port "${CLIENT_PORT}" \
-    -rest-port ${REST_PORT} \
-    -insecure-rest-server \
-    -external-port ${EXTERNAL_PORT} \
-    -metrics-port ${DAEMON_METRICS_PORT} \
-    -libp2p-metrics-port ${LIBP2P_METRICS_PORT} \
-    -config-file "${CONFIG}" \
-    -log-json \
-    -log-level "${LOG_LEVEL}" \
-    -file-log-level "${FILE_LOG_LEVEL}" \
-    -precomputed-blocks-file "${FOLDER}"/precomputed_blocks.log \
-    -log-precomputed-blocks ${LOG_PRECOMPUTED_BLOCKS} \
-    $@
+    --client-port "${CLIENT_PORT}" \
+    --rest-port ${REST_PORT} \
+    --insecure-rest-server \
+    --external-port ${EXTERNAL_PORT} \
+    --metrics-port ${DAEMON_METRICS_PORT} \
+    --libp2p-metrics-port ${LIBP2P_METRICS_PORT} \
+    --config-file "${CONFIG}" \
+    --log-level "${LOG_LEVEL}" \
+    --file-log-level "${FILE_LOG_LEVEL}" \
+    --precomputed-blocks-file "${FOLDER}"/precomputed_blocks.log \
+    --log-precomputed-blocks ${LOG_PRECOMPUTED_BLOCKS} \
+    --proof-level "${PROOF_LEVEL}" \
+    $@ ${extra_opts[@]}
 }
 
 # Executes the Mina Snark Worker
-exec-worker-daemon() {
+exec-snark-worker() {
   COORDINATOR_PORT=${1}
   shift
-  SHUTDOWN_ON_DISCONNECT="false"
   COORDINATOR_HOST_AND_PORT="localhost:${COORDINATOR_PORT}"
 
   # shellcheck disable=SC2068
   exec ${MINA_EXE} internal snark-worker \
-    -proof-level "${PROOF_LEVEL}" \
-    -shutdown-on-disconnect "${SHUTDOWN_ON_DISCONNECT}" \
-    -daemon-address "${COORDINATOR_HOST_AND_PORT}" \
+    --proof-level "${PROOF_LEVEL}" \
+    --shutdown-on-disconnect false \
+    --log-level "${LOG_LEVEL}" \
+    --file-log-level "${FILE_LOG_LEVEL}" \
+    --daemon-address "${COORDINATOR_HOST_AND_PORT}" \
     $@
 }
 
@@ -216,28 +369,80 @@ exec-archive-node() {
     $@
 }
 
-# Spawns the Node in background
-spawn-node() {
-  FOLDER=${1}
-  shift
+exec-rosetta-node() {
   # shellcheck disable=SC2068
-  exec-daemon $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
+  MINA_ROSETTA_MAX_DB_POOL_SIZE=${MINA_ROSETTA_MAX_DB_POOL_SIZE} exec ${ROSETTA_EXE} \
+    --archive-uri postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" \
+    --graphql-uri $((SEED_START_PORT + 1)) \
+    --port "${ROSETTA_PORT}" \
+    --log-level "${LOG_LEVEL}" \
+    $@
+}
+
+log-file() {
+  # If $1 is provided, use it. Otherwise, fall back to $REDIRECT_LOGS.
+  local should_redirect="${1:-$REDIRECT_LOGS}"
+
+  if [[ "$should_redirect" == true ]]; then
+    tee "${FOLDER}/log.txt"
+  else
+    cat
+  fi
+}
+
+tag-stdout() {
+  awk -v tag="$1" '{ print "[" tag "] " $0 }'
+}
+
+# Spawns the Node in background
+spawn-daemon() {
+  local tag=${1}
+  FOLDER=${2}
+  shift 2
+
+  # NOTE:
+  # Process Substitution >(...): This creates a "named pipe" under the hood. 
+  # `exec-daemon` treats it like a file output, but the data is actually being 
+  # piped into the logging functions.
+  # The `&` placement: By putting the & immediately after the exec-daemon 
+  # command (and its redirections), $! specifically tracks that process.
+
+  # shellcheck disable=SC2068
+  exec-daemon $@ \
+    --config-directory "$FOLDER" \
+    > >(log-file | tag-stdout "$tag") 2>&1 &
 }
 
 # Spawns worker in background
-spawn-worker() {
-  FOLDER=${1}
-  shift
+# Optionally redirect worker logs to file if REDIRECT_WORKER_LOGS is true
+spawn-snark-worker() {
+  local tag=${1}
+  FOLDER=${2}
+  shift 2
+
   # shellcheck disable=SC2068
-  exec-worker-daemon $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
+  exec-snark-worker $@ \
+    --config-directory "${FOLDER}" \
+    > >(log-file "$REDIRECT_WORKER_LOGS" | tag-stdout "$tag") 2>&1 &
 }
 
 # Spawns the Archive Node in background
 spawn-archive-node() {
   FOLDER=${1}
   shift
+
   # shellcheck disable=SC2068
-  exec-archive-node $@ &>"${FOLDER}"/log.txt &
+  exec-archive-node $@ \
+    > >(log-file | tag-stdout "archive") 2>&1 &
+}
+
+spawn-rosetta-server() {
+  FOLDER=${1}
+  shift
+
+  # shellcheck disable=SC2068
+  exec-rosetta-node $@ \
+    > >(log-file | tag-stdout "rosetta") 2>&1 &
 }
 
 # Resets genesis ledger
@@ -247,9 +452,27 @@ reset-genesis-ledger() {
   echo 'Resetting Genesis Ledger...'
   printf "\n"
 
-  jq "{genesis: {genesis_state_timestamp:\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"}, ledger:.}" \
-    <"${GENESIS_LEDGER_FOLDER}"/genesis_ledger.json \
-    >"${DAEMON_CONFIG}"
+  # WARN: ensure we're always using the same consensus param here and in hard fork test!
+  jq --arg timestamp "$(date +"%Y-%m-%dT%H:%M:%S%z")" \
+     --arg proof_level "$PROOF_LEVEL" \
+  '
+  {
+    genesis: {
+      slots_per_epoch: 48,
+      k: 10,
+      grace_period_slots: 3,
+      genesis_state_timestamp: $timestamp
+    },
+    proof: {
+      work_delay: 1,
+      level: $proof_level,
+      transaction_capacity: { 
+        "2_to_the": 2 
+      },
+    },
+    ledger: .
+  }
+  ' < "${GENESIS_LEDGER_FOLDER}/genesis_ledger.json" > "${DAEMON_CONFIG}"
 }
 
 recreate-schema() {
@@ -261,13 +484,32 @@ recreate-schema() {
 
   # We need to change our working directory as script has relation to others subscripts
   # and calling them from local folder
-  cd ./src/app/archive
+  pushd ./src/app/archive
   psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" < create_schema.sql
-  cd ../../../
+  popd
 
   echo "Schema '${PG_DB}' created successfully."
   printf "\n"
 }
+
+jq-inplace() {
+  local jq_filter="$1"
+  local file="$2"
+
+  local tmp
+  tmp=$(mktemp)
+  jq "$jq_filter" "$file" > "$tmp" && mv -f "$tmp" "$file"
+}
+
+config_mode_is_inherit() {
+  [[ "$1" == "inherit" || "$1" == inherit_with:* ]]
+}
+
+is_process_running() {
+  kill -0 "$1" 2>/dev/null
+}
+
+REDIRECT_WORKER_LOGS=true
 
 # ================================================
 # Parse inputs from arguments
@@ -280,6 +522,9 @@ done
 
 while [[ "$#" -gt 0 ]]; do
   case ${1} in
+    --no-worker-log-redirect)
+      REDIRECT_WORKER_LOGS=false
+      ;;
   -w | --whales)
     WHALES="${2}"
     shift
@@ -292,10 +537,20 @@ while [[ "$#" -gt 0 ]]; do
     NODES="${2}"
     shift
     ;;
-  -a | --archive) ARCHIVE=true ;;
-  -sp | --seed-start-port)
-    SEED_START_PORT="${2}"
+  -s | --seed)
+    SEED="${2}"
     shift
+    ;;
+  -rmps | --rosetta-max-pool-size)
+    MINA_ROSETTA_MAX_DB_POOL_SIZE="${2}"
+    shift
+    ;;
+  -rp | --rosetta-port)
+    ROSETTA_PORT="${2}"
+    shift
+    ;;
+  -d | --demo)
+    DEMO_MODE=true
     ;;
   -scp | --snark-coordinator-start-port)
     SNARK_COORDINATOR_PORT="${2}"
@@ -351,8 +606,8 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   -vt | --value-transfer-txns) VALUE_TRANSFERS=true ;;
   -zt | --zkapp-transactions) ZKAPP_TRANSACTIONS=true ;;
-  -tf | --transactions-frequency)
-    TRANSACTION_FREQUENCY="${2}"
+  -ti | --transaction-interval)
+    TRANSACTION_INTERVAL="${2}"
     shift
     ;;
   -sf | --snark-worker-fee)
@@ -364,13 +619,53 @@ while [[ "$#" -gt 0 ]]; do
     PROOF_LEVEL="${2}"
     shift
     ;;
-  -r | --reset) RESET=true ;;
-  -u | --update-genesis-timestamp) UPDATE_GENESIS_TIMESTAMP=true ;;
+  -c | --config)
+    CONFIG_MODE="${2}"
+    shift
+    ;;
+  -u | --update-genesis-timestamp) 
+    UPDATE_GENESIS_TIMESTAMP="${2}"
+    shift
+    ;;
   -st |--override-slot-time)
-      OVERRIDE_SLOT_TIME_MS="${2}"
-      shift
-      ;;
-  -d | --demo) DEMO_MODE=true ;;
+    OVERRIDE_SLOT_TIME_MS="${2}"
+    shift
+    ;;
+  -ste | --slot-transaction-end) 
+    SLOT_TX_END="${2}"
+    shift
+    ;;
+  -sce | --slot-chain-end) 
+    SLOT_CHAIN_END="${2}"
+    shift
+    ;;
+  --itn-keys)
+    ITN_KEYS="${2}"
+    shift
+    ;;
+  -hfd |--hardfork-genesis-slot-delta)
+    HARDFORK_GENESIS_SLOT_DELTA="${2}"
+    shift
+    ;;
+  --hardfork-handling)
+    HARDFORK_HANDLING="${2}"
+    shift
+    ;;
+  -r | --root)
+    ROOT="${2}"
+    shift
+    ;;
+  --redirect-logs)
+    REDIRECT_LOGS=true
+    ;;
+  --on-exit)
+    ON_EXIT="${2}"
+    shift
+    ;;
+  --node-status-url) 
+    NODE_STATUS_URL="${2}"
+    shift
+    ;;
   *)
     echo "Unknown parameter passed: ${1}"
 
@@ -380,38 +675,43 @@ while [[ "$#" -gt 0 ]]; do
   shift
 done
 
-printf "\n"
-echo "================================"
-printf "\n"
-echo "███╗   ███╗██╗███╗   ██╗ █████╗ "
-echo "████╗ ████║██║████╗  ██║██╔══██╗"
-echo "██╔████╔██║██║██╔██╗ ██║███████║"
-echo "██║╚██╔╝██║██║██║╚██╗██║██╔══██║"
-echo "██║ ╚═╝ ██║██║██║ ╚████║██║  ██║"
-echo "╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝"
-echo "      .:: LOCAL NETWORK ::.     "
-printf "\n"
-echo "================================"
-printf "\n"
+
+cat <<'EOF'
+================================
+
+███╗   ███╗██╗███╗   ██╗ █████╗ 
+████╗ ████║██║████╗  ██║██╔══██╗
+██╔████╔██║██║██╔██╗ ██║███████║
+██║╚██╔╝██║██║██║╚██╗██║██╔══██║
+██║ ╚═╝ ██║██║██║ ╚████║██║  ██║
+╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝
+      .:: LOCAL NETWORK ::.     
+
+================================
+
+EOF
 
 # ================================================
 # Check the PostgreSQL configuration required
 # for Archive Node operation
 
-if ${ARCHIVE}; then
-  echo "Archive Node spawning is enabled, we need to do the PostgreSQL communication check."
-  echo "In case of any issues please make sure that you:"
-  echo -e "\t1. Run the PostgreSQL server;"
-  echo -e "\t2. Have configured the PostgreSQL access;"
-  echo -e "\t3. Have configured the PostgreSQL 'database';"
-  echo -e "\t\t3.1. psql -c 'CREATE DATABASE ${PG_DB}'"
-  echo -e "\t\t3.2. psql ${PG_DB} < ./src/app/archive/create_schema.sql'"
-  echo -e "\t4. Passed correct PostgreSQL credentials as CLI arguments to this script."
-  printf "\n"
-  echo "================================"
-  printf "\n"
+if [[ -n "${ARCHIVE_SERVER_PORT}" ]]; then
+cat <<EOF
 
-  if ${RESET}; then
+Archive Node spawning is enabled, we need to do the PostgreSQL communication check.
+In case of any issues please make sure that you:
+  1. Run the PostgreSQL server;
+  2. Have configured the PostgreSQL access;
+  3. Have configured the PostgreSQL 'database';
+    3.1. psql -c 'CREATE DATABASE ${PG_DB}'
+    3.2. psql ${PG_DB} < ./src/app/archive/create_schema.sql'
+  4. Passed correct PostgreSQL credentials as CLI arguments to this script.
+
+================================
+
+EOF
+
+  if ! config_mode_is_inherit "$CONFIG_MODE"; then
     recreate-schema
   fi
 
@@ -421,136 +721,107 @@ if ${ARCHIVE}; then
 fi
 
 # ================================================
-# Configure the Seed Peer ID
-
-SEED_PEER_ID="/ip4/127.0.0.1/tcp/$((${SEED_START_PORT} + 2))/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
-
-# ================================================
 #
 
-if ${VALUE_TRANSFERS}; then
-  if [ "${FISH}" -eq "0" ]; then
-    echo "Sending transactions requires at least one 'Fish' node running!"
-    printf "\n"
-
+# Ensure at least 1 Whale or 1 Fish for standard transfers
+if [ "${VALUE_TRANSFERS}" = "true" ] && [ "${WHALES}" -lt 1 ] && [ "${FISH}" -lt 1 ]; then
+    echo "Error: Value transfers require at least 1 Whale or 1 Fish node."
     exit 1
-  fi
 fi
 
-if ${ZKAPP_TRANSACTIONS}; then
-  if [ "${WHALES}" -lt "2" ] || [ "${FISH}" -eq "0" ]; then
-    echo "Send zkApp transactions requires at least one 'Fish' node running and at least 2 whale accounts acting as the fee payer and sender account!"
-    printf "\n"
-
+# Ensure at least 2 Whales for zkApp transactions
+if [ "${ZKAPP_TRANSACTIONS}" = "true" ] && [ "${WHALES}" -lt 2 ]; then
+    echo "Error: zkApp transactions require at least 2 Whale accounts."
     exit 1
-  fi
 fi
 
 # ================================================
 # Create the Genesis Ledger
 
-if ${DEMO_MODE}; then
-  LEDGER_FOLDER="${HOME}/.mina-network/mina-local-network-demo"
-else
-  LEDGER_FOLDER="${HOME}/.mina-network/mina-local-network-${WHALES}-${FISH}-${NODES}"
+if ! config_mode_is_inherit "$CONFIG_MODE" ; then
+  rm -rf "${ROOT}"
+elif [ ! -d "${ROOT}" ]; then
+  echo "Error: ROOT does not exist to inherit from."
+  exit 1
 fi
 
-if ${RESET}; then
-  rm -rf "${LEDGER_FOLDER}"
-  if ${ARCHIVE}; then
-    recreate-schema
-  fi
-fi
-
-if [ ! -d "${LEDGER_FOLDER}" ]; then
-  echo "Making the Ledger..."
+if [ ! -d "${ROOT}" ]; then
+  echo "Generating keypairs..."
   printf "\n"
 
-  mkdir -p "${LEDGER_FOLDER}"
+  mkdir -p "${ROOT}"
 
-  clean-dir "${LEDGER_FOLDER}"/offline_whale_keys
-  clean-dir "${LEDGER_FOLDER}"/offline_fish_keys
-  clean-dir "${LEDGER_FOLDER}"/online_whale_keys
-  clean-dir "${LEDGER_FOLDER}"/online_fish_keys
-  clean-dir "${LEDGER_FOLDER}"/snark_coordinator_keys
-  clean-dir "${LEDGER_FOLDER}"/service-keys
-  clean-dir "${LEDGER_FOLDER}"/libp2p_keys
-  clean-dir "${LEDGER_FOLDER}"/zkapp_keys
+  clean-dir "${ROOT}"/offline_whale_keys
+  clean-dir "${ROOT}"/offline_fish_keys
+  clean-dir "${ROOT}"/online_whale_keys
+  clean-dir "${ROOT}"/online_fish_keys
+  clean-dir "${ROOT}"/snark_coordinator_keys
+  clean-dir "${ROOT}"/libp2p_keys
+  clean-dir "${ROOT}"/zkapp_keys
 
   if ${ZKAPP_TRANSACTIONS}; then
-    generate-keypair ${LEDGER_FOLDER}/zkapp_keys/zkapp_account
+    generate-keypair ${ROOT}/zkapp_keys/zkapp_account
   fi
 
-  generate-keypair "${LEDGER_FOLDER}"/snark_coordinator_keys/snark_coordinator_account
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${FISH}; i++)); do
-    generate-keypair "${LEDGER_FOLDER}"/offline_fish_keys/offline_fish_account_${i}
-    generate-keypair "${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_${i}
-    generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/fish_${i}
+  generate-keypair "${ROOT}"/snark_coordinator_keys/snark_coordinator_account
+  for ((i = 0; i < FISH; i++)); do
+    generate-keypair "${ROOT}"/offline_fish_keys/offline_fish_account_${i}
+    generate-keypair "${ROOT}"/online_fish_keys/online_fish_account_${i}
+    generate-libp2p-keypair "${ROOT}"/libp2p_keys/fish_${i}
   done
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${WHALES}; i++)); do
-    generate-keypair "${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_${i}
-    generate-keypair "${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_${i}
-    generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/whale_${i}
+  for ((i = 0; i < WHALES; i++)); do
+    generate-keypair "${ROOT}"/offline_whale_keys/offline_whale_account_${i}
+    generate-keypair "${ROOT}"/online_whale_keys/online_whale_account_${i}
+    generate-libp2p-keypair "${ROOT}"/libp2p_keys/whale_${i}
   done
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${NODES}; i++)); do
-    generate-keypair "${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_${i}
-    generate-keypair "${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_${i}
-    generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/node_${i}
+  for ((i = 0; i < NODES; i++)); do
+    generate-keypair "${ROOT}"/offline_whale_keys/offline_whale_account_${i}
+    generate-keypair "${ROOT}"/online_whale_keys/online_whale_account_${i}
+    generate-libp2p-keypair "${ROOT}"/libp2p_keys/node_${i}
   done
 
   if [ "$(uname)" != "Darwin" ] && [ ${FISH} -gt 0 ]; then
-    # shellcheck disable=SC2012
-    FILE=$(ls "${LEDGER_FOLDER}"/offline_fish_keys/ | head -n 1)
-    OWNER=$(stat -c "%U" "${LEDGER_FOLDER}"/offline_fish_keys/"${FILE}")
+    FILE=$(find "${ROOT}/offline_fish_keys" -mindepth 1 -maxdepth 1 -type f | head -n 1)
+    OWNER=$(stat -c "%U" "${FILE}")
 
     if [ "${FILE}" != "${OWNER}" ]; then
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/zkapp_keys
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/offline_fish_keys
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/online_fish_keys
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/offline_whale_keys
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/online_whale_keys
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/snark_coordinator_keys
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/service-keys
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/libp2p_keys
+      # Check if sudo command exists
+      if command -v sudo >/dev/null 2>&1; then
+        SUDO_CMD="sudo"
+      else
+        SUDO_CMD=""
+      fi
+
+      ${SUDO_CMD} chown -R "${OWNER}" "${ROOT}"/zkapp_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${ROOT}"/offline_fish_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${ROOT}"/online_fish_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${ROOT}"/offline_whale_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${ROOT}"/online_whale_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${ROOT}"/snark_coordinator_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${ROOT}"/libp2p_keys
     fi
   fi
 
-  chmod -R 0700 "${LEDGER_FOLDER}"/zkapp_keys
-  chmod -R 0700 "${LEDGER_FOLDER}"/offline_fish_keys
-  chmod -R 0700 "${LEDGER_FOLDER}"/online_fish_keys
-  chmod -R 0700 "${LEDGER_FOLDER}"/offline_whale_keys
-  chmod -R 0700 "${LEDGER_FOLDER}"/online_whale_keys
-  chmod -R 0700 "${LEDGER_FOLDER}"/snark_coordinator_keys
-  chmod -R 0700 "${LEDGER_FOLDER}"/service-keys
-  chmod -R 0700 "${LEDGER_FOLDER}"/libp2p_keys
-
-  python3 scripts/mina-local-network/generate-mina-local-network-ledger.py \
-    --num-whale-accounts "${WHALES}" \
-    --num-fish-accounts "${FISH}" \
-    --offline-whale-accounts-directory "${LEDGER_FOLDER}"/offline_whale_keys \
-    --offline-fish-accounts-directory "${LEDGER_FOLDER}"/offline_fish_keys \
-    --online-whale-accounts-directory "${LEDGER_FOLDER}"/online_whale_keys \
-    --online-fish-accounts-directory "${LEDGER_FOLDER}"/online_fish_keys \
-    --snark-coordinator-accounts-directory "${LEDGER_FOLDER}"/snark_coordinator_keys
-
-  mv -f scripts/mina-local-network/genesis_ledger.json "${LEDGER_FOLDER}"/genesis_ledger.json
-
-  printf "\n"
-  echo "================================"
-  printf "\n"
+  chmod -R 0700 "${ROOT}"/zkapp_keys
+  chmod -R 0700 "${ROOT}"/offline_fish_keys
+  chmod -R 0700 "${ROOT}"/online_fish_keys
+  chmod -R 0700 "${ROOT}"/offline_whale_keys
+  chmod -R 0700 "${ROOT}"/online_whale_keys
+  chmod -R 0700 "${ROOT}"/snark_coordinator_keys
+  chmod -R 0700 "${ROOT}"/libp2p_keys
 fi
 
-SNARK_COORDINATOR_PUBKEY=$(cat "${LEDGER_FOLDER}"/snark_coordinator_keys/snark_coordinator_account.pub)
+printf "\n"
+echo "================================"
+printf "\n"
 
+SNARK_COORDINATOR_PUBKEY=$(cat "${ROOT}"/snark_coordinator_keys/snark_coordinator_account.pub)
 
 # ================================================
 # Check the demo mode
 
 if ${DEMO_MODE}; then
-  echo "Demo mode requires no Whale nodes, no Fish nodes and no non block-producing nodes!"
+  echo "Demo mode requires no standalone whales, fish, plain nodes, or snark workers!"
   echo "Resetting the values to 0."
 
   # Set the default values for demo mode
@@ -571,70 +842,150 @@ fi
 # ================================================
 # Print the configuration summary
 
-echo "Starting the Network with:"
-echo -e "\t1 seed"
-echo -e "\t1 snark coordinator"
-echo -e "\t${SNARK_WORKERS_COUNT} snark worker(s)"
+cat <<EOF
+Starting the Network with:
+    1 seed
+    1 snark coordinator
+    ${SNARK_WORKERS_COUNT} snark worker(s)
+    $([[ -n "$ARCHIVE_SERVER_PORT" ]] && echo 1 || echo 0) archive
+    $([[ -n "$ROSETTA_PORT" ]] && echo 1 || echo 0) rosetta
+    ${WHALES} whales
+    ${FISH} fish
+    ${NODES} non block-producing nodes
+    Sending transactions: ${VALUE_TRANSFERS}
+    Sending zkApp transactions: ${ZKAPP_TRANSACTIONS}
 
-if ${ARCHIVE}; then
-  echo -e "\t1 archive"
-fi
+================================
 
-echo -e "\t${WHALES} whales"
-echo -e "\t${FISH} fish"
-echo -e "\t${NODES} non block-producing nodes"
-echo -e "\tSending transactions: ${VALUE_TRANSFERS}"
-echo -e "\tSending zkApp transactions: ${ZKAPP_TRANSACTIONS}"
-printf "\n"
-echo "================================"
-printf "\n"
+EOF
 
 
 # ================================================
 # Update the Genesis State Timestamp or Reset the Genesis Ledger
 
-CONFIG=${LEDGER_FOLDER}/daemon.json
+CONFIG=${ROOT}/daemon.json
 
-if ${RESET}; then
-  reset-genesis-ledger "${LEDGER_FOLDER}" "${CONFIG}"
+load_config() {
+  local config_mode="${1}"
+  local config_file="${2}"
+
+  case "${config_mode}" in
+    inherit)
+      if [ ! -f "${config_file}" ]; then
+        echo "Error: Config file '${config_file}' does not exist, can't inherit." >&2
+        exit 1
+      fi
+      echo "Inheriting config file ${config_file}:"
+      cat "${config_file}"
+      ;;
+    reset)
+
+      echo "Making the Ledger..." 
+      python3 scripts/mina-local-network/generate-mina-local-network-ledger.py \
+        --num-whale-accounts "${WHALES}" \
+        --num-fish-accounts "${FISH}" \
+        --offline-whale-accounts-directory "${ROOT}"/offline_whale_keys \
+        --offline-fish-accounts-directory "${ROOT}"/offline_fish_keys \
+        --online-whale-accounts-directory "${ROOT}"/online_whale_keys \
+        --online-fish-accounts-directory "${ROOT}"/online_fish_keys \
+        --snark-coordinator-accounts-directory "${ROOT}"/snark_coordinator_keys \
+        --out-genesis-ledger-file "${ROOT}"/genesis_ledger.json
+
+      reset-genesis-ledger "${ROOT}" "${config_file}"
+      echo "Using freshly generated config file ${config_file}:"
+      cat "${config_file}"
+      ;;
+    inherit_with:*)
+      local replaced_config_file
+      IFS=',' read -r replaced_config_file OVERRIDE_GENSIS_LEDGER <<< "${config_mode#inherit_with:}"
+      if [ ! -f "${replaced_config_file}" ]; then
+        echo "Error: Config file '${replaced_config_file}' does not exist, can't inherit_with." >&2
+        exit 1
+      else
+        echo "Inheriting config at ${replaced_config_file}:"
+        cat "${replaced_config_file}"
+      fi
+      cp -f "${replaced_config_file}" "${config_file}"
+      ;;
+  esac
+}
+
+load_config "${CONFIG_MODE}" "${CONFIG}"
+
+if [ -n "$OVERRIDE_GENSIS_LEDGER" ]; then
+  echo "Inherited genesis ledgers: "
+  ls -1 "$OVERRIDE_GENSIS_LEDGER"
 fi
 
-if ${UPDATE_GENESIS_TIMESTAMP}; then
-  if test -f "${CONFIG}"; then
-    echo 'Updating Genesis State timestamp...'
-    printf "\n"
+update_genesis_timestamp() {
+  case "$1" in
+    fixed:*)
+      local timestamp="${1#fixed:}"
+      echo "Updating Genesis State timestamp to ${timestamp}..."
 
-    tmp=$(mktemp)
-    jq ".genesis.genesis_state_timestamp=\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"" "${CONFIG}" >"$tmp" && mv -f "$tmp" "${CONFIG}"
-  else
-    reset-genesis-ledger "${LEDGER_FOLDER}" "${CONFIG}"
-  fi
-fi
+      local overridden_unix
+      overridden_unix=$(date -d "$timestamp" +%s)
+      local now_unix
+      now_unix=$(date +%s)
+
+      # NOTE: while there's still race condition that before all nodes are 
+      # spawned up we passed this instant, we should catch the improperly-set 
+      # genesis timestamp in most scenarios
+      if (( overridden_unix < now_unix )); then
+        echo "Spawning a network with genesis $timestamp in the past!!"
+        return 1
+      fi
+      jq-inplace ".genesis.genesis_state_timestamp=\"${timestamp}\"" "${CONFIG}"
+      ;;
+    delay_sec:*)
+      local delay_sec="${1#delay_sec:}"
+      local now
+      now=$(date +%s)
+      local timestamp
+      timestamp=$(date -u -d "@$((now + delay_sec))" '+%F %H:%M:%S+00:00')
+      echo "Updating Genesis State timestamp to ${timestamp}..."
+      jq-inplace ".genesis.genesis_state_timestamp=\"${timestamp}\"" "${CONFIG}"
+      ;;
+    no)
+      : ;;
+    *)
+      echo "Unknown UPDATE_GENESIS_TIMESTAMP value: $1" >&2
+      return 1 ;;
+  esac
+}
+
+update_genesis_timestamp "${UPDATE_GENESIS_TIMESTAMP}"
 
 if [ ! -z "${OVERRIDE_SLOT_TIME_MS}" ]; then
-  echo 'Modifying configuration to override slot time'
-  
-  if [ ! -f "${CONFIG}" ]; then
-    reset-genesis-ledger "${LEDGER_FOLDER}" "${CONFIG}"
-  fi
-  
-  printf "\n"
-  tmp=$(mktemp)
-  jq ".proof.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" "${CONFIG}" >"$tmp" && mv -f "$tmp" "${CONFIG}"
+  echo "Setting proof.block_window_duration_ms to ${OVERRIDE_SLOT_TIME_MS}..."
+  jq-inplace ".proof.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" "${CONFIG}"
+fi
+
+if [ ! -z "${SLOT_TX_END}" ]; then
+  echo "Setting daemon.slot_tx_end to ${SLOT_TX_END}..."
+  jq-inplace ".daemon.slot_tx_end=${SLOT_TX_END}" "${CONFIG}"
+fi
+
+if [ ! -z "${SLOT_CHAIN_END}" ]; then
+  echo "Setting daemon.slot_chain_end to ${SLOT_CHAIN_END}..."
+  jq-inplace ".daemon.slot_chain_end=${SLOT_CHAIN_END}" "${CONFIG}"
+fi
+
+if [ ! -z "${HARDFORK_GENESIS_SLOT_DELTA}" ]; then
+  echo "Setting daemon.hard_fork_genesis_slot_delta to ${HARDFORK_GENESIS_SLOT_DELTA}..."
+  jq-inplace ".daemon.hard_fork_genesis_slot_delta=${HARDFORK_GENESIS_SLOT_DELTA}" "${CONFIG}"
 fi
 
 # ================================================
 # Launch the Nodes
 
-NODES_FOLDER=${LEDGER_FOLDER}/nodes
+NODES_FOLDER=${ROOT}/nodes
 mkdir -p ${NODES_FOLDER}/seed
 
-if ! ${DEMO_MODE}; then
-  mkdir -p "${NODES_FOLDER}"/snark_coordinator
-  mkdir -p "${NODES_FOLDER}"/snark_workers
-fi
+mkdir -p "${NODES_FOLDER}"/snark_coordinator
+mkdir -p "${NODES_FOLDER}"/snark_workers
 
-if ${RESET}; then
+if ! config_mode_is_inherit "$CONFIG_MODE"; then
   clean-dir "${NODES_FOLDER}"
   mkdir -p "${NODES_FOLDER}"/seed
   mkdir -p "${NODES_FOLDER}"/snark_coordinator
@@ -643,7 +994,7 @@ fi
 
 # ----------
 
-if ${ARCHIVE}; then
+if [[ -n "${ARCHIVE_SERVER_PORT}" ]]; then
   echo 'Starting the Archive Node...'
   printf "\n"
 
@@ -653,168 +1004,229 @@ if ${ARCHIVE}; then
   ARCHIVE_PID=$!
 fi
 
-# ----------
+if [[ -n "${ROSETTA_PORT}" ]]; then
+  if [[ -z "${ARCHIVE_SERVER_PORT}" ]]; then
+    echo "Rosetta server requires Archive node to be running!"
+    printf "\n"
 
-if ${DEMO_MODE}; then
-  echo "Running in demo mode, only seed node is going to be started."
+    exit 1
+  fi
+
+  echo 'Starting the Rosetta server...'
   printf "\n"
 
-  spawn-node ${NODES_FOLDER}/seed ${SEED_START_PORT} \
-    -block-producer-key ${LEDGER_FOLDER}/online_whale_keys/online_whale_account_0 \
-    --run-snark-worker "$(cat ${LEDGER_FOLDER}/snark_coordinator_keys/snark_coordinator_account.pub)" \
-    --snark-worker-fee 0.001 \
-    --proof-level ${PROOF_LEVEL} \
-    --demo-mode \
-    --external-ip "$(hostname -i)" \
-    --seed \
-    ${ARCHIVE_ADDRESS_CLI_ARG}
+  mkdir -p "${NODES_FOLDER}"/rosetta
 
-else 
-  spawn-node "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY} "${ARCHIVE_ADDRESS_CLI_ARG}"
+  spawn-rosetta-server "${NODES_FOLDER}"/rosetta
+  ROSETTA_PID=$!
 fi
 
-SEED_PID=$!
+# ----------
 
-echo 'Waiting for seed to go up...'
-printf "\n"
+SEED_PEER_ID=
+case "${SEED}" in
+  spawn:*)
+    SEED_START_PORT="${SEED#spawn:}"
+    SEED_PEER_ID="/ip4/127.0.0.1/tcp/$((SEED_START_PORT + 2))/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
+    if ${DEMO_MODE}; then
+      echo "Running in demo mode, an amalgamation node is going to be started."
+      printf "\n"
+      spawn-daemon seed ${NODES_FOLDER}/seed ${SEED_START_PORT} \
+        -block-producer-key ${ROOT}/online_whale_keys/online_whale_account_0 \
+        --run-snark-worker "$(cat ${ROOT}/snark_coordinator_keys/snark_coordinator_account.pub)" \
+        --snark-worker-fee 0.001 \
+        --demo-mode \
+        --external-ip "$(hostname -i)" \
+        --seed \
+        ${ARCHIVE_ADDRESS_CLI_ARG}
+    else
+      spawn-daemon seed "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY} "${ARCHIVE_ADDRESS_CLI_ARG}"
+    fi
+    SEED_PID=$!
 
-until ${MINA_EXE} client status -daemon-port "${SEED_START_PORT}" &>/dev/null; do
-  sleep 1
-done
+    echo 'Waiting for seed to go up...'
+    printf "\n"
+
+    until ${MINA_EXE} client status -daemon-port "${SEED_START_PORT}" &>/dev/null; do
+      sleep ${POLL_INTERVAL}
+    done
+    ;;
+
+  at:*)
+    if ${DEMO_MODE}; then
+      echo "Running in demo mode, external seed is not supported!" >&2
+      exit 1
+    fi
+
+    SEED_PEER_ID="${SEED#at:}"
+    echo "Listening to external seed node at ${SEED_PEER_ID}"
+    SEED_PID=""
+    ;;
+esac
+printf "$SEED_PEER_ID" > "${ROOT}/seed_peer_id.txt"
 
 #---------- Starting snark coordinator
 
-if [ "${SNARK_WORKERS_COUNT}" -eq "0" ]; then
+
+if [[ -z "${SNARK_COORDINATOR_PORT}" ]]; then
+  echo "Skipping snark coordinator because no SNARK_COORDINATOR_PORT is provided"
+elif [ "${SNARK_WORKERS_COUNT}" -eq "0" ]; then
   echo "Skipping snark coordinator because SNARK_WORKERS_COUNT is 0"
-  SNARK_COORDINATOR_PID=""
-
-else
-
-  SNARK_COORDINATOR_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-coordinator ${SNARK_COORDINATOR_PUBKEY} -work-selection seq"
-  spawn-node "${NODES_FOLDER}"/snark_coordinator "${SNARK_COORDINATOR_PORT}" -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} ${SNARK_COORDINATOR_FLAGS}
-  SNARK_COORDINATOR_PID=$!
-
-  echo 'Waiting for snark coordinator to go up...'
-  printf "\n"
-
-  until ${MINA_EXE} client status -daemon-port "${SNARK_COORDINATOR_PORT}" &>/dev/null; do
-    sleep 1
-  done
+  SNARK_COORDINATOR_PORT=""
 fi
 
-#---------- Starting snark workers
-
-# shellcheck disable=SC2004
-for ((i = 0; i < ${SNARK_WORKERS_COUNT}; i++)); do
-  FOLDER=${NODES_FOLDER}/snark_workers/worker_${i}
-  mkdir -p "${FOLDER}"
-  spawn-worker "${FOLDER}" "${SNARK_COORDINATOR_PORT}"
-  SNARK_WORKERS_PIDS[${i}]=$!
-done
+if [[ -n "${SNARK_COORDINATOR_PORT}" ]]; then
+  SNARK_COORDINATOR_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-coordinator ${SNARK_COORDINATOR_PUBKEY} -work-selection seq"
+  spawn-daemon snark_coordinator "${NODES_FOLDER}"/snark_coordinator "${SNARK_COORDINATOR_PORT}" -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} ${SNARK_COORDINATOR_FLAGS}
+  SNARK_COORDINATOR_PID=$!
+fi
 
 # ----------
 
-# shellcheck disable=SC2004
-for ((i = 0; i < ${WHALES}; i++)); do
+for ((i = 0; i < WHALES; i++)); do
   FOLDER=${NODES_FOLDER}/whale_${i}
-  KEY_FILE=${LEDGER_FOLDER}/online_whale_keys/online_whale_account_${i}
+  KEY_FILE=${ROOT}/online_whale_keys/online_whale_account_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((${WHALE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
-    -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/whale_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
+  spawn-daemon "whale_${i}" "${FOLDER}" $((WHALE_START_PORT + i * 6)) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
+    -libp2p-keypair "${ROOT}"/libp2p_keys/whale_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   WHALE_PIDS[${i}]=$!
 done
 
 # ----------
 
-# shellcheck disable=SC2004
-for ((i = 0; i < ${FISH}; i++)); do
+for ((i = 0; i < FISH; i++)); do
   FOLDER=${NODES_FOLDER}/fish_${i}
-  KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_${i}
+  KEY_FILE=${ROOT}/online_fish_keys/online_fish_account_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((${FISH_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
-    -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/fish_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
+  spawn-daemon "fish_${i}" "${FOLDER}" $((FISH_START_PORT + i * 6)) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
+    -libp2p-keypair "${ROOT}"/libp2p_keys/fish_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   FISH_PIDS[${i}]=$!
 done
 
 # ----------
 
-# shellcheck disable=SC2004
-for ((i = 0; i < ${NODES}; i++)); do
+for ((i = 0; i < NODES; i++)); do
   FOLDER=${NODES_FOLDER}/node_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((${NODE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} \
-    -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/node_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
+  spawn-daemon "plain_${i}" "${FOLDER}" $((NODE_START_PORT + i * 6)) -peer ${SEED_PEER_ID} \
+    -libp2p-keypair "${ROOT}"/libp2p_keys/node_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   NODE_PIDS[${i}]=$!
 done
 
+#---------- Starting snark workers
+
+
+if [[ -n "${SNARK_COORDINATOR_PORT}" ]]; then
+  echo 'Waiting for snark coordinator to go up before spawning snark workers...'
+  printf "\n"
+
+  until ${MINA_EXE} client status -daemon-port "${SNARK_COORDINATOR_PORT}" &>/dev/null; do
+    sleep ${POLL_INTERVAL}
+  done
+
+  for ((i = 0; i < SNARK_WORKERS_COUNT; i++)); do
+    FOLDER=${NODES_FOLDER}/snark_workers/worker_${i}
+    mkdir -p "${FOLDER}"
+    spawn-snark-worker "snark_worker_${i}" "${FOLDER}" "${SNARK_COORDINATOR_PORT}"
+    SNARK_WORKERS_PIDS[${i}]=$!
+  done
+fi
+
 # ================================================
 
-echo "================================"
-echo "Network participants information:"
-printf "\n"
+cat <<EOF
+================================
+Network participants information:
+EOF
+if [[ -n "${SEED_PID}" ]]; then
+  cat <<EOF
+          Seed:
+                  Instance #0:
+                    pid ${SEED_PID}
+                    status: ${MINA_EXE} client status -daemon-port ${SEED_START_PORT}
+                    data dir: ${NODES_FOLDER}/seed
+EOF
+fi
 
-echo -e "\tSeed:"
-echo -e "\t\tInstance #0:"
-echo -e "\t\t  pid ${SEED_PID}"
-echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SEED_START_PORT}"
-echo -e "\t\t  logs: cat ${NODES_FOLDER}/seed/log.txt | ${LOGPROC_EXE}"
+if [ "${SNARK_WORKERS_COUNT}" -gt 0 ]; then
+  cat <<EOF
+	Snark Coordinator:
+		Instance #0:
+		  pid ${SNARK_COORDINATOR_PID}
+		  status: ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_PORT}
+		  data dir: ${NODES_FOLDER}/snark_coordinator
 
-if [ "${SNARK_WORKERS_COUNT}" -gt "0" ]; then
-  echo -e "\tSnark Coordinator:"
-  echo -e "\t\tInstance #0:"
-  echo -e "\t\t  pid ${SNARK_COORDINATOR_PID}"
-  echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_PORT}"
-  echo -e "\t\t  logs: cat ${NODES_FOLDER}/snark_coordinator/log.txt | ${LOGPROC_EXE}"
+	Snark Workers:
+EOF
 
-  echo -e "\tSnark Workers:"
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${SNARK_WORKERS_COUNT}; i++)); do
-    echo -e "\t\tInstance #${i}:"
-    echo -e "\t\t  pid ${SNARK_WORKERS_PIDS[${i}]}"
-    echo -e "\t\t  logs: cat ${NODES_FOLDER}/snark_workers/snark_worker_${i}/log.txt | ${LOGPROC_EXE}"
+  for ((i = 0; i < SNARK_WORKERS_COUNT; i++)); do
+    cat <<EOF
+		Instance #${i}:
+		  pid ${SNARK_WORKERS_PIDS[${i}]}
+		  data dir: ${NODES_FOLDER}/snark_workers/worker_${i}
+EOF
   done
 fi
 
-if ${ARCHIVE}; then
-  echo -e "\tArchive:"
-  echo -e "\t\tInstance #0:"
-  echo -e "\t\t  pid ${ARCHIVE_PID}"
-  echo -e "\t\t  server-port: ${ARCHIVE_SERVER_PORT}"
-  echo -e "\t\t  logs: cat ${NODES_FOLDER}/archive/log.txt | ${LOGPROC_EXE}"
+if [[ -n "${ARCHIVE_SERVER_PORT}" ]]; then
+  cat <<EOF
+	Archive:
+		Instance #0:
+		  pid ${ARCHIVE_PID}
+		  server-port: ${ARCHIVE_SERVER_PORT}
+		  data dir: "${NODES_FOLDER}"/archive
+EOF
 fi
 
-if [ "${WHALES}" -gt "0" ]; then
-  echo -e "\tWhales:"
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${WHALES}; i++)); do
-    echo -e "\t\tInstance #${i}:"
-    echo -e "\t\t  pid ${WHALE_PIDS[${i}]}"
-    # shellcheck disable=SC2004
-    echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port $((${WHALE_START_PORT} + (${i} * 5)))"
-    echo -e "\t\t  logs: cat ${NODES_FOLDER}/whale_${i}/log.txt | ${LOGPROC_EXE}"
+if [[ -n "${ROSETTA_PORT}" ]]; then
+  cat <<EOF
+  Rosetta:
+    Instance #0:
+      pid ${ROSETTA_PID}
+      port: ${ROSETTA_PORT}
+      data dir: "${NODES_FOLDER}"/rosetta
+EOF
+fi
+
+if [ "${WHALES}" -gt 0 ]; then
+  cat <<EOF
+	Whales:
+EOF
+  for ((i = 0; i < WHALES; i++)); do
+    cat <<EOF
+		Instance #${i}:
+		  pid ${WHALE_PIDS[${i}]}
+		  status: ${MINA_EXE} client status -daemon-port $((WHALE_START_PORT + i * 6))
+		  data dir: ${NODES_FOLDER}/whale_${i}
+EOF
   done
 fi
 
-if [ "${FISH}" -gt "0" ]; then
-  echo -e "\tFish:"
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${FISH}; i++)); do
-    echo -e "\t\tInstance #${i}:"
-    echo -e "\t\t  pid ${FISH_PIDS[${i}]}"
-    # shellcheck disable=SC2004
-    echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port $((${FISH_START_PORT} + (${i} * 5)))"
-    echo -e "\t\t  logs: cat ${NODES_FOLDER}/fish_${i}/log.txt | ${LOGPROC_EXE}"
+if [ "${FISH}" -gt 0 ]; then
+  cat <<EOF
+	Fish:
+EOF
+  for ((i = 0; i < FISH; i++)); do
+    cat <<EOF
+		Instance #${i}:
+		  pid ${FISH_PIDS[${i}]}
+		  status: ${MINA_EXE} client status -daemon-port $((FISH_START_PORT + i * 6))
+		  data dir: ${NODES_FOLDER}/fish_${i}
+EOF
   done
 fi
 
-if [ "${NODES}" -gt "0" ]; then
-  echo -e "\tNon block-producing nodes:"
-  for ((i = 0; i < ${NODES}; i++)); do
-    echo -e "\t\tInstance #${i}:"
-    echo -e "\t\t  pid ${NODE_PIDS[${i}]}"
-    # shellcheck disable=SC2004
-    echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port $((${NODE_START_PORT} + (${i} * 5)))"
-    echo -e "\t\t  logs: cat ${NODES_FOLDER}/node_${i}/log.txt | ${LOGPROC_EXE}"
+if [ "${NODES}" -gt 0 ]; then
+  cat <<EOF
+	Non block-producing nodes:
+EOF
+  for ((i = 0; i < NODES; i++)); do
+    cat <<EOF
+		Instance #${i}:
+		  pid ${NODE_PIDS[${i}]}
+		  status: ${MINA_EXE} client status -daemon-port $((NODE_START_PORT + i * 6))
+		  data dir: ${NODES_FOLDER}/node_${i}
+EOF
   done
 fi
 
@@ -825,20 +1237,50 @@ printf "\n"
 # Start sending transactions and zkApp transactions
 
 if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
-  FEE_PAYER_KEY_FILE=${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_0
-  SENDER_KEY_FILE=${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_1
-  ZKAPP_ACCOUNT_KEY_FILE=${LEDGER_FOLDER}/zkapp_keys/zkapp_account
-  ZKAPP_ACCOUNT_PUB_KEY=$(cat ${LEDGER_FOLDER}/zkapp_keys/zkapp_account.pub)
 
-  KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0
-  PUB_KEY=$(cat "${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_0.pub)
-  REST_SERVER="http://127.0.0.1:$((${FISH_START_PORT} + 1))/graphql"
+  VALID_TRANSFER_NODES=$((WHALES + FISH))
+
+  if [ "$VALID_TRANSFER_NODES" -eq 0 ]; then
+      echo "Error: No nodes available to send transactions."
+      exit 1
+  fi
+
+  RANDOM_INDEX=$(( RANDOM % VALID_TRANSFER_NODES ))
+
+  # Determine if the index falls into the Whale or Fish range
+  if [ "$RANDOM_INDEX" -lt "$WHALES" ]; then
+      TRANSFER_NODE_TYPE="whale"
+      # For whales, the relative index is just the RANDOM_INDEX
+      TRANSFER_NODE_INDEX="$RANDOM_INDEX"
+      TRANSFER_PORT_BASE=$(( WHALE_START_PORT + TRANSFER_NODE_INDEX * 6 ))
+      TRANFER_NODE_PID="${WHALE_PIDS[TRANSFER_NODE_INDEX]}"
+  else
+      TRANSFER_NODE_TYPE="fish" # Fixed variable name here
+      TRANSFER_NODE_INDEX=$((RANDOM_INDEX - WHALES))
+      # For fish, we subtract the whale count to get the 0-based fish index
+      TRANSFER_PORT_BASE=$(( FISH_START_PORT + TRANSFER_NODE_INDEX * 6 ))
+      TRANFER_NODE_PID="${FISH_PIDS[TRANSFER_NODE_INDEX]}"
+  fi
+
+  echo "Using ${TRANSFER_NODE_TYPE} at base port ${TRANSFER_PORT_BASE} to send transactions"
+
+
+  FEE_PAYER_KEY_FILE=${ROOT}/offline_whale_keys/offline_whale_account_0
+  SENDER_KEY_FILE=${ROOT}/offline_whale_keys/offline_whale_account_1
+  if ${ZKAPP_TRANSACTIONS}; then
+    ZKAPP_ACCOUNT_KEY_FILE=${ROOT}/zkapp_keys/zkapp_account
+    ZKAPP_ACCOUNT_PUB_KEY=$(cat "${ROOT}/zkapp_keys/zkapp_account.pub")
+  fi
+
+  KEY_FILE="${ROOT}/online_${TRANSFER_NODE_TYPE}_keys/online_${TRANSFER_NODE_TYPE}_account_${TRANSFER_NODE_INDEX}"
+  PUB_KEY=$(cat "${KEY_FILE}.pub")
+  REST_SERVER="http://127.0.0.1:$((TRANSFER_PORT_BASE + 1))/graphql"
 
   echo "Waiting for Node (${REST_SERVER}) to be up to start sending value transfer transactions..."
   printf "\n"
 
-  until ${MINA_EXE} client status -daemon-port "${FISH_START_PORT}" &>/dev/null; do
-    sleep 1
+  until ${MINA_EXE} client status -daemon-port "${TRANSFER_PORT_BASE}" &>/dev/null; do
+    sleep ${POLL_INTERVAL}
   done
 
   SYNCED=0
@@ -849,12 +1291,12 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   set +e
 
   while [ $SYNCED -eq 0 ]; do
-    SYNC_STATUS=$(curl -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${REST_SERVER})
+    SYNC_STATUS=$(curl -sS -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${REST_SERVER})
     SYNCED=$(echo "${SYNC_STATUS}" | grep -c "SYNCED")
-    sleep 1
+    sleep ${POLL_INTERVAL}
   done
 
-  echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_FREQUENCY} seconds"
+  echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_INTERVAL} seconds"
   printf "\n"
 
   if ${ZKAPP_TRANSACTIONS}; then
@@ -869,7 +1311,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     ${MINA_EXE} account import -rest-server ${REST_SERVER} -privkey-path "${KEY_FILE}"
     ${MINA_EXE} account unlock -rest-server ${REST_SERVER} -public-key "${PUB_KEY}"
 
-    sleep "${TRANSACTION_FREQUENCY}"
+    sleep "${TRANSACTION_INTERVAL}"
     ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver "${PUB_KEY}" -sender "${PUB_KEY}"
   fi
 
@@ -877,11 +1319,19 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   sender_nonce=1
   state=0
 
-  while true; do
-    sleep ${TRANSACTION_FREQUENCY}
+  # TODO: simulate scripts/hardfork/run-localnet.sh to send txns to everyone in the ledger.
+  value_txn_id=0
+  while is_process_running "${TRANFER_NODE_PID}"; do
+    sleep ${TRANSACTION_INTERVAL}
+    echo "${TRANSFER_NODE_TYPE} ${TRANSFER_NODE_INDEX} at ${TRANFER_NODE_PID} is alive, sending txns"
 
-    if ${VALUE_TRANSFERS}; then
-      ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -receiver ${PUB_KEY} -sender ${PUB_KEY}
+    if ${VALUE_TRANSFERS} && \
+      ${MINA_EXE} client send-payment \
+        -rest-server ${REST_SERVER} -amount 1 -receiver ${PUB_KEY} -sender ${PUB_KEY}; then
+      echo "Sent value txn #$value_txn_id"
+      value_txn_id=$((value_txn_id+1))
+    else
+      echo "Failed to send value txn #$value_txn_id"
     fi
 
     if ${ZKAPP_TRANSACTIONS}; then
@@ -898,6 +1348,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   done
 
   set -e
+
 fi
 
 # ================================================

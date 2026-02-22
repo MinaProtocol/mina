@@ -57,7 +57,6 @@ struct
   module Addr = Location.Addr
   module Location_binable = Location_binable
   module Kvdb = In_memory_kvdb
-  module Storage_locations = Storage_locations
 end
 
 module type Test_intf = sig

@@ -51,3 +51,17 @@ module Sub_zkapp : sig
 
   val to_single : t -> Single.t
 end
+
+module Any : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t =
+        | Single of Single.Stable.V1.t
+        | Sub_zkapp of Sub_zkapp.Stable.V1.t
+      [@@deriving compare, hash, sexp, yojson, equal]
+
+      val to_latest : t -> t
+    end
+  end]
+end

@@ -308,6 +308,29 @@ let close_protocol ?(reset_existing_streams = false) t ~protocol =
 let release_stream t id =
   Hashtbl.remove t.streams (Libp2p_ipc.stream_id_to_string id)
 
+let log_stream_table_stats t =
+  let fully_open, half_closed_us, half_closed_them, fully_closed =
+    Hashtbl.fold t.streams ~init:(0, 0, 0, 0)
+      ~f:(fun ~key:_ ~data:stream (fo, hcu, hct, fc) ->
+        match Libp2p_stream.state stream with
+        | FullyOpen ->
+            (fo + 1, hcu, hct, fc)
+        | HalfClosed Us ->
+            (fo, hcu + 1, hct, fc)
+        | HalfClosed Them ->
+            (fo, hcu, hct + 1, fc)
+        | FullyClosed ->
+            (fo, hcu, hct, fc + 1) )
+  in
+  [%log' trace t.logger] "stream table stats"
+    ~metadata:
+      [ ("total", `Int (Hashtbl.length t.streams))
+      ; ("fully_open", `Int fully_open)
+      ; ("half_closed_us", `Int half_closed_us)
+      ; ("half_closed_them", `Int half_closed_them)
+      ; ("fully_closed", `Int fully_closed)
+      ]
+
 let open_stream t ~protocol ~peer =
   let open Deferred.Or_error.Let_syntax in
   let peer_id = Libp2p_ipc.create_peer_id (Peer.Id.to_string peer) in
@@ -318,6 +341,7 @@ let open_stream t ~protocol ~peer =
   Hashtbl.add_exn t.streams
     ~key:(Libp2p_ipc.stream_id_to_string (Libp2p_stream.id stream))
     ~data:stream ;
+  log_stream_table_stats t ;
   stream
 
 let reset_stream t = Libp2p_stream.reset ~helper:t.helper
@@ -437,6 +461,7 @@ let handle_push_message t push_message =
                 Hashtbl.add_exn t.streams
                   ~key:(Libp2p_ipc.stream_id_to_string stream_id)
                   ~data:stream ;
+                log_stream_table_stats t ;
                 O1trace.background_thread "dispatch_libp2p_stream_handler"
                   (fun () ->
                     let open Deferred.Let_syntax in
@@ -512,7 +537,8 @@ let handle_push_message t push_message =
                 Libp2p_stream.stream_closed ~logger:t.logger ~who_closed:Them
                   stream
               in
-              if should_release then Hashtbl.remove t.streams stream_id_str
+              if should_release then Hashtbl.remove t.streams stream_id_str ;
+              log_stream_table_stats t
           | None ->
               () ) ;
           [%log' trace t.logger]
@@ -533,7 +559,8 @@ let handle_push_message t push_message =
                 Libp2p_stream.stream_closed ~logger:t.logger ~who_closed:Them
                   stream
               in
-              if should_release then Hashtbl.remove t.streams stream_id_str
+              if should_release then Hashtbl.remove t.streams stream_id_str ;
+              log_stream_table_stats t
           | None ->
               [%log' error t.logger]
                 "streamReadComplete for stream we don't know about $stream_id"

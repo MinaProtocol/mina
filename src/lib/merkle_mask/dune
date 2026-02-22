@@ -16,6 +16,7 @@
  (modules_without_implementation
   base_merkle_tree_intf
   inputs_intf
+  mask_maps_intf
   maskable_merkle_tree_intf
   masking_merkle_tree_intf)
  (libraries

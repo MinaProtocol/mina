@@ -151,7 +151,10 @@ module Stable : sig
 end
 
 val write_all_proofs_to_disk :
-  proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+     signature_kind:Mina_signature_kind.t
+  -> proof_cache_db:Proof_cache_tag.cache_db
+  -> Stable.Latest.t
+  -> t
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
 

@@ -1,3 +1,12 @@
+(** Testing
+    -------
+
+    Component: Zkapps_examples
+    Subject: Test zkapp empty update
+    Invocation: \
+     dune exec src/app/zkapps_examples/test/empty_update/empty_update.exe
+*)
+
 open Transaction_snark_tests.Util
 open Core_kernel
 open Mina_base
@@ -137,7 +146,7 @@ let zkapp_command : Zkapp_command.t =
     ; memo
     }
 
-let () =
+let test_empty_update () =
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       Async.Thread_safe.block_on_async_exn (fun () ->
           let (_ : _) =
@@ -148,3 +157,8 @@ let () =
                      (add_amount zero (Currency.Amount.of_nanomina_int_exn 500))) )
           in
           check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) )
+
+let () =
+  let open Alcotest in
+  run "Empty update test"
+    [ ("empty_update", [ test_case "Empty_update" `Quick test_empty_update ]) ]

@@ -185,9 +185,9 @@ let tear_down { nodes; states; _ } =
 let set_state t (node : Node.t) s =
   remove_state t.states node ; Node.set_state node s ; add_state t.states node
 
-let finish t (node : Node.t) b =
+let finish ~is_error t (node : Node.t) =
   let s, r =
-    if Result.is_error b then (Node.State.Failed, Error node.attempts)
+    if is_error then (Node.State.Failed, Error node.attempts)
     else (Finished, Ok `Added_to_frontier)
   in
   set_state t node s ;
