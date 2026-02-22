@@ -24,14 +24,6 @@ module type Field_ops = sig
 end
 
 let field_of_hex (type f) (module F : Field_ops with type t = f) s =
-  (* Pad short hex strings like "0x1" to full 64-char "0x0000...0001" *)
-  let s =
-    if String.is_prefix s ~prefix:"0x" || String.is_prefix s ~prefix:"0X" then
-      let hex = String.drop_prefix s 2 in
-      let padded = String.make (max 0 (64 - String.length hex)) '0' ^ hex in
-      "0x" ^ padded
-    else s
-  in
   Kimchi_pasta.Pasta.Bigint256.of_hex_string s |> F.of_bigint
 
 type feature_config =

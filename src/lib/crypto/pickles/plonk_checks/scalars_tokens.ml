@@ -388,7 +388,10 @@ module Tick : S = struct
      ; Cell (Witness 2, Next)
      ; Dup
      ; Add
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -465,7 +468,10 @@ module Tick : S = struct
      ; Cell (Witness 3, Next)
      ; Dup
      ; Add
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -542,7 +548,10 @@ module Tick : S = struct
      ; Cell (Witness 4, Next)
      ; Dup
      ; Add
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -619,7 +628,10 @@ module Tick : S = struct
      ; Cell (Witness 5, Next)
      ; Dup
      ; Add
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -696,7 +708,10 @@ module Tick : S = struct
      ; Cell (Witness 6, Next)
      ; Dup
      ; Add
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -762,7 +777,10 @@ module Tick : S = struct
      ; Sub
      ; Store
      ; Mul
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Cell (Witness 7, Curr)
      ; Sub
      ; Sub
@@ -791,7 +809,10 @@ module Tick : S = struct
      ; Load 31
      ; Sub
      ; Mul
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Cell (Witness 7, Curr)
      ; Sub
      ; Load 30
@@ -887,10 +908,16 @@ module Tick : S = struct
      ; Add
      ; Challenge Alpha
      ; Pow 4
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Cell (Witness 11, Curr)
      ; Constant EndoCoefficient
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Add
@@ -904,7 +931,10 @@ module Tick : S = struct
      ; Cell (Witness 12, Curr)
      ; Dup
      ; Add
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -964,10 +994,16 @@ module Tick : S = struct
      ; Add
      ; Challenge Alpha
      ; Pow 7
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Cell (Witness 13, Curr)
      ; Constant EndoCoefficient
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Add
@@ -981,7 +1017,10 @@ module Tick : S = struct
      ; Cell (Witness 14, Curr)
      ; Dup
      ; Add
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -1136,7 +1175,7 @@ module Tick : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
          )
      ; Add
      ; Cell (Witness 6, Curr)
@@ -1160,7 +1199,7 @@ module Tick : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
          )
      ; Add
      ; Cell (Witness 7, Curr)
@@ -1184,7 +1223,7 @@ module Tick : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
          )
      ; Add
      ; Cell (Witness 8, Curr)
@@ -1208,7 +1247,7 @@ module Tick : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
          )
      ; Add
      ; Cell (Witness 9, Curr)
@@ -1232,7 +1271,7 @@ module Tick : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
          )
      ; Add
      ; Cell (Witness 10, Curr)
@@ -1256,7 +1295,7 @@ module Tick : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
          )
      ; Add
      ; Cell (Witness 11, Curr)
@@ -1280,7 +1319,7 @@ module Tick : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
          )
      ; Add
      ; Cell (Witness 12, Curr)
@@ -1304,7 +1343,7 @@ module Tick : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56E229849987882780000002"
          )
      ; Add
      ; Cell (Witness 13, Curr)
@@ -1327,7 +1366,10 @@ module Tick : S = struct
          )
      ; Cell (Witness 6, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 6, Curr)
      ; Mul
@@ -1347,7 +1389,10 @@ module Tick : S = struct
          )
      ; Cell (Witness 7, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 7, Curr)
      ; Mul
@@ -1367,7 +1412,10 @@ module Tick : S = struct
          )
      ; Cell (Witness 8, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 8, Curr)
      ; Mul
@@ -1387,7 +1435,10 @@ module Tick : S = struct
          )
      ; Cell (Witness 9, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 9, Curr)
      ; Mul
@@ -1407,7 +1458,10 @@ module Tick : S = struct
          )
      ; Cell (Witness 10, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 10, Curr)
      ; Mul
@@ -1427,7 +1481,10 @@ module Tick : S = struct
          )
      ; Cell (Witness 11, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 11, Curr)
      ; Mul
@@ -1447,7 +1504,10 @@ module Tick : S = struct
          )
      ; Cell (Witness 12, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 12, Curr)
      ; Mul
@@ -1467,7 +1527,10 @@ module Tick : S = struct
          )
      ; Cell (Witness 13, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 13, Curr)
      ; Mul
@@ -1492,7 +1555,10 @@ module Tick : S = struct
      ; Add
      ; Cell (Witness 6, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 6, Curr)
      ; Mul
@@ -1515,7 +1581,10 @@ module Tick : S = struct
      ; Add
      ; Cell (Witness 7, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 7, Curr)
      ; Mul
@@ -1538,7 +1607,10 @@ module Tick : S = struct
      ; Add
      ; Cell (Witness 8, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 8, Curr)
      ; Mul
@@ -1561,7 +1633,10 @@ module Tick : S = struct
      ; Add
      ; Cell (Witness 9, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 9, Curr)
      ; Mul
@@ -1584,7 +1659,10 @@ module Tick : S = struct
      ; Add
      ; Cell (Witness 10, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 10, Curr)
      ; Mul
@@ -1607,7 +1685,10 @@ module Tick : S = struct
      ; Add
      ; Cell (Witness 11, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 11, Curr)
      ; Mul
@@ -1630,7 +1711,10 @@ module Tick : S = struct
      ; Add
      ; Cell (Witness 12, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 12, Curr)
      ; Mul
@@ -1653,7 +1737,10 @@ module Tick : S = struct
      ; Add
      ; Cell (Witness 13, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 13, Curr)
      ; Mul
@@ -1672,30 +1759,48 @@ module Tick : S = struct
      ; Cell (Index Gate_type.RangeCheck0, Curr)
      ; Cell (Witness 7, Curr)
      ; Cell (Witness 7, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 7, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 7, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Challenge Alpha
      ; Pow 1
      ; Cell (Witness 8, Curr)
      ; Cell (Witness 8, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 8, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 8, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -1704,15 +1809,24 @@ module Tick : S = struct
      ; Pow 2
      ; Cell (Witness 9, Curr)
      ; Cell (Witness 9, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 9, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 9, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -1721,15 +1835,24 @@ module Tick : S = struct
      ; Pow 3
      ; Cell (Witness 10, Curr)
      ; Cell (Witness 10, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 10, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 10, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -1738,15 +1861,24 @@ module Tick : S = struct
      ; Pow 4
      ; Cell (Witness 11, Curr)
      ; Cell (Witness 11, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 11, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 11, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -1755,15 +1887,24 @@ module Tick : S = struct
      ; Pow 5
      ; Cell (Witness 12, Curr)
      ; Cell (Witness 12, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 12, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 12, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -1772,15 +1913,24 @@ module Tick : S = struct
      ; Pow 6
      ; Cell (Witness 13, Curr)
      ; Cell (Witness 13, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 13, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 13, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -1789,15 +1939,24 @@ module Tick : S = struct
      ; Pow 7
      ; Cell (Witness 14, Curr)
      ; Cell (Witness 14, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 14, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 14, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -1805,210 +1964,483 @@ module Tick : S = struct
      ; Challenge Alpha
      ; Pow 8
      ; Cell (Witness 14, Curr)
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Cell (Witness 13, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 12, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 11, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 10, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 9, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 8, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 7, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 6, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Cell (Witness 5, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Cell (Witness 4, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Cell (Witness 3, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Cell (Witness 2, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -2022,7 +2454,10 @@ module Tick : S = struct
      ; Cell (Coefficient 0, Curr)
      ; Cell (Witness 1, Next)
      ; Cell (Witness 0, Curr)
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Cell (Witness 0, Next)
      ; Mul
      ; Add
@@ -2032,36 +2467,57 @@ module Tick : S = struct
      ; Add
      ; Mul
      ; SkipIf (Feature_flag.RangeCheck0, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Add
      ; SkipIfNot (Feature_flag.RangeCheck1, 943)
      ; Cell (Index Gate_type.RangeCheck1, Curr)
      ; Cell (Witness 2, Curr)
      ; Cell (Witness 2, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 2, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 2, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Challenge Alpha
      ; Pow 1
      ; Cell (Witness 7, Curr)
      ; Cell (Witness 7, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 7, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 7, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2070,15 +2526,24 @@ module Tick : S = struct
      ; Pow 2
      ; Cell (Witness 8, Curr)
      ; Cell (Witness 8, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 8, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 8, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2087,15 +2552,24 @@ module Tick : S = struct
      ; Pow 3
      ; Cell (Witness 9, Curr)
      ; Cell (Witness 9, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 9, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 9, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2104,15 +2578,24 @@ module Tick : S = struct
      ; Pow 4
      ; Cell (Witness 10, Curr)
      ; Cell (Witness 10, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 10, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 10, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2121,15 +2604,24 @@ module Tick : S = struct
      ; Pow 5
      ; Cell (Witness 11, Curr)
      ; Cell (Witness 11, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 11, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 11, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2138,15 +2630,24 @@ module Tick : S = struct
      ; Pow 6
      ; Cell (Witness 12, Curr)
      ; Cell (Witness 12, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 12, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 12, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2155,15 +2656,24 @@ module Tick : S = struct
      ; Pow 7
      ; Cell (Witness 13, Curr)
      ; Cell (Witness 13, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 13, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 13, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2172,15 +2682,24 @@ module Tick : S = struct
      ; Pow 8
      ; Cell (Witness 14, Curr)
      ; Cell (Witness 14, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 14, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 14, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2189,15 +2708,24 @@ module Tick : S = struct
      ; Pow 9
      ; Cell (Witness 0, Next)
      ; Cell (Witness 0, Next)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 0, Next)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 0, Next)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2206,15 +2734,24 @@ module Tick : S = struct
      ; Pow 10
      ; Cell (Witness 1, Next)
      ; Cell (Witness 1, Next)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 1, Next)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 1, Next)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2223,15 +2760,24 @@ module Tick : S = struct
      ; Pow 11
      ; Cell (Witness 2, Next)
      ; Cell (Witness 2, Next)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 2, Next)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 2, Next)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2240,15 +2786,24 @@ module Tick : S = struct
      ; Pow 12
      ; Cell (Witness 7, Next)
      ; Cell (Witness 7, Next)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 7, Next)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 7, Next)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2257,15 +2812,24 @@ module Tick : S = struct
      ; Pow 13
      ; Cell (Witness 8, Next)
      ; Cell (Witness 8, Next)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 8, Next)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 8, Next)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2274,15 +2838,24 @@ module Tick : S = struct
      ; Pow 14
      ; Cell (Witness 9, Next)
      ; Cell (Witness 9, Next)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 9, Next)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 9, Next)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2291,15 +2864,24 @@ module Tick : S = struct
      ; Pow 15
      ; Cell (Witness 10, Next)
      ; Cell (Witness 10, Next)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 10, Next)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 10, Next)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2308,15 +2890,24 @@ module Tick : S = struct
      ; Pow 16
      ; Cell (Witness 11, Next)
      ; Cell (Witness 11, Next)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 11, Next)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 11, Next)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2325,15 +2916,24 @@ module Tick : S = struct
      ; Pow 17
      ; Cell (Witness 12, Next)
      ; Cell (Witness 12, Next)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 12, Next)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 12, Next)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2342,15 +2942,24 @@ module Tick : S = struct
      ; Pow 18
      ; Cell (Witness 13, Next)
      ; Cell (Witness 13, Next)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 13, Next)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 13, Next)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2359,15 +2968,24 @@ module Tick : S = struct
      ; Pow 19
      ; Cell (Witness 14, Next)
      ; Cell (Witness 14, Next)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 14, Next)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 14, Next)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -2375,600 +2993,1428 @@ module Tick : S = struct
      ; Challenge Alpha
      ; Pow 20
      ; Cell (Witness 14, Next)
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Cell (Witness 13, Next)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 12, Next)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 11, Next)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 10, Next)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 9, Next)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 8, Next)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 7, Next)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 2, Next)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 1, Next)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 0, Next)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 14, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 13, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 12, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 11, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 10, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 9, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 8, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 7, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 6, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Cell (Witness 5, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Cell (Witness 4, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Cell (Witness 3, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Cell (Witness 2, Curr)
      ; Mul
@@ -2979,7 +4425,10 @@ module Tick : S = struct
      ; Add
      ; Mul
      ; SkipIf (Feature_flag.RangeCheck1, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Add
      ; SkipIfNot (Feature_flag.ForeignFieldAdd, 72)
      ; Cell (Index Gate_type.ForeignFieldAdd, Curr)
@@ -2992,11 +4441,17 @@ module Tick : S = struct
      ; Pow 1
      ; Cell (Witness 7, Curr)
      ; Cell (Witness 7, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 7, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Add
      ; Mul
      ; Mul
@@ -3005,13 +4460,19 @@ module Tick : S = struct
      ; Pow 2
      ; Cell (Witness 0, Curr)
      ; Cell (Witness 1, Curr)
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Mul
      ; Add
      ; Cell (Coefficient 3, Curr)
      ; Cell (Witness 3, Curr)
      ; Cell (Witness 4, Curr)
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Mul
      ; Add
      ; Mul
@@ -3019,18 +4480,27 @@ module Tick : S = struct
      ; Cell (Witness 6, Curr)
      ; Cell (Coefficient 0, Curr)
      ; Cell (Coefficient 1, Curr)
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Mul
      ; Add
      ; Mul
      ; Sub
      ; Cell (Witness 7, Curr)
-     ; Constant (Literal "0x100000000000000000000000000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000100000000000000000000000000000000000000000000"
+         )
      ; Mul
      ; Sub
      ; Cell (Witness 0, Next)
      ; Cell (Witness 1, Next)
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Mul
      ; Add
      ; Sub
@@ -3055,36 +4525,57 @@ module Tick : S = struct
      ; Add
      ; Mul
      ; SkipIf (Feature_flag.ForeignFieldAdd, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Add
      ; SkipIfNot (Feature_flag.ForeignFieldMul, 297)
      ; Cell (Index Gate_type.ForeignFieldMul, Curr)
      ; Cell (Witness 7, Next)
      ; Cell (Witness 7, Next)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 7, Next)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 7, Next)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Challenge Alpha
      ; Pow 1
      ; Cell (Witness 11, Next)
      ; Cell (Witness 11, Next)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 11, Next)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 11, Next)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -3106,8 +4597,14 @@ module Tick : S = struct
      ; Cell (Coefficient 1, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x10000000000000000000000")
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Cell (Witness 7, Next)
      ; Mul
      ; Cell (Witness 6, Next)
@@ -3120,7 +4617,10 @@ module Tick : S = struct
      ; Add
      ; Challenge Alpha
      ; Pow 3
-     ; Constant (Literal "0x100000000000000000000000000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000100000000000000000000000000000000000000000000"
+         )
      ; Cell (Witness 11, Next)
      ; Mul
      ; Cell (Witness 0, Curr)
@@ -3130,7 +4630,10 @@ module Tick : S = struct
      ; Cell (Coefficient 1, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Cell (Witness 6, Curr)
      ; Mul
      ; Add
@@ -3141,38 +4644,62 @@ module Tick : S = struct
      ; Add
      ; Challenge Alpha
      ; Pow 4
-     ; Constant (Literal "0x100000000000000000000000000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000100000000000000000000000000000000000000000000"
+         )
      ; Cell (Witness 2, Curr)
      ; Mul
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Cell (Witness 1, Curr)
      ; Mul
      ; Add
      ; Cell (Witness 0, Curr)
      ; Add
-     ; Constant (Literal "0x100000000000000000000000000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000100000000000000000000000000000000000000000000"
+         )
      ; Cell (Witness 5, Curr)
      ; Mul
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Cell (Witness 4, Curr)
      ; Mul
      ; Add
      ; Cell (Witness 3, Curr)
      ; Add
      ; Mul
-     ; Constant (Literal "0x100000000000000000000000000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000100000000000000000000000000000000000000000000"
+         )
      ; Cell (Witness 4, Next)
      ; Mul
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Cell (Witness 3, Next)
      ; Mul
      ; Add
      ; Cell (Witness 2, Next)
      ; Add
-     ; Constant (Literal "0x100000000000000000000000000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000100000000000000000000000000000000000000000000"
+         )
      ; Cell (Coefficient 3, Curr)
      ; Mul
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Cell (Coefficient 2, Curr)
      ; Mul
      ; Add
@@ -3180,16 +4707,25 @@ module Tick : S = struct
      ; Add
      ; Mul
      ; Add
-     ; Constant (Literal "0x100000000000000000000000000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000100000000000000000000000000000000000000000000"
+         )
      ; Cell (Witness 1, Next)
      ; Mul
      ; Cell (Witness 0, Next)
      ; Add
      ; Sub
-     ; Constant (Literal "0x100000000000000000000000000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000100000000000000000000000000000000000000000000"
+         )
      ; Cell (Witness 4, Next)
      ; Mul
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Cell (Witness 3, Next)
      ; Mul
      ; Add
@@ -3207,15 +4743,24 @@ module Tick : S = struct
      ; Pow 5
      ; Cell (Witness 11, Curr)
      ; Cell (Witness 11, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 11, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 11, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -3224,15 +4769,24 @@ module Tick : S = struct
      ; Pow 6
      ; Cell (Witness 12, Curr)
      ; Cell (Witness 12, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 12, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 12, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -3241,15 +4795,24 @@ module Tick : S = struct
      ; Pow 7
      ; Cell (Witness 13, Curr)
      ; Cell (Witness 13, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 13, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 13, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -3265,45 +4828,78 @@ module Tick : S = struct
      ; Add
      ; Challenge Alpha
      ; Pow 9
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Cell (Witness 7, Curr)
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Cell (Witness 8, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x1000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000001000000"
+         )
      ; Cell (Witness 9, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x1000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000001000000000"
+         )
      ; Cell (Witness 10, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x1000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000001000000000000"
+         )
      ; Cell (Witness 8, Next)
      ; Mul
      ; Add
-     ; Constant (Literal "0x1000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000001000000000000000"
+         )
      ; Cell (Witness 9, Next)
      ; Mul
      ; Add
-     ; Constant (Literal "0x1000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000001000000000000000000"
+         )
      ; Cell (Witness 10, Next)
      ; Mul
      ; Add
-     ; Constant (Literal "0x1000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000001000000000000000000000"
+         )
      ; Cell (Witness 11, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000004000000000000000000000"
+         )
      ; Cell (Witness 12, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Cell (Witness 13, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x40000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000040000000000000000000000"
+         )
      ; Cell (Witness 14, Curr)
      ; Mul
      ; Add
@@ -3331,7 +4927,10 @@ module Tick : S = struct
      ; Cell (Coefficient 2, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Cell (Witness 7, Next)
      ; Mul
      ; Cell (Witness 6, Next)
@@ -3348,35 +4947,56 @@ module Tick : S = struct
      ; Pow 10
      ; Cell (Witness 5, Next)
      ; Cell (Witness 4, Next)
-     ; Constant (Literal "0x10000000000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000010000000000000000000000"
+         )
      ; Add
      ; Cell (Coefficient 0, Curr)
      ; Sub
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Sub
      ; Mul
      ; Add
      ; Mul
      ; SkipIf (Feature_flag.ForeignFieldMul, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Add
      ; SkipIfNot (Feature_flag.Xor, 67)
      ; Cell (Index Gate_type.Xor16, Curr)
      ; Cell (Witness 3, Curr)
      ; Cell (Witness 4, Curr)
-     ; Constant (Literal "0x10")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000010"
+         )
      ; Mul
      ; Add
      ; Cell (Witness 5, Curr)
-     ; Constant (Literal "0x100")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000100"
+         )
      ; Mul
      ; Add
      ; Cell (Witness 6, Curr)
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Add
-     ; Constant (Literal "0x10000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000010000"
+         )
      ; Cell (Witness 0, Next)
      ; Mul
      ; Add
@@ -3386,18 +5006,30 @@ module Tick : S = struct
      ; Pow 1
      ; Cell (Witness 7, Curr)
      ; Cell (Witness 8, Curr)
-     ; Constant (Literal "0x10")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000010"
+         )
      ; Mul
      ; Add
      ; Cell (Witness 9, Curr)
-     ; Constant (Literal "0x100")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000100"
+         )
      ; Mul
      ; Add
      ; Cell (Witness 10, Curr)
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Add
-     ; Constant (Literal "0x10000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000010000"
+         )
      ; Cell (Witness 1, Next)
      ; Mul
      ; Add
@@ -3409,18 +5041,30 @@ module Tick : S = struct
      ; Pow 2
      ; Cell (Witness 11, Curr)
      ; Cell (Witness 12, Curr)
-     ; Constant (Literal "0x10")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000010"
+         )
      ; Mul
      ; Add
      ; Cell (Witness 13, Curr)
-     ; Constant (Literal "0x100")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000100"
+         )
      ; Mul
      ; Add
      ; Cell (Witness 14, Curr)
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Add
-     ; Constant (Literal "0x10000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000010000"
+         )
      ; Cell (Witness 2, Next)
      ; Mul
      ; Add
@@ -3430,36 +5074,57 @@ module Tick : S = struct
      ; Add
      ; Mul
      ; SkipIf (Feature_flag.Xor, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Add
      ; SkipIfNot (Feature_flag.Rot, 321)
      ; Cell (Index Gate_type.Rot64, Curr)
      ; Cell (Witness 7, Curr)
      ; Cell (Witness 7, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 7, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 7, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Challenge Alpha
      ; Pow 1
      ; Cell (Witness 8, Curr)
      ; Cell (Witness 8, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 8, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 8, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -3468,15 +5133,24 @@ module Tick : S = struct
      ; Pow 2
      ; Cell (Witness 9, Curr)
      ; Cell (Witness 9, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 9, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 9, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -3485,15 +5159,24 @@ module Tick : S = struct
      ; Pow 3
      ; Cell (Witness 10, Curr)
      ; Cell (Witness 10, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 10, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 10, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -3502,15 +5185,24 @@ module Tick : S = struct
      ; Pow 4
      ; Cell (Witness 11, Curr)
      ; Cell (Witness 11, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 11, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 11, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -3519,15 +5211,24 @@ module Tick : S = struct
      ; Pow 5
      ; Cell (Witness 12, Curr)
      ; Cell (Witness 12, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 12, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 12, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -3536,15 +5237,24 @@ module Tick : S = struct
      ; Pow 6
      ; Cell (Witness 13, Curr)
      ; Cell (Witness 13, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 13, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 13, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -3553,15 +5263,24 @@ module Tick : S = struct
      ; Pow 7
      ; Cell (Witness 14, Curr)
      ; Cell (Witness 14, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 14, Curr)
-     ; Constant (Literal "0x2")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000002"
+         )
      ; Sub
      ; Mul
      ; Cell (Witness 14, Curr)
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -3572,7 +5291,10 @@ module Tick : S = struct
      ; Cell (Coefficient 0, Curr)
      ; Mul
      ; Cell (Witness 2, Curr)
-     ; Constant (Literal "0x10000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000010000000000000000"
+         )
      ; Mul
      ; Cell (Witness 0, Next)
      ; Add
@@ -3591,156 +5313,354 @@ module Tick : S = struct
      ; Challenge Alpha
      ; Pow 10
      ; Cell (Witness 14, Curr)
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Cell (Witness 13, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 12, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 11, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 10, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 9, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 8, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 7, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
      ; Cell (Witness 6, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Cell (Witness 5, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Cell (Witness 4, Curr)
      ; Mul
      ; Add
-     ; Constant (Literal "0x4")
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x4")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000004"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
-     ; Constant (Literal "0x1000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000001000"
+         )
      ; Mul
      ; Cell (Witness 3, Curr)
      ; Mul
@@ -3748,14 +5668,20 @@ module Tick : S = struct
      ; Cell (Witness 2, Curr)
      ; Cell (Coefficient 0, Curr)
      ; Sub
-     ; Constant (Literal "0x10000000000000000")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000010000000000000000"
+         )
      ; Add
      ; Sub
      ; Mul
      ; Add
      ; Mul
      ; SkipIf (Feature_flag.Rot, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Add
      ; Cell (Index Gate_type.Generic, Curr)
      ; Cell (Coefficient 0, Curr)
@@ -3810,7 +5736,10 @@ module Tick : S = struct
      ; SkipIfNot (Feature_flag.LookupsPerRow 0, 11)
      ; Challenge Gamma
      ; Challenge Beta
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Add
      ; Mul
      ; Cell (LookupSorted 0, Curr)
@@ -3820,11 +5749,17 @@ module Tick : S = struct
      ; Mul
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 0, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; SkipIfNot (Feature_flag.LookupsPerRow 1, 11)
      ; Challenge Gamma
      ; Challenge Beta
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Add
      ; Mul
      ; Cell (LookupSorted 1, Next)
@@ -3834,12 +5769,18 @@ module Tick : S = struct
      ; Mul
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 1, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 2, 11)
      ; Challenge Gamma
      ; Challenge Beta
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Add
      ; Mul
      ; Cell (LookupSorted 2, Curr)
@@ -3849,12 +5790,18 @@ module Tick : S = struct
      ; Mul
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 3, 11)
      ; Challenge Gamma
      ; Challenge Beta
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Add
      ; Mul
      ; Cell (LookupSorted 3, Next)
@@ -3864,12 +5811,18 @@ module Tick : S = struct
      ; Mul
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 4, 11)
      ; Challenge Gamma
      ; Challenge Beta
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Add
      ; Mul
      ; Cell (LookupSorted 4, Curr)
@@ -3879,101 +5832,173 @@ module Tick : S = struct
      ; Mul
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 4, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Mul
      ; Cell (LookupAggreg, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; SkipIfNot (Feature_flag.LookupPattern Lookup_pattern.Xor, 1)
      ; Cell (LookupKindIndex Lookup_pattern.Xor, Curr)
      ; SkipIf (Feature_flag.LookupPattern Lookup_pattern.Xor, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; SkipIfNot (Feature_flag.LookupPattern Lookup_pattern.Lookup, 1)
      ; Cell (LookupKindIndex Lookup_pattern.Lookup, Curr)
      ; SkipIf (Feature_flag.LookupPattern Lookup_pattern.Lookup, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Add
      ; SkipIfNot (Feature_flag.LookupPattern Lookup_pattern.RangeCheck, 1)
      ; Cell (LookupKindIndex Lookup_pattern.RangeCheck, Curr)
      ; SkipIf (Feature_flag.LookupPattern Lookup_pattern.RangeCheck, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Add
      ; SkipIfNot (Feature_flag.LookupPattern Lookup_pattern.ForeignFieldMul, 1)
      ; Cell (LookupKindIndex Lookup_pattern.ForeignFieldMul, Curr)
      ; SkipIf (Feature_flag.LookupPattern Lookup_pattern.ForeignFieldMul, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Add
      ; Sub
      ; SkipIfNot (Feature_flag.LookupsPerRow 1, 1)
      ; Challenge Gamma
      ; SkipIf (Feature_flag.LookupsPerRow 1, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; SkipIfNot (Feature_flag.LookupsPerRow 2, 1)
      ; Challenge Gamma
      ; SkipIf (Feature_flag.LookupsPerRow 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 3, 1)
      ; Challenge Gamma
      ; SkipIf (Feature_flag.LookupsPerRow 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 4, 1)
      ; Challenge Gamma
      ; SkipIf (Feature_flag.LookupsPerRow 4, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIfNot (Feature_flag.LookupsPerRow 2, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 3, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 4, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 4, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Mul
      ; Mul
      ; SkipIfNot (Feature_flag.LookupPattern Lookup_pattern.Xor, 74)
      ; Cell (LookupKindIndex Lookup_pattern.Xor, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIfNot (Feature_flag.LookupsPerRow 2, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 3, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 4, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 4, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Challenge Gamma
      ; Challenge JointCombiner
@@ -4025,37 +6050,64 @@ module Tick : S = struct
      ; Mul
      ; Mul
      ; SkipIf (Feature_flag.LookupPattern Lookup_pattern.Xor, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Add
      ; SkipIfNot (Feature_flag.LookupPattern Lookup_pattern.Lookup, 97)
      ; Cell (LookupKindIndex Lookup_pattern.Lookup, Curr)
      ; SkipIfNot (Feature_flag.LookupsPerRow 4, 1)
      ; Challenge Gamma
      ; SkipIf (Feature_flag.LookupsPerRow 4, 1)
-     ; Constant (Literal "0x1")
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIfNot (Feature_flag.LookupsPerRow 2, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 3, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 4, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 4, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Mul
      ; Challenge Gamma
@@ -4068,12 +6120,18 @@ module Tick : S = struct
      ; SkipIfNot (Feature_flag.TableWidth 2, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.TableWidth 3, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Cell (Witness 0, Curr)
      ; Mul
@@ -4090,12 +6148,18 @@ module Tick : S = struct
      ; SkipIfNot (Feature_flag.TableWidth 2, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.TableWidth 3, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Cell (Witness 0, Curr)
      ; Mul
@@ -4112,12 +6176,18 @@ module Tick : S = struct
      ; SkipIfNot (Feature_flag.TableWidth 2, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.TableWidth 3, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Cell (Witness 0, Curr)
      ; Mul
@@ -4126,33 +6196,57 @@ module Tick : S = struct
      ; Mul
      ; Mul
      ; SkipIf (Feature_flag.LookupPattern Lookup_pattern.Lookup, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Add
      ; SkipIfNot (Feature_flag.LookupPattern Lookup_pattern.RangeCheck, 90)
      ; Cell (LookupKindIndex Lookup_pattern.RangeCheck, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIfNot (Feature_flag.LookupsPerRow 2, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 3, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 4, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 4, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Challenge Gamma
      ; Cell (Witness 3, Curr)
@@ -4160,12 +6254,18 @@ module Tick : S = struct
      ; SkipIfNot (Feature_flag.TableWidth 2, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.TableWidth 3, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Add
      ; Add
@@ -4176,12 +6276,18 @@ module Tick : S = struct
      ; SkipIfNot (Feature_flag.TableWidth 2, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.TableWidth 3, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Add
      ; Add
@@ -4192,12 +6298,18 @@ module Tick : S = struct
      ; SkipIfNot (Feature_flag.TableWidth 2, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.TableWidth 3, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Add
      ; Add
@@ -4208,45 +6320,75 @@ module Tick : S = struct
      ; SkipIfNot (Feature_flag.TableWidth 2, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.TableWidth 3, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Add
      ; Add
      ; Mul
      ; Mul
      ; SkipIf (Feature_flag.LookupPattern Lookup_pattern.RangeCheck, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Add
      ; SkipIfNot (Feature_flag.LookupPattern Lookup_pattern.ForeignFieldMul, 90)
      ; Cell (LookupKindIndex Lookup_pattern.ForeignFieldMul, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIfNot (Feature_flag.LookupsPerRow 2, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 3, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.LookupsPerRow 4, 3)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Challenge Beta
      ; Add
      ; SkipIf (Feature_flag.LookupsPerRow 4, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Challenge Gamma
      ; Cell (Witness 7, Curr)
@@ -4254,12 +6396,18 @@ module Tick : S = struct
      ; SkipIfNot (Feature_flag.TableWidth 2, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.TableWidth 3, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Add
      ; Add
@@ -4270,12 +6418,18 @@ module Tick : S = struct
      ; SkipIfNot (Feature_flag.TableWidth 2, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.TableWidth 3, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Add
      ; Add
@@ -4286,12 +6440,18 @@ module Tick : S = struct
      ; SkipIfNot (Feature_flag.TableWidth 2, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.TableWidth 3, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Add
      ; Add
@@ -4302,23 +6462,35 @@ module Tick : S = struct
      ; SkipIfNot (Feature_flag.TableWidth 2, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 2, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; SkipIfNot (Feature_flag.TableWidth 3, 1)
      ; Challenge JointCombiner
      ; SkipIf (Feature_flag.TableWidth 3, 1)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Mul
      ; Add
      ; Add
      ; Mul
      ; Mul
      ; SkipIf (Feature_flag.LookupPattern Lookup_pattern.ForeignFieldMul, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Add
      ; Challenge Gamma
      ; Challenge Beta
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Add
      ; Mul
      ; Cell (LookupTable, Curr)
@@ -4336,7 +6508,10 @@ module Tick : S = struct
      ; Pow 25
      ; UnnormalizedLagrangeBasis (false, 0)
      ; Cell (LookupAggreg, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -4345,7 +6520,10 @@ module Tick : S = struct
      ; Pow 26
      ; UnnormalizedLagrangeBasis (true, -1)
      ; Cell (LookupAggreg, Curr)
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Mul
@@ -4359,7 +6537,10 @@ module Tick : S = struct
      ; Sub
      ; Mul
      ; SkipIf (Feature_flag.LookupsPerRow 1, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Mul
      ; Add
      ; Challenge Alpha
@@ -4371,7 +6552,10 @@ module Tick : S = struct
      ; Sub
      ; Mul
      ; SkipIf (Feature_flag.LookupsPerRow 2, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Mul
      ; Add
      ; Challenge Alpha
@@ -4383,7 +6567,10 @@ module Tick : S = struct
      ; Sub
      ; Mul
      ; SkipIf (Feature_flag.LookupsPerRow 3, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Mul
      ; Add
      ; Challenge Alpha
@@ -4395,7 +6582,10 @@ module Tick : S = struct
      ; Sub
      ; Mul
      ; SkipIf (Feature_flag.LookupsPerRow 4, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Mul
      ; Add
      ; Challenge Alpha
@@ -4405,11 +6595,17 @@ module Tick : S = struct
      ; Cell (LookupRuntimeSelector, Curr)
      ; Mul
      ; SkipIf (Feature_flag.RuntimeLookupTables, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Mul
      ; Add
      ; SkipIf (Feature_flag.LookupTables, 1)
-     ; Constant (Literal "0x0")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000000"
+         )
      ; Add
     |]
 end
@@ -4773,7 +6969,10 @@ module Tock : S = struct
      ; Cell (Witness 2, Next)
      ; Dup
      ; Add
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -4850,7 +7049,10 @@ module Tock : S = struct
      ; Cell (Witness 3, Next)
      ; Dup
      ; Add
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -4927,7 +7129,10 @@ module Tock : S = struct
      ; Cell (Witness 4, Next)
      ; Dup
      ; Add
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -5004,7 +7209,10 @@ module Tock : S = struct
      ; Cell (Witness 5, Next)
      ; Dup
      ; Add
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -5081,7 +7289,10 @@ module Tock : S = struct
      ; Cell (Witness 6, Next)
      ; Dup
      ; Add
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -5147,7 +7358,10 @@ module Tock : S = struct
      ; Sub
      ; Store
      ; Mul
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Cell (Witness 7, Curr)
      ; Sub
      ; Sub
@@ -5176,7 +7390,10 @@ module Tock : S = struct
      ; Load 31
      ; Sub
      ; Mul
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Cell (Witness 7, Curr)
      ; Sub
      ; Load 30
@@ -5272,10 +7489,16 @@ module Tock : S = struct
      ; Add
      ; Challenge Alpha
      ; Pow 4
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Cell (Witness 11, Curr)
      ; Constant EndoCoefficient
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Add
@@ -5289,7 +7512,10 @@ module Tock : S = struct
      ; Cell (Witness 12, Curr)
      ; Dup
      ; Add
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -5349,10 +7575,16 @@ module Tock : S = struct
      ; Add
      ; Challenge Alpha
      ; Pow 7
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Cell (Witness 13, Curr)
      ; Constant EndoCoefficient
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Mul
      ; Add
@@ -5366,7 +7598,10 @@ module Tock : S = struct
      ; Cell (Witness 14, Curr)
      ; Dup
      ; Add
-     ; Constant (Literal "0x1")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+         )
      ; Sub
      ; Cell (Witness 1, Curr)
      ; Mul
@@ -5521,7 +7756,7 @@ module Tock : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
          )
      ; Add
      ; Cell (Witness 6, Curr)
@@ -5545,7 +7780,7 @@ module Tock : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
          )
      ; Add
      ; Cell (Witness 7, Curr)
@@ -5569,7 +7804,7 @@ module Tock : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
          )
      ; Add
      ; Cell (Witness 8, Curr)
@@ -5593,7 +7828,7 @@ module Tock : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
          )
      ; Add
      ; Cell (Witness 9, Curr)
@@ -5617,7 +7852,7 @@ module Tock : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
          )
      ; Add
      ; Cell (Witness 10, Curr)
@@ -5641,7 +7876,7 @@ module Tock : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
          )
      ; Add
      ; Cell (Witness 11, Curr)
@@ -5665,7 +7900,7 @@ module Tock : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
          )
      ; Add
      ; Cell (Witness 12, Curr)
@@ -5689,7 +7924,7 @@ module Tock : S = struct
      ; Mul
      ; Constant
          (Literal
-            "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
+            "0x0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB061197F56EE1C24ECB67C8580000002"
          )
      ; Add
      ; Cell (Witness 13, Curr)
@@ -5712,7 +7947,10 @@ module Tock : S = struct
          )
      ; Cell (Witness 6, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 6, Curr)
      ; Mul
@@ -5732,7 +7970,10 @@ module Tock : S = struct
          )
      ; Cell (Witness 7, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 7, Curr)
      ; Mul
@@ -5752,7 +7993,10 @@ module Tock : S = struct
          )
      ; Cell (Witness 8, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 8, Curr)
      ; Mul
@@ -5772,7 +8016,10 @@ module Tock : S = struct
          )
      ; Cell (Witness 9, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 9, Curr)
      ; Mul
@@ -5792,7 +8039,10 @@ module Tock : S = struct
          )
      ; Cell (Witness 10, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 10, Curr)
      ; Mul
@@ -5812,7 +8062,10 @@ module Tock : S = struct
          )
      ; Cell (Witness 11, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 11, Curr)
      ; Mul
@@ -5832,7 +8085,10 @@ module Tock : S = struct
          )
      ; Cell (Witness 12, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 12, Curr)
      ; Mul
@@ -5852,7 +8108,10 @@ module Tock : S = struct
          )
      ; Cell (Witness 13, Curr)
      ; Mul
-     ; Constant (Literal "0x3")
+     ; Constant
+         (Literal
+            "0x0000000000000000000000000000000000000000000000000000000000000003"
+         )
      ; Add
      ; Cell (Witness 13, Curr)
      ; Mul
@@ -5877,7 +8136,10 @@ module Tock : S = struct
      ; Add
      ; Cell (Witness 6, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 6, Curr)
      ; Mul
@@ -5900,7 +8162,10 @@ module Tock : S = struct
      ; Add
      ; Cell (Witness 7, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 7, Curr)
      ; Mul
@@ -5923,7 +8188,10 @@ module Tock : S = struct
      ; Add
      ; Cell (Witness 8, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 8, Curr)
      ; Mul
@@ -5946,7 +8214,10 @@ module Tock : S = struct
      ; Add
      ; Cell (Witness 9, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 9, Curr)
      ; Mul
@@ -5969,7 +8240,10 @@ module Tock : S = struct
      ; Add
      ; Cell (Witness 10, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 10, Curr)
      ; Mul
@@ -5992,7 +8266,10 @@ module Tock : S = struct
      ; Add
      ; Cell (Witness 11, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 11, Curr)
      ; Mul
@@ -6015,7 +8292,10 @@ module Tock : S = struct
      ; Add
      ; Cell (Witness 12, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 12, Curr)
      ; Mul
@@ -6038,7 +8318,10 @@ module Tock : S = struct
      ; Add
      ; Cell (Witness 13, Curr)
      ; Mul
-     ; Constant (Literal "0xB")
+     ; Constant
+         (Literal
+            "0x000000000000000000000000000000000000000000000000000000000000000B"
+         )
      ; Add
      ; Cell (Witness 13, Curr)
      ; Mul

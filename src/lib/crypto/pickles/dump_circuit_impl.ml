@@ -303,14 +303,6 @@ let linearization_tick_circuit (inputs : Impl.Field.t array) () =
       ~endo:(Impl.Field.constant Endo.Step_inner_curve.base)
       ~mds:sponge_params.mds
       ~field_of_hex:(fun s ->
-        (* Pad short hex strings like "0x1" to full 64-char "0x0000...0001" *)
-        let s =
-          if String.is_prefix s ~prefix:"0x" || String.is_prefix s ~prefix:"0X" then
-            let hex = String.drop_prefix s 2 in
-            let padded = String.make (max 0 (64 - String.length hex)) '0' ^ hex in
-            "0x" ^ padded
-          else s
-        in
         Kimchi_pasta.Pasta.Bigint256.of_hex_string s
         |> Kimchi_pasta.Pasta.Fp.of_bigint
         |> Impl.Field.constant)
@@ -428,13 +420,6 @@ let linearization_tock_circuit (inputs : WrapImpl.Field.t array) () =
       ~endo:(Field.constant Endo.Wrap_inner_curve.base)
       ~mds:sponge_params.mds
       ~field_of_hex:(fun s ->
-        let s =
-          if String.is_prefix s ~prefix:"0x" || String.is_prefix s ~prefix:"0X" then
-            let hex = String.drop_prefix s 2 in
-            let padded = String.make (max 0 (64 - String.length hex)) '0' ^ hex in
-            "0x" ^ padded
-          else s
-        in
         Kimchi_pasta.Pasta.Bigint256.of_hex_string s
         |> Kimchi_pasta.Pasta.Fq.of_bigint
         |> Field.constant)

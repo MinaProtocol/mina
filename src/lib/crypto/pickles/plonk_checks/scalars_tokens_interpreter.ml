@@ -109,8 +109,8 @@ let evaluate (tokens : ST.polish_token array) (env : 'a Scalars.Env.t) : 'a =
         let _zero =
           env.if_feature
             ( flag
-            , (fun () -> enabled := true ; env.field "0x0")
-            , (fun () -> enabled := false ; env.field "0x0") )
+            , (fun () -> enabled := true ; env.field "0x0000000000000000000000000000000000000000000000000000000000000000")
+            , (fun () -> enabled := false ; env.field "0x0000000000000000000000000000000000000000000000000000000000000000") )
         in
         if !enabled then advance state
         else { state with pos = state.pos + 1 + count }
@@ -123,15 +123,15 @@ let evaluate (tokens : ST.polish_token array) (env : 'a Scalars.Env.t) : 'a =
         let _zero =
           env.if_feature
             ( flag
-            , (fun () -> enabled := true ; env.field "0x0")
-            , (fun () -> enabled := false ; env.field "0x0") )
+            , (fun () -> enabled := true ; env.field "0x0000000000000000000000000000000000000000000000000000000000000000")
+            , (fun () -> enabled := false ; env.field "0x0000000000000000000000000000000000000000000000000000000000000000") )
         in
         if !enabled then { state with pos = state.pos + 1 + count }
         else advance state
   in
   let initial = { stack = []; store = []; pos = 0 } in
   let final_state = eval_loop tokens (Array.length tokens) initial in
-  match final_state.stack with v :: _ -> v | [] -> env.field "0x0"
+  match final_state.stack with v :: _ -> v | [] -> env.field "0x0000000000000000000000000000000000000000000000000000000000000000"
 
 (* --- Drop-in replacements for Scalars.Tick and Scalars.Tock --- *)
 
