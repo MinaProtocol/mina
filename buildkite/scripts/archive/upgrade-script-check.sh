@@ -161,6 +161,12 @@ main() {
             exit 0
         fi
 
+        # Determine if this is a PR build
+        local is_pr_build=false
+        if [[ -n "${BUILDKITE_PULL_REQUEST:-}" && "${BUILDKITE_PULL_REQUEST:-}" != "false" ]]; then
+            is_pr_build=true
+        fi
+
         # Check that all required scripts exist
         for script_path in "${scripts[@]}"; do
             if ! check_file_exists "$script_path"; then
@@ -172,19 +178,27 @@ main() {
             exit 1
             fi
 
-            # Check if the upgrade script itself has changes
-            if has_changes_in_git "$script_path"; then
-                if [[ "$MODE" == "verbose" ]]; then
-                    echo "✓ Upgrade script has been modified: $script_path"
+            # For PR builds, check if the upgrade script itself has changes in git
+            # For non-PR builds (nightlies, branch builds), schema may naturally diverge
+            # from the comparison branch, so only verify that the scripts exist
+            if [[ "$is_pr_build" == "true" ]]; then
+                if has_changes_in_git "$script_path"; then
+                    if [[ "$MODE" == "verbose" ]]; then
+                        echo "✓ Upgrade script has been modified: $script_path"
+                    fi
+                else
+                    if [[ "$MODE" == "verbose" ]]; then
+                        echo "Error: Schema changed but upgrade script not updated: $script_path"
+                        echo "Please update the upgrade script to reflect schema changes."
+                        echo "This is critical to ensure smooth database migrations in production."
+                        echo "Upgrade/Rollback scripts must be updated together with schema changes, in the same commit."
+                        echo "For local testing, scripts can be modified in staged/unstaged git states."
+                        exit 1
+                    fi
                 fi
             else
                 if [[ "$MODE" == "verbose" ]]; then
-                    echo "Error: Schema changed but upgrade script not updated: $script_path"
-                    echo "Please update the upgrade script to reflect schema changes."
-                    echo "This is critical to ensure smooth database migrations in production."
-                    echo "Upgrade/Rollback scripts must be updated together with schema changes, in the same commit."
-                    echo "For local testing, scripts can be modified in staged/unstaged git states."
-                    exit 1
+                    echo "✓ Upgrade script exists (non-PR build, skipping modification check): $script_path"
                 fi
             fi
 
