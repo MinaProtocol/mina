@@ -16,6 +16,7 @@ in  Pipeline.build
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.DaemonPrefork
+            , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive

@@ -48,7 +48,9 @@ let Spec =
           , suffix : Text
           , precomputed_block_prefix : Optional Text
           , use_artifacts_from_buildkite_build : Optional Text
+          , hardfork_shift_slot_delta : Optional Natural
           , size : Size
+          , mina_create_legacy_genesis_version : Text
           }
       , default =
           { codenames = [ DebianVersions.DebVersion.Bullseye ]
@@ -60,7 +62,9 @@ let Spec =
           , version = "\\\$MINA_DEB_VERSION"
           , precomputed_block_prefix = None Text
           , use_artifacts_from_buildkite_build = None Text
+          , hardfork_shift_slot_delta = None Natural
           , size = Size.XLarge
+          , mina_create_legacy_genesis_version = "3.3.0-2b689c8"
           }
       }
 
@@ -77,6 +81,18 @@ let generateReferenceTarballsCommand =
                   }
                   spec.use_artifacts_from_buildkite_build
 
+          let hardforkShiftSlotDeltaArg =
+                merge
+                  { Some =
+                          \(delta : Natural)
+                      ->      "--hardfork-shift-slot-delta "
+                          ++  Natural/show delta
+                          ++  " --prefork-genesis-config /workdir/genesis_ledgers/${Network.lowerName
+                                                                                      spec.network}.json"
+                  , None = ""
+                  }
+                  spec.hardfork_shift_slot_delta
+
           in  Command.build
                 Command.Config::{
                 , commands =
@@ -86,8 +102,8 @@ let generateReferenceTarballsCommand =
                       Arch.Type.Amd64
                       [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
                       "./buildkite/scripts/hardfork/release/generate-fork-config-and-ledger-tarballs-using-legacy-app.sh --network ${Network.lowerName
-                                                                                                                                       spec.network} --version 3.2.0-f77c8c9  --codename ${DebianVersions.lowerName
-                                                                                                                                                                                             codename} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg}"
+                                                                                                                                       spec.network} --version ${spec.mina_create_legacy_genesis_version}  --codename ${DebianVersions.lowerName
+                                                                                                                                                                                                                          codename} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg} ${hardforkShiftSlotDeltaArg}"
                 , label =
                     "Generate hardfork reference tarballs for ${DebianVersions.lowerName
                                                                   codename}"
@@ -109,6 +125,25 @@ let generateTarballsCommand =
                   }
                   spec.use_artifacts_from_buildkite_build
 
+          let hardforkShiftSlotDeltaArg =
+                merge
+                  { Some =
+                          \(delta : Natural)
+                      ->      "--hardfork-shift-slot-delta "
+                          ++  Natural/show delta
+                          ++  " --prefork-genesis-config /workdir/genesis_ledgers/${Network.lowerName
+                                                                                      spec.network}.json"
+                  , None = ""
+                  }
+                  spec.hardfork_shift_slot_delta
+
+          let genesis_timestamp_env =
+                merge
+                  { Some = \(ts : Text) -> [ "GENESIS_TIMESTAMP=" ++ ts ]
+                  , None = [] : List Text
+                  }
+                  spec.genesis_timestamp
+
           in  Command.build
                 Command.Config::{
                 , commands =
@@ -116,11 +151,17 @@ let generateTarballsCommand =
                       Toolchain.SelectionMode.ByDebianAndArch
                       codename
                       Arch.Type.Amd64
-                      [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
+                      (   [ "AWS_ACCESS_KEY_ID"
+                          , "AWS_SECRET_ACCESS_KEY"
+                          , "GENESIS_TIMESTAMP"
+                          ]
+                        # genesis_timestamp_env
+                      )
                       (     "./buildkite/scripts/hardfork/release/generate-fork-config-and-ledger-tarballs.sh "
                         ++  "--network ${Network.lowerName spec.network} "
                         ++  "--config-url ${spec.config_json_gz_url} "
                         ++  "--codename ${DebianVersions.lowerName codename} "
+                        ++  "${hardforkShiftSlotDeltaArg} "
                         ++  "${cacheArg}"
                       )
                 , label =
@@ -424,6 +465,7 @@ let generate_hardfork_package =
       ->  \(version : Optional Text)
       ->  \(precomputed_block_prefix : Optional Text)
       ->  \(use_artifacts_from_buildkite_build : Optional Text)
+      ->  \(hardfork_shift_slot_delta : Optional Natural)
       ->  ( pipeline
               Spec::{
               , codenames = codenames
@@ -438,6 +480,7 @@ let generate_hardfork_package =
               , precomputed_block_prefix = precomputed_block_prefix
               , use_artifacts_from_buildkite_build =
                   use_artifacts_from_buildkite_build
+              , hardfork_shift_slot_delta = hardfork_shift_slot_delta
               }
           ).pipeline
 
