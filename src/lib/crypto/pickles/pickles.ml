@@ -2076,3 +2076,5 @@ module Make_str (_ : Wire_types.Concrete) = struct
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
+
+module Dump_circuit_impl = Dump_circuit_impl
