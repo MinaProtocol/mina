@@ -72,7 +72,7 @@ check_file_exists() {
     return 0
 }
 
-# Check if files have differences against specified branch
+# Check if files have differences against specified branch (only changes introduced by this branch)
 has_changes() {
     local file="$1"
     if ! check_file_exists "$file"; then
@@ -85,8 +85,12 @@ has_changes() {
         exit 1
     }
 
-    # Check if file has differences
-    if ! git diff --quiet "origin/$COMPARISION_BRANCH" -- "$REPO_ROOT/$file" 2>/dev/null; then
+    # Use merge-base to only detect changes introduced by this branch,
+    # not divergence from the comparison branch moving forward
+    local merge_base
+    merge_base=$(git merge-base "origin/$COMPARISION_BRANCH" HEAD)
+
+    if ! git diff --quiet "$merge_base" HEAD -- "$REPO_ROOT/$file" 2>/dev/null; then
         return 0
     else
         return 1
@@ -107,23 +111,25 @@ has_changes_in_git() {
         return 1
     }
 
-    # Check if file was modified in last commit, staged, or has unstaged changes
     local file_path="$REPO_ROOT/$file"
+    local merge_base
+    merge_base=$(git merge-base "origin/$COMPARISION_BRANCH" HEAD)
 
-    # Check if file was modified in last commit
-    if git diff --quiet HEAD~1 HEAD -- "$file_path" 2>/dev/null; then
-        # No changes in last commit, check staged changes
-        if git diff --quiet --cached -- "$file_path" 2>/dev/null; then
-            # No staged changes, check unstaged changes
-            if git diff --quiet -- "$file_path" 2>/dev/null; then
-                # No changes found
-                return 1
-            fi
-        fi
+    # Check if file was modified anywhere in this branch (all commits since merge-base)
+    if ! git diff --quiet "$merge_base" HEAD -- "$file_path" 2>/dev/null; then
+        return 0
     fi
 
-    # File has changes in one of the three states
-    return 0
+    # Also check staged and unstaged changes (for local testing)
+    if ! git diff --quiet --cached -- "$file_path" 2>/dev/null; then
+        return 0
+    fi
+    if ! git diff --quiet -- "$file_path" 2>/dev/null; then
+        return 0
+    fi
+
+    # No changes found
+    return 1
 }
 
 

@@ -87,7 +87,7 @@ start_postgres() {
         "$POSTGRES_IMAGE"
 
     echo "Waiting for PostgreSQL to be ready..."
-    for i in $(seq 1 30); do
+    for _ in $(seq 1 30); do
         if docker exec "$POSTGRES_CONTAINER" pg_isready -U "$PG_USER" >/dev/null 2>&1; then
             echo "PostgreSQL is ready."
             return 0
