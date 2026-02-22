@@ -6,11 +6,15 @@ module Statement : sig
   type t = Transaction_snark.Statement.t One_or_two.t
   [@@deriving compare, sexp, yojson, equal]
 
+  include Comparable.S with type t := t
+
   include Hashable.S with type t := t
 
   module Stable : sig
     module V2 : sig
       type t [@@deriving bin_io, compare, sexp, version, yojson, equal]
+
+      include Comparable.S with type t := t
 
       include Hashable.S_binable with type t := t
     end
@@ -47,41 +51,62 @@ end
        H(all_statements_in_bundle || fee || public_key)
 *)
 
-type t = Mina_wire_types.Transaction_snark_work.V2.t =
-  { fee : Fee.t
-  ; proofs : Ledger_proof.t One_or_two.t
+module type S = sig
+  type t
+
+  val fee : t -> Fee.t
+
+  val prover : t -> Public_key.Compressed.t
+end
+
+type t =
+  { fee : Currency.Fee.t
+  ; proofs : Ledger_proof.Cached.t One_or_two.t
   ; prover : Public_key.Compressed.t
   }
-[@@deriving compare, sexp, yojson]
 
-val fee : t -> Fee.t
+include S with type t := t
 
 val info : t -> Info.t
 
 val statement : t -> Statement.t
 
+val proofs : t -> Ledger_proof.Cached.t One_or_two.t
+
 module Stable : sig
   module V2 : sig
-    type t [@@deriving equal, sexp, compare, bin_io, yojson, version]
+    type t [@@deriving bin_io, equal, sexp, version, yojson]
+
+    val statement : t -> Statement.Stable.V2.t
+
+    val fee : t -> Fee.Stable.V1.t
+
+    val prover : t -> Public_key.Compressed.Stable.V1.t
+
+    val proofs : t -> Ledger_proof.t One_or_two.t
+
+    val to_latest : t -> t
   end
+
+  module Latest = V2
 end
-with type V2.t = t
+with type V2.t = Mina_wire_types.Transaction_snark_work.V2.t
 
 type unchecked = t
 
 module Checked : sig
-  type nonrec t = t =
-    { fee : Fee.t
-    ; proofs : Ledger_proof.t One_or_two.t
-    ; prover : Public_key.Compressed.t
-    }
-  [@@deriving sexp, compare, to_yojson]
-
-  module Stable : module type of Stable
+  include S
 
   val create_unsafe : unchecked -> t
 
   val statement : t -> Statement.t
+
+  val proofs : t -> Ledger_proof.Cached.t One_or_two.t
 end
 
 val forget : Checked.t -> t
+
+val write_all_proofs_to_disk :
+  proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+
+val read_all_proofs_from_disk : t -> Stable.Latest.t

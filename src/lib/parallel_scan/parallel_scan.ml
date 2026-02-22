@@ -792,7 +792,7 @@ module Tree = struct
     List.rev_mapi lst ~f:(fun i value -> { Job_view.position = len - i; value })
 end
 
-(*This struture works well because we always complete all the nodes on a specific level before proceeding to the next level*)
+(*This structure works well because we always complete all the nodes on a specific level before proceeding to the next level*)
 module T = struct
   module Binable_arg = struct
     [%%versioned
@@ -941,39 +941,46 @@ module State = struct
             match job with Job.Merge a -> f_merge a | Base d -> f_base d )
       in
       Mina_stdlib.Nonempty_list.iter trees ~f:(fun tree ->
-          let w_to_string { Weight.base = b; merge = m } =
-            Int.to_string b ^ Int.to_string m
+          let add_weight_to_hash { Weight.base = b; merge = m } =
+            add_string @@ Int.to_string b ;
+            add_string @@ Int.to_string m
           in
-          let w_to_string' (w1, w2) = w_to_string w1 ^ w_to_string w2 in
+          let add_weight_pair_to_hash (w1, w2) =
+            add_weight_to_hash w1 ; add_weight_to_hash w2
+          in
           let f_merge = function
             | w, Merge.Job.Empty ->
-                add_string (w_to_string' w ^ "Empty")
+                add_weight_pair_to_hash w ; add_string "Empty"
             | w, Merge.Job.Full { left; right; status; seq_no } ->
-                add_string
-                  ( w_to_string' w ^ "Full" ^ Int.to_string seq_no
-                  ^ Job_status.to_string status ) ;
+                add_weight_pair_to_hash w ;
+                add_string "Full" ;
+                add_string @@ Int.to_string seq_no ;
+                add_string @@ Job_status.to_string status ;
                 add_string (f_merge left) ;
                 add_string (f_merge right)
             | w, Merge.Job.Part j ->
-                add_string (w_to_string' w ^ "Part") ;
+                add_weight_pair_to_hash w ;
+                add_string "Part" ;
                 add_string (f_merge j)
           in
           let f_base = function
             | w, Base.Job.Empty ->
-                add_string (w_to_string w ^ "Empty")
+                add_weight_to_hash w ; add_string "Empty"
             | w, Base.Job.Full { job; status; seq_no } ->
-                add_string
-                  ( w_to_string w ^ "Full" ^ Int.to_string seq_no
-                  ^ Job_status.to_string status ) ;
+                add_weight_to_hash w ;
+                add_string "Full" ;
+                add_string @@ Int.to_string seq_no ;
+                add_string @@ Job_status.to_string status ;
                 add_string (f_base job)
           in
           tree_hash tree f_merge f_base )
     in
-    let acc_string =
-      Option.value_map acc ~default:"None" ~f:(fun (a, d_lst) ->
-          f_merge a ^ List.fold ~init:"" d_lst ~f:(fun acc d -> acc ^ f_base d) )
-    in
-    add_string acc_string ;
+    ( match acc with
+    | Some (a, d_lst) ->
+        add_string (f_merge a) ;
+        List.iter d_lst ~f:(fun d -> add_string (f_base d))
+    | None ->
+        add_string "None" ) ;
     add_string (Int.to_string curr_job_seq_no) ;
     add_string (Int.to_string max_base_jobs) ;
     add_string (Int.to_string delay) ;
@@ -1029,7 +1036,7 @@ module State = struct
 end
 
 include T
-module State_or_error = State_or_error.Make3 (T)
+module State_or_error = Mina_stdlib.State_or_error.Make3 (T)
 
 let check b ~message = State_or_error.error_if b ~message ~value:()
 
@@ -1423,25 +1430,6 @@ let last_emitted_value t = t.acc
 
 let current_job_sequence_number t = t.curr_job_seq_no
 
-let base_jobs_on_latest_tree t =
-  let depth = Int.ceil_log2 t.max_base_jobs in
-  List.filter_map
-    (Tree.jobs_on_level ~depth ~level:depth
-       (Mina_stdlib.Nonempty_list.head t.trees) )
-    ~f:(fun job -> match job with Base d -> Some d | Merge _ -> None)
-
-(* 0-based indexing, so 0 indicates next-to-latest tree *)
-let base_jobs_on_earlier_tree t ~index =
-  let depth = Int.ceil_log2 t.max_base_jobs in
-  let earlier_trees = Mina_stdlib.Nonempty_list.tail t.trees in
-  match List.nth earlier_trees index with
-  | None ->
-      []
-  | Some tree ->
-      let jobs = Tree.jobs_on_level ~depth ~level:depth tree in
-      List.filter_map jobs ~f:(fun job ->
-          match job with Base d -> Some d | Merge _ -> None )
-
 let partition_if_overflowing : ('merge, 'base) t -> Space_partition.t =
  fun t ->
   let cur_tree_space = free_space_on_current_tree t in
@@ -1461,9 +1449,7 @@ let next_on_new_tree t =
   curr_tree_space = t.max_base_jobs
 
 let pending_data t =
-  List.concat_map
-    Mina_stdlib.Nonempty_list.(to_list @@ rev t.trees)
-    ~f:Tree.base_jobs
+  List.map Mina_stdlib.Nonempty_list.(to_list @@ rev t.trees) ~f:Tree.base_jobs
 
 let view_jobs_with_position (state : ('merge, 'base) State.t) fa fd =
   List.fold ~init:[] (Mina_stdlib.Nonempty_list.to_list state.trees)

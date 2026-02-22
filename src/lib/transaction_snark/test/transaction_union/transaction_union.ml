@@ -8,6 +8,8 @@ open Mina_base
 
 let state_body = U.genesis_state_body
 
+let signature_kind = U.signature_kind
+
 let constraint_constants = U.constraint_constants
 
 let consensus_constants = U.consensus_constants
@@ -56,6 +58,7 @@ let%test_module "Transaction union tests" =
       let user_command_in_block =
         { Transaction_protocol_state.Poly.transaction = user_command
         ; block_data = state_body
+        ; global_slot = current_global_slot
         }
       in
       let user_command_supply_increase = Currency.Amount.Signed.zero in
@@ -66,8 +69,11 @@ let%test_module "Transaction union tests" =
                 (User_command.Signed_command
                    (Signed_command.forget_check user_command) )
             in
-            Transaction_snark.Statement.Poly.with_empty_local_state ~source
-              ~target ~sok_digest
+            Transaction_snark.Statement.Poly.with_empty_local_state
+              ~source_first_pass_ledger:source ~target_first_pass_ledger:target
+              ~source_second_pass_ledger:target
+              ~target_second_pass_ledger:target ~connecting_ledger_left:target
+              ~connecting_ledger_right:target ~sok_digest
               ~fee_excess:(Or_error.ok_exn (Transaction.fee_excess txn))
               ~supply_increase:user_command_supply_increase
               ~pending_coinbase_stack_state
@@ -79,6 +85,10 @@ let%test_module "Transaction union tests" =
         Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
       let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+      let global_slot =
+        Mina_state.Protocol_state.Body.consensus_state state_body
+        |> Consensus.Data.Consensus_state.global_slot_since_genesis
+      in
       let producer = mk_pubkey () in
       let producer_id = Account_id.create producer Token_id.default in
       let receiver = mk_pubkey () in
@@ -100,15 +110,18 @@ let%test_module "Transaction union tests" =
       let source_stack =
         if carryforward then
           Pending_coinbase.Stack.(
-            push_state state_body_hash pending_coinbase_init)
+            push_state state_body_hash global_slot pending_coinbase_init)
         else pending_coinbase_init
       in
       let pending_coinbase_stack_target =
         U.pending_coinbase_stack_target transaction U.genesis_state_body_hash
-          pending_coinbase_init
+          Mina_numbers.Global_slot_since_genesis.zero pending_coinbase_init
       in
       let txn_in_block =
-        { Transaction_protocol_state.Poly.transaction; block_data = state_body }
+        { Transaction_protocol_state.Poly.transaction
+        ; block_data = state_body
+        ; global_slot
+        }
       in
       Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
           Ledger.create_new_account_exn ledger producer_id
@@ -118,30 +131,37 @@ let%test_module "Transaction union tests" =
               [ producer_id; receiver_id; other_id ]
           in
           let sparse_ledger_after, applied_transaction =
-            Sparse_ledger.apply_transaction
-              ~constraint_constants:U.constraint_constants sparse_ledger
-              ~txn_state_view:
-                (txn_in_block.block_data |> Mina_state.Protocol_state.Body.view)
-              txn_in_block.transaction
+            Result.( >>= )
+              (Sparse_ledger.apply_transaction_first_pass
+                 ~constraint_constants:U.constraint_constants ~global_slot
+                 sparse_ledger
+                 ~txn_state_view:
+                   ( txn_in_block.block_data
+                   |> Mina_state.Protocol_state.Body.view )
+                 txn_in_block.transaction )
+              (fun (sparse_ledger, partially_applied) ->
+                Sparse_ledger.apply_transaction_second_pass sparse_ledger
+                  partially_applied )
             |> Or_error.ok_exn
           in
           let supply_increase =
-            Mina_ledger.Ledger.Transaction_applied.supply_increase
-              applied_transaction
+            Mina_transaction_logic.Transaction_applied.supply_increase
+              ~constraint_constants applied_transaction
             |> Or_error.ok_exn
           in
-          Transaction_snark.check_transaction txn_in_block
+          Transaction_snark.check_transaction ~signature_kind txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
             ~constraint_constants:U.constraint_constants
             ~sok_message:
               (Mina_base.Sok_message.create ~fee:Currency.Fee.zero
                  ~prover:Public_key.Compressed.empty )
-            ~source:(Sparse_ledger.merkle_root sparse_ledger)
-            ~target:(Sparse_ledger.merkle_root sparse_ledger_after)
+            ~source_first_pass_ledger:(Sparse_ledger.merkle_root sparse_ledger)
+            ~target_first_pass_ledger:
+              (Sparse_ledger.merkle_root sparse_ledger_after)
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
               { source = source_stack; target = pending_coinbase_stack_target }
-            ~zkapp_account1:None ~zkapp_account2:None ~supply_increase )
+            ~supply_increase )
 
     let%test_unit "coinbase with new state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -153,7 +173,7 @@ let%test_module "Transaction union tests" =
 
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
-          let wallets = U.Wallet.random_wallets () in
+          let wallets = Quickcheck.random_value (U.Wallet.random_wallets ()) in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               Array.iter
                 (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))
@@ -174,7 +194,7 @@ let%test_module "Transaction union tests" =
                 Mina_state.Protocol_state.Body.consensus_state state_body
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
-              let target =
+              let target_first_pass_ledger =
                 Ledger.merkle_root_after_user_command_exn ledger
                   ~txn_global_slot:current_global_slot t1
               in
@@ -192,7 +212,7 @@ let%test_module "Transaction union tests" =
               let pending_coinbase_stack = Pending_coinbase.Stack.empty in
               let pending_coinbase_stack_target =
                 U.pending_coinbase_stack_target (Command (Signed_command t1))
-                  state_body_hash pending_coinbase_stack
+                  state_body_hash current_global_slot pending_coinbase_stack
               in
               let pending_coinbase_stack_state =
                 { Transaction_snark.Pending_coinbase_stack_state.source =
@@ -208,13 +228,16 @@ let%test_module "Transaction union tests" =
                 in
                 Currency.Amount.Signed.create ~magnitude ~sgn:Sgn.Neg
               in
-              Transaction_snark.check_user_command ~constraint_constants
-                ~sok_message
-                ~source:(Ledger.merkle_root ledger)
-                ~target ~init_stack:pending_coinbase_stack
+              Transaction_snark.check_user_command ~signature_kind
+                ~constraint_constants ~sok_message
+                ~source_first_pass_ledger:(Ledger.merkle_root ledger)
+                ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state
                 ~supply_increase:user_command_supply_increase
-                { transaction = t1; block_data = state_body }
+                { transaction = t1
+                ; block_data = state_body
+                ; global_slot = current_global_slot
+                }
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
     let account_fee =
@@ -222,7 +245,10 @@ let%test_module "Transaction union tests" =
 
     let%test_unit "account creation fee - user commands" =
       Test_util.with_randomness 123456789 (fun () ->
-          let wallets = U.Wallet.random_wallets ~n:3 () |> Array.to_list in
+          let wallets =
+            Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ())
+            |> Array.to_list
+          in
           let sender = List.hd_exn wallets in
           let receivers = List.tl_exn wallets in
           let txns_per_receiver = 2 in
@@ -273,7 +299,10 @@ let%test_module "Transaction union tests" =
 
     let%test_unit "account creation fee - fee transfers" =
       Test_util.with_randomness 123456789 (fun () ->
-          let receivers = U.Wallet.random_wallets ~n:3 () |> Array.to_list in
+          let receivers =
+            Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ())
+            |> Array.to_list
+          in
           let txns_per_receiver = 3 in
           let fee = 8_000_000_000 in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
@@ -308,7 +337,9 @@ let%test_module "Transaction union tests" =
 
     let%test_unit "account creation fee - coinbase" =
       Test_util.with_randomness 123456789 (fun () ->
-          let wallets = U.Wallet.random_wallets ~n:3 () in
+          let wallets =
+            Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ())
+          in
           let receiver = wallets.(0) in
           let other = wallets.(1) in
           let dummy_account = wallets.(2) in
@@ -365,11 +396,19 @@ let%test_module "Transaction union tests" =
         ~carryforward1 ~carryforward2 =
       let module T = (val Lazy.force U.snark_module) in
       Test_util.with_randomness 123456789 (fun () ->
-          let wallets = U.Wallet.random_wallets () in
+          let wallets = Quickcheck.random_value (U.Wallet.random_wallets ()) in
           (*let state_body = Lazy.force state_body in
             let state_body_hash = Lazy.force state_body_hash in*)
           let state_body_hash1, state_body1 = state_hash_and_body1 in
+          let global_slot1 =
+            Mina_state.Protocol_state.Body.consensus_state state_body1
+            |> Consensus.Data.Consensus_state.global_slot_since_genesis
+          in
           let state_body_hash2, state_body2 = state_hash_and_body2 in
+          let global_slot2 =
+            Mina_state.Protocol_state.Body.consensus_state state_body2
+            |> Consensus.Data.Consensus_state.global_slot_since_genesis
+          in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               Array.iter wallets ~f:(fun { account; private_key = _ } ->
                   Ledger.create_new_account_exn ledger
@@ -413,7 +452,8 @@ let%test_module "Transaction union tests" =
               let pending_coinbase_stack_state1 =
                 (* No coinbase to add to the stack. *)
                 let stack_with_state =
-                  Pending_coinbase.Stack.push_state state_body_hash1 init_stack1
+                  Pending_coinbase.Stack.push_state state_body_hash1
+                    global_slot1 init_stack1
                 in
                 (* Since protocol state body is added once per block, the
                    source would already have the state if [carryforward=true]
@@ -449,7 +489,7 @@ let%test_module "Transaction union tests" =
                 let previous_stack = pending_coinbase_stack_state1.pc.target in
                 let stack_with_state2 =
                   Pending_coinbase.Stack.(
-                    push_state state_body_hash2 previous_stack)
+                    push_state state_body_hash2 global_slot2 previous_stack)
                 in
                 (* No coinbase to add. *)
                 let source_stack, target_stack, init_stack, state_body2 =
@@ -480,7 +520,9 @@ let%test_module "Transaction union tests" =
                 ( Ledger.apply_user_command ~constraint_constants ledger
                     ~txn_global_slot:current_global_slot t1
                   |> Or_error.ok_exn
-                  : Ledger.Transaction_applied.Signed_command_applied.t ) ;
+                  : Mina_transaction_logic.Transaction_applied
+                    .Signed_command_applied
+                    .t ) ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
@@ -516,10 +558,11 @@ let%test_module "Transaction union tests" =
               in
               Async.Thread_safe.block_on_async (fun () ->
                   T.verify_against_digest proof13 )
-              |> Result.ok_exn ) )
+              |> Result.ok_exn |> Or_error.ok_exn ) )
 
-    let%test "base_and_merge: transactions in one block (t1,t2 in b1), \
-              carryforward the state from a previous transaction t0 in b1" =
+    let%test_unit "base_and_merge: transactions in one block (t1,t2 in b1), \
+                   carryforward the state from a previous transaction t0 in b1"
+        =
       let state_hash_and_body1 = (state_body_hash, state_body) in
       test_base_and_merge ~state_hash_and_body1
         ~state_hash_and_body2:state_hash_and_body1 ~carryforward1:true
@@ -527,22 +570,27 @@ let%test_module "Transaction union tests" =
 
     (* No new state body, carryforward the stack from the previous transaction*)
 
-    let%test "base_and_merge: transactions in one block (t1,t2 in b1), don't \
-              carryforward the state from a previous transaction t0 in b1" =
+    let%test_unit "base_and_merge: transactions in one block (t1,t2 in b1), \
+                   don't carryforward the state from a previous transaction t0 \
+                   in b1" =
       let state_hash_and_body1 = (state_body_hash, state_body) in
       test_base_and_merge ~state_hash_and_body1
         ~state_hash_and_body2:state_hash_and_body1 ~carryforward1:false
         ~carryforward2:true
 
-    let%test "base_and_merge: transactions in two different blocks (t1,t2 in \
-              b1, b2 resp.), carryforward the state from a previous \
-              transaction t0 in b1" =
+    let%test_unit "base_and_merge: transactions in two different blocks (t1,t2 \
+                   in b1, b2 resp.), carryforward the state from a previous \
+                   transaction t0 in b1" =
       let state_hash_and_body1 =
         let open Staged_ledger_diff in
         let state_body0 =
           Mina_state.Protocol_state.negative_one
-            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
-            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+            ~genesis_ledger:
+              (Consensus.Genesis_data.Ledger.to_hashed
+                 Genesis_ledger.for_unit_tests )
+            ~genesis_epoch_data:
+              (Consensus.Genesis_data.Epoch.to_hashed
+                 Consensus.Genesis_data.Epoch.for_unit_tests )
             ~constraint_constants ~consensus_constants ~genesis_body_reference
           |> Mina_state.Protocol_state.body
         in
@@ -557,15 +605,19 @@ let%test_module "Transaction union tests" =
 
     (*t2 is in a new state, therefore do not carryforward the previous state*)
 
-    let%test "base_and_merge: transactions in two different blocks (t1,t2 in \
-              b1, b2 resp.), don't carryforward the state from a previous \
-              transaction t0 in b1" =
+    let%test_unit "base_and_merge: transactions in two different blocks (t1,t2 \
+                   in b1, b2 resp.), don't carryforward the state from a \
+                   previous transaction t0 in b1" =
       let state_hash_and_body1 =
         let state_body0 =
           let open Staged_ledger_diff in
           Mina_state.Protocol_state.negative_one
-            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
-            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+            ~genesis_ledger:
+              (Consensus.Genesis_data.Ledger.to_hashed
+                 Genesis_ledger.for_unit_tests )
+            ~genesis_epoch_data:
+              (Consensus.Genesis_data.Epoch.to_hashed
+                 Consensus.Genesis_data.Epoch.for_unit_tests )
             ~constraint_constants ~consensus_constants ~genesis_body_reference
           |> Mina_state.Protocol_state.body
         in
@@ -584,7 +636,8 @@ let%test_module "Transaction union tests" =
         (Balance.of_nanomina_int_exn balance)
 
     let test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
-        ~fee_payer_pk ~fee_token ?memo ?valid_until ?nonce body =
+        ~fee_payer_pk ~fee_token ?memo ?valid_until ?nonce ?expected_failure
+        body =
       let memo =
         match memo with
         | Some memo ->
@@ -621,17 +674,16 @@ let%test_module "Transaction union tests" =
           ~memo ~body
       in
       let signer = Signature_lib.Keypair.of_private_key_exn signer in
-      let user_command = Signed_command.sign signer payload in
-      U.test_transaction_union ledger (Command (Signed_command user_command)) ;
+      let user_command =
+        Signed_command.sign ~signature_kind:U.signature_kind signer payload
+      in
+      U.test_transaction_union ?expected_failure ledger
+        (Command (Signed_command user_command)) ;
       let fee_payer = Signed_command.Payload.fee_payer payload in
-      let source = Signed_command.Payload.source payload in
       let receiver = Signed_command.Payload.receiver payload in
       let fee_payer_account = get_account fee_payer in
-      let source_account = get_account source in
       let receiver_account = get_account receiver in
-      ( `Fee_payer_account fee_payer_account
-      , `Source_account source_account
-      , `Receiver_account receiver_account )
+      (`Fee_payer_account fee_payer_account, `Receiver_account receiver_account)
 
     let random_int_incl l u = Quickcheck.random_value (Int.gen_incl l u)
 
@@ -644,7 +696,7 @@ let%test_module "Transaction union tests" =
                        charges fee" =
           Test_util.with_randomness 123456789 (fun () ->
               Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                  let wallets = U.Wallet.random_wallets ~n:2 () in
+                  let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                   let signer = wallets.(0).private_key in
                   let fee_payer_pk = wallets.(0).account.public_key in
                   let source_pk = fee_payer_pk in
@@ -681,7 +733,7 @@ let%test_module "Transaction union tests" =
         let%test_unit "transfer non-default tokens to an existing account" =
           Test_util.with_randomness 123456789 (fun () ->
               Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                  let wallets = U.Wallet.random_wallets ~n:2 () in
+                  let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                   let signer = wallets.(0).private_key in
                   let fee_payer_pk = wallets.(0).account.public_key in
                   let source_pk = fee_payer_pk in
@@ -730,7 +782,7 @@ let%test_module "Transaction union tests" =
                        transfer" =
           Test_util.with_randomness 123456789 (fun () ->
               Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                  let wallets = U.Wallet.random_wallets ~n:2 () in
+                  let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                   let signer = wallets.(0).private_key in
                   let fee_payer_pk = wallets.(0).account.public_key in
                   let source_pk = fee_payer_pk in
@@ -769,7 +821,7 @@ let%test_module "Transaction union tests" =
         let%test_unit "insufficient source balance for non-default token transfer" =
           Test_util.with_randomness 123456789 (fun () ->
               Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                  let wallets = U.Wallet.random_wallets ~n:2 () in
+                  let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                   let signer = wallets.(0).private_key in
                   let fee_payer_pk = wallets.(0).account.public_key in
                   let source_pk = fee_payer_pk in
@@ -807,7 +859,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "transfer non-existing source" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 let fee_payer_pk = wallets.(0).account.public_key in
                 let source_pk = wallets.(1).account.public_key in
@@ -838,7 +890,9 @@ let%test_module "Transaction union tests" =
     let%test_unit "delegation delegatee does not exist" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              let wallets = U.Wallet.random_wallets ~n:2 () in
+              let wallets =
+                Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ())
+              in
               let signer = wallets.(0).private_key in
               let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = fee_payer_pk in
@@ -849,17 +903,13 @@ let%test_module "Transaction union tests" =
               in
               let fee = Fee.of_mina_int_exn @@ random_int_incl 2 15 in
               let ( `Fee_payer_account fee_payer_account
-                  , `Source_account source_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
                   ~fee_payer_pk ~fee_token
-                  (Stake_delegation
-                     (Set_delegate
-                        { delegator = source_pk; new_delegate = receiver_pk } )
+                  (Stake_delegation (Set_delegate { new_delegate = receiver_pk })
                   )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
-              let source_account = Option.value_exn source_account in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -868,17 +918,18 @@ let%test_module "Transaction union tests" =
                   expected_fee_payer_balance ) ;
               assert (
                 Public_key.Compressed.equal
-                  (Option.value_exn source_account.delegate)
+                  (Option.value_exn fee_payer_account.delegate)
                   source_pk ) ;
               assert (Option.is_none receiver_account) ) )
 
     let%test_unit "delegation delegator does not exist" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              let wallets = U.Wallet.random_wallets ~n:3 () in
+              let wallets =
+                Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ())
+              in
               let signer = wallets.(0).private_key in
               let fee_payer_pk = wallets.(0).account.public_key in
-              let source_pk = wallets.(1).account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
               let token_id = Token_id.default in
@@ -889,13 +940,10 @@ let%test_module "Transaction union tests" =
               in
               let fee = Fee.of_mina_int_exn @@ random_int_incl 2 15 in
               let ( `Fee_payer_account fee_payer_account
-                  , `Source_account source_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
                   ~fee_payer_pk ~fee_token
-                  (Stake_delegation
-                     (Set_delegate
-                        { delegator = source_pk; new_delegate = receiver_pk } )
+                  (Stake_delegation (Set_delegate { new_delegate = receiver_pk })
                   )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -905,12 +953,88 @@ let%test_module "Transaction union tests" =
               assert (
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
-              assert (Option.is_none source_account) ;
               assert (Option.is_some receiver_account) ) )
+
+    let%test_unit "Payment to and from same key" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets =
+                Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ())
+              in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let receiver_pk = wallets.(0).account.public_key in
+              let token_id = Token_id.default in
+              let accounts =
+                [| create_account fee_payer_pk token_id 50_000_000_000 |]
+              in
+              let fee = Fee.of_nanomina_int_exn 1_000_000_000 in
+              let amount = Amount.of_nanomina_int_exn 4_000_000_000 in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Receiver_account _receiver_account ) =
+                test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
+                  ~fee_payer_pk ~fee_token:token_id
+                  (Payment { receiver_pk; amount })
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ) )
+
+    let%test_unit "Payment with source balance insufficient- untimed" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets =
+                Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ())
+              in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let receiver_pk = wallets.(1).account.public_key in
+              let token_id = Token_id.default in
+              let accounts =
+                [| create_account fee_payer_pk token_id 5_000_000_000 |]
+              in
+              let fee = Fee.of_nanomina_int_exn 1_000_000_000 in
+              let amount = Amount.of_nanomina_int_exn 5_000_000_000 in
+              ignore
+              @@ test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
+                   ~fee_payer_pk ~fee_token:token_id
+                   ~expected_failure:
+                     [ Transaction_status.Failure.Source_insufficient_balance ]
+                   (Payment { receiver_pk; amount }) ) )
+
+    let%test_unit "Payment with insufficient account creation fee- untimed" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets =
+                Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ())
+              in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let receiver_pk = wallets.(1).account.public_key in
+              let token_id = Token_id.default in
+              let accounts =
+                [| create_account fee_payer_pk token_id 5_000_000_000 |]
+              in
+              let fee = Fee.of_nanomina_int_exn 1_000_000_000 in
+              let amount = Amount.of_nanomina_int_exn 1 in
+              ignore
+              @@ test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
+                   ~fee_payer_pk ~fee_token:token_id
+                   ~expected_failure:
+                     [ Transaction_status.Failure
+                       .Amount_insufficient_to_create_account
+                     ]
+                   (Payment { receiver_pk; amount }) ) )
 
     let%test_unit "timed account - transactions" =
       Test_util.with_randomness 123456789 (fun () ->
-          let wallets = U.Wallet.random_wallets ~n:3 () in
+          let wallets =
+            Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ())
+          in
           let sender = wallets.(0) in
           let receivers = Array.to_list wallets |> List.tl_exn in
           let txns_per_receiver = 2 in
@@ -923,11 +1047,13 @@ let%test_module "Transaction union tests" =
           in
           let balance = Balance.of_mina_int_exn 100_000 in
           let initial_minimum_balance = Balance.of_mina_int_exn 80_000 in
-          let cliff_time = Mina_numbers.Global_slot.of_int 1000 in
+          let cliff_time = Mina_numbers.Global_slot_since_genesis.of_int 1000 in
           let cliff_amount = Amount.of_nanomina_int_exn 10_000 in
-          let vesting_period = Mina_numbers.Global_slot.of_int 10 in
+          let vesting_period = Mina_numbers.Global_slot_span.of_int 10 in
           let vesting_increment = Amount.of_nanomina_int_exn 1 in
-          let txn_global_slot = Mina_numbers.Global_slot.of_int 1002 in
+          let txn_global_slot =
+            Mina_numbers.Global_slot_since_genesis.of_int 1002
+          in
           let sender =
             { sender with
               account =
@@ -982,7 +1108,7 @@ let%test_module "Transaction union tests" =
     (*let%test_unit "create own new token" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:1 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:1 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee payer is the new token owner. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1018,7 +1144,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create new token for a different pk" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee payer and new token owner are distinct. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1054,7 +1180,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create new token for a different pk new accounts disabled" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee payer and new token owner are distinct. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1090,7 +1216,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create own new token account" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and receiver are the same, token owner differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1139,7 +1265,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create new token account for a different pk" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:3 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer, receiver, and token owner differ. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1189,7 +1315,7 @@ let%test_module "Transaction union tests" =
                      token" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and token owner are the same, receiver differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1238,7 +1364,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create new own locked token account in a locked token" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and receiver are the same, token owner differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1288,7 +1414,7 @@ let%test_module "Transaction union tests" =
                      fee-payer" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:3 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer, receiver, and token owner differ. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1332,7 +1458,7 @@ let%test_module "Transaction union tests" =
                      non-owner fee-payer" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:3 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer, receiver, and token owner differ. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1375,7 +1501,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create new token account fails if account exists" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:3 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer, receiver, and token owner differ. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1421,7 +1547,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create new token account fails if receiver is token owner" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Receiver and token owner are the same, fee-payer differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1467,7 +1593,7 @@ let%test_module "Transaction union tests" =
                      doesn't own the token" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:3 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer, receiver, and token owner differ. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1509,7 +1635,7 @@ let%test_module "Transaction union tests" =
                      also the account creation target and does not exist" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:3 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer, receiver, and token owner are the same. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1545,7 +1671,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create new token account works for default token" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and receiver are the same, token owner differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1589,7 +1715,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "mint tokens in owner's account" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:1 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:1 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer, receiver, and token owner are the same. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1634,7 +1760,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "mint tokens in another pk's account" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and token owner are the same, receiver differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1685,7 +1811,7 @@ let%test_module "Transaction union tests" =
                      token owner" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and token owner are the same, receiver differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1729,7 +1855,7 @@ let%test_module "Transaction union tests" =
           =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and token owner are the same, receiver differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1769,7 +1895,7 @@ let%test_module "Transaction union tests" =
                      to mint" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and receiver are the same, token owner differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1815,7 +1941,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "mint tokens fails if the receiver account is not present" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and fee payer are the same, receiver differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1866,9 +1992,9 @@ let%test_module "Transaction union tests" =
             let account_id = Account_id.create pk Token_id.default in
             let balance = Balance.of_mina_int_exn 100_000 in
             let initial_minimum_balance = Balance.of_mina_int_exn 80 in
-            let cliff_time = Mina_numbers.Global_slot.of_int 2 in
+            let cliff_time = Mina_numbers.Global_slot_since_genesis.of_int 2 in
             let cliff_amount = Amount.of_mina_int_exn 5 in
-            let vesting_period = Mina_numbers.Global_slot.of_int 2 in
+            let vesting_period = Mina_numbers.Global_slot_span.of_int 2 in
             let vesting_increment = Amount.of_mina_int_exn 40 in
             Or_error.ok_exn
             @@ Account.create_timed account_id balance ~initial_minimum_balance
@@ -1917,7 +2043,9 @@ let%test_module "Transaction union tests" =
                   Ledger.create_new_account_exn ledger (Account.identifier acc)
                     acc ) ;
               (* well over the vesting period, the timing field shouldn't change*)
-              let txn_global_slot = Mina_numbers.Global_slot.of_int 100 in
+              let txn_global_slot =
+                Mina_numbers.Global_slot_since_genesis.of_int 100
+              in
               List.iter transactions ~f:(fun txn ->
                   U.test_transaction_union ~txn_global_slot ledger txn ) ) )
   end )
@@ -1927,6 +2055,8 @@ let%test_module "legacy transactions using zkApp accounts" =
     let memo = Signed_command_memo.create_from_string_exn "zkApp-legacy-txns"
 
     let `VK vk, `Prover _zkapp_prover = Lazy.force U.trivial_zkapp
+
+    let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
     let account ledger pk =
       let location =
@@ -2090,6 +2220,50 @@ let%test_module "legacy transactions using zkApp accounts" =
                     ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
+    let%test_unit "Failed payments from zkapp accounts- Access=Proof" =
+      let open Mina_transaction_logic.For_tests in
+      Quickcheck.test ~trials:5 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  let spec = List.hd_exn specs in
+                  let permissions =
+                    Some
+                      { Permissions.user_default with
+                        access = Permissions.Auth_required.Proof
+                      }
+                  in
+                  test_payments ?permissions
+                    ~expected_failure_sender:
+                      Transaction_status.Failure.Update_not_permitted_balance
+                    ~new_kp ~spec ledger ;
+                  Async.Deferred.return () ) ) )
+
+    let%test_unit "Failed payments from zkapp accounts- Increment_nonce=Proof" =
+      let open Mina_transaction_logic.For_tests in
+      Quickcheck.test ~trials:5 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  let spec = List.hd_exn specs in
+                  let permissions =
+                    Some
+                      { Permissions.user_default with
+                        increment_nonce = Permissions.Auth_required.Proof
+                      }
+                  in
+                  test_payments ?permissions
+                    ~expected_failure_sender:
+                      Transaction_status.Failure.Update_not_permitted_nonce
+                    ~new_kp ~spec ledger ;
+                  Async.Deferred.return () ) ) )
+
     let test_delegations ?expected_failure_sender
         ~(new_kp : Signature_lib.Keypair.t)
         ~(spec : Mina_transaction_logic.For_tests.Transaction_spec.t)
@@ -2100,6 +2274,13 @@ let%test_module "legacy transactions using zkApp accounts" =
       let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
       Transaction_snark.For_tests.create_trivial_zkapp_account ?permissions ~vk
         ~ledger snapp_pk ;
+      let receiver_id = Account_id.create spec.receiver Token_id.default in
+      if
+        Option.is_none
+          (Mina_ledger.Ledger.location_of_account ledger receiver_id)
+      then
+        Mina_ledger.Ledger.create_new_account_exn ledger receiver_id
+          (Account.initialize receiver_id) ;
       let txn_fee = Fee.of_nanomina_int_exn 1_000_000 in
       let sender_kp, sender_nonce = spec.sender in
       (*Delegator is a zkapp account*)

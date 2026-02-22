@@ -10,7 +10,9 @@ module Types = struct
 
     module V1 : sig
       type t =
-        (Mina_numbers.Global_slot.V1.t, Mina_numbers.Length.V1.t) Poly.V1.t
+        ( Mina_numbers.Global_slot_since_hard_fork.V1.t
+        , Mina_numbers.Length.V1.t )
+        Poly.V1.t
     end
   end
 end
@@ -24,7 +26,10 @@ module type Concrete = sig
   end
 
   module V1 : sig
-    type t = (Mina_numbers.Global_slot.V1.t, Mina_numbers.Length.V1.t) Poly.V1.t
+    type t =
+      ( Mina_numbers.Global_slot_since_hard_fork.V1.t
+      , Mina_numbers.Length.V1.t )
+      Poly.V1.t
   end
 end
 
@@ -37,7 +42,10 @@ module M = struct
   end
 
   module V1 = struct
-    type t = (Mina_numbers.Global_slot.V1.t, Mina_numbers.Length.V1.t) Poly.V1.t
+    type t =
+      ( Mina_numbers.Global_slot_since_hard_fork.V1.t
+      , Mina_numbers.Length.V1.t )
+      Poly.V1.t
   end
 end
 

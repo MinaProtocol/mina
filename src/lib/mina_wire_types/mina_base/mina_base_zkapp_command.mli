@@ -80,15 +80,15 @@ module Call_forest : sig
 end
 
 module V1 : sig
-  type t =
-    { fee_payer : Mina_base_account_update.Fee_payer.V1.t
-    ; account_updates :
-        ( Mina_base_account_update.V1.t
-        , Call_forest.Digest.Account_update.V1.t
-        , Call_forest.Digest.Forest.V1.t )
-        Call_forest.V1.t
-    ; memo : Mina_base_signed_command_memo.V1.t
-    }
+  module T : sig
+    type 'a t =
+      { fee_payer : Mina_base_account_update.Fee_payer.V1.t
+      ; account_updates : 'a
+      ; memo : Mina_base_signed_command_memo.V1.t
+      }
+  end
+
+  type t = (Mina_base_account_update.V1.t, unit, unit) Call_forest.V1.t T.t
 end
 
 module Valid : sig
@@ -99,11 +99,7 @@ module Valid : sig
   end
 
   module V1 : sig
-    type t =
-      { zkapp_command : V1.t
-      ; verification_keys :
-          (Mina_base_account_id.V2.t * Verification_key_hash.V1.t) list
-      }
+    type t = { zkapp_command : V1.t }
   end
 end
 

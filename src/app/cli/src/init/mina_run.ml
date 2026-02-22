@@ -1,8 +1,15 @@
+(*
+  Mina_run provides the runtime layer for the Mina daemon, building on 
+  Mina_lib’s core protocol logic. It manages GraphQL APIs, node status 
+  reporting, crash/shutdown handling, and configuration setup, acting as the 
+  control panel connecting Mina_lib to CLI tools and external services. *)
+
 open Core
 open Async
 module Graphql_cohttp_async =
   Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
     (Cohttp_async.Body)
+module Root_ledger = Mina_ledger.Root
 
 let snark_job_list_json t =
   let open Participating_state.Let_syntax in
@@ -13,6 +20,125 @@ let snark_pool_list t =
   Mina_lib.snark_pool t |> Network_pool.Snark_pool.resource_pool
   |> Network_pool.Snark_pool.Resource_pool.snark_pool_json
   |> Yojson.Safe.to_string
+
+(** Poll until best tip reaches the target slot *)
+let wait_for_best_tip ~logger ~slot_tx_end mina =
+  let open Deferred.Let_syntax in
+  let open Mina_numbers in
+  Deferred.repeat_until_finished () (fun () ->
+      match Mina_lib.best_tip mina with
+      | `Bootstrapping ->
+          [%log debug] "Node is bootstrapping, waiting 15s before retry" ;
+          let%map () = after (Time.Span.of_sec 15.0) in
+          `Repeat ()
+      | `Active breadcrumb ->
+          let protocol_state =
+            Transition_frontier.Breadcrumb.protocol_state breadcrumb
+          in
+          let consensus_state =
+            Mina_state.Protocol_state.consensus_state protocol_state
+          in
+          let current_slot =
+            Consensus.Data.Consensus_state.curr_global_slot consensus_state
+          in
+          let blockchain_length =
+            Consensus.Data.Consensus_state.blockchain_length consensus_state
+          in
+          let state_hash =
+            Transition_frontier.Breadcrumb.state_hash breadcrumb
+          in
+          if Global_slot_since_hard_fork.(current_slot >= slot_tx_end) then (
+            [%log debug]
+              "Best tip has reached slot_tx_end. Current slot: %s, target \
+               slot: %s, blockchain_length: %s, state_hash: %s"
+              (Global_slot_since_hard_fork.to_string current_slot)
+              (Global_slot_since_hard_fork.to_string slot_tx_end)
+              (Length.to_string blockchain_length)
+              (Mina_base.State_hash.to_base58_check state_hash) ;
+            return (`Finished ()) )
+          else (
+            [%log debug]
+              "Best tip not yet at slot_tx_end. Current slot: %s, target slot: \
+               %s, blockchain_length: %s, state_hash: %s. Waiting 15s before \
+               retry"
+              (Global_slot_since_hard_fork.to_string current_slot)
+              (Global_slot_since_hard_fork.to_string slot_tx_end)
+              (Length.to_string blockchain_length)
+              (Mina_base.State_hash.to_base58_check state_hash) ;
+            let%map () = after (Time.Span.of_sec 15.0) in
+            `Repeat () ) )
+
+let start_auto_hardfork_config_generation ~logger mina =
+  let open Deferred.Let_syntax in
+  let config = Mina_lib.config mina in
+  let runtime_config = config.precomputed_values.runtime_config in
+  let consensus_constants = config.precomputed_values.consensus_constants in
+  match config.hardfork_handling with
+  | Cli_lib.Arg_type.Hardfork_handling.Keep_running ->
+      Deferred.unit
+  | Cli_lib.Arg_type.Hardfork_handling.Migrate_exit -> (
+      match
+        ( Runtime_config.slot_chain_end runtime_config
+        , Runtime_config.slot_tx_end runtime_config
+        , Runtime_config.scheduled_hard_fork_genesis_slot runtime_config )
+      with
+      | Some slot_chain_end, Some slot_tx_end, Some _scheduled_genesis -> (
+          (* Calculate when slot_chain_end begins *)
+          let chain_end_time =
+            Consensus.Data.Consensus_time.(
+              start_time ~constants:consensus_constants
+                (of_global_slot ~constants:consensus_constants slot_chain_end))
+          in
+          let chain_end_time_str =
+            Block_time.to_time_exn chain_end_time
+            |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+          in
+          [%log debug]
+            "Spawning background thread to wait for hardfork config \
+             generation. Will wait until slot_chain_end: slot %s at %s"
+            (Mina_numbers.Global_slot_since_hard_fork.to_string slot_chain_end)
+            chain_end_time_str ;
+          (* Wait until slot_chain_end time *)
+          let%bind () =
+            let span =
+              Block_time.diff chain_end_time
+                (Block_time.now config.time_controller)
+            in
+            after (Block_time.Span.to_time_span span)
+          in
+          [%log debug]
+            "Reached slot_chain_end time, now waiting for best tip to reach \
+             slot_tx_end: %s"
+            (Mina_numbers.Global_slot_since_hard_fork.to_string slot_tx_end) ;
+          let%bind () = wait_for_best_tip ~logger ~slot_tx_end mina in
+          let network_id =
+            Mina_signature_kind.to_directory_name (Mina_lib.signature_kind mina)
+          in
+          let config_dir =
+            config.conf_dir ^/ sprintf "auto-fork-mesa-%s" network_id
+          in
+          [%log info] "Generating hardfork config in $config_dir"
+            ~metadata:[ ("config_dir", `String config_dir) ] ;
+          let%bind result =
+            Mina_lib.Hardfork_config.dump_reference_config
+              ~breadcrumb_spec:`Stop_slot ~config_dir
+              ~generate_fork_validation:false mina
+          in
+          match result with
+          | Ok () ->
+              [%log info]
+                "Successfully generated hardfork config, shutting down daemon" ;
+              (* Shutdown like Stop_daemon *)
+              Scheduler.yield () >>= fun () -> exit 0
+          | Error e ->
+              [%log error]
+                "Failed to generate hardfork config: %s. Daemon will continue \
+                 running"
+                (Error.to_string_hum e) ;
+              Deferred.unit )
+      | _ ->
+          (* Config not complete for auto-generation *)
+          Deferred.unit )
 
 (* create reader, writer for protocol versions, but really for any one-line item in conf_dir *)
 let make_conf_dir_item_io ~conf_dir ~filename =
@@ -30,66 +156,6 @@ let make_conf_dir_item_io ~conf_dir ~filename =
     close_out outp
   in
   (read_item, write_item)
-
-let get_current_protocol_version ~compile_time_current_protocol_version
-    ~conf_dir ~logger =
-  let read_protocol_version, write_protocol_version =
-    make_conf_dir_item_io ~conf_dir ~filename:"current_protocol_version"
-  in
-  function
-  | None -> (
-      try
-        (* not provided on command line, try to read from config dir *)
-        let protocol_version = read_protocol_version () in
-        [%log info]
-          "Setting current protocol version to $protocol_version from config"
-          ~metadata:[ ("protocol_version", `String protocol_version) ] ;
-        Protocol_version.of_string_exn protocol_version
-      with Sys_error _ ->
-        (* not on command-line, not in config dir, use compile-time value *)
-        [%log info]
-          "Setting current protocol version to $protocol_version from \
-           compile-time config"
-          ~metadata:
-            [ ("protocol_version", `String compile_time_current_protocol_version)
-            ] ;
-        Protocol_version.of_string_exn compile_time_current_protocol_version )
-  | Some protocol_version -> (
-      try
-        (* it's an error if the command line value disagrees with the value in the config *)
-        let config_protocol_version = read_protocol_version () in
-        if String.equal config_protocol_version protocol_version then (
-          [%log info]
-            "Using current protocol version $protocol_version from command \
-             line, which matches the one in the config"
-            ~metadata:[ ("protocol_version", `String protocol_version) ] ;
-          Protocol_version.of_string_exn config_protocol_version )
-        else (
-          [%log fatal]
-            "Current protocol version $protocol_version from the command line \
-             disagrees with $config_protocol_version from the Coda config"
-            ~metadata:
-              [ ("protocol_version", `String protocol_version)
-              ; ("config_protocol_version", `String config_protocol_version)
-              ] ;
-          failwith
-            "Current protocol version from command line disagrees with \
-             protocol version in Coda config; please delete your Coda config \
-             if you wish to use a new protocol version" )
-      with Sys_error _ -> (
-        (* use value provided on command line, write to config dir *)
-        match Protocol_version.of_string_opt protocol_version with
-        | None ->
-            [%log fatal] "Protocol version provided on command line is invalid"
-              ~metadata:[ ("protocol_version", `String protocol_version) ] ;
-            failwith "Protocol version from command line is invalid"
-        | Some pv ->
-            write_protocol_version protocol_version ;
-            [%log info]
-              "Using current protocol_version $protocol_version from command \
-               line, writing to config"
-              ~metadata:[ ("protocol_version", `String protocol_version) ] ;
-            pv ) )
 
 let get_proposed_protocol_version_opt ~conf_dir ~logger =
   let read_protocol_version, write_protocol_version =
@@ -129,7 +195,7 @@ let get_proposed_protocol_version_opt ~conf_dir ~logger =
           validate_cli_protocol_version protocol_version ;
           write_protocol_version protocol_version ;
           [%log info]
-            "Overwriting Coda config proposed protocol version \
+            "Overwriting Mina config proposed protocol version \
              $config_proposed_protocol_version with proposed protocol version \
              $protocol_version from the command line"
             ~metadata:
@@ -161,7 +227,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   match !coda_ref with
   | None ->
       [%log warn]
-        "Shutdown before Coda instance was created, not saving a visualization"
+        "Shutdown before Mina instance was created, not saving a visualization"
   | Some t -> (
       (*Transition frontier visualization*)
       match Mina_lib.visualize_frontier ~filename:frontier_file t with
@@ -187,14 +253,13 @@ let summary exn_json =
     ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
     ; ("Exception", exn_json)
     ; ("Command", `String daemon_command)
-    ; ("Coda_branch", `String Mina_version.branch)
     ; ("Coda_commit", `String Mina_version.commit_id)
     ]
 
 let coda_status coda_ref =
   Option.value_map coda_ref
     ~default:
-      (Deferred.return (`String "Shutdown before Coda instance was created"))
+      (Deferred.return (`String "Shutdown before Mina instance was created"))
     ~f:(fun t ->
       Mina_commands.get_status ~flag:`Performance t
       >>| Daemon_rpcs.Types.Status.to_yojson )
@@ -270,9 +335,11 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   else Some (report_file, temp_config)
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
-let setup_local_server ?(client_trustlist = []) ?rest_server_port
-    ?limited_graphql_port ?(open_limited_graphql_port = false)
-    ?(insecure_rest_server = false) coda =
+let setup_local_server ?(client_trustlist = []) ~rest_server_port
+    ?limited_graphql_port ?itn_graphql_port ?auth_keys
+    ?(open_limited_graphql_port = false) ?(insecure_rest_server = false) mina =
+  let compile_config = (Mina_lib.config mina).compile_config in
+  let itn_features = (Mina_lib.config mina).itn_features in
   let client_trustlist =
     ref
       (Unix.Cidr.Set.of_list
@@ -287,97 +354,117 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   let implement_notrace = Rpc.Rpc.implement in
   let logger =
     Logger.extend
-      (Mina_lib.top_level_logger coda)
-      [ ("coda_run", `String "Setting up server logs") ]
+      (Mina_lib.top_level_logger mina)
+      [ ("mina_run", `String "Setting up server logs") ]
   in
   let client_impls =
     [ implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
           Deferred.map
-            ( Mina_commands.setup_and_submit_user_commands coda ts
+            ( Mina_commands.setup_and_submit_user_commands mina ts
+            |> Participating_state.to_deferred_or_error )
+            ~f:Or_error.join )
+    ; implement Daemon_rpcs.Send_zkapp_commands.rpc (fun () zkapps ->
+          Deferred.map
+            ( Mina_commands.setup_and_submit_zkapp_commands mina zkapps
             |> Participating_state.to_deferred_or_error )
             ~f:Or_error.join )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () aid ->
           return
-            ( Mina_commands.get_balance coda aid
+            ( Mina_commands.get_balance mina aid
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_trust_status.rpc (fun () ip_address ->
-          return (Mina_commands.get_trust_status coda ip_address) )
+          return (Mina_commands.get_trust_status mina ip_address) )
     ; implement Daemon_rpcs.Get_trust_status_all.rpc (fun () () ->
-          return (Mina_commands.get_trust_status_all coda) )
+          return (Mina_commands.get_trust_status_all mina) )
     ; implement Daemon_rpcs.Reset_trust_status.rpc (fun () ip_address ->
-          return (Mina_commands.reset_trust_status coda ip_address) )
+          return (Mina_commands.reset_trust_status mina ip_address) )
     ; implement Daemon_rpcs.Chain_id_inputs.rpc (fun () () ->
-          return (Mina_commands.chain_id_inputs coda) )
+          return
+            ( Mina_commands.chain_id_inputs mina
+            |> Daemon_rpcs.Chain_id_inputs.of_inputs ) )
     ; implement Daemon_rpcs.Verify_proof.rpc (fun () (aid, tx, proof) ->
           return
-            ( Mina_commands.verify_payment coda aid tx proof
+            ( Mina_commands.verify_payment mina aid tx proof
             |> Participating_state.active_error |> Or_error.join ) )
     ; implement Daemon_rpcs.Get_public_keys_with_details.rpc (fun () () ->
-          return
-            ( Mina_commands.get_keys_with_details coda
-            |> Participating_state.active_error ) )
+          let%map keys = Mina_commands.get_keys_with_details mina in
+          Participating_state.active_error keys )
     ; implement Daemon_rpcs.Get_public_keys.rpc (fun () () ->
-          return
-            ( Mina_commands.get_public_keys coda
-            |> Participating_state.active_error ) )
+          let%map keys = Mina_commands.get_public_keys mina in
+          Participating_state.active_error keys )
     ; implement Daemon_rpcs.Get_nonce.rpc (fun () aid ->
           return
-            ( Mina_commands.get_nonce coda aid
+            ( Mina_commands.get_nonce mina aid
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_inferred_nonce.rpc (fun () aid ->
           return
-            ( Mina_lib.get_inferred_nonce_from_transaction_pool_and_ledger coda
+            ( Mina_lib.get_inferred_nonce_from_transaction_pool_and_ledger mina
                 aid
             |> Participating_state.active_error ) )
     ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
-          Mina_commands.get_status ~flag coda )
+          Mina_commands.get_status ~flag mina )
     ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
-          Mina_commands.clear_hist_status ~flag coda )
+          Mina_commands.clear_hist_status ~flag mina )
     ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
-          (* getting the ledger may take more time than a heartbeat timeout
-             run in thread to allow RPC heartbeats to proceed
-          *)
-          Async.In_thread.run (fun () -> Mina_lib.get_ledger coda lh) )
+          Mina_lib.get_ledger mina lh )
     ; implement Daemon_rpcs.Get_snarked_ledger.rpc (fun () lh ->
-          Mina_lib.get_snarked_ledger coda lh |> return )
+          Mina_lib.get_snarked_ledger mina lh )
     ; implement Daemon_rpcs.Get_staking_ledger.rpc (fun () which ->
-          ( match which with
-          | Next ->
-              Option.value_map (Mina_lib.next_epoch_ledger coda)
-                ~default:
-                  (Or_error.error_string "next staking ledger not available")
-                ~f:(function
-                | `Finalized ledger ->
-                    Ok ledger
-                | `Notfinalized ->
-                    Or_error.error_string
-                      "next staking ledger is not finalized yet" )
-          | Current ->
-              Option.value_map
-                (Mina_lib.staking_ledger coda)
-                ~default:
-                  (Or_error.error_string "current staking ledger not available")
-                ~f:Or_error.return )
-          |> Or_error.map ~f:(function
-               | Genesis_epoch_ledger l ->
-                   Mina_ledger.Ledger.to_list l
-               | Ledger_db db ->
-                   Mina_ledger.Ledger.Db.to_list db )
-          |> Deferred.return )
+          let ledger_or_error =
+            match which with
+            | Next ->
+                Option.value_map (Mina_lib.next_epoch_ledger mina)
+                  ~default:
+                    (Or_error.error_string "next staking ledger not available")
+                  ~f:(function
+                  | `Finalized ledger ->
+                      Ok ledger
+                  | `Notfinalized ->
+                      Or_error.error_string
+                        "next staking ledger is not finalized yet" )
+            | Current ->
+                Option.value_map
+                  (Mina_lib.staking_ledger mina)
+                  ~default:
+                    (Or_error.error_string
+                       "current staking ledger not available" )
+                  ~f:Or_error.return
+          in
+          match ledger_or_error with
+          | Ok ledger -> (
+              match ledger with
+              | Genesis_epoch_ledger l ->
+                  let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
+                  let%map accts = Mina_ledger.Ledger.to_list l_inner in
+                  Ok accts
+              | Ledger_root l ->
+                  let casted = Root_ledger.as_unmasked l in
+                  let%map accts =
+                    Mina_ledger.Ledger.Any_ledger.M.to_list casted
+                  in
+                  Ok accts )
+          | Error err ->
+              return (Error err) )
     ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
           Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
           Deferred.unit )
     ; implement Daemon_rpcs.Snark_job_list.rpc (fun () () ->
-          return (snark_job_list_json coda |> Participating_state.active_error) )
+          return (snark_job_list_json mina |> Participating_state.active_error) )
     ; implement Daemon_rpcs.Snark_pool_list.rpc (fun () () ->
-          return (snark_pool_list coda) )
+          return (snark_pool_list mina) )
     ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
           let open Mina_lib.Config in
-          Mina_tracing.start (Mina_lib.config coda).conf_dir )
+          Mina_tracing.start (Mina_lib.config mina).conf_dir )
     ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
           Mina_tracing.stop () ; Deferred.unit )
+    ; implement Daemon_rpcs.Start_internal_tracing.rpc (fun () () ->
+          Internal_tracing.toggle ~commit_id:Mina_version.commit_id ~logger
+            `Enabled )
+    ; implement Daemon_rpcs.Stop_internal_tracing.rpc (fun () () ->
+          Internal_tracing.toggle ~commit_id:Mina_version.commit_id ~logger
+            `Disabled )
     ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
-          return (Mina_lib.visualize_frontier ~filename coda) )
+          return (Mina_lib.visualize_frontier ~filename mina) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
         (fun () filename ->
           return (Mina_ledger.Ledger.Debug.visualize ~filename) )
@@ -400,106 +487,87 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
           return (Set.to_list !client_trustlist) )
     ; implement Daemon_rpcs.Get_node_status.rpc (fun () peers ->
-          Node_status.get_node_status_from_peers (Mina_lib.net coda) peers )
+          Mina_networking.get_node_status_from_peers (Mina_lib.net mina) peers )
     ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
           return
             (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ()) )
+    ; implement Daemon_rpcs.Generate_hardfork_config.rpc
+        (fun () { config_dir; generate_fork_validation } ->
+          Mina_lib.Hardfork_config.dump_reference_config
+            ~breadcrumb_spec:`Stop_slot ~config_dir ~generate_fork_validation
+            mina )
+    ; implement Daemon_rpcs.Submit_internal_log.rpc
+        (fun () { timestamp; message; metadata; process } ->
+          let metadata =
+            List.map metadata ~f:(fun (s, value) ->
+                (s, Yojson.Safe.from_string value) )
+          in
+          return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
-  let log_snark_work_metrics (work : Snark_worker.Work.Result.t) =
-    Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
-    One_or_two.iter
-      (One_or_two.zip_exn work.metrics
-         (Snark_worker.Work.Result.transactions work) )
-      ~f:(fun ((total, tag), transaction_opt) ->
-        ( match tag with
-        | `Merge ->
-            Perf_histograms.add_span ~name:"snark_worker_merge_time" total ;
-            Mina_metrics.(
-              Cryptography.Snark_work_histogram.observe
-                Cryptography.snark_work_merge_time_sec (Time.Span.to_sec total))
-        | `Transition -> (
-            (*should be Some in the case of `Transition*)
-            match Option.value_exn transaction_opt with
-            | Mina_transaction.Transaction.Command
-                (Mina_base.User_command.Zkapp_command parties) ->
-                let init =
-                  match
-                    (Mina_base.Account_update.of_fee_payer parties.fee_payer)
-                      .authorization
-                  with
-                  | Proof _ ->
-                      (1, 1)
-                  | _ ->
-                      (1, 0)
-                in
-                let parties_count, proof_parties_count =
-                  Mina_base.Zkapp_command.Call_forest.fold
-                    parties.account_updates ~init
-                    ~f:(fun (count, proof_parties_count) party ->
-                      ( count + 1
-                      , if
-                          Mina_base.Control.(
-                            Tag.equal Proof
-                              (tag
-                                 (Mina_base.Account_update.authorization party) ))
-                        then proof_parties_count + 1
-                        else proof_parties_count ) )
-                in
-                Mina_metrics.(
-                  Cryptography.(
-                    Counter.inc snark_work_zkapp_base_time_sec
-                      (Time.Span.to_sec total) ;
-                    Counter.inc_one snark_work_zkapp_base_submissions ;
-                    Counter.inc zkapp_transaction_length
-                      (Float.of_int parties_count) ;
-                    Counter.inc zkapp_proof_updates
-                      (Float.of_int proof_parties_count)))
-            | _ ->
-                Mina_metrics.(
-                  Cryptography.(
-                    Counter.inc_one snark_work_base_submissions ;
-                    Counter.inc snark_work_base_time_sec
-                      (Time.Span.to_sec total))) ) ) ;
-        Perf_histograms.add_span ~name:"snark_worker_transition_time" total )
-  in
   let snark_worker_impls =
-    [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->
-          Deferred.return
-            (let open Option.Let_syntax in
-            let%bind key =
-              Option.merge
-                (Mina_lib.snark_worker_key coda)
-                (Mina_lib.snark_coordinator_key coda)
-                ~f:Fn.const
-            in
-            let%map r = Mina_lib.request_work coda in
-            [%log trace]
-              ~metadata:[ ("work_spec", Snark_worker.Work.Spec.to_yojson r) ]
-              "responding to a Get_work request with some new work" ;
-            Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-            (r, key)) )
-    ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
-        (fun () (work : Snark_worker.Work.Result.t) ->
-          [%log trace] "received completed work from a snark worker"
-            ~metadata:
-              [ ("work_spec", Snark_worker.Work.Spec.to_yojson work.spec) ] ;
-          log_snark_work_metrics work ;
-          Deferred.return @@ Mina_lib.add_work coda work )
-    ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
-        (fun
-          ()
-          ((_work_spec, _prover_pk) :
-            Snark_worker.Work.Spec.t * Signature_lib.Public_key.Compressed.t )
-        ->
-          [%str_log error] Snark_worker.Generating_snark_work_failed ;
+    [ implement Snark_worker.Rpcs.Get_work.Stable.Latest.rpc (fun () () ->
+          match Mina_lib.request_work mina with
+          | None ->
+              Deferred.return None
+          | Some (Ok spec) ->
+              [%log debug] "responding to a Get_work request with some new work"
+                ~metadata:
+                  [ ( "work_id"
+                    , Snark_work_lib.(
+                        Spec.Partitioned.Poly.get_id spec |> Id.Any.to_yojson)
+                    )
+                  ] ;
+
+              Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
+              Deferred.return (Some spec)
+          | Some (Error (`Failed_to_generate_inputs (zkapp_cmd, e))) ->
+              let open Mina_base.Zkapp_command in
+              [%log error]
+                "Mina_lib.request_work failed to generate inputs for a zkapp \
+                 command"
+                ~metadata:
+                  [ ("error", `String (Error.to_string_hum e))
+                  ; ( "zkapp_cmd"
+                    , Stable.Latest.to_yojson
+                      @@ read_all_proofs_from_disk zkapp_cmd )
+                  ] ;
+              Deferred.return None )
+    ; implement Snark_worker.Rpcs.Submit_work.Stable.Latest.rpc
+        (fun () (result : Snark_work_lib.Result.Partitioned.Stable.Latest.t) ->
+          [%log debug] "received completed work from a snark worker"
+            ~metadata:[ ("work_id", Snark_work_lib.Id.Any.to_yojson result.id) ] ;
+          Mina_metrics.(
+            Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
+          Deferred.return @@ Mina_lib.add_work mina result )
+    ; implement Snark_worker.Rpcs.Failed_to_generate_snark.Stable.Latest.rpc
+        (fun () (error, _) ->
+          [%str_log error]
+            (Snark_worker.Events.Generating_snark_work_failed
+               { error = Error_json.error_to_yojson error } ) ;
           Mina_metrics.(Counter.inc_one Snark_work.snark_work_failed_rpc) ;
           Deferred.unit )
     ]
   in
-  let create_graphql_server ~bind_to_address ~schema ~server_description port =
+  let create_graphql_server_with_auth ~mk_context ?auth_keys ~bind_to_address
+      ~schema ~server_description ~require_auth port =
+    if require_auth && Option.is_none auth_keys then
+      failwith
+        "Could not create GraphQL server, authentication is required, but no \
+         authentication keys were provided" ;
+    let auth_keys =
+      Option.map auth_keys ~f:(fun s ->
+          let pk_strs = String.split_on_chars ~on:[ ',' ] s in
+          List.map pk_strs ~f:(fun pk_str ->
+              match Itn_crypto.pubkey_of_base64 pk_str with
+              | Ok pk ->
+                  pk
+              | Error _ ->
+                  failwithf "Could not decode %s to an Ed25519 public key"
+                    pk_str () ) )
+    in
     let graphql_callback =
-      Graphql_cohttp_async.make_callback (fun _req -> coda) schema
+      Graphql_cohttp_async.make_callback ?auth_keys mk_context schema
     in
     Cohttp_async.(
       Server.create_expert
@@ -516,7 +584,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
         (fun ~body _sock req ->
           let uri = Cohttp.Request.uri req in
           let status flag =
-            let%bind status = Mina_commands.get_status ~flag coda in
+            let%bind status = Mina_commands.get_status ~flag mina in
             Server.respond_string
               ( status |> Daemon_rpcs.Types.Status.to_yojson
               |> Yojson.Safe.pretty_to_string )
@@ -548,15 +616,19 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
              !"Created %s at: http://localhost:%i/graphql"
              server_description port )
   in
-  Option.iter rest_server_port ~f:(fun rest_server_port ->
-      O1trace.background_thread "serve_graphql" (fun () ->
-          create_graphql_server
-            ~bind_to_address:
-              Tcp.Bind_to_address.(
-                if insecure_rest_server then All_addresses else Localhost)
-            ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
-            rest_server_port ) ) ;
-  (*Second graphql server with limited queries exposed*)
+  let create_graphql_server =
+    create_graphql_server_with_auth
+      ~mk_context:(fun ~with_seq_no:_ _req -> mina)
+      ?auth_keys:None
+  in
+  O1trace.background_thread "serve_graphql" (fun () ->
+      create_graphql_server
+        ~bind_to_address:
+          Tcp.Bind_to_address.(
+            if insecure_rest_server then All_addresses else Localhost)
+        ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
+        ~require_auth:false rest_server_port ) ;
+  (* Second graphql server with limited queries exposed *)
   Option.iter limited_graphql_port ~f:(fun rest_server_port ->
       O1trace.background_thread "serve_limited_graphql" (fun () ->
           create_graphql_server
@@ -565,10 +637,23 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 if open_limited_graphql_port then All_addresses else Localhost)
             ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server with limited queries"
-            rest_server_port ) ) ;
+            ~require_auth:false rest_server_port ) ) ;
+  if itn_features then
+    (* Third graphql server with ITN-particular queries exposed *)
+    Option.iter itn_graphql_port ~f:(fun rest_server_port ->
+        O1trace.background_thread "serve_itn_graphql" (fun () ->
+            create_graphql_server_with_auth
+              ~mk_context:(fun ~with_seq_no _req -> (with_seq_no, mina))
+              ?auth_keys
+              ~bind_to_address:
+                Tcp.Bind_to_address.(
+                  if insecure_rest_server then All_addresses else Localhost)
+              ~schema:Mina_graphql.schema_itn
+              ~server_description:"GraphQL server for ITN queries"
+              ~require_auth:true rest_server_port ) ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses
-      (On_port (Mina_lib.client_port coda))
+      (On_port (Mina_lib.client_port mina))
   in
   O1trace.background_thread "serve_client_rpcs" (fun () ->
       Deferred.ignore_m
@@ -598,17 +683,17 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                Deferred.unit )
              else
                Rpc.Connection.server_with_close
-                 ~handshake_timeout:
-                   (Time.Span.of_sec
-                      Mina_compile_config.rpc_handshake_timeout_sec )
+                 ~handshake_timeout:compile_config.rpc_handshake_timeout
                  ~heartbeat_config:
                    (Rpc.Connection.Heartbeat_config.create
                       ~timeout:
                         (Time_ns.Span.of_sec
-                           Mina_compile_config.rpc_heartbeat_timeout_sec )
+                           (Time.Span.to_sec
+                              compile_config.rpc_heartbeat_timeout ) )
                       ~send_every:
                         (Time_ns.Span.of_sec
-                           Mina_compile_config.rpc_heartbeat_send_every_sec )
+                           (Time.Span.to_sec
+                              compile_config.rpc_heartbeat_send_every ) )
                       () )
                  reader writer
                  ~implementations:
@@ -733,7 +818,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                    ~log_issue:true
                in
                Core.print_string message ; Deferred.unit
-           | Mina_user_error.Mina_user_error { message; where } ->
+           | Mina_stdlib.Mina_user_error.Mina_user_error { message; where } ->
                Core.print_string "\nFATAL ERROR" ;
                let error =
                  match where with
@@ -754,10 +839,19 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                   *** Shutting down ***\n" ;
                handle_crash Mina_lib.Offline_shutdown ~time_controller ~conf_dir
                  ~child_pids ~top_logger coda_ref
+           | Mina_lib.Bootstrap_stuck_shutdown ->
+               Core.print_string
+                 "\n\
+                  [FATAL] *** Mina daemon has been stuck in bootstrap for too \
+                  long ***\n\
+                  *** Shutting down ***\n" ;
+               handle_crash Mina_lib.Bootstrap_stuck_shutdown ~time_controller
+                 ~conf_dir ~child_pids ~top_logger coda_ref
            | _exn ->
                let error = Error.of_exn ~backtrace:`Get exn in
                let%bind () =
-                 Node_error_service.send_report ~logger:top_logger ~error
+                 Node_error_service.send_report
+                   ~commit_id:Mina_version.commit_id ~logger:top_logger ~error
                in
                handle_crash exn ~time_controller ~conf_dir ~child_pids
                  ~top_logger coda_ref

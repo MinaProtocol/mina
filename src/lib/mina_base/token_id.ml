@@ -18,7 +18,8 @@ module Stable = struct
     type t = Legacy_token.Stable.V1.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
-    let to_latest _ = failwith "Not implemented"
+    let to_latest token_id =
+      Legacy_token.to_field token_id |> Account_id.Digest.of_field
   end
 end]
 
@@ -31,15 +32,36 @@ Account_id.Digest.
   , gen_non_default
   , to_field_unsafe
   , of_field
-  , to_string
-  , of_string
-  , comparator
-  , ( <> ) )]
+  , to_string )]
+
+let of_string s =
+  try Account_id.Digest.of_string s
+  with Base58_check.Invalid_base58_check_length _ ->
+    Legacy_token.of_string s |> Stable.V1.to_latest
 
 include Account_id.Digest.Binables
 
 (* someday, allow this in %%define_locally *)
 module Checked = Account_id.Digest.Checked
+
+let gen_token_tree ~length =
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind root =
+    let%bind use_default = Quickcheck.Generator.bool in
+    if use_default then return default else gen_non_default
+  in
+  let rec loop acc n =
+    if Int.( <= ) n 0 then return (List.rev acc)
+    else
+      let%bind parent_token =
+        Quickcheck.Generator.of_list (List.map acc ~f:fst)
+      in
+      let%bind pk = Signature_lib.Public_key.Compressed.gen in
+      let owner = Account_id.create pk parent_token in
+      let child = Account_id.derive_token_id ~owner in
+      loop ((child, Some owner) :: acc) (n - 1)
+  in
+  loop [ (root, None) ] length
 
 let deriver obj =
   (* this doesn't use js_type:Field because it is converted to JSON differently than a normal Field *)

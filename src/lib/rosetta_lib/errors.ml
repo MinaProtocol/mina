@@ -43,7 +43,7 @@ module Variant = struct
       `Transaction_submit_no_sender
     | `Transaction_submit_duplicate
     | `Transaction_submit_bad_nonce
-    | `Transaction_submit_fee_small
+    | `Transaction_submit_fee_small of string
     | `Transaction_submit_invalid_signature
     | `Transaction_submit_insufficient_balance
     | `Transaction_submit_expired ]
@@ -126,7 +126,7 @@ end = struct
         "Can't send transaction: A duplicate is detected"
     | `Transaction_submit_bad_nonce ->
         "Can't send transaction: Nonce invalid"
-    | `Transaction_submit_fee_small ->
+    | `Transaction_submit_fee_small _ ->
         "Can't send transaction: Fee too small"
     | `Transaction_submit_invalid_signature ->
         "Can't send transaction: Invalid signature"
@@ -206,7 +206,7 @@ end = struct
         None
     | `Transaction_submit_bad_nonce ->
         None
-    | `Transaction_submit_fee_small ->
+    | `Transaction_submit_fee_small _ ->
         None
     | `Transaction_submit_invalid_signature ->
         None
@@ -260,7 +260,7 @@ end = struct
         false
     | `Transaction_submit_bad_nonce ->
         false
-    | `Transaction_submit_fee_small ->
+    | `Transaction_submit_fee_small _ ->
         false
     | `Transaction_submit_invalid_signature ->
         false
@@ -326,12 +326,11 @@ end = struct
         "You must use the current nonce in your account in the ledger or one \
          that is inferred based on pending transactions in the transaction \
          pool."
-    | `Transaction_submit_fee_small ->
+    | `Transaction_submit_fee_small s ->
         sprintf
           "The minimum fee on transactions is %s . Please increase your fee to \
            at least this amount."
-          (Currency.Fee.to_mina_string
-             Mina_compile_config.minimum_user_command_fee )
+          s
     | `Transaction_submit_invalid_signature ->
         "An invalid signature is attached to this transaction"
     | `Transaction_submit_insufficient_balance ->
@@ -411,7 +410,7 @@ module Transaction_submit = struct
   (* This is a very hacky error message check from GraphQL right now.
    * We'll need to do some surgery on the daemon to properly pass errors through
    * GraphQL more explicitly *)
-  let of_request_error s =
+  let of_request_error ~minimum_user_command_fee s =
     let variant =
       let p pat = String.is_substring ~substring:pat s in
       if p "infer nonce for transaction from specified" then
@@ -420,7 +419,9 @@ module Transaction_submit = struct
       else if p "either different from inferred nonce" then
         Some `Transaction_submit_bad_nonce
       else if p "is less than the minimum fee" then
-        Some `Transaction_submit_fee_small
+        Some
+          (`Transaction_submit_fee_small
+            (Currency.Fee.to_mina_string minimum_user_command_fee) )
       else if p "Error: Invalid_signature" then
         Some `Transaction_submit_invalid_signature
       else if p "[\"Insufficient_funds\"]" then

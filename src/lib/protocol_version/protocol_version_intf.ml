@@ -1,30 +1,28 @@
+open Core_kernel
+
 module type Full = sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
-      type t [@@deriving compare, sexp, yojson]
+    module V2 : sig
+      type t [@@deriving compare, equal, sexp, yojson]
     end
   end]
 
-  val major : t -> int
+  include Comparable.S with type t := t
 
-  val minor : t -> int
+  val transaction : t -> int
+
+  val network : t -> int
 
   val patch : t -> int
 
-  val create_exn : major:int -> minor:int -> patch:int -> t
+  val create : transaction:int -> network:int -> patch:int -> t
 
-  val create_opt : major:int -> minor:int -> patch:int -> t option
-
-  val get_current : unit -> t
-
-  val set_current : t -> unit
+  val current : t
 
   val get_proposed_opt : unit -> t option
 
   val set_proposed_opt : t option -> unit
-
-  val zero : t
 
   (** a daemon can accept blocks or RPC responses with compatible protocol versions *)
   val compatible_with_daemon : t -> bool

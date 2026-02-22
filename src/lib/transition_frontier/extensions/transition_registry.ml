@@ -8,6 +8,8 @@ module T = struct
 
   type view = unit
 
+  let name = "transition_registry"
+
   let create ~logger:_ _frontier = (State_hash.Table.create (), ())
 
   let notify t state_hash =

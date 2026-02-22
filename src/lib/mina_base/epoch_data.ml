@@ -70,3 +70,7 @@ module Value = struct
     end
   end]
 end
+
+type t = Value.Stable.V1.t [@@deriving sexp, compare, equal, hash, yojson]
+
+include Comparable.Make (Value.Stable.V1)

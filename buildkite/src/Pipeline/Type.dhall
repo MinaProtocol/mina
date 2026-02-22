@@ -1,5 +1,1 @@
-let Command = ../Command/Base.dhall
-in
-
--- TODO: Union type with block steps
-{ steps : List Command.Type }
+let Command = ../Command/Base.dhall in { steps : List Command.Type }

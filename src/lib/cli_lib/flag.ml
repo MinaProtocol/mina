@@ -129,7 +129,7 @@ module Port = struct
 
   let default_client = 8301
 
-  let default_rest = 0xc0d
+  let default_rest = 3085
 
   let default_archive = default_rest + 1
 
@@ -324,6 +324,21 @@ module Log = struct
     in
     flag "--file-log-level" ~aliases:[ "file-log-level" ] ~doc
       (optional_with_default Logger.Level.Trace log_level)
+
+  let file_log_rotations =
+    let open Command.Param in
+    flag "--file-log-rotations"
+      ~doc:
+        (Printf.sprintf
+           "Number of file log rotations before overwriting old logs (default: \
+            %d)"
+           Default.file_log_rotations )
+      (optional_with_default Default.file_log_rotations int)
+
+  let file =
+    let open Command.Param in
+    flag "--log-file" ~aliases:[ "log-file" ]
+      ~doc:"FILE Set log file (stores JSON)" (optional string)
 end
 
 type signed_command_common =
@@ -333,23 +348,27 @@ type signed_command_common =
   ; memo : string option
   }
 
-let signed_command_common : signed_command_common Command.Param.t =
+let fee_common ~default_transaction_fee ~minimum_user_command_fee :
+    Currency.Fee.t Command.Param.t =
+  Command.Param.flag "--fee" ~aliases:[ "fee" ]
+    ~doc:
+      (Printf.sprintf
+         "FEE Amount you are willing to pay to process the transaction \
+          (default: %s) (minimum: %s)"
+         (Currency.Fee.to_mina_string default_transaction_fee)
+         (Currency.Fee.to_mina_string minimum_user_command_fee) )
+    (Command.Param.optional_with_default default_transaction_fee
+       Arg_type.txn_fee )
+
+let signed_command_common ~default_transaction_fee ~minimum_user_command_fee :
+    signed_command_common Command.Param.t =
   let open Command.Let_syntax in
   let open Arg_type in
   let%map_open sender =
     flag "--sender" ~aliases:[ "sender" ]
       (required public_key_compressed)
       ~doc:"PUBLICKEY Public key from which you want to send the transaction"
-  and fee =
-    flag "--fee" ~aliases:[ "fee" ]
-      ~doc:
-        (Printf.sprintf
-           "FEE Amount you are willing to pay to process the transaction \
-            (default: %s) (minimum: %s)"
-           (Currency.Fee.to_mina_string
-              Mina_compile_config.default_transaction_fee )
-           (Currency.Fee.to_mina_string Mina_base.Signed_command.minimum_fee) )
-      (optional txn_fee)
+  and fee = fee_common ~default_transaction_fee ~minimum_user_command_fee
   and nonce =
     flag "--nonce" ~aliases:[ "nonce" ]
       ~doc:
@@ -361,11 +380,7 @@ let signed_command_common : signed_command_common Command.Param.t =
     flag "--memo" ~aliases:[ "memo" ]
       ~doc:"STRING Memo accompanying the transaction" (optional string)
   in
-  { sender
-  ; fee = Option.value fee ~default:Mina_compile_config.default_transaction_fee
-  ; nonce
-  ; memo
-  }
+  { sender; fee; nonce; memo }
 
 module Signed_command = struct
   open Arg_type
@@ -386,16 +401,15 @@ module Signed_command = struct
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
 
-  let fee =
+  let fee ~default_transaction_fee ~minimum_user_command_fee =
     let open Command.Param in
     flag "--fee" ~aliases:[ "fee" ]
       ~doc:
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
-           (Currency.Fee.to_mina_string
-              Mina_compile_config.default_transaction_fee )
-           (Currency.Fee.to_mina_string Mina_base.Signed_command.minimum_fee) )
+           (Currency.Fee.to_mina_string default_transaction_fee)
+           (Currency.Fee.to_mina_string minimum_user_command_fee) )
       (optional txn_fee)
 
   let valid_until =
@@ -426,3 +440,21 @@ module Signed_command = struct
            Mina_base.Signed_command_memo.max_input_length )
       (optional string)
 end
+
+let signature_kind =
+  let open Command.Param in
+  let arg_type =
+    Command.Arg_type.create (fun s ->
+        match String.lowercase s with
+        | "mainnet" ->
+            Mina_signature_kind.Mainnet
+        | "testnet" ->
+            Mina_signature_kind.Testnet
+        | other ->
+            Mina_signature_kind.Other_network other )
+  in
+  flag "--signature-kind"
+    ~doc:
+      "mainnet|testnet|<other> Signature kind to use (default: value compiled \
+       into this binary)"
+    (optional_with_default Mina_signature_kind.t_DEPRECATED arg_type)

@@ -1,5 +1,4 @@
 open Mina_base
-open Mina_block
 
 type full = Full
 
@@ -22,14 +21,9 @@ type lite = Lite
  *  transition frontier and the persistent transition frontier.
  *)
 module Node : sig
-  [%%versioned:
-  module Stable : sig
-    module V3 : sig
-      type 'a t =
-        | Full : Breadcrumb.t -> full t
-        | Lite : Mina_block.Validated.Stable.V2.t -> lite t
-    end
-  end]
+  type 'a t =
+    | Full : Breadcrumb.t -> full t
+    | Lite : Mina_block.Validated.t -> lite t
 end
 
 module Node_list : sig
@@ -63,9 +57,14 @@ end
  *  by transitioning the root.
  *)
 module Root_transition : sig
+  type 'repr root_transition_scan_state =
+    | Lite : lite root_transition_scan_state
+    | Full : Staged_ledger.Scan_state.t -> full root_transition_scan_state
+
   type 'repr t =
-    { new_root : Root_data.Limited.t
+    { new_root : Root_data.Limited.Stable.Latest.t
     ; garbage : 'repr Node_list.t
+    ; old_root_scan_state : 'repr root_transition_scan_state
     ; just_emitted_a_proof : bool
     }
 
@@ -133,12 +132,7 @@ module Lite : sig
   type 'mutant t = (lite, 'mutant) diff
 
   module E : sig
-    [%%versioned:
-    module Stable : sig
-      module V3 : sig
-        type t = E : (lite, 'mutant) diff -> t
-      end
-    end]
+    type t = E : (lite, 'mutant) diff -> t [@@unboxed]
   end
 end
 

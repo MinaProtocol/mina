@@ -10,6 +10,12 @@ let%test_module "Zkapp tokens tests" =
   ( module struct
     (* code patterned after "tokens test" unit test in Mina_ledger.Ledger *)
 
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let constraint_constants = U.constraint_constants
 
     let account_creation_fee =
@@ -21,9 +27,10 @@ let%test_module "Zkapp tokens tests" =
 
     let token_funder, _ = keypair_and_amounts.(1)
 
-    let token_owner = Keypair.create ()
+    let token_owner, _ = keypair_and_amounts.(2)
 
-    let token_accounts = Array.init 4 ~f:(fun _ -> Keypair.create ())
+    let token_accounts =
+      Array.init 4 ~f:(fun i -> fst @@ keypair_and_amounts.(i + 3))
 
     let custom_token_id =
       Account_id.derive_token_id
@@ -92,12 +99,12 @@ let%test_module "Zkapp tokens tests" =
                     let with_dummy_signatures =
                       mk_forest
                         [ mk_node
-                            (mk_account_update_body Signature Call token_funder
+                            (mk_account_update_body Signature No token_funder
                                Token_id.default
                                (-(11 * account_creation_fee)) )
                             []
                         ; mk_node
-                            (mk_account_update_body Signature Call token_owner
+                            (mk_account_update_body Signature No token_owner
                                Token_id.default
                                (10 * account_creation_fee) )
                             []
@@ -122,11 +129,12 @@ let%test_module "Zkapp tokens tests" =
                     let with_dummy_signatures =
                       mk_forest
                         [ mk_node
-                            (mk_account_update_body Signature Call token_owner
+                            (mk_account_update_body Signature No token_owner
                                Token_id.default (-account_creation_fee) )
                             [ mk_node
-                                (mk_account_update_body Signature Call
-                                   token_accounts.(0) custom_token_id 100 )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_accounts.(0)
+                                   custom_token_id 100 )
                                 []
                             ]
                         ]
@@ -146,15 +154,17 @@ let%test_module "Zkapp tokens tests" =
                     let with_dummy_signatures =
                       mk_forest
                         [ mk_node
-                            (mk_account_update_body Signature Call token_owner
+                            (mk_account_update_body Signature No token_owner
                                Token_id.default
                                (-2 * account_creation_fee) )
                             [ mk_node
-                                (mk_account_update_body Signature Call
-                                   token_owner custom_token_id 0 )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_owner custom_token_id
+                                   0 )
                                 [ mk_node
-                                    (mk_account_update_body Signature Call
-                                       token_accounts.(2) custom_token_id2 500 )
+                                    (mk_account_update_body Signature
+                                       Parents_own_token token_accounts.(2)
+                                       custom_token_id2 500 )
                                     []
                                 ]
                             ]
@@ -175,51 +185,62 @@ let%test_module "Zkapp tokens tests" =
                     let with_dummy_signatures =
                       mk_forest
                         [ mk_node
-                            (mk_account_update_body Signature Call token_owner
+                            (mk_account_update_body Signature No token_owner
                                Token_id.default
                                (-2 * account_creation_fee) )
                             [ mk_node
-                                (mk_account_update_body Signature Call
-                                   token_accounts.(0) custom_token_id (-30) )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_accounts.(0)
+                                   custom_token_id (-30) )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   token_accounts.(1) custom_token_id 30 )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_accounts.(1)
+                                   custom_token_id 30 )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   fee_payer_keypair Token_id.default (-50) )
+                                (mk_account_update_body Signature
+                                   Parents_own_token fee_payer_keypair
+                                   Token_id.default (-50) )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   token_funder Token_id.default 50 )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_funder
+                                   Token_id.default 50 )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   token_accounts.(0) custom_token_id (-10) )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_accounts.(0)
+                                   custom_token_id (-10) )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   token_accounts.(1) custom_token_id 10 )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_accounts.(1)
+                                   custom_token_id 10 )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   token_accounts.(1) custom_token_id (-5) )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_accounts.(1)
+                                   custom_token_id (-5) )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   token_accounts.(0) custom_token_id 5 )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_accounts.(0)
+                                   custom_token_id 5 )
                                 []
                             ; mk_node
-                                (mk_account_update_body Signature Call
-                                   token_owner custom_token_id 0 )
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_owner custom_token_id
+                                   0 )
                                 [ mk_node
-                                    (mk_account_update_body Signature Call
-                                       token_accounts.(2) custom_token_id2 (-210) )
+                                    (mk_account_update_body Signature
+                                       Parents_own_token token_accounts.(2)
+                                       custom_token_id2 (-210) )
                                     []
                                 ; mk_node
-                                    (mk_account_update_body Signature Call
-                                       token_accounts.(3) custom_token_id2 210 )
+                                    (mk_account_update_body Signature
+                                       Parents_own_token token_accounts.(3)
+                                       custom_token_id2 210 )
                                     []
                                 ]
                             ]
@@ -238,4 +259,11 @@ let%test_module "Zkapp tokens tests" =
                   check_token_balance token_accounts.(2) custom_token_id2 290 ;
                   check_token_balance token_accounts.(3) custom_token_id2 210 ;
                   Async.Deferred.unit ) ) )
+
+    let () =
+      match Sys.getenv_opt "PROOF_CACHE_OUT" with
+      | Some path ->
+          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+      | None ->
+          ()
   end )

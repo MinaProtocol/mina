@@ -22,6 +22,8 @@ module Incoming : sig
 
   val map : f:('a -> 'b) -> 'a t -> 'b t
 
+  val lift_error : ('a, 'e) Result.t t -> ('a t, 'e) Result.t
+
   val local : 'a -> 'a t
 
   val remote_sender_exn : 'a t -> Peer.t

@@ -20,7 +20,11 @@ module Poly : sig
   [%%versioned:
   module Stable : sig
     module V2 : sig
-      type 'a t = { transaction : 'a; block_data : Block_data.Stable.V2.t }
+      type 'a t =
+        { transaction : 'a
+        ; block_data : Block_data.Stable.V2.t
+        ; global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+        }
       [@@deriving sexp]
     end
   end]
@@ -36,3 +40,5 @@ end]
 val transaction : 'a t -> 'a
 
 val block_data : _ t -> Block_data.t
+
+val global_slot : _ t -> Mina_numbers.Global_slot_since_genesis.t

@@ -1,0 +1,20 @@
+(tests
+ (names floating_point_test snarky_taylor_test)
+ (libraries
+  ;; opam libraries
+  alcotest
+  base
+  bignum
+  bignum.bigint
+  core_kernel
+  ;; local libraries
+  bitstring_lib
+  snark_params
+  snarky
+  snarky.backendless
+  snarky_integer
+  snarky_taylor)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_let ppx_version)))

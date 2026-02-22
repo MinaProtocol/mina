@@ -24,8 +24,6 @@ let%test_unit "of_affine" =
     | Infinity ->
         assert false
   in
-  Pasta_bindings.Fp.print x ;
-  Pasta_bindings.Fp.print y ;
   Pasta_bindings.Pallas.(ignore (of_affine_coordinates x y : t))
 
 let%test_unit "vector test" =

@@ -20,12 +20,12 @@ module Make_str (A : Wire_types.Concrete) = struct
     module V2 = struct
       type t = A.V2.t =
         { protocol_state : Protocol_state.Value.Stable.V2.t
-        ; protocol_state_proof : Proof.Stable.V2.t [@sexp.opaque]
+        ; protocol_state_proof : (Proof.Stable.V2.t[@sexp.opaque])
         ; delta_block_chain_proof :
             (* TODO: abstract *)
             State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
-        ; current_protocol_version : Protocol_version.Stable.V1.t
-        ; proposed_protocol_version_opt : Protocol_version.Stable.V1.t option
+        ; current_protocol_version : Protocol_version.Stable.V2.t
+        ; proposed_protocol_version_opt : Protocol_version.Stable.V2.t option
         }
       [@@deriving fields, sexp, to_yojson]
 
@@ -62,13 +62,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let cur_ver_fun =
             Option.(bind current_protocol_version ~f:(Fn.compose return const))
           in
-          let cur_ver_fallback () =
-            try Protocol_version.get_current ()
-            with _ ->
-              failwith
-                "Cannot create block header before setting current protocol \
-                 version"
-          in
+          let cur_ver_fallback () = Protocol_version.current in
           { protocol_state
           ; protocol_state_proof
           ; delta_block_chain_proof
@@ -122,6 +116,12 @@ module Make_str (A : Wire_types.Concrete) = struct
       Protocol_version.compatible_with_daemon (current_protocol_version body)
     in
     { valid_current; valid_next; matches_daemon }
+
+  type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
+
+  let blockchain_length h =
+    protocol_state h |> Mina_state.Protocol_state.consensus_state
+    |> Consensus.Data.Consensus_state.blockchain_length
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

@@ -1,16 +1,7 @@
 (* transaction_union_payload.ml *)
-
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Currency
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
-
 open Signature_lib
 module Tag = Transaction_union_tag
 
@@ -28,17 +19,17 @@ module Body = struct
     (Tag.t, Public_key.Compressed.t, Token_id.t, Currency.Amount.t, bool) t_
   [@@deriving sexp]
 
-  let of_user_command_payload_body = function
-    | Signed_command_payload.Body.Payment { source_pk; receiver_pk; amount } ->
+  let of_user_command_payload_body ~fee_payer_pk = function
+    | Signed_command_payload.Body.Payment { receiver_pk; amount } ->
         { tag = Tag.Payment
-        ; source_pk
+        ; source_pk = fee_payer_pk
         ; receiver_pk
         ; token_id = Token_id.default
         ; amount
         }
-    | Stake_delegation (Set_delegate { delegator; new_delegate }) ->
+    | Stake_delegation (Set_delegate { new_delegate }) ->
         { tag = Tag.Stake_delegation
-        ; source_pk = delegator
+        ; source_pk = fee_payer_pk
         ; receiver_pk = new_delegate
         ; token_id = Token_id.default
         ; amount = Currency.Amount.zero
@@ -81,8 +72,6 @@ module Body = struct
           return Token_id.default
     in
     { tag; source_pk; receiver_pk; token_id; amount }
-
-  [%%ifdef consensus_mechanism]
 
   type var =
     ( Tag.Unpacked.var
@@ -130,8 +119,6 @@ module Body = struct
         |]
   end
 
-  [%%endif]
-
   let to_input_legacy { tag; source_pk; receiver_pk; token_id; amount } =
     assert (Token_id.equal token_id Token_id.default) ;
     Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
@@ -171,12 +158,10 @@ module Payload_common = struct
     , Public_key.Compressed.t
     , Token_id.t
     , Mina_numbers.Account_nonce.t
-    , Mina_numbers.Global_slot.t
+    , Mina_numbers.Global_slot_since_genesis.t
     , Signed_command_memo.t )
     Poly.t
   [@@deriving sexp]
-
-  [%%ifdef consensus_mechanism]
 
   module Checked = struct
     type value = t
@@ -186,7 +171,7 @@ module Payload_common = struct
       , Public_key.Compressed.var
       , Token_id.Checked.t
       , Mina_numbers.Account_nonce.Checked.t
-      , Mina_numbers.Global_slot.Checked.t
+      , Mina_numbers.Global_slot_since_genesis.Checked.t
       , Signed_command_memo.Checked.t )
       Poly.t
 
@@ -198,7 +183,8 @@ module Payload_common = struct
       ; fee_token = Token_id.Checked.constant fee_token
       ; nonce = Mina_numbers.Account_nonce.Checked.constant nonce
       ; memo = Signed_command_memo.Checked.constant memo
-      ; valid_until = Mina_numbers.Global_slot.Checked.constant valid_until
+      ; valid_until =
+          Mina_numbers.Global_slot_since_genesis.Checked.constant valid_until
       }
   end
 
@@ -209,13 +195,11 @@ module Payload_common = struct
       ; Token_id.typ
       ; Public_key.Compressed.typ
       ; Mina_numbers.Account_nonce.typ
-      ; Mina_numbers.Global_slot.typ
+      ; Mina_numbers.Global_slot_since_genesis.typ
       ; Signed_command_memo.typ
       ]
       ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_of_hlist:of_hlist
-
-  [%%endif]
 end
 
 type t = (Payload_common.t, Body.t) Signed_command_payload.Poly.t
@@ -234,7 +218,7 @@ let of_user_command_payload
       ; valid_until
       ; memo
       }
-  ; body = Body.of_user_command_payload_body body
+  ; body = Body.of_user_command_payload_body ~fee_payer_pk body
   }
 
 let gen =
@@ -242,8 +226,6 @@ let gen =
   let%bind common = Signed_command_payload.Common.gen in
   let%map body = Body.gen ~fee:common.fee in
   Signed_command_payload.Poly.{ common; body }
-
-[%%ifdef consensus_mechanism]
 
 type var = (Payload_common.Checked.t, Body.var) Signed_command_payload.Poly.t
 
@@ -272,8 +254,6 @@ module Checked = struct
     ; body = Body.Checked.constant body
     }
 end
-
-[%%endif]
 
 let to_input_legacy ({ common; body } : t) =
   Random_oracle.Input.Legacy.append

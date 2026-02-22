@@ -60,18 +60,11 @@ module Assert_equal4V1
     (W : V1S4 with type ('a, 'b, 'c, 'd) V1.t = ('a, 'b, 'c, 'd) O.V1.t) =
 struct end
 
-module Assert_equal9V1
-    (O : V1S9)
-    (W : V1S9
-           with type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) V1.t =
-             ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) O.V1.t) =
-struct end
-
-module Assert_equal9V2
-    (O : V2S9)
-    (W : V2S9
-           with type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) V2.t =
-             ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) O.V2.t) =
+module Assert_equal8V1
+    (O : V1S8)
+    (W : V1S8
+           with type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) V1.t =
+             ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) O.V1.t) =
 struct end
 
 (** {2 Actual tests}
@@ -119,7 +112,16 @@ module Mina_numbers = struct
   module O = Mina_numbers
   module W = WT.Mina_numbers
   include Assert_equal0V1 (O.Account_nonce.Stable) (W.Account_nonce)
-  include Assert_equal0V1 (O.Global_slot.Stable) (W.Global_slot)
+  include Assert_equal0V1 (O.Global_slot_legacy.Stable) (W.Global_slot_legacy)
+  include
+    Assert_equal0V1
+      (O.Global_slot_since_genesis.Stable)
+      (W.Global_slot_since_genesis)
+  include
+    Assert_equal0V1
+      (O.Global_slot_since_hard_fork.Stable)
+      (W.Global_slot_since_hard_fork)
+  include Assert_equal0V1 (O.Global_slot_span.Stable) (W.Global_slot_span)
   include Assert_equal0V1 (O.Length.Stable) (W.Length)
   include Assert_equal0V1 (O.Index.Stable) (W.Index)
 end
@@ -138,7 +140,7 @@ module Pickles = struct
       (O.Side_loaded.Verification_key.Stable)
       (W.Side_loaded.Verification_key)
   include Assert_equal0V1 (O.Backend.Tick.Field.Stable) (W.Backend.Tick.Field)
-  include Assert_equal2 (O.Proof) (W.Proof)
+  include Assert_equal1 (O.Proof) (W.Proof)
   include
     Assert_equal0V2
       (O.Proof.Proofs_verified_2.Stable)
@@ -198,10 +200,6 @@ module Mina_base = struct
       (O.Account_update.Body.Events'.Stable)
       (W.Account_update.Body.Events')
   include Assert_equal0V1 (O.Ledger_hash.Stable) (W.Ledger_hash)
-  include
-    Assert_equal0V1
-      (O.Zkapp_command.Valid.Verification_key_hash.Stable)
-      (W.Zkapp_command.Valid.Verification_key_hash)
 
   include
     Assert_equal0V1
@@ -249,11 +247,6 @@ module Mina_base = struct
       (O.Zkapp_command.Call_forest.Stable)
       (W.Zkapp_command.Call_forest)
   include Assert_equal0V2 (O.Control.Stable) (W.Control)
-  include Assert_equal0V1 (O.Account_update.Stable) (W.Account_update)
-  include Assert_equal0V1 (O.Zkapp_command.Stable) (W.Zkapp_command)
-  include Assert_equal0V1 (O.Zkapp_command.Valid.Stable) (W.Zkapp_command.Valid)
-  include Assert_equal0V2 (O.User_command.Stable) (W.User_command)
-  include Assert_equal0V2 (O.User_command.Valid.Stable) (W.User_command.Valid)
   include
     Assert_equal0V1
       (O.Pending_coinbase.State_stack.Stable)
@@ -319,8 +312,6 @@ module Mina_transaction = struct
   module O = Mina_transaction.Transaction
   module W = WT.Mina_transaction
   include Assert_equal1V2 (O.Poly.Stable) (W.Poly)
-  include Assert_equal0V2 (O.Stable) (W)
-  include Assert_equal0V2 (O.Valid.Stable) (W.Valid)
 end
 
 module Mina_state = struct
@@ -341,13 +332,19 @@ module Mina_state = struct
       (W.Protocol_state.Body.Value)
   include
     Assert_equal0V2 (O.Protocol_state.Value.Stable) (W.Protocol_state.Value)
+  include
+    Assert_equal0V2 (O.Snarked_ledger_state.Stable) (W.Snarked_ledger_state)
+  include
+    Assert_equal0V2
+      (O.Snarked_ledger_state.With_sok.Stable)
+      (W.Snarked_ledger_state.With_sok)
 end
 
 module Mina_transaction_logic = struct
   module O = Mina_transaction_logic
   module W = WT.Mina_transaction_logic
   include
-    Assert_equal9V1
+    Assert_equal8V1
       (O.Zkapp_command_logic.Local_state.Stable)
       (W.Zkapp_command_logic.Local_state)
   include
@@ -359,8 +356,6 @@ end
 module Transaction_snark = struct
   module O = Transaction_snark
   module W = WT.Transaction_snark
-  include Assert_equal0V2 (O.Statement.Stable) (W.Statement)
-  include Assert_equal0V2 (O.Statement.With_sok.Stable) (W.Statement.With_sok)
   include Assert_equal0V2 (O.Stable) (W)
 end
 
@@ -380,7 +375,7 @@ end
 module Protocol_version = struct
   module O = Protocol_version
   module W = WT.Protocol_version
-  include Assert_equal0V1 (O.Stable) (W)
+  include Assert_equal0V2 (O.Stable) (W)
 end
 
 module Network_pool = struct
@@ -391,10 +386,6 @@ module Network_pool = struct
     Assert_equal0V2
       (O.Snark_pool.Diff_versioned.Stable)
       (W.Snark_pool.Diff_versioned)
-  include
-    Assert_equal0V2
-      (O.Transaction_pool.Diff_versioned.Stable)
-      (W.Transaction_pool.Diff_versioned)
 end
 
 module Consensus = struct
@@ -402,7 +393,7 @@ module Consensus = struct
   module W = WT.Consensus
   include Assert_equal0V1 (O.Body_reference.Stable) (W.Body_reference)
   include
-    Assert_equal0V1
+    Assert_equal0V2
       (O.Data.Consensus_state.Value.Stable)
       (W.Data.Consensus_state.Value)
 end
@@ -423,24 +414,4 @@ module Mina_block = struct
   module O = Mina_block
   module W = WT.Mina_block
   include Assert_equal0V2 (O.Header.Stable) (W.Header)
-end
-
-module Staged_ledger_diff = struct
-  module O = Staged_ledger_diff
-  module W = WT.Staged_ledger_diff
-  include Assert_equal1V1 (O.At_most_two.Stable) (W.At_most_two)
-  include Assert_equal1V1 (O.At_most_one.Stable) (W.At_most_one)
-  include Assert_equal2V2 (O.Pre_diff_two.Stable) (W.Pre_diff_two)
-  include Assert_equal2V2 (O.Pre_diff_one.Stable) (W.Pre_diff_one)
-  include
-    Assert_equal0V2
-      (O.Pre_diff_with_at_most_two_coinbase.Stable)
-      (W.Pre_diff_with_at_most_two_coinbase)
-  include
-    Assert_equal0V2
-      (O.Pre_diff_with_at_most_two_coinbase.Stable)
-      (W.Pre_diff_with_at_most_two_coinbase)
-  include Assert_equal0V2 (O.Diff.Stable) (W.Diff)
-  include Assert_equal0V2 (O.Stable) (W)
-  include Assert_equal0V1 (O.Body.Stable) (W.Body)
 end

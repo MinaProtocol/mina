@@ -1,10 +1,10 @@
 open Snark_params.Tick.Run
 
-type 'a t = 'a As_prover.Ref.t
+type 'a t = 'a Typ.prover_value
 
-let get = As_prover.Ref.get
+let get x = As_prover.read (Typ.prover_value ()) x
 
-let create = As_prover.Ref.create
+let create compute = exists (Typ.prover_value ()) ~compute
 
 let if_ b ~then_ ~else_ =
   create (fun () ->
@@ -12,4 +12,4 @@ let if_ b ~then_ ~else_ =
 
 let map t ~f = create (fun () -> f (get t))
 
-let typ = Typ.Internal.ref
+let typ = Typ.prover_value

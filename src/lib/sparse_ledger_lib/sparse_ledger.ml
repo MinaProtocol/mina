@@ -1,3 +1,45 @@
+(** Sparse Ledger implementation.
+
+    This module provides a space-efficient representation of a Merkle ledger
+    where most branches can be stored as hashes without holding the full
+    account data. It is parameterized over:
+    - the type of Merkle hashes,
+    - the type of account identifiers, and
+    - the type of account records.
+
+    A sparse ledger stores:
+    - [depth]: the height of the binary Merkle tree,
+    - [tree]: the partial Merkle tree structure with leaves that may be either
+      full accounts or hash placeholders,
+    - [indexes]: a mapping from account identifiers to their leaf index in the
+      tree.
+
+    The main functionality includes:
+    - Creating an empty ledger from a root hash ({!of_hash}),
+    - Retrieving accounts by index ({!get_exn}),
+    - Modifying accounts at a given index ({!set_exn}),
+    - Computing Merkle paths ({!path_exn}),
+    - Inserting accounts using Merkle paths ({!add_path}) or precomputed
+      sibling hashes ({!add_wide_path_unsafe}),
+    - Iterating over all accounts with their indices ({!iteri}),
+    - Computing the Merkle root ({!merkle_root}),
+    - Looking up the index of a given account ID ({!find_index_exn}).
+
+    {b Warning:}
+    - [add_wide_path_unsafe] does not recompute or verify hashes and can
+      produce an inconsistent tree if used incorrectly.
+    - Functions with [_exn] in their name will raise if the requested index or
+      path is invalid.
+
+    This structure is useful for:
+    - Incrementally reconstructing a Merkle ledger from partial proofs,
+    - Maintaining sparse proofs for a small set of accounts in a large ledger,
+    - Efficiently verifying account membership without storing all accounts.
+
+    See the test module for property-based tests ensuring consistency of index
+    tracking, Merkle path reconstruction, and hash correctness.
+*)
+
 open Core_kernel
 
 module Tree = struct
@@ -74,6 +116,17 @@ module type S = sig
   val add_path :
     t -> [ `Left of hash | `Right of hash ] list -> account_id -> account -> t
 
+  (** Same as [add_path], but using the hashes provided in the wide merkle path
+      instead of recomputing them.
+      This is unsafe: the hashes are not checked or recomputed.
+  *)
+  val add_wide_path_unsafe :
+       t
+    -> [ `Left of hash * hash | `Right of hash * hash ] list
+    -> account_id
+    -> account
+    -> t
+
   val iteri : t -> f:(int -> account -> unit) -> unit
 
   val merkle_root : t -> hash
@@ -122,54 +175,85 @@ end = struct
 
   let merkle_root { T.tree; _ } = hash tree
 
-  let add_path depth0 tree0 path0 account =
-    let rec build_tree height p =
-      match p with
-      | `Left h_r :: path ->
-          let l = build_tree (height - 1) path in
-          Tree.Node (Hash.merge ~height (hash l) h_r, l, Hash h_r)
-      | `Right h_l :: path ->
-          let r = build_tree (height - 1) path in
-          Node (Hash.merge ~height h_l (hash r), Hash h_l, r)
-      | [] ->
-          assert (height = -1) ;
-          Account account
+  let add_path_impl ~replace_self tree0 path0 account =
+    (* Takes height, left and right children and builds a pair of sibling nodes
+       one level up *)
+    let build_tail_f height (prev_l, prev_r) =
+      replace_self ~f:(fun mself ->
+          let self =
+            match mself with
+            | Some self ->
+                self
+            | None ->
+                Hash.merge ~height (hash prev_l) (hash prev_r)
+          in
+          Tree.Node (self, prev_l, prev_r) )
     in
-    let rec union height tree path =
-      match (tree, path) with
-      | Tree.Hash h, path ->
-          let t = build_tree height path in
-          [%test_result: Hash.t]
-            ~message:
-              "Hashes in union are not equal, something is wrong with your \
-               ledger"
-            ~expect:h (hash t) ;
-          t
-      | Node (h, l, r), `Left h_r :: path ->
-          assert (Hash.equal h_r (hash r)) ;
-          let l = union (height - 1) l path in
-          Node (h, l, r)
-      | Node (h, l, r), `Right h_l :: path ->
-          assert (Hash.equal h_l (hash l)) ;
-          let r = union (height - 1) r path in
-          Node (h, l, r)
+    (* Builds the tail of path, i.e. part of the path that is not present in
+       the current ledger and we just add it all the way down to account
+       using the path *)
+    let build_tail hash_node_to_bottom_path =
+      let bottom_el, bottom_to_hash_node_path =
+        Mina_stdlib.Nonempty_list.(rev hash_node_to_bottom_path |> uncons)
+      in
+      (* Left and right branches of a node that is parent of the bottom node *)
+      let init = replace_self ~f:(Fn.const (Tree.Account account)) bottom_el in
+      List.foldi ~init bottom_to_hash_node_path ~f:build_tail_f
+    in
+    (* Traverses the tree along path, collecting nodes and untraversed sibling hashes
+        Stops when encounters `Hash` or `Account` node.
+
+       Returns the last visited node (`Hash` or `Account`), remainder of path and
+       collected node/sibling hashes in bottom-to-top order.
+    *)
+    let rec traverse_through_nodes = function
+      | Tree.Account _, _ :: _ ->
+          failwith "path is longer than a tree's branch"
+      | Account _, [] | Tree.Hash _, [] ->
+          Tree.Account account
+      | Tree.Hash h, fst_el :: rest ->
+          let tail_l, tail_r =
+            build_tail (Mina_stdlib.Nonempty_list.init fst_el rest)
+          in
+          Tree.Node (h, tail_l, tail_r)
+      | Node (h, l, r), `Left _ :: rest ->
+          Tree.Node (h, traverse_through_nodes (l, rest), r)
+      | Node (h, l, r), `Right _ :: rest ->
+          Tree.Node (h, l, traverse_through_nodes (r, rest))
       | Node _, [] ->
-          failwith "Path too short"
-      | Account _, _ :: _ ->
-          failwith "Path too long"
-      | Account a, [] ->
-          assert (Account.equal a account) ;
-          tree
+          failwith "path is shorter than a tree's branch"
     in
-    union (depth0 - 1) tree0 (List.rev path0)
+    traverse_through_nodes (tree0, List.rev path0)
 
   let add_path (t : t) path account_id account =
     let index =
       List.foldi path ~init:0 ~f:(fun i acc x ->
           match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
     in
+    let replace_self ~f = function
+      | `Left h_r ->
+          (f None, Tree.Hash h_r)
+      | `Right h_l ->
+          (Tree.Hash h_l, f None)
+    in
     { t with
-      tree = add_path t.depth t.tree path account
+      tree = add_path_impl ~replace_self t.tree path account
+    ; indexes = (account_id, index) :: t.indexes
+    }
+
+  let add_wide_path_unsafe (t : t) path account_id account =
+    let index =
+      List.foldi path ~init:0 ~f:(fun i acc x ->
+          match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
+    in
+    let replace_self ~f = function
+      | `Left (h_l, h_r) ->
+          (f (Some h_l), Tree.Hash h_r)
+      | `Right (h_l, h_r) ->
+          (Tree.Hash h_l, f (Some h_r))
+    in
+    { t with
+      tree = add_path_impl ~replace_self t.tree path account
     ; indexes = (account_id, index) :: t.indexes
     }
 
@@ -221,8 +305,8 @@ end = struct
           in
           failwithf
             !"Sparse_ledger.get: Bad index %i. Expected a%s, but got a%s at \
-              depth %i. Tree = %{sexp:t}"
-            idx expected_kind kind (depth - i) t ()
+              depth %i. Tree = %{sexp:t}, tree_depth = %d"
+            idx expected_kind kind (depth - i) t depth ()
     in
     go (depth - 1) tree
 
@@ -302,7 +386,10 @@ let%test_module "sparse-ledger-test" =
 
     module Account = struct
       module T = struct
-        type t = { name : string; favorite_number : int }
+        type t =
+          { name : Mina_stdlib.Bounded_types.String.Stable.V1.t
+          ; favorite_number : int
+          }
         [@@deriving bin_io, equal, sexp, yojson]
       end
 

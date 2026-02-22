@@ -13,7 +13,7 @@ module Payload = struct
           ( Currency.Fee.Stable.V1.t
           , Public_key.Compressed.Stable.V1.t
           , Account_nonce.Stable.V1.t option
-          , Global_slot.Stable.V1.t
+          , Global_slot_since_genesis.Stable.V1.t
           , Signed_command_memo.Stable.V1.t )
           Signed_command_payload.Common.Poly.Stable.V2.t
         [@@deriving sexp, to_yojson]
@@ -125,22 +125,25 @@ let fee_payer ({ payload; _ } : t) = Payload.fee_payer payload
 
 let create ?nonce ~fee ~fee_payer_pk ~valid_until ~memo ~body ~signer
     ~sign_choice () : t =
-  let valid_until = Option.value valid_until ~default:Global_slot.max_value in
+  let valid_until =
+    Option.value valid_until ~default:Global_slot_since_genesis.max_value
+  in
   let payload =
     Payload.create ~fee ~fee_payer_pk ?nonce ~valid_until ~memo ~body
   in
   { payload; signer; signature = sign_choice }
 
-let sign ~signer ~(user_command_payload : Signed_command_payload.t) = function
+let sign ~signer ~(user_command_payload : Signed_command_payload.t)
+    ~signature_kind = function
   | Sign_choice.Signature signature ->
       Option.value_map
         ~default:(Deferred.return (Error "Invalid_signature"))
-        (Signed_command.create_with_signature_checked signature signer
-           user_command_payload )
+        (Signed_command.create_with_signature_checked ~signature_kind signature
+           signer user_command_payload )
         ~f:Deferred.Result.return
   | Keypair signer_kp ->
       Deferred.Result.return
-        (Signed_command.sign signer_kp user_command_payload)
+        (Signed_command.sign ~signature_kind signer_kp user_command_payload)
   | Hd_index hd_index ->
       Secrets.Hardware_wallets.sign ~hd_index
         ~public_key:(Public_key.decompress_exn signer)
@@ -195,7 +198,8 @@ let warn_if_unable_to_pay_account_creation_fee ~get_account
       ()
 
 let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
-    ~get_account ~constraint_constants ~logger (client_input : t) =
+    ~get_account ~constraint_constants ~logger ~signature_kind (client_input : t)
+    =
   Deferred.map
     ~f:
       (Result.map_error ~f:(fun str ->
@@ -218,13 +222,13 @@ let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
       ~constraint_constants ~logger user_command_payload
   in
   let%map signed_user_command =
-    sign ~signer:client_input.signer ~user_command_payload
+    sign ~signature_kind ~signer:client_input.signer ~user_command_payload
       client_input.signature
   in
   (Signed_command.forget_check signed_user_command, updated_nonce_map)
 
 let to_user_commands ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
-    ~get_account ~constraint_constants ~logger uc_inputs :
+    ~get_account ~constraint_constants ~logger ~signature_kind uc_inputs :
     Signed_command.t list Deferred.Or_error.t =
   (* When batching multiple user commands, keep track of the nonces and send
       all the user commands if they are valid or none if there is an error in
@@ -236,7 +240,7 @@ let to_user_commands ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
       ~f:(fun (valid_user_commands, nonce_map) uc_input ->
         let%map res, updated_nonce_map =
           to_user_command ~nonce_map ~get_current_nonce ~get_account
-            ~constraint_constants ~logger uc_input
+            ~constraint_constants ~logger ~signature_kind uc_input
         in
         (res :: valid_user_commands, updated_nonce_map) )
   in

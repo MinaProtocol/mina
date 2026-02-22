@@ -1,14 +1,6 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
-
 module Wire_types = Mina_wire_types.Mina_state.Protocol_state
 
 module Make_sig (A : Wire_types.Types.S) = struct
@@ -82,7 +74,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           type t =
             ( State_hash.Stable.V1.t
             , Blockchain_state.Value.Stable.V2.t
-            , Consensus.Data.Consensus_state.Value.Stable.V1.t
+            , Consensus.Data.Consensus_state.Value.Stable.V2.t
             , Protocol_constants_checked.Value.Stable.V1.t )
             Poly.Stable.V1.t
           [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
@@ -96,8 +88,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       ('state_hash, 'blockchain_state, 'consensus_state, 'constants) Poly.t
 
     type value = Value.t [@@deriving sexp, yojson]
-
-    [%%ifdef consensus_mechanism]
 
     type var =
       ( State_hash.var
@@ -135,7 +125,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; consensus_state
         ; constants
         } =
-      let blockchain_state = Blockchain_state.var_to_input blockchain_state in
+      let%map blockchain_state =
+        Blockchain_state.var_to_input blockchain_state
+      in
       let constants = Protocol_constants_checked.var_to_input constants in
       let consensus_state =
         Consensus.Data.Consensus_state.var_to_input consensus_state
@@ -146,7 +138,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         |> append constants)
 
     let hash_checked (t : var) =
-      let input = var_to_input t in
+      let%bind input = var_to_input t in
       make_checked (fun () ->
           Random_oracle.Checked.(
             hash ~init:Hash_prefix.protocol_state_body (pack_input input)
@@ -158,17 +150,15 @@ module Make_str (A : Wire_types.Concrete) = struct
         Zkapp_precondition.Protocol_state.View.Checked.t =
       let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
       let cs : Consensus.Data.Consensus_state.var = t.consensus_state in
-      { snarked_ledger_hash = t.blockchain_state.registers.ledger
+      { snarked_ledger_hash =
+          Blockchain_state.snarked_ledger_hash t.blockchain_state
       ; blockchain_length = C.blockchain_length_var cs
       ; min_window_density = C.min_window_density_var cs
-      ; last_vrf_output = ()
       ; total_currency = C.total_currency_var cs
       ; global_slot_since_genesis = C.global_slot_since_genesis_var cs
       ; staking_epoch_data = C.staking_epoch_data_var cs
       ; next_epoch_data = C.next_epoch_data_var cs
       }
-
-    [%%endif]
 
     let hash s =
       Random_oracle.hash ~init:Hash_prefix.protocol_state_body
@@ -178,10 +168,10 @@ module Make_str (A : Wire_types.Concrete) = struct
     let view (t : Value.t) : Zkapp_precondition.Protocol_state.View.t =
       let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
       let cs = t.consensus_state in
-      { snarked_ledger_hash = t.blockchain_state.registers.ledger
+      { snarked_ledger_hash =
+          Blockchain_state.snarked_ledger_hash t.blockchain_state
       ; blockchain_length = C.blockchain_length cs
       ; min_window_density = C.min_window_density cs
-      ; last_vrf_output = ()
       ; total_currency = C.total_currency cs
       ; global_slot_since_genesis = C.global_slot_since_genesis cs
       ; staking_epoch_data = C.staking_epoch_data cs
@@ -211,11 +201,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   type value = Value.t [@@deriving sexp, yojson]
 
-  [%%ifdef consensus_mechanism]
-
   type var = (State_hash.var, Body.var) Poly.t
-
-  [%%endif]
 
   module Proof = Proof
   module Hash = State_hash
@@ -252,7 +238,9 @@ module Make_str (A : Wire_types.Concrete) = struct
   let constants { Poly.Stable.Latest.body = { Body.Poly.constants; _ }; _ } =
     constants
 
-  [%%ifdef consensus_mechanism]
+  let snarked_ledger_hash
+      { Poly.Stable.Latest.body = { Body.Poly.blockchain_state; _ }; _ } =
+    Blockchain_state.snarked_ledger_hash blockchain_state
 
   let create_var = create'
 
@@ -285,8 +273,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     State_hash.if_ is_genesis ~then_:state_hash
       ~else_:state.body.genesis_state_hash
 
-  [%%endif]
-
   let hashes = hashes_abstract ~hash_body:Body.hash
 
   let hashes_with_body t ~body_hash =
@@ -307,16 +293,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           hash
     else state.body.genesis_state_hash
 
-  [%%if call_logger]
-
-  let hash s =
-    Mina_debug.Call_logger.record_call "Protocol_state.hash" ;
-    hash s
-
-  [%%endif]
-
-  let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
-      ~consensus_constants ~genesis_body_reference =
+  let negative_one ~(genesis_ledger : Consensus.Genesis_data.Hashed.t)
+      ~genesis_epoch_data ~constraint_constants ~consensus_constants
+      ~genesis_body_reference =
     { Poly.Stable.Latest.previous_state_hash =
         State_hash.of_hash Outside_hash_image.t
     ; body =
@@ -324,7 +303,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             Blockchain_state.negative_one ~constraint_constants
               ~consensus_constants
               ~genesis_ledger_hash:
-                (Mina_ledger.Ledger.merkle_root (Lazy.force genesis_ledger))
+                (Consensus.Genesis_data.Hashed.hash genesis_ledger)
               ~genesis_body_reference
         ; genesis_state_hash = State_hash.of_hash Outside_hash_image.t
         ; consensus_state =

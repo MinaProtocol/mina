@@ -1,31 +1,18 @@
 #!/bin/bash
 
 # test replayer on known archive db
+set -x
 
-REPLAYER_DIR=src/app/replayer
-DB=archive
+INPUT_FILE=src/test/archive/sample_db/replayer_input_file.json
+REPLAYER_APP=_build/default/src/app/replayer/replayer.exe
+PG_CONN=postgres://postgres:postgres@localhost:5432/archive
 
-DOCKER_IMAGE=12.4-alpine
-CONTAINER_FILE=docker.container
-
-PG_PORT=5432
-PG_PASSWORD=somepassword
-PG_CONN=postgres://postgres:$PG_PASSWORD@localhost:$PG_PORT/$DB
-
-SOCKET_DIR=/var/run/postgresql
-
-function cleanup () {
-    CONTAINER=`cat $CONTAINER_FILE`
-
-    if [[ ! -z $CONTAINER ]] ; then
-	echo "Killing, removing docker container"
-	for action in kill rm; do
-	    docker container $action $CONTAINER
-	done
-    fi
-
-    rm -f $CONTAINER_FILE
-}
+while [[ "$#" -gt 0 ]]; do case $1 in
+  -i|--input-file) INPUT_FILE="$2"; shift;;
+  -a|--app) REPLAYER_APP="$2"; shift;;
+  -p|--pg) PG_CONN="$2"; shift;;
+  *) echo "Unknown parameter passed: $1"; exit 1;;
+esac; shift; done
 
 function report () {
  if [[ $1 == 0 ]]; then
@@ -35,30 +22,11 @@ function report () {
  fi
 }
 
-# -v mounts dir with Unix socket on host
-echo "Starting docker with Postgresql"
-docker run \
-       --name replayer-postgres -d -v $SOCKET_DIR:$SOCKET_DIR -p $PG_PORT:$PG_PORT \
-       -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=$PG_PASSWORD -e POSTGRES_DB=$DB postgres:$DOCKER_IMAGE > $CONTAINER_FILE
-
-trap "cleanup; exit 1" SIGINT
-
-# wait for Postgresql to become available
-sleep 5
-
-echo "Populating archive database"
-psql -U postgres -d $DB < $REPLAYER_DIR/test/archive_db.sql
-
-echo "Building replayer"
-make replayer
-
 echo "Running replayer"
-./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input.json
+$REPLAYER_APP --archive-uri $PG_CONN --input-file $INPUT_FILE
 
 RESULT=$?
 
 report $RESULT
-
-cleanup
 
 exit $RESULT

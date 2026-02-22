@@ -56,7 +56,7 @@ let get_test_field = function
         (Yojson.Basic.to_string json)
         ()
 
-module Make_test
+module Produce_test
     (S : Json_intf_any_typ with type ('a, 'b) typ := ('a, 'b) Graphql.Schema.typ)
     (G : Test_Intf with type t = S.t) =
 struct
@@ -73,7 +73,20 @@ struct
     test_query schema () "{ test }" (fun response ->
         [%test_eq: G.t] value (S.parse @@ get_test_field response) )
 
-  let%test_unit "test" =
+  let test_query () =
     Core_kernel.Quickcheck.test G.gen ~sexp_of:G.sexp_of_t
       ~f:query_server_and_compare
+end
+
+module Make_test
+    (S : Json_intf_any_typ with type ('a, 'b) typ := ('a, 'b) Graphql.Schema.typ)
+    (G : Test_Intf with type t = S.t) =
+struct
+  include Produce_test (S) (G)
+
+  (* This should be removed when the effort of moving from inline tests to
+     alcotest is finished. The library in graphql_lib still uses Make_test and
+     relies on this method for unit testing.
+  *)
+  let%test_unit "test" = test_query ()
 end

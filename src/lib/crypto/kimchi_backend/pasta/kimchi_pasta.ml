@@ -7,14 +7,17 @@ module Pallas_based_plonk = struct
 
   let field_size = Pallas_based_plonk.field_size
 
+  module Cvar = Pallas_based_plonk.Cvar
   module Verification_key = Pallas_based_plonk.Verification_key
   module R1CS_constraint_system = Pallas_based_plonk.R1CS_constraint_system
+  module Constraint = R1CS_constraint_system.Constraint
   module Rounds_vector = Pallas_based_plonk.Rounds_vector
   module Rounds = Pallas_based_plonk.Rounds
   module Keypair = Pallas_based_plonk.Keypair
   module Proof = Pallas_based_plonk.Proof
   module Proving_key = Pallas_based_plonk.Proving_key
   module Oracles = Pallas_based_plonk.Oracles
+  module Run_state = Pallas_based_plonk.Run_state
 end
 
 module Vesta_based_plonk = struct
@@ -24,14 +27,17 @@ module Vesta_based_plonk = struct
 
   let field_size = Vesta_based_plonk.field_size
 
+  module Cvar = Vesta_based_plonk.Cvar
   module Verification_key = Vesta_based_plonk.Verification_key
   module R1CS_constraint_system = Vesta_based_plonk.R1CS_constraint_system
+  module Constraint = R1CS_constraint_system.Constraint
   module Rounds_vector = Vesta_based_plonk.Rounds_vector
   module Rounds = Vesta_based_plonk.Rounds
   module Keypair = Vesta_based_plonk.Keypair
   module Proof = Vesta_based_plonk.Proof
   module Proving_key = Vesta_based_plonk.Proving_key
   module Oracles = Vesta_based_plonk.Oracles
+  module Run_state = Vesta_based_plonk.Run_state
 end
 
 module Pasta = struct
@@ -41,7 +47,4 @@ module Pasta = struct
   module Fq = Pasta.Fq
   module Vesta = Pasta.Vesta
   module Pallas = Pasta.Pallas
-  module Precomputed = Pasta.Precomputed
 end
-
-module Precomputed = Precomputed

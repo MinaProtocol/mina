@@ -1,21 +1,15 @@
 (library
- (name logger)
  (public_name logger)
- (library_flags -linkall)
- (inline_tests)
+ (name logger)
  (libraries
-   ;; opam libraries
-   result
-   core_kernel
-   sexplib0
-   bin_prot.shape
-   base.caml
-   base.base_internalhash_types
-   ;; local libraries
-   interpolator_lib
-   ppx_version.runtime
- )
+  ;; opam libraries
+  core_kernel
+  sexplib0
+  ;; local libraries
+  interpolator_lib)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
- (instrumentation (backend bisect_ppx))
- (synopsis "Logging library"))
+  (pps ppx_version ppx_mina ppx_jane ppx_deriving_yojson ppx_deriving.std))
+ (virtual_modules logger)
+ (default_implementation logger.native))

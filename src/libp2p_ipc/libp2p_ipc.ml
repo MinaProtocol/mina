@@ -163,7 +163,7 @@ let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
            (List.map ~f:create_topic_level topic_config))
 
 let create_gating_config ~banned_ips ~banned_peers ~trusted_ips ~trusted_peers
-    ~isolate =
+    ~isolate ~clean_added_peers =
   build
     (module Builder.GatingConfig)
     Builder.GatingConfig.(
@@ -171,7 +171,8 @@ let create_gating_config ~banned_ips ~banned_peers ~trusted_ips ~trusted_peers
       *> list_op banned_peer_ids_set_list banned_peers
       *> list_op trusted_ips_set_list trusted_ips
       *> list_op trusted_peer_ids_set_list trusted_peers
-      *> op isolate_set isolate)
+      *> op isolate_set isolate
+      *> op clean_added_peers_set clean_added_peers)
 
 let create_rpc_header ~sequence_number =
   build'
@@ -264,6 +265,40 @@ let push_message_to_outgoing_message request =
     Builder.Libp2pHelperInterface.Message.(
       builder_op push_message_set_builder request)
 
+let create_remove_resource_push_message ~ids =
+  let ids =
+    List.map ids ~f:(fun id ->
+        build'
+          (module Builder.RootBlockId)
+          Builder.RootBlockId.(op blake2b_hash_set id) )
+  in
+  build'
+    (module Builder.Libp2pHelperInterface.PushMessage)
+    Builder.Libp2pHelperInterface.PushMessage.(
+      builder_op header_set_builder (create_push_message_header ())
+      *> reader_op remove_resource_set_reader
+           (build
+              (module Builder.Libp2pHelperInterface.RemoveResource)
+              Builder.Libp2pHelperInterface.RemoveResource.(
+                list_op ids_set_list ids) ))
+
+let create_download_resource_push_message ~tag ~ids =
+  let ids =
+    List.map ids ~f:(fun id ->
+        build'
+          (module Builder.RootBlockId)
+          Builder.RootBlockId.(op blake2b_hash_set id) )
+  in
+  build'
+    (module Builder.Libp2pHelperInterface.PushMessage)
+    Builder.Libp2pHelperInterface.PushMessage.(
+      builder_op header_set_builder (create_push_message_header ())
+      *> reader_op download_resource_set_reader
+           (build
+              (module Builder.Libp2pHelperInterface.DownloadResource)
+              Builder.Libp2pHelperInterface.DownloadResource.(
+                op tag_set_exn tag *> list_op ids_set_list ids) ))
+
 let create_add_resource_push_message ~tag ~data =
   build'
     (module Builder.Libp2pHelperInterface.PushMessage)
@@ -339,4 +374,7 @@ let read_incoming_messages reader =
 
 let write_outgoing_message writer msg =
   msg |> Builder.Libp2pHelperInterface.Message.to_message
-  |> Capnp.Codecs.serialize_iter ~compression ~f:(Writer.write writer)
+  |> Capnp.Codecs.serialize_fold_copyless ~compression ~init:0
+       ~f:(fun total str len ->
+         Writer.write ~len writer str ;
+         total + len )

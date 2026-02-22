@@ -9,18 +9,19 @@ let%test_module "Archive node unit tests" =
   ( module struct
     let logger = Logger.create ()
 
-    let proof_level = Genesis_constants.Proof_level.None
+    let proof_level = Genesis_constants.Proof_level.No_check
 
     let precomputed_values =
       { (Lazy.force Precomputed_values.for_unit_tests) with proof_level }
 
     let constraint_constants = precomputed_values.constraint_constants
 
+    let genesis_constants = precomputed_values.genesis_constants
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
 
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
@@ -34,15 +35,15 @@ let%test_module "Archive node unit tests" =
       lazy
         ( Thread_safe.block_on_async_exn
         @@ fun () ->
-        match%map Caqti_async.connect archive_uri with
+        match%bind Mina_caqti.connect archive_uri with
         | Ok conn ->
-            conn
+            return conn
         | Error e ->
             failwith @@ Caqti_error.show e )
 
     let conn_pool_lazy =
       lazy
-        ( match Caqti_async.connect_pool archive_uri with
+        ( match Mina_caqti.connect_pool archive_uri with
         | Ok pool ->
             pool
         | Error e ->
@@ -111,7 +112,8 @@ let%test_module "Archive node unit tests" =
       let%map (zkapp_command : Zkapp_command.t) =
         Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
           ~fee_payer_keypair ~keymap ~ledger
-          ~protocol_state_view:genesis_state_view ()
+          ~protocol_state_view:genesis_state_view ~constraint_constants
+          ~genesis_constants ()
       in
       User_command.Zkapp_command zkapp_command
 
@@ -126,20 +128,26 @@ let%test_module "Archive node unit tests" =
           Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
             ~min_fee:Currency.Fee.zero coinbase_amount )
 
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
     let%test_unit "User_command: read and write signed command" =
       let conn = Lazy.force conn_lazy in
       Thread_safe.block_on_async_exn
       @@ fun () ->
       Async.Quickcheck.async_test ~sexp_of:[%sexp_of: User_command.t]
         user_command_signed_gen ~f:(fun user_command ->
-          let transaction_hash = Transaction_hash.hash_command user_command in
+          let transaction_hash =
+            Transaction_hash.hash_command_with_hashes user_command
+          in
           match%map
             let open Deferred.Result.Let_syntax in
             let%bind user_command_id =
-              Processor.User_command.add_if_doesn't_exist conn user_command
+              Processor.User_command.add_if_doesn't_exist conn ~logger
+                ~v1_transaction_hash:false user_command
             in
             let%map result =
               Processor.User_command.find conn ~transaction_hash
+                ~v1_transaction_hash:false
               >>| function
               | Some (`Signed_command_id signed_command_id) ->
                   Some signed_command_id
@@ -160,7 +168,9 @@ let%test_module "Archive node unit tests" =
       @@ fun () ->
       Async.Quickcheck.async_test ~trials:20 ~sexp_of:[%sexp_of: User_command.t]
         user_command_zkapp_gen ~f:(fun user_command ->
-          let transaction_hash = Transaction_hash.hash_command user_command in
+          let transaction_hash =
+            Transaction_hash.hash_command_with_hashes user_command
+          in
           match user_command with
           | Signed_command _ ->
               failwith "zkapp_gen failed"
@@ -180,18 +190,25 @@ let%test_module "Archive node unit tests" =
                       let token_id =
                         Account_id.derive_token_id ~owner:acct_id
                       in
-                      Processor.Token_owners.add_if_doesn't_exist token_id
-                        acct_id ;
+                      Processor.Token_owners.add_to_owner_tbl token_id acct_id ;
                       add_token_owners tree.calls )
+              in
+              let%bind _ =
+                Processor.Protocol_versions.add_if_doesn't_exist conn
+                  ~transaction:Protocol_version.(transaction current)
+                  ~network:Protocol_version.(network current)
+                  ~patch:Protocol_version.(patch current)
               in
               add_token_owners p.account_updates ;
               match%map
                 let open Deferred.Result.Let_syntax in
                 let%bind user_command_id =
-                  Processor.User_command.add_if_doesn't_exist conn user_command
+                  Processor.User_command.add_if_doesn't_exist conn ~logger
+                    ~v1_transaction_hash:false user_command
                 in
                 let%map result =
                   Processor.User_command.find conn ~transaction_hash
+                    ~v1_transaction_hash:false
                   >>| function
                   | Some (`Zkapp_command_id zkapp_command_id) ->
                       Some zkapp_command_id
@@ -230,6 +247,7 @@ let%test_module "Archive node unit tests" =
             in
             let%map result =
               Processor.Internal_command.find_opt conn ~transaction_hash
+                ~v1_transaction_hash:false
                 ~command_type:(Processor.Fee_transfer.Kind.to_string kind)
             in
             [%test_result: int] ~expect:fee_transfer_id
@@ -254,6 +272,7 @@ let%test_module "Archive node unit tests" =
             in
             let%map result =
               Processor.Internal_command.find_opt conn ~transaction_hash
+                ~v1_transaction_hash:false
                 ~command_type:Processor.Coinbase.coinbase_command_type
             in
             [%test_result: int] ~expect:coinbase_id (Option.value_exn result)
@@ -281,11 +300,6 @@ let%test_module "Archive node unit tests" =
             Strict_pipe.create ~name:"archive"
               (Buffered (`Capacity 100, `Overflow Crash))
           in
-          let processor_deferred_computation =
-            Processor.run
-              ~constraint_constants:precomputed_values.constraint_constants pool
-              reader ~logger ~delete_older_than:None
-          in
           let diffs =
             List.map
               ~f:(fun breadcrumb ->
@@ -296,11 +310,16 @@ let%test_module "Archive node unit tests" =
           in
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
           Strict_pipe.Writer.close writer ;
-          let%bind () = processor_deferred_computation in
+          let%bind () =
+            Processor.run ~proof_cache_db
+              ~genesis_constants:precomputed_values.genesis_constants
+              ~constraint_constants:precomputed_values.constraint_constants pool
+              reader ~logger ~delete_older_than:None
+          in
           match%map
             Mina_caqti.deferred_result_list_fold breadcrumbs ~init:()
               ~f:(fun () breadcrumb ->
-                Caqti_async.Pool.use
+                Mina_caqti.Pool.use
                   (fun conn ->
                     let open Deferred.Result.Let_syntax in
                     match%bind
@@ -334,6 +353,39 @@ let%test_module "Archive node unit tests" =
               ()
           | Error e ->
               failwith @@ Caqti_error.show e )
+
+    (* A test that [Processor.Token.add_all_if_don't_exist] will succeed for an
+       arbitrary tree of token IDs, and that calling it makes it safe for
+       [Processor.Token.add_all_if_don't_exist] to be run on the tokens in the
+       tree in arbitrary order. *)
+    let%test_unit "Token: insert randomized token tree in dependency order" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      (* Generate a tree of token IDs but presented in random order - one token
+         will have no owner, and the rest will have an owner in the list *)
+      let tree = Quickcheck.random_value (Token_id.gen_token_tree ~length:30) in
+      let%bind () =
+        match%map Processor.Token.add_all_if_don't_exist conn tree with
+        | Ok () ->
+            ()
+        | Error e ->
+            failwith @@ Caqti_error.show e
+      in
+      (* Now try retrieving the database indices of the tokens in a random
+         order *)
+      let shuffled_tokens = List.map (List.permute tree) ~f:fst in
+      match%map
+        let open Deferred.Result.Let_syntax in
+        Mina_stdlib.Deferred.Result.List.iter shuffled_tokens
+          ~f:(fun token_id ->
+            let%map _ = Processor.Token.add_if_doesn't_exist conn token_id in
+            () )
+      with
+      | Ok () ->
+          ()
+      | Error e ->
+          failwith @@ Caqti_error.show e
 
     (*
     let%test_unit "Block: read and write with pruning" =

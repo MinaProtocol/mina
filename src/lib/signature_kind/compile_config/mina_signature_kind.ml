@@ -1,13 +1,10 @@
-[%%import "/src/config.mlh"]
+include Mina_signature_kind_type
 
-type t = Testnet | Mainnet
-
-[%%if mainnet]
-
-let t = Mainnet
-
-[%%else]
-
-let t = Testnet
-
-[%%endif]
+let t_DEPRECATED =
+  match Node_config.network with
+  | "testnet" ->
+      Testnet
+  | "mainnet" ->
+      Mainnet
+  | _ ->
+      Other_network Node_config.network

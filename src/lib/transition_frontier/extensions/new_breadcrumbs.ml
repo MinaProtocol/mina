@@ -6,6 +6,8 @@ module T = struct
 
   type view = Breadcrumb.t list
 
+  let name = "new_breadcrumbs"
+
   let create ~logger:_ frontier = ((), [ Full_frontier.root frontier ])
 
   let handle_diffs () _frontier diffs_with_mutants =

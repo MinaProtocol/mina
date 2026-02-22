@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_import
 open Snark_params.Tick
@@ -13,11 +11,7 @@ open Snark_params.Tick
 module Legacy_token_id : sig
   val default : (Field.t, bool) Random_oracle_input.Legacy.t
 
-  [%%ifdef consensus_mechanism]
-
   val default_checked : (Field.Var.t, Boolean.var) Random_oracle_input.Legacy.t
-
-  [%%endif]
 end
 
 module Body : sig
@@ -35,7 +29,10 @@ module Body : sig
     end
 
     module V1 : sig
-      type t [@@deriving compare, equal, sexp, hash, yojson]
+      type t =
+        | Payment of Payment_payload.Stable.V1.t
+        | Stake_delegation of Stake_delegation.Stable.V1.t
+      [@@deriving compare, equal, sexp, hash, yojson]
     end
   end]
 
@@ -44,10 +41,6 @@ module Body : sig
   val receiver_pk : t -> Signature_lib.Public_key.Compressed.t
 
   val receiver : t -> Account_id.t
-
-  val source_pk : t -> Signature_lib.Public_key.Compressed.t
-
-  val source : t -> Account_id.t
 end
 
 module Common : sig
@@ -92,10 +85,10 @@ module Common : sig
         ( Currency.Fee.Stable.V1.t
         , Public_key.Compressed.Stable.V1.t
         , Mina_numbers.Account_nonce.Stable.V1.t
-        , Mina_numbers.Global_slot.Stable.V1.t
+        , Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         , Signed_command_memo.Stable.V1.t )
         Poly.Stable.V2.t
-      [@@deriving compare, equal, sexp, hash]
+      [@@deriving compare, equal, sexp, hash, yojson]
     end
 
     module V1 : sig
@@ -104,7 +97,7 @@ module Common : sig
         , Public_key.Compressed.Stable.V1.t
         , Token_id.Stable.V1.t
         , Mina_numbers.Account_nonce.Stable.V1.t
-        , Mina_numbers.Global_slot.Stable.V1.t
+        , Mina_numbers.Global_slot_legacy.Stable.V1.t
         , Signed_command_memo.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
@@ -115,13 +108,11 @@ module Common : sig
 
   val gen : t Quickcheck.Generator.t
 
-  [%%ifdef consensus_mechanism]
-
   type var =
     ( Currency.Fee.var
     , Public_key.Compressed.var
     , Mina_numbers.Account_nonce.Checked.t
-    , Mina_numbers.Global_slot.Checked.t
+    , Mina_numbers.Global_slot_since_genesis.Checked.t
     , Signed_command_memo.Checked.t )
     Poly.t
 
@@ -135,8 +126,6 @@ module Common : sig
 
     val constant : t -> var
   end
-
-  [%%endif]
 end
 
 module Poly : sig
@@ -180,7 +169,7 @@ val create :
      fee:Currency.Fee.t
   -> fee_payer_pk:Public_key.Compressed.t
   -> nonce:Mina_numbers.Account_nonce.t
-  -> valid_until:Mina_numbers.Global_slot.t option
+  -> valid_until:Mina_numbers.Global_slot_since_genesis.t option
   -> memo:Signed_command_memo.t
   -> body:Body.t
   -> t
@@ -197,7 +186,7 @@ val fee_excess : t -> Fee_excess.t
 
 val nonce : t -> Mina_numbers.Account_nonce.t
 
-val valid_until : t -> Mina_numbers.Global_slot.t
+val valid_until : t -> Mina_numbers.Global_slot_since_genesis.t
 
 val memo : t -> Signed_command_memo.t
 
@@ -206,10 +195,6 @@ val body : t -> Body.t
 val receiver_pk : t -> Public_key.Compressed.t
 
 val receiver : t -> Account_id.t
-
-val source_pk : t -> Public_key.Compressed.t
-
-val source : t -> Account_id.t
 
 val token : t -> Token_id.t
 

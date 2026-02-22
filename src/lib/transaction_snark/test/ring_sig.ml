@@ -15,7 +15,7 @@ open Snark_params.Tick.Let_syntax
 (* check a signature on msg against a public key *)
 let check_sig pk msg sigma : Boolean.var Checked.t =
   let%bind (module S) = Inner_curve.Checked.Shifted.create () in
-  Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
+  Schnorr.Chunked.Checked.verifies ~signature_kind (module S) sigma pk msg
 
 (* verify witness signature against public keys *)
 let%snarkydef_ verify_sig pubkeys msg sigma =
@@ -56,7 +56,7 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
         ; public_output = ()
         ; auxiliary_output = ()
         } )
-  ; uses_lookup = false
+  ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
   }
 
 let%test_unit "1-of-1" =
@@ -67,7 +67,7 @@ let%test_unit "1-of-1" =
   in
   Quickcheck.test ~trials:1 gen ~f:(fun (sk, msg) ->
       let pk = Inner_curve.(scale one sk) in
-      (let sigma = Schnorr.Chunked.sign sk msg in
+      (let sigma = Schnorr.Chunked.sign ~signature_kind sk msg in
        let%bind sigma_var, msg_var =
          exists
            Typ.(Schnorr.Chunked.Signature.typ * Schnorr.chunked_message_typ ())
@@ -88,7 +88,7 @@ let%test_unit "1-of-2" =
   Quickcheck.test ~trials:1 gen ~f:(fun (sk0, sk1, msg) ->
       let pk0 = Inner_curve.(scale one sk0) in
       let pk1 = Inner_curve.(scale one sk1) in
-      (let sigma1 = Schnorr.Chunked.sign sk1 msg in
+      (let sigma1 = Schnorr.Chunked.sign ~signature_kind sk1 msg in
        let%bind sigma1_var =
          exists Schnorr.Chunked.Signature.typ ~compute:(As_prover.return sigma1)
        and msg_var =
@@ -99,7 +99,12 @@ let%test_unit "1-of-2" =
       |> run_and_check |> Or_error.ok_exn )
 
 (* test a snapp tx with a 3-account_update ring *)
-let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
+let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
+  let proof_cache =
+    Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+    @@ Yojson.Safe.from_file "proof_cache.json"
+  in
+  Transaction_snark.For_tests.set_proof_cache proof_cache ;
   let open Mina_transaction_logic.For_tests in
   let gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -121,20 +126,15 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
       Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
           Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
           let spec = List.hd_exn specs in
-          let tag, _, (module P), Pickles.Provers.[ ringsig_prover; _ ] =
-            Pickles.compile () ~cache:Cache_dir.cache
+          let tag, _, (module P), Pickles.Provers.[ ringsig_prover ] =
+            Pickles.compile () ~cache:Cache_dir.cache ~proof_cache
               ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
-              ~branches:(module Nat.N2)
-              ~max_proofs_verified:(module Nat.N2)
-                (* You have to put 2 here... *)
+              ~max_proofs_verified:(module Nat.N0)
               ~name:"ringsig"
-              ~constraint_constants:
-                (Genesis_constants.Constraint_constants.to_snark_keys_header
-                   constraint_constants )
-              ~choices:(fun ~self ->
-                [ ring_sig_rule ring_member_pks; dummy_rule self ] )
+              ~choices:(fun ~self:_ -> [ ring_sig_rule ring_member_pks ])
           in
           let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
+          let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk) in
           ( if debug_mode then
             Binable.to_string (module Side_loaded_verification_key.Stable.V2) vk
             |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
@@ -176,19 +176,20 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
              } ) ;
           let sender_pk = sender.public_key |> Public_key.compress in
           let fee_payer : Account_update.Fee_payer.t =
-            { Account_update.Fee_payer.body =
+            (* Real signature added in below *)
+            Account_update.Fee_payer.make
+              ~body:
                 { public_key = sender_pk
                 ; fee = Amount.to_fee fee
                 ; valid_until = None
                 ; nonce = sender_nonce
                 }
-                (* Real signature added in below *)
-            ; authorization = Signature.dummy
-            }
+              ~authorization:Signature.dummy
           in
           let sender_account_update_data : Account_update.Simple.t =
-            { body =
-                { public_key = sender_pk
+            Account_update.with_no_aux
+              ~body:
+                { Account_update.Body.Simple.public_key = sender_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
@@ -201,18 +202,21 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
-                    ; account = Nonce (Account.Nonce.succ sender_nonce)
+                    ; account =
+                        Zkapp_precondition.Account.nonce
+                          (Account.Nonce.succ sender_nonce)
+                    ; valid_while = Ignore
                     }
-                ; call_type = Call
+                ; may_use_token = No
                 ; use_full_commitment = false
                 ; authorization_kind = Signature
                 }
-            ; authorization = Signature Signature.dummy
-            }
+              ~authorization:(Control.Poly.Signature Signature.dummy)
           in
           let snapp_account_update_data : Account_update.Simple.t =
-            { body =
-                { public_key = ringsig_account_pk
+            Account_update.with_no_aux
+              ~body:
+                { Account_update.Body.Simple.public_key = ringsig_account_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.(of_unsigned amount)
@@ -225,18 +229,21 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
-                    ; account = Full Zkapp_precondition.Account.accept
+                    ; account = Zkapp_precondition.Account.accept
+                    ; valid_while = Ignore
                     }
+                ; may_use_token = No
                 ; use_full_commitment = false
-                ; call_type = Call
-                ; authorization_kind = Proof
+                ; authorization_kind = Proof (With_hash.hash vk)
                 }
-            ; authorization = Proof Mina_base.Proof.transaction_dummy
-            }
+              ~authorization:
+                (Control.Poly.Proof
+                   (Lazy.force Mina_base.Proof.transaction_dummy) )
           in
           let protocol_state = Zkapp_precondition.Protocol_state.accept in
           let ps =
             Zkapp_command.Call_forest.With_hashes.of_zkapp_command_simple_list
+              ~signature_kind
               [ sender_account_update_data; snapp_account_update_data ]
           in
           let account_updates_hash = Zkapp_command.Call_forest.hash ps in
@@ -247,7 +254,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
           in
           let tx_statement : Zkapp_statement.t =
             { account_update =
-                Account_update.Body.digest
+                Account_update.Body.digest ~signature_kind
                   (Account_update.of_simple snapp_account_update_data).body
             ; calls = (Zkapp_command.Digest.Forest.empty :> field)
             }
@@ -257,7 +264,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
             |> Random_oracle_input.Chunked.field_elements
           in
           let signing_sk = List.nth_exn ring_member_sks sign_index in
-          let sigma = Schnorr.Chunked.sign signing_sk msg in
+          let sigma = Schnorr.Chunked.sign ~signature_kind signing_sk msg in
           let handler (Snarky_backendless.Request.With { request; respond }) =
             match request with
             | Sigma ->
@@ -265,40 +272,45 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
             | _ ->
                 respond Unhandled
           in
-          let (), (), (pi : Pickles.Side_loaded.Proof.t) =
+          let (), (), (pi : _ Pickles.Proof.t) =
             (fun () -> ringsig_prover ~handler tx_statement)
             |> Async.Thread_safe.block_on_async_exn
           in
+          let pi = Pickles.Side_loaded.Proof.of_proof pi in
           let fee_payer =
             let txn_comm =
               Zkapp_command.Transaction_commitment.create_complete transaction
                 ~memo_hash
                 ~fee_payer_hash:
-                  (Zkapp_command.Digest.Account_update.create
+                  (Zkapp_command.Digest.Account_update.create ~signature_kind
                      (Account_update.of_fee_payer fee_payer) )
             in
             { fee_payer with
               authorization =
-                Signature_lib.Schnorr.Chunked.sign sender.private_key
+                Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                  sender.private_key
                   (Random_oracle.Input.Chunked.field txn_comm)
             }
           in
           let sender : Account_update.Simple.t =
             let sender_signature =
-              Signature_lib.Schnorr.Chunked.sign sender.private_key
+              Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                sender.private_key
                 (Random_oracle.Input.Chunked.field transaction)
             in
             { body = sender_account_update_data.body
             ; authorization = Signature sender_signature
+            ; aux = sender_account_update_data.aux
             }
           in
           let zkapp_command : Zkapp_command.t =
-            Zkapp_command.of_simple
+            Zkapp_command.of_simple ~signature_kind ~proof_cache_db
               { fee_payer
               ; account_updates =
                   [ sender
                   ; { body = snapp_account_update_data.body
                     ; authorization = Proof pi
+                    ; aux = snapp_account_update_data.aux
                     }
                   ]
               ; memo
@@ -327,4 +339,10 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
             |> Yojson.Safe.pretty_to_string
             |> printf "protocol_state:\n%s\n\n" )
           |> fun () ->
-          ignore (apply_zkapp_command ledger [ zkapp_command ] : Sparse_ledger.t) ) )
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) ) ;
+  match Sys.getenv "PROOF_CACHE_OUT" with
+  | Some path ->
+      Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+  | None ->
+      ()

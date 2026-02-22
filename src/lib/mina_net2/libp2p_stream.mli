@@ -3,7 +3,12 @@ open Network_peer
 
 type participant = Us | Them [@@deriving equal]
 
+type state = FullyOpen | HalfClosed of participant | FullyClosed
+[@@deriving equal]
+
 type t
+
+val state : t -> state
 
 val id : t -> Libp2p_ipc.stream_id
 
@@ -41,3 +46,5 @@ val stream_closed :
   -> who_closed:participant
   -> t
   -> [ `Stream_should_be_released of bool ]
+
+val max_chunk_size : int

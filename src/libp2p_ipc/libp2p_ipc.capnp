@@ -59,6 +59,7 @@ struct GatingConfig {
   trustedIps @2 :List(Text);
   trustedPeerIds @3 :List(PeerId);
   isolate @4 :Bool;
+  cleanAddedPeers @5 :Bool;
 }
 
 struct TopicLevel {
@@ -324,14 +325,14 @@ struct Libp2pHelperInterface {
   }
 
   # validation is a special push message where the sequence number
-  # corresponds to the the push message sent to the daemon in the
+  # corresponds to the push message sent to the daemon in the
   # GossipReceived message
   struct Validation {
     validationId @0 :ValidationId;
     result @1 :ValidationResult;
   }
 
-  struct DeleteResource {
+  struct RemoveResource {
     ids @0 :List(RootBlockId);
   }
 
@@ -419,7 +420,7 @@ struct Libp2pHelperInterface {
     union {
       validation @1 :Libp2pHelperInterface.Validation;
       addResource @2 :Libp2pHelperInterface.AddResource;
-      deleteResource @3 :Libp2pHelperInterface.DeleteResource;
+      removeResource @3 :Libp2pHelperInterface.RemoveResource;
       downloadResource @4 :Libp2pHelperInterface.DownloadResource;
       heartbeatPeer @5 :Libp2pHelperInterface.HeartbeatPeer;
     }
@@ -474,6 +475,7 @@ struct DaemonInterface {
   struct ResourceUpdate {
     type @0 :ResourceUpdateType;
     ids @1 :List(RootBlockId);
+    tag @2 :UInt8;
   }
 
   struct PushMessage {

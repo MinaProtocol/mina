@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_import
 
@@ -17,23 +15,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let invalid = (Public_key.Compressed.empty, Pickles.Backend.Tick.Field.zero)
 
   module Digest = struct
-    [%%ifdef consensus_mechanism]
-
     let of_bigstring_exn =
       Binable.of_bigstring (module Pickles.Backend.Tick.Field.Stable.Latest)
 
     let to_bigstring =
       Binable.to_bigstring (module Pickles.Backend.Tick.Field.Stable.Latest)
-
-    [%%else]
-
-    let of_bigstring_exn =
-      Binable.of_bigstring (module Snark_params.Tick.Field.Stable.Latest)
-
-    let to_bigstring =
-      Binable.to_bigstring (module Snark_params.Tick.Field.Stable.Latest)
-
-    [%%endif]
 
     module Base58_check = Base58_check.Make (struct
       let description = "Token ID"
@@ -56,8 +42,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     let to_field_unsafe = Fn.id
 
-    [%%ifdef consensus_mechanism]
-
     [%%versioned
     module Stable = struct
       module V1 = struct
@@ -73,26 +57,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
-
-    [%%else]
-
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = Snark_params.Tick.Field.Stable.V1.t
-        [@@deriving sexp, equal, compare, hash]
-
-        let to_yojson (t : t) : Yojson.Safe.t = `String (to_string t)
-
-        let of_yojson (j : Yojson.Safe.t) : (t, string) result =
-          try Ok (of_string (Yojson.Safe.Util.to_string j))
-          with e -> Error (Exn.to_string e)
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    [%%endif]
 
     [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
 
@@ -114,8 +78,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     let gen_non_default =
       Quickcheck.Generator.filter gen ~f:(fun x -> not (equal x default))
-
-    [%%ifdef consensus_mechanism]
 
     module Checked = struct
       open Pickles.Impls.Step
@@ -141,8 +103,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
     end
 
     let typ = Snark_params.Tick.Field.typ
-
-    [%%endif]
   end
 
   [%%versioned
@@ -160,6 +120,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let empty : t = (Public_key.Compressed.empty, Digest.default)
 
   let public_key (key, _tid) = key
+
+  let of_public_key (pk : Public_key.t) =
+    create (Public_key.compress pk) Digest.default
 
   let token_id (_key, id) = id
 
@@ -184,11 +147,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
       (Public_key.Compressed.to_input key)
       (Digest.to_input tid)
 
-  [%%ifdef consensus_mechanism]
-
   type var = Public_key.Compressed.var * Digest.Checked.t
 
-  let typ = Snarky_backendless.Typ.(Public_key.Compressed.typ * Digest.typ)
+  let typ = Snark_params.Tick.Typ.(Public_key.Compressed.typ * Digest.typ)
 
   let var_of_t ((key, tid) : t) =
     ( Public_key.Compressed.var_of_t key
@@ -228,8 +189,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
       in
       (pk, tid)
   end
-
-  [%%endif]
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

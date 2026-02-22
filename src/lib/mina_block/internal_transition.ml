@@ -46,17 +46,13 @@ module Stable = struct
 end]
 
 (* bin_io, version omitted *)
-type t = Stable.Latest.t =
+type t =
   { snark_transition : Snark_transition.Value.t
   ; ledger_proof : Ledger_proof.t option
   ; prover_state : Consensus.Data.Prover_state.t
   ; staged_ledger_diff : Staged_ledger_diff.t
   }
-[@@deriving sexp, fields, to_yojson]
+[@@deriving fields]
 
 let create ~snark_transition ~ledger_proof ~prover_state ~staged_ledger_diff =
-  { Stable.Latest.snark_transition
-  ; ledger_proof
-  ; staged_ledger_diff
-  ; prover_state
-  }
+  { snark_transition; ledger_proof; staged_ledger_diff; prover_state }

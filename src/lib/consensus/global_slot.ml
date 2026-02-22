@@ -12,7 +12,7 @@ module Make_sig (A : Wire_types.Types.S) = struct
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
-  module T = Mina_numbers.Global_slot
+  module T = Mina_numbers.Global_slot_since_hard_fork
   module Length = Mina_numbers.Length
 
   module Poly = struct
@@ -59,7 +59,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let create ~(constants : Constants.t) ~(epoch : Epoch.t) ~(slot : Slot.t) : t
       =
-    { slot_number = UInt32.Infix.(slot + (constants.slots_per_epoch * epoch))
+    { slot_number =
+        T.of_uint32 UInt32.Infix.(slot + (constants.slots_per_epoch * epoch))
     ; slots_per_epoch = constants.slots_per_epoch
     }
 
@@ -73,18 +74,24 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let slots_per_epoch { Poly.slots_per_epoch; _ } = slots_per_epoch
 
-  let epoch (t : t) = UInt32.Infix.(t.slot_number / t.slots_per_epoch)
+  let epoch (t : t) =
+    let slot_number_u32 = T.to_uint32 t.slot_number in
+    UInt32.Infix.(slot_number_u32 / t.slots_per_epoch)
 
-  let slot (t : t) = UInt32.Infix.(t.slot_number mod t.slots_per_epoch)
+  let slot (t : t) =
+    let slot_number_u32 = T.to_uint32 t.slot_number in
+    UInt32.Infix.(slot_number_u32 mod t.slots_per_epoch)
 
   let to_epoch_and_slot t = (epoch t, slot t)
 
-  let ( + ) (x : t) n : t =
-    { x with slot_number = T.add x.slot_number (T.of_int n) }
+  let add (t : t) (span : Mina_numbers.Global_slot_span.t) =
+    { t with slot_number = T.add t.slot_number span }
 
-  let ( < ) (t : t) (t' : t) = UInt32.compare t.slot_number t'.slot_number < 0
+  let ( + ) (t : t) n : t = add t (Mina_numbers.Global_slot_span.of_int n)
 
-  let ( - ) (t : t) (t' : t) = T.sub t.slot_number t'.slot_number
+  let ( < ) (t : t) (t' : t) = T.compare t.slot_number t'.slot_number < 0
+
+  let diff_slots (t1 : t) (t2 : t) = T.diff t1.slot_number t2.slot_number
 
   let max (t1 : t) (t2 : t) = if t1 < t2 then t2 else t1
 
@@ -146,7 +153,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       ( Epoch.Checked.Unsafe.of_field (T.Checked.to_field epoch)
       , Slot.Checked.Unsafe.of_field (T.Checked.to_field slot) )
 
-    let sub (t : t) (t' : t) = T.Checked.sub t.slot_number t'.slot_number
+    let diff_slots (t : t) (t' : t) =
+      T.Checked.diff t.slot_number t'.slot_number
   end
 
   module For_tests = struct

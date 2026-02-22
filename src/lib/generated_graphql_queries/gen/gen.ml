@@ -20,8 +20,8 @@ module Zkapp_command_templates = struct
   let internal_send_zkapp =
     sprintf
       {graphql|
-         mutation ($zkapp_command: SendTestZkappInput!) {
-            internalSendZkapp(zkappCommand: $zkapp_command) {
+         mutation ($zkapp_commands: [SendTestZkappInput!]!) {
+            internalSendZkapp(zkappCommands: $zkapp_commands) {
                zkapp { id
                        hash
                        failureReason {

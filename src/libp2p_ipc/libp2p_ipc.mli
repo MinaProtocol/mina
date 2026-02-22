@@ -36,7 +36,7 @@ module Subscription_id : sig
   val create : unit -> t
 end
 
-val undefined_union : context:string -> int -> unit
+val undefined_union : context:string -> int -> 'a
 
 val unsafe_parse_peer_id : peer_id -> Peer.Id.t
 
@@ -80,6 +80,7 @@ val create_gating_config :
   -> trusted_ips:string list
   -> trusted_peers:Builder.PeerId.t list
   -> isolate:bool
+  -> clean_added_peers:bool
   -> gating_config
 
 val create_rpc_request :
@@ -96,6 +97,11 @@ val create_validation_push_message :
 
 val create_add_resource_push_message : tag:int -> data:string -> push_message
 
+val create_download_resource_push_message :
+  tag:int -> ids:string list -> push_message
+
+val create_remove_resource_push_message : ids:string list -> push_message
+
 val create_heartbeat_peer_push_message : peer_id:Peer.Id.t -> push_message
 
 val push_message_to_outgoing_message : push_message -> outgoing_message
@@ -104,4 +110,4 @@ val read_incoming_messages :
      string Strict_pipe.Reader.t
   -> incoming_message Or_error.t Strict_pipe.Reader.t
 
-val write_outgoing_message : Writer.t -> outgoing_message -> unit
+val write_outgoing_message : Writer.t -> outgoing_message -> int

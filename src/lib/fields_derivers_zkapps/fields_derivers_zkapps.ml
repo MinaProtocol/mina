@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 module Field = Snark_params.Tick.Field
 
@@ -189,13 +187,20 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _e = Fields_derivers_js.Js_layout.skip obj in
     Fields_derivers_json.Of_yojson.skip obj
 
-  let js_only js_layout obj : _ Unified_input.t =
+  let js_only (js_layout : _ Fields_derivers_js.Js_layout.Input.t -> 'a) obj :
+      _ Unified_input.t =
     let _a = Graphql.Fields.skip obj in
     let _b = Graphql.Args.skip obj in
     let _c = Fields_derivers_json.To_yojson.skip obj in
     let _d = Fields_derivers_graphql.Graphql_query.skip obj in
-    obj#js_layout := js_layout ;
+    let _e = js_layout obj in
     Fields_derivers_json.Of_yojson.skip obj
+
+  let js_leaf leaf obj =
+    js_only Fields_derivers_js.Js_layout.(of_layout @@ leaf_type leaf) obj
+
+  let js_record entries obj =
+    js_only (Fields_derivers_js.Js_layout.record entries) obj
 
   let int obj : _ Unified_input.t =
     let _a = Graphql.Fields.int obj in
@@ -221,10 +226,22 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _e = Fields_derivers_js.Js_layout.bool obj in
     Fields_derivers_json.Of_yojson.bool obj
 
-  let global_slot obj =
-    iso_string obj ~name:"GlobalSlot" ~js_type:UInt32
-      ~to_string:Unsigned.UInt32.to_string
-      ~of_string:(except ~f:Unsigned.UInt32.of_string `Uint)
+  let global_slot_since_genesis obj =
+    iso_string obj ~name:"GlobalSlotSinceGenesis" ~js_type:UInt32
+      ~to_string:Mina_numbers.Global_slot_since_genesis.to_string
+      ~of_string:
+        (except ~f:Mina_numbers.Global_slot_since_genesis.of_string `Uint)
+
+  let global_slot_since_hard_fork obj =
+    iso_string obj ~name:"GlobalSlotSinceHardFork" ~js_type:UInt32
+      ~to_string:Mina_numbers.Global_slot_since_hard_fork.to_string
+      ~of_string:
+        (except ~f:Mina_numbers.Global_slot_since_hard_fork.of_string `Uint)
+
+  let global_slot_span obj =
+    iso_string obj ~name:"GlobalSlotSpan" ~js_type:UInt32
+      ~to_string:Mina_numbers.Global_slot_span.to_string
+      ~of_string:(except ~f:Mina_numbers.Global_slot_span.of_string `Uint)
 
   let amount obj =
     iso_string obj ~name:"CurrencyAmount" ~js_type:UInt64
@@ -311,9 +328,9 @@ module Make (Schema : Graphql_intf.Schema) = struct
     in
     Fields_derivers_json.Of_yojson.finish ((fun x -> f (`Right x)), acc)
 
-  let with_checked ~checked ~name deriver obj =
-    Fields_derivers_js.Js_layout.with_checked ~name
-      (checked @@ o ())
+  let needs_custom_js ~js_type ~name deriver obj =
+    Fields_derivers_js.Js_layout.needs_custom_js ~name
+      (js_type @@ o ())
       (deriver obj)
 
   let balance_change obj =
@@ -332,14 +349,19 @@ module Make (Schema : Graphql_intf.Schema) = struct
           failwith "impossible"
     in
     let sign_deriver =
-      iso_string ~name:"Sign" ~js_type:(Custom "Sign") ~to_string:sign_to_string
+      iso_string ~name:"Sign" ~js_type:Sign ~to_string:sign_to_string
         ~of_string:sign_of_string
     in
     let ( !. ) = ( !. ) ~t_fields_annots:Currency.Signed_poly.t_fields_annots in
-    Currency.Signed_poly.Fields.make_creator obj ~magnitude:!.amount
-      ~sgn:!.sign_deriver
-    |> finish "BalanceChange"
-         ~t_toplevel_annots:Currency.Signed_poly.t_toplevel_annots
+    let balance_change obj' =
+      Currency.Signed_poly.Fields.make_creator obj' ~magnitude:!.amount
+        ~sgn:!.sign_deriver
+      |> finish "BalanceChange"
+           ~t_toplevel_annots:Currency.Signed_poly.t_toplevel_annots
+    in
+    needs_custom_js
+      ~js_type:(js_leaf (Custom "BalanceChange"))
+      ~name:"BalanceChange" balance_change obj
 
   let to_json obj x = !(obj#to_json) @@ !(obj#contramap) x
 
@@ -520,8 +542,6 @@ module Derivers = Make (Fields_derivers_graphql.Schema)
 include Derivers
 module Js_layout = Fields_derivers_js.Js_layout
 
-[%%ifdef consensus_mechanism]
-
 let proof obj : _ Unified_input.t =
   let of_string s =
     match Pickles.Side_loaded.Proof.of_base64 s with
@@ -530,7 +550,7 @@ let proof obj : _ Unified_input.t =
     | Error _err ->
         raise_invalid_scalar `Proof s
   in
-  iso_string obj ~name:"SnappProof" ~js_type:String
+  iso_string obj ~name:"ZkappProof" ~js_type:String
     ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
 
 let verification_key_with_hash obj =
@@ -553,148 +573,3 @@ let verification_key_with_hash obj =
     ~hash:!.field obj
   |> finish "VerificationKeyWithHash"
        ~t_toplevel_annots:With_hash.Stable.Latest.t_toplevel_annots
-
-let%test_unit "verification key with hash, roundtrip json" =
-  let open Pickles.Side_loaded.Verification_key in
-  (* we do this because the dummy doesn't have a wrap_vk on it *)
-  let data = dummy |> to_base58_check |> of_base58_check_exn in
-  let v = { With_hash.data; hash = Field.one } in
-  let o = verification_key_with_hash @@ o () in
-  [%test_eq: (t, Field.t) With_hash.t] v (of_json o (to_json o v))
-
-[%%endif]
-
-let%test_module "Test" =
-  ( module struct
-    module IO = struct
-      type +'a t = 'a
-
-      let bind t f = f t
-
-      let return t = t
-
-      module Stream = struct
-        type 'a t = 'a Seq.t
-
-        let map t f = Seq.map f t
-
-        let iter t f = Seq.iter f t
-
-        let close _t = ()
-      end
-    end
-
-    module Field_error = struct
-      type t = string
-
-      let message_of_field_error t = t
-
-      let extensions_of_field_error _t = None
-    end
-
-    module Schema = Graphql_schema.Make (IO) (Field_error)
-    module Derivers = Make (Schema)
-    include Derivers
-    module Public_key = Signature_lib.Public_key.Compressed
-
-    module Or_ignore_test = struct
-      type 'a t = Check of 'a | Ignore [@@deriving compare, sexp, equal]
-
-      let of_option = function None -> Ignore | Some x -> Check x
-
-      let to_option = function Ignore -> None | Check x -> Some x
-
-      let to_yojson a x = [%to_yojson: 'a option] a (to_option x)
-
-      let of_yojson a x = Result.map ~f:of_option ([%of_yojson: 'a option] a x)
-
-      let derived inner init =
-        iso ~map:of_option ~contramap:to_option
-          ((option ~js_type:Flagged_option @@ inner @@ o ()) (o ()))
-          init
-    end
-
-    module V = struct
-      type t =
-        { foo : int
-        ; foo1 : Unsigned_extended.UInt64.t
-        ; bar : Unsigned_extended.UInt64.t Or_ignore_test.t
-        ; baz : Unsigned_extended.UInt32.t list
-        }
-      [@@deriving annot, compare, sexp, equal, fields, yojson]
-
-      let v =
-        { foo = 1
-        ; foo1 = Unsigned.UInt64.of_int 10
-        ; bar = Or_ignore_test.Check (Unsigned.UInt64.of_int 10)
-        ; baz = Unsigned.UInt32.[ of_int 11; of_int 12 ]
-        }
-
-      let ( !. ) = ( !. ) ~t_fields_annots
-
-      let derivers obj =
-        Fields.make_creator obj ~foo:!.int ~foo1:!.uint64
-          ~bar:!.(Or_ignore_test.derived uint64)
-          ~baz:!.(list @@ uint32 @@ o ())
-        |> finish "V" ~t_toplevel_annots
-    end
-
-    let v1 = V.derivers @@ o ()
-
-    let%test_unit "full roundtrips" = Test.Loop.run v1 V.v
-
-    module V2 = struct
-      type t = { field : Field.t; nothing : unit [@skip] }
-      [@@deriving annot, compare, sexp, equal, fields]
-
-      let v = { field = Field.of_int 10; nothing = () }
-
-      let derivers obj =
-        let open Derivers in
-        let ( !. ) ?skip_data = ( !. ) ?skip_data ~t_fields_annots in
-        Fields.make_creator obj ~field:!.field
-          ~nothing:(( !. ) ~skip_data:() skip)
-        |> finish "V2" ~t_toplevel_annots
-    end
-
-    let v2 = V2.derivers @@ Derivers.o ()
-
-    let%test_unit "to_json'" =
-      let open Derivers in
-      [%test_eq: string]
-        (Yojson.Safe.to_string (to_json v2 V2.v))
-        {|{"field":"10"}|}
-
-    let%test_unit "roundtrip json'" =
-      let open Derivers in
-      [%test_eq: V2.t] (of_json v2 (to_json v2 V2.v)) V2.v
-
-    module V3 = struct
-      type t = { public_key : Public_key.t }
-      [@@deriving annot, compare, sexp, equal, fields]
-
-      let v =
-        { public_key =
-            Public_key.of_base58_check_exn
-              "B62qoTqMG41DFgkyQmY2Pos1x671Gfzs9k8NKqUdSg7wQasEV6qnXQP"
-        }
-
-      let derivers obj =
-        let open Derivers in
-        let ( !. ) = ( !. ) ~t_fields_annots in
-        Fields.make_creator obj ~public_key:!.public_key
-        |> finish "V3" ~t_toplevel_annots
-    end
-
-    let v3 = V3.derivers @@ Derivers.o ()
-
-    let%test_unit "to_json'" =
-      let open Derivers in
-      [%test_eq: string]
-        (Yojson.Safe.to_string (to_json v3 V3.v))
-        {|{"publicKey":"B62qoTqMG41DFgkyQmY2Pos1x671Gfzs9k8NKqUdSg7wQasEV6qnXQP"}|}
-
-    let%test_unit "roundtrip json'" =
-      let open Derivers in
-      [%test_eq: V3.t] (of_json v3 (to_json v3 V3.v)) V3.v
-  end )

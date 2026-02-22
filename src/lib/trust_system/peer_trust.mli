@@ -52,7 +52,7 @@ module Make (Action : Action_intf) : sig
 
   (** Set up the trust system. Pass the directory to store the trust database
       in. *)
-  val create : string -> t
+  val create : string -> t Deferred.t
 
   (** Get a fake trust system, for tests. *)
   val null : unit -> t

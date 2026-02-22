@@ -12,7 +12,7 @@ else
     genfiles=("${KEYDIR}"*)
     if [ ${#genfiles[@]} -gt 0 ]; then
         ls -l ${KEYDIR}
-        aws s3 sync --acl public-read ${KEYDIR} s3://snark-keys.o1test.net/
+        aws s3 sync --acl public-read ${KEYDIR} s3://snark-keys-ro.o1test.net/
     else
         echo "No build time generated keys found."
     fi

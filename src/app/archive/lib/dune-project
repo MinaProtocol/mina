@@ -1,3 +1,0 @@
-(lang dune 2.7)
-(name graphql_query)
-(implicit_transitive_deps false)

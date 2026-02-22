@@ -1,49 +1,81 @@
-let Prelude = ../../External/Prelude.dhall
-let B = ../../External/Buildkite.dhall
-
 let Cmd = ../../Lib/Cmds.dhall
+
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
-let RunInToolchain = ../../Command/RunInToolchain.dhall
+
 let Size = ../../Command/Size.dhall
-let Libp2p = ../../Command/Libp2pHelperBuild.dhall
-let DockerImage = ../../Command/DockerImage.dhall
-let DebianVersions = ../../Constants/DebianVersions.dhall
-let dirtyWhen = [ 
-  S.strictlyStart (S.contains "src/app/rosetta")
-  , S.strictlyStart (S.contains "buildkite/src/Jobs/Test/RosettaIntegrationTests")
-]
 
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+let Dockers = ../../Constants/DockerVersions.dhall
 
-in
+let Artifacts = ../../Constants/Artifacts.dhall
 
-Pipeline.build
-  Pipeline.Config::
-    { spec =
-      JobSpec::{
-        dirtyWhen = dirtyWhen,
-        path = "Test",
-        name = "RosettaIntegrationTests"
-      }
-    , steps = [
-      Command.build
-        Command.Config::{
-          commands = [
-             Cmd.run ("export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}") ]
-            # RunInToolchain.runInToolchain ([] : List Text) "./buildkite/scripts/build-snarkyjs-bindings.sh"
-            # [
-            Cmd.runInDocker Cmd.Docker::{image="gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}", entrypoint=" --entrypoint buildkite/scripts/rosetta-integration-tests.sh"} "bash"
-          ],
-          label = "Rosetta integration tests Bullseye"
-          , key = "rosetta-integration-tests-bullseye"
-          , target = Size.Small
-          , depends_on = [ { name = "MinaArtifactBullseye", key = "rosetta-bullseye-docker-image" } ]
-          , soft_fail = Some (B/SoftFail.Boolean True)
+let Network = ../../Constants/Network.dhall
+
+let RunWithPostgres = ../../Command/RunWithPostgres.dhall
+
+let network = Network.Type.TestnetGeneric
+
+let dirtyWhen =
+      [ S.strictlyStart (S.contains "src")
+      , S.exactly "buildkite/src/Jobs/Test/RosettaIntegrationTests" "dhall"
+      , S.exactly "buildkite/scripts/tests/rosetta-integration-tests" "sh"
+      , S.exactly "dockerfiles/Dockerfile-mina-rosetta" ""
+      ]
+
+let rosettaDocker =
+      Artifacts.fullDockerTag
+        Artifacts.Tag::{ artifact = Artifacts.Type.Rosetta, network = network }
+
+in  Pipeline.build
+      Pipeline.Config::{
+      , spec = JobSpec::{
+        , dirtyWhen = dirtyWhen
+        , path = "Test"
+        , name = "RosettaIntegrationTests"
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          , PipelineTag.Type.Rosetta
+          ]
         }
-    ]
-  }
+      , steps =
+        [ Command.build
+            Command.Config::{
+            , commands =
+              [ Cmd.run
+                  "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
+              , RunWithPostgres.runInDockerWithPostgresConn
+                  ([] : List Text)
+                  ( Some
+                      ( RunWithPostgres.ScriptOrArchive.Script
+                          "./src/test/archive/sample_db/archive_db.sql"
+                      )
+                  )
+                  rosettaDocker
+                  "./buildkite/scripts/rosetta-indexer-test.sh"
+              , Cmd.runInDocker
+                  Cmd.Docker::{ image = rosettaDocker }
+                  "buildkite/scripts/tests/rosetta-integration-tests.sh"
+              ]
+            , label = "Rosetta integration tests Bullseye"
+            , key = "rosetta-integration-tests-bullseye"
+            , target = Size.Small
+            , artifact_paths = [ S.contains "test_output/artifacts/*" ]
+            , depends_on =
+                Dockers.dependsOn
+                  Dockers.DepsSpec::{
+                  , codename = Dockers.Type.Bullseye
+                  , artifact = Artifacts.Type.Rosetta
+                  , network = network
+                  }
+            }
+        ]
+      }

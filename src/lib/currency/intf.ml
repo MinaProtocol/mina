@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_bits
 open Snark_params.Tick
@@ -10,9 +8,6 @@ module type Basic = sig
   type t [@@deriving sexp, compare, hash, yojson]
 
   type magnitude = t [@@deriving sexp, compare]
-
-  (* not automatically derived *)
-  val dhall_type : Ppx_dhall_type.Dhall_type.t
 
   val max_int : t
 
@@ -66,8 +61,6 @@ module type Basic = sig
 
   val to_nanomina_int : t -> int
 
-  [%%ifdef consensus_mechanism]
-
   type var
 
   val typ : (var, t) Typ.t
@@ -85,8 +78,6 @@ module type Basic = sig
   val equal_var : var -> var -> Boolean.var Checked.t
 
   val pack_var : var -> Field.Var.t
-
-  [%%endif]
 end
 
 module type Arithmetic_intf = sig
@@ -112,19 +103,17 @@ module type Signed_intf = sig
 
   type signed_fee
 
-  [%%ifdef consensus_mechanism]
-
   type magnitude_var
-
-  [%%endif]
 
   type t = (magnitude, Sgn.t) Signed_poly.t
   [@@deriving sexp, hash, compare, equal, yojson]
 
   val gen : t Quickcheck.Generator.t
 
-  val create :
-    magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Signed_poly.t
+  val create : magnitude:magnitude -> sgn:Sgn.t -> t
+
+  (* allows creation of negative 0 *)
+  val create_preserve_zero_sign : magnitude:magnitude -> sgn:Sgn.t -> t
 
   val sgn : t -> Sgn.t
 
@@ -155,8 +144,6 @@ module type Signed_intf = sig
   val to_fee : t -> signed_fee
 
   val of_fee : signed_fee -> t
-
-  [%%ifdef consensus_mechanism]
 
   type var (* = (magnitude_var, Sgn.var) Signed_poly.t *)
 
@@ -203,11 +190,7 @@ module type Signed_intf = sig
 
     type t = var
   end
-
-  [%%endif]
 end
-
-[%%ifdef consensus_mechanism]
 
 module type Checked_arithmetic_intf = sig
   type value
@@ -257,14 +240,10 @@ module type Checked_arithmetic_intf = sig
   val scale : Field.Var.t -> var -> var Checked.t
 end
 
-[%%endif]
-
 module type S = sig
   include Basic
 
   include Arithmetic_intf with type t := t
-
-  [%%ifdef consensus_mechanism]
 
   module Signed :
     Signed_intf with type magnitude := t and type magnitude_var := var
@@ -275,18 +254,10 @@ module type S = sig
        and type signed_var := Signed.var
        and type value := t
 
-  [%%else]
-
-  module Signed : Signed_intf with type magnitude := t
-
-  [%%endif]
-
   val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
 end
 
 module type Full = sig
-  [%%ifdef consensus_mechanism]
-
   open Snark_params.Tick
 
   module Signed_var : sig
@@ -297,8 +268,6 @@ module type Full = sig
       { repr : 'mag repr; mutable value : Field.Var.t option }
   end
 
-  [%%endif]
-
   module Signed_poly = Signed_poly
 
   module Fee : sig
@@ -308,9 +277,6 @@ module type Full = sig
         [@@@with_all_version_tags]
 
         type t [@@deriving sexp, compare, hash, yojson, equal]
-
-        (* not automatically derived *)
-        val dhall_type : Ppx_dhall_type.Dhall_type.t
       end
     end]
 
@@ -321,25 +287,12 @@ module type Full = sig
     include Codable.S with type t := t
 
     (* TODO: Get rid of signed fee, use signed amount *)
-    [%%ifdef consensus_mechanism]
-
     module Signed :
       Signed_intf
         with type magnitude := t
          and type magnitude_var := var
          and type signed_fee := (t, Sgn.t) Signed_poly.t
          and type Checked.signed_fee_var := Field.Var.t Signed_var.t
-
-    [%%else]
-
-    module Signed :
-      Signed_intf
-        with type magnitude := t
-         and type signed_fee := (t, Sgn.t) Signed_poly.t
-
-    [%%endif]
-
-    [%%ifdef consensus_mechanism]
 
     module Checked : sig
       include
@@ -350,8 +303,6 @@ module type Full = sig
 
       val add_signed : var -> Signed.var -> var Checked.t
     end
-
-    [%%endif]
   end
   [@@warning "-32"]
 
@@ -362,9 +313,6 @@ module type Full = sig
         [@@@with_all_version_tags]
 
         type t [@@deriving sexp, compare, hash, equal, yojson]
-
-        (* not automatically derived *)
-        val dhall_type : Ppx_dhall_type.Dhall_type.t
       end
     end]
 
@@ -374,21 +322,12 @@ module type Full = sig
 
     include Codable.S with type t := t
 
-    [%%ifdef consensus_mechanism]
-
     module Signed :
       Signed_intf
         with type magnitude := t
          and type magnitude_var := var
          and type signed_fee := Fee.Signed.t
          and type Checked.signed_fee_var := Fee.Signed.Checked.t
-
-    [%%else]
-
-    module Signed :
-      Signed_intf with type magnitude := t and type signed_fee := Fee.Signed.t
-
-    [%%endif]
 
     (* TODO: Delete these functions *)
 
@@ -399,8 +338,6 @@ module type Full = sig
     val add_fee : t -> Fee.t -> t option
 
     val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
-
-    [%%ifdef consensus_mechanism]
 
     module Checked : sig
       include
@@ -418,12 +355,12 @@ module type Full = sig
 
       val to_fee : var -> Fee.var
 
+      val to_field : var -> Field.Var.t
+
       module Unsafe : sig
         val of_field : Field.Var.t -> t
       end
     end
-
-    [%%endif]
   end
   [@@warning "-32"]
 
@@ -432,9 +369,6 @@ module type Full = sig
     module Stable : sig
       module V1 : sig
         type t [@@deriving sexp, compare, hash, yojson, equal]
-
-        (* not automatically derived *)
-        val dhall_type : Ppx_dhall_type.Dhall_type.t
       end
     end]
 
@@ -456,8 +390,6 @@ module type Full = sig
     val ( + ) : t -> Amount.t -> t option
 
     val ( - ) : t -> Amount.t -> t option
-
-    [%%ifdef consensus_mechanism]
 
     module Checked : sig
       type t = var
@@ -483,6 +415,8 @@ module type Full = sig
 
       val sub_or_zero : var -> var -> var Checked.t
 
+      val sub_amount_or_zero : var -> Amount.var -> var Checked.t
+
       val ( + ) : var -> Amount.var -> var Checked.t
 
       val ( - ) : var -> Amount.var -> var Checked.t
@@ -501,12 +435,12 @@ module type Full = sig
 
       val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
 
+      val to_field : var -> Field.Var.t
+
       module Unsafe : sig
         val of_field : Field.Var.t -> var
       end
     end
-
-    [%%endif]
   end
   [@@warning "-32"]
 

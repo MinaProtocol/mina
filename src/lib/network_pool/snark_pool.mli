@@ -1,4 +1,3 @@
-open Async_kernel
 open Pipe_lib
 open Core_kernel
 
@@ -25,8 +24,9 @@ module type S = sig
   include
     Intf.Network_pool_base_intf
       with type resource_pool := Resource_pool.t
-       and type resource_pool_diff := Resource_pool.Diff.t
-       and type resource_pool_diff_verified := Resource_pool.Diff.verified
+       and type resource_pool_diff :=
+        Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
+       and type resource_pool_diff_verified := Resource_pool.Diff.Cached.t
        and type transition_frontier := transition_frontier
        and type config := Resource_pool.Config.t
        and type transition_frontier_diff :=
@@ -37,20 +37,6 @@ module type S = sig
        t
     -> Transaction_snark_work.Statement.t
     -> Transaction_snark_work.Checked.t option
-
-  val load :
-       ?allow_multiple_instances_for_tests:bool
-    -> config:Resource_pool.Config.t
-    -> logger:Logger.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> consensus_constants:Consensus.Constants.t
-    -> time_controller:Block_time.Controller.t
-    -> frontier_broadcast_pipe:
-         transition_frontier option Broadcast_pipe.Reader.t
-    -> log_gossip_heard:bool
-    -> on_remote_push:(unit -> unit Deferred.t)
-    -> unit
-    -> (t * Remote_sink.t * Local_sink.t) Deferred.t
 end
 
 module type Transition_frontier_intf = sig
@@ -74,6 +60,10 @@ module type Transition_frontier_intf = sig
        t
     -> Transition_frontier.Extensions.Snark_pool_refcount.view
        Pipe_lib.Broadcast_pipe.Reader.t
+
+  val work_is_referenced : t -> Transaction_snark_work.Statement.t -> bool
+
+  val best_tip_table : t -> Transaction_snark_work.Statement.Set.t
 end
 
 module Make
@@ -91,14 +81,22 @@ include S with type transition_frontier := Transition_frontier.t
 module Diff_versioned : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V2 : sig
-      type t = Resource_pool.Diff.t =
+      type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
         | Add_solved_work of
             Transaction_snark_work.Statement.Stable.V2.t
             * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
-      [@@deriving compare, sexp, hash]
+      [@@deriving equal]
     end
   end]
+
+  type t = Resource_pool.Diff.Cached.t =
+    | Add_solved_work of
+        Transaction_snark_work.Statement.t
+        * Ledger_proof.Cached.t One_or_two.t Priced_proof.t
+    | Empty
 end

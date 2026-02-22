@@ -47,22 +47,27 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
   else Deferred.return ()
 
 let engines : engine list =
-  [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S)) ]
+  [ ("local", (module Integration_test_local_engine : Intf.Engine.S)) ]
 
 let tests : test list =
-  [ ( "peers-reliability"
-    , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
+  [ ( "block-prod-prio"
+    , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
+  ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
   ; ( "chain-reliability"
     , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
-  ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
-  ; ("delegation", (module Delegation_test.Make : Intf.Test.Functor_intf))
+  ; ("epoch-ledger", (module Epoch_ledger.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
+  ; ("post-hard-fork", (module Post_hard_fork.Make : Intf.Test.Functor_intf))
   ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
+  ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
+  ; ( "peers-reliability"
+    , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
+  ; ("slot-end", (module Slot_end_test.Make : Intf.Test.Functor_intf))
+  ; ( "verification-key"
+    , (module Verification_key_update.Make : Intf.Test.Functor_intf) )
   ; ("zkapps", (module Zkapps.Make : Intf.Test.Functor_intf))
   ; ("zkapps-timing", (module Zkapps_timing.Make : Intf.Test.Functor_intf))
-  ; ( "opt-block-prod"
-    , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
-  ; ("snarkyjs", (module Snarkyjs.Make : Intf.Test.Functor_intf))
+  ; ("zkapps-nonce", (module Zkapps_nonce_test.Make : Intf.Test.Functor_intf))
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
@@ -70,15 +75,16 @@ let report_test_errors ~log_error_set ~internal_error_set =
   let open Test_error in
   let open Test_error.Set in
   let color_eprintf color =
-    Printf.ksprintf (fun s -> Print.eprintf "%s%s%s" color s Bash_colors.none)
+    Printf.ksprintf (fun s ->
+        Print.eprintf "%s%s%s" color s Mina_stdlib.Bash_colors.none )
   in
   let color_of_severity = function
     | `None ->
-        Bash_colors.green
+        Mina_stdlib.Bash_colors.green
     | `Soft ->
-        Bash_colors.yellow
+        Mina_stdlib.Bash_colors.yellow
     | `Hard ->
-        Bash_colors.red
+        Mina_stdlib.Bash_colors.red
   in
   let category_prefix_of_severity = function
     | `None ->
@@ -122,7 +128,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
       (color_of_severity log_errors_severity)
       "=== Log %ss ===\n" log_type ;
     Error_accumulator.iter_contexts log_errors ~f:(fun node_id log_errors ->
-        color_eprintf Bash_colors.light_magenta "    %s:\n" node_id ;
+        color_eprintf Mina_stdlib.Bash_colors.light_magenta "    %s:\n" node_id ;
         List.iter log_errors ~f:(fun (severity, { error_message; _ }) ->
             color_eprintf
               (color_of_severity severity)
@@ -146,7 +152,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
       | `Hard ->
           report_log_errors "Error" ) ;
       (* report contextualized internal errors *)
-      color_eprintf Bash_colors.magenta "=== Test Results ===\n" ;
+      color_eprintf Mina_stdlib.Bash_colors.magenta "=== Test Results ===\n" ;
       Error_accumulator.iter_contexts internal_errors ~f:(fun context errors ->
           print_category_header
             (max_severity_of_list (List.map errors ~f:fst))
@@ -177,7 +183,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
       Print.eprintf "\n" ;
       let exit_code =
         if test_failed then (
-          color_eprintf Bash_colors.red
+          color_eprintf Mina_stdlib.Bash_colors.red
             "The test has failed. See the above errors for details.\n\n" ;
           match (internal_error_set.exit_code, log_error_set.exit_code) with
           | None, None ->
@@ -185,14 +191,15 @@ let report_test_errors ~log_error_set ~internal_error_set =
           | Some exit_code, _ | None, Some exit_code ->
               Some exit_code )
         else (
-          color_eprintf Bash_colors.green
+          color_eprintf Mina_stdlib.Bash_colors.green
             "The test has completed successfully.\n\n" ;
           None )
       in
       let%bind () = Writer.(flushed (Lazy.force stderr)) in
       return exit_code
 
-(* TODO: refactor cleanup system (smells like a monad for composing linear resources would help a lot) *)
+(* TODO: refactor cleanup system (smells like a monad for composing linear
+   resources would help a lot) *)
 
 let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
     ~log_engine_cleanup_func ~lift_accumulated_errors_func ~net_manager_ref
@@ -260,20 +267,21 @@ let main inputs =
    *   Exec.execute ~logger ~engine_cli_inputs ~images (module Test (Engine))
    *)
   let logger = Logger.create () in
+  let constants = Test_config.default_constants in
   let images =
     { Test_config.Container_images.mina = inputs.mina_image
     ; archive_node =
         Option.value inputs.archive_image ~default:"archive_image_unused"
     ; user_agent = "codaprotocol/coda-user-agent:0.1.5"
-    ; bots = "minaprotocol/mina-bots:latest"
     ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in
-  let%bind () = validate_inputs ~logger inputs T.config in
+  let test_config = T.config ~constants in
+  let%bind () = validate_inputs ~logger inputs test_config in
   [%log trace] "expanding network config" ;
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
-      ~debug:inputs.debug ~test_config:T.config ~images
+      ~debug:inputs.debug ~constants ~images ~test_config
   in
   (* resources which require additional cleanup at end of test *)
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
@@ -360,13 +368,32 @@ let main inputs =
         [%log info] "Starting the daemons within the pods" ;
         let start_print (node : Engine.Network.Node.t) =
           let open Malleable_error.Let_syntax in
-          [%log info] "starting %s ..." (Engine.Network.Node.id node) ;
+          [%log info] "starting %s ..." (Engine.Network.Node.infra_id node) ;
           let%bind res = Engine.Network.Node.start ~fresh_state:false node in
-          [%log info] "%s started" (Engine.Network.Node.id node) ;
+          [%log info] "%s started" (Engine.Network.Node.infra_id node) ;
           Malleable_error.return res
         in
-        let seed_nodes = network |> Engine.Network.seeds in
-        let non_seed_pods = network |> Engine.Network.all_non_seed_pods in
+        let seed_nodes =
+          network |> Engine.Network.seeds |> Core.String.Map.data
+        in
+        let non_seed_pods =
+          network |> Engine.Network.all_non_seed_nodes |> Core.String.Map.data
+        in
+        let _offline_node_event_subscription =
+          (* Monitor for offline nodes; abort the test if a node goes down
+             unexpectedly.
+          *)
+          Dsl.Event_router.on (Dsl.event_router dsl) Node_offline
+            ~f:(fun offline_node () ->
+              let node_name = Engine.Network.Node.infra_id offline_node in
+              [%log info] "Detected node offline $node"
+                ~metadata:[ ("node", `String node_name) ] ;
+              if Engine.Network.Node.should_be_running offline_node then (
+                [%log fatal] "Offline $node is required for this test"
+                  ~metadata:[ ("node", `String node_name) ] ;
+                failwith "Aborted because of required offline node" ) ;
+              Async_kernel.Deferred.return `Continue )
+        in
         (* TODO: parallelize (requires accumlative hard errors) *)
         let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
         let%bind () =
@@ -374,8 +401,17 @@ let main inputs =
         in
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "Daemons started" ;
+        let archive_nodes =
+          Engine.Network.archive_nodes network |> Core.String.Map.data
+        in
+        let%bind () =
+          Malleable_error.List.iter archive_nodes ~f:(fun archive_node ->
+              let node_id = Engine.Network.Node.id archive_node in
+              Engine.Network.Node.tail_mina_logs_to_file ~logger archive_node
+                ~log_file:(sprintf "%s-%s.local.test.log" test_name node_id) )
+        in
         [%log trace] "executing test" ;
-        T.run network dsl )
+        T.run ~config:test_config network dsl )
   in
   let exit_reason, test_result =
     match monitor_test_result with
@@ -431,7 +467,7 @@ let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
 let engine_cmd ((engine_name, (module Engine)) : engine) =
   let info =
-    let doc = "Run mina integration test(s) on remote cloud provider." in
+    let doc = "Run mina integration test(s) on engine." in
     Term.info engine_name ~doc ~exits:Term.default_exits
   in
   let test_inputs_with_cli_inputs_arg =
@@ -462,7 +498,8 @@ let default_cmd =
   let info = Term.info "test_executive" ~doc ~exits:Term.default_error_exits in
   (help_term, info)
 
-(* TODO: move required args to positions instead of flags, or provide reasonable defaults to make them optional *)
+(* TODO: move required args to positions instead of flags, or provide reasonable
+   defaults to make them optional *)
 let () =
   let engine_cmds = List.map engines ~f:engine_cmd in
   Term.(exit @@ eval_choice default_cmd (engine_cmds @ [ help_cmd ]))

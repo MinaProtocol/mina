@@ -7,6 +7,25 @@ let rec sexp_to_yojson (sexp : Sexp.t) : Yojson.Safe.t =
   | List sexps ->
       `List (List.map ~f:sexp_to_yojson sexps)
 
+let sexp_record_to_yojson (sexp : Sexp.t) : Yojson.Safe.t =
+  let fail () =
+    failwith
+      (Printf.sprintf
+         "sexp_record_to_yojson called on an s-expression with a non-record \
+          structure %s"
+         (Sexp.to_string_hum sexp) )
+  in
+  match sexp with
+  | List fields ->
+      `Assoc
+        (List.map fields ~f:(function
+          | List [ Atom label; value ] ->
+              (label, sexp_to_yojson value)
+          | _ ->
+              fail () ) )
+  | _ ->
+      fail ()
+
 let rec sexp_of_yojson (json : Yojson.Safe.t) : (Sexp.t, string) Result.t =
   match json with
   | `String str ->
@@ -162,6 +181,6 @@ let info_to_yojson (info : Info.t) : Yojson.Safe.t =
 let error_to_yojson (err : Error.t) : Yojson.Safe.t =
   match info_to_yojson (err :> Info.t) with
   | `Assoc assocs ->
-      `Assoc (("commit_id", `String Mina_version.commit_id) :: assocs)
+      `Assoc assocs
   | json ->
-      `Assoc [ ("commit_id", `String Mina_version.commit_id); ("error", json) ]
+      `Assoc [ ("error", json) ]

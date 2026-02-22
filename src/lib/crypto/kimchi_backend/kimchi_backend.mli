@@ -11,8 +11,6 @@ module Kimchi_backend_common : sig
 
       val sexp_of_t : t -> Sexplib0.Sexp.t
 
-      val compare : t -> t -> int
-
       val bin_size_t : t Bin_prot.Size.sizer
 
       val bin_write_t : t Bin_prot.Write.writer
@@ -34,7 +32,9 @@ module Kimchi_backend_common : sig
 
       val hash : t -> Ppx_hash_lib.Std.Hash.hash_value
 
-      module Bigint : Kimchi_backend_common__.Bigint.Intf
+      val to_hex_string : t -> string
+
+      module Bigint : Kimchi_pasta_snarky_backend__.Bigint.Intf
 
       val to_bigint : t -> Bigint.t
 
@@ -55,6 +55,8 @@ module Kimchi_backend_common : sig
       val square : t -> t
 
       val is_square : t -> bool
+
+      val compare : t -> t -> int
 
       val equal : t -> t -> bool
 
@@ -164,17 +166,20 @@ module Pasta : sig
 
     val field_size : Pasta_bindings.BigInt256.t
 
+    module Cvar = Kimchi_pasta.Pallas_based_plonk.Cvar
     module Verification_key = Kimchi_pasta.Pallas_based_plonk.Verification_key
 
     module R1CS_constraint_system =
       Kimchi_pasta.Pallas_based_plonk.R1CS_constraint_system
 
+    module Constraint = Kimchi_pasta.Pallas_based_plonk.Constraint
     module Rounds_vector = Kimchi_pasta.Pallas_based_plonk.Rounds_vector
     module Rounds = Kimchi_pasta.Pallas_based_plonk.Rounds
     module Keypair = Kimchi_pasta.Pallas_based_plonk.Keypair
     module Proof = Kimchi_pasta.Pallas_based_plonk.Proof
     module Proving_key = Kimchi_pasta.Pallas_based_plonk.Proving_key
     module Oracles = Kimchi_pasta.Pallas_based_plonk.Oracles
+    module Run_state = Kimchi_pasta.Pallas_based_plonk.Run_state
   end
 
   (* module Pasta = Kimchi_pasta.Pasta *)
@@ -186,8 +191,6 @@ module Pasta : sig
     module Pallas = Kimchi_pasta.Pasta.Pallas
   end
 
-  module Precomputed = Kimchi_pasta.Precomputed
-
   (* pickles required *)
   module Vesta_based_plonk : sig
     (* all pickles required *)
@@ -197,14 +200,17 @@ module Pasta : sig
 
     val field_size : Pasta_bindings.BigInt256.t
 
+    module Cvar = Kimchi_pasta.Vesta_based_plonk.Cvar
     module Verification_key = Kimchi_pasta.Vesta_based_plonk.Verification_key
     module R1CS_constraint_system =
       Kimchi_pasta.Vesta_based_plonk.R1CS_constraint_system
+    module Constraint = Kimchi_pasta.Vesta_based_plonk.Constraint
     module Rounds_vector = Kimchi_pasta.Vesta_based_plonk.Rounds_vector
     module Rounds = Kimchi_pasta.Vesta_based_plonk.Rounds
     module Keypair = Kimchi_pasta.Vesta_based_plonk.Keypair
     module Proof = Kimchi_pasta.Vesta_based_plonk.Proof
     module Proving_key = Kimchi_pasta.Vesta_based_plonk.Proving_key
     module Oracles = Kimchi_pasta.Vesta_based_plonk.Oracles
+    module Run_state = Kimchi_pasta.Vesta_based_plonk.Run_state
   end
 end

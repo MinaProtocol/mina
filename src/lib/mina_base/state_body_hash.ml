@@ -31,4 +31,4 @@ module Stable = struct
   end
 end]
 
-type _unused = unit constraint t = Stable.Latest.t
+let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T

@@ -8,39 +8,42 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
 
   type dsl = Dsl.t
 
-  let block_producer_balance = "1000" (* 1_000_000_000_000 *)
-
-  let config =
-    let n = 3 in
+  let config ~constants =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
+    ; genesis_ledger =
+        (let open Test_account in
+        [ create ~account_name:"node-a-key" ~balance:"1000" ()
+        ; create ~account_name:"node-b-key" ~balance:"1000" ()
+        ])
     ; block_producers =
-        List.init n ~f:(fun _ ->
-            { Wallet.balance = block_producer_balance; timing = Untimed } )
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ]
     }
 
-  let run network t =
+  let run ~config:_ network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     [%log info] "gossip_consistency test: starting..." ;
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Network.all_nodes network))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data (Network.all_mina_nodes network)) )
     in
     [%log info] "gossip_consistency test: done waiting for initializations" ;
-    let receiver_bp = Caml.List.nth (Network.block_producers network) 0 in
+    let receiver_bp = Network.block_producer_exn network "node-a" in
     let%bind receiver_pub_key = pub_key_of_node receiver_bp in
-    let sender_bp =
-      Core_kernel.List.nth_exn (Network.block_producers network) 1
-    in
+    let sender_bp = Network.block_producer_exn network "node-b" in
     let%bind sender_pub_key = pub_key_of_node sender_bp in
     let num_payments = 3 in
     let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in

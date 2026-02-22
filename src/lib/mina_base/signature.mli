@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params.Tick
 
@@ -15,13 +13,11 @@ module Stable : sig
   end
 end]
 
+val gen : t Quickcheck.Generator.t
+
 include Codable.S with type t := t
 
-[%%ifdef consensus_mechanism]
-
 type var = Field.Var.t * Inner_curve.Scalar.var
-
-[%%endif]
 
 include Codable.Base58_check_intf with type t := t
 

@@ -1,21 +1,35 @@
 open Core_kernel
 open Mina_base
 
-[%%import "/src/config.mlh"]
-
 module T = struct
   include Blake2.Make ()
 end
 
 include T
 
+(* Base58Check functions for original mainnet transaction hashes *)
+module V1_base58_check = Codable.Make_base58_check (struct
+  (* top tag needed for compatibility *)
+  type t = Stable.Latest.With_top_version_tag.t [@@deriving bin_io_unversioned]
+
+  let version_byte = Base58_check.Version_bytes.v1_transaction_hash
+
+  let description = "V1 Transaction hash"
+end)
+
+let to_base58_check_v1 = V1_base58_check.to_base58_check
+
+let of_base58_check_v1 = V1_base58_check.of_base58_check
+
+let of_base58_check_exn_v1 = V1_base58_check.of_base58_check_exn
+
+(* Base58Check functions for current hard fork *)
 module Base58_check = Codable.Make_base58_check (struct
-  (* for legacy compatibility *)
-  include Stable.Latest.With_top_version_tag
+  type t = Stable.Latest.t [@@deriving bin_io_unversioned]
 
   let version_byte = Base58_check.Version_bytes.transaction_hash
 
-  let description = "Transaction Hash"
+  let description = "Transaction hash"
 end)
 
 [%%define_locally
@@ -31,45 +45,73 @@ let of_yojson = function
   | _ ->
       Error "Transaction_hash.of_yojson: Expected a string"
 
-let hash_signed_command, hash_zkapp_command =
-  let mk_hasher (type a) (module M : Bin_prot.Binable.S with type t = a)
-      (cmd : a) =
-    cmd |> Binable.to_string (module M) |> digest_string
-  in
-  let signed_cmd_hasher = mk_hasher (module Signed_command.Stable.Latest) in
-  let zkapp_cmd_hasher = mk_hasher (module Zkapp_command.Stable.Latest) in
-  (* replace actual signatures, proofs with dummies for hashing, so we can
-     reproduce the transaction hashes if signatures, proofs omitted in
-     archive db
-  *)
-  let hash_signed_command (cmd : Signed_command.t) =
-    let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
-    signed_cmd_hasher cmd_dummy_signature
-  in
-  let hash_zkapp_command (cmd : Zkapp_command.t) =
-    let cmd_dummy_signatures_and_proofs =
-      { cmd with
-        fee_payer = { cmd.fee_payer with authorization = Signature.dummy }
-      ; account_updates =
-          Zkapp_command.Call_forest.map cmd.account_updates
-            ~f:(fun (acct_update : Account_update.t) ->
-              let dummy_auth =
-                match acct_update.authorization with
-                | Control.Proof _ ->
-                    Control.Proof Proof.transaction_dummy
-                | Control.Signature _ ->
-                    Control.Signature Signature.dummy
-                | Control.None_given ->
-                    Control.None_given
-              in
-              { acct_update with authorization = dummy_auth } )
-      }
-    in
-    zkapp_cmd_hasher cmd_dummy_signatures_and_proofs
-  in
-  (hash_signed_command, hash_zkapp_command)
+let mk_hasher (type a) (module M : Bin_prot.Binable.S with type t = a) (cmd : a)
+    =
+  cmd |> Binable.to_string (module M) |> digest_string
 
-[%%ifdef consensus_mechanism]
+let signed_cmd_hasher_v1 =
+  mk_hasher
+    ( module struct
+      include Signed_command.Stable.V1
+    end )
+
+let signed_cmd_hasher = mk_hasher (module Signed_command.Stable.Latest)
+
+let zkapp_cmd_hasher = mk_hasher (module Zkapp_command.Stable.Latest)
+
+(* replace actual signatures, proofs with dummies for hashing, so we can
+   reproduce the transaction hashes if signatures, proofs omitted in
+   archive db
+*)
+let hash_signed_command_v1 (cmd : Signed_command.Stable.V1.t) =
+  let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
+  signed_cmd_hasher_v1 cmd_dummy_signature
+
+let hash_signed_command (cmd : Signed_command.t) =
+  let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
+  signed_cmd_hasher cmd_dummy_signature
+
+let hash_zkapp_command (type p aux)
+    ({ fee_payer; account_updates; memo } :
+      ( ( Account_update.Body.t
+        , (p, Signature.t) Control.Poly.t
+        , aux )
+        Account_update.Poly.t
+      , unit
+      , unit )
+      Zkapp_command.with_forest ) =
+  let cmd_dummy_signatures_and_proofs =
+    { Zkapp_command.Poly.memo
+    ; fee_payer = { fee_payer with authorization = Signature.dummy }
+    ; account_updates =
+        Zkapp_command.Call_forest.map account_updates
+          ~f:(fun (acct_update : (_, _, _) Account_update.Poly.t) ->
+            let dummy_auth =
+              match acct_update.authorization with
+              | Control.Poly.Proof _ ->
+                  Control.Poly.Proof (Lazy.force Proof.transaction_dummy)
+              | Control.Poly.Signature _ ->
+                  Control.Poly.Signature Signature.dummy
+              | Control.Poly.None_given ->
+                  Control.Poly.None_given
+            in
+            Account_update.forget_aux
+              { acct_update with authorization = dummy_auth } )
+    }
+  in
+  zkapp_cmd_hasher cmd_dummy_signatures_and_proofs
+
+(* no signatures to replace for internal commands *)
+let hash_coinbase = mk_hasher (module Mina_base.Coinbase.Stable.Latest)
+
+let hash_fee_transfer = mk_hasher (module Fee_transfer.Single.Stable.Latest)
+
+let hash_zkapp_command_with_hashes
+    ({ account_updates; _ } as cmd : (_, _, _) Zkapp_command.with_forest) =
+  hash_zkapp_command
+    { cmd with
+      account_updates = Zkapp_command.Call_forest.forget_hashes account_updates
+    }
 
 let hash_command cmd =
   match cmd with
@@ -78,19 +120,14 @@ let hash_command cmd =
   | User_command.Zkapp_command p ->
       hash_zkapp_command p
 
+let hash_command_with_hashes cmd =
+  match cmd with
+  | User_command.Signed_command s ->
+      hash_signed_command s
+  | User_command.Zkapp_command p ->
+      hash_zkapp_command_with_hashes p
+
 let hash_signed_command_v2 = hash_signed_command
-
-let hash_signed_command_v1 (cmd : Signed_command.t_v1) =
-  let b58 = Signed_command.Base58_check_v1.to_base58_check cmd in
-  digest_string b58
-
-let hash_zkapp_command_v1 = hash_zkapp_command
-
-let hash_fee_transfer fee_transfer =
-  fee_transfer |> Fee_transfer.Single.to_base58_check |> digest_string
-
-let hash_coinbase coinbase =
-  coinbase |> Coinbase.to_base58_check |> digest_string
 
 let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
   (* A transaction id might be:
@@ -101,8 +138,8 @@ let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
      For the Base64 case, the Bin_prot serialization leads with a version tag
   *)
   match Signed_command.of_base58_check_exn_v1 transaction_id with
-  | Ok cmd_legacy ->
-      Ok (hash_signed_command_v1 cmd_legacy)
+  | Ok cmd_v1 ->
+      Ok (hash_signed_command_v1 cmd_v1)
   | Error _ -> (
       match Base64.decode transaction_id with
       | Ok s -> (
@@ -115,8 +152,8 @@ let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
           | 1 -> (
               (* must be a zkApp command *)
               try
-                let cmd = Zkapp_command.Stable.V1.bin_read_t ~pos_ref buf in
-                Ok (hash_zkapp_command_v1 cmd)
+                let cmd = Zkapp_command.Stable.Latest.bin_read_t ~pos_ref buf in
+                Ok (hash_zkapp_command cmd)
               with _ ->
                 Or_error.error_string
                   "Could not decode serialized zkApp command (version 1)" )
@@ -139,43 +176,43 @@ let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
             "Could not decode transaction id as either Base58Check or Base64" )
 
 module User_command_with_valid_signature = struct
-  type hash = T.t [@@deriving sexp, compare, hash]
+  type hash = T.t [@@deriving equal, sexp, compare, hash]
 
   let hash_to_yojson = to_yojson
 
   let hash_of_yojson = of_yojson
 
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        ( (User_command.Valid.Stable.V2.t[@hash.ignore])
-        , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
-        With_hash.Stable.V1.t
-      [@@deriving sexp, hash, to_yojson]
+  type t = (User_command.Valid.t, hash) With_hash.t
+  [@@deriving sexp_of, to_yojson]
 
-      let to_latest = Fn.id
-
-      (* Compare only on hashes, comparing on the data too would be slower and
-         add no value.
-      *)
-      let compare (x : t) (y : t) = T.compare x.hash y.hash
-    end
-  end]
+  let equal ({ hash = h1; _ } : t) ({ hash = h2; _ } : t) = T.equal h1 h2
 
   let create (c : User_command.Valid.t) : t =
-    { data = c; hash = hash_command (User_command.forget_check c) }
+    { data = c
+    ; hash =
+        hash_command
+          (User_command.read_all_proofs_from_disk @@ User_command.forget_check c)
+    }
 
   let data ({ data; _ } : t) = data
 
   let command ({ data; _ } : t) = User_command.forget_check data
 
-  let hash ({ hash; _ } : t) = hash
+  let transaction_hash ({ hash; _ } : t) = hash
 
   let forget_check ({ data; hash } : t) =
     { With_hash.data = User_command.forget_check data; hash }
 
-  include Comparable.Make (Stable.Latest)
+  module Set = struct
+    type el = t
+
+    module Generic_set = With_hash.Set (T)
+    include Generic_set
+
+    type nonrec t = User_command.Valid.t Generic_set.t
+
+    let sexp_of_t = Generic_set.sexp_of_t User_command.Valid.sexp_of_t
+  end
 
   let make data hash : t = { data; hash }
 end
@@ -205,7 +242,8 @@ module User_command = struct
     end
   end]
 
-  let create (c : User_command.t) : t = { data = c; hash = hash_command c }
+  let create (c : User_command.Stable.Latest.t) : t =
+    { data = c; hash = hash_command c }
 
   let data ({ data; _ } : t) = data
 
@@ -214,52 +252,104 @@ module User_command = struct
   let hash ({ hash; _ } : t) = hash
 
   let of_checked ({ data; hash } : User_command_with_valid_signature.t) : t =
-    { With_hash.data = User_command.forget_check data; hash }
+    { With_hash.data =
+        User_command.(read_all_proofs_from_disk @@ forget_check data)
+    ; hash
+    }
 
   include Comparable.Make (Stable.Latest)
 end
 
-let%test "signed command v1 hash from transaction id" =
-  let transaction_id =
-    "BD421DxjdoLimeUh4RA4FEvHdDn6bfxyMVWiWUwbYzQkqhNUv8B5M4gCSREpu9mVueBYoHYWkwB8BMf6iS2jjV8FffvPGkuNeczBfY7YRwLuUGBRCQJ3ktFBrNuu4abqgkYhXmcS2xyzoSGxHbXkJRAokTwjQ9HP6TLSeXz9qa92nJaTeccMnkoZBmEitsZWWnTCMqDc6rhN4Z9UMpg4wzdPMwNJvLRuJBD14Dd5pR84KBoY9rrnv66rHPc4m2hH9QSEt4aEJC76BQ446pHN9ZLmyhrk28f5xZdBmYxp3hV13fJEJ3Gv1XqJMBqFxRhzCVGoKDbLAaNRb5F1u1WxTzJu5n4cMMDEYydGEpNirY2PKQqHkR8gEqjXRTkpZzP8G19qT"
-  in
-  (* N.B.: this is the old-style hash, computed by digesting the Base58Check serialization *)
-  let expected_hash = "CkpZUiKxdNnT53v5LAxnsohbLc9xabe6HcsQUtFsVVAQZB2pdNUjc" in
-  let hash =
-    match hash_of_transaction_id transaction_id with
-    | Ok hash ->
-        to_base58_check hash
-    | Error err ->
-        failwithf "Error getting hash: %s" (Error.to_string_hum err) ()
-  in
-  String.equal hash expected_hash
+let%test_module "Transaction hashes" =
+  ( module struct
+    let new_zkapp_txn =
+      let txn = Lazy.force (Zkapp_command.dummy ~signature_kind:Testnet) in
+      { txn with
+        account_updates =
+          Zkapp_command.Call_forest.forget_hashes
+          @@ Zkapp_command.Call_forest.map txn.account_updates ~f:(fun x ->
+                 { (Account_update.forget_aux x) with
+                   Account_update.Poly.authorization =
+                     Mina_base.Control.Poly.Proof
+                       (Lazy.force Proof.blockchain_dummy)
+                 } )
+      }
 
-let%test "signed command v2 hash from transaction id" =
-  let transaction_id =
-    "Av0BlDV3VklWpVXVRQr7cidImXn8E9nqCAxPjuyUNZ2pu3pJJxkBAP//IgAgpNU5narWobUpPXWnrzjilYnd9C6DVcafO/ZLc3vdrMgAVklWpVXVRQr7cidImXn8E9nqCAxPjuyUNZ2pu3pJJxkBFeE3d36c7ThjtioG6XUJjkISr2jfgpa99wHwhZ6neSQB/rQkVklWpVXVRQr7cidImXn8E9nqCAxPjuyUNZ2pu3pJJxkBAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
-  in
-  let expected_hash = "CkpZcAHDStkSGLD8Whb4vjk4qMrf79TL8gKUT3sC8PUHpKmV8mpMx" in
-  let hash =
-    match hash_of_transaction_id transaction_id with
-    | Ok hash ->
-        to_base58_check hash
-    | Error err ->
-        failwithf "Error getting hash: %s" (Error.to_string_hum err) ()
-  in
-  String.equal hash expected_hash
+    let new_zkapp_transaction_id () =
+      Binable.to_string
+        (module Mina_base.User_command.Stable.Latest)
+        (Zkapp_command new_zkapp_txn)
+      |> Base64.encode_exn
 
-let%test "zkApp v1 hash from transaction id" =
-  let transaction_id =
-    "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"
-  in
-  let expected_hash = "CkpZsMJKBPUigtJp9An9iHA5dXtpug3cb4asYd7DHJu2orBQA2nSP" in
-  let hash =
-    match hash_of_transaction_id transaction_id with
-    | Ok hash ->
-        to_base58_check hash
-    | Error err ->
-        failwithf "Error getting hash: %s" (Error.to_string_hum err) ()
-  in
-  String.equal hash expected_hash
+    let new_zkapp_txn_hash () =
+      hash_command (Zkapp_command new_zkapp_txn) |> to_base58_check
 
-[%%endif]
+    let run_test ?regenerate_zkapp ~transaction_id ~expected_hash () =
+      let hash =
+        match hash_of_transaction_id transaction_id with
+        | Ok hash ->
+            to_base58_check hash
+        | Error err ->
+            (* Generate a new transaction_id and hash if the transaction_id fails to hash *)
+            if
+              Option.is_some regenerate_zkapp
+              && Option.value_exn regenerate_zkapp
+            then (
+              Printf.printf "\nThere was an error hashing the transaction.\n" ;
+              Printf.printf
+                "If the encoding has changed you can update the values:\n" ;
+              Printf.printf "Transaction ID:\n%s\n\n"
+                (new_zkapp_transaction_id ()) ;
+              Printf.printf "Expected hash:\n%s\n" (new_zkapp_txn_hash ()) ) ;
+            failwithf "Error getting hash: %s\n" (Error.to_string_hum err) ()
+      in
+      String.equal hash expected_hash
+
+    let%test "decode, recode v1 hashes" =
+      let v1_hashes =
+        [ "CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa"
+        ; "CkpZB4WE3wDRJ4CqCXqS4dqF8hoRQDVK8banePKUgTR6kvhTfyjRp"
+        ; "CkpYeG32dVJUjs6iq3oroXWitXar1eBtV3GVFyH5agw7HPp9bG4yQ"
+        ]
+      in
+      let decoded = List.map v1_hashes ~f:of_base58_check_exn_v1 in
+      let recoded = List.map decoded ~f:to_base58_check_v1 in
+      List.equal String.equal v1_hashes recoded
+
+    let%test "signed command v1 hash from transaction id" =
+      let transaction_id =
+        "BD421DxjdoLimeUh4RA4FEvHdDn6bfxyMVWiWUwbYzQkqhNUv8B5M4gCSREpu9mVueBYoHYWkwB8BMf6iS2jjV8FffvPGkuNeczBfY7YRwLuUGBRCQJ3ktFBrNuu4abqgkYhXmcS2xyzoSGxHbXkJRAokTwjQ9HP6TLSeXz9qa92nJaTeccMnkoZBmEitsZWWnTCMqDc6rhN4Z9UMpg4wzdPMwNJvLRuJBD14Dd5pR84KBoY9rrnv66rHPc4m2hH9QSEt4aEJC76BQ446pHN9ZLmyhrk28f5xZdBmYxp3hV13fJEJ3Gv1XqJMBqFxRhzCVGoKDbLAaNRb5F1u1WxTzJu5n4cMMDEYydGEpNirY2PKQqHkR8gEqjXRTkpZzP8G19qT"
+      in
+      let expected_hash =
+        "5JuV53FPXad1QLC46z7wsou9JjjYP87qaUeryscZqLUMmLSg8j2n"
+      in
+      run_test ~transaction_id ~expected_hash ()
+
+    let%test "signed command v2 hash from transaction id" =
+      let transaction_id =
+        "Av0IlDV3VklWpVXVRQr7cidImXn8E9nqCAxPjuyUNZ2pu3pJJxkBAAD//yIAIKTVOZ2q1qG1KT11p6844pWJ3fQug1XGnzv2S3N73azIABXhN3d+nO04Y7YqBul1CY5CEq9o34KWvfcB8IWep3kkAf60JFZJVqVV1UUK+3InSJl5/BPZ6ggMT47slDWdqbt6SScZAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      in
+      let expected_hash =
+        "5JvBt4173K3t7gQSpFoMGtbtZuYWPSg29cWad5pnnRd9BnAowoqY"
+      in
+      run_test ~transaction_id ~expected_hash ()
+
+    (* To regenerate: use the values provided in the error message *)
+    let%test "zkApp v1 hash from transaction id" =
+      let transaction_id =
+        "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"
+      in
+      let expected_hash =
+        "5JtWZqwvKEgSMSHbDhYXg6s76GhfBNscQtxLKXnT6YYTsUKQkcpV"
+      in
+      run_test ~regenerate_zkapp:true ~transaction_id ~expected_hash ()
+
+    let%test "Hash fresh zkapp transaction" =
+      match hash_of_transaction_id (new_zkapp_transaction_id ()) with
+      | Ok _ ->
+          true
+          (* there's no point checking the hash is the same if it's freshly generated *)
+      | Error err ->
+          failwithf "Error hashing new transaction: %s\n"
+            (Error.to_string_hum err) ()
+  end )

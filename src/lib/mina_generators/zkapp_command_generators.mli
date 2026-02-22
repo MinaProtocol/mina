@@ -1,6 +1,13 @@
 open Mina_base
 open Core_kernel
 
+type balance_change_range_t =
+  { min_balance_change : Currency.Amount.t
+  ; max_balance_change : Currency.Amount.t
+  ; min_new_zkapp_balance : Currency.Amount.t
+  ; max_new_zkapp_balance : Currency.Amount.t
+  }
+
 type failure =
   | Invalid_account_precondition
   | Invalid_protocol_state_precondition
@@ -13,6 +20,7 @@ type failure =
       | `Token_symbol
       | `Send
       | `Receive ]
+[@@deriving yojson]
 
 type role =
   [ `Fee_payer | `New_account | `Ordinary_participant | `New_token_account ]
@@ -23,6 +31,9 @@ val max_token_updates : int
 
 val gen_account_precondition_from_account :
      ?failure:failure
+  -> ?ignore_sequence_events_precond:bool
+  -> ?no_account_precondition:bool
+  -> ?is_nonce_precondition:bool
   -> first_use_of_account:bool
   -> Account.t
   -> Account_update.Account_precondition.t Quickcheck.Generator.t
@@ -43,9 +54,20 @@ val gen_protocol_state_precondition :
     Generated zkapp_command uses dummy signatures and dummy proofs.
   *)
 val gen_zkapp_command_from :
-     ?failure:failure
+     ?global_slot:Mina_numbers.Global_slot_since_genesis.t
+  -> ?memo:string
+  -> ?no_account_precondition:bool
+  -> ?fee_range:Currency.Fee.t * Currency.Fee.t
+  -> ?balance_change_range:balance_change_range_t
+  -> ?ignore_sequence_events_precond:bool
+  -> ?no_token_accounts:bool
+  -> ?limited:bool
+  -> ?generate_new_accounts:bool
+  -> ?failure:failure
   -> ?max_account_updates:int
   -> ?max_token_updates:int
+  -> ?map_account_update:
+       (Account_update.Stable.Latest.t -> Account_update.Stable.Latest.t)
   -> fee_payer_keypair:Signature_lib.Keypair.t
   -> keymap:
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t
@@ -53,13 +75,17 @@ val gen_zkapp_command_from :
   -> ledger:Mina_ledger.Ledger.t
   -> ?protocol_state_view:Zkapp_precondition.Protocol_state.View.t
   -> ?vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
+  -> ?available_public_keys:Signature_lib.Public_key.Compressed.Hash_set.t
+  -> genesis_constants:Genesis_constants.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> unit
   -> Zkapp_command.t Quickcheck.Generator.t
 
 (** Generate a list of zkapp_command, `fee_payer_keypairs` contains a list of possible fee payers
   *)
 val gen_list_of_zkapp_command_from :
-     ?failure:failure
+     ?global_slot:Mina_numbers.Global_slot_since_genesis.t
+  -> ?failure:failure
   -> ?max_account_updates:int
   -> ?max_token_updates:int
   -> fee_payer_keypairs:Signature_lib.Keypair.t list
@@ -70,5 +96,18 @@ val gen_list_of_zkapp_command_from :
   -> ?protocol_state_view:Zkapp_precondition.Protocol_state.View.t
   -> ?vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
   -> ?length:int
+  -> genesis_constants:Genesis_constants.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> unit
   -> Zkapp_command.t list Quickcheck.Generator.t
+
+(** Generate a zkapp command with max cost *)
+val gen_max_cost_zkapp_command_from :
+     ?memo:string
+  -> ?fee_range:Currency.Fee.t * Currency.Fee.t
+  -> fee_payer_keypair:Signature_lib.Keypair.t
+  -> account_state_tbl:(Account.t * role) Account_id.Table.t
+  -> vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
+  -> genesis_constants:Genesis_constants.t
+  -> unit
+  -> Zkapp_command.t Quickcheck.Generator.t
