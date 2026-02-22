@@ -32,36 +32,40 @@ type feature_config =
   | Only_enabled of Kimchi_types.feature_flag list
 
 let feature_flag_name : Kimchi_types.feature_flag -> string = function
-  | RangeCheck0 -> "RangeCheck0"
-  | RangeCheck1 -> "RangeCheck1"
-  | ForeignFieldAdd -> "ForeignFieldAdd"
-  | ForeignFieldMul -> "ForeignFieldMul"
-  | Xor -> "Xor"
-  | Rot -> "Rot"
-  | LookupTables -> "LookupTables"
-  | RuntimeLookupTables -> "RuntimeLookupTables"
-  | LookupPattern _ -> "LookupPattern"
-  | TableWidth n -> Printf.sprintf "TableWidth(%d)" n
-  | LookupsPerRow n -> Printf.sprintf "LookupsPerRow(%d)" n
-
-let feature_config_name = function
-  | All_disabled -> "all disabled"
-  | All_enabled -> "all enabled"
-  | Only_enabled flags ->
-      Printf.sprintf "only [%s]"
-        (List.map flags ~f:feature_flag_name |> String.concat ~sep:", ")
+  | RangeCheck0 ->
+      "RangeCheck0"
+  | RangeCheck1 ->
+      "RangeCheck1"
+  | ForeignFieldAdd ->
+      "ForeignFieldAdd"
+  | ForeignFieldMul ->
+      "ForeignFieldMul"
+  | Xor ->
+      "Xor"
+  | Rot ->
+      "Rot"
+  | LookupTables ->
+      "LookupTables"
+  | RuntimeLookupTables ->
+      "RuntimeLookupTables"
+  | LookupPattern _ ->
+      "LookupPattern"
+  | TableWidth n ->
+      Printf.sprintf "TableWidth(%d)" n
+  | LookupsPerRow n ->
+      Printf.sprintf "LookupsPerRow(%d)" n
 
 let is_feature_enabled config flag =
   match config with
-  | All_disabled -> false
-  | All_enabled -> true
+  | All_disabled ->
+      false
+  | All_enabled ->
+      true
   | Only_enabled flags ->
       List.exists flags ~f:(fun f ->
-          String.equal (feature_flag_name f) (feature_flag_name flag))
+          String.equal (feature_flag_name f) (feature_flag_name flag) )
 
-let make_env
-    (type f)
-    (module F : Field_ops with type t = f)
+let make_env (type f) (module F : Field_ops with type t = f)
     ~(feature_config : feature_config) : f Plonk_checks.Scalars.Env.t =
   let pow (x, n) =
     let rec go acc = function 0 -> acc | i -> go (F.mul acc x) (i - 1) in
@@ -84,7 +88,7 @@ let make_env
   ; zeta_to_srs_length = lazy (F.random ())
   ; var =
       (fun key ->
-        Hashtbl.find_or_add var_tbl key ~default:(fun () -> F.random ()))
+        Hashtbl.find_or_add var_tbl key ~default:(fun () -> F.random ()) )
   ; field = field_of_hex (module F)
   ; cell = Fn.id
   ; alpha_pow =
@@ -93,7 +97,7 @@ let make_env
   ; endo_coefficient = F.random ()
   ; mds =
       (fun key ->
-        Hashtbl.find_or_add mds_tbl key ~default:(fun () -> F.random ()))
+        Hashtbl.find_or_add mds_tbl key ~default:(fun () -> F.random ()) )
   ; srs_length_log2 = 16
   ; vanishes_on_zero_knowledge_and_previous_rows = F.random ()
   ; joint_combiner = F.random ()
@@ -101,31 +105,12 @@ let make_env
   ; gamma = F.random ()
   ; unnormalized_lagrange_basis =
       (fun key ->
-        Hashtbl.find_or_add lagrange_tbl key ~default:(fun () -> F.random ()))
+        Hashtbl.find_or_add lagrange_tbl key ~default:(fun () -> F.random ()) )
   ; if_feature =
       (fun (flag, if_true, if_false) ->
         if is_feature_enabled feature_config flag then if_true ()
-        else if_false ())
+        else if_false () )
   }
-
-let test_equivalence
-    (type f)
-    (module F : Field_ops with type t = f)
-    ~name
-    ~(original : f Plonk_checks.Scalars.Env.t -> f)
-    ~(interpreter : f Plonk_checks.Scalars.Env.t -> f)
-    ~feature_config =
-  let env = make_env (module F) ~feature_config in
-  let result_original = original env in
-  let result_interpreter = interpreter env in
-  if F.equal result_original result_interpreter then (
-    Printf.printf "  PASS: %s (%s)\n%!" name (feature_config_name feature_config) ;
-    true)
-  else (
-    Printf.printf "  FAIL: %s (%s)\n%!" name (feature_config_name feature_config) ;
-    Printf.printf "    original:    %s\n%!" (F.to_string result_original) ;
-    Printf.printf "    interpreter: %s\n%!" (F.to_string result_interpreter) ;
-    false)
 
 (* All feature flags that appear in the Tick linearization *)
 let tick_flags : Kimchi_types.feature_flag list =
@@ -138,72 +123,72 @@ let tick_flags : Kimchi_types.feature_flag list =
   ; LookupTables
   ]
 
+(* All 2^n - 2 strict subsets of a list (non-empty, not the full list) *)
+let strict_subsets xs =
+  let n = List.length xs in
+  List.init
+    ((1 lsl n) - 2)
+    ~f:(fun i ->
+      let mask = i + 1 in
+      List.filteri xs ~f:(fun j _ -> mask land (1 lsl j) <> 0) )
+
+let random_flag_subset_generator =
+  Quickcheck.Generator.of_list (strict_subsets tick_flags)
+
+let check_equivalence (type f) (module F : Field_ops with type t = f)
+    ~(original : f Plonk_checks.Scalars.Env.t -> f)
+    ~(interpreter : f Plonk_checks.Scalars.Env.t -> f) ~feature_config () =
+  Quickcheck.test ~trials:10 Unit.quickcheck_generator ~f:(fun () ->
+      let env = make_env (module F) ~feature_config in
+      let result_original = original env in
+      let result_interpreter = interpreter env in
+      if not (F.equal result_original result_interpreter) then
+        Alcotest.failf "original: %s, interpreter: %s"
+          (F.to_string result_original)
+          (F.to_string result_interpreter) )
+
+let tick_test feature_config =
+  check_equivalence
+    (module Kimchi_pasta.Pasta.Fp)
+    ~original:Plonk_checks.Scalars.Tick.constant_term
+    ~interpreter:Plonk_checks.Scalars_tokens_interpreter.Tick.constant_term
+    ~feature_config
+
+let tock_test feature_config =
+  check_equivalence
+    (module Kimchi_pasta.Pasta.Fq)
+    ~original:Plonk_checks.Scalars.Tock.constant_term
+    ~interpreter:Plonk_checks.Scalars_tokens_interpreter.Tock.constant_term
+    ~feature_config
+
+let test_random_subsets () =
+  Quickcheck.test ~trials:20 random_flag_subset_generator ~f:(fun flags ->
+      let config = Only_enabled flags in
+      let env_tick =
+        make_env (module Kimchi_pasta.Pasta.Fp) ~feature_config:config
+      in
+      let orig_tick = Plonk_checks.Scalars.Tick.constant_term env_tick in
+      let interp_tick =
+        Plonk_checks.Scalars_tokens_interpreter.Tick.constant_term env_tick
+      in
+      if not (Kimchi_pasta.Pasta.Fp.equal orig_tick interp_tick) then
+        Alcotest.failf
+          "Tick mismatch with flags [%s]: original=%s interpreter=%s"
+          (List.map flags ~f:feature_flag_name |> String.concat ~sep:", ")
+          (Kimchi_pasta.Pasta.Fp.to_string orig_tick)
+          (Kimchi_pasta.Pasta.Fp.to_string interp_tick) )
+
 let () =
-  Printf.printf
-    "Equivalence test: Scalars vs Scalars_tokens_interpreter\n\n%!" ;
-  let all_pass = ref true in
-  (* Test 1: Features disabled (10 rounds) *)
-  Printf.printf "=== All features disabled ===\n%!" ;
-  for round = 1 to 10 do
-    Printf.printf "Round %d:\n%!" round ;
-    if
-      not
-        (test_equivalence
-           (module Kimchi_pasta.Pasta.Fp)
-           ~name:"Tick" ~feature_config:All_disabled
-           ~original:Plonk_checks.Scalars.Tick.constant_term
-           ~interpreter:
-             Plonk_checks.Scalars_tokens_interpreter.Tick.constant_term)
-    then all_pass := false ;
-    if
-      not
-        (test_equivalence
-           (module Kimchi_pasta.Pasta.Fq)
-           ~name:"Tock" ~feature_config:All_disabled
-           ~original:Plonk_checks.Scalars.Tock.constant_term
-           ~interpreter:
-             Plonk_checks.Scalars_tokens_interpreter.Tock.constant_term)
-    then all_pass := false
-  done ;
-  (* Test 2: Individual features enabled *)
-  Printf.printf "\n=== Individual features ===\n%!" ;
-  List.iter tick_flags ~f:(fun flag ->
-      let config = Only_enabled [ flag ] in
-      Printf.printf "Testing with %s:\n%!" (feature_config_name config) ;
-      if
-        not
-          (test_equivalence
-             (module Kimchi_pasta.Pasta.Fp)
-             ~name:"Tick" ~feature_config:config
-             ~original:Plonk_checks.Scalars.Tick.constant_term
-             ~interpreter:
-               Plonk_checks.Scalars_tokens_interpreter.Tick.constant_term)
-      then all_pass := false) ;
-  (* Test 3: All features enabled *)
-  Printf.printf "\n=== All features enabled ===\n%!" ;
-  for round = 1 to 10 do
-    Printf.printf "Round %d:\n%!" round ;
-    if
-      not
-        (test_equivalence
-           (module Kimchi_pasta.Pasta.Fp)
-           ~name:"Tick" ~feature_config:All_enabled
-           ~original:Plonk_checks.Scalars.Tick.constant_term
-           ~interpreter:
-             Plonk_checks.Scalars_tokens_interpreter.Tick.constant_term)
-    then all_pass := false ;
-    if
-      not
-        (test_equivalence
-           (module Kimchi_pasta.Pasta.Fq)
-           ~name:"Tock" ~feature_config:All_enabled
-           ~original:Plonk_checks.Scalars.Tock.constant_term
-           ~interpreter:
-             Plonk_checks.Scalars_tokens_interpreter.Tock.constant_term)
-    then all_pass := false
-  done ;
-  if !all_pass then
-    Printf.printf "\nAll equivalence tests passed!\n%!"
-  else (
-    Printf.printf "\nSome tests FAILED!\n%!" ;
-    exit 1)
+  let open Alcotest in
+  run "Scalars equivalence"
+    [ ( "All features disabled"
+      , [ test_case "Tick" `Quick (tick_test All_disabled)
+        ; test_case "Tock" `Quick (tock_test All_disabled)
+        ] )
+    ; ( "Random feature subsets (Tick)"
+      , [ test_case "random subsets" `Quick test_random_subsets ] )
+    ; ( "All features enabled"
+      , [ test_case "Tick" `Quick (tick_test All_enabled)
+        ; test_case "Tock" `Quick (tock_test All_enabled)
+        ] )
+    ]

@@ -49,7 +49,10 @@ let evaluate (tokens : ST.polish_token array) (env : 'a Scalars.Env.t) : 'a =
       (state : 'a eval_state) (token : ST.polish_token) : 'a eval_state =
     match token with
     | ST.Constant term -> push (eval_constant term) (advance state)
-    (* Challenges — peephole: Challenge Alpha + Pow n → alpha_pow n *)
+    (* Peephole: Challenge Alpha is always followed by Pow n in the
+       generated token streams (Rust's to_polish only emits Alpha as
+       part of Expr::Pow(alpha, n)). The fallback to alpha_pow 1 is
+       defensive and never fires in practice. *)
     | ST.Challenge ST.Alpha ->
         if state.pos + 1 < tok_len then (
           match toks.(state.pos + 1) with

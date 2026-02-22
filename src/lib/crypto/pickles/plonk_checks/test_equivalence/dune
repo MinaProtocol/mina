@@ -5,6 +5,7 @@
   -open
   Core_kernel)
  (libraries
+  alcotest
   core_kernel
   kimchi_pasta
   kimchi_pasta.basic
