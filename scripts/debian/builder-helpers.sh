@@ -637,7 +637,7 @@ build_daemon_mesa_deb() {
 
   create_control_file "mina-mesa" "${SHARED_DEPS}${DAEMON_DEPS}, mina-mesa-config (>=${MINA_DEB_VERSION})" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}" "mina-mesa (<< ${MINA_DEB_VERSION})"
-   
+
   copy_common_daemon_apps testnet
 
   copy_common_daemon_utils 'o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'

@@ -263,7 +263,6 @@ in  { Type = Artifact
     , Tag = Tag
     , capitalName = capitalName
     , lowerName = lowerName
-    , toDebianName = toDebianName
     , toDebianNames = toDebianNames
     , dockerName = dockerName
     , dockerNames = dockerNames
