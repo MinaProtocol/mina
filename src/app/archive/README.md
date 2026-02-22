@@ -69,7 +69,7 @@ Compilation
 To compile the Archive, use the following command:
 
 ```shell
-$ make build_archive
+$ make build-archive
 ```
 
 This will build the archive executable in the _build directory. For mainnet signatures, use:
