@@ -34,3 +34,13 @@
   (progn
    (run %{<} %{target})
    (run ocamlformat -i scalars.ml))))
+
+(rule
+ (target scalars_tokens.ml)
+ (mode promote)
+ (deps
+  (:< gen_scalars_tokens/gen_scalars_tokens.exe))
+ (action
+  (progn
+   (run %{<} %{target})
+   (run ocamlformat -i scalars_tokens.ml))))
