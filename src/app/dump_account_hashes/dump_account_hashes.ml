@@ -2,6 +2,30 @@
 
 open Core_kernel
 
+let input_to_json input =
+  let field_elements_json =
+    `List
+      ( Array.to_list input.Random_oracle_input.Chunked.field_elements
+      |> List.map ~f:(fun field ->
+             `String (Snark_params.Tick.Field.to_string field) ) )
+  in
+
+  let packeds_json =
+    `List
+      ( Array.to_list input.packeds
+      |> List.map ~f:(fun (field, bits) ->
+             `List
+               [ `String (Snark_params.Tick.Field.to_string field); `Int bits ] )
+      )
+  in
+  `Assoc [ ("fieldElements", field_elements_json); ("packeds", packeds_json) ]
+
+let packed_input_to_json input_packed =
+  `List
+    ( Array.to_list input_packed
+    |> List.map ~f:(fun field ->
+           `String (Snark_params.Tick.Field.to_string field) ) )
+
 let () =
   (* Get the default zkapp account digest *)
   let default_zkapp_digest =
@@ -16,9 +40,16 @@ let () =
     Lazy.force Mina_base.Zkapp_account.zkapp_uri_non_preimage_hash
   in
 
-  let default_account_input = Mina_base.Zkapp_account.(to_input default) in
+  let default_account_input = Mina_base.Account.(to_input empty) in
   let default_account_input_packed =
     Random_oracle.pack_input default_account_input
+  in
+
+  let default_zkapp_account_input =
+    Mina_base.Zkapp_account.(to_input default)
+  in
+  let default_zkapp_account_input_packed =
+    Random_oracle.pack_input default_zkapp_account_input
   in
 
   let empty_zkapp_uri_hash_string =
@@ -33,30 +64,6 @@ let () =
     Snark_params.Tick.Field.to_string zkapp_uri_non_preimage
   in
 
-  (* Extract and format the default account input components *)
-  let field_elements_json =
-    `List
-      ( Array.to_list default_account_input.field_elements
-      |> List.map ~f:(fun field ->
-             `String (Snark_params.Tick.Field.to_string field) ) )
-  in
-
-  let packeds_json =
-    `List
-      ( Array.to_list default_account_input.packeds
-      |> List.map ~f:(fun (field, bits) ->
-             `List
-               [ `String (Snark_params.Tick.Field.to_string field); `Int bits ] )
-      )
-  in
-
-  let packed_input_json =
-    `List
-      ( Array.to_list default_account_input_packed
-      |> List.map ~f:(fun field ->
-             `String (Snark_params.Tick.Field.to_string field) ) )
-  in
-
   (* Create JSON object with the hashes *)
   let json =
     `Assoc
@@ -65,12 +72,13 @@ let () =
       ; ( "zkapp_uri_non_preimage_hash"
         , `String zkapp_uri_non_preimage_hash_string )
       ; ("empty_zkapp_uri_hash", `String empty_zkapp_uri_hash_string)
-      ; ( "default_account_input"
-        , `Assoc
-            [ ("fieldElements", field_elements_json)
-            ; ("packeds", packeds_json)
-            ] )
-      ; ("default_account_input_packed", packed_input_json)
+      ; ( "default_zkapp_account_input"
+        , input_to_json default_zkapp_account_input )
+      ; ( "default_zkapp_account_input_packed"
+        , packed_input_to_json default_zkapp_account_input_packed )
+      ; ("default_account_input", input_to_json default_account_input)
+      ; ( "default_account_input_packed"
+        , packed_input_to_json default_account_input_packed )
       ]
   in
 
