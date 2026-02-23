@@ -1928,7 +1928,8 @@ function persist(){
 
             local __cn
             __cn=$(basename "$__codename_dir")
-            local __remote_target="$(storage_root "$__backend")/$__target/debians/$__cn/"
+            local __remote_target
+            __remote_target="$(storage_root "$__backend")/$__target/debians/$__cn/"
 
             for __deb_file in "$__codename_dir"*.deb; do
                 if [[ ! -f "$__deb_file" ]]; then
