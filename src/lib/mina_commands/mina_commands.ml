@@ -206,27 +206,6 @@ module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
      Receipt.Chain_hash.cons_zkapp_command_commitment fee_payer_index elt parent_hash *)
 end)
 
-let chain_id_inputs (t : Mina_lib.t) : Chain_id.Inputs.t =
-  (* these are the inputs to Blake2.digest_string in Mina.chain_id *)
-  let config = Mina_lib.config t in
-  let precomputed_values = config.precomputed_values in
-  let genesis_state_hash =
-    (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
-  in
-  let genesis_constants = precomputed_values.genesis_constants in
-  let protocol_version = Protocol_version.current in
-  let protocol_transaction_version =
-    Protocol_version.transaction protocol_version
-  in
-  let protocol_network_version = Protocol_version.network protocol_version in
-  { Chain_id.Inputs.genesis_state_hash
-  ; genesis_constants
-  ; constraint_system_digests =
-      Lazy.force precomputed_values.constraint_system_digests
-  ; protocol_transaction_version
-  ; protocol_network_version
-  }
-
 let verify_payment t (addr : Account_id.t)
     (verifying_txn : User_command.Stable.Latest.t) (init_receipt, proof) =
   let open Participating_state.Let_syntax in
