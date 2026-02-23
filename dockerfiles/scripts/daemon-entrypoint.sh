@@ -95,6 +95,12 @@ if [[ ${VERBOSE} ]]; then
   tail -n 5 ".mina-config/mina-best-tip.log" | jq -rc '.metadata.added_transitions[0] | {state_hash: .state_hash, height: '${CONSENSUS_STATE}'.blockchain_length, slot: '${CONSENSUS_STATE}'.global_slot_since_genesis}'
 fi
 
-sleep 15 # to allow all mina proccesses to quit, cleanup, and finish logging
+# Sleep to allow all mina proccesses to quit, cleanup, and finish logging. This
+# is necessary because the daemon does not wait for its children to shut down;
+# it relies on them noticing the daemon has shut down to initiate their own
+# shutdown. Though not ideal, it does work, but it does also mean that the
+# daemon exiting is not a reliable indication that all the mina processes have
+# stopped.
+sleep 5
 
 exit ${MINA_EXIT_CODE}
