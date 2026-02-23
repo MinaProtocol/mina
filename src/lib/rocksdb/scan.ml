@@ -1,5 +1,4 @@
 open Core
-open Async
 
 module Hex_util = struct
   (* Converts Bigstring to hex string *)
@@ -22,48 +21,40 @@ module Hex_util = struct
 end
 
 let dump ~db_path ~text_file () =
-  let db = Database.create db_path in
-  let kv_pairs = Database.to_alist db in
-  let%bind writer = Writer.open_file text_file in
-  List.iter kv_pairs ~f:(fun (k, v) ->
-      Writer.writef writer "%s : %s\n" (Hex_util.to_hex k) (Hex_util.to_hex v) ) ;
-  let%bind () = Writer.close writer in
-  Database.close db ;
-  printf "Dump complete: %s\n" text_file ;
-  Writer.flushed (Lazy.force Writer.stdout)
+  Out_channel.with_file text_file ~f:(fun oc ->
+      let db = Database.create db_path in
+      Exn.protect
+        ~f:(fun () ->
+          let kv_pairs = Database.to_alist db in
+          List.iter kv_pairs ~f:(fun (k, v) ->
+              Printf.fprintf oc "%s : %s\n" (Hex_util.to_hex k)
+                (Hex_util.to_hex v) ) ;
+          Out_channel.flush oc ;
+          printf "Dump complete: %s\n" text_file )
+        ~finally:(fun () -> Database.close db) )
 
 let restore ~db_path ~text_file () =
-  let db = Database.create db_path in
-  let%bind reader = Reader.open_file text_file in
-  let kv_of_line line =
-    Scanf.sscanf line "%s : %s" (fun k_hex v_hex ->
-        let key = Hex_util.of_hex k_hex in
-        let data = Hex_util.of_hex v_hex in
-        (key, data) )
-  in
-  let chunk_size = 256 in
-  let buffer = Queue.create ~capacity:chunk_size () in
-  let process_batch () =
-    Database.set_batch db ?remove_keys:None
-      ~key_data_pairs:(Queue.to_list buffer) ;
-    Queue.clear buffer
-  in
-  Monitor.protect
-    (fun () ->
-      let%bind () =
-        Reader.lines reader
-        |> Pipe.iter_without_pushback ~f:(fun line ->
-               try
-                 let kv = kv_of_line line in
-                 Queue.enqueue buffer kv ;
-                 if Queue.length buffer >= chunk_size then process_batch ()
-               with e ->
-                 failwithf "Can't parse data line `%s` in dump file: %s" line
-                   (Exn.to_string e) () )
+  In_channel.with_file text_file ~f:(fun ic ->
+      let db = Database.create db_path in
+      let chunk_size = 256 in
+      let buffer = ref [] in
+      let process_batch () =
+        if not (List.is_empty !buffer) then (
+          Database.set_batch db ?remove_keys:None ~key_data_pairs:!buffer ;
+          buffer := [] )
       in
-      if not (Queue.is_empty buffer) then process_batch () ;
-      printf "Restore complete: %s\n" db_path ;
-      Writer.flushed (Lazy.force Writer.stdout) )
-    ~finally:(fun () ->
-      let%map () = Reader.close reader in
-      Database.close db )
+      Exn.protect
+        ~f:(fun () ->
+          In_channel.iter_lines ic ~f:(fun line ->
+              try
+                Scanf.sscanf line "%s : %s" (fun k_hex v_hex ->
+                    let key = Hex_util.of_hex k_hex in
+                    let data = Hex_util.of_hex v_hex in
+                    buffer := (key, data) :: !buffer ) ;
+                if List.length !buffer >= chunk_size then process_batch ()
+              with e ->
+                failwithf "Can't parse data line `%s` in dump file: %s" line
+                  (Exn.to_string e) () ) ;
+          process_batch () ;
+          printf "Restore complete: %s\n%!" db_path )
+        ~finally:(fun () -> Database.close db) )

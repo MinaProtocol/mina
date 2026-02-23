@@ -1,8 +1,7 @@
 open Core
-open Async
 
 let dump_cmd =
-  Command.async ~summary:"Scan RocksDB and dump KV pairs as hex"
+  Command.basic ~summary:"Scan RocksDB and dump KV pairs as hex"
     (let%map_open.Command db_path =
        flag "--db-path" (required string) ~doc:"PATH to source RocksDB"
      and output_file =
@@ -11,7 +10,7 @@ let dump_cmd =
      Rocksdb.Scan.dump ~db_path ~text_file:output_file )
 
 let restore_cmd =
-  Command.async ~summary:"Restore RocksDB from a hex-encoded file"
+  Command.basic ~summary:"Restore RocksDB from a hex-encoded file"
     (let%map_open.Command input_file =
        flag "--input-file" (required string) ~doc:"PATH to hex dump"
      and db_path =
