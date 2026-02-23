@@ -1,0 +1,12 @@
+(tests
+ (names test_chain_id)
+ (libraries
+  ;; opam libraries
+  alcotest
+  ;; local libraries
+  chain_id
+  precomputed_values)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane)))
