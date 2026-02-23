@@ -19,6 +19,7 @@
 (package (name bowe_gabizon_hash))
 (package (name cache_dir))
 (package (name cache_lib))
+(package (name chain_id))
 (package (name child_processes))
 (package (name cli))
 (package (name cli_lib))
