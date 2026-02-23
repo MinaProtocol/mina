@@ -1490,7 +1490,7 @@ struct
 
   module Plonk_checks = struct
     include Plonk_checks
-    include Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
+    include Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars_tokens_interpreter.Tock)
   end
 
   (** Generate constraints to finalize deferred values from a step proof.
