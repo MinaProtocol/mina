@@ -7,7 +7,7 @@ FROM opam-deps AS toolchain
 ARG DOCKER_VERSION=28.3.1
 ARG DEBS3_VERSION=0.11.7
 ARG INFLUXDB_CLI_VERSION=2.7.5
-ARG SHELLCHECK_VERSION=0.10.0
+ARG SHELLCHECK_VERSION=0.11.0
 ARG HADOLINT_VERSION=2.12.0
 ARG GCLOUD_VERSION=476.0.0
 ARG TARGETPLATFORM
@@ -97,7 +97,7 @@ RUN curl -sL https://github.com/hadolint/hadolint/releases/download/v$HADOLINT_V
     && chmod +x /usr/bin/hadolint
 
 # --- Shellcheck
-RUN curl -sL https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHECK_VERSION/shellcheck-v$SHELLCHECK_VERSION.linux.${DEBIAN_ARCH}.tar.xz \
+RUN curl -sL https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHECK_VERSION/shellcheck-v$SHELLCHECK_VERSION.linux.${CANONICAL_ARCH}.tar.xz \
     | tar --extract --file=- --xz --strip-components=1 --directory=/usr/bin shellcheck-v$SHELLCHECK_VERSION/shellcheck
 
 USER opam
