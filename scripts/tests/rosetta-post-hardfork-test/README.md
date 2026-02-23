@@ -14,9 +14,7 @@ Validates Mina's [Rosetta API](https://docs.cdp.coinbase.com/mesh/docs/welcome/)
 
 ## Obtaining the Funded Account Key
 
-The prefunded block-producer keys are stored in **GCP Secret Manager**. The secret names correspond to variables defined in the gitops values file:
-
-<https://github.com/o1-labs/gitops-infrastructure/blob/mesa-migration/platform/o1labs-hetzner-networks/mina-standard-pre-mesa-auto/values/values.yaml.gotmpl#L432>
+The prefunded block-producer keys are stored in **GCP Secret Manager**. The secret names correspond to variables defined in the gitops values file for the target network (check the relevant branch and environment in the [gitops-infrastructure](https://github.com/o1-labs/gitops-infrastructure) repo).
 
 Substitute the variable to find the matching secret name, then download it:
 
@@ -56,13 +54,7 @@ This outputs a 64-character hex string to pass as the `-k` argument.
 
 ## Rosetta Endpoint
 
-The Rosetta API is exposed on port **3087** of the Rosetta container. For the pre-mesa hardfork testing network the public URL is:
-
-```
-https://rosetta.hetzner-pre-mesa-1.gcp.o1test.net
-```
-
-(This forwards to port 3087 on the container.)
+The Rosetta API is exposed on port **3087** of the Rosetta container. Use the public Rosetta URL for the target hardfork testing network (e.g. `https://rosetta.<network-name>.gcp.o1test.net`). Check the gitops infrastructure for the current endpoint.
 
 ## Usage
 
@@ -90,7 +82,7 @@ https://rosetta.hetzner-pre-mesa-1.gcp.o1test.net
 ```bash
 ./runner.sh \
   -n mainnet \
-  -o https://rosetta.hetzner-pre-mesa-1.gcp.o1test.net \
+  -o https://rosetta.<network-name>.gcp.o1test.net \
   -k abc123def456... \
   -a B62qkUHaJUHERZuCHQhXCQ8xsGBqyYSgjQsKnKN5HhSJecakuJ4pYyk
 ```
