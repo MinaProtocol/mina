@@ -4,8 +4,20 @@ open Mina_base
 
 module Location : Merkle_ledger.Location_intf.S
 
+module Mask_maps :
+  Merkle_mask.Mask_maps_intf.S
+    with type account := Account.t
+     and type account_id := Account_id.t
+     and type 'a account_id_map := 'a Account_id.Map.t
+     and type account_id_set := Account_id.Set.t
+     and type 'a address_map := 'a Location.Addr.Map.t
+     and type hash := Ledger_hash.t
+     and type location := Location.t
+     and type 'a location_map := 'a Location.Map.t
+     and type 'a token_id_map := 'a Token_id.Map.t
+
 module Db :
-  Merkle_ledger.Database_intf.S
+  Merkle_ledger.Intf.Ledger.DATABASE
     with module Location = Location
     with module Addr = Location.Addr
     with type root_hash := Ledger_hash.t
@@ -17,8 +29,34 @@ module Db :
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
 
+module Unstable_db :
+  Merkle_ledger.Intf.Ledger.DATABASE
+    with module Location = Location
+    with module Addr = Location.Addr
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.Unstable.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+
+module Hardfork_db :
+  Merkle_ledger.Intf.Ledger.DATABASE
+    with module Location = Location
+    with module Addr = Location.Addr
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.Hardfork.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+
 module Any_ledger :
-  Merkle_ledger.Any_ledger.S
+  Merkle_ledger.Intf.Ledger.ANY
     with module Location = Location
     with type account := Account.t
      and type key := Public_key.Compressed.t
@@ -41,6 +79,7 @@ module Mask :
      and type hash := Ledger_hash.t
      and type location := Location.t
      and type parent := Any_ledger.M.t
+     and type maps_t := Mask_maps.t
 
 module Maskable :
   Merkle_mask.Maskable_merkle_tree_intf.S
@@ -58,6 +97,25 @@ module Maskable :
      and type attached_mask := Mask.Attached.t
      and type accumulated_t := Mask.accumulated_t
      and type t := Any_ledger.M.t
+     and type maps_t := Mask_maps.t
+
+module Make_converting (Converting_inputs : sig
+  val convert : Account.t -> Account.Hardfork.t
+end) :
+  Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
+    with module Location = Location
+     and module Addr = Location.Addr
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.t
+     and type key := Signature_lib.Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+     and type converted_account := Account.Hardfork.t
+     and type primary_ledger = Db.t
+     and type converting_ledger = Hardfork_db.t
 
 include
   Merkle_mask.Maskable_merkle_tree_intf.S
@@ -75,6 +133,7 @@ include
      and type attached_mask = Mask.Attached.t
      and type unattached_mask = Mask.t
      and type accumulated_t = Mask.accumulated_t
+     and type maps_t := Mask_maps.t
 
 (* We override the type of unregister_mask_exn that comes from
    Merkle_mask.Maskable_merkle_tree_intf.S because at this level callers aren't
@@ -84,6 +143,10 @@ val unregister_mask_exn : loc:string -> Mask.Attached.t -> Mask.t
 
 val unsafe_preload_accounts_from_parent :
   Mask.Attached.t -> Account_id.t list -> unit
+
+val append_maps : t -> Mask_maps.t -> unit
+
+val get_maps : t -> Mask_maps.t
 
 (* The maskable ledger is t = Mask.Attached.t because register/unregister
  * work off of this type *)
@@ -98,6 +161,8 @@ val create : ?directory_name:string -> depth:int -> unit -> t
 val create_ephemeral : depth:int -> unit -> t
 
 val of_database : Db.t -> t
+
+val of_any_ledger : Any_ledger.witness -> t
 
 (** This is not _really_ copy, merely a stop-gap until we remove usages of copy in our codebase. What this actually does is creates a new empty mask on top of the current ledger *)
 val copy : t -> t

@@ -185,9 +185,9 @@ let tear_down { nodes; states; _ } =
 let set_state t (node : Node.t) s =
   remove_state t.states node ; Node.set_state node s ; add_state t.states node
 
-let finish t (node : Node.t) b =
+let finish ~is_error t (node : Node.t) =
   let s, r =
-    if Result.is_error b then (Node.State.Failed, Error node.attempts)
+    if is_error then (Node.State.Failed, Error node.attempts)
     else (Finished, Ok `Added_to_frontier)
   in
   set_state t node s ;
@@ -368,7 +368,7 @@ let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
         breadcrumb_added t b
     | E (Root_transitioned { new_root; garbage = Full hs; _ }) ->
         List.iter (Diff.Node_list.to_lite hs) ~f:(remove_node t) ;
-        let h = (Root_data.Limited.hashes new_root).state_hash in
+        let h = (Root_data.Limited.Stable.Latest.hashes new_root).state_hash in
         if Hashtbl.mem t.nodes h then prune t ~root_hash:h
         else (
           [%log' debug t.logger]
@@ -381,11 +381,11 @@ let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
     | E (Best_tip_changed _) ->
         () )
 
-let create ~root =
+let create ~logger ~root =
   let t =
     { states = Node.State.Enum.Table.create ()
     ; nodes = State_hash.Table.create ()
-    ; logger = Logger.create ()
+    ; logger
     }
   in
   create_node_full t root ; t

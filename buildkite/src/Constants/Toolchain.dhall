@@ -1,44 +1,34 @@
 let DebianVersions = ./DebianVersions.dhall
+
 let RunInToolchain = ../Command/RunInToolchain.dhall
-let ContainerImages = ./ContainerImages.dhall
 
-let SelectionMode: Type  = < ByDebian | Custom : Text >
+let Arch = ./Arch.dhall
 
---- Bullseye and Focal are so similar that they share a toolchain runner
---- Same with Bookworm and Jammy
-let runner = \(debVersion : DebianVersions.DebVersion) ->
-  merge {
-     Bookworm = RunInToolchain.runInToolchainBookworm
-     , Bullseye = RunInToolchain.runInToolchainBullseye
-     , Buster = RunInToolchain.runInToolchainBuster
-     , Jammy = RunInToolchain.runInToolchainBookworm
-     , Focal = RunInToolchain.runInToolchainBullseye
-   } debVersion
+let SelectionMode
+    : Type
+    = < ByDebianAndArch | Custom : Text >
 
-let select = \(mode: SelectionMode) -> \(debVersion : DebianVersions.DebVersion) ->
-    merge {
-        ByDebian = runner debVersion
-        , Custom = \(image: Text) -> RunInToolchain.runInToolchainImage image
-    } mode
+let runner =
+          \(debVersion : DebianVersions.DebVersion)
+      ->  \(arch : Arch.Type)
+      ->  merge
+            { Bookworm = RunInToolchain.runInToolchainBookworm arch
+            , Bullseye = RunInToolchain.runInToolchainBullseye arch
+            , Jammy = RunInToolchain.runInToolchainJammy
+            , Focal = RunInToolchain.runInToolchain
+            , Noble = RunInToolchain.runInToolchainNoble arch
+            }
+            debVersion
 
---- Bullseye and Focal are so similar that they share a toolchain image
---- Same with Bookworm and Jammy
-let image = \(debVersion : DebianVersions.DebVersion) ->
-  merge { 
-    Bookworm = ContainerImages.minaToolchainBookworm
-    , Bullseye = ContainerImages.minaToolchainBullseye
-    , Buster = ContainerImages.minaToolchainBuster
-    , Jammy = ContainerImages.minaToolchainBookworm
-    , Focal = ContainerImages.minaToolchainBullseye
-  } debVersion
+let select =
+          \(mode : SelectionMode)
+      ->  \(debVersion : DebianVersions.DebVersion)
+      ->  \(arch : Arch.Type)
+      ->  merge
+            { ByDebianAndArch = runner debVersion arch
+            , Custom =
+                \(image : Text) -> RunInToolchain.runInToolchainImage image arch
+            }
+            mode
 
-in
-
-{
-  SelectionMode = SelectionMode
-  , select = select
-  , runner = runner
-  , image = image
-}
-
-
+in  { SelectionMode = SelectionMode, select = select, runner = runner }

@@ -1,5 +1,4 @@
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Async_kernel
 open Core_kernel
 open Mina_base
@@ -25,19 +24,28 @@ let%test_module "Full_frontier tests" =
 
     let add_breadcrumbs frontier = List.iter ~f:(add_breadcrumb frontier)
 
+    let test_eq ~message b1 b2 =
+      if not @@ Breadcrumb.equal b1 b2 then failwith message
+
+    let test_not_eq ~message b1 b2 =
+      if Breadcrumb.equal b1 b2 then failwith message
+
     let%test_unit "Should be able to find a breadcrumbs after adding them" =
       Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:4
         ~f:(fun make_breadcrumb ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let%bind frontier =
+                create_frontier ~epoch_ledger_backing_type:Stable_db ()
+              in
               let root = Full_frontier.root frontier in
               let%map breadcrumb = make_breadcrumb root in
               add_breadcrumb frontier breadcrumb ;
               let queried_breadcrumb =
-                Full_frontier.find_exn frontier
-                  (Breadcrumb.state_hash breadcrumb)
+                Full_frontier.find frontier (Breadcrumb.state_hash breadcrumb)
+                |> Option.value_exn ~message:"breadcrumb not found in frontier"
               in
-              [%test_eq: Breadcrumb.t] breadcrumb queried_breadcrumb ;
+              test_eq ~message:"retrieved unexpected benchmark from frontier"
+                breadcrumb queried_breadcrumb ;
               clean_up_persistent_root ~frontier ) )
 
     let%test_unit "Constructing a better branch should change the best tip" =
@@ -50,7 +58,9 @@ let%test_module "Full_frontier tests" =
       Quickcheck.test gen_branches ~trials:4
         ~f:(fun (make_short_branch, make_long_branch) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let%bind frontier =
+                create_frontier ~epoch_ledger_backing_type:Stable_db ()
+              in
               let test_best_tip ?message breadcrumb =
                 [%test_eq: State_hash.t] ?message
                   (Breadcrumb.state_hash breadcrumb)
@@ -78,18 +88,14 @@ let%test_module "Full_frontier tests" =
 
     let%test_unit "The root should be updated after (> max_length) nodes are \
                    added in sequence" =
-      let test_eq ?message = [%test_eq: Breadcrumb.t] ?equal:None ?message in
-      let test_not_eq ?message =
-        let message = Option.map message ~f:(fun m -> "not " ^ m) in
-        [%test_eq: Breadcrumb.t] ?message ~equal:(fun a b ->
-            not (Breadcrumb.equal a b) )
-      in
       Quickcheck.test
         (gen_breadcrumb_seq ~verifier (max_length * 2))
         ~trials:4
         ~f:(fun make_seq ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let%bind frontier =
+                create_frontier ~epoch_ledger_backing_type:Stable_db ()
+              in
               let root = Full_frontier.root frontier in
               let%map seq = make_seq root in
               ignore
@@ -117,7 +123,9 @@ let%test_module "Full_frontier tests" =
         ~trials:2
         ~f:(fun make_seq ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let%bind frontier =
+                create_frontier ~epoch_ledger_backing_type:Stable_db ()
+              in
               let root = Full_frontier.root frontier in
               let%map rest = make_seq root in
               List.iter rest ~f:(fun breadcrumb ->
@@ -144,7 +152,9 @@ let%test_module "Full_frontier tests" =
       in
       Quickcheck.test gen ~trials:4 ~f:(fun make_seq ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let%bind frontier =
+                create_frontier ~epoch_ledger_backing_type:Stable_db ()
+              in
               let root = Full_frontier.root frontier in
               let%map breadcrumbs = make_seq root in
               List.iter breadcrumbs ~f:(fun b ->
@@ -171,7 +181,9 @@ let%test_module "Full_frontier tests" =
       Quickcheck.test gen ~trials:4
         ~f:(fun (make_ancestors, make_branch_a, make_branch_b) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let%bind frontier =
+                create_frontier ~epoch_ledger_backing_type:Stable_db ()
+              in
               let root = Full_frontier.root frontier in
               let%bind ancestors = make_ancestors root in
               let youngest_ancestor = List.last_exn ancestors in
@@ -182,8 +194,12 @@ let%test_module "Full_frontier tests" =
               in
               add_breadcrumbs frontier ancestors ;
               add_breadcrumbs frontier (branch_a @ branch_b) ;
-              [%test_eq: State_hash.t]
-                (Full_frontier.common_ancestor frontier tip_a tip_b)
+              let common_ancestor =
+                Full_frontier.common_ancestor frontier tip_a tip_b
+                |> Result.map_error ~f:(fun _ -> "Common ancestor not found")
+                |> Result.ok_or_failwith
+              in
+              [%test_eq: State_hash.t] common_ancestor
                 (Breadcrumb.state_hash youngest_ancestor) ;
               clean_up_persistent_root ~frontier ) )
   end )

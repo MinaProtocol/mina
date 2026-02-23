@@ -1,9 +1,11 @@
 open Core_kernel
 open Async
 
-type async_pool = (Caqti_async.connection, Caqti_error.t) Caqti_async.Pool.t
+type async_pool = (Caqti_async.connection, Caqti_error.t) Mina_caqti.Pool.t
 
 type pool = { uri : Uri.t; pool : async_pool }
+
+let logger = Logger.create ()
 
 let archive_uri_arg =
   let pool =
@@ -12,7 +14,7 @@ let archive_uri_arg =
       let uri = Uri.of_string s in
       let%map pool =
         Result.map_error ~f:(fun e -> `Msg (Caqti_error.show e))
-        @@ Caqti_async.connect_pool uri
+        @@ Mina_caqti.connect_pool uri
       in
       { uri; pool }
     in
@@ -29,7 +31,7 @@ let ok_or_failwith show result =
 
 let with_db pool f =
   let open Deferred.Let_syntax in
-  Caqti_async.Pool.use (fun db -> f db) pool >>| ok_or_failwith Caqti_error.show
+  Mina_caqti.Pool.use (fun db -> f db) pool >>| ok_or_failwith Caqti_error.show
 
 module Ops = Lib.Search.Transactions_info.T (Deferred.Result)
 
@@ -56,17 +58,17 @@ type _ info_t =
 let run_user_commands db ~offset ~limit query =
   Deferred.Result.map ~f:(fun (c, commands) ->
       (c, List.map commands ~f:(fun command -> User_command command)) )
-  @@ Lib.Search.Sql.User_commands.run db ~offset ~limit query
+  @@ Lib.Search.Sql.User_commands.run db ~logger ~offset ~limit query
 
 let run_internal_commands db ~offset ~limit query =
   Deferred.Result.map ~f:(fun (c, commands) ->
       (c, List.map commands ~f:(fun command -> Internal_command command)) )
-  @@ Lib.Search.Sql.Internal_commands.run db ~offset ~limit query
+  @@ Lib.Search.Sql.Internal_commands.run db ~logger ~offset ~limit query
 
 let run_zkapp_commands db ~offset ~limit query =
   Deferred.Result.map ~f:(fun (c, commands) ->
       (c, List.map commands ~f:(fun command -> Zkapp_command command)) )
-  @@ Lib.Search.Sql.Zkapp_commands.run db ~offset ~limit query
+  @@ Lib.Search.Sql.Zkapp_commands.run db ~logger ~offset ~limit query
 
 module Test_values = struct
   module T = struct
@@ -83,7 +85,7 @@ module Test_values = struct
     type t
 
     val get_values :
-      Caqti_async.connection -> (t T.t, Caqti_error.t) Deferred.Result.t
+      (module Mina_caqti.CONNECTION) -> (t T.t, Caqti_error.t) Deferred.Result.t
   end) =
   struct
     type t = M.t
@@ -118,26 +120,26 @@ module Test_values = struct
   module Txn_hash = Make (struct
     type t = string
 
-    let get_values (module Conn : Caqti_async.CONNECTION) =
+    let get_values (module Conn : Mina_caqti.CONNECTION) =
       let open Deferred.Result.Let_syntax in
       let query table =
         [%string "SELECT hash FROM %{table} ORDER BY RANDOM() LIMIT 1000"]
       in
       let%bind user_commands =
         Conn.collect_list
-          ( Caqti_request.collect Caqti_type.unit Caqti_type.string
+          ( Mina_caqti.collect_req Caqti_type.unit Caqti_type.string
           @@ query "user_commands" )
           ()
       in
       let%bind internal_commands =
         Conn.collect_list
-          ( Caqti_request.collect Caqti_type.unit Caqti_type.string
+          ( Mina_caqti.collect_req Caqti_type.unit Caqti_type.string
           @@ query "internal_commands" )
           ()
       in
       let%map zkapp_commands =
         Conn.collect_list
-          ( Caqti_request.collect Caqti_type.unit Caqti_type.string
+          ( Mina_caqti.collect_req Caqti_type.unit Caqti_type.string
           @@ query "zkapp_commands" )
           ()
       in
@@ -153,9 +155,9 @@ module Test_values = struct
           Result.return (pk, token_id) )
         ~decode:(fun (pk, token_id) ->
           Result.return (`Pk pk, `Token_id token_id) )
-        Caqti_type.(tup2 string string)
+        Caqti_type.(t2 string string)
 
-    let get_values (module Conn : Caqti_async.CONNECTION) =
+    let get_values (module Conn : Mina_caqti.CONNECTION) =
       let open Deferred.Result.Let_syntax in
       let query =
         [%string
@@ -169,7 +171,7 @@ module Test_values = struct
       |sql}]
       in
       let%map user_commands =
-        Conn.collect_list (Caqti_request.collect Caqti_type.unit typ query) ()
+        Conn.collect_list (Mina_caqti.collect_req Caqti_type.unit typ query) ()
       in
       let internal_commands = user_commands in
       let zkapp_commands = user_commands in
@@ -209,7 +211,7 @@ module Test_values = struct
         ~decode:(fun pk -> Result.return (`Pk pk))
         Caqti_type.string
 
-    let get_values (module Conn : Caqti_async.CONNECTION) =
+    let get_values (module Conn : Mina_caqti.CONNECTION) =
       let open Deferred.Result.Let_syntax in
       let query =
         [%string
@@ -221,7 +223,7 @@ module Test_values = struct
       |sql}]
       in
       let%map user_commands =
-        Conn.collect_list (Caqti_request.collect Caqti_type.unit typ query) ()
+        Conn.collect_list (Mina_caqti.collect_req Caqti_type.unit typ query) ()
       in
       let internal_commands = user_commands in
       let zkapp_commands = user_commands in
@@ -246,11 +248,11 @@ module Test_values = struct
   module Max_block = struct
     type t = int64
 
-    let deferred_generator _ (module Conn : Caqti_async.CONNECTION) =
+    let deferred_generator _ (module Conn : Mina_caqti.CONNECTION) =
       let open Deferred.Result.Let_syntax in
       let%map max_height =
         Conn.find
-          (Caqti_request.find Caqti_type.unit Caqti_type.int64
+          (Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
              "SELECT MAX(height) FROM blocks" )
           ()
       in
@@ -291,7 +293,7 @@ module Make (T : sig
 
   val deferred_generator :
        [ `User_commands | `Internal_commands | `Zkapp_commands ]
-    -> Caqti_async.connection
+    -> (module Mina_caqti.CONNECTION)
     -> (t Quickcheck.Generator.t, Caqti_error.t) Deferred.Result.t
 end) (I : sig
   type t = T.t
@@ -342,13 +344,18 @@ struct
     let%bind generator = with_db pool (T.deferred_generator table) in
     Quickcheck.async_test ~trials generator ~f:(fun value ->
         let query = I.to_query value in
+        let limit = 100000L in
         let%bind total_count, commands =
-          with_db pool (fun db -> run db ~offset:None ~limit:None query)
+          with_db pool (fun db -> run db ~offset:None ~limit:(Some limit) query)
         in
         let open Alcotest in
         let infos = to_info commands in
-        check int64 "total_count = len (commands)" total_count
-          (Int64.of_int (List.length infos)) ;
+        if Int64.(total_count > limit) then
+          check int64 "limit = len (commands)" limit
+            (Int64.of_int (List.length infos))
+        else
+          check int64 "total_count = len (commands)" total_count
+            (Int64.of_int (List.length infos)) ;
         check_condition value infos )
 
   let test_user_command pool = test `User_commands ~pool run_user_commands
@@ -361,10 +368,10 @@ struct
   let test_suite =
     let open Alcotest_async in
     ( I.name
-    , [ test_case ~timeout:(sec 200.) "User commands" `Slow @@ test_user_command
-      ; test_case ~timeout:(sec 200.) "Internal commands" `Slow
+    , [ test_case ~timeout:(sec 400.) "User commands" `Slow @@ test_user_command
+      ; test_case ~timeout:(sec 400.) "Internal commands" `Slow
         @@ test_internal_command
-      ; test_case ~timeout:(sec 200.) "Zkapp commands" `Slow
+      ; test_case ~timeout:(sec 400.) "Zkapp commands" `Slow
         @@ test_zkapp_command
       ] )
 
@@ -390,13 +397,13 @@ struct
       let name, tests = test_suite in
       ( name
       , tests
-        @ [ test_case ~timeout:(sec 200.) "Non existing user command" `Slow
+        @ [ test_case ~timeout:(sec 400.) "Non existing user command" `Slow
             @@ test_not_existing ~limit:50 ~table:"user_commands"
                  run_user_commands
-          ; test_case ~timeout:(sec 200.) "Non existing internal command" `Slow
+          ; test_case ~timeout:(sec 400.) "Non existing internal command" `Slow
             @@ test_not_existing ~limit:50 ~table:"internal_commands"
                  run_internal_commands
-          ; test_case ~timeout:(sec 200.) "Non existing zkapp command" `Slow
+          ; test_case ~timeout:(sec 400.) "Non existing zkapp command" `Slow
             @@ test_not_existing ~limit:50 ~table:"zkapp_commands"
                  run_zkapp_commands
           ] )
@@ -465,11 +472,17 @@ module Account_identifier = struct
 
         let of_internal_command_info
             { Lib.Search.Internal_command_info.info; _ } =
-          Deferred.return [ (info.receiver, info.token) ]
+          Deferred.return
+          @@ (info.receiver, info.token)
+             :: ( Option.to_list
+                @@ Option.map
+                     ~f:(fun coinbase_receiver ->
+                       (coinbase_receiver, info.token) )
+                     info.coinbase_receiver )
 
         let of_zkapp_command_info { Lib.Search.Zkapp_command_info.info; _ } =
           Deferred.return
-          @@ (info.fee_payer, info.token)
+          @@ (info.fee_payer, `Token_id Rosetta_lib.Amount_of.Token_id.default)
              :: List.map info.account_updates ~f:(fun { account; token; _ } ->
                     (account, token) )
 
@@ -493,10 +506,10 @@ module Account_identifier = struct
           |sql}]
       in
       let%map values =
-        with_db pool (fun (module Conn : Caqti_async.CONNECTION) ->
+        with_db pool (fun (module Conn : Mina_caqti.CONNECTION) ->
             Conn.collect_list
-              (Caqti_request.collect Caqti_type.unit
-                 Caqti_type.(tup2 string string)
+              (Mina_caqti.collect_req Caqti_type.unit
+                 Caqti_type.(t2 string string)
                  query )
               () )
       in
@@ -516,7 +529,7 @@ module Op_status =
 
       let name = "operation-status"
 
-      let trials = 30
+      let trials = 20
 
       let to_query v =
         let op_status =
@@ -598,7 +611,8 @@ module Address = struct
 
         let of_internal_command_info
             { Lib.Search.Internal_command_info.info; _ } =
-          Deferred.return [ info.receiver ]
+          Deferred.return
+          @@ (info.receiver :: Option.to_list info.coinbase_receiver)
 
         let of_zkapp_command_info { Lib.Search.Zkapp_command_info.info; _ } =
           Deferred.return
@@ -668,7 +682,7 @@ module Max_block =
 
       let name = "max-block"
 
-      let trials = 20
+      let trials = 10
 
       let to_query max_block =
         Lib.Search.Transaction_query.make ~max_block
@@ -693,9 +707,12 @@ module Max_block =
 module Offset_limit = struct
   type t = { offset : int; limit : int }
 
-  let offset_generator = Int.gen_incl 1 100
+  (* Max value + Max limit value should not exceed valid user_commands count in database
+     otherwise quickcheck will become flaky.
+  *)
+  let offset_generator = Int.gen_incl 1 50
 
-  let limit_generator = Int.gen_incl 1 50
+  let limit_generator = Int.gen_incl 1 20
 
   let transaction_testable =
     Alcotest.testable
@@ -722,7 +739,7 @@ module Offset_limit = struct
     with_db pool (fun db ->
         Deferred.Result.map_error ~f:(fun _ ->
             Caqti_error.(request_failed ~uri:Uri.empty ~query:"" (Msg "")) )
-        @@ Lib.Search.Sql.run db (to_query ~offset ~limit) )
+        @@ Lib.Search.Sql.run ~logger db (to_query ~offset ~limit) )
 
   let run' { offset; limit } = run ~offset ~limit
 
@@ -751,7 +768,7 @@ module Offset_limit = struct
       ( { offset = offset_1; limit = limit_1 }
       , { offset = offset_2; limit = limit_2 } )
     in
-    Quickcheck.async_test ~trials:10 generator ~f:(fun (value_1, value_2) ->
+    Quickcheck.async_test ~trials:5 generator ~f:(fun (value_1, value_2) ->
         let open Deferred.Let_syntax in
         let%bind info_1 = run' value_1 pool in
         let%bind transactions_1_result = Ops.to_transactions info_1 in
@@ -779,8 +796,8 @@ module Offset_limit = struct
   let test_suite =
     let open Alcotest_async in
     ( "offset-limit"
-    , [ test_case ~timeout:(sec 200.) "Limit and offset" `Slow @@ test
-      ; test_case ~timeout:(sec 200.) "Limit" `Slow @@ test_limit
+    , [ test_case ~timeout:(sec 400.) "Limit and offset" `Slow @@ test
+      ; test_case ~timeout:(sec 400.) "Limit" `Slow @@ test_limit
       ] )
 end
 

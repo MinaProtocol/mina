@@ -9,7 +9,7 @@ Table of Contents
     * [`constraint_constants`](#constraint_constants)
       * [`transaction_capacity`](#transaction_capacity)
       * [`fork`](#fork)
-    * [`commits`](#commits)
+    * [`commit`](#commits)
   * [Example](#example)
 * [`body`](#body)
   * Verifier key
@@ -68,12 +68,8 @@ Here is an example of `json` field in human-readable format.  The details are di
         "account_creation_fee": "1000000000",
         "fork": {}
     },
-    "commits": {
-        "mina": "29b90544308c4db199640062508af3789867ce03",
-        "marlin": "[DIRTY]29b90544308c4db199640062508af3789867ce03"
-    },
+    "commit": "29b90544308c4db199640062508af3789867ce03",
     "length": 2130,
-    "commit_date": "2021-02-17T10:52:33-08:00",
     "constraint_system_hash": "a6cec912699b70258202f2ed855cc0ef",
     "identifying_hash": "a6cec912699b70258202f2ed855cc0ef"
 }
@@ -86,9 +82,8 @@ Here is an example of `json` field in human-readable format.  The details are di
 | `header_version`         | `Number` | Version number for keyfile header format |
 | `kind`                   | `Object` | Description of key stored in this file |
 | `constraint_constants`   | `Object` | Constraint system constants |
-| `commits`                | `Object` | Unique build identifiers |
+| `commit`                 | `String` | Git commit of mina source |
 | `length`                 | `Number` | Length of entire keyfile (including header) |
-| `commit_data`            | `String` | Commit date of `mina` blockchain version (corresponds to hashes in `commits`) |
 | `constraint_system_hash` | `String` | MD5 hash digest hex of all constraints comprising the zk proof system |
 | `identifying_hash`       | `String` | Alias for `constraint_system_hash` |
 
@@ -132,13 +127,6 @@ To help ensure no download errors have occurred, the `length` field should match
 | `previous_length`      | `Number` | Height |
 | `genesis_slot` | `Number` | Slot |
 
-### `commits`
-
-| Field   | Type     | Description |
-| - | - | - |
-| `mina`   | `String` | Githash uniquely identifying `mina` blockchain build (e.g. `"29b90544308c4db199640062508af3789867ce03"`) |
-| `marlin` | `String` | Githash uniquely identifying `marlin` library build (e.g. `"[DIRTY]29b90544308c4db199640062508af3789867ce03"`) |
-
 ## Example
 [example]: #example
 
@@ -146,7 +134,7 @@ This is an example of what the entire header looks like on disk.
 
 ```
 MINA_SNARK_KEYS\n
-{"header_version":1,"kind":{"type":"step-verification-key","identifier":"blockchain-snark-step"},"constraint_constants":{"sub_windows_per_window":11,"ledger_depth":20,"work_delay":2,"block_window_duration_ms":180000,"transaction_capacity":{"two_to_the":7},"pending_coinbase_depth":5,"coinbase_amount":"720000000000","supercharged_coinbase_factor":2,"account_creation_fee":"1000000000","fork":{}},"commits":{"mina":"29b90544308c4db199640062508af3789867ce03","marlin":"[DIRTY]29b90544308c4db199640062508af3789867ce03"},"length":      2130,"commit_date":"2021-02-17T10:52:33-08:00","constraint_system_hash":"a6cec912699b70258202f2ed855cc0ef","identifying_hash":"a6cec912699b70258202f2ed855cc0ef"}\n
+{"header_version":1,"kind":{"type":"step-verification-key","identifier":"blockchain-snark-step"},"constraint_constants":{"sub_windows_per_window":11,"ledger_depth":20,"work_delay":2,"block_window_duration_ms":180000,"transaction_capacity":{"two_to_the":7},"pending_coinbase_depth":5,"coinbase_amount":"720000000000","supercharged_coinbase_factor":2,"account_creation_fee":"1000000000","fork":{}},"commit":"29b90544308c4db199640062508af3789867ce03","length":      2130,"constraint_system_hash":"a6cec912699b70258202f2ed855cc0ef","identifying_hash":"a6cec912699b70258202f2ed855cc0ef"}\n
 ```
 
 # `body`

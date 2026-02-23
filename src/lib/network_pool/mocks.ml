@@ -8,7 +8,7 @@ module Transaction_snark_work = Transaction_snark_work
 module Base_ledger = Mina_ledger.Ledger
 
 module Staged_ledger = struct
-  type t = Base_ledger.t [@@deriving sexp]
+  type t = Base_ledger.t
 
   let ledger = Fn.id
 end
@@ -33,7 +33,6 @@ module Transition_frontier = struct
     ; diff_writer : (diff Broadcast_pipe.Writer.t[@sexp.opaque])
     ; diff_reader : (diff Broadcast_pipe.Reader.t[@sexp.opaque])
     }
-  [@@deriving sexp]
 
   let add_statements table stmts =
     List.iter stmts ~f:(fun s ->

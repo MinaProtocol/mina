@@ -25,5 +25,8 @@
       "hash": "jxjmYHK1tnGy5S6CDaLDTRrDbw17DmtEd6Jnw3L86QSsLm15w5g",
       "s3_data_hash": "094ceb7c580ef53be0bf2385698fd8d2faebf91fdd8542c076df649aa261b94e"
     }
+  },
+  "daemon": {
+    "network_id": "devnet"
   }
 }

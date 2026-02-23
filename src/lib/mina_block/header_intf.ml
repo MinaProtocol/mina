@@ -13,6 +13,8 @@ module type Full = sig
 
   type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
+  type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
+
   val create :
        protocol_state:Protocol_state.Value.t
     -> protocol_state_proof:Proof.t
@@ -36,4 +38,6 @@ module type Full = sig
     { valid_current : bool; valid_next : bool; matches_daemon : bool }
 
   val protocol_version_status : t -> protocol_version_status
+
+  val blockchain_length : t -> Mina_numbers.Length.t
 end

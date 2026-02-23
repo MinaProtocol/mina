@@ -31,23 +31,23 @@ module Subchain = struct
       fields b_fields join_condition fields
 
   let query_unparented =
-    Caqti_request.collect Caqti_type.string Archive_lib.Processor.Block.typ
+    Mina_caqti.collect_req Caqti_type.string Archive_lib.Processor.Block.typ
       (make_sql ~join_condition:"b.id = chain.parent_id")
 
   let query_from_start =
-    Caqti_request.collect
-      Caqti_type.(tup2 string string)
+    Mina_caqti.collect_req
+      Caqti_type.(t2 string string)
       Archive_lib.Processor.Block.typ
       (make_sql
          ~join_condition:
            "b.id = chain.parent_id AND (chain.state_hash <> $2 OR b.state_hash \
             = $2)" )
 
-  let start_from_unparented (module Conn : Caqti_async.CONNECTION)
+  let start_from_unparented (module Conn : Mina_caqti.CONNECTION)
       ~end_state_hash =
     Conn.collect_list query_unparented end_state_hash
 
-  let start_from_specified (module Conn : Caqti_async.CONNECTION)
+  let start_from_specified (module Conn : Mina_caqti.CONNECTION)
       ~start_state_hash ~end_state_hash =
     Conn.collect_list query_from_start (end_state_hash, start_state_hash)
 
@@ -56,10 +56,10 @@ module Subchain = struct
     let comma_fields =
       String.concat Archive_lib.Processor.Block.Fields.names ~sep:","
     in
-    Caqti_request.collect Caqti_type.unit Archive_lib.Processor.Block.typ
+    Mina_caqti.collect_req Caqti_type.unit Archive_lib.Processor.Block.typ
       (sprintf "SELECT %s FROM blocks" comma_fields)
 
-  let all_blocks (module Conn : Caqti_async.CONNECTION) =
+  let all_blocks (module Conn : Mina_caqti.CONNECTION) =
     Conn.collect_list query_all ()
 end
 
@@ -67,14 +67,14 @@ end
 
 module Blocks_and_user_commands = struct
   let query =
-    Caqti_request.collect Caqti_type.int
-      Caqti_type.(tup2 int int)
+    Mina_caqti.collect_req Caqti_type.int
+      Caqti_type.(t2 int int)
       {sql| SELECT user_command_id, sequence_no
             FROM blocks_user_commands
             WHERE block_id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.collect_list query block_id
 end
 
@@ -91,7 +91,7 @@ module Block_user_command_tokens = struct
       Caqti_type.[ string; option int; option int ]
 
   let query =
-    Caqti_request.collect Caqti_type.int typ
+    Mina_caqti.collect_req Caqti_type.int typ
       {sql| SELECT tokens.value, owner_public_key_id, owner_token_id
             FROM (blocks_user_commands buc
             INNER JOIN blocks
@@ -105,7 +105,7 @@ module Block_user_command_tokens = struct
             WHERE block_id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.collect_list query block_id
 end
 
@@ -122,7 +122,7 @@ module Blocks_and_internal_commands = struct
       Caqti_type.[ int; int; int ]
 
   let query =
-    Caqti_request.collect Caqti_type.int typ
+    Mina_caqti.collect_req Caqti_type.int typ
       {sql| SELECT internal_command_id, sequence_no, secondary_sequence_no
             FROM (blocks_internal_commands
             INNER JOIN blocks
@@ -130,7 +130,7 @@ module Blocks_and_internal_commands = struct
             WHERE block_id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.collect_list query block_id
 end
 
@@ -147,7 +147,7 @@ module Block_internal_command_tokens = struct
       Caqti_type.[ string; option int; option int ]
 
   let query =
-    Caqti_request.collect Caqti_type.int typ
+    Mina_caqti.collect_req Caqti_type.int typ
       {sql| SELECT tokens.value, owner_public_key_id, owner_token_id
             FROM (blocks_internal_commands bic
             INNER JOIN blocks
@@ -161,20 +161,20 @@ module Block_internal_command_tokens = struct
             WHERE block_id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.collect_list query block_id
 end
 
 module Blocks_and_zkapp_commands = struct
   let query =
-    Caqti_request.collect Caqti_type.int
-      Caqti_type.(tup2 int int)
+    Mina_caqti.collect_req Caqti_type.int
+      Caqti_type.(t2 int int)
       {sql| SELECT zkapp_command_id, sequence_no
             FROM blocks_zkapp_commands
             WHERE block_id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.collect_list query block_id
 end
 
@@ -191,7 +191,7 @@ module Block_zkapp_command_tokens = struct
       Caqti_type.[ string; option int; option int ]
 
   let query =
-    Caqti_request.collect Caqti_type.int typ
+    Mina_caqti.collect_req Caqti_type.int typ
       {sql| SELECT tokens.value, owner_public_key_id, owner_token_id
             FROM (blocks_zkapp_commands bzkc
             INNER JOIN blocks
@@ -208,6 +208,6 @@ module Block_zkapp_command_tokens = struct
             WHERE block_id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.collect_list query block_id
 end

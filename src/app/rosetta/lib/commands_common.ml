@@ -208,8 +208,11 @@ module User_command_info = struct
                 let open Mina_base.Signed_command_memo in
                 base58_check |> of_base58_check_exn |> to_string_hum
               in
-              if String.is_empty memo then None
-              else Some (`Assoc [ ("memo", `String memo) ])
+              let nonce = ("nonce", `Int (Unsigned.UInt32.to_int info.nonce)) in
+              Some
+                (`Assoc
+                  ( if String.is_empty memo then [ nonce ]
+                  else [ nonce; ("memo", `String memo) ] ) )
             with _ -> None )
     ; related_transactions = []
     }
@@ -263,7 +266,6 @@ module Zkapp_command_info = struct
     ; fee_payer : [ `Pk of string ]
     ; valid_until : Unsigned_extended.UInt32.t option
     ; nonce : Unsigned_extended.UInt32.t
-    ; token : [ `Token_id of string ]
     ; sequence_no : int
     ; memo : string option
     ; hash : string
@@ -287,22 +289,16 @@ module Zkapp_command_info = struct
                  { Op.label = `Zkapp_account_update upd; related_to = None } )
           )
         ~f:(fun ~related_operations ~operation_identifier op ->
+          let default_token = `Token_id Amount_of.Token_id.default in
           match op.label with
           | `Zkapp_fee_payer_dec ->
               M.return
                 { Operation.operation_identifier
                 ; related_operations
                 ; status = Some (Operation_statuses.name `Success)
-                ; account =
-                    Some
-                      (account_id t.fee_payer
-                         (`Token_id Amount_of.Token_id.default) )
+                ; account = Some (account_id t.fee_payer default_token)
                 ; _type = Operation_types.name `Zkapp_fee_payer_dec
-                ; amount =
-                    Some
-                      Amount_of.(
-                        negated
-                        @@ token (`Token_id Amount_of.Token_id.default) t.fee)
+                ; amount = Some Amount_of.(negated @@ token default_token t.fee)
                 ; coin_change = None
                 ; metadata = None
                 }
@@ -346,7 +342,6 @@ module Zkapp_command_info = struct
   let dummies =
     [ { fee_payer = `Pk "Eve"
       ; fee = Unsigned.UInt64.of_int 20_000_000_000
-      ; token = `Token_id Amount_of.Token_id.default
       ; sequence_no = 1
       ; hash = "COMMAND_1"
       ; failure_reasons = []
@@ -357,7 +352,6 @@ module Zkapp_command_info = struct
       }
     ; { fee_payer = `Pk "Alice"
       ; fee = Unsigned.UInt64.of_int 10_000_000_000
-      ; token = `Token_id Amount_of.Token_id.default
       ; sequence_no = 2
       ; hash = "COMMAND_2"
       ; failure_reasons = [ "Failure1" ]

@@ -10,9 +10,17 @@ let max_latency
     * of_ms 5L)
 
 module Capacity = struct
-  let flush = 30
+  type t =
+    { flush : int
+          (** The number of entries that will trigger a frontier buffer flush *)
+    ; max : int  (** The maximum capacity of the diff buffer *)
+    }
+  [@@deriving to_yojson]
 
-  let max = flush * 4
+  let make ?flush () =
+    let flush = Option.value ~default:30 flush in
+    let max = flush * 4 in
+    { flush; max }
 end
 
 (* TODO: lift up as Block_time utility *)
@@ -49,8 +57,39 @@ end
 
 type work = { diffs : Diff.Lite.E.t list }
 
+module Rev_dyn_array : sig
+  type 'a t
+
+  val create : unit -> _ t
+
+  val length : _ t -> int
+
+  val clear : _ t -> unit
+
+  val to_list : 'a t -> 'a list
+
+  val add : 'a t -> 'a -> unit
+end = struct
+  type 'a t = { mutable length : int; mutable rev_list : 'a list }
+
+  let create () = { length = 0; rev_list = [] }
+
+  let length { length; _ } = length
+
+  let to_list { rev_list; _ } = List.rev rev_list
+
+  let clear t =
+    t.length <- 0 ;
+    t.rev_list <- []
+
+  let add t x =
+    t.length <- t.length + 1 ;
+    t.rev_list <- x :: t.rev_list
+end
+
 type t =
-  { diff_array : Diff.Lite.E.t DynArray.t
+  { diff_array : Diff.Lite.E.t Rev_dyn_array.t
+  ; capacity : Capacity.t
   ; worker : Worker.t
         (* timer unfortunately needs to be mutable to break recursion *)
   ; mutable timer : Timer.t option
@@ -59,16 +98,15 @@ type t =
   }
 
 let check_for_overflow t =
-  if DynArray.length t.diff_array > Capacity.max then
+  if Rev_dyn_array.length t.diff_array > t.capacity.max then
     failwith "persistence buffer overflow"
 
-let should_flush t = DynArray.length t.diff_array >= Capacity.flush
+let should_flush t = Rev_dyn_array.length t.diff_array >= t.capacity.flush
 
 let flush t =
   let rec flush_job t =
-    let diffs = DynArray.to_list t.diff_array in
-    DynArray.clear t.diff_array ;
-    DynArray.compact t.diff_array ;
+    let diffs = Rev_dyn_array.to_list t.diff_array in
+    Rev_dyn_array.clear t.diff_array ;
     let%bind () = Worker.dispatch t.worker diffs in
     if should_flush t then flush_job t
     else (
@@ -76,12 +114,14 @@ let flush t =
       Deferred.unit )
   in
   assert (Option.is_none t.flush_job) ;
-  if DynArray.length t.diff_array > 0 then t.flush_job <- Some (flush_job t)
+  if Rev_dyn_array.length t.diff_array > 0 then
+    t.flush_job <- Some (flush_job t)
 
 let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~time_controller ~worker =
+    ~time_controller ~worker ~capacity =
   let t =
-    { diff_array = DynArray.create ()
+    { diff_array = Rev_dyn_array.create ()
+    ; capacity
     ; worker
     ; timer = None
     ; flush_job = None
@@ -98,7 +138,7 @@ let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
 
 let write t ~diffs =
   if t.closed then failwith "attempt to write to diff buffer after closed" ;
-  List.iter diffs ~f:(DynArray.add t.diff_array) ;
+  List.iter diffs ~f:(Rev_dyn_array.add t.diff_array) ;
   if should_flush t && Option.is_none t.flush_job then flush t
   else check_for_overflow t
 

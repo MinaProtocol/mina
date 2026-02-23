@@ -187,23 +187,23 @@ let incremental_balance_during_vesting_is_a_multiple_of_vesting_increment () =
   Quickcheck.test
     (let open Quickcheck in
     let open Generator.Let_syntax in
-    let%bind timing =
+    let%bind timing_ =
       Account.gen_timing_at_least_one_vesting_period Balance.max_int
     in
     let min_slot =
       Global_slot_since_genesis.(
-        add timing.cliff_time Global_slot_span.(of_int 1))
+        add timing_.cliff_time Global_slot_span.(of_int 1))
     in
     let max_slot =
       let open Global_slot_since_genesis in
       sub
-        Account.(timing_final_vesting_slot @@ Timing.of_record timing)
+        Account.(timing_final_vesting_slot @@ Timing.of_record timing_)
         Global_slot_span.(of_int 1)
       |> Option.value ~default:zero
     in
     let%bind slot1 = Global_slot_since_genesis.gen_incl min_slot max_slot in
     let%map slot2 = Global_slot_since_genesis.gen_incl slot1 max_slot in
-    (timing, slot1, slot2))
+    (timing_, slot1, slot2))
     ~f:(fun (timing, start_slot, end_slot) ->
       let open UInt64 in
       [%test_eq: int] 0
@@ -274,8 +274,7 @@ let minimum_balance_checked_equal_to_unchecked () =
           ~vesting_increment:Amount.(var_of_t timing.vesting_increment)
           ~vesting_period:(global_slot_span_var timing.vesting_period)
           ~global_slot:(global_slot_since_genesis_var global_slot)
-        |> Snarky_backendless.(
-             Checked_runner.Simple.map ~f:(As_prover0.read Balance.typ))
+        |> Snark_params.Tick.(Checked.map ~f:(As_prover.read Balance.typ))
         |> Snark_params.Tick.run_and_check
       in
       [%test_eq: Balance.t Or_error.t] (Ok min_balance) min_balance_checked )

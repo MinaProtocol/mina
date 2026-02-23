@@ -22,7 +22,8 @@ module Rules = struct
       The app state is set to the initial state.
   *)
   module Initialize_state = struct
-    let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
+    let initial_state =
+      lazy (List.init Zkapp_state.max_size_int ~f:(fun _ -> Field.Constant.zero))
 
     let handler (public_key : Public_key.Compressed.t) (token_id : Token_id.t)
         (may_use_token : Account_update.May_use_token.t)
@@ -125,7 +126,8 @@ module Rules = struct
                  .to_account_update_and_calls
             in
             let digest =
-              Zkapp_command.Digest.Account_update.Checked.create final_update
+              Zkapp_command.Digest.Account_update.Checked.create
+                ~signature_kind:Testnet final_update
             in
             ( { Zkapp_call_forest.Checked.account_update =
                   { data = final_update; hash = digest }
@@ -135,7 +137,7 @@ module Rules = struct
                      to be able to reconstruct the command outside the circuit
                      when it has finished.
                   *)
-                  Prover_value.create (fun () -> Control.None_given)
+                  Prover_value.create (fun () -> Control.Poly.None_given)
               }
             , calls )
           in
@@ -160,7 +162,9 @@ module Rules = struct
       lazy
         (let dummy_body = Account_update.Body.dummy in
          { With_hash.data = dummy_body
-         ; hash = Zkapp_command.Digest.Account_update.create_body dummy_body
+         ; hash =
+             Zkapp_command.Digest.Account_update.create_body
+               ~signature_kind:Testnet dummy_body
          } )
 
     let dummy_tree_hash =
@@ -317,7 +321,7 @@ module Rules = struct
     end
 
     let dummy_proof =
-      lazy (Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15)
+      lazy (Pickles.Proof.dummy Nat.N2.n Nat.N2.n ~domain_log2:15)
 
     let next_account_update
         ({ forest; pending_forests; check_may_use_token } : State.Circuit.t) :
@@ -327,9 +331,8 @@ module Rules = struct
       let dummy_account_update_body = Lazy.force dummy_account_update_body in
       let dummy : _ Zkapp_command.Call_forest.Tree.t =
         { account_update =
-            { Account_update.body = dummy_account_update_body.data
-            ; authorization = Control.None_given
-            }
+            Account_update.with_aux ~body:dummy_account_update_body.data
+              ~authorization:Control.Poly.None_given
         ; account_update_digest = dummy_account_update_body.hash
         ; calls = []
         }
@@ -338,7 +341,8 @@ module Rules = struct
         Zkapp_command.Digest.Tree.constant (Lazy.force dummy_tree_hash)
       in
       let (account_update, forest), rest_of_forest =
-        Zkapp_call_forest.Checked.pop ~dummy ~dummy_tree_hash forest
+        Zkapp_call_forest.Checked.pop ~signature_kind:Testnet ~dummy
+          ~dummy_tree_hash forest
       in
       let rest_of_forest_is_empty =
         Zkapp_call_forest.Checked.is_empty rest_of_forest
@@ -461,7 +465,7 @@ module Rules = struct
       type _ Snarky_backendless.Request.t +=
         | Prove :
             bool * Statement.Value.t
-            -> (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Snarky_backendless.Request.t
+            -> Nat.N2.n Pickles.Proof.t Snarky_backendless.Request.t
 
       let main
           { Pickles.Inductive_rule.public_input =
@@ -482,7 +486,7 @@ module Rules = struct
         *)
         Boolean.Assert.any [ proof_must_verify; zero_total ] ;
         let proof =
-          exists (Typ.Internal.ref ()) ~request:(fun () ->
+          exists (Typ.prover_value ()) ~request:(fun () ->
               let proof_must_verify =
                 As_prover.read Boolean.typ proof_must_verify
               in
@@ -494,7 +498,7 @@ module Rules = struct
             ; (* dummy to avoid pickles bug *)
               { public_input = recursive_input
               ; proof =
-                  exists (Typ.Internal.ref ()) ~compute:(fun () ->
+                  exists (Typ.prover_value ()) ~compute:(fun () ->
                       Lazy.force dummy_proof )
               ; proof_must_verify = Boolean.false_
               }
@@ -510,8 +514,7 @@ module Rules = struct
         ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
         }
 
-      let handler
-          (prove : Statement.Value.t -> (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
+      let handler (prove : Statement.Value.t -> Nat.N2.n Pickles.Proof.t)
           (Snarky_backendless.Request.With { request; respond }) =
         match request with
         | Prove (should_prove, statement) ->
@@ -567,7 +570,7 @@ module Rules = struct
       *)
       Boolean.Assert.any [ proof_must_verify; zero_total ] ;
       let proof =
-        exists (Typ.Internal.ref ()) ~request:(fun () ->
+        exists (Typ.prover_value ()) ~request:(fun () ->
             let proof_must_verify =
               As_prover.read Boolean.typ proof_must_verify
             in
@@ -581,7 +584,7 @@ module Rules = struct
           ; (* dummy to avoid pickles bug *)
             { public_input = recursive_input
             ; proof =
-                exists (Typ.Internal.ref ()) ~compute:(fun () ->
+                exists (Typ.prover_value ()) ~compute:(fun () ->
                     Lazy.force dummy_proof )
             ; proof_must_verify = Boolean.false_
             }
@@ -600,8 +603,7 @@ module Rules = struct
     let handler (public_key : Public_key.Compressed.t) (token_id : Token_id.t)
         (call_forest : Zkapp_call_forest.t)
         (may_use_token : Account_update.May_use_token.t)
-        (prove :
-          Recursive.Statement.Value.t -> (Nat.N2.n, Nat.N2.n) Pickles.Proof.t )
+        (prove : Recursive.Statement.Value.t -> Nat.N2.n Pickles.Proof.t)
         (Snarky_backendless.Request.With { request; respond }) =
       match request with
       | Public_key ->
@@ -629,12 +631,8 @@ module Transfer_recursive = struct
          ~override_wrap_domain:Pickles_base.Proofs_verified.N1
          ~public_input:(Input Rules.Transfer.Recursive.Statement.typ)
          ~auxiliary_typ:Impl.Typ.unit
-         ~branches:(module Nat.N1)
          ~max_proofs_verified:(module Nat.N2)
          ~name:"transfer recurse"
-         ~constraint_constants:
-           Genesis_constants.Constraint_constants.(
-             to_snark_keys_header compiled)
          ~choices:(fun ~self -> [ Rules.Transfer.Recursive.rule self ]) )
 
   let tag = Lazy.map lazy_compiled ~f:(fun (tag, _, _, _) -> tag)
@@ -661,11 +659,8 @@ let lazy_compiled =
     (Zkapps_examples.compile () ~cache:Cache_dir.cache
        ~override_wrap_domain:Pickles_base.Proofs_verified.N1
        ~auxiliary_typ:Impl.Typ.unit
-       ~branches:(module Nat.N3)
        ~max_proofs_verified:(module Nat.N2)
        ~name:"tokens"
-       ~constraint_constants:
-         Genesis_constants.Constraint_constants.(to_snark_keys_header compiled)
        ~choices:(fun ~self:_ ->
          [ Rules.Initialize_state.rule
          ; Rules.Mint.rule
@@ -683,7 +678,7 @@ let p_module = Lazy.map lazy_compiled ~f:(fun (_, _, p_module, _) -> p_module)
 module P = struct
   type statement = Zkapp_statement.t
 
-  type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+  type t = Nat.N2.n Pickles.Proof.t
 
   module type Proof_intf =
     Pickles.Proof_intf with type statement = statement and type t = t
@@ -691,7 +686,11 @@ module P = struct
   let verification_key =
     Lazy.bind p_module ~f:(fun (module P : Proof_intf) -> P.verification_key)
 
+  let verification_key_promise = lazy (failwith "not implemented")
+
   let id = Lazy.bind p_module ~f:(fun (module P : Proof_intf) -> P.id)
+
+  let id_promise = lazy (failwith "not implemented")
 
   let verify statements =
     let module P : Proof_intf = (val Lazy.force p_module) in

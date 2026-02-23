@@ -12,10 +12,10 @@
   ;; local libraries
   currency
   kimchi_backend_common
-  kimchi_backend.pasta
-  kimchi_backend.pasta.basic
+  kimchi_pasta
+  kimchi_pasta.basic
   mina_base
-  mina_base_test_helpers
+  mina_base.test_helpers
   mina_ledger
   mina_numbers
   monad_lib

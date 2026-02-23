@@ -10,19 +10,19 @@ include struct
 
   type _ t +=
     | Prev_state : Protocol_state.Value.t t
-    | Prev_state_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t t
+    | Prev_state_proof : Nat.N2.n Pickles.Proof.t t
     | Transition : Snark_transition.Value.t t
     | Txn_snark : Transaction_snark.Statement.With_sok.t t
-    | Txn_snark_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t t
+    | Txn_snark_proof : Nat.N2.n Pickles.Proof.t t
 end
 
 module Witness = struct
   type t =
     { prev_state : Protocol_state.Value.t
-    ; prev_state_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+    ; prev_state_proof : Nat.N2.n Pickles.Proof.t
     ; transition : Snark_transition.Value.t
     ; txn_snark : Transaction_snark.Statement.With_sok.t
-    ; txn_snark_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+    ; txn_snark_proof : Nat.N2.n Pickles.Proof.t
     }
 end
 
@@ -160,13 +160,13 @@ let%snarkydef_ step ~(logger : Logger.t)
            , previous_state_body_hash ) =
     let%bind prev_state_ref =
       with_label __LOC__ (fun () ->
-          exists (Typ.Internal.ref ()) ~request:(As_prover.return Prev_state) )
+          exists (Typ.prover_value ()) ~request:(As_prover.return Prev_state) )
     in
     let%bind t =
       with_label __LOC__ (fun () ->
           exists
             (Protocol_state.typ ~constraint_constants)
-            ~compute:(As_prover.Ref.get prev_state_ref) )
+            ~compute:(As_prover.read (Typ.prover_value ()) prev_state_ref) )
     in
     let%map previous_state_hash, body = Protocol_state.hash_checked t in
     let previous_blockchain_proof_input =
@@ -238,7 +238,7 @@ let%snarkydef_ step ~(logger : Logger.t)
     in
     (t, is_base_case)
   in
-  let%bind txn_snark_should_verify, success =
+  let%bind txn_snark_must_verify, success =
     let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped =
       let coinbase_receiver =
         Consensus.Data.Consensus_state.coinbase_receiver_var consensus_state
@@ -348,16 +348,16 @@ let%snarkydef_ step ~(logger : Logger.t)
     in
     (transaction_snark_should_verifiy, result)
   in
-  let txn_snark_should_verify =
+  let txn_snark_must_verify =
     match proof_level with
-    | Check | None ->
+    | Check | No_check ->
         Boolean.false_
     | Full ->
-        txn_snark_should_verify
+        txn_snark_must_verify
   in
-  let prev_should_verify =
+  let prev_must_verify =
     match proof_level with
-    | Check | None ->
+    | Check | No_check ->
         Boolean.false_
     | Full ->
         Boolean.not is_base_case
@@ -366,35 +366,38 @@ let%snarkydef_ step ~(logger : Logger.t)
     with_label __LOC__ (fun () -> Boolean.Assert.any [ is_base_case; success ])
   in
   let%bind previous_blockchain_proof =
-    exists (Typ.Internal.ref ()) ~request:(As_prover.return Prev_state_proof)
+    exists (Typ.prover_value ()) ~request:(As_prover.return Prev_state_proof)
   in
   let%map txn_snark_proof =
-    exists (Typ.Internal.ref ()) ~request:(As_prover.return Txn_snark_proof)
+    exists (Typ.prover_value ()) ~request:(As_prover.return Txn_snark_proof)
   in
   ( { Pickles.Inductive_rule.Previous_proof_statement.public_input =
         previous_blockchain_proof_input
     ; proof = previous_blockchain_proof
-    ; proof_must_verify = prev_should_verify
+    ; proof_must_verify = prev_must_verify
     }
   , { Pickles.Inductive_rule.Previous_proof_statement.public_input = txn_snark
     ; proof = txn_snark_proof
-    ; proof_must_verify = txn_snark_should_verify
+    ; proof_must_verify = txn_snark_must_verify
     } )
 
 module Statement = struct
   type t = Protocol_state.Value.t
 
-  let to_field_elements (t : t) : Tick.Field.t array =
-    [| (Protocol_state.hashes t).state_hash |]
+  let typ =
+    Data_as_hash.typ ~hash:(fun t -> (Protocol_state.hashes t).state_hash)
+
+  let to_field_elements =
+    let (Typ { value_to_fields; _ }) = typ in
+    Fn.compose fst value_to_fields
 end
 
-module Statement_var = struct
-  type t = Protocol_state.Value.t Data_as_hash.t
-end
-
-type tag = (Statement_var.t, Statement.t, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
-
-let typ = Data_as_hash.typ ~hash:(fun t -> (Protocol_state.hashes t).state_hash)
+type tag =
+  ( Protocol_state.Value.t Data_as_hash.t
+  , Statement.t
+  , Nat.N2.n
+  , Nat.N1.n )
+  Pickles.Tag.t
 
 let check w ?handler ~proof_level ~constraint_constants new_state_hash :
     unit Or_error.t =
@@ -402,7 +405,7 @@ let check w ?handler ~proof_level ~constraint_constants new_state_hash :
   check
     (Fn.flip handle (wrap_handler handler w) (fun () ->
          let%bind curr =
-           exists typ ~compute:(As_prover.return new_state_hash)
+           exists Statement.typ ~compute:(As_prover.return new_state_hash)
          in
          step ~proof_level ~constraint_constants ~logger:(Logger.create ()) curr )
     )
@@ -428,7 +431,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
 module type S = sig
   module Proof :
     Pickles.Proof_intf
-      with type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+      with type t = Nat.N2.n Pickles.Proof.t
        and type statement = Protocol_state.Value.t
 
   val tag : tag
@@ -451,21 +454,21 @@ end
 
 let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
 
+(** Return the constraint system for the blockchain-step circuit. *)
+let step_constraint_system ~proof_level ~constraint_constants =
+  let main x =
+    let open Tick in
+    let%map _ =
+      step ~proof_level ~constraint_constants ~logger:(Logger.create ()) x
+    in
+    ()
+  in
+  Tick.constraint_system ~input_typ:Statement.typ ~return_typ:Tick.Typ.unit main
+
 let constraint_system_digests ~proof_level ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
   [ ( "blockchain-step"
-    , digest
-        (let main x =
-           let open Tick in
-           let%map _ =
-             step ~proof_level ~constraint_constants ~logger:(Logger.create ())
-               x
-           in
-           ()
-         in
-         Tick.constraint_system ~input_typ:typ
-           ~return_typ:(Snarky_backendless.Typ.unit ())
-           main ) )
+    , digest (step_constraint_system ~proof_level ~constraint_constants) )
   ]
 
 module Make (T : sig
@@ -478,15 +481,12 @@ end) : S = struct
   open T
 
   let tag, cache_handle, p, Pickles.Provers.[ step ] =
-    Pickles.compile () ~cache:Cache_dir.cache ~public_input:(Input typ)
+    Pickles.compile () ~cache:Cache_dir.cache
+      ~public_input:(Input Statement.typ)
       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~auxiliary_typ:Typ.unit
-      ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"
-      ~constraint_constants:
-        (Genesis_constants.Constraint_constants.to_snark_keys_header
-           constraint_constants )
       ~choices:(fun ~self ->
         [ rule ~proof_level ~constraint_constants T.tag self ] )
 

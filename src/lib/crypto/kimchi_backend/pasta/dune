@@ -1,7 +1,8 @@
 (library
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (name kimchi_pasta)
- (public_name kimchi_backend.pasta)
+ (public_name kimchi_pasta)
  (flags -warn-error -27)
  (instrumentation
   (backend bisect_ppx))
@@ -16,12 +17,11 @@
   base.caml
   ;; local libraries
   sponge
-  pickles_types
-  kimchi_backend.common
+  kimchi_backend_common
   promise
   kimchi_bindings
   kimchi_pasta_basic
-  bounded_types
+  mina_stdlib
   kimchi_pasta_constraint_system
   kimchi_types
   pasta_bindings

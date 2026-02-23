@@ -61,7 +61,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
+      type t = Zkapp_basic.F.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id

@@ -12,7 +12,7 @@ pkgs.mkShell {
     postgresql.out
     sodium-static.out
     sodium-static.dev
-    go_1_18
+    go_1_19
     capnproto
     zlib.dev
     bzip2.dev
@@ -21,8 +21,10 @@ pkgs.mkShell {
     wasm-pack
     lmdb
     rosetta-cli
+    rocksdb-mina.tools
   ];
   OPAMSWITCH = "mina";
+  MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
   shellHook = ''
     eval $(opam env)
     if ! opam switch list --short 2>&1 | grep -w mina 2>&1 > /dev/null; then

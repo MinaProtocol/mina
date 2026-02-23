@@ -183,7 +183,7 @@ module Make_str (A : Wire_types.Concrete) = struct
            (Input.Chunked.append (Coinbase_data.to_input coinbase) (to_input h)) )
       |> of_hash
 
-    let empty = Random_oracle.salt "CoinbaseStack" |> Random_oracle.digest
+    let empty = Hash_prefix_create.salt "CoinbaseStack" |> Random_oracle.digest
 
     module Checked = struct
       type t = var
@@ -260,6 +260,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    let init (t : t) = t.init
+
+    let curr (t : t) = t.curr
 
     type var = Stack_hash.var Poly.t
 
@@ -396,7 +400,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       |> of_hash
 
     let empty_hash =
-      Random_oracle.(digest (salt "PendingCoinbaseMerkleTree")) |> of_hash
+      Hash_prefix_create.salt "PendingCoinbaseMerkleTree"
+      |> Random_oracle.digest |> of_hash
 
     let of_digest = of_hash
   end
@@ -528,6 +533,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    let data (t : t) = t.data
+
+    let state (t : t) = t.state
   end
 
   module Hash_versioned = struct
@@ -1025,12 +1034,16 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     type t = (Merkle_tree.t, Stack_id.t) Poly.t [@@deriving sexp, to_yojson]
 
-    let init_hash = Stack.data_hash Stack.empty
-
     let hash_at_level =
-      let cached = ref [| init_hash |] in
+      let cached = ref [||] in
       fun i ->
         let len = Array.length !cached in
+        let len =
+          if len = 0 then (
+            cached := [| Stack.data_hash Stack.empty |] ;
+            1 )
+          else len
+        in
         ( if i >= len then
           let cur_hash = ref (Array.last !cached) in
           cached :=
@@ -1301,7 +1314,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let%test_unit "add stack + remove stack = initial tree " =
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Genesis_constants.For_unit_tests.Constraint_constants.t
     in
     let depth = constraint_constants.pending_coinbase_depth in
     let coinbases_gen =
@@ -1386,7 +1399,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   let%test_unit "Checked_stack = Unchecked_stack" =
     let open Quickcheck in
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Genesis_constants.For_unit_tests.Constraint_constants.t
     in
     test ~trials:20
       (Generator.tuple2 Stack.gen (Coinbase.Gen.gen ~constraint_constants))
@@ -1409,7 +1422,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   let%test_unit "Checked_tree = Unchecked_tree" =
     let open Quickcheck in
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Genesis_constants.For_unit_tests.Constraint_constants.t
     in
     let depth = constraint_constants.pending_coinbase_depth in
     let pending_coinbases = create ~depth () |> Or_error.ok_exn in
@@ -1474,7 +1487,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   let%test_unit "Checked_tree = Unchecked_tree after pop" =
     let open Quickcheck in
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Genesis_constants.For_unit_tests.Constraint_constants.t
     in
     let depth = constraint_constants.pending_coinbase_depth in
     test ~trials:20
@@ -1566,7 +1579,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let open Quickcheck in
     let module Pending_coinbase = T in
     let constraint_constants =
-      { Genesis_constants.Constraint_constants.for_unit_tests with
+      { Genesis_constants.For_unit_tests.Constraint_constants.t with
         pending_coinbase_depth = 3
       }
     in

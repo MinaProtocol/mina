@@ -133,6 +133,14 @@ module Chain_id_inputs = struct
     State_hash.Stable.Latest.t * Genesis_constants.t * string list * int * int
   [@@deriving bin_io_unversioned]
 
+  let of_inputs (inputs : Chain_id.Inputs.t) : response =
+    ( inputs.genesis_state_hash
+    , inputs.genesis_constants
+    , List.map inputs.constraint_system_digests ~f:(fun (_, digest) ->
+          Md5.to_hex digest )
+    , inputs.protocol_transaction_version
+    , inputs.protocol_network_version )
+
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Chain_id_inputs" ~version:0 ~bin_query ~bin_response
 end
@@ -330,9 +338,7 @@ end
 module Get_node_status = struct
   type query = Mina_net2.Multiaddr.t list option [@@deriving bin_io_unversioned]
 
-  type response =
-    Mina_networking.Rpcs.Get_node_status.Node_status.Stable.Latest.t Or_error.t
-    list
+  type response = Mina_networking.Node_status.Stable.Latest.t Or_error.t list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -346,5 +352,16 @@ module Get_object_lifetime_statistics = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_object_lifetime_statistics" ~version:0 ~bin_query
+      ~bin_response
+end
+
+module Generate_hardfork_config = struct
+  type query = { config_dir : string; generate_fork_validation : bool }
+  [@@deriving bin_io_unversioned]
+
+  type response = unit Or_error.t [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Generate_hardfork_config" ~version:0 ~bin_query
       ~bin_response
 end

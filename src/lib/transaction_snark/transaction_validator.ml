@@ -16,34 +16,42 @@ let apply_user_command ~constraint_constants ~txn_global_slot l uc =
   within_mask l ~f:(fun l' ->
       Result.map
         ~f:(fun applied_txn ->
-          applied_txn.Ledger.Transaction_applied.Signed_command_applied.common
+          applied_txn
+            .Mina_transaction_logic.Transaction_applied.Signed_command_applied
+             .common
             .user_command
             .status )
         (Ledger.apply_user_command l' ~constraint_constants ~txn_global_slot uc) )
 
-let apply_transactions' ~constraint_constants ~global_slot ~txn_state_view l t =
+let apply_transactions' ~constraint_constants ~global_slot ~txn_state_view
+    ~signature_kind l t =
   O1trace.sync_thread "apply_transaction" (fun () ->
       within_mask l ~f:(fun l' ->
-          Ledger.apply_transactions ~constraint_constants ~global_slot
-            ~txn_state_view l' t ) )
+          Ledger.apply_transactions ~signature_kind ~constraint_constants
+            ~global_slot ~txn_state_view l' t ) )
 
-let apply_transactions ~constraint_constants ~global_slot ~txn_state_view l txn
-    =
-  apply_transactions' l ~constraint_constants ~global_slot ~txn_state_view txn
+let apply_transactions ~constraint_constants ~global_slot ~txn_state_view
+    ~signature_kind l txn =
+  apply_transactions' l ~constraint_constants ~global_slot ~txn_state_view
+    ~signature_kind txn
 
 let apply_transaction_first_pass ~constraint_constants ~global_slot
-    ~txn_state_view l txn : Ledger.Transaction_partially_applied.t Or_error.t =
+    ~txn_state_view ~signature_kind l txn :
+    Ledger.Transaction_partially_applied.t Or_error.t =
   O1trace.sync_thread "apply_transaction_first_pass" (fun () ->
       within_mask l ~f:(fun l' ->
-          Ledger.apply_transaction_first_pass l' ~constraint_constants
-            ~global_slot ~txn_state_view txn ) )
+          Ledger.apply_transaction_first_pass ~signature_kind l'
+            ~constraint_constants ~global_slot ~txn_state_view txn ) )
 
 let%test_unit "invalid transactions do not dirty the ledger" =
   let open Core in
   let open Mina_numbers in
   let open Currency in
   let open Signature_lib in
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let constraint_constants =
+    Genesis_constants.For_unit_tests.Constraint_constants.t
+  in
+  let signature_kind = Mina_signature_kind.Testnet in
   let ledger = Ledger.create_ephemeral ~depth:4 () in
   let sender_sk, receiver_sk =
     Quickcheck.Generator.generate ~size:0
@@ -84,8 +92,8 @@ let%test_unit "invalid transactions do not dirty the ledger" =
         ~body:(Signed_command_payload.Body.Payment payment)
     in
     Option.value_exn
-      (Signed_command.create_with_signature_checked
-         (Signed_command.sign_payload sender_sk payload)
+      (Signed_command.create_with_signature_checked ~signature_kind
+         (Signed_command.sign_payload ~signature_kind sender_sk payload)
          sender_pk payload )
   in
   Ledger.create_new_account_exn ledger sender_id sender_account ;

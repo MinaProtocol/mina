@@ -7,7 +7,7 @@ module Id = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Bounded_types.String.Stable.V1.t
+      type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
       [@@deriving compare, hash, equal, sexp]
 
       let to_latest = Fn.id
@@ -37,7 +37,7 @@ module Inet_addr = struct
 
       let to_yojson ip_addr = `String (Unix.Inet_addr.to_string ip_addr)
 
-      include Bounded_types.String.Of_stringable (struct
+      include Mina_stdlib.Bounded_types.String.Of_stringable (struct
         type nonrec t = t
 
         [%%define_locally Unix.Inet_addr.(to_string, of_string)]
@@ -144,9 +144,9 @@ module Display = struct
 
     module V1 = struct
       type t =
-        { host : Bounded_types.String.Stable.V1.t
+        { host : Mina_stdlib.Bounded_types.String.Stable.V1.t
         ; libp2p_port : int
-        ; peer_id : Bounded_types.String.Stable.V1.t
+        ; peer_id : Mina_stdlib.Bounded_types.String.Stable.V1.t
         }
       [@@deriving yojson, version, sexp, fields]
 

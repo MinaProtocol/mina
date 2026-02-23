@@ -19,11 +19,10 @@ see `check_command_types`, below. There is also a special rule for RPC types; se
 """
 
 import subprocess
-import os
-import io
 import sys
 import re
 import sexpdata
+import requests
 
 exit_code=0
 
@@ -31,19 +30,38 @@ def set_error():
   global exit_code
   exit_code=1
 
-def branch_commit(branch):
+def latest_branch_commit(branch):
+  '''
+    Retrieves latest commit on branch
+  '''
   print ('Retrieving', branch, 'head commit...')
-  result=subprocess.run(['git','log','-n','1','--format="%h"','--abbrev=7','--no-merges',f'{branch}'],
+  result=subprocess.run(['git','log','-n','1','--format="%h"','--abbrev=7',f'{branch}'],
                         capture_output=True)
   output=result.stdout.decode('ascii')
   print ('command stdout:', output)
   print ('command stderr:', result.stderr.decode('ascii'))
-  return output.replace('"','').replace('\n','')
+  return output.replace('"','').strip()
+  
+def url_to_type_shape_file(file):
+  '''
+    Return url to mina type shape file
+  '''
+  return f'https://storage.googleapis.com/mina-type-shapes/{file}'
 
-def download_type_shapes(role,branch,sha1) :
+def url_exists(url):
+  '''
+    Checks if url exists (by sending head and validating that status code is ok)
+  '''
+  return requests.head(url).status_code == 200
+
+def download_type_shape(role,branch,sha1) :
   file=type_shape_file(sha1)
+  url=url_to_type_shape_file(file)
+  if not url_exists(url):
+    raise Exception(f"reference file for '{sha1}' commit does not exists. Url does not exists {url} ")
+
   print ('Downloading type shape file',file,'for',role,'branch',branch,'at commit',sha1)
-  result=subprocess.run(['wget','--no-clobber',f'https://storage.googleapis.com/mina-type-shapes/{file}'])
+  subprocess.run(['wget','--no-clobber',url], check=True)
 
 def type_shape_file(sha1) :
   # created by buildkite build-artifact script
@@ -222,6 +240,10 @@ def check_type_shapes(pr_branch_dict,base_branch,base_type_dict,release_branch,r
         set_error()
     # not an error if the type was introduced in the base branch, and the type changed in PR branch
 
+def assert_commit(commit, desc):
+  if not commit:
+    f"Empty commit detected when evaluating commit of {desc}"
+
 if __name__ == "__main__":
   if len(sys.argv) != 4 :
         print("Usage: %s pr-branch base-branch release-branch" % sys.argv[0], file=sys.stderr)
@@ -233,18 +255,18 @@ if __name__ == "__main__":
 
   subprocess.run(['git','fetch'],capture_output=False)
 
-  base_branch_commit=branch_commit(base_branch)
-  download_type_shapes('base',base_branch,base_branch_commit)
+  base_branch_commit = latest_branch_commit(base_branch)
+  download_type_shape('base',base_branch,base_branch_commit)
 
   print('')
 
-  release_branch_commit=branch_commit(release_branch)
-  download_type_shapes('release',release_branch,release_branch_commit)
+  release_branch_commit=latest_branch_commit(release_branch)
+  download_type_shape('release',release_branch,release_branch_commit)
 
   print('')
 
-  pr_branch_commit=branch_commit(pr_branch)
-  download_type_shapes('pr',pr_branch,pr_branch_commit)
+  pr_branch_commit=latest_branch_commit(pr_branch)
+  download_type_shape('pr',pr_branch,pr_branch_commit)
 
   print('')
 

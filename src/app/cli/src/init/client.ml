@@ -3,12 +3,7 @@ open Async
 open Signature_lib
 open Mina_base
 open Mina_transaction
-
-module Client = Graphql_lib.Client.Make (struct
-  let preprocess_variables_string = Fn.id
-
-  let headers = String.Map.empty
-end)
+module Client = Graphql_lib.Client
 
 module Args = struct
   open Command.Param
@@ -314,10 +309,15 @@ let verify_receipt =
       ~doc:"TOKEN_ID The token ID for the account"
       (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
+  let legacy_json_flag =
+    flag "--legacy" no_arg
+      ~doc:"Use legacy json format (zkapp command with hashes)"
+  in
   Command.async ~summary:"Verify a receipt of a sent payment"
     (Cli_lib.Background_daemon.rpc_init
-       (Args.zip4 payment_path_flag proof_path_flag address_flag token_flag)
-       ~f:(fun port (payment_path, proof_path, pk, token_id) ->
+       (Args.zip5 payment_path_flag proof_path_flag address_flag token_flag
+          legacy_json_flag )
+       ~f:(fun port (payment_path, proof_path, pk, token_id, use_legacy_json) ->
          let account_id = Account_id.create pk token_id in
          let dispatch_result =
            let open Deferred.Or_error.Let_syntax in
@@ -325,22 +325,43 @@ let verify_receipt =
              read_json payment_path ~flag:"payment-path"
            in
            let%bind proof_json = read_json proof_path ~flag:"proof-path" in
+           let of_payment_json =
+             if use_legacy_json then
+               Fn.compose
+                 (Result.map ~f:User_command.read_all_proofs_from_disk)
+                 Mina_block.Legacy_format.User_command.of_yojson
+             else User_command.Stable.Latest.of_yojson
+           in
+           let of_proof_json =
+             let unwrap_proof =
+               Tuple2.map_snd
+                 ~f:(List.map ~f:User_command.read_all_proofs_from_disk)
+             in
+             if use_legacy_json then
+               Fn.compose
+                 (Result.map ~f:unwrap_proof)
+                 [%of_yojson:
+                   Receipt.Chain_hash.t
+                   * Mina_block.Legacy_format.User_command.t list]
+             else
+               [%of_yojson:
+                 Receipt.Chain_hash.t * User_command.Stable.Latest.t list]
+           in
            let to_deferred_or_error result ~error =
              Result.map_error result ~f:(fun s ->
                  Error.of_string (sprintf "%s: %s" error s) )
              |> Deferred.return
            in
            let%bind payment =
-             User_command.of_yojson payment_json
-             |> to_deferred_or_error
-                  ~error:
-                    (sprintf "Payment file %s has invalid json format"
-                       payment_path )
+             to_deferred_or_error
+               ~error:
+                 (sprintf "Payment file %s has invalid json format" payment_path)
+               (of_payment_json payment_json)
            and proof =
-             [%of_yojson: Receipt.Chain_hash.t * User_command.t list] proof_json
-             |> to_deferred_or_error
-                  ~error:
-                    (sprintf "Proof file %s has invalid json format" proof_path)
+             to_deferred_or_error
+               ~error:
+                 (sprintf "Proof file %s has invalid json format" proof_path)
+               (of_proof_json proof_json)
            in
            Daemon_rpcs.Client.dispatch Verify_proof.rpc
              (account_id, payment, proof)
@@ -513,8 +534,14 @@ let send_payment_graphql =
     flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let compile_config = Mina_compile_config.Compiled.t in
   let args =
-    Args.zip3 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
+    Args.zip3
+      (Cli_lib.Flag.signed_command_common
+         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
+         ~default_transaction_fee:compile_config.default_transaction_fee )
+      receiver_flag amount_flag
   in
   Command.async ~summary:"Send payment to an address"
     (Cli_lib.Background_daemon.graphql_init args
@@ -542,7 +569,15 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let args = Args.zip2 Cli_lib.Flag.signed_command_common receiver_flag in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let compile_config = Mina_compile_config.Compiled.t in
+  let args =
+    Args.zip2
+      (Cli_lib.Flag.signed_command_common
+         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
+         ~default_transaction_fee:compile_config.default_transaction_fee )
+      receiver_flag
+  in
   Command.async ~summary:"Delegate your stake to another public key"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
@@ -663,7 +698,7 @@ module Export_logs = struct
   let export_locally =
     let run ~tarfile ~conf_dir =
       let open Mina_lib in
-      let conf_dir = Conf_dir.compute_conf_dir conf_dir in
+      let conf_dir = Conf_dir.compute_conf_dir_exn conf_dir in
       fun () ->
         match%map Conf_dir.export_logs_to_tar ?basename:tarfile ~conf_dir with
         | Ok result ->
@@ -717,10 +752,15 @@ let handle_export_ledger_response ~json = function
       exit 1
   | Ok (Ok accounts) ->
       if json then (
-        Yojson.Safe.pretty_print Format.std_formatter
-          (Runtime_config.Accounts.to_yojson
-             (List.map accounts ~f:(fun a ->
-                  Genesis_ledger_helper.Accounts.Single.of_account a None ) ) ) ;
+        Format.fprintf Format.std_formatter "[\n  " ;
+        let print_comma = ref false in
+        List.iter accounts ~f:(fun a ->
+            if !print_comma then Format.fprintf Format.std_formatter "\n, "
+            else print_comma := true ;
+            Genesis_ledger_helper.Accounts.Single.of_account a None
+            |> Runtime_config.Accounts.Single.to_yojson
+            |> Yojson.Safe.pretty_print Format.std_formatter ) ;
+        Format.fprintf Format.std_formatter "\n]" ;
         printf "\n" )
       else printf !"%{sexp:Account.t list}\n" accounts ;
       return ()
@@ -806,13 +846,14 @@ let hash_ledger =
            (required string))
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
+       let constraint_constants =
+         Genesis_constants.Compiled.constraint_constants
+       in
        let process_accounts accounts =
-         let constraint_constants =
-           Genesis_constants.Constraint_constants.compiled
-         in
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-             ~depth:constraint_constants.ledger_depth accounts
+             ~logger:(Logger.create ()) ~depth:constraint_constants.ledger_depth
+             ~genesis_backing_type:Stable_db accounts
          in
          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
          Format.printf "%s@."
@@ -864,7 +905,7 @@ let currency_in_ledger =
            Token_id.Table.create ()
          in
          List.iter accounts ~f:(fun (acct : Account.t) ->
-             let token_id = Account.token acct in
+             let token_id = Account.token_id acct in
              let balance = acct.balance |> Currency.Balance.to_uint64 in
              match Token_id.Table.find currency_tbl token_id with
              | None ->
@@ -909,22 +950,24 @@ let currency_in_ledger =
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
-    (Command.Param.return (fun () ->
-         (* TODO: Allow these to be configurable. *)
-         let proof_level = Genesis_constants.Proof_level.compiled in
-         let constraint_constants =
-           Genesis_constants.Constraint_constants.compiled
-         in
-         let all =
-           Transaction_snark.constraint_system_digests ~constraint_constants ()
-           @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-               ~proof_level ~constraint_constants ()
-         in
-         let all =
-           List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
-         in
-         List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
-         Deferred.unit ) )
+    (let open Command.Let_syntax in
+    let%map signature_kind = Cli_lib.Flag.signature_kind in
+    fun () ->
+      let constraint_constants =
+        Genesis_constants.Compiled.constraint_constants
+      in
+      let proof_level = Genesis_constants.Compiled.proof_level in
+      let all =
+        Transaction_snark.constraint_system_digests ~signature_kind
+          ~constraint_constants ()
+        @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
+            ~proof_level ~constraint_constants ()
+      in
+      let all =
+        List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
+      in
+      List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
+      Deferred.unit)
 
 let snark_job_list =
   let open Deferred.Let_syntax in
@@ -1034,13 +1077,13 @@ let pending_snark_work =
                  (Array.map
                     ~f:(fun bundle ->
                       Array.map bundle.workBundle ~f:(fun w ->
-                          let f = w.fee_excess in
+                          let fee_excess_left = w.fee_excess.feeExcessLeft in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id = w.work_id
                           ; fee_excess =
                               Currency.Amount.Signed.of_fee
-                                (to_signed_fee_exn f.sign
-                                   (Currency.Amount.to_fee f.fee_magnitude) )
+                                (to_signed_fee_exn fee_excess_left.sign
+                                   fee_excess_left.feeMagnitude )
                           ; supply_increase = w.supply_increase
                           ; source_first_pass_ledger_hash =
                               w.source_first_pass_ledger_hash
@@ -1297,7 +1340,7 @@ let import_key =
                !"\n😄 Imported account!\nPublic key: %s\n"
                (Public_key.Compressed.to_base58_check public_key)
          | `Graphql_error _ as e ->
-             don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn e)
+             don't_wait_for (Client.Connection_error.ok_exn e)
        in
        match access_method with
        | `GraphQL graphql_endpoint -> (
@@ -1305,7 +1348,7 @@ let import_key =
            | Ok res ->
                print_result res
            | Error err ->
-               don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) )
+               don't_wait_for (Client.Connection_error.ok_exn err) )
        | `Conf_dir conf_dir ->
            let%map res = do_local conf_dir in
            print_result res
@@ -1317,11 +1360,12 @@ let import_key =
            | Ok res ->
                Deferred.return (print_result res)
            | Error _res ->
-               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn None in
                eprintf
                  "%sWarning: Could not connect to a running daemon.\n\
                   Importing to local directory %s%s\n"
-                 Bash_colors.orange conf_dir Bash_colors.none ;
+                 Mina_stdlib.Bash_colors.orange conf_dir
+                 Mina_stdlib.Bash_colors.none ;
                let%map res = do_local conf_dir in
                print_result res ) )
 
@@ -1452,7 +1496,7 @@ let list_accounts =
          | Error (`Failed_request _ as err) ->
              Error err
          | Error (`Graphql_error _ as err) ->
-             don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) ;
+             don't_wait_for (Client.Connection_error.ok_exn err) ;
              Ok ()
        in
        let do_local conf_dir =
@@ -1477,7 +1521,7 @@ let list_accounts =
            | Ok () ->
                ()
            | Error err ->
-               don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) )
+               don't_wait_for (Client.Connection_error.ok_exn err) )
        | `Conf_dir conf_dir ->
            do_local conf_dir
        | `None -> (
@@ -1488,11 +1532,12 @@ let list_accounts =
            | Ok () ->
                Deferred.unit
            | Error _res ->
-               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn None in
                eprintf
                  "%sWarning: Could not connect to a running daemon.\n\
                   Listing from local directory %s%s\n"
-                 Bash_colors.orange conf_dir Bash_colors.none ;
+                 Mina_stdlib.Bash_colors.orange conf_dir
+                 Mina_stdlib.Bash_colors.none ;
                do_local conf_dir ) )
 
 let create_account =
@@ -1512,7 +1557,7 @@ let create_account =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             response.createAccount.public_key
+             response.createAccount.account.public_key
          in
          printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ) )
 
@@ -1529,7 +1574,7 @@ let create_hd_account =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             response.createHDAccount.public_key
+             response.createHDAccount.account.public_key
          in
          printf "\n😄 created HD account with HD-index %s!\nPublic key: %s\n"
            (Mina_numbers.Hd_index.to_string hd_index)
@@ -1563,7 +1608,7 @@ let unlock_account =
              in
              let pk_string =
                Public_key.Compressed.to_base58_check
-                 response.unlockAccount.public_key
+                 response.unlockAccount.account.public_key
              in
              printf "\n🔓 Unlocked account!\nPublic key: %s\n" pk_string
          | Error e ->
@@ -1600,7 +1645,8 @@ let generate_libp2p_keypair_do privkey_path =
     (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
     let logger = Logger.null () in
     (* Using the helper only for keypair generation requires no state. *)
-    File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
+    Mina_stdlib_unix.File_system.with_temp_dir "mina-generate-libp2p-keypair"
+      ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
@@ -1632,7 +1678,8 @@ let dump_libp2p_keypair_do privkey_path =
     (let open Deferred.Let_syntax in
     let logger = Logger.null () in
     (* Using the helper only for keypair generation requires no state. *)
-    File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
+    Mina_stdlib_unix.File_system.with_temp_dir "mina-dump-libp2p-keypair"
+      ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
@@ -1778,6 +1825,9 @@ let add_peers_graphql =
                   } ) ) ) )
 
 let compile_time_constants =
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let proof_level = Genesis_constants.Compiled.proof_level in
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
     (Command.Param.return (fun () ->
@@ -1795,13 +1845,16 @@ let compile_time_constants =
                conf_dir ^/ "daemon.json"
          in
          let open Async in
-         let%map ({ consensus_constants; _ } as precomputed_values), _ =
+         let%map ({ consensus_constants; _ } as precomputed_values) =
            config_file |> Genesis_ledger_helper.load_config_json >>| Or_error.ok
-           >>| Option.value ~default:(`Assoc [])
+           >>| Option.value
+                 ~default:
+                   (`Assoc [ ("ledger", `Assoc [ ("accounts", `List []) ]) ])
            >>| Runtime_config.of_yojson >>| Result.ok
            >>| Option.value ~default:Runtime_config.default
-           >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
-                 ~logger:(Logger.null ()) ~proof_level:None
+           >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
+                 ~constraint_constants ~logger:(Logger.null ()) ~proof_level
+                 ~cli_proof_level:None ~genesis_dir
            >>| Or_error.ok_exn
          in
          let all_constants =
@@ -1888,7 +1941,7 @@ let node_status =
              List.iter all_status_data ~f:(fun peer_status_data ->
                  printf "%s\n%!"
                    ( Yojson.Safe.to_string
-                   @@ Mina_networking.Rpcs.Get_node_status.response_to_yojson
+                   @@ Mina_networking.Node_status.response_to_yojson
                         peer_status_data ) )
          | Error err ->
              printf "Failed to get node status: %s\n%!"
@@ -2075,6 +2128,7 @@ let archive_blocks =
                  add_to_failure_file path ) ) )
 
 let receipt_chain_hash =
+  let proof_cache_db = Proof_cache_tag.create_identity_db () in
   let open Command.Let_syntax in
   Command.basic
     ~summary:
@@ -2092,7 +2146,7 @@ let receipt_chain_hash =
          ~doc:
            "NN For a zkApp, 0 for fee payer or 1-based index of account update"
          (optional string)
-     in
+     and signature_kind = Cli_lib.Flag.signature_kind in
      fun () ->
        let previous_hash =
          Receipt.Chain_hash.of_base58_check_exn previous_hash
@@ -2111,7 +2165,9 @@ let receipt_chain_hash =
              in
              let receipt_elt =
                let _txn_commitment, full_txn_commitment =
-                 Zkapp_command.get_transaction_commitments zkapp_cmd
+                 Zkapp_command.get_transaction_commitments ~signature_kind
+                   (Zkapp_command.write_all_proofs_to_disk ~signature_kind
+                      ~proof_cache_db zkapp_cmd )
                in
                Receipt.Zkapp_command_elt.Zkapp_command_commitment
                  full_txn_commitment
@@ -2232,13 +2288,49 @@ let thread_graph =
                   (humanize_graphql_error ~graphql_endpoint e) ) ;
              exit 1 ) )
 
+let generate_hardfork_config =
+  let open Command.Param in
+  let hardfork_config_dir_flag =
+    flag "--hardfork-config-dir"
+      ~doc:
+        "DIR Directory to generate hardfork configuration, relative to the \
+         daemon working directory"
+      (required string)
+  in
+  let generate_fork_validation =
+    flag "--generate-fork-validation"
+      ~doc:
+        "BOOL whether generating the fork validation folder. Defaults to true"
+      (optional_with_default true bool)
+  in
+  let args =
+    Command.Param.map2 hardfork_config_dir_flag generate_fork_validation
+      ~f:(fun config_dir generate_fork_validation ->
+        Daemon_rpcs.Generate_hardfork_config.
+          { config_dir; generate_fork_validation } )
+  in
+
+  Command.async ~summary:"Generate reference hardfork configuration"
+    (Cli_lib.Background_daemon.rpc_init args ~f:(fun port args ->
+         match%bind
+           Daemon_rpcs.Client.dispatch_join_errors
+             Daemon_rpcs.Generate_hardfork_config.rpc args port
+         with
+         | Ok () ->
+             printf "Hardfork configuration successfully generated\n" ;
+             exit 0
+         | Error e ->
+             eprintf "Failed to generate hard fork config: %s\n"
+               (Error.to_string_hum e) ;
+             exit 1 ) )
+
 let signature_kind =
   Command.basic
     ~summary:"Print the signature kind that this binary is compiled with"
     (let%map.Command () = Command.Param.return () in
      fun () ->
        let signature_kind_string =
-         match Mina_signature_kind.t with
+         match Mina_signature_kind.t_DEPRECATED with
          | Mainnet ->
              "mainnet"
          | Testnet ->
@@ -2249,7 +2341,81 @@ let signature_kind =
        in
        Core.print_endline signature_kind_string )
 
+let test_genesis_creation =
+  Command.async ~summary:"Test genesis creation"
+    (let%map_open.Command () = Command.Param.return () in
+     Cli_lib.Exceptions.handle_nicely
+       Test_genesis_creation.time_genesis_creation )
+
+let test_ledger_application =
+  Command.async ~summary:"Test ledger application"
+    (let%map_open.Command privkey_path = Cli_lib.Flag.privkey_read_path
+     and prev_block_path =
+       flag "--prev-block-path" ~doc:"FILE file with serialized block"
+         (optional string)
+     and ledger_path =
+       flag "--ledger-path" ~doc:"FILE directory with ledger DB"
+         (required string)
+     and num_txs =
+       flag "--num-txs"
+         ~doc:"NN Number of transactions to create after preparatory rounds"
+         (required int)
+     and num_txs_per_round =
+       flag "--num-txs-per-round"
+         ~doc:
+           "NN Number of transactions to create per preparatory round \
+            (default: 3)"
+         (optional int)
+     and rounds =
+       flag "--rounds" ~doc:"NN Number of preparatory rounds (default: 580)"
+         (optional int)
+     and first_partition_slots =
+       flag "--first-partition-slots"
+         ~doc:
+           "NN Number of slots in first partition of scan state (default: 128)"
+         (optional int)
+     and max_depth =
+       flag "--max-depth" ~doc:"NN Maximum depth of masks (default: 290)"
+         (optional int)
+     and no_new_stack =
+       flag "--old-stack" ~doc:"Use is_new_stack: false (scan state)" no_arg
+     and has_second_partition =
+       flag "--has-second-partition"
+         ~doc:"Assume there is a second partition (scan state)" no_arg
+     and tracing = flag "--tracing" ~doc:"Wrap test into tracing" no_arg
+     and no_masks = flag "--no-masks" ~doc:"Do not create masks" no_arg
+     and benchmark =
+       flag "--dump-benchmark" ~doc:"Dump json file with benchmark data"
+         (optional string)
+     and transfer_parties_get_actions_events =
+       flag "--transfer-parties-get-actions-events"
+         ~doc:
+           "If true, all updates in the ledger commands will have full actions \
+            and events. If false, they will have empty actions and events. \
+            Default: false."
+         no_arg
+     in
+     Cli_lib.Exceptions.handle_nicely
+     @@ fun () ->
+     let first_partition_slots =
+       Option.value ~default:128 first_partition_slots
+     in
+     let num_txs_per_round = Option.value ~default:3 num_txs_per_round in
+     let rounds = Option.value ~default:580 rounds in
+     let max_depth = Option.value ~default:290 max_depth in
+     let constraint_constants =
+       Genesis_constants.Compiled.constraint_constants
+     in
+     let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+     Test_ledger_application.test ~privkey_path
+       ~ledger_path:(ledger_path, Stable_db) ?prev_block_path
+       ~first_partition_slots ~no_new_stack ~has_second_partition
+       ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing
+       ~transfer_parties_get_actions_events num_txs ~constraint_constants
+       ~genesis_constants ~benchmark )
+
 let itn_create_accounts =
+  let compile_config = Mina_compile_config.Compiled.t in
   Command.async ~summary:"Fund new accounts for incentivized testnet"
     (let open Command.Param in
     let privkey_path = Cli_lib.Flag.privkey_read_path in
@@ -2263,7 +2429,7 @@ let itn_create_accounts =
       flag "--fee"
         ~doc:
           (sprintf "NN Fee in nanomina paid to create an account (minimum: %s)"
-             Mina_compile_config.minimum_user_command_fee_string )
+             (Currency.Fee.to_string compile_config.minimum_user_command_fee) )
         (required int)
     in
     let amount =
@@ -2272,7 +2438,12 @@ let itn_create_accounts =
         (required int)
     in
     let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
-    Cli_lib.Background_daemon.rpc_init args ~f:Itn.create_accounts)
+    let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+    let constraint_constants =
+      Genesis_constants.Compiled.constraint_constants
+    in
+    Cli_lib.Background_daemon.rpc_init args
+      ~f:(Itn.create_accounts ~genesis_constants ~constraint_constants))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -2354,7 +2525,7 @@ let client_trustlist_group =
     ; ("remove", trustlist_remove)
     ]
 
-let advanced =
+let advanced ~itn_features =
   let cmds0 =
     [ ("get-nonce", get_nonce_cmd)
     ; ("client-trustlist", client_trustlist_group)
@@ -2397,11 +2568,16 @@ let advanced =
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
     ; ("print-signature-kind", signature_kind)
+    ; ("generate-hardfork-config", generate_hardfork_config)
+    ; ( "test"
+      , Command.group ~summary:"Testing-only commands"
+          [ ("create-genesis", test_genesis_creation)
+          ; ("submit-to-archive", Test_submit_to_archive.command)
+          ] )
     ]
   in
   let cmds =
-    if Mina_compile_config.itn_features then
-      ("itn-create-accounts", itn_create_accounts) :: cmds0
+    if itn_features then ("itn-create-accounts", itn_create_accounts) :: cmds0
     else cmds0
   in
   Command.group ~summary:"Advanced client commands" cmds
@@ -2411,6 +2587,11 @@ let ledger =
     [ ("export", export_ledger)
     ; ("hash", hash_ledger)
     ; ("currency", currency_in_ledger)
+    ; ( "test"
+      , Command.group ~summary:"Testing-only commands"
+          [ ("apply", test_ledger_application)
+          ; ("generate-accounts", Cli_lib.Commands.generate_test_ledger)
+          ] )
     ]
 
 let libp2p =

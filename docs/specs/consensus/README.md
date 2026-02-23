@@ -99,7 +99,7 @@ These are the `mainnet` parameters Mina uses for Samasika
 
 | Field | Value | Description |
 | - | - | - |
-| `delta`                         | `0`                     | Maximum permissable delay of packets (in slots after the current) |
+| `delta`                         | `0`                     | Maximum permissible delay of packets (in slots after the current) |
 | `k`                             | `290`                   | Depth of finality (number of confirmations) |
 | `slots_per_epoch`               | `7140`                  | Number of slots per epoch |
 | `slots_duration`                | `180000` (= 3m)         | Slot duration in ms |

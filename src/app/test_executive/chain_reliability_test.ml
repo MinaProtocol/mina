@@ -8,16 +8,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
 
   type dsl = Dsl.t
 
-  let config =
+  let config ~(constants : Test_config.constants) =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -32,7 +33,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
     }
 
-  let run network t =
+  let run ~config:_ network t =
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
@@ -42,15 +43,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Wait_condition.nodes_to_initialize
            (Core.String.Map.data all_mina_nodes) )
     in
-    let node_a =
-      Core.String.Map.find_exn (Network.block_producers network) "node-a"
-    in
-    let node_b =
-      Core.String.Map.find_exn (Network.block_producers network) "node-b"
-    in
-    let node_c =
-      Core.String.Map.find_exn (Network.block_producers network) "node-c"
-    in
+    let node_a = Network.block_producer_exn network "node-a" in
+    let node_b = Network.block_producer_exn network "node-b" in
+    let node_c = Network.block_producer_exn network "node-c" in
     let%bind _ =
       section "blocks are produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 2))
@@ -105,7 +100,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          () )
     in
     section "common prefix of all nodes is no farther back than 1 block"
-      (* the common prefix test relies on at least 4 blocks having been produced.  previous sections altogether have already produced 4, so no further block production is needed.  if previous sections change, then this may need to be re-adjusted*)
+      (* the common prefix test relies on at least 4 blocks having been
+         produced. previous sections altogether have already produced 4, so no
+         further block production is needed. if previous sections change, then this
+         may need to be re-adjusted*)
       (let%bind (labeled_chains : (string * string list) list) =
          Malleable_error.List.map (Core.String.Map.data all_mina_nodes)
            ~f:(fun node ->

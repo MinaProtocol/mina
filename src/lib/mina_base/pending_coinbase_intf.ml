@@ -96,6 +96,28 @@ module type S = sig
     end]
   end
 
+  module Coinbase_stack : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t = Field.t
+      end
+    end]
+  end
+
+  module State_stack : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t
+      end
+    end]
+
+    val init : t -> Field.t
+
+    val curr : t -> Field.t
+  end
+
   module Stack_versioned : sig
     [%%versioned:
     module Stable : sig
@@ -103,6 +125,10 @@ module type S = sig
         type nonrec t [@@deriving sexp, compare, equal, yojson, hash]
       end
     end]
+
+    val data : t -> Coinbase_stack.t
+
+    val state : t -> State_stack.t
   end
 
   module Stack : sig
@@ -166,15 +192,6 @@ module type S = sig
 
       val create_with : t -> t
     end
-  end
-
-  module State_stack : sig
-    [%%versioned:
-    module Stable : sig
-      module V1 : sig
-        type t
-      end
-    end]
   end
 
   module Update : sig

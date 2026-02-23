@@ -1,81 +1,100 @@
 #!/bin/bash
 
-# This script is supposed to be executed from pipeline without arguments. In order to control
-# Input parameters pipeline should defined env variables like below:
+# Usage (in buildkite definition)
+
 # steps:
 #  - commands:
 #      - "./buildkite/scripts/run_promote_build_job.sh | buildkite-agent pipeline upload"
-#    label: ":pipeline: run promote build job"
+#    label: ":pipeline: run promote dockers build job"
 #    agents:
 #       size: "generic"
-#   plugins:
+#    plugins:
 #      "docker#v3.5.0":
 #        environment:
 #          - BUILDKITE_AGENT_ACCESS_TOKEN
-#          - "PACKAGES=LogProc"
-#          - "VERSION=2.0.0berkeley-rc1-develop-91bf5d2"
-#          - "CODENAME=Bullseye"
+#          - "ARTIFACTS=Archive,Daemon"
+#          - "REMOVE_PROFILE_FROM_NAME=1"
+#          - "PROFILE=Hardfork"
+#          - "NETWORK=Devnet"
+#          - "FROM_VERSION=3.0.0devnet-tooling-dkijania-hardfork-package-gen-in-nightly-b37f50e"
+#          - "NEW_VERSION=3.0.0fake-ddb6fc4"
+#          - "CODENAMES=Focal,Bullseye"
 #          - "FROM_CHANNEL=Unstable"
-#          - "TO_CHANNEL=Nightly"
-#        image: codaprotocol/ci-toolchain-base:v3
+#          - "TO_CHANNEL=Experimental"
+#        image: europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4
 #        mount-buildkite-agent: true
 #        propagate-environment: true
-#
-# Below method is kept for documentaion purposes
+
+
+set -x
+
+ARTIFACTS_DHALL_DEF="(./buildkite/src/Constants/Artifacts.dhall)"
+DEBIAN_VERSION_DHALL_DEF="(./buildkite/src/Constants/DebianVersions.dhall)"
+PROMOTE_PACKAGE_DHALL_DEF="(./buildkite/src/Entrypoints/PublishPackages.dhall)"
+PROFILES_DHALL_DEF="(./buildkite/src/Constants/Profiles.dhall)"
+NETWORK_DHALL_DEF="(./buildkite/src/Constants/Network.dhall)"
+DEBIAN_CHANNEL_DHALL_DEF="(./buildkite/src/Constants/DebianChannel.dhall)"
+DEBIAN_REPO_DHALL_DEF="(./buildkite/src/Constants/DebianRepo.dhall)"
 
 function usage() {
   if [[ -n "$1" ]]; then
     echo -e "${RED}☞  $1${CLEAR}\n";
   fi
-  echo "  DEBIANS             The comma delimitered debian names. For example: 'Daemon,Archive' "
-  echo "  DOCKERS             The comma delimitered docker names. For example: 'Daemon,Archive' "
-  echo "  CODENAME            The Debian codename (Bullseye, Buster etc.)"
-  echo "  VERSION             The Docker or Debian version"
-  echo "  NEW_VERSION         The new Debian version or new Docker tag"
-  echo "  PROFILE             The Docker and Debian profile (Standard, Lightnet)"
-  echo "  FROM_CHANNEL        The Docker name (mina-berkeley, mina-archive etc.)"
-  echo "  TO_CHANNEL          The Docker version"
-  echo "  PUBLISH             The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io"
+  echo "  ARTIFACTS                   The comma delimitered artifacts names. For example: 'Daemon,Archive' "
+  echo "  CODENAMES                   The Debian codenames (Bullseye, Focal etc.)"
+  echo "  VERSION                     The new Debian version or new Docker tag"
+  echo "  PROFILE                     The Docker and Debian profile (Standard, Lightnet)"
+  echo "  NETWORK                     The Docker and Debian network (Devnet, Mainnet)"
+  echo "  CHANNEL                     Target debian channel"
+  echo "  REPO                        Source debian repository"
+  echo "  BUILD_ID                    The Buildkite build ID. If defined, script will use it to generate debian package version"
+  echo "  DOCKER_REPO                 The Docker repository. If defined, script will publish docker to target repository. Otherwise it will only create docker image locally"
+  echo "  VERIFY                      The Verify flag. If set, script will verify the artifacts before promoting them"
   echo ""
   exit 1
 }
 
-if [ -z "$DEBIANS" ] && [ -z "$DOCKERS"]; then usage "No Debians nor Dockers defined for promoting!"; fi;
+if [[ -z "$ARTIFACTS" ]]; then usage "No artifacts defined for promoting!"; exit 1; fi;
+if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; exit 1; fi;
+if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
+if [[ -z "$DOCKER_REPO" ]]; then usage "Docker repo is not set!"; exit 1; fi;
+if [[ -z "$NETWORK" ]]; then NETWORK="Devnet"; fi;
+if [[ -z "$CHANNEL" ]]; then CHANNEL="Unstable"; fi;
+if [[ -z "$REPO" ]]; then REPO="Nightly"; fi;
+if [[ -z "$VERIFY" ]]; then VERIFY=0; fi;
+if [[ -z "$VERSION" ]]; then usage "Version is not set!"; exit 1; fi;
+if [[ -z "$NEW_VERSION" ]];  then usage "New Version is not set!"; exit 1; fi;
+if [[ -z "$BUILD_ID" ]]; then usage "Build ID is not set!"; exit 1; fi;
 
-DHALL_DEBIANS="([] : List (./buildkite/src/Constants/DebianPackage.dhall).Type)"
+DHALL_DOCKER_REPO="DockerRepo.Type.$DOCKER_REPO"
 
-
-if [[ -n "$DEBIANS" ]]; then 
-    if [[ -z "$CODENAME" ]]; then usage "Codename is not set!"; fi;
-    if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
-    if [[ -z "$FROM_CHANNEL" ]]; then usage "'From channel' arg is not set!"; fi;
-    if [[ -z "$TO_CHANNEL" ]]; then usage "'To channel' arg is not set!"; fi;
-    if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
-    if [[ -z "$NEW_VERSION" ]]; then NEW_VERSION=$VERSION; fi;
-    
-
-  arr_of_debians=(${DEBIANS//,/ })
-  DHALL_DEBIANS=""
-  for i in "${arr_of_debians[@]}"; do
-    DHALL_DEBIANS="${DHALL_DEBIANS}, (./buildkite/src/Constants/DebianPackage.dhall).Type.${i}"
-  done
-  DHALL_DEBIANS="[${DHALL_DEBIANS:1}]"
+if [[ $VERIFY -eq 1 ]]; then
+    DHALL_VERIFY="True"
+  else 
+    DHALL_VERIFY="False"
 fi
 
+function to_dhall_list() {
+  local input_str="$1"
+  local dhall_type="$2"
+  local arr=(${input_str//,/ })
+  local dhall_list=""
 
-DHALL_DOCKERS="([] : List (./buildkite/src/Constants/Artifacts.dhall).Type)"
+  if [[ ${#arr[@]} -eq 0 || -z "${arr[0]}" ]]; then
+    dhall_list="([] : List $dhall_type)"
+  elif [[ ${#arr[@]} -eq 1 ]]; then
+    dhall_list="[$dhall_type.${arr[0]}]"
+  else
+    for i in "${arr[@]}"; do
+      dhall_list="${dhall_list}, $dhall_type.${i}"
+    done
+    dhall_list="[${dhall_list:1}]"
+  fi
 
-if [[ -n "$DOCKERS" ]]; then 
-    if [[ -z "$NEW_VERSION" ]]; then usage "New Tag is not set!"; fi;
-    if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
-    if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
-  
-  arr_of_dockers=(${DOCKERS//,/ })
-  DHALL_DOCKERS=""
-  for i in "${arr_of_dockers[@]}"; do
-    DHALL_DOCKERS="${DHALL_DOCKERS}, (./buildkite/src/Constants/Artifacts.dhall).Type.${i}"
-  done
-  DHALL_DOCKERS="[${DHALL_DOCKERS:1}]"
-fi
+  echo "$dhall_list"
+}
 
-echo '(./buildkite/src/Entrypoints/PromotePackage.dhall).promote_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${VERSION}"'" "'"${NEW_VERSION}"'" "amd64" (./buildkite/src/Constants/Profiles.dhall).Type.'"${PROFILE}"' (./buildkite/src/Constants/DebianVersions.dhall).DebVersion.'"${CODENAME}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${FROM_CHANNEL}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${TO_CHANNEL}"' "'"${TAG}"'" ' | dhall-to-yaml --quoted 
+DHALL_ARTIFACTS=$(to_dhall_list "$ARTIFACTS" "$ARTIFACTS_DHALL_DEF.Type")
+DHALL_CODENAMES=$(to_dhall_list "$CODENAMES" "$DEBIAN_VERSION_DHALL_DEF.DebVersion")
+
+echo $PROMOTE_PACKAGE_DHALL_DEF'.promote_artifacts '"$DHALL_ARTIFACTS"' "'"${VERSION}"'" "'"${NEW_VERSION}"'" "amd64" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${CHANNEL}"' '$DEBIAN_REPO_DHALL_DEF'.Type.'"${REPO}"' '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_DOCKER_REPO}' '${DHALL_VERIFY}' "'"${BUILD_ID}"'" ' | dhall-to-yaml --quoted

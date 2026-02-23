@@ -9,16 +9,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
 
   type dsl = Dsl.t
 
-  let config =
+  let config ~(constants : Test_config.constants) =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -26,7 +27,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
     }
 
-  let run network t =
+  let run ~config:_ network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
@@ -35,13 +36,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Wait_condition.nodes_to_initialize
            (Core.String.Map.data all_mina_nodes) )
     in
-    let node =
-      Core.String.Map.find_exn (Network.block_producers network) "node"
-    in
-    let bp_keypair =
-      (Core.String.Map.find_exn (Network.genesis_keypairs network) "node-key")
-        .keypair
-    in
+    let node = Network.block_producer_exn network "node" in
+    let bp_keypair = (Network.genesis_keypair_exn network "node-key").keypair in
     let bp_pk = bp_keypair.public_key |> Signature_lib.Public_key.compress in
     let bp_pk_account_id = Account_id.create bp_pk Token_id.default in
     let bp_original_balance = Currency.Amount.of_mina_string_exn "1000" in
@@ -58,7 +54,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Network.Node.get_ingress_uri node)
            ~account_id:bp_pk_account_id
        in
-       (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
+       (* TODO, the intg test framework is ignoring
+          test_constants.coinbase_amount for whatever reason, so hardcoding this
+          until that is fixed *)
        let bp_expected =
          Currency.Amount.add bp_original_balance coinbase_reward
          |> Option.value_exn

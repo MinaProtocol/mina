@@ -1,14 +1,8 @@
 open Core_kernel
 
-module type Inputs_intf = sig
-  include Base_inputs_intf.S
-
-  module Location : Location_intf.S
-end
-
-module Make (Inputs : Inputs_intf) : sig
+module Make (Inputs : Intf.Inputs.Intf) : sig
   include
-    Base_ledger_intf.S
+    Intf.Ledger.NULL
       with module Addr = Inputs.Location.Addr
       with module Location = Inputs.Location
       with type key := Inputs.Key.t
@@ -19,14 +13,10 @@ module Make (Inputs : Inputs_intf) : sig
        and type hash := Inputs.Hash.t
        and type root_hash := Inputs.Hash.t
        and type account := Inputs.Account.t
-
-  val create : depth:int -> unit -> t
 end = struct
   open Inputs
 
   type t = { uuid : Uuid.t; depth : int } [@@deriving sexp_of]
-
-  let t_of_sexp _ = failwith "t_of_sexp unimplemented"
 
   type index = int
 
@@ -40,7 +30,9 @@ end = struct
   let create ~depth () = { uuid = Uuid_unix.create (); depth }
 
   let empty_hash_at_height =
-    Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+    Mina_stdlib.Empty_hashes.extensible_cache
+      (module Hash)
+      ~init_hash:Hash.empty_account
 
   let merkle_path t location =
     let location =
@@ -55,7 +47,7 @@ end = struct
       else
         let dir = Location.last_direction (Location.to_path_exn k) in
         let hash = empty_hash_at_height h in
-        Direction.map dir ~left:(`Left hash) ~right:(`Right hash)
+        Mina_stdlib.Direction.map dir ~left:(`Left hash) ~right:(`Right hash)
         :: loop (Location.parent k)
     in
     loop location
@@ -75,7 +67,9 @@ end = struct
       else
         let dir = Location.last_direction (Location.to_path_exn k) in
         let hash = empty_hash_at_height h in
-        Direction.map dir ~left:(`Left (hash, hash)) ~right:(`Right (hash, hash))
+        Mina_stdlib.Direction.map dir
+          ~left:(`Left (hash, hash))
+          ~right:(`Right (hash, hash))
         :: loop (Location.parent k)
     in
     loop location
@@ -101,9 +95,12 @@ end = struct
   let set_at_index_exn _t =
     failwith "set_at_index_exn: null ledgers cannot be mutated"
 
+  let get_at_index _t _index = None
+
   let get_at_index_exn _t = failwith "get_at_index_exn: null ledgers are empty"
 
-  let set_batch _t = failwith "set_batch: null ledgers cannot be mutated"
+  let set_batch ?hash_cache:_ _t =
+    failwith "set_batch: null ledgers cannot be mutated"
 
   let set _t = failwith "set: null ledgers cannot be mutated"
 
@@ -134,6 +131,8 @@ end = struct
   let token_owners _t = Account_id.Set.empty
 
   let tokens _t _pk = Token_id.Set.empty
+
+  let iteri_untrusted _t ~f:_ = ()
 
   let iteri _t ~f:_ = ()
 
@@ -168,9 +167,6 @@ end = struct
   let set_batch_accounts _t =
     failwith "set_batch_accounts: null ledgers cannot be mutated"
 
-  let set_inner_hash_at_addr_exn _t =
-    failwith "set_inner_hash_at_addr_exn: null ledgers cannot be mutated"
-
   let get_inner_hash_at_addr_exn t addr =
     empty_hash_at_height (Addr.height ~ledger_depth:t.depth addr)
 
@@ -179,4 +175,6 @@ end = struct
   let depth t = t.depth
 
   let detached_signal _ = Async_kernel.Deferred.never ()
+
+  let all_accounts_on_masks _ = Location.Map.empty
 end

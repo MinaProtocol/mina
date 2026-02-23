@@ -26,6 +26,8 @@ usage() {
     echo ""
     echo "  Optional:"
     echo "    MISSING_BLOCKS_AUDITOR  Path to the missing-blocks-auditor exe (default: mina-missing-blocks-auditor)"
+    echo "    ARCHIVE_BLOCKS          Path to the archive blocks exe (default: mina-archive-blocks)"
+    echo "    BLOCKS_FORMAT           Block format type. Possible values: [precomputed/extensional] (default: precomputed)"
     echo "    TIMEOUT                 Time to sleep in seconds when in daemon mode. After recovery it will sleep six times more (default: 600)"
     echo ""
     echo "Example:"
@@ -77,7 +79,17 @@ check_env_vars() {
       echo -e "[INFO] The MISSING_BLOCKS_AUDITOR environment variable is not set or is empty. Defaulting to \033[31mmina-missing-block-auditor\e[m."
       MISSING_BLOCKS_AUDITOR=mina-missing-blocks-auditor
   fi
+
+  if [ -z "$BLOCKS_FORMAT" ]; then
+      echo -e "[INFO] The BLOCKS_FORMAT environment variable is not set or is empty. Defaulting to \033[31mprecomputed\e[m."
+      BLOCKS_FORMAT=precomputed
+  fi
   
+  if [ -z "$ARCHIVE_BLOCKS" ]; then
+      echo -e "[INFO] The ARCHIVE_BLOCKS environment variable is not set or is empty. Defaulting to \033[31mmina-archive-blocks\e[m."
+      ARCHIVE_BLOCKS=mina-archive-blocks
+  fi
+
   if [ -z "$TIMEOUT" ]; then
       echo -e "[INFO] The TIMEOUT environment variable is not set or is empty. Defaulting to \033[31m600\e[m."
       TIMEOUT=600
@@ -95,14 +107,16 @@ jq_parent_hash() {
 
 populate_db() {
   tempfile=$(mktemp)
-  mina-archive-blocks --precomputed --archive-uri "${1}" "${2}" > tempfile
+  echo  "${ARCHIVE_BLOCKS} --${BLOCKS_FORMAT} --archive-uri ${1} ${2}"
+  ${ARCHIVE_BLOCKS} "--${BLOCKS_FORMAT}" --archive-uri "${1}" "${2}" > tempfile
+  
   if [ $? -ne 0 ]; then
     echo $'[ERROR] mina-archive-blocks failed. The database remains unhealthy.\n Make sure the environment variables are set correctly and the database is accessible.'
-    rm "${2}" tempfile
+    rm "${2}" "$tempfile"
     exit 1
   fi
   jq -rs '"[BOOTSTRAP] Populated database with block: \(.[-1].message)"' < tempfile
-  rm tempfile
+  rm "$tempfile"
   rm "${2}"
   if [ $? -ne 0 ]; then
     echo $'[ERROR] Failed to remove block file. The database remains unhealthy.\n Make sure the environment variables PRECOMPUTED_BLOCKS_URL and MINA_NETWORK are set correctly.'
@@ -119,7 +133,6 @@ download_block() {
   fi
 }
 
-HASH='map(select(.metadata.parent_hash != null and .metadata.parent_height != null)) | .[0].metadata.parent_hash'
 # Bootstrap finds every missing state hash in the database and imports them from a bucket of precomputed .json blocks
 bootstrap() {
   echo "[BOOTSTRAP] Top 10 blocks before bootstrapping the archiveDB:"
@@ -199,7 +212,7 @@ main() {
       fi
       echo "[BOOTSTRAP] $($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq -rs .[].message)"
       [[ "$PARENT" != "null" ]] && echo "[BOOTSTRAP] Some blocks are missing, moving to recovery logic..." && bootstrap $SINGLE_RUN
-      echo "[RESOLUTION] The bootstrap process finished successfuly, the Archive node is synced with no missing blocks to genesis!"
+      echo "[RESOLUTION] The bootstrap process finished successfully, the Archive node is synced with no missing blocks to genesis!"
       exit 0
       ;; 
 

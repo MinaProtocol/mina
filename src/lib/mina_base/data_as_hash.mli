@@ -15,7 +15,7 @@ open Snark_params.Tick
     (* Use the hash representing x *) ...
     let%bind () =
       as_prover As_prover.(
-        let%map x = As_prover.Ref.get (Data_as_hash.ref x) in
+        let%map x = As_prover.read (Typ.prover_value ()) (Data_as_hash.prover_value x) in
         printf "%s\n" (Foo.to_string x)
       )
     in
@@ -26,7 +26,7 @@ type 'value t
 
 val hash : _ t -> Field.Var.t
 
-val ref : 'value t -> 'value As_prover.Ref.t
+val prover_value : 'value t -> 'value Typ.prover_value
 
 val typ : hash:('value -> Field.t) -> ('value t, 'value) Typ.t
 
@@ -36,11 +36,17 @@ val optional_typ :
   -> dummy_value:'value
   -> ('value t, 'value option) Typ.t
 
+val lazy_optional_typ :
+     hash:('value -> Field.t)
+  -> non_preimage:Field.t lazy_t
+  -> dummy_value:'value
+  -> ('value t, 'value option) Typ.t
+
 val to_input : _ t -> Field.Var.t Random_oracle_input.Chunked.t
 
 val if_ : Boolean.var -> then_:'value t -> else_:'value t -> 'value t
 
-val make_unsafe : Field.Var.t -> 'value As_prover.Ref.t -> 'value t
+val make_unsafe : Field.Var.t -> 'value Typ.prover_value -> 'value t
 
 module As_record : sig
   type 'a t = { data : 'a; hash : Field.t } [@@deriving annot, fields]

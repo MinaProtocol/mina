@@ -6,6 +6,8 @@ val genesis_constants : Genesis_constants.t
 
 val proof_level : Genesis_constants.Proof_level.t
 
+val signature_kind : Mina_signature_kind.t
+
 val consensus_constants : Consensus.Constants.t
 
 val constraint_constants : Genesis_constants.Constraint_constants.t
@@ -66,16 +68,16 @@ val check_zkapp_command_with_merges_exn :
 
 (** Verification key of a trivial smart contract *)
 val trivial_zkapp :
-  ( [> `VK of (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t ]
+  ( [> `VK of
+       (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+       Async.Deferred.t ]
   * [> `Prover of
        ( unit
        , unit
        , unit
        , Zkapp_statement.t
-       , ( unit
-         * unit
-         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
-         Async.Deferred.t )
+       , (unit * unit * Pickles_types.Nat.N2.n Pickles.Proof.t) Async.Deferred.t
+       )
        Pickles.Prover.t ] )
   Lazy.t
 
@@ -87,16 +89,16 @@ val test_snapp_update :
      ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> ?snapp_permissions:Permissions.t
-  -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+  -> vk:
+       (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+       Async.Deferred.t
   -> zkapp_prover:
        ( unit
        , unit
        , unit
        , Zkapp_statement.t
-       , ( unit
-         * unit
-         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
-         Async.Deferred.t )
+       , (unit * unit * Pickles_types.Nat.N2.n Pickles.Proof.t) Async.Deferred.t
+       )
        Pickles.Prover.t
   -> Transaction_snark.For_tests.Update_states_spec.t
   -> init_ledger:Mina_transaction_logic.For_tests.Init_ledger.t

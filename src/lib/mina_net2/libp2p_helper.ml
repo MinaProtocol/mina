@@ -118,6 +118,21 @@ let%test "record_of_yojson 1" =
        lines )
     [ true; false ]
 
+(** State for managing a libp2p_helper child process and interactions with it.
+    Push messages (which do not need direct responses) between libp2p_helper and
+    the parent ocaml process do not need tracking here. RPC requests sent from
+    the parent to the libp2p_helper do need responses; these are coordinated
+    through the [outstanding_requests] table.
+
+    1. Before sending a request to the libp2p_helper in [do_rpc], an empty
+    [Ivar.t] is added to the [outstanding_requests] table. The request will then
+    be sent, and the requester will wait on the [Ivar.t].
+
+    2. When processing a response from the libp2p_helper in
+    [handle_incoming_message], the entry in the [outstanding_requests] table for
+    the associated request will be removed. The [Ivar.t] will then be filled
+    with the response.
+*)
 type t =
   { process : Child_processes.t
   ; logger : Logger.t
@@ -126,6 +141,8 @@ type t =
   ; outstanding_requests :
       Libp2p_ipc.rpc_response_body Or_error.t Ivar.t
       Libp2p_ipc.Sequence_number.Table.t
+        (** A table tracking requests to the libp2p helper that need
+            responses *)
   }
 
 let handle_libp2p_helper_termination t ~pids ~killed result =
@@ -134,6 +151,7 @@ let handle_libp2p_helper_termination t ~pids ~killed result =
         (Or_error.error_string "libp2p_helper process died before answering") ) ;
   Hashtbl.clear t.outstanding_requests ;
   Child_processes.Termination.remove pids (Child_processes.pid t.process) ;
+  Mina_metrics.Process_memory.Libp2p_helper.clear_pid () ;
   if (not killed) && not t.finished then (
     match result with
     | Ok ((Error (`Exit_non_zero _) | Error (`Signal _)) as e) ->
@@ -195,15 +213,13 @@ let handle_incoming_message t msg ~handle_push_message =
                 RpcMessageHeader.sequence_number_get rpc_header
               in
               record_message_delay (RpcMessageHeader.time_sent_get rpc_header) ;
-              match Hashtbl.find t.outstanding_requests sequence_number with
+              match
+                Hashtbl.find_and_remove t.outstanding_requests sequence_number
+              with
               | Some ivar ->
-                  if Ivar.is_full ivar then
-                    [%log' error t.logger]
-                      "Attempted fill outstanding libp2p_helper RPC request \
-                       more than once"
-                  else
-                    Ivar.fill ivar
-                      (Libp2p_ipc.rpc_response_to_or_error rpc_response)
+                  (* Invariant: no ivar is filled when they're in [t.outstanding_requests] *)
+                  Ivar.fill ivar
+                    (Libp2p_ipc.rpc_response_to_or_error rpc_response)
               | None ->
                   [%log' error t.logger]
                     "Attempted to fill outstanding libp2p_helper RPC request, \
@@ -221,8 +237,7 @@ let handle_incoming_message t msg ~handle_push_message =
               handle_push_message t (DaemonInterface.PushMessage.get push_msg) )
           )
   | Undefined n ->
-      Libp2p_ipc.undefined_union ~context:"DaemonInterface.Message" n ;
-      Deferred.unit
+      Libp2p_ipc.undefined_union ~context:"DaemonInterface.Message" n
 
 let spawn ?(allow_multiple_instances = false) ~logger ~pids ~conf_dir
     ~handle_push_message () =
@@ -248,6 +263,9 @@ let spawn ?(allow_multiple_instances = false) ~logger ~pids ~conf_dir
            MINA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper."
   | Ok process ->
       Child_processes.register_process pids process Libp2p_helper ;
+      let pid = Child_processes.pid process in
+      [%log info] "Libp2p helper process has PID %d" (Pid.to_int pid) ;
+      Mina_metrics.Process_memory.Libp2p_helper.set_pid pid ;
       let t =
         { process
         ; logger
@@ -362,10 +380,8 @@ let send_validation ~validation_id ~validation_result =
       (Libp2p_ipc.create_validation_push_message ~validation_id
          ~validation_result )
 
-let send_add_resource ~tag ~body =
-  let open Staged_ledger_diff in
-  let tag = Body.Tag.to_enum tag in
-  let data = Body.to_binio_bigstring body |> Bigstring.to_string in
+let send_add_resource ~tag ~data =
+  let tag = Bitswap_tag.to_enum tag in
   send_push ~name:"AddResource"
     ~msg:(Libp2p_ipc.create_add_resource_push_message ~tag ~data)
 
@@ -386,7 +402,7 @@ let test_with_libp2p_helper ?(logger = Logger.null ())
         (fun () -> f conf_dir helper)
         ~finally:(fun () ->
           let%bind () = shutdown helper in
-          File_system.remove_dir conf_dir ) )
+          Mina_stdlib_unix.File_system.remove_dir conf_dir ) )
 
 let%test_module "bitswap blocks" =
   ( module struct

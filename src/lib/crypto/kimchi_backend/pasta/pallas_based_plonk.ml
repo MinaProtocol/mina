@@ -34,10 +34,13 @@ end
 module R1CS_constraint_system =
   Kimchi_pasta_constraint_system.Pallas_constraint_system
 
-let lagrange srs domain_log2 : _ Kimchi_types.poly_comm array =
+module Constraint = R1CS_constraint_system.Constraint
+
+let lagrange (srs : Kimchi_bindings.Protocol.SRS.Fq.t) domain_log2 :
+    _ Kimchi_types.poly_comm array =
   let domain_size = Int.pow 2 domain_log2 in
-  Array.init domain_size ~f:(fun i ->
-      Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment srs domain_size i )
+  Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitments_whole_domain srs
+    domain_size
 
 let with_lagrange f (vk : Verification_key.t) =
   f (lagrange vk.srs vk.domain.log_size_of_group) vk
@@ -77,13 +80,18 @@ module Proof = Plonk_dlog_proof.Make (struct
       , Pasta_bindings.Fq.t )
       Kimchi_types.prover_proof
 
+    type with_public_evals =
+      ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
+      , Pasta_bindings.Fq.t )
+      Kimchi_types.proof_with_public
+
     include Kimchi_bindings.Protocol.Proof.Fq
 
     let batch_verify vks ts =
       Promise.run_in_thread (fun () -> batch_verify vks ts)
 
-    let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
-        prev_comms =
+    let create_aux ~f:backend_create (pk : Keypair.t) ~primary ~auxiliary
+        ~prev_chals ~prev_comms =
       (* external values contains [1, primary..., auxiliary ] *)
       let external_values i =
         let open Field.Vector in
@@ -92,7 +100,7 @@ module Proof = Plonk_dlog_proof.Make (struct
       in
 
       (* compute witness *)
-      let computed_witness =
+      let computed_witness, runtime_tables =
         R1CS_constraint_system.compute_witness pk.cs external_values
       in
       let num_rows = Array.length computed_witness.(0) in
@@ -106,16 +114,19 @@ module Proof = Plonk_dlog_proof.Make (struct
             done ;
             witness )
       in
-      create pk.index witness_cols prev_chals prev_comms
+      backend_create pk.index witness_cols runtime_tables prev_chals prev_comms
 
-    let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
-      create_aux pk primary auxiliary prev_chals prev_comms
-        ~f:(fun pk auxiliary_input prev_challenges prev_sgs ->
+    let create_async (pk : Keypair.t) ~primary ~auxiliary ~prev_chals
+        ~prev_comms =
+      create_aux pk ~primary ~auxiliary ~prev_chals ~prev_comms
+        ~f:(fun index witness runtime_tables prev_chals prev_sgs ->
           Promise.run_in_thread (fun () ->
-              create pk auxiliary_input prev_challenges prev_sgs ) )
+              Kimchi_bindings.Protocol.Proof.Fq.create index witness
+                runtime_tables prev_chals prev_sgs ) )
 
-    let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
-      create_aux pk primary auxiliary prev_chals prev_comms ~f:create
+    let create (pk : Keypair.t) ~primary ~auxiliary ~prev_chals ~prev_comms =
+      create_aux pk ~primary ~auxiliary ~prev_chals ~prev_comms
+        ~f:Kimchi_bindings.Protocol.Proof.Fq.create
   end
 
   module Verifier_index = Kimchi_bindings.Protocol.VerifierIndex.Fq
@@ -165,5 +176,11 @@ module Oracles = Plonk_dlog_oracles.Make (struct
     include Kimchi_bindings.Protocol.Oracles.Fq
 
     let create = with_lagrange create
+
+    let create_with_public_evals = with_lagrange create_with_public_evals
   end
 end)
+
+module Cvar = Kimchi_pasta_snarky_backend.Pallas_based_plonk.Cvar
+
+module Run_state = Kimchi_pasta_snarky_backend.Pallas_based_plonk.Run_state

@@ -9,17 +9,16 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
     ~unprocessed_transition_cache : unit =
-  match Transition_frontier.catchup_tree frontier with
-  | Hash _ ->
-      Normal_catchup.run
-        ~context:(module Context)
-        ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
-        ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
+  match Transition_frontier.catchup_state frontier with
   | Full _ ->
       Super_catchup.run
         ~context:(module Context)

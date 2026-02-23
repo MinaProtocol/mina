@@ -15,9 +15,9 @@ module type Concrete = sig
 
   module V2 : sig
     type t =
-      { statement : Mina_state.Snarked_ledger_state.With_sok.V2.t
-      ; proof : Proof.V2.t
-      }
+      ( Mina_state.Snarked_ledger_state.With_sok.V2.t
+      , Proof.V2.t )
+      Proof_carrying_data.V1.t
   end
 end
 

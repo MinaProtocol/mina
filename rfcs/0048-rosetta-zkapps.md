@@ -54,7 +54,7 @@ Most of the changes will be localized to supporting new zkApps related [Rosetta 
 
 These new transactions will be present in both the `/block` and `/mempool` endpoints.
 
-Note: GraphQL queries for zkApp transactions can be [generated programatically](https://github.com/MinaProtocol/mina/blob/develop/src/lib/mina_base/parties.ml#L1431) as they are quite large.
+Note: GraphQL queries for zkApp transactions can be [generated programmatically](https://github.com/MinaProtocol/mina/blob/develop/src/lib/mina_base/parties.ml#L1431) as they are quite large.
 
 **Operations for zkApps**
 

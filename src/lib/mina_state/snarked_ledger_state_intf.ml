@@ -110,6 +110,22 @@ module type Full = sig
          , 'sok_digest
          , Mina_transaction_logic.Zkapp_command_logic.Local_state.Value.t )
          t
+
+    val drop_sok :
+         ( 'ledger_hash
+         , 'amount
+         , 'pending_coinbase
+         , 'fee_excess
+         , 'sok_digest
+         , 'local_state )
+         t
+      -> ( 'ledger_hash
+         , 'amount
+         , 'pending_coinbase
+         , 'fee_excess
+         , unit
+         , 'local_state )
+         t
   end
 
   module Statement_ledgers : sig
@@ -223,22 +239,9 @@ module type Full = sig
       , Local_state.Checked.t )
       Poly.t
 
-    open Tick
+    val typ : (var, t) Tick.Typ.t
 
-    val typ : (var, t) Typ.t
-
-    val to_input : t -> Field.t Random_oracle.Input.Chunked.t
-
-    val to_field_elements : t -> Field.t array
-
-    module Checked : sig
-      type t = var
-
-      val to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t Checked.t
-
-      (* This is actually a checked function. *)
-      val to_field_elements : var -> Field.Var.t array
-    end
+    val to_field_elements : t -> Tick.Field.t array
   end
 
   val gen : t Quickcheck.Generator.t

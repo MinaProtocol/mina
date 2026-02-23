@@ -1,30 +1,8 @@
-open Core
+open Core_kernel
 
-module type Inputs_intf = sig
-  include Base_inputs_intf.S
-
-  module Location : Location_intf.S
-
-  module Location_binable : Hashable.S_binable with type t := Location.t
-
-  module Kvdb : Intf.Key_value_database with type config := string
-
-  module Storage_locations : Intf.Storage_locations
-end
-
-module Make (Inputs : Inputs_intf) :
-  Database_intf.S
-    with module Location = Inputs.Location
-     and module Addr = Inputs.Location.Addr
-     and type key := Inputs.Key.t
-     and type token_id := Inputs.Token_id.t
-     and type token_id_set := Inputs.Token_id.Set.t
-     and type account := Inputs.Account.t
-     and type root_hash := Inputs.Hash.t
-     and type hash := Inputs.Hash.t
-     and type account_id := Inputs.Account_id.t
-     and type account_id_set := Inputs.Account_id.Set.t = struct
-  (* The max depth of a merkle tree can never be greater than 253. *)
+module Make (Inputs : Intf.Inputs.DATABASE) = struct
+  (* The max depth of a merkle tree can never be greater than 253,
+     due to the way we encode locations. *)
   open Inputs
 
   module Db_error = struct
@@ -66,7 +44,9 @@ module Make (Inputs : Inputs_intf) :
 
   let depth t = t.depth
 
-  let create ?directory_name ~depth () =
+  let create ?directory_name ?(fresh = false) ~depth () =
+    let open Core in
+    (* for ^/ and Unix below *)
     assert (depth < 0xfe) ;
     let uuid = Uuid_unix.create () in
     let directory =
@@ -79,6 +59,7 @@ module Make (Inputs : Inputs_intf) :
       | Some name ->
           name
     in
+    if fresh then Mina_stdlib_unix.File_system.rmrf directory ;
     Unix.mkdir_p directory ;
     let kvdb = Kvdb.create directory in
     { uuid
@@ -117,7 +98,9 @@ module Make (Inputs : Inputs_intf) :
     with exn -> close t ; raise exn
 
   let empty_hash =
-    Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+    Mina_stdlib.Empty_hashes.extensible_cache
+      (module Hash)
+      ~init_hash:Hash.empty_account
 
   let get_raw { kvdb; depth; _ } location =
     Kvdb.get kvdb ~key:(Location.serialize ~ledger_depth:depth location)
@@ -192,10 +175,6 @@ module Make (Inputs : Inputs_intf) :
     assert (Addr.depth address <= mdb.depth) ;
     get_hash mdb (Location.Hash address)
 
-  let set_inner_hash_at_addr_exn mdb address hash =
-    assert (Addr.depth address <= mdb.depth) ;
-    set_bin mdb (Location.Hash address) Hash.bin_size_t Hash.bin_write_t hash
-
   let get_generic mdb location =
     assert (Location.is_generic location) ;
     get_raw mdb location
@@ -269,7 +248,7 @@ module Make (Inputs : Inputs_intf) :
           let first_location =
             Location.Account
               ( Addr.of_directions
-              @@ List.init mdb.depth ~f:(fun _ -> Direction.Left) )
+              @@ List.init mdb.depth ~f:(fun _ -> Mina_stdlib.Direction.Left) )
           in
           set_raw mdb location (Location.serialize ~ledger_depth first_location) ;
           Result.return first_location
@@ -290,30 +269,22 @@ module Make (Inputs : Inputs_intf) :
       Result.map location_result ~f:(fun location ->
           set mdb key location ; location )
 
-    let last_location_address mdb =
-      match
-        last_location_key () |> get_raw mdb |> Result.of_option ~error:()
-        |> Result.bind ~f:(Location.parse ~ledger_depth:mdb.depth)
-      with
-      | Error () ->
-          None
-      | Ok parsed_location ->
-          Some (Location.to_path_exn parsed_location)
-
     let last_location mdb =
-      match
-        last_location_key () |> get_raw mdb |> Result.of_option ~error:()
-        |> Result.bind ~f:(Location.parse ~ledger_depth:mdb.depth)
-      with
-      | Error () ->
-          None
-      | Ok parsed_location ->
-          Some parsed_location
+      last_location_key () |> get_raw mdb
+      |> Option.bind ~f:(fun data ->
+             Location.parse ~ledger_depth:mdb.depth data |> Result.ok )
+
+    let last_location_address mdb =
+      Option.map (last_location mdb) ~f:Location.to_path_exn
   end
 
-  let get_at_index_exn mdb index =
+  let get_at_index mdb index =
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
-    get mdb (Location.Account addr) |> Option.value_exn
+    get mdb (Location.Account addr)
+
+  let get_at_index_exn mdb index =
+    get_at_index mdb index
+    |> Option.value_exn ~message:"Expected account at index" ~here:[%here]
 
   let all_accounts (t : t) =
     match Account_location.last_location_address t with
@@ -543,12 +514,13 @@ module Make (Inputs : Inputs_intf) :
   module For_tests = struct
     let gen_account_location ~ledger_depth =
       let open Quickcheck.Let_syntax in
-      let build_account (path : Direction.t list) =
+      let build_account (path : Mina_stdlib.Direction.t list) =
         assert (List.length path = ledger_depth) ;
         Location.Account (Addr.of_directions path)
       in
       let%map dirs =
-        Quickcheck.Generator.list_with_length ledger_depth Direction.gen
+        Quickcheck.Generator.list_with_length ledger_depth
+          Mina_stdlib.Direction.gen
       in
       build_account dirs
   end
@@ -590,7 +562,7 @@ module Make (Inputs : Inputs_intf) :
 
   let get_or_create_account mdb account_id account =
     match Account_location.get mdb account_id with
-    | Error Account_location_not_found -> (
+    | Error Db_error.Account_location_not_found -> (
         match Account_location.allocate mdb account_id with
         | Ok location ->
             set mdb location account ;
@@ -599,18 +571,24 @@ module Make (Inputs : Inputs_intf) :
         | Error err ->
             Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
         )
-    | Error err ->
+    | Error ((Db_error.Malformed_database | Db_error.Out_of_leaves) as err) ->
         Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
     | Ok location ->
         Ok (`Existed, location)
 
-  let iteri t ~f =
+  let iteri_untrusted t ~f =
     match Account_location.last_location_address t with
     | None ->
         ()
     | Some last_addr ->
         Sequence.range ~stop:`inclusive 0 (Addr.to_int last_addr)
-        |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
+        |> Sequence.iter ~f:(fun i -> f i (get_at_index t i))
+
+  let iteri t ~f =
+    iteri_untrusted t ~f:(fun index account_opt ->
+        f index
+          (Option.value_exn ~message:"Expected account at index" ~here:[%here]
+             account_opt ) )
 
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
      maybe use that here, instead of loading all accounts into memory See Issue
@@ -655,7 +633,7 @@ module Make (Inputs : Inputs_intf) :
     in
     let dependency_hashes = get_hash_batch_exn mdb dependency_locs in
     List.map2_exn dependency_dirs dependency_hashes ~f:(fun dir hash ->
-        Direction.map dir ~left:(`Left hash) ~right:(`Right hash) )
+        Mina_stdlib.Direction.map dir ~left:(`Left hash) ~right:(`Right hash) )
 
   let path_batch_impl ~expand_query ~compute_path mdb locations =
     let locations =
@@ -685,7 +663,7 @@ module Make (Inputs : Inputs_intf) :
         let res =
           List.map2_exn loc_and_dir_list sibling_hashes
             ~f:(fun (_, direction) sibling_hash ->
-              Direction.map direction ~left:(`Left sibling_hash)
+              Mina_stdlib.Direction.map direction ~left:(`Left sibling_hash)
                 ~right:(`Right sibling_hash) )
         in
         (rest_hashes, res) )
@@ -701,7 +679,7 @@ module Make (Inputs : Inputs_intf) :
         let res =
           List.map3_exn loc_and_dir_list sibling_hashes self_hashes
             ~f:(fun (_, direction) sibling_hash self_hash ->
-              Direction.map direction
+              Mina_stdlib.Direction.map direction
                 ~left:(`Left (self_hash, sibling_hash))
                 ~right:(`Right (sibling_hash, self_hash)) )
         in
@@ -712,4 +690,6 @@ module Make (Inputs : Inputs_intf) :
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
     merkle_path_at_addr_exn t addr
+
+  let all_accounts_on_masks _ = Location.Map.empty
 end

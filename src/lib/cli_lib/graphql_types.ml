@@ -1,4 +1,4 @@
-(*Types coresponding to the result of graphql queries*)
+(*Types corresponding to the result of graphql queries*)
 
 (*List of completed work from Graphql_queries.Snark_pool*)
 module Completed_works = struct

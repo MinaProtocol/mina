@@ -1,0 +1,12 @@
+(library
+ (name disk_cache)
+ (public_name disk_cache)
+ (virtual_modules disk_cache)
+ (default_implementation disk_cache.identity)
+ (libraries
+  ;; local libraries
+  disk_cache.intf)
+ (preprocess
+  (pps ppx_mina ppx_version))
+ (instrumentation
+  (backend bisect_ppx)))
