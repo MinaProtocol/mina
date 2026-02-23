@@ -142,4 +142,76 @@ module Database_tests = struct
   let all = [ test_get_batch (); test_to_alist (); test_checkpoint_read () ]
 end
 
-let () = Alcotest.run "Rocksdb" [ ("database", Database_tests.all) ]
+module Scan_tests = struct
+  let length_k = 128
+
+  let length_v = 512
+
+  let rows = 2000
+
+  let random_kvs =
+    let open Quickcheck.Generator.Let_syntax in
+    let kv_gen =
+      let%bind key =
+        String.gen_with_length length_k Char.quickcheck_generator
+      in
+      let%map value =
+        String.gen_with_length length_v Char.quickcheck_generator
+      in
+      (Bigstring.of_string key, Bigstring.of_string value)
+    in
+    List.gen_with_length rows kv_gen
+
+  let bigstring_testable =
+    let pp ppf b = Format.fprintf ppf "%S" (Bigstring.to_string b) in
+    Alcotest.testable pp Bigstring.equal
+
+  let with_temp_dir_sync ~f dir =
+    let temp_dir = Unix.mkdtemp dir in
+    Exn.protect
+      ~f:(fun () -> f temp_dir)
+      ~finally:(fun () -> Mina_stdlib_unix.File_system.rmrf temp_dir)
+
+  let roundtrip1 ~random () =
+    Alcotest.test_case "recovering a dumped kv store gives same data" `Quick
+      (fun () ->
+        let kvs_to_dump =
+          Quickcheck.Generator.generate ~size:10 ~random random_kvs
+        in
+        with_temp_dir_sync "rocksdb_scan_roundtrip1" ~f:(fun test_dir ->
+            let db_to_dump_path =
+              let db_path = test_dir ^/ "db_to_dump" in
+              let db = Database.create db_path in
+              Database.set_batch ?remove_keys:None ~key_data_pairs:kvs_to_dump
+                db ;
+              Database.close db ;
+              db_path
+            in
+            let dumped_text_file =
+              let text_file = test_dir ^/ "text_file.txt" in
+              Scan.dump ~db_path:db_to_dump_path ~text_file () ;
+              text_file
+            in
+            let db_recovered_path =
+              let db_path = test_dir ^/ "db_recovered" in
+              Scan.restore ~db_path ~text_file:dumped_text_file () ;
+              db_path
+            in
+            let kvs_recovered =
+              let db = Database.create db_recovered_path in
+              let kvs = Database.to_alist db in
+              Database.close db ; kvs
+            in
+            Alcotest.(
+              check
+                (list (pair bigstring_testable bigstring_testable))
+                "dumped & recovered DB stores the same kv pairs" kvs_to_dump
+                kvs_recovered) ) )
+
+  let all ~random = [ roundtrip1 ~random () ]
+end
+
+let () =
+  let random = Splittable_random.State.create Random.State.default in
+  Alcotest.run "Rocksdb"
+    [ ("database", Database_tests.all); ("scan", Scan_tests.all ~random) ]
