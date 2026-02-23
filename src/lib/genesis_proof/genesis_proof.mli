@@ -14,7 +14,7 @@ module Inputs : sig
     ; consensus_constants : Consensus.Constants.t
     ; protocol_state_with_hashes :
         Protocol_state.value State_hash.With_state_hashes.t
-    ; constraint_system_digests : (string * Md5_lib.t) list option
+    ; constraint_system_digests : (string * Md5_lib.t) list Lazy.t
     ; signature_kind : Mina_signature_kind.t
     }
 
@@ -144,6 +144,12 @@ module T : sig
 end
 
 include module type of T with type t = T.t
+
+val constraint_system_digests :
+     signature_kind:Mina_signature_kind_type.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> proof_level:Genesis_constants.Proof_level.t
+  -> (string * Md5_lib.t) list lazy_t
 
 val create_values_no_proof : Inputs.t -> t
 
