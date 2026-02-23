@@ -20,10 +20,12 @@ in  Pipeline.build
           , artifacts =
             [ Artifacts.Type.LogProc
             , Artifacts.Type.Daemon
+            , Artifacts.Type.DaemonConfig
+            , Artifacts.Type.DaemonPrefork
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
-            , Artifacts.Type.CreateLegacyGenesis
+            , Artifacts.Type.CreatePreforkGenesis
             ]
           , network = Network.Type.Devnet
           , arch = Arch.Type.Arm64

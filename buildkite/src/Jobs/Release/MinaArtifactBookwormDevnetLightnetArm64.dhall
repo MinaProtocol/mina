@@ -19,7 +19,11 @@ let Profiles = ../../Constants/Profiles.dhall
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
-          , artifacts = [ Artifacts.Type.LogProc, Artifacts.Type.Daemon ]
+          , artifacts =
+            [ Artifacts.Type.LogProc
+            , Artifacts.Type.Daemon
+            , Artifacts.Type.DaemonConfig
+            ]
           , network = Network.Type.Devnet
           , arch = Arch.Type.Arm64
           , profile = Profiles.Type.Lightnet

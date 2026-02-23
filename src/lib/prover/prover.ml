@@ -453,7 +453,10 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
       ] ;
   Child_processes.Termination.register_process pids process
     Child_processes.Termination.Prover ;
-  Mina_metrics.Process_memory.Prover.set_pid (Process.pid process) ;
+
+  let pid = Process.pid process in
+  [%log info] "Prover process has PID %d" (Pid.to_int pid) ;
+  Mina_metrics.Process_memory.Prover.set_pid pid ;
   let exit_or_signal =
     Child_processes.Termination.wait_safe ~logger process ~module_:__MODULE__
       ~location:__LOC__ ~here:[%here]

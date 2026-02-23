@@ -1,5 +1,8 @@
 ARG image=debian:bullseye
 FROM ${image} AS production
+
+ARG TARGETARCH
+
 ARG deb_codename=bullseye
 ARG deb_version
 ARG deb_release=unstable
@@ -7,6 +10,8 @@ ARG deb_repo="http://packages.o1test.net"
 ARG network=mainnet
 
 ARG psql_version=13
+
+ARG GCLOUD_VERSION=476.0.0
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -54,11 +59,18 @@ RUN apt-get update --quiet --yes \
 
 # Install google-cloud-sdk for GCLOUD_UPLOAD feature
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-  && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
-  && apt-get update --quiet --yes \
-  && apt-get install --quiet --yes --no-install-recommends google-cloud-sdk kubectl google-cloud-sdk-gke-gcloud-auth-plugin \
-  && rm -rf /var/lib/apt/lists/*
+
+RUN case "${TARGETARCH}" in \
+        "amd64") GCLOUD_ARCH="x86_64" ;; \
+        "arm64") GCLOUD_ARCH="arm" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    curl -sSfL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${GCLOUD_ARCH}.tar.gz" | \
+    tar -xz -C /opt/ && \
+    /opt/google-cloud-sdk/install.sh --quiet && \
+    /opt/google-cloud-sdk/bin/gcloud components install gke-gcloud-auth-plugin kubectl --quiet
+
+ENV PATH="/opt/google-cloud-sdk/bin:${PATH}"
 
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 

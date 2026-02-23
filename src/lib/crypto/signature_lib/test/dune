@@ -1,5 +1,5 @@
 (tests
- (names signature_lib_tests test_private_key)
+ (names signature_lib_tests test_private_key test_encoding_regression)
  (libraries
   ;; opam libraries
   alcotest

@@ -199,6 +199,7 @@ let docker_step
                     , if_ = spec.if_
                     }
                   ]
+                , DaemonConfig = [] : List DockerImage.ReleaseSpec.Type
                 , DaemonAutoHardfork =
                   [ DockerImage.ReleaseSpec::{
                     , deps =
@@ -244,9 +245,10 @@ let docker_step
                     , size = size
                     }
                   ]
+                , DaemonPrefork = [] : List DockerImage.ReleaseSpec.Type
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
                 , LogProc = [] : List DockerImage.ReleaseSpec.Type
-                , CreateLegacyGenesis = [] : List DockerImage.ReleaseSpec.Type
+                , CreatePreforkGenesis = [] : List DockerImage.ReleaseSpec.Type
                 , BatchTxn =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps

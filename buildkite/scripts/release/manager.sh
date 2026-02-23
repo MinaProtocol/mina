@@ -33,7 +33,6 @@ set -E # inherit -e
 set -e # exit immediately on errors
 set -u # exit on not assigned variables
 set -o pipefail # exit on pipe failure
-set -x
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -74,6 +73,14 @@ function check_docker() {
     check_app "docker"
 }
 
+function check_aws() {
+    check_app "aws"
+}
+
+function check_debs3() {
+    check_app "deb-s3"
+}
+
 function check_app() {
     if ! command -v $1 &> /dev/null; then
         echo -e "❌ ${RED} !! $1 program not found. Please install program to proceed. ${CLEAR}\n";
@@ -86,9 +93,8 @@ mkdir -p $DEBIAN_CACHE_FOLDER
 ################################################################################
 # imports
 ################################################################################
-# shellcheck disable=SC1090
-. $SCRIPTPATH/../../../scripts/debian/reversion-helper.sh
 
+SESSION_SCRIPTS=$SCRIPTPATH/../../../scripts/debian/session
 
 ################################################################################
 # functions
@@ -99,6 +105,15 @@ function prefix_cmd {
     shift
     local CMD=("$@")
     "${CMD[@]}" 1> >(sed "s/^/${PREF}/") 2> >(sed "s/^/${PREF}/" 1>&2)
+}
+
+# Extract bucket name from potentially full S3 URL
+# Input: s3.us-west-2.amazonaws.com/bucket-name or just bucket-name
+# Output: bucket-name
+function extract_bucket_name() {
+    local __repo=$1
+    # Strip s3 prefix patterns like "s3.us-west-2.amazonaws.com/" or "s3.amazonaws.com/"
+    echo "$__repo" | sed -E 's|^s3(\.[^/]+)?\.amazonaws\.com/||'
 }
 
 function main_help(){
@@ -112,6 +127,8 @@ function main_help(){
     echo ""
     echo " publish - publish build artifact to debian repository and docker registry";
     echo " promote - promote artifacts from one channel (registry) to another";
+    echo " pull - pull artifacts from cache into local folder";
+    echo " reversion - reversion all .deb packages in a folder";
     echo " progress - show progress of promoting/publishing release artifacts";
     echo " fix - fix debian package repository";
     echo " verify - verify artifacts in target channel (registry)";
@@ -328,10 +345,18 @@ function storage_upload() {
 
     case $backend in
         local)
-            cp "$local_path" "$remote_path"
+            # Check if remote_path is a directory or a file by extension
+            if [[ -d "$remote_path" || "${remote_path: -1}" == "/" || ! "$remote_path" =~ \.[^/]+$ ]]; then
+                # remote_path is a directory (ends with / or is a dir or has no extension)
+                mkdir -p "$remote_path"
+            else
+                # remote_path is a file (has an extension)
+                mkdir -p "$(dirname "$remote_path")"
+            fi
+            cp $local_path "$remote_path"
             ;;
         gs)
-            gsutil cp "$local_path" "$remote_path"
+            gsutil cp $local_path "$remote_path"
             ;;
         hetzner)
            rsync -avz -e "ssh -p 23 -i $HETZNER_KEY" $local_path "$HETZNER_USER@$HETZNER_HOST:$remote_path"
@@ -348,7 +373,7 @@ function storage_root() {
 
     case $backend in
         local)
-            echo "/var/storagebox/"
+            echo "/var/storagebox"
             ;;
         gs)
             echo "gs://buildkite_k8s/coda/shared"
@@ -417,6 +442,7 @@ function publish_debian() {
     local __force_upload_debians=${13:-0}
     local __debian_sign_key=${14}
     local __new_artifact_name=${15:-""}
+    local __skip_cache_invalidation=${SKIP_CACHE_INVALIDATION:-0}
 
     get_cached_debian_or_download $__backend $__artifact $__codename "$__network" "$__arch" "$__profile"
     local __artifact_full_name
@@ -438,14 +464,19 @@ function publish_debian() {
 
     if [[ $__source_version != "$__target_version" ]]; then
         echo " 🗃️  Rebuilding $__artifact debian from $__source_version to $__target_version"
-        prefix_cmd "$SUBCOMMAND_TAB" reversion --deb ${__deb} \
-                --package ${__artifact_full_name} \
-                --source-version ${__source_version} \
-                --new-version ${__target_version} \
-                --suite "unstable" \
-                --new-suite ${__channel} \
-                --new-name ${__new_artifact_name} \
-                --arch ${__arch}
+        local __session_dir
+        __session_dir=$(mktemp -d -t deb-session-XXXXXX)
+        local __input_deb="${__deb}_${__source_version}_${__arch}.deb"
+        local __output_deb="$DEBIAN_CACHE_FOLDER/$__codename/${__new_artifact_name}_${__target_version}_${__arch}.deb"
+
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-open.sh" "$__input_deb" "$__session_dir"
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-reversion.sh" "$__session_dir" "$__target_version"
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-replace-suite.sh" "$__session_dir" "$__channel"
+        if [[ "$__new_artifact_name" != "$__artifact_full_name" ]]; then
+            prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-rename-package.sh" "$__session_dir" "$__new_artifact_name"
+        fi
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-save.sh" "$__session_dir" "$__output_deb"
+        rm -rf "$__session_dir"
     fi
 
     echo " 🍥  Publishing $__artifact debian to $__channel channel with $__target_version version"
@@ -458,6 +489,7 @@ function publish_debian() {
             --bucket $__debian_repo \
             $(if [[ $__force_upload_debians == 1 ]]; then echo "--force"; fi) \
             -c $__codename \
+            $(if [[ $__skip_cache_invalidation == 1 ]]; then echo "--skip-cache-invalidation"; fi) \
             -r $__channel \
             --arch $__arch \
             ${__sign_arg[@]}
@@ -543,6 +575,7 @@ function promote_debian() {
     local __debian_repo=${10}
     local __arch=${11}
     local __debian_sign_key=${12}
+    local __skip_cache_invalidation=${SKIP_CACHE_INVALIDATION:-0}
 
     if [[ $__debian_sign_key != "" ]]; then
         local __sign_arg=("--sign" "$__debian_sign_key")
@@ -558,23 +591,49 @@ function promote_debian() {
     local __artifact_full_name
     __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
 
-    local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
+    local __new_artifact_name=$__artifact_full_name
 
     if [[ $__dry_run == 0 ]]; then
         echo "    🗃️  Promoting $__artifact debian from $__codename/$__source_version to $__codename/$__target_version"
-        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/reversion.sh \
-                --deb ${__artifact_full_name} \
-                --version ${__source_version} \
-                --new-version ${__target_version} \
-                --suite ${__source_channel} \
-                --repo ${__debian_repo} \
-                --new-suite ${__target_channel} \
-                --new-name ${__new_artifact_name}
+        local __debian_bucket
+        __debian_bucket=$(extract_bucket_name "$__debian_repo")
+
+        # Download the .deb from S3
+        mkdir -p "$DEBIAN_CACHE_FOLDER/$__codename"
+        local __input_deb="$DEBIAN_CACHE_FOLDER/$__codename/${__artifact_full_name}_${__source_version}_${__arch}.deb"
+        wget "https://s3.us-west-2.amazonaws.com/${__debian_bucket}/pool/${__codename}/m/mi/${__artifact_full_name}_${__source_version}_${__arch}.deb" \
+            -O "$__input_deb"
+
+        # Open session and modify
+        local __session_dir
+        __session_dir=$(mktemp -d -t deb-session-XXXXXX)
+        local __output_deb="$DEBIAN_CACHE_FOLDER/$__codename/${__new_artifact_name}_${__target_version}_${__arch}.deb"
+
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-open.sh" "$__input_deb" "$__session_dir"
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-reversion.sh" "$__session_dir" "$__target_version"
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-replace-suite.sh" "$__session_dir" "$__target_channel"
+        if [[ "$__new_artifact_name" != "$__artifact_full_name" ]]; then
+            prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-rename-package.sh" "$__session_dir" "$__new_artifact_name"
+        fi
+        prefix_cmd "$SUBCOMMAND_TAB" "$SESSION_SCRIPTS/deb-session-save.sh" "$__session_dir" "$__output_deb"
+        rm -rf "$__session_dir"
+
+        # Publish the modified .deb
+        # shellcheck disable=SC2068,SC2046
+        prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/publish.sh \
+            --names "$__output_deb" \
+            --version $__target_version \
+            --bucket $__debian_bucket \
+            -c $__codename \
+            $(if [[ $__skip_cache_invalidation == 1 ]]; then echo "--skip-cache-invalidation"; fi) \
+            -r $__target_channel \
+            --arch $__arch \
+            ${__sign_arg[@]}
 
         if [[ $__verify == 1 ]]; then
             echo "     📋 Verifying: $__artifact debian to $__target_channel channel with $__target_version version"
 
-            prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
+            prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/verify.sh \
                 -p $__new_artifact_name \
                 --version $__target_version \
                 -m $__codename \
@@ -739,6 +798,10 @@ function publish(){
                 __profile=${2:?$error_message}
                 shift 2;
             ;;
+            --skip-cache-invalidation )
+                export SKIP_CACHE_INVALIDATION=1
+                shift 1;
+            ;;
             * )
                 echo -e "❌ ${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
@@ -788,6 +851,7 @@ function publish(){
     echo " - Architectures: $__archs"
     echo " - Profile: $__profile"
     echo " - Force upload debians: $__force_upload_debians"
+    echo " - Skip cache invalidation: ${SKIP_CACHE_INVALIDATION:-0}"
     echo ""
 
     if [[ $__backend != "gs" && $__backend != "hetzner" && $__backend != "local" ]]; then
@@ -806,7 +870,11 @@ function publish(){
         fi
     fi
 
-
+    # Only require aws and deb-s3 if we are dealing with debians
+    if [[ $__only_dockers == 0 ]]; then
+        check_aws
+        check_debs3
+    fi
 
     if [[ $__verify == 1 ]]; then
         check_docker
@@ -842,6 +910,7 @@ function publish(){
                                             "$__arch" \
                                             "$__force_upload_debians" \
                                             "$__debian_sign_key"
+
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -987,6 +1056,7 @@ function promote(){
     fi
 
     local __artifacts="$DEFAULT_ARTIFACTS"
+    local __backend="local"
     local __networks="$DEFAULT_NETWORKS"
     local __source_version
     local __target_version
@@ -1004,7 +1074,7 @@ function promote(){
     local __debian_sign_key=""
     local __arch="$DEFAULT_ARCHITECTURES"
     local __profile="$DEFAULT_PROFILE"
-
+    local __force_upload_debians=0
 
     while [ ${#} -gt 0 ]; do
         error_message="❌ Error: a value is needed for '$1'";
@@ -1014,6 +1084,10 @@ function promote(){
             ;;
             --artifacts )
                 __artifacts=${2:?$error_message}
+                shift 2;
+            ;;
+            --backend )
+                __backend=${2:?$error_message}
                 shift 2;
             ;;
             --networks )
@@ -1080,9 +1154,17 @@ function promote(){
                 __arch=${2:?$error_message}
                 shift 2;
             ;;
+            --force-upload-debians )
+                __force_upload_debians=1
+                shift 1;
+            ;;
             --profile )
                 __profile=${2:?$error_message}
                 shift 2;
+            ;;
+            --skip-cache-invalidation )
+                export SKIP_CACHE_INVALIDATION=1
+                shift 1;
             ;;
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
@@ -1136,20 +1218,43 @@ function promote(){
     echo " - Only dockers: $__only_dockers"
     echo " - Only debians: $__only_debians"
     echo " - Verify: $__verify"
-    echo " - Architecture: $__arch"
     echo " - Dry run: $__dry_run"
+    echo " - Backend: $__backend"
+    echo " - Debian repo: $__debian_repo"
+    echo " - Debian sign key: $__debian_sign_key"
     echo " - Strip network from archive: $__strip_network_from_archive"
+    echo " - Architectures: $__arch"
+    echo " - Profile: $__profile"
+    echo " - Force upload debians: $__force_upload_debians"
+    echo " - Skip cache invalidation: ${SKIP_CACHE_INVALIDATION:-0}"
     echo ""
 
-    #check environment setup
-    if [[ $__verify == 1 ]]; then
-        check_docker
+
+
+    if [[ $__backend != "gs" && $__backend != "hetzner" && $__backend != "local" ]]; then
+        echo -e "❌ ${RED} !! Backend (--backend) can be only gs, hetzner or local ${CLEAR}\n";
+        promote_help; exit 1;
     fi
 
-    if [[ $__source_version == "$__target_version" ]]; then
-        echo " ⚠️  Warning: Source version and target version are the same.
-    Script will do promotion but it won't have an effect at the end unless you are publishing dockers..."
-        echo ""
+    if [[ $__backend == "gs" ]]; then
+        #check environment setup
+        check_gsutil
+    elif [[ $__backend == "local" ]]; then
+        #check root folder is writable
+        if [[ ! -r $(storage_root "$__backend") ]]; then
+            echo -e "❌ ${RED} !! Local backend root folder $(storage_root "$__backend") is not readable. Please check it exists and is accessible ${CLEAR}\n";
+            exit 1
+        fi
+    fi
+
+    # Only require deb-s3 and aws if we are dealing with debians
+    if [[ $__only_dockers == 0 ]]; then
+        check_aws
+        check_debs3
+    fi
+
+    if [[ $__verify == 1 ]]; then
+        check_docker
     fi
 
     IFS=', '
@@ -1197,8 +1302,7 @@ function promote(){
                                         $__dry_run \
                                         $__debian_repo \
                                         "$__arch" \
-                                        $__debian_sign_key \
-                                        $new_name
+                                        $__debian_sign_key
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -1221,7 +1325,6 @@ function promote(){
                                             $__debian_repo \
                                             "$__arch" \
                                             $__debian_sign_key
-
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -1243,7 +1346,7 @@ function promote(){
                                             $__dry_run \
                                             $__debian_repo \
                                             "$__arch" \
-                                            $__debian_sign_key
+                                            "$__debian_sign_key"
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -1426,6 +1529,12 @@ function verify(){
     echo " - Build flag: $__build_flag"
     echo ""
 
+    # Only require deb-s3 and aws if we are dealing with debians
+    if [[ $__only_dockers == 0 ]]; then
+        check_aws
+        check_debs3
+    fi
+
     #check environment setup
     if [[ $__only_debians == 0 ]]; then
         check_docker
@@ -1471,7 +1580,9 @@ function verify(){
                                 __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag")
 
                                 if [[ $__only_dockers == 0 ]]; then
-                                        echo "     📋  Verifying: $artifact debian on $__channel channel with $__version version for $__codename codename"
+
+                                        echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
+                                        echo ""
 
                                         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
                                             -p $__artifact_full_name \
@@ -1479,7 +1590,7 @@ function verify(){
                                             -m $__codename \
                                             -r $__debian_repo \
                                             -c $__channel \
-                                            -a $__arch \
+                                            -a "$__arch" \
                                             ${__signed_debian_repo:+--signed}
 
                                         echo ""
@@ -1488,6 +1599,7 @@ function verify(){
                                     if [[ $__only_debians == 0 ]]; then
 
                                         echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_repo" $artifact $__version $__codename "$network" "$__arch")"
+                                        echo ""
 
                                         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
                                             -p "$artifact" \
@@ -1691,14 +1803,20 @@ function persist_help(){
     printf "  %-25s %s\n" "--arch" "[string] target architecture. Default: $DEFAULT_ARCHITECTURES";
     printf "  %-25s %s\n" "--backend" "[string] backend to persist artifacts. e.g gs,hetzner";
     printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to persist. e.g mina-logproc,mina-archive,mina-rosetta";
-    printf "  %-25s %s\n" "--build_id" "[string] buildkite build id to persist artifacts";
+    printf "  %-25s %s\n" "--buildkite-build-id" "[string] buildkite build id to persist artifacts";
+    printf "  %-25s %s\n" "--local-debian-path" "[string] path to local .deb file or directory (exclusive with --buildkite-build-id)";
+    printf "  %-25s %s\n" "--source-folder" "[string] folder with {codename}/*.deb structure (as produced by pull/reversion)";
     printf "  %-25s %s\n" "--target" "[string] target location to persist artifacts";
     echo ""
     echo "Example:"
     echo ""
-    echo "  " $CLI_NAME persist --backend gs --artifacts mina-logproc,mina-archive,mina-rosetta --build_id 123 --target /debians_legacy
+    echo "  " $CLI_NAME persist --backend gs --artifacts mina-logproc,mina-archive,mina-rosetta --buildkite-build-id 123 --target /debians_legacy
+    echo "  " $CLI_NAME persist --backend gs --artifacts mina-archive --local-debian-path /path/to/debs --target /debians_legacy
+    echo "  " $CLI_NAME persist --source-folder ./reversioned --target /debians_legacy
     echo ""
-    echo " Above command will persist mina-logproc,mina-archive,mina-rosetta artifacts to {backend root}/debians_legacy"
+    echo " The --source-folder mode uploads all .deb files found under {source-folder}/{codename}/ to"
+    echo " {backend root}/{target}/debians/{codename}/ preserving the codename structure."
+    echo " It does not require --artifacts, --codename, or --arch (they are inferred from the folder)."
     echo ""
     echo ""
 }
@@ -1710,7 +1828,10 @@ function persist(){
 
     local __backend="hetzner"
     local __artifacts="$DEFAULT_ARTIFACTS"
+    local __artifacts_set=0
     local __buildkite_build_id
+    local __local_debian_path
+    local __source_folder
     local __target
     local __codename
     local __new_version
@@ -1729,6 +1850,7 @@ function persist(){
             ;;
             --artifacts )
                 __artifacts=${2:?$error_message}
+                __artifacts_set=1
                 shift 2;
             ;;
             --codename )
@@ -1737,6 +1859,14 @@ function persist(){
             ;;
             --buildkite-build-id )
                 __buildkite_build_id=${2:?$error_message}
+                shift 2;
+            ;;
+            --local-debian-path )
+                __local_debian_path=${2:?$error_message}
+                shift 2;
+            ;;
+            --source-folder )
+                __source_folder=${2:?$error_message}
                 shift 2;
             ;;
             --new-version )
@@ -1763,13 +1893,85 @@ function persist(){
         esac
     done
 
-    if [[ -z ${__buildkite_build_id+x} ]]; then
-        echo -e "❌ ${RED} !! Buildkite build id (--buildkite-build-id) is required${CLEAR}\n";
+    if [[ -z ${__target+x} ]]; then
+        echo -e "❌ ${RED} !! Target (--target) is required${CLEAR}\n";
         persist_help; exit 1;
     fi
 
-    if [[ -z ${__target+x} ]]; then
-        echo -e "❌ ${RED} !! Target (--target) is required${CLEAR}\n";
+    # --source-folder mode: upload all debs from {codename}/*.deb structure
+    if [[ -n ${__source_folder+x} ]]; then
+        if [[ -n ${__buildkite_build_id+x} || -n ${__local_debian_path+x} ]]; then
+            echo -e "❌ ${RED} !! --source-folder is mutually exclusive with --buildkite-build-id and --local-debian-path${CLEAR}\n";
+            persist_help; exit 1;
+        fi
+
+        if [[ ! -d "$__source_folder" ]]; then
+            echo -e "❌ ${RED} !! Source folder does not exist: $__source_folder${CLEAR}\n";
+            exit 1;
+        fi
+
+        echo ""
+        echo " ℹ️  Persisting debs from source folder with following parameters:"
+        echo " - Backend: $__backend"
+        echo " - Source folder: $__source_folder"
+        echo " - Target: $__target"
+        echo ""
+
+        local __total_count=0
+        local __success_count=0
+        local __fail_count=0
+
+        for __codename_dir in "$__source_folder"/*/; do
+            if [[ ! -d "$__codename_dir" ]]; then
+                continue
+            fi
+
+            local __cn
+            __cn=$(basename "$__codename_dir")
+            local __remote_target
+            __remote_target="$(storage_root "$__backend")/$__target/debians/$__cn/"
+
+            for __deb_file in "$__codename_dir"*.deb; do
+                if [[ ! -f "$__deb_file" ]]; then
+                    continue
+                fi
+
+                (( __total_count++ )) || true
+                local __deb_basename
+                __deb_basename=$(basename "$__deb_file")
+                echo "  📤  Uploading $__cn/$__deb_basename"
+
+                if storage_upload "$__backend" "$__deb_file" "$__remote_target"; then
+                    (( __success_count++ )) || true
+                else
+                    echo -e "  ⚠️  Warning: failed to upload $__cn/$__deb_basename — skipping"
+                    (( __fail_count++ )) || true
+                fi
+            done
+        done
+
+        echo ""
+        if [[ $__total_count -eq 0 ]]; then
+            echo -e " ⚠️  No .deb files found in $__source_folder/{codename}/ subdirectories."
+        else
+            echo " ℹ️  Summary: $__success_count/$__total_count packages uploaded successfully."
+            if [[ $__fail_count -gt 0 ]]; then
+                echo -e " ⚠️  $__fail_count package(s) failed to upload."
+            fi
+        fi
+        echo " ✅  Done."
+        echo ""
+        return
+    fi
+
+    # Legacy modes: --buildkite-build-id or --local-debian-path
+    if [[ -n ${__buildkite_build_id+x} && -n ${__local_debian_path+x} ]]; then
+        echo -e "❌ ${RED} !! --buildkite-build-id and --local-debian-path are mutually exclusive${CLEAR}\n";
+        persist_help; exit 1;
+    fi
+
+    if [[ -z ${__buildkite_build_id+x} && -z ${__local_debian_path+x} ]]; then
+        echo -e "❌ ${RED} !! Either --buildkite-build-id, --local-debian-path, or --source-folder is required${CLEAR}\n";
         persist_help; exit 1;
     fi
 
@@ -1778,8 +1980,57 @@ function persist(){
         persist_help; exit 1;
     fi
 
-    if [[ -z ${__artifacts+x} ]]; then
+    if [[ -n ${__local_debian_path+x} ]]; then
+        if [[ -f "$__local_debian_path" ]]; then
+            :
+        elif [[ -d "$__local_debian_path" ]]; then
+            :
+        else
+            echo -e "❌ ${RED} !! --local-debian-path does not exist: $__local_debian_path${CLEAR}\n";
+            persist_help; exit 1;
+        fi
+    fi
+
+    if [[ -n ${__local_debian_path+x} && $__artifacts_set -eq 0 ]]; then
+        if [[ -f "$__local_debian_path" ]]; then
+            local __base
+            __base=$(basename "$__local_debian_path" .deb)
+            __artifacts="${__base%%_*}"
+        else
+            local __files=()
+            local __f
+            while IFS= read -r -d '' __f; do
+                __files+=("$__f")
+            done < <(find "$__local_debian_path" -maxdepth 1 -type f -name "*_*_${__arch}.deb" -print0)
+
+            if [[ ${#__files[@]} -eq 0 ]]; then
+                echo -e "❌ ${RED} !! No debs found in $__local_debian_path for arch $__arch${CLEAR}\n";
+                exit 1;
+            fi
+
+            declare -A __artifact_seen=()
+            local __artifact_list=()
+            for __f in "${__files[@]}"; do
+                local __name
+                __name=$(basename "$__f" .deb)
+                __name="${__name%%_*}"
+                if [[ -z ${__artifact_seen[$__name]+x} ]]; then
+                    __artifact_list+=("$__name")
+                    __artifact_seen[$__name]=1
+                fi
+            done
+
+            __artifacts=$(IFS=','; echo "${__artifact_list[*]}")
+        fi
+    fi
+
+    if [[ -z "$__artifacts" ]]; then
         echo -e "❌ ${RED} !! Artifacts (--artifacts) is required${CLEAR}\n";
+        persist_help; exit 1;
+    fi
+
+    if [[ -n ${__local_debian_path+x} && -f "$__local_debian_path" && "$__artifacts" == *","* ]]; then
+        echo -e "❌ ${RED} !! --local-debian-path file requires a single artifact${CLEAR}\n";
         persist_help; exit 1;
     fi
 
@@ -1787,7 +2038,12 @@ function persist(){
     echo " ℹ️  Persisting mina artifacts with following parameters:"
     echo " - Backend: $__backend"
     echo " - Artifacts: $__artifacts"
-    echo " - Buildkite build id: $__buildkite_build_id"
+    if [[ -n ${__buildkite_build_id+x} ]]; then
+        echo " - Buildkite build id: $__buildkite_build_id"
+    fi
+    if [[ -n ${__local_debian_path+x} ]]; then
+        echo " - Local debian path: $__local_debian_path"
+    fi
     echo " - Codename: $__codename"
     echo " - Suite: $__suite"
     echo " - Architecture: $__arch"
@@ -1804,7 +2060,21 @@ function persist(){
     echo ""
 
     for __artifact in "${__artifacts_arr[@]}"; do
-        storage_download "$__backend" "$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact}_*_${__arch}.deb" "$tmp_dir"
+        if [[ -n ${__local_debian_path+x} ]]; then
+            if [[ -f "$__local_debian_path" ]]; then
+                cp "$__local_debian_path" "$tmp_dir/"
+            else
+                local __source_pattern="$__local_debian_path/${__artifact}_*_${__arch}.deb"
+                if compgen -G "$__source_pattern" > /dev/null; then
+                    cp $__source_pattern "$tmp_dir/"
+                else
+                    echo -e "❌ ${RED} !! No debs found for $__artifact ($__arch) in $__local_debian_path${CLEAR}\n";
+                    exit 1;
+                fi
+            fi
+        else
+            storage_download "$__backend" "$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact}_*_${__arch}.deb" "$tmp_dir"
+        fi
 
         if [[ -n ${__new_version+x} ]]; then
             local __source_version
@@ -1828,7 +2098,7 @@ function persist(){
                 --arch ${__arch}
         fi
 
-      
+
         storage_upload "$__backend" "$tmp_dir/${__artifact}_*" "$(storage_root "$__backend")/$__target/debians/$__codename/"
     done
 
@@ -1839,30 +2109,36 @@ function persist(){
 
 #==============
 # pull
-# 
-# PUlls artifacts from cache.
+#
+# Pulls artifacts from cache.
+# Supports pulling multiple artifacts, architectures and codenames at once.
+# Downloads are organized into {target-folder}/{codename}/ subdirectories.
 #==============
 function pull_help(){
-    echo Pulls artifact from cache.
+    echo Pulls artifacts from cache.
     echo ""
     echo "     $CLI_NAME pull [-options]"
     echo ""
     echo "Parameters:"
     echo ""
     printf "  %-25s %s\n" "-h  | --help" "show help";
-    printf "  %-25s %s\n" "--backend" "[string] backend to persist artifacts. e.g gs,hetzner";
-    printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to persist. e.g mina-logproc,mina-archive,mina-rosetta";
-    printf "  %-25s %s\n" "--build_id" "[string] buildkite build id to persist artifacts";
-    printf "  %-25s %s\n" "--target" "[string] target local location to persist artifacts";
-    printf "  %-25s %s\n" "--codenames" "[string list] target location to persist artifacts";
-    printf "  %-25s %s\n" "--networks" "[stringlist ] target location to persist artifacts";
+    printf "  %-25s %s\n" "--backend" "[string] backend to pull artifacts from. e.g gs,hetzner (default: hetzner)";
+    printf "  %-25s %s\n" "--artifacts" "[comma separated list] full package names to pull. e.g mina-devnet-prefork-mesa,mina-mainnet-prefork-mesa";
+    printf "  %-25s %s\n" "--archs" "[comma separated list] architectures to pull. e.g amd64,arm64 (default: $DEFAULT_ARCHITECTURES)";
+    printf "  %-25s %s\n" "--codenames" "[comma separated list] debian codenames. e.g bullseye,noble (default: $DEFAULT_CODENAMES)";
+    printf "  %-25s %s\n" "--buildkite-build-id" "[string] buildkite build id to pull artifacts from";
+    printf "  %-25s %s\n" "--from-special-folder" "[string] pull from a special folder instead of build id path";
+    printf "  %-25s %s\n" "--target-folder" "[string] local folder to download artifacts into (organized as {codename}/*.deb)";
     echo ""
-    echo "Example:"
+    echo "Examples:"
     echo ""
-    echo "  " $CLI_NAME pull --backend gs --artifacts mina-logproc,mina-archive,mina-rosetta --build_id 123 --target /debians_legacy
+    echo "  $CLI_NAME pull --artifacts mina-devnet-prefork-mesa,mina-mainnet-prefork-mesa --archs arm64,amd64 --codenames bullseye,noble --buildkite-build-id 123 --target-folder ./debians"
     echo ""
-    echo " Above command will pull mina-logproc,mina-archive,mina-rosetta artifacts to {backend root}/debians_legacy"
+    echo "  Above command will pull the specified packages for all arch/codename combinations into:"
+    echo "    ./debians/bullseye/*.deb"
+    echo "    ./debians/noble/*.deb"
     echo ""
+    echo "  When multiple configurations are requested, missing packages produce a warning instead of an error."
     echo ""
 }
 
@@ -1872,11 +2148,11 @@ function pull(){
     fi
 
     local __backend="hetzner"
-    local __artifacts="$DEFAULT_ARTIFACTS"
+    local __artifacts=""
     local __buildkite_build_id
-    local __target="."
+    local __target_folder="."
     local __codenames="$DEFAULT_CODENAMES"
-    local __networks="$DEFAULT_NETWORKS"
+    local __archs="$DEFAULT_ARCHITECTURES"
     local __from_special_folder
 
     while [ ${#} -gt 0 ]; do
@@ -1905,12 +2181,8 @@ function pull(){
                 __from_special_folder=${2:?$error_message}
                 shift 2;
             ;;
-            --target )
-                __target=${2:?$error_message}
-                shift 2;
-            ;;
-            --networks )
-                __networks=${2:?$error_message}
+            --target-folder )
+                __target_folder=${2:?$error_message}
                 shift 2;
             ;;
             --archs )
@@ -1920,24 +2192,27 @@ function pull(){
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
-                persist_help; exit 1;
+                pull_help; exit 1;
             ;;
         esac
     done
 
-    if [[ -z ${__buildkite_build_id+x} && -z ${__from_special_folder+x} ]]; then
-        echo -e "❌ ${RED} !! Buildkite build id (--buildkite-build-id) is required${CLEAR}\n";
+    if [[ -z "$__artifacts" ]]; then
+        echo -e "❌ ${RED} !! Artifacts (--artifacts) are required${CLEAR}\n";
         pull_help; exit 1;
     fi
 
+    if [[ -z ${__buildkite_build_id+x} && -z ${__from_special_folder+x} ]]; then
+        echo -e "❌ ${RED} !! Buildkite build id (--buildkite-build-id) or special folder (--from-special-folder) is required${CLEAR}\n";
+        pull_help; exit 1;
+    fi
 
     echo ""
     echo " ℹ️  Pulling mina artifacts with following parameters:"
     echo " - Backend: $__backend"
     echo " - Artifacts: $__artifacts"
-    echo " - Target: $__target"
+    echo " - Target folder: $__target_folder"
     echo " - Codenames: $__codenames"
-    echo " - Networks: $__networks"
     echo " - Architectures: $__archs"
 
     if [[ -n ${__from_special_folder+x} ]]; then
@@ -1950,29 +2225,229 @@ function pull(){
     IFS=', '
     read -r -a __artifacts_arr <<< "$__artifacts"
     read -r -a __codenames_arr <<< "$__codenames"
-    read -r -a __networks_arr <<< "$__networks"
     read -r -a __archs_arr <<< "$__archs"
 
-    for __arch in "${__archs_arr[@]}"; do
+    local __total_configs=$(( ${#__artifacts_arr[@]} * ${#__codenames_arr[@]} * ${#__archs_arr[@]} ))
+    local __fail_count=0
+    local __success_count=0
+
+    for __codename in "${__codenames_arr[@]}"; do
+        local __codename_target="$__target_folder/$__codename"
+        mkdir -p "$__codename_target"
+
         for __artifact in "${__artifacts_arr[@]}"; do
-            for __codename in "${__codenames_arr[@]}"; do
-                for network in "${__networks_arr[@]}"; do
-                    echo "  📥  Pulling $__artifact for $__codename codename and $network network"
-                    local __artifact_full_name
-                    local __source_path
-                    __artifact_full_name=$(get_artifact_with_suffix $__artifact $network)
+            for __arch in "${__archs_arr[@]}"; do
+                echo "  📥  Pulling ${__artifact}_*_${__arch}.deb for $__codename"
+                local __source_path
 
-                    if [[ -n ${__from_special_folder+x} ]]; then
-                        __source_path="$(storage_root "$__backend")/$__from_special_folder/${__artifact_full_name}_*_${__arch}.deb"
-                    else
-                        __source_path="$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact_full_name}_*_${__arch}.deb"
+                if [[ -n ${__from_special_folder+x} ]]; then
+                    __source_path="$(storage_root "$__backend")/$__from_special_folder/${__artifact}_*_${__arch}.deb"
+                else
+                    __source_path="$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact}_*_${__arch}.deb"
+                fi
+
+                if [[ $__total_configs -gt 1 ]]; then
+                    if ! storage_download "$__backend" "$__source_path" "$__codename_target" 2>/dev/null; then
+                        echo -e "  ⚠️  Warning: ${__artifact}_*_${__arch}.deb not found for $__codename — skipping"
+                        (( __fail_count++ )) || true
+                        continue
                     fi
-
-                    storage_download "$__backend" "$__source_path" "$__target"
-                done
+                else
+                    storage_download "$__backend" "$__source_path" "$__codename_target"
+                fi
+                (( __success_count++ )) || true
             done
         done
     done
+
+    echo ""
+    echo " ℹ️  Summary: $__success_count/$__total_configs packages downloaded successfully."
+    if [[ $__fail_count -gt 0 ]]; then
+        echo -e " ⚠️  $__fail_count package(s) were not found and skipped."
+    fi
+    echo " ✅  Done."
+    echo ""
+}
+
+#==============
+# reversion
+#
+# Reversions all .deb files found in a folder structure produced by `pull`.
+# Walks {source-folder}/{codename}/*.deb and writes reversioned debs to
+# {output-folder}/{codename}/*.deb.
+#==============
+function reversion_help(){
+    echo "Reversion all .deb packages in a folder (as produced by 'pull')."
+    echo ""
+    echo "     $CLI_NAME reversion [-options]"
+    echo ""
+    echo "Parameters:"
+    echo ""
+    printf "  %-25s %s\n" "-h  | --help" "show help";
+    printf "  %-25s %s\n" "--source-folder" "[string] folder with {codename}/*.deb structure (required)";
+    printf "  %-25s %s\n" "--output-folder" "[string] folder to write reversioned debs into (required)";
+    printf "  %-25s %s\n" "--new-version" "[string] new version string (required, e.g. 3.0.0-rc1)";
+    printf "  %-25s %s\n" "--suite" "[string] replace suite in control file (e.g. stable, unstable)";
+    printf "  %-25s %s\n" "--name" "[string] rename the package (e.g. mina-devnet-hardfork)";
+    echo ""
+    echo "Examples:"
+    echo ""
+    echo "  $CLI_NAME reversion --source-folder ./debians --output-folder ./reversioned --new-version 3.0.0-rc1 --suite stable"
+    echo ""
+    echo "  Above command will reversion all .deb files found under ./debians/{codename}/ and write"
+    echo "  the results to ./reversioned/{codename}/ preserving the codename subdirectory structure."
+    echo ""
+}
+
+function reversion(){
+    if [[ ${#} == 0 ]]; then
+        reversion_help; exit 0;
+    fi
+
+    local __source_folder=""
+    local __output_folder=""
+    local __new_version=""
+    local __suite=""
+    local __name=""
+
+    while [ ${#} -gt 0 ]; do
+        error_message="Error: a value is needed for '$1'";
+        case $1 in
+            -h | --help )
+                reversion_help; exit 0;
+            ;;
+            --source-folder )
+                __source_folder=${2:?$error_message}
+                shift 2;
+            ;;
+            --output-folder )
+                __output_folder=${2:?$error_message}
+                shift 2;
+            ;;
+            --new-version )
+                __new_version=${2:?$error_message}
+                shift 2;
+            ;;
+            --suite )
+                __suite=${2:?$error_message}
+                shift 2;
+            ;;
+            --name )
+                __name=${2:?$error_message}
+                shift 2;
+            ;;
+            * )
+                echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
+                echo "";
+                reversion_help; exit 1;
+            ;;
+        esac
+    done
+
+    if [[ -z "$__source_folder" ]]; then
+        echo -e "❌ ${RED} !! Source folder (--source-folder) is required${CLEAR}\n";
+        reversion_help; exit 1;
+    fi
+
+    if [[ -z "$__output_folder" ]]; then
+        echo -e "❌ ${RED} !! Output folder (--output-folder) is required${CLEAR}\n";
+        reversion_help; exit 1;
+    fi
+
+    if [[ -z "$__new_version" ]]; then
+        echo -e "❌ ${RED} !! New version (--new-version) is required${CLEAR}\n";
+        reversion_help; exit 1;
+    fi
+
+    if [[ ! -d "$__source_folder" ]]; then
+        echo -e "❌ ${RED} !! Source folder does not exist: $__source_folder${CLEAR}\n";
+        exit 1;
+    fi
+
+    echo ""
+    echo " ℹ️  Reversioning .deb packages with following parameters:"
+    echo " - Source folder: $__source_folder"
+    echo " - Output folder: $__output_folder"
+    echo " - New version: $__new_version"
+    if [[ -n "$__suite" ]]; then
+        echo " - Suite: $__suite"
+    fi
+    if [[ -n "$__name" ]]; then
+        echo " - Rename to: $__name"
+    fi
+
+    local __reversion_script="$SCRIPTPATH/../../../scripts/debian/reversion.sh"
+
+    if [[ ! -f "$__reversion_script" ]]; then
+        echo -e "❌ ${RED} !! Reversion script not found at: $__reversion_script${CLEAR}\n";
+        exit 1;
+    fi
+
+    local __total_count=0
+    local __success_count=0
+    local __fail_count=0
+
+    for __codename_dir in "$__source_folder"/*/; do
+        if [[ ! -d "$__codename_dir" ]]; then
+            continue
+        fi
+
+        local __codename
+        __codename=$(basename "$__codename_dir")
+        local __output_codename_dir="$__output_folder/$__codename"
+        mkdir -p "$__output_codename_dir"
+
+        for __deb_file in "$__codename_dir"*.deb; do
+            if [[ ! -f "$__deb_file" ]]; then
+                continue
+            fi
+
+            (( __total_count++ )) || true
+            local __deb_basename
+            __deb_basename=$(basename "$__deb_file")
+            echo "  🔄  Reversioning $__codename/$__deb_basename -> version $__new_version"
+
+            # Parse package name and arch from deb filename ({name}_{version}_{arch}.deb)
+            local __pkg_name __pkg_arch __final_name
+            __pkg_name=$(echo "$__deb_basename" | sed 's/_[^_]*_[^_]*\.deb$//')
+            __pkg_arch=$(echo "$__deb_basename" | sed 's/.*_\([^_]*\)\.deb$/\1/')
+            if [[ -n "$__name" ]]; then
+                __final_name="$__name"
+            else
+                __final_name="$__pkg_name"
+            fi
+            local __output_file="$__output_codename_dir/${__final_name}_${__new_version}_${__pkg_arch}.deb"
+
+            local __reversion_args=()
+            __reversion_args+=("$__deb_file" "$__new_version")
+
+            if [[ -n "$__suite" ]]; then
+                __reversion_args+=(--suite "$__suite")
+            fi
+            if [[ -n "$__name" ]]; then
+                __reversion_args+=(--name "$__name")
+            fi
+
+            __reversion_args+=(--output "$__output_file")
+
+            if prefix_cmd "$SUBCOMMAND_TAB" "$__reversion_script" "${__reversion_args[@]}"; then
+                (( __success_count++ )) || true
+            else
+                echo -e "  ⚠️  Warning: failed to reversion $__codename/$__deb_basename — skipping"
+                (( __fail_count++ )) || true
+            fi
+        done
+    done
+
+    echo ""
+    if [[ $__total_count -eq 0 ]]; then
+        echo -e " ⚠️  No .deb files found in $__source_folder/{codename}/ subdirectories."
+    else
+        echo " ℹ️  Summary: $__success_count/$__total_count packages reversioned successfully."
+        if [[ $__fail_count -gt 0 ]]; then
+            echo -e " ⚠️  $__fail_count package(s) failed to reversion."
+        fi
+    fi
     echo " ✅  Done."
     echo ""
 }
@@ -2390,7 +2865,7 @@ function main(){
         help )
             main_help 0;
         ;;
-        publish | promote | verify | fix | persist | pull | progress)
+        publish | promote | verify | fix | persist | pull | reversion | progress)
             $1 "${@:2}";
         ;;
         * )

@@ -29,7 +29,11 @@ APT_SOURCES_DIR="/etc/apt/sources.list.d"
 export DEBIAN_FRONTEND=noninteractive
 
 # Configuration
-BLACKLISTED_REPOS=()  # Uncomment to start with no blacklisted repos
+
+# Set BLACKLISTED_REPOS=() to start with no blacklisted repos
+# Usage: Specify name of repo files (not full paths) to blacklist by default
+
+BLACKLISTED_REPOS=()
 VERBOSE=false
 DRY_RUN=false
 SUDO_CMD=""

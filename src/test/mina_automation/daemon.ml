@@ -226,7 +226,7 @@ let default () = { config = Config.default (); executor = Executor.AutoDetect }
 
 let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
-let start ?hardfork_handling ?block_producer_key t =
+let start ?hardfork_handling ?block_producer_key ?env t =
   let open Deferred.Let_syntax in
   let base_args =
     [ "daemon"
@@ -259,7 +259,7 @@ let start ?hardfork_handling ?block_producer_key t =
   in
   [%log debug] "Starting daemon" ;
 
-  let%bind _, process = Executor.run_in_background t.executor ~args () in
+  let%bind _, process = Executor.run_in_background t.executor ~args ?env () in
 
   let mina_process : Process.t =
     { config = t.config

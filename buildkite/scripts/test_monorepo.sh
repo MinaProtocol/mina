@@ -23,6 +23,12 @@ MONOREPO_SCRIPT="$SCRIPT_DIR/monorepo.sh"
 # Test temp directory
 TEST_DIR=""
 
+# Mainline branches for excludeIf/includeIf tests
+MAINLINE_BRANCHES=(mesa compatible develop master)
+MAINLINE_BRANCHES_COMMA_SEPARATED="$(IFS=,; echo "${MAINLINE_BRANCHES[*]}")"
+TEST_CLOSEST_ANCESTOR="develop"
+TEST_NONMATCH_ANCESTOR="nonmatchingbranch"
+TEST_CLOSEST_ANCESTOR_UPPER=$(echo "$TEST_CLOSEST_ANCESTOR" | tr '[:lower:]' '[:upper:]')
 # Setup function
 setup() {
   TEST_DIR=$(mktemp -d)
@@ -30,6 +36,8 @@ setup() {
   mkdir -p "$TEST_DIR/.git"
   echo "test content" > "$TEST_DIR/git_diff.txt"
 }
+
+
 
 # Teardown function
 teardown() {
@@ -224,7 +232,7 @@ spec:
 EOF
 
   local result
-  result=$(check_exclude_if "$TEST_DIR/NoExclude.yml" "NoExclude" "mesa" 2>/dev/null)
+  result=$(check_exclude_if "$TEST_DIR/NoExclude.yml" "NoExclude" "$TEST_CLOSEST_ANCESTOR" 2>/dev/null)
   assert_equals "0" "$result" "Should not exclude when no excludeIf present"
 }
 
@@ -232,18 +240,18 @@ EOF
 test_check_exclude_if_matching() {
   echo -e "\n${YELLOW}Testing: check_exclude_if (matching ancestor)${NC}"
 
-  cat > "$TEST_DIR/ExcludeMatch.yml" << 'EOF'
+  cat > "$TEST_DIR/ExcludeMatch.yml" << EOF
 spec:
   name: ExcludeMatch
   tags: [Lint]
   scope: [PullRequest]
   excludeIf:
-    - ancestor: Mesa
+    - ancestor: $TEST_CLOSEST_ANCESTOR
       reason: "Test exclusion"
 EOF
 
   local result output
-  output=$(check_exclude_if "$TEST_DIR/ExcludeMatch.yml" "ExcludeMatch" "mesa" 2>&1)
+  output=$(check_exclude_if "$TEST_DIR/ExcludeMatch.yml" "ExcludeMatch" "$TEST_CLOSEST_ANCESTOR" 2>&1)
   result=$(echo "$output" | tail -1)
 
   assert_equals "1" "$result" "Should exclude when ancestor matches"
@@ -254,18 +262,18 @@ EOF
 test_check_exclude_if_not_matching() {
   echo -e "\n${YELLOW}Testing: check_exclude_if (non-matching ancestor)${NC}"
 
-  cat > "$TEST_DIR/ExcludeNoMatch.yml" << 'EOF'
+  cat > "$TEST_DIR/ExcludeNoMatch.yml" << EOF
 spec:
   name: ExcludeNoMatch
   tags: [Lint]
   scope: [PullRequest]
   excludeIf:
-    - ancestor: Develop
+    - ancestor: $TEST_NONMATCH_ANCESTOR
       reason: "Test exclusion"
 EOF
 
   local result
-  result=$(check_exclude_if "$TEST_DIR/ExcludeNoMatch.yml" "ExcludeNoMatch" "mesa" 2>/dev/null)
+  result=$(check_exclude_if "$TEST_DIR/ExcludeNoMatch.yml" "ExcludeNoMatch" "$TEST_CLOSEST_ANCESTOR" 2>/dev/null)
   assert_equals "0" "$result" "Should not exclude when ancestor doesn't match"
 }
 
@@ -273,20 +281,20 @@ EOF
 test_check_exclude_if_skip_non_ancestor() {
   echo -e "\n${YELLOW}Testing: check_exclude_if (skip non-ancestor items)${NC}"
 
-  cat > "$TEST_DIR/ExcludeMixed.yml" << 'EOF'
+  cat > "$TEST_DIR/ExcludeMixed.yml" << EOF
 spec:
   name: ExcludeMixed
   tags: [Lint]
   scope: [PullRequest]
   excludeIf:
     - someOtherField: value
-    - ancestor: Compatible
+    - ancestor: $TEST_NONMATCH_ANCESTOR
       reason: "Test exclusion"
     - futureType: something
 EOF
 
   local result output
-  output=$(check_exclude_if "$TEST_DIR/ExcludeMixed.yml" "ExcludeMixed" "mesa" 2>&1)
+  output=$(check_exclude_if "$TEST_DIR/ExcludeMixed.yml" "ExcludeMixed" "$TEST_CLOSEST_ANCESTOR" 2>&1)
   result=$(echo "$output" | tail -1)
 
   assert_equals "0" "$result" "Should not exclude when no ancestor matches"
@@ -297,18 +305,18 @@ EOF
 test_check_exclude_if_case_insensitive() {
   echo -e "\n${YELLOW}Testing: check_exclude_if (case-insensitive)${NC}"
 
-  cat > "$TEST_DIR/ExcludeCase.yml" << 'EOF'
+  cat > "$TEST_DIR/ExcludeCase.yml" << EOF
 spec:
   name: ExcludeCase
   tags: [Lint]
   scope: [PullRequest]
   excludeIf:
-    - ancestor: MESA
+    - ancestor: $TEST_CLOSEST_ANCESTOR_UPPER
       reason: "Test case insensitive"
 EOF
 
   local result
-  result=$(check_exclude_if "$TEST_DIR/ExcludeCase.yml" "ExcludeCase" "mesa" 2>/dev/null)
+  result=$(check_exclude_if "$TEST_DIR/ExcludeCase.yml" "ExcludeCase" "$TEST_CLOSEST_ANCESTOR" 2>/dev/null)
   assert_equals "1" "$result" "Should exclude with case-insensitive matching"
 }
 
@@ -324,7 +332,7 @@ spec:
 EOF
 
   local result
-  result=$(check_include_if "$TEST_DIR/NoInclude.yml" "NoInclude" "mesa" 2>/dev/null)
+  result=$(check_include_if "$TEST_DIR/NoInclude.yml" "NoInclude" "$TEST_CLOSEST_ANCESTOR" 2>/dev/null)
   assert_equals "1" "$result" "Should include by default when no includeIf present"
 }
 
@@ -332,18 +340,18 @@ EOF
 test_check_include_if_matching() {
   echo -e "\n${YELLOW}Testing: check_include_if (matching ancestor)${NC}"
 
-  cat > "$TEST_DIR/IncludeMatch.yml" << 'EOF'
+  cat > "$TEST_DIR/IncludeMatch.yml" << EOF
 spec:
   name: IncludeMatch
   tags: [Lint]
   scope: [PullRequest]
   includeIf:
-    - ancestor: Mesa
+    - ancestor: $TEST_CLOSEST_ANCESTOR
       reason: "Only run on Mesa descendants"
 EOF
 
   local result output
-  output=$(check_include_if "$TEST_DIR/IncludeMatch.yml" "IncludeMatch" "mesa" 2>&1)
+  output=$(check_include_if "$TEST_DIR/IncludeMatch.yml" "IncludeMatch" "$TEST_CLOSEST_ANCESTOR" 2>&1)
   result=$(echo "$output" | tail -1)
 
   assert_equals "1" "$result" "Should include when ancestor matches"
@@ -354,18 +362,18 @@ EOF
 test_check_include_if_not_matching() {
   echo -e "\n${YELLOW}Testing: check_include_if (non-matching ancestor)${NC}"
 
-  cat > "$TEST_DIR/IncludeNoMatch.yml" << 'EOF'
+  cat > "$TEST_DIR/IncludeNoMatch.yml" << EOF
 spec:
   name: IncludeNoMatch
   tags: [Lint]
   scope: [PullRequest]
   includeIf:
-    - ancestor: Develop
+    - ancestor: $TEST_NONMATCH_ANCESTOR
       reason: "Only run on Develop descendants"
 EOF
 
   local result output
-  output=$(check_include_if "$TEST_DIR/IncludeNoMatch.yml" "IncludeNoMatch" "mesa" 2>&1)
+  output=$(check_include_if "$TEST_DIR/IncludeNoMatch.yml" "IncludeNoMatch" "$TEST_CLOSEST_ANCESTOR" 2>&1)
   result=$(echo "$output" | tail -1)
 
   assert_equals "0" "$result" "Should exclude when ancestor doesn't match any includeIf condition"
@@ -376,22 +384,22 @@ EOF
 test_check_include_if_multiple_one_matches() {
   echo -e "\n${YELLOW}Testing: check_include_if (multiple conditions, one matches)${NC}"
 
-  cat > "$TEST_DIR/IncludeMultiple.yml" << 'EOF'
+  cat > "$TEST_DIR/IncludeMultiple.yml" << EOF
 spec:
   name: IncludeMultiple
   tags: [Lint]
   scope: [PullRequest]
   includeIf:
-    - ancestor: Develop
-      reason: "Run on Develop"
-    - ancestor: Mesa
-      reason: "Run on Mesa"
-    - ancestor: Master
-      reason: "Run on Master"
+    - ancestor: $TEST_CLOSEST_ANCESTOR
+      reason: "Run on closest"
+    - ancestor: $TEST_NONMATCH_ANCESTOR
+      reason: "Run on non-matching"
+    - ancestor: nonexistent
+      reason: "Run on nonexistent"
 EOF
 
   local result
-  result=$(check_include_if "$TEST_DIR/IncludeMultiple.yml" "IncludeMultiple" "mesa" 2>/dev/null)
+  result=$(check_include_if "$TEST_DIR/IncludeMultiple.yml" "IncludeMultiple" "$TEST_CLOSEST_ANCESTOR" 2>/dev/null)
   assert_equals "1" "$result" "Should include when at least one includeIf condition matches"
 }
 
@@ -399,20 +407,20 @@ EOF
 test_check_include_if_multiple_none_match() {
   echo -e "\n${YELLOW}Testing: check_include_if (multiple conditions, none match)${NC}"
 
-  cat > "$TEST_DIR/IncludeNoneMatch.yml" << 'EOF'
+  cat > "$TEST_DIR/IncludeNoneMatch.yml" << EOF
 spec:
   name: IncludeNoneMatch
   tags: [Lint]
   scope: [PullRequest]
   includeIf:
-    - ancestor: Develop
-      reason: "Run on Develop"
-    - ancestor: Master
-      reason: "Run on Master"
+    - ancestor: $TEST_NONMATCH_ANCESTOR
+      reason: "Run on non-matching"
+    - ancestor: nonexistent
+      reason: "Run on nonexistent"
 EOF
 
   local result
-  result=$(check_include_if "$TEST_DIR/IncludeNoneMatch.yml" "IncludeNoneMatch" "mesa" 2>/dev/null)
+  result=$(check_include_if "$TEST_DIR/IncludeNoneMatch.yml" "IncludeNoneMatch" "$TEST_CLOSEST_ANCESTOR" 2>/dev/null)
   assert_equals "0" "$result" "Should exclude when no includeIf conditions match"
 }
 
@@ -420,18 +428,18 @@ EOF
 test_check_include_if_case_insensitive() {
   echo -e "\n${YELLOW}Testing: check_include_if (case-insensitive)${NC}"
 
-  cat > "$TEST_DIR/IncludeCase.yml" << 'EOF'
+  cat > "$TEST_DIR/IncludeCase.yml" << EOF
 spec:
   name: IncludeCase
   tags: [Lint]
   scope: [PullRequest]
   includeIf:
-    - ancestor: MESA
+    - ancestor: $TEST_CLOSEST_ANCESTOR_UPPER
       reason: "Test case insensitive"
 EOF
 
   local result
-  result=$(check_include_if "$TEST_DIR/IncludeCase.yml" "IncludeCase" "mesa" 2>/dev/null)
+  result=$(check_include_if "$TEST_DIR/IncludeCase.yml" "IncludeCase" "$TEST_CLOSEST_ANCESTOR" 2>/dev/null)
   assert_equals "1" "$result" "Should include with case-insensitive matching"
 }
 
@@ -439,20 +447,20 @@ EOF
 test_check_include_if_skip_non_ancestor() {
   echo -e "\n${YELLOW}Testing: check_include_if (skip non-ancestor items)${NC}"
 
-  cat > "$TEST_DIR/IncludeMixed.yml" << 'EOF'
+  cat > "$TEST_DIR/IncludeMixed.yml" << EOF
 spec:
   name: IncludeMixed
   tags: [Lint]
   scope: [PullRequest]
   includeIf:
     - someOtherField: value
-    - ancestor: Mesa
+    - ancestor: $TEST_CLOSEST_ANCESTOR
       reason: "Run on Mesa"
     - futureType: something
 EOF
 
   local result output
-  output=$(check_include_if "$TEST_DIR/IncludeMixed.yml" "IncludeMixed" "mesa" 2>&1)
+  output=$(check_include_if "$TEST_DIR/IncludeMixed.yml" "IncludeMixed" "$TEST_CLOSEST_ANCESTOR" 2>&1)
   result=$(echo "$output" | tail -1)
 
   assert_equals "1" "$result" "Should include when at least one ancestor condition matches"
@@ -475,14 +483,14 @@ EOF
   echo "^.*$" > "$TEST_DIR/jobs/IntegrationTest.dirtywhen"
 
   local output
-  output=$("$MONOREPO_SCRIPT" \
+  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
     --scopes pullrequest \
     --tags lint \
     --filter-mode any \
     --selection-mode full \
     --jobs "$TEST_DIR/jobs" \
     --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches mesa,master,develop \
+    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
     --dry-run 2>&1 || true)
 
   assert_contains "$output" "Including job IntegrationTest" "Should include matching job"
@@ -505,14 +513,14 @@ EOF
   echo "^.*$" > "$TEST_DIR/jobs/TagFilterTest.dirtywhen"
 
   local output
-  output=$("$MONOREPO_SCRIPT" \
+  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
     --scopes pullrequest \
     --tags lint \
     --filter-mode any \
     --selection-mode full \
     --jobs "$TEST_DIR/jobs" \
     --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches mesa,master,develop \
+    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
     --dry-run 2>&1 || true)
 
   assert_contains "$output" "rejected job due to tags mismatch" "Should reject job with non-matching tags"
@@ -534,14 +542,14 @@ EOF
   echo "^.*$" > "$TEST_DIR/jobs/ScopeFilterTest.dirtywhen"
 
   local output
-  output=$("$MONOREPO_SCRIPT" \
+  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
     --scopes pullrequest \
     --tags lint \
     --filter-mode any \
     --selection-mode full \
     --jobs "$TEST_DIR/jobs" \
     --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches mesa,master,develop \
+    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
     --dry-run 2>&1 || true)
 
   assert_contains "$output" "rejected job due to scope mismatch" "Should reject job with non-matching scope"
@@ -551,7 +559,7 @@ EOF
 test_integration_include_if_matching() {
   echo -e "\n${YELLOW}Testing: Integration - includeIf matching${NC}"
 
-  cat > "$TEST_DIR/jobs/IncludeIfMatch.yml" << 'EOF'
+  cat > "$TEST_DIR/jobs/IncludeIfMatch.yml" << EOF
 spec:
   name: IncludeIfMatch
   path: Test
@@ -560,20 +568,20 @@ spec:
   scope:
     - PullRequest
   includeIf:
-    - ancestor: develop
+    - ancestor: $TEST_CLOSEST_ANCESTOR
       reason: "Only run on Develop descendants"
 EOF
   echo "^.*$" > "$TEST_DIR/jobs/IncludeIfMatch.dirtywhen"
 
   local output
-  output=$("$MONOREPO_SCRIPT" \
+  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
     --scopes pullrequest \
     --tags lint \
     --filter-mode any \
     --selection-mode full \
     --jobs "$TEST_DIR/jobs" \
     --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches mesa,develop,master \
+    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
     --dry-run 2>&1 || true)
 
   assert_contains "$output" "included based on includeIf condition" "Should show includeIf inclusion message"
@@ -599,14 +607,14 @@ EOF
   echo "^.*$" > "$TEST_DIR/jobs/IncludeIfNoMatch.dirtywhen"
 
   local output
-  output=$("$MONOREPO_SCRIPT" \
+  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
     --scopes pullrequest \
     --tags lint \
     --filter-mode any \
     --selection-mode full \
     --jobs "$TEST_DIR/jobs" \
     --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches mesa,master,develop \
+    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
     --dry-run 2>&1 || true)
 
   assert_contains "$output" "none of the includeIf conditions matched" "Should show includeIf exclusion message"
@@ -617,7 +625,7 @@ EOF
 test_integration_both_include_exclude_include_wins() {
   echo -e "\n${YELLOW}Testing: Integration - includeIf matches, excludeIf doesn't${NC}"
 
-  cat > "$TEST_DIR/jobs/BothIncludeWins.yml" << 'EOF'
+  cat > "$TEST_DIR/jobs/BothIncludeWins.yml" << EOF
 spec:
   name: BothIncludeWins
   path: Test
@@ -626,23 +634,23 @@ spec:
   scope:
     - PullRequest
   excludeIf:
-    - ancestor: mesa
+    - ancestor: $TEST_NONMATCH_ANCESTOR
       reason: "Exclude on Mesa"
   includeIf:
-    - ancestor: develop
+    - ancestor: $TEST_CLOSEST_ANCESTOR
       reason: "Include on Develop"
 EOF
   echo "^.*$" > "$TEST_DIR/jobs/BothIncludeWins.dirtywhen"
 
   local output
-  output=$("$MONOREPO_SCRIPT" \
+  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
     --scopes pullrequest \
     --tags lint \
     --filter-mode any \
     --selection-mode full \
     --jobs "$TEST_DIR/jobs" \
     --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches mesa,master,develop \
+    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
     --dry-run 2>&1 || true)
 
   assert_contains "$output" "Including job BothIncludeWins" "Should include job when includeIf matches and excludeIf doesn't"
@@ -652,7 +660,7 @@ EOF
 test_integration_both_include_exclude_exclude_wins() {
   echo -e "\n${YELLOW}Testing: Integration - excludeIf matches (takes priority)${NC}"
 
-  cat > "$TEST_DIR/jobs/BothExcludeWins.yml" << 'EOF'
+  cat > "$TEST_DIR/jobs/BothExcludeWins.yml" << EOF
 spec:
   name: BothExcludeWins
   path: Test
@@ -661,25 +669,25 @@ spec:
   scope:
     - PullRequest
   excludeIf:
-    - ancestor: develop
+    - ancestor: $TEST_CLOSEST_ANCESTOR
       reason: "Exclude on Develop"
   includeIf:
-    - ancestor: develop
+    - ancestor: $TEST_CLOSEST_ANCESTOR
       reason: "Include on Develop"
-    - ancestor: mesa
+    - ancestor: $TEST_NONMATCH_ANCESTOR
       reason: "Include on Mesa"
 EOF
   echo "^.*$" > "$TEST_DIR/jobs/BothExcludeWins.dirtywhen"
 
   local output
-  output=$("$MONOREPO_SCRIPT" \
+  output=$(FORCE_CLOSEST_ANCESTOR="$TEST_CLOSEST_ANCESTOR" "$MONOREPO_SCRIPT" \
     --scopes pullrequest \
     --tags lint \
     --filter-mode any \
     --selection-mode full \
     --jobs "$TEST_DIR/jobs" \
     --git-diff-file "$TEST_DIR/git_diff.txt" \
-    --mainline-branches mesa,master,develop \
+    --mainline-branches "$MAINLINE_BRANCHES_COMMA_SEPARATED" \
     --dry-run 2>&1 || true)
 
   assert_contains "$output" "excluded based on excludeIf condition" "Should show excludeIf message"

@@ -102,27 +102,26 @@ if [[ ${#MAINLINE_BRANCHES[@]} -eq 0 ]]; then
 fi
 
 # Debug output
-if [[ "$DEBUG" == true ]]; then
+if [[ "${DEBUG:-false}" == true ]]; then
   echo "Debug: SELECTION_MODE=$SELECTION_MODE"
   echo "Debug: TAGS=$TAGS"
   echo "Debug: SCOPES=$SCOPES"
   echo "Debug: FILTER_MODE=$FILTER_MODE"
   echo "Debug: JOBS=$JOBS"
   echo "Debug: GIT_DIFF_FILE=$GIT_DIFF_FILE"
+  if [[ -n "$GIT_DIFF_FILE" && -f "$GIT_DIFF_FILE" ]]; then
+    echo "Debug: Contents of GIT_DIFF_FILE ($GIT_DIFF_FILE):"
+    cat "$GIT_DIFF_FILE"
+  fi
   echo "Debug: MAINLINE_BRANCHES=${MAINLINE_BRANCHES[*]}"
+  echo "Debug: DRY_RUN=$DRY_RUN"
+
 fi
 
 # Check if yq is installed, if not install it
 if ! command -v yq &> /dev/null; then
-  echo "yq not found, installing..."
-  if command -v apt-get &> /dev/null; then
-    sudo apt-get update && sudo apt-get install -y wget
-    sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
-    sudo chmod +x /usr/local/bin/yq
-  else
-    echo "Error: yq is not installed and automatic installation is not supported on this system. Please install yq manually."
-    exit 1
-  fi
+  echo "Error: yq is not installed and automatic installation is not supported on this system. Please install yq manually."
+  exit 1
 fi
 
 IFS=',' read -r -a DESIRED_TAGS <<< "$TAGS"
@@ -332,11 +331,12 @@ select_job() {
   if [[ "$selection_full" == true ]]; then
     echo 1
   elif [[ "$selection_triaged" == true ]]; then
-    dirtyWhen=$(cat "${file%.yml}.dirtywhen")
-    # Remove quotes from beginning and end of string
-    dirtyWhen="${dirtyWhen%\"}"
-    dirtyWhen="${dirtyWhen#\"}"
-    if cat "$git_diff_file" | grep -E "$dirtyWhen" > /dev/null; then
+    # Use yq to properly parse the YAML string (handles escape sequences correctly)
+    dirtyWhen=$(yq -r '.' "${file%.yml}.dirtywhen")
+    if [[ "${DEBUG:-false}" == true ]]; then
+      echo "Dirty when for $job_name: $dirtyWhen" >&2
+    fi
+    if grep -E "$dirtyWhen" "$git_diff_file" > /dev/null; then
       echo 1
     else
       echo 0
@@ -344,10 +344,13 @@ select_job() {
   fi
 }
 
-
-# Find the closest ancestor branch
-# which will be used for excludeIf evaluations
-closest_ancestor=$(find_closest_ancestor)
+# Check for forced closest ancestor via environment variable
+# Used only in testing or if git is on fire
+if [[ -n "${FORCE_CLOSEST_ANCESTOR:-}" ]]; then
+  closest_ancestor="$FORCE_CLOSEST_ANCESTOR"
+else
+  closest_ancestor=$(find_closest_ancestor)
+fi
 
 find "$JOBS" -type f -name "*.yml" | while read -r file; do
   tags=$(yq .spec.tags "$file")
@@ -393,9 +396,8 @@ find "$JOBS" -type f -name "*.yml" | while read -r file; do
   else
     job_path=$(yq -r .spec.path "$file")
 
-    dhall-to-yaml --quoted <<< "(./buildkite/src/Jobs/$job_path/$job_name.dhall).pipeline" | buildkite-agent pipeline upload
+    ./buildkite/scripts/pipeline/upload.sh "(./buildkite/src/Jobs/$job_path/$job_name.dhall).pipeline"
     printf " -> ✅ Uploaded job: %s\n" "$job_name"
   fi
 
 done
-

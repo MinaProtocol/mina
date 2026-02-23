@@ -113,9 +113,8 @@ let generateStep =
 
                 then  " && echo Skipping local debian repo setup "
 
-                else      " && ./buildkite/scripts/debian/update.sh --verbose"
-                      ++  " && apt-get install aptly -y && ./buildkite/scripts/debian/start_local_repo.sh --root ${spec.deb_root_folder} --arch ${Arch.lowerName
-                                                                                                                                                    spec.arch}"
+                else  " && ./buildkite/scripts/debian/start_local_repo.sh --root ${spec.deb_root_folder} --arch ${Arch.lowerName
+                                                                                                                    spec.arch}"
 
           let maybeStopDebianRepo =
                       if spec.no_debian
@@ -151,7 +150,8 @@ let generateStep =
                 else  ""
 
           let pruneDockerImages =
-                    "docker system prune --all --force "
+                    "if [ -z \"\\\${SKIP_DOCKER_PRUNE:-}\" ]; then "
+                ++  "docker system prune --all --force "
                 ++  merge
                       { Arm64 = ""
                       , XLarge = "--filter until=24h"
@@ -164,6 +164,7 @@ let generateStep =
                       , Perf = "--filter until=24h"
                       }
                       spec.size
+                ++  "; else echo 'Skipping docker prune due to SKIP_DOCKER_PRUNE'; fi"
 
           let loadOnlyArg =
                       if DockerPublish.shouldPublish
