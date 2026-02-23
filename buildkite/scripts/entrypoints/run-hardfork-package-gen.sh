@@ -12,7 +12,7 @@ set -euox pipefail
 #   ./run-hardfork-package-gen.sh
 #
 # REQUIRED ENVIRONMENT VARIABLES:
-#   CODENAMES                     - Comma-separated list of Debian codenames (e.g., "Bullseye,Focal")
+#   CODENAMES_CONFIG              - Comma-separated list of Debian codenames to include in the package generation. Fist one will be used for validations
 #   NETWORK                       - Target network name (e.g., "Devnet", "Mainnet")
 #   GENESIS_TIMESTAMP             - Genesis timestamp in ISO format (e.g., "2024-04-07T11:45:00Z")
 #   CONFIG_JSON_GZ_URL            - URL to the gzipped genesis config JSON file
@@ -21,7 +21,7 @@ set -euox pipefail
 #   USE_ARTIFACTS_FROM_BUILDKITE_BUILD - (Optional) Buildkite build number to use artifacts from (e.g., "1234")
 #
 # EXAMPLE:
-#   export CODENAMES="Bullseye,Focal"
+#   export CODENAMES_CONFIG="Bullseye_Amd64,Focal_Arm64"
 #   export NETWORK="Devnet"
 #   export GENESIS_TIMESTAMP="2024-04-07T11:45:00Z"
 #   export CONFIG_JSON_GZ_URL="https://example.com/config.json.gz"
@@ -38,6 +38,7 @@ set -euox pipefail
 
 
 DEBIAN_VERSION_DHALL_DEF="(./buildkite/src/Constants/DebianVersions.dhall)"
+ARCH_DHALL_DEF="(./buildkite/src/Constants/Arch.dhall)"
 NETWORK_DHALL_DEF="(./buildkite/src/Constants/Network.dhall)"
 GENERATE_HARDFORK_PACKAGE_DHALL_DEF="(./buildkite/src/Entrypoints/GenerateHardforkPackage.dhall)"
 
@@ -46,7 +47,7 @@ function usage() {
     echo -e "${RED}☞  $1${CLEAR}\n";
   fi
   cat << EOF
-  CODENAMES                     The Debian codenames (Bullseye, Focal etc.)
+  CODENAMES_CONFIG              The Debian codenames config (Bullseye_Amd64, Focal_Arm64 etc.)
   NETWORK                       The Docker and Debian network (Devnet, Mainnet)
   GENESIS_TIMESTAMP             The Genesis timestamp in ISO format (e.g. 2024-04-07T11:45:00Z)
   CONFIG_JSON_GZ_URL            The URL to the gzipped genesis config JSON file
@@ -78,8 +79,8 @@ function to_dhall_list() {
   echo "$dhall_list"
 }
 
-if [[ -z "${CODENAMES:-}" ]]; then
-  usage "CODENAMES environment variable is required"
+if [[ -z "${CODENAMES_CONFIG:-}" ]]; then
+  usage "CODENAMES_CONFIG environment variable is required"
 fi
 
 if [[ -z "${NETWORK:-}" ]]; then
@@ -122,7 +123,23 @@ else
   PRECOMPUTED_FORK_BLOCK_PREFIX="(Some \"${PRECOMPUTED_FORK_BLOCK_PREFIX}\")"
 fi
 
-DHALL_CODENAMES=$(to_dhall_list "${CODENAMES:-}" "$DEBIAN_VERSION_DHALL_DEF.DebVersion")
+codenames_array=()
+for codename_config in ${CODENAMES_CONFIG//,/ }; do
+  codename="${codename_config%_*}"
+  arch="${codename_config#*_}"
+  codenames_array+=("{ DebVersion = ${DEBIAN_VERSION_DHALL_DEF}.DebVersion.${codename}, Arch = ${ARCH_DHALL_DEF}.Type.${arch} }")
+done
+
+# Build Dhall list directly (cannot use to_dhall_list because records contain commas)
+if [[ ${#codenames_array[@]} -eq 0 ]]; then
+  DHALL_CODENAMES="([] : List { DebVersion : ${DEBIAN_VERSION_DHALL_DEF}.DebVersion, Arch : ${ARCH_DHALL_DEF}.Type })"
+else
+  DHALL_CODENAMES="[ ${codenames_array[0]}"
+  for ((i=1; i<${#codenames_array[@]}; i++)); do
+    DHALL_CODENAMES="${DHALL_CODENAMES}, ${codenames_array[$i]}"
+  done
+  DHALL_CODENAMES="${DHALL_CODENAMES} ]"
+fi
 
 # shellcheck disable=SC2089
 printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s\n' \

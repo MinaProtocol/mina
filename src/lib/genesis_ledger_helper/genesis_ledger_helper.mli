@@ -128,6 +128,19 @@ end
     file content *)
 val load_config_json : string -> Yojson.Safe.t Or_error.t Deferred.t
 
+(** Reconcile the given "base" genesis constants and a [Runtime_config.t] of
+    overrides to those constants and return the result as a
+    [Genesis_proof.Light.t]. This method computes these constants in exactly the
+    same way as [init_from_config_file]. *)
+val light_proof_from_runtime_config :
+     logger:Logger.t
+  -> cli_proof_level:Genesis_constants.Proof_level.t option
+  -> genesis_constants:Genesis_constants.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> proof_level:Genesis_constants.Proof_level.t
+  -> Runtime_config.t
+  -> Genesis_proof.Light.t Or_error.t Deferred.t
+
 (** Given specified "base" protocol constants and a [Runtime_config.t] of
     overrides to those constants, compute the actual constants to be used and
     return a full [Precomputed_values.t] with those constants. This method is
