@@ -21,6 +21,7 @@
 #   -t, --tag           Docker image tag version (required)
 #   -n, --network       Network configuration: devnet or mainnet (default: devnet)
 #   --sync-timeout      Sync timeout duration in seconds (default: 900)
+#   --new-block-timeout Timeout for waiting for new blocks in seconds (default: 600)
 #   --run-load-test     Enable load testing (default: false)
 #   --run-compatibility-test  Enable compatibility testing with specified branch
 #   --upgrade-scripts-workdir  Working directory for upgrade/downgrade scripts (default: src/app/archive)
@@ -47,6 +48,7 @@ GREEN='\033[0;32m'
 
 NETWORK=devnet
 SYNC_TIMEOUT=900
+NEW_BLOCK_TIMEOUT=600
 DB_CONN_STR="postgres://pguser:pguser@localhost:5432/archive"
 UPGRADE_SCRIPTS_WORKDIR="src/app/archive"
 
@@ -61,6 +63,7 @@ USAGE="Usage: $0 [-t docker-tag] [-n network]
   -t, --version             The version to be used in the docker image tag
   -n, --network             The network configuration to use (devnet or mainnet). Default=$NETWORK
   --sync-timeout            The sync timeout duration in seconds. Default=$SYNC_TIMEOUT
+  --new-block-timeout       The timeout for waiting for new blocks in seconds. Default=$NEW_BLOCK_TIMEOUT
   --run-compatibility-test  Enable compatibility testing with specified branch
   --upgrade-scripts-workdir Working directory for upgrade/downgrade scripts. Default=$UPGRADE_SCRIPTS_WORKDIR
   --run-load-test           Enable load testing
@@ -94,6 +97,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
     -t|--tag) TAG="$2"; shift;;
     -r|--repo) REPO="$2"; shift;;
     --sync-timeout) SYNC_TIMEOUT="$2"; shift;;
+    --new-block-timeout) NEW_BLOCK_TIMEOUT="$2"; shift;;
     --upgrade-scripts-workdir) UPGRADE_SCRIPTS_WORKDIR="$2"; shift;;
     --metrics-mode) METRICS_MODE="--metrics-mode" ;;
     --branch) BRANCH="$2"; shift;;
@@ -160,7 +164,7 @@ wait_for_new_blocks() {
         local previous_blocks=$1
         local test_name=$2
         local timeout_counter=0
-        local max_wait=600  # 10 minutes
+        local max_wait=$NEW_BLOCK_TIMEOUT
 
         echo "Waiting for new blocks after $test_name..."
 

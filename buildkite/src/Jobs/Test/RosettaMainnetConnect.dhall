@@ -14,6 +14,7 @@ in  Pipeline.build
           , network = Network.Type.Mainnet
           , profile = Profile.Type.Mainnet
           , syncTimeout = 2400
+          , newBlockTimeout = 2400
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }
