@@ -103,7 +103,9 @@ fi
 pushd "$(git rev-parse --show-toplevel)"
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-git config --global --add safe.directory /workdir
+if [ -n "${BUILDKITE:-}" ]; then
+  git config --global --add safe.directory /workdir
+fi
 
 TEST_COMMIT="$(git rev-parse HEAD)"
 
