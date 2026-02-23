@@ -486,7 +486,7 @@ let get_account_data ~logger node_uri ~account_id =
                 "the nonce from get_balance is None, which should be impossible"
               acc.nonce
         ; total_balance = acc.balance.total
-        ; delegate = Option.map ~f:(fun delegate -> delegate.publicKey) acc.delegateAccount
+        ; delegate = acc.delegate
         ; liquid_balance_opt = acc.balance.liquid
         ; locked_balance_opt = acc.balance.locked
         }

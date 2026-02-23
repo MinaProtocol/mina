@@ -2,7 +2,6 @@ open Core
 open Integration_test_lib
 open Currency
 open Mina_base
-open Mina_numbers
 open Signature_lib
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
@@ -19,42 +18,35 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let config =
+  let config ~(constants : Test_config.constants) =
     let open Test_config in
     let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
         ~vesting_increment : Mina_base.Account_timing.t =
       Timed
-        { initial_minimum_balance = Balance.of_int min_balance
-        ; cliff_time = Mina_numbers.Global_slot.of_int cliff_time
-        ; cliff_amount = Amount.of_int cliff_amount
-        ; vesting_period = Mina_numbers.Global_slot.of_int vesting_period
-        ; vesting_increment = Amount.of_int vesting_increment
+        { initial_minimum_balance = Balance.of_nanomina_int_exn min_balance
+        ; cliff_time = Mina_numbers.Global_slot_since_genesis.of_int cliff_time
+        ; cliff_amount = Amount.of_nanomina_int_exn cliff_amount
+        ; vesting_period = Mina_numbers.Global_slot_span.of_int vesting_period
+        ; vesting_increment = Amount.of_nanomina_int_exn vesting_increment
         }
     in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "bp-1"
-          ; balance = "400000"
-          ; timing = Untimed (* 400_000_000_000_000 *)
-          }
-        ; { account_name = "bp-2"
-          ; balance = "300000"
-          ; timing = Untimed (* 300_000_000_000_000 *)
-          }
-        ; { account_name = "timed-bp"
-          ; balance = "30000"
-          ; timing =
-              make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
-                ~cliff_amount:0 ~vesting_period:4
-                ~vesting_increment:5_000_000_000_000
-              (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
-          }
-        ; { account_name = "snark-node-1"; balance = "0"; timing = Untimed }
-        ; { account_name = "snark-node-2"; balance = "0"; timing = Untimed }
-        ; { account_name = "fish-1"; balance = "100"; timing = Untimed }
-        ; { account_name = "fish-2"; balance = "100"; timing = Untimed }
-        ]
+        (let open Test_account in
+        [ create ~account_name:"bp-1" ~balance:"400000" ()
+        ; create ~account_name:"bp-2" ~balance:"300000" ()
+        ; create ~account_name:"timed-bp" ~balance:"30000"
+            ~timing:
+              (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
+                 ~cliff_amount:0 ~vesting_period:4
+                 ~vesting_increment:5_000_000_000_000 )
+            ()
+        ; create ~account_name:"snark-node-1" ~balance:"0" ()
+        ; create ~account_name:"snark-node-2" ~balance:"0" ()
+        ; create ~account_name:"fish-1" ~balance:"100" ()
+        ; create ~account_name:"fish-2" ~balance:"100" ()
+        ])
     ; block_producers =
         [ { node_name = "bp-1-node"; account_name = "bp-1" }
         ; { node_name = "bp-2-node"; account_name = "bp-2" }
@@ -67,7 +59,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; worker_nodes = 4
           }
     ; snark_worker_fee = "0.0002"
-    ; num_archive_nodes = 1
+    ; num_archive_nodes = 0
     ; proof_config =
         { proof_config_default with
           work_delay = Some 1
@@ -76,33 +68,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     }
 
-  let payment ?(memo = "") ?(token = Token_id.default)
-      ?(valid_until = Global_slot.max_value) ?(fee = Fee.of_int 1_000_000_000)
-      ~logger ~node ~sender ~receiver amount =
+  let payment ?(memo = "")
+      ?(valid_until = Mina_numbers.Global_slot_since_genesis.max_value)
+      ?(fee = Fee.of_nanomina_int_exn 1_000_000_000) ~logger ~node ~sender
+      ~receiver amount =
     let open Network_keypair in
     let open Malleable_error.Let_syntax in
     let sender_pk = sender.keypair.public_key |> Public_key.compress in
-    let payment_payload =
-      { Payment_payload.Poly.receiver_pk =
-          receiver.keypair.public_key |> Public_key.compress
-      ; source_pk = sender_pk
-      ; token_id = token
-      ; amount
-      }
-    in
+    let receiver_pk = receiver.keypair.public_key |> Public_key.compress in
     [%log info] "Executing payment of %s from %s to %s"
       (Currency.Amount.to_string amount)
       (Public_key.Compressed.to_string sender_pk)
-      (Public_key.Compressed.to_string
-         (Public_key.compress receiver.keypair.public_key) ) ;
+      (Public_key.Compressed.to_string receiver_pk) ;
     let%bind { nonce; _ } =
       Integration_test_lib.Graphql_requests.must_get_account_data ~logger
         (Network.Node.get_ingress_uri node)
-        ~public_key:sender_pk
+        ~account_id:
+          (Mina_base.Account_id.create sender_pk Mina_base.Token_id.default)
     in
+    let payment_payload = { Payment_payload.Poly.receiver_pk; amount } in
     let common =
       { Signed_command_payload.Common.Poly.fee
-      ; fee_token = token
       ; fee_payer_pk = sender_pk
       ; nonce
       ; valid_until
@@ -115,21 +101,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       }
     in
     let raw_signature =
-      Signed_command.sign_payload sender.keypair.private_key payload
+      Signed_command.sign_payload ~signature_kind:Testnet
+        sender.keypair.private_key payload
       |> Signature.Raw.encode
     in
-    Integration_test_lib.Graphql_requests.must_send_payment_with_raw_sig
+    Integration_test_lib.Graphql_requests.must_send_payment_with_raw_sig ~logger
       (Network.Node.get_ingress_uri node)
-      ~logger
-      ~sender_pub_key:(Signed_command_payload.source_pk payload)
+      ~sender_pub_key:(Signed_command_payload.fee_payer_pk payload)
       ~receiver_pub_key:(Signed_command_payload.receiver_pk payload)
       ~amount ~fee
       ~nonce:(Signed_command_payload.nonce payload)
-      ~memo ~token ~valid_until ~raw_signature
+      ~memo ~valid_until ~raw_signature
 
-  let mina amt = Amount.of_int (1_000_000_000 * amt)
+  let mina amt = Amount.of_nanomina_int_exn (1_000_000_000 * amt)
 
-  let run network t =
+  let run ~config:_ network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
@@ -247,13 +233,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     Malleable_error.List.iter ledger_accounts ~f:(fun genesis_account ->
         let open Runtime_config.Accounts in
         let public_key =
-          Option.value_exn genesis_account.pk
-          |> Public_key.Compressed.of_base58_check_exn
+          Public_key.Compressed.of_base58_check_exn genesis_account.pk
         in
         let%bind gql_account =
           Integration_test_lib.Graphql_requests.must_get_account_data ~logger
-            ~public_key
             (Network.Node.get_ingress_uri node)
+            ~account_id:
+              (Mina_base.Account_id.create public_key Mina_base.Token_id.default)
         in
         let%bind () =
           if
@@ -266,22 +252,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Malleable_error.soft_error_format ~value:()
               "Error: delegate mismatch in account %s.  \n\
                In the genesis ledger: %s.  \n\
-               On the original blockchain: %s."
-              (Option.value_exn genesis_account.pk)
+               On the original blockchain: %s." genesis_account.pk
               (Option.value_exn genesis_account.delegate)
               ( Public_key.Compressed.to_base58_check
               @@ Option.value_exn gql_account.delegate )
         in
         if Balance.equal genesis_account.balance gql_account.total_balance then (
           [%log info] "balance check successful for account %s."
-            (Option.value_exn genesis_account.pk) ;
+            genesis_account.pk ;
           Malleable_error.return () )
         else
           Malleable_error.soft_error_format ~value:()
             "Error: balance mismatch in account %s.  \n\
              In the genesis ledger: %s.  \n\
-             On the original blockchain: %s."
-            (Option.value_exn genesis_account.pk)
-            (Balance.to_formatted_string genesis_account.balance)
-            (Balance.to_formatted_string gql_account.total_balance) )
+             On the original blockchain: %s." genesis_account.pk
+            (Balance.to_string genesis_account.balance)
+            (Balance.to_string gql_account.total_balance) )
 end
