@@ -78,6 +78,10 @@ let () =
         , `String
             (Snark_params.Tick.Field.to_string
                (Lazy.force Mina_base.Zkapp_account.default_digest) ) )
+      ; ( "default_account_hash"
+        , `String
+            (Snark_params.Tick.Field.to_string
+               (Lazy.force Mina_base.Account.empty_digest) ) )
       ]
   in
 
