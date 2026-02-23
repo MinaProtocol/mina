@@ -79,5 +79,4 @@ let of_precomputed_values (pv : Precomputed_values.t) =
   in
   make ~genesis_constants:pv.genesis_constants
     ~constraint_constants:pv.constraint_constants ~genesis_ledger
-    ~genesis_epoch_data
-    ~constraint_system_digests:pv.constraint_system_digests
+    ~genesis_epoch_data ~constraint_system_digests:pv.constraint_system_digests
