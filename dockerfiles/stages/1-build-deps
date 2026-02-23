@@ -57,7 +57,7 @@ ARG GO_CAPNP_VERSION=v3.0.0-alpha.5
 # This should stay in line with:
 # - src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml
 # - src/lib/crypto/proof-systems/rust-toolchain.toml
-ARG RUST_VERSION=1.81.0
+ARG RUST_VERSION=1.92.0
 # Nightly Rust Version used for WebAssembly builds
 # This should stay in line with the value of the variable
 # $NIGHTLY_RUST_VERSION defined in:

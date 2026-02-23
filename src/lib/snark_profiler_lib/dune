@@ -64,7 +64,6 @@
   (pps
    ppx_mina
    ppx_version
-   ; ppx_jane except ppx_optcomp
    ppx_base
    ppx_assert
    ppx_bench

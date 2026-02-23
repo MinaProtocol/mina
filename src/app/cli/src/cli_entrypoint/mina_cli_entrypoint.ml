@@ -14,32 +14,6 @@ type mina_initialization =
   ; itn_graphql_port : int option
   }
 
-(* keep this code in sync with Client.chain_id_inputs, Mina_commands.chain_id_inputs, and
-   Daemon_rpcs.Chain_id_inputs
-*)
-let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
-    ~protocol_transaction_version ~protocol_network_version =
-  (* if this changes, also change Mina_commands.chain_id_inputs *)
-  let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
-  let genesis_constants_hash = Genesis_constants.hash genesis_constants in
-  let all_snark_keys =
-    List.map constraint_system_digests ~f:(fun (_, digest) -> Md5.to_hex digest)
-    |> String.concat ~sep:""
-  in
-  let version_digest v = Int.to_string v |> Md5.digest_string |> Md5.to_hex in
-  let protocol_transaction_version_digest =
-    version_digest protocol_transaction_version
-  in
-  let protocol_network_version_digest =
-    version_digest protocol_network_version
-  in
-  let b2 =
-    Blake2.digest_string
-      ( genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash
-      ^ protocol_transaction_version_digest ^ protocol_network_version_digest )
-  in
-  Blake2.to_hex b2
-
 let plugin_flag =
   if Node_config.plugins then
     let open Command.Param in
@@ -139,8 +113,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
   let%map precomputed_values =
     match%map
       Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
-        ~logger ~genesis_constants ~constraint_constants ~proof_level
-        ~ledger_backing config
+        ~logger ~genesis_constants ~constraint_constants ~proof_level config
     with
     | Ok precomputed_values ->
         precomputed_values
@@ -651,9 +624,9 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         raise (Error.to_exn (Error.of_string "Invalid pubsub topic mode"))
   in
   fun () ->
+    let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
     O1trace.thread "mina" (fun () ->
         let open Deferred.Let_syntax in
-        let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
         let%bind () = Mina_stdlib_unix.File_system.create_dir conf_dir in
         let () =
           if is_background then (
@@ -664,6 +637,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               ~redirect_stderr:`Dev_null () )
           else Option.iter working_dir ~f:Caml.Sys.chdir
         in
+        (* NOTE: invocation of memtrace must happen after daemonization *)
+        Memtrace.trace_if_requested ~context:"mina" () ;
         Stdout_log.setup log_json log_level ;
         (* 512MB logrotate max size = 1GB max filesystem usage *)
         let logrotate_max_size = 1024 * 1024 * 10 in
@@ -1332,11 +1307,14 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             let protocol_network_version =
               Protocol_version.(transaction current)
             in
-            chain_id ~genesis_state_hash
-              ~genesis_constants:precomputed_values.genesis_constants
-              ~constraint_system_digests:
-                (Lazy.force precomputed_values.constraint_system_digests)
-              ~protocol_transaction_version ~protocol_network_version
+            Chain_id.make
+              { genesis_state_hash
+              ; genesis_constants = precomputed_values.genesis_constants
+              ; constraint_system_digests =
+                  Lazy.force precomputed_values.constraint_system_digests
+              ; protocol_transaction_version
+              ; protocol_network_version
+              }
           in
           [%log info] "Daemon will use chain id %s" chain_id ;
           [%log info] "Daemon running protocol version %s"
@@ -1454,7 +1432,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let%map mina =
             Mina_lib.create ~commit_id:Mina_version.commit_id ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~file_log_level ~log_level ~log_json ~chain_id ~is_seed
+                 ~file_log_level ~log_level ~log_json ~chain_id
                  ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
                  ~gossip_net_params ~proposed_protocol_version_opt
                  ~work_selection_method:
@@ -1521,6 +1499,9 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           mina_initialization_deferred ()
         in
         mina_ref := Some mina ;
+        (* Start auto hardfork config generation if conditions are met *)
+        O1trace.background_thread "auto_hardfork_config_generation" (fun () ->
+            Mina_run.start_auto_hardfork_config_generation ~logger mina ) ;
         (*This pipe is consumed only by integration tests*)
         don't_wait_for
           (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
@@ -2025,7 +2006,7 @@ let internal_commands logger ~itn_features =
           let open Deferred.Let_syntax in
           Parallel.init_master () ;
           let logger = Logger.create () in
-          let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
+          let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
           let genesis_constants =
             Genesis_constants.Compiled.genesis_constants
           in
@@ -2069,6 +2050,146 @@ let internal_commands logger ~itn_features =
               Format.eprintf "Failed to generate block@.%s@."
                 (Yojson.Safe.to_string @@ Error_json.error_to_yojson err) ;
               exit 1) )
+  ; ( "chain-id"
+    , Command.async
+        ~summary:"Print the chain_id that uniquely identifies the network"
+        (let open Command.Let_syntax in
+        let%map_open config_files =
+          flag "--config-file" ~aliases:[ "config-file" ]
+            ~doc:
+              "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
+               default: <config_dir>/daemon.json). Pass multiple times to \
+               override fields from earlier config files"
+            (listed string)
+        and conf_dir = Cli_lib.Flag.conf_dir
+        and genesis_dir =
+          flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
+            ~doc:"DIR Directory that contains the genesis ledger"
+            (optional string)
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          Parallel.init_master () ;
+          let logger = Logger.create () in
+          let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
+          let genesis_constants =
+            Genesis_constants.Compiled.genesis_constants
+          in
+          let constraint_constants =
+            Genesis_constants.Compiled.constraint_constants
+          in
+          let proof_level = Genesis_constants.Proof_level.Full in
+          let config_files =
+            List.map config_files ~f:(fun config_file ->
+                (config_file, `Must_exist) )
+          in
+          let%bind ( precomputed_values
+                   , _config_jsons
+                   , _config
+                   , _chain_state_locations
+                   , _ ) =
+            load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
+              ~constraint_constants ~proof_level ~cli_proof_level:None
+              ~hardfork_handling:Keep_running config_files
+          in
+          let chain_id =
+            let protocol_transaction_version =
+              Protocol_version.(transaction current)
+            in
+            (*TODO: this is wrong, should be `Protocol_version.network current`, but is
+              consistent with the computation made by the daemon's entrypoint. Fix this in
+              the PR for develop.
+            *)
+            let protocol_network_version =
+              Protocol_version.(transaction current)
+            in
+            let genesis_state_hash =
+              (Precomputed_values.genesis_state_hashes precomputed_values)
+                .state_hash
+            in
+            Chain_id.make
+              { genesis_state_hash
+              ; genesis_constants = precomputed_values.genesis_constants
+              ; constraint_system_digests =
+                  Lazy.force precomputed_values.constraint_system_digests
+              ; protocol_transaction_version
+              ; protocol_network_version
+              }
+          in
+          let () = printf "%s" chain_id in
+          exit 0) )
+  ; ( "print-hard-fork-genesis-timestamp"
+    , Command.async
+        ~summary:
+          "Print the scheduled hard fork genesis timestamp computed from the \
+           given config file(s)"
+        (let open Command.Let_syntax in
+        let%map_open config_files =
+          flag "--config-file" ~aliases:[ "config-file" ]
+            ~doc:
+              "PATH path to a configuration file. Pass multiple times to \
+               override fields from earlier config files"
+            (listed string)
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          let logger = Logger.null () in
+          let genesis_constants =
+            Genesis_constants.Compiled.genesis_constants
+          in
+          let constraint_constants =
+            Genesis_constants.Compiled.constraint_constants
+          in
+          let proof_level = Genesis_constants.Compiled.proof_level in
+          let config =
+            let config_jsons =
+              List.map config_files ~f:(fun config_file ->
+                  let json =
+                    In_channel.with_file config_file ~f:(fun ic ->
+                        Yojson.Safe.from_channel ic )
+                  in
+                  (config_file, json) )
+            in
+            List.fold ~init:Runtime_config.default config_jsons
+              ~f:(fun config (config_file, config_json) ->
+                match Runtime_config.of_yojson config_json with
+                | Ok loaded_config ->
+                    Runtime_config.combine config loaded_config
+                | Error err ->
+                    failwithf "Could not parse configuration file %s: %s"
+                      config_file err () )
+          in
+          let scheduled_genesis_slot =
+            match Runtime_config.scheduled_hard_fork_genesis_slot config with
+            | Some slot ->
+                slot
+            | None ->
+                failwith
+                  "Could not compute scheduled genesis slot: slot_chain_end \
+                   and hard_fork_genesis_slot_delta must both be set in the \
+                   daemon config"
+          in
+          let%map light_proof =
+            match%map
+              Genesis_ledger_helper.light_proof_from_runtime_config ~logger
+                ~cli_proof_level:None ~genesis_constants ~constraint_constants
+                ~proof_level config
+            with
+            | Ok light_proof ->
+                light_proof
+            | Error err ->
+                Error.raise err
+          in
+          let consensus_constants = light_proof.consensus_constants in
+          let timestamp =
+            Consensus.Data.Consensus_time.(
+              start_time ~constants:consensus_constants
+                (of_global_slot ~constants:consensus_constants
+                   scheduled_genesis_slot ))
+            |> Block_time.to_time_exn
+            |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+          in
+          print_endline timestamp) )
   ]
 
 let mina_commands logger ~itn_features =

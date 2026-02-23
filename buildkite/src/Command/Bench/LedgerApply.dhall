@@ -45,10 +45,12 @@ let pipeline
               ]
             , preCommands =
                 RunInToolchain.runInToolchain
-                  [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
-                  , "COVERALLS_TOKEN"
-                  , "BENCHMARK_FILE=input.json"
-                  ]
+                  (   [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
+                      , "COVERALLS_TOKEN"
+                      , "BENCHMARK_FILE=input.json"
+                      ]
+                    # DebianVersions.overrideEnvs
+                  )
                   "buildkite/scripts/tests/ledger_test_apply.sh && buildkite/scripts/upload-partial-coverage-data.sh ${spec.key}"
             }
 

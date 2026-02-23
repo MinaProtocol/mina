@@ -7,7 +7,7 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
-TESTNET_NAME="${TESTNET_NAME:-berkeley}"
+TESTNET_NAME="${TESTNET_NAME:-testnet-generic}"
 
 git config --global --add safe.directory /workdir
 

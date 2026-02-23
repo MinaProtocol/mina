@@ -101,6 +101,9 @@ module Block = struct
 
   let protocol_state t = Frontier_base.Breadcrumb.protocol_state t.breadcrumb
 
+  let consensus_state_with_hashes t =
+    Frontier_base.Breadcrumb.consensus_state_with_hashes t.breadcrumb
+
   let state_timestamp t =
     Blockchain_state.timestamp @@ Protocol_state.blockchain_state
     @@ protocol_state t
@@ -135,12 +138,17 @@ module Block = struct
       (* [create_exn] is only safe to use for initial genesis block. *)
       Staged_ledger.create_exn ~constraint_constants ~ledger
     in
+    let accounts_created =
+      Precomputed_values.accounts precomputed_values
+      |> Lazy.force
+      |> List.map ~f:Precomputed_values.id_of_account_record
+    in
     [%log info] "Generating genesis breadcrumb" ;
     let breadcrumb =
       Frontier_base.Breadcrumb.create ~validated_transition:validated
         ~staged_ledger
         ~transition_receipt_time:(Some (Time.now ()))
-        ~just_emitted_a_proof:false
+        ~just_emitted_a_proof:false ~accounts_created
     in
     (* Block proof contained in genesis header is just a stub.
        Hence we need to generate the real proof here, in order to
@@ -365,7 +373,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
               ~state_hash:(Some previous_state_hash) previous_protocol_state )
     >>| V.skip_proof_validation `This_block_was_generated_internally
     >>= V.validate_frontier_dependencies ~to_header:Mina_block.header ~context
-          ~root_block:(Block.block_with_hash previous)
+          ~root_consensus_state:(Block.consensus_state_with_hashes previous)
           ~is_block_in_frontier:(State_hash.equal previous_state_hash)
     |> Result.map_error
          ~f:(const (Error.of_string "failed to validate just created block"))
@@ -462,7 +470,7 @@ let load_and_initialize_config ~logger ~config_file =
   let proof_level = Genesis_constants.Compiled.proof_level in
   Genesis_ledger_helper.init_from_config_file ~genesis_constants
     ~constraint_constants ~logger ~proof_level ~cli_proof_level:None
-    ~genesis_dir:"genesis" ~ledger_backing:Stable_db runtime_config
+    ~genesis_dir:"genesis" runtime_config
   >>| Or_error.ok_exn
 
 let initialize_verifier_and_components ~logger

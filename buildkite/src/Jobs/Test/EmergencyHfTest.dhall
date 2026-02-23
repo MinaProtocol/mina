@@ -14,7 +14,9 @@ let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
 let ContainerImages = ../../Constants/ContainerImages.dhall
 
-let Mina = ../../Command/Mina.dhall
+let FixPermissions = ../../Command/FixPermissions.dhall
+
+let Arch = ../../Constants/Arch.dhall
 
 let key = "emergency-hf-test"
 
@@ -37,7 +39,7 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                  [ Mina.fixPermissionsCommand ]
+                  [ FixPermissions.command Arch.Type.Amd64 ]
                 # [ RunWithPostgres.runInDockerWithPostgresConn
                       ([] : List Text)
                       (None RunWithPostgres.ScriptOrArchive)

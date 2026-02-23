@@ -118,7 +118,7 @@ val reset_factory_root_exn :
        (   config:Root_ledger.Config.t
         -> depth:int
         -> unit
-        -> Root_ledger.t Or_error.t )
+        -> Root_ledger.t Async.Deferred.Or_error.t )
   -> root_state_hash:State_hash.t
   -> unit Async.Deferred.t
 

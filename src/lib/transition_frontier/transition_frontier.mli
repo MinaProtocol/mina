@@ -118,8 +118,6 @@ module For_tests : sig
   open Core_kernel
   open Signature_lib
 
-  val equal : t -> t -> bool
-
   val gen_genesis_breadcrumb :
        ?logger:Logger.t
     -> verifier:Verifier.t
@@ -144,7 +142,7 @@ module For_tests : sig
          (   config:Mina_ledger.Root.Config.t
           -> depth:int
           -> unit
-          -> Root_ledger.t Core_kernel.Or_error.t )
+          -> Root_ledger.t Async.Deferred.Or_error.t )
          * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
          ( Breadcrumb.t
@@ -167,7 +165,7 @@ module For_tests : sig
          (   config:Mina_ledger.Root.Config.t
           -> depth:int
           -> unit
-          -> Root_ledger.t Core_kernel.Or_error.t )
+          -> Root_ledger.t Async.Deferred.Or_error.t )
          * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
          ( Breadcrumb.t

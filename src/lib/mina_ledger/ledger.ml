@@ -274,34 +274,6 @@ module Ledger_inner = struct
 
   type maskable_ledger = t
 
-  module Converting_ledger :
-    Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
-      with module Location = Location
-       and module Addr = Location.Addr
-      with type root_hash := Ledger_hash.t
-       and type hash := Ledger_hash.t
-       and type account := Account.t
-       and type key := Signature_lib.Public_key.Compressed.t
-       and type token_id := Token_id.t
-       and type token_id_set := Token_id.Set.t
-       and type account_id := Account_id.t
-       and type account_id_set := Account_id.Set.t
-       and type converted_account := Account.Hardfork.t
-       and type primary_ledger = Db.t
-       and type converting_ledger = Hardfork_db.t =
-    Converting_merkle_tree.With_database
-      (struct
-        type converted_account = Account.Hardfork.t
-
-        let convert = Account.Hardfork.of_stable
-
-        let converted_equal = Account.Hardfork.equal
-
-        include Inputs
-      end)
-      (Db)
-      (Hardfork_db)
-
   module Make_converting (Converting_inputs : sig
     val convert : Account.t -> Account.Hardfork.t
   end) :
@@ -356,15 +328,6 @@ module Ledger_inner = struct
   let create_ephemeral ~depth () =
     let _base, mask = create_ephemeral_with_base ~depth () in
     mask
-
-  let create_converting_with_base ~config ~logger ~depth () =
-    let converting_ledger =
-      Converting_ledger.create ~config ~logger ~depth ()
-    in
-    let casted = Any_ledger.cast (module Converting_ledger) converting_ledger in
-    let mask = Mask.create ~depth () in
-    ( Maskable.register_mask casted mask
-    , Converting_ledger.converting_ledger converting_ledger )
 
   (** Create a new empty ledger.
 
@@ -436,22 +399,6 @@ module Ledger_inner = struct
       raise exn
 
   let packed t = Any_ledger.cast (module Mask.Attached) t
-
-  let with_converting_ledger ~logger ~depth ~f =
-    let ledger_and_base =
-      create_converting_with_base ~config:Converting_ledger.Config.Temporary
-        ~logger ~depth ()
-    in
-    try
-      let result = f ledger_and_base in
-      close (fst ledger_and_base) ;
-      Ok result
-    with exn ->
-      close (fst ledger_and_base) ;
-      Error (Error.of_exn exn)
-
-  let with_converting_ledger_exn ~logger ~depth ~f =
-    with_converting_ledger ~logger ~depth ~f |> Or_error.ok_exn
 
   let register_mask t mask =
     let accumulated = Mask.Attached.to_accumulated t in
@@ -525,6 +472,63 @@ module Ledger_inner = struct
     | `Added, new_loc ->
         assert (Ledger_hash.equal start_hash (merkle_root ledger)) ;
         (merkle_path ledger new_loc, Account.empty)
+
+  module Converting_for_tests = struct
+    module Converting_ledger :
+      Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
+        with module Location = Location
+         and module Addr = Location.Addr
+        with type root_hash := Ledger_hash.t
+         and type hash := Ledger_hash.t
+         and type account := Account.t
+         and type key := Signature_lib.Public_key.Compressed.t
+         and type token_id := Token_id.t
+         and type token_id_set := Token_id.Set.t
+         and type account_id := Account_id.t
+         and type account_id_set := Account_id.Set.t
+         and type converted_account := Account.Hardfork.t
+         and type primary_ledger = Db.t
+         and type converting_ledger = Hardfork_db.t =
+      Converting_merkle_tree.With_database
+        (struct
+          type converted_account = Account.Hardfork.t
+
+          let convert = Account.Hardfork.of_stable
+
+          let converted_equal = Account.Hardfork.equal
+
+          include Inputs
+        end)
+        (Db)
+        (Hardfork_db)
+
+    let create_converting_with_base ~config ~logger ~depth () =
+      let converting_ledger =
+        Converting_ledger.create ~config ~logger ~depth ()
+      in
+      let casted =
+        Any_ledger.cast (module Converting_ledger) converting_ledger
+      in
+      let mask = Mask.create ~depth () in
+      ( Maskable.register_mask casted mask
+      , Converting_ledger.converting_ledger converting_ledger )
+
+    let with_converting_ledger ~logger ~depth ~f =
+      let ledger_and_base =
+        create_converting_with_base ~config:Converting_ledger.Config.Temporary
+          ~logger ~depth ()
+      in
+      try
+        let result = f ledger_and_base in
+        close (fst ledger_and_base) ;
+        Ok result
+      with exn ->
+        close (fst ledger_and_base) ;
+        Error (Error.of_exn exn)
+
+    let with_converting_ledger_exn ~logger ~depth ~f =
+      with_converting_ledger ~logger ~depth ~f |> Or_error.ok_exn
+  end
 end
 
 include Ledger_inner
@@ -937,7 +941,8 @@ let%test_unit "user_command application on converting ledger" =
   let logger = Logger.create () in
   Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
       let cmds = List.map specs ~f:command_send in
-      L.with_converting_ledger_exn ~logger ~depth ~f:(fun (l, cl) ->
+      L.Converting_for_tests.with_converting_ledger_exn ~logger ~depth
+        ~f:(fun (l, cl) ->
           Init_ledger.init (module L) init_ledger l ;
           let init_merkle_root = L.merkle_root l in
           let init_cl_merkle_root = Hardfork_db.merkle_root cl in

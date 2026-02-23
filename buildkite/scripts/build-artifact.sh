@@ -32,3 +32,5 @@ make build-daemon-utils
 make build-archive-utils
 
 make build-test-utils
+
+make build-delegation-verify

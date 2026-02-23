@@ -108,7 +108,7 @@ let compileFile
                          ||  P.Bool.not
                                (P.Optional.null (List Text) pattern.exts)
 
-                then  "\\\$"
+                then  "\$"
 
                 else  ""
 
@@ -126,7 +126,7 @@ let everythingExample = assert : compile [ everything ] === ".*"
 let exactlyExample =
         assert
       :     compile [ exactly "scripts/compile" "py" ]
-        ===  "^scripts/compile(\\.py)\\\$"
+        ===  "^scripts/compile(\\.py)\$"
 
 let containsExample =
         assert
@@ -135,7 +135,7 @@ let containsExample =
 let strictContainsExample =
         assert
       :     compile [ strictly (contains "buildkite/Makefile") ]
-        ===  "^buildkite/Makefile\\\$"
+        ===  "^buildkite/Makefile\$"
 
 let D = PathPattern
 
@@ -150,7 +150,7 @@ let realisticExample =
               , strictly (contains "buildkite/Makefile")
               , exactly "buildkite/scripts/generate-jobs" "sh"
               ]
-        ===  "^buildkite/.*(\\.dhall)\\\$|^buildkite/Makefile\\\$|^buildkite/scripts/generate-jobs(\\.sh)\\\$"
+        ===  "^buildkite/.*(\\.dhall)\$|^buildkite/Makefile\$|^buildkite/scripts/generate-jobs(\\.sh)\$"
 
 in      { compile = compile
         , everything = everything

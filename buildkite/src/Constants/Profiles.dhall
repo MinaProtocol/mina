@@ -39,9 +39,7 @@ let fromNetwork =
       ->  merge
             { Devnet = Profile.Devnet
             , Mainnet = Profile.Mainnet
-            , Berkeley = Profile.Devnet
-            , DevnetLegacy = Profile.Devnet
-            , MainnetLegacy = Profile.Mainnet
+            , TestnetGeneric = Profile.Devnet
             , PreMesa1 = Profile.Devnet
             }
             network

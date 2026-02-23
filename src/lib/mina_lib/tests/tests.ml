@@ -83,7 +83,6 @@ let%test_module "Epoch ledger sync tests" =
             ~genesis_dir:(make_dirname "genesis_dir")
             ~constraint_constants ~genesis_constants ~logger
             ~proof_level:No_check runtime_config ~cli_proof_level:None
-            ~ledger_backing:Stable_db
         with
         | Ok precomputed_values ->
             precomputed_values
@@ -131,7 +130,7 @@ let%test_module "Epoch ledger sync tests" =
             ~max_subtree_depth:None ~default_subtree_depth:None ()
       end in
       let genesis_ledger = Genesis_ledger.for_unit_tests in
-      let genesis_epoch_data : Consensus.Genesis_epoch_data.t = None in
+      let genesis_epoch_data = None in
       let genesis_state_hash = Quickcheck.random_value Ledger_hash.gen in
       let consensus_local_state =
         Consensus.Data.Local_state.create

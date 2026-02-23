@@ -1,4 +1,5 @@
 open Core_kernel
+open Async
 open Currency
 open Signature_lib
 open Mina_base
@@ -79,7 +80,8 @@ module Utils = struct
         (Ledger.merkle_root genesis_mask)
         (Root_ledger.merkle_root root) ) ;
     assert (Root_ledger.depth root = depth) ;
-    Root_ledger.create_checkpoint ~config root () |> Or_error.return
+    Root_ledger.copy_reconfigured ~config root ()
+    |> Deferred.map ~f:Or_error.return
 
   let create_root_from_backing_root_with_directory genesis_mask root ~directory
       ~depth () =
@@ -179,13 +181,13 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
     let backing_ledger, mask = Lazy.force backing_ledger in
     match backing_ledger with
     | `Ephemeral ledger ->
-        let open Or_error.Let_syntax in
         let root = Root_ledger.create ~logger ~config ~depth () in
         (* We are transferring to an unmasked view of the root, so this is
            used solely for the transfer side effect *)
-        let%map _dest =
+        let%map.Deferred.Or_error _dest =
           Ledger_transfer_mask.transfer_accounts ~src:ledger
             ~dest:(Root_ledger.as_unmasked root)
+          |> Deferred.return
         in
         root
     | `Root ledger ->

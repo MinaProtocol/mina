@@ -91,7 +91,10 @@ let f (type a) ?parent (outputs : a codec io list) make_breadcrumb =
       List.iter outputs ~f:(fun output ->
           let module Enc = (val output.encoding) in
           let content =
-            Enc.of_breadcrumb ?with_parent_statehash:parent breadcrumb
+            Enc.of_breadcrumb ?with_parent_statehash:parent
+              ~accounts_created:
+                (Frontier_base.Breadcrumb.accounts_created breadcrumb)
+              breadcrumb
           in
           eprintf
             !"Randomly generated block, %s: %s\n"

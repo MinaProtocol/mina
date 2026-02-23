@@ -1,7 +1,7 @@
 open Core_kernel
 
 (** Buffer size for writing: 128 KB *)
-let buffer_size = 131072
+let default_buffer_size = 131072
 
 module type S = Intf.S
 
@@ -11,8 +11,33 @@ module Tag = struct
     module V1 = struct
       type ('filename_key, 'a) t =
         { filename_key : 'filename_key; offset : int64; size : int }
+
+      let compare filename_key_compare t1 t2 =
+        let c = filename_key_compare t1.filename_key t2.filename_key in
+        if c <> 0 then c
+        else
+          let c' = Int64.compare t1.offset t2.offset in
+          if c' <> 0 then c' else Int.compare t1.size t2.size
+
+      let equal filename_key_equal t1 t2 =
+        let c = filename_key_equal t1.filename_key t2.filename_key in
+        if c then
+          if Int64.equal t1.offset t2.offset then Int.equal t1.size t2.size
+          else false
+        else false
+
+      let sexp_of_t sexp_of_filename_key t =
+        [%sexp_of: Sexp.t * int64 * int]
+          (sexp_of_filename_key t.filename_key, t.offset, t.size)
+
+      let t_of_sexp filename_key_of_sexp sexp =
+        [%of_sexp: Sexp.t * int64 * int] sexp
+        |> fun (filename_key, offset, size) ->
+        { filename_key = filename_key_of_sexp filename_key; offset; size }
     end
   end]
+
+  [%%define_locally Stable.Latest.(compare, equal, t_of_sexp, sexp_of_t)]
 end
 
 module Make_custom (Inputs : sig
@@ -37,7 +62,9 @@ end) :
     Out_channel.output_string oc (Buffer.contents buffer)
 
   (* Write key function provided to the callback *)
-  let make_writer ~oc ~filename_key ~buffer : writer_t =
+  let make_writer ~buffer_size ~init_offset ~oc ~filename_key ~buffer : writer_t
+      =
+    let offset = ref init_offset in
     { f =
         (fun (type a) (module B : Bin_prot.Binable.S with type t = a)
              (value : a) ->
@@ -52,11 +79,10 @@ end) :
 
           (* Create tag before writing *)
           let tag =
-            { Tag.filename_key
-            ; offset = Int64.of_int @@ Buffer.length buffer
-            ; size = serialized_size
-            }
+            { Tag.filename_key; offset = !offset; size = serialized_size }
           in
+
+          (offset := Int64.(!offset + of_int serialized_size)) ;
 
           (* Add to buffer *)
           Buffer.add_string buffer data ;
@@ -68,30 +94,43 @@ end) :
           tag )
     }
 
-  (** Write multiple keys to a database file with buffered I/O *)
-  let write_values_exn ~f filename_key =
-    let do_writing oc =
-      (* Buffer for accumulating writes *)
-      let buffer = Buffer.create buffer_size in
-      let writer = make_writer ~oc ~filename_key ~buffer in
-
-      (* Call user function with write_value *)
-      let result = f writer in
-
-      (* Flush any remaining data *)
-      if Buffer.length buffer > 0 then flush_buffer oc buffer ;
-
-      result
+  let do_writing ~buffer_size ~filename_key ~init_offset ~f oc =
+    (* Buffer for accumulating writes *)
+    let buffer = Buffer.create buffer_size in
+    let writer =
+      make_writer ~buffer_size ~init_offset ~oc ~filename_key ~buffer
     in
-    Out_channel.with_file
-      (Inputs.filename filename_key)
-      ~binary:true ~f:do_writing
 
-  (** Read a value from the database using a tag *)
-  let read :
-      type a.
-      (module Bin_prot.Binable.S with type t = a) -> a tag -> a Or_error.t =
-   fun (module B : Bin_prot.Binable.S with type t = a) tag ->
+    (* Call user function with write_value *)
+    let result = f writer in
+
+    (* Flush any remaining data *)
+    if Buffer.length buffer > 0 then flush_buffer oc buffer ;
+
+    result
+
+  (** Write multiple keys to a database file with buffered I/O *)
+  let write_values_exn ?(buffer_size = default_buffer_size) ~f filename_key =
+    let filename = Inputs.filename filename_key in
+    Out_channel.with_file filename ~binary:true
+      ~f:(do_writing ~buffer_size ~filename_key ~init_offset:0L ~f)
+
+  (** Append multiple keys to an existing database file with buffered I/O *)
+  let append_values_exn ?(buffer_size = default_buffer_size) ~f filename_key =
+    let filename = Inputs.filename filename_key in
+    let do_appending oc =
+      (* Get current file size to calculate offset for new writes *)
+      let init_offset = Out_channel.length oc in
+      do_writing ~buffer_size ~filename_key ~init_offset ~f oc
+    in
+    Out_channel.with_file filename ~binary:true ~append:true ~f:do_appending
+
+  (** Get the size of the value stored at the given tag *)
+  let size (tag : _ tag) = tag.size
+
+  (** Read the bytes stored at the given tag *)
+  let read_bytes : _ tag -> Bytes.t Or_error.t =
+   fun tag ->
     let do_reading ic =
       (* Seek to the specified offset *)
       In_channel.seek ic tag.offset ;
@@ -99,7 +138,22 @@ end) :
       (* Read the exact number of bytes *)
       let buffer = Bytes.create tag.size in
       In_channel.really_input_exn ic ~buf:buffer ~pos:0 ~len:tag.size ;
+      buffer
+    in
+    Or_error.tag ~tag:(Inputs.filename tag.filename_key)
+    @@ Or_error.try_with ~backtrace:true
+    @@ fun () ->
+    In_channel.with_file
+      (Inputs.filename tag.filename_key)
+      ~binary:true ~f:do_reading
 
+  (** Read a value from the database using a tag *)
+  let read :
+      type a.
+      (module Bin_prot.Binable.S with type t = a) -> a tag -> a Or_error.t =
+   fun (module B : Bin_prot.Binable.S with type t = a) tag ->
+    let%bind.Or_error buffer = read_bytes tag in
+    let do_parsing () =
       (* Deserialize using bin_prot *)
       let bigstring = Bigstring.of_bytes buffer in
       let pos_ref = ref 0 in
@@ -114,11 +168,10 @@ end) :
       else Ok value
     in
     Or_error.tag ~tag:(Inputs.filename tag.filename_key)
-    @@ Or_error.try_with_join ~backtrace:true
-    @@ fun () ->
-    In_channel.with_file
-      (Inputs.filename tag.filename_key)
-      ~binary:true ~f:do_reading
+    @@ Or_error.try_with_join ~backtrace:true do_parsing
+
+  let read_many (type a) (module B : Bin_prot.Binable.S with type t = a) =
+    Mina_stdlib.Result.List.map ~f:(read (module B))
 end
 
 include Make_custom (struct

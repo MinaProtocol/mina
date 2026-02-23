@@ -215,7 +215,8 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
     match prev_protocol_state with
     | None ->
         generate_protocol_state_stub ~consensus_constants ~constraint_constants
-          (module Test_genesis_ledger)
+          (Consensus.Genesis_data.Ledger.to_hashed
+             (module Test_genesis_ledger) )
     | Some p ->
         p
   in

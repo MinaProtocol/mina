@@ -399,8 +399,8 @@ let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
       (Mina_stdlib.Nonempty_list.singleton previous_protocol_state_hash) )
 
 let validate_frontier_dependencies ~to_header
-    ~context:(module Context : CONTEXT) ~root_block ~is_block_in_frontier
-    (t, validation) =
+    ~context:(module Context : CONTEXT) ~root_consensus_state
+    ~is_block_in_frontier (t, validation) =
   let module Context = struct
     include Context
 
@@ -413,13 +413,6 @@ let validate_frontier_dependencies ~to_header
   let open Result.Let_syntax in
   let hash = State_hash.With_state_hashes.state_hash t in
   let protocol_state = Fn.compose Header.protocol_state to_header in
-  let root_consensus_state =
-    With_hash.map
-      ~f:
-        (Fn.compose Protocol_state.consensus_state
-           (Fn.compose Header.protocol_state Block.header) )
-      root_block
-  in
   let parent_hash =
     Protocol_state.previous_state_hash (protocol_state @@ With_hash.data t)
   in
@@ -500,6 +493,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   in
   let%bind.Deferred.Result ( `Ledger_proof proof_opt
                            , `Staged_ledger transitioned_staged_ledger
+                           , `Accounts_created accounts_created
                            , `Pending_coinbase_update _ ) =
     Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
       ~get_completed_work
@@ -547,7 +541,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     | None ->
         (*There was no proof emitted, snarked ledger hash shouldn't change*)
         Protocol_state.snarked_ledger_hash parent_protocol_state
-    | Some (proof, _) ->
+    | Some proof ->
         Mina_state.Snarked_ledger_state.snarked_ledger_hash
         @@ Ledger_proof.Cached.statement proof
   in
@@ -580,7 +574,8 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
         ( `Just_emitted_a_proof (Option.is_some proof_opt)
         , `Block_with_validation
             (t, Unsafe.set_valid_staged_ledger_diff validation)
-        , `Staged_ledger transitioned_staged_ledger )
+        , `Staged_ledger transitioned_staged_ledger
+        , `Accounts_created accounts_created )
   | Error errors ->
       Error (`Invalid_staged_ledger_diff errors)
 

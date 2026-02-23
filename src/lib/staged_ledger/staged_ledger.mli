@@ -37,35 +37,11 @@ module Scan_state : sig
     [@@deriving sexp]
   end
 
-  module Transactions_ordered : sig
-    module Poly : sig
-      type 'a t =
-        { first_pass : 'a list
-        ; second_pass : 'a list
-        ; previous_incomplete : 'a list
-        ; current_incomplete : 'a list
-        }
-      [@@deriving sexp, to_yojson]
-    end
-
-    type t = Transaction_snark_scan_state.Transaction_with_witness.t Poly.t
-  end
-
   val empty :
     constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
   (** Statements of the required snark work *)
   val snark_job_list_json : t -> string
-
-  (** All the transactions with hash of the parent block in which they were
-      included in the order in which they were applied *)
-  val staged_transactions_with_state_hash :
-       t
-    -> ( Transaction.t With_status.t
-       * State_hash.t
-       * Mina_numbers.Global_slot_since_genesis.t )
-       Transactions_ordered.Poly.t
-       list
 
   (** Statements of all the pending work. Fails if there are any invalid
       statements in the scan state [t] *)
@@ -194,16 +170,6 @@ val create_exn :
 
 val replace_ledger_exn : t -> Ledger.t -> t
 
-(** Transactions corresponding to the most recent ledger proof in t *)
-val proof_txns_with_state_hashes :
-     t
-  -> ( Transaction.t With_status.t
-     * State_hash.t
-     * Mina_numbers.Global_slot_since_genesis.t )
-     Scan_state.Transactions_ordered.Poly.t
-     Mina_stdlib.Nonempty_list.t
-     option
-
 val copy : t -> t
 
 val hash : t -> Staged_ledger_hash.t
@@ -228,15 +194,9 @@ val apply :
   -> ?transaction_pool_proxy:Check_commands.transaction_pool_proxy
   -> t
   -> Staged_ledger_diff.t
-  -> ( [ `Ledger_proof of
-         ( Ledger_proof.Cached.t
-         * ( Transaction.t With_status.t
-           * State_hash.t
-           * Mina_numbers.Global_slot_since_genesis.t )
-           Scan_state.Transactions_ordered.Poly.t
-           list )
-         option ]
+  -> ( [ `Ledger_proof of Ledger_proof.Cached.t option ]
        * [ `Staged_ledger of t ]
+       * [ `Accounts_created of Account_id.t list ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
      , Staged_ledger_error.t )
      Deferred.Result.t
@@ -253,47 +213,12 @@ val apply_diff_unchecked :
   -> signature_kind:Mina_signature_kind.t
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
-  -> ( [ `Ledger_proof of
-         ( Ledger_proof.Cached.t
-         * ( Transaction.t With_status.t
-           * State_hash.t
-           * Mina_numbers.Global_slot_since_genesis.t )
-           Scan_state.Transactions_ordered.Poly.t
-           list )
-         option ]
+  -> ( [ `Ledger_proof of Ledger_proof.Cached.t option ]
        * [ `Staged_ledger of t ]
+       * [ `Accounts_created of Account_id.t list ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
      , Staged_ledger_error.t )
      Deferred.Result.t
-
-(** Most recent ledger proof in t *)
-val current_ledger_proof : t -> Ledger_proof.Cached.t option
-
-(* Internals of the txn application. This is only exposed to facilitate
-   writing unit tests. *)
-module Application_state : sig
-  type txn =
-    ( Signed_command.With_valid_signature.t
-    , Zkapp_command.Valid.t )
-    User_command.t_
-
-  type t =
-    { valid_seq : txn Sequence.t
-    ; invalid : (txn * Error.t) list
-    ; skipped_by_fee_payer : txn list Account_id.Map.t
-    ; zkapp_space_remaining : int option
-    ; total_space_remaining : int
-    }
-
-  val init : ?zkapp_limit:int -> total_limit:int -> t
-
-  val try_applying_txn :
-       ?logger:Logger.t
-    -> apply:(User_command.t Transaction.t_ -> ('a, Error.t) Result.t)
-    -> t
-    -> txn
-    -> (t, txn Sequence.t * (txn * Error.t) list) Continue_or_stop.t
-end
 
 (* This should memoize the snark verifications *)
 
@@ -363,17 +288,9 @@ val all_work_pairs :
 (** Statements of all the pending work in t*)
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 
-(** Account ids created in the latest block, taken from the new_accounts
-    in the latest and next-to-latest trees of the scan state
-*)
-val latest_block_accounts_created :
-  t -> previous_block_state_hash:State_hash.t -> Account_id.t list
-
-(** Go through all masks until reach root, convert all accounts accumulated 
-    along the way, and commit them to a HF database
-*)
-val convert_and_apply_all_masks_to_ledger :
-  hardfork_db:Ledger.Hardfork_db.t -> t -> unit
+module For_tests : sig
+  module Application_state = Application_state
+end
 
 module Test_helpers : sig
   val dummy_state_and_view :
@@ -401,7 +318,9 @@ module Test_helpers : sig
     -> Zkapp_precondition.Protocol_state.View.t
     -> Frozen_ledger_hash.t * Frozen_ledger_hash.t
     -> ( bool
-         * Transaction_snark_scan_state.Transaction_with_witness.t list
+         * ( Transaction_snark_scan_state.Transaction_with_witness.t
+           * Account_id.t list )
+           list
          * Pending_coinbase.Update.Action.t
          * [> `Update_none
            | `Update_one of Pending_coinbase.Stack_versioned.t

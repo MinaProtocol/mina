@@ -4,16 +4,14 @@ let List/any = Prelude.List.any
 
 let Network
     : Type
-    = < Devnet | Mainnet | Berkeley | DevnetLegacy | MainnetLegacy | PreMesa1 >
+    = < Devnet | Mainnet | TestnetGeneric | PreMesa1 >
 
 let capitalName =
           \(network : Network)
       ->  merge
             { Devnet = "Devnet"
             , Mainnet = "Mainnet"
-            , Berkeley = "Berkeley"
-            , DevnetLegacy = "DevnetLegacy"
-            , MainnetLegacy = "MainnetLegacy"
+            , TestnetGeneric = "TestnetGeneric"
             , PreMesa1 = "PreMesa1"
             }
             network
@@ -23,9 +21,17 @@ let lowerName =
       ->  merge
             { Devnet = "devnet"
             , Mainnet = "mainnet"
-            , Berkeley = "berkeley"
-            , DevnetLegacy = "devnet_legacy"
-            , MainnetLegacy = "mainnet_legacy"
+            , TestnetGeneric = "testnet_generic"
+            , PreMesa1 = "hetzner-pre-mesa-1"
+            }
+            network
+
+let debianSuffix =
+          \(network : Network)
+      ->  merge
+            { Devnet = "devnet"
+            , Mainnet = "mainnet"
+            , TestnetGeneric = "testnet-generic"
             , PreMesa1 = "hetzner-pre-mesa-1"
             }
             network
@@ -33,11 +39,9 @@ let lowerName =
 let requiresMainnetBuild =
           \(network : Network)
       ->  merge
-            { Devnet = True
+            { Devnet = False
             , Mainnet = True
-            , Berkeley = False
-            , DevnetLegacy = True
-            , MainnetLegacy = True
+            , TestnetGeneric = True
             , PreMesa1 = False
             }
             network
@@ -61,6 +65,7 @@ let foldMinaBuildMainnetEnv =
 in  { Type = Network
     , capitalName = capitalName
     , lowerName = lowerName
+    , debianSuffix = debianSuffix
     , requiresMainnetBuild = requiresMainnetBuild
     , foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv
     , buildMainnetEnv = buildMainnetEnv

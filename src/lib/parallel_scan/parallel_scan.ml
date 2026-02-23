@@ -1430,25 +1430,6 @@ let last_emitted_value t = t.acc
 
 let current_job_sequence_number t = t.curr_job_seq_no
 
-let base_jobs_on_latest_tree t =
-  let depth = Int.ceil_log2 t.max_base_jobs in
-  List.filter_map
-    (Tree.jobs_on_level ~depth ~level:depth
-       (Mina_stdlib.Nonempty_list.head t.trees) )
-    ~f:(fun job -> match job with Base d -> Some d | Merge _ -> None)
-
-(* 0-based indexing, so 0 indicates next-to-latest tree *)
-let base_jobs_on_earlier_tree t ~index =
-  let depth = Int.ceil_log2 t.max_base_jobs in
-  let earlier_trees = Mina_stdlib.Nonempty_list.tail t.trees in
-  match List.nth earlier_trees index with
-  | None ->
-      []
-  | Some tree ->
-      let jobs = Tree.jobs_on_level ~depth ~level:depth tree in
-      List.filter_map jobs ~f:(fun job ->
-          match job with Base d -> Some d | Merge _ -> None )
-
 let partition_if_overflowing : ('merge, 'base) t -> Space_partition.t =
  fun t ->
   let cur_tree_space = free_space_on_current_tree t in

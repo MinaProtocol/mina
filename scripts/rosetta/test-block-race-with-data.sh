@@ -36,6 +36,12 @@ LEDGER_ARCHIVE="ledger.tar"
 DB_DIR="db"
 LEDGER_DIR="ledger"
 
+CURRENT_USER=$(whoami)
+POSTGRES_USER="$CURRENT_USER"
+POSTGRES_PASSWORD=""
+POSTGRES_DB="archive"
+POSTGRES_HOST="localhost"
+
 # Function to display usage
 usage() {
     cat << EOF
@@ -48,6 +54,10 @@ Required parameters:
 
 Optional parameters:
   --postgres-port PORT         PostgreSQL server port (default: $POSTGRES_PORT)
+  --postgres-user USER         PostgreSQL user (default: $POSTGRES_USER)
+  --postgres-password PASS     PostgreSQL password (default: empty)
+  --postgres-db DB             PostgreSQL database name (default: $POSTGRES_DB)
+  --postgres-host HOST         PostgreSQL host (default: $POSTGRES_HOST)
   --port-base PORT             Base port number for services (default: $PORT_BASE)
   --num-blocks N               Number of blocks to generate (default: $NUM_BLOCKS)
   --num-zkapp-txs N            Number of zkApp transactions (default: $NUM_ZKAPP_TXS)
@@ -69,6 +79,22 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --postgres-port)
             POSTGRES_PORT="$2"
+            shift 2
+            ;;
+        --postgres-user)
+            POSTGRES_USER="$2"
+            shift 2
+            ;;
+        --postgres-password)
+            POSTGRES_PASSWORD="$2"
+            shift 2
+            ;;
+        --postgres-db)
+            POSTGRES_DB="$2"
+            shift 2
+            ;;
+        --postgres-host)
+            POSTGRES_HOST="$2"
             shift 2
             ;;
         --port-base)
@@ -182,8 +208,7 @@ if [[ ! -x "$ROSETTA_EXE" ]]; then
 fi
 
 # Get current username for postgres URI
-CURRENT_USER=$(whoami)
-POSTGRES_URI="postgres://$CURRENT_USER@localhost:$POSTGRES_PORT/archive"
+POSTGRES_URI="postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DB"
 
 # PID for postgres cleanup
 POSTGRES_PID=""

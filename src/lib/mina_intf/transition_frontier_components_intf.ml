@@ -181,8 +181,8 @@ module type Best_tip_prover_intf = sig
   val prove :
        context:(module CONTEXT)
     -> transition_frontier
-    -> ( Mina_block.t State_hash.With_state_hashes.t
-       , State_body_hash.t list * Mina_block.t )
+    -> ( Frontier_base.Breadcrumb.t
+       , State_body_hash.t list * Frontier_base.Breadcrumb.t )
        Proof_carrying_data.t
        option
 
@@ -208,8 +208,8 @@ module type Consensus_best_tip_prover_intf = sig
        context:(module CONTEXT)
     -> frontier:transition_frontier
     -> Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
-    -> ( Mina_block.t
-       , State_body_hash.t list * Mina_block.t )
+    -> ( Frontier_base.Breadcrumb.t
+       , State_body_hash.t list * Frontier_base.Breadcrumb.t )
        Proof_carrying_data.t
        option
 

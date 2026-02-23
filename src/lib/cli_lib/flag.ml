@@ -129,7 +129,7 @@ module Port = struct
 
   let default_client = 8301
 
-  let default_rest = 0xc0d
+  let default_rest = 3085
 
   let default_archive = default_rest + 1
 

@@ -453,7 +453,10 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
       ] ;
   Child_processes.Termination.register_process pids process
     Child_processes.Termination.Prover ;
-  Mina_metrics.Process_memory.Prover.set_pid (Process.pid process) ;
+
+  let pid = Process.pid process in
+  [%log info] "Prover process has PID %d" (Pid.to_int pid) ;
+  Mina_metrics.Process_memory.Prover.set_pid pid ;
   let exit_or_signal =
     Child_processes.Termination.wait_safe ~logger process ~module_:__MODULE__
       ~location:__LOC__ ~here:[%here]
@@ -571,8 +574,12 @@ let create_genesis_block_inputs (genesis_inputs : Genesis_proof.Inputs.t) =
   let consensus_constants = genesis_inputs.consensus_constants in
   let prev_state =
     let open Staged_ledger_diff in
-    Protocol_state.negative_one ~genesis_ledger:genesis_inputs.genesis_ledger
-      ~genesis_epoch_data:genesis_inputs.genesis_epoch_data
+    Protocol_state.negative_one
+      ~genesis_ledger:
+        (Consensus.Genesis_data.Ledger.to_hashed genesis_inputs.genesis_ledger)
+      ~genesis_epoch_data:
+        (Consensus.Genesis_data.Epoch.to_hashed
+           genesis_inputs.genesis_epoch_data )
       ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   let genesis_epoch_ledger =

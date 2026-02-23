@@ -3195,6 +3195,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     [@@deriving fields]
   end
 
+  (** Merge circuit: combines two transaction proofs into one.
+      Used for ALL transaction types (base, zkapp_opt_signed_opt_signed,
+      zkapp_opt_signed, zkapp_proved). *)
   module Merge = struct
     open Tick
 
@@ -3570,6 +3573,58 @@ module Make_str (A : Wire_types.Concrete) = struct
               ~return_typ:Tick.Typ.unit
               (main ~signature_kind ~constraint_constants)) )
     ]
+
+  (** Return the constraint system for the transaction-merge circuit. *)
+  let merge_constraint_system () =
+    Merge.(
+      Tick.constraint_system ~input_typ:Statement.With_sok.typ
+        ~return_typ:Tick.Typ.unit (fun x ->
+          let open Tick in
+          Checked.map ~f:ignore @@ main x ))
+
+  (** Return the constraint system for the transaction-base circuit. *)
+  let base_constraint_system ~signature_kind ~constraint_constants =
+    Base.(
+      Tick.constraint_system ~input_typ:Statement.With_sok.typ
+        ~return_typ:Tick.Typ.unit
+        (main ~signature_kind ~constraint_constants))
+
+  (** Return the constraint system for the zkapp-opt_signed-opt_signed circuit. *)
+  let zkapp_opt_signed_opt_signed_constraint_system ~signature_kind
+      ~constraint_constants =
+    let spec = Zkapp_command_segment.Basic.spec Opt_signed_opt_signed in
+    Tick.constraint_system ~input_typ:Statement.With_sok.typ
+      ~return_typ:Tick.Typ.unit (fun stmt ->
+        let open Tick in
+        let (_ : Zkapp_statement.Checked.t option * _) =
+          Base.Zkapp_command_snark.main ~signature_kind spec
+            ~constraint_constants stmt
+        in
+        Checked.return () )
+
+  (** Return the constraint system for the zkapp-opt_signed circuit. *)
+  let zkapp_opt_signed_constraint_system ~signature_kind ~constraint_constants =
+    let spec = Zkapp_command_segment.Basic.spec Opt_signed in
+    Tick.constraint_system ~input_typ:Statement.With_sok.typ
+      ~return_typ:Tick.Typ.unit (fun stmt ->
+        let open Tick in
+        let (_ : Zkapp_statement.Checked.t option * _) =
+          Base.Zkapp_command_snark.main ~signature_kind spec
+            ~constraint_constants stmt
+        in
+        Checked.return () )
+
+  (** Return the constraint system for the zkapp-proved circuit. *)
+  let zkapp_proved_constraint_system ~signature_kind ~constraint_constants =
+    let spec = Zkapp_command_segment.Basic.spec Proved in
+    Tick.constraint_system ~input_typ:Statement.With_sok.typ
+      ~return_typ:Tick.Typ.unit (fun stmt ->
+        let open Tick in
+        let (_ : Zkapp_statement.Checked.t option * _) =
+          Base.Zkapp_command_snark.main ~signature_kind spec
+            ~constraint_constants stmt
+        in
+        Checked.return () )
 
   module Account_update_group = Zkapp_command.Make_update_group (struct
     type local_state =

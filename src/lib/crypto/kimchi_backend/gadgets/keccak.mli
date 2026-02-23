@@ -1,18 +1,19 @@
 module Circuit := Kimchi_pasta_snarky_backend.Step_impl
 
-(* Endianness type *)
+(** Endianness type. *)
 type endianness = Big | Little
 
-(** Gagdet for NIST SHA-3 function for output lengths 224/256/384/512
- * Input:
- * - Endianness of the input (default is Big). 
- * - Endianness of the output (default is Big).
- * - Flag to enable input byte checks (default is false). Outputs are always constrained.
- * - int representing the output length of the hash function (224|256|384|512)
- * - Arbitrary length list of Cvars representing the input to the hash function where each of them is a byte 
- * Output:
- * - List of `int` Cvars representing the output of the hash function where each of them is a byte
- *)
+(** Gadget for NIST SHA-3 function for output lengths 224/256/384/512.
+
+    @param inp_endian Endianness of the input (default is Big)
+    @param out_endian Endianness of the output (default is Big)
+    @param byte_checks Flag to enable input byte checks (default is false).
+                       Outputs are always constrained.
+    @param len Output length of the hash function (224|256|384|512)
+    @param message Arbitrary length list of Cvars representing the input to
+                   the hash function where each of them is a byte
+    @return List of Cvars representing the output of the hash function where
+            each of them is a byte *)
 val nist_sha3 :
      ?inp_endian:endianness
   -> ?out_endian:endianness
@@ -21,15 +22,16 @@ val nist_sha3 :
   -> Circuit.Field.t list
   -> Circuit.Field.t list
 
-(** Gadget for Keccak hash function for the parameters used in Ethereum 
- * Input:
- * - Endianness of the input (default is Big). 
- * - Endianness of the output (default is Big).
- * - Flag to enable input byte checks (default is false). Outputs are always constrained.
- * - Arbitrary length list of Cvars representing the input to the hash function where each of them is a byte 
- * Output: 
- * - List of 256 Cvars representing the output of the hash function where each of them is a byte 
- *)
+(** Gadget for Keccak hash function for the parameters used in Ethereum.
+
+    @param inp_endian Endianness of the input (default is Big)
+    @param out_endian Endianness of the output (default is Big)
+    @param byte_checks Flag to enable input byte checks (default is false).
+                       Outputs are always constrained.
+    @param message Arbitrary length list of Cvars representing the input to
+                   the hash function where each of them is a byte
+    @return List of 256 Cvars representing the output of the hash function
+            where each of them is a byte *)
 val ethereum :
      ?inp_endian:endianness
   -> ?out_endian:endianness
@@ -37,17 +39,19 @@ val ethereum :
   -> Circuit.Field.t list
   -> Circuit.Field.t list
 
-(*** Gagdet for pre-NIST SHA-3 function for output lengths 224/256/384/512.
- * Note that when calling with output length 256 this is equivalent to the ethereum function 
- * Input:
- * - Endianness of the input (default is Big). 
- * - Endianness of the output (default is Big).
- * - Flag to enable input byte checks (default is false). Outputs are always constrained.
- * - int representing the output length of the hash function (224|256|384|512)
- * - Arbitrary length list of Cvars Cvars representing the input to the hash function where each of them is a byte 
- * Output:
- * - List of `int` Cvars representing the output of the hash function where each of them is a byte
- *)
+(** Gadget for pre-NIST SHA-3 function for output lengths 224/256/384/512.
+    Note that when calling with output length 256 this is equivalent to the
+    [ethereum] function.
+
+    @param inp_endian Endianness of the input (default is Big)
+    @param out_endian Endianness of the output (default is Big)
+    @param byte_checks Flag to enable input byte checks (default is false).
+                       Outputs are always constrained.
+    @param len Output length of the hash function (224|256|384|512)
+    @param message Arbitrary length list of Cvars representing the input to
+                   the hash function where each of them is a byte
+    @return List of Cvars representing the output of the hash function where
+            each of them is a byte *)
 val pre_nist :
      ?inp_endian:endianness
   -> ?out_endian:endianness

@@ -223,15 +223,13 @@ module Make (Inputs : Inputs_intf) :
           (Consensus.Hooks.select
              ~context:(module Context)
              ~existing:
-               (With_hash.map ~f:Mina_block.consensus_state
+               (Breadcrumb.consensus_state_with_hashes
                   best_tip_with_witness.data )
              ~candidate:seen_consensus_state )
           `Keep
       in
       let%map () = Option.some_if is_tip_better () in
-      { best_tip_with_witness with
-        data = With_hash.data best_tip_with_witness.data
-      }
+      best_tip_with_witness
 
     let verify ~context:(module Context : CONTEXT) ~verifier observed_state
         peer_root =

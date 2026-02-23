@@ -2,7 +2,6 @@
 
 let Mode = < Any | All >
 
-in  { Type = Mode
-    , any = \(mode : Mode) -> merge { Any = True, All = False } mode
-    , all = \(mode : Mode) -> merge { Any = False, All = True } mode
-    }
+let show = \(mode : Mode) -> merge { Any = "any", All = "all" } mode
+
+in  { Type = Mode, show = show }

@@ -1,3 +1,4 @@
+open Async
 open Core
 open Mina_base
 
@@ -180,10 +181,7 @@ module T = struct
         ; hardfork_slot
         } ->
         let module Converting_ledger = Ledger.Make_converting (struct
-          let convert =
-            Account.(
-              Fn.compose Hardfork.of_stable
-                (slot_reduction_update ~hardfork_slot))
+          let convert = Account.Hardfork.migrate_from_berkeley ~hardfork_slot
         end) in
         let config : Converting_ledger.Config.t =
           { primary_directory; converting_directory }
@@ -200,10 +198,7 @@ module T = struct
         Stable_db (Ledger.Db.create ~depth ())
     | Converting_db hardfork_slot ->
         let module Converting_ledger = Ledger.Make_converting (struct
-          let convert =
-            Account.(
-              Fn.compose Hardfork.of_stable
-                (slot_reduction_update ~hardfork_slot))
+          let convert = Account.Hardfork.migrate_from_berkeley ~hardfork_slot
         end) in
         Converting_db
           ( (module Converting_ledger)
@@ -274,14 +269,14 @@ module T = struct
       [empty_hardfork_db]. The accounts are set in the target database in chunks
       so the daemon is still responsive during this operation; the daemon would
       otherwise stop everything as it hashed every account in the list. *)
-  let chunked_migration ?(chunk_size = 1 lsl 6) stable_locations_and_accounts
-      empty_migrated_db =
+  let chunked_migration ?(chunk_size = 1 lsl 6) ~hardfork_slot
+      stable_locations_and_accounts empty_migrated_db =
     let open Async.Deferred.Let_syntax in
     let ledger_depth = Ledger.Hardfork_db.depth empty_migrated_db in
     let addrs_and_accounts =
       List.mapi stable_locations_and_accounts ~f:(fun i acct ->
           ( Ledger.Hardfork_db.Addr.of_int_exn ~ledger_depth i
-          , Account.Hardfork.of_stable acct ) )
+          , Account.Hardfork.migrate_from_berkeley ~hardfork_slot acct ) )
     in
     let rec set_chunks accounts =
       let%bind () = Async_unix.Scheduler.yield () in
@@ -309,10 +304,7 @@ module T = struct
                ~message:"Invariant: database must be in a directory"
         in
         let module Converting_ledger = Ledger.Make_converting (struct
-          let convert =
-            Account.(
-              Fn.compose Hardfork.of_stable
-                (slot_reduction_update ~hardfork_slot))
+          let convert = Account.Hardfork.migrate_from_berkeley ~hardfork_slot
         end) in
         let converting_config =
           Converting_ledger.Config.with_primary ~directory_name
@@ -323,7 +315,9 @@ module T = struct
             ~depth:(Ledger.Db.depth db) ()
         in
         let%map migrated_db =
-          chunked_migration (Ledger.Db.to_list_sequential db) migrated_db
+          chunked_migration ~hardfork_slot
+            (Ledger.Db.to_list_sequential db)
+            migrated_db
         in
         Converting_db
           ( (module Converting_ledger)
@@ -395,6 +389,33 @@ module T = struct
     | Converting_db ((module Converting_ledger), db, _) ->
         ( Converting_ledger.primary_ledger db
         , Some (Converting_ledger.converting_ledger db) )
+
+  let copy_reconfigured t ~config () =
+    let open Deferred.Let_syntax in
+    (* We must handle the transformation
+       (stable|converting)->(stable|converting). Rather than handle all four
+       separately, it ends up being simpler to start by asking if the two
+       backings are equal or not. *)
+    if
+      Config.equal_backing_type (backing_of_t t)
+        (Config.backing_of_config config)
+    then
+      (* If the src/dest backings are equal, simply checkpoint *)
+      create_checkpoint t ~config () |> return
+    else
+      (* Otherwise, copy the stable database and then migrate if necessary *)
+      let dest_root =
+        Stable_db
+          (Ledger.Db.create_checkpoint
+             (fst (unsafely_decompose_root t))
+             ~directory_name:(Config.primary_directory config)
+             () )
+      in
+      match Config.backing_of_config config with
+      | Stable_db ->
+          return dest_root
+      | Converting_db hardfork_slot ->
+          make_converting ~hardfork_slot dest_root
 end
 
 include T

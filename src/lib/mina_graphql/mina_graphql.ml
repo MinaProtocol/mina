@@ -2084,11 +2084,9 @@ module Queries = struct
     field "genesisBlock" ~typ:(non_null Types.block) ~args:[]
       ~doc:"Get the genesis block" ~resolve:(fun { ctx = mina; _ } () ->
         let open Mina_state in
-        let { Precomputed_values.genesis_ledger
-            ; constraint_constants
-            ; consensus_constants
-            ; genesis_epoch_data
+        let { Precomputed_values.constraint_constants
             ; proof_data
+            ; protocol_state_with_hashes
             ; _
             } =
           (Mina_lib.config mina).precomputed_values
@@ -2096,9 +2094,7 @@ module Queries = struct
         let { With_hash.data = genesis_state
             ; hash = { State_hash.State_hashes.state_hash = hash; _ }
             } =
-          let open Staged_ledger_diff in
-          Genesis_protocol_state.t ~genesis_ledger ~genesis_epoch_data
-            ~constraint_constants ~consensus_constants ~genesis_body_reference
+          protocol_state_with_hashes
         in
         let winner = fst Consensus_state_hooks.genesis_winner in
         { With_hash.data =
@@ -2614,7 +2610,7 @@ module Queries = struct
         in
         let%bind { source_ledgers
                  ; global_slot_since_genesis
-                 ; genesis_state_timestamp = _
+                 ; genesis_state_timestamp
                  ; state_hash
                  ; staking_epoch_seed
                  ; next_epoch_seed
@@ -2633,7 +2629,8 @@ module Queries = struct
         in
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger
-            ~global_slot_since_genesis ~state_hash ~staking_ledger
+            ~genesis_state_timestamp ~global_slot_since_genesis ~state_hash
+            ~staking_ledger
             ~staking_epoch_seed:(Epoch_seed.to_base58_check staking_epoch_seed)
             ~next_epoch_ledger:(Some next_epoch_ledger)
             ~next_epoch_seed:(Epoch_seed.to_base58_check next_epoch_seed)
