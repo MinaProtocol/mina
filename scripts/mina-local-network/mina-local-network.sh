@@ -48,11 +48,11 @@ ROSETTA_PORT=
 
 MINA_ROSETTA_MAX_DB_POOL_SIZE=64
 
-PG_HOST="localhost"
-PG_PORT="5432"
-PG_USER="${USER}"
-PG_PASSWD=""
-PG_DB="archive"
+PG_USER=${PG_USER:-${USER}}
+PG_PASSWD=${PG_PW:-""}
+PG_DB=${PG_DB:-archive}
+PG_HOST=${PG_HOST:-localhost}
+PG_PORT=${PG_PORT:-5432}
 
 DEMO_MODE=false
 SLOT_TX_END=
@@ -478,9 +478,9 @@ reset-genesis-ledger() {
 recreate-schema() {
   echo "Recreating database '${PG_DB}'..."
 
-  psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}" -c "DROP DATABASE IF EXISTS ${PG_DB};"
+  PGPASSWORD="${PG_PASSWD}" psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}" -c "DROP DATABASE IF EXISTS ${PG_DB};"
 
-  psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}" -c "CREATE DATABASE ${PG_DB};"
+  PGPASSWORD="${PG_PASSWD}" psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}" -c "CREATE DATABASE ${PG_DB};"
 
   # We need to change our working directory as script has relation to others subscripts
   # and calling them from local folder
