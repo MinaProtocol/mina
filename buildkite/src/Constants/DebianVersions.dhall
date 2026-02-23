@@ -1,117 +1,125 @@
-let Prelude = ../External/Prelude.dhall
-let RunInToolchain = ../Command/RunInToolchain.dhall
-let ContainerImages = ./ContainerImages.dhall
+let Profiles = ./Profiles.dhall
+
+let Network = ./Network.dhall
+
+let BuildFlags = ./BuildFlags.dhall
+
+let Arch = ./Arch.dhall
+
 let S = ../Lib/SelectFiles.dhall
-let D = S.PathPattern
 
-let DebVersion = < Bookworm | Bullseye | Buster | Stretch | Jammy | Focal | Bionic >
+let DebVersion = < Bookworm | Bullseye | Jammy | Focal | Noble >
 
-let capitalName = \(debVersion : DebVersion) ->
-  merge {
-    Bookworm = "Bookworm"
-    , Bullseye = "Bullseye"
-    , Buster = "Buster"
-    , Stretch = "Stretch"
-    , Jammy = "Jammy"
-    , Focal = "Focal"
-    , Bionic = "Bionic"
-  } debVersion
+let capitalName =
+          \(debVersion : DebVersion)
+      ->  merge
+            { Bookworm = "Bookworm"
+            , Bullseye = "Bullseye"
+            , Jammy = "Jammy"
+            , Focal = "Focal"
+            , Noble = "Noble"
+            }
+            debVersion
 
-let lowerName = \(debVersion : DebVersion) ->
-  merge {
-    Bookworm = "bookworm"
-    , Bullseye = "bullseye"
-    , Buster = "buster"
-    , Stretch = "stretch"
-    , Jammy = "jammy"
-    , Focal = "focal"
-    , Bionic = "bionic"
-  } debVersion
+let lowerName =
+          \(debVersion : DebVersion)
+      ->  merge
+            { Bookworm = "bookworm"
+            , Bullseye = "bullseye"
+            , Jammy = "jammy"
+            , Focal = "focal"
+            , Noble = "noble"
+            }
+            debVersion
 
---- Bionic and Stretch are so similar that they share a toolchain runner
---- Same with Bullseye and Focal
---- Same with Bookworm and Jammy
-let toolchainRunner = \(debVersion : DebVersion) ->
-  merge {
-    Bookworm = RunInToolchain.runInToolchainBookworm
-    , Bullseye = RunInToolchain.runInToolchainBullseye
-    , Buster = RunInToolchain.runInToolchainBuster
-    , Stretch = RunInToolchain.runInToolchainStretch
-    , Jammy = RunInToolchain.runInToolchainBookworm
-    , Focal = RunInToolchain.runInToolchainBullseye
-    , Bionic = RunInToolchain.runInToolchainStretch
-  } debVersion
+let DepsSpec =
+      { Type =
+          { deb_version : DebVersion
+          , network : Network.Type
+          , profile : Profiles.Type
+          , build_flag : BuildFlags.Type
+          , step : Text
+          , prefix : Text
+          , arch : Arch.Type
+          }
+      , default =
+          { deb_version = DebVersion.Bullseye
+          , network = Network.Type.TestnetGeneric
+          , profile = Profiles.Type.Devnet
+          , build_flag = BuildFlags.Type.None
+          , step = "build"
+          , prefix = "MinaArtifact"
+          , arch = Arch.Type.Amd64
+          }
+      }
 
---- Bionic and Stretch are so similar that they share a toolchain image
---- Same with Bullseye and Focal
---- Same with Bookworm and Jammy
-let toolchainImage = \(debVersion : DebVersion) ->
-  merge { 
-    Bookworm = ContainerImages.minaToolchainBookworm
-    , Bullseye = ContainerImages.minaToolchainBullseye
-    , Buster = ContainerImages.minaToolchainBuster
-    , Stretch = ContainerImages.minaToolchainStretch
-    , Jammy = ContainerImages.minaToolchainBookworm
-    , Focal = ContainerImages.minaToolchainBullseye
-    , Bionic = ContainerImages.minaToolchainStretch
-  } debVersion
+let dependsOn =
+          \(spec : DepsSpec.Type)
+      ->  let profileSuffix = Profiles.toSuffixUppercase spec.profile
 
-let dependsOn = \(debVersion : DebVersion) ->
-  merge {
-    Bookworm = [{ name = "MinaArtifactBookworm", key = "build-deb-pkg" }]
-    , Bullseye = [{ name = "MinaArtifactBullseye", key = "build-deb-pkg" }]
-    , Buster = [{ name = "MinaArtifactBuster", key = "build-deb-pkg" }]
-    , Stretch = [{ name = "MinaArtifactStretch", key = "build-deb-pkg" }]
-    , Jammy = [{ name = "MinaArtifactJammy", key = "build-deb-pkg" }]
-    , Focal = [{ name = "MinaArtifactFocal", key = "build-deb-pkg" }]
-    , Bionic = [{ name = "MinaArtifactBionic", key = "build-deb-pkg" }]
-  } debVersion
+          let name =
+                "${spec.prefix}${capitalName
+                                   spec.deb_version}${Network.capitalName
+                                                        spec.network}${profileSuffix}${BuildFlags.toSuffixUppercase
+                                                                                         spec.build_flag}${Arch.nameSuffix
+                                                                                                             spec.arch}"
 
--- Most debian builds are only used for public releases
--- so they don't need to be triggered by dirtyWhen on every change
--- these files representing changing the logic of the job, in which case test every platform
-let minimalDirtyWhen = [
-  S.exactly "buildkite/src/Constants/DebianVersions" "dhall",
-  S.exactly "buildkite/src/Constants/ContainerImages" "dhall",
-  S.exactly "buildkite/src/Command/MinaArtifact" "sh",
-  S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
-  S.strictlyStart (S.contains "dockerfiles/stages"),
-  S.exactly "scripts/rebuild-deb" "sh",
-  S.exactly "scripts/release-docker" "sh",
-  S.exactly "buildkite/scripts/build-artifact" "sh"
-]
+          in  [ { name = name, key = "${spec.step}-deb-pkg" } ]
 
--- The default debian version (Bullseye) is used in all downstream CI jobs
--- so the jobs must also trigger whenever src changes
-let bullseyeDirtyWhen = [
-  S.strictlyStart (S.contains "src"),
-  S.strictlyStart (S.contains "automation"),
-  S.strictly (S.contains "Makefile"),
-  S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh",
-  S.strictlyStart (S.contains "buildkite/src/Jobs/Test")
-] # minimalDirtyWhen
+let minimalDirtyWhen =
+      [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
+      , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
+      , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
+      , S.exactly "buildkite/src/Command/PatchArchiveTest" "dhall"
+      , S.exactly "buildkite/src/Command/ArchiveNodeTest" "dhall"
+      , S.exactly "buildkite/src/Command/Bench/Base" "dhall"
+      , S.strictlyStart (S.contains "scripts/benchmarks")
+      , S.strictlyStart (S.contains "buildkite/scripts/bench")
+      , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
+      , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
+      , S.strictlyStart (S.contains "dockerfiles/stages")
+      , S.strictlyStart (S.contains "dockerfiles")
+      , S.strictlyStart (S.contains "scripts/debian")
+      , S.strictlyStart (S.contains "scripts/docker")
+      , S.exactly "buildkite/scripts/build-artifact" "sh"
+      , S.exactly "buildkite/scripts/version-linter" "sh"
+      , S.strictlyStart (S.contains "buildkite/scripts/tests")
+      , S.strictlyStart (S.contains "scripts/rosetta")
+      , S.exactly "scripts/rosetta/test-block-race" "sh"
+      , S.exactly "scripts/version-linter" "py"
+      , S.exactly
+          "buildkite/scripts/version-linter-patch-missing-type-shapes"
+          "sh"
+      ]
 
-in
+let bullseyeDirtyWhen =
+        [ S.strictlyStart (S.contains "src")
+        , S.strictly (S.contains "Makefile")
+        , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
+        , S.exactly "buildkite/scripts/tests/rosetta-integration-tests" "sh"
+        , S.exactly "scripts/patch-archive-test" "sh"
+        , S.strictlyStart (S.contains "buildkite/src/Jobs/Test")
+        ]
+      # minimalDirtyWhen
 
-let dirtyWhen = \(debVersion : DebVersion) ->
-  merge {
-    Bookworm = minimalDirtyWhen
-    , Bullseye = bullseyeDirtyWhen
-    , Buster = minimalDirtyWhen
-    , Stretch = minimalDirtyWhen
-    , Jammy = minimalDirtyWhen
-    , Focal = minimalDirtyWhen
-    , Bionic = minimalDirtyWhen
-  } debVersion
+let dirtyWhen =
+          \(debVersion : DebVersion)
+      ->  merge
+            { Bookworm = minimalDirtyWhen
+            , Bullseye = bullseyeDirtyWhen
+            , Jammy = minimalDirtyWhen
+            , Focal = minimalDirtyWhen
+            , Noble = minimalDirtyWhen
+            }
+            debVersion
 
-in
+let overrideEnvs = [ "OVERRIDE_TAG", "SKIP_GITBRANCH" ]
 
-{
-  DebVersion = DebVersion
-  , capitalName = capitalName
-  , lowerName = lowerName
-  , toolchainRunner = toolchainRunner
-  , toolchainImage = toolchainImage
-  , dependsOn = dependsOn
-  , dirtyWhen = dirtyWhen
-}
+in  { DebVersion = DebVersion
+    , capitalName = capitalName
+    , lowerName = lowerName
+    , dependsOn = dependsOn
+    , dirtyWhen = dirtyWhen
+    , DepsSpec = DepsSpec
+    , overrideEnvs = overrideEnvs
+    }

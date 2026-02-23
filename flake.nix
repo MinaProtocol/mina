@@ -7,11 +7,14 @@
     extra-trusted-public-keys = [
       "nix-cache.minaprotocol.org:fdcuDzmnM0Kbf7yU4yywBuUEJWClySc1WIF6t6Mm8h4="
       "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c="
+      "mina-nix-cache-1:djtioLfv2oxuK2lqPUgmZbf8bY8sK/BnYZCU2iU5Q10="
     ];
   };
 
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable-small";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11-small";
+  inputs.nixpkgs-old.url = "github:nixos/nixpkgs/nixos-23.05-small";
+  inputs.nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
   inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
@@ -20,7 +23,24 @@
   inputs.opam-nix.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.inputs.opam-repository.follows = "opam-repository";
 
-  inputs.opam-repository.url = "github:ocaml/opam-repository";
+  inputs.dune-nix.url = "github:o1-labs/dune-nix";
+  inputs.dune-nix.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.dune-nix.inputs.flake-utils.follows = "utils";
+
+  inputs.describe-dune.url = "github:o1-labs/describe-dune";
+  inputs.describe-dune.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.describe-dune.inputs.flake-utils.follows = "utils";
+
+  inputs.o1-opam-repository.url = "github:o1-labs/opam-repository/dd90c5c72b7b7caeca3db3224b2503924deea08a";
+  inputs.o1-opam-repository.flake = false;
+
+  # The version must be the same as the version used in:
+  # - dockerfiles/1-build-deps
+  # - flake.nix (and flake.lock after running
+  #   `nix flake update opam-repository`).
+  # - scripts/update-opam-switch.sh
+  inputs.opam-repository.url =
+    "github:ocaml/opam-repository/08d8c16c16dc6b23a5278b06dff0ac6c7a217356";
   inputs.opam-repository.flake = false;
 
   inputs.nixpkgs-mozilla.url = "github:mozilla/nixpkgs-mozilla";
@@ -36,16 +56,62 @@
 
   inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
 
+  inputs.nix-utils.url = "github:juliosueiras-nix/nix-utils";
+
+  inputs.flockenzeit.url = "github:balsoft/Flockenzeit";
+
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
-    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline, ...
-    }:
-    {
+    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
+    , nix-utils, flockenzeit, nixpkgs-old, nixpkgs-unstable, ... }:
+    let
+      inherit (nixpkgs) lib;
+
+      # All the submodules required by .gitmodules
+      submodules = map builtins.head (builtins.filter lib.isList
+        (map (builtins.match "	path = (.*)")
+          (lib.splitString "\n" (builtins.readFile ./.gitmodules))));
+
+      # Warn about missing submodules
+      requireSubmodules = let
+        ref = r: "[34;1m${r}[31;1m";
+        command = c: "[37;1m${c}[31;1m";
+      in lib.warnIf (!builtins.all (x: x)
+        (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { })
+          submodules)) ''
+            Some submodules are missing, you may get errors. Consider one of the following:
+            - run ${command "nix/pin.sh"} and use "${
+              ref "mina"
+            }" flake ref, e.g. ${command "nix develop mina"} or ${
+              command "nix build mina"
+            };
+            - use "${ref "git+file://$PWD?submodules=1"}";
+            - use "${
+              ref "git+https://github.com/minaprotocol/mina?submodules=1"
+            }";
+            - use non-flake commands like ${command "nix-build"} and ${
+              command "nix-shell"
+            }.
+          '';
+    in {
       overlays = {
         misc = import ./nix/misc.nix;
         rust = import ./nix/rust.nix;
         go = import ./nix/go.nix;
+        javascript = import ./nix/javascript.nix;
+        ocaml = pkgs: prev: {
+          ocamlPackages_mina =
+            requireSubmodules (import ./nix/ocaml.nix { inherit inputs pkgs; });
+        };
+        # Skip tests on nodejs dep due to known issue with nixpkgs 24.11 https://github.com/NixOS/nixpkgs/issues/402079
+        # this can be removed after upgrading
+        skipNodeTests = final: prev: {
+          nodejs = prev.nodejs.overrideAttrs (old: { doCheck = false; });
+        };
       };
       nixosModules.mina = import ./nix/modules/mina.nix inputs;
+      # Mina Demo container
+      # Use `nixos-container create --flake mina`
+      # Taken from docs/demo.md
       nixosConfigurations.container = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = let
@@ -113,198 +179,222 @@
           }
         ];
       };
+      # Buildkite pipeline for the Nix CI
       pipeline = with flake-buildkite-pipeline.lib;
         let
+          inherit (nixpkgs) lib;
+          dockerUrl = package: tag:
+            "us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:${tag}";
+
           pushToRegistry = package: {
             command = runInEnv self.devShells.x86_64-linux.operations ''
-              skopeo \
-              copy \
-              --insecure-policy \
-              --dest-registry-token $(gcloud auth application-default print-access-token) \
-              docker-archive:${self.packages.x86_64-linux.${package}} \
-              docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
+              ${self.packages.x86_64-linux.${package}} | gzip --fast | \
+                skopeo \
+                  copy \
+                  --insecure-policy \
+                  --dest-registry-token $(gcloud auth application-default print-access-token) \
+                  docker-archive:/dev/stdin \
+                  docker://${dockerUrl package "$BUILDKITE_COMMIT"}
+              if [[ develop == "$BUILDKITE_BRANCH" ]]; then
+                skopeo \
+                  copy \
+                  --insecure-policy \
+                  --dest-registry-token $(gcloud auth application-default print-access-token) \
+                  docker://${dockerUrl package "$BUILDKITE_COMMIT"} \
+                  docker://${dockerUrl package "$BUILDKITE_BRANCH"}
+              fi
             '';
-            label = "Upload ${package} to Google Artifact Registry";
+            label =
+              "Assemble and upload ${package} to Google Artifact Registry";
             depends_on = [ "packages_x86_64-linux_${package}" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
-            branches = [ "compatible" "develop" ];
+            key = "push_${package}";
           };
+          # Publish the documentation generated by ocamldoc to s3
           publishDocs = {
             command = runInEnv self.devShells.x86_64-linux.operations ''
               gcloud auth activate-service-account --key-file "$GOOGLE_APPLICATION_CREDENTIALS"
-              gsutil -m rsync -rd ${self.defaultPackage.x86_64-linux}/share/doc/html gs://mina-docs
+              gsutil -m rsync -rd ${self.packages.x86_64-linux.default}/share/doc/html gs://mina-docs
             '';
             label = "Publish documentation to Google Storage";
-            depends_on = [ "defaultPackage_x86_64-linux" ];
+            depends_on = [ "packages_x86_64-linux_default" ];
             branches = [ "develop" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
           };
+          runIntegrationTest = test:
+            { with-archive ? false }: {
+              command =
+                runInEnv self.devShells.x86_64-linux.integration-tests ''
+                  test_executive local ${test} \
+                  --mina-image=${
+                    dockerUrl "mina-image-full" "$BUILDKITE_COMMIT"
+                  } \
+                  ${lib.optionalString with-archive "--archive-image=${
+                    dockerUrl "mina-archive-image-full" "$BUILDKITE_COMMIT"
+                  }"}
+                '';
+              label = "Run ${test} integration test";
+              depends_on = [ "push_mina-image-full" ]
+                ++ lib.optional with-archive "push_mina-archive-image-full";
+              "if" =
+                ''build.pull_request.labels includes "nix-integration-tests"'';
+              retry = {
+                automatic = [{
+                  exit_status = "*";
+                  limit = 3;
+                }];
+              };
+            };
         in {
           steps = flakeSteps {
+            derivationCache = "https://storage.googleapis.com/mina-nix-cache";
             reproduceRepo = "mina";
             commonExtraStepConfig = {
               agents = [ "nix" ];
               plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
             };
           } self ++ [
-            (pushToRegistry "mina-docker")
-            (pushToRegistry "mina-daemon-docker")
+            (pushToRegistry "mina-image-slim")
+            (pushToRegistry "mina-image-full")
+            (pushToRegistry "mina-archive-image-full")
             publishDocs
+            (runIntegrationTest "peers-reliability" { })
+            (runIntegrationTest "chain-reliability" { })
+            (runIntegrationTest "payment" { with-archive = true; })
+            (runIntegrationTest "delegation" { with-archive = true; })
+            (runIntegrationTest "gossip-consis" { })
+            # FIXME: opt-block-prod test fails.
+            # This has been disabled in the "old" CI for a while.
+            # (runIntegrationTest "opt-block-prod" { })
+            (runIntegrationTest "medium-bootstrap" { })
+            (runIntegrationTest "zkapps" { with-archive = true; })
+            (runIntegrationTest "zkapps-timing" { with-archive = true; })
           ];
         };
     } // utils.lib.eachDefaultSystem (system:
       let
+        # Helper function to map dependencies to current nixpkgs equivalents
+        mapDepsToCurrentPkgs = pkgs: deps:
+          map (dep:
+            if pkgs ? ${dep.pname or dep.name or ""} then
+              pkgs.${dep.pname or dep.name or ""}
+            else
+              dep) deps;
+
+        # Helper function to disable compression libraries in cmake flags
+        disableCompressionLibs = flags:
+          builtins.filter (flag: flag != [ ]) (map (flag:
+            if builtins.isString flag
+            && builtins.match ".*WITH_(BZ2|LZ4|SNAPPY|ZLIB|ZSTD)=1.*" flag
+            != null then
+              builtins.replaceStrings [ "=1" ] [ "=0" ] flag
+            else
+              flag) flags);
+
+        rocksdbOverlay = pkgs: prev: {
+          rocksdb-mina = let
+            # Get the full derivation from unstable but build with current nixpkgs
+            unstableRocksdb =
+              (nixpkgs-unstable.legacyPackages.${system}.rocksdb.override {
+                enableShared = false;
+                enableLiburing = false;
+                bzip2 = null;
+                lz4 = null;
+                snappy = null;
+                zlib = null;
+                zstd = null;
+              });
+          in pkgs.stdenv.mkDerivation (unstableRocksdb.drvAttrs // {
+            cmakeFlags =
+              disableCompressionLibs unstableRocksdb.drvAttrs.cmakeFlags;
+            # Override the build environment to use current nixpkgs toolchain
+            nativeBuildInputs = mapDepsToCurrentPkgs pkgs
+              (unstableRocksdb.nativeBuildInputs or [ ]);
+            buildInputs =
+              mapDepsToCurrentPkgs pkgs (unstableRocksdb.buildInputs or [ ]);
+          });
+        };
+        go119Overlay = (_: _: {
+          inherit (nixpkgs-old.legacyPackages.${system})
+            go_1_19 buildGo119Module;
+        });
+
+        # nixpkgs with all relevant overlays applied
         pkgs = nixpkgs.legacyPackages.${system}.extend
           (nixpkgs.lib.composeManyExtensions ([
             (import nixpkgs-mozilla)
+            nix-npm-buildPackage.overlays.default
             (final: prev: {
-              ocamlPackages_mina = requireSubmodules
-                (import ./nix/ocaml.nix { inherit inputs pkgs; });
+              rpmDebUtils = final.callPackage "${nix-utils}/utils/rpm-deb" { };
+              mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
+              nix-npm-buildPackage =
+                pkgs.callPackage inputs.nix-npm-buildPackage {
+                  nodejs = pkgs.nodejs-16_x;
+                };
             })
-          ] ++ builtins.attrValues self.overlays));
-        inherit (pkgs) lib;
-        mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
-        nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage { };
-
-        submodules = map builtins.head (builtins.filter lib.isList
-          (map (builtins.match "	path = (.*)")
-            (lib.splitString "\n" (builtins.readFile ./.gitmodules))));
-
-        requireSubmodules = let 
-          ref = r: "[34;1m${r}[31;1m";
-          command = c: "[37;1m${c}[31;1m";
-        in lib.warnIf (!builtins.all (x: x)
-          (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { }) submodules)) ''
-            Some submodules are missing, you may get errors. Consider one of the following:
-            - run ${command "nix/pin.sh"} and use "${ref "mina"}" flake ref, e.g. ${command "nix develop mina"} or ${command "nix build mina"};
-            - use "${ref "git+file://$PWD?submodules=1"}";
-            - use "${ref "git+https://github.com/minaprotocol/mina?submodules=1"}";
-            - use non-flake commands like ${command "nix-build"} and ${command "nix-shell"}.
-          '';
+          ] ++ builtins.attrValues self.overlays
+            ++ [ rocksdbOverlay go119Overlay ]));
 
         checks = import ./nix/checks.nix inputs pkgs;
 
+        dockerImages = pkgs.callPackage ./nix/docker.nix {
+          inherit flockenzeit;
+          currentTime = self.sourceInfo.lastModified or 0;
+        };
+
         ocamlPackages = pkgs.ocamlPackages_mina;
+
+        # Nix-built `dpkg` archives with Mina in them
+        debianPackages = pkgs.callPackage ./nix/debian.nix { };
+
+        # Packages for the development environment that are not needed to build mina-dev.
+        # For instance dependencies for tests.
+        devShellPackages = with pkgs; [
+          rosetta-cli
+          wasm-pack
+          nodejs
+          binaryen
+          zip
+          libiconv
+          cargo
+          curl
+          (pkgs.python3.withPackages
+            (python-pkgs: [ python-pkgs.click python-pkgs.requests ]))
+          jq
+          rocksdb-mina.tools
+        ];
       in {
-
-        # Jobs/Lint/Rust.dhall
-        packages.trace-tool = pkgs.rustPlatform.buildRustPackage rec {
-          pname = "trace-tool";
-          version = "0.1.0";
-          src = ./src/app/trace-tool;
-          cargoLock.lockFile = ./src/app/trace-tool/Cargo.lock;
-        };
-
-        # Jobs/Lint/ValidationService
-        # Jobs/Test/ValidationService
-        packages.validation = ((mix-to-nix.override {
-          beamPackages = pkgs.beam.packagesWith pkgs.erlangR22; # todo: jose
-        }).mixToNix {
-          src = ./src/app/validation;
-          # todo: think about fixhexdep overlay
-          # todo: dialyze
-          overlay = (final: previous: {
-            goth = previous.goth.overrideAttrs
-              (o: { preConfigure = "sed -i '/warnings_as_errors/d' mix.exs"; });
-          });
-        }).overrideAttrs (o: {
-          # workaround for requiring --allow-import-from-derivation
-          # during 'nix flake show'
-          name = "coda_validation-0.1.0";
-          version = "0.1.0";
-        });
-
-        # Jobs/Release/LeaderboardArtifact
-        packages.leaderboard = nix-npm-buildPackage.buildYarnPackage {
-          src = ./frontend/leaderboard;
-          yarnBuildMore = "yarn build";
-          # fix reason
-          yarnPostLink = pkgs.writeScript "yarn-post-link" ''
-            #!${pkgs.stdenv.shell}
-            ls node_modules/bs-platform/lib/*.linux
-            patchelf \
-              --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
-              --set-rpath "${pkgs.stdenv.cc.cc.lib}/lib" \
-              ./node_modules/bs-platform/lib/*.linux ./node_modules/bs-platform/vendor/ninja/snapshot/*.linux
-          '';
-          # todo: external stdlib @rescript/std
-          preInstall = ''
-            shopt -s extglob
-            rm -rf node_modules/bs-platform/lib/!(js)
-            rm -rf node_modules/bs-platform/!(lib)
-            rm -rf yarn-cache
-          '';
-        };
-
-        # TODO: fix bs-platform build correctly
-        packages.client_sdk = nix-npm-buildPackage.buildYarnPackage {
-          name = "client_sdk";
-          src = ./frontend/client_sdk;
-          yarnPostLink = pkgs.writeScript "yarn-post-link" ''
-            #!${pkgs.stdenv.shell}
-            ls node_modules/bs-platform/lib/*.linux
-            patchelf \
-              --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
-              --set-rpath "${pkgs.stdenv.cc.cc.lib}/lib" \
-              ./node_modules/bs-platform/lib/*.linux ./node_modules/bs-platform/vendor/ninja/snapshot/*.linux
-          '';
-          yarnBuildMore = ''
-            cp ${ocamlPackages.mina_client_sdk}/share/client_sdk/client_sdk.bc.js src
-            yarn build
-          '';
-          installPhase = ''
-            mkdir -p $out/share/client_sdk
-            mv src/*.js $out/share/client_sdk
-          '';
-        };
 
         inherit ocamlPackages;
 
-        packages = {
+        # Main user-facing binaries.
+        packages = (rec {
           inherit (ocamlPackages)
-            mina mina_tests mina-ocaml-format mina_client_sdk test_executive;
-          inherit (pkgs) libp2p_helper marlin_plonk_bindings_stubs;
+            mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk
+            test_executive with-instrumentation;
+          # Granular nix
+          inherit (ocamlPackages)
+            src exes all all-tested all-exes files tested info dune-description
+            base-libs external-libs;
+          # ^ TODO move elsewhere, external-libs isn't a package
+          # TODO consider the following: inherit (ocamlPackages) default;
+          granular = ocamlPackages.default;
+          default = ocamlPackages.mina;
+          inherit (pkgs)
+            libp2p_helper kimchi_bindings_stubs snarky_js validation trace-tool
+            zkapp-cli hardfork_test;
+          inherit (dockerImages)
+            mina-image-slim mina-image-full mina-archive-image-full
+            mina-image-instr-full;
+          mina-deb = debianPackages.mina;
+          impure-shell = (import ./nix/impure-shell.nix pkgs).inputDerivation;
+        }) // {
+          inherit (ocamlPackages) pkgs;
         };
 
-        packages.mina-docker = pkgs.dockerTools.buildImage {
-          name = "mina";
-          copyToRoot = pkgs.buildEnv {
-            name = "mina-image-root";
-            paths = [ ocamlPackages.mina.out ];
-            pathsToLink = [ "/bin" "/share" "/etc" ];
-          };
-        };
-        packages.mina-daemon-docker = pkgs.dockerTools.buildImage {
-          name = "mina-daemon";
-          copyToRoot = pkgs.buildEnv {
-            name = "mina-daemon-image-root";
-            paths = [
-              pkgs.dumb-init
-              pkgs.coreutils
-              pkgs.bashInteractive
-              pkgs.python3
-              pkgs.libp2p_helper
-              ocamlPackages.mina.out
-              ocamlPackages.mina.mainnet
-              ocamlPackages.mina.genesis
-              ocamlPackages.mina_build_config
-              ocamlPackages.mina_daemon_scripts
-            ];
-            pathsToLink = [ "/bin" "/share" "/etc" ];
-          };
-          config = {
-            env = [ "MINA_TIME_OFFSET=0" ];
-            cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
-          };
-        };
-
-        legacyPackages.musl = pkgs.pkgsMusl;
-        legacyPackages.regular = pkgs;
-
-        defaultPackage = ocamlPackages.mina;
-        packages.default = ocamlPackages.mina;
-
+        # Pure dev shell, from which you can build Mina yourself manually, or hack on it.
         devShell = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          buildInputs = oa.buildInputs ++ devShellPackages;
           shellHook = ''
             ${oa.shellHook}
             unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
@@ -312,25 +402,64 @@
         });
         devShells.default = self.devShell.${system};
 
+        # Shell with an LSP server available in it. You can start your editor from this shell, and tell it to look for LSP in PATH.
         devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
           name = "mina-with-lsp";
+          buildInputs = oa.buildInputs ++ devShellPackages;
           nativeBuildInputs = oa.nativeBuildInputs
             ++ [ ocamlPackages.ocaml-lsp-server ];
           shellHook = ''
             ${oa.shellHook}
             unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
             # TODO: dead code doesn't allow us to have nice things
-            pushd src/app/cli
-            dune build @check
-            popd
           '';
         });
 
-        devShells.operations =
-          pkgs.mkShell { packages = with pkgs; [ skopeo google-cloud-sdk ]; };
+        devShells.operations = pkgs.mkShell {
+          name = "mina-operations";
+          packages = with pkgs; [ skopeo gzip google-cloud-sdk ];
+        };
 
+        # TODO: think about rust toolchain in the dev shell
+        devShells.integration-tests = pkgs.mkShell {
+          name = "mina-integration-tests";
+          shellHook = ''
+            export MINA_BRANCH=$()
+          '';
+          buildInputs = [ self.packages.${system}.test_executive ];
+        };
+
+        # An "impure" shell, giving you the system deps of Mina, opam, cargo and go.
         devShells.impure = import ./nix/impure-shell.nix pkgs;
 
+        # A shell from which it's possible to build Mina with Rust bits being built incrementally using cargo.
+        # This is "impure" from the nix' perspective since running `cargo build` requires networking in general.
+        # However, this is a useful balance between purity and convenience for Rust development.
+        devShells.rust-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina-rust-shell";
+          buildInputs = oa.buildInputs ++ devShellPackages;
+          nativeBuildInputs = oa.nativeBuildInputs ++ [
+            pkgs.rustup
+            pkgs.libiconv # needed on macOS for one of the rust dep
+          ];
+        });
+
+        # A shell from which we can compile snarky_js and use zkapp-cli to write and deploy zkapps
+        devShells.zkapp-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina-zkapp-shell";
+          buildInputs = oa.buildInputs ++ devShellPackages;
+          nativeBuildInputs = oa.nativeBuildInputs ++ [
+            pkgs.rustup
+            pkgs.libiconv # needed on macOS for one of the rust dep
+            pkgs.git
+            pkgs.nodejs
+            pkgs.zkapp-cli
+            pkgs.binaryen # provides wasm-opt
+          ];
+        });
+
         inherit checks;
+
+        formatter = pkgs.nixfmt-classic;
       });
 }

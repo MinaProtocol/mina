@@ -91,6 +91,11 @@ module Incoming = struct
 
   let map ~f t = { t with data = f t.data }
 
+  let lift_error t =
+    let open Result.Let_syntax in
+    let%map data = t.data in
+    { t with data }
+
   let local data =
     let received_at = Time.now () in
     let sender = Sender.Local in

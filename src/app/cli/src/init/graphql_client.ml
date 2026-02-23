@@ -1,11 +1,6 @@
 open Core
 open Async
-
-module Client = Graphql_lib.Client.Make (struct
-  let preprocess_variables_string = Fn.id
-
-  let headers = String.Map.empty
-end)
+module Client = Graphql_lib.Client
 
 let run_exn ~f query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
   let log_location_detail =
@@ -38,3 +33,5 @@ let query query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
   Client.query query_obj uri.value
 
 let query_exn query_obj port = run_exn ~f:Client.query query_obj port
+
+let query_json_exn query_obj port = run_exn ~f:Client.query_json query_obj port

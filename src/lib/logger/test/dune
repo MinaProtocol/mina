@@ -1,0 +1,15 @@
+(test
+ (name logger_test)
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  core
+  core_kernel
+  ;; local libraries
+  logger
+  logger.file_system)
+ (preprocess
+  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
+ (instrumentation
+  (backend bisect_ppx)))

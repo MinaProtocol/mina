@@ -48,6 +48,10 @@ module Uri : sig
 end
 
 module Port : sig
+  val default_client : int
+
+  val default_libp2p : int
+
   module Daemon : sig
     val external_ : int Types.with_name_and_displayed_default Command.Param.t
 
@@ -69,6 +73,10 @@ module Log : sig
   val level : Logger.Level.t Command.Param.t
 
   val file_log_level : Logger.Level.t Command.Param.t
+
+  val file : string option Command.Param.t
+
+  val file_log_rotations : int Command.Param.t
 end
 
 type signed_command_common =
@@ -78,7 +86,15 @@ type signed_command_common =
   ; memo : string option
   }
 
-val signed_command_common : signed_command_common Command.Param.t
+val fee_common :
+     default_transaction_fee:Currency.Fee.t
+  -> minimum_user_command_fee:Currency.Fee.t
+  -> Currency.Fee.t Command.Param.t
+
+val signed_command_common :
+     default_transaction_fee:Currency.Fee.t
+  -> minimum_user_command_fee:Currency.Fee.t
+  -> signed_command_common Command.Param.t
 
 module Signed_command : sig
   val hd_index : Mina_numbers.Hd_index.t Command.Param.t
@@ -87,11 +103,17 @@ module Signed_command : sig
 
   val amount : Currency.Amount.t Command.Param.t
 
-  val fee : Currency.Fee.t option Command.Param.t
+  val fee :
+       default_transaction_fee:Currency.Fee.t
+    -> minimum_user_command_fee:Currency.Fee.t
+    -> Currency.Fee.t option Command.Param.t
 
-  val valid_until : Mina_numbers.Global_slot.t option Command.Param.t
+  val valid_until :
+    Mina_numbers.Global_slot_since_genesis.t option Command.Param.t
 
   val nonce : Mina_numbers.Account_nonce.t option Command.Param.t
 
   val memo : string option Command.Param.t
 end
+
+val signature_kind : Mina_signature_kind.t Command.Param.t

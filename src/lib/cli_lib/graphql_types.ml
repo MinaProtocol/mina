@@ -1,4 +1,4 @@
-(*Types coresponding to the result of graphql queries*)
+(*Types corresponding to the result of graphql queries*)
 
 (*List of completed work from Graphql_queries.Snark_pool*)
 module Completed_works = struct
@@ -21,8 +21,10 @@ module Pending_snark_work = struct
       { work_id : int
       ; fee_excess : Currency.Amount.Signed.t
       ; supply_increase : Currency.Amount.t
-      ; source_ledger_hash : Mina_base.Frozen_ledger_hash.t
-      ; target_ledger_hash : Mina_base.Frozen_ledger_hash.t
+      ; source_first_pass_ledger_hash : Mina_base.Frozen_ledger_hash.t
+      ; target_first_pass_ledger_hash : Mina_base.Frozen_ledger_hash.t
+      ; source_second_pass_ledger_hash : Mina_base.Frozen_ledger_hash.t
+      ; target_second_pass_ledger_hash : Mina_base.Frozen_ledger_hash.t
       }
     [@@deriving yojson]
   end

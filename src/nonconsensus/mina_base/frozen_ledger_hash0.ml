@@ -1,1 +1,0 @@
-../../lib/mina_base/frozen_ledger_hash0.ml

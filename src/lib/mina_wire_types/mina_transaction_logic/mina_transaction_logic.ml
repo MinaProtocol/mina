@@ -1,0 +1,1 @@
+module Zkapp_command_logic = Zkapp_command_logic

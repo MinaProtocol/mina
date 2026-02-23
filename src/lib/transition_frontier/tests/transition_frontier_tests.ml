@@ -1,6 +1,5 @@
 (*
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core
 open Async
 open Mina_base
@@ -32,7 +31,7 @@ let%test_module "Root_history and Transition_frontier" =
 
     let logger = Logger.null ()
 
-    let hb_logger = Logger.create ()
+    let hb_logger = Logger.null ()
 
     let pids = Child_processes.Termination.create_pid_table ()
 
@@ -89,7 +88,7 @@ let%test_module "Root_history and Transition_frontier" =
           let queried_breadcrumbs =
             breadcrumbs_path frontier
             @@ Transition_frontier.Breadcrumb.state_hash random_breadcrumb
-            |> Option.value_exn |> Non_empty_list.to_list
+            |> Option.value_exn |> Nonempty_list.to_list
           in
           assert (Transition_frontier.For_tests.root_history_is_empty frontier) ;
           let expected_breadcrumbs =
@@ -127,7 +126,7 @@ let%test_module "Root_history and Transition_frontier" =
           heartbeat_flag := false ;
           List.equal Transition_frontier.Breadcrumb.equal expected_breadcrumbs
             ( breadcrumbs_path frontier query_hash
-            |> Option.value_exn |> Non_empty_list.to_list ) )
+            |> Option.value_exn |> Nonempty_list.to_list ) )
 
     let%test "moving the root removes the old root's non-heir children as \
               garbage" =
@@ -223,7 +222,7 @@ let%test_module "Root_history and Transition_frontier" =
           in
           let result =
             breadcrumbs_path frontier random_breadcrumb_hash
-            |> Option.value_exn |> Non_empty_list.to_list
+            |> Option.value_exn |> Nonempty_list.to_list
           in
           heartbeat_flag := false ;
           List.equal Transition_frontier.Breadcrumb.equal

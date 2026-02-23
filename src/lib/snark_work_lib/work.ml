@@ -1,89 +1,25 @@
-(* TODO: remove type generalizations #2594 *)
-
+(* WARN:
+   This file would be rewritten finally
+*)
+(*
+  The better name for this file should really be poly.ml, because the types here
+  are polymorphic, and we really need the concretized version in selector.ml
+ *)
 open Core_kernel
 
 module Single = struct
-  module Spec = struct
-    [%%versioned
-    module Stable = struct
-      [@@@no_toplevel_latest_type]
-
-      module V1 = struct
-        type ('transition, 'witness, 'ledger_proof) t =
-          | Transition of
-              Transaction_snark.Statement.Stable.V1.t * 'transition * 'witness
-          | Merge of
-              Transaction_snark.Statement.Stable.V1.t
-              * 'ledger_proof
-              * 'ledger_proof
-        [@@deriving sexp, to_yojson]
-
-        let to_latest transition_latest witness_latest ledger_proof_latest =
-          function
-          | Transition (stmt, transition, witness) ->
-              Transition
-                (stmt, transition_latest transition, witness_latest witness)
-          | Merge (stmt, proof1, proof2) ->
-              Merge
-                (stmt, ledger_proof_latest proof1, ledger_proof_latest proof2)
-
-        let of_latest transition_latest witness_latest ledger_proof_latest =
-          function
-          | Transition (stmt, transition, witness) ->
-              let open Result.Let_syntax in
-              let%map transition = transition_latest transition
-              and witness = witness_latest witness in
-              Transition (stmt, transition, witness)
-          | Merge (stmt, proof1, proof2) ->
-              let open Result.Let_syntax in
-              let%map proof1 = ledger_proof_latest proof1
-              and proof2 = ledger_proof_latest proof2 in
-              Merge (stmt, proof1, proof2)
-      end
-    end]
-
-    type ('transition, 'witness, 'ledger_proof) t =
-          ('transition, 'witness, 'ledger_proof) Stable.Latest.t =
-      | Transition of Transaction_snark.Statement.t * 'transition * 'witness
-      | Merge of Transaction_snark.Statement.t * 'ledger_proof * 'ledger_proof
-    [@@deriving sexp, to_yojson]
-
-    let statement = function Transition (s, _, _) -> s | Merge (s, _, _) -> s
-
-    let gen :
-           'transition Quickcheck.Generator.t
-        -> 'witness Quickcheck.Generator.t
-        -> 'ledger_proof Quickcheck.Generator.t
-        -> ('transition, 'witness, 'ledger_proof) t Quickcheck.Generator.t =
-     fun gen_trans gen_witness gen_proof ->
-      let open Quickcheck.Generator in
-      let gen_transition =
-        let open Let_syntax in
-        let%bind statement = Transaction_snark.Statement.gen in
-        let%map transition, witness = tuple2 gen_trans gen_witness in
-        Transition (statement, transition, witness)
-      in
-      let gen_merge =
-        let open Let_syntax in
-        let%bind statement = Transaction_snark.Statement.gen in
-        let%map p1, p2 = tuple2 gen_proof gen_proof in
-        Merge (statement, p1, p2)
-      in
-      union [ gen_transition; gen_merge ]
-  end
+  module Spec = Single_spec.Poly
 end
 
 module Spec = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'single t =
         { instances : 'single One_or_two.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
         }
-      [@@deriving fields, sexp, to_yojson]
+      [@@deriving fields, sexp, yojson]
 
       let to_latest single_latest { instances; fee } =
         { instances = One_or_two.Stable.V1.to_latest single_latest instances
@@ -101,7 +37,14 @@ module Spec = struct
 
   type 'single t = 'single Stable.Latest.t =
     { instances : 'single One_or_two.t; fee : Currency.Fee.t }
-  [@@deriving fields, sexp, to_yojson]
+  [@@deriving fields, sexp, yojson]
+
+  let map ~f { instances; fee } =
+    { instances = One_or_two.map ~f instances; fee }
+
+  let map_opt ~f_single { instances; fee } =
+    let%map.Option instances = One_or_two.Option.map ~f:f_single instances in
+    { instances; fee }
 end
 
 module Result = struct
@@ -119,4 +62,11 @@ module Result = struct
       [@@deriving fields]
     end
   end]
+
+  let map ~f_spec ~f_single { proofs; metrics; spec; prover } =
+    { proofs = One_or_two.map ~f:f_single proofs
+    ; metrics
+    ; spec = f_spec spec
+    ; prover
+    }
 end

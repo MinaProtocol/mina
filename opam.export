@@ -1,14 +1,15 @@
 opam-version: "2.0"
+compiler: ["ocaml-base-compiler.4.14.2"]
 roots: [
+  "alcotest.1.1.0"
+  "alcotest-async.1.1.0"
   "angstrom.0.15.0"
-  "async_ssl.v0.14.0"
-  "bignum.v0.14.0"
   "bisect_ppx.2.8.1"
   "bitstring.4.1.0"
+  "camlp-streams.5.0.1"
   "camlp4.4.14+1"
   "capnp.3.4.0"
   "check_opam_switch.~dev"
-  "cohttp-async.5.0.0"
   "core_extended.v0.14.0"
   "extlib.1.7.8"
   "graphql-async.0.13.0"
@@ -18,32 +19,41 @@ roots: [
   "js_of_ocaml.4.0.0"
   "js_of_ocaml-ppx.4.0.0"
   "js_of_ocaml-toplevel.4.0.0"
+  "lmdb.1.0"
   "menhir.20210419"
+  "memtrace.0.2.3"
   "merlin.4.5-414"
-  "ocaml-base-compiler.4.14.0"
+  "ocaml-base-compiler.4.14.2"
   "ocamlformat.0.20.1"
   "ocamlgraph.1.8.8"
   "ocp-browser.1.3.3"
   "ocp-indent.1.7.0"
-  "odoc.2.1.0"
+  "odoc.2.1.1"
   "ppx_bitstring.4.1.0"
   "ppx_deriving.5.2.1"
   "ppx_deriving_yojson.3.6.1"
   "prometheus.1.1"
+  "qcheck.0.20"
+  "qcheck-alcotest.0.20"
   "re2.v0.14.0"
+  "rocks.0.2.0"
+  "rocksdb_stubs.10.5.1"
   "rpc_parallel.v0.14.0"
   "sexp_diff_kernel.v0.14.0"
+  "sodium.dev"
   "utop.2.9.1"
   "yojson.1.7.0"
 ]
 installed: [
+  "alcotest.1.1.0"
+  "alcotest-async.1.1.0"
   "angstrom.0.15.0"
   "asetmap.0.8.1"
   "astring.0.8.5"
   "async.v0.14.0"
   "async_kernel.v0.14.0"
   "async_rpc_kernel.v0.14.0"
-  "async_ssl.v0.14.0"
+  "async_ssl.v0.14.0-o1labs"
   "async_unix.v0.14.0"
   "base.v0.14.3"
   "base-bigarray.base"
@@ -61,12 +71,13 @@ installed: [
   "biniou.1.2.1"
   "bisect_ppx.2.8.1"
   "bitstring.4.1.0"
+  "camlp-streams.5.0.1"
   "camlp4.4.14+1"
   "camomile.1.0.2"
   "capnp.3.4.0"
-  "caqti.1.5.0"
-  "caqti-async.1.3.0"
-  "caqti-driver-postgresql.1.5.1"
+  "caqti.2.0.1"
+  "caqti-async.2.0.1"
+  "caqti-driver-postgresql.2.0.1"
   "charInfo_width.1.1.0"
   "check_opam_switch.~dev"
   "cmdliner.1.0.3"
@@ -75,15 +86,17 @@ installed: [
   "conduit.4.0.0"
   "conduit-async.4.0.0"
   "conf-g++.1.0"
-  "conf-gmp.2"
+  "conf-gmp.5"
+  "conf-libbz2.1"
   "conf-libffi.2.0.0"
-  "conf-libssl.2"
+  "conf-libssl.4"
   "conf-m4.1"
-  "conf-openssl.1"
-  "conf-perl.1"
-  "conf-pkg-config.1.1"
-  "conf-postgresql.1"
+  "conf-openssl.2"
+  "conf-perl.2"
+  "conf-pkg-config.4"
+  "conf-postgresql.2"
   "conf-which.1"
+  "conf-zlib.1"
   "core.v0.14.1"
   "core_bench.v0.14.0"
   "core_extended.v0.14.0"
@@ -91,8 +104,9 @@ installed: [
   "core_unix.v0.14.0"
   "cppo.1.6.7"
   "cppo_ocamlbuild.1.6.7"
-  "crunch.3.0.0"
+  "crunch.3.2.0"
   "csexp.1.5.1"
+  "cstruct.6.0.1"
   "ctypes.0.17.1"
   "ctypes-foreign.0.4.0"
   "digestif.0.9.0"
@@ -102,9 +116,10 @@ installed: [
   "dune-build-info.3.1.1"
   "dune-configurator.2.8.2"
   "dune-private-libs.2.6.2"
+  "duration.0.2.1"
   "easy-format.1.3.2"
   "either.1.0.0"
-  "eqaf.0.2"
+  "eqaf.0.9"
   "extlib.1.7.8"
   "fieldslib.v0.14.0"
   "fix.20201120"
@@ -129,12 +144,15 @@ installed: [
   "jst-config.v0.14.1"
   "lambda-term.3.1.0"
   "lens.1.2.5"
+  "lmdb.1.0"
   "logs.0.7.0"
   "lwt.5.4.0"
+  "lwt-dllist.1.0.1"
   "lwt_log.1.1.1"
   "lwt_react.1.1.2"
   "macaddr.5.0.1"
   "magic-mime.1.1.2"
+  "memtrace.0.2.3"
   "menhir.20210419"
   "menhirLib.20210419"
   "menhirSdk.20210419"
@@ -143,11 +161,16 @@ installed: [
   "mew.0.1.0"
   "mew_vi.0.5.0"
   "minicli.5.0.2"
+  "mirage-crypto.0.11.0"
+  "mirage-crypto-ec.0.11.0"
+  "mirage-crypto-rng.0.11.0"
+  "mirage-crypto-rng-async.0.11.0"
   "mmap.1.1.0"
+  "mtime.2.0.0"
   "num.1.1"
-  "ocaml.4.14.0"
-  "ocaml-base-compiler.4.14.0"
-  "ocaml-compiler-libs.v0.12.3"
+  "ocaml.4.14.2"
+  "ocaml-base-compiler.4.14.2"
+  "ocaml-compiler-libs.v0.12.4"
   "ocaml-config.2"
   "ocaml-migrate-parsetree.2.3.0"
   "ocaml-options-vanilla.1"
@@ -162,12 +185,12 @@ installed: [
   "ocp-index.1.3.3"
   "ocplib-endian.1.0"
   "octavius.1.2.2"
-  "odoc.2.1.0"
+  "odoc.2.1.1"
   "odoc-parser.1.0.0"
   "opam-core.2.1.2"
-  "opam-depext.1.2.1"
   "opam-file-format.2.1.4"
   "opam-format.2.1.2"
+  "ounit2.2.2.6"
   "parsexp.v0.14.2"
   "postgresql.5.0.0"
   "ppx_assert.v0.14.0"
@@ -183,7 +206,6 @@ installed: [
   "ppx_deriving_yojson.3.6.1"
   "ppx_enumerate.v0.14.0"
   "ppx_expect.v0.14.2"
-  "ppx_fail.v0.14.0"
   "ppx_fields_conv.v0.14.2"
   "ppx_fixed_literal.v0.14.0"
   "ppx_hash.v0.14.0"
@@ -208,17 +230,24 @@ installed: [
   "prometheus.1.1"
   "protocol_version_header.v0.14.0"
   "ptime.0.8.5"
+  "qcheck.0.20"
+  "qcheck-alcotest.0.20"
+  "qcheck-core.0.20"
+  "qcheck-ounit.0.20"
   "re.1.9.0"
   "re2.v0.14.0"
   "react.1.2.1"
   "res.5.0.1"
   "result.1.5"
+  "rocks.0.2.0"
+  "rocksdb_stubs.10.5.1"
   "rpc_parallel.v0.14.0"
   "rresult.0.6.0"
   "seq.base"
   "sexp_diff_kernel.v0.14.0"
   "sexplib.v0.14.0"
   "sexplib0.v0.14.0"
+  "sodium.dev"
   "spawn.v0.13.0"
   "splittable_random.v0.14.0"
   "stdint.0.7.0"
@@ -238,79 +267,12 @@ installed: [
   "uri-sexp.4.2.0"
   "utop.2.9.1"
   "uucp.13.0.0"
+  "uuidm.0.9.7"
   "uuseg.13.0.0"
   "uutf.1.0.2"
   "variantslib.v0.14.0"
   "yojson.1.7.0"
-  "zarith.1.7"
+  "zarith.1.11"
   "zarith_stubs_js.v0.14.1"
   "zed.3.1.0"
 ]
-pinned: [
-  "check_opam_switch.~dev"
-  "graphql_ppx.1.2.2"
-]
-package "check_opam_switch" {
-  opam-version: "2.0"
-  version: "~dev"
-  synopsis:
-    "A tool to check that the current opam environment is up to date with an opam.export file"
-  description:
-    "A tool to check that the current opam environment is up to date with an opam.export file"
-  maintainer: "yves.stan.lecornec@tweag.io"
-  depends: [
-    "dune" {>= "3.3"}
-    "opam-core" {>= "2.0.0"}
-    "opam-format" {>= "2.0.0"}
-    "minicli" {>= "5.0.0"}
-    "odoc" {with-doc}
-  ]
-  build: [
-    ["dune" "subst"] {dev}
-    [
-      "dune"
-      "build"
-      "-p"
-      name
-      "-j"
-      jobs
-      "@install"
-      "@runtest" {with-test}
-      "@doc" {with-doc}
-    ]
-  ]
-  url {
-    src: "https://github.com/tweag/check_opam_switch/archive/d0aa49884e0f9fd4bbb2cd1a32b798a12f84b603.tar.gz"
-    checksum: "sha256=24ab29ea4aff9da9d649f0b577c5d4e27ce2bef51058e139965cc9be25494a46"
-  }
-}
-package "graphql_ppx" {
-  opam-version: "2.0"
-  version: "1.2.2"
-  synopsis: "GraphQL PPX rewriter for ReScript/ReasonML"
-  description:
-    "GraphQL language primitives for ReScript/ReasonML written in ReasonML"
-  maintainer: "Jaap Frolich <jfrolich@gmail.com>"
-  authors: [
-    "Jaap Frolich <jfrolich@gmail.com>"
-    "Tomasz Cichocinski <tomaszcichocinski@gmail.com>"
-  ]
-  license: "MIT"
-  homepage: "https://github.com/reasonml-community/graphql-ppx"
-  bug-reports: "https://github.com/reasonml-community/graphql-ppx/issues"
-  depends: [
-    "dune" {>= "2.5"}
-    "ocaml" {>= "4.06"}
-    "ppxlib" {>= "0.21.0"}
-    "result" {>= "1.5"}
-  ]
-  build: [
-    ["dune" "build" "-p" name "-j" jobs]
-    ["dune" "runtest" "-p" name "-j" jobs] {with-test}
-  ]
-  dev-repo: "git+https://github.com/o1-labs/graphql_ppx.git"
-  url {
-    src: "https://github.com/o1-labs/graphql_ppx/archive/f3ba4f7622240a2299f622b0c1d910f734579c25.tar.gz"
-         checksum: "sha256=8aff33988218c99a95a91fb04ef703a3b8cde0676b7a90ee72478959829867d8"
-  }
-}

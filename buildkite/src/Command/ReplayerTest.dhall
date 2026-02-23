@@ -1,24 +1,38 @@
-let Prelude = ../External/Prelude.dhall
+let Artifacts = ../Constants/Artifacts.dhall
+
+let BuildFlags = ../Constants/BuildFlags.dhall
 
 let Command = ./Base.dhall
-let Docker = ./Docker/Type.dhall
+
 let Size = ./Size.dhall
 
-let Cmd = ../Lib/Cmds.dhall in
+let RunWithPostgres = ./RunWithPostgres.dhall
 
-{ step = \(dependsOn : List Command.TaggedKey.Type) ->
-    Command.build
-      Command.Config::{
-        commands = [
-          Cmd.runInDocker
-            Cmd.Docker::{
-              image = (../Constants/ContainerImages.dhall).ubuntu2004
-            }
-            "./buildkite/scripts/replayer-test.sh"
-        ],
-        label = "Replayer test",
-        key = "replayer-test",
-        target = Size.Large,
-        depends_on = dependsOn
-      }
-}
+let key = "replayer-test"
+
+in  { step =
+            \(dependsOn : List Command.TaggedKey.Type)
+        ->  Command.build
+              Command.Config::{
+              , commands =
+                [ RunWithPostgres.runInDockerWithPostgresConn
+                    ([] : List Text)
+                    ( Some
+                        ( RunWithPostgres.ScriptOrArchive.Script
+                            "./src/test/archive/sample_db/archive_db.sql"
+                        )
+                    )
+                    ( Artifacts.fullDockerTag
+                        Artifacts.Tag::{
+                        , artifact = Artifacts.Type.FunctionalTestSuite
+                        , buildFlags = BuildFlags.Type.Instrumented
+                        }
+                    )
+                    "./buildkite/scripts/replayer-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
+                ]
+              , label = "Archive: Replayer test"
+              , key = key
+              , target = Size.Large
+              , depends_on = dependsOn
+              }
+    }

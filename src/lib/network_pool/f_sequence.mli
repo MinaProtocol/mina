@@ -2,7 +2,7 @@
 
       They are a purely functional data structure that provides amortized O(1)
       cons, snoc, uncons, and unsnoc; O(log (min (d1, d2))) splitting and
-      indexing, where d1 and d2 are the distances from the first and and last
+      indexing, where d1 and d2 are the distances from the first and last
       elements respectively, and O(log(min(n1, n2))) appends where n1 and n2 are
       the sizes of argument trees.
 
@@ -37,6 +37,8 @@ val unsnoc : 'e t -> ('e t * 'e) option
 val foldl : ('a -> 'e -> 'a) -> 'a -> 'e t -> 'a
 
 val foldr : ('e -> 'a -> 'a) -> 'a -> 'e t -> 'a
+
+val findi : 'a t -> f:('a -> bool) -> int option
 
 val iter : 'e t -> f:('e -> unit) -> unit
 

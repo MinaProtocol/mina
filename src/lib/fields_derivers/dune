@@ -1,0 +1,17 @@
+(library
+ (name fields_derivers)
+ (public_name fields_derivers)
+ (libraries core_kernel fieldslib ppx_inline_test.config)
+ (instrumentation
+  (backend bisect_ppx))
+ (inline_tests
+  (flags -verbose -show-counts))
+ (preprocess
+  (pps
+   ppx_annot
+   ppx_custom_printf
+   ppx_fields_conv
+   ppx_inline_test
+   ppx_jane
+   ppx_let
+   ppx_version)))

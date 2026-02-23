@@ -30,11 +30,11 @@ module Message = struct
 
   type var = Mina_base.State_hash.var t
 
-  let data_spec = Tick.Data_spec.[ Mina_base.State_hash.typ ]
-
   let typ =
-    Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
-      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    Tick.Typ.of_hlistable
+      [ Mina_base.State_hash.typ ]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
 
   let gen =
     let open Quickcheck.Let_syntax in
@@ -84,7 +84,7 @@ module Vrf =
 
 let%test_unit "eval unchecked vs. checked equality" =
   let constraint_constants =
-    Genesis_constants.Constraint_constants.for_unit_tests
+    Genesis_constants.For_unit_tests.Constraint_constants.t
   in
   let gen =
     let open Quickcheck.Let_syntax in
@@ -107,7 +107,7 @@ let%test_unit "eval unchecked vs. checked equality" =
 let%bench_module "vrf bench module" =
   ( module struct
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Genesis_constants.For_unit_tests.Constraint_constants.t
 
     let gen =
       let open Quickcheck.Let_syntax in

@@ -1,16 +1,46 @@
-# An overlay defining Go parts&dependencies of Mina
+# An overlay with an additional parameter buildGo119Module
+# defining Go parts&dependencies of Mina
+
+# We are using legacy Go 1.19 because it's hardcoded
+# in libp2p libraries, and we'd need to update these libraries in
+# order to use a higher version
+
+let
+  goHashes = final: name:
+    let
+      hashes = final.lib.importJSON ./go-hashes/${name}.json;
+      # sanity check, to make sure the fixed output drv doesn't keep working
+      # when the inputs change
+    in if builtins.hashFile "sha256" ../src/app/${name}/src/go.mod
+    == hashes."go.mod"
+    && builtins.hashFile "sha256" ../src/app/${name}/src/go.sum
+    == hashes."go.sum" then
+      hashes.vendorSha256
+    else
+      final.lib.warn ''
+        Below, you will find an error about a hash mismatch.
+        This is likely because you have updated go.mod and/or go.sum in ${name}.
+        Please, locate the "got: " hash in the aforementioned error. If it's in SRI format ([35;1msha256-<...>[31;1m), copy the entire hash, including the `[35;1msha256-[31;1m'. Otherwise (if it's in the base32 format, like `[35;1msha256:<...>[31;1m'), copy only the base32 part, without `[35;1msha256:[31;1m'.
+        Then, run [37;1m./nix/update-go-hashes.sh ${name} [35;1m"<got hash here>"[31;0m
+      '' final.lib.fakeHash;
+
+in
+
 final: prev: {
   vend = final.callPackage ./vend { };
 
-  go-capnproto2 = final.buildGo118Module rec {
+  go-capnproto2 = final.buildGo119Module rec {
     pname = "capnpc-go";
-    version = "v3.0.0-alpha.1";
-    vendorSha256 = "sha256-jbX/nnlnQoItFXFL/MZZKe4zAjM/EA3q+URJG8I3hok=";
+    version = "v3.0.0-alpha.5";
+    vendorHash = "sha256-oZ6fUUpAsBS5hvl2+eqWsE3i0lwJzXeVaH2OiqWJQyY=";
+    # Don't understand the problem, but it seems to build fine without examples
+    excludedPackages =
+      [ "./example/books/ex1" "./example/books/ex2" "./example/hashes" ];
     src = final.fetchFromGitHub {
       owner = "capnproto";
       repo = "go-capnproto2";
-      rev = "v3.0.0-alpha.1";
-      hash = "sha256-afdLw7of5AksR4ErCMqXqXCOnJ/nHK2Lo4xkC5McBfM";
+      rev = "v3.0.0-alpha.5";
+      hash = "sha256-geKqYjPUyJ7LT01NhJc9y8oO1hyhktTx1etAK4cXBec=";
     };
   };
 
@@ -29,23 +59,12 @@ final: prev: {
   };
 
   # Jobs/Test/Libp2pUnitTest
-  libp2p_helper = final.buildGo118Module {
+  libp2p_helper = final.buildGo119Module {
     pname = "libp2p_helper";
     version = "0.1";
     src = ../src/app/libp2p_helper/src;
     doCheck = false; # TODO: tests hang
-    vendorSha256 =
-      # sanity check, to make sure the fixed output drv doesn't keep working
-      # when the inputs change
-      if builtins.hashFile "sha256" ../src/app/libp2p_helper/src/go.mod
-      == "4ce9e2efa7e35cce9b7b131bef15652830756f6f6da250afefd4751efa1d6565"
-      && builtins.hashFile "sha256" ../src/app/libp2p_helper/src/go.sum
-      == "8b90b3cee4be058eeca0bc9a5a2ee88d62cada9fb09785e0ced5e5cea7893192" then
-        "sha256-MXLfE122UCNizqvGUu6WlThh1rnZueTqirCzaEWmbno="
-      else
-        final.lib.warn
-        "Please update the hashes in ${__curPos.file}#${toString __curPos.line}"
-        final.lib.fakeHash;
+    vendorHash = goHashes final "libp2p_helper";
     NO_MDNS_TEST = 1; # no multicast support inside the nix sandbox
     overrideModAttrs = n: {
       # Yo dawg
@@ -66,6 +85,36 @@ final: prev: {
       chmod +w vendor
       cp -r --reflink=auto ${final.libp2p_ipc_go}/ vendor/libp2p_ipc
       sed -i 's/.*libp2p_ipc.*//' go.mod
+    '';
+    # For compatibility with mina's child_processes library
+    postInstall = ''
+      mv $out/bin/libp2p_helper $out/bin/mina-libp2p_helper
+    '';
+  };
+
+  # Tool for testing implementation of the rosetta api
+  rosetta-cli = final.buildGoModule rec {
+    pname = "rosetta-cli";
+    version = "0.10.3-pallas";
+    src = final.fetchFromGitHub {
+      owner = "MinaProtocol";
+      repo = "rosetta-cli";
+      rev = "9a8ba09359482898580bb35c3aa86896364b14ce";
+      sha256 = "sha256-3Lk5pa6fAeHGCmDjhaUjUoASxN6ozTD9e2+0wDH7hGs=";
+    };
+    vendorHash = "sha256-lCBAsCNtorEu0WRZRLEMEaNyjtVIdJSAZg3icrpHIsQ=";
+  };
+  
+  # Hardfork test application
+  hardfork_test = final.buildGoModule {
+    pname = "hardfork_test";
+    version = "0.1.0";
+    src = ../src/app/hardfork_test/src;
+    # Completely skip vendoring and let go download dependencies
+    vendorHash = goHashes final "hardfork_test";
+    # Set the output binary name to hardfork_test
+    postInstall = ''
+      mv $out/bin/cmd $out/bin/hardfork_test
     '';
   };
 }

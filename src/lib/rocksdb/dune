@@ -2,25 +2,27 @@
  (name rocksdb)
  (public_name rocksdb)
  (library_flags -linkall)
-(libraries
-   ;; opam libraries
-   async_kernel
-   async
-   base.caml
-   core.uuid
-   core_kernel
-   rocks
-   core
-   core_kernel.uuid
-   sexplib0
-   ppx_inline_test.config
-   async_unix
-   base.base_internalhash_types
-   ;; local libraries
-   file_system
-   key_value_database
-)
+ (flags
+  (:standard -warn-error +a))
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  async_unix
+  base.base_internalhash_types
+  base.caml
+  core
+  core.uuid
+  core_kernel
+  core_kernel.uuid
+  ppx_inline_test.config
+  rocks
+  sexplib0
+  ;; local libraries
+  mina_stdlib_unix
+  key_value_database)
  (preprocess
   (pps ppx_version ppx_jane))
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "RocksDB Database module"))

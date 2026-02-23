@@ -6,13 +6,12 @@ open Network_peer
 module Snark_tables = struct
   type t =
     { all :
-        Ledger_proof.t One_or_two.t Priced_proof.t
+        Ledger_proof.Cached.t One_or_two.t Priced_proof.t
         Transaction_snark_work.Statement.Map.t
     ; rebroadcastable :
-        (Ledger_proof.t One_or_two.t Priced_proof.t * Core.Time.t)
+        (Ledger_proof.Cached.t One_or_two.t Priced_proof.t * Core.Time.t)
         Transaction_snark_work.Statement.Map.t
     }
-  [@@deriving sexp]
 end
 
 module type S = sig
@@ -38,8 +37,9 @@ module type S = sig
   include
     Intf.Network_pool_base_intf
       with type resource_pool := Resource_pool.t
-       and type resource_pool_diff := Resource_pool.Diff.t
-       and type resource_pool_diff_verified := Resource_pool.Diff.t
+       and type resource_pool_diff :=
+        Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
+       and type resource_pool_diff_verified := Resource_pool.Diff.Cached.t
        and type transition_frontier := transition_frontier
        and type config := Resource_pool.Config.t
        and type transition_frontier_diff :=
@@ -97,8 +97,9 @@ struct
           { trust_system : (Trust_system.t[@sexp.opaque])
           ; verifier : (Verifier.t[@sexp.opaque])
           ; disk_location : string
+          ; proof_cache_db : Proof_cache_tag.cache_db
           }
-        [@@deriving sexp, make]
+        [@@deriving make]
       end
 
       type transition_frontier_diff =
@@ -107,16 +108,16 @@ struct
 
       type t =
         { snark_tables : Snark_tables.t ref
-        ; snark_table_lock : (unit Throttle.Sequencer.t[@sexp.opaque])
         ; frontier : (unit -> Transition_frontier.t option[@sexp.opaque])
         ; config : Config.t
         ; logger : (Logger.t[@sexp.opaque])
         ; account_creation_fee : Currency.Fee.t
         ; batcher : Batcher.Snark_pool.t
         }
-      [@@deriving sexp]
 
       let make_config = Config.make
+
+      let proof_cache_db t = t.config.proof_cache_db
 
       let best_tip_ledger t =
         t.frontier ()
@@ -166,65 +167,35 @@ struct
       let handle_new_best_tip_ledger t ledger =
         let open Mina_base in
         let open Signature_lib in
-        Throttle.enqueue t.snark_table_lock (fun () ->
-            let%map _ =
-              let open Interruptible.Deferred_let_syntax in
-              Interruptible.force
-                (let%bind.Interruptible () =
-                   Interruptible.lift (Deferred.return ())
-                     (Base_ledger.detached_signal ledger)
-                 in
-                 let%bind prover_account_ids =
-                   let account_ids =
-                     !(t.snark_tables).all |> Map.data
-                     |> List.map
-                          ~f:(fun { Priced_proof.fee = { prover; _ }; _ } ->
-                            prover )
-                     |> List.dedup_and_sort
-                          ~compare:Public_key.Compressed.compare
-                     |> List.map ~f:(fun prover ->
-                            (prover, Account_id.create prover Token_id.default) )
-                     |> Public_key.Compressed.Map.of_alist_exn
-                   in
-                   Deferred.map (Scheduler.yield ()) ~f:(Fn.const account_ids)
-                 in
-                 (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
-                 let%bind prover_account_locations =
-                   let account_locations =
-                     prover_account_ids |> Map.data
-                     |> Base_ledger.location_of_account_batch ledger
-                     |> Account_id.Map.of_alist_exn
-                   in
-                   Deferred.map (Scheduler.yield ())
-                     ~f:(Fn.const account_locations)
-                 in
-                 let yield = Staged.unstage (Scheduler.yield_every ~n:50) in
-                 let%map () =
-                   let open Deferred.Let_syntax in
-                   Map.fold ~init:Deferred.unit !(t.snark_tables).all
-                     ~f:(fun ~key ~data:{ fee = { fee; prover }; _ } acc ->
-                       let%bind () = acc in
-                       let%map () = yield () in
-                       let prover_account_exists =
-                         prover
-                         |> Map.find_exn prover_account_ids
-                         |> Map.find_exn prover_account_locations
-                         |> Option.is_some
-                       in
-                       let keep =
-                         fee_is_sufficient t ~fee
-                           ~account_exists:prover_account_exists
-                       in
-                       if not keep then
-                         t.snark_tables :=
-                           { all = Map.remove !(t.snark_tables).all key
-                           ; rebroadcastable =
-                               Map.remove !(t.snark_tables).rebroadcastable key
-                           } )
-                 in
-                 () )
+        let account_ids =
+          !(t.snark_tables).all |> Map.data
+          |> List.map ~f:(fun { Priced_proof.fee = { prover; _ }; _ } ->
+                 prover )
+          |> List.dedup_and_sort ~compare:Public_key.Compressed.compare
+          |> List.map ~f:(fun prover ->
+                 (prover, Account_id.create prover Token_id.default) )
+          |> Public_key.Compressed.Map.of_alist_exn
+        in
+        (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
+        let account_locations =
+          account_ids |> Map.data
+          |> Base_ledger.location_of_account_batch ledger
+          |> Account_id.Map.of_alist_exn
+        in
+        Map.iteri !(t.snark_tables).all
+          ~f:(fun ~key ~data:{ fee = { fee; prover }; _ } ->
+            let account_exists =
+              prover |> Map.find_exn account_ids
+              |> Map.find_exn account_locations
+              |> Option.is_some
             in
-            () )
+            let keep = fee_is_sufficient t ~fee ~account_exists in
+            if not keep then
+              t.snark_tables :=
+                { all = Map.remove !(t.snark_tables).all key
+                ; rebroadcastable =
+                    Map.remove !(t.snark_tables).rebroadcastable key
+                } )
 
       let handle_refcount_update t
           ({ removed_work } : Extensions.Snark_pool_refcount.view) =
@@ -245,12 +216,11 @@ struct
       let handle_transition_frontier_diff u t =
         match u with
         | `New_best_tip ledger ->
-            O1trace.thread "apply_new_best_tip_ledger_to_snark_pool" (fun () ->
-                handle_new_best_tip_ledger t ledger )
+            O1trace.sync_thread "apply_new_best_tip_ledger_to_snark_pool"
+              (fun () -> handle_new_best_tip_ledger t ledger)
         | `Refcount_update refcount_update ->
             O1trace.sync_thread "apply_refcount_update_to_snark_pool" (fun () ->
-                handle_refcount_update t refcount_update ) ;
-            Deferred.unit
+                handle_refcount_update t refcount_update )
 
       (*TODO? add referenced statements from the transition frontier to ref_table here otherwise the work referenced in the root and not in any of the successor blocks will never be included. This may not be required because the chances of a new block from the root is very low (root's existing successor is 1 block away from finality)*)
       let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
@@ -286,10 +256,11 @@ struct
                 { Snark_tables.all = Transaction_snark_work.Statement.Map.empty
                 ; rebroadcastable = Transaction_snark_work.Statement.Map.empty
                 }
-          ; snark_table_lock = Throttle.Sequencer.create ()
           ; frontier =
               (fun () -> Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
-          ; batcher = Batcher.Snark_pool.create config.verifier
+          ; batcher =
+              Batcher.Snark_pool.create ~proof_cache_db:config.proof_cache_db
+                ~logger config.verifier
           ; logger
           ; config
           ; account_creation_fee =
@@ -306,53 +277,47 @@ struct
       let request_proof t = Map.find !(t.snark_tables).all
 
       let add_snark ?(is_local = false) t ~work
-          ~(proof : Ledger_proof.t One_or_two.t) ~fee =
-        Throttle.enqueue t.snark_table_lock (fun () ->
-            Deferred.return
-              ( if work_is_referenced t work then (
-                (*Note: fee against existing proofs and the new proofs are checked in
-                  Diff.unsafe_apply which calls this function*)
-                t.snark_tables :=
-                  { all =
-                      Map.set !(t.snark_tables).all ~key:work
-                        ~data:{ proof; fee }
-                  ; rebroadcastable =
-                      ( if is_local then
-                        Map.set !(t.snark_tables).rebroadcastable ~key:work
-                          ~data:({ proof; fee }, Time.now ())
-                      else
-                        (* Stop rebroadcasting locally generated snarks if they are
-                           overwritten. No-op if there is no rebroadcastable SNARK with that
-                           statement. *)
-                        Map.remove !(t.snark_tables).rebroadcastable work )
-                  } ;
-                (*when snark work is added to the pool*)
-                Mina_metrics.(
-                  Gauge.set Snark_work.useful_snark_work_received_time_sec
-                    Time.(
-                      let x = now () |> to_span_since_epoch |> Span.to_sec in
-                      x -. Mina_metrics.time_offset_sec) ;
-                  Gauge.set Snark_work.snark_pool_size
-                    (Float.of_int @@ Map.length !(t.snark_tables).all) ;
-                  Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
-                    ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
-                    |> Float.of_int )) ;
-                `Added )
-              else
-                let origin =
-                  if is_local then "locally generated" else "gossiped"
-                in
-                [%log' warn t.logger]
-                  "Rejecting %s snark work $stmt, statement not referenced"
-                  origin
-                  ~metadata:
-                    [ ( "stmt"
-                      , One_or_two.to_yojson
-                          Transaction_snark.Statement.to_yojson work )
-                    ] ;
-                `Statement_not_referenced ) )
+          ~(proof : Ledger_proof.Cached.t One_or_two.t) ~fee =
+        if work_is_referenced t work then (
+          (*Note: fee against existing proofs and the new proofs are checked in
+            Diff.unsafe_apply which calls this function*)
+          t.snark_tables :=
+            { all = Map.set !(t.snark_tables).all ~key:work ~data:{ proof; fee }
+            ; rebroadcastable =
+                ( if is_local then
+                  Map.set !(t.snark_tables).rebroadcastable ~key:work
+                    ~data:({ proof; fee }, Time.now ())
+                else
+                  (* Stop rebroadcasting locally generated snarks if they are
+                     overwritten. No-op if there is no rebroadcastable SNARK with that
+                     statement. *)
+                  Map.remove !(t.snark_tables).rebroadcastable work )
+            } ;
+          (*when snark work is added to the pool*)
+          Mina_metrics.(
+            Gauge.set Snark_work.useful_snark_work_received_time_sec
+              Time.(
+                let x = now () |> to_span_since_epoch |> Span.to_sec in
+                x -. Mina_metrics.time_offset_sec) ;
+            Gauge.set Snark_work.snark_pool_size
+              (Float.of_int @@ Map.length !(t.snark_tables).all) ;
+            Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
+              ( fee.Mina_base.Fee_with_prover.fee
+              |> Currency.Fee.to_nanomina_int |> Float.of_int )) ;
+          `Added )
+        else
+          let origin = if is_local then "locally generated" else "gossiped" in
+          [%log' warn t.logger]
+            "Rejecting %s snark work $stmt, statement not referenced" origin
+            ~metadata:
+              [ ( "stmt"
+                , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
+                    work )
+              ] ;
+          `Statement_not_referenced
 
       let verify_and_act t ~work ~sender =
+        let open Intf.Verification_error in
         let statements, priced_proof = work in
         let { Priced_proof.proof = proofs; fee = { prover; fee } } =
           priced_proof
@@ -386,11 +351,11 @@ struct
         let message = Mina_base.Sok_message.create ~fee ~prover in
         let verify proofs =
           let open Deferred.Let_syntax in
-          let%bind statement_check =
+          let statement_check () =
             One_or_two.Deferred_result.map proofs ~f:(fun (p, s) ->
                 let proof_statement = Ledger_proof.statement p in
                 if Transaction_snark.Statement.( = ) proof_statement s then
-                  Deferred.Or_error.ok_unit
+                  Deferred.Result.return ()
                 else
                   let e = Error.of_string "Statement and proof do not match" in
                   if is_local then
@@ -400,76 +365,98 @@ struct
                         %{sexp: Transaction_snark.Statement.t}"
                       proof_statement s ;
                   let%map () = log_and_punish s e in
-                  Error e )
+                  Error (Invalid e) )
           in
           let work = One_or_two.map proofs ~f:snd in
-          let prover_account_exists =
+          let account_opt =
             let open Mina_base in
             let open Option.Let_syntax in
-            Option.is_some
-              (let%bind ledger = best_tip_ledger t in
-               if Deferred.is_determined (Base_ledger.detached_signal ledger)
-               then None
-               else
-                 Account_id.create prover Token_id.default
-                 |> Base_ledger.location_of_account ledger )
+            let%bind ledger = best_tip_ledger t in
+            if Deferred.is_determined (Base_ledger.detached_signal ledger) then
+              None
+            else
+              let%bind loc =
+                Account_id.create prover Token_id.default
+                |> Base_ledger.location_of_account ledger
+              in
+
+              Base_ledger.get ledger loc
           in
+          let prover_account_exists = Option.is_some account_opt in
+          let prover_permitted_to_receive =
+            let open Option.Let_syntax in
+            let%map account = account_opt in
+            Mina_base.Account.has_permission
+              ~control:Mina_base.Control.Tag.None_given ~to_:`Access account
+            && Mina_base.Account.has_permission
+                 ~control:Mina_base.Control.Tag.None_given ~to_:`Receive account
+          in
+          let invalid s = Deferred.Result.fail @@ Invalid (Error.of_string s) in
           if
             not (fee_is_sufficient t ~fee ~account_exists:prover_account_exists)
           then (
             [%log' debug t.logger]
-              "Prover $prover did not have sufficient balance" ~metadata ;
-            return false )
-          else if not (work_is_referenced t work) then (
-            [%log' debug t.logger] "Work $stmt not referenced"
+              "Snark work did not have sufficient fee to create prover $prover \
+               account"
+              ~metadata ;
+            invalid "fee not sufficient to create prover account" )
+          else if
+            Option.value_map ~default:false ~f:not prover_permitted_to_receive
+          then (
+            [%log' warn t.logger]
+              "Snark work prover $prover not permitted to receive fees. \
+               Required permission to receive is $receive_permission"
               ~metadata:
-                ( ( "stmt"
-                  , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
-                      work )
+                ( ( "receive_permission"
+                  , Mina_base.Permissions.Auth_required.to_yojson
+                      (Option.value_map account_opt
+                         ~default:Mina_base.Permissions.user_default
+                         ~f:(fun (a : Mina_base.Account.t) -> a.permissions) )
+                        .receive )
                 :: metadata ) ;
-            return false )
+            invalid "prover not permitted to receive fees" )
+          else if not (work_is_referenced t work) then (
+            [%log' debug t.logger] "Work for $work_ids not referenced"
+              ~metadata:
+                ( ( "work_ids"
+                  , Transaction_snark_work.Statement.compact_json work )
+                :: metadata ) ;
+            invalid "work not referenced" )
           else
-            match statement_check with
-            | Error _ ->
-                return false
-            | Ok _ -> (
-                let log ?punish e =
-                  Deferred.List.iter (One_or_two.to_list proofs)
-                    ~f:(fun (_, s) -> log_and_punish ?punish s e)
-                in
-                let proof_env =
-                  Envelope.Incoming.wrap
-                    ~data:(One_or_two.map proofs ~f:fst, message)
-                    ~sender
-                in
-                match Signature_lib.Public_key.decompress prover with
-                | None ->
-                    (* We may need to decompress the key when paying the fee
-                       transfer, so check that we can do it now.
-                    *)
-                    [%log' error t.logger]
-                      "Proof had an invalid key: $public_key"
-                      ~metadata:
-                        [ ( "public_key"
-                          , Signature_lib.Public_key.Compressed.to_yojson prover
-                          )
-                        ] ;
-                    Deferred.return false
-                | Some _ -> (
-                    match%bind
-                      Batcher.Snark_pool.verify t.batcher proof_env
-                    with
-                    | Ok true ->
-                        return true
-                    | Ok false ->
-                        (* if this proof is in the set of invalid proofs*)
-                        let e = Error.of_string "Invalid proof" in
-                        let%map () = log e in
-                        false
-                    | Error e ->
-                        (* Verifier crashed or other errors at our end. Don't punish the peer*)
-                        let%map () = log ~punish:false e in
-                        false ) )
+            let%bind.Deferred.Result _ = statement_check () in
+            let log ?punish e =
+              Deferred.List.iter (One_or_two.to_list proofs) ~f:(fun (_, s) ->
+                  log_and_punish ?punish s e )
+            in
+            let proof_env =
+              Envelope.Incoming.wrap
+                ~data:(One_or_two.map ~f:fst proofs, message)
+                ~sender
+            in
+            match Signature_lib.Public_key.decompress prover with
+            | None ->
+                (* We may need to decompress the key when paying the fee
+                   transfer, so check that we can do it now.
+                *)
+                [%log' error t.logger] "Proof had an invalid key: $public_key"
+                  ~metadata:
+                    [ ( "public_key"
+                      , Signature_lib.Public_key.Compressed.to_yojson prover )
+                    ] ;
+                invalid "invalid key"
+            | Some _ -> (
+                match%bind Batcher.Snark_pool.verify t.batcher proof_env with
+                | Ok () ->
+                    Deferred.Result.return ()
+                | Error (`Invalid invalid) ->
+                    let invalid_err = Verifier.invalid_to_error invalid in
+                    (* if this proof is in the set of invalid proofs*)
+                    let%map () = log invalid_err in
+                    Error (Invalid invalid_err)
+                | Error (`Crash e) ->
+                    (* Verifier crashed or other errors at our end. Don't punish the peer*)
+                    let%map () = log ~punish:false e in
+                    Error (Failure e) )
         in
         match One_or_two.zip proofs statements with
         | Ok pairs ->
@@ -484,7 +471,8 @@ struct
                   ]
                 @ metadata )
               "One_or_two length mismatch: $error" ;
-            Deferred.return false
+            Deferred.Result.fail
+            @@ Invalid (Error.tag ~tag:"One_or_two length mismatch" e)
     end
 
     include T
@@ -501,7 +489,9 @@ struct
           Map.to_alist !(t.snark_tables).rebroadcastable
           |> List.filter_map ~f:(fun (stmt, (snark, _time)) ->
                  if Set.mem best_tips stmt then
-                   Some (Diff.Add_solved_work (stmt, snark))
+                   Some
+                     (Diff.Cached.read_all_proofs_from_disk
+                        (Diff.Cached.Add_solved_work (stmt, snark)) )
                  else None )
 
     let remove_solved_work t work =
@@ -520,14 +510,14 @@ struct
   let get_completed_work t statement =
     Option.map
       (Resource_pool.request_proof (resource_pool t) statement)
-      ~f:(fun Priced_proof.{ proof; fee = { fee; prover } } ->
+      ~f:(fun Priced_proof.{ proof = proofs; fee = { fee; prover } } ->
         Transaction_snark_work.Checked.create_unsafe
-          { Transaction_snark_work.fee; proofs = proof; prover } )
+          { Transaction_snark_work.fee; proofs; prover } )
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
 include
-  Make (Mina_base.Ledger) (Staged_ledger)
+  Make (Mina_ledger.Ledger) (Staged_ledger)
     (struct
       include Transition_frontier
 
@@ -555,37 +545,38 @@ module Diff_versioned = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
-      type t = Resource_pool.Diff.t =
+    module V2 = struct
+      type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
         | Add_solved_work of
-            Transaction_snark_work.Statement.Stable.V1.t
-            * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+            Transaction_snark_work.Statement.Stable.V2.t
+            * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
-      [@@deriving compare, sexp, to_yojson, hash]
+      [@@deriving equal]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t =
+  type t = Resource_pool.Diff.Cached.t =
     | Add_solved_work of
         Transaction_snark_work.Statement.t
-        * Ledger_proof.t One_or_two.t Priced_proof.t
+        * Ledger_proof.Cached.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, sexp, to_yojson, hash]
 end
-
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 
 let%test_module "random set test" =
   ( module struct
     open Mina_base
+    module Mock_snark_pool =
+      Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
 
     let trust_system = Mocks.trust_system
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let block_window_duration =
+      Mina_compile_config.For_unit_tests.t.block_window_duration
 
     (* SNARK work is rejected if the prover doesn't have an account and the fee
        is below the account creation fee. So, just to make generating valid SNARK
@@ -605,13 +596,12 @@ let%test_module "random set test" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
 
-    module Mock_snark_pool =
-      Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)
-    open Ledger_proof.For_tests
+    let mk_dummy_proof = Ledger_proof.For_tests.mk_dummy_proof
+
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
     let apply_diff resource_pool work
         ?(proof = One_or_two.map ~f:mk_dummy_proof)
@@ -621,18 +611,18 @@ let%test_module "random set test" =
           (work, { Priced_proof.Stable.Latest.proof = proof work; fee })
       in
       let enveloped_diff = Envelope.Incoming.wrap ~data:diff ~sender in
-      match%bind
+      match%map
         Mock_snark_pool.Resource_pool.Diff.verify resource_pool enveloped_diff
       with
-      | Ok _ ->
+      | Ok verified_diff ->
           Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
-            enveloped_diff
+            verified_diff
       | Error _ ->
-          Deferred.return (Error (`Other (Error.of_string "Invalid diff")))
+          Error (`Other (Error.of_string "Invalid diff"))
 
     let config =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
-        ~disk_location:"/tmp/snark-pool"
+        ~disk_location:"/tmp/snark-pool" ~proof_cache_db
 
     let gen ?length () =
       let open Quickcheck.Generator.Let_syntax in
@@ -655,6 +645,7 @@ let%test_module "random set test" =
           ~consensus_constants ~time_controller
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+          ~block_window_duration
         (* |>  *)
       in
       let pool = Mock_snark_pool.resource_pool mock_pool in
@@ -691,7 +682,7 @@ let%test_module "random set test" =
               , One_or_two.map work ~f:(fun statement ->
                     Ledger_proof.create ~statement
                       ~sok_digest:invalid_sok_digest
-                      ~proof:Proof.transaction_dummy )
+                      ~proof:(Lazy.force Proof.transaction_dummy) )
               , fee
               , some_other_pk )
               :: acc )
@@ -702,15 +693,6 @@ let%test_module "random set test" =
                 @@ Signature_lib.Public_key.Compressed.equal mal_pk fee.prover ) )
       in
       Quickcheck.test ~trials:5
-        ~sexp_of:
-          [%sexp_of:
-            (Mock_snark_pool.Resource_pool.t * Mocks.Transition_frontier.t)
-            Deferred.t
-            * ( Transaction_snark_work.Statement.t
-              * Ledger_proof.t One_or_two.t
-              * Fee_with_prover.t
-              * Signature_lib.Public_key.Compressed.t )
-              list]
         (Quickcheck.Generator.tuple2 (gen ()) invalid_work_gen)
         ~f:(fun (t, invalid_work_lst) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -745,13 +727,6 @@ let%test_module "random set test" =
                    the snark pool, the fee of the work is at most the minimum \
                    of those fees" =
       Quickcheck.test ~trials:5
-        ~sexp_of:
-          [%sexp_of:
-            (Mock_snark_pool.Resource_pool.t * Mocks.Transition_frontier.t)
-            Deferred.t
-            * Mocks.Transaction_snark_work.Statement.t
-            * Fee_with_prover.t
-            * Fee_with_prover.t]
         (Async.Quickcheck.Generator.tuple4 (gen ())
            Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
            Fee_with_prover.gen )
@@ -775,13 +750,6 @@ let%test_module "random set test" =
                    proof of the same work only if it's fee is smaller than the \
                    existing priced proof" =
       Quickcheck.test ~trials:5
-        ~sexp_of:
-          [%sexp_of:
-            (Mock_snark_pool.Resource_pool.t * Mocks.Transition_frontier.t)
-            Deferred.t
-            * Mocks.Transaction_snark_work.Statement.t
-            * Fee_with_prover.t
-            * Fee_with_prover.t]
         (Quickcheck.Generator.tuple4 (gen ())
            Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
            Fee_with_prover.gen )
@@ -821,22 +789,23 @@ let%test_module "random set test" =
               ~consensus_constants ~time_controller ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+              ~block_window_duration
           in
           let priced_proof =
             { Priced_proof.proof =
                 `One
-                  (mk_dummy_proof
+                  (Ledger_proof.For_tests.Cached.mk_dummy_proof
                      (Quickcheck.random_value
                         ~seed:(`Deterministic "test proof")
                         Transaction_snark.Statement.gen ) )
             ; fee =
-                { fee = Currency.Fee.of_int 0
+                { fee = Currency.Fee.zero
                 ; prover = Signature_lib.Public_key.Compressed.empty
                 }
             }
           in
           let command =
-            Mock_snark_pool.Resource_pool.Diff.Add_solved_work
+            Mock_snark_pool.Resource_pool.Diff.Cached.Add_solved_work
               (fake_work, priced_proof)
           in
           don't_wait_for
@@ -848,14 +817,19 @@ let%test_module "random set test" =
                    with
                  | Some { proof; fee = _ } ->
                      assert (
-                       [%equal: Ledger_proof.t One_or_two.t] proof
-                         priced_proof.proof )
+                       [%equal: Ledger_proof.t One_or_two.t]
+                         (One_or_two.map
+                            ~f:Ledger_proof.Cached.read_proof_from_disk proof )
+                         (One_or_two.map
+                            ~f:Ledger_proof.Cached.read_proof_from_disk
+                            priced_proof.proof ) )
                  | None ->
                      failwith "There should have been a proof here" ) ;
                  Deferred.unit ) ;
           Mock_snark_pool.apply_and_broadcast network_pool
             (Envelope.Incoming.local command)
-            (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) )
+            (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) ;
+          Deferred.unit )
 
     let%test_unit "when creating a network, the incoming diffs and locally \
                    generated diffs in reader pipes will automatically get \
@@ -876,7 +850,7 @@ let%test_module "random set test" =
               , Priced_proof.
                   { proof = One_or_two.map ~f:mk_dummy_proof work
                   ; fee =
-                      { fee = Currency.Fee.of_int 0
+                      { fee = Currency.Fee.zero
                       ; prover = Signature_lib.Public_key.Compressed.empty
                       }
                   } )
@@ -892,6 +866,7 @@ let%test_module "random set test" =
                 ~consensus_constants ~time_controller
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+                ~block_window_duration
             in
             List.map (List.take works per_reader) ~f:create_work
             |> List.map ~f:(fun work ->
@@ -908,7 +883,7 @@ let%test_module "random set test" =
                    |> Deferred.don't_wait_for ) ;
             don't_wait_for
             @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
-                 ~f:(fun work_command ->
+                 ~f:(fun With_nonce.{ message = work_command; _ } ->
                    let work =
                      match work_command with
                      | Mock_snark_pool.Resource_pool.Diff.Add_solved_work
@@ -956,18 +931,25 @@ let%test_module "random set test" =
              ~peer_id:(Peer.Id.unsafe_of_string "contents should be irrelevant")
              ~libp2p_port:8302 )
       in
-      let compare_work (x : Mock_snark_pool.Resource_pool.Diff.t)
-          (y : Mock_snark_pool.Resource_pool.Diff.t) =
-        match (x, y) with
-        | Add_solved_work (stmt1, _), Add_solved_work (stmt2, _) ->
-            Transaction_snark_work.Statement.compare stmt1 stmt2
-        | _ ->
-            assert false
-      in
       let check_work ~expected ~got =
-        let sort = List.sort ~compare:compare_work in
-        [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list] (sort got)
-          (sort expected)
+        let open Mock_snark_pool.Resource_pool.Diff in
+        let compare a b =
+          match (a, b) with
+          | Empty, Empty ->
+              0
+          | Empty, _ ->
+              -1
+          | _, Empty ->
+              1
+          | Add_solved_work (a, _), Add_solved_work (b, _) ->
+              Transaction_snark_work.Statement.compare a b
+        in
+        let sort = List.sort ~compare in
+        if
+          not
+          @@ [%equal: Diff_versioned.Stable.V2.t list] (sort got)
+               (sort expected)
+        then failwith "diffs don't match"
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
@@ -976,6 +958,7 @@ let%test_module "random set test" =
               ~constraint_constants ~consensus_constants ~time_controller
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+              ~block_window_duration
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in
           let%bind () =
@@ -995,7 +978,8 @@ let%test_module "random set test" =
           in
           ignore
             ( ok_exn res1
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.t
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable1 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1006,7 +990,8 @@ let%test_module "random set test" =
           let proof2 = One_or_two.map ~f:mk_dummy_proof stmt2 in
           ignore
             ( ok_exn res2
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.t
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable2 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1019,7 +1004,8 @@ let%test_module "random set test" =
           let proof3 = One_or_two.map ~f:mk_dummy_proof stmt3 in
           ignore
             ( ok_exn res3
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.t
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable3 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
@@ -1046,7 +1032,8 @@ let%test_module "random set test" =
           let proof4 = One_or_two.map ~f:mk_dummy_proof stmt4 in
           ignore
             ( ok_exn res6
-              : Mock_snark_pool.Resource_pool.Diff.verified
+              : [ `Accept | `Reject ]
+                * Mock_snark_pool.Resource_pool.Diff.t
                 * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           (* Mark best tip as not including stmt3. *)
           let%bind () =

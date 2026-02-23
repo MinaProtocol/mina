@@ -9,7 +9,7 @@ module Payload : sig
   module Common : sig
     [%%versioned:
     module Stable : sig
-      module V1 : sig
+      module V2 : sig
         type t [@@deriving sexp, to_yojson]
       end
     end]
@@ -19,7 +19,7 @@ module Payload : sig
 
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t [@@deriving sexp, to_yojson]
     end
   end]
@@ -42,9 +42,9 @@ end
 
 [%%versioned:
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t =
-      ( Payload.Stable.V1.t
+      ( Payload.Stable.V2.t
       , Public_key.Compressed.Stable.V1.t
       , Sign_choice.Stable.V1.t )
       Signed_command.Poly.Stable.V1.t
@@ -57,9 +57,8 @@ val fee_payer : t -> Account_id.t
 val create :
      ?nonce:Account.Nonce.t
   -> fee:Currency.Fee.t
-  -> fee_token:Token_id.t
   -> fee_payer_pk:Public_key.Compressed.t
-  -> valid_until:Global_slot.t option
+  -> valid_until:Global_slot_since_genesis.t option
   -> memo:Signed_command_memo.t
   -> body:Signed_command_payload.Body.t
   -> signer:Public_key.Compressed.t
@@ -75,6 +74,7 @@ val to_user_command :
   -> get_account:(Account_id.t -> Account.t option Participating_state.T.t)
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> logger:Logger.t
+  -> signature_kind:Mina_signature_kind.t
   -> t
   -> (Signed_command.t * (Account.Nonce.t * Account.Nonce.t) Account_id.Map.t)
      Deferred.Or_error.t
@@ -87,5 +87,6 @@ val to_user_commands :
   -> get_account:(Account_id.t -> Account.t option Participating_state.T.t)
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> logger:Logger.t
+  -> signature_kind:Mina_signature_kind.t
   -> t list
   -> Signed_command.t list Deferred.Or_error.t

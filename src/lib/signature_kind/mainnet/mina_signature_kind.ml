@@ -1,3 +1,3 @@
-type t = Testnet | Mainnet
+include Mina_signature_kind_type
 
-let t = Mainnet
+let t_DEPRECATED = Mainnet

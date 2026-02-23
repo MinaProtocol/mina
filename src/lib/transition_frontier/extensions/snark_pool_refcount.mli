@@ -1,4 +1,4 @@
-type view = { removed_work: Transaction_snark_work.Statement.t list }
+type view = { removed_work : Transaction_snark_work.Statement.t list }
 [@@deriving sexp]
 
 include Intf.Extension_intf with type view := view

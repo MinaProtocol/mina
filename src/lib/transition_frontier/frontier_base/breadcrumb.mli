@@ -8,16 +8,16 @@ open Core_kernel
 open Signature_lib
 open Mina_base
 open Mina_state
-open Mina_block
 open Network_peer
 
-type t [@@deriving sexp, equal, compare, to_yojson]
+type t [@@deriving equal, compare, to_yojson]
 
 type display =
-  { state_hash: string
-  ; blockchain_state: Blockchain_state.display
-  ; consensus_state: Consensus.Data.Consensus_state.display
-  ; parent: string }
+  { state_hash : string
+  ; blockchain_state : Blockchain_state.display
+  ; consensus_state : Consensus.Data.Consensus_state.display
+  ; parent : string
+  }
 [@@deriving yojson]
 
 val create :
@@ -25,16 +25,21 @@ val create :
   -> staged_ledger:Staged_ledger.t
   -> just_emitted_a_proof:bool
   -> transition_receipt_time:Time.t option
+  -> accounts_created:Account_id.t list
   -> t
 
 val build :
-     ?skip_staged_ledger_verification:[`All | `Proofs]
+     ?skip_staged_ledger_verification:[ `All | `Proofs ]
+  -> ?transaction_pool_proxy:Staged_ledger.transaction_pool_proxy
   -> logger:Logger.t
   -> precomputed_values:Precomputed_values.t
   -> verifier:Verifier.t
   -> trust_system:Trust_system.t
   -> parent:t
   -> transition:Mina_block.almost_valid_block
+  -> get_completed_work:
+       (   Transaction_snark_work.Statement.t
+        -> Transaction_snark_work.Checked.t option )
   -> sender:Envelope.Sender.t option
   -> transition_receipt_time:Time.t option
   -> unit
@@ -59,7 +64,8 @@ val transition_receipt_time : t -> Time.t option
 
 val hash : t -> int
 
-val protocol_state_with_hashes : t -> Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t
+val protocol_state_with_hashes :
+  t -> Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t
 
 val protocol_state : t -> Mina_state.Protocol_state.Value.t
 
@@ -72,21 +78,27 @@ val state_hash : t -> State_hash.t
 
 val parent_hash : t -> State_hash.t
 
-val mask : t -> Ledger.Mask.Attached.t
-
-val all_user_commands : t list -> Signed_command.Set.t
+val mask : t -> Mina_ledger.Ledger.Mask.Attached.t
 
 val display : t -> display
 
 val name : t -> string
 
+val staged_ledger_hash : t -> Staged_ledger_hash.t
+
+(** The accounts created in the block that this breadcrumb represents
+    For convenience of implementation, it's by definition an empty list for the root *)
+val accounts_created : t -> Account_id.t list
+
 module For_tests : sig
   val gen :
        ?logger:Logger.t
+    -> ?send_to_random_pk:bool
     -> precomputed_values:Precomputed_values.t
     -> verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
+    -> unit
     -> (t -> t Deferred.t) Quickcheck.Generator.t
 
   val gen_non_deferred :
@@ -95,6 +107,7 @@ module For_tests : sig
     -> verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
+    -> unit
     -> (t -> t) Quickcheck.Generator.t
 
   val gen_seq :
@@ -107,20 +120,20 @@ module For_tests : sig
     -> (t -> t list Deferred.t) Quickcheck.Generator.t
 
   val build_fail :
-    ?skip_staged_ledger_verification:[`All | `Proofs]
- -> logger:Logger.t
- -> precomputed_values:Precomputed_values.t
- -> verifier:Verifier.t
- -> trust_system:Trust_system.t
- -> parent:t
- -> transition:Mina_block.almost_valid_block
- -> sender:Envelope.Sender.t option
- -> transition_receipt_time:Time.t option
- -> unit
- -> ( t
-    , [> `Invalid_staged_ledger_diff of Error.t
-      | `Invalid_staged_ledger_hash of Error.t
-      | `Fatal_error of exn ] )
-    Result.t
-    Deferred.t
+       ?skip_staged_ledger_verification:[ `All | `Proofs ]
+    -> logger:Logger.t
+    -> precomputed_values:Precomputed_values.t
+    -> verifier:Verifier.t
+    -> trust_system:Trust_system.t
+    -> parent:t
+    -> transition:Mina_block.almost_valid_block
+    -> sender:Envelope.Sender.t option
+    -> transition_receipt_time:Time.t option
+    -> unit
+    -> ( t
+       , [> `Invalid_staged_ledger_diff of Error.t
+         | `Invalid_staged_ledger_hash of Error.t
+         | `Fatal_error of exn ] )
+       Result.t
+       Deferred.t
 end

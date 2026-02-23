@@ -1,7 +1,7 @@
 open Core_kernel
 open Rosetta_models
 
-type t = [ `Success | `Failed ] [@@deriving to_representatives]
+type t = [ `Success | `Failed ] [@@deriving to_representatives, equal]
 
 let name = function `Success -> "Success" | `Failed -> "Failed"
 

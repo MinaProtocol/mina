@@ -58,14 +58,14 @@ let%test_module "vrf-test" =
             with type var := Snark_params.Tick.Inner_curve.var
             with module Checked := Snark_params.Tick.Inner_curve.Checked )
 
-      type 'a or_infinity = 'a Marlin_plonk_bindings_types.Or_infinity.t =
+      type 'a or_infinity = 'a Kimchi_types.or_infinity =
         | Infinity
-        | Finite of 'a
+        | Finite of ('a * 'a)
       [@@deriving equal]
 
       let equal x y =
         Snark_params.Tick.Inner_curve.(
-          equal_or_infinity Affine.equal (to_affine_or_infinity x)
+          equal_or_infinity Field.equal (to_affine_or_infinity x)
             (to_affine_or_infinity y))
 
       module Checked = struct

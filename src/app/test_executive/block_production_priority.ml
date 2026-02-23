@@ -8,7 +8,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
@@ -19,31 +20,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* let num_sender_nodes = 4 *)
 
-  let config =
+  let config ~(constants : Test_config.constants) =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; genesis_ledger =
-        [ { Test_Account.account_name = "receiver-key"
-          ; balance = "9999999"
-          ; timing = Untimed
-          }
-        ; { account_name = "empty-bp-key"; balance = "0"; timing = Untimed }
-        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
+        (let open Test_account in
+        [ create ~account_name:"receiver-key" ~balance:"9999999" ()
+        ; create ~account_name:"empty-bp-key" ~balance:"0" ()
+        ; create ~account_name:"snark-node-key" ~balance:"0" ()
         ]
         @ List.init num_extra_keys ~f:(fun i ->
               let i_str = Int.to_string i in
-              { Test_Account.account_name =
-                  String.concat [ "sender-account"; i_str ]
-              ; balance = "10000"
-              ; timing = Untimed
-              } )
+              create
+                ~account_name:(String.concat [ "sender-account"; i_str ])
+                ~balance:"10000" () ))
     ; block_producers =
         [ { node_name = "receiver"; account_name = "receiver-key" }
         ; { node_name = "empty_node-1"; account_name = "empty-bp-key" }
         ; { node_name = "empty_node-2"; account_name = "empty-bp-key" }
         ; { node_name = "empty_node-3"; account_name = "empty-bp-key" }
         ; { node_name = "empty_node-4"; account_name = "empty-bp-key" }
+        ; { node_name = "observer"; account_name = "empty-bp-key" }
         ]
     ; snark_coordinator =
         Some
@@ -61,9 +59,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     }
 
-  let fee = Currency.Fee.of_int 10_000_000
+  let fee = Currency.Fee.of_nanomina_int_exn 10_000_000
 
-  let amount = Currency.Amount.of_int 10_000_000
+  let amount = Currency.Amount.of_nanomina_int_exn 10_000_000
 
   let tx_delay_ms = 500
 
@@ -71,15 +69,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let min_resulting_blocks = 12
 
-  let run network t =
+  let run ~config:_ network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let receiver =
-      Core.String.Map.find_exn (Network.block_producers network) "receiver"
-    in
+    let receiver = Network.block_producer_exn network "receiver" in
+    let observer = Network.block_producer_exn network "observer" in
     let%bind receiver_pub_key = pub_key_of_node receiver in
     let empty_bps =
-      Core.String.Map.remove (Network.block_producers network) "receiver"
+      Core.String.Map.remove
+        (Core.String.Map.remove (Network.block_producers network) "receiver")
+        "observer"
       |> Core.String.Map.data
     in
     let rec map_remove_keys map ~(keys : string list) =
@@ -117,6 +116,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "wait for 3 blocks to be produced (warm-up)"
         (wait_for t (Wait_condition.blocks_to_be_produced 3))
+    in
+    let%bind () =
+      section_hard "stop observer"
+        (let%map () = Network.Node.stop observer in
+         [%log info]
+           "Observer %s stopped, will now wait for blocks to be produced"
+           (Network.Node.id observer) )
     in
     let end_t =
       Time.add (Time.now ())
@@ -159,7 +165,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          let%bind () =
            ok_if_true "not enough blocks"
-             (List.length blocks >= min_resulting_blocks)
+             Mina_stdlib.List.Length.Compare.(blocks >= min_resulting_blocks)
          in
          let tx_counts =
            Array.of_list
@@ -209,15 +215,31 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            List.fold ~init:0 ~f:( + )
            @@ List.drop block_production_delay_histogram_buckets_60s_min 1
          in
-         (* First two slots might be delayed because of test's bootstrap, so we have 2 as a threshold *)
+         (* First two slots might be delayed because of test's bootstrap, so we
+            have 2 as a threshold *)
          ok_if_true "block production was delayed" (blocks_delayed_over_60s <= 2)
         )
     in
-    section "retrieve metrics of tx sender nodes"
-      (* We omit the result because we just want to query the txn sending nodes to see some useful
-          output in test logs *)
-      (Malleable_error.List.iter empty_bps
-         ~f:
-           (Fn.compose Malleable_error.soften_error
-              (Fn.compose Malleable_error.ignore_m get_metrics) ) )
+    let%bind () =
+      section "retrieve metrics of tx sender nodes"
+        (* We omit the result because we just want to query senders to see some
+           useful output in test logs *)
+        (Malleable_error.List.iter empty_bps
+           ~f:
+             (Fn.compose Malleable_error.soften_error
+                (Fn.compose Malleable_error.ignore_m get_metrics) ) )
+    in
+    section "catchup observer"
+      (let%bind () = Network.Node.start ~fresh_state:false observer in
+       [%log info]
+         "Observer %s started again, will now wait for this node to initialize"
+         (Network.Node.id observer) ;
+       let%bind () = wait_for t (Wait_condition.node_to_initialize observer) in
+       wait_for t
+         ( Wait_condition.nodes_to_synchronize [ receiver; observer ]
+         |> Wait_condition.with_timeouts
+              ~soft_timeout:(Network_time_span.Slots 3)
+              ~hard_timeout:
+                (Network_time_span.Literal
+                   (Time.Span.of_ms (15. *. 60. *. 1000.)) ) ) )
 end

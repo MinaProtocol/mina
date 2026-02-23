@@ -12,14 +12,14 @@ module Extend_blockchain_input = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        { chain : Blockchain.Stable.V1.t
-        ; next_state : Protocol_state.Value.Stable.V1.t
-        ; block : Snark_transition.Value.Stable.V1.t
-        ; ledger_proof : Ledger_proof.Stable.V1.t option
-        ; prover_state : Consensus.Data.Prover_state.Stable.V1.t
-        ; pending_coinbase : Pending_coinbase_witness.Stable.V1.t
+        { chain : Blockchain.Stable.V2.t
+        ; next_state : Protocol_state.Value.Stable.V2.t
+        ; block : Snark_transition.Value.Stable.V2.t
+        ; ledger_proof : Ledger_proof.Stable.V2.t option
+        ; prover_state : Consensus.Data.Prover_state.Stable.V2.t
+        ; pending_coinbase : Pending_coinbase_witness.Stable.V2.t
         }
 
       let to_latest = Fn.id
@@ -51,147 +51,209 @@ module Worker_state = struct
       -> Pending_coinbase_witness.t
       -> Blockchain.t Async.Deferred.Or_error.t
 
-    val verify : Protocol_state.Value.t -> Proof.t -> bool Deferred.t
+    val verify : Protocol_state.Value.t -> Proof.t -> unit Or_error.t Deferred.t
+
+    val toggle_internal_tracing : bool -> unit
+
+    val set_itn_logger_data : daemon_port:int -> unit
+
+    val get_blockchain_verification_key :
+      unit -> Pickles.Verification_key.t Deferred.t
+
+    val get_transaction_verification_key :
+      unit -> Pickles.Verification_key.t Deferred.t
   end
 
   (* bin_io required by rpc_parallel *)
   type init_arg =
     { conf_dir : string
-    ; logger : Logger.Stable.Latest.t
+    ; enable_internal_tracing : bool
+    ; internal_trace_filename : string option
+    ; logger : Logger.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
+    ; commit_id : string
+    ; signature_kind : Mina_signature_kind_type.t
     }
   [@@deriving bin_io_unversioned]
 
   type t = (module S)
 
-  let ledger_proof_opt (chain : Blockchain.t) next_state = function
+  let ledger_proof_opt next_state = function
     | Some t ->
-        Ledger_proof.
-          ({ (statement t) with sok_digest = sok_digest t }, underlying_proof t)
+        Ledger_proof.(statement_with_sok t, underlying_proof t)
     | None ->
-        let bs = Protocol_state.blockchain_state in
-        let lh x = Blockchain_state.snarked_ledger_hash (bs x) in
-        let tok x = Blockchain_state.snarked_next_available_token (bs x) in
-        let chain_state = Blockchain_snark.Blockchain.state chain in
-        ( { source = lh chain_state
-          ; target = lh next_state
-          ; supply_increase = Currency.Amount.zero
-          ; fee_excess = Fee_excess.zero
-          ; sok_digest = Sok_message.Digest.default
-          ; next_available_token_before = tok chain_state
-          ; next_available_token_after = tok next_state
-          ; pending_coinbase_stack_state =
-              { source = Pending_coinbase.Stack.empty
-              ; target = Pending_coinbase.Stack.empty
-              }
+        ( { (Blockchain_state.ledger_proof_statement
+               (Protocol_state.blockchain_state next_state) )
+            with
+            sok_digest = Sok_message.Digest.default
           }
-        , Proof.transaction_dummy )
+        , Lazy.force Proof.transaction_dummy )
 
-  let create { logger; proof_level; constraint_constants; _ } : t Deferred.t =
-    Deferred.return
-      (let m =
-         match proof_level with
-         | Genesis_constants.Proof_level.Full ->
-             ( module struct
-               module T = Transaction_snark.Make (struct
-                 let constraint_constants = constraint_constants
+  let create
+      { logger
+      ; proof_level
+      ; constraint_constants
+      ; commit_id
+      ; signature_kind
+      ; _
+      } : t Deferred.t =
+    match proof_level with
+    | Genesis_constants.Proof_level.Full ->
+        let module T = Transaction_snark.Make (struct
+          let signature_kind = signature_kind
 
-                 let proof_level = proof_level
-               end)
+          let constraint_constants = constraint_constants
 
-               module B = Blockchain_snark.Blockchain_snark_state.Make (struct
-                 let tag = T.tag
+          let proof_level = proof_level
+        end) in
+        let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
+          let tag = T.tag
 
-                 let constraint_constants = constraint_constants
+          let constraint_constants = constraint_constants
 
-                 let proof_level = proof_level
-               end)
+          let proof_level = proof_level
+        end) in
+        let%map.Async.Deferred (_ : Pickles.Dirty.t) =
+          Pickles.Cache_handle.generate_or_load B.cache_handle
+          |> Promise.to_deferred
+        in
+        ( module struct
+          module T = T
+          module B = B
 
-               let (_ : Pickles.Dirty.t) =
-                 Pickles.Cache_handle.generate_or_load B.cache_handle
+          let extend_blockchain (chain : Blockchain.t)
+              (next_state : Protocol_state.Value.t)
+              (block : Snark_transition.value) (t : Ledger_proof.t option)
+              state_for_handler pending_coinbase =
+            Internal_tracing.Context_call.with_call_id
+            @@ fun () ->
+            [%log internal] "Prover_extend_blockchain" ;
+            let%map.Async.Deferred res =
+              Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                  let txn_snark_statement, txn_snark_proof =
+                    ledger_proof_opt next_state t
+                  in
+                  Context_logger.with_logger (Some logger)
+                  @@ fun () ->
+                  let%map.Async.Deferred (), (), proof =
+                    B.step
+                      ~handler:
+                        (Consensus.Data.Prover_state.handler
+                           ~constraint_constants state_for_handler
+                           ~pending_coinbase )
+                      { transition = block
+                      ; prev_state = Blockchain_snark.Blockchain.state chain
+                      ; prev_state_proof =
+                          Blockchain_snark.Blockchain.proof chain
+                      ; txn_snark = txn_snark_statement
+                      ; txn_snark_proof
+                      }
+                      next_state
+                  in
+                  Blockchain_snark.Blockchain.create ~state:next_state ~proof )
+            in
+            [%log internal] "Prover_extend_blockchain_done" ;
+            Or_error.iter_error res ~f:(fun e ->
+                [%log error]
+                  ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                  "Prover threw an error while extending block: $error" ) ;
+            res
 
-               let extend_blockchain (chain : Blockchain.t)
-                   (next_state : Protocol_state.Value.t)
-                   (block : Snark_transition.value) (t : Ledger_proof.t option)
-                   state_for_handler pending_coinbase =
-                 let%map.Async.Deferred res =
-                   Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                       let t = ledger_proof_opt chain next_state t in
-                       let%map.Async.Deferred proof =
-                         B.step
-                           ~handler:
-                             (Consensus.Data.Prover_state.handler
-                                ~constraint_constants state_for_handler
-                                ~pending_coinbase )
-                           { transition = block
-                           ; prev_state =
-                               Blockchain_snark.Blockchain.state chain
-                           }
-                           [ ( Blockchain_snark.Blockchain.state chain
-                             , Blockchain_snark.Blockchain.proof chain )
-                           ; t
-                           ]
-                           next_state
-                       in
+          let verify state proof =
+            Internal_tracing.Context_call.with_call_id
+            @@ fun () ->
+            [%log internal] "Prover_verify" ;
+            let%map result = B.Proof.verify [ (state, proof) ] in
+            [%log internal] "Prover_verify_done" ;
+            result
+
+          let toggle_internal_tracing enabled =
+            don't_wait_for
+            @@ Internal_tracing.toggle ~commit_id ~logger
+                 (if enabled then `Enabled else `Disabled)
+
+          let set_itn_logger_data ~daemon_port =
+            Itn_logger.set_data ~process_kind:"prover" ~daemon_port
+
+          let get_blockchain_verification_key () =
+            Lazy.force B.Proof.verification_key
+
+          let get_transaction_verification_key () =
+            Lazy.force T.verification_key
+        end : S )
+    | Check ->
+        Deferred.return
+          ( module struct
+            module Transaction_snark = Transaction_snark
+
+            let extend_blockchain (chain : Blockchain.t)
+                (next_state : Protocol_state.Value.t)
+                (block : Snark_transition.value) (t : Ledger_proof.t option)
+                state_for_handler pending_coinbase =
+              let t, _proof = ledger_proof_opt next_state t in
+              let res =
+                Blockchain_snark.Blockchain_snark_state.check ~proof_level
+                  ~constraint_constants
+                  { transition = block
+                  ; prev_state = Blockchain_snark.Blockchain.state chain
+                  ; prev_state_proof =
+                      Lazy.force Mina_base.Proof.blockchain_dummy
+                  ; txn_snark = t
+                  ; txn_snark_proof =
+                      Lazy.force Mina_base.Proof.transaction_dummy
+                  }
+                  ~handler:
+                    (Consensus.Data.Prover_state.handler state_for_handler
+                       ~constraint_constants ~pending_coinbase )
+                  next_state
+                |> Or_error.map ~f:(fun () ->
                        Blockchain_snark.Blockchain.create ~state:next_state
-                         ~proof )
-                 in
-                 Or_error.iter_error res ~f:(fun e ->
-                     [%log error]
-                       ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                       "Prover threw an error while extending block: $error" ) ;
-                 res
+                         ~proof:(Lazy.force Mina_base.Proof.blockchain_dummy) )
+              in
+              Or_error.iter_error res ~f:(fun e ->
+                  [%log error]
+                    ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                    "Prover threw an error while extending block: $error" ) ;
+              Async.Deferred.return res
 
-               let verify state proof = B.Proof.verify [ (state, proof) ]
-             end : S )
-         | Check ->
-             ( module struct
-               module Transaction_snark = Transaction_snark
+            let verify _state _proof = Deferred.return (Ok ())
 
-               let extend_blockchain (chain : Blockchain.t)
-                   (next_state : Protocol_state.Value.t)
-                   (block : Snark_transition.value) (t : Ledger_proof.t option)
-                   state_for_handler pending_coinbase =
-                 let t, _proof = ledger_proof_opt chain next_state t in
-                 let res =
-                   Blockchain_snark.Blockchain_snark_state.check ~proof_level
-                     ~constraint_constants
-                     { transition = block
-                     ; prev_state = Blockchain_snark.Blockchain.state chain
-                     }
-                     ~handler:
-                       (Consensus.Data.Prover_state.handler state_for_handler
-                          ~constraint_constants ~pending_coinbase )
-                     t (Protocol_state.hashes next_state).state_hash
-                   |> Or_error.map ~f:(fun () ->
-                          Blockchain_snark.Blockchain.create ~state:next_state
-                            ~proof:Mina_base.Proof.blockchain_dummy )
-                 in
-                 Or_error.iter_error res ~f:(fun e ->
-                     [%log error]
-                       ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                       "Prover threw an error while extending block: $error" ) ;
-                 Async.Deferred.return res
+            let toggle_internal_tracing _ = ()
 
-               let verify _state _proof = Deferred.return true
-             end : S )
-         | None ->
-             ( module struct
-               module Transaction_snark = Transaction_snark
+            let set_itn_logger_data ~daemon_port:_ = ()
 
-               let extend_blockchain _chain next_state _block _ledger_proof
-                   _state_for_handler _pending_coinbase =
-                 Deferred.return
-                 @@ Ok
-                      (Blockchain_snark.Blockchain.create
-                         ~proof:Mina_base.Proof.blockchain_dummy
-                         ~state:next_state )
+            let get_blockchain_verification_key () =
+              Deferred.return (Lazy.force Pickles.Verification_key.dummy)
 
-               let verify _ _ = Deferred.return true
-             end : S )
-       in
-       m )
+            let get_transaction_verification_key () =
+              Deferred.return (Lazy.force Pickles.Verification_key.dummy)
+          end : S )
+    | No_check ->
+        Deferred.return
+          ( module struct
+            module Transaction_snark = Transaction_snark
+
+            let extend_blockchain _chain next_state _block _ledger_proof
+                _state_for_handler _pending_coinbase =
+              Deferred.return
+              @@ Ok
+                   (Blockchain_snark.Blockchain.create
+                      ~proof:(Lazy.force Mina_base.Proof.blockchain_dummy)
+                      ~state:next_state )
+
+            let verify _ _ = Deferred.return (Ok ())
+
+            let toggle_internal_tracing _ = ()
+
+            let set_itn_logger_data ~daemon_port:_ = ()
+
+            let get_blockchain_verification_key () =
+              Deferred.return (Lazy.force Pickles.Verification_key.dummy)
+
+            let get_transaction_verification_key () =
+              Deferred.return (Lazy.force Pickles.Verification_key.dummy)
+          end : S )
 
   let get = Fn.id
 end
@@ -227,11 +289,36 @@ module Functions = struct
           pending_coinbase )
 
   let verify_blockchain =
-    create Blockchain.Stable.Latest.bin_t bin_bool (fun w chain ->
+    create Blockchain.Stable.Latest.bin_t
+      [%bin_type_class: unit Core_kernel.Or_error.Stable.V2.t] (fun w chain ->
         let (module W) = Worker_state.get w in
         W.verify
           (Blockchain_snark.Blockchain.state chain)
           (Blockchain_snark.Blockchain.proof chain) )
+
+  let toggle_internal_tracing =
+    create bin_bool bin_unit (fun w enabled ->
+        let (module M) = Worker_state.get w in
+        M.toggle_internal_tracing enabled ;
+        Deferred.unit )
+
+  let set_itn_logger_data =
+    create bin_int bin_unit (fun w daemon_port ->
+        let (module M) = Worker_state.get w in
+        M.set_itn_logger_data ~daemon_port ;
+        Deferred.unit )
+
+  let get_blockchain_verification_key =
+    create bin_unit [%bin_type_class: Pickles.Verification_key.Stable.Latest.t]
+      (fun w () ->
+        let (module M) = Worker_state.get w in
+        M.get_blockchain_verification_key () )
+
+  let get_transaction_verification_key =
+    create bin_unit [%bin_type_class: Pickles.Verification_key.Stable.Latest.t]
+      (fun w () ->
+        let (module M) = Worker_state.get w in
+        M.get_transaction_verification_key () )
 end
 
 module Worker = struct
@@ -242,7 +329,13 @@ module Worker = struct
       { initialized : ('w, unit, [ `Initialized ]) F.t
       ; extend_blockchain :
           ('w, Extend_blockchain_input.t, Blockchain.t Or_error.t) F.t
-      ; verify_blockchain : ('w, Blockchain.t, bool) F.t
+      ; verify_blockchain : ('w, Blockchain.t, unit Or_error.t) F.t
+      ; toggle_internal_tracing : ('w, bool, unit) F.t
+      ; set_itn_logger_data : ('w, int, unit) F.t
+      ; get_blockchain_verification_key :
+          ('w, unit, Pickles.Verification_key.t) F.t
+      ; get_transaction_verification_key :
+          ('w, unit, Pickles.Verification_key.t) F.t
       }
 
     module Worker_state = Worker_state
@@ -269,20 +362,54 @@ module Worker = struct
         { initialized = f initialized
         ; extend_blockchain = f extend_blockchain
         ; verify_blockchain = f verify_blockchain
+        ; toggle_internal_tracing = f toggle_internal_tracing
+        ; set_itn_logger_data = f set_itn_logger_data
+        ; get_blockchain_verification_key = f get_blockchain_verification_key
+        ; get_transaction_verification_key = f get_transaction_verification_key
         }
 
       let init_worker_state
-          Worker_state.{ conf_dir; logger; proof_level; constraint_constants } =
+          Worker_state.
+            { conf_dir
+            ; enable_internal_tracing
+            ; internal_trace_filename
+            ; logger
+            ; proof_level
+            ; constraint_constants
+            ; commit_id
+            ; signature_kind
+            } =
         let max_size = 256 * 1024 * 512 in
         let num_rotate = 1 in
         Logger.Consumer_registry.register ~id:"default"
-          ~processor:(Logger.Processor.raw ())
+          ~processor:(Logger.Processor.raw ()) ~commit_id
           ~transport:
-            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-               ~log_filename:"mina-prover.log" ~max_size ~num_rotate ) ;
+            (Logger_file_system.dumb_logrotate ~directory:conf_dir
+               ~log_filename:"mina-prover.log" ~max_size ~num_rotate )
+          () ;
+        Option.iter internal_trace_filename ~f:(fun log_filename ->
+            Itn_logger.set_message_postprocessor
+              Internal_tracing.For_itn_logger.post_process_message ;
+            Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+              ~processor:Internal_tracing.For_logger.processor ~commit_id
+              ~transport:
+                (Internal_tracing.For_logger.json_lines_rotate_transport
+                   ~directory:(conf_dir ^ "/internal-tracing")
+                   ~log_filename () )
+              () ) ;
+        if enable_internal_tracing then
+          don't_wait_for @@ Internal_tracing.toggle ~commit_id ~logger `Enabled ;
         [%log info] "Prover started" ;
         Worker_state.create
-          { conf_dir; logger; proof_level; constraint_constants }
+          { conf_dir
+          ; enable_internal_tracing
+          ; internal_trace_filename
+          ; logger
+          ; proof_level
+          ; constraint_constants
+          ; commit_id
+          ; signature_kind
+          }
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
     end
@@ -294,7 +421,10 @@ end
 type t =
   { connection : Worker.Connection.t; process : Process.t; logger : Logger.t }
 
-let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
+let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
+    ~pids ~conf_dir ~proof_level ~constraint_constants ~commit_id
+    ~signature_kind () =
+  [%log info] "Starting a new prover process" ;
   let on_failure err =
     [%log error] "Prover process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -304,7 +434,15 @@ let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
     (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
       ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
-      { conf_dir; logger; proof_level; constraint_constants }
+      { conf_dir
+      ; enable_internal_tracing
+      ; internal_trace_filename
+      ; logger
+      ; proof_level
+      ; constraint_constants
+      ; commit_id
+      ; signature_kind
+      }
   in
   [%log info]
     "Daemon started process of kind $process_kind with pid $prover_pid"
@@ -315,6 +453,10 @@ let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
       ] ;
   Child_processes.Termination.register_process pids process
     Child_processes.Termination.Prover ;
+
+  let pid = Process.pid process in
+  [%log info] "Prover process has PID %d" (Pid.to_int pid) ;
+  Mina_metrics.Process_memory.Prover.set_pid pid ;
   let exit_or_signal =
     Child_processes.Termination.wait_safe ~logger process ~module_:__MODULE__
       ~location:__LOC__ ~here:[%here]
@@ -426,28 +568,35 @@ let prove t ~prev_state ~prev_state_proof ~next_state
       (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
   Blockchain_snark.Blockchain.proof chain
 
-let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
-  let start_time = Core.Time.now () in
+let create_genesis_block_inputs (genesis_inputs : Genesis_proof.Inputs.t) =
   let genesis_ledger = Genesis_ledger.Packed.t genesis_inputs.genesis_ledger in
   let constraint_constants = genesis_inputs.constraint_constants in
   let consensus_constants = genesis_inputs.consensus_constants in
   let prev_state =
-    Protocol_state.negative_one ~genesis_ledger
-      ~genesis_epoch_data:genesis_inputs.genesis_epoch_data
-      ~constraint_constants ~consensus_constants
+    let open Staged_ledger_diff in
+    Protocol_state.negative_one
+      ~genesis_ledger:
+        (Consensus.Genesis_data.Ledger.to_hashed genesis_inputs.genesis_ledger)
+      ~genesis_epoch_data:
+        (Consensus.Genesis_data.Epoch.to_hashed
+           genesis_inputs.genesis_epoch_data )
+      ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   let genesis_epoch_ledger =
     match genesis_inputs.genesis_epoch_data with
     | None ->
         genesis_ledger
     | Some data ->
-        data.staking.ledger
+        Genesis_ledger.Packed.t data.staking.ledger
   in
   let open Pickles_types in
-  let blockchain_dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n in
+  let blockchain_dummy =
+    Pickles.Proof.dummy Nat.N2.n Nat.N2.n ~domain_log2:16
+  in
   let snark_transition =
+    let open Staged_ledger_diff in
     Snark_transition.genesis ~constraint_constants ~consensus_constants
-      ~genesis_ledger
+      ~genesis_ledger ~genesis_body_reference
   in
   let pending_coinbase =
     { Mina_base.Pending_coinbase_witness.pending_coinbases =
@@ -460,13 +609,58 @@ let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
   let prover_state : Consensus_mechanism.Data.Prover_state.t =
     Consensus.Data.Prover_state.genesis_data ~genesis_epoch_ledger
   in
+  ( Blockchain.create ~proof:blockchain_dummy ~state:prev_state
+  , genesis_inputs.protocol_state_with_hashes.data
+  , snark_transition
+  , None
+  , prover_state
+  , pending_coinbase )
+
+let create_genesis_block_locally (worker_state : Worker_state.t)
+    (genesis_inputs : Genesis_proof.Inputs.t) =
+  let ( blockchain
+      , protocol_state
+      , snark_transition
+      , ledger_proof_opt
+      , prover_state
+      , pending_coinbase ) =
+    create_genesis_block_inputs genesis_inputs
+  in
+  let module Worker_state = (val worker_state) in
+  Worker_state.extend_blockchain blockchain protocol_state snark_transition
+    ledger_proof_opt prover_state pending_coinbase
+
+let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
+  let start_time = Core.Time.now () in
+  let ( blockchain
+      , protocol_state
+      , snark_transition
+      , ledger_proof_opt
+      , prover_state
+      , pending_coinbase ) =
+    create_genesis_block_inputs genesis_inputs
+  in
   let%map chain =
-    extend_blockchain t
-      (Blockchain.create ~proof:blockchain_dummy ~state:prev_state)
-      genesis_inputs.protocol_state_with_hashes.data snark_transition None
-      prover_state pending_coinbase
+    extend_blockchain t blockchain protocol_state snark_transition
+      ledger_proof_opt prover_state pending_coinbase
   in
   Mina_metrics.(
     Gauge.set Cryptography.blockchain_proving_time_ms
       (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
   chain
+
+let toggle_internal_tracing { connection; _ } enabled =
+  Worker.Connection.run connection ~f:Worker.functions.toggle_internal_tracing
+    ~arg:enabled
+
+let set_itn_logger_data { connection; _ } ~daemon_port =
+  Worker.Connection.run connection ~f:Worker.functions.set_itn_logger_data
+    ~arg:daemon_port
+
+let get_blockchain_verification_key { connection; _ } =
+  Worker.Connection.run connection
+    ~f:Worker.functions.get_blockchain_verification_key ~arg:()
+
+let get_transaction_verification_key { connection; _ } =
+  Worker.Connection.run connection
+    ~f:Worker.functions.get_transaction_verification_key ~arg:()

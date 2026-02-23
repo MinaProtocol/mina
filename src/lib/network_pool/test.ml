@@ -3,9 +3,6 @@ open Core_kernel
 open Pipe_lib
 open Network_peer
 
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
-
 let%test_module "network pool test" =
   ( module struct
     let trust_system = Mocks.trust_system
@@ -22,19 +19,23 @@ let%test_module "network pool test" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let block_window_duration =
+      Mina_compile_config.For_unit_tests.t.block_window_duration
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
 
     module Mock_snark_pool =
       Snark_pool.Make (Mocks.Base_ledger) (Mocks.Staged_ledger)
         (Mocks.Transition_frontier)
 
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
     let config =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
-        ~disk_location:"/tmp/snark-pool"
+        ~disk_location:"/tmp/snark-pool" ~proof_cache_db
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
@@ -49,7 +50,7 @@ let%test_module "network pool test" =
         { Priced_proof.proof =
             One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
         ; fee =
-            { fee = Currency.Fee.of_int 0
+            { fee = Currency.Fee.zero
             ; prover = Signature_lib.Public_key.Compressed.empty
             }
         }
@@ -60,18 +61,22 @@ let%test_module "network pool test" =
               ~consensus_constants ~time_controller
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+              ~block_window_duration
           in
           let%bind () =
             Mocks.Transition_frontier.refer_statements tf [ work ]
           in
-          let command =
-            Mock_snark_pool.Resource_pool.Diff.Add_solved_work
-              (work, priced_proof)
+          let read_proofs =
+            One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
           in
-          don't_wait_for
-            (Mock_snark_pool.apply_and_broadcast network_pool
-               (Envelope.Incoming.local command)
-               (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) ) ;
+          let command =
+            Mock_snark_pool.Resource_pool.Diff.Cached.write_all_proofs_to_disk
+              ~proof_cache_db
+              (Add_solved_work (work, priced_proof))
+          in
+          Mock_snark_pool.apply_and_broadcast network_pool
+            (Envelope.Incoming.local command)
+            (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) ;
           let%map _ =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
           in
@@ -79,7 +84,8 @@ let%test_module "network pool test" =
           match Mock_snark_pool.Resource_pool.request_proof pool work with
           | Some { proof; fee = _ } ->
               assert (
-                [%equal: Ledger_proof.t One_or_two.t] proof priced_proof.proof )
+                [%equal: Ledger_proof.t One_or_two.t] (read_proofs proof)
+                  priced_proof.proof )
           | None ->
               failwith "There should have been a proof here" )
 
@@ -101,7 +107,7 @@ let%test_module "network pool test" =
               { proof =
                   One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
               ; fee =
-                  { fee = Currency.Fee.of_int 0
+                  { fee = Currency.Fee.zero
                   ; prover = Signature_lib.Public_key.Compressed.empty
                   }
               } )
@@ -115,6 +121,7 @@ let%test_module "network pool test" =
             ~consensus_constants ~time_controller
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+            ~block_window_duration
         in
         List.map (List.take works per_reader) ~f:create_work
         |> List.map ~f:(fun work ->
@@ -130,7 +137,7 @@ let%test_module "network pool test" =
         let%bind () = Mocks.Transition_frontier.refer_statements tf works in
         don't_wait_for
         @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
-             ~f:(fun work_command ->
+             ~f:(fun With_nonce.{ message = work_command; _ } ->
                let work =
                  match work_command with
                  | Mock_snark_pool.Resource_pool.Diff.Add_solved_work (work, _)

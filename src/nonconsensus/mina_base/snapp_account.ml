@@ -1,1 +1,0 @@
-../../lib/mina_base/snapp_account.ml

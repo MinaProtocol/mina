@@ -115,10 +115,10 @@ let get_nonce ~logger ~(ingress_uri : Uri.t) ~(pub_key : Account.key) =
       [ ("pub_key", Signature_lib.Public_key.Compressed.to_yojson pub_key)
       ; ("ingress_uri", `String (Uri.to_string ingress_uri))
       ] ;
+  let account_id = Account_id.create pub_key Mina_base.Token_id.default in
   let%bind nonce =
     let%bind querry_result =
-      Integration_test_lib.Graphql_requests.get_account_data ingress_uri ~logger
-        ~public_key:pub_key
+      Graphql_requests.get_account_data ingress_uri ~logger ~account_id
     in
     match querry_result with
     | Ok res ->
@@ -153,7 +153,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     ~origin_sender_secret_key_path
     ~(origin_sender_secret_key_pw_option : string option)
     ~returner_secret_key_path ~(returner_secret_key_pw_option : string option)
-    ~graphql_target_node_option () =
+    ~graphql_target_node_option ~minimum_user_command_fee ~signature_kind () =
   let open Deferred.Let_syntax in
   (* define the rate limiting function *)
   let open Logger in
@@ -169,7 +169,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   let batch_count = ref 0 in
   let limit =
     (* call this function after a transaction happens *)
-    (* TODO, in the current state of things, this function counts to limit_level of transactions, and then slaps a pause after it.  This happens even if the transactions themselves took far longer than the pause.  It thereby makes the rate slower and more conservative than would appear.  In future, perhaps implement with some sort of Timer *)
+    (* TODO: in the current state of things, this function counts to limit_level of transactions, and then slaps a pause after it.  This happens even if the transactions themselves took far longer than the pause.  It thereby makes the rate slower and more conservative than would appear.  In future, perhaps implement with some sort of Timer *)
     if rate_limit then ( fun () ->
       incr batch_count ;
       if !batch_count >= limit_level then
@@ -192,20 +192,20 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     else fun () -> Deferred.return ()
   in
 
-  (* constants regarding send amount and fees *)
-  let base_send_amount = Currency.Amount.of_formatted_string "0" in
+  (* contants regarding send amount and fees *)
+  let base_send_amount = Currency.Amount.of_mina_string_exn "0" in
   let fee_amount =
     match txn_fee_option with
     | None ->
         Currency.Amount.to_fee
           (Option.value_exn
              (Currency.Amount.scale
-                (Currency.Amount.of_fee Mina_base.Signed_command.minimum_fee)
+                (Currency.Amount.of_fee minimum_user_command_fee)
                 10 ) )
     | Some f ->
-        Currency.Amount.to_fee (Currency.Amount.of_formatted_string f)
+        Currency.Amount.to_fee (Currency.Amount.of_mina_string_exn f)
   in
-  (* let acct_creation_fee = Currency.Amount.of_formatted_string "1" in *)
+  (* let acct_creation_fee = Currency.Amount.of_mina_string_exn "1" in *)
   let initial_send_amount =
     (* min_fee*num_txn_per_accts + base_send_amount*num_txn_per_accts + acct_creation_fee*num_accounts *)
     let total_send_value =
@@ -259,8 +259,9 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     let%bind res =
       Graphql_requests.sign_and_send_payment ~logger node_ingress_uri
         ~sender_keypair:sender_kp ~receiver_pub_key ~amount:base_send_amount
-        ~fee:fee_amount ~nonce ~memo:"" ~token:Token_id.default
-        ~valid_until:Mina_numbers.Global_slot.max_value
+        ~fee:fee_amount ~nonce ~memo:""
+        ~valid_until:Mina_numbers.Global_slot_since_genesis.max_value
+        ~signature_kind
     in
     let%bind () =
       match res with
@@ -309,6 +310,8 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   return ()
 
 let output_there_and_back_cmds =
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let compile_config = Mina_compile_config.Compiled.t in
   let open Command.Let_syntax in
   Command.async
     ~summary:
@@ -393,12 +396,18 @@ let output_there_and_back_cmds =
            "URL The graphql node to send graphl commands to.  must be in \
             format `<ip>:<port>`.  default is `127.0.0.1:3085`"
          (optional string)
+     and minimum_user_command_fee =
+       let default = compile_config.default_transaction_fee in
+       Cli_lib.Flag.fee_common
+         ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
+         ~default_transaction_fee:default
      in
      there_and_back_again ~num_txn_per_acct ~txns_per_block ~txn_fee_option
        ~slot_time ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
        ~origin_sender_secret_key_path ~origin_sender_secret_key_pw_option
        ~returner_secret_key_path ~returner_secret_key_pw_option
-       ~graphql_target_node_option )
+       ~graphql_target_node_option ~minimum_user_command_fee
+       ~signature_kind:Mina_signature_kind.t_DEPRECATED )
 
 let () =
   Command.run

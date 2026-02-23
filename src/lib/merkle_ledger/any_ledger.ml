@@ -13,55 +13,8 @@
  * Props to @nholland for showing me this trick.
  * *)
 
-open Core_kernel
-
-module type S = sig
-  type key
-
-  type token_id
-
-  type token_id_set
-
-  type account_id
-
-  type account_id_set
-
-  type account
-
-  type hash
-
-  module Location : Location_intf.S
-
-  (** The type of the witness for a base ledger exposed here so that it can
-   * be easily accessed from outside this module *)
-  type witness [@@deriving sexp_of]
-
-  module type Base_intf =
-    Base_ledger_intf.S
-      with module Addr = Location.Addr
-      with module Location = Location
-      with type key := key
-       and type token_id := token_id
-       and type token_id_set := token_id_set
-       and type account_id := account_id
-       and type account_id_set := account_id_set
-       and type hash := hash
-       and type root_hash := hash
-       and type account := account
-
-  val cast : (module Base_intf with type t = 'a) -> 'a -> witness
-
-  module M : Base_intf with type t = witness
-end
-
-module type Inputs_intf = sig
-  include Base_inputs_intf.S
-
-  module Location : Location_intf.S
-end
-
-module Make_base (Inputs : Inputs_intf) :
-  S
+module Make_base (Inputs : Intf.Inputs.Intf) :
+  Intf.Ledger.ANY
     with module Location = Inputs.Location
     with type key := Inputs.Key.t
      and type token_id := Inputs.Token_id.t
@@ -74,7 +27,7 @@ module Make_base (Inputs : Inputs_intf) :
   module Location = Location
 
   module type Base_intf =
-    Base_ledger_intf.S
+    Intf.Ledger.S
       with module Addr = Location.Addr
       with module Location = Location
       with type key := Inputs.Key.t
@@ -90,8 +43,6 @@ module Make_base (Inputs : Inputs_intf) :
 
   let cast (m : (module Base_intf with type t = 'a)) (t : 'a) = T (m, t)
 
-  let sexp_of_witness (T ((module B), t)) = B.sexp_of_t t
-
   (** M can be used wherever a base ledger is demanded, construct instances
    * by using the witness constructor directly
    *
@@ -100,9 +51,7 @@ module Make_base (Inputs : Inputs_intf) :
    * In the future, this should be a `ppx`.
    *)
   module M : Base_intf with type t = witness = struct
-    type t = witness [@@deriving sexp_of]
-
-    let t_of_sexp _ = failwith "t_of_sexp unimplemented"
+    type t = witness
 
     type index = int
 
@@ -113,23 +62,31 @@ module Make_base (Inputs : Inputs_intf) :
 
     module Addr = Location.Addr
 
-    let remove_accounts_exn (T ((module Base), t)) = Base.remove_accounts_exn t
-
     let merkle_path_at_index_exn (T ((module Base), t)) =
       Base.merkle_path_at_index_exn t
 
     let merkle_path (T ((module Base), t)) = Base.merkle_path t
 
+    let merkle_path_batch (T ((module Base), t)) = Base.merkle_path_batch t
+
+    let wide_merkle_path_batch (T ((module Base), t)) =
+      Base.wide_merkle_path_batch t
+
     let merkle_root (T ((module Base), t)) = Base.merkle_root t
+
+    let get_hash_batch_exn (T ((module Base), t)) = Base.get_hash_batch_exn t
 
     let index_of_account_exn (T ((module Base), t)) =
       Base.index_of_account_exn t
 
     let set_at_index_exn (T ((module Base), t)) = Base.set_at_index_exn t
 
+    let get_at_index (T ((module Base), t)) = Base.get_at_index t
+
     let get_at_index_exn (T ((module Base), t)) = Base.get_at_index_exn t
 
-    let set_batch (T ((module Base), t)) = Base.set_batch t
+    let set_batch ?hash_cache (T ((module Base), t)) =
+      Base.set_batch ?hash_cache t
 
     let set (T ((module Base), t)) = Base.set t
 
@@ -163,11 +120,7 @@ module Make_base (Inputs : Inputs_intf) :
 
     let token_owners (T ((module Base), t)) = Base.token_owners t
 
-    let next_available_token (T ((module Base), t)) =
-      Base.next_available_token t
-
-    let set_next_available_token (T ((module Base), t)) =
-      Base.set_next_available_token t
+    let iteri_untrusted (T ((module Base), t)) = Base.iteri_untrusted t
 
     let iteri (T ((module Base), t)) = Base.iteri t
 
@@ -183,8 +136,6 @@ module Make_base (Inputs : Inputs_intf) :
 
     let to_list_sequential (T ((module Base), t)) = Base.to_list_sequential t
 
-    let make_space_for (T ((module Base), t)) = Base.make_space_for t
-
     let get_all_accounts_rooted_at_exn (T ((module Base), t)) =
       Base.get_all_accounts_rooted_at_exn t
 
@@ -192,9 +143,6 @@ module Make_base (Inputs : Inputs_intf) :
       Base.set_all_accounts_rooted_at_exn t
 
     let set_batch_accounts (T ((module Base), t)) = Base.set_batch_accounts t
-
-    let set_inner_hash_at_addr_exn (T ((module Base), t)) =
-      Base.set_inner_hash_at_addr_exn t
 
     let get_inner_hash_at_addr_exn (T ((module Base), t)) =
       Base.get_inner_hash_at_addr_exn t
@@ -209,5 +157,8 @@ module Make_base (Inputs : Inputs_intf) :
     let depth (T ((module Base), t)) = Base.depth t
 
     let detached_signal (T ((module Base), t)) = Base.detached_signal t
+
+    let all_accounts_on_masks (T ((module Base), t)) =
+      Base.all_accounts_on_masks t
   end
 end

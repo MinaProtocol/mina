@@ -1,6 +1,0 @@
-[%%define consensus_mechanism "proof_of_stake"]
-[%%define k 24]
-[%%define delta 0]
-[%%define slots_per_epoch 576]
-[%%define slots_per_sub_window 2]
-[%%define sub_windows_per_window 3]

@@ -2,10 +2,21 @@ open Core_kernel
 open Currency
 
 module Test_inputs = struct
-  module Transaction_witness = Int
+  module Transaction_witness = struct
+    type t = Int.t
+
+    let transaction = Fn.id
+  end
+
   module Ledger_hash = Int
   module Sparse_ledger = Int
-  module Transaction = Int
+
+  module Transaction = struct
+    type t = Int.t
+
+    let yojson_summary t = `Int t
+  end
+
   module Ledger_proof_statement = Fee
 
   module Transaction_protocol_state = struct
@@ -14,12 +25,30 @@ module Test_inputs = struct
 
   module Ledger_proof = struct
     type t = Fee.t [@@deriving hash, compare, sexp]
+
+    module Stable = struct
+      module Latest = struct
+        type nonrec t = t
+      end
+    end
+
+    module Cached = struct
+      type nonrec t = t
+
+      let read_proof_from_disk = Fn.id
+    end
   end
 
   module Transaction_snark_work = struct
-    type t = Fee.t
+    module Checked = struct
+      type t = Fee.t
 
-    let fee = Fn.id
+      let fee = Fn.id
+
+      let prover _ = Key_gen.Sample_keypairs.genesis_winner |> fst
+    end
+
+    include Checked
 
     module Statement = struct
       type t = Transaction_snark.Statement.t One_or_two.t
@@ -31,8 +60,8 @@ module Test_inputs = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V1 = struct
-        type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
+      module V2 = struct
+        type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
         [@@deriving hash, compare, sexp]
 
         let to_latest = Fn.id
@@ -57,8 +86,7 @@ module Test_inputs = struct
 
   module Staged_ledger = struct
     type t =
-      (int, int, Transaction_snark_work.t) Snark_work_lib.Work.Single.Spec.t
-      List.t
+      (int, Transaction_snark_work.t) Snark_work_lib.Work.Single.Spec.t List.t
 
     let work = Fn.id
 
@@ -87,8 +115,9 @@ end
 
 module Implementation_inputs = struct
   open Mina_base
+  open Mina_transaction
   module Ledger_hash = Ledger_hash
-  module Sparse_ledger = Sparse_ledger
+  module Sparse_ledger = Mina_ledger.Sparse_ledger
   module Transaction = Transaction
   module Transaction_witness = Transaction_witness
   module Ledger_proof = Ledger_proof

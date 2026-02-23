@@ -25,7 +25,7 @@ let of_directions dirs =
     | [] ->
         ()
     | h :: t ->
-        if Direction.to_bool h then set path i ;
+        if Mina_stdlib.Direction.to_bool h then set path i ;
         loop (i + 1) t
   in
   loop 0 dirs ; path
@@ -45,7 +45,7 @@ module Binable_arg = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = int * string
+      type t = int * Mina_stdlib.Bounded_types.String.Stable.V1.t
 
       let to_latest = Fn.id
     end
@@ -75,7 +75,7 @@ module Stable = struct
     let t_of_sexp =
       let of_string buf =
         String.to_list buf
-        |> List.map ~f:(Fn.compose Direction.of_int_exn Char.to_int)
+        |> List.map ~f:(Fn.compose Mina_stdlib.Direction.of_int_exn Char.to_int)
         |> of_directions
       in
       Fn.compose of_string string_of_sexp
@@ -97,9 +97,9 @@ let height ~ledger_depth path = ledger_depth - depth path
 
 let get = get
 
-[%%define_locally
-Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, compare, equal)]
+[%%define_locally Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson)]
 
+include Comparable.Make_binable (Stable.Latest)
 include Hashable.Make_binable (Stable.Latest)
 
 let of_byte_string = bitstring_of_string
@@ -114,33 +114,45 @@ let copy (path : t) : t =
 (* returns a slice of the original path, so the returned key needs to be
        copied before mutating the path *)
 let parent (path : t) =
-  if bitstring_length path = 0 then
+  if Int.equal (bitstring_length path) 0 then
     Or_error.error_string "Address length should be nonzero"
   else Or_error.return (slice path 0 (bitstring_length path - 1))
 
 let parent_exn = Fn.compose Or_error.ok_exn parent
 
-let is_leaf ~ledger_depth path = bitstring_length path >= ledger_depth
+let is_leaf ~ledger_depth path = Int.(bitstring_length path >= ledger_depth)
 
 let child ~ledger_depth (path : t) dir : t Or_error.t =
   if is_leaf ~ledger_depth path then
     Or_error.error_string "The address length cannot be greater than depth"
   else
-    let dir_bit = Direction.to_bool dir in
+    let dir_bit = Mina_stdlib.Direction.to_bool dir in
     let%bitstring path = {| path: -1: bitstring; dir_bit: 1|} in
     Or_error.return path
 
 let child_exn ~ledger_depth (path : t) dir : t =
   child ~ledger_depth path dir |> Or_error.ok_exn
 
+let extend ~ledger_depth (path : t) ~num_bits (child_idx : int64) =
+  let final_len = bitstring_length path + num_bits in
+  if Int.(final_len > ledger_depth) then
+    Or_error.errorf "The address length cannot be greater than depth (%i > %i)"
+      final_len ledger_depth
+  else
+    let%bitstring path = {| path: -1: bitstring; child_idx: num_bits: int |} in
+    Or_error.return path
+
+let extend_exn ~ledger_depth path ~num_bits child_idx =
+  extend ~ledger_depth path ~num_bits child_idx |> Or_error.ok_exn
+
 let to_int (path : t) : int =
   Sequence.range 0 (depth path)
   |> Sequence.fold ~init:0 ~f:(fun acc i ->
          let index = depth path - 1 - i in
-         acc + ((if get path index <> 0 then 1 else 0) lsl i) )
+         acc + ((if Int.(get path index <> 0) then 1 else 0) lsl i) )
 
 let of_int_exn ~ledger_depth index =
-  if index >= 1 lsl ledger_depth then failwith "Index is too large"
+  if Int.(index >= 1 lsl ledger_depth) then failwith "Index is too large"
   else
     let buf = create_bitstring ledger_depth in
     ignore
@@ -153,14 +165,15 @@ let of_int_exn ~ledger_depth index =
     buf
 
 let dirs_from_root t =
-  List.init (depth t) ~f:(fun pos -> Direction.of_bool (is_set t pos))
+  List.init (depth t) ~f:(fun pos ->
+      Mina_stdlib.Direction.of_bool (is_set t pos) )
 
 let root () = create_bitstring 0
 
 let sibling (path : t) : t =
   let path = copy path in
   let last_bit_index = depth path - 1 in
-  let last_bit = if get path last_bit_index = 0 then 1 else 0 in
+  let last_bit = if Int.equal (get path last_bit_index) 0 then 1 else 0 in
   put path last_bit_index last_bit ;
   path
 
@@ -169,12 +182,12 @@ let next (path : t) : t Option.t =
   let path = copy path in
   let len = depth path in
   let rec find_rightmost_clear_bit i =
-    if i < 0 then None
+    if Int.(i < 0) then None
     else if is_clear path i then Some i
     else find_rightmost_clear_bit (i - 1)
   in
   let rec clear_bits i =
-    if i >= len then ()
+    if Int.(i >= len) then ()
     else (
       clear path i ;
       clear_bits (i + 1) )
@@ -189,12 +202,12 @@ let prev (path : t) : t Option.t =
   let path = copy path in
   let len = depth path in
   let rec find_rightmost_one_bit i =
-    if i < 0 then None
+    if Int.(i < 0) then None
     else if is_set path i then Some i
     else find_rightmost_one_bit (i - 1)
   in
   let rec set_bits i =
-    if i >= len then ()
+    if Int.(i >= len) then ()
     else (
       set path i ;
       set_bits (i + 1) )
@@ -208,28 +221,38 @@ let serialize ~ledger_depth path =
   let path = add_padding path in
   let path_len = depth path in
   let required_bits = 8 * byte_count_of_bits ledger_depth in
-  assert (path_len <= required_bits) ;
+  assert (Int.(path_len <= required_bits)) ;
   let required_padding = required_bits - path_len in
   Bigstring.of_string @@ string_of_bitstring
   @@ concat [ path; zeroes_bitstring required_padding ]
 
 let is_parent_of parent ~maybe_child = Bitstring.is_prefix maybe_child parent
 
+let same_height_ancestors x y =
+  let depth_x = depth x in
+  let depth_y = depth y in
+  if Int.(depth_x < depth_y) then (x, slice y 0 depth_x)
+  else (slice x 0 depth_y, y)
+
+let is_further_right ~than path =
+  let than, path = same_height_ancestors than path in
+  Int.( < ) (compare than path) 0
+
 module Range = struct
   type nonrec t = t * t
 
   let rec fold_exl (first, last) ~init ~f =
     let comparison = compare first last in
-    if comparison > 0 then
+    if Int.(comparison > 0) then
       raise (Invalid_argument "first address needs to precede last address")
-    else if comparison = 0 then init
+    else if Int.(comparison = 0) then init
     else fold_exl (next first |> Option.value_exn, last) ~init:(f first init) ~f
 
   let fold_incl (first, last) ~init ~f =
     f last @@ fold_exl (first, last) ~init ~f
 
   let fold ?(stop = `Inclusive) (first, last) ~init ~f =
-    assert (depth first = depth last) ;
+    assert (Int.(depth first = depth last)) ;
     match stop with
     | `Inclusive ->
         fold_incl (first, last) ~init ~f
@@ -253,24 +276,12 @@ module Range = struct
         | _, `Stop ->
             None
         | current_node, `Don't_stop ->
-            if compare current_node last_node = 0 then
+            if Int.equal (compare current_node last_node) 0 then
               Some (current_node, (current_node, `Stop))
             else
               Option.map (next current_node) ~f:(fun next_node ->
                   (current_node, (next_node, `Don't_stop)) ) )
 end
-
-let%test "Bitstring bin_io serialization does not change" =
-  (* Bitstring.t is trustlisted as a versioned type. This test assures that serializations of that type haven't changed *)
-  let text =
-    "Contrary to popular belief, Lorem Ipsum is not simply random text. It has \
-     roots in a piece of classical Latin literature."
-  in
-  let bitstring = Bitstring.bitstring_of_string text in
-  let known_good_digest = "c4c7ade09ba305b69ffac494a6eab60e" in
-  Ppx_version_runtime.Serialization.check_serialization
-    (module Stable.V1)
-    bitstring known_good_digest
 
 module Make_test (Input : sig
   val depth : int
@@ -280,10 +291,12 @@ struct
     List.is_empty (dirs_from_root (root ()))
 
   let%test_unit "parent_exn(child_exn(node)) = node" =
-    Quickcheck.test ~sexp_of:[%sexp_of: Direction.t List.t * Direction.t]
+    Quickcheck.test
+      ~sexp_of:
+        [%sexp_of: Mina_stdlib.Direction.t List.t * Mina_stdlib.Direction.t]
       (Quickcheck.Generator.tuple2
-         (Direction.gen_var_length_list Input.depth)
-         Direction.gen )
+         (Mina_stdlib.Direction.gen_var_length_list Input.depth)
+         Mina_stdlib.Direction.gen )
       ~f:(fun (path, direction) ->
         let address = of_directions path in
         [%test_eq: t]
@@ -298,21 +311,22 @@ struct
           (to_int @@ of_int_exn ~ledger_depth:Input.depth index) )
 
   let%test_unit "of_index_exn(to_index(addr)) = addr" =
-    Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
-      (Direction.gen_list Input.depth) ~f:(fun directions ->
+    Quickcheck.test ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t list]
+      (Mina_stdlib.Direction.gen_list Input.depth) ~f:(fun directions ->
         let address = of_directions directions in
         [%test_result: t] ~expect:address
           (of_int_exn ~ledger_depth:Input.depth @@ to_int address) )
 
   let%test_unit "nonempty(addr): sibling(sibling(addr)) = addr" =
-    Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
-      (Direction.gen_var_length_list ~start:1 Input.depth) ~f:(fun directions ->
+    Quickcheck.test ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t list]
+      (Mina_stdlib.Direction.gen_var_length_list ~start:1 Input.depth)
+      ~f:(fun directions ->
         let address = of_directions directions in
         [%test_result: t] ~expect:address (sibling @@ sibling address) )
 
   let%test_unit "prev(next(addr)) = addr" =
-    Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
-      (Direction.gen_list Input.depth) ~f:(fun directions ->
+    Quickcheck.test ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t list]
+      (Mina_stdlib.Direction.gen_list Input.depth) ~f:(fun directions ->
         let address = of_directions directions in
         match next address with
         | None ->

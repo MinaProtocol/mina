@@ -28,7 +28,7 @@ docker run codaprotocol/coda-daemon:<version> daemon -help
 
 ### Running Coda with a Container Orchestrator
 
-Currently, the implementation of the Kademlia DHT in use by the Coda Daemon is a tad tempermental, and requires consistent ports to be set on both the host and container.
+Currently, the implementation of the Kademlia DHT in use by the Coda Daemon is a tad temperamental, and requires consistent ports to be set on both the host and container.
 
 There is a bug issue [here](https://github.com/CodaProtocol/coda/issues/2947) that details the problem. In the meantime, it is easiest to avoid any sort of bridge networking and run the Daemon container on the host network, especially if you'd like to use non-default ports. 
 

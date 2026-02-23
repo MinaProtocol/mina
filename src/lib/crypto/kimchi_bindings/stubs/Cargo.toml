@@ -1,0 +1,19 @@
+[package]
+name = "wires_15_stubs"
+version = "0.1.0"
+authors = ["opensource@o1labs.org"]
+description = "OCaml stubs for the plonk proof systems"
+repository = "https://github.com/MinaProtocol/mina"
+license = "MIT/Apache-2.0"
+edition = "2021"
+
+[dependencies]
+ocaml = { version = "0.22.2", features = ["no-caml-startup"] }
+ocaml-gen = "1.0.0"
+
+# proof-systems
+kimchi = { path = "../../proof-systems/kimchi", features = ["ocaml_types"] }
+kimchi-stubs = { path = "../../proof-systems/kimchi-stubs" }
+
+[[bin]]
+name = "wires_15_stubs"

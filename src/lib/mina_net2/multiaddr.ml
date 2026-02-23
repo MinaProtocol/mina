@@ -22,6 +22,12 @@ let to_peer t =
   | _ ->
       None
 
+let of_peer ({ host; libp2p_port; peer_id } : Peer.t) =
+  (* assume host is IPv4 address *)
+  sprintf "/ip4/%s/tcp/%d/p2p/%s"
+    (Unix.Inet_addr.to_string host)
+    libp2p_port peer_id
+
 let valid_as_peer t =
   match String.split ~on:'/' t with
   | [ ""; protocol; _; "tcp"; _; "p2p"; _ ]
@@ -33,11 +39,12 @@ let valid_as_peer t =
 
 let of_file_contents contents : t list =
   String.split ~on:'\n' contents
-  |> List.filter ~f:(fun s ->
-         if valid_as_peer s then true
-         else if String.is_empty s then false
+  |> List.filter_map ~f:(fun full_line ->
+         let s = String.strip full_line in
+         if valid_as_peer s then Some s
+         else if String.is_empty s then None
          else (
            [%log' error (Logger.create ())]
              "Invalid peer $peer found in peers list"
              ~metadata:[ ("peer", `String s) ] ;
-           false ) )
+           None ) )

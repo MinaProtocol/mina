@@ -2,12 +2,24 @@ let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let ReplayerTest = ../../Command/ReplayerTest.dhall
 
+let Dockers = ../../Constants/DockerVersions.dhall
+
+let Artifacts = ../../Constants/Artifacts.dhall
+
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
 let dependsOn =
-      [ { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" } ]
+      Dockers.dependsOn
+        Dockers.DepsSpec::{
+        , artifact = Artifacts.Type.FunctionalTestSuite
+        , buildFlags = BuildFlags.Type.Instrumented
+        }
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -15,9 +27,16 @@ in  Pipeline.build
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
           , S.exactly "buildkite/scripts/replayer-test" "sh"
+          , S.exactly "buildkite/src/Jobs/Test/ReplayerTest" "dhall"
+          , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
           ]
         , path = "Test"
         , name = "ReplayerTest"
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps = [ ReplayerTest.step dependsOn ]
       }

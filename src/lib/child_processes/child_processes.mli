@@ -27,9 +27,15 @@ type output_type = [ `Chunks | `Lines ]
 
 (** Start a process, handling a lock file, termination, optional logging, and
     the standard in, out and error fds. This is for "custom" processes, as
-    opposed to ones that are built using RPC parallel. *)
+    opposed to ones that are built using RPC parallel.
+
+    The optional [allow_multiple_instances] argument defaults to `false`. In that
+    case, a lockfile prevents multiple instances of an executable from running.
+    It can be set to `true` to start multiple instances of the same executable.
+*)
 val start_custom :
-     logger:Logger.t
+     ?allow_multiple_instances:bool
+  -> logger:Logger.t
   -> name:string
        (** The name of the executable file, without any coda- prefix *)
   -> git_root_relative_path:string
@@ -54,7 +60,8 @@ val start_custom :
          An [Error _] passed to a [`Handler _] indicates that there was an
          error monitoring the process, and that it is unknown whether the
          process started.
-     *)
+       *)
+  -> unit
   -> t Deferred.Or_error.t
 
 val kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t

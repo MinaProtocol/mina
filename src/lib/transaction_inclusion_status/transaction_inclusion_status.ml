@@ -1,6 +1,6 @@
-open Inline_test_quiet_logs
 open Core_kernel
 open Mina_base
+open Mina_transaction
 open Pipe_lib
 open Network_pool
 
@@ -25,43 +25,31 @@ end
 
 (* TODO: this is extremely expensive as implemented and needs to be replaced with an extension *)
 let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
-  let open Or_error.Let_syntax in
-  let%map check_cmd =
-    Result.of_option (Signed_command.check cmd)
-      ~error:(Error.of_string "Invalid signature")
-    |> Result.map ~f:(fun x ->
-           Transaction_hash.User_command_with_valid_signature.create
-             (Signed_command x) )
-  in
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
   match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
   | None ->
       State.Unknown
   | Some transition_frontier ->
-      with_return (fun { return } ->
-          let best_tip_path =
-            Transition_frontier.best_tip_path transition_frontier
-          in
-          let in_breadcrumb breadcrumb =
-            breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
-            |> Mina_block.Validated.valid_commands
-            |> List.exists ~f:(fun { data = cmd'; _ } ->
-                   match cmd' with
-                   | Snapp_command _ ->
-                       false
-                   | Signed_command cmd' ->
-                       Signed_command.equal cmd
-                         (Signed_command.forget_check cmd') )
-          in
-          if List.exists ~f:in_breadcrumb best_tip_path then
-            return State.Included ;
-          if
-            List.exists ~f:in_breadcrumb
-              (Transition_frontier.all_breadcrumbs transition_frontier)
-          then return State.Pending ;
-          if Transaction_pool.Resource_pool.member resource_pool check_cmd then
-            return State.Pending ;
-          State.Unknown )
+      let best_tip_path =
+        Transition_frontier.best_tip_path transition_frontier
+      in
+      let in_breadcrumb breadcrumb =
+        breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
+        |> Mina_block.Validated.valid_commands
+        |> List.exists ~f:(fun { data = found; _ } ->
+               let found' = User_command.forget_check found in
+               User_command.equal_ignoring_proofs_and_hashes_and_aux cmd found' )
+      in
+      if List.exists ~f:in_breadcrumb best_tip_path then State.Included
+      else if
+        List.exists ~f:in_breadcrumb
+          (Transition_frontier.all_breadcrumbs transition_frontier)
+      then State.Pending
+      else if
+        Transaction_pool.Resource_pool.member resource_pool
+          (Transaction_hash.hash_command cmd)
+      then State.Pending
+      else State.Unknown
 
 let%test_module "transaction_status" =
   ( module struct
@@ -73,6 +61,20 @@ let%test_module "transaction_status" =
     let frontier_size = 1
 
     let logger = Logger.null ()
+
+    let () =
+      (* Disable log messages from best_tip_diff logger. *)
+      Logger.Consumer_registry.register ~commit_id:""
+        ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
+        ~transport:
+          (Logger.Transport.create
+             ( module struct
+               type t = unit
+
+               let transport () _ = ()
+             end )
+             () )
+        ()
 
     let time_controller = Block_time.Controller.basic ~logger
 
@@ -88,11 +90,13 @@ let%test_module "transaction_status" =
 
     let pool_max_size = precomputed_values.genesis_constants.txpool_max_size
 
+    let block_window_duration =
+      Mina_compile_config.For_unit_tests.t.block_window_duration
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
+            () )
 
     let key_gen =
       let open Quickcheck.Generator in
@@ -107,14 +111,21 @@ let%test_module "transaction_status" =
       Transition_frontier.For_tests.gen ~logger ~precomputed_values ~verifier
         ~trust_system ~max_length ~size:frontier_size ()
 
+    (* TODO: Generate zkApps txns *)
     let gen_user_command =
-      Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~fee_range:10
-        ~key_gen ~nonce:(Account_nonce.of_int 1) ()
+      let signature_kind = Mina_signature_kind.Testnet in
+      Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
+        ~max_amount:100 ~fee_range:10 ~key_gen ~nonce:(Account_nonce.of_int 1)
+        ()
 
     let create_pool ~frontier_broadcast_pipe =
       let config =
         Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
-          ~verifier
+          ~verifier ~genesis_constants:precomputed_values.genesis_constants
+          ~slot_tx_end:None
+          ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
+          ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
+          ~signature_kind:Testnet
       in
       let transaction_pool, _, local_sink =
         Transaction_pool.create ~config
@@ -122,17 +133,17 @@ let%test_module "transaction_status" =
           ~consensus_constants:precomputed_values.consensus_constants
           ~time_controller ~logger ~frontier_broadcast_pipe
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
+          ~block_window_duration
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
-           ~f:(fun transactions ->
+           ~f:(fun Network_pool.With_nonce.{ message = transactions; _ } ->
              [%log trace]
                "Transactions have been applied successfully and is propagated \
                 throughout the 'network'"
                ~metadata:
                  [ ( "transactions"
-                   , Transaction_pool.Resource_pool.Diff.to_yojson transactions
-                   )
+                   , Transaction_pool.Diff_versioned.to_yojson transactions )
                  ] ;
              Deferred.unit ) ;
       (* Need to wait for transaction_pool to see the transition_frontier *)
@@ -155,9 +166,8 @@ let%test_module "transaction_status" =
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               [%log info] "Checking status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
-                ( Or_error.ok_exn
-                @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     user_command ) ) )
+                (get_status ~frontier_broadcast_pipe ~transaction_pool
+                   (Signed_command user_command) ) ) )
 
     let%test_unit "A pending transaction is either in the transition frontier \
                    or transaction pool, but not in the best path of the \
@@ -178,9 +188,8 @@ let%test_module "transaction_status" =
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               let status =
-                Or_error.ok_exn
-                @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     user_command
+                get_status ~frontier_broadcast_pipe ~transaction_pool
+                  (Signed_command user_command)
               in
               [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Pending status ) )
@@ -194,7 +203,7 @@ let%test_module "transaction_status" =
         let%map tail_user_commands =
           Quickcheck.Generator.list_with_length 10 gen_user_command
         in
-        Non_empty_list.init head_user_command tail_user_commands
+        Mina_stdlib.Nonempty_list.init head_user_command tail_user_commands
       in
       Quickcheck.test ~trials:1
         (Quickcheck.Generator.tuple2 gen_frontier user_commands_generator)
@@ -207,7 +216,7 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let unknown_user_command, pool_user_commands =
-                Non_empty_list.uncons user_commands
+                Mina_stdlib.Nonempty_list.uncons user_commands
               in
               let%bind () =
                 Transaction_pool.Local_sink.push local_diffs_writer
@@ -218,7 +227,6 @@ let%test_module "transaction_status" =
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
-                ( Or_error.ok_exn
-                @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     unknown_user_command ) ) )
+                (get_status ~frontier_broadcast_pipe ~transaction_pool
+                   (Signed_command unknown_user_command) ) ) )
   end )
