@@ -1,3 +1,5 @@
+open Core_kernel
+
 module type LOCATION = sig
   module Addr : module type of Merkle_address
 
@@ -22,7 +24,7 @@ module type LOCATION = sig
 
   val root_hash : t
 
-  val last_direction : Addr.t -> Direction.t
+  val last_direction : Addr.t -> Mina_stdlib.Direction.t
 
   val build_generic : Bigstring.t -> t
 
@@ -44,7 +46,7 @@ module type LOCATION = sig
 
   val order_siblings : t -> 'a -> 'a -> 'a * 'a
 
-  val merkle_path_dependencies_exn : t -> (t * Direction.t) list
+  val merkle_path_dependencies_exn : t -> (t * Mina_stdlib.Direction.t) list
 
   include Comparable.S with type t := t
 end
@@ -203,10 +205,6 @@ module type Key_value_database = sig
     -> 'b
 end
 
-module type Storage_locations = sig
-  val key_value_db_dir : string
-end
-
 module type SYNCABLE = sig
   type root_hash
 
@@ -216,7 +214,7 @@ module type SYNCABLE = sig
 
   type addr
 
-  type t [@@deriving sexp]
+  type t
 
   type path
 
@@ -227,8 +225,6 @@ module type SYNCABLE = sig
   val merkle_path_at_addr_exn : t -> addr -> path
 
   val get_inner_hash_at_addr_exn : t -> addr -> hash
-
-  val set_inner_hash_at_addr_exn : t -> addr -> hash -> unit
 
   val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
 
@@ -269,8 +265,6 @@ module Inputs = struct
     module Location_binable : Hashable.S_binable with type t := Location.t
 
     module Kvdb : Key_value_database with type config := string
-
-    module Storage_locations : Storage_locations
   end
 end
 
@@ -303,11 +297,7 @@ module Ledger = struct
 
     module Path : Merkle_path.S with type hash := hash
 
-    module Location : sig
-      type t [@@deriving sexp, compare, hash]
-
-      include Comparable.S with type t := t
-    end
+    module Location : LOCATION
 
     include
       SYNCABLE
@@ -323,6 +313,9 @@ module Ledger = struct
 
     (** list of accounts via slower sequential mechanism *)
     val to_list_sequential : t -> account list
+
+    (** iterate over all indexes and accounts, if the ledger is not known to be sound *)
+    val iteri_untrusted : t -> f:(index -> account option -> unit) -> unit
 
     (** iterate over all indexes and accounts *)
     val iteri : t -> f:(index -> account -> unit) -> unit
@@ -392,7 +385,10 @@ module Ledger = struct
 
     val set : t -> Location.t -> account -> unit
 
-    val set_batch : t -> (Location.t * account) list -> unit
+    val set_batch :
+      ?hash_cache:hash Addr.Map.t -> t -> (Location.t * account) list -> unit
+
+    val get_at_index : t -> int -> account option
 
     val get_at_index_exn : t -> int -> account
 
@@ -422,6 +418,11 @@ module Ledger = struct
       accessed.
   *)
     val detached_signal : t -> unit Async_kernel.Deferred.t
+
+    (** Get all accounts on all masks of current ledger until reaching a 
+        non-mask. Used to migrate root to an potential staged ledger for fork 
+        config generation *)
+    val all_accounts_on_masks : t -> account Location.Map.t
   end
 
   module type NULL = sig
@@ -449,7 +450,7 @@ module Ledger = struct
 
     (** The type of the witness for a base ledger exposed here so that it can
    * be easily accessed from outside this module *)
-    type witness [@@deriving sexp_of]
+    type witness
 
     module type Base_intf =
       S
@@ -472,7 +473,7 @@ module Ledger = struct
   module type DATABASE = sig
     include S
 
-    val create : ?directory_name:string -> depth:int -> unit -> t
+    val create : ?directory_name:string -> ?fresh:bool -> depth:int -> unit -> t
 
     (** create_checkpoint would create the checkpoint and open a db connection to that checkpoint *)
     val create_checkpoint : t -> directory_name:string -> unit -> t
@@ -485,6 +486,89 @@ module Ledger = struct
     module For_tests : sig
       val gen_account_location :
         ledger_depth:int -> Location.t Quickcheck.Generator.t
+    end
+  end
+
+  module Converting = struct
+    open struct
+      module type LEDGER_S = S
+    end
+
+    module type S = sig
+      include LEDGER_S
+
+      type primary_ledger
+
+      type converting_ledger
+
+      type converted_account
+
+      (** Create a converting ledger based on two component ledgers. No migration is
+      performed (use [of_ledgers_with_migration] if you need this) but all
+      subsequent write operations on the converting merkle tree will be applied
+      to both ledgers. *)
+      val of_ledgers : primary_ledger -> converting_ledger -> t
+
+      (** Create a converting ledger with an already-existing [Primary_ledger.t] and
+      an empty [Converting_ledger.t] that will be initialized with the migrated
+      account data. *)
+      val of_ledgers_with_migration : primary_ledger -> converting_ledger -> t
+
+      (** Retrieve the primary ledger backing the converting merkle tree *)
+      val primary_ledger : t -> primary_ledger
+
+      (** Retrieve the converting ledger backing the converting merkle tree *)
+      val converting_ledger : t -> converting_ledger
+
+      (** The input account conversion method, re-exposed for convenience *)
+      val convert : account -> converted_account
+    end
+
+    module type Config = sig
+      type t = { primary_directory : string; converting_directory : string }
+      [@@deriving yojson]
+
+      type create =
+        | Temporary
+            (** Create a converting ledger with databases in temporary directories *)
+        | In_directories of t
+            (** Create a converting ledger with databases in explicit directories *)
+
+      (** Create a [checkpoint] config with the default converting directory
+        name *)
+      val with_primary : directory_name:string -> t
+
+      (** Given a primary dir, returns the default converting_directory path associated with that primary dir *)
+      val default_converting_directory_name : string -> string
+    end
+
+    module type WITH_DATABASE = sig
+      include S
+
+      module Config : Config
+
+      val dbs_synced : primary_ledger -> converting_ledger -> bool
+
+      (** Create a new converting merkle tree with the given configuration. If
+      [In_directories] is given, existing databases will be opened and used to
+      back the converting merkle tree. If the converting database does not exist
+      in the directory, or exists but is empty, one will be created by migrating
+      the primary database. Existing but incompatible converting databases (such
+      as out-of-sync databases) will be deleted and re-migrated. *)
+      val create :
+           config:Config.create
+        -> logger:Logger.t
+        -> depth:int
+        -> ?assert_synced:bool
+        -> unit
+        -> t
+
+      (** Make checkpoints of the databases backing the converting merkle tree and
+      create a new converting ledger based on those checkpoints *)
+      val create_checkpoint : t -> config:Config.t -> unit -> t
+
+      (** Make checkpoints of the databases backing the converting merkle tree *)
+      val make_checkpoint : t -> config:Config.t -> unit
     end
   end
 end

@@ -10,7 +10,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
@@ -19,9 +20,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* TODO: refactor all currency values to decimal represenation *)
   (* TODO: test account creation fee *)
-  let config =
+  let config ~constants =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -32,7 +33,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
                  ~cliff_amount:0 ~vesting_period:4
                  ~vesting_increment:5_000_000_000_000 )
-            (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
+            (* 30_000_000_000_000 mina is the total. initially, the balance will
+               be 10k mina. after 8 global slots, the cliff is hit, although the
+               cliff amount is 0. 4 slots after that, 5_000_000_000_000 mina will
+               vest, and 4 slots after that another 5_000_000_000_000 will vest,
+               and then twice again, for a total of 30k mina all fully liquid and
+               unlocked at the end of the schedule*)
             ()
         ; create ~account_name:"snark-node-key1" ~balance:"0" ()
         ; create ~account_name:"snark-node-key2" ~balance:"0" ()
@@ -60,7 +66,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     }
 
-  let run network t =
+  let run ~config:(Test_config.{ signature_kind; _ } as config) network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
@@ -69,27 +75,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Wait_condition.nodes_to_initialize
            (Core.String.Map.data all_mina_nodes) )
     in
-    let untimed_node_a =
-      Core.String.Map.find_exn
-        (Network.block_producers network)
-        "untimed-node-a"
-    in
-    let untimed_node_b =
-      Core.String.Map.find_exn
-        (Network.block_producers network)
-        "untimed-node-b"
-    in
-    let timed_node_c =
-      Core.String.Map.find_exn (Network.block_producers network) "timed-node-c"
-    in
-    let fish1 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1"
-    in
-    let fish2 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2"
-    in
-    (* hardcoded values of the balances of fish1 (receiver) and fish2 (sender), update here if they change in the config *)
-    (* TODO undo the harcoding, don't be lazy and just make the graphql commands to fetch the balances *)
+    let untimed_node_a = Network.block_producer_exn network "untimed-node-a" in
+    let untimed_node_b = Network.block_producer_exn network "untimed-node-b" in
+    let timed_node_c = Network.block_producer_exn network "timed-node-c" in
+    let fish1 = Network.genesis_keypair_exn network "fish1" in
+    let fish2 = Network.genesis_keypair_exn network "fish2" in
+    (* hardcoded values of the balances of fish1 (receiver) and fish2 (sender),
+       update here if they change in the config *)
+    (* TODO undo the harcoding, don't be lazy and just make the graphql commands
+       to fetch the balances *)
     let receiver_original_balance = Currency.Amount.of_mina_string_exn "100" in
     let sender_original_balance = Currency.Amount.of_mina_string_exn "100" in
     let sender = fish2.keypair in
@@ -99,25 +93,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
            public_key |> Signature_lib.Public_key.to_bigstring
            |> Bigstring.to_string ) ) ;
-    let snark_coordinator =
-      Core.String.Map.find_exn (Network.all_nodes network) "snark-node"
-    in
+    let snark_coordinator = Network.node_exn network "snark-node" in
     let snark_node_key1 =
-      Core.String.Map.find_exn
-        (Network.genesis_keypairs network)
-        "snark-node-key1"
+      Network.genesis_keypair_exn network "snark-node-key1"
     in
     let snark_node_key2 =
-      Core.String.Map.find_exn
-        (Network.genesis_keypairs network)
-        "snark-node-key2"
+      Network.genesis_keypair_exn network "snark-node-key2"
     in
+
     [%log info] "snark node keypairs: %s"
       (List.to_string [ snark_node_key1.keypair; snark_node_key2.keypair ]
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
            public_key |> Signature_lib.Public_key.to_yojson
            |> Yojson.Safe.to_string ) ) ;
-    (* setup code, creating a signed txn which we'll use to make a successful txn, and then use the same txn in a replay attack which should fail *)
+    (* setup code, creating a signed txn which we'll use to make a successful
+       txn, and then use the same txn in a replay attack which should fail *)
     let receiver_pub_key =
       receiver.public_key |> Signature_lib.Public_key.compress
     in
@@ -153,7 +143,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       { Signed_command_payload.Poly.common; body }
     in
     let raw_signature =
-      Signed_command.sign_payload sender.private_key payload
+      Signed_command.sign_payload ~signature_kind sender.private_key payload
       |> Signature.Raw.encode
     in
     (* setup complete *)
@@ -187,7 +177,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Network.Node.get_ingress_uri untimed_node_b)
              ~account_id:sender_account_id
          in
-         (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
+         (* TODO, the intg test framework is ignoring
+            test_constants.coinbase_amount for whatever reason, so hardcoding this
+            until that is fixed *)
          let receiver_expected =
            Currency.Amount.add receiver_original_balance amount
            |> Option.value_exn
@@ -213,13 +205,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          if
            (* node_a is the receiver *)
            (* node_a_balance >= 400_000_000_000_000 + txn_amount *)
-           (* coinbase_amount is much less than txn_amount, so that even if node_a receives a coinbase, the balance (before receiving currency from a txn) should be less than original_amount + txn_amount *)
+           (* coinbase_amount is much less than txn_amount, so that even if
+              node_a receives a coinbase, the balance (before receiving currency
+              from a txn) should be less than original_amount + txn_amount *)
            Currency.Amount.( >= )
              (Currency.Balance.to_amount receiver_balance)
              receiver_expected
            (* node_b is the sender *)
-           (* node_b_balance <= (300_000_000_000_000 + node_b_num_produced_blocks*possible_coinbase_reward*2) - (txn_amount + txn_fee) *)
-           (* if one is unlucky, node_b could theoretically win a bunch of blocks in a row, which is why we have the `node_b_num_produced_blocks*possible_coinbase_reward*2` bit.  the *2 is because untimed accounts get supercharged rewards *)
+           (* node_b_balance <= \
+              (300_000_000_000_000 + \
+               node_b_num_produced_blocks * possible_coinbase_reward * 2) - \
+              (txn_amount + txn_fee) *)
+           (* if one is unlucky, node_b could theoretically win a bunch of
+              blocks in a row, which is why we have the
+              `node_b_num_produced_blocks*possible_coinbase_reward*2` bit. the *2
+              is because untimed accounts get supercharged rewards *)
            (* TODO, the fee is not calculated in at the moment *)
            && Currency.Amount.( <= )
                 (Currency.Balance.to_amount sender_balance)
@@ -395,11 +395,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               `(transaction_capacity_log+1) * (work_delay+1)`
             and for 2^2 transaction capacity and work delay 1 it is
               `(2+1)*(1+1)=6`.
-            Per block there can be 2 transactions included (other two slots would be for a coinbase and fee transfers).
-            In the initial state of the network, the scan state waits till all the trees are filled before emitting a proof from the first tree.
+            Per block there can be 2 transactions included (other two slots
+            would be for a coinbase and fee transfers).
+            In the initial state of the network, the scan state waits till all
+            the trees are filled before emitting a proof from the first tree.
             Hence, 6*2 = 12 transactions untill we get the first snarked ledger.
             2 successful txn are sent in the prior course of this test,
-            so spamming out at least 10 more here will trigger a ledger proof to be emitted *)
+            so spamming out at least 10 more here will trigger a ledger proof to
+            be emitted *)
            send_payments ~logger ~sender_pub_key ~receiver_pub_key
              ~amount:Currency.Amount.one ~fee ~node:sender 10
          in
@@ -484,7 +487,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~amount:Currency.Amount.one ~fee ~node:sender 12
          in
          wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:3
               ~test_config:config ) )
     in
     let%bind () =

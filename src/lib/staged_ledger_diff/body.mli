@@ -1,3 +1,30 @@
-include
-  Body_intf.Full
-    with type Stable.V1.t = Mina_wire_types.Staged_ledger_diff.Body.V1.t
+[%%versioned:
+module Stable : sig
+  [@@@no_toplevel_latest_type]
+
+  module V2 : sig
+    type t = { staged_ledger_diff : Diff.Stable.V3.t } [@@deriving equal, sexp]
+
+    val create : Diff.Stable.V3.t -> t
+
+    val staged_ledger_diff : t -> Diff.Stable.V3.t
+  end
+end]
+
+type t
+
+val create : Diff.t -> t
+
+val staged_ledger_diff : t -> Diff.t
+
+val to_binio_bigstring : Stable.Latest.t -> Core_kernel.Bigstring.t
+
+val compute_reference : tag:int -> Stable.Latest.t -> Consensus.Body_reference.t
+
+val write_all_proofs_to_disk :
+     signature_kind:Mina_signature_kind.t
+  -> proof_cache_db:Proof_cache_tag.cache_db
+  -> Stable.Latest.t
+  -> t
+
+val read_all_proofs_from_disk : t -> Stable.Latest.t

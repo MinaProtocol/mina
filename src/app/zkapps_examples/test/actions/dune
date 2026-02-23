@@ -1,13 +1,14 @@
-(library
+(test
  (name actions)
  (libraries
   ;; opam libraries
+  alcotest
   async
   async_kernel
   async_unix
   core
   core_kernel
-  ppx_inline_test.config
+  yojson
   ;; local libraries
   cache_dir
   consensus
@@ -16,7 +17,7 @@
   genesis_constants
   kimchi_backend
   kimchi_pasta
-  kimchi_backend.pasta.basic
+  kimchi_pasta.basic
   merkle_ledger
   merkle_list_verifier
   mina_base
@@ -24,12 +25,13 @@
   mina_ledger
   mina_numbers
   mina_state
+  mina_wire_types
   pickles
   pickles.backend
   pickles_base
   pickles_types
-  random_oracle_input
   random_oracle
+  random_oracle_input
   signature_lib
   snark_params
   transaction_protocol_state
@@ -37,10 +39,7 @@
   transaction_snark_tests
   with_hash
   zkapps_actions
-  zkapps_examples
-  yojson
-  mina_wire_types)
- (inline_tests (flags -verbose -show-counts))
+  zkapps_examples)
  (preprocess
   (pps ppx_version ppx_jane))
  (instrumentation

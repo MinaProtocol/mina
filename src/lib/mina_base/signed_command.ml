@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_import
 open Mina_numbers
@@ -133,11 +131,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let nonce = Fn.compose Payload.nonce payload
 
-  (* for filtering *)
-  let minimum_fee = Currency.Fee.minimum_user_command_fee
-
-  let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
-
   let signer { Poly.signer; _ } = signer
 
   let fee_token (_ : t) = Token_id.default
@@ -173,30 +166,31 @@ module Make_str (_ : Wire_types.Concrete) = struct
     Transaction_union_payload.(
       to_input_legacy (of_user_command_payload payload))
 
-  let sign_payload ?signature_kind (private_key : Signature_lib.Private_key.t)
+  let sign_payload ~signature_kind (private_key : Signature_lib.Private_key.t)
       (payload : Payload.t) : Signature.t =
-    Signature_lib.Schnorr.Legacy.sign ?signature_kind private_key
+    Signature_lib.Schnorr.Legacy.sign ~signature_kind private_key
       (to_input_legacy payload)
 
-  let sign ?signature_kind (kp : Signature_keypair.t) (payload : Payload.t) : t
+  let sign ~signature_kind (kp : Signature_keypair.t) (payload : Payload.t) : t
       =
     { payload
     ; signer = kp.public_key
-    ; signature = sign_payload ?signature_kind kp.private_key payload
+    ; signature = sign_payload ~signature_kind kp.private_key payload
     }
 
   module For_tests = struct
     (* Pretend to sign a command. Much faster than actually signing. *)
-    let fake_sign ?signature_kind:_ (kp : Signature_keypair.t)
-        (payload : Payload.t) : t =
+    let fake_sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
       { payload; signer = kp.public_key; signature = Signature.dummy }
   end
 
   module Gen = struct
     let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
-        ?(nonce = Account_nonce.zero) ~fee_range create_body =
+        ?(nonce = Account_nonce.zero)
+        ?(min_fee = Genesis_constants.For_unit_tests.t.minimum_user_command_fee)
+        ~fee_range create_body =
       let open Quickcheck.Generator.Let_syntax in
-      let min_fee = Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee in
+      let min_fee = Fee.to_nanomina_int min_fee in
       let max_fee = min_fee + fee_range in
       let%bind (signer : Signature_keypair.t), (receiver : Signature_keypair.t)
           =
@@ -220,8 +214,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     module Payment = struct
       let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
-          ?nonce ?(min_amount = 1) ~max_amount ~fee_range () =
-        gen_inner sign' ~key_gen ?nonce ~fee_range
+          ?nonce ?(min_amount = 1) ~max_amount ?min_fee ~fee_range () =
+        gen_inner sign' ~key_gen ?nonce ?min_fee ~fee_range
         @@ fun { public_key = receiver; _ } ->
         let open Quickcheck.Generator.Let_syntax in
         let%map amount =
@@ -235,26 +229,27 @@ module Make_str (_ : Wire_types.Concrete) = struct
         match sign_type with
         | `Fake ->
             gen_inner For_tests.fake_sign
-        | `Real ->
-            gen_inner sign
+        | `Real signature_kind ->
+            gen_inner (sign ~signature_kind)
 
       let gen_with_random_participants ?sign_type ~keys ?nonce ?min_amount
-          ~max_amount ~fee_range =
+          ~max_amount ?min_fee ~fee_range =
         with_random_participants ~keys ~gen:(fun ~key_gen ->
-            gen ?sign_type ~key_gen ?nonce ?min_amount ~max_amount ~fee_range )
+            gen ?sign_type ~key_gen ?nonce ?min_amount ~max_amount ?min_fee
+              ~fee_range )
     end
 
     module Stake_delegation = struct
-      let gen ~key_gen ?nonce ~fee_range () =
-        gen_inner For_tests.fake_sign ~key_gen ?nonce ~fee_range
+      let gen ~key_gen ?nonce ?min_fee ~fee_range () =
+        gen_inner For_tests.fake_sign ~key_gen ?nonce ?min_fee ~fee_range
           (fun { public_key = new_delegate; _ } ->
             Quickcheck.Generator.return
             @@ Signed_command_payload.Body.Stake_delegation
                  (Set_delegate
                     { new_delegate = Public_key.compress new_delegate } ) )
 
-      let gen_with_random_participants ~keys ?nonce ~fee_range =
-        with_random_participants ~keys ~gen:(gen ?nonce ~fee_range)
+      let gen_with_random_participants ~keys ?nonce ?min_fee ~fee_range =
+        with_random_participants ~keys ~gen:(gen ?nonce ?min_fee ~fee_range)
     end
 
     let payment = Payment.gen
@@ -268,7 +263,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     let sequence :
            ?length:int
-        -> ?sign_type:[ `Fake | `Real ]
+        -> ?sign_type:[ `Fake | `Real of Mina_signature_kind.t ]
         -> ( Signature_lib.Keypair.t
            * Currency.Amount.t
            * Mina_numbers.Account_nonce.t
@@ -369,8 +364,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
               match sign_type with
               | `Fake ->
                   For_tests.fake_sign
-              | `Real ->
-                  sign
+              | `Real signature_kind ->
+                  sign ~signature_kind
             in
             return @@ sign' sender_pk payload )
   end
@@ -414,8 +409,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
   (* give transaction ids have version tag *)
   include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
 
-  let check_signature ?signature_kind ({ payload; signer; signature } : t) =
-    Signature_lib.Schnorr.Legacy.verify ?signature_kind signature
+  let check_signature ~signature_kind ({ payload; signer; signature } : t) =
+    Signature_lib.Schnorr.Legacy.verify ~signature_kind signature
       (Snark_params.Tick.Inner_curve.of_affine signer)
       (to_input_legacy payload)
 
@@ -428,32 +423,37 @@ module Make_str (_ : Wire_types.Concrete) = struct
     List.for_all (public_keys t) ~f:(fun pk ->
         Option.is_some (Public_key.decompress pk) )
 
-  let create_with_signature_checked ?signature_kind signature signer payload =
+  let create_with_signature_checked ~signature_kind signature signer payload =
     let open Option.Let_syntax in
     let%bind signer = Public_key.decompress signer in
     let t = Poly.{ payload; signature; signer } in
-    Option.some_if (check_signature ?signature_kind t && check_valid_keys t) t
+    Option.some_if (check_signature ~signature_kind t && check_valid_keys t) t
 
   let gen_test =
     let open Quickcheck.Let_syntax in
     let%bind keys =
       Quickcheck.Generator.list_with_length 2 Signature_keypair.gen
     in
-    Gen.payment_with_random_participants ~sign_type:`Real
-      ~keys:(Array.of_list keys) ~max_amount:10000 ~fee_range:1000 ()
+    let sign_type = `Real Mina_signature_kind.Testnet in
+    Gen.payment_with_random_participants ~sign_type ~keys:(Array.of_list keys)
+      ~max_amount:10000 ~fee_range:1000 ()
 
   let%test_unit "completeness" =
-    Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))
+    let signature_kind = Mina_signature_kind.Testnet in
+    Quickcheck.test ~trials:20 gen_test ~f:(fun t ->
+        assert (check_signature ~signature_kind t) )
 
   let%test_unit "json" =
     Quickcheck.test ~trials:20 ~sexp_of:sexp_of_t gen_test ~f:(fun t ->
         assert (Codable.For_tests.check_encoding (module Stable.Latest) ~equal t) )
 
   (* return type is `t option` here, interface coerces that to `With_valid_signature.t option` *)
-  let check t = Option.some_if (check_signature t && check_valid_keys t) t
+  let check ~signature_kind t =
+    Option.some_if (check_signature ~signature_kind t && check_valid_keys t) t
 
   (* return type is `t option` here, interface coerces that to `With_valid_signature.t option` *)
-  let check_only_for_signature t = Option.some_if (check_signature t) t
+  let check_only_for_signature ~signature_kind t =
+    Option.some_if (check_signature ~signature_kind t) t
 
   let forget_check t = t
 

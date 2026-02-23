@@ -128,7 +128,6 @@ func main() {
 	setLogLevel("dht.pb", "debug")
 	setLogLevel("tcp-tpt", "debug")
 	setLogLevel("autonat", "debug")
-	setLogLevel("routing/record", "debug")
 	setLogLevel("pubsub", "info")
 	setLogLevel("badger", "debug")
 	setLogLevel("relay", "info") // Log relayed byte counts spammily

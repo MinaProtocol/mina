@@ -28,10 +28,10 @@
   pickles.limb_vector
   pickles_types
   kimchi_backend
-  kimchi_backend.pasta
-  kimchi_backend.pasta.basic
-  kimchi_backend.pasta.constraint_system
-  kimchi_backend.common
+  kimchi_pasta
+  kimchi_pasta.basic
+  kimchi_pasta.constraint_system
+  kimchi_backend_common
   kimchi_bindings
   kimchi_types
   pasta_bindings
@@ -41,7 +41,7 @@
   data_hash_lib
   hash_prefixes
   fields_derivers
-  fields_derivers_zkapps
+  fields_derivers.zkapps
   genesis_constants
   mina_numbers
   mina_signature_kind
@@ -62,7 +62,7 @@
   bindings_js
   integers_stubs_js
   zarith_stubs_js
-  node_backend
+  bindings_js.node_backend
   ;; js-specific overrides ;;
   cache_dir.fake
   digestif.ocaml

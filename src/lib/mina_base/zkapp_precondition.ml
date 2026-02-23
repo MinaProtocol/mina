@@ -1,13 +1,5 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
-
 open Signature_lib
 module A = Account
 open Mina_numbers
@@ -461,13 +453,13 @@ end
 module Account = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V2.t =
+    module V3 = struct
+      type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V3.t =
         { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
         ; nonce : Account_nonce.Stable.V1.t Numeric.Stable.V1.t
         ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
         ; delegate : Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
-        ; state : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V1.t
+        ; state : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V2.t
         ; action_state : F.Stable.V1.t Eq_data.Stable.V1.t
         ; proved_state : bool Eq_data.Stable.V1.t
         ; is_new : bool Eq_data.Stable.V1.t
@@ -487,7 +479,8 @@ module Account = struct
     let%bind state =
       let%bind fields =
         let field_gen = Snark_params.Tick.Field.gen in
-        Quickcheck.Generator.list_with_length 8 (Or_ignore.gen field_gen)
+        Quickcheck.Generator.list_with_length Zkapp_state.max_size_int
+          (Or_ignore.gen field_gen)
       in
       (* won't raise because length is correct *)
       Quickcheck.Generator.return (Zkapp_state.V.of_list_exn fields)
@@ -857,7 +850,7 @@ module Protocol_state = struct
       let%bind start_checkpoint = Hash.gen State_hash.gen in
       let%bind lock_checkpoint = Hash.gen State_hash.gen in
       let min_epoch_length = 8 in
-      let max_epoch_length = Genesis_constants.slots_per_epoch in
+      let max_epoch_length = Genesis_constants.For_unit_tests.slots_per_epoch in
       let%map epoch_length =
         Numeric.gen
           (Length.gen_incl
@@ -998,8 +991,9 @@ module Protocol_state = struct
     let snarked_ledger_hash = Zkapp_basic.Or_ignore.Ignore in
     let%bind blockchain_length = Numeric.gen Length.gen Length.compare in
     let max_min_window_density =
-      Genesis_constants.for_unit_tests.protocol.slots_per_sub_window
-      * Genesis_constants.Constraint_constants.compiled.sub_windows_per_window
+      Genesis_constants.For_unit_tests.t.protocol.slots_per_sub_window
+      * Genesis_constants.For_unit_tests.Constraint_constants.t
+          .sub_windows_per_window
       - 1
       |> Length.of_int
     in
@@ -1505,9 +1499,9 @@ module Other = struct
 
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        ( Account.Stable.V2.t
+        ( Account.Stable.V3.t
         , Account_state.Stable.V1.t Transition.Stable.V1.t
         , F.Stable.V1.t Hash.Stable.V1.t )
         Poly.Stable.V1.t
@@ -1580,11 +1574,11 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     type t =
-      ( Account.Stable.V2.t
+      ( Account.Stable.V3.t
       , Protocol_state.Stable.V1.t
-      , Other.Stable.V2.t
+      , Other.Stable.V3.t
       , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving sexp, equal, yojson, hash, compare]

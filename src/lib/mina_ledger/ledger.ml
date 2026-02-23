@@ -5,19 +5,19 @@ open Mina_base
 
 module Ledger_inner = struct
   module Location_at_depth : Merkle_ledger.Location_intf.S =
-    Merkle_ledger.Location.T
+    Merkle_ledger.Location
 
   module Location_binable = struct
     module Arg = struct
       type t = Location_at_depth.t =
-        | Generic of Location.Bigstring.Stable.Latest.t
+        | Generic of Mina_stdlib.Bigstring.Stable.Latest.t
         | Account of Location_at_depth.Addr.Stable.Latest.t
         | Hash of Location_at_depth.Addr.Stable.Latest.t
       [@@deriving bin_io_unversioned, hash, sexp, compare]
     end
 
     type t = Arg.t =
-      | Generic of Location.Bigstring.t
+      | Generic of Mina_stdlib.Bigstring.t
       | Account of Location_at_depth.Addr.t
       | Hash of Location_at_depth.Addr.t
     [@@deriving hash, sexp, compare]
@@ -29,14 +29,28 @@ module Ledger_inner = struct
   module Kvdb : Intf.Key_value_database with type config := string =
     Rocksdb.Database
 
-  module Storage_locations : Intf.Storage_locations = struct
-    let key_value_db_dir = "mina_key_value_db"
-  end
-
   module Hash = struct
     module Arg = struct
       type t = Ledger_hash.Stable.Latest.t
       [@@deriving sexp, compare, hash, bin_io_unversioned]
+    end
+
+    module type Intf = sig
+      type t [@@deriving sexp, of_sexp, hash, equal, compare, yojson]
+
+      type account
+
+      include Binable.S with type t := t
+
+      include module type of Hashable.Make_binable (Arg)
+
+      val to_base58_check : t -> string
+
+      val merge : height:int -> t -> t -> t
+
+      val hash_account : account -> t
+
+      val empty_account : t
     end
 
     [%%versioned
@@ -61,32 +75,95 @@ module Ledger_inner = struct
           Ledger_hash.of_digest (Lazy.force Account.empty_digest)
       end
     end]
+
+    module Unstable = struct
+      type t = Ledger_hash.Stable.V1.t
+      [@@deriving sexp, compare, hash, equal, yojson, bin_io_unversioned]
+
+      include Hashable.Make_binable (Arg)
+
+      let to_base58_check = Ledger_hash.to_base58_check
+
+      let merge = Ledger_hash.merge
+
+      let hash_account =
+        Fn.compose Ledger_hash.of_digest Mina_base.Account.Unstable.digest
+
+      let empty_account =
+        Ledger_hash.of_digest (Lazy.force Account.Unstable.empty_digest)
+    end
+
+    module Hardfork = struct
+      type t = Ledger_hash.Stable.V1.t
+      [@@deriving sexp, compare, hash, equal, yojson, bin_io_unversioned]
+
+      include Hashable.Make_binable (Arg)
+
+      let to_base58_check = Ledger_hash.to_base58_check
+
+      let merge = Ledger_hash.merge
+
+      let hash_account =
+        Fn.compose Ledger_hash.of_digest Mina_base.Account.Hardfork.digest
+
+      let empty_account =
+        Ledger_hash.of_digest (Lazy.force Account.Hardfork.empty_digest)
+    end
   end
 
   module Account = struct
+    module type Intf = sig
+      type t [@@deriving sexp, of_sexp, equal, compare]
+
+      include Binable.S with type t := t
+
+      val balance : t -> Currency.Balance.t
+
+      val empty : t
+
+      val identifier : t -> Account_id.t
+
+      val token : t -> Token_id.t
+    end
+
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t = Account.Stable.V2.t [@@deriving equal, compare, sexp]
+      module V3 = struct
+        type t = Account.Stable.V3.t [@@deriving equal, compare, sexp]
 
         let to_latest = Fn.id
 
         let identifier = Account.identifier
 
-        let balance Account.Poly.{ balance; _ } = balance
+        let balance Account.{ balance; _ } = balance
 
         let empty = Account.empty
 
-        let token = Account.Poly.token_id
+        let token = Account.token_id
       end
     end]
 
     let empty = Stable.Latest.empty
 
     let initialize = Account.initialize
+
+    module Unstable = struct
+      include Mina_base.Account.Unstable
+
+      let token = token_id
+    end
+
+    module Hardfork = struct
+      include Mina_base.Account.Hardfork
+
+      let token = token_id
+    end
   end
 
-  module Inputs = struct
+  module Make_inputs
+      (Account : Account.Intf)
+      (Hash : Hash.Intf with type account := Account.t) =
+  struct
     module Key = Public_key.Compressed
     module Token_id = Token_id
     module Account_id = Account_id
@@ -97,15 +174,14 @@ module Ledger_inner = struct
       let to_int = to_nanomina_int
     end
 
-    module Account = Account.Stable.Latest
-    module Hash = Hash.Stable.Latest
+    module Account = Account
+    module Hash = Hash
     module Kvdb = Kvdb
     module Location = Location_at_depth
     module Location_binable = Location_binable
-    module Storage_locations = Storage_locations
   end
 
-  module Db :
+  module type Account_Db =
     Merkle_ledger.Intf.Ledger.DATABASE
       with module Location = Location_at_depth
       with module Addr = Location_at_depth.Addr
@@ -114,10 +190,26 @@ module Ledger_inner = struct
        and type key := Public_key.Compressed.t
        and type token_id := Token_id.t
        and type token_id_set := Token_id.Set.t
-       and type account := Account.t
        and type account_id_set := Account_id.Set.t
-       and type account_id := Account_id.t =
-    Database.Make (Inputs)
+       and type account_id := Account_id.t
+
+  module Mask_maps = Mask_maps.F (Location_at_depth)
+
+  module Inputs = struct
+    include Make_inputs (Account.Stable.Latest) (Hash.Stable.Latest)
+    module Mask_maps = Mask_maps
+  end
+
+  module Unstable_inputs = Make_inputs (Account.Unstable) (Hash.Unstable)
+  module Hardfork_inputs = Make_inputs (Account.Hardfork) (Hash.Hardfork)
+
+  module Db : Account_Db with type account := Account.t = Database.Make (Inputs)
+
+  module Unstable_db : Account_Db with type account := Account.Unstable.t =
+    Database.Make (Unstable_inputs)
+
+  module Hardfork_db : Account_Db with type account := Account.Hardfork.t =
+    Database.Make (Hardfork_inputs)
 
   module Null = Null_ledger.Make (Inputs)
 
@@ -145,7 +237,8 @@ module Ledger_inner = struct
        and type account_id_set := Account_id.Set.t
        and type hash := Hash.t
        and type location := Location_at_depth.t
-       and type parent := Any_ledger.M.t =
+       and type parent := Any_ledger.M.t
+       and type maps_t := Mask_maps.t =
   Merkle_mask.Masking_merkle_tree.Make (struct
     include Inputs
     module Base = Any_ledger.M
@@ -166,6 +259,7 @@ module Ledger_inner = struct
        and type unattached_mask := Mask.t
        and type attached_mask := Mask.Attached.t
        and type accumulated_t := Mask.accumulated_t
+       and type maps_t := Mask_maps.t
        and type t := Any_ledger.M.t =
   Merkle_mask.Maskable_merkle_tree.Make (struct
     include Inputs
@@ -179,6 +273,40 @@ module Ledger_inner = struct
   module Debug = Maskable.Debug
 
   type maskable_ledger = t
+
+  module Make_converting (Converting_inputs : sig
+    val convert : Account.t -> Account.Hardfork.t
+  end) :
+    Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
+      with module Location = Location
+       and module Addr = Location.Addr
+      with type root_hash := Ledger_hash.t
+       and type hash := Ledger_hash.t
+       and type account := Account.t
+       and type key := Signature_lib.Public_key.Compressed.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
+       and type converted_account := Account.Hardfork.t
+       and type primary_ledger = Db.t
+       and type converting_ledger = Hardfork_db.t =
+    Converting_merkle_tree.With_database
+      (struct
+        type converted_account = Account.Hardfork.t
+
+        let convert = Converting_inputs.convert
+
+        let converted_equal = Account.Hardfork.equal
+
+        include Inputs
+      end)
+      (Db)
+      (Hardfork_db)
+
+  let of_any_ledger ledger =
+    let mask = Mask.create ~depth:(Any_ledger.M.depth ledger) () in
+    Maskable.register_mask ledger mask
 
   let of_database db =
     let casted = Any_ledger.cast (module Db) db in
@@ -276,6 +404,10 @@ module Ledger_inner = struct
     let accumulated = Mask.Attached.to_accumulated t in
     Maskable.register_mask ~accumulated (packed t) mask
 
+  let append_maps = Maskable.append_maps
+
+  let get_maps = Maskable.get_maps
+
   let unsafe_preload_accounts_from_parent =
     Maskable.unsafe_preload_accounts_from_parent
 
@@ -338,36 +470,67 @@ module Ledger_inner = struct
     | `Existed, _ ->
         failwith "create_empty for a key already present"
     | `Added, new_loc ->
-        Debug_assert.debug_assert (fun () ->
-            [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger) ) ;
+        assert (Ledger_hash.equal start_hash (merkle_root ledger)) ;
         (merkle_path ledger new_loc, Account.empty)
 
-  let _handler t =
-    let open Snark_params.Tick in
-    let path_exn idx =
-      List.map (merkle_path_at_index_exn t idx) ~f:(function
-        | `Left h ->
-            h
-        | `Right h ->
-            h )
-    in
-    stage (fun (With { request; respond }) ->
-        match request with
-        | Ledger_hash.Get_element idx ->
-            let elt = get_at_index_exn t idx in
-            let path = (path_exn idx :> Random_oracle.Digest.t list) in
-            respond (Provide (elt, path))
-        | Ledger_hash.Get_path idx ->
-            let path = (path_exn idx :> Random_oracle.Digest.t list) in
-            respond (Provide path)
-        | Ledger_hash.Set (idx, account) ->
-            set_at_index_exn t idx account ;
-            respond (Provide ())
-        | Ledger_hash.Find_index pk ->
-            let index = index_of_account_exn t pk in
-            respond (Provide index)
-        | _ ->
-            unhandled )
+  module Converting_for_tests = struct
+    module Converting_ledger :
+      Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
+        with module Location = Location
+         and module Addr = Location.Addr
+        with type root_hash := Ledger_hash.t
+         and type hash := Ledger_hash.t
+         and type account := Account.t
+         and type key := Signature_lib.Public_key.Compressed.t
+         and type token_id := Token_id.t
+         and type token_id_set := Token_id.Set.t
+         and type account_id := Account_id.t
+         and type account_id_set := Account_id.Set.t
+         and type converted_account := Account.Hardfork.t
+         and type primary_ledger = Db.t
+         and type converting_ledger = Hardfork_db.t =
+      Converting_merkle_tree.With_database
+        (struct
+          type converted_account = Account.Hardfork.t
+
+          let convert =
+            Account.Hardfork.migrate_to_mesa
+              ~hardfork_slot:Mina_numbers.Global_slot_since_genesis.zero
+
+          let converted_equal = Account.Hardfork.equal
+
+          include Inputs
+        end)
+        (Db)
+        (Hardfork_db)
+
+    let create_converting_with_base ~config ~logger ~depth () =
+      let converting_ledger =
+        Converting_ledger.create ~config ~logger ~depth ()
+      in
+      let casted =
+        Any_ledger.cast (module Converting_ledger) converting_ledger
+      in
+      let mask = Mask.create ~depth () in
+      ( Maskable.register_mask casted mask
+      , Converting_ledger.converting_ledger converting_ledger )
+
+    let with_converting_ledger ~logger ~depth ~f =
+      let ledger_and_base =
+        create_converting_with_base ~config:Converting_ledger.Config.Temporary
+          ~logger ~depth ()
+      in
+      try
+        let result = f ledger_and_base in
+        close (fst ledger_and_base) ;
+        Ok result
+      with exn ->
+        close (fst ledger_and_base) ;
+        Error (Error.of_exn exn)
+
+    let with_converting_ledger_exn ~logger ~depth ~f =
+      with_converting_ledger ~logger ~depth ~f |> Or_error.ok_exn
+  end
 end
 
 include Ledger_inner
@@ -376,12 +539,13 @@ include Mina_transaction_logic.Make (Ledger_inner)
 (* use mask to restore ledger after application *)
 let merkle_root_after_zkapp_command_exn ~constraint_constants ~global_slot
     ~txn_state_view ledger zkapp_command =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let mask = Mask.create ~depth:(depth ledger) () in
   let masked_ledger = register_mask ledger mask in
   let _applied =
     Or_error.ok_exn
-      (apply_zkapp_command_unchecked ~constraint_constants ~global_slot
-         ~state_view:txn_state_view masked_ledger
+      (apply_zkapp_command_unchecked ~signature_kind ~constraint_constants
+         ~global_slot ~state_view:txn_state_view masked_ledger
          (Zkapp_command.Valid.forget zkapp_command) )
   in
   let root = merkle_root masked_ledger in
@@ -458,8 +622,9 @@ let apply_initial_ledger_state : t -> init_state -> unit =
 let%test_unit "tokens test" =
   let open Mina_transaction_logic.For_tests in
   let open Zkapp_command_builder in
+  let signature_kind = Mina_signature_kind.Testnet in
   let constraint_constants =
-    Genesis_constants.Constraint_constants.for_unit_tests
+    Genesis_constants.For_unit_tests.Constraint_constants.t
   in
   let keypair_and_amounts = Quickcheck.random_value (Init_ledger.gen ()) in
   let ledger_get_exn ledger pk token =
@@ -491,7 +656,7 @@ let%test_unit "tokens test" =
           account_updates
       in
       match
-        apply_zkapp_command_unchecked ~constraint_constants
+        apply_zkapp_command_unchecked ~signature_kind ~constraint_constants
           ~global_slot:
             (Mina_numbers.Global_slot_since_genesis.succ
                view.global_slot_since_genesis )
@@ -644,7 +809,7 @@ let%test_unit "zkapp_command payment test" =
   let open Mina_transaction_logic.For_tests in
   let module L = Ledger_inner in
   let constraint_constants =
-    { Genesis_constants.Constraint_constants.for_unit_tests with
+    { Genesis_constants.For_unit_tests.Constraint_constants.t with
       account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
     }
   in
@@ -670,8 +835,9 @@ let%test_unit "zkapp_command payment test" =
               let%bind () =
                 iter_err ts2 ~f:(fun t ->
                     let%bind res, _ =
-                      apply_zkapp_command_unchecked l2 t ~constraint_constants
-                        ~global_slot:txn_global_slot ~state_view:view
+                      apply_zkapp_command_unchecked ~signature_kind l2 t
+                        ~constraint_constants ~global_slot:txn_global_slot
+                        ~state_view:view
                     in
                     match res.command.status with
                     | Transaction_status.Applied ->
@@ -704,7 +870,7 @@ let%test_unit "user_command application on masked ledger" =
   let open Mina_transaction_logic.For_tests in
   let module L = Ledger_inner in
   let constraint_constants =
-    { Genesis_constants.Constraint_constants.for_unit_tests with
+    { Genesis_constants.For_unit_tests.Constraint_constants.t with
       account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
     }
   in
@@ -733,7 +899,7 @@ let%test_unit "zkapp_command application on masked ledger" =
   let open Mina_transaction_logic.For_tests in
   let module L = Ledger_inner in
   let constraint_constants =
-    { Genesis_constants.Constraint_constants.for_unit_tests with
+    { Genesis_constants.For_unit_tests.Constraint_constants.t with
       account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
     }
   in
@@ -757,10 +923,58 @@ let%test_unit "zkapp_command application on masked ledger" =
           let () =
             iter_err cmds
               ~f:
-                (apply_zkapp_command_unchecked ~constraint_constants
-                   ~global_slot:txn_global_slot ~state_view:view l )
+                (apply_zkapp_command_unchecked ~signature_kind
+                   ~constraint_constants ~global_slot:txn_global_slot
+                   ~state_view:view l )
             |> Or_error.ok_exn
           in
           assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
           (*Parent updates reflected in child masks*)
           assert (Ledger_hash.equal (L.merkle_root l) (L.merkle_root m)) ) )
+
+let%test_unit "user_command application on converting ledger" =
+  let open Mina_transaction_logic.For_tests in
+  let module L = Ledger_inner in
+  let constraint_constants =
+    { Genesis_constants.For_unit_tests.Constraint_constants.t with
+      account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
+    }
+  in
+  let logger = Logger.create () in
+  Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+      let cmds = List.map specs ~f:command_send in
+      L.Converting_for_tests.with_converting_ledger_exn ~logger ~depth
+        ~f:(fun (l, cl) ->
+          Init_ledger.init (module L) init_ledger l ;
+          let init_merkle_root = L.merkle_root l in
+          let init_cl_merkle_root = Hardfork_db.merkle_root cl in
+          let () =
+            iter_err cmds
+              ~f:
+                (apply_user_command_unchecked ~constraint_constants
+                   ~txn_global_slot l )
+            |> Or_error.ok_exn
+          in
+          (* Assert that the ledger and the converting ledger are non-empty *)
+          assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
+          L.commit l ;
+          assert (
+            not
+              (Ledger_hash.equal init_cl_merkle_root
+                 (Hardfork_db.merkle_root cl) ) ) ;
+          (* Assert that the converted ledger has the same accounts as the first one, up to conversion *)
+          L.iteri l ~f:(fun index account ->
+              let account_converted = Hardfork_db.get_at_index_exn cl index in
+              assert (
+                Mina_base.Account.Hardfork.(
+                  equal
+                    (Account.Hardfork.migrate_to_mesa
+                       ~hardfork_slot:
+                         Mina_numbers.Global_slot_since_genesis.zero account )
+                    account_converted) ) ) ;
+          (* Assert that the converted ledger doesn't have anything "extra" compared to the primary ledger *)
+          Hardfork_db.iteri cl ~f:(fun index account_converted ->
+              let account = L.get_at_index_exn l index in
+              assert (
+                Mina_base.Account.Key.(
+                  equal account.public_key account_converted.public_key) ) ) ) )

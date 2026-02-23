@@ -4,24 +4,24 @@ module Libp2p = Libp2p
 module Fake = Fake
 
 module type S = sig
-  module Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf
+  module Rpc_interface : RPC_INTERFACE
 
   include module type of Intf
 
   module Message : module type of Message
 
-  module Any : Any.S with module Rpc_intf := Rpc_intf
+  module Any : Any.S with module Rpc_interface := Rpc_interface
 
-  module Libp2p : Libp2p.S with module Rpc_intf := Rpc_intf
+  module Libp2p : Libp2p.S with module Rpc_interface := Rpc_interface
 
-  module Fake : Fake.S with module Rpc_intf := Rpc_intf
+  module Fake : Fake.S with module Rpc_interface := Rpc_interface
 end
 
-module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
-  S with module Rpc_intf := Rpc_intf = struct
+module Make (Rpc_interface : RPC_INTERFACE) :
+  S with module Rpc_interface := Rpc_interface = struct
   include Intf
   module Message = Message
-  module Any = Any.Make (Rpc_intf)
-  module Fake = Fake.Make (Rpc_intf)
-  module Libp2p = Libp2p.Make (Rpc_intf)
+  module Any = Any.Make (Rpc_interface)
+  module Fake = Fake.Make (Rpc_interface)
+  module Libp2p = Libp2p.Make (Rpc_interface)
 end

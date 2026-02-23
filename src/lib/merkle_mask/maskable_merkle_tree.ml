@@ -17,6 +17,7 @@ module type Inputs_intf = sig
        and type account_id := Account_id.t
        and type account_id_set := Account_id.Set.t
        and type parent := Base.t
+       and type maps_t := Mask_maps.t
 
   val mask_to_base : Mask.Attached.t -> Base.t
 end
@@ -52,12 +53,25 @@ module Make (Inputs : Inputs_intf) = struct
     let display_attached_mask mask =
       let root_hash = Mask.Attached.merkle_root mask in
       let num_accounts = Mask.Attached.num_accounts mask in
+      (* The total_currency computation is disabled by default - it causes the
+         frontier mask visualization that happens at shutdown to be
+         exceptionally slow on mainnet. See #17501 and #18196. Set the
+         MINA_FRONTIER_CURRENCY_VISUALIZATION environment variable to enable it.
+         Note that this might be useful in debugging changes to the total
+         currency in the ledgers, but it isn't expected to be equal to any total
+         currency value in the consensus data beyond the genesis epochs; as of
+         writing there is a quirk/bug that causes a slight desync in the total
+         currency updating across epoch boundaries. *)
       let total_currency =
-        Mask.Attached.foldi mask ~init:0 ~f:(fun _ total_currency account ->
-            (* only default token matters for total currency *)
-            if Token_id.equal (Account.token account) Token_id.default then
-              total_currency + (Balance.to_int @@ Account.balance account)
-            else total_currency )
+        match Sys.getenv "MINA_FRONTIER_CURRENCY_VISUALIZATION" with
+        | Some _ ->
+            Mask.Attached.foldi mask ~init:0 ~f:(fun _ total_currency account ->
+                (* only default token matters for total currency *)
+                if Token_id.equal (Account.token account) Token_id.default then
+                  total_currency + (Balance.to_int @@ Account.balance account)
+                else total_currency )
+        | None ->
+            0
       in
       let uuid = format_uuid mask in
       { hash =
@@ -108,6 +122,10 @@ module Make (Inputs : Inputs_intf) = struct
           let graph = to_graph () in
           Graphviz.output_graph output_channel graph )
   end
+
+  let append_maps = Mask.Attached.append_maps
+
+  let get_maps = Mask.Attached.get_maps
 
   let unsafe_preload_accounts_from_parent =
     Mask.Attached.unsafe_preload_accounts_from_parent
@@ -244,8 +262,8 @@ module Make (Inputs : Inputs_intf) = struct
               List.iter accounts ~f:(fun account ->
                   Mask.Attached.parent_set_notify mask account ) ) )
 
-  let set_batch t locations_and_accounts =
-    Base.set_batch t locations_and_accounts ;
+  let set_batch ?hash_cache t locations_and_accounts =
+    Base.set_batch ?hash_cache t locations_and_accounts ;
     batch_notify_mask_children t (List.map locations_and_accounts ~f:snd)
 
   let set_batch_accounts t addresses_and_accounts =

@@ -1,14 +1,19 @@
 #!/bin/bash
 
+set -xeo pipefail
+
 export MINA_REPO="https://github.com/MinaProtocol/mina.git"
 
-if [ "${BUILDKITE_REPO}" ==  ${MINA_REPO} ]; then
+if [ -z "${BUILDKITE_PULL_REQUEST_REPO}" ]; then
+    echo "Unable to detect fork without BUILDKITE_PULL_REQUEST_REPO"
+    echo "Looks like CI was ran without !ci-build-me skipping..."
+    export FORK=0
+    exit 0
+fi
+
+if [[ "${BUILDKITE_PULL_REQUEST_REPO}" ==  "${MINA_REPO}" ]]; then
     echo "This is not a Forked repo, skipping..."
-    export REMOTE="origin"
     export FORK=0
 else
-    git remote add mina ${MINA_REPO} || true
-    git fetch mina
-    export REMOTE="mina"
     export FORK=1
 fi

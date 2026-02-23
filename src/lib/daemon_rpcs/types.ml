@@ -7,7 +7,7 @@ module Git_sha = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = Bounded_types.String.Stable.V1.t
+      type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
       [@@deriving sexp, to_yojson, equal]
 
       let to_latest = Fn.id
@@ -111,7 +111,8 @@ module Status = struct
       ; external_transition_latency : Perf_histograms.Report.t option
       ; accepted_transition_local_latency : Perf_histograms.Report.t option
       ; accepted_transition_remote_latency : Perf_histograms.Report.t option
-      ; snark_worker_transition_time : Perf_histograms.Report.t option
+      ; snark_worker_zkapp_transition_time : Perf_histograms.Report.t option
+      ; snark_worker_nonzkapp_transition_time : Perf_histograms.Report.t option
       ; snark_worker_merge_time : Perf_histograms.Report.t option
       }
     [@@deriving to_yojson, bin_io_unversioned, fields]
@@ -144,12 +145,22 @@ module Status = struct
                 ( "Accepted remote block Latencies (hist.)"
                 , summarize_report report )
                 :: acc )
-          ~snark_worker_transition_time:(fun acc x ->
+          ~snark_worker_zkapp_transition_time:(fun acc x ->
             match f x with
             | None ->
                 acc
             | Some report ->
-                ("Snark Worker a->b (hist.)", summarize_report report) :: acc )
+                ( "Snark Worker zkApp Transition (hist.)"
+                , summarize_report report )
+                :: acc )
+          ~snark_worker_nonzkapp_transition_time:(fun acc x ->
+            match f x with
+            | None ->
+                acc
+            | Some report ->
+                ( "Snark Worker non-zkApp Transition (hist.)"
+                , summarize_report report )
+                :: acc )
           ~snark_worker_merge_time:(fun acc x ->
             match f x with
             | None ->

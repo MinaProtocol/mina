@@ -1,0 +1,7 @@
+{ Type = { allow_failure : Optional (./properties/allow_failure/Type ) 
+, step : Optional (./properties/step/Type ) 
+} 
+, default = { allow_failure = None ((./properties/allow_failure/Type )) 
+, step = None ((./properties/step/Type )) 
+} 
+}

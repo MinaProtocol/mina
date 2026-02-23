@@ -230,6 +230,48 @@ module Local_state = struct
     end
   end]
 
+  let map_with_hashes (type with_hashes with_hashes_modified)
+      ~(f : with_hashes -> with_hashes_modified)
+      (t :
+        ( ('token_id, with_hashes) Stack_frame.t
+        , ( (('token_id, with_hashes) Stack_frame.t, 'frame_digest) With_hash.t
+          , 'call_stack_digest )
+          With_stack_hash.t
+          list
+        , 'c
+        , 'd
+        , 'e
+        , 'f
+        , 'g
+        , 'h )
+        t ) :
+      ( ('token_id, with_hashes_modified) Stack_frame.t
+      , ( ( ('token_id, with_hashes_modified) Stack_frame.t
+          , 'frame_digest )
+          With_hash.t
+        , 'call_stack_digest )
+        With_stack_hash.t
+        list
+      , 'c
+      , 'd
+      , 'e
+      , 'f
+      , 'g
+      , 'h )
+      t =
+    let map_frame frame =
+      { frame with Stack_frame.calls = f frame.Stack_frame.calls }
+    in
+    { t with
+      stack_frame = map_frame t.stack_frame
+    ; call_stack =
+        List.map t.call_stack
+          ~f:(fun ({ With_stack_hash.elt = { data; _ } as elt; _ } as wsh) ->
+            { wsh with
+              With_stack_hash.elt = { elt with data = map_frame data }
+            } )
+    }
+
   let typ stack_frame call_stack excess supply_increase ledger bool comm length
       failure_status_tbl =
     Pickles.Impls.Step.Typ.of_hlistable
@@ -351,7 +393,8 @@ module type Account_update_intf = sig
   val implicit_account_creation_fee : t -> bool
 
   val check_authorization :
-       will_succeed:bool
+       signature_kind:Mina_signature_kind.t
+    -> will_succeed:bool
     -> commitment:transaction_commitment
     -> calls:call_forest
     -> t
@@ -450,7 +493,8 @@ module type Call_forest_intf = sig
 
   val is_empty : t -> bool
 
-  val pop_exn : t -> (account_update * t) * t
+  val pop_exn :
+    signature_kind:Mina_signature_kind.t -> t -> (account_update * t) * t
 end
 
 module type Stack_frame_intf = sig
@@ -506,6 +550,8 @@ module type Controller_intf = sig
   val check : proof_verifies:bool -> signature_verifies:bool -> t -> bool
 
   val verification_key_perm_fallback_to_signature_with_older_version : t -> t
+
+  val access_perm_fallback_to_signature_with_older_version : t -> t
 end
 
 module type Txn_version_intf = sig
@@ -528,8 +574,6 @@ module type Account_intf = sig
   module Permissions : sig
     type controller
 
-    type txn_version
-
     val access : t -> controller
 
     val edit_state : t -> controller
@@ -543,8 +587,6 @@ module type Account_intf = sig
     val set_permissions : t -> controller
 
     val set_verification_key_auth : t -> controller
-
-    val set_verification_key_txn_version : t -> txn_version
 
     val set_zkapp_uri : t -> controller
 
@@ -665,6 +707,12 @@ module type Account_intf = sig
   val permissions : t -> Permissions.t
 
   val set_permissions : Permissions.t -> t -> t
+
+  type txn_version
+
+  val txn_version : t -> txn_version
+
+  val set_txn_version_to_current : t -> t
 end
 
 module Eff = struct
@@ -779,7 +827,6 @@ module type Inputs_intf = sig
   and Account :
     (Account_intf
       with type Permissions.controller := Controller.t
-       and type Permissions.txn_version := Txn_version.t
        and type timing := Timing.t
        and type balance := Balance.t
        and type receipt_chain_hash := Receipt_chain_hash.t
@@ -794,7 +841,8 @@ module type Inputs_intf = sig
        and type nonce := Nonce.t
        and type state_hash := State_hash.t
        and type token_id := Token_id.t
-       and type account_id := Account_id.t)
+       and type account_id := Account_id.t
+       and type txn_version = Txn_version.t)
 
   and Actions :
     (Actions_intf with type bool := Bool.t and type field := Field.t)
@@ -865,7 +913,11 @@ module type Inputs_intf = sig
     val commitment : account_updates:Call_forest.t -> t
 
     val full_commitment :
-      account_update:Account_update.t -> memo_hash:Field.t -> commitment:t -> t
+         signature_kind:Mina_signature_kind.t
+      -> account_update:Account_update.t
+      -> memo_hash:Field.t
+      -> commitment:t
+      -> t
   end
 
   and Index : sig
@@ -966,7 +1018,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; new_frame : Stack_frame.t
     }
 
-  let get_next_account_update (current_forest : Stack_frame.t)
+  let get_next_account_update ~signature_kind (current_forest : Stack_frame.t)
       (* The stack for the most recent zkApp *)
         (call_stack : Call_stack.t) (* The partially-completed parent stacks *)
       : get_next_account_update_result =
@@ -988,7 +1040,7 @@ module Make (Inputs : Inputs_intf) = struct
       )
     in
     let (account_update, account_update_forest), remainder_of_current_forest =
-      Call_forest.pop_exn (Stack_frame.calls current_forest)
+      Call_forest.pop_exn ~signature_kind (Stack_frame.calls current_forest)
     in
     let may_use_parents_own_token =
       Account_update.may_use_parents_own_token account_update
@@ -1083,7 +1135,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t), last_action_slot)
 
-  let apply ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+  let apply ~signature_kind
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start : [ `Yes of _ Start_data.t | `No | `Compute of _ Start_data.t ])
       (h :
         (< global_state : Global_state.t
@@ -1165,7 +1218,7 @@ module Make (Inputs : Inputs_intf) = struct
           } =
         with_label ~label:"get next account update" (fun () ->
             (* TODO: Make the stack frame hashed inside of the local state *)
-            get_next_account_update to_pop call_stack )
+            get_next_account_update ~signature_kind to_pop call_stack )
       in
       let local_state =
         with_label ~label:"token owner not caller" (fun () ->
@@ -1198,8 +1251,8 @@ module Make (Inputs : Inputs_intf) = struct
                 ~account_updates:(Stack_frame.calls remaining)
             in
             let full_tx_commitment_on_start =
-              Transaction_commitment.full_commitment ~account_update
-                ~memo_hash:start_data.memo_hash
+              Transaction_commitment.full_commitment ~signature_kind
+                ~account_update ~memo_hash:start_data.memo_hash
                 ~commitment:tx_commitment_on_start
             in
             let tx_commitment =
@@ -1295,7 +1348,7 @@ module Make (Inputs : Inputs_intf) = struct
           ~then_:local_state.full_transaction_commitment
           ~else_:local_state.transaction_commitment
       in
-      Inputs.Account_update.check_authorization
+      Inputs.Account_update.check_authorization ~signature_kind
         ~will_succeed:local_state.will_succeed ~commitment
         ~calls:account_update_forest account_update
     in
@@ -1497,11 +1550,18 @@ module Make (Inputs : Inputs_intf) = struct
        This must be done before updating zkApp fields!
     *)
     let a = Account.make_zkapp a in
+    let auth_with_fallback ~fallback_logic auth =
+      Account.txn_version a |> Txn_version.older_than_current
+      |> Controller.if_ ~then_:(fallback_logic auth) ~else_:auth
+    in
     (* Check that the account can be accessed with the given authorization. *)
     let local_state =
       let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.access a)
+        Account.Permissions.access a
+        |> auth_with_fallback
+             ~fallback_logic:
+               Controller.access_perm_fallback_to_signature_with_older_version
+        |> Controller.check ~proof_verifies ~signature_verifies
       in
       Local_state.add_check local_state Update_not_permitted_access
         has_permission
@@ -1565,21 +1625,13 @@ module Make (Inputs : Inputs_intf) = struct
       let verification_key =
         Account_update.Update.verification_key account_update
       in
-      let older_than_current_version =
-        Txn_version.older_than_current
-          (Account.Permissions.set_verification_key_txn_version a)
-      in
-      let original_auth = Account.Permissions.set_verification_key_auth a in
-      let auth =
-        Controller.if_ older_than_current_version
-          ~then_:
-            (Controller
-             .verification_key_perm_fallback_to_signature_with_older_version
-               original_auth )
-          ~else_:original_auth
-      in
       let has_permission =
-        Controller.check ~proof_verifies ~signature_verifies auth
+        Account.Permissions.set_verification_key_auth a
+        |> auth_with_fallback
+             ~fallback_logic:
+               Controller
+               .verification_key_perm_fallback_to_signature_with_older_version
+        |> Controller.check ~proof_verifies ~signature_verifies
       in
       let local_state =
         Local_state.add_check local_state Update_not_permitted_verification_key
@@ -1590,6 +1642,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.verification_key a)
       in
       let a = Account.set_verification_key verification_key a in
+      let a = Account.set_txn_version_to_current a in
       (a, local_state)
     in
     (* Update action state. *)

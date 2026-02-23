@@ -18,8 +18,8 @@
   currency
   data_hash_lib
   genesis_constants
-  bounded_types
-  genesis_ledger
+  mina_stdlib
+  coda_genesis_ledger
   logger
   mina_base
   mina_base.import
@@ -41,11 +41,6 @@
   mina_transaction
   with_hash)
  (preprocess
-  (pps
-   ppx_base
-   ppx_let
-   ppx_custom_printf
-   ppx_assert))
+  (pps ppx_base ppx_let ppx_custom_printf ppx_assert))
  (instrumentation
   (backend bisect_ppx)))
-

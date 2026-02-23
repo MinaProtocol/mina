@@ -1,4 +1,5 @@
 ;; Don't build tests automatically
+
 (vendored_dirs tests)
 
 (library
@@ -6,18 +7,18 @@
  (public_name ppx_mina)
  (kind ppx_deriver)
  (libraries
-   ;; opam libraries
-   ppx_deriving.api
-   ppxlib
-   ppx_bin_prot
-   core_kernel
-   base
-   base.caml
-   ;; local libraries
-   ppx_representatives
-   ppx_register_event
-   ppx_to_enum
-)
- (preprocessor_deps ../../config.mlh)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppxlib.metaquot ppx_optcomp)))
+  ;; opam libraries
+  ppx_deriving.api
+  ppxlib
+  ppx_bin_prot
+  core_kernel
+  base
+  base.caml
+  ;; local libraries
+  ppx_representatives
+  ppx_register_event
+  ppx_to_enum)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppxlib.metaquot)))

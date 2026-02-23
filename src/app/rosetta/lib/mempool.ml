@@ -47,6 +47,8 @@ module Get_transactions_by_hash =
     }
 |}]
 
+module Mina_currency = Currency
+
 (* Avoid shadowing graphql_ppx functions *)
 open Core_kernel
 open Async
@@ -61,6 +63,7 @@ module All = struct
         { gql : unit -> ('gql, Errors.t) M.t
         ; validate_network_choice :
                network_identifier:Network_identifier.t
+            -> minimum_user_command_fee:Mina_currency.Fee.t
             -> graphql_uri:Uri.t
             -> (unit, Errors.t) M.t
         }
@@ -72,10 +75,16 @@ module All = struct
     (* But for tests, we want things to go fast *)
     module Mock = T (Result)
 
-    let real : graphql_uri:Uri.t -> 'gql Real.t =
-     fun ~graphql_uri ->
+    let real :
+           graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
+        -> 'gql Real.t =
+     fun ~graphql_uri ~minimum_user_command_fee ->
       { gql =
-          (fun () -> Graphql.query (Get_all_transactions.make ()) graphql_uri)
+          (fun () ->
+            Graphql.query ~minimum_user_command_fee
+              (Get_all_transactions.make ())
+              graphql_uri )
       ; validate_network_choice = Network.Validate_choice.Real.validate
       }
 
@@ -95,15 +104,16 @@ module All = struct
   module Impl (M : Monad_fail.S) = struct
     let handle :
            graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
         -> env:'gql Env.T(M).t
         -> Network_request.t
         -> (Mempool_response.t, Errors.t) M.t =
-     fun ~graphql_uri ~env req ->
+     fun ~graphql_uri ~minimum_user_command_fee ~env req ->
       let open M.Let_syntax in
       let%bind res = env.gql () in
       let%map () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~graphql_uri
+          ~graphql_uri ~minimum_user_command_fee
       in
       let open Get_all_transactions in
       { Mempool_response.transaction_identifiers =
@@ -123,7 +133,8 @@ module All = struct
           ~expected:
             (Mock.handle
                ~graphql_uri:(Uri.of_string "https://minaprotocol.com")
-               ~env:Env.mock Network.dummy_network_request )
+               ~minimum_user_command_fee:Mina_currency.Fee.one ~env:Env.mock
+               Network.dummy_network_request )
           ~actual:
             (Result.return
                { Mempool_response.transaction_identifiers =
@@ -141,6 +152,7 @@ module Transaction = struct
         { gql : hash:string -> ('gql, Errors.t) M.t
         ; validate_network_choice :
                network_identifier:Network_identifier.t
+            -> minimum_user_command_fee:Mina_currency.Fee.t
             -> graphql_uri:Uri.t
             -> (unit, Errors.t) M.t
         }
@@ -149,11 +161,14 @@ module Transaction = struct
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
-    let real : graphql_uri:Uri.t -> 'gql Real.t =
-     fun ~graphql_uri ->
+    let real :
+           graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
+        -> 'gql Real.t =
+     fun ~graphql_uri ~minimum_user_command_fee ->
       { gql =
           (fun ~hash ->
-            Graphql.query
+            Graphql.query ~minimum_user_command_fee
               Get_transactions_by_hash.(
                 make @@ makeVariables ~hashes:[| hash |] ())
               graphql_uri )
@@ -272,15 +287,16 @@ module Transaction = struct
 
     let handle :
            graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
         -> env:'gql Env.T(M).t
         -> Mempool_transaction_request.t
         -> (Mempool_transaction_response.t, Errors.t) M.t =
-     fun ~graphql_uri ~env req ->
+     fun ~graphql_uri ~minimum_user_command_fee ~env req ->
       let open M.Let_syntax in
       let%bind res = env.gql ~hash:req.transaction_identifier.hash in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~graphql_uri
+          ~graphql_uri ~minimum_user_command_fee
       in
       let open Get_transactions_by_hash in
       let%bind user_command_obj =
@@ -325,7 +341,8 @@ module Transaction = struct
     end )
 end
 
-let router ~graphql_uri ~logger (route : string list) body =
+let router ~graphql_uri ~minimum_user_command_fee ~logger (route : string list)
+    body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /mempool/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
@@ -337,7 +354,9 @@ let router ~graphql_uri ~logger (route : string list) body =
         |> Errors.Lift.wrap
       in
       let%map res =
-        All.Real.handle ~graphql_uri ~env:(All.Env.real ~graphql_uri) req
+        All.Real.handle ~graphql_uri ~minimum_user_command_fee
+          ~env:(All.Env.real ~graphql_uri ~minimum_user_command_fee)
+          req
         |> Errors.Lift.wrap
       in
       Mempool_response.to_yojson res
@@ -348,8 +367,8 @@ let router ~graphql_uri ~logger (route : string list) body =
         |> Errors.Lift.wrap
       in
       let%map res =
-        Transaction.Real.handle ~graphql_uri
-          ~env:(Transaction.Env.real ~graphql_uri)
+        Transaction.Real.handle ~graphql_uri ~minimum_user_command_fee
+          ~env:(Transaction.Env.real ~graphql_uri ~minimum_user_command_fee)
           req
         |> Errors.Lift.wrap
       in

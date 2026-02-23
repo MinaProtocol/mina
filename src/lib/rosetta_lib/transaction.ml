@@ -25,9 +25,9 @@ module Unsigned = struct
         }
       [@@deriving yojson]
 
-      let is_fee_sufficient (payment : t) : bool =
+      let is_fee_sufficient ~minimum_user_command_fee (payment : t) : bool =
         let open Currency.Fee in
-        of_uint64 payment.fee >= Currency.Fee.minimum_user_command_fee
+        of_uint64 payment.fee >= minimum_user_command_fee
     end
 
     module Delegation = struct
@@ -223,6 +223,32 @@ module Signed = struct
       ; stake_delegation : Unsigned.Rendered.Delegation.t option
       }
     [@@deriving yojson]
+
+    let deprecated_fields =
+      [ "create_token"; "create_token_account"; "mint_tokens" ]
+
+    let of_yojson = function
+      | `Assoc l ->
+          let open Result.Let_syntax in
+          let%bind l =
+            let exception Non_null of string in
+            try
+              return
+              @@ List.filter l ~f:(fun (field, json) ->
+                     if List.mem ~equal:String.equal deprecated_fields field
+                     then
+                       match json with
+                       | `Null ->
+                           false
+                       | _ ->
+                           raise (Non_null field)
+                     else true )
+            with Non_null field ->
+              Error (sprintf "Found non-null deprecated field '%s'" field)
+          in
+          of_yojson (`Assoc l)
+      | x ->
+          of_yojson x
   end
 
   let render (t : t) =

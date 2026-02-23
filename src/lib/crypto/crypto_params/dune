@@ -1,0 +1,34 @@
+(library
+ (name crypto_params)
+ (public_name crypto_params)
+ (flags :standard -short-paths -warn-error -58)
+ (library_flags -linkall)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries
+  ;; opam libraries
+  bin_prot.shape
+  core_kernel
+  sexplib0
+  ;; local libraries
+  cache_dir
+  group_map
+  kimchi_backend
+  kimchi_pasta
+  kimchi_pasta.basic
+  pickles
+  pickles.backend
+  snarky.backendless
+  tuple_lib)
+ (preprocess
+  (pps h_list.ppx ppx_jane ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "Cryptographic parameters"))
+
+(rule
+ (targets group_map_params.ml)
+ (deps
+  (:< gen/gen.exe))
+ (action
+  (run %{<} %{targets})))

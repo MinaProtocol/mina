@@ -2,12 +2,9 @@ open Core
 open Async
 open Mina_net2
 
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
-
 let%test_module "Mina network tests" =
   ( module struct
-    let logger = Logger.create ()
+    let logger = Logger.null ()
 
     let pids = Child_processes.Termination.create_pid_table ()
 
@@ -93,9 +90,9 @@ let%test_module "Mina network tests" =
         let%bind () = shutdown a in
         let%bind () = shutdown b in
         let%bind () = shutdown c in
-        let%bind () = File_system.remove_dir a_tmp in
-        let%bind () = File_system.remove_dir b_tmp in
-        File_system.remove_dir c_tmp
+        let%bind () = Mina_stdlib_unix.File_system.remove_dir a_tmp in
+        let%bind () = Mina_stdlib_unix.File_system.remove_dir b_tmp in
+        Mina_stdlib_unix.File_system.remove_dir c_tmp
       in
       (b, c, shutdown)
 

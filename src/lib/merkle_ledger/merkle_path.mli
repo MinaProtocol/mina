@@ -9,7 +9,7 @@ module type S = sig
 
   val implied_root : t -> hash -> hash
 
-  (** [check_path path leaf_hash root_hash] is used in tests to check that 
+  (** [check_path path leaf_hash root_hash] is used in tests to check that
       [leaf_hash] along with [path] actually corresponds to [root_hash]. *)
   val check_path : t -> hash -> hash -> bool
 end

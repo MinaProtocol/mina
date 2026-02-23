@@ -1,6 +1,0 @@
-version = "0.6.0"
-description = "Binding to libsodium, a shared library wrapper for djb's NaCl"
-requires = "bigarray bytes ctypes.stubs"
-archive(byte) = "sodium.cma"
-archive(native) = "sodium.cmxa"
-exists_if = "sodium.cma"

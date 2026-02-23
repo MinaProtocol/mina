@@ -413,8 +413,8 @@ github.com/multiformats/go-varint v0.0.7/go.mod h1:r8PUYw/fD/SjBCiKOoDlGF6QawOEL
 github.com/neelance/astrewrite v0.0.0-20160511093645-99348263ae86/go.mod h1:kHJEU3ofeGjhHklVoIGuVj85JJwZ6kWPaJwCIxgnFmo=
 github.com/neelance/sourcemap v0.0.0-20151028013722-8c68805598ab/go.mod h1:Qr6/a/Q4r9LP1IltGz7tA7iOK1WonHEYhu1HRBA7ZiM=
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
-github.com/o1-labs/go-bs-lmdb v1.1.0 h1:qfZNYs5tMJ5Ym23avKIbpubfWJBtSJ1REhu51qb9U6M=
-github.com/o1-labs/go-bs-lmdb v1.1.0/go.mod h1:MGOPzEutRw24iN0qrSSbqOIzbgnyFQST/cKlnVSBmnI=
+github.com/o1-labs/go-bs-lmdb v1.2.1 h1:vweOC9utt/eUiaJvoREMuTvfR/uAej86nXopudKmzgU=
+github.com/o1-labs/go-bs-lmdb v1.2.1/go.mod h1:MGOPzEutRw24iN0qrSSbqOIzbgnyFQST/cKlnVSBmnI=
 github.com/o1-labs/go-bs-tests v0.0.6 h1:MytWPo5kOMgxK29UkU6ycWRJrMhuILUSQAtYpn5ek0g=
 github.com/o1-labs/go-libp2p-kad-dht-patcher v1.1.0 h1:YXmSCpS/VADts1gJbyEbFLsveun8t5HVfrRQbUHm7ds=
 github.com/o1-labs/go-libp2p-kad-dht-patcher v1.1.0/go.mod h1:ANWfn2GqDHigP/bw2boP1PnUG2WL3UNdfnfckVfJOIc=

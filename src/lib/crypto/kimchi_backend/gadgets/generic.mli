@@ -1,32 +1,25 @@
-(** Generic addition gate gadget
- *   Constrains left_input + right_input = sum
- *   Returns sum
- *)
+module Circuit := Kimchi_pasta_snarky_backend.Step_impl
+
+(** Generic addition gate gadget. Constrains left_input + right_input = sum.
+    Returns the sum. *)
 val add :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t (* left_input *)
-  -> 'f Snarky_backendless.Cvar.t (* right_input *)
-  -> 'f Snarky_backendless.Cvar.t
+     Circuit.Field.t (* left_input *)
+  -> Circuit.Field.t (* right_input *)
+  -> Circuit.Field.t
 (* sum *)
 
-(** Generic subtraction gate gadget
- *   Constrains left_input - right_input = difference
- *   Returns difference
- *)
+(** Generic subtraction gate gadget. Constrains left_input - right_input =
+    difference. Returns the difference. *)
 val sub :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t (* left_input *)
-  -> 'f Snarky_backendless.Cvar.t (* right_input *)
-  -> 'f Snarky_backendless.Cvar.t
+     Circuit.Field.t (* left_input *)
+  -> Circuit.Field.t (* right_input *)
+  -> Circuit.Field.t
 (* difference *)
 
-(** Generic multiplication gate gadget
- *   Constrains left_input * right_input = product
- *   Returns product
- *)
+(** Generic multiplication gate gadget. Constrains left_input * right_input =
+    product. Returns the product. *)
 val mul :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t (* left_input *)
-  -> 'f Snarky_backendless.Cvar.t (* right_input *)
-  -> 'f Snarky_backendless.Cvar.t
+     Circuit.Field.t (* left_input *)
+  -> Circuit.Field.t (* right_input *)
+  -> Circuit.Field.t
 (* product *)

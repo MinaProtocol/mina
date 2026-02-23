@@ -41,12 +41,7 @@ module Base = struct
       -> unit Or_error.t Or_error.t Deferred.t
 
     val verify_transaction_snarks :
-         t
-      -> (ledger_proof * Mina_base.Sok_message.t) list
-      -> unit Or_error.t Or_error.t Deferred.t
-
-    val get_blockchain_verification_key :
-      t -> Pickles.Verification_key.t Or_error.t Deferred.t
+      t -> ledger_proof list -> unit Or_error.t Or_error.t Deferred.t
 
     val toggle_internal_tracing : t -> bool -> unit Or_error.t Deferred.t
 
@@ -65,9 +60,12 @@ module type S = sig
     -> ?enable_internal_tracing:bool
     -> ?internal_trace_filename:string
     -> proof_level:Genesis_constants.Proof_level.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> pids:Child_processes.Termination.t
     -> conf_dir:string option
+    -> commit_id:string
+    -> blockchain_verification_key:Pickles.Verification_key.t
+    -> transaction_verification_key:Pickles.Verification_key.t
+    -> signature_kind:Mina_signature_kind.t
     -> unit
     -> t Deferred.t
 end

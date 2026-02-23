@@ -11,15 +11,15 @@ open Mina_state
 module Wire_types = Mina_wire_types.Mina_block.Header
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S = Header_intf.Full with type Stable.V2.t = A.V2.t
+  module type S = Header_intf.Full with type Stable.V3.t = A.V3.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t = A.V2.t =
-        { protocol_state : Protocol_state.Value.Stable.V2.t
+    module V3 = struct
+      type t = A.V3.t =
+        { protocol_state : Protocol_state.Value.Stable.V3.t
         ; protocol_state_proof : (Proof.Stable.V2.t[@sexp.opaque])
         ; delta_block_chain_proof :
             (* TODO: abstract *)
@@ -116,6 +116,12 @@ module Make_str (A : Wire_types.Concrete) = struct
       Protocol_version.compatible_with_daemon (current_protocol_version body)
     in
     { valid_current; valid_next; matches_daemon }
+
+  type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
+
+  let blockchain_length h =
+    protocol_state h |> Mina_state.Protocol_state.consensus_state
+    |> Consensus.Data.Consensus_state.blockchain_length
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

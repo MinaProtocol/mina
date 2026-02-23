@@ -4,29 +4,24 @@
  (flags :standard -short-paths)
  (library_flags -linkall)
  (libraries
-   ;; opam libraries
-   zarith
-   bignum.bigint
-   bin_prot.shape
-   base.caml
-   core
-   sexplib0
-   core_kernel
-   bignum
-   ppx_inline_test.config
-   ;; local libraries
-   snarky.backendless
-   genesis_constants
-   snarky_curves
-   bitstring_lib
-   ppx_version.runtime
- )
+  ;; opam libraries
+  zarith
+  bignum.bigint
+  bin_prot.shape
+  base.caml
+  core
+  sexplib0
+  core_kernel
+  bignum
+  ppx_inline_test.config
+  ;; local libraries
+  snarky.backendless
+  genesis_constants
+  snarky_curves
+  bitstring_lib
+  ppx_version.runtime)
  (preprocess
-  (pps
-    h_list.ppx
-    ppx_bench
-    ppx_compare
-    ppx_jane
-    ppx_version))
- (instrumentation (backend bisect_ppx))
+  (pps h_list.ppx ppx_bench ppx_compare ppx_jane ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "VRF instantiation"))

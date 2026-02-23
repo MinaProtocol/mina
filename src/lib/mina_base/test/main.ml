@@ -169,8 +169,60 @@ let () =
           ; test_case "Wire embedded in t." `Quick wire_embedded_in_t
           ; test_case "Wire embedded in graphql." `Quick
               wire_embedded_in_graphql
+          ; test_case "Latest zkApp version." `Quick latest_zkapp_version
           ; test_case "JSON roundtrip dummy." `Quick
               Test_derivers.json_roundtrip_dummy
           ; test_case "Full circuit." `Quick Test_derivers.full_circuit
+          ] )
+    ; Test_encoding_regression.
+        ( "base58 encoding regression"
+        , [ test_case "Signature dummy encoding" `Quick
+              test_signature_dummy_encoding
+          ; test_case "Token_id default encoding" `Quick
+              test_token_id_default_encoding
+          ; test_case "State_hash dummy encoding" `Quick
+              test_state_hash_dummy_encoding
+          ; test_case "State_body_hash of Field.zero encoding" `Quick
+              test_state_body_hash_field_zero_encoding
+          ; test_case "Ledger_hash of Field.zero encoding" `Quick
+              test_ledger_hash_field_zero_encoding
+          ; test_case "Ledger_hash of Field.one encoding" `Quick
+              test_ledger_hash_field_one_encoding
+          ; test_case "Receipt.Chain_hash empty encoding" `Quick
+              test_receipt_chain_hash_empty_encoding
+          ; test_case "Epoch_seed of Field.zero encoding" `Quick
+              test_epoch_seed_field_zero_encoding
+          ; test_case "Signed_command_memo empty encoding" `Quick
+              test_signed_command_memo_empty_encoding
+          ; test_case "Staged_ledger_hash.Aux_hash dummy encoding" `Quick
+              test_staged_ledger_hash_aux_hash_dummy_encoding
+          ; test_case "Staged_ledger_hash.Pending_coinbase_aux dummy encoding"
+              `Quick test_staged_ledger_hash_pending_coinbase_aux_dummy_encoding
+          ; test_case "Pending_coinbase.Hash empty encoding" `Quick
+              test_pending_coinbase_hash_empty_encoding
+          ; test_case "Coinbase encoding" `Quick test_coinbase_encoding
+          ; test_case "Fee_transfer.Single encoding" `Quick
+              test_fee_transfer_single_encoding
+          ; test_case "Transaction_hash encoding" `Quick
+              test_transaction_hash_empty_encoding
+          ] )
+    ; Slot_reduction_vesting_test.
+        ( "slot reduction vesting update"
+        , [ test_case "Hardfork slot gen after vesting end works" `Quick
+              not_vesting_after_vesting
+          ; test_case "Hardfork slot gen before vesting end works" `Quick
+              vesting_before_vesting_end
+          ; test_case "Intermediate representation roundtrips" `Quick
+              record_conversion_roundtrip
+          ; test_case "Unadjusted vesting ends as expected" `Quick
+              unadjusted_vesting_ends_as_expected
+          ; test_case "Fast vesting schedules end as expected" `Quick
+              fast_vesting_ends_as_expected
+          ; test_case "Does not change minimum balance at hardfork" `Quick
+              minimum_balance_unchanged_at_hardfork
+          ; test_case "No even slot difference discrepancies" `Quick
+              no_even_vesting_discrepancies
+          ; test_case "No odd slot difference discrepancies" `Quick
+              no_odd_vesting_discrepancies
           ] )
     ]

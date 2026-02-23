@@ -464,9 +464,10 @@ let check_state_hash ~logger state_hash_opt =
               [ ("state_hash", `String state_hash)
               ; ("error", Error_json.error_to_yojson err)
               ] ;
-          Core.exit 1 )
+          Stdlib.exit 1 )
 
-let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
+let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
+    ~output_folder ~network ~include_block_height_in_name () =
   ( match (start_state_hash_opt, end_state_hash_opt, all_blocks) with
   | None, None, true | None, Some _, false | Some _, Some _, false ->
       ()
@@ -480,7 +481,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
   (* sanity-check input state hashes *)
   check_state_hash ~logger start_state_hash_opt ;
   check_state_hash ~logger end_state_hash_opt ;
-  match Caqti_async.connect_pool ~max_size:128 archive_uri with
+  match Mina_caqti.connect_pool ~max_size:128 archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]
@@ -511,7 +512,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
                 [%log error]
                   "No subchain available from an unparented block (possibly \
                    the genesis block) to block with given end state hash" ;
-                Core.exit 1 ) ;
+                Stdlib.exit 1 ) ;
               blocks
           | Some start_state_hash, Some end_state_hash ->
               [%log info]
@@ -536,7 +537,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
                    available; try omitting the start state hash, to get a \
                    chain from an unparented block to the block with the end \
                    state hash" ;
-                Core.exit 1 ) ;
+                Stdlib.exit 1 ) ;
               blocks
           | _ ->
               (* unreachable *)
@@ -620,8 +621,20 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
             [%log info] "Writing block with $state_hash"
               ~metadata:
                 [ ("state_hash", State_hash.to_yojson block.state_hash) ] ;
+
+            let network_prefix =
+              network
+              |> Option.value_map ~default:"" ~f:(fun network -> network ^ "-")
+            in
+            let height_prefix =
+              if include_block_height_in_name then
+                Unsigned.UInt32.to_string block.height ^ "-"
+              else ""
+            in
             let output_file =
-              State_hash.to_base58_check block.state_hash ^ ".json"
+              output_folder ^ "/" ^ network_prefix ^ height_prefix
+              ^ State_hash.to_base58_check block.state_hash
+              ^ ".json"
             in
             (* use Latest.to_yojson to get versioned JSON *)
             Async_unix.Writer.with_file output_file ~f:(fun writer ->
@@ -660,6 +673,17 @@ let () =
          and all_blocks =
            Param.flag "--all-blocks" Param.no_arg
              ~doc:"Extract all blocks in the archive database"
+         and output_folder =
+           Param.flag "--output-folder" ~doc:"Output folder for blocks jsons"
+             Param.(optional_with_default "." string)
+         and network =
+           Param.flag "--network"
+             ~doc:"Network name which will be a prefix of each individual file"
+             Param.(optional string)
+         and include_block_height_in_name =
+           Param.flag "--include-block-height-in-name"
+             ~doc:"Includes block height in block name" Param.no_arg
          in
+
          main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
-        )))
+           ~output_folder ~network ~include_block_height_in_name )))

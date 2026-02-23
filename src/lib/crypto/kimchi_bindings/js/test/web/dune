@@ -8,7 +8,7 @@
   kimchi_bindings
   js_of_ocaml
   bindings_js
-  web_backend
+  bindings_js.web_backend
   logger.fake
   pasta_bindings.backend.none)
  (link_deps ../../web/plonk_wasm.js ../../web/plonk_wasm_bg.wasm)

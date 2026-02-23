@@ -1,14 +1,6 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_util
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
-
 module Frozen_ledger_hash = Frozen_ledger_hash0
 module Ledger_hash = Ledger_hash0
 
@@ -76,6 +68,12 @@ module Auth_required = struct
 
   let verification_key_perm_fallback_to_signature_with_older_version = function
     | Impossible | Proof ->
+        Signature
+    | t ->
+        t
+
+  let access_perm_fallback_to_signature_with_older_version = function
+    | Proof ->
         Signature
     | t ->
         t
@@ -175,8 +173,6 @@ module Auth_required = struct
 
     let _ = map
 
-    [%%ifdef consensus_mechanism]
-
     let if_ b ~then_:t ~else_:e =
       let open Pickles.Impls.Step in
       { constant = Boolean.if_ b ~then_:t.constant ~else_:e.constant
@@ -187,8 +183,6 @@ module Auth_required = struct
           Boolean.if_ b ~then_:t.signature_sufficient
             ~else_:e.signature_sufficient
       }
-
-    [%%endif]
   end
 
   let encode : t -> bool Encoding.t = function
@@ -252,8 +246,6 @@ module Auth_required = struct
     List.iter [ Impossible; Proof; Signature; Either ] ~f:(fun t ->
         [%test_eq: t] t (decode (encode t)) )
 
-  [%%ifdef consensus_mechanism]
-
   module Checked = struct
     type t = Boolean.var Encoding.t
 
@@ -308,10 +300,20 @@ module Auth_required = struct
          that the proof should verify. *)
       (result, `proof_must_verify (didn't_fail_yet &&& not signature_sufficient))
 
+    (* proof/either/impossible -> signature *)
     let verification_key_perm_fallback_to_signature_with_older_version
         ({ signature_sufficient; _ } as t : t) =
       if_
         Pickles.Impls.Step.Boolean.(not signature_sufficient)
+        ~then_:(constant Signature) ~else_:t
+
+    (* proof/either -> signature *)
+    let access_perm_fallback_to_signature_with_older_version
+        ({ signature_sufficient; constant = signature_is_constant; _ } as t : t)
+        =
+      if_
+        Pickles.Impls.Step.Boolean.(
+          (not signature_sufficient) && not signature_is_constant)
         ~then_:(constant Signature) ~else_:t
   end
 
@@ -324,8 +326,6 @@ module Auth_required = struct
         ~value_of_hlist:of_hlist
     in
     Typ.transport t ~there:encode ~back:decode
-
-  [%%endif]
 
   let to_input x = Encoding.to_input (encode x) ~field_of_bool
 
@@ -455,8 +455,6 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
     ; access
     }
 
-[%%ifdef consensus_mechanism]
-
 module Checked = struct
   type t =
     ( Auth_required.Checked.t
@@ -572,8 +570,6 @@ let typ =
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 
-[%%endif]
-
 let to_input (x : t) =
   Poly.to_input Auth_required.to_input Mina_numbers.Txn_version.to_input x
 
@@ -669,7 +665,7 @@ let%test_unit "json value" =
         setPermissions: "Signature",
         setVerificationKey: {
           auth: "Signature",
-          txnVersion: "3"
+          txnVersion: "4"
           },
         setZkappUri: "Signature",
         editActionState: "Signature",
@@ -679,3 +675,41 @@ let%test_unit "json value" =
         setTiming: "Signature"
       }|json}
     |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
+
+module Hardfork = struct
+  type t = Stable.Latest.t [@@deriving equal, sexp, compare]
+
+  let hardfork_txn_version = Mina_numbers.Txn_version.(succ current)
+
+  let user_default : t =
+    { edit_state = Signature
+    ; send = Signature
+    ; receive = None
+    ; set_delegate = Signature
+    ; set_permissions = Signature
+    ; set_verification_key = (Signature, hardfork_txn_version)
+    ; set_zkapp_uri = Signature
+    ; edit_action_state = Signature
+    ; set_token_symbol = Signature
+    ; increment_nonce = Signature
+    ; set_voting_for = Signature
+    ; set_timing = Signature
+    ; access = None
+    }
+
+  let empty : t =
+    { edit_state = None
+    ; send = None
+    ; receive = None
+    ; access = None
+    ; set_delegate = None
+    ; set_permissions = None
+    ; set_verification_key = (None, hardfork_txn_version)
+    ; set_zkapp_uri = None
+    ; edit_action_state = None
+    ; set_token_symbol = None
+    ; increment_nonce = None
+    ; set_voting_for = None
+    ; set_timing = None
+    }
+end

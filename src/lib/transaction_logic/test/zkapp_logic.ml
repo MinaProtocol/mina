@@ -27,7 +27,7 @@ let balance_to_fee = Fn.compose Amount.to_fee Balance.to_amount
    validate them. *)
 let%test_module "Test transaction logic." =
   ( module struct
-    open Transaction_logic.Transaction_applied.Zkapp_command_applied
+    open Mina_transaction_logic.Transaction_applied.Zkapp_command_applied
 
     let run_zkapp_cmd ~fee_payer ~fee ~accounts txns =
       let open Result.Let_syntax in
@@ -38,7 +38,8 @@ let%test_module "Test transaction logic." =
       in
       let%bind ledger = Ledger_helpers.ledger_of_accounts accounts in
       let%map txn, _ =
-        Transaction_logic.apply_zkapp_command_unchecked ~constraint_constants
+        Transaction_logic.apply_zkapp_command_unchecked ~signature_kind
+          ~constraint_constants
           ~global_slot:Global_slot_since_genesis.(of_int 120)
           ~state_view:protocol_state ledger cmd
       in
@@ -183,9 +184,8 @@ let%test_module "Test transaction logic." =
                           Predicates.verify_balance_change ~balance_change orig
                             updt
                           && not
-                               Account.Poly.(
-                                 Account.Token_symbol.equal orig.token_symbol
-                                   updt.token_symbol)
+                               (Account.Token_symbol.equal orig.token_symbol
+                                  updt.token_symbol )
                       | _ ->
                           false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
@@ -470,7 +470,8 @@ let%test_module "Test transaction logic." =
           Generator.create (fun ~size:_ ~random:_ -> Zkapp_basic.F.random ())
         in
         let%map app_state_update =
-          Generator.list_with_length 8 (Zkapp_basic.Set_or_keep.gen gen_field)
+          Generator.list_with_length Mina_base.Zkapp_state.max_size_int
+            (Zkapp_basic.Set_or_keep.gen gen_field)
         in
         let app_state = Zkapp_state.V.of_list_exn app_state_update in
         let txn =

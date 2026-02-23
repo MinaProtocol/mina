@@ -6,18 +6,6 @@ open Currency
 module Ledger = Mina_ledger.Ledger
 module Sparse_ledger = Mina_ledger.Sparse_ledger
 
-let map2_or_error xs ys ~f =
-  let rec go xs ys acc =
-    match (xs, ys) with
-    | [], [] ->
-        Ok (List.rev acc)
-    | x :: xs, y :: ys -> (
-        match f x y with Error e -> Error e | Ok z -> go xs ys (z :: acc) )
-    | _, _ ->
-        Or_error.error_string "Length mismatch"
-  in
-  go xs ys []
-
 module type Monad_with_Or_error_intf = sig
   type 'a t
 
@@ -33,22 +21,22 @@ end
 module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    [@@@no_toplevel_latest_type]
+
+    module V3 = struct
       (* TODO: The statement is redundant here - it can be computed from the
          witness and the transaction
       *)
       type t =
-        { transaction_with_info :
-            Mina_transaction_logic.Transaction_applied.Stable.V2.t
+        { transaction_with_status :
+            Mina_transaction.Transaction.Stable.V3.t With_status.Stable.V2.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
         ; statement : Transaction_snark.Statement.Stable.V2.t
-        ; init_stack :
-            Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
-            .t
+        ; init_stack : Pending_coinbase.Stack_versioned.Stable.V1.t
         ; first_pass_ledger_witness :
-            (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+            (Mina_ledger.Sparse_ledger.Stable.V3.t[@sexp.opaque])
         ; second_pass_ledger_witness :
-            (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+            (Mina_ledger.Sparse_ledger.Stable.V3.t[@sexp.opaque])
         ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         }
       [@@deriving sexp, to_yojson]
@@ -56,26 +44,122 @@ module Transaction_with_witness = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t =
+    { transaction_with_status : Mina_transaction.Transaction.t With_status.t
+    ; state_hash : State_hash.t * State_body_hash.t
+    ; statement : Transaction_snark.Statement.t
+    ; init_stack : Pending_coinbase.Stack_versioned.t
+    ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
+    ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
+    ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
+    ; hash : Aux_hash.t
+    }
+
+  let hash (v : Stable.Latest.t) : Aux_hash.t =
+    let h = Digestif.SHA256.init () in
+    let h =
+      Binable.to_string (module Stable.Latest) v
+      |> Digestif.SHA256.feed_string h
+    in
+    Digestif.SHA256.get h |> Aux_hash.of_sha256
+
+  let create
+      ~(transaction_with_status : Mina_transaction.Transaction.t With_status.t)
+      ~(state_hash : State_hash.t * State_body_hash.t)
+      ~(statement : Transaction_snark.Statement.t)
+      ~(init_stack : Pending_coinbase.Stack_versioned.t)
+      ~(first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t)
+      ~(second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t)
+      ~(block_global_slot : Mina_numbers.Global_slot_since_genesis.t) : t =
+    let (v : Stable.Latest.t) =
+      { Stable.Latest.transaction_with_status =
+          With_status.map transaction_with_status
+            ~f:Mina_transaction.Transaction.read_all_proofs_from_disk
+      ; Stable.Latest.state_hash
+      ; statement
+      ; init_stack
+      ; first_pass_ledger_witness
+      ; second_pass_ledger_witness
+      ; block_global_slot
+      }
+    in
+    { transaction_with_status
+    ; state_hash
+    ; statement
+    ; init_stack
+    ; first_pass_ledger_witness
+    ; second_pass_ledger_witness
+    ; block_global_slot
+    ; hash = hash v
+    }
+
+  let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+      ( { Stable.Latest.transaction_with_status
+        ; state_hash
+        ; statement
+        ; init_stack
+        ; first_pass_ledger_witness
+        ; second_pass_ledger_witness
+        ; block_global_slot
+        } as v ) =
+    { transaction_with_status =
+        With_status.map transaction_with_status
+          ~f:
+            (Mina_transaction.Transaction.write_all_proofs_to_disk
+               ~signature_kind ~proof_cache_db )
+    ; state_hash
+    ; statement
+    ; init_stack
+    ; first_pass_ledger_witness
+    ; second_pass_ledger_witness
+    ; block_global_slot
+    ; hash = hash v
+    }
+
+  let read_all_proofs_from_disk
+      { transaction_with_status
+      ; state_hash
+      ; statement
+      ; init_stack
+      ; first_pass_ledger_witness
+      ; second_pass_ledger_witness
+      ; block_global_slot
+      ; _
+      } =
+    { Stable.Latest.transaction_with_status =
+        With_status.map transaction_with_status
+          ~f:Mina_transaction.Transaction.read_all_proofs_from_disk
+    ; state_hash
+    ; statement
+    ; init_stack
+    ; first_pass_ledger_witness
+    ; second_pass_ledger_witness
+    ; block_global_slot
+    }
 end
 
-module Ledger_proof_with_sok_message = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t = Ledger_proof.Stable.V2.t * Sok_message.Stable.V1.t
-      [@@deriving sexp]
+module Ledger_proof_with_hash = struct
+  let hash (v : Ledger_proof.Stable.Latest.t) =
+    let h = Digestif.SHA256.init () in
+    let h =
+      Binable.to_string (module Ledger_proof.Stable.Latest) v
+      |> Digestif.SHA256.feed_string h
+    in
+    Digestif.SHA256.get h |> Aux_hash.of_sha256
 
-      let to_latest = Fn.id
-    end
-  end]
+  type t = (Ledger_proof.Cached.t, Aux_hash.t) With_hash.t
+
+  let create : Ledger_proof.Cached.t -> t =
+    let hash_data p = hash (Ledger_proof.Cached.read_proof_from_disk p) in
+    fun p -> With_hash.of_data ~hash_data p
 end
 
 module Available_job = struct
   type t =
-    ( Ledger_proof_with_sok_message.t
+    ( Ledger_proof_with_hash.t
     , Transaction_with_witness.t )
     Parallel_scan.Available_job.t
-  [@@deriving sexp]
 end
 
 module Space_partition = Parallel_scan.Space_partition
@@ -149,68 +233,97 @@ module Job_view = struct
     `List [ `Int position; job_to_yojson ]
 end
 
-type job = Available_job.t [@@deriving sexp]
+type job = Available_job.t
+
+let hash_generic :
+    type a b.
+       ledger_proof_hash:(a -> string)
+    -> tx_witness_hash:(b -> string)
+    -> (a, b) Parallel_scan.State.t
+       * (b list * [ `Border_block_continued_in_the_next_tree of bool ])
+    -> Staged_ledger_hash.Aux_hash.t =
+ fun ~ledger_proof_hash ~tx_witness_hash
+     (parallel_scan_state, previous_incomplete_zkapp_updates) ->
+  let state_hash =
+    Parallel_scan.State.hash parallel_scan_state ledger_proof_hash
+      tx_witness_hash
+  in
+  let ( previous_incomplete_zkapp_updates
+      , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
+    previous_incomplete_zkapp_updates
+  in
+  let incomplete_updates =
+    List.fold ~init:(Digestif.SHA256.init ()) previous_incomplete_zkapp_updates
+      ~f:(fun h t -> Digestif.SHA256.feed_string h (tx_witness_hash t))
+    |> Digestif.SHA256.get
+  in
+  let continue_in_next_tree =
+    Digestif.SHA256.digest_string (Bool.to_string continue_in_next_tree)
+  in
+  [ state_hash; incomplete_updates; continue_in_next_tree ]
+  |> List.fold ~init:(Digestif.SHA256.init ()) ~f:(fun h t ->
+         Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string t) )
+  |> Digestif.SHA256.get |> Staged_ledger_hash.Aux_hash.of_sha256
 
 (*Scan state and any zkapp updates that were applied to the to the most recent
    snarked ledger but are from the tree just before the tree corresponding to
    the snarked ledger*)
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  [@@@no_toplevel_latest_type]
+
+  module V3 = struct
     type t =
       { scan_state :
-          ( Ledger_proof_with_sok_message.Stable.V2.t
-          , Transaction_with_witness.Stable.V2.t )
+          ( Ledger_proof.Stable.V2.t
+          , Transaction_with_witness.Stable.V3.t )
           Parallel_scan.State.Stable.V1.t
       ; previous_incomplete_zkapp_updates :
-          Transaction_with_witness.Stable.V2.t list
+          Transaction_with_witness.Stable.V3.t list
           * [ `Border_block_continued_in_the_next_tree of bool ]
       }
-    [@@deriving sexp]
 
     let to_latest = Fn.id
 
     let hash (t : t) =
-      let state_hash =
-        Parallel_scan.State.hash t.scan_state
-          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
-          (Binable.to_string (module Transaction_with_witness.Stable.V2))
-      in
-      let ( previous_incomplete_zkapp_updates
-          , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
-        t.previous_incomplete_zkapp_updates
-      in
-      let incomplete_updates =
-        List.fold ~init:(Digestif.SHA256.init ())
-          previous_incomplete_zkapp_updates ~f:(fun h t ->
-            Digestif.SHA256.feed_string h
-            @@ Binable.to_string (module Transaction_with_witness.Stable.V2) t )
-        |> Digestif.SHA256.get
-      in
-      let continue_in_next_tree =
-        Digestif.SHA256.digest_string (Bool.to_string continue_in_next_tree)
-      in
-      [ state_hash; incomplete_updates; continue_in_next_tree ]
-      |> List.fold ~init:(Digestif.SHA256.init ()) ~f:(fun h t ->
-             Digestif.SHA256.feed_string h (Digestif.SHA256.to_raw_string t) )
-      |> Digestif.SHA256.get |> Staged_ledger_hash.Aux_hash.of_sha256
+      hash_generic
+        ~ledger_proof_hash:(fun (x : Ledger_proof.Stable.V2.t) ->
+          Ledger_proof_with_hash.hash x )
+        ~tx_witness_hash:(fun (x : Transaction_with_witness.Stable.V3.t) ->
+          Transaction_with_witness.hash x )
+        (t.scan_state, t.previous_incomplete_zkapp_updates)
   end
 end]
 
-[%%define_locally Stable.Latest.(hash)]
+type t =
+  { scan_state :
+      ( Ledger_proof_with_hash.t
+      , Transaction_with_witness.t )
+      Parallel_scan.State.t
+  ; previous_incomplete_zkapp_updates :
+      Transaction_with_witness.t list
+      * [ `Border_block_continued_in_the_next_tree of bool ]
+  }
+
+let hash (t : t) =
+  hash_generic
+    ~ledger_proof_hash:(fun (x : Ledger_proof_with_hash.t) -> x.hash)
+    ~tx_witness_hash:(fun (x : Transaction_with_witness.t) -> x.hash)
+    (t.scan_state, t.previous_incomplete_zkapp_updates)
 
 (**********Helpers*************)
 
 let create_expected_statement ~constraint_constants
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
     ~connecting_merkle_root
-    { Transaction_with_witness.transaction_with_info
+    { Transaction_with_witness.transaction_with_status
     ; state_hash
     ; first_pass_ledger_witness
     ; second_pass_ledger_witness
-    ; init_stack
+    ; init_stack = pending_coinbase_before
     ; statement
     ; block_global_slot
+    ; _
     } =
   let open Or_error.Let_syntax in
   let source_first_pass_merkle_root =
@@ -221,9 +334,7 @@ let create_expected_statement ~constraint_constants
     Frozen_ledger_hash.of_ledger_hash
     @@ Sparse_ledger.merkle_root second_pass_ledger_witness
   in
-  let { With_status.data = transaction; status = _ } =
-    Ledger.Transaction_applied.transaction transaction_with_info
-  in
+  let transaction = transaction_with_status.data in
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
   let empty_local_state = Mina_state.Local_state.empty () in
@@ -248,20 +359,12 @@ let create_expected_statement ~constraint_constants
       |> Frozen_ledger_hash.of_ledger_hash
     in
     let%map supply_increase =
-      Ledger.Transaction_applied.supply_increase applied_transaction
+      Mina_transaction_logic.Transaction_applied.supply_increase
+        ~constraint_constants applied_transaction
     in
     ( target_first_pass_merkle_root
     , target_second_pass_merkle_root
     , supply_increase )
-  in
-  let%bind pending_coinbase_before =
-    match init_stack with
-    | Base source ->
-        Ok source
-    | Merge ->
-        Or_error.errorf
-          !"Invalid init stack in Pending coinbase stack state . Expected Base \
-            found Merge"
   in
   let pending_coinbase_after =
     let state_body_hash = snd state_hash in
@@ -295,39 +398,21 @@ let create_expected_statement ~constraint_constants
   ; sok_digest = ()
   }
 
-let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
-    Ledger_proof_with_sok_message.t Or_error.t =
-  let sok_digest = Ledger_proof.sok_digest current_proof
-  and proof = Ledger_proof.underlying_proof current_proof in
-  match job with
-  | Base { statement; _ } ->
-      let ledger_proof = Ledger_proof.create ~statement ~sok_digest ~proof in
-      Ok (ledger_proof, Sok_message.create ~fee ~prover)
-  | Merge ((p, _), (p', _)) ->
-      let open Or_error.Let_syntax in
-      let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
-      let%map statement = Transaction_snark.Statement.merge s s' in
-      ( Ledger_proof.create ~statement ~sok_digest ~proof
-      , Sok_message.create ~fee ~prover )
-
 let total_proofs (works : Transaction_snark_work.t list) =
   List.sum (module Int) works ~f:(fun w -> One_or_two.length w.proofs)
 
 (*************exposed functions*****************)
 
-module P = struct
-  type t = Ledger_proof_with_sok_message.t
-end
-
 module Make_statement_scanner (Verifier : sig
   type t
 
-  val verify : verifier:t -> P.t list -> unit Or_error.t Deferred.Or_error.t
+  val verify :
+       verifier:t
+    -> Ledger_proof_with_hash.t list
+    -> unit Or_error.t Deferred.Or_error.t
 end) =
 struct
   module Fold = Parallel_scan.State.Make_foldable (Deferred)
-
-  let logger = lazy (Logger.create ())
 
   module Timer = struct
     module Info = struct
@@ -355,15 +440,15 @@ struct
         }
     end
 
-    type t = Info.t String.Table.t
+    type t = { table : Info.t String.Table.t; logger : Logger.t }
 
-    let create () : t = String.Table.create ()
+    let create ~logger () : t = { table = String.Table.create (); logger }
 
     let time (t : t) label f =
       let start = Time.now () in
       let x = f () in
       let elapsed = Time.(diff (now ()) start) in
-      Hashtbl.update t label ~f:(function
+      Hashtbl.update t.table label ~f:(function
         | None ->
             Info.singleton elapsed
         | Some acc ->
@@ -371,23 +456,18 @@ struct
       x
 
     let log label (t : t) =
-      let logger = Lazy.force logger in
-      [%log debug]
+      [%log' debug t.logger]
         ~metadata:
-          (List.map (Hashtbl.to_alist t) ~f:(fun (k, info) ->
+          (List.map (Hashtbl.to_alist t.table) ~f:(fun (k, info) ->
                (k, Info.to_yojson info) ) )
         "%s timing" label
   end
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
-  let scan_statement ~constraint_constants
-      ({ scan_state = tree; previous_incomplete_zkapp_updates = _ } : t)
-      ~statement_check ~verifier :
-      ( Transaction_snark.Statement.t
-      , [ `Error of Error.t | `Empty ] )
-      Deferred.Result.t =
+  let scan_statement (type merge) ~constraint_constants ~logger
+      ~merge_to_statement tree ~statement_check ~verify =
     let open Deferred.Or_error.Let_syntax in
-    let timer = Timer.create () in
+    let timer = Timer.create ~logger () in
     let yield_occasionally =
       let f = Staged.unstage (Async.Scheduler.yield_every ~n:50) in
       fun () -> f () |> Deferred.map ~f:Or_error.return
@@ -396,7 +476,7 @@ struct
       Async.Scheduler.yield () |> Deferred.map ~f:Or_error.return
     in
     let module Acc = struct
-      type t = (Transaction_snark.Statement.t * P.t list) option
+      type t = (Transaction_snark.Statement.t * merge list) option
     end in
     let write_error description =
       sprintf !"Staged_ledger.scan_statement: %s\n" description
@@ -444,24 +524,23 @@ struct
     in
     let fold_step_a (acc_statement, acc_pc) job =
       match job with
-      | Parallel_scan.Merge.Job.Part (proof, message) ->
-          let statement = Ledger_proof.statement proof in
+      | Parallel_scan.Merge.Job.Part merge ->
+          let statement = merge_to_statement merge in
           let%map acc_stmt =
-            merge_acc ~proofs:[ (proof, message) ] acc_statement statement
+            merge_acc ~proofs:[ merge ] acc_statement statement
           in
           (acc_stmt, acc_pc)
       | Empty | Full { status = Parallel_scan.Job_status.Done; _ } ->
           return (acc_statement, acc_pc)
-      | Full { left = proof_1, message_1; right = proof_2, message_2; _ } ->
-          let stmt1 = Ledger_proof.statement proof_1 in
-          let stmt2 = Ledger_proof.statement proof_2 in
+      | Full { left; right; _ } ->
+          let stmt1 = merge_to_statement left in
+          let stmt2 = merge_to_statement right in
           let%bind merged_statement =
             Timer.time timer (sprintf "merge:%s" __LOC__) (fun () ->
                 Deferred.return (Transaction_snark.Statement.merge stmt1 stmt2) )
           in
           let%map acc_stmt =
-            merge_acc acc_statement merged_statement
-              ~proofs:[ (proof_1, message_1); (proof_2, message_2) ]
+            merge_acc acc_statement merged_statement ~proofs:[ left; right ]
           in
           (acc_stmt, acc_pc)
     in
@@ -545,7 +624,7 @@ struct
     | Ok (None, _) ->
         Deferred.return (Error `Empty)
     | Ok (Some (res, proofs), _) -> (
-        match%map.Deferred Verifier.verify ~verifier proofs with
+        match%map.Deferred verify proofs with
         | Ok (Ok ()) ->
             Ok res
         | Ok (Error err) ->
@@ -555,8 +634,8 @@ struct
     | Error e ->
         Deferred.return (Error (`Error e))
 
-  let check_invariants t ~constraint_constants ~statement_check ~verifier
-      ~error_prefix
+  let check_invariants_impl parallel_scan_state ~merge_to_statement
+      ~constraint_constants ~logger ~statement_check ~verify ~error_prefix
       ~(last_proof_statement : Transaction_snark.Statement.t option)
       ~(registers_end :
          ( Frozen_ledger_hash.t
@@ -594,7 +673,8 @@ struct
     in
     match%map
       O1trace.sync_thread "validate_transaction_snark_scan_state" (fun () ->
-          scan_statement t ~constraint_constants ~statement_check ~verifier )
+          scan_statement parallel_scan_state ~constraint_constants ~logger
+            ~statement_check ~verify ~merge_to_statement )
     with
     | Error (`Error e) ->
         Error e
@@ -634,15 +714,21 @@ struct
             "nondefault fee token"
         in
         ()
+
+  let check_invariants (t : t) ~verifier =
+    check_invariants_impl t.scan_state
+      ~merge_to_statement:(fun (x : Ledger_proof_with_hash.t) ->
+        Ledger_proof.Cached.statement x.data )
+      ~verify:(Verifier.verify ~verifier)
 end
 
 let statement_of_job : job -> Transaction_snark.Statement.t option = function
   | Base { statement; _ } ->
       Some statement
-  | Merge ((p1, _), (p2, _)) ->
+  | Merge ({ data = p1; _ }, { data = p2; _ }) ->
       Transaction_snark.Statement.merge
-        (Ledger_proof.statement p1)
-        (Ledger_proof.statement p2)
+        (Ledger_proof.Cached.statement p1)
+        (Ledger_proof.Cached.statement p2)
       |> Result.ok
 
 let create ~work_delay ~transaction_capacity_log_2 : t =
@@ -659,6 +745,17 @@ let empty ~(constraint_constants : Genesis_constants.Constraint_constants.t) ()
 
 module Transactions_ordered = struct
   module Poly = struct
+    (** Represents sequence of transactions extracted from scan state
+           when it emitted a proof, split into:
+
+           * [first_pass] - transactions that went through first pass
+           * [second_pass] - transactions that went through second pass and correspond
+             to the current ledger proof (subset of first pass group)
+           * [current_incomplete] - transactions that went through second pass and correspond
+             to the the next ledger proof (subset of first pass group)
+           * [previous_incomplete] - leftover from previous ledger proof emitted with
+             the current ledger proof (not intersecting with other groups)
+        *)
     type 'a t =
       { first_pass : 'a list
       ; second_pass : 'a list
@@ -668,15 +765,7 @@ module Transactions_ordered = struct
     [@@deriving sexp, to_yojson]
   end
 
-  type t = Transaction_with_witness.t Poly.t [@@deriving sexp, to_yojson]
-
-  let map (t : 'a Poly.t) ~f : 'b Poly.t =
-    let f = List.map ~f in
-    { Poly.first_pass = f t.first_pass
-    ; second_pass = f t.second_pass
-    ; previous_incomplete = f t.previous_incomplete
-    ; current_incomplete = f t.current_incomplete
-    }
+  type t = Transaction_with_witness.t Poly.t
 
   let fold (t : 'a Poly.t) ~f ~init =
     let init = List.fold ~init t.first_pass ~f in
@@ -699,14 +788,11 @@ module Transactions_ordered = struct
                      (first_pass_txns, second_pass_txns, _old_root)
                      (txn_with_witness : Transaction_with_witness.t)
                    ->
-                  let txn =
-                    Ledger.Transaction_applied.transaction
-                      txn_with_witness.transaction_with_info
-                  in
+                  let txn = txn_with_witness.transaction_with_status.data in
                   let target_first_pass_ledger =
                     txn_with_witness.statement.target.first_pass_ledger
                   in
-                  match txn.data with
+                  match txn with
                   | Transaction.Coinbase _
                   | Fee_transfer _
                   | Command (User_command.Signed_command _) ->
@@ -768,15 +854,18 @@ end
 
 let extract_txn_and_global_slot (txn_with_witness : Transaction_with_witness.t)
     =
-  let txn =
-    Ledger.Transaction_applied.transaction
-      txn_with_witness.transaction_with_info
-  in
+  let txn = txn_with_witness.transaction_with_status in
   let state_hash = fst txn_with_witness.state_hash in
   let global_slot = txn_with_witness.block_global_slot in
   (txn, state_hash, global_slot)
 
-let latest_ledger_proof' t =
+let latest_ledger_proof t =
+  let%map.Option { data = proof; _ }, _ =
+    Parallel_scan.last_emitted_value t.scan_state
+  in
+  proof
+
+let latest_ledger_proof_and_txs' t =
   let open Option.Let_syntax in
   let%map proof, txns_with_witnesses =
     Parallel_scan.last_emitted_value t.scan_state
@@ -805,15 +894,9 @@ let latest_ledger_proof' t =
   in
   (proof, txns)
 
-let latest_ledger_proof t =
-  Option.map (latest_ledger_proof' t) ~f:(fun (p, txns) ->
-      ( p
-      , List.map txns
-          ~f:(Transactions_ordered.map ~f:extract_txn_and_global_slot) ) )
-
 let incomplete_txns_from_recent_proof_tree t =
   let open Option.Let_syntax in
-  let%map proof, txns_per_block = latest_ledger_proof' t in
+  let%map proof, txns_per_block = latest_ledger_proof_and_txs' t in
   let txns =
     match List.last txns_per_block with
     | None ->
@@ -859,12 +942,6 @@ let staged_transactions t =
         :: txns
   in
   List.concat txns
-
-(*All the transactions in the order in which they were applied along with the parent protocol state of the blocks that contained them*)
-let staged_transactions_with_state_hash t =
-  let pending_transactions_per_block = staged_transactions t in
-  List.map pending_transactions_per_block
-    ~f:(Transactions_ordered.map ~f:extract_txn_and_global_slot)
 
 (* written in continuation passing style so that implementation can be used both sync and async *)
 let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
@@ -916,7 +993,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
         k ()
     | (expected_status, partially_applied_txn) :: partially_applied_txns' ->
         let%bind res = apply_second_pass ledger partially_applied_txn in
-        let status = Ledger.Transaction_applied.transaction_status res in
+        let status = Ledger.status_of_applied res in
         if Transaction_status.equal expected_status status then
           Ok
             (`Continue
@@ -930,9 +1007,10 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
             expected_status status
             (Ledger.Transaction_partially_applied.command partially_applied_txn)
   in
-  let apply_previous_incomplete_txns ~k (txns : Previous_incomplete_txns.t) =
+  let apply_previous_incomplete_txns ~signature_kind ~k
+      (txns : Previous_incomplete_txns.t) =
     (*Note: Previous incomplete transactions refer to the block's transactions from previous scan state tree that were split between the two trees.
-      The set in the previous tree have gone through the first pass. For the second pass that is to happen after the rest of the set goes through the first pass, we need partially applied state - result of previous tree's transactions' first pass. To generate the partial state, we do a a first pass application of previous tree's transaction on a sparse ledger created from witnesses stored in the scan state and then use it to apply to the ledger here*)
+      The set in the previous tree have gone through the first pass. For the second pass that is to happen after the rest of the set goes through the first pass, we need partially applied state - result of previous tree's transactions' first pass. To generate the partial state, we do a first pass application of previous tree's transaction on a sparse ledger created from witnesses stored in the scan state and then use it to apply to the ledger here*)
     let inject_ledger_info partially_applied_txn =
       let open Sparse_ledger.T.Transaction_partially_applied in
       match partially_applied_txn with
@@ -981,6 +1059,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
             { command = t.command
             ; previous_hash = t.previous_hash
             ; original_first_pass_account_states
+            ; signature_kind
             ; constraint_constants = t.constraint_constants
             ; state_view = t.state_view
             ; global_state
@@ -1032,18 +1111,14 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
   in
   let rec apply_txns (previous_incomplete : Previous_incomplete_txns.t)
       (ordered_txns : _ Transactions_ordered.Poly.t list)
-      ~first_pass_ledger_hash =
+      ~first_pass_ledger_hash ~signature_kind =
     let previous_incomplete =
       (*filter out any non-zkapp transactions for second pass application*)
       match previous_incomplete with
       | Previous_incomplete_txns.Unapplied txns ->
           Previous_incomplete_txns.Unapplied
             (List.filter txns ~f:(fun txn ->
-                 match
-                   (Ledger.Transaction_applied.transaction
-                      txn.transaction_with_info )
-                     .data
-                 with
+                 match txn.transaction_with_status.data with
                  | Command (Zkapp_command _) ->
                      true
                  | _ ->
@@ -1055,8 +1130,9 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
     in
     match ordered_txns with
     | [] ->
-        apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
-            Ok (`Complete first_pass_ledger_hash) )
+        apply_previous_incomplete_txns ~signature_kind
+          ~k:(fun () -> Ok (`Complete first_pass_ledger_hash))
+          previous_incomplete
     | [ txns_per_block ] when stop_at_first_pass ->
         (*Last block; don't apply second pass. This is for snarked ledgers which are first pass ledgers*)
         apply_txns_first_pass txns_per_block.first_pass
@@ -1065,13 +1141,14 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
               then there’d be at least two sets of txns_per_block and the
               previous_incomplete txns will be applied when processing the first
               set. The subsequent sets shouldn’t have any previous-incomplete.*)
-            apply_txns (Unapplied []) [] ~first_pass_ledger_hash )
+            apply_txns (Unapplied []) [] ~first_pass_ledger_hash ~signature_kind )
     | txns_per_block :: ordered_txns' ->
         (*Apply first pass of a blocks transactions either new or continued from previous tree*)
         apply_txns_first_pass txns_per_block.first_pass
           ~k:(fun first_pass_ledger_hash partially_applied_txns ->
             (*Apply second pass of previous tree's transactions, if any*)
-            apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
+            apply_previous_incomplete_txns previous_incomplete ~signature_kind
+              ~k:(fun () ->
                 let continue_previous_tree's_txns =
                   (* If this is a continuation from previous tree for the same block (incomplete txns in both sets) then do second pass now*)
                   let previous_not_empty =
@@ -1092,11 +1169,11 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
                 if do_second_pass then
                   apply_txns_second_pass partially_applied_txns ~k:(fun () ->
                       apply_txns (Unapplied []) ordered_txns'
-                        ~first_pass_ledger_hash )
+                        ~first_pass_ledger_hash ~signature_kind )
                 else
                   (*Transactions not completed in this tree, so second pass after first pass of remaining transactions for the same block in the next tree*)
                   apply_txns (Partially_applied partially_applied_txns)
-                    ordered_txns' ~first_pass_ledger_hash ) )
+                    ordered_txns' ~first_pass_ledger_hash ~signature_kind ) )
   in
   let previous_incomplete =
     Option.value_map (List.hd ordered_txns)
@@ -1113,7 +1190,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
 
 let apply_ordered_txns_sync ?stop_at_first_pass ordered_txns ~ledger
     ~get_protocol_state ~apply_first_pass ~apply_second_pass
-    ~apply_first_pass_sparse_ledger =
+    ~apply_first_pass_sparse_ledger ~signature_kind =
   let rec run = function
     | Ok (`Continue k) ->
         run (k ())
@@ -1125,11 +1202,11 @@ let apply_ordered_txns_sync ?stop_at_first_pass ordered_txns ~ledger
   run
   @@ apply_ordered_txns_stepwise ?stop_at_first_pass ordered_txns ~ledger
        ~get_protocol_state ~apply_first_pass ~apply_second_pass
-       ~apply_first_pass_sparse_ledger
+       ~apply_first_pass_sparse_ledger ~signature_kind
 
 let apply_ordered_txns_async ?stop_at_first_pass ordered_txns
     ?(async_batch_size = 10) ~ledger ~get_protocol_state ~apply_first_pass
-    ~apply_second_pass ~apply_first_pass_sparse_ledger =
+    ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind =
   let open Deferred.Result.Let_syntax in
   let yield =
     let f = Staged.unstage (Scheduler.yield_every ~n:async_batch_size) in
@@ -1148,36 +1225,38 @@ let apply_ordered_txns_async ?stop_at_first_pass ordered_txns
   run
   @@ apply_ordered_txns_stepwise ?stop_at_first_pass ordered_txns ~ledger
        ~get_protocol_state ~apply_first_pass ~apply_second_pass
-       ~apply_first_pass_sparse_ledger
+       ~apply_first_pass_sparse_ledger ~signature_kind
 
 let get_snarked_ledger_sync ~ledger ~get_protocol_state ~apply_first_pass
-    ~apply_second_pass ~apply_first_pass_sparse_ledger t =
-  match latest_ledger_proof' t with
+    ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind t =
+  match latest_ledger_proof_and_txs' t with
   | None ->
       Or_error.errorf "No transactions found"
   | Some (_, txns_per_block) ->
       apply_ordered_txns_sync ~stop_at_first_pass:true txns_per_block ~ledger
         ~get_protocol_state ~apply_first_pass ~apply_second_pass
-        ~apply_first_pass_sparse_ledger
+        ~apply_first_pass_sparse_ledger ~signature_kind
       |> Or_error.ignore_m
 
 let get_snarked_ledger_async ?async_batch_size ~ledger ~get_protocol_state
-    ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger t =
-  match latest_ledger_proof' t with
+    ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger
+    ~signature_kind t =
+  match latest_ledger_proof_and_txs' t with
   | None ->
       Deferred.Or_error.errorf "No transactions found"
   | Some (_, txns_per_block) ->
       apply_ordered_txns_async ~stop_at_first_pass:true txns_per_block
         ?async_batch_size ~ledger ~get_protocol_state ~apply_first_pass
-        ~apply_second_pass ~apply_first_pass_sparse_ledger
+        ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind
       |> Deferred.Or_error.ignore_m
 
 let get_staged_ledger_async ?async_batch_size ~ledger ~get_protocol_state
-    ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger t =
+    ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger
+    ~signature_kind t =
   let staged_transactions_with_state_hash = staged_transactions t in
   apply_ordered_txns_async staged_transactions_with_state_hash ?async_batch_size
     ~ledger ~get_protocol_state ~apply_first_pass ~apply_second_pass
-    ~apply_first_pass_sparse_ledger
+    ~apply_first_pass_sparse_ledger ~signature_kind
 
 let free_space t = Parallel_scan.free_space t.scan_state
 
@@ -1185,12 +1264,6 @@ let free_space t = Parallel_scan.free_space t.scan_state
 let all_jobs t = Parallel_scan.all_jobs t.scan_state
 
 let next_on_new_tree t = Parallel_scan.next_on_new_tree t.scan_state
-
-let base_jobs_on_latest_tree t =
-  Parallel_scan.base_jobs_on_latest_tree t.scan_state
-
-let base_jobs_on_earlier_tree t =
-  Parallel_scan.base_jobs_on_earlier_tree t.scan_state
 
 let partition_if_overflowing t =
   let bundle_count work_count = (work_count + 1) / 2 in
@@ -1203,24 +1276,10 @@ let partition_if_overflowing t =
           (slots, bundle_count job_count) )
   }
 
-let extract_from_job (job : job) =
-  match job with
-  | Parallel_scan.Available_job.Base d ->
-      First
-        ( d.transaction_with_info
-        , d.statement
-        , d.state_hash
-        , d.first_pass_ledger_witness
-        , d.second_pass_ledger_witness
-        , d.init_stack
-        , d.block_global_slot )
-  | Merge ((p1, _), (p2, _)) ->
-      Second (p1, p2)
-
 let snark_job_list_json t =
   let all_jobs : Job_view.t list list =
-    let fa (a : Ledger_proof_with_sok_message.t) =
-      Ledger_proof.statement (fst a)
+    let fa (a : Ledger_proof_with_hash.t) =
+      Ledger_proof.Cached.statement a.data
     in
     let fd (d : Transaction_with_witness.t) = d.statement in
     Parallel_scan.view_jobs_with_position t.scan_state fa fd
@@ -1263,68 +1322,60 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
              | Some stmt ->
                  stmt ) ) )
 
+let single_spec_of_job ~get_state :
+    job -> Snark_work_lib.Spec.Single.t Or_error.t = function
+  | Parallel_scan.Available_job.Base
+      { transaction_with_status
+      ; statement
+      ; state_hash
+      ; first_pass_ledger_witness
+      ; second_pass_ledger_witness
+      ; init_stack
+      ; block_global_slot
+      ; _
+      } ->
+      let%map.Or_error witness =
+        let { With_status.data = transaction; status } =
+          transaction_with_status
+        in
+        let%map.Or_error protocol_state_body =
+          get_state (fst state_hash)
+          |> Or_error.map ~f:Mina_state.Protocol_state.body
+        in
+        { Transaction_witness.first_pass_ledger = first_pass_ledger_witness
+        ; second_pass_ledger = second_pass_ledger_witness
+        ; transaction
+        ; protocol_state_body
+        ; init_stack
+        ; status
+        ; block_global_slot
+        }
+      in
+      Snark_work_lib.Work.Single.Spec.Transition (statement, witness)
+  | Merge ({ data = p1; _ }, { data = p2; _ }) ->
+      let%map.Or_error merged =
+        Transaction_snark.Statement.merge
+          (Ledger_proof.Cached.statement p1)
+          (Ledger_proof.Cached.statement p2)
+      in
+      Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
+
+let single_spec_one_or_twos_rev_of_job_list ~get_state jobs =
+  List.fold_result ~init:[] (One_or_two.group_list jobs) ~f:(fun acc' pair ->
+      let%map.Or_error spec =
+        One_or_two.Or_error.map ~f:(single_spec_of_job ~get_state) pair
+      in
+      spec :: acc' )
+
 let all_work_pairs t
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
-    (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
-    One_or_two.t
-    list
-    Or_error.t =
+    Snark_work_lib.Spec.Single.t One_or_two.t list Or_error.t =
   let all_jobs = all_jobs t in
-  let module A = Available_job in
-  let open Or_error.Let_syntax in
-  let single_spec (job : job) =
-    match extract_from_job job with
-    | First
-        ( transaction_with_info
-        , statement
-        , state_hash
-        , first_pass_ledger_witness
-        , second_pass_ledger_witness
-        , init_stack
-        , block_global_slot ) ->
-        let%map witness =
-          let { With_status.data = transaction; status } =
-            Mina_transaction_logic.Transaction_applied.transaction_with_status
-              transaction_with_info
-          in
-          let%bind protocol_state_body =
-            let%map state = get_state (fst state_hash) in
-            Mina_state.Protocol_state.body state
-          in
-          let%map init_stack =
-            match init_stack with
-            | Base x ->
-                Ok x
-            | Merge ->
-                Or_error.error_string "init_stack was Merge"
-          in
-          { Transaction_witness.first_pass_ledger = first_pass_ledger_witness
-          ; second_pass_ledger = second_pass_ledger_witness
-          ; transaction
-          ; protocol_state_body
-          ; init_stack
-          ; status
-          ; block_global_slot
-          }
-        in
-        Snark_work_lib.Work.Single.Spec.Transition (statement, witness)
-    | Second (p1, p2) ->
-        let%map merged =
-          Transaction_snark.Statement.merge
-            (Ledger_proof.statement p1)
-            (Ledger_proof.statement p2)
-        in
-        Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
-  in
   List.fold_until all_jobs ~init:[]
     ~finish:(fun lst -> Ok lst)
     ~f:(fun acc jobs ->
-      let specs_list : 'a One_or_two.t list Or_error.t =
-        List.fold ~init:(Ok []) (One_or_two.group_list jobs)
-          ~f:(fun acc' pair ->
-            let%bind acc' = acc' in
-            let%map spec = One_or_two.Or_error.map ~f:single_spec pair in
-            spec :: acc' )
+      let specs_list =
+        single_spec_one_or_twos_rev_of_job_list ~get_state jobs
       in
       match specs_list with
       | Ok list ->
@@ -1336,27 +1387,18 @@ let update_metrics t = Parallel_scan.update_metrics t.scan_state
 
 let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in
-  let fill_in_transaction_snark_work tree (works : Transaction_snark_work.t list)
-      : (Ledger_proof.t * Sok_message.t) list Or_error.t =
-    let next_jobs =
-      List.(
-        take
-          (concat @@ Parallel_scan.jobs_for_next_update tree)
-          (total_proofs works))
-    in
-    map2_or_error next_jobs
-      (List.concat_map works
-         ~f:(fun { Transaction_snark_work.fee; proofs; prover } ->
-           One_or_two.map proofs ~f:(fun proof -> (fee, proof, prover))
-           |> One_or_two.to_list ) )
-      ~f:completed_work_to_scanable_work
+  let deconstruct_work (w : Transaction_snark_work.t) :
+      Ledger_proof_with_hash.t list =
+    One_or_two.map ~f:Ledger_proof_with_hash.create
+      (Transaction_snark_work.proofs w)
+    |> One_or_two.to_list
   in
   (*get incomplete transactions from previous proof which will be completed in
      the new proof, if there's one*)
   let old_proof_and_incomplete_zkapp_updates =
     incomplete_txns_from_recent_proof_tree t
   in
-  let%bind work_list = fill_in_transaction_snark_work t.scan_state work in
+  let work_list = List.concat_map ~f:deconstruct_work work in
   let%bind proof_opt, updated_scan_state =
     Parallel_scan.update t.scan_state ~completed_jobs:work_list
       ~data:transactions
@@ -1378,15 +1420,15 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
                  t.previous_incomplete_zkapp_updates
              } ) )
       proof_opt
-      ~f:(fun ((proof, _), _txns_with_witnesses) ->
-        let curr_stmt = Ledger_proof.statement proof in
+      ~f:(fun ({ data = proof; _ }, _txns_with_witnesses) ->
+        let curr_stmt = Ledger_proof.Cached.statement proof in
         let prev_stmt, incomplete_zkapp_updates_from_old_proof =
           Option.value_map
             ~default:
               (curr_stmt, ([], `Border_block_continued_in_the_next_tree false))
             old_proof_and_incomplete_zkapp_updates
-            ~f:(fun ((p', _), incomplete_zkapp_updates_from_old_proof) ->
-              ( Ledger_proof.statement p'
+            ~f:(fun ({ data = p'; _ }, incomplete_zkapp_updates_from_old_proof) ->
+              ( Ledger_proof.Cached.statement p'
               , incomplete_zkapp_updates_from_old_proof ) )
         in
         (*prev_target is connected to curr_source- Order of the arguments is
@@ -1409,10 +1451,7 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
               value_exn is safe here
               [latest_ledger_proof] generates ordered transactions
               appropriately*)
-            let (proof, _), txns =
-              Option.value_exn (latest_ledger_proof scan_state')
-            in
-            Ok (Some (proof, txns), scan_state')
+            Ok (latest_ledger_proof scan_state', scan_state')
         | Error e ->
             Or_error.errorf
               "The new final statement does not connect to the previous \
@@ -1457,3 +1496,45 @@ let check_required_protocol_states t ~protocol_states =
   in
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc
+
+let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+    { Stable.Latest.scan_state = uncached
+    ; previous_incomplete_zkapp_updates = tx_list, border_status
+    } =
+  let f1 proof =
+    { With_hash.data =
+        Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
+    ; hash = Ledger_proof_with_hash.hash proof
+    }
+  in
+  { scan_state =
+      Parallel_scan.State.map uncached ~f1
+        ~f2:
+          (Transaction_with_witness.write_all_proofs_to_disk ~signature_kind
+             ~proof_cache_db )
+  ; previous_incomplete_zkapp_updates =
+      ( List.map
+          ~f:
+            (Transaction_with_witness.write_all_proofs_to_disk ~signature_kind
+               ~proof_cache_db )
+          tx_list
+      , border_status )
+  }
+
+let read_all_proofs_from_disk
+    { scan_state = cached
+    ; previous_incomplete_zkapp_updates = tx_list, border_status
+    } =
+  let f1 { With_hash.data = proof; hash = _ } =
+    Ledger_proof.Cached.read_proof_from_disk proof
+  in
+  let scan_state =
+    Parallel_scan.State.map ~f1
+      ~f2:Transaction_with_witness.read_all_proofs_from_disk cached
+  in
+  Stable.Latest.
+    { scan_state
+    ; previous_incomplete_zkapp_updates =
+        ( List.map ~f:Transaction_with_witness.read_all_proofs_from_disk tx_list
+        , border_status )
+    }

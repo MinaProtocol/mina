@@ -28,7 +28,7 @@ See [#1585](https://github.com/CodaProtocol/coda/pull/1585) for early discussion
 
 ### Extensions Redefined
 
-A Transition Frontier Extension is an stateful, incremental view on the state of a Transiton Frontier. When a Transition Frontier is initialized, all of its extensions are also initialized using the Transition Frontier's root. Every mutation performed is represented as a list of diffs, and when the Transition Frontier updates, each Extension is notified of this list of diffs synchronously. Transition Frontier Extensions will notify the Transition Frontier if there was a update to the Extension's view when handling the diffs. If an Extension's view is updated, then a synchronous event is broadcast internally with the new view of that Extension. A Transition Frontier Extension has access to the Transition Frontier so that it can query and calculate information it requires when it handles diffs.
+A Transition Frontier Extension is a stateful, incremental view on the state of a Transiton Frontier. When a Transition Frontier is initialized, all of its extensions are also initialized using the Transition Frontier's root. Every mutation performed is represented as a list of diffs, and when the Transition Frontier updates, each Extension is notified of this list of diffs synchronously. Transition Frontier Extensions will notify the Transition Frontier if there was a update to the Extension's view when handling the diffs. If an Extension's view is updated, then a synchronous event is broadcast internally with the new view of that Extension. A Transition Frontier Extension has access to the Transition Frontier so that it can query and calculate information it requires when it handles diffs.
 
 ### Extension Guidelines
 

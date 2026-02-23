@@ -10,6 +10,12 @@ let%test_module "Zkapp tokens tests" =
   ( module struct
     (* code patterned after "tokens test" unit test in Mina_ledger.Ledger *)
 
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let constraint_constants = U.constraint_constants
 
     let account_creation_fee =
@@ -21,9 +27,10 @@ let%test_module "Zkapp tokens tests" =
 
     let token_funder, _ = keypair_and_amounts.(1)
 
-    let token_owner = Keypair.create ()
+    let token_owner, _ = keypair_and_amounts.(2)
 
-    let token_accounts = Array.init 4 ~f:(fun _ -> Keypair.create ())
+    let token_accounts =
+      Array.init 4 ~f:(fun i -> fst @@ keypair_and_amounts.(i + 3))
 
     let custom_token_id =
       Account_id.derive_token_id
@@ -252,4 +259,11 @@ let%test_module "Zkapp tokens tests" =
                   check_token_balance token_accounts.(2) custom_token_id2 290 ;
                   check_token_balance token_accounts.(3) custom_token_id2 210 ;
                   Async.Deferred.unit ) ) )
+
+    let () =
+      match Sys.getenv_opt "PROOF_CACHE_OUT" with
+      | Some path ->
+          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+      | None ->
+          ()
   end )
