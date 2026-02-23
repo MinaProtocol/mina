@@ -1,6 +1,12 @@
 open Core
 open Rocksdb
 
+let with_temp_dir_sync ~f dir =
+  let temp_dir = Unix.mkdtemp dir in
+  Exn.protect
+    ~f:(fun () -> f temp_dir)
+    ~finally:(fun () -> Mina_stdlib_unix.File_system.rmrf temp_dir)
+
 module Database_tests = struct
   let bigstring_testable =
     Alcotest.testable
@@ -11,42 +17,36 @@ module Database_tests = struct
 
   let test_get_batch () =
     Alcotest.test_case "get_batch" `Quick (fun () ->
-        Async.Thread_safe.block_on_async_exn (fun () ->
-            Mina_stdlib_unix.File_system.with_temp_dir "/tmp/mina-rocksdb-test"
-              ~f:(fun db_dir ->
-                let db = Database.create db_dir in
-                let[@warning "-8"] [ key1; key2; key3 ] =
-                  List.map ~f:(fun s -> Bigstring.of_string s) [ "a"; "b"; "c" ]
-                in
-                let data = Bigstring.of_string "test" in
-                Database.set db ~key:key1 ~data ;
-                Database.set db ~key:key3 ~data ;
-                let[@warning "-8"] [ res1; res2; res3 ] =
-                  Database.get_batch db ~keys:[ key1; key2; key3 ]
-                in
-                Alcotest.(check opt_bigstring_testable)
-                  "First key is present" (Some data) res1 ;
-                Alcotest.(check opt_bigstring_testable)
-                  "Second key is not present" None res2 ;
-                Alcotest.(check opt_bigstring_testable)
-                  "Third key is present" (Some data) res3 ;
-                Async.Deferred.unit ) ) )
+        with_temp_dir_sync "/tmp/mina-rocksdb-test" ~f:(fun db_dir ->
+            let db = Database.create db_dir in
+            let[@warning "-8"] [ key1; key2; key3 ] =
+              List.map ~f:(fun s -> Bigstring.of_string s) [ "a"; "b"; "c" ]
+            in
+            let data = Bigstring.of_string "test" in
+            Database.set db ~key:key1 ~data ;
+            Database.set db ~key:key3 ~data ;
+            let[@warning "-8"] [ res1; res2; res3 ] =
+              Database.get_batch db ~keys:[ key1; key2; key3 ]
+            in
+            Alcotest.(check opt_bigstring_testable)
+              "First key is present" (Some data) res1 ;
+            Alcotest.(check opt_bigstring_testable)
+              "Second key is not present" None res2 ;
+            Alcotest.(check opt_bigstring_testable)
+              "Third key is present" (Some data) res3 ) )
 
   let test_to_alist () =
     Alcotest.test_case "to_alist (of_alist l) = l" `Quick (fun () ->
-        Async.Thread_safe.block_on_async_exn
-        @@ fun () ->
-        Async.Quickcheck.async_test ~trials:20
+        Quickcheck.test ~trials:20
           Quickcheck.Generator.(
             tuple2 String.quickcheck_generator String.quickcheck_generator
             |> list)
           ~f:(fun kvs ->
             match Hashtbl.of_alist (module String) kvs with
             | `Duplicate_key _ ->
-                Async.Deferred.unit
+                ()
             | `Ok _ ->
-                Mina_stdlib_unix.File_system.with_temp_dir
-                  "/tmp/mina-rocksdb-test" ~f:(fun db_dir ->
+                with_temp_dir_sync "/tmp/mina-rocksdb-test" ~f:(fun db_dir ->
                     let sorted =
                       List.sort kvs ~compare:[%compare: string * string]
                       |> List.map ~f:(fun (k, v) ->
@@ -62,22 +62,18 @@ module Database_tests = struct
                     Alcotest.(
                       check (list (pair bigstring_testable bigstring_testable)))
                       "to_alist returns the expected list" sorted alist ;
-                    Database.close db ;
-                    Async.Deferred.unit ) ) )
+                    Database.close db ) ) )
 
   let test_checkpoint_read () =
     Alcotest.test_case "checkpoint read" `Quick (fun () ->
-        let open Async in
-        Thread_safe.block_on_async_exn
-        @@ fun () ->
-        Quickcheck.async_test ~trials:20
+        Quickcheck.test ~trials:20
           Quickcheck.Generator.(
             list
             @@ tuple2 String.quickcheck_generator String.quickcheck_generator)
           ~f:(fun kvs ->
             match Hashtbl.of_alist (module String) kvs with
             | `Duplicate_key _ ->
-                Deferred.unit
+                ()
             | `Ok db_hashtbl -> (
                 let open Core in
                 let cp_hashtbl = Hashtbl.copy db_hashtbl in
@@ -134,10 +130,9 @@ module Database_tests = struct
                       "Checkpoint to_alist has expected content" cp_sorted
                       cp_alist ;
                     Database.close db ;
-                    Database.close cp ;
-                    Deferred.unit
+                    Database.close cp
                 | _ ->
-                    Deferred.unit ) ) )
+                    () ) ) )
 
   let all = [ test_get_batch (); test_to_alist (); test_checkpoint_read () ]
 end
@@ -166,12 +161,6 @@ module Scan_tests = struct
     let pp ppf b = Format.fprintf ppf "%S" (Bigstring.to_string b) in
     Alcotest.testable pp Bigstring.equal
 
-  let with_temp_dir_sync ~f dir =
-    let temp_dir = Unix.mkdtemp dir in
-    Exn.protect
-      ~f:(fun () -> f temp_dir)
-      ~finally:(fun () -> Mina_stdlib_unix.File_system.rmrf temp_dir)
-
   let roundtrip1 ~random () =
     Alcotest.test_case "recovering a dumped kv store gives same data" `Quick
       (fun () ->
@@ -187,16 +176,19 @@ module Scan_tests = struct
               Database.close db ;
               db_path
             in
+            Unix.sleep 3 ;
             let dumped_text_file =
               let text_file = test_dir ^/ "text_file.txt" in
               Scan.dump ~db_path:db_to_dump_path ~text_file () ;
               text_file
             in
+            Unix.sleep 3 ;
             let db_recovered_path =
               let db_path = test_dir ^/ "db_recovered" in
               Scan.restore ~db_path ~text_file:dumped_text_file () ;
               db_path
             in
+            Unix.sleep 3 ;
             let kvs_recovered =
               let db = Database.create db_recovered_path in
               let kvs = Database.to_alist db in

@@ -3,8 +3,6 @@
  (libraries
   ;; opam libraries
   alcotest
-  async
-  async_unix
   base.base_internalhash_types
   base.caml
   core
