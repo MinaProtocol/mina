@@ -102,6 +102,9 @@ fi
 
 pushd "$(git rev-parse --show-toplevel)"
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+git config --global --add safe.directory /workdir
+
 TEST_COMMIT="$(git rev-parse HEAD)"
 
 
