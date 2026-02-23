@@ -103,34 +103,43 @@ let evaluate (tokens : ST.polish_token array) (env : 'a Scalars.Env.t) : 'a =
         push env.vanishes_on_zero_knowledge_and_previous_rows (advance state)
     | ST.UnnormalizedLagrangeBasis (zk_rows, offset) ->
         push (env.unnormalized_lagrange_basis (zk_rows, offset)) (advance state)
-    (* Conditional: SkipIfNot — if feature is NOT enabled, skip count tokens.
-       Used for the true branch of IfFeature(feat, e1, e2):
-         SkipIfNot(feat, len_e1) [e1 tokens] SkipIf(feat, len_e2) [e2 tokens]
-       When enabled, e1 evaluates; when disabled, e1 is skipped. *)
-    | ST.SkipIfNot (flag, count) ->
-        let enabled = ref true in
-        let _zero =
+    (* Conditional: IfFeature is encoded as a pair:
+         SkipIfNot(flag, len_e1) [e1 tokens] SkipIf(flag, len_e2) [e2 tokens]
+       We evaluate both branches as bounded sub-sequences, extract their
+       top-of-stack values, and let env.if_feature select the result.
+       This works correctly with Maybe feature flags: when the flag is
+       Some bool_var, F.if_ creates an in-circuit conditional over both
+       branch values. When concrete (None = disabled), only the false
+       branch thunk is called; when Some(true), both are called and
+       F.if_ selects the true-branch value. *)
+    | ST.SkipIfNot (flag, count_true) ->
+        let true_end = state.pos + 1 + count_true in
+        let count_false =
+          match toks.(true_end) with
+          | ST.SkipIf (_, c) -> c
+          | _ -> failwith "SkipIfNot: expected matching SkipIf"
+        in
+        let false_end = true_end + 1 + count_false in
+        let zero = "0x0000000000000000000000000000000000000000000000000000000000000000" in
+        let extract_top s =
+          match s.stack with v :: _ -> v | [] -> env.field zero
+        in
+        let result =
           env.if_feature
             ( flag
-            , (fun () -> enabled := true ; env.field "0x0000000000000000000000000000000000000000000000000000000000000000")
-            , (fun () -> enabled := false ; env.field "0x0000000000000000000000000000000000000000000000000000000000000000") )
+            , (fun () ->
+                let s = eval_loop toks true_end { state with pos = state.pos + 1 } in
+                extract_top s)
+            , (fun () ->
+                let s = eval_loop toks false_end { state with pos = true_end + 1 } in
+                extract_top s) )
         in
-        if !enabled then advance state
-        else { state with pos = state.pos + 1 + count }
-    (* Conditional: SkipIf — if feature IS enabled, skip count tokens.
-       Used for the false branch of IfFeature(feat, e1, e2):
-         SkipIfNot(feat, len_e1) [e1 tokens] SkipIf(feat, len_e2) [e2 tokens]
-       When enabled, e2 is skipped; when disabled, e2 evaluates. *)
-    | ST.SkipIf (flag, count) ->
-        let enabled = ref true in
-        let _zero =
-          env.if_feature
-            ( flag
-            , (fun () -> enabled := true ; env.field "0x0000000000000000000000000000000000000000000000000000000000000000")
-            , (fun () -> enabled := false ; env.field "0x0000000000000000000000000000000000000000000000000000000000000000") )
-        in
-        if !enabled then { state with pos = state.pos + 1 + count }
-        else advance state
+        push result { state with pos = false_end }
+    (* SkipIf is consumed by the SkipIfNot handler above. If we reach here,
+       it means the token stream has a standalone SkipIf, which shouldn't
+       happen in well-formed output from to_polish(). *)
+    | ST.SkipIf (_, count) ->
+        { state with pos = state.pos + 1 + count }
   in
   let initial = { stack = []; store = []; pos = 0 } in
   let final_state = eval_loop tokens (Array.length tokens) initial in
