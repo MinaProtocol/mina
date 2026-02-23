@@ -1,3 +1,5 @@
+open Core
+
 let genesis_ledger_total_currency ~ledger =
   Mina_ledger.Ledger.foldi ~init:Currency.Amount.zero (Lazy.force ledger)
     ~f:(fun _addr sum (account : Mina_base.Account.t) ->
@@ -19,11 +21,16 @@ module Hashed = struct
     }
 
   let hash t = t.hash
+
+  let zero_total_currency (t : t) : t =
+    { hash = t.hash; total_currency = Currency.Amount.zero }
 end
 
 module Epoch = struct
   module Data = struct
     type 'ledger t = { ledger : 'ledger; seed : Mina_base.Epoch_seed.t }
+
+    let map ~f { ledger; seed } = { ledger = f ledger; seed }
 
     let to_hashed (t : Genesis_ledger.Packed.t t) : Hashed.t t =
       let total_currency =
@@ -39,15 +46,23 @@ module Epoch = struct
 
   type 'ledger t = 'ledger tt option
 
+  let zero_total_currency (t : Hashed.t t) : Hashed.t t =
+    Option.map
+      ~f:(fun x ->
+        { staking = Data.map ~f:Hashed.zero_total_currency x.staking
+        ; next = Option.map ~f:(Data.map ~f:Hashed.zero_total_currency) x.next
+        } )
+      t
+
   let for_unit_tests : Genesis_ledger.Packed.t t = None
 
   let compiled : Genesis_ledger.Packed.t t = None
 
   let to_hashed (ledger : Genesis_ledger.Packed.t t) : Hashed.t t =
     Option.map
-      (fun l ->
+      ~f:(fun l ->
         let staking = Data.to_hashed l.staking in
-        let next = Option.map Data.to_hashed l.next in
+        let next = Option.map ~f:Data.to_hashed l.next in
         { staking; next } )
       ledger
 end
