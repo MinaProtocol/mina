@@ -21,10 +21,15 @@ let () =
     Random_oracle.pack_input default_account_input
   in
 
+  let empty_zkapp_uri_hash_string =
+    Snark_params.Tick.Field.to_string
+    @@ Mina_base.Zkapp_account.hash_zkapp_uri ""
+  in
+
   (* Convert to string using the same format as used in ledger JSON implementation *)
   let digest_string = Snark_params.Tick.Field.to_string default_zkapp_digest in
   let vk_hash_string = Snark_params.Tick.Field.to_string dummy_vk_hash_value in
-  let zkapp_uri_string =
+  let zkapp_uri_non_preimage_hash_string =
     Snark_params.Tick.Field.to_string zkapp_uri_non_preimage
   in
 
@@ -57,7 +62,9 @@ let () =
     `Assoc
       [ ("default_zkapp_account_digest", `String digest_string)
       ; ("dummy_vk_hash", `String vk_hash_string)
-      ; ("zkapp_uri_non_preimage_hash", `String zkapp_uri_string)
+      ; ( "zkapp_uri_non_preimage_hash"
+        , `String zkapp_uri_non_preimage_hash_string )
+      ; ("empty_zkapp_uri_hash", `String empty_zkapp_uri_hash_string)
       ; ( "default_account_input"
         , `Assoc
             [ ("fieldElements", field_elements_json)
