@@ -15,6 +15,7 @@ val check_commands :
   -> verifier:Verifier.t
   -> transaction_pool_proxy:transaction_pool_proxy
   -> User_command.t With_status.t list
+  -> Mina_transaction.Transaction_hash.t list
   -> ( ( Signed_command.With_valid_signature.t
        , Zkapp_command.Valid.t )
        User_command.t_

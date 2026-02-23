@@ -6,8 +6,14 @@ module T = struct
   type t = { logger : Logger.t; best_tip_diff_logger : Logger.t }
 
   type view =
-    { new_commands : User_command.Valid.t With_status.t list
-    ; removed_commands : User_command.Valid.t With_status.t list
+    { new_commands :
+        Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
+        With_status.t
+        list
+    ; removed_commands :
+        Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
+        With_status.t
+        list
     ; reorg_best_tip : bool
     }
 
@@ -32,16 +38,13 @@ module T = struct
       [@@deriving register_event { msg = "Formed a new best tip" }]
   end
 
-  let breadcrumb_commands =
-    Fn.compose Mina_block.Validated.valid_commands
-      Breadcrumb.validated_transition
-
   let create ~logger frontier =
     let best_tip_diff_logger =
       Logger.create ~id:Logger.Logger_id.best_tip_diff ()
     in
     ( { logger; best_tip_diff_logger }
-    , { new_commands = breadcrumb_commands (Full_frontier.root frontier)
+    , { new_commands =
+          Breadcrumb.valid_commands_hashed (Full_frontier.root frontier)
       ; removed_commands = []
       ; reorg_best_tip = false
       } )
@@ -137,11 +140,13 @@ module T = struct
                   |> Or_error.ok_exn
                 in
                 let new_commands =
-                  List.bind added_to_best_tip_path ~f:breadcrumb_commands
+                  List.bind added_to_best_tip_path
+                    ~f:Breadcrumb.valid_commands_hashed
                   @ new_commands
                 in
                 let removed_commands =
-                  List.bind removed_from_best_tip_path ~f:breadcrumb_commands
+                  List.bind removed_from_best_tip_path
+                    ~f:Breadcrumb.valid_commands_hashed
                   @ removed_commands
                 in
                 let reorg_best_tip =

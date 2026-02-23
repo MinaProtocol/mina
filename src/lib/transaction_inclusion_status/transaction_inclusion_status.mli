@@ -1,6 +1,5 @@
 open Core_kernel
 open Pipe_lib
-open Mina_base
 
 module State : sig
   module Stable : sig
@@ -22,5 +21,5 @@ val get_status :
      frontier_broadcast_pipe:
        Transition_frontier.t Option.t Broadcast_pipe.Reader.t
   -> transaction_pool:Network_pool.Transaction_pool.t
-  -> User_command.Stable.Latest.t
+  -> Mina_transaction.Transaction_hash.t
   -> State.t

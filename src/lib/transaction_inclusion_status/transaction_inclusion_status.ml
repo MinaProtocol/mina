@@ -24,7 +24,7 @@ module State = struct
 end
 
 (* TODO: this is extremely expensive as implemented and needs to be replaced with an extension *)
-let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
+let get_status ~frontier_broadcast_pipe ~transaction_pool cmd_hash =
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
   match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
   | None ->
@@ -33,22 +33,17 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
       let best_tip_path =
         Transition_frontier.best_tip_path transition_frontier
       in
-      let in_breadcrumb breadcrumb =
-        breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
-        |> Mina_block.Validated.valid_commands
-        |> List.exists ~f:(fun { data = found; _ } ->
-               let found' = User_command.forget_check found in
-               User_command.equal_ignoring_proofs_and_hashes_and_aux cmd found' )
+      let in_breadcrumb =
+        Fn.flip Transition_frontier.Breadcrumb.contains_transaction_by_hash
+          cmd_hash
       in
       if List.exists ~f:in_breadcrumb best_tip_path then State.Included
       else if
         List.exists ~f:in_breadcrumb
           (Transition_frontier.all_breadcrumbs transition_frontier)
       then State.Pending
-      else if
-        Transaction_pool.Resource_pool.member resource_pool
-          (Transaction_hash.hash_command cmd)
-      then State.Pending
+      else if Transaction_pool.Resource_pool.member resource_pool cmd_hash then
+        State.Pending
       else State.Unknown
 
 let%test_module "transaction_status" =
@@ -166,8 +161,9 @@ let%test_module "transaction_status" =
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               [%log info] "Checking status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
-                (get_status ~frontier_broadcast_pipe ~transaction_pool
-                   (Signed_command user_command) ) ) )
+                ( get_status ~frontier_broadcast_pipe ~transaction_pool
+                @@ Transaction_hash.hash_command (Signed_command user_command)
+                ) ) )
 
     let%test_unit "A pending transaction is either in the transition frontier \
                    or transaction pool, but not in the best path of the \
@@ -189,7 +185,7 @@ let%test_module "transaction_status" =
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               let status =
                 get_status ~frontier_broadcast_pipe ~transaction_pool
-                  (Signed_command user_command)
+                @@ Transaction_hash.hash_command (Signed_command user_command)
               in
               [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Pending status ) )
@@ -227,6 +223,7 @@ let%test_module "transaction_status" =
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
-                (get_status ~frontier_broadcast_pipe ~transaction_pool
-                   (Signed_command unknown_user_command) ) ) )
+                ( get_status ~frontier_broadcast_pipe ~transaction_pool
+                @@ Transaction_hash.hash_command
+                     (Signed_command unknown_user_command) ) ) )
   end )

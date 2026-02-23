@@ -2,6 +2,22 @@ open Core_kernel
 open Mina_base
 open Mina_transaction
 
+type 'txn t =
+  { valid_seq : 'txn Sequence.t
+  ; invalid : ('txn * Error.t) list
+  ; skipped_by_fee_payer : 'txn list Account_id.Map.t
+  ; zkapp_space_remaining : int option
+  ; total_space_remaining : int
+  }
+
+let init ?zkapp_limit ~total_limit =
+  { valid_seq = Sequence.empty
+  ; invalid = []
+  ; skipped_by_fee_payer = Account_id.Map.empty
+  ; zkapp_space_remaining = zkapp_limit
+  ; total_space_remaining = total_limit
+  }
+
 module Make (Txn : sig
   type t [@@deriving to_yojson]
 
@@ -10,24 +26,16 @@ module Make (Txn : sig
   val is_zkapp_command : t -> bool
 
   val to_user_command : t -> User_command.t
-end) =
-struct
-  type t =
-    { valid_seq : Txn.t Sequence.t
-    ; invalid : (Txn.t * Error.t) list
-    ; skipped_by_fee_payer : Txn.t list Account_id.Map.t
-    ; zkapp_space_remaining : int option
-    ; total_space_remaining : int
-    }
-
-  let init ?zkapp_limit ~total_limit =
-    { valid_seq = Sequence.empty
-    ; invalid = []
-    ; skipped_by_fee_payer = Account_id.Map.empty
-    ; zkapp_space_remaining = zkapp_limit
-    ; total_space_remaining = total_limit
-    }
-
+end) : sig
+  val try_applying_txn :
+       ?logger:Logger.t
+    -> apply:
+         (   User_command.t Transaction.t_
+          -> ('any_application_result, Error.t) result )
+    -> Txn.t t
+    -> Txn.t
+    -> (Txn.t t, Txn.t Sequence.t * (Txn.t * Error.t) list) Continue_or_stop.t
+end = struct
   let add_skipped_txn t (txn : Txn.t) =
     Account_id.Map.update t.skipped_by_fee_payer (Txn.key txn)
       ~f:(Option.value_map ~default:[ txn ] ~f:(List.cons txn))
@@ -35,7 +43,7 @@ struct
   let dependency_skipped txn t =
     Account_id.Map.mem t.skipped_by_fee_payer (Txn.key txn)
 
-  let try_applying_txn ?logger ~apply (state : t) (txn : Txn.t) =
+  let try_applying_txn ?logger ~apply (state : Txn.t t) (txn : Txn.t) =
     let open Continue_or_stop in
     match state.zkapp_space_remaining with
     | _ when state.total_space_remaining < 1 ->
@@ -75,7 +83,7 @@ struct
               } )
 end
 
-module Valid_user_command = Make (struct
+module Valid_user_command_inputs = struct
   type t = User_command.Valid.t [@@deriving to_yojson]
 
   let key = function
@@ -91,4 +99,21 @@ module Valid_user_command = Make (struct
         false
 
   let to_user_command = User_command.forget_check
+end
+
+module Valid_user_command = Make (Valid_user_command_inputs)
+
+module Valid_user_command_with_hash = Make (struct
+  type t = Transaction_hash.User_command_with_valid_signature.t
+
+  let proxy1 f =
+    Fn.compose f Transaction_hash.User_command_with_valid_signature.data
+
+  let key = proxy1 Valid_user_command_inputs.key
+
+  let is_zkapp_command = proxy1 Valid_user_command_inputs.is_zkapp_command
+
+  let to_user_command = proxy1 Valid_user_command_inputs.to_user_command
+
+  let to_yojson = Transaction_hash.User_command_with_valid_signature.to_yojson
 end)

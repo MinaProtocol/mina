@@ -1291,7 +1291,8 @@ module T = struct
   module Resources = struct
     module Discarded = struct
       type t =
-        { commands_rev : User_command.Valid.t Sequence.t
+        { commands_rev :
+            Transaction_hash.User_command_with_valid_signature.t Sequence.t
         ; completed_work : Transaction_snark_work.Checked.t Sequence.t
         }
 
@@ -1311,7 +1312,8 @@ module T = struct
       { max_space : int (*max space available currently*)
       ; max_jobs : int
             (*Required amount of work for max_space that can be purchased*)
-      ; commands_rev : User_command.Valid.t Sequence.t
+      ; commands_rev :
+          Transaction_hash.User_command_with_valid_signature.t Sequence.t
       ; completed_work_rev : Transaction_snark_work.Checked.t Sequence.t
       ; fee_transfers : Fee.t Public_key.Compressed.Map.t
       ; add_coinbase : bool
@@ -1464,7 +1466,9 @@ module T = struct
       in
       (coinbase, singles)
 
-    let init ~constraint_constants (uc_seq : User_command.Valid.t Sequence.t)
+    let init ~constraint_constants
+        (uc_seq :
+          Transaction_hash.User_command_with_valid_signature.t Sequence.t )
         (cw_seq : Transaction_snark_work.Checked.t Sequence.t)
         (slots, job_count) ~receiver_pk ~add_coinbase ~supercharge_coinbase
         logger ~is_coinbase_receiver_new =
@@ -1490,7 +1494,9 @@ module T = struct
       let budget =
         Or_error.map2
           (sum_fees (Sequence.to_list uc_seq) ~f:(fun t ->
-               User_command.fee (User_command.forget_check t) ) )
+               User_command.fee
+                 (Transaction_hash.User_command_with_valid_signature.command t) )
+          )
           (sum_fees
              (List.filter
                 ~f:(fun (k, _) ->
@@ -1507,11 +1513,11 @@ module T = struct
       in
       { max_space = slots
       ; max_jobs = job_count
-      ; commands_rev =
-          uc_seq
+      ; commands_rev = uc_seq
+      ; completed_work_rev =
+          seq_rev cw_seq
           (* Completed work in reverse order for faster removal of proofs if
              budget doesn't suffice *)
-      ; completed_work_rev = seq_rev cw_seq
       ; fee_transfers
       ; add_coinbase
       ; supercharge_coinbase
@@ -1573,7 +1579,8 @@ module T = struct
       let open Or_error.Let_syntax in
       let payment_fees =
         sum_fees (Sequence.to_list t.commands_rev) ~f:(fun t ->
-            User_command.(fee (forget_check t)) )
+            User_command.fee
+              (Transaction_hash.User_command_with_valid_signature.command t) )
       in
       let prover_fee_others =
         Public_key.Compressed.Map.fold t.fee_transfers ~init:(Ok Fee.zero)
@@ -1707,7 +1714,11 @@ module T = struct
             match t.budget with
             | Ok b ->
                 option "Fee insufficient"
-                  (Fee.sub b User_command.(fee (forget_check uc)))
+                  (Fee.sub b
+                     User_command.(
+                       fee
+                         (Transaction_hash.User_command_with_valid_signature
+                          .command uc )) )
             | _ ->
                 rebudget new_t
           in
@@ -1798,7 +1809,8 @@ module T = struct
           check_constraints_and_update ~constraint_constants resources'
             (Option.value_map uc_opt ~default:log ~f:(fun uc ->
                  Diff_creation_log.discard_command `No_space
-                   (User_command.forget_check uc)
+                   (Transaction_hash.User_command_with_valid_signature.command
+                      uc )
                    log ) )
       else
         (* insufficient budget; reduce the cost*)
@@ -1816,7 +1828,7 @@ module T = struct
       check_constraints_and_update ~constraint_constants resources'
         (Option.value_map uc_opt ~default:log ~f:(fun uc ->
              Diff_creation_log.discard_command `No_work
-               (User_command.forget_check uc)
+               (Transaction_hash.User_command_with_valid_signature.command uc)
                log ) )
 
   let one_prediff ~constraint_constants cw_seq ts_seq ~receiver ~add_coinbase
@@ -1857,25 +1869,42 @@ module T = struct
                    coinbase in the second pre_diff" ;
                 Zero
           in
+          let command_lst = Sequence.to_list res.commands_rev in
           (* We have to reverse here because we only know they work in THIS order *)
-          { Staged_ledger_diff.Pre_diff_one.commands =
-              Sequence.to_list_rev res.commands_rev
+          { Staged_ledger_diff.Pre_diff_generic.commands =
+              List.rev_map
+                ~f:Transaction_hash.User_command_with_valid_signature.data
+                command_lst
           ; completed_works = Sequence.to_list_rev res.completed_work_rev
           ; coinbase = to_at_most_one res.coinbase
           ; internal_command_statuses =
               [] (*updated later based on application result*)
+          ; command_hashes =
+              List.rev_map
+                ~f:
+                  Transaction_hash.User_command_with_valid_signature
+                  .transaction_hash command_lst
           } )
     in
     let pre_diff_with_two (res : Resources.t) :
         ( Transaction_snark_work.Checked.t
         , User_command.Valid.t )
         Staged_ledger_diff.Pre_diff_two.t =
+      let command_lst = Sequence.to_list res.commands_rev in
       (* We have to reverse here because we only know they work in THIS order *)
-      { commands = Sequence.to_list_rev res.commands_rev
+      { commands =
+          List.rev_map
+            ~f:Transaction_hash.User_command_with_valid_signature.data
+            command_lst
       ; completed_works = Sequence.to_list_rev res.completed_work_rev
       ; coinbase = res.coinbase
       ; internal_command_statuses =
           [] (*updated later based on application result*)
+      ; command_hashes =
+          List.rev_map
+            ~f:
+              Transaction_hash.User_command_with_valid_signature
+              .transaction_hash command_lst
       }
     in
     let end_log ((res : Resources.t), (log : Diff_creation_log.t)) =
@@ -2012,7 +2041,8 @@ module T = struct
       ~(global_slot : Mina_numbers.Global_slot_since_genesis.t)
       ?(log_block_creation = false) t ~coinbase_receiver ~logger
       ~current_state_view ~zkapp_cmd_limit
-      ~(transactions_by_fee : User_command.Valid.t Sequence.t)
+      ~(transactions_by_fee :
+         Transaction_hash.User_command_with_valid_signature.t Sequence.t )
       ~(get_completed_work :
             Transaction_snark_work.Statement.t
          -> Transaction_snark_work.Checked.t option ) ~supercharge_coinbase =
@@ -2125,12 +2155,11 @@ module T = struct
             let valid_on_this_ledger, invalid_on_this_ledger =
               Sequence.fold_until transactions_by_fee
                 ~init:
-                  (Application_state.Valid_user_command.init
-                     ?zkapp_limit:zkapp_cmd_limit
+                  (Application_state.init ?zkapp_limit:zkapp_cmd_limit
                      ~total_limit:(Scan_state.free_space t.scan_state) )
                 ~f:
-                  (Application_state.Valid_user_command.try_applying_txn ~apply
-                     ~logger )
+                  (Application_state.Valid_user_command_with_hash
+                   .try_applying_txn ~apply ~logger )
                 ~finish:(fun state -> (state.valid_seq, state.invalid))
             in
             [%log internal] "Generate_staged_ledger_diff" ;
@@ -2315,9 +2344,13 @@ let%test_module "staged ledger tests" =
       let supercharge_coinbase =
         supercharge_coinbase ~ledger:(Sl.ledger !sl) ~winner ~global_slot
       in
+      let transactions_by_fee =
+        Sequence.map txns
+          ~f:Transaction_hash.User_command_with_valid_signature.create
+      in
       let diff =
         Sl.create_diff ~constraint_constants ~global_slot !sl ~logger
-          ~current_state_view ~transactions_by_fee:txns
+          ~current_state_view ~transactions_by_fee
           ~get_completed_work:stmt_to_work ~supercharge_coinbase
           ~coinbase_receiver ~zkapp_cmd_limit
       in
@@ -3220,7 +3253,10 @@ let%test_module "staged ledger tests" =
             @@ ( { completed_works = List.take completed_works job_count1
                  ; commands = List.take txns slots
                  ; coinbase = Zero
-                 ; internal_command_statuses = []
+                 ; internal_command_statuses =
+                     []
+                     (* Skipping hash computation, as they shouldn't affect status computation *)
+                 ; command_hashes = []
                  }
                , None )
         | Some (_, _) ->
@@ -3229,7 +3265,10 @@ let%test_module "staged ledger tests" =
               ( { completed_works = List.take completed_works job_count1
                 ; commands = List.take txns slots
                 ; coinbase = Zero
-                ; internal_command_statuses = []
+                ; internal_command_statuses =
+                    []
+                    (* Skipping hash computation, as they shouldn't affect status computation *)
+                ; command_hashes = []
                 }
               , Some
                   { completed_works =
@@ -3237,7 +3276,10 @@ let%test_module "staged ledger tests" =
                       else List.drop completed_works job_count1 )
                   ; commands = txns_in_second_diff
                   ; coinbase = Zero
-                  ; internal_command_statuses = []
+                  ; internal_command_statuses =
+                      []
+                      (* Skipping hash computation, as they shouldn't affect status computation *)
+                  ; command_hashes = []
                   } )
       in
       let empty_diff = Staged_ledger_diff.empty_diff in
@@ -3365,10 +3407,15 @@ let%test_module "staged ledger tests" =
                       Mina_numbers.Global_slot_since_genesis.of_int global_slot
                     in
                     let current_state_view = dummy_state_view ~global_slot () in
+                    let transactions_by_fee =
+                      Sequence.map cmds_this_iter
+                        ~f:
+                          Transaction_hash.User_command_with_valid_signature
+                          .create
+                    in
                     let diff_result =
                       Sl.create_diff ~constraint_constants ~global_slot !sl
-                        ~logger ~current_state_view
-                        ~transactions_by_fee:cmds_this_iter
+                        ~logger ~current_state_view ~transactions_by_fee
                         ~get_completed_work:stmt_to_work ~coinbase_receiver
                         ~supercharge_coinbase:true ~zkapp_cmd_limit:None
                     in
@@ -4216,7 +4263,11 @@ let%test_module "staged ledger tests" =
               let diff_result =
                 Sl.create_diff ~constraint_constants ~global_slot !sl ~logger
                   ~current_state_view
-                  ~transactions_by_fee:(Sequence.of_list [ invalid_command ])
+                  ~transactions_by_fee:
+                    (Sequence.singleton
+                       ( invalid_command
+                       |> Transaction_hash.User_command_with_valid_signature
+                          .create ) )
                   ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
                   ~coinbase_receiver ~supercharge_coinbase:false
                   ~zkapp_cmd_limit:None
@@ -4308,7 +4359,11 @@ let%test_module "staged ledger tests" =
               let diff_result =
                 Sl.create_diff ~constraint_constants ~global_slot !sl ~logger
                   ~current_state_view
-                  ~transactions_by_fee:(Sequence.of_list [ valid_command ])
+                  ~transactions_by_fee:
+                    (Sequence.singleton
+                       ( valid_command
+                       |> Transaction_hash.User_command_with_valid_signature
+                          .create ) )
                   ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
                   ~coinbase_receiver ~supercharge_coinbase:false
                   ~zkapp_cmd_limit:None
@@ -4520,15 +4575,19 @@ let%test_module "staged ledger tests" =
             Sl.create_diff ~constraint_constants ~global_slot sl ~logger
               ~current_state_view
               ~transactions_by_fee:
-                (Sequence.of_list
-                   [ valid_command_1
-                   ; valid_command_2
-                   ; invalid_command_3
-                   ; invalid_command_4
-                   ; valid_command_5
-                   ; invalid_command_6
-                   ; valid_command_7
-                   ] )
+                ( Sequence.of_list
+                    [ valid_command_1
+                    ; valid_command_2
+                    ; invalid_command_3
+                    ; invalid_command_4
+                    ; valid_command_5
+                    ; invalid_command_6
+                    ; valid_command_7
+                    ]
+                |> Sequence.map
+                     ~f:
+                       Transaction_hash.User_command_with_valid_signature.create
+                )
               ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
               ~coinbase_receiver ~supercharge_coinbase:false
               ~zkapp_cmd_limit:None
@@ -4679,6 +4738,11 @@ let%test_module "staged ledger tests" =
                   ; commands = cmds
                   ; coinbase = Zero
                   ; internal_command_statuses = [ Applied ]
+                  ; command_hashes =
+                      List.map cmds
+                        ~f:
+                          (Fn.compose Transaction_hash.hash_command_with_hashes
+                             With_status.data )
                   }
                 in
                 { diff = (pre_diff, None) }
@@ -5120,7 +5184,9 @@ let%test_module "staged ledger tests" =
                       ~logger ~current_state_view
                       ~transactions_by_fee:
                         (Sequence.singleton
-                           (User_command.Zkapp_command invalid_zkapp_command) )
+                           ( User_command.Zkapp_command invalid_zkapp_command
+                           |> Transaction_hash.User_command_with_valid_signature
+                              .create ) )
                       ~get_completed_work:
                         (stmt_to_work_zero_fee ~prover:self_pk)
                       ~coinbase_receiver ~supercharge_coinbase:false
