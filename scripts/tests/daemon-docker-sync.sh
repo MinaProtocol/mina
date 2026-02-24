@@ -88,7 +88,7 @@ EXPECTED_EXIT_CODE=130
  # plausible.
 BEST_TIP_AGE_THRESHOLD_MS=$((4 * 60 * 60 * 1000))
 
-echo "=== Daemon Docker Stop Test ==="
+echo "=== Daemon Docker Sync Test ==="
 echo "Image:   $IMAGE"
 echo "Network: $NETWORK"
 echo "Timeout: ${TIMEOUT}s"
