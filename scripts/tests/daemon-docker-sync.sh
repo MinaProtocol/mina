@@ -95,12 +95,9 @@ echo "Timeout: ${TIMEOUT}s"
 
 # --- Start daemon container ---
 
-CONFIG_DIR=$(mktemp -d)
-
 echo ""
 echo "Starting daemon container..."
 container_id=$(docker run -d \
-    -v "$CONFIG_DIR:/root/.mina-config" \
     --env PEER_LIST_URL="https://storage.googleapis.com/seed-lists/${NETWORK}_seeds.txt" \
     "$IMAGE" \
     daemon)
@@ -115,19 +112,21 @@ docker_logs_pid=$!
 
 # --- Cleanup trap ---
 
-collect_logs() {
-    echo "========================= COLLECTING LOGS ==========================="
+# Copy daemon log files out of the (stopped) container. This uses docker cp
+# instead of a volume mount because volume mounts don't work reliably when the
+# test runs inside a CI container that shares a Docker socket with the host.
+copy_logs_from_container() {
     mkdir -p test_output/artifacts/mina-logs
-    cp "$CONFIG_DIR"/mina.log* test_output/artifacts/mina-logs/ 2>/dev/null || true
-
-    echo "Logs collected in test_output/artifacts/"
+    docker cp "$container_id:/root/.mina-config/" test_output/artifacts/mina-config/ 2>/dev/null || true
 }
 
 check_daemon_logs() {
+    copy_logs_from_container
+
     local log_files
-    log_files=("$CONFIG_DIR"/mina.log*)
+    log_files=(test_output/artifacts/mina-config/mina.log*)
     if [[ ! -e "${log_files[0]}" ]]; then
-        echo "Warning: no daemon log files found in $CONFIG_DIR"
+        echo "Warning: no daemon log files found in container"
         return 0
     fi
 
@@ -146,7 +145,7 @@ check_daemon_logs() {
 cleanup() {
     local exit_code=$?
     if [[ $exit_code -ne 0 ]]; then
-        collect_logs
+        copy_logs_from_container
     fi
     kill "$docker_logs_pid" 2>/dev/null; wait "$docker_logs_pid" 2>/dev/null || true
     { docker stop "$container_id" 2>/dev/null; docker rm "$container_id" 2>/dev/null; } || true
@@ -243,10 +242,7 @@ echo "Container exit code: $exit_code (expected: $EXPECTED_EXIT_CODE)"
 
 echo ""
 echo "Checking daemon logs for Fatal errors..."
-if ! check_daemon_logs; then
-    collect_logs
-    exit 1
-fi
+check_daemon_logs || exit 1
 
 if [[ "$exit_code" -eq "$EXPECTED_EXIT_CODE" ]]; then
     echo -e "${GREEN}PASS: Container exited with expected code $EXPECTED_EXIT_CODE${CLEAR}"
