@@ -924,12 +924,37 @@ let slot_reduction_update ~hardfork_slot (account : t) =
   in
   { account with timing }
 
+let gen_with_private_key ?balance ?token_id :
+    (Signature_lib.Private_key.t * t) Quickcheck.Generator.t =
+  let open Quickcheck.Let_syntax in
+  let%bind keypair = Signature_lib.Keypair.gen in
+  let%bind token_id =
+    Option.value_map ~default:Token_id.gen ~f:Quickcheck.Generator.return
+      token_id
+  in
+  let%map balance =
+    Option.value_map ~default:Currency.Balance.gen
+      ~f:Quickcheck.Generator.return balance
+  in
+  let account_id =
+    let pk = Signature_lib.Public_key.compress keypair.public_key in
+    Account_id.create pk token_id
+  in
+  let account = create account_id balance in
+  (keypair.private_key, account)
+
 let gen : t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in
   let%bind token_id = Token_id.gen in
   let%map balance = Currency.Balance.gen in
   create (Account_id.create public_key token_id) balance
+
+let gen_zkapp_account_with_private_key ?balance ?token_id :
+    (Signature_lib.Private_key.t * t) Quickcheck.Generator.t =
+  let open Quickcheck.Let_syntax in
+  let%map sk, account = gen_with_private_key ?balance ?token_id in
+  (sk, { account with zkapp = Some Zkapp_account.default })
 
 let gen_with_constrained_balance ~low ~high : t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
