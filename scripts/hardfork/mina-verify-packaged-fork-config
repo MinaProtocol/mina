@@ -364,7 +364,7 @@ if checks_contains tarballs; then
 
         declare -A scanner_pids
         for kind in packaged web generated; do
-            $MINA_ROCKSDB_SCANNER --db-path "$tardir/$kind" --output-file "$WORKDIR/$kind.scan" &
+            $MINA_ROCKSDB_SCANNER dump --db-path "$tardir/$kind" --output-file "$WORKDIR/$kind.scan" &
             scanner_pids[$kind]=$!
         done
 

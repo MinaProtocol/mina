@@ -73,34 +73,15 @@ check_file_exists() {
     return 0
 }
 
-# Check if files have differences against specified branch
-has_changes() {
-    local file="$1"
-    if ! check_file_exists "$file"; then
-        return 1
-    fi
+# Cached merge base to avoid repeated git fetch and merge-base calculations
+_MERGE_BASE=""
 
-    # Fetch latest branch to ensure accurate comparison
-    git fetch origin "$COMPARISION_BRANCH" >/dev/null 2>&1 || {
-        echo "Error: Failed to fetch origin/$COMPARISION_BRANCH" >&2
-        exit 1
-    }
-
-    # Check if file has differences
-    if ! git diff --quiet "origin/$COMPARISION_BRANCH" -- "$REPO_ROOT/$file" 2>/dev/null; then
+# Fetch comparison branch and compute merge-base (cached)
+get_merge_base() {
+    if [[ -n "$_MERGE_BASE" ]]; then
         return 0
-    else
-        return 1
-    fi
-}
-
-has_changes_in_git() {
-    local file="$1"
-    if ! check_file_exists "$file"; then
-        return 1
     fi
 
-    # Fetch latest branch to ensure accurate comparison
     git fetch origin "$COMPARISION_BRANCH" >/dev/null 2>&1 || {
         if [[ "$MODE" == "verbose" ]]; then
             echo "Error: Failed to fetch origin/$COMPARISION_BRANCH" >&2
@@ -108,23 +89,46 @@ has_changes_in_git() {
         return 1
     }
 
-    # Check if file was modified in last commit, staged, or has unstaged changes
+    _MERGE_BASE=$(git merge-base "origin/$COMPARISION_BRANCH" HEAD)
+}
+
+# Check if file has changes against the comparison branch
+# Usage: has_changes [--include-worktree] <file>
+#   --include-worktree: Also check staged and unstaged changes (for local testing)
+has_changes() {
+    local include_worktree=false
+    if [[ "${1:-}" == "--include-worktree" ]]; then
+        include_worktree=true
+        shift
+    fi
+
+    local file="$1"
+    if ! check_file_exists "$file"; then
+        return 1
+    fi
+
+    if ! get_merge_base; then
+        return 1
+    fi
+
     local file_path="$REPO_ROOT/$file"
 
-    # Check if file was modified in last commit
-    if git diff --quiet HEAD~1 HEAD -- "$file_path" 2>/dev/null; then
-        # No changes in last commit, check staged changes
-        if git diff --quiet --cached -- "$file_path" 2>/dev/null; then
-            # No staged changes, check unstaged changes
-            if git diff --quiet -- "$file_path" 2>/dev/null; then
-                # No changes found
-                return 1
-            fi
+    # Check committed changes (all commits since merge-base)
+    if ! git diff --quiet "$_MERGE_BASE" HEAD -- "$file_path" 2>/dev/null; then
+        return 0
+    fi
+
+    if [[ "$include_worktree" == "true" ]]; then
+        # Also check staged and unstaged changes (for local testing)
+        if ! git diff --quiet --cached -- "$file_path" 2>/dev/null; then
+            return 0
+        fi
+        if ! git diff --quiet -- "$file_path" 2>/dev/null; then
+            return 0
         fi
     fi
 
-    # File has changes in one of the three states
-    return 0
+    return 1
 }
 
 
@@ -162,6 +166,12 @@ main() {
             exit 0
         fi
 
+        # Determine if this is a PR build
+        local is_pr_build=false
+        if [[ -n "${BUILDKITE_PULL_REQUEST:-}" && "${BUILDKITE_PULL_REQUEST:-}" != "false" ]]; then
+            is_pr_build=true
+        fi
+
         # Check that all required scripts exist
         for script_path in "${scripts[@]}"; do
             if ! check_file_exists "$script_path"; then
@@ -173,19 +183,27 @@ main() {
             exit 1
             fi
 
-            # Check if the upgrade script itself has changes
-            if has_changes_in_git "$script_path"; then
-                if [[ "$MODE" == "verbose" ]]; then
-                    echo "✓ Upgrade script has been modified: $script_path"
+            # For PR builds, check if the upgrade script itself has changes in git
+            # For non-PR builds (nightlies, branch builds), schema may naturally diverge
+            # from the comparison branch, so only verify that the scripts exist
+            if [[ "$is_pr_build" == "true" ]]; then
+                if has_changes --include-worktree "$script_path"; then
+                    if [[ "$MODE" == "verbose" ]]; then
+                        echo "✓ Upgrade script has been modified: $script_path"
+                    fi
+                else
+                    if [[ "$MODE" == "verbose" ]]; then
+                        echo "Error: Schema changed but upgrade script not updated: $script_path"
+                        echo "Please update the upgrade script to reflect schema changes."
+                        echo "This is critical to ensure smooth database migrations in production."
+                        echo "Upgrade/Rollback scripts must be updated together with schema changes, in the same commit."
+                        echo "For local testing, scripts can be modified in staged/unstaged git states."
+                        exit 1
+                    fi
                 fi
             else
                 if [[ "$MODE" == "verbose" ]]; then
-                    echo "Error: Schema changed but upgrade script not updated: $script_path"
-                    echo "Please update the upgrade script to reflect schema changes."
-                    echo "This is critical to ensure smooth database migrations in production."
-                    echo "Upgrade/Rollback scripts must be updated together with schema changes, in the same commit."
-                    echo "For local testing, scripts can be modified in staged/unstaged git states."
-                    exit 1
+                    echo "✓ Upgrade script exists (non-PR build, skipping modification check): $script_path"
                 fi
             fi
 
