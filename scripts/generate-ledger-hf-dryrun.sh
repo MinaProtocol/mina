@@ -78,6 +78,7 @@ PREFIX="$DEFAULT_PREFIX"
 OUTPUT_DIR="$DEFAULT_OUTPUT_DIR"
 MINA_BINARY=""
 RUNTIME_GENESIS_LEDGER_BINARY=""
+PAD_APP_STATE=""
 
 export MINA_PRIVKEY_PASS="${MINA_PRIVKEY_PASS:-}"
 
@@ -134,6 +135,9 @@ OPTIONS:
 
   --runtime-genesis-ledger-binary PATH
                                Path to runtime_genesis_ledger binary (builds if not specified or missing)
+
+  --pad-app-state             Pad app state when generating ledger hashes
+                               (passed to runtime_genesis_ledger)
 
   -h, --help                  Show this help message
 
@@ -285,6 +289,10 @@ while [[ $# -gt 0 ]]; do
             RUNTIME_GENESIS_LEDGER_BINARY="$2"
             shift 2
             ;;
+        --pad-app-state)
+            PAD_APP_STATE="--pad-app-state"
+            shift
+            ;;
         -h|--help)
             show_help
             exit 0
@@ -324,6 +332,7 @@ echo "  Next Seed: $NEXT_SEED"
 echo "  Output Directory: $OUTPUT_DIR"
 echo "  Mina Binary: ${MINA_BINARY:-"(will build if needed)"}"
 echo "  Runtime Genesis Ledger Binary: ${RUNTIME_GENESIS_LEDGER_BINARY:-"(will build if needed)"}"
+echo "  Pad App State: ${PAD_APP_STATE:-"disabled"}"
 echo
 
 # Ensure binaries are available
@@ -363,15 +372,23 @@ ensure_binary "RUNTIME_GENESIS_LEDGER_BINARY" "devnet.genesis" "runtime_genesis_
 # Generate block producer keys
 echo "Generating $BP_KEYS block producer keys..."
 for ((i=1; i<=BP_KEYS; i++)); do
-    echo "  Generating ${PREFIX}-bp${i}..."
-    "$MINA_BINARY" advanced generate-keypair --privkey-path "${PREFIX}-bp${i}"
+    if [[ -f "${PREFIX}-bp${i}" ]] && [[ -f "${PREFIX}-bp${i}.pub" ]]; then
+        echo "  Skipping ${PREFIX}-bp${i} (already exists)..."
+    else
+        echo "  Generating ${PREFIX}-bp${i}..."
+        "$MINA_BINARY" advanced generate-keypair --privkey-path "${PREFIX}-bp${i}"
+    fi
 done
 
 # Generate plain keys
 echo "Generating $PLAIN_KEYS plain keys..."
 for ((i=1; i<=PLAIN_KEYS; i++)); do
-    echo "  Generating ${PREFIX}-plain${i}..."
-    "$MINA_BINARY" advanced generate-keypair --privkey-path "${PREFIX}-plain${i}"
+    if [[ -f "${PREFIX}-plain${i}" ]] && [[ -f "${PREFIX}-plain${i}.pub" ]]; then
+        echo "  Skipping ${PREFIX}-plain${i} (already exists)..."
+    else
+        echo "  Generating ${PREFIX}-plain${i}..."
+        "$MINA_BINARY" advanced generate-keypair --privkey-path "${PREFIX}-plain${i}"
+    fi
 done
 
 # Build key arguments for prepare-test-ledger script
@@ -462,7 +479,7 @@ rmdir "$CACHE_DIR" 2>/dev/null || true
 
 # Generate ledger hashes
 echo "Generating ledger hashes..."
-"$RUNTIME_GENESIS_LEDGER_BINARY" --config-file runtime_config_full.json --hash-output-file hashes.json --genesis-dir "$PREFIX" --ignore-missing
+"$RUNTIME_GENESIS_LEDGER_BINARY" --config-file runtime_config_full.json --hash-output-file hashes.json --genesis-dir "$PREFIX" --ignore-missing $PAD_APP_STATE
 
 # Generate final runtime configuration with timestamp
 echo "Generating final runtime configuration..."
