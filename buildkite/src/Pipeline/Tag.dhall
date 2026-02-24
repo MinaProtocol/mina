@@ -33,6 +33,7 @@ let Tag
       | Focal
       | Jammy
       | Archive
+      | Mesa
       >
 
 let capitalName =
@@ -63,6 +64,7 @@ let capitalName =
             , Focal = "Focal"
             , Jammy = "Jammy"
             , Archive = "Archive"
+            , Mesa = "Mesa"
             }
             tag
 
@@ -94,6 +96,7 @@ let lowerName =
             , Focal = "focal"
             , Jammy = "jammy"
             , Archive = "archive"
+            , Mesa = "mesa"
             }
             tag
 

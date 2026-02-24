@@ -1,0 +1,22 @@
+{
+  "genesis": {
+    "genesis_state_timestamp": "2025-11-27T13:00:00Z"
+  },
+  "ledger": {
+    "add_genesis_winner": false,
+    "s3_data_hash": "cce08a77918b5727bf9dd7769e9a729727a394d2fa4377674311e567a9071dc2",
+    "hash": "jwQkrmEhsdde6T3gR98A7GPZSqsfRGP1G2Hi7PJuKLfh3s64Sa3"
+  },
+  "epoch_data": {
+    "staking": {
+      "seed": "2vahsgRV5nDPmtgr2Xo2Uq2dkngfSgvg7d1TKqQbY3wUS2ZDxCC3",
+      "s3_data_hash": "58480aacdabf777d0a1394be6781c264e8042f0e7f57473ae861a5026a841d96",
+      "hash": "jxEKtzF5zDcmGuz377zdndK1sa7bUvQK1WzkJiX2a7s4WhoB11q"
+    },
+    "next": {
+      "seed": "2vbH4D8B76WMYPRFgeuVvdWVhv6tAFoCJtg83yuJT1dud3QVSiZn",
+      "s3_data_hash": "bc1d73bbd4005a9aab1de53eadc3d3308c92fd9407b7cfe715882afd138e3d78",
+      "hash": "jxyb5RtQoQAQuZDpJY8KawPRp8jqsCidWyAgueTeKBbhJKdQj9t"
+    }
+  }
+}

@@ -230,6 +230,7 @@ if ! command -v mina-create-genesis &> /dev/null; then
 fi
 
 mina-create-genesis \
+    --pad-app-state \
     --config-file "$CONFIG_FILE" \
     --genesis-dir "$LEDGERS_DIR/" \
     --hash-output-file "$LEDGER_HASHES_JSON" || {

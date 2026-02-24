@@ -4,7 +4,7 @@ let List/any = Prelude.List.any
 
 let Network
     : Type
-    = < Devnet | Mainnet | TestnetGeneric | PreMesa1 >
+    = < Devnet | Mainnet | TestnetGeneric | PreMesa1 | Mesa >
 
 let capitalName =
           \(network : Network)
@@ -13,6 +13,7 @@ let capitalName =
             , Mainnet = "Mainnet"
             , TestnetGeneric = "TestnetGeneric"
             , PreMesa1 = "PreMesa1"
+            , Mesa = "Mesa"
             }
             network
 
@@ -23,6 +24,7 @@ let lowerName =
             , Mainnet = "mainnet"
             , TestnetGeneric = "testnet_generic"
             , PreMesa1 = "hetzner-pre-mesa-1"
+            , Mesa = "mesa"
             }
             network
 
@@ -33,6 +35,7 @@ let debianSuffix =
             , Mainnet = "mainnet"
             , TestnetGeneric = "testnet-generic"
             , PreMesa1 = "hetzner-pre-mesa-1"
+            , Mesa = "mesa"
             }
             network
 
@@ -43,6 +46,7 @@ let requiresMainnetBuild =
             , Mainnet = True
             , TestnetGeneric = True
             , PreMesa1 = False
+            , Mesa = False
             }
             network
 

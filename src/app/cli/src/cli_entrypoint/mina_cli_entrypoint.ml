@@ -1884,10 +1884,7 @@ let internal_commands logger ~itn_features =
                 match mode with
                 | `Transaction ->
                     `Transaction
-                      (List.t_of_sexp
-                         (Tuple2.t_of_sexp Ledger_proof.t_of_sexp
-                            Sok_message.t_of_sexp )
-                         input_sexp )
+                      (List.t_of_sexp Ledger_proof.t_of_sexp input_sexp)
                 | `Blockchain ->
                     `Blockchain
                       (List.t_of_sexp Blockchain_snark.Blockchain.t_of_sexp
@@ -1903,7 +1900,7 @@ let internal_commands logger ~itn_features =
                 match mode with
                 | `Transaction -> (
                     match
-                      [%derive.of_yojson: (Ledger_proof.t * Sok_message.t) list]
+                      [%derive.of_yojson: Ledger_proof.t list]
                         (Yojson.Safe.from_string input_line)
                     with
                     | Ok input ->

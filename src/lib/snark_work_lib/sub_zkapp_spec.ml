@@ -4,12 +4,12 @@ open Core_kernel
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V1 = struct
+  module V2 = struct
     type t =
       | Segment of
           { statement : Transaction_snark.Statement.With_sok.Stable.V2.t
           ; witness :
-              Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
+              Transaction_snark.Zkapp_command_segment.Witness.Stable.V2.t
           ; spec : Transaction_snark.Zkapp_command_segment.Basic.Stable.V1.t
           }
       | Merge of

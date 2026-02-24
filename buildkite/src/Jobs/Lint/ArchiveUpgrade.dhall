@@ -16,6 +16,10 @@ let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
+let Expr = ../../Pipeline/Expr.dhall
+
+let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -33,6 +37,12 @@ in  Pipeline.build
         , name = "ArchiveUpgrade"
         , scope = PipelineScope.PullRequestOnly
         , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
+        , includeIf =
+          [ Expr.Type.DescendantOf
+              { ancestor = MainlineBranch.Type.Develop
+              , reason = "Only run on Develop descendants"
+              }
+          ]
         }
       , steps =
         [ Command.build
