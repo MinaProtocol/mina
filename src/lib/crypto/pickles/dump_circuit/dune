@@ -1,0 +1,3 @@
+(executable
+ (name dump_circuit)
+ (libraries pickles))
