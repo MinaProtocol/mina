@@ -275,7 +275,6 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 }
 
 func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
-	// ===========================================================================
 	t.Logger.Info("Cleaning up deamon.json generate by mina-local-network so we're not using prefork genesis info...")
 	networkDaemonConfig := filepath.Join(t.Config.Root, "daemon.json")
 	data, err := os.ReadFile(networkDaemonConfig)
@@ -306,10 +305,8 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 	if err := os.WriteFile(networkDaemonConfig, updatedData, 0644); err != nil {
 		return fmt.Errorf("Error writing daemon.json: %v", err)
 	}
-	fmt.Println("daemon.json successfully sanitized!")
 
-	// ===========================================================================
-	t.Logger.Info("Moving fork config & ledgers in place for fork network")
+	t.Logger.Info("`daemon.json` successfully sanitized, now moving fork config & ledgers in place for fork network")
 	filesToMove := []string{"daemon.json", "genesis"}
 	for _, info := range t.Config.AllDaemonInfos() {
 		for _, fileToMove := range filesToMove {
