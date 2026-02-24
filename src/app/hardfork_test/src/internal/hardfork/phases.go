@@ -193,29 +193,6 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 	return nil
 }
 
-func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) error {
-	daemonInfos := t.Config.AllDaemonInfos()
-	errors := make([]error, len(daemonInfos))
-
-	var wg sync.WaitGroup
-	for idx, info := range daemonInfos {
-		wg.Add(1)
-		go func(idx int, info config.DaemonInfo) {
-			defer wg.Done()
-			errors[idx] = t.legacyFork(info, *analysis, mainGenesisTs)
-		}(idx, info)
-	}
-	wg.Wait()
-
-	for i, info := range daemonInfos {
-		if errors[i] != nil {
-			return fmt.Errorf("Legacy fork on daemon %v failed: %v", info, errors[i])
-		}
-	}
-
-	return nil
-}
-
 func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnalysisResult, mainGenesisTs int64) error {
 
 	forkDataPath := filepath.Join(daemon.NodeDir, "fork_data")
@@ -252,24 +229,32 @@ func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnal
 	return nil
 }
 
-// Uses `mina advanced generate-hardfork-config CLI`
-func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) error {
+func (t *HardforkTest) ForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) error {
 	daemonInfos := t.Config.AllDaemonInfos()
-	errors := make([]error, len(daemonInfos))
+	numDaemons := len(daemonInfos)
+	errors := make([]error, numDaemons)
+	forkMethodsPerDaemon := make([]config.ForkMethod, numDaemons)
 
 	var wg sync.WaitGroup
 	for idx, info := range daemonInfos {
 		wg.Add(1)
-		go func(idx int, info config.DaemonInfo) {
+		forkMethodToUse := t.Config.ForkMethods.RandomChoose()
+		forkMethodsPerDaemon[idx] = forkMethodToUse
+		go func(idx int, info config.DaemonInfo, forkMethod config.ForkMethod) {
 			defer wg.Done()
-			errors[idx] = t.advancedFork(info, *analysis, mainGenesisTs)
-		}(idx, info)
+			switch forkMethod {
+			case config.Legacy:
+				errors[idx] = t.legacyFork(info, *analysis, mainGenesisTs)
+			case config.Advanced:
+				errors[idx] = t.advancedFork(info, *analysis, mainGenesisTs)
+			}
+		}(idx, info, forkMethodToUse)
 	}
 	wg.Wait()
 
 	for i, info := range daemonInfos {
 		if errors[i] != nil {
-			return fmt.Errorf("Advanced fork on daemon %v failed: %v", info, errors[i])
+			return fmt.Errorf("%s fork on daemon %v failed: %v", forkMethodsPerDaemon[i].String(), info, errors[i])
 		}
 	}
 
