@@ -25,8 +25,8 @@ struct
 
   module Plonk_checks = struct
     include Plonk_checks
-    module Type1 = Plonk_checks.Make (Shifted_value.Type1) (Scalars.Tick)
-    module Type2 = Plonk_checks.Make (Shifted_value.Type2) (Scalars.Tock)
+    module Type1 = Plonk_checks.Make (Shifted_value.Type1) (Scalars_tokens_interpreter.Tick)
+    module Type2 = Plonk_checks.Make (Shifted_value.Type2) (Scalars_tokens_interpreter.Tock)
   end
 
   (* The prover corresponding to the given inductive rule. *)
