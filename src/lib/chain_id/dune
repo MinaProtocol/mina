@@ -19,5 +19,6 @@
   (backend bisect_ppx))
  (preprocess
   (pps
+   ppx_version
    ppx_jane
    )))
