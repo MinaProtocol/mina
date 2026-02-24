@@ -206,7 +206,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   let%bind accounts = Ledger.to_list ledger in
   List.iter accounts ~f:(fun acc ->
       printf "Account: %s\n%!"
-        ( Genesis_ledger_helper_lib.Accounts.Single.of_account acc None
+        ( Genesis_ledger_helper_lib.Accounts.Single.to_json_layout acc None
         |> Runtime_config.Accounts.Single.to_yojson |> Yojson.Safe.to_string ) ) ;
   let state_body =
     compile_time_genesis.data |> Mina_state.Protocol_state.body
@@ -339,7 +339,7 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
       let config = Option.value_exn runtime_config.Runtime_config.ledger in
       match config.base with
       | Accounts accounts ->
-          lazy (Genesis_ledger_helper.Accounts.to_full accounts)
+          lazy (Genesis_ledger_helper.Accounts.of_json_layout accounts)
       | _ ->
           failwith "Invalid genesis ledger, does not contain the accounts"
     in

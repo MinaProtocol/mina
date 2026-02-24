@@ -7,13 +7,13 @@ module Accounts : sig
   module Single : sig
     (** Convert a stable account and its optional private key into the
         [Runtime_config.Accounts.Single.t] JSON layout format *)
-    val of_account :
+    val to_json_layout :
       Account.t -> Private_key.t option -> Runtime_config.Accounts.Single.t
   end
 
   (** Parse an array of runtime config accounts and extract their private key
       and account data. Throws an exception if parsing fails. *)
-  val to_full :
+  val of_json_layout :
     Runtime_config.Accounts.t -> (Private_key.t option * Account.t) list
 end
 

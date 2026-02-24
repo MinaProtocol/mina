@@ -757,7 +757,7 @@ let handle_export_ledger_response ~json = function
         List.iter accounts ~f:(fun a ->
             if !print_comma then Format.fprintf Format.std_formatter "\n, "
             else print_comma := true ;
-            Genesis_ledger_helper.Accounts.Single.of_account a None
+            Genesis_ledger_helper.Accounts.Single.to_json_layout a None
             |> Runtime_config.Accounts.Single.to_yojson
             |> Yojson.Safe.pretty_print Format.std_formatter ) ;
         Format.fprintf Format.std_formatter "\n]" ;
@@ -876,7 +876,8 @@ let hash_ledger =
          match Runtime_config.Accounts.of_yojson json with
          | Ok runtime_accounts ->
              let accounts =
-               lazy (Genesis_ledger_helper.Accounts.to_full runtime_accounts)
+               lazy
+                 (Genesis_ledger_helper.Accounts.of_json_layout runtime_accounts)
              in
              process_accounts accounts
          | Error err ->
@@ -939,7 +940,7 @@ let currency_in_ledger =
          match Runtime_config.Accounts.of_yojson json with
          | Ok runtime_accounts ->
              let accounts =
-               Genesis_ledger_helper.Accounts.to_full runtime_accounts
+               Genesis_ledger_helper.Accounts.of_json_layout runtime_accounts
                |> List.map ~f:(fun (_sk_opt, acct) -> acct)
              in
              process_accounts accounts

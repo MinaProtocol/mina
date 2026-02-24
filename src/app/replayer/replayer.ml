@@ -60,7 +60,7 @@ let json_ledger_hash_of_ledger ledger =
 let create_ledger_as_list ledger =
   let%map accounts = Ledger.to_list ledger in
   List.map accounts ~f:(fun acc ->
-      Genesis_ledger_helper.Accounts.Single.of_account acc None )
+      Genesis_ledger_helper.Accounts.Single.to_json_layout acc None )
 
 module First_pass_ledger_hashes = struct
   (* ledger hashes after 1st pass, indexed by order of occurrence *)

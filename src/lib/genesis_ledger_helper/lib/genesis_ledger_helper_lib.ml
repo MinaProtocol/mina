@@ -6,8 +6,8 @@ let () = Key_cache_native.linkme (* Ensure that we use the native key cache. *)
 
 module Accounts = struct
   module Single = struct
-    let to_account_with_pk :
-        Runtime_config.Accounts.Single.t -> Mina_base.Account.t Or_error.t =
+    let of_json_layout :
+        Runtime_config.Accounts.Single.t -> Account.t Or_error.t =
      fun t ->
       let open Or_error.Let_syntax in
       let pk = Signature_lib.Public_key.Compressed.of_base58_check_exn t.pk in
@@ -186,7 +186,7 @@ module Accounts = struct
         }
         : Mina_base.Account.t )
 
-    let of_account :
+    let to_json_layout :
            Mina_base.Account.t
         -> Signature_lib.Private_key.t option
         -> Runtime_config.Accounts.Single.t =
@@ -309,7 +309,7 @@ module Accounts = struct
       }
   end
 
-  let to_full :
+  let of_json_layout :
       Runtime_config.Accounts.t -> (Private_key.t option * Account.t) list =
     List.map
       ~f:(fun ({ Runtime_config.Accounts.pk; sk; _ } as account_config) ->
@@ -325,8 +325,7 @@ module Accounts = struct
               None
         in
         let account =
-          Single.to_account_with_pk { account_config with pk }
-          |> Or_error.ok_exn
+          Single.of_json_layout { account_config with pk } |> Or_error.ok_exn
         in
         (sk, account) )
 
@@ -674,7 +673,7 @@ let%test_module "Runtime config" =
             failwith "Expected accounts in ledger"
       in
       let accounts =
-        Accounts.to_full runtime_accounts
+        Accounts.of_json_layout runtime_accounts
         |> List.map ~f:(fun (_sk, account) -> account)
       in
       assert (List.length accounts = 1) ;
@@ -719,7 +718,7 @@ let%test_module "Runtime config" =
             failwith "Expected accounts in ledger"
       in
       let accounts =
-        Accounts.to_full runtime_accounts
+        Accounts.of_json_layout runtime_accounts
         |> List.map ~f:(fun (_sk, account) -> account)
       in
       assert (List.length accounts = 1) ;
@@ -746,7 +745,7 @@ let%test_module "Runtime config" =
             failwith "Expected accounts in ledger"
       in
       let accounts =
-        Accounts.to_full runtime_accounts
+        Accounts.of_json_layout runtime_accounts
         |> List.map ~f:(fun (_sk, account) -> account)
       in
       assert (List.length accounts = 1) ;

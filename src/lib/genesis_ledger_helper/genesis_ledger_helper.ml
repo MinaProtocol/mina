@@ -339,7 +339,8 @@ module Ledger = struct
           Some
             ( lazy
               (patch_accounts_version
-                 (add_genesis_winner_account (Accounts.to_full accounts)) ) )
+                 (add_genesis_winner_account (Accounts.of_json_layout accounts)) )
+              )
       | Named name -> (
           match Genesis_ledger.fetch_ledger name with
           | Some (module M) ->
@@ -956,9 +957,9 @@ let%test_module "Account config test" =
       let module Ledger = (val Genesis_ledger.for_unit_tests) in
       let accounts = Lazy.force Ledger.accounts in
       List.iter accounts ~f:(fun (sk, acc) ->
-          let acc_config = Accounts.Single.of_account acc sk in
+          let acc_config = Accounts.Single.to_json_layout acc sk in
           let acc' =
-            Accounts.Single.to_account_with_pk acc_config |> Or_error.ok_exn
+            Accounts.Single.of_json_layout acc_config |> Or_error.ok_exn
           in
           [%test_eq: Account.t] acc acc' )
   end )
