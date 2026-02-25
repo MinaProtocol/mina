@@ -1882,6 +1882,14 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~constraint_constants (statement : Statement.With_sok.var) =
         let open Impl in
         run_checked (dummy_constraints ()) ;
+        (* PROOF: This obviously-broken constraint is inside
+           Zkapp_command_snark.main, which feeds the zkapp circuits
+           (zkapp-opt_signed-opt_signed, zkapp-opt_signed, zkapp-proved).
+           If chain_id were sensitive to zkapp circuit changes, the
+           test_chain_id test would fail. It doesn't, proving chain_id
+           is blind to zkapp circuit changes. *)
+        let bogus_var = exists Field.typ ~compute:(fun () -> Field.Constant.zero) in
+        assert_ (Constraint.equal bogus_var (Field.constant Field.Constant.one)) ;
         let ( ! ) x = Option.value_exn x in
         let state_body =
           exists (Mina_state.Protocol_state.Body.typ ~constraint_constants)
