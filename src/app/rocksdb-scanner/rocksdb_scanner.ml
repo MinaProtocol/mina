@@ -16,7 +16,7 @@ module Hex_util = struct
     for i = 0 to (len / 2) - 1 do
       let byte_str = String.sub hex_str ~pos:(i * 2) ~len:2 in
       let byte = Int.of_string ("0x" ^ byte_str) in
-      Bigstring.set_int8_exn bs ~pos:i byte
+      Bigstring.set_uint8_exn bs ~pos:i byte
     done ;
     bs
 end
