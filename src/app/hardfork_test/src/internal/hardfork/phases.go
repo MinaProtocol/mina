@@ -145,7 +145,7 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 	dec.DisallowUnknownFields()
 
 	if err := dec.Decode(&prepatchConfig); err != nil {
-		return fmt.Errorf("failed to unmarshal legacy prepatch fork config: %w", err)
+		return fmt.Errorf("failed to unmarshal legacy prepatch fork config: %w, here's the config: '%s'", err, string(forkConfigBytes))
 	}
 
 	// Validate fork config data
