@@ -43,7 +43,7 @@ func (t *HardforkTest) GenerateForkLedgers(executablePath, forkConfigPath, ledge
 	return nil
 }
 
-func (t *HardforkTest) GenerateAndValidateHashesAndLedgers(analysis *BlockAnalysisResult, forkConfigPath, preforkLedgersDir, prepatchForkConfig string) error {
+func (t *HardforkTest) GenerateAndValidateHashesAndLedgers(analysis BlockAnalysisResult, forkConfigPath, preforkLedgersDir, prepatchForkConfig string) error {
 	// Generate prefork ledgers using main network executable
 	if err := t.GenerateForkLedgers(t.Config.MainRuntimeGenesisLedger, forkConfigPath, preforkLedgersDir, prepatchForkConfig); err != nil {
 		return err

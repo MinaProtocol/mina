@@ -25,7 +25,7 @@ type RuntimeGenesisLedgerHashes struct {
 }
 
 func (t *HardforkTest) ValidateRuntimeGenesisLedgerHashes(
-	analysis *BlockAnalysisResult,
+	analysis BlockAnalysisResult,
 	ledgerHashesFile string,
 ) error {
 

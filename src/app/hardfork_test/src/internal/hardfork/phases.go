@@ -159,7 +159,7 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 
 	prepatchLedgersDir := filepath.Join(forkDataPrepatchPath, "ledgers")
 	prepatchHashesFile := filepath.Join(forkDataPrepatchPath, "ledger_hashes.json")
-	if err := t.GenerateAndValidateHashesAndLedgers(&analysis, prepatchConfigFile, prepatchLedgersDir, prepatchHashesFile); err != nil {
+	if err := t.GenerateAndValidateHashesAndLedgers(analysis, prepatchConfigFile, prepatchLedgersDir, prepatchHashesFile); err != nil {
 		return err
 	}
 
