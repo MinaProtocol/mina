@@ -242,6 +242,7 @@ func (t *HardforkTest) ForkPhase(analysis *BlockAnalysisResult, mainGenesisTs in
 		forkMethodsPerDaemon[idx] = forkMethodToUse
 		go func(idx int, info config.DaemonInfo, forkMethod config.ForkMethod) {
 			defer wg.Done()
+			t.Logger.Info("Forking node at port %d with method %s", info.StartPort, forkMethod.String())
 			switch forkMethod {
 			case config.Legacy:
 				errors[idx] = t.legacyFork(info, *analysis, mainGenesisTs)
