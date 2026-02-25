@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Ledger Dumper Tool is queries the archive database for ledger entries associated with a specific slot, which is a unit of time in mina. The data fetched includes various details such as delegate keys, balances, nonces, receipt chain hashes, and more.
+The Ledger Dumper Tool queries the archive database for ledger entries associated with a specific slot, which is a unit of time in mina. The data fetched includes various details such as delegate keys, balances, nonces, receipt chain hashes, and more.
 
 
 ## Example

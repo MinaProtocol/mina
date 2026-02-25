@@ -820,6 +820,8 @@ copy_common_archive_configs() {
     "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
   cp ./default/src/app/replayer/replayer.exe \
     "${BUILDDIR}/usr/local/bin/mina-replayer"
+  cp ./default/src/app/dump_slot_ledger/dump_slot_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-dump-slot-ledger"
 
   rsync -Huav ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/archive"
 

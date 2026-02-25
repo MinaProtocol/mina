@@ -237,7 +237,9 @@ let dockerTag =
                 , DaemonAutoHardfork =
                     "${spec.version}-${Network.debianSuffix
                                          spec.network}${profile_part}"
-                , Archive = "${spec.version}${build_flags_part}"
+                , Archive =
+                    "${spec.version}-${Network.debianSuffix
+                                         spec.network}${build_flags_part}"
                 , LogProc = "${spec.version}"
                 , TestExecutive = "${spec.version}"
                 , BatchTxn = "${spec.version}"

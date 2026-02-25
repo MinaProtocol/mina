@@ -2,6 +2,7 @@
   (name dump_slot_ledger)
   (libraries
     async base base.caml caqti caqti-driver-postgresql core cli_lib mina_caqti
+    yojson
     )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_custom_printf ppx_deriving.show ppx_mina ppx_jane ppx_version )))
+ (preprocess (pps ppx_deriving_yojson ppx_jane ppx_version )))

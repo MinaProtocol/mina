@@ -3,7 +3,7 @@ open Async
 
 module Ledger_entry = struct
   (*
-The type that represents the ledger information we want to dump from the archive db 
+The type that represents the ledger information we want to dump from the archive db
 *)
   type t =
     { delegate_key : string option
@@ -15,7 +15,7 @@ The type that represents the ledger information we want to dump from the archive
     ; token_symbol : string option
     ; timestamp : string
     }
-  [@@deriving show]
+  [@@deriving to_yojson]
 end
 
 module Database = struct
@@ -26,9 +26,9 @@ module Database = struct
     *)
     let tup8 i1 i2 i3 i4 i5 i6 i7 i8 =
       let open Caqti_type in
-      let first = tup4 i1 i2 i3 i4 in
-      let second = tup4 i5 i6 i7 i8 in
-      tup2 first second
+      let first = t4 i1 i2 i3 i4 in
+      let second = t4 i5 i6 i7 i8 in
+      t2 first second
   end
 
   open Ledger_entry
@@ -69,15 +69,17 @@ module Database = struct
         tup8 (option string) int string int string string (option string) string)
 end
 
+let json_error msg =
+  eprintf "%s\n" (Yojson.Safe.to_string (`Assoc [ ("error", `String msg) ]))
+
 let dump_slot slot postgres =
   let open Deferred.Let_syntax in
-  let logger = Logger.create () in
-  let pool = Caqti_async.connect_pool postgres in
+  let pool = Mina_caqti.connect_pool postgres in
   match pool with
   | Error e ->
-      [%log error]
-        "Failed to create a Caqti pool for Postgresql, see error: $error"
-        ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
+      json_error
+        (sprintf "Failed to create a Caqti pool for Postgresql: %s"
+           (Caqti_error.show e) ) ;
       Deferred.unit
   | Ok pool -> (
       let slot_string = Mina_numbers.Global_slot_since_genesis.to_string slot in
@@ -85,11 +87,10 @@ let dump_slot slot postgres =
         (*
       This query dumps all the ledger information tied to each account.
       The assumption here is the chain state for a slot corresponds to the
-      closest block before the slot occured. This is because every block
-      has is produced during a slot, but not every slot implies a block was
-      produced.  
+      closest block produced before or at the given slot. This is because
+      a block is produced during a slot, but not every slot has a block.
       *)
-        Caqti_request.collect Caqti_type.unit Database.caqti_ledger_entry
+        Mina_caqti.collect_req Caqti_type.unit Database.caqti_ledger_entry
         @@ sprintf
              {sql|
       WITH SlotBlock AS (
@@ -118,22 +119,20 @@ let dump_slot slot postgres =
              slot_string
       in
       let%bind ledger =
-        Caqti_async.Pool.use
-          (fun (module Conn : Caqti_async.CONNECTION) ->
+        Mina_caqti.Pool.use
+          (fun (module Conn : Mina_caqti.CONNECTION) ->
             Conn.collect_list entries ()
             >>| function
             | Ok rows ->
-                let () =
-                  List.iter rows ~f:(fun row ->
-                      let dump = Format.asprintf "%a" Ledger_entry.pp row in
-                      [%log info] "$dump\n" ~metadata:[ ("dump", `String dump) ] )
-                in
+                List.iter rows ~f:(fun row ->
+                    printf "%s\n"
+                      (Yojson.Safe.to_string (Ledger_entry.to_yojson row)) ) ;
                 Ok ()
             | Error e ->
-                [%log error]
-                  "Failed to obtain ledger entries from the database, see \
-                   error: $error"
-                  ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
+                json_error
+                  (sprintf
+                     "Failed to obtain ledger entries from the database: %s"
+                     (Caqti_error.show e) ) ;
                 Ok () )
           pool
       in
@@ -142,10 +141,10 @@ let dump_slot slot postgres =
       | Ok () ->
           Deferred.unit
       | Error e ->
-          [%log error]
-            "Failed to obtain entries after the initial ledger query, see \
-             error: $error"
-            ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
+          json_error
+            (sprintf
+               "Failed to obtain entries after the initial ledger query: %s"
+               (Caqti_error.show e) ) ;
           Deferred.unit )
 
 let command =
@@ -156,7 +155,7 @@ let command =
     (let%map_open.Command postgres = Cli_lib.Flag.Uri.Archive.postgres
      and slot =
        flag "--slot" ~aliases:[ "slot" ]
-         ~doc:"the global slot since genesis tha tyou would like to dump"
+         ~doc:"the global slot since genesis that you would like to dump"
          (required Cli_lib.Arg_type.global_slot)
      in
      fun () -> dump_slot slot postgres.value )
