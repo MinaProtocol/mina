@@ -3,6 +3,7 @@ module Util = Mina_base_util
 module Account = Account
 module Account_id = Account_id
 module Account_timing = Account_timing
+module Aux_hash = Aux_hash
 module Call_stack_digest = Call_stack_digest
 module Chain_id = Chain_id
 module Coinbase = Coinbase
