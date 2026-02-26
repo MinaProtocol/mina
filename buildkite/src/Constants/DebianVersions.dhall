@@ -44,7 +44,7 @@ let DepsSpec =
           }
       , default =
           { deb_version = DebVersion.Bullseye
-          , network = Network.Type.TestnetGeneric
+          , network = Network.Type.Devnet
           , profile = Profiles.Type.Devnet
           , build_flag = BuildFlags.Type.None
           , step = "build"
