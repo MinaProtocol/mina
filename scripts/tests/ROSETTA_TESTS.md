@@ -287,7 +287,7 @@ The script loads realistic test data from the archive database:
 ./rosetta-connectivity.sh --tag 3.0.3-bullseye-mainnet --network mainnet --run-load-test
 
 # Custom timeout for slow environments
-./rosetta-connectivity.sh --tag 3.0.3-bullseye-testnet-generic --timeout 1800
+./rosetta-connectivity.sh --tag 3.0.3-bullseye-devnet-generic --timeout 1800
 ```
 
 ## Integration and Dependencies
