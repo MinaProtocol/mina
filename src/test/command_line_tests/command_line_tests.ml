@@ -694,6 +694,140 @@ module ConfigFileOverride = struct
     | Ok () -> Mina_automation_fixture.Intf.Passed | Error err -> Failed err
 end
 
+module PeerListUrlInvalidScheme = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let test_case (test : t) =
+    let daemon = Daemon.of_config test.config in
+    let%bind () = Daemon.Config.generate_keys test.config in
+    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+    let%bind () =
+      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+    in
+    let%bind process =
+      Daemon.start ~peer_list_url:"ftp://invalid-scheme.example.com/peers.txt"
+        daemon
+    in
+    match%bind
+      Async.Clock.with_timeout
+        (Core.Time.Span.of_sec 30.)
+        (Process.wait process.process)
+    with
+    | `Timeout ->
+        let%bind _ = Daemon.Process.force_kill process in
+        Deferred.Or_error.return
+          (Mina_automation_fixture.Intf.Failed
+             "Daemon did not exit within 30 seconds" )
+    | `Result (Ok ()) ->
+        Deferred.Or_error.return
+          (Mina_automation_fixture.Intf.Failed
+             "Daemon exited with code 0, expected non-zero for invalid \
+              peer-list-url scheme" )
+    | `Result (Error (`Exit_non_zero _)) ->
+        Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+    | `Result (Error (`Signal signal)) ->
+        Deferred.Or_error.return
+          (Mina_automation_fixture.Intf.Failed
+             (sprintf "Daemon terminated by signal: %s"
+                (Core.Signal.to_string signal) ) )
+end
+
+module PeerListUrlNoScheme = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let test_case (test : t) =
+    let daemon = Daemon.of_config test.config in
+    let%bind () = Daemon.Config.generate_keys test.config in
+    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+    let%bind () =
+      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+    in
+    let%bind process = Daemon.start ~peer_list_url:"not-a-url-at-all" daemon in
+    match%bind
+      Async.Clock.with_timeout
+        (Core.Time.Span.of_sec 30.)
+        (Process.wait process.process)
+    with
+    | `Timeout ->
+        let%bind _ = Daemon.Process.force_kill process in
+        Deferred.Or_error.return
+          (Mina_automation_fixture.Intf.Failed
+             "Daemon did not exit within 30 seconds" )
+    | `Result (Ok ()) ->
+        Deferred.Or_error.return
+          (Mina_automation_fixture.Intf.Failed
+             "Daemon exited with code 0, expected non-zero for peer-list-url \
+              without scheme" )
+    | `Result (Error (`Exit_non_zero _)) ->
+        Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+    | `Result (Error (`Signal signal)) ->
+        Deferred.Or_error.return
+          (Mina_automation_fixture.Intf.Failed
+             (sprintf "Daemon terminated by signal: %s"
+                (Core.Signal.to_string signal) ) )
+end
+
+module PeerListUrlValidHttps = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let test_case (test : t) =
+    let daemon = Daemon.of_config test.config in
+    let%bind () = Daemon.Config.generate_keys test.config in
+    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+    let%bind () =
+      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+    in
+    let%bind process =
+      Daemon.start
+        ~peer_list_url:"https://bootnodes.minaprotocol.com/networks/devnet.txt"
+        daemon
+    in
+    (* The daemon should not crash immediately from URL validation.
+       Give it a few seconds to get past the peer-list-url check. *)
+    let%bind () = after (Core.Time.Span.of_sec 5.) in
+    (* Check if the process is still running *)
+    match%bind
+      Async.Clock.with_timeout (Core.Time.Span.of_sec 1.)
+        (Process.wait process.process)
+    with
+    | `Timeout ->
+        (* Still running = good, the URL was accepted *)
+        let%bind _ = Daemon.Process.force_kill process in
+        Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+    | `Result (Ok ()) ->
+        (* Exited cleanly - also fine, URL was accepted *)
+        Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+    | `Result (Error (`Exit_non_zero exit_code)) ->
+        (* Check if exit was due to URL validation by reading logs *)
+        let log_file = Daemon.Config.ConfigDirs.mina_log test.config.dirs in
+        let%bind log_exists = Sys.file_exists log_file in
+        let%bind logs =
+          match log_exists with
+          | `Yes ->
+              Reader.file_contents log_file
+          | `No | `Unknown ->
+              Deferred.return ""
+        in
+        if
+          String.is_substring logs
+            ~substring:"peer-list-url must be a valid URL"
+        then
+          Deferred.Or_error.return
+            (Mina_automation_fixture.Intf.Failed
+               "Daemon rejected valid https peer-list-url" )
+        else
+          (* Non-zero exit for other reasons is acceptable *)
+          Deferred.Or_error.return
+            (Mina_automation_fixture.Intf.Warning
+               (sprintf "Daemon exited with code %d (not due to URL validation)"
+                  exit_code ) )
+    | `Result (Error (`Signal signal)) ->
+        Deferred.Or_error.return
+          (Mina_automation_fixture.Intf.Failed
+             (sprintf "Daemon terminated by signal: %s"
+                (Core.Signal.to_string signal) ) )
+end
+
 let () =
   let open Alcotest in
   run "Test commadline."
@@ -786,5 +920,33 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (ConfigFileOverride) ) )
+        ] )
+    ; ( "peer-list-url-invalid-scheme"
+      , [ test_case
+            "The mina daemon rejects --peer-list-url with invalid scheme \
+             (ftp://)"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (PeerListUrlInvalidScheme) ) )
+        ] )
+    ; ( "peer-list-url-no-scheme"
+      , [ test_case
+            "The mina daemon rejects --peer-list-url without http/https scheme"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (PeerListUrlNoScheme) ) )
+        ] )
+    ; ( "peer-list-url-valid-https"
+      , [ test_case
+            "The mina daemon accepts --peer-list-url with valid https:// URL"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (PeerListUrlValidHttps) ) )
         ] )
     ]
