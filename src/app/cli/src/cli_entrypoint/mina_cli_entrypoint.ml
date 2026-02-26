@@ -1292,9 +1292,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                      peer_list_url ) )
           in
           Option.iter seed_peer_list_url ~f:(fun url ->
-              let uri = Uri.of_string url in
-              match Uri.scheme uri with
-              | Some ("http" | "https") ->
+              match Uri.scheme (Uri.of_string url) with
+              | Some "http" | Some "https" ->
                   ()
               | _ ->
                   Mina_stdlib.Mina_user_error.raisef
