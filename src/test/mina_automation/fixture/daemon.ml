@@ -43,6 +43,9 @@ module type TestCaseWithBootstrap = TestCase with type t = after_bootstrap
 
 module type TestCaseWithoutBootstrap = TestCase with type t = before_bootstrap
 
+module type TestCaseWithoutBootstrapAndWithSetup =
+  TestCaseWithSetup with type t = Integration_test_lib.Test_config.t
+
 module Make_FixtureWithBootstrap (M : TestCaseWithBootstrap) :
   Fixture with type t = after_bootstrap = struct
   type t = after_bootstrap
@@ -96,6 +99,20 @@ module Make_FixtureWithoutBootstrap (M : TestCaseWithoutBootstrap) :
       { config = Daemon.Config.default ()
       ; temp_dir = Filename.temp_dir "daemon_test" ""
       }
+
+  let teardown _t = Deferred.Or_error.ok_unit
+
+  let on_test_fail _t = Deferred.unit
+end
+
+module Make_FixtureWithBootstrapAndFromTestConfig
+    (M : TestCaseWithoutBootstrapAndWithSetup) :
+  Fixture with type t = Integration_test_lib.Test_config.t = struct
+  type t = Integration_test_lib.Test_config.t
+
+  let test_case = M.test_case
+
+  let setup () = Deferred.Or_error.return (M.setup ())
 
   let teardown _t = Deferred.Or_error.ok_unit
 

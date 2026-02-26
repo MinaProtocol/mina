@@ -44,6 +44,25 @@ include Account_id.Digest.Binables
 (* someday, allow this in %%define_locally *)
 module Checked = Account_id.Digest.Checked
 
+let gen_token_tree ~length =
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind root =
+    let%bind use_default = Quickcheck.Generator.bool in
+    if use_default then return default else gen_non_default
+  in
+  let rec loop acc n =
+    if Int.( <= ) n 0 then return (List.rev acc)
+    else
+      let%bind parent_token =
+        Quickcheck.Generator.of_list (List.map acc ~f:fst)
+      in
+      let%bind pk = Signature_lib.Public_key.Compressed.gen in
+      let owner = Account_id.create pk parent_token in
+      let child = Account_id.derive_token_id ~owner in
+      loop ((child, Some owner) :: acc) (n - 1)
+  in
+  loop [ (root, None) ] length
+
 let deriver obj =
   (* this doesn't use js_type:Field because it is converted to JSON differently than a normal Field *)
   Fields_derivers_zkapps.iso_string obj ~name:"TokenId"

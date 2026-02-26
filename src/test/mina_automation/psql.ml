@@ -46,7 +46,11 @@ let create_credential_arg ~connection =
     match connection with
     | Conn_str conn_str ->
         let uri = conn_str |> Uri.of_string in
-        let password = uri |> Uri.password |> Option.value_exn in
+        let password =
+          uri |> Uri.password
+          |> Option.value_exn ~here:[%here]
+               ~message:"No password provided for postgres connection!"
+        in
         let user = uri |> Uri.user in
         let host = uri |> Uri.host in
         let port = uri |> Uri.port in

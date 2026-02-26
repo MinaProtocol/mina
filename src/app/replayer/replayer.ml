@@ -630,6 +630,53 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
         [ ("max_canonical_slot", `String (Int64.to_string max_canonical_slot)) ] ;
     Deferred.unit )
 
+let fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
+    ~global_slot_hashes_tbl =
+  let slots = Int64.Table.keys global_slot_hashes_tbl in
+  let chain_oldest_slot =
+    Option.value ~default:Int64.minus_one
+      (List.min_elt slots ~compare:Int64.compare)
+  in
+  let chain_oldest_state_hash =
+    Option.value_map (Int64.Table.find global_slot_hashes_tbl chain_oldest_slot)
+      ~default:"<none>" ~f:(fun (sh, _, _) -> State_hash.to_base58_check sh)
+  in
+  let%bind chain_oldest_parent_state_hash =
+    match%map
+      Mina_caqti.Pool.use
+        (fun db -> Sql.Parent_block.get_parent_hash db chain_oldest_state_hash)
+        pool
+    with
+    | Ok hash ->
+        hash
+    | Error _ ->
+        (* This is a separate database transaction, so technically we could have
+           lost connection or the block could have been deleted between now and
+           when the chain query was run. *)
+        "<chain endpoint data no longer retrievable>"
+  in
+  let%bind chain_oldest_height =
+    match%map
+      Mina_caqti.Pool.use
+        (fun db -> Sql.Block.get_height_by_state_hash db chain_oldest_state_hash)
+        pool
+    with
+    | Ok height ->
+        height
+    | Error _ ->
+        Int64.minus_one
+  in
+  [%log fatal]
+    "Block chain leading to target state hash does not include genesis block"
+    ~metadata:
+      [ ("target_state_hash", `String target_state_hash)
+      ; ("chain_oldest_state_hash", `String chain_oldest_state_hash)
+      ; ( "chain_oldest_parent_state_hash"
+        , `String chain_oldest_parent_state_hash )
+      ; ("chain_oldest_height", `String (Int64.to_string chain_oldest_height))
+      ] ;
+  Core_kernel.exit 1
+
 let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
     ~checkpoint_interval ~checkpoint_output_folder_opt ~checkpoint_file_prefix
     ~genesis_dir_opt ~log_json ~log_level ~log_filename ~file_log_level
@@ -746,20 +793,23 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             in
             return (Int.Set.of_list ids, oldest_block_id) )
       in
-      if Int64.equal input.start_slot_since_genesis 0L then
-        (* check that genesis block is in chain to target hash                                                                                                                                                                                          assumption: genesis block occupies global slot 0
+      let%bind () =
+        if Int64.equal input.start_slot_since_genesis 0L then
+          (* check that genesis block is in chain to target hash
+             assumption: genesis block occupies global slot 0
 
-           if nonzero start slot, can't assume there's a block at that slot *)
-        if Int64.Table.mem global_slot_hashes_tbl Int64.zero then
-          [%log info]
-            "Block chain leading to target state hash includes genesis block, \
-             length = %d"
-            (Int.Set.length block_ids)
-        else (
-          [%log fatal]
-            "Block chain leading to target state hash does not include genesis \
-             block" ;
-          Core_kernel.exit 1 ) ;
+             if nonzero start slot, can't assume there's a block at that slot *)
+          if Int64.Table.mem global_slot_hashes_tbl Int64.zero then (
+            [%log info]
+              "Block chain leading to target state hash includes genesis \
+               block, length = %d"
+              (Int.Set.length block_ids) ;
+            Deferred.unit )
+          else
+            fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
+              ~global_slot_hashes_tbl
+        else Deferred.unit
+      in
       (* some mutable state, less painful than passing epoch ledgers throughout *)
       let staking_epoch_ledger = ref ledger in
       let next_epoch_ledger = ref ledger in

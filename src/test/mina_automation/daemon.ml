@@ -3,6 +3,7 @@ Module to run daemon process.
 *)
 open Core
 
+open Integration_test_lib
 open Async
 
 module Paths = struct
@@ -93,6 +94,17 @@ module Client = struct
       ~args:[ "ledger"; "currency"; "--ledger-file"; ledger_file ]
       ()
 
+  let ledger_export_snarked_ledger t =
+    Executor.run t.executor
+      ~args:
+        [ "ledger"
+        ; "export"
+        ; "snarked-ledger"
+        ; "--daemon-port"
+        ; string_of_int t.port
+        ]
+      ()
+
   let test_ledger t ~(n : int) =
     Executor.run t.executor
       ~args:[ "ledger"; "test"; "generate-accounts"; "-n"; string_of_int n ]
@@ -135,21 +147,39 @@ module Config = struct
 
     let dirs t = [ t.conf; t.genesis; t.libp2p_keypair ]
 
+    let default =
+      let root = Filename.temp_dir ~in_dir:"/tmp" "mina_automation" "" in
+      create ~root_path:root ()
+
     let mina_log t = t.conf ^/ "mina.log"
   end
 
-  type t = { port : int; dirs : ConfigDirs.t }
-
-  let default ?dirs () =
-    let root_path = Filename.temp_dir ~in_dir:"/tmp" "mina_automation" "" in
-    { port = 8031
-    ; dirs =
-        ( match dirs with
-        | Some dirs ->
-            dirs
-        | None ->
-            ConfigDirs.create ~root_path () )
+  type t =
+    { client_port : int
+    ; rest_port : int
+    ; dirs : ConfigDirs.t
+    ; config : Test_config.t
+    ; runtime_config : Runtime_config.t
+    ; genesis_ledger : Genesis_ledger.t
     }
+
+  let create ?(client_port = 8031) ?(rest_port = 3085) ~(dirs : ConfigDirs.t)
+      ~(config : Test_config.t) () =
+    let genesis_ledger = Genesis_ledger.create config.genesis_ledger in
+    let runtime_config =
+      Runtime_config_builder.create ~test_config:config ~genesis_ledger
+    in
+
+    Yojson.Safe.to_file
+      (dirs.conf ^/ "daemon.json")
+      (Runtime_config.to_yojson runtime_config) ;
+
+    { client_port; rest_port; dirs; config; runtime_config; genesis_ledger }
+
+  let default () =
+    create ~dirs:ConfigDirs.default
+      ~config:(Test_config.default ~constants:Test_config.default_constants)
+      ()
 
   let libp2p_keypair_folder t = ConfigDirs.libp2p_keypair_folder t.dirs
 
@@ -195,23 +225,31 @@ let archive_blocks_from_files t ~archive_address ~format ?(sleep = 5) blocks =
       let%bind _ = archive_blocks t ~archive_address ~format [ block ] () in
       after (Time.Span.of_sec (Float.of_int sleep)) )
 
+let of_test_config test_config =
+  { config =
+      Config.create ~dirs:Config.ConfigDirs.default ~config:test_config ()
+  ; executor = Executor.AutoDetect
+  }
+
 let of_config config = { config; executor = Executor.AutoDetect }
 
 let default () = { config = Config.default (); executor = Executor.AutoDetect }
 
-let client t = Client.create ~port:t.config.port ~executor:t.executor ()
+let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
-let start t =
+let start ?hardfork_handling ?block_producer_key ?env t =
   let open Deferred.Let_syntax in
-  let args =
+  let base_args =
     [ "daemon"
     ; "--seed"
     ; "--demo-mode"
-    ; "--background"
+    ; "--insecure-rest-server"
     ; "--working-dir"
     ; "."
     ; "--client-port"
-    ; string_of_int t.config.port
+    ; string_of_int t.config.client_port
+    ; "--rest-port"
+    ; string_of_int t.config.rest_port
     ; "--config-directory"
     ; t.config.dirs.conf
     ; "--genesis-ledger-dir"
@@ -222,15 +260,22 @@ let start t =
     ; Config.libp2p_keypair_folder t.config
     ]
   in
-
+  let opt_arg key value_opt =
+    match value_opt with None -> [] | Some value -> [ key; value ]
+  in
+  let args =
+    base_args
+    @ opt_arg "--hardfork-handling" hardfork_handling
+    @ opt_arg "--block-producer-key" block_producer_key
+  in
   [%log debug] "Starting daemon" ;
 
-  let%bind _, process = Executor.run_in_background t.executor ~args () in
+  let%bind _, process = Executor.run_in_background t.executor ~args ?env () in
 
   let mina_process : Process.t =
     { config = t.config
     ; process
-    ; client = Client.create ~port:t.config.port ~executor:t.executor ()
+    ; client = Client.create ~port:t.config.client_port ~executor:t.executor ()
     }
   in
   Deferred.return mina_process

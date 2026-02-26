@@ -397,7 +397,7 @@ module Mutations = struct
       , string )
       result
       Io.t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    let signature_kind = Mina_lib.signature_kind mina in
     (* instead of adding the zkapp_command to the transaction pool, as we would for an actual zkapp,
        apply the zkapp using an ephemeral ledger
     *)
@@ -1172,7 +1172,7 @@ module Mutations = struct
                 ~memo:(Signed_command_memo.create_from_string_exn memo)
                 ~body
             in
-            let signature_kind = Mina_signature_kind.t_DEPRECATED in
+            let signature_kind = Mina_lib.signature_kind mina in
             let signature =
               Ok (Signed_command.sign_payload ~signature_kind sender payload)
             in
@@ -1656,9 +1656,8 @@ module Queries = struct
   open Schema
 
   (* helper for pooledUserCommands, pooledZkappCommands *)
-  let get_commands ~proof_cache_db ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
-      =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let get_commands ~signature_kind ~proof_cache_db ~resource_pool ~pk_opt
+      ~hashes_opt ~txns_opt =
     match (pk_opt, hashes_opt, txns_opt) with
     | None, None, None ->
         Network_pool.Transaction_pool.Resource_pool.get_all resource_pool
@@ -1766,6 +1765,7 @@ module Queries = struct
         in
         let cmds =
           get_commands
+            ~signature_kind:(Mina_lib.signature_kind mina)
             ~proof_cache_db:(Mina_lib.proof_cache_db mina)
             ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
         in
@@ -1806,6 +1806,7 @@ module Queries = struct
         in
         let cmds =
           get_commands
+            ~signature_kind:(Mina_lib.signature_kind mina)
             ~proof_cache_db:(Mina_lib.proof_cache_db mina)
             ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
         in
@@ -2083,11 +2084,9 @@ module Queries = struct
     field "genesisBlock" ~typ:(non_null Types.block) ~args:[]
       ~doc:"Get the genesis block" ~resolve:(fun { ctx = mina; _ } () ->
         let open Mina_state in
-        let { Precomputed_values.genesis_ledger
-            ; constraint_constants
-            ; consensus_constants
-            ; genesis_epoch_data
+        let { Precomputed_values.constraint_constants
             ; proof_data
+            ; protocol_state_with_hashes
             ; _
             } =
           (Mina_lib.config mina).precomputed_values
@@ -2095,9 +2094,7 @@ module Queries = struct
         let { With_hash.data = genesis_state
             ; hash = { State_hash.State_hashes.state_hash = hash; _ }
             } =
-          let open Staged_ledger_diff in
-          Genesis_protocol_state.t ~genesis_ledger ~genesis_epoch_data
-            ~constraint_constants ~consensus_constants ~genesis_body_reference
+          protocol_state_with_hashes
         in
         let winner = fst Consensus_state_hooks.genesis_winner in
         { With_hash.data =
@@ -2351,7 +2348,7 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null Types.pending_work)
       ~resolve:(fun { ctx = mina; _ } () ->
-        let snark_job_state = Mina_lib.snark_job_state mina in
+        let snark_job_state = Mina_lib.work_selector mina in
         let snark_pool = Mina_lib.snark_pool mina in
         let fee_opt =
           Mina_lib.(
@@ -2381,7 +2378,7 @@ module Queries = struct
           ]
       ~typ:(non_null @@ list @@ non_null Types.pending_work_spec)
       ~resolve:(fun { ctx = mina; _ } () start_idx end_idx ->
-        let snark_job_state = Mina_lib.snark_job_state mina in
+        let snark_job_state = Mina_lib.work_selector mina in
         let snark_pool = Mina_lib.snark_pool mina in
         let all_work = Work_selector.all_work ~snark_pool snark_job_state in
         let work_size = all_work |> List.length |> Unsigned.UInt32.of_int in
@@ -2538,6 +2535,7 @@ module Queries = struct
                     (from, to_, amount, fee, valid_until, memo, nonce_opt)
                     signature ->
         let open Deferred.Result.Let_syntax in
+        let signature_kind = Mina_lib.signature_kind mina in
         let genesis_constants =
           (Mina_lib.config mina).precomputed_values.genesis_constants
         in
@@ -2564,10 +2562,9 @@ module Queries = struct
             ~constraint_constants:
               (Mina_lib.config mina).precomputed_values.constraint_constants
             ~logger:(Mina_lib.top_level_logger mina)
-            ~signature_kind:Mina_signature_kind.t_DEPRECATED user_command_input
+            ~signature_kind user_command_input
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         Signed_command.check_signature ~signature_kind user_command )
 
   let runtime_config =
@@ -2611,20 +2608,29 @@ module Queries = struct
               Deferred.Or_error.error_string
                 "Cannot specify both state hash and height"
         in
-        let%bind { staged_ledger
+        let%bind { source_ledgers
                  ; global_slot_since_genesis
+                 ; genesis_state_timestamp
                  ; state_hash
-                 ; staking_ledger
                  ; staking_epoch_seed
-                 ; next_epoch_ledger
                  ; next_epoch_seed
                  ; blockchain_length
                  } =
           Mina_lib.Hardfork_config.prepare_inputs ~breadcrumb_spec mina
         in
+        let staged_ledger = source_ledgers.staged_ledger in
+        let staking_ledger =
+          Mina_lib.Hardfork_config.genesis_source_ledger_cast
+            source_ledgers.staking_ledger
+        in
+        let next_epoch_ledger =
+          Mina_lib.Hardfork_config.genesis_source_ledger_cast
+            source_ledgers.next_epoch_ledger
+        in
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger
-            ~global_slot_since_genesis ~state_hash ~staking_ledger
+            ~genesis_state_timestamp ~global_slot_since_genesis ~state_hash
+            ~staking_ledger
             ~staking_epoch_seed:(Epoch_seed.to_base58_check staking_epoch_seed)
             ~next_epoch_ledger:(Some next_epoch_ledger)
             ~next_epoch_seed:(Epoch_seed.to_base58_check next_epoch_seed)
@@ -2741,8 +2747,8 @@ module Queries = struct
       ~doc:"The signature kind that this daemon instance is using"
       ~typ:(non_null string)
       ~args:Arg.[]
-      ~resolve:(fun _ () ->
-        match Mina_signature_kind.t_DEPRECATED with
+      ~resolve:(fun { ctx = mina; _ } () ->
+        match Mina_lib.signature_kind mina with
         | Mainnet ->
             "mainnet"
         | Testnet ->

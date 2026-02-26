@@ -42,9 +42,25 @@ let main ~archive_uri () =
               ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
             exit 1
       in
-      (* filter out genesis block *)
+      (* filters out genesis or first fork block. This is needed as they are not considered missing and
+         archive blocks can start from block with height > 1 in case of sandbox network forked from devnet/mainnet.
+         Archive of such network won't include genesis block but fork block as a first block *)
+      let%bind genesis_or_fork_block_height =
+        match%bind
+          Mina_caqti.Pool.use
+            (fun db -> Sql.GenesisOrFirstForkBlockHeight.run db ())
+            pool
+        with
+        | Ok height ->
+            return height
+        | Error msg ->
+            [%log error] "Error getting genesis or first fork block height"
+              ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
+            exit 1
+      in
       let missing_blocks =
-        List.filter missing_blocks_raw ~f:(fun (_, _, height, _) -> height <> 1)
+        List.filter missing_blocks_raw ~f:(fun (_, _, height, _) ->
+            height <> genesis_or_fork_block_height )
       in
       let%bind () =
         if List.is_empty missing_blocks then
@@ -134,8 +150,14 @@ let main ~archive_uri () =
         [%log info] "Length of canonical chain is %Ld blocks" chain_len
       else (
         add_error chain_length_error ;
-        [%log info] "Length of canonical chain is %Ld blocks, expected: %Ld"
-          chain_len highest_canonical ) ;
+        if genesis_or_fork_block_height = 1 then
+          [%log info] "Length of canonical chain is %Ld blocks, expected: %Ld"
+            chain_len highest_canonical
+        else
+          [%log info]
+            "Length of canonical chain is %Ld blocks, expected: %Ld. (Note: \
+             genesis or first fork block has height %d)"
+            chain_len highest_canonical genesis_or_fork_block_height ) ;
       let invalid_chain =
         List.filter canonical_chain
           ~f:(fun (_block_id, _state_hash, chain_status) ->

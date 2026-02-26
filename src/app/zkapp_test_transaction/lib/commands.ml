@@ -10,7 +10,11 @@ let graphql_zkapp_command (zkapp_command : Zkapp_command.Stable.Latest.t) =
     {|
 mutation MyMutation {
   __typename
-  sendZkapp(input: { zkappCommand: %s })
+  sendZkapp(input: { zkappCommand: %s }) {
+    zkapp {
+      hash
+    }
+  }
 }
     |}
     (Zkapp_command.arg_query_string zkapp_command)
@@ -32,9 +36,8 @@ let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
     in
     Mina_ledger.Ledger.register_mask ledger new_mask
   in
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let _partial_stmt =
-    Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind
+    Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind:Testnet
       ~constraint_constants ~global_slot
       ~txn_state_view:(Mina_state.Protocol_state.Body.view state_body)
       second_pass_ledger
@@ -109,8 +112,11 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
       let open Staged_ledger_diff in
       (*not using Precomputed_values.for_unit_test because of dependency cycle*)
       Mina_state.Genesis_protocol_state.t
-        ~genesis_ledger:Genesis_ledger.for_unit_tests
-        ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+        ~genesis_ledger:
+          (Consensus.Genesis_data.Ledger.to_hashed Genesis_ledger.for_unit_tests)
+        ~genesis_epoch_data:
+          (Consensus.Genesis_data.Epoch.to_hashed
+             Consensus.Genesis_data.Epoch.for_unit_tests )
         ~constraint_constants ~consensus_constants ~genesis_body_reference
     in
     compile_time_genesis.data |> Mina_state.Protocol_state.body
@@ -171,8 +177,11 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   let compile_time_genesis =
     (*not using Precomputed_values.for_unit_test because of dependency cycle*)
     Mina_state.Genesis_protocol_state.t
-      ~genesis_ledger:Genesis_ledger.for_unit_tests
-      ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+      ~genesis_ledger:
+        (Consensus.Genesis_data.Ledger.to_hashed Genesis_ledger.for_unit_tests)
+      ~genesis_epoch_data:
+        (Consensus.Genesis_data.Epoch.to_hashed
+           Consensus.Genesis_data.Epoch.for_unit_tests )
       ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   let protocol_state_predicate =
@@ -368,7 +377,8 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
   in
   let%bind zkapp_command =
     Transaction_snark.For_tests.deploy_snapp
-      ~permissions:Permissions.user_default ~constraint_constants spec
+      ~permissions:Permissions.user_default ~constraint_constants
+      ~signature_kind:Testnet spec
   in
   let%map () =
     if debug then

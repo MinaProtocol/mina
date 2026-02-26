@@ -288,17 +288,6 @@ val view_jobs_with_position :
   -> ('base -> 'c)
   -> 'c Job_view.t list list
 
-(** All the base jobs that are part of the latest tree being filled
- * i.e., does not include base jobs that are part of previous trees not
- * promoted to the merge jobs yet*)
-val base_jobs_on_latest_tree : ('merge, 'base) State.t -> 'base list
-
-(** All the base jobs that are part of a tree before the latest tree
-    index is 0-based, 0 is the next-to-latest tree
-*)
-val base_jobs_on_earlier_tree :
-  ('merge, 'base) State.t -> index:int -> 'base list
-
 (** Returns true only if the next 'd that could be enqueued is
 on a new tree*)
 val next_on_new_tree : ('merge, 'base) State.t -> bool

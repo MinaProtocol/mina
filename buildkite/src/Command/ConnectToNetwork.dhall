@@ -4,6 +4,8 @@ let Command = ./Base.dhall
 
 let Size = ./Size.dhall
 
+let DebianVersions = ../Constants/DebianVersions.dhall
+
 let RunInToolchain = ./RunInToolchain.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
@@ -19,7 +21,7 @@ in  { step =
               Command.Config::{
               , commands =
                   RunInToolchain.runInToolchain
-                    ([] : List Text)
+                    DebianVersions.overrideEnvs
                     "./buildkite/scripts/connect/connect-to-network.sh ${mina_suffix} ${testnet} ${wait_between_graphql_poll} ${wait_before_final_check} "
               , label = "Connect to ${testnet}"
               , soft_fail = Some soft_fail

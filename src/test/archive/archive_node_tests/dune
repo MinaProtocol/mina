@@ -14,8 +14,8 @@
    ;; mina libraries
    mina_automation
    mina_automation.fixture
-   mina_automation.runner
- )
+   mina_automation.runner)
+ 
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_mina ppx_compare))
-)
+ (preprocess (pps ppx_version ppx_jane ppx_mina ppx_compare)))
+

@@ -4,6 +4,17 @@ set -euo pipefail
 # If enabled, keep my tags intact, it won't run git fetch --prune
 KEEP_MY_TAGS_INTACT=${KEEP_MY_TAGS_INTACT:-1}
 
+# Explicit warnings for override environment variables
+if [[ -v SKIP_GITBRANCH ]]; then
+    echo "⚠️  WARNING: SKIP_GITBRANCH is defined - will override GITBRANCH in package version" >&2
+fi
+if [[ -v OVERRIDE_TAG ]]; then
+    echo "⚠️  WARNING: OVERRIDE_TAG is defined - will override GITTAG to '${OVERRIDE_TAG}' in package version" >&2
+fi
+if [[ -v OVERRIDE_GITHASH ]]; then
+    echo "⚠️  WARNING: OVERRIDE_GITHASH is defined - will override GITHASH to '${OVERRIDE_GITHASH}' in package version" >&2
+fi
+
 function find_most_recent_numeric_tag() {
 
     local keep_tags_values=("1" "true" "t" "T" "y" "yes" "Y" "YES")
@@ -20,8 +31,11 @@ function find_most_recent_numeric_tag() {
     echo $TAG
 }
 
-GITHASH=$(git rev-parse --short=7 HEAD)
-THIS_COMMIT_TAG=$(git tag --points-at HEAD)
+GITHASH_CONFIG=${OVERRIDE_GITHASH:-$(git rev-parse --short=8 --verify HEAD)}
+# Remove last character to get 7-character short hash
+GITHASH=${GITHASH_CONFIG%?}
+THIS_COMMIT_TAG=${OVERRIDE_TAG:-$(git tag --points-at HEAD)}
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 if [[ -v BRANCH_NAME ]]; then
    GITBRANCH=$(echo "$BRANCH_NAME" | sed 's!/!-!g; s!_!-!g; s!#!-!g')
@@ -29,17 +43,25 @@ else
    GITBRANCH=$(git name-rev --name-only $GITHASH | sed "s/remotes\/origin\///g" | sed 's!/!-!g; s!_!-!g; s!#!-!g' )
 fi
 
-GITTAG=$(find_most_recent_numeric_tag HEAD)
+GITTAG=${OVERRIDE_TAG:-$(find_most_recent_numeric_tag HEAD)}
 
-MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
+
+if [[ "${SKIP_GITBRANCH:-0}" == "1" ]]; then
+    MINA_DEB_VERSION="${GITTAG}-${GITHASH}"
+else
+    MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
+fi
+
 MINA_DOCKER_TAG=$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')
 
 [[ -v THIS_COMMIT_TAG ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
 
 export GITTAG
 export GITHASH
+export GITHASH_CONFIG
 export GITBRANCH
 export MINA_DEB_VERSION
 export MINA_DOCKER_TAG
 export THIS_COMMIT_TAG
 export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=bullseye}
+export REPO_ROOT

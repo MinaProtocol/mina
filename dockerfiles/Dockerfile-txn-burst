@@ -4,7 +4,7 @@
 #or directly run with:
 # docker run -v <local keypath>:/keys --entrypoint ./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe txn_burst_util --num-txn-per-acct 10 --origin-sender-sk-path "/keys/<origin key path>" --origin-sender-sk-pw "some password" --returner-sk-path "/keys/<origin key path>" --returner-sk-pw "some password"
 
-ARG image=debian:bullseye-slim
+ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim
 FROM ${image}
 
 ARG deb_version

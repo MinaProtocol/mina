@@ -33,11 +33,18 @@ function usage() {
   echo "      --deb-build-flags     The build-flags string for the debian package to install"
   echo "      --deb-suffix          The debian suffix to use for the docker image"
   echo "  -p, --platform            The target platform for the docker build (e.g. linux/amd64). Default=linux/amd64"
+  echo "  -l, --load-only           Load the built image into local docker daemon only, do not push to remote registry"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
   exit 1
 }
+
+# Defines if build is for pushing to remote registry or loading locally only.
+# Can be overridden with --load-only flag.
+DOCKER_ACTION="push"
+# By default we use cache
+NO_CACHE=""
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -s|--service) SERVICE="$2"; shift;;
@@ -47,6 +54,8 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -c|--cache-from) INPUT_CACHE="$2"; shift;;
   -r|--repo) MINA_REPO="$2"; shift;;
   -p|--platform) INPUT_PLATFORM="$2"; shift;;
+  -l|--load-only) DOCKER_ACTION="load" ;;
+  --docker-registry) export DOCKER_REGISTRY="$2"; shift;;
   --no-cache) NO_CACHE="--no-cache"; ;;
   --deb-codename) INPUT_CODENAME="$2"; shift;;
   --deb-release) INPUT_RELEASE="$2"; shift;;
@@ -55,10 +64,10 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
-  --deb-suffix) 
+  --deb-suffix)
       # shellcheck disable=SC2034
       DOCKER_DEB_SUFFIX="--build-arg deb_suffix=$2"; shift;;
-  --deb-repo-key) 
+  --deb-repo-key)
       # shellcheck disable=SC2034
       DEB_REPO_KEY="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
@@ -74,31 +83,33 @@ if [[ -z "$INPUT_NETWORK" ]]; then
   NETWORK="--build-arg network=devnet"
 fi
 
-LEGACY_VERSION="--build-arg deb_legacy_version=$INPUT_LEGACY_VERSION"
-
-if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
-  LEGACY_VERSION=""
+LEGACY_VERSION=""
+if [[ -n "${INPUT_LEGACY_VERSION:-}" ]]; then
+  LEGACY_VERSION="--build-arg deb_legacy_version=$INPUT_LEGACY_VERSION"
 fi
 
-BRANCH="--build-arg MINA_BRANCH=$INPUT_BRANCH"
-if [[ -z "$INPUT_BRANCH" ]]; then
+if [[ -z "${INPUT_BRANCH:-}" ]]; then
   echo "Branch is not set. Using the default (compatible)"
   BRANCH="--build-arg MINA_BRANCH=compatible"
+else
+  BRANCH="--build-arg MINA_BRANCH=$INPUT_BRANCH"
 fi
 
-REPO="--build-arg MINA_REPO=${MINA_REPO}"
-if [[ -z "${MINA_REPO}" ]]; then
+if [[ -z "${MINA_REPO:-}" ]]; then
   echo "Repository is not set. Using the default (https://github.com/MinaProtocol/mina)"
   REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
+else
+  REPO="--build-arg MINA_REPO=$MINA_REPO"
 fi
 
-DEB_CODENAME="--build-arg deb_codename=$INPUT_CODENAME"
-if [[ -z "$INPUT_CODENAME" ]]; then
+if [[ -z "${INPUT_CODENAME:-}" ]]; then
   echo "Debian codename is not set. Using the default (bullseye)"
   DEB_CODENAME="--build-arg deb_codename=bullseye"
+else
+  DEB_CODENAME="--build-arg deb_codename=$INPUT_CODENAME"
 fi
 
-if [[ -z "$INPUT_PLATFORM" ]]; then
+if [[ -z "${INPUT_PLATFORM:-}" ]]; then
   INPUT_PLATFORM="linux/amd64"
 fi
 
@@ -123,39 +134,57 @@ case "${INPUT_PLATFORM}" in
         echo "unsupported platform"; exit 1
         ;;
 esac
+
+if [[ -z "${DOCKER_REGISTRY:-}" ]]; then
+  echo "Docker registry is not set. Using the default ($USER/mina-protocol)"
+  DOCKER_REGISTRY="$USER/mina-protocol"
+fi
+
 CANONICAL_ARCH_ARG="--build-arg CANONICAL_ARCH=$CANONICAL_ARCH"
 DEBIAN_ARCH_ARG="--build-arg DEBIAN_ARCH=$DEBIAN_ARCH"
+DOCKER_REPO_ARG="--build-arg docker_repo=$DOCKER_REGISTRY"
 
-DEB_RELEASE="--build-arg deb_release=$INPUT_RELEASE"
-if [[ -z "$INPUT_RELEASE" ]]; then
+if [[ -z "${INPUT_RELEASE:-}" ]]; then
   echo "Debian release is not set. Using the default (unstable)"
   DEB_RELEASE="--build-arg deb_release=unstable"
+else
+  DEB_RELEASE="--build-arg deb_release=$INPUT_RELEASE"
 fi
 
-DEB_VERSION="--build-arg deb_version=$INPUT_VERSION"
-if [[ -z "$INPUT_VERSION" ]]; then
+if [[ -z "${INPUT_VERSION:-}" ]]; then
   echo "Debian version is not set. Using the default ($VERSION)"
   DEB_VERSION="--build-arg deb_version=$VERSION"
+else
+  DEB_VERSION="--build-arg deb_version=$INPUT_VERSION"
 fi
 
-if [[ -z "$DEB_PROFILE" ]]; then
+if [[ -z "${DEB_PROFILE:-}" ]]; then
   echo "Debian profile is not set. Using the default (devnet)"
   DEB_PROFILE="devnet"
 fi
 
-if [[ -z "$DEB_BUILD_FLAGS" ]]; then
+if [[ -z "${DEB_BUILD_FLAGS:-}" ]]; then
   DEB_BUILD_FLAGS=""
 fi
 
-CACHE="--cache-from $INPUT_CACHE"
-if [[ -z "$INPUT_CACHE" ]]; then
+
+if [[ -z "${INPUT_CACHE:-}" ]]; then
   CACHE=""
+else
+  CACHE="--cache-from $INPUT_CACHE"
 fi
 
-DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
+if [[ -z "${INPUT_REPO:-}" ]]; then
+  echo "Debian repository is not set. Using the default (http://localhost:8080)"
+  DEB_REPO="--build-arg deb_repo=http://localhost:8080"
+else
+  echo "Using provided Debian repository: $INPUT_REPO"
+  DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
+fi
+
 GW=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')
 LOCALHOST_REPLACEMENT=$GW
-if [[ -z "$INPUT_REPO" ]]; then
+if [[ -z "${INPUT_REPO:-}" ]]; then
   echo "Debian repository is not set. Using the default (http://$LOCALHOST_REPLACEMENT:8080)"
   DEB_REPO="--build-arg deb_repo=http://$LOCALHOST_REPLACEMENT:8080"
 else
@@ -234,6 +263,9 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend"
         DOCKER_CONTEXT="src/app/delegation_backend"
         ;;
+    mina-delegation-verifier)
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-stateless-verifier"
+        ;;
     delegation-backend-toolchain)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
         DOCKER_CONTEXT="src/app/delegation_backend"
@@ -241,6 +273,10 @@ case "${SERVICE}" in
     mina-test-suite)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-test-suite"
         DOCKER_CONTEXT="dockerfiles/"
+        ;;
+    *)
+        echo "Unsupported service: $SERVICE"
+        exit 1
         ;;
 esac
 
@@ -250,11 +286,11 @@ export_docker_tag
 BUILD_NETWORK="--allow=network.host"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
-if [[ -z "${DOCKER_CONTEXT}" ]]; then
+if [[ -z "${DOCKER_CONTEXT:-}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
-  --load --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
+  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -t "$HASHTAG" -
 else
-  docker buildx build --load --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
+  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."

@@ -314,6 +314,19 @@ let supply_increase :
   Option.value_map total ~default:(Or_error.error_string "overflow")
     ~f:(fun v -> Ok v)
 
+let transaction : t -> Transaction.t =
+ fun { varying; _ } ->
+  match varying with
+  | Command (Signed_command { common = { user_command = { data; _ }; _ }; _ })
+    ->
+      Transaction.Command (User_command.Signed_command data)
+  | Command (Zkapp_command { command = { data; _ }; _ }) ->
+      Transaction.Command (User_command.Zkapp_command data)
+  | Fee_transfer { fee_transfer = { data; _ }; _ } ->
+      Transaction.Fee_transfer data
+  | Coinbase { coinbase = { data; _ }; _ } ->
+      Transaction.Coinbase data
+
 let transaction_with_status : t -> Transaction.t With_status.t =
  fun { varying; _ } ->
   match varying with

@@ -28,6 +28,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PublishPackages = ../../Command/Packages/Publish.dhall
 
+let DockerRepo = ../../Constants/DockerRepo.dhall
+
 let new_tags =
           \(codename : DebianVersions.DebVersion)
       ->  \(channel : DebianChannel.Type)
@@ -54,6 +56,7 @@ let targetVersion =
 let specs_for_branch =
           \(branch : Text)
       ->  \(channel : DebianChannel.Type)
+      ->  \(profile : Profiles.Type)
       ->  PublishPackages.Spec::{
           , artifacts =
             [ Artifacts.Type.LogProc
@@ -61,7 +64,7 @@ let specs_for_branch =
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             ]
-          , profile = Profiles.Type.Devnet
+          , profile = profile
           , networks = [ Network.Type.Devnet ]
           , codenames =
             [ DebianVersions.DebVersion.Noble
@@ -71,13 +74,13 @@ let specs_for_branch =
           , channel = channel
           , new_docker_tags = new_tags
           , target_version = targetVersion
-          , publish_to_docker_io = False
+          , docker_repo = DockerRepo.Type.Internal
           , backend = "local"
           , verify = True
           , branch = "\\\${BUILDKITE_BRANCH}"
           , source_version = "\\\${MINA_DEB_VERSION}"
           , build_id = "\\\${BUILDKITE_BUILD_ID}"
-          , if = Some "build.branch == \"${branch}\""
+          , if_ = Some "build.branch == \"${branch}\""
           }
 
 in  Pipeline.build
@@ -91,9 +94,39 @@ in  Pipeline.build
         }
       , steps =
             PublishPackages.publish
-              (specs_for_branch "compatible" DebianChannel.Type.Compatible)
+              ( specs_for_branch
+                  "compatible"
+                  DebianChannel.Type.Compatible
+                  Profiles.Type.Lightnet
+              )
           # PublishPackages.publish
-              (specs_for_branch "develop" DebianChannel.Type.Develop)
+              ( specs_for_branch
+                  "develop"
+                  DebianChannel.Type.Develop
+                  Profiles.Type.Lightnet
+              )
           # PublishPackages.publish
-              (specs_for_branch "master" DebianChannel.Type.Master)
+              ( specs_for_branch
+                  "master"
+                  DebianChannel.Type.Master
+                  Profiles.Type.Lightnet
+              )
+          # PublishPackages.publish
+              ( specs_for_branch
+                  "compatible"
+                  DebianChannel.Type.Compatible
+                  Profiles.Type.Devnet
+              )
+          # PublishPackages.publish
+              ( specs_for_branch
+                  "develop"
+                  DebianChannel.Type.Develop
+                  Profiles.Type.Devnet
+              )
+          # PublishPackages.publish
+              ( specs_for_branch
+                  "master"
+                  DebianChannel.Type.Master
+                  Profiles.Type.Devnet
+              )
       }

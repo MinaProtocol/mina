@@ -1,5 +1,3 @@
-(include ../../../dune.flags.inc)
-
 (executable
  (package cli)
  (name mina)

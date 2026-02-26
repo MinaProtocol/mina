@@ -4,7 +4,7 @@
 
 let Prelude = ../External/Prelude.dhall
 
-let List/any = Prelude.List.any
+let Extensions = ../Lib/Extensions.dhall
 
 let Tag
     : Type
@@ -22,46 +22,18 @@ let Tag
       | Hardfork
       | Promote
       | Rosetta
+      | Devnet
+      | Lightnet
+      | Arm64
+      | Amd64
+      | Mainnet
+      | Bullseye
+      | Bookworm
+      | Noble
+      | Focal
+      | Jammy
+      | Archive
       >
-
-let toNatural
-    : Tag -> Natural
-    =     \(tag : Tag)
-      ->  merge
-            { Fast = 1
-            , Long = 2
-            , VeryLong = 3
-            , TearDown = 4
-            , Lint = 5
-            , Release = 6
-            , Test = 7
-            , Toolchain = 8
-            , Hardfork = 9
-            , Stable = 10
-            , Promote = 11
-            , Debian = 12
-            , Docker = 13
-            , Rosetta = 14
-            }
-            tag
-
-let equal
-    : Tag -> Tag -> Bool
-    =     \(left : Tag)
-      ->  \(right : Tag)
-      ->  Prelude.Natural.equal (toNatural left) (toNatural right)
-
-let hasAny
-    : Tag -> List Tag -> Bool
-    =     \(input : Tag)
-      ->  \(tags : List Tag)
-      ->  List/any Tag (\(x : Tag) -> equal x input) tags
-
-let contains
-    : List Tag -> List Tag -> Bool
-    =     \(input : List Tag)
-      ->  \(tags : List Tag)
-      ->  List/any Tag (\(x : Tag) -> hasAny x tags) input
 
 let capitalName =
           \(tag : Tag)
@@ -80,6 +52,17 @@ let capitalName =
             , Docker = "Docker"
             , Debian = "Debian"
             , Rosetta = "Rosetta"
+            , Devnet = "Devnet"
+            , Lightnet = "Lightnet"
+            , Arm64 = "Arm64"
+            , Amd64 = "Amd64"
+            , Mainnet = "Mainnet"
+            , Bullseye = "Bullseye"
+            , Bookworm = "Bookworm"
+            , Noble = "Noble"
+            , Focal = "Focal"
+            , Jammy = "Jammy"
+            , Archive = "Archive"
             }
             tag
 
@@ -100,14 +83,26 @@ let lowerName =
             , Docker = "docker"
             , Debian = "debian"
             , Rosetta = "rosetta"
+            , Devnet = "devnet"
+            , Lightnet = "lightnet"
+            , Arm64 = "arm64"
+            , Amd64 = "amd64"
+            , Mainnet = "mainnet"
+            , Bullseye = "bullseye"
+            , Bookworm = "bookworm"
+            , Noble = "noble"
+            , Focal = "focal"
+            , Jammy = "jammy"
+            , Archive = "archive"
             }
             tag
+
+let join =
+          \(tags : List Tag)
+      ->  Extensions.join "," (Prelude.List.map Tag Text lowerName tags)
 
 in  { Type = Tag
     , capitalName = capitalName
     , lowerName = lowerName
-    , toNatural = toNatural
-    , equal = equal
-    , hasAny = hasAny
-    , contains = contains
+    , join = join
     }

@@ -26,6 +26,8 @@ let Benchmarks = ../../Constants/Benchmarks.dhall
 
 let SelectFiles = ../../Lib/SelectFiles.dhall
 
+let Network = ../../Constants/Network.dhall
+
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let Spec =
@@ -51,7 +53,10 @@ let Spec =
                   DebianVersions.DepsSpec::{
                   , build_flag = BuildFlags.Type.Instrumented
                   }
-              # DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
+              # DebianVersions.dependsOn
+                  DebianVersions.DepsSpec::{
+                  , network = Network.Type.TestnetGeneric
+                  }
           , additionalDirtyWhen = [] : List SelectFiles.Type
           , yellowThreshold = 0.1
           , redThreshold = 0.2
@@ -71,6 +76,7 @@ let command
                     (   Benchmarks.toEnvList Benchmarks.Type::{=}
                       # [ "BRANCH=\\\${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-BUILDKITE_BRANCH}"
                         ]
+                      # DebianVersions.overrideEnvs
                     )
                     "EXTRA_ARGS=\"${spec.extraArgs}\" ./buildkite/scripts/bench/run.sh  ${spec.bench} --red-threshold ${Double/show
                                                                                                                           spec.redThreshold} --yellow-threshold ${Double/show

@@ -1,13 +1,13 @@
-(library
+(test
  (name add_events)
  (libraries
   ;; opam libraries
+  alcotest
   async
   async_kernel
   async_unix
   core
   core_kernel
-  ppx_inline_test.config
   ;; local libraries
   cache_dir
   currency
@@ -25,8 +25,8 @@
   pickles
   pickles.backend
   pickles_types
-  random_oracle_input
   random_oracle
+  random_oracle_input
   signature_lib
   snark_params
   transaction_snark
@@ -34,8 +34,6 @@
   with_hash
   zkapps_add_events
   zkapps_examples)
- (inline_tests
-  (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_jane))
  (instrumentation

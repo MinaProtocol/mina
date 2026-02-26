@@ -4,15 +4,14 @@ set -eo pipefail
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
-PUBLISH=0
-GCR_REPO=gcr.io/o1labs-192920
 QUIET=""
 ARCH=amd64
 while [[ "$#" -gt 0 ]]; do case $1 in
   -n|--name) NAME="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -t|--tag) TAG="$2"; shift;;
-  -p|--publish) PUBLISH=1; ;;
+  --pull-registry) PULL_REGISTRY="$2"; shift;;
+  --push-registry) PUSH_REGISTRY="$2"; shift;;
   -q|--quiet) QUIET="-q"; ;;
   -a|--arch) ARCH="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
@@ -26,7 +25,8 @@ function usage() {
   echo "  -n, --name      The Docker name (mina-devnet, mina-archive etc.)"
   echo "  -v, --version   The Docker version"
   echo "  -t, --tag       The Additional tag"
-  echo "  -p, --publish   The Publish to docker.io flag. If defined script will publish docker do docker.io. Otherwise it will still resides in gcr.io"
+  echo "  --pull-registry The Docker pull registry (e.g. gcr.io/o1labs-192920)"
+  echo "  --push-registry The Docker push registry (e.g. gcr.io/o1labs-192920)"
   echo "  -q, --quiet     The Quiet mode. If defined script will output limited logs"
   echo "  -a, --arch      The Architecture of docker (amd64, arm64)"
   echo ""
@@ -37,6 +37,7 @@ function usage() {
 if [[ -z "$NAME" ]]; then usage "Name is not set!"; fi;
 if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
 if [[ -z "$TAG" ]]; then usage "Tag is not set!"; fi;
+if [[ -z "$PULL_REGISTRY" ]]; then usage "Pull registry is not set!"; fi;
 
 # Sanitize the tag to ensure it is compliant with Docker tag format
 TAG=$(echo "$TAG" | sed 's/[^a-zA-Z0-9_.-]/-/g')
@@ -47,19 +48,17 @@ case $ARCH in
   *) echo "❌  Unknown architecture passed: $ARCH"; exit 1 ;;
 esac
 
-SOURCE_TAG="${GCR_REPO}/${NAME}:${VERSION}${DOCKER_ARCH_SUFFIX}"
+SOURCE_TAG="${PULL_REGISTRY}/${NAME}:${VERSION}${DOCKER_ARCH_SUFFIX}"
 
 echo "📎 Adding new tag ($TAG) for docker ${SOURCE_TAG}"
 echo "   📥 pulling ${SOURCE_TAG}"
 docker pull $QUIET ${SOURCE_TAG}
 
-if [[ $PUBLISH == 1 ]]; then
-  TARGET_REPO=docker.io/minaprotocol
-else
-  TARGET_REPO=$GCR_REPO
+if [[ -z "$PUSH_REGISTRY" ]]; then
+  PUSH_REGISTRY=$PULL_REGISTRY
 fi
 
-TARGET_TAG="${TARGET_REPO}/${NAME}:${TAG}${DOCKER_ARCH_SUFFIX}"
+TARGET_TAG="${PUSH_REGISTRY}/${NAME}:${TAG}${DOCKER_ARCH_SUFFIX}"
 
 docker tag "${SOURCE_TAG}" "${TARGET_TAG}"
 echo "   📤 pushing ${TARGET_TAG}"

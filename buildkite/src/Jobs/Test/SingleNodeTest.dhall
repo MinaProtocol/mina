@@ -35,7 +35,11 @@ let buildTestCmd
                 Command.Config::{
                 , commands =
                     RunInToolchain.runInToolchain
-                      [ "DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN" ]
+                      (   [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
+                          , "COVERALLS_TOKEN"
+                          ]
+                        # DebianVersions.overrideEnvs
+                      )
                       "buildkite/scripts/single-node-tests.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 , label = "single-node-tests"
                 , key = key
