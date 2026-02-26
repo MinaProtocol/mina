@@ -158,9 +158,11 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
   ; last_snarked_ledger_hash
   }
 
-(* map from global slots (since genesis) to state hash, ledger hash, snarked ledger hash triples *)
+(* map from global slots (since genesis) to state hash, ledger hash, snarked ledger hash, and global slot since hard fork *)
 let global_slot_hashes_tbl :
-    (Int64.t, State_hash.t * Ledger_hash.t * Frozen_ledger_hash.t) Hashtbl.t =
+    ( Int64.t
+    , State_hash.t * Ledger_hash.t * Frozen_ledger_hash.t * Int64.t )
+    Hashtbl.t =
   Int64.Table.create ()
 
 let get_slot_hashes slot = Hashtbl.find global_slot_hashes_tbl slot
@@ -639,7 +641,7 @@ let fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
   in
   let chain_oldest_state_hash =
     Option.value_map (Int64.Table.find global_slot_hashes_tbl chain_oldest_slot)
-      ~default:"<none>" ~f:(fun (sh, _, _) -> State_hash.to_base58_check sh)
+      ~default:"<none>" ~f:(fun (sh, _, _, _) -> State_hash.to_base58_check sh)
   in
   let%bind chain_oldest_parent_state_hash =
     match%map
@@ -773,6 +775,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               Deferred.List.iter block_infos
                 ~f:(fun
                      { global_slot_since_genesis
+                     ; global_slot_since_hard_fork
                      ; state_hash
                      ; ledger_hash
                      ; snarked_ledger_hash_id
@@ -789,7 +792,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                     ~data:
                       ( State_hash.of_base58_check_exn state_hash
                       , Ledger_hash.of_base58_check_exn ledger_hash
-                      , Frozen_ledger_hash.of_base58_check_exn snarked_hash ) )
+                      , Frozen_ledger_hash.of_base58_check_exn snarked_hash
+                      , global_slot_since_hard_fork ) )
             in
             return (Int.Set.of_list ids, oldest_block_id) )
       in
@@ -818,7 +822,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         let least_slot =
           Option.value_exn @@ List.min_elt slots ~compare:Int64.compare
         in
-        let state_hash, _ledger_hash, _snarked_hash =
+        let state_hash, _ledger_hash, _snarked_hash, _slot_since_hf =
           Int64.Table.find_exn global_slot_hashes_tbl least_slot
         in
         let%bind { staking_epoch_data_id; next_epoch_data_id; _ } =
@@ -1242,7 +1246,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               [%log fatal]
                 "Missing state hash information for current global slot" ;
               Core.exit 1
-          | Some (state_hash, _ledger_hash, _snarked_hash) ->
+          | Some (state_hash, _ledger_hash, _snarked_hash, _slot_since_hf) ->
               [%log spam]
                 ~metadata:
                   [ ( "state_hash"
@@ -1269,7 +1273,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                   "Missing ledger hash information for last global slot, which \
                    is not the start slot" ;
                 Core.exit 1 )
-          | Some (state_hash, ledger_hash, snarked_hash) ->
+          | Some (state_hash, ledger_hash, snarked_hash, _slot_since_hf) ->
               let write_checkpoint_file ~checkpoint_output_folder_opt
                   ~checkpoint_file_prefix () =
                 let write_checkpoint () =
