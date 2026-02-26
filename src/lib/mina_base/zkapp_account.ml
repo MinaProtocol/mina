@@ -221,7 +221,8 @@ end
     formed by the following fields:
    - app_state: an array of field elements, the current state of a zkApp
      associated with the account. In the first protocol upgrade Berkeley, the
-     size of the state has been set to eight.
+     size of the state has been set to eight. In the Mesa hardfork, it is
+     extended to thirty-two (see {!Hardfork} and {!Zkapp_state.Hardfork}).
    - verification_key: an optional key to use when verifying transaction SNARKs
      for zkApps using this account; when not provided, the account is a typical
      Mina account that supports payments.
