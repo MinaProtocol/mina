@@ -35,7 +35,7 @@ The Mina codebase has several categories of tests that range from fast in-proces
 | PPX tests | `ppx_mina` extension | ✅ | `make test-ppx` |
 | ZkApps examples unit tests | `zkapps_examples` app | ✅ (nightly in CI) | `dune runtest` |
 | Archive node unit tests | `archive` app | ✅ (needs PostgreSQL) | `dune runtest` |
-| Command-line / single-node tests | Daemon CLI | ✅ (needs built package) | `mina-command-line-tests` |
+| Command-line / single-node tests | Daemon CLI | ✅ (needs app built) | `mina-command-line-tests` |
 | Integration tests (Lucy) | Full multi-node network | ✅ (needs Docker) | `mina-test-executive` |
 | Rosetta tests | Rosetta API + daemon | ⚠️ (CI recommended) | custom scripts |
 | Replayer test | Archive replayer | ⚠️ (needs PostgreSQL) | `mina-replayer` |
@@ -149,15 +149,21 @@ In CI this is handled by `buildkite/scripts/tests/archive-node-unit-tests.sh`.
 
 ## Command-line / Single-node Tests
 
-The `mina-command-line-tests` binary (`src/test/command_line_tests/`) tests the Mina daemon CLI in a single-node configuration. These tests require a built or installed `mina` daemon binary.
+The `mina-command-line-tests` binary (`src/test/command_line_tests/`) tests the Mina daemon CLI in a single-node configuration. The test runner uses `mina_automation`, which automatically locates the Mina daemon binary — first in `_build/default/` (local build), then in system paths such as `/usr/local/bin`.
 
-**Run from an installed debian package** (as done in CI):
+**Build and run locally:**
 
 ```bash
-mina-command-line-tests test -v
+# Build the daemon and the test runner
+dune build src/app/cli/src/mina.exe src/test/command_line_tests/command_line_tests.exe --profile=dev
+
+# Run all tests
+export MINA_LIBP2P_PASS="naughty blue worm"
+export MINA_PRIVKEY_PASS="naughty blue worm"
+./_build/default/src/test/command_line_tests/command_line_tests.exe test -v
 ```
 
-In CI this is handled by `buildkite/scripts/single-node-tests.sh`, which installs the `mina-test-suite` and `mina-testnet-generic-lightnet` packages before running the tests.
+In CI this is handled by `buildkite/scripts/single-node-tests.sh`, which installs the `mina-test-suite` and `mina-testnet-generic-lightnet` debian packages and then runs `mina-command-line-tests test -v`.
 
 ---
 
@@ -172,22 +178,40 @@ Lucy tests are found in `src/app/test_executive/` and use a custom OCaml DSL def
 - A `mina-daemon` Docker image URL
 - A `mina-archive` Docker image URL
 
-**Run a test using a pre-built debian package (recommended):**
+**Compile from source and run locally (recommended for development):**
+
+```bash
+make build
+dune build src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
+```
+
+The compiled binaries will be at:
+- `./_build/default/src/app/test_executive/test_executive.exe`
+- `./_build/default/src/app/logproc/logproc.exe`
+
+You can add optional shell aliases for convenience (in `~/.bashrc` or `~/.bash_aliases`):
+
+```bash
+alias test_executive=./_build/default/src/app/test_executive/test_executive.exe
+alias logproc=./_build/default/src/app/logproc/logproc.exe
+```
+
+Then run a test the same way as with the installed binary:
 
 ```bash
 export TEST_NAME=<test>
 export MINA_IMAGE=<url-to-mina-daemon-image>
 export ARCHIVE_IMAGE=<url-to-mina-archive-image>
 
-mina-test-executive local "$TEST_NAME" \
+test_executive local "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
   --debug \
   | tee "$TEST_NAME.local.test.log" \
-  | mina-logproc -i inline -f '!(.level in ["Spam", "Debug"])'
+  | logproc -i inline -f '!(.level in ["Spam", "Debug"])'
 ```
 
-**Install the packages:**
+**Alternatively, install the `mina-test-executive` debian package:**
 
 ```bash
 echo "deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) stable" \
@@ -195,13 +219,15 @@ echo "deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) stable" \
 apt-get update && apt-get install -y mina-test-executive
 ```
 
-**Compile from source (needed to modify tests):**
+Then invoke the installed binary directly:
 
 ```bash
-make build
-dune build src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
-# Binary will be at:
-./_build/default/src/app/test_executive/test_executive.exe
+mina-test-executive local "$TEST_NAME" \
+  --mina-image "$MINA_IMAGE" \
+  --archive-image "$ARCHIVE_IMAGE" \
+  --debug \
+  | tee "$TEST_NAME.local.test.log" \
+  | mina-logproc -i inline -f '!(.level in ["Spam", "Debug"])'
 ```
 
 **Available tests** (as of this writing):
