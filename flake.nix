@@ -347,6 +347,20 @@
         # Nix-built `dpkg` archives with Mina in them
         debianPackages = pkgs.callPackage ./nix/debian.nix { };
 
+        # Pinned to match the version used in CI (dockerfiles/Dockerfile-toolchain-base)
+        dhall = pkgs.stdenv.mkDerivation {
+          pname = "dhall";
+          version = "1.30.0";
+          src = pkgs.fetchurl {
+            url = "https://github.com/dhall-lang/dhall-haskell/releases/download/1.30.0/dhall-1.30.0-x86_64-linux.tar.bz2";
+            sha256 = "sha256-aEVCHenDzED0FAoSeMQI3470m/gIbufzdzDS7ajOlAI=";
+          };
+          sourceRoot = ".";
+          installPhase = ''
+            install -Dm755 bin/dhall $out/bin/dhall
+          '';
+        };
+
         # Packages for the development environment that are not needed to build mina-dev.
         # For instance dependencies for tests.
         devShellPackages = with pkgs; [
@@ -362,6 +376,7 @@
             (python-pkgs: [ python-pkgs.click python-pkgs.requests ]))
           jq
           rocksdb-mina.tools
+          dhall
         ];
       in {
 
