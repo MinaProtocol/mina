@@ -17,6 +17,15 @@ module Step_SC = Scalar_challenge.Make
   (Import.Challenge.Make(Impl))
   (Endo.Step_inner_curve)
 
+(* Instantiate Plonk_checks.Make for Type1 shifted values (Step/Tick side) *)
+module Step_plonk_checks = struct
+  include Plonk_checks
+  include
+    Plonk_checks.Make
+      (Pickles_types.Shifted_value.Type1)
+      (Plonk_checks.Scalars_tokens_interpreter.Tick)
+end
+
 let dump output_dir name circuit ~input_typ ~return_typ =
   let cs =
     Impl.constraint_system ~input_typ ~return_typ circuit
@@ -320,6 +329,130 @@ let linearization_tick_circuit (inputs : Impl.Field.t array) () =
       plonk_minimal combined_evals
   in
   Plonk_checks.Scalars_tokens_interpreter.Tick.constant_term env
+
+(* ---- ft_eval0 circuit (Step 11a) ----
+   Input layout (91 fields = linearization layout + p_eval0):
+     0-29:   w (15 pairs)
+     30-59:  coefficients (15 pairs)
+     60-61:  z (pair)
+     62-73:  s (6 pairs)
+     74-85:  selectors (6 pairs: generic, poseidon, add, mul, emul, endoscalar)
+     86:     alpha
+     87:     beta
+     88:     gamma
+     89:     zeta
+     90:     p_eval0 (public input evaluation at zeta)
+*)
+let ft_eval0_circuit (inputs : Impl.Field.t array) () =
+  let pair i = (inputs.(i), inputs.(i + 1)) in
+  let w = Pickles_types.Vector.init Pickles_types.Nat.N15.n ~f:(fun i ->
+    pair (2 * i)) in
+  let coefficients = Pickles_types.Vector.init Pickles_types.Nat.N15.n ~f:(fun i ->
+    pair (30 + 2 * i)) in
+  let z = pair 60 in
+  let s = Pickles_types.Vector.init Pickles_types.Nat.N6.n ~f:(fun i ->
+    pair (62 + 2 * i)) in
+  let combined_evals : (Impl.Field.t * Impl.Field.t, _) Kimchi_backend_common.Plonk_types.Evals.In_circuit.t =
+    { w
+    ; coefficients
+    ; z
+    ; s
+    ; generic_selector = pair 74
+    ; poseidon_selector = pair 76
+    ; complete_add_selector = pair 78
+    ; mul_selector = pair 80
+    ; emul_selector = pair 82
+    ; endomul_scalar_selector = pair 84
+    ; range_check0_selector = Pickles_types.Opt.Nothing
+    ; range_check1_selector = Pickles_types.Opt.Nothing
+    ; foreign_field_add_selector = Pickles_types.Opt.Nothing
+    ; foreign_field_mul_selector = Pickles_types.Opt.Nothing
+    ; xor_selector = Pickles_types.Opt.Nothing
+    ; rot_selector = Pickles_types.Opt.Nothing
+    ; lookup_aggregation = Pickles_types.Opt.Nothing
+    ; lookup_table = Pickles_types.Opt.Nothing
+    ; lookup_sorted = Pickles_types.Vector.init Pickles_types.Nat.N5.n
+        ~f:(fun _ -> Pickles_types.Opt.Nothing)
+    ; runtime_lookup_table = Pickles_types.Opt.Nothing
+    ; runtime_lookup_table_selector = Pickles_types.Opt.Nothing
+    ; xor_lookup_selector = Pickles_types.Opt.Nothing
+    ; lookup_gate_lookup_selector = Pickles_types.Opt.Nothing
+    ; range_check_lookup_selector = Pickles_types.Opt.Nothing
+    ; foreign_field_mul_lookup_selector = Pickles_types.Opt.Nothing
+    }
+  in
+  let plonk_minimal :
+    (Impl.Field.t, Impl.Field.t, Impl.Boolean.var) Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t =
+    { alpha = inputs.(86)
+    ; beta = inputs.(87)
+    ; gamma = inputs.(88)
+    ; zeta = inputs.(89)
+    ; joint_combiner = None
+    ; feature_flags =
+        let f = Impl.Boolean.false_ in
+        { Kimchi_backend_common.Plonk_types.Features.
+          range_check0 = f; range_check1 = f
+        ; foreign_field_add = f; foreign_field_mul = f
+        ; xor = f; rot = f; lookup = f
+        ; runtime_tables = f
+        }
+    }
+  in
+  let sponge_params =
+    Sponge.Params.map Tick_field_sponge.params ~f:Impl.Field.constant
+  in
+  let domain_log2 = 16 in
+  let domain =
+    Plonk_checks.domain
+      (module Impl.Field)
+      ~shifts:(fun ~log2_size ->
+        Common.tick_shifts ~log2_size
+        |> Array.map ~f:Impl.Field.constant)
+      ~domain_generator:(fun ~log2_size ->
+        Backend.Tick.Field.domain_generator ~log2_size
+        |> Impl.Field.constant)
+      (Pickles_base.Domain.Pow_2_roots_of_unity domain_log2)
+  in
+  let module Env_bool = struct
+    include Impl.Boolean
+    type t = Impl.Boolean.var
+  end in
+  let module Env_field = struct
+    include Impl.Field
+    type bool = Env_bool.t
+    let if_ (b : bool) ~then_ ~else_ =
+      match Impl.Field.to_constant (b :> Impl.field_var) with
+      | Some x ->
+          if Impl.Field.Constant.(equal one) x then then_ ()
+          else else_ ()
+      | None ->
+          Impl.Field.if_ b ~then_:(then_ ()) ~else_:(else_ ())
+  end in
+  let env =
+    Plonk_checks.scalars_env
+      (module Env_bool) (module Env_field)
+      ~srs_length_log2:Common.Max_degree.step_log2
+      ~zk_rows:3
+      ~endo:(Impl.Field.constant Endo.Step_inner_curve.base)
+      ~mds:sponge_params.mds
+      ~field_of_hex:(fun s ->
+        let s =
+          if String.is_prefix s ~prefix:"0x" || String.is_prefix s ~prefix:"0X" then
+            let hex = String.drop_prefix s 2 in
+            let padded = String.make (max 0 (64 - String.length hex)) '0' ^ hex in
+            "0x" ^ padded
+          else s
+        in
+        Kimchi_pasta.Pasta.Bigint256.of_hex_string s
+        |> Kimchi_pasta.Pasta.Fp.of_bigint
+        |> Impl.Field.constant)
+      ~domain
+      plonk_minimal combined_evals
+  in
+  let p_eval0 = [| inputs.(90) |] in
+  Step_plonk_checks.ft_eval0
+    (module Impl.Field)
+    ~env ~domain plonk_minimal combined_evals p_eval0
 
 (* ---- Tock linearization polynomial circuit ---- *)
 
@@ -1054,6 +1187,9 @@ let run ~output_dir =
   let array90_wrap = WrapImpl.Typ.array ~length:90 WrapImpl.Field.typ in
   dump_tock' "linearization_tock_circuit" linearization_tock_circuit
     ~input_typ:array90_wrap ~return_typ:WrapImpl.Field.typ ;
+  let array91_field = Impl.Typ.array ~length:91 Impl.Field.typ in
+  dump "ft_eval0_circuit" ft_eval0_circuit
+    ~input_typ:array91_field ~return_typ:Impl.Field.typ ;
   (* Phase 1 sub-circuits *)
   let array4_field = Impl.Typ.array ~length:4 Impl.Field.typ in
   dump "expand_plonk_circuit" expand_plonk_circuit
