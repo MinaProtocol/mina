@@ -108,6 +108,61 @@ module LedgerCurrency = struct
     else Passed
 end
 
+module ExportSnarkedLedger = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let parse_accounts output =
+    try
+      let json = Yojson.Safe.from_string output in
+      match Runtime_config.Accounts.of_yojson json with
+      | Ok accounts ->
+          Ok accounts
+      | Error err ->
+          Error err
+    with exn -> Error (Exn.to_string exn)
+
+  let test_case (test : t) =
+    let daemon = Daemon.of_config test.config in
+    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+    let%bind () = Daemon.Config.generate_keys test.config in
+    let%bind () =
+      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+    in
+    let%bind process = Daemon.start daemon in
+    let%bind bootstrap_result =
+      Daemon.Client.wait_for_bootstrap process.client ()
+    in
+    let%bind bootstrap_ok =
+      match bootstrap_result with
+      | Ok () ->
+          Deferred.return true
+      | Error e ->
+          let () = printf "Error:\n%s\n" (Error.to_string_hum e) in
+          let log_file = Daemon.Config.ConfigDirs.mina_log test.config.dirs in
+          let%bind logs = Reader.file_contents log_file in
+          let () = printf "Daemon logs:\n%s\n" logs in
+          let%bind () = Daemon.Client.stop_daemon process.client in
+          Deferred.return false
+    in
+    if not bootstrap_ok then
+      Deferred.Or_error.return
+        (Mina_automation_fixture.Intf.Failed "Daemon failed to bootstrap")
+    else
+      let%bind output =
+        Daemon.Client.ledger_export_snarked_ledger process.client
+      in
+      let%bind () = Daemon.Client.stop_daemon process.client in
+      Deferred.Or_error.return
+        ( if contain_log_output output then
+          Mina_automation_fixture.Intf.Failed "output contains log"
+        else
+          match parse_accounts output with
+          | Ok _ ->
+              Passed
+          | Error err ->
+              Failed (Printf.sprintf "invalid JSON output: %s" err) )
+end
+
 module AdvancedPrintSignatureKind = struct
   type t = Mina_automation_fixture.Daemon.before_bootstrap
 
@@ -520,6 +575,14 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (LedgerCurrency) ) )
+        ] )
+    ; ( "ledger-export-snarked-ledger"
+      , [ test_case "The mina ledger export snarked-ledger outputs valid JSON"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (ExportSnarkedLedger) ) )
         ] )
     ; ( "advanced-print-signature-kind"
       , [ test_case "The mina cli prints correct signature kind" `Quick
