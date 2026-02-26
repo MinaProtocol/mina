@@ -30,7 +30,7 @@ in  { step =
                     )
                     "./buildkite/scripts/dump-slot-test.sh"
                 ]
-              , label = "Dump Slot test"
+              , label = "Archive: Dump Slot test"
               , key = key
               , target = Size.Large
               , depends_on = dependsOn
