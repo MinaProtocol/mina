@@ -11,6 +11,8 @@ NETWORK_NAME=""
 CONFIG_JSON_GZ_URL=""
 CODENAME=""
 CACHED_BUILDKITE_BUILD_ID=""
+HARD_FORK_SHIFT_SLOT_DELTA=""
+PREFORK_GENESIS_CONFIG=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -30,7 +32,19 @@ while [[ $# -gt 0 ]]; do
       CACHED_BUILDKITE_BUILD_ID="$2"
       shift 2
       ;;
+    --hardfork-shift-slot-delta)
+      HARD_FORK_SHIFT_SLOT_DELTA="$2"
+      shift 2
+      ;;
+    --prefork-genesis-config)
+      PREFORK_GENESIS_CONFIG="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      ;;
     *)
+      echo "Unknown argument: $1" >&2
       usage
       ;;
   esac
@@ -50,6 +64,14 @@ if [[ -z "$CODENAME" ]]; then
   usage
 fi
 
+
+HARD_FORK_SHIFT_SLOT_DELTA_ARG=""
+if [[ -n "$HARD_FORK_SHIFT_SLOT_DELTA" ]]; then
+  jq '.ledger' "$PREFORK_GENESIS_CONFIG" > prefork_ledger.json
+  cat prefork_ledger.json
+  HARD_FORK_SHIFT_SLOT_DELTA_ARG="--hardfork-shift-slot-delta $HARD_FORK_SHIFT_SLOT_DELTA --prefork-genesis-config prefork_ledger.json"
+fi
+
 echo "--- Restoring cached build artifacts for apps/${CODENAME}/"
 
 # Install mina-logproc from cached build if available, else from current build
@@ -61,7 +83,7 @@ fi
 
 echo "--- Generating ledger tarballs for hardfork network: $NETWORK_NAME"
 
-./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs.sh --network "$NETWORK_NAME" --config-url "$CONFIG_JSON_GZ_URL" --runtime-ledger mina-create-genesis --logproc mina-logproc
+./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs.sh --network "$NETWORK_NAME" --config-url "$CONFIG_JSON_GZ_URL" --runtime-ledger mina-create-genesis --logproc mina-logproc $HARD_FORK_SHIFT_SLOT_DELTA_ARG
 
 ./scripts/hardfork/release/upload-ledger-tarballs.sh hardfork_ledgers new_config.json
 

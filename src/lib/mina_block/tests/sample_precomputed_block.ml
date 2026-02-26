@@ -491,7 +491,7 @@ let sample_block_sexp =
 let sample_block_json =
   {json|
 {
-  "version": 3,
+  "version": 4,
   "data": {
     "scheduled_time": "1690219472442",
     "protocol_state": {

@@ -41,6 +41,7 @@ let fromNetwork =
             , Mainnet = Profile.Mainnet
             , TestnetGeneric = Profile.Devnet
             , PreMesa1 = Profile.Devnet
+            , Mesa = Profile.Devnet
             }
             network
 
