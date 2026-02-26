@@ -74,9 +74,9 @@ let command
                       , "source ./buildkite/scripts/export-git-env-vars.sh"
                       , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
                                                                              spec.network} --tag \\\${MINA_DOCKER_TAG} --sync-timeout ${Natural/show
-                                                                                                                                         spec.syncTimeout} --new-block-timeout ${Natural/show
-                                                                                                                                                                                                                     spec.newBlockTimeout} --repo ${DockerRepo.show
-                                                                                                                                                                                                                                                      spec.repo} --run-compatibility-test develop --run-load-test --branch \\\${BUILDKITE_BRANCH} --commit \\\${BUILDKITE_COMMIT} --metrics-mode --perf-output-file /workdir/rosetta.perf"
+                                                                                                                                          spec.syncTimeout} --new-block-timeout ${Natural/show
+                                                                                                                                                                                    spec.newBlockTimeout} --repo ${DockerRepo.show
+                                                                                                                                                                                                                     spec.repo} --run-compatibility-test develop --run-load-test --branch \\\${BUILDKITE_BRANCH} --commit \\\${BUILDKITE_COMMIT} --metrics-mode --perf-output-file /workdir/rosetta.perf"
                       ]
                   ]
                 # RunInToolchain.runInToolchain
