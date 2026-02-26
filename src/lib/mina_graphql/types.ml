@@ -3640,3 +3640,17 @@ let get_filtered_log_entries =
           ~args:Arg.[]
           ~resolve:(fun _ (_, is_started) -> is_started)
       ] )
+
+let ancestry_proof =
+  obj "AncestryProof" ~fields:(fun _ ->
+      [ field "stateBodyHashes"
+          ~typ:(non_null (list (non_null string)))
+          ~doc:"The state body hashes of the ancestry proof"
+          ~args:Arg.[]
+          ~resolve:(fun (_ : Mina_lib.t resolve_info) (_, state_body_hashes) ->
+            state_body_hashes )
+      ; field "initStateHash" ~typ:(non_null string)
+          ~doc:"The initial state hash of the ancestry proof"
+          ~args:Arg.[]
+          ~resolve:(fun _ (init_state_hash, _) -> init_state_hash)
+      ] )
