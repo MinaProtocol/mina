@@ -81,7 +81,8 @@ type EpochDataPrepatch struct {
 }
 
 type LegacyPrepatchForkConfigView struct {
-	Proof struct {
+	Genesis any `json:"genesis"`
+	Proof   struct {
 		Fork struct {
 			BlockChainLength       int    `json:"blockchain_length"`
 			GlobalSlotSinceGenesis int    `json:"global_slot_since_genesis"`
