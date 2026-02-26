@@ -60,21 +60,20 @@ let command
       ->  Command.build
             Command.Config::{
             , commands =
-                [ Cmd.chain
-                    [ "export MINA_DEB_CODENAME=${Dockers.lowerName
-                                                    spec.dockerType}"
-                    , "source ./buildkite/scripts/export-git-env-vars.sh"
-                    , "scripts/tests/daemon-docker-sync.sh --network ${Network.lowerName
-                                                                         spec.network} --tag \\\${MINA_DOCKER_TAG}-${Network.lowerName
-                                                                                                                       spec.network} --timeout ${Natural/show
-                                                                                                                                                   spec.timeout} --repo ${DockerRepo.show
-                                                                                                                                                                            spec.repo}"
-                    ]
-                ]
+              [ Cmd.chain
+                  [ "export MINA_DEB_CODENAME=${Dockers.lowerName
+                                                  spec.dockerType}"
+                  , "source ./buildkite/scripts/export-git-env-vars.sh"
+                  , "scripts/tests/daemon-docker-sync.sh --network ${Network.lowerName
+                                                                       spec.network} --tag \\\${MINA_DOCKER_TAG}-${Network.lowerName
+                                                                                                                     spec.network} --timeout ${Natural/show
+                                                                                                                                                 spec.timeout} --repo ${DockerRepo.show
+                                                                                                                                                                          spec.repo}"
+                  ]
+              ]
             , label =
                 "Daemon docker sync ${Network.lowerName spec.network} test"
-            , key =
-                "daemon-docker-sync-${Network.lowerName spec.network}-test"
+            , key = "daemon-docker-sync-${Network.lowerName spec.network}-test"
             , target = Size.XLarge
             , artifact_paths = [ S.contains "test_output/artifacts/**/*" ]
             , soft_fail = Some spec.softFail
@@ -95,19 +94,16 @@ let pipeline
       ->  Pipeline.Config::{
           , spec = JobSpec::{
             , dirtyWhen =
-                [ S.strictlyStart (S.contains "src")
-                , S.exactly
-                    "buildkite/src/Jobs/Test/DaemonDockerSync${Network.capitalName
-                                                                  spec.network}"
-                    "dhall"
-                , S.exactly
-                    "buildkite/src/Command/DaemonDockerSync"
-                    "dhall"
-                , S.exactly "scripts/tests/daemon-docker-sync" "sh"
-                ]
+              [ S.strictlyStart (S.contains "src")
+              , S.exactly
+                  "buildkite/src/Jobs/Test/DaemonDockerSync${Network.capitalName
+                                                               spec.network}"
+                  "dhall"
+              , S.exactly "buildkite/src/Command/DaemonDockerSync" "dhall"
+              , S.exactly "scripts/tests/daemon-docker-sync" "sh"
+              ]
             , path = "Test"
-            , name =
-                "DaemonDockerSync${Network.capitalName spec.network}"
+            , name = "DaemonDockerSync${Network.capitalName spec.network}"
             , scope = spec.scope
             , tags =
               [ PipelineTag.Type.Long
