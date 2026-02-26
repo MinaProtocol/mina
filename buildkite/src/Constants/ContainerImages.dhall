@@ -6,26 +6,26 @@
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4"
 , minaToolchainBookworm =
     { amd64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:7c248d7-bookworm-testnet-generic"
+        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:d378ae6-bookworm-testnet-generic"
     , arm64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:7c248d7-bookworm-testnet-generic-arm64"
+        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:d378ae6-bookworm-testnet-generic-arm64"
     }
 , minaToolchainBullseye =
     { amd64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:7c248d7-bullseye-testnet-generic"
+        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:d378ae6-bullseye-testnet-generic"
     , arm64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:7c248d7-bullseye-testnet-generic-arm64"
+        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:d378ae6-bullseye-testnet-generic-arm64"
     }
 , minaToolchainNoble =
     { amd64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:7c248d7-noble-testnet-generic"
+        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:d378ae6-noble-testnet-generic"
     , arm64 =
-        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:7c248d7-noble-testnet-generic-arm64"
+        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:d378ae6-noble-testnet-generic-arm64"
     }
 , minaToolchainJammy.amd64 =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:7c248d7-jammy-testnet-generic"
+    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:d378ae6-jammy-testnet-generic"
 , minaToolchain =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:7c248d7-bullseye-testnet-generic"
+    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:d378ae6-bullseye-testnet-generic"
 , postgres =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/postgres:12.4-alpine"
 , xrefcheck =
