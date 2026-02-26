@@ -94,6 +94,17 @@ module Client = struct
       ~args:[ "ledger"; "currency"; "--ledger-file"; ledger_file ]
       ()
 
+  let ledger_export_snarked_ledger t =
+    Executor.run t.executor
+      ~args:
+        [ "ledger"
+        ; "export"
+        ; "snarked-ledger"
+        ; "--daemon-port"
+        ; string_of_int t.port
+        ]
+      ()
+
   let test_ledger t ~(n : int) =
     Executor.run t.executor
       ~args:[ "ledger"; "test"; "generate-accounts"; "-n"; string_of_int n ]
