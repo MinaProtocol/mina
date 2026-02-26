@@ -628,6 +628,59 @@ let b_correct_circuit (inputs : Impl.Field.t array) () =
   let _b_correct = equal b_used b_actual in
   ()
 
+(* Sub-circuit 4: plonk_checks_passed (Step 13)
+   Verifies that claimed perm value matches computed value.
+   This isolates the Plonk_checks.checked / derive_plonk logic.
+
+   The perm scalar from derive_plonk:
+     perm = -(z_omega * beta * alpha^21 * zkp * prod_{i=0}^{5}(gamma + beta*s_i + w_i))
+   Then Shifted_value.of_field wraps it, and Shifted_value.equal compares
+   with the claimed value.
+
+   Input layout (18 fields):
+     0:     alpha (expanded to full field)
+     1:     beta
+     2:     gamma
+     3:     zkPolynomial
+     4:     z_omega (z eval at omega*zeta)
+     5-10:  sigma[0..5] (sigma evals at zeta)
+     11-16: w[0..5] (witness evals at zeta)
+     17:    claimed_perm (Shifted_value.Type1 inner)
+*)
+let plonk_checks_passed_circuit (inputs : Impl.Field.t array) () =
+  let open Impl.Field in
+  let alpha = inputs.(0) in
+  let beta = inputs.(1) in
+  let gamma = inputs.(2) in
+  let zkp = inputs.(3) in
+  let z_omega = inputs.(4) in
+  let sigma = Array.init 6 ~f:(fun i -> inputs.(Int.(5 + i))) in
+  let w = Array.init 6 ~f:(fun i -> inputs.(Int.(11 + i))) in
+  let claimed_perm = inputs.(17) in
+  (* Compute alpha^21 via pow_ (same algorithm as scalars_env) *)
+  let alpha_pow_21 = pow_ alpha 21 in
+  (* derive_plonk perm formula *)
+  let init = z_omega * beta * alpha_pow_21 * zkp in
+  let raw_perm =
+    Array.foldi sigma ~init ~f:(fun i acc s ->
+      acc * (gamma + (beta * s) + w.(i)))
+    |> negate
+  in
+  (* Type1.of_field: shifts computed value to match claimed inner.
+     of_field raw = (raw - c) * scale, then compare inners.
+     This matches PureScript's shiftedEqualType1 / ofFieldType1Circuit. *)
+  let shift1 =
+    Pickles_types.Shifted_value.Type1.Shift.(
+      map ~f:constant (create (module Impl.Field.Constant)))
+  in
+  let (Pickles_types.Shifted_value.Type1.Shifted_value perm_shifted) =
+    Pickles_types.Shifted_value.Type1.of_field (module Impl.Field) ~shift:shift1
+      raw_perm
+  in
+  (* Compare claimed inner vs of_field(raw_perm) inner *)
+  let _result = equal claimed_perm perm_shifted in
+  ()
+
 let finalize_other_proof_circuit (inputs : Impl.Field.t array) () =
   let open Pickles_types in
   let open Kimchi_backend_common.Plonk_types in
@@ -1011,6 +1064,9 @@ let run ~output_dir =
   let array20_field = Impl.Typ.array ~length:20 Impl.Field.typ in
   dump "b_correct_circuit" b_correct_circuit
     ~input_typ:array20_field ~return_typ:Impl.Typ.unit ;
+  let array18_field = Impl.Typ.array ~length:18 Impl.Field.typ in
+  dump "plonk_checks_passed_circuit" plonk_checks_passed_circuit
+    ~input_typ:array18_field ~return_typ:Impl.Typ.unit ;
   (* Pickles sub-circuits *)
   let array151_field = Impl.Typ.array ~length:151 Impl.Field.typ in
   dump "finalize_other_proof_circuit" finalize_other_proof_circuit
