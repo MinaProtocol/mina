@@ -14,6 +14,20 @@ module Unparented_blocks = struct
   let run (module Conn : Mina_caqti.CONNECTION) () = Conn.collect_list query ()
 end
 
+module GenesisOrFirstForkBlockHeight = struct
+  let query =
+    Mina_caqti.find_req Caqti_type.unit Caqti_type.int
+      {sql| SELECT height FROM blocks
+            WHERE parent_id IS NULL
+            AND global_slot_since_hard_fork = 0
+            AND chain_status = 'canonical'
+            ORDER BY height ASC
+            LIMIT 1
+      |sql}
+
+  let run (module Conn : Mina_caqti.CONNECTION) height = Conn.find query height
+end
+
 module Missing_blocks_gap = struct
   let query =
     Mina_caqti.find_req Caqti_type.int Caqti_type.int

@@ -8,6 +8,14 @@ module Prod : module type of Prod
 
 include Verifier_intf.S with type ledger_proof = Ledger_proof.t
 
+val get_verification_keys_eagerly :
+     signature_kind:Mina_signature_kind.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> proof_level:Genesis_constants.Proof_level.t
+  -> ( [ `Blockchain of Pickles.Verification_key.t ]
+     * [ `Transaction of Pickles.Verification_key.t ] )
+     Async.Deferred.t
+
 module For_tests : sig
   val default :
        logger:Logger.t

@@ -60,6 +60,8 @@ type sysinfo =
   }
 [@@deriving to_yojson]
 
+let node_status_version = 2
+
 type node_status_data =
   { version : int
   ; block_height_at_best_tip : int
@@ -83,6 +85,7 @@ type node_status_data =
   ; pubsub_msg_broadcasted : gossip_count
   ; received_blocks : block list
   ; sysinfo : sysinfo
+  ; block_producer_public_key : string option
   }
 [@@deriving to_yojson]
 
@@ -179,7 +182,8 @@ let reset_gauges () =
   Queue.clear Transition_frontier.rejected_blocks
 
 let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
-    ~chain_id ~network ~addrs_and_ports ~start_time ~slot_duration =
+    ~chain_id ~network ~addrs_and_ports ~start_time ~slot_duration
+    ~block_producer_public_key_base58 =
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("url", `String node_status_url) ] ;
   let five_slots = Time.Span.scale slot_duration 5. in
@@ -238,7 +242,7 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
           , `Cpu_usage libp2p_cpu_usage ) ->
           let%bind peers = Mina_networking.peers network in
           let node_status_data =
-            { version = 1
+            { version = node_status_version
             ; block_height_at_best_tip =
                 Transition_frontier.best_tip tf
                 |> Transition_frontier.Breadcrumb.consensus_state
@@ -403,6 +407,7 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
                       ; reason_for_rejection = None
                       } )
             ; sysinfo
+            ; block_producer_public_key = block_producer_public_key_base58
             }
           in
           reset_gauges () ;

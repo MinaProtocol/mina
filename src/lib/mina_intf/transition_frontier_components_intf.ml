@@ -4,6 +4,7 @@ open Pipe_lib
 open Cache_lib
 open Mina_base
 open Network_peer
+module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -17,6 +18,8 @@ module type CONTEXT = sig
   val ledger_sync_config : Syncable_ledger.daemon_config
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 module type Transition_handler_validator_intf = sig
@@ -178,8 +181,8 @@ module type Best_tip_prover_intf = sig
   val prove :
        context:(module CONTEXT)
     -> transition_frontier
-    -> ( Mina_block.t State_hash.With_state_hashes.t
-       , State_body_hash.t list * Mina_block.t )
+    -> ( Frontier_base.Breadcrumb.t
+       , State_body_hash.t list * Frontier_base.Breadcrumb.t )
        Proof_carrying_data.t
        option
 
@@ -205,8 +208,8 @@ module type Consensus_best_tip_prover_intf = sig
        context:(module CONTEXT)
     -> frontier:transition_frontier
     -> Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
-    -> ( Mina_block.t
-       , State_body_hash.t list * Mina_block.t )
+    -> ( Frontier_base.Breadcrumb.t
+       , State_body_hash.t list * Frontier_base.Breadcrumb.t )
        Proof_carrying_data.t
        option
 
@@ -340,7 +343,7 @@ module type Transition_router_intf = sig
           -> Transaction_snark_work.Checked.t option )
     -> catchup_mode:[ `Super ]
     -> notify_online:(unit -> unit Deferred.t)
-    -> ledger_backing:Mina_ledger.Ledger.Root.Config.backing_type
+    -> ledger_backing:Mina_ledger.Root.Config.backing_type
     -> unit
     -> ( [ `Transition of Mina_block.Validated.t ]
        * [ `Source of [ `Gossip | `Catchup | `Internal ] ]

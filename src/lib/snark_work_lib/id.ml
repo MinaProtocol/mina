@@ -53,3 +53,17 @@ module Sub_zkapp = struct
   let to_single ({ which_one; pairing_id; _ } : t) : Single.t =
     { which_one; pairing_id }
 end
+
+module Any = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        | Single of Single.Stable.V1.t
+        | Sub_zkapp of Sub_zkapp.Stable.V1.t
+      [@@deriving compare, hash, sexp, yojson, equal]
+
+      let to_latest = Fn.id
+    end
+  end]
+end

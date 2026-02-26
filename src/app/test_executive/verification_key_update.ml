@@ -207,7 +207,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       Malleable_error.lift
-      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
+      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+           ~signature_kind spec
     in
     let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.t =
       let memo = Signed_command_memo.empty in

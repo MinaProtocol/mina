@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Signature_lib
+module Root_ledger = Mina_ledger.Root
 
 (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
 
@@ -20,7 +21,6 @@ type t =
   ; pids : Child_processes.Termination.t
   ; trust_system : Trust_system.t
   ; monitor : Monitor.t option
-  ; is_seed : bool
   ; disable_node_status : bool
   ; block_production_keypairs : Keypair.And_compressed_pk.Set.t
   ; coinbase_receiver : Consensus.Coinbase_receiver.t
@@ -37,6 +37,8 @@ type t =
   ; persistent_root_location : string
   ; persistent_frontier_location : string
   ; epoch_ledger_location : string
+  ; proof_cache_location : string
+  ; zkapp_vk_cache_location : string
   ; staged_ledger_transition_backup_capacity : int [@default 10]
   ; time_controller : Block_time.Controller.t
   ; snark_work_fee : Currency.Fee.t
@@ -60,6 +62,7 @@ type t =
   ; uptime_submitter_keypair : Keypair.t option [@default None]
   ; uptime_send_node_commit : bool [@default false]
   ; stop_time : int
+  ; stop_time_interval : int
   ; file_log_level : Logger.Level.t [@default Logger.Level.Info]
   ; log_level : Logger.Level.t [@default Logger.Level.Info]
   ; log_json : bool [@default false]
@@ -67,13 +70,8 @@ type t =
   ; zkapp_cmd_limit : int option ref
   ; compile_config : Mina_compile_config.t
   ; itn_features : bool
-  ; hardfork_mode : Cli_lib.Arg_type.Hardfork_mode.t
+  ; hardfork_handling : Cli_lib.Arg_type.Hardfork_handling.t
+  ; ledger_backing : Mina_ledger.Root.Config.backing_type
+  ; hardfork_slot : Mina_numbers.Global_slot_since_genesis.t option
   }
 [@@deriving make]
-
-let ledger_backing ~hardfork_mode =
-  match hardfork_mode with
-  | Cli_lib.Arg_type.Hardfork_mode.Auto ->
-      Mina_ledger.Ledger.Root.Config.Converting_db
-  | _ ->
-      Stable_db

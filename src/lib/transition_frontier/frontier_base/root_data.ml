@@ -149,8 +149,7 @@ module Minimal = struct
   let of_limited ~common hash = { hash; common }
 
   let upgrade t ~transition ~protocol_states =
-    let hash = hash t in
-    assert (State_hash.equal (Mina_block.Validated.state_hash transition) hash) ;
+    assert (State_hash.equal (Mina_block.Validated.state_hash transition) t.hash) ;
     let protocol_states =
       List.map protocol_states ~f:(fun (state_hash, s) ->
           { With_hash.data = s

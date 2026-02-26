@@ -27,6 +27,7 @@
     }
   },
   "daemon": {
-    "network_id": "mainnet"
+    "network_id": "mainnet",
+    "peer_list_url": "https://bootnodes.minaprotocol.com/networks/mainnet.txt"
   }
 }

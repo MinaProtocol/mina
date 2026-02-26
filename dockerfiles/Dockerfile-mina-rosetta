@@ -1,4 +1,4 @@
-ARG image=ubuntu:focal
+ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
 FROM ${image} AS production
 ARG deb_codename=focal
 ARG deb_version

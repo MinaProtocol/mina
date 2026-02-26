@@ -391,6 +391,34 @@ what is a code coverage of end-to-end/manual tests performed over mina under dev
 Additionally there is a docker image available which wraps up above mina build into full mina image. 
 One can prepare it using command: `$(nix build mina#mina-image-instr-full --print-out-paths) | docker load`
 
+### Test coverage
+
+Coverage instrumentation is already configured in all dune files via `(instrumentation (backend bisect_ppx))`. To run tests with coverage from a nix shell:
+
+```
+nix develop mina
+
+# Run tests with coverage for a specific library
+DUNE_INSTRUMENT_WITH=bisect_ppx dune runtest src/lib/base58_check --force
+
+# Run tests with coverage for multiple libraries
+DUNE_INSTRUMENT_WITH=bisect_ppx dune runtest src/lib/base58_check src/lib/merkle_ledger --force
+
+# Generate per-file coverage summary
+bisect-ppx-report summary --coverage-path=_build/default --per-file
+
+# Generate HTML coverage report
+bisect-ppx-report html --coverage-path=_build/default --tree --ignore-missing-files
+# Open _coverage/index.html in a browser
+
+# Use the display_summary tool to see coverage for files modified in develop
+bisect-ppx-report summary --coverage-path=_build/default --per-file > /tmp/summary.txt
+dune exec src/app/coverage_utils/display_summary/main.exe -- /tmp/summary.txt | column -t
+```
+
+Setting `DUNE_INSTRUMENT_WITH=bisect_ppx` can also be used in CI to enable coverage
+without modifying any build scripts.
+
 ### Discovering all the packages this Flake provides
 
 `nix flake show` doesn't work due to

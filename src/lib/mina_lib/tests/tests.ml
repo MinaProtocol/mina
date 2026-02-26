@@ -5,6 +5,7 @@ let%test_module "Epoch ledger sync tests" =
     open Mina_base
     open Pipe_lib
     open Network_peer
+    module Root_ledger = Mina_ledger.Root
 
     module type CONTEXT = sig
       include Mina_lib.CONTEXT
@@ -82,9 +83,8 @@ let%test_module "Epoch ledger sync tests" =
             ~genesis_dir:(make_dirname "genesis_dir")
             ~constraint_constants ~genesis_constants ~logger
             ~proof_level:No_check runtime_config ~cli_proof_level:None
-            ~genesis_backing_type:Stable_db
         with
-        | Ok (precomputed_values, _) ->
+        | Ok precomputed_values ->
             precomputed_values
         | Error err ->
             failwithf "Could not create precomputed values: %s"
@@ -130,7 +130,7 @@ let%test_module "Epoch ledger sync tests" =
             ~max_subtree_depth:None ~default_subtree_depth:None ()
       end in
       let genesis_ledger = Genesis_ledger.for_unit_tests in
-      let genesis_epoch_data : Consensus.Genesis_epoch_data.t = None in
+      let genesis_epoch_data = None in
       let genesis_state_hash = Quickcheck.random_value Ledger_hash.gen in
       let consensus_local_state =
         Consensus.Data.Local_state.create
@@ -148,6 +148,8 @@ let%test_module "Epoch ledger sync tests" =
         let consensus_local_state = consensus_local_state
 
         let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
+        let signature_kind = Mina_signature_kind.Testnet
       end in
       return (module Context : CONTEXT)
 
@@ -173,7 +175,7 @@ let%test_module "Epoch ledger sync tests" =
       end) )
 
     let make_empty_root_ledger ~backing_type (module Context : CONTEXT) =
-      Mina_ledger.Ledger.Root.create_temporary ~logger ~backing_type
+      Root_ledger.create_temporary ~logger ~backing_type
         ~depth:Context.precomputed_values.constraint_constants.ledger_depth ()
 
     (* [instance] and [test_number] are used to make ports distinct
@@ -215,7 +217,7 @@ let%test_module "Epoch ledger sync tests" =
             ~slot_tx_end:None
             ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
             ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
-            ~signature_kind:Mina_signature_kind.t_DEPRECATED
+            ~signature_kind:Testnet
         in
         Network_pool.Transaction_pool.create ~config ~constraint_constants
           ~consensus_constants ~time_controller ~logger
@@ -257,6 +259,7 @@ let%test_module "Epoch ledger sync tests" =
       let creatable_gossip_net =
         let chain_id = "dummy_chain_id" in
         let conf_dir = make_dirname "libp2p" in
+        let mina_net_location = Filename.concat conf_dir "mina_net2" in
         let seed_peer_list_url = None in
         let addrs_and_ports =
           let external_ip = Core.Unix.Inet_addr.localhost in
@@ -277,7 +280,7 @@ let%test_module "Epoch ledger sync tests" =
         let gossip_net_params : Gossip_net.Libp2p.Config.t =
           { timeout = Time.Span.of_sec 3.
           ; logger
-          ; conf_dir
+          ; mina_net_location
           ; chain_id
           ; unsafe_no_trust_ip = false
           ; seed_peer_list_url
@@ -445,7 +448,7 @@ let%test_module "Epoch ledger sync tests" =
         let root_ledger =
           make_empty_root_ledger ~backing_type (module Context)
         in
-        let casted = Mina_ledger.Ledger.Root.as_unmasked root_ledger in
+        let casted = Root_ledger.as_unmasked root_ledger in
         List.iter starting_accounts ~f:(fun (acct : Account.t) ->
             let acct_id = Account_id.create acct.public_key Token_id.default in
             match
@@ -505,7 +508,7 @@ let%test_module "Epoch ledger sync tests" =
             let sync_ledger1_tm1 = Unix.gettimeofday () in
             [%log debug] "(%s) Time to sync ledger 1: %0.02f" test.name
               (sync_ledger1_tm1 -. sync_ledger1_tm0) ;
-            let ledger_root = Mina_ledger.Ledger.Root.merkle_root ledger in
+            let ledger_root = Root_ledger.merkle_root ledger in
             assert (Ledger_hash.equal ledger_root staking_ledger_root) ;
             [%log debug] "Synced current epoch ledger successfully"
         | `Target_changed _ ->
@@ -523,7 +526,7 @@ let%test_module "Epoch ledger sync tests" =
           [%log debug] "(%s) Time to sync ledger 2: %0.02f" test.name
             (sync_ledger2_tm1 -. sync_ledger2_tm0) ;
           test.cleanup () ;
-          let ledger_root = Mina_ledger.Ledger.Root.merkle_root ledger in
+          let ledger_root = Root_ledger.merkle_root ledger in
           assert (Ledger_hash.equal ledger_root next_epoch_ledger_root) ;
           [%log debug] "Synced next epoch ledger, sync test succeeded" ;
           Deferred.unit
@@ -578,7 +581,7 @@ let%test_module "Epoch ledger sync tests" =
     let make_db_ledger (module Context : CONTEXT) ~backing_type
         (accounts : Account.t list) =
       let root_ledger = make_empty_root_ledger ~backing_type (module Context) in
-      let casted = Mina_ledger.Ledger.Root.as_unmasked root_ledger in
+      let casted = Root_ledger.as_unmasked root_ledger in
       List.iter accounts ~f:(fun acct ->
           let acct_id = Account_id.create acct.public_key Token_id.default in
           match
@@ -623,7 +626,8 @@ let%test_module "Epoch ledger sync tests" =
                    with converting db" =
       Async.Thread_safe.block_on_async_exn
         (test_sync_current_next_staking_to_empty_ledger
-           ~backing_type:Converting_db )
+           ~backing_type:
+             (Converting_db (Mina_numbers.Global_slot_since_genesis.random ())) )
 
     let test_sync_current_next_staking_to_nonempty_ledger ~backing_type () =
       let%bind (module Context) = make_context () in
@@ -660,7 +664,8 @@ let%test_module "Epoch ledger sync tests" =
                    backed with converting db" =
       Async.Thread_safe.block_on_async_exn
         (test_sync_current_next_staking_to_nonempty_ledger
-           ~backing_type:Converting_db )
+           ~backing_type:
+             (Converting_db (Mina_numbers.Global_slot_since_genesis.random ())) )
 
     (* A `fetch` to sync a genesis ledger will just loop, because `get_ledger_by_hash`
        returns None for genesis ledgers

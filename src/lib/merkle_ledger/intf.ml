@@ -205,10 +205,6 @@ module type Key_value_database = sig
     -> 'b
 end
 
-module type Storage_locations = sig
-  val key_value_db_dir : string
-end
-
 module type SYNCABLE = sig
   type root_hash
 
@@ -269,8 +265,6 @@ module Inputs = struct
     module Location_binable : Hashable.S_binable with type t := Location.t
 
     module Kvdb : Key_value_database with type config := string
-
-    module Storage_locations : Storage_locations
   end
 end
 
@@ -319,6 +313,9 @@ module Ledger = struct
 
     (** list of accounts via slower sequential mechanism *)
     val to_list_sequential : t -> account list
+
+    (** iterate over all indexes and accounts, if the ledger is not known to be sound *)
+    val iteri_untrusted : t -> f:(index -> account option -> unit) -> unit
 
     (** iterate over all indexes and accounts *)
     val iteri : t -> f:(index -> account -> unit) -> unit
@@ -390,6 +387,8 @@ module Ledger = struct
 
     val set_batch :
       ?hash_cache:hash Addr.Map.t -> t -> (Location.t * account) list -> unit
+
+    val get_at_index : t -> int -> account option
 
     val get_at_index_exn : t -> int -> account
 
@@ -547,6 +546,8 @@ module Ledger = struct
       include S
 
       module Config : Config
+
+      val dbs_synced : primary_ledger -> converting_ledger -> bool
 
       (** Create a new converting merkle tree with the given configuration. If
       [In_directories] is given, existing databases will be opened and used to
