@@ -154,3 +154,74 @@ Parameters:
 The Archive does not have its own interface for retrieving its data – for
 that one can use Rosetta (see `src/app/rosetta`) or query the Postgres
 database directly.
+
+Recovering Blocks from Precomputed Block Logs
+---------------------------------------------
+
+The Mina daemon supports two options for preserving precomputed blocks that
+can be used to recover missing archive data:
+
+- `--precomputed-blocks-file PATH`: Write precomputed blocks directly to a
+  dedicated file. Each block is written as a single-line JSON object (one
+  block per line). This is the **recommended approach** for archiving
+  precomputed blocks.
+- `--log-precomputed-blocks true`: Include precomputed blocks inline in the
+  standard daemon log output.
+
+### Warning: Log Truncation
+
+Precomputed blocks can be very large — sometimes several megabytes each.
+When using `--log-precomputed-blocks`, these large blocks are written as
+single log entries. This can cause truncation in two ways:
+
+1. **Mina's internal log limit**: The Mina daemon enforces a maximum log
+   line length of 1 MB (1,048,576 bytes). Log entries exceeding this limit
+   are replaced with a truncation notice in the normal log, while the full
+   content is redirected to a separate file named `mina-oversized-logs.log`
+   in the daemon's configuration directory (typically `~/.mina-config/`).
+
+2. **External logging service limits**: Log aggregators and shipping services
+   (such as Loki, Elasticsearch, Splunk, Fluentd, etc.) typically impose
+   their own per-entry size limits. A precomputed block log entry that exceeds
+   these limits will be silently truncated, resulting in invalid JSON that
+   cannot be used for archive recovery.
+
+A truncated precomputed block cannot be imported into the archive database.
+
+### Recommended Configuration
+
+To reliably preserve precomputed blocks for archive recovery, use the
+`--precomputed-blocks-file` flag instead of `--log-precomputed-blocks`:
+
+```shell
+$ mina daemon \
+    --archive-address 3086 \
+    --precomputed-blocks-file /path/to/precomputed-blocks.log \
+    [other options]
+```
+
+This writes each precomputed block directly to the specified file as a
+single JSON line, bypassing the logging subsystem entirely and avoiding any
+size-based truncation.
+
+If you must use `--log-precomputed-blocks` with an external logging service,
+ensure that service is configured to handle log entries of at least 10 MB to
+safely accommodate the largest possible precomputed blocks.
+
+### Recovering Blocks from the Oversized Log File
+
+If you used `--log-precomputed-blocks` and some blocks were truncated in
+transit to an external logging service, the full content of those blocks may
+still be available locally in `mina-oversized-logs.log` in the daemon's
+configuration directory. This file captures log entries that exceeded Mina's
+internal 1 MB log line limit.
+
+To import a precomputed block from either source into the archive database,
+use the `archive_blocks` tool (see `src/app/archive_blocks/README.md`):
+
+```shell
+$ archive_blocks \
+    --archive-uri "postgres://username@localhost:5432/mina_archive" \
+    --precomputed \
+    block.json
+```
