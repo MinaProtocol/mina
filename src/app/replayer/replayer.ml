@@ -1907,6 +1907,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       let%bind () =
         match hard_fork_params_opt with
         | Some (scheduled_genesis_since_hf, hard_fork_output_file) ->
+            (* Note that the [ledger] here is a mutable ledger mask, so
+               apply_commands does modify it in-place when it applies the
+               transactions to the ledger. Thus the [ledger] here will be the
+               final staged ledger of the replayer run. *)
             apply_hard_fork_migration ~logger ~constraint_constants ~ledger
               ~genesis_dir ~scheduled_genesis_since_hf ~hard_fork_output_file
               ~hard_fork_target
