@@ -59,6 +59,36 @@ module Runtime = struct
   let long_async_job : Long_job_histogram.t = ()
 end
 
+module Process_memory = struct
+  let rss_update_interval_mins : float ref = ref 1.
+
+  module type Rss_gauge_intf = sig
+    val set_pid : Pid.t -> unit
+
+    val clear_pid : unit -> unit
+  end
+
+  module Make_rss_gauge () : Rss_gauge_intf = struct
+    let set_pid _ = ()
+
+    let clear_pid () = ()
+  end
+
+  module Daemon = Make_rss_gauge ()
+
+  module Prover = Make_rss_gauge ()
+
+  module Verifier = Make_rss_gauge ()
+
+  module Snark_worker = Make_rss_gauge ()
+
+  module Uptime_snark_worker = Make_rss_gauge ()
+
+  module Vrf_evaluator = Make_rss_gauge ()
+
+  module Libp2p_helper = Make_rss_gauge ()
+end
+
 module Cryptography = struct
   let blockchain_proving_time_ms : Gauge.t = ()
 
@@ -70,11 +100,11 @@ module Cryptography = struct
 
   let snark_work_zkapp_base_time_sec : Counter.t = ()
 
-  let snark_work_base_time_sec : Counter.t = ()
+  let snark_work_nonzkapp_base_time_sec : Counter.t = ()
 
   let snark_work_zkapp_base_submissions : Counter.t = ()
 
-  let snark_work_base_submissions : Counter.t = ()
+  let snark_work_nonzkapp_base_submissions : Counter.t = ()
 
   let zkapp_proof_updates : Counter.t = ()
 
@@ -336,10 +366,6 @@ module Pipe = struct
     let transition_frontier_valid_transitions : Counter.t = ()
 
     let transition_frontier_primary_transitions : Counter.t = ()
-
-    let router_transition_frontier_controller : Counter.t = ()
-
-    let router_bootstrap_controller : Counter.t = ()
 
     let router_verified_transitions : Counter.t = ()
 

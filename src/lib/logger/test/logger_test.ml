@@ -1,6 +1,6 @@
 open Core
 
-let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
+let test_dumb_logrotate_rotates_logs_when_expected () =
   let max_size = 1024 * 2 (* 2KB *) in
   let num_rotate = 1 in
   let logger = Logger.create () ~id:"test" in
@@ -16,14 +16,15 @@ let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "test" ;
     let curr_size = get_size "mina.log" in
     if curr_size < last_size then (
-      assert rotation_expected ;
-      assert (exists "mina.log.0") ;
-      assert (get_size "mina.log.0" = last_size) ;
+      Alcotest.(check bool) "rotation expected" true rotation_expected ;
+      Alcotest.(check bool) "mina.log.0 exists" true (exists "mina.log.0") ;
+      Alcotest.(check int)
+        "mina.log.0 size equals last_size" last_size (get_size "mina.log.0") ;
       if rotations <= 2 then
         run_test ~last_size:curr_size ~rotations:(rotations + 1)
           ~rotation_expected:false )
     else (
-      assert (not rotation_expected) ;
+      Alcotest.(check bool) "rotation not expected" false rotation_expected ;
       run_test ~last_size:curr_size ~rotations
         ~rotation_expected:(curr_size >= max_size) )
   in
@@ -38,3 +39,12 @@ let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
   with exn ->
     ignore (Unix.system ("rm -rf " ^ directory) : Unix.Exit_or_signal.t) ;
     raise exn
+
+let () =
+  let open Alcotest in
+  run "Logger"
+    [ ( "dumb_logrotate"
+      , [ test_case "rotates logs when expected" `Quick
+            test_dumb_logrotate_rotates_logs_when_expected
+        ] )
+    ]

@@ -32,7 +32,7 @@
   result
   sexplib0
   ;; local libraries
-  bounded_types
+  mina_stdlib
   kimchi_pasta_snarky_backend
   mina_wire_types
   ppx_version.runtime

@@ -1076,7 +1076,7 @@ end = struct
     every ~stop (Time.Span.of_sec 30.) (fun () ->
         [%log' debug t.logger]
           ~metadata:[ ("jobs", to_yojson t) ]
-          "Downloader jobs" ) ;
+          "Downloader $jobs" ) ;
     refresh_peers t peers ;
     t
 

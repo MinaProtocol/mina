@@ -13,7 +13,7 @@
   ;; local libraries
   network_peer
   ppx_version.runtime
-  bounded_types)
+  mina_stdlib)
  (inline_tests
   (flags -verbose -show-counts))
  (instrumentation

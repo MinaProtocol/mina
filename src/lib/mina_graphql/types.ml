@@ -3,6 +3,7 @@ open Async
 open Mina_base
 open Mina_transaction
 module Ledger = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Root
 open Signature_lib
 open Currency
 open Schema
@@ -270,7 +271,8 @@ module DaemonStatus = struct
              ~rpc_timings:(id ~typ:(non_null rpc_timings))
              ~external_transition_latency:h ~accepted_transition_local_latency:h
              ~accepted_transition_remote_latency:h
-             ~snark_worker_transition_time:h ~snark_worker_merge_time:h )
+             ~snark_worker_zkapp_transition_time:h
+             ~snark_worker_nonzkapp_transition_time:h ~snark_worker_merge_time:h )
 
   let consensus_configuration : (_, Consensus.Configuration.t option) typ =
     obj "ConsensusConfiguration" ~fields:(fun _ ->
@@ -1494,11 +1496,14 @@ module AccountObj = struct
                  let account_id = account_id account in
                  match%bind Mina_lib.staking_ledger mina with
                  | Genesis_epoch_ledger staking_ledger -> (
+                     let staking_ledger_inner =
+                       Lazy.force @@ Genesis_ledger.Packed.t staking_ledger
+                     in
                      match
                        let open Option.Let_syntax in
                        account_id
-                       |> Ledger.location_of_account staking_ledger
-                       >>= Ledger.get staking_ledger
+                       |> Ledger.location_of_account staking_ledger_inner
+                       >>= Ledger.get staking_ledger_inner
                      with
                      | Some account ->
                          let%bind delegate_key = account.delegate in
@@ -1509,14 +1514,15 @@ module AccountObj = struct
                             genesis ledger. The account was not present in the \
                             ledger." ;
                          None )
-                 | Ledger_db staking_ledger -> (
+                 | Ledger_root staking_ledger -> (
+                     let casted = Root_ledger.as_unmasked staking_ledger in
                      try
                        let index =
-                         Ledger.Db.index_of_account_exn staking_ledger
+                         Ledger.Any_ledger.M.index_of_account_exn casted
                            account_id
                        in
                        let account =
-                         Ledger.Db.get_at_index_exn staking_ledger index
+                         Ledger.Any_ledger.M.get_at_index_exn casted index
                        in
                        let%bind delegate_key = account.delegate in
                        Some (get_best_ledger_account_pk mina delegate_key)

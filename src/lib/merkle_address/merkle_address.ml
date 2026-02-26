@@ -45,7 +45,7 @@ module Binable_arg = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = int * Bounded_types.String.Stable.V1.t
+      type t = int * Mina_stdlib.Bounded_types.String.Stable.V1.t
 
       let to_latest = Fn.id
     end

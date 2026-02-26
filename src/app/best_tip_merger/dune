@@ -30,14 +30,13 @@
   cli_lib
   transition_frontier
   data_hash_lib
-  rose_tree
+  mina_stdlib
   consensus
   mina_wire_types
   pickles.backend
   snark_params
   pickles
-  kimchi_pasta
-  bounded_types)
+  kimchi_pasta)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

@@ -2,9 +2,27 @@
 
 open Core
 
-let compute_conf_dir conf_dir_opt =
+(** Compute the config directory to be used by the daemon. This method raises a
+    user error exception if the MINA_HARDFORK_STATE_DIR environment variable is
+    not equal to this config directory, if that environment variable is set. This
+    allows the hard fork dispatcher to use that variable to refer to the config
+    directory. *)
+let compute_conf_dir_exn conf_dir_opt =
   let home = Sys.home_directory () in
-  Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir_opt
+  let conf_dir =
+    Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir_opt
+  in
+  ( match Sys.getenv "MINA_HARDFORK_STATE_DIR" with
+  | Some hardfork_state_dir when not (String.equal conf_dir hardfork_state_dir)
+    ->
+      Mina_stdlib.Mina_user_error.raisef
+        "The daemon configuration directory (%s) does not match the \
+         MINA_HARDFORK_STATE_DIR environment variable (%s). Please ensure they \
+         are consistent."
+        conf_dir hardfork_state_dir ()
+  | _ ->
+      () ) ;
+  conf_dir
 
 (** Attempt to create the daemon lockfile in the [conf_dir], and otherwise throw
     an error (to signal shutdown) if this fails. The lockfile is acquired by a
@@ -32,7 +50,7 @@ let rec check_and_set_lockfile ~logger conf_dir =
       | Ok () ->
           [%log debug] "Created daemon lockfile $lockfile"
             ~metadata:[ ("lockfile", `String lockfile) ] ;
-          Exit_handlers.register_async_shutdown_handler ~logger
+          Mina_stdlib_unix.Exit_handlers.register_async_shutdown_handler ~logger
             ~description:"Remove daemon lockfile" (fun () ->
               match%bind Sys.file_exists lockfile with
               | `Yes ->
@@ -52,7 +70,7 @@ let rec check_and_set_lockfile ~logger conf_dir =
                 let%bind pid =
                   let rm_and_raise () =
                     Core.Unix.unlink lockfile ;
-                    Mina_user_error.raise
+                    Mina_stdlib.Mina_user_error.raise
                       "Invalid format in lockfile (removing it)"
                   in
                   match%map Reader.read_line reader with
@@ -74,7 +92,7 @@ let rec check_and_set_lockfile ~logger conf_dir =
                     (* can happen when running in Docker *)
                     return ()
                   else
-                    Mina_user_error.raisef
+                    Mina_stdlib.Mina_user_error.raisef
                       "A daemon (process id %d) is already running with the \
                        current configuration directory (%s)"
                       (Pid.to_int pid) conf_dir

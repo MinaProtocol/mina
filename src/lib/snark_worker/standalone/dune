@@ -1,7 +1,9 @@
 (executable
  (name run_snark_worker)
+ (package mina_snark_worker)
+ (public_name mina-standalone-snark-worker)
  (libraries
-  ;; opam libraries 
+  ;; opam libraries
   async
   async.async_command
   async_kernel

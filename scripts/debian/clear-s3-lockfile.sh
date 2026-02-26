@@ -1,7 +1,7 @@
 #!/bin/bash
 
-MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=unstable}
-MINA_DEB_RELEASE=${MINA_DEB_RELEASE:=main}
+MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=bullseye}
+MINA_DEB_RELEASE=${MINA_DEB_RELEASE:=unstable}
 MINA_DEB_BUCKET=${MINA_DEB_BUCKET:=packages.o1test.net}
 
 S3_LOCKFILE_DATE="$(aws s3 ls s3://${MINA_DEB_BUCKET}/dists/${MINA_DEB_CODENAME}/${MINA_DEB_RELEASE}/binary-/lockfile | awk '{print $1 " " $2}')"
@@ -14,7 +14,7 @@ fi
 S3_LOCKFILE_SECONDS=$(date -d "$S3_LOCKFILE_DATE" +%s)
 NOW_SECONDS=$(date +%s)
 TIME_DIFF=$(($NOW_SECONDS - $S3_LOCKFILE_SECONDS))
-if [[ $TIME_DIFF > 300 ]]; then
+if [[ $TIME_DIFF -gt 300 ]]; then
     echo "Lockfile has been held for > 5 mins. The deb-s3 instance is likely to have died. Deleting lockfile.."
     aws s3 rm s3://${MINA_DEB_BUCKET}/dists/${MINA_DEB_CODENAME}/${MINA_DEB_RELEASE}/binary-/lockfile
     echo "Lockfile deleted"

@@ -2,13 +2,9 @@
 
 set -eo pipefail
 
-# Don't prompt for answers during apt-get install
-export DEBIAN_FRONTEND=noninteractive
+buildkite/scripts/debian/update.sh --verbose
 
-sudo apt-get update
-sudo apt-get install -y git apt-transport-https ca-certificates tzdata curl
-
-TESTNET_NAME="berkeley"
+TESTNET_NAME="testnet-generic"
 
 git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh

@@ -20,7 +20,7 @@
   pickles
   kimchi_pasta
   kimchi_pasta.basic
-  bounded_types
+  mina_stdlib
   random_oracle
   mina_runtime_config
   transaction_witness

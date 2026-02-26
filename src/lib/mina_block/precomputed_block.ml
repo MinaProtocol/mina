@@ -100,7 +100,7 @@ end]
 
 let of_block ~logger
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~scheduled_time ~staged_ledger block_with_hash =
+    ~scheduled_time ~staged_ledger ~accounts_created block_with_hash =
   let ledger = Staged_ledger.ledger staged_ledger in
   let block = With_hash.data block_with_hash in
   let state_hash =
@@ -145,13 +145,7 @@ let of_block ~logger
       ] ;
   let accounts_created =
     let account_creation_fee = constraint_constants.account_creation_fee in
-    let previous_block_state_hash =
-      Mina_state.Protocol_state.previous_state_hash
-        (Header.protocol_state header)
-    in
-    List.map
-      (Staged_ledger.latest_block_accounts_created staged_ledger
-         ~previous_block_state_hash ) ~f:(fun acct_id ->
+    List.map accounts_created ~f:(fun acct_id ->
         (acct_id, account_creation_fee) )
   in
   let tokens_used =

@@ -446,14 +446,14 @@ struct
                 invalid "invalid key"
             | Some _ -> (
                 match%bind Batcher.Snark_pool.verify t.batcher proof_env with
-                | Ok true ->
+                | Ok () ->
                     Deferred.Result.return ()
-                | Ok false ->
+                | Error (`Invalid invalid) ->
+                    let invalid_err = Verifier.invalid_to_error invalid in
                     (* if this proof is in the set of invalid proofs*)
-                    let e = Error.of_string "Invalid proof" in
-                    let%bind () = log e in
-                    invalid "invalid proof"
-                | Error e ->
+                    let%map () = log invalid_err in
+                    Error (Invalid invalid_err)
+                | Error (`Crash e) ->
                     (* Verifier crashed or other errors at our end. Don't punish the peer*)
                     let%map () = log ~punish:false e in
                     Error (Failure e) )

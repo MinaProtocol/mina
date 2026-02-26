@@ -220,7 +220,7 @@ let fuzz_vrf_round ~stakers ~base_chains =
   Deferred.List.bind base_chains ~f:(fun base ->
     let all_possible_chains = Vrf_distribution.compute_all_possible_chains vrf_dist ~base in
     let chains_to_traverse = limit_chains_to_traverse all_possible_chains in
-    Rose_tree.Deferred.fold_to_leaves_and_save all_possible_chains ~init:base ~f:(fun pred pending_block ->
+    Mina_stdlib.Rose_tree.Deferred.fold_to_leaves_and_save all_possible_chains ~init:base ~f:(fun pred pending_block ->
       let blocks = generate_blocks pending_block in
       let%map () = Deferred.List.iter blocks ~f:check_block in
       blocks))

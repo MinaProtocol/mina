@@ -9,6 +9,7 @@ module Poly : sig
         ; proof : 'proof
         ; elapsed : Mina_stdlib.Time.Span.Stable.V1.t
         }
+      [@@deriving to_yojson]
     end
   end]
 
@@ -28,8 +29,3 @@ module Stable : sig
 end]
 
 type t = (Single_spec.t, Ledger_proof.Cached.t) Poly.t
-
-val read_all_proofs_from_disk : t -> Stable.Latest.t
-
-val write_all_proofs_to_disk :
-  proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t

@@ -6,9 +6,9 @@ let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
-
 let PipelineTag = ../../Pipeline/Tag.dhall
+
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
@@ -18,30 +18,45 @@ let Size = ../../Command/Size.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let Profiles = ../../Constants/Profiles.dhall
+
+let DockerRepo = ../../Constants/DockerRepo.dhall
+
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
+let Benchmarks = ../../Constants/Benchmarks.dhall
+
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
+let B/If = B.definitions/commandStep/properties/if/Type
 
 let Spec =
       { Type =
           { dockerType : Dockers.Type
           , network : Network.Type
-          , mode : PipelineMode.Type
           , additionalDirtyWhen : List S.Type
           , softFail : B/SoftFail
           , timeout : Natural
+          , profile : Profiles.Type
+          , scope : List PipelineScope.Type
+          , repo : DockerRepo.Type
+          , if_ : B/If
           }
       , default =
           { dockerType = Dockers.Type.Bullseye
           , network = Network.Type.Devnet
-          , mode = PipelineMode.Type.Stable
           , additionalDirtyWhen = [] : List S.Type
           , softFail = B/SoftFail.Boolean False
-          , timeout = 1000
+          , timeout = 1500
+          , profile = Profiles.Type.Devnet
+          , scope = PipelineScope.Full
+          , repo = DockerRepo.Type.InternalEurope
+          , if_ =
+              "build.pull_request.base_branch != \"develop\" && build.branch != \"develop\""
           }
       }
 
@@ -51,27 +66,35 @@ let command
       ->  Command.build
             Command.Config::{
             , commands =
-              [ Cmd.chain
-                  [ "export MINA_DEB_CODENAME=${Dockers.lowerName
-                                                  spec.dockerType}"
-                  , "source ./buildkite/scripts/export-git-env-vars.sh"
-                  , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
-                                                                         spec.network} --tag \\\${MINA_DOCKER_TAG} --timeout ${Natural/show
-                                                                                                                                 spec.timeout}"
+                  [ Cmd.chain
+                      [ "export MINA_DEB_CODENAME=${Dockers.lowerName
+                                                      spec.dockerType}"
+                      , "source ./buildkite/scripts/export-git-env-vars.sh"
+                      , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
+                                                                             spec.network} --tag \\\${MINA_DOCKER_TAG} --timeout ${Natural/show
+                                                                                                                                     spec.timeout} --repo ${DockerRepo.show
+                                                                                                                                                              spec.repo} --run-compatibility-test develop --run-load-test --branch \\\${BUILDKITE_BRANCH} --commit \\\${BUILDKITE_COMMIT} --metrics-mode --perf-output-file /workdir/rosetta.perf"
+                      ]
                   ]
-              ]
+                # RunInToolchain.runInToolchain
+                    (Benchmarks.toEnvList Benchmarks.Type::{=})
+                    "./buildkite/scripts/bench/send.sh"
             , label =
                 "Rosetta ${Network.lowerName spec.network} connectivity test "
             , key =
                 "rosetta-${Network.lowerName spec.network}-connectivity-test"
             , target = Size.XLarge
+            , artifact_paths = [ S.contains "test_output/artifacts/**/*" ]
             , soft_fail = Some spec.softFail
+            , if_ = Some spec.if_
             , depends_on =
                 Dockers.dependsOn
-                  spec.dockerType
-                  spec.network
-                  Profiles.Type.Standard
-                  Artifacts.Type.Rosetta
+                  Dockers.DepsSpec::{
+                  , codename = spec.dockerType
+                  , network = spec.network
+                  , artifact = Artifacts.Type.Rosetta
+                  , profile = spec.profile
+                  }
             }
 
 let pipeline
@@ -92,19 +115,19 @@ let pipeline
                       "buildkite/src/Command/Rosetta/Connectivity"
                       "dhall"
                   , S.exactly "scripts/tests/rosetta-connectivity" "sh"
-                  , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
                   , S.exactly
-                      "buildkite/scripts/rosetta-integration-tests-full"
+                      "buildkite/scripts/tests/rosetta-integration-tests"
                       "sh"
                   ]
                 # spec.additionalDirtyWhen
             , path = "Test"
             , name = "Rosetta${Network.capitalName spec.network}Connect"
-            , mode = spec.mode
+            , scope = spec.scope
             , tags =
               [ PipelineTag.Type.Long
               , PipelineTag.Type.Test
               , PipelineTag.Type.Stable
+              , PipelineTag.Type.Rosetta
               ]
             }
           , steps = [ command spec ]
