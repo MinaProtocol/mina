@@ -23,6 +23,11 @@ source buildkite/scripts/refresh_code.sh
 
 git fetch origin "${BRANCH}"
 
+CUR_BRANCH_HEAD="$(git rev-parse HEAD)"
+MERGING_BRANCH_HEAD="$(git rev-parse origin/"${BRANCH}")"
+
+echo "Current branch HEAD: ${CUR_BRANCH_HEAD}, merging branch HEAD: ${MERGING_BRANCH_HEAD}"
+
 # Check mergeability. We use flags so that
 # * `--no-commit` stops us from updating the index with a merge commit,
 # * `--no-ff` stops us from updating the index to the HEAD, if the merge is a
