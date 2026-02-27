@@ -146,22 +146,23 @@ module ExportSnarkedLedger = struct
           Deferred.return false
     in
     if not bootstrap_ok then
-      Deferred.Or_error.return
-        (Mina_automation_fixture.Intf.Failed "Daemon failed to bootstrap")
+      Deferred.return
+        (Mina_automation_fixture.Intf.Failed
+           (Error.of_string "Daemon failed to bootstrap") )
     else
       let%bind output =
         Daemon.Client.ledger_export_snarked_ledger process.client
       in
-      let%bind () = Daemon.Client.stop_daemon process.client in
-      Deferred.Or_error.return
-        ( if contain_log_output output then
-          Mina_automation_fixture.Intf.Failed "output contains log"
-        else
-          match parse_accounts output with
-          | Ok _ ->
-              Passed
-          | Error err ->
-              Failed (Printf.sprintf "invalid JSON output: %s" err) )
+      let%map () = Daemon.Client.stop_daemon process.client in
+      if contain_log_output output then
+        Mina_automation_fixture.Intf.Failed
+          (Error.of_string "output contains log")
+      else
+        match parse_accounts output with
+        | Ok _ ->
+            Passed
+        | Error err ->
+            Failed (Error.createf "invalid JSON output: %s" err)
 end
 
 module AdvancedPrintSignatureKind = struct
@@ -470,9 +471,10 @@ module AutoHardforkConfigGeneration = struct
     let%bind.Deferred result = poll_for_activated () in
     match result with
     | `Timeout ->
-        Deferred.Or_error.return
+        Deferred.return
           (Mina_automation_fixture.Intf.Failed
-             "Hardfork config was not generated within timeout" )
+             (Error.of_string "Hardfork config was not generated within timeout")
+          )
     | `Success -> (
         (* Wait for daemon to auto-shutdown after generating hardfork config *)
         match%bind.Deferred
@@ -480,29 +482,29 @@ module AutoHardforkConfigGeneration = struct
             (Process.wait process.process)
         with
         | `Timeout ->
-            Deferred.Or_error.return
+            Deferred.return
               (Mina_automation_fixture.Intf.Failed
-                 "Daemon did not shut down within 5 minutes after generating \
-                  hardfork config" )
+                 (Error.of_string
+                    "Daemon did not shut down within 5 minutes after \
+                     generating hardfork config" ) )
         | `Result (Ok ()) -> (
             (* Daemon exited cleanly with code 0, validate generated config *)
-            match%bind.Deferred
+            match%map.Deferred
               validate_generated_config ~conf_dir ~old_genesis_timestamp
             with
             | Ok () ->
-                Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+                Mina_automation_fixture.Intf.Passed
             | Error err ->
-                Deferred.Or_error.return
-                  (Mina_automation_fixture.Intf.Failed (Error.to_string_hum err))
-            )
+                Mina_automation_fixture.Intf.Failed err )
         | `Result (Error (`Exit_non_zero exit_code)) ->
-            Deferred.Or_error.return
+            Deferred.return
               (Mina_automation_fixture.Intf.Failed
-                 (sprintf "Daemon exited with non-zero status: %d" exit_code) )
+                 (Error.createf "Daemon exited with non-zero status: %d"
+                    exit_code ) )
         | `Result (Error (`Signal signal)) ->
-            Deferred.Or_error.return
+            Deferred.return
               (Mina_automation_fixture.Intf.Failed
-                 (sprintf "Daemon terminated by signal: %s"
+                 (Error.createf "Daemon terminated by signal: %s"
                     (Core.Signal.to_string signal) ) ) )
 end
 
@@ -526,20 +528,19 @@ module HardforkStateDirMismatch = struct
         (Process.wait process.process)
     with
     | `Timeout ->
-        let%bind _ = Daemon.Process.force_kill process in
-        Deferred.Or_error.return
-          (Mina_automation_fixture.Intf.Failed
-             "Daemon did not exit within 5 seconds" )
+        let%map _ = Daemon.Process.force_kill process in
+        Mina_automation_fixture.Intf.Failed
+          (Error.of_string "Daemon did not exit within 5 seconds")
     | `Result (Ok ()) ->
-        Deferred.Or_error.return
+        Deferred.return
           (Mina_automation_fixture.Intf.Failed
-             "Daemon exited with code 0, expected non-zero" )
+             (Error.of_string "Daemon exited with code 0, expected non-zero") )
     | `Result (Error (`Exit_non_zero _)) ->
-        Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+        Deferred.return Mina_automation_fixture.Intf.Passed
     | `Result (Error (`Signal signal)) ->
-        Deferred.Or_error.return
+        Deferred.return
           (Mina_automation_fixture.Intf.Failed
-             (sprintf "Daemon terminated by signal: %s"
+             (Error.createf "Daemon terminated by signal: %s"
                 (Core.Signal.to_string signal) ) )
 end
 

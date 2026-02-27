@@ -123,26 +123,29 @@ let test_case (test_data : t) =
   in
   let log_file = output ^/ "precomputed_blocks_test.log" in
   Archive.Process.start_logging test_data.archive ~log_file ;
-  let%bind.Deferred.Or_error () = Archive.wait_until_ready ~log_file in
-  let%bind () =
-    Daemon.archive_blocks_from_files daemon.executor
-      ~archive_address:test_data.archive.config.server_port ~format:`Precomputed
-      precomputed_blocks
-  in
+  match%bind Archive.wait_until_ready ~log_file with
+  | Ok () ->
+      let%bind () =
+        Daemon.archive_blocks_from_files daemon.executor
+          ~archive_address:test_data.archive.config.server_port
+          ~format:`Precomputed precomputed_blocks
+      in
 
-  let%bind () =
-    assert_archived_blocks ~archive_uri
-      ~expected:(List.length precomputed_blocks)
-  in
+      let%bind () =
+        assert_archived_blocks ~archive_uri
+          ~expected:(List.length precomputed_blocks)
+      in
 
-  let%bind () =
-    assert_replayer_run_against_last_block
-      ~replayer_input_file_path:
-        (Network_data.replayer_input_file_path test_data.network_data)
-      archive_uri test_data.temp_dir
-  in
+      let%bind () =
+        assert_replayer_run_against_last_block
+          ~replayer_input_file_path:
+            (Network_data.replayer_input_file_path test_data.network_data)
+          archive_uri test_data.temp_dir
+      in
 
-  let%map perf_data = extract_perf_metrics log_file in
-  perf_metrics_to_yojson perf_data |> Yojson.to_file "archive.perf" ;
+      let%map perf_data = extract_perf_metrics log_file in
+      perf_metrics_to_yojson perf_data |> Yojson.to_file "archive.perf" ;
 
-  Mina_automation_fixture.Intf.Passed
+      Mina_automation_fixture.Intf.Passed
+  | Error e ->
+      Deferred.return (Mina_automation_fixture.Intf.Failed e)
