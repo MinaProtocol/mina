@@ -10,17 +10,7 @@ ARG INFLUXDB_CLI_VERSION=2.7.5
 ARG SHELLCHECK_VERSION=0.11.0
 ARG HADOLINT_VERSION=2.12.0
 ARG GCLOUD_VERSION=476.0.0
-ARG TARGETPLATFORM
 ARG TARGETARCH
-ARG BUILDPLATFORM
-
-# Canonical naming convention
-# : aarch64/x86_64
-ARG CANONICAL_ARCH
-
-# Debian naming convention
-# : arm64/x86_64
-ARG DEBIAN_ARCH
 
 USER root
 
@@ -67,7 +57,12 @@ RUN curl -L -o influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.
     && rm -rf influx_dir
 
 # --- Docker Daemon
-RUN curl -sL https://download.docker.com/linux/static/stable/${CANONICAL_ARCH}/docker-${DOCKER_VERSION}.tgz \
+RUN case "${TARGETARCH}" in \
+        "amd64") DOCKER_ARCH="x86_64" ;; \
+        "arm64") DOCKER_ARCH="aarch64" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    curl -sL https://download.docker.com/linux/static/stable/${DOCKER_ARCH}/docker-${DOCKER_VERSION}.tgz \
     | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=-
 
 # --- Google Cloud tools
@@ -93,18 +88,33 @@ RUN curl -sL https://deb.nodesource.com/setup_24.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Hadolint
-RUN curl -sL https://github.com/hadolint/hadolint/releases/download/v$HADOLINT_VERSION/hadolint-Linux-${DEBIAN_ARCH} \
+RUN case "${TARGETARCH}" in \
+        "amd64") HADOLINT_ARCH="x86_64" ;; \
+        "arm64") HADOLINT_ARCH="arm64" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    curl -sL "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-${HADOLINT_ARCH}" \
     -o /usr/bin/hadolint \
     && chmod +x /usr/bin/hadolint
 
 # --- Shellcheck
-RUN curl -sL https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHECK_VERSION/shellcheck-v$SHELLCHECK_VERSION.linux.${CANONICAL_ARCH}.tar.xz \
+RUN case "${TARGETARCH}" in \
+        "amd64") SHELLCHECK_ARCH="x86_64" ;; \
+        "arm64") SHELLCHECK_ARCH="aarch64" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    curl -sL "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.${SHELLCHECK_ARCH}.tar.xz" \
     | tar --extract --file=- --xz --strip-components=1 --directory=/usr/bin shellcheck-v$SHELLCHECK_VERSION/shellcheck
 
 # --- AWS
-RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-${CANONICAL_ARCH}.zip" -o "awscliv2.zip" \
-  && unzip awscliv2.zip \
-  && ./aws/install \
-  && rm -rf awscliv2.zip aws
+RUN case "${TARGETARCH}" in \
+        "amd64") AWS_ARCH="x86_64" ;; \
+        "arm64") AWS_ARCH="aarch64" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-${AWS_ARCH}.zip" -o "awscliv2.zip" \
+    && unzip awscliv2.zip \
+    && ./aws/install \
+    && rm -rf awscliv2.zip aws
 
 USER opam
