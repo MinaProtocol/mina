@@ -266,8 +266,6 @@ copy_common_daemon_configs() {
   # We want to copy the genesis ledger for the network ($1) and in case of
   # devnet/mainnet also copy the magic config (config_$GITHASH_CONFIG.json).
   # This config is automatically picked up by the daemon on startup.
-  # In case of devnet(mainnet)-generic we only copy the devnet ledger without magic one
-  # as devnet-generic should be devnet agnostic.
   case "${NETWORK_NAME}" in
     devnet|mainnet)
       cp ../genesis_ledgers/"${NETWORK_NAME}".json \
