@@ -222,6 +222,17 @@ val all_work_pairs :
      list
      Or_error.t
 
+(** Proof bundles with full specs for only the work needed by the next diff *)
+val work_pairs_for_new_diff :
+     t
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> ( Transaction_witness.t
+     , Ledger_proof.Cached.t )
+     Snark_work_lib.Work.Single.Spec.t
+     One_or_two.t
+     list
+     Or_error.t
+
 val write_all_proofs_to_disk :
      signature_kind:Mina_signature_kind.t
   -> proof_cache_db:Proof_cache_tag.cache_db

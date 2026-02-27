@@ -1348,6 +1348,20 @@ let all_work_pairs t
       | Error e ->
           Stop (Error e) )
 
+let work_pairs_for_new_diff t ~get_state =
+  let work_list = Parallel_scan.jobs_for_next_update t.scan_state in
+  List.fold_until work_list ~init:[]
+    ~finish:(fun lst -> Ok lst)
+    ~f:(fun acc jobs ->
+      let specs_list =
+        single_spec_one_or_twos_rev_of_job_list ~get_state jobs
+      in
+      match specs_list with
+      | Ok list ->
+          Continue (acc @ List.rev list)
+      | Error e ->
+          Stop (Error e) )
+
 let update_metrics t = Parallel_scan.update_metrics t.scan_state
 
 let fill_work_and_enqueue_transactions t ~logger transactions work =

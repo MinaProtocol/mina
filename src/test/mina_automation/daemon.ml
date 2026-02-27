@@ -163,21 +163,22 @@ module Config = struct
     ; genesis_ledger : Genesis_ledger.t
     }
 
-  let create ?(client_port = 8031) ?(rest_port = 3085) ~(dirs : ConfigDirs.t)
-      ~(config : Test_config.t) () =
+  let create ?(client_port = 8031) ?(rest_port = 3085) ?(write_config = true)
+      ~(dirs : ConfigDirs.t) ~(config : Test_config.t) () =
     let genesis_ledger = Genesis_ledger.create config.genesis_ledger in
     let runtime_config =
       Runtime_config_builder.create ~test_config:config ~genesis_ledger
     in
 
-    Yojson.Safe.to_file
-      (dirs.conf ^/ "daemon.json")
-      (Runtime_config.to_yojson runtime_config) ;
+    if write_config then
+      Yojson.Safe.to_file
+        (dirs.conf ^/ "daemon.json")
+        (Runtime_config.to_yojson runtime_config) ;
 
     { client_port; rest_port; dirs; config; runtime_config; genesis_ledger }
 
-  let default () =
-    create ~dirs:ConfigDirs.default
+  let default ?write_config () =
+    create ?write_config ~dirs:ConfigDirs.default
       ~config:(Test_config.default ~constants:Test_config.default_constants)
       ()
 
@@ -237,7 +238,8 @@ let default () = { config = Config.default (); executor = Executor.AutoDetect }
 
 let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
-let start ?hardfork_handling ?block_producer_key ?env t =
+let start ?hardfork_handling ?block_producer_key ?config_file ?run_snark_worker
+    ?snark_worker_fee ?precomputed_blocks_file ?env t =
   let open Deferred.Let_syntax in
   let base_args =
     [ "daemon"
@@ -267,6 +269,10 @@ let start ?hardfork_handling ?block_producer_key ?env t =
     base_args
     @ opt_arg "--hardfork-handling" hardfork_handling
     @ opt_arg "--block-producer-key" block_producer_key
+    @ opt_arg "--config-file" config_file
+    @ opt_arg "--run-snark-worker" run_snark_worker
+    @ opt_arg "--snark-worker-fee" snark_worker_fee
+    @ opt_arg "--precomputed-blocks-file" precomputed_blocks_file
   in
   [%log debug] "Starting daemon" ;
 
