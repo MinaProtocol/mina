@@ -50,8 +50,8 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
-MINA_DEB_NAME="mina-testnet-generic"
-MINA_DEVNET_DEB_NAME="mina-devnet"
+MINA_DEB_NAME="mina-devnet"
+MINA_ARCHIVE_DEB_NAME="mina-archive-devnet"
 DUNE_PROFILE="${DUNE_PROFILE:-dev}"
 DEB_SUFFIX=""
 
@@ -64,7 +64,7 @@ case "${DUNE_PROFILE}" in
     _SUFFIX=${DUNE_PROFILE//_/-}
     DEB_SUFFIX="${_SUFFIX}"
     MINA_DEB_NAME="${MINA_DEB_NAME}-${DEB_SUFFIX}"
-    MINA_DEVNET_DEB_NAME="${MINA_DEVNET_DEB_NAME}-${DEB_SUFFIX}"
+    MINA_ARCHIVE_DEB_NAME="${MINA_ARCHIVE_DEB_NAME}-${DEB_SUFFIX}"
     ;;
 esac
 
@@ -73,6 +73,7 @@ esac
 if [[ -v DUNE_INSTRUMENT_WITH ]]; then
     INSTRUMENTED_SUFFIX=instrumented
     MINA_DEB_NAME="${MINA_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
+    MINA_ARCHIVE_DEB_NAME="${MINA_ARCHIVE_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
     DEB_SUFFIX="${DEB_SUFFIX}-${INSTRUMENTED_SUFFIX}"
 fi
 
@@ -265,16 +266,11 @@ copy_common_daemon_configs() {
   # We want to copy the genesis ledger for the network ($1) and in case of
   # devnet/mainnet also copy the magic config (config_$GITHASH_CONFIG.json).
   # This config is automatically picked up by the daemon on startup.
-  # In case of testnet-generic we only copy the devnet ledger without magic one
-  # as testnet-generic should be testnet agnostic.
   case "${NETWORK_NAME}" in
     devnet|mainnet|mesa)
       cp ../genesis_ledgers/"${NETWORK_NAME}".json \
         "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
       cp ../genesis_ledgers/${NETWORK_NAME}.json "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
-      ;;
-    testnet-generic)
-      cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
       ;;
     *)
       echo "Unknown network name provided: ${NETWORK_NAME}"; exit 1
@@ -477,29 +473,6 @@ build_rosetta_devnet_deb() {
 }
 ## END ROSETTA DEVNET PACKAGE ##
 
-## ROSETTA GENERIC TESTNET PACKAGE ##
-
-#
-# Builds mina-rosetta-testnet-generic package for Generic testnet Rosetta API
-#
-# Output: mina-rosetta-testnet-generic_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}
-#
-# Rosetta API implementation for testnet-generic testnet with testnet signature binaries.
-#
-build_rosetta_testnet_generic_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building testnet-generic rosetta deb"
-
-  create_control_file mina-rosetta-testnet-generic "${SHARED_DEPS}" \
-    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
-
-  copy_common_rosetta_configs "testnet"
-
-  build_deb mina-rosetta-testnet-generic
-}
-## END GENERIC TESTNET PACKAGE ##
 
 ## ROSETTA MESA PACKAGE ##
 
@@ -571,8 +544,8 @@ build_daemon_mainnet_config_deb() {
 #
 # Builds devnet daemon package with profile-aware naming
 #
-# Output: ${MINA_DEVNET_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Where MINA_DEVNET_DEB_NAME can be:
+# Output: ${MINA_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Where MINA_DEB_NAME can be:
 #   - "mina-devnet" (default)
 #   - "mina-devnet-lightnet" (if DUNE_PROFILE=lightnet)
 #   - "mina-devnet-instrumented" (if DUNE_INSTRUMENT_WITH is set)
@@ -588,14 +561,14 @@ build_daemon_devnet_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building testnet signatures deb without keys:"
 
-  create_control_file "${MINA_DEVNET_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-devnet-config (>=${MINA_DEB_VERSION})" \
-    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}" "${MINA_DEVNET_DEB_NAME} (<< ${MINA_DEB_VERSION})"
+  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-devnet-config (>=${MINA_DEB_VERSION})" \
+    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}" "${MINA_DEB_NAME} (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_apps testnet
 
   copy_common_daemon_utils 'seed-lists/devnet_seeds.txt'
 
-  build_deb "${MINA_DEVNET_DEB_NAME}"
+  build_deb "${MINA_DEB_NAME}"
 }
 
 build_daemon_devnet_config_deb() {
@@ -739,44 +712,82 @@ build_daemon_mesa_prefork_deb() {
 }
 ## END DEVNET PREFORK PACKAGE ##
 
-## TESTNET GENERIC PACKAGE ##
+## DEVNET GENERIC PACKAGE ##
 
 #
-# Builds Testnet Generic testnet daemon package with profile-aware naming
+# Builds Devnet Generic daemon package with profile-aware naming
 #
-# Output: ${MINA_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Where MINA_DEB_NAME can be:
-#   - "mina-testnet-generic" (default)
-#   - "mina-testnet-generic-lightnet" (if DUNE_PROFILE=lightnet)
-#   - "mina-testnet-generic-instrumented" (if DUNE_INSTRUMENT_WITH is set)
-#   - "mina-testnet-generic-lightnet-instrumented" (both conditions)
+# Output: ${MINA_GENERIC_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Where MINA_GENERIC_DEB_NAME can be:
+#   - "mina-devnet-generic" (default)
+#   - "mina-devnet-generic-lightnet" (if DUNE_PROFILE=lightnet)
+#   - "mina-devnet-generic-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#   - "mina-devnet-generic-lightnet-instrumented" (both conditions)
 #
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Testnet Generic testnet daemon with testnet signatures and without any configs (like ledgers etc.).
+# Devnet Generic daemon with testnet signatures and without any configs (like ledgers etc.).
 # Package name includes suffixes for different profiles.
 #
-build_daemon_testnet_generic_deb() {
+build_daemon_devnet_generic_deb() {
 
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Testnet Generic testnet signatures deb without keys:"
+  echo "--- Building Mina Devnet Generic testnet signatures deb without keys:"
 
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
+  local _suffix="${DEB_SUFFIX#-}"
+  MINA_GENERIC_DEB_NAME="mina-devnet-generic${_suffix:+-${_suffix}}"
+
+  create_control_file "${MINA_GENERIC_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Generic Testnet Network' \
     "${SUGGESTED_DEPS}" "mina-devnet (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_apps testnet
 
-  # copy devnet config just in case, but not as magic config, so it won't get picked up by default
-  # when starting the daemon
-  copy_common_daemon_configs testnet-generic
-
   copy_common_daemon_utils 'seed-lists/devnet_seeds.txt'
 
-  build_deb "${MINA_DEB_NAME}"
+  build_deb "${MINA_GENERIC_DEB_NAME}"
 
 }
-## END TESTNET GENERIC PACKAGE ##
+## END DEVNET GENERIC PACKAGE ##
+
+## MAINNET GENERIC PACKAGE ##
+
+#
+# Builds Mainnet Generic daemon package with profile-aware naming
+#
+# Output: ${MINA_GENERIC_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Where MINA_GENERIC_DEB_NAME can be:
+#   - "mina-mainnet-generic" (default)
+#   - "mina-mainnet-generic-lightnet" (if DUNE_PROFILE=lightnet)
+#   - "mina-mainnet-generic-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#   - "mina-mainnet-generic-lightnet-instrumented" (both conditions)
+#
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Mainnet Generic testnet daemon with testnet signatures and without any configs (like ledgers etc.).
+# Package name includes suffixes for different profiles.
+#
+build_daemon_mainnet_generic_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Mainnet Generic testnet signatures deb without keys:"
+
+  local _suffix="${DEB_SUFFIX#-}"
+  MINA_GENERIC_DEB_NAME="mina-mainnet-generic${_suffix:+-${_suffix}}"
+
+  create_control_file "${MINA_GENERIC_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon for the Generic Mainnet Network' \
+    "${SUGGESTED_DEPS}" "mina-mainnet (<< ${MINA_DEB_VERSION})"
+
+  copy_common_daemon_apps mainnet
+
+  copy_common_daemon_utils 'seed-lists/mainnet_seeds.txt'
+
+  build_deb "${MINA_GENERIC_DEB_NAME}"
+
+}
+
+## END MAINNET GENERIC PACKAGE ##
 
 copy_common_daemon_hardfork_configs() {
   local NETWORK_NAME="${1}"
@@ -827,34 +838,6 @@ build_daemon_devnet_hardfork_config_deb() {
 }
 
 ## END DEVNET HARDFORK PACKAGE ##
-
-## TESTNET GENERIC  HARDFORK PACKAGE ##
-
-#
-# Builds mina-testnet-generic-hardfork package for Testnet Generic hardfork
-#
-# Output: mina-testnet-generic-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Testnet Generic daemon package with hardfork-specific runtime config and ledgers.
-# Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
-#
-build_daemon_testnet_generic_hardfork_config_deb() {
-  local __deb_name=mina-testnet-generic-config
-
-  echo "------------------------------------------------------------"
-  echo "--- Building hardfork config testnet-generic signatures deb without keys:"
-
-  create_control_file "${__deb_name}" "" \
-    'Mina Protocol Client and Daemon for the Berkeley Network' "${SUGGESTED_DEPS}" \
-    "mina-testnet-generic (<< ${MINA_DEB_VERSION})"
-
-  copy_common_daemon_hardfork_configs berkeley
-
-  build_deb "${__deb_name}"
-}
-
-## END TESTNET GENERIC HARDFORK PACKAGE ##
 
 ## MAINNET HARDFORK PACKAGE ##
 
@@ -917,6 +900,8 @@ copy_common_archive_configs() {
     "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
   cp ./default/src/app/replayer/replayer.exe \
     "${BUILDDIR}/usr/local/bin/mina-replayer"
+  cp ./default/src/app/dump_slot_ledger/dump_slot_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-dump-slot-ledger"
 
   rsync -Huav ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/archive"
 
@@ -934,49 +919,17 @@ copy_common_archive_configs() {
 # Archive node package for devnet with all archive utilities and SQL scripts.
 #
 build_archive_devnet_deb () {
-  ARCHIVE_DEB=mina-archive-devnet
 
   echo "------------------------------------------------------------"
   echo "--- Building archive devnet deb"
 
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
+  create_control_file "$MINA_ARCHIVE_DEB_NAME" "${ARCHIVE_DEPS}" 'Mina Archive Process
  Compatible with Mina Daemon'
 
-  copy_common_archive_configs "$ARCHIVE_DEB"
+  copy_common_archive_configs "$MINA_ARCHIVE_DEB_NAME"
 
 }
 ## END ARCHIVE DEVNET PACKAGE ##
-
-## ARCHIVE GENERIC TESTNET PACKAGE ##
-
-#
-# Builds Generic testnet archive package with profile-aware naming
-#
-# Output: mina-archive-testnet-generic${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Where DEB_SUFFIX can be:
-#   - "" (empty, default)
-#   - "-lightnet" (if DUNE_PROFILE=lightnet)
-#   - "-instrumented" (if DUNE_INSTRUMENT_WITH is set)
-#   - "-lightnet-instrumented" (both conditions)
-#
-# Dependencies: ${ARCHIVE_DEPS}
-#
-# Archive node package for Generic testnet with suffix-aware naming for different profiles.
-#
-build_archive_testnet_generic_deb () {
-  ARCHIVE_DEB=mina-archive-testnet-generic${DEB_SUFFIX}
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive testnet-generic deb"
-
-
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
-
-  copy_common_archive_configs "$ARCHIVE_DEB"
-
-}
-## END ARCHIVE BERKELEY PACKAGE ##
 
 ## ARCHIVE MESA PACKAGE ##
 

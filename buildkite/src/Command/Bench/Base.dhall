@@ -54,9 +54,7 @@ let Spec =
                   , build_flag = BuildFlags.Type.Instrumented
                   }
               # DebianVersions.dependsOn
-                  DebianVersions.DepsSpec::{
-                  , network = Network.Type.TestnetGeneric
-                  }
+                  DebianVersions.DepsSpec::{ network = Network.Type.Devnet }
           , additionalDirtyWhen = [] : List SelectFiles.Type
           , yellowThreshold = 0.1
           , redThreshold = 0.2
