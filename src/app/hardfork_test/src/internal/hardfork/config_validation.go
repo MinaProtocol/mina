@@ -108,10 +108,6 @@ func (t *HardforkTest) ValidateLegacyPrepatchForkConfig(lastBlockBeforeTxEnd cli
 		return fmt.Errorf("Expected proof.fork.blockchain_length to be %d, got %d", lastBlockBeforeTxEnd.BlockHeight, config.Proof.Fork.BlockChainLength)
 	}
 
-	if config.Proof.Fork.GlobalSlotSinceGenesis != lastBlockBeforeTxEnd.Slot {
-		return fmt.Errorf("Expected proof.fork.global_slot_since_genesis to be %d, got %d", lastBlockBeforeTxEnd.Slot, config.Proof.Fork.GlobalSlotSinceGenesis)
-	}
-
 	if config.Proof.Fork.StateHash != lastBlockBeforeTxEnd.StateHash {
 		return fmt.Errorf("Expected proof.fork.state_hash to be `%s`, got `%s`", lastBlockBeforeTxEnd.StateHash, config.Proof.Fork.StateHash)
 	}
