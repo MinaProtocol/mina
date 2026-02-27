@@ -947,6 +947,146 @@ let sponge_and_challenges_circuit (inputs : Impl.Field.t array) () =
   let _r_field = scalar (Import.Scalar_challenge.create r_actual) in
   ()
 
+(* Sub-circuit 7: combined_inner_product (Step 11)
+   Computes the combined inner product used in bulletproof verification:
+     CIP = sum_j xi^j f_j(zeta) + r * sum_j xi^j f_j(zetaw)
+   where f_j includes sg_evals (challenge polynomial evaluations), public input,
+   ft_eval, and all polynomial evaluations.
+
+   Input layout (129 fields):
+     0-1:     mask (2 booleans)
+     2-17:    prev_challenges[0] (16 fields)
+     18-33:   prev_challenges[1] (16 fields)
+     34:      zeta
+     35:      zetaw
+     36:      xi (already expanded to full field)
+     37:      r (already expanded to full field)
+     38:      ft_eval0 (precomputed from PlonK relation)
+     39:      ft_eval1
+     40:      public_input at zeta
+     41:      public_input at zetaw
+     42-84:   evals at zeta (43 fields: z, 6 selectors, 15 w, 15 coeff, 6 s)
+     85-127:  evals at zetaw (43 fields: same structure)
+     128:     claimed_cip (Type1 shifted value inner)
+*)
+let cip_circuit (inputs : Impl.Field.t array) () =
+  let open Pickles_types in
+  let open Kimchi_backend_common.Plonk_types in
+  let as_bool (x : Impl.Field.t) : Impl.Boolean.var =
+    Impl.Boolean.Unsafe.of_cvar x
+  in
+  let single x = [| x |] in
+  (* Parse inputs *)
+  let actual_width_mask =
+    Vector.[ as_bool inputs.(0); as_bool inputs.(1) ]
+  in
+  let prev_challenges =
+    Vector.[
+      Vector.init Nat.N16.n ~f:(fun j -> inputs.(2 + j)) ;
+      Vector.init Nat.N16.n ~f:(fun j -> inputs.(18 + j))
+    ]
+  in
+  let zeta = inputs.(34) in
+  let zetaw = inputs.(35) in
+  let xi = inputs.(36) in
+  let r = inputs.(37) in
+  let ft_eval0 = inputs.(38) in
+  let ft_eval1 = inputs.(39) in
+  let public_input_zeta = single inputs.(40) in
+  let public_input_zetaw = single inputs.(41) in
+  (* Build evals record for a 43-field block starting at base.
+     to_list order: z, gen_sel, pos_sel, comp_add_sel, mul_sel, emul_sel,
+     endo_scal_sel, 15 w, 15 coeff, 6 s *)
+  let evals_at base : (Impl.Field.t array, Impl.Boolean.var) Evals.In_circuit.t =
+    { w = Vector.init Nat.N15.n ~f:(fun j -> single inputs.(base + 7 + j))
+    ; coefficients = Vector.init Nat.N15.n ~f:(fun j -> single inputs.(base + 22 + j))
+    ; z = single inputs.(base)
+    ; s = Vector.init Nat.N6.n ~f:(fun j -> single inputs.(base + 37 + j))
+    ; generic_selector = single inputs.(base + 1)
+    ; poseidon_selector = single inputs.(base + 2)
+    ; complete_add_selector = single inputs.(base + 3)
+    ; mul_selector = single inputs.(base + 4)
+    ; emul_selector = single inputs.(base + 5)
+    ; endomul_scalar_selector = single inputs.(base + 6)
+    ; range_check0_selector = Opt.Nothing
+    ; range_check1_selector = Opt.Nothing
+    ; foreign_field_add_selector = Opt.Nothing
+    ; foreign_field_mul_selector = Opt.Nothing
+    ; xor_selector = Opt.Nothing
+    ; rot_selector = Opt.Nothing
+    ; lookup_aggregation = Opt.Nothing
+    ; lookup_table = Opt.Nothing
+    ; lookup_sorted = Vector.init Nat.N5.n ~f:(fun _ -> Opt.Nothing)
+    ; runtime_lookup_table = Opt.Nothing
+    ; runtime_lookup_table_selector = Opt.Nothing
+    ; xor_lookup_selector = Opt.Nothing
+    ; lookup_gate_lookup_selector = Opt.Nothing
+    ; range_check_lookup_selector = Opt.Nothing
+    ; foreign_field_mul_lookup_selector = Opt.Nothing
+    }
+  in
+  let evals_zeta = evals_at 42 in
+  let evals_zetaw = evals_at 85 in
+  let claimed_cip = inputs.(128) in
+  (* Compute challenge polynomials from prev_challenges *)
+  let sg_olds =
+    Vector.map prev_challenges ~f:(fun chals ->
+        unstage (Wrap_verifier.challenge_polynomial (module Impl.Field)
+                   (Vector.to_array chals)) )
+  in
+  (* Evaluate challenge polynomials at zeta and zetaw *)
+  let sg_evals pt =
+    Vector.map2
+      ~f:(fun keep f -> (keep, f pt))
+      (Vector.trim_front actual_width_mask
+         (Nat.lte_exn Nat.N2.n Nat.N2.n) )
+      sg_olds
+  in
+  let sg_evals1 = sg_evals zeta in
+  let sg_evals2 = sg_evals zetaw in
+  (* Build combine function matching step_verifier.ml lines 1083-1103 *)
+  let combine ~ft ~sg_evals x_hat
+      (e : (Impl.Field.t array, Impl.Boolean.var) Evals.In_circuit.t) =
+    let sg_evals =
+      sg_evals |> Vector.to_list
+      |> List.map ~f:(fun (keep, eval) -> [| Opt.Maybe (keep, eval) |])
+    in
+    let a =
+      Evals.In_circuit.to_list e
+      |> List.map ~f:(function
+           | Opt.Nothing ->
+               [||]
+           | Just a ->
+               Array.map a ~f:Opt.just
+           | Maybe (b, a) ->
+               Array.map a ~f:(Opt.maybe b) )
+    in
+    let v =
+      List.append sg_evals
+        (Array.map ~f:Opt.just x_hat :: [| Opt.just ft |] :: a)
+    in
+    Common.combined_evaluation (module Impl) ~xi v
+  in
+  (* Compute actual CIP: combine_zeta + r * combine_zetaw
+     OCaml right-to-left: zetaw combine computed first *)
+  let open Impl.Field in
+  let actual_cip =
+    combine ~ft:ft_eval0 ~sg_evals:sg_evals1 public_input_zeta evals_zeta
+    + r
+      * combine ~ft:ft_eval1 ~sg_evals:sg_evals2 public_input_zetaw evals_zetaw
+  in
+  (* Compare with claimed CIP via Type1.to_field *)
+  let shift1 =
+    Shifted_value.Type1.Shift.(
+      map ~f:constant (create (module Impl.Field.Constant)))
+  in
+  let expected =
+    Shifted_value.Type1.to_field (module Impl.Field) ~shift:shift1
+      (Shifted_value.Type1.Shifted_value claimed_cip)
+  in
+  let _result = equal expected actual_cip in
+  ()
+
 let finalize_other_proof_circuit (inputs : Impl.Field.t array) () =
   let open Pickles_types in
   let open Kimchi_backend_common.Plonk_types in
@@ -1339,6 +1479,9 @@ let run ~output_dir =
   let array124_field = Impl.Typ.array ~length:124 Impl.Field.typ in
   dump "sponge_and_challenges_circuit" sponge_and_challenges_circuit
     ~input_typ:array124_field ~return_typ:Impl.Typ.unit ;
+  let array129_field = Impl.Typ.array ~length:129 Impl.Field.typ in
+  dump "cip_circuit" cip_circuit
+    ~input_typ:array129_field ~return_typ:Impl.Typ.unit ;
   (* Pickles sub-circuits *)
   let array151_field = Impl.Typ.array ~length:151 Impl.Field.typ in
   dump "finalize_other_proof_circuit" finalize_other_proof_circuit
