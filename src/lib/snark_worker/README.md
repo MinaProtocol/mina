@@ -14,14 +14,60 @@ The SNARK worker operates as either:
 SNARK workers generate proofs for transactions and receive fees for their work,
 creating an economic incentive for proof generation in the Mina network.
 
+## High-Level Design
+
+The SNARK worker follows a simple polling loop:
+
+1. **Request work** – The worker calls `Get_work` RPC on the daemon to obtain a
+   `Spec.Partitioned.t`. The daemon's *work partitioner* partitions pending
+   scan-state jobs into individually-provable chunks before handing them out.
+
+2. **Generate proof** – `Prod.Impl.perform_partitioned` drives the actual proof
+   generation.  Depending on the configured proof level it either:
+   - Runs the full SNARK prover (`Transaction_snark`) for a `Single` spec or a
+     `Sub_zkapp_command` segment/merge spec, or
+   - Returns a dummy proof when the proof level is `Check` or `No_check`.
+
+3. **Submit result** – The worker calls `Submit_work` RPC on the daemon with the
+   completed `Result.Partitioned.t`.  The daemon's work partitioner combines
+   partial sub-zkapp results and, once a full work unit is assembled, adds it to
+   the snark pool.
+
+4. **Report failures** – If proof generation fails, the worker calls
+   `Failed_to_generate_snark` RPC so the daemon can reassign the work to another
+   worker.
+
+The worker retries all RPC calls with jitter-based back-off.  When no work is
+available it naps for a randomised interval to avoid busy-polling.
+
+### Worker State
+
+`Prod.Impl.Worker_state.t` is created once at startup and holds:
+
+- The proof-level variant (`Full`, `Check`, or `No_check`) together with the
+  instantiated `Transaction_snark` module.
+- A proof-cache database (`Proof_cache_tag.cache_db`) for storing intermediate
+  ZK-app segment proofs to disk, avoiding out-of-memory issues for large ZK-app
+  commands.
+- Logger and signature-kind configuration.
+
 ## Library Structure
 
-- `snark_worker.ml/mli` - Main implementation and interface
-- `intf.ml` - Core interfaces for the SNARK worker
-- `functor.ml` - Functor for creating SNARK worker implementations
-- `prod.ml` - Production implementation of the SNARK worker
-- `rpcs.ml` - RPC definitions for communication between daemon and worker
-- `debug.ml` - Debugging utilities
+- `snark_worker.ml` – Top-level module re-exporting RPCs, entry point, and the
+  production implementation.
+- `intf.ml` – RPC master-module signatures and the `Work_S` / `Rpcs_versioned_S`
+  interfaces.
+- `prod.ml` – Production implementation: `Worker_state` creation and the
+  `perform_partitioned` / `perform_single` proof-generation functions.
+- `entry.ml` – The `main` polling loop and the `command_from_rpcs` CLI command
+  used by the integrated worker.
+- `events.ml` – Structured-log event definitions.
+- `rpc_get_work.ml` – Versioned RPC definition for requesting work from the
+  daemon.
+- `rpc_submit_work.ml` – Versioned RPC definition for submitting completed
+  proofs to the daemon.
+- `rpc_failed_to_generate_snark.ml` – Versioned RPC definition for reporting
+  proof-generation failures.
 
 ## Standalone Worker
 
@@ -32,9 +78,19 @@ For information about the standalone SNARK worker executable, see the
 
 The library is primarily used:
 
-1. Internally by the Mina daemon to process SNARK work
-2. By external SNARK workers that connect to a Mina daemon to perform proof
-   generation
+1. Internally by the Mina daemon (`entry.ml` / `command_from_rpcs`) to run an
+   integrated SNARK worker process.
+2. By external SNARK workers that connect to a Mina daemon via the versioned RPC
+   protocol to perform proof generation independently.
 
-SNARK workers communicate with the Mina daemon via a set of versioned RPCs for
-requesting work and submitting completed proofs.
+SNARK workers communicate with the Mina daemon via versioned RPCs:
+
+| RPC | Direction | Purpose |
+|-----|-----------|---------|
+| `Get_work` | Worker → Daemon | Poll for a partitioned work spec |
+| `Submit_work` | Worker → Daemon | Submit a completed proof |
+| `Failed_to_generate_snark` | Worker → Daemon | Report a proof-generation error |
+
+For a high-level description of how the SNARK worker interacts with the SNARK
+pool and the rest of the daemon, see
+[docs/snark-worker-and-pool.md](../../../docs/snark-worker-and-pool.md).
