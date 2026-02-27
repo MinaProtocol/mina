@@ -814,6 +814,139 @@ let plonk_checks_passed_circuit (inputs : Impl.Field.t array) () =
   let _result = equal claimed_perm perm_shifted in
   ()
 
+(* Sub-circuit 6: sponge_and_challenges (Steps 7+8)
+   Reconstructs the Fiat-Shamir sponge state by absorbing all evaluation
+   data, then squeezes xi and r challenges and expands them via endo.
+
+   Input layout (124 fields):
+     0-1:     mask (2 booleans)
+     2-17:    prev_challenges[0] (16 fields)
+     18-33:   prev_challenges[1] (16 fields)
+     34:      sponge_digest_before_evaluations
+     35:      ft_eval1
+     36-37:   public_input (zeta, zetaw)
+     38-67:   w[0..14] pairs = 30 fields
+     68-97:   coefficients[0..14] pairs = 30 fields
+     98-99:   z pair = 2 fields
+     100-111: s[0..5] pairs = 12 fields
+     112-123: selectors[0..5] pairs = 12 fields
+*)
+let sponge_and_challenges_circuit (inputs : Impl.Field.t array) () =
+  let open Pickles_types in
+  let open Kimchi_backend_common.Plonk_types in
+  let as_bool (x : Impl.Field.t) : Impl.Boolean.var =
+    Impl.Boolean.Unsafe.of_cvar x
+  in
+  let single x = [| x |] in
+  let eval_pair i = (single inputs.(i), single inputs.(i + 1)) in
+  let sponge_params =
+    Sponge.Params.map Tick_field_sponge.params ~f:Impl.Field.constant
+  in
+  (* 1. Challenge digest via OptSponge *)
+  let actual_width_mask =
+    Vector.[ as_bool inputs.(0); as_bool inputs.(1) ]
+  in
+  let prev_challenges =
+    Vector.[
+      Vector.init Nat.N16.n ~f:(fun j -> inputs.(2 + j)) ;
+      Vector.init Nat.N16.n ~f:(fun j -> inputs.(18 + j))
+    ]
+  in
+  let module Opt_sponge = struct
+    include Opt_sponge.Make (Impl) (Step_main_inputs.Sponge.Permutation)
+  end
+  in
+  let challenge_digest =
+    let opt_sponge = Opt_sponge.create sponge_params in
+    Vector.iter2
+      (Vector.trim_front actual_width_mask
+         (Nat.lte_exn Nat.N2.n Nat.N2.n) )
+      prev_challenges
+      ~f:(fun keep chals ->
+        Vector.iter chals ~f:(fun chal ->
+            Opt_sponge.absorb opt_sponge (keep, chal) ) ) ;
+    Opt_sponge.squeeze opt_sponge
+  in
+  (* 2. Main sponge: absorb sponge_digest *)
+  let sponge =
+    let sponge = Step_main_inputs.Sponge.create sponge_params in
+    Step_main_inputs.Sponge.absorb sponge (`Field inputs.(34)) ;
+    sponge
+  in
+  (* 3. Absorb challenge_digest *)
+  Step_main_inputs.Sponge.absorb sponge (`Field challenge_digest) ;
+  (* 4. Absorb ft_eval1 *)
+  Step_main_inputs.Sponge.absorb sponge (`Field inputs.(35)) ;
+  (* 5. Absorb public_input *)
+  Array.iter ~f:(fun x -> Step_main_inputs.Sponge.absorb sponge (`Field x))
+    (single inputs.(36)) ;
+  Array.iter ~f:(fun x -> Step_main_inputs.Sponge.absorb sponge (`Field x))
+    (single inputs.(37)) ;
+  (* 6. Build evals and absorb via to_absorption_sequence *)
+  let evals_evals :
+    ( Impl.Field.t array * Impl.Field.t array
+    , Impl.Boolean.var )
+    Evals.In_circuit.t =
+    { w = Vector.init Nat.N15.n ~f:(fun j -> eval_pair (38 + 2 * j))
+    ; coefficients = Vector.init Nat.N15.n ~f:(fun j -> eval_pair (68 + 2 * j))
+    ; z = eval_pair 98
+    ; s = Vector.init Nat.N6.n ~f:(fun j -> eval_pair (100 + 2 * j))
+    ; generic_selector = eval_pair 112
+    ; poseidon_selector = eval_pair 114
+    ; complete_add_selector = eval_pair 116
+    ; mul_selector = eval_pair 118
+    ; emul_selector = eval_pair 120
+    ; endomul_scalar_selector = eval_pair 122
+    ; range_check0_selector = Opt.Nothing
+    ; range_check1_selector = Opt.Nothing
+    ; foreign_field_add_selector = Opt.Nothing
+    ; foreign_field_mul_selector = Opt.Nothing
+    ; xor_selector = Opt.Nothing
+    ; rot_selector = Opt.Nothing
+    ; lookup_aggregation = Opt.Nothing
+    ; lookup_table = Opt.Nothing
+    ; lookup_sorted = Vector.init Nat.N5.n ~f:(fun _ -> Opt.Nothing)
+    ; runtime_lookup_table = Opt.Nothing
+    ; runtime_lookup_table_selector = Opt.Nothing
+    ; xor_lookup_selector = Opt.Nothing
+    ; lookup_gate_lookup_selector = Opt.Nothing
+    ; range_check_lookup_selector = Opt.Nothing
+    ; foreign_field_mul_lookup_selector = Opt.Nothing
+    }
+  in
+  let xs = Evals.In_circuit.to_absorption_sequence evals_evals in
+  List.iter xs ~f:(fun opt ->
+    let absorb =
+      Array.iter ~f:(fun x -> Step_main_inputs.Sponge.absorb sponge (`Field x))
+    in
+    match opt with
+    | Nothing -> ()
+    | Just (x1, x2) -> absorb x1 ; absorb x2
+    | Maybe _ -> () (* unreachable: all optional fields are Nothing *)
+  ) ;
+  (* 7. Squeeze xi and r *)
+  let assert_128_bits a =
+    ignore
+      ( Scalar_challenge.to_field_checked (module Impl)
+          (Import.Scalar_challenge.create a)
+          ~endo:Endo.Wrap_inner_curve.scalar
+        : Impl.Field.t )
+  in
+  let squeeze_challenge () =
+    let x = Step_main_inputs.Sponge.squeeze sponge in
+    Util.Step.lowest_128_bits ~constrain_low_bits:true ~assert_128_bits x
+  in
+  let xi = squeeze_challenge () in
+  let r_actual = squeeze_challenge () in
+  (* 8. Expand xi and r to full field via endo *)
+  let scalar =
+    Scalar_challenge.to_field_checked (module Impl)
+      ~endo:Endo.Wrap_inner_curve.scalar
+  in
+  let _xi_field = scalar (Import.Scalar_challenge.create xi) in
+  let _r_field = scalar (Import.Scalar_challenge.create r_actual) in
+  ()
+
 let finalize_other_proof_circuit (inputs : Impl.Field.t array) () =
   let open Pickles_types in
   let open Kimchi_backend_common.Plonk_types in
@@ -1203,6 +1336,9 @@ let run ~output_dir =
   let array18_field = Impl.Typ.array ~length:18 Impl.Field.typ in
   dump "plonk_checks_passed_circuit" plonk_checks_passed_circuit
     ~input_typ:array18_field ~return_typ:Impl.Typ.unit ;
+  let array124_field = Impl.Typ.array ~length:124 Impl.Field.typ in
+  dump "sponge_and_challenges_circuit" sponge_and_challenges_circuit
+    ~input_typ:array124_field ~return_typ:Impl.Typ.unit ;
   (* Pickles sub-circuits *)
   let array151_field = Impl.Typ.array ~length:151 Impl.Field.typ in
   dump "finalize_other_proof_circuit" finalize_other_proof_circuit
