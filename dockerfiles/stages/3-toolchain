@@ -100,4 +100,11 @@ RUN curl -sL https://github.com/hadolint/hadolint/releases/download/v$HADOLINT_V
 RUN curl -sL https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHECK_VERSION/shellcheck-v$SHELLCHECK_VERSION.linux.${CANONICAL_ARCH}.tar.xz \
     | tar --extract --file=- --xz --strip-components=1 --directory=/usr/bin shellcheck-v$SHELLCHECK_VERSION/shellcheck
 
+# --- AWS
+
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-${CANONICAL_ARCH}.zip" -o "awscliv2.zip" \
+  && unzip awscliv2.zip \
+  && ./aws/install \
+  && rm -rf awscliv2.zip aws
+
 USER opam
