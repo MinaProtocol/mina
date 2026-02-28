@@ -89,6 +89,13 @@ let assert_square_circuit (x : Impl.Field.t) () =
   in
   Impl.assert_square x y
 
+let pow2_pow_circuit (x : Impl.Field.t) () =
+  let rec go acc i =
+    if i = 0 then acc else go (Impl.Field.square acc) (i - 1)
+  in
+  let (_ : Impl.Field.t) = go x 16 in
+  ()
+
 let assert_non_zero_circuit (x : Impl.Field.t) () =
   Impl.Field.Assert.non_zero x
 
@@ -1413,6 +1420,8 @@ let run ~output_dir =
   dump "assert_equal_circuit" assert_equal_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
   dump "assert_square_circuit" assert_square_circuit
+    ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
+  dump "pow2_pow_circuit" pow2_pow_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
   dump "assert_non_zero_circuit" assert_non_zero_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
