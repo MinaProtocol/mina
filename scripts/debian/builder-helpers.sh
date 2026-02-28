@@ -646,63 +646,35 @@ copy_common_daemon_hardfork_configs() {
 }
 
 
-## DEVNET HARDFORK PACKAGE ##
+## HARDFORK PACKAGE ##
 
 #
-# Builds mina-devnet-hardfork package for devnet hardfork
+# Builds mina-${NETWORK}-hardfork package for specified network
 #
-# Output: mina-devnet-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-${NETWORK}-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Devnet daemon package with hardfork-specific runtime config and ledgers.
+# Config only package with hardfork-specific runtime config and ledgers. 
 # Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
 #
-build_daemon_devnet_hardfork_config_deb() {
-  local __deb_name=mina-devnet-config
+build_daemon_hardfork_config_deb() {
+
+  local network="$1"
+  local package_name="mina-${network}-config"
 
   echo "------------------------------------------------------------"
-  echo "--- Building hardfork config testnet signatures deb without keys:"
+  echo "--- Building hardfork config for ${network} network deb without keys:"
 
-  create_control_file "${__deb_name}" "" \
-    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}" "mina-devnet (<< ${MINA_DEB_VERSION})"
+  create_control_file "${package_name}" "" \
+    "Mina Protocol hardfork config for the ${network} Network" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
 
-  copy_common_daemon_hardfork_configs devnet
+  copy_common_daemon_hardfork_configs "${network}"
 
-  build_deb "${__deb_name}"
+  build_deb "${package_name}"
 
 }
 
-## END DEVNET HARDFORK PACKAGE ##
-
-## MAINNET HARDFORK PACKAGE ##
-
-#
-# Builds mina-mainnet-hardfork config package for mainnet hardfork
-#
-# Output: mina-mainnet-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Mainnet daemon package with hardfork-specific runtime config and ledgers.
-# Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
-# Note: Uses testnet signatures despite being mainnet hardfork package.
-#
-build_daemon_mainnet_hardfork_config_deb() {
-  local __deb_name=mina-mainnet-config
-
-  echo "------------------------------------------------------------"
-  echo "--- Building hardfork mainnet signatures deb without keys:"
-
-  create_control_file "${__deb_name}" "" \
-    'Mina Protocol Client and Daemon for the Mainnet Network' "${SUGGESTED_DEPS}" \
-    "mina-mainnet (<< ${MINA_DEB_VERSION})"
-
-  copy_common_daemon_hardfork_configs mainnet
-
-  build_deb "${__deb_name}"
-
-}
-
-## END MAINNET HARDFORK PACKAGE ##
+## END HARDFORK PACKAGE ##
 
 #
 # Copies common binaries and configuration for archive packages
