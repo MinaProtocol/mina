@@ -558,7 +558,7 @@ module ConfigFileOverride = struct
       Yojson.Safe.from_string ledger_content
       |> Runtime_config.Accounts.of_yojson |> Result.ok_or_failwith
     in
-    (* Build base config: ledger + fork A + daemon with txpool_max_size *)
+    (* Build base config: ledger + fork A + daemon with network_id *)
     let ledger : Runtime_config.Ledger.t =
       { base = Accounts accounts
       ; num_accounts = None
@@ -570,7 +570,7 @@ module ConfigFileOverride = struct
       }
     in
     let daemon_cfg : Runtime_config.Daemon.t =
-      { txpool_max_size = Some 3000
+      { txpool_max_size = None
       ; peer_list_url = None
       ; zkapp_proof_update_cost = None
       ; zkapp_signed_single_update_cost = None
@@ -583,7 +583,7 @@ module ConfigFileOverride = struct
       ; slot_chain_end = None
       ; hard_fork_genesis_slot_delta = None
       ; minimum_user_command_fee = None
-      ; network_id = None
+      ; network_id = Some "obvious-base-config-network-id-for-test"
       ; sync_ledger_max_subtree_depth = None
       ; sync_ledger_default_subtree_depth = None
       }
@@ -653,35 +653,29 @@ module ConfigFileOverride = struct
       of_option proof.fork ~error:"Merged config missing proof.fork field"
     in
     let%bind () =
-      if fork.blockchain_length <> 500 then
+      if Runtime_config.Fork_config.equal fork fork_b then
+        Deferred.Or_error.return ()
+      else
         Deferred.Or_error.error_string
-          (sprintf "proof.fork.blockchain_length is %d, expected 500 (fork B)"
-             fork.blockchain_length )
-      else Deferred.Or_error.return ()
+          "Merged proof.fork does not match expected fork B"
     in
-    let%bind () =
-      if fork.global_slot_since_genesis <> 1000 then
-        Deferred.Or_error.error_string
-          (sprintf
-             "proof.fork.global_slot_since_genesis is %d, expected 1000 (fork \
-              B)"
-             fork.global_slot_since_genesis )
-      else Deferred.Or_error.return ()
-    in
-    (* Verify daemon.txpool_max_size preserved from base *)
+    (* Verify daemon.network_id preserved from base *)
     let%bind daemon_merged =
       of_option merged_config.daemon ~error:"Merged config missing daemon field"
     in
+    let expected_network_id = "obvious-base-config-network-id-for-test" in
     let%bind () =
-      match daemon_merged.txpool_max_size with
-      | Some 3000 ->
+      match daemon_merged.network_id with
+      | Some id when String.equal id expected_network_id ->
           Deferred.Or_error.return ()
-      | Some n ->
+      | Some id ->
           Deferred.Or_error.error_string
-            (sprintf "daemon.txpool_max_size is %d, expected 3000" n)
+            (sprintf "daemon.network_id is %s, expected %s" id
+               expected_network_id )
       | None ->
           Deferred.Or_error.error_string
-            "daemon.txpool_max_size is None, expected Some 3000"
+            (sprintf "daemon.network_id is None, expected Some %s"
+               expected_network_id )
     in
     (* Verify ledger preserved from base *)
     let%bind () =
