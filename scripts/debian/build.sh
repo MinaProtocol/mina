@@ -27,18 +27,19 @@ if [ $# -eq 0 ]
   then
     echo "No arguments supplied. Building all known debian packages"
     build_logproc_deb
-    build_archive_testnet_generic_deb
     build_archive_devnet_deb
     build_archive_mainnet_deb
     build_batch_txn_deb
-    build_daemon_testnet_generic_deb
+    build_daemon_mainnet_generic_deb
     build_daemon_mainnet_deb
     build_daemon_mainnet_config_deb
+    build_daemon_devnet_generic_deb
     build_daemon_devnet_deb
     build_daemon_devnet_config_deb
-    build_rosetta_testnet_generic_deb
-    build_rosetta_mainnet_deb
     build_rosetta_devnet_deb
+    build_rosetta_devnet_generic_deb
+    build_rosetta_mainnet_deb
+    build_rosetta_mainnet_generic_deb
     build_test_executive_deb
     build_functional_test_suite_deb
     build_zkapp_test_transaction_deb
