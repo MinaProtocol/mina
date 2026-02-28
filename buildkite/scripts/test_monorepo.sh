@@ -74,7 +74,7 @@ assert_contains() {
 
   TESTS_RUN=$((TESTS_RUN + 1))
 
-  if echo "$haystack" | grep -qF "$needle"; then
+  if echo "$haystack" | LC_ALL=C grep -qF "$needle"; then
     TESTS_PASSED=$((TESTS_PASSED + 1))
     echo -e "${GREEN}✓${NC} $message"
     return 0
