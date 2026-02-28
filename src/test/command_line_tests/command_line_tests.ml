@@ -545,6 +545,150 @@ module HardforkStateDirMismatch = struct
                 (Core.Signal.to_string signal) ) )
 end
 
+module ConfigFileOverride = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let test_case (test : t) =
+    let daemon = Daemon.of_config test.config in
+    let client = Daemon.client daemon in
+    let%bind () = Daemon.Config.generate_keys test.config in
+    (* Generate 10 test accounts *)
+    let%bind ledger_content = Daemon.Client.test_ledger client ~n:10 in
+    let accounts =
+      Yojson.Safe.from_string ledger_content
+      |> Runtime_config.Accounts.of_yojson |> Result.ok_or_failwith
+    in
+    (* Build base config: ledger + fork A + daemon with network_id *)
+    let ledger : Runtime_config.Ledger.t =
+      { base = Accounts accounts
+      ; num_accounts = None
+      ; balances = []
+      ; hash = None
+      ; s3_data_hash = None
+      ; name = None
+      ; add_genesis_winner = Some true
+      }
+    in
+    let daemon_cfg : Runtime_config.Daemon.t =
+      { txpool_max_size = None
+      ; peer_list_url = None
+      ; zkapp_proof_update_cost = None
+      ; zkapp_signed_single_update_cost = None
+      ; zkapp_signed_pair_update_cost = None
+      ; zkapp_transaction_cost_limit = None
+      ; max_event_elements = None
+      ; max_action_elements = None
+      ; zkapp_cmd_limit_hardcap = None
+      ; slot_tx_end = None
+      ; slot_chain_end = None
+      ; hard_fork_genesis_slot_delta = None
+      ; minimum_user_command_fee = None
+      ; network_id = Some "obvious-base-config-network-id-for-test"
+      ; sync_ledger_max_subtree_depth = None
+      ; sync_ledger_default_subtree_depth = None
+      }
+    in
+    let fork_a : Runtime_config.Fork_config.t =
+      { state_hash = "3NKSvjaGSKiQuAt8BP1b1VCpLbJc9RcEFjYCaBYsJJFdrtd6tpaV"
+      ; blockchain_length = 100
+      ; global_slot_since_genesis = 200
+      }
+    in
+    let proof_a = Runtime_config.Proof_keys.make ~fork:fork_a () in
+    let base_config =
+      Runtime_config.make ~ledger ~daemon:daemon_cfg ~proof:proof_a ()
+    in
+    (* Write base config as daemon.json *)
+    let base_file = test.config.dirs.conf ^/ "daemon.json" in
+    Runtime_config.to_yojson base_config |> Yojson.Safe.to_file base_file ;
+    (* Build override config: only fork B, no ledger, no daemon *)
+    let fork_b : Runtime_config.Fork_config.t =
+      { state_hash = "3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15"
+      ; blockchain_length = 500
+      ; global_slot_since_genesis = 1000
+      }
+    in
+    let proof_b = Runtime_config.Proof_keys.make ~fork:fork_b () in
+    let override_config = Runtime_config.make ~proof:proof_b () in
+    (* Write override config *)
+    let override_file = test.config.dirs.conf ^/ "override.json" in
+    Runtime_config.to_yojson override_config
+    |> Yojson.Safe.to_file override_file ;
+    (* Start daemon with override config file *)
+    let%bind process = Daemon.start ~config_files:[ override_file ] daemon in
+    let%bind result = Daemon.Client.wait_for_bootstrap process.client () in
+    let%bind () =
+      match result with
+      | Ok () ->
+          Deferred.return ()
+      | Error e ->
+          let () = printf "Error:\n%s\n" (Error.to_string_hum e) in
+          let log_file = Daemon.Config.ConfigDirs.mina_log test.config.dirs in
+          let%bind logs = Reader.file_contents log_file in
+          let () = printf "Daemon logs:\n%s\n" logs in
+          Writer.flushed (Lazy.force Writer.stdout)
+    in
+    (* Query merged runtime config from daemon *)
+    let%bind output =
+      Daemon.Client.advanced_runtime_config process.client
+        ~rest_port:test.config.rest_port
+    in
+    let%bind () = Daemon.Client.stop_daemon process.client in
+    (* Parse and verify the merged config *)
+    let of_option opt ~error =
+      Result.of_option opt ~error:(Error.of_string error) |> Deferred.return
+    in
+    let open Deferred.Or_error.Let_syntax in
+    let%bind merged_config =
+      Yojson.Safe.from_string output
+      |> Runtime_config.of_yojson
+      |> Result.map_error ~f:Error.of_string
+      |> Deferred.return
+    in
+    (* Verify fork B won (override) *)
+    let%bind proof =
+      of_option merged_config.proof ~error:"Merged config missing proof field"
+    in
+    let%bind fork =
+      of_option proof.fork ~error:"Merged config missing proof.fork field"
+    in
+    let%bind () =
+      if Runtime_config.Fork_config.equal fork fork_b then
+        Deferred.Or_error.return ()
+      else
+        Deferred.Or_error.error_string
+          "Merged proof.fork does not match expected fork B"
+    in
+    (* Verify daemon.network_id preserved from base *)
+    let%bind daemon_merged =
+      of_option merged_config.daemon ~error:"Merged config missing daemon field"
+    in
+    let expected_network_id = "obvious-base-config-network-id-for-test" in
+    let%bind () =
+      match daemon_merged.network_id with
+      | Some id when String.equal id expected_network_id ->
+          Deferred.Or_error.return ()
+      | Some id ->
+          Deferred.Or_error.error_string
+            (sprintf "daemon.network_id is %s, expected %s" id
+               expected_network_id )
+      | None ->
+          Deferred.Or_error.error_string
+            (sprintf "daemon.network_id is None, expected Some %s"
+               expected_network_id )
+    in
+    (* Verify ledger preserved from base *)
+    let%bind () =
+      match merged_config.ledger with
+      | Some _ ->
+          Deferred.Or_error.return ()
+      | None ->
+          Deferred.Or_error.error_string
+            "Merged config missing ledger (should be preserved from base)"
+    in
+    Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+end
+
 let () =
   let open Alcotest in
   run "Test commadline."
@@ -630,5 +774,12 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (HardforkStateDirMismatch) ) )
+        ] )
+    ; ( "config-file-override"
+      , [ test_case "Multiple --config-file flags merge/override configs" `Slow
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (ConfigFileOverride) ) )
         ] )
     ]

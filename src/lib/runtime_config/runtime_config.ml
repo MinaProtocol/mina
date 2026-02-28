@@ -8,7 +8,7 @@ module Fork_config = struct
     ; blockchain_length : int (* number of blocks produced since genesis *)
     ; global_slot_since_genesis : int (* global slot since genesis *)
     }
-  [@@deriving yojson, bin_io_unversioned]
+  [@@deriving yojson, bin_io_unversioned, equal]
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
