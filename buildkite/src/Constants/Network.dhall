@@ -41,11 +41,7 @@ let toLabelSegment = \(network : Network) -> "-${debianSuffix network}"
 let requiresMainnetBuild =
           \(network : Network)
       ->  merge
-            { Devnet = False
-            , Mainnet = True
-            , PreMesa1 = False
-            , Mesa = False
-            }
+            { Devnet = False, Mainnet = True, PreMesa1 = False, Mesa = False }
             network
 
 let buildMainnetEnv =
