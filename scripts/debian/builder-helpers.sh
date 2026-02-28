@@ -79,10 +79,6 @@ fi
 
 BUILDDIR="deb_build"
 
-
-# For automode purpose. We need to control location for both runtimes
-AUTOMODE_PRE_HF_DIR=${BUILDDIR}/usr/lib/mina/berkeley
-
 # Function to ease creation of Debian package control files
 create_control_file() {
 
@@ -515,59 +511,41 @@ build_daemon_deb() {
 
 ## END DAEMON PACKAGE ##
 
-## MAINNET PREFORK PACKAGE ##
+## PREFORK PACKAGE ##
+
+# For automode purpose. We need to control location for both runtimes
+CURRENT_CODENAME=berkeley
+AUTOMODE_CURRENT_DIR="${BUILDDIR}/usr/lib/mina/${CURRENT_CODENAME}"
+POSTFORK_CODENAME=mesa
 
 #
-# Builds mina-mainnet-prefork-mesa tailored package for automode package
+# Builds mina-NETWORK-prefork-POSTFORK_CODENAME tailored package for automode package
 #
-# Output: mina-mainnet-prefork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-${NETWORK}-prefork-${POSTFORK_CODENAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Contains only the legacy mainnet binaries places in "/usr/lib/mina/berkeley" without
+# Contains only the legacy binaries placed in "$AUTOMODE_CURRENT_DIR" without
 # configuration files or genesis ledgers.
 #
-build_daemon_mainnet_prefork_deb() {
 
-  NAME="mina-mainnet-prefork-mesa"
+build_daemon_prefork_deb() {
+
+  local network="$1"
 
   echo "------------------------------------------------------------"
   echo "--- Building mainnet berkeley deb for prefork automode :"
 
-  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+  local package_name="mina-${network}-prefork-${POSTFORK_CODENAME}"
 
-  copy_common_daemon_apps mainnet $AUTOMODE_PRE_HF_DIR
 
-  build_deb $NAME
+  create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
+    "Mina Protocol Client and Daemon for prefork under network ${network}" "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_apps "${network}" "$AUTOMODE_CURRENT_DIR"
+
+  build_deb "${package_name}"
 }
-## END MAINNET PREFORK PACKAGE ##
-
-## DEVNET PREFORK PACKAGE ##
-
-#
-# Builds mina-devnet-prefork-mesa tailored package for automode package
-#
-# Output: mina-devnet-prefork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Contains only the prefork devnet binaries places in "/usr/lib/mina/berkeley" without
-# configuration files or genesis ledgers.
-#
-build_daemon_devnet_prefork_deb() {
-
-  NAME="mina-devnet-prefork-mesa"
-
-  echo "------------------------------------------------------------"
-  echo "--- Building testnet berkeley prefork deb for automode :"
-
-  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
-
-  copy_common_daemon_apps testnet $AUTOMODE_PRE_HF_DIR
-
-  build_deb $NAME
-}
-## END DEVNET PREFORK PACKAGE ##
+## END PREFORK PACKAGE ##
 
 ## Devnet GENERIC PACKAGE ##
 
