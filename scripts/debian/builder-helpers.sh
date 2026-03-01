@@ -547,76 +547,40 @@ build_daemon_prefork_deb() {
 }
 ## END PREFORK PACKAGE ##
 
-## Devnet GENERIC PACKAGE ##
+## GENERIC PACKAGE ##
 
 #
-# Builds Devnet Generic daemon package with profile-aware naming
-#
-# Output: ${MINA_GENERIC_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Where MINA_GENERIC_DEB_NAME can be:
-#   - "mina-devnet-generic" (default)
-#   - "mina-devnet-generic-lightnet" (if DUNE_PROFILE=lightnet)
-#   - "mina-devnet-generic-instrumented" (if DUNE_INSTRUMENT_WITH is set)
-#   - "mina-devnet-generic-lightnet-instrumented" (both conditions)
-#
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Devnet Generic daemon with testnet signatures and without any configs (like ledgers etc.).
-# Package name includes suffixes for different profiles.
-#
-build_daemon_devnet_generic_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building Mina Devnet Generic testnet signatures deb without keys:"
-
-  local _suffix="${DEB_SUFFIX#-}"
-  MINA_GENERIC_DEB_NAME="mina-devnet-generic${_suffix:+-${_suffix}}"
-
-  create_control_file "${MINA_GENERIC_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon for the Generic Testnet Network' \
-    "${SUGGESTED_DEPS}" "mina-devnet (<< ${MINA_DEB_VERSION})"
-
-  copy_common_daemon_apps testnet
-
-  copy_common_daemon_utils 'seed-lists/devnet_seeds.txt'
-
-  build_deb "${MINA_GENERIC_DEB_NAME}"
-
-}
-## END DEVNET GENERIC PACKAGE ##
-
-## MAINNET GENERIC PACKAGE ##
-
-#
-# Builds Mainnet Generic daemon package with profile-aware naming
+# Builds Generic daemon package with profile-aware naming
 #
 # Output: ${MINA_GENERIC_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Where MINA_GENERIC_DEB_NAME can be:
-#   - "mina-mainnet-generic" (default)
-#   - "mina-mainnet-generic-lightnet" (if DUNE_PROFILE=lightnet)
-#   - "mina-mainnet-generic-instrumented" (if DUNE_INSTRUMENT_WITH is set)
-#   - "mina-mainnet-generic-lightnet-instrumented" (both conditions)
+#   - "mina-NETWORK-generic" (default)
+#   - "mina-NETWORK-generic-lightnet" (if DUNE_PROFILE=lightnet)
+#   - "mina-NETWORK-generic-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#   - "mina-NETWORK-generic-lightnet-instrumented" (both conditions)
 #
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Mainnet Generic testnet daemon with testnet signatures and without any configs (like ledgers etc.).
+# Generic daemon with specified signatures, without any configs (like ledgers etc.).
 # Package name includes suffixes for different profiles.
 #
-build_daemon_mainnet_generic_deb() {
+build_daemon_generic_deb() {
+
+  local network="$1"
 
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Mainnet Generic testnet signatures deb without keys:"
+  echo "--- Building Mina Generic package for specified network without keys:"
 
   local _suffix="${DEB_SUFFIX#-}"
-  MINA_GENERIC_DEB_NAME="mina-mainnet-generic${_suffix:+-${_suffix}}"
+  MINA_GENERIC_DEB_NAME="mina-${network}-generic${_suffix:+-${_suffix}}"
 
   create_control_file "${MINA_GENERIC_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon for the Generic Mainnet Network' \
-    "${SUGGESTED_DEPS}" "mina-mainnet (<< ${MINA_DEB_VERSION})"
+    "Mina Protocol Client and Daemon for the Generic ${network} Network" \
+    "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION})"
 
-  copy_common_daemon_apps mainnet
+  copy_common_daemon_apps "${network}"
 
-  copy_common_daemon_utils 'seed-lists/mainnet_seeds.txt'
+  copy_common_daemon_utils "seed-lists/${network}_seeds.txt"
 
   build_deb "${MINA_GENERIC_DEB_NAME}"
 
