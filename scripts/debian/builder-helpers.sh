@@ -55,6 +55,24 @@ MINA_ARCHIVE_DEB_NAME="mina-archive-devnet"
 DUNE_PROFILE="${DUNE_PROFILE:-dev}"
 DEB_SUFFIX=""
 
+profile_package_network() {
+  case "${DUNE_PROFILE}" in
+    mainnet)
+      printf "mainnet"
+      ;;
+    dev|devnet|lightnet)
+      printf "devnet"
+      ;;
+    *)
+      echo "Unknown DUNE_PROFILE provided: ${DUNE_PROFILE}" >&2
+      exit 1
+      ;;
+  esac
+}
+
+PROFILE_DEB_NETWORK="$(profile_package_network)"
+PROFILE_DEB_NAME="mina-${PROFILE_DEB_NETWORK}-profile"
+
 # Add suffix to debian to distinguish different profiles
 # (mainnet/devnet/lightnet)
 case "${DUNE_PROFILE}" in
@@ -313,17 +331,6 @@ copy_common_daemon_configs() {
 
   local NETWORK_NAME="${1}"
 
-  # Store node config hint (based on NETWORK_NAME)
-  mkdir -p "${BUILDDIR}/etc/coda/build_config"
-  case "${NETWORK_NAME}" in
-    mainnet)
-      printf "mainnet" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
-      ;;
-    devnet)
-      printf "devnet" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
-      ;;
-  esac
-
   mkdir -p "${BUILDDIR}/var/lib/coda"
 
   # Include genesis ledgers for the network.
@@ -520,7 +527,7 @@ build_rosetta_deb() {
 
   local package_name="mina-rosetta-${network}"
 
-  create_control_file "${package_name}" "${SHARED_DEPS}" \
+  create_control_file "${package_name}" "${SHARED_DEPS}, ${PROFILE_DEB_NAME} (>= ${MINA_DEB_VERSION})" \
     'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
 
   mkdir -p "${BUILDDIR}/usr/local/bin"
@@ -548,6 +555,36 @@ build_rosetta_deb() {
   build_deb "${package_name}"
 }
 ## END ROSETTA PACKAGE ##
+
+## PROFILE PACKAGE ##
+build_profile_deb() {
+
+  local network="${1}"
+
+  local package_name="mina-${network}-profile"
+
+  echo "--- Building package ${package_name}"
+  echo "------------------------------------------------------------"
+  echo "build_profile_deb inputs:"
+  echo "Network Name: ${1} (like mainnet, devnet, testnet-generic)"
+
+  create_control_file "${package_name}" "" \
+    "Mina profile for network ${network}" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
+
+  # Store node config hint (based on NETWORK_NAME)
+  mkdir -p "${BUILDDIR}/etc/coda/build_config"
+  case "${network}" in
+    mainnet)
+      printf "mainnet" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
+      ;;
+    devnet)
+      printf "devnet" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
+      ;;
+  esac
+
+  build_deb "${package_name}"
+}
+## END PACKAGE ##
 
 ## CONFIG PACKAGE ##
 build_daemon_config_deb() {
@@ -622,7 +659,7 @@ build_daemon_deb() {
       ;;
   esac
 
-  create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network}-config (>=${MINA_DEB_VERSION})" \
+  create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network}-config (>=${MINA_DEB_VERSION}), ${PROFILE_DEB_NAME} (>= ${MINA_DEB_VERSION})" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION}), mina-${network}-postfork-${POSTFORK_CODENAME}"
 
   copy_common_daemon_apps "${network}"
@@ -856,12 +893,7 @@ build_daemon_generic_deb() {
   local _suffix="${DEB_SUFFIX#-}"
   MINA_GENERIC_DEB_NAME="mina-${network}-generic${_suffix:+-${_suffix}}"
 
-  # The generic package owns /usr/local/bin/mina and /etc/bash_completion.d/mina,
-  # which are also shipped by the postfork automode package. Declare
-  # Replaces/Breaks against it (as the full daemon does) so that transitioning
-  # from automode back to the normal split layout does not trip a dpkg file
-  # conflict on those shared paths.
-  create_control_file "${MINA_GENERIC_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
+  create_control_file "${MINA_GENERIC_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}, ${PROFILE_DEB_NAME} (>= ${MINA_DEB_VERSION})" \
     "Mina Protocol Client and Daemon for the Generic ${network} Network" \
     "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION}), mina-${network}-postfork-${POSTFORK_CODENAME}"
 
@@ -1016,7 +1048,7 @@ build_archive_deb () {
   echo "------------------------------------------------------------"
   echo "--- Building archive ${network} deb"
 
-  create_control_file "${package_name}" "${ARCHIVE_DEPS}" "Mina Archive Node for network ${network}"
+  create_control_file "${package_name}" "${ARCHIVE_DEPS}, ${PROFILE_DEB_NAME} (>= ${MINA_DEB_VERSION})" "Mina Archive Node for network ${network}"
 
   copy_common_archive_configs "${package_name}"
 
