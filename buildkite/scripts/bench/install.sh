@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-TESTNET_NAME="testnet-generic"
+TESTNET_NAME="devnet-generic"
 
 git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh
