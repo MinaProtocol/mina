@@ -79,6 +79,21 @@ fi
 
 BUILDDIR="deb_build"
 
+signature_of_network() {
+  case "${network}" in
+    mainnet)
+      printf "mainnet"
+      ;;
+    devnet)
+      printf "testnet"
+      ;;
+    *)
+      echo "Unknown network name provided: ${network}" >&2
+      exit 1
+      ;;
+  esac
+}
+
 # Function to ease creation of Debian package control files
 create_control_file() {
 
@@ -215,11 +230,16 @@ copy_common_daemon_utils() {
 # Copies common daemon binaries only to debian package
 copy_common_daemon_apps() {
 
+  local network="${1}"
+
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_apps inputs:"
-  echo "Signature Type: ${1} (mainnet or testnet)"
+  echo "Signature Type: ${network} (mainnet or testnet)"
 
   local TARGET_ROOT_DIR="${2:-${BUILDDIR}/usr/local/bin}"
+
+  local signature
+  signature=$(signature_of_network "$network")
 
   echo "Target Root Dir: ${TARGET_ROOT_DIR}"
 
@@ -238,9 +258,8 @@ copy_common_daemon_apps() {
   cp ./default/src/app/rocksdb-scanner/rocksdb_scanner.exe \
     "${TARGET_ROOT_DIR}/mina-rocksdb-scanner"
 
-  # Copy signature-based Binaries (based on signature type $1 passed into the \
-  # function)
-  cp ./default/src/app/cli/src/mina_"${1}"_signatures.exe \
+  # Copy signature-based Binaries
+  cp ./default/src/app/cli/src/mina_"${signature}"_signatures.exe \
     "${TARGET_ROOT_DIR}/mina"
 
 }
@@ -418,10 +437,13 @@ build_rosetta_deb() {
 
   mkdir -p "${BUILDDIR}/usr/local/bin"
 
+  local signature
+  signature=$(signature_of_network "$network")
+
   # Copy rosetta-based Binaries
-  cp ./default/src/app/rosetta/rosetta_"${network}"_signatures.exe \
+  cp "./default/src/app/rosetta/rosetta_${signature}_signatures.exe" \
     "${BUILDDIR}/usr/local/bin/mina-rosetta"
-  cp ./default/src/app/rosetta/ocaml-signer/signer_"${network}"_signatures.exe \
+  cp "./default/src/app/rosetta/ocaml-signer/signer_${signature}_signatures.exe" \
     "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
 
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/"{rosetta-cli-config,scripts}
