@@ -19,12 +19,14 @@ in  Pipeline.build
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
+            , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonPrefork
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
+            , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
             ]

@@ -1,8 +1,8 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let Profiles = ../../Constants/Profiles.dhall
 
-let BuildFlags = ../../Constants/BuildFlags.dhall
+let Artifacts = ../../Constants/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
@@ -13,18 +13,17 @@ in  Pipeline.build
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
-            , Artifacts.Type.LogProc
-            , Artifacts.Type.Archive
-            , Artifacts.Type.Rosetta
-            , Artifacts.Type.FunctionalTestSuite
+            , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.DaemonConfig
+            , Artifacts.Type.LogProc
             ]
-          , buildFlags = BuildFlags.Type.Instrumented
+          , profile = Profiles.Type.Lightnet
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
-            , PipelineTag.Type.Devnet
+            , PipelineTag.Type.Lightnet
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Bullseye
             ]
