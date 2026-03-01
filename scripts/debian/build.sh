@@ -48,11 +48,18 @@ resolve_and_build_package() {
     return
   fi
 
+  if [[ "$package" =~ ^profile_(mainnet|devnet)$ ]]; then
+    "build_profile_deb" "${BASH_REMATCH[1]}"
+    return
+  fi
+
   echo "Invalid debian package name '$package'"
   exit 1
 }
 
 default_targets=(
+  profile_devnet
+  profile_mainnet
   logproc
   archive_devnet
   archive_mainnet
