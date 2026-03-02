@@ -240,6 +240,7 @@ build-archive-utils: ocaml_checks reformat-diff ## Build archive node and relate
 		src/app/extract_blocks/extract_blocks.exe \
 		src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
 		src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
+		src/app/dump_slot_ledger/dump_slot_ledger.exe \
 		--profile=$(DUNE_PROFILE)  \
 		&& echo "✅ Build complete"
 
@@ -566,10 +567,6 @@ define build_debian_package
 		&& echo "✅ Build complete"
 endef
 
-.PHONY: debian-build-archive-testnet-generic
-debian-build-archive-testnet-generic: ## Build the Debian archive package
-	$(call build_debian_package,archive_testnet_generic)
-
 .PHONY: debian-build-archive-devnet
 debian-build-archive-devnet: ## Build the Debian archive package for devnet
 	$(call build_debian_package,archive_devnet)
@@ -578,9 +575,9 @@ debian-build-archive-devnet: ## Build the Debian archive package for devnet
 debian-build-archive-mainnet: ## Build the Debian archive package for mainnet
 	$(call build_debian_package,archive_mainnet)
 
-.PHONY: debian-build-daemon-testnet-generic
-debian-build-daemon-testnet-generic: ## Build the Debian daemon package for testnet-generic
-	$(call build_debian_package,daemon_testnet_generic)
+.PHONY: debian-build-daemon-devnet-generic
+debian-build-daemon-devnet-generic: ## Build the Debian daemon package for devnet-generic
+	$(call build_debian_package,daemon_devnet_generic)
 
 .PHONY: debian-build-daemon-devnet
 debian-build-daemon-devnet: ## Build the Debian daemon package for devnet
@@ -590,9 +587,9 @@ debian-build-daemon-devnet: ## Build the Debian daemon package for devnet
 debian-build-daemon-mainnet: ## Build the Debian daemon package for mainnet
 	$(call build_debian_package,daemon_mainnet)
 
-.PHONY: debian-build-config-devnet
-debian-build-config-devnet: ## Build the Debian config package for devnet
-	$(call build_debian_package,daemon_devnet_config)
+.PHONY: debian-build-daemon-mainnet-generic
+debian-build-daemon-mainnet-generic: ## Build the Debian daemon package for mainnet-generic
+	$(call build_debian_package,daemon_mainnet_generic)
 
 .PHONY: debian-build-daemon-devnet-prefork
 debian-build-daemon-devnet-prefork: ## Build the Debian daemon package for automote devnet pre hardfork
@@ -619,9 +616,17 @@ debian-build-prefork-genesis-ledger: ## Build the Debian Create Legacy Genesis p
 	$(call check_env_var,NETWORK_NAME)
 	$(call build_debian_package,prefork_$(NETWORK_NAME)_genesis_ledger)
 
-.PHONY: debian-build-rosetta-testnet-generic
-debian-build-rosetta-testnet-generic: ## Build the Debian Rosetta package
-	$(call build_debian_package,rosetta_testnet_generic)
+.PHONY: debian-build-rosetta-devnet-generic
+debian-build-rosetta-devnet-generic: ## Build the Debian Rosetta package
+	$(call build_debian_package,rosetta_devnet_generic)
+
+.PHONY: debian-build-rosetta-mainnet-generic
+debian-build-rosetta-mainnet-generic: ## Build the Debian Rosetta package
+	$(call build_debian_package,rosetta_mainnet_generic)
+
+.PHONY: debian-build-zkapp-test-transaction
+debian-build-zkapp-test-transaction: ## Build the Debian Zkapp Test Transaction package for devnet
+	$(call build_debian_package,zkapp_test_transaction)
 
 .PHONY: debian-build-rosetta-devnet
 debian-build-rosetta-devnet: ## Build the Debian Rosetta package for devnet
@@ -724,11 +729,6 @@ docker-build-toolchain: ## Build the toolchain to be used in CI
 		--service mina-toolchain \
 		--version mina-toolchain-$(CODENAME)-$(GITHASH)
 
-.PHONY: docker-build-archive-testnet-generic
-docker-build-archive-testnet-generic: SHELL := /bin/bash
-docker-build-archive-testnet-generic: start-local-debian-repo ## Build the archive Docker image
-	$(call build_docker_image,mina-archive,testnet-generic)
-
 .PHONY: docker-build-archive-devnet
 docker-build-archive-devnet: SHELL := /bin/bash
 docker-build-archive-devnet: start-local-debian-repo ## Build the archive Docker image for devnet
@@ -739,10 +739,10 @@ docker-build-archive-mainnet: SHELL := /bin/bash
 docker-build-archive-mainnet: start-local-debian-repo ## Build the archive Docker image for mainnet
 	$(call build_docker_image,mina-archive,mainnet)
 
-.PHONY: docker-build-daemon-testnet-generic
-docker-build-daemon-testnet-generic: SHELL := /bin/bash
-docker-build-daemon-testnet-generic: start-local-debian-repo ## Build the daemon Docker image
-	$(call build_docker_image,mina-daemon,testnet-generic)
+.PHONY: docker-build-daemon-devnet-generic
+docker-build-daemon-devnet-generic: SHELL := /bin/bash
+docker-build-daemon-devnet-generic: start-local-debian-repo ## Build the daemon Docker image
+	$(call build_docker_image,mina-daemon,devnet-generic)
 
 .PHONY: docker-build-daemon-devnet
 docker-build-daemon-devnet: SHELL := /bin/bash
@@ -755,9 +755,9 @@ docker-build-daemon-mainnet: start-local-debian-repo ## Build the daemon Docker 
 	$(call build_docker_image,mina-daemon,mainnet)
 
 .PHONY: docker-build-rosetta
-docker-build-rosetta-testnet-generic: SHELL := /bin/bash
-docker-build-rosetta-testnet-generic: start-local-debian-repo ## Build the Rosetta Docker image
-	$(call build_docker_image,mina-rosetta,testnet-generic)
+docker-build-rosetta-devnet-generic: SHELL := /bin/bash
+docker-build-rosetta-devnet-generic: start-local-debian-repo ## Build the Rosetta Docker image
+	$(call build_docker_image,mina-rosetta,devnet-generic)
 
 .PHONY: docker-build-rosetta-devnet
 docker-build-rosetta-devnet: SHELL := /bin/bash
@@ -772,38 +772,116 @@ docker-build-rosetta-mainnet: start-local-debian-repo ## Build the Rosetta Docke
 ########################################
 # Generate hardfork packages
 
-.PHONY: hardfork-debian
-hardfork-debian: SHELL := /bin/bash
-hardfork-debian: ocaml_checks ## Generate hardfork packages
-	$(info 📦 Generating hardfork packages for network $(NETWORK_NAME))
+.PHONY: debian-build-hardfork-config
+debian-build-hardfork-config: SHELL := /bin/bash
+debian-build-hardfork-config: #ocaml_checks ## Generate hardfork packages
+	$(info 📦 Generating hardfork debian packages for network $(NETWORK_NAME))
+
+	$(call check_env_var,NETWORK_NAME)
+	$(call check_env_var,CODENAME)
+	$(call check_env_var,BRANCH_NAME)
 
 	@BUILD_DIR=./_build \
 	MINA_DEB_CODENAME=$(CODENAME) \
 	BRANCH_NAME=$(BRANCH_NAME) \
 	KEEP_MY_TAGS_INTACT=true \
-	./scripts/hardfork/release/build-packages.sh daemon_devnet_hardfork
+	./scripts/hardfork/release/build-packages.sh daemon_$(NETWORK_NAME)_hardfork_config
 
 
-.PHONY: hardfork-docker
-hardfork-docker: SHELL := /bin/bash
-hardfork-docker: ocaml_checks ## Generate hardfork packages
+
+.PHONY: docker-build-daemon-hardfork-docker
+docker-build-daemon-hardfork-docker: SHELL := /bin/bash
+docker-build-daemon-hardfork-docker: ## Generate hardfork packages
 	$(info 📦 Generating hardfork docker for network $(NETWORK_NAME))
 
-	$(MAKE) hardfork-debian
+	$(call check_env_var,NETWORK_NAME)
+	$(call check_env_var,CODENAME)
+	$(call check_env_var,BRANCH_NAME)
+
+	$(MAKE) debian-build-config-$(NETWORK_NAME)
 	$(MAKE) start-local-debian-repo
 
-	@BUILD_DIR=./_build \
-	MINA_DEB_CODENAME=$(CODENAME) \
-	KEEP_MY_TAGS_INTACT=true \
-	. ./scripts/export-git-env-vars.sh \
-	&& ./scripts/docker/build.sh \
+	@export BUILD_DIR=./_build && \
+	export MINA_DEB_CODENAME=$(CODENAME) && \
+	export KEEP_MY_TAGS_INTACT=true && \
+	. ./scripts/export-git-env-vars.sh && \
+	./scripts/docker/build.sh \
 		--deb-codename $(CODENAME) \
 		--service mina-daemon \
-		--version "$$MINA_DEB_VERSION" \
+		--version "$$MINA_DOCKER_TAG" \
+		--deb-version "$$MINA_DEB_VERSION" \
 		--branch $(BRANCH_NAME) \
 		--network $(NETWORK_NAME) \
-		--deb-suffix hardfork \
+		--deb-suffix generic \
+		--custom-suffix generic \
+		--load-only
 		--no-cache
+
+	cp _build/mina-devnet-config_*.deb .
+
+	@export BUILD_DIR=./_build && \
+	export MINA_DEB_CODENAME=$(CODENAME) && \
+	export KEEP_MY_TAGS_INTACT=true && \
+	. ./scripts/export-git-env-vars.sh && \
+	./scripts/docker/build.sh \
+		--deb-codename $(CODENAME) \
+		--service mina-daemon-config \
+		--version "$$MINA_DOCKER_TAG" \
+		--deb-version "$$MINA_DEB_VERSION" \
+		--branch $(BRANCH_NAME) \
+		--network $(NETWORK_NAME) \
+		--custom-suffix configured \
+		--no-cache \
+		--load-only
+
+	$(info 📦 stopping local Debian repository)
+	@./scripts/debian/aptly.sh stop
+
+.PHONY: docker-build-hardfork-rosetta-docker
+docker-build-hardfork-rosetta-docker: SHELL := /bin/bash
+docker-build-hardfork-rosetta-docker: ## Generate hardfork packages
+	$(info 📦 Generating hardfork docker for network $(NETWORK_NAME))
+	$(call check_env_var,NETWORK_NAME)
+	$(call check_env_var,CODENAME)
+	$(call check_env_var,BRANCH_NAME)
+
+	$(MAKE) debian-build-config-$(NETWORK_NAME)
+	$(MAKE) start-local-debian-repo
+
+	@export BUILD_DIR=./_build && \
+	export MINA_DEB_CODENAME=$(CODENAME) && \
+	export KEEP_MY_TAGS_INTACT=true && \
+	. ./scripts/export-git-env-vars.sh && \
+	./scripts/docker/build.sh \
+		--deb-codename $(CODENAME) \
+		--service mina-rosetta \
+		--version "$$MINA_DOCKER_TAG" \
+		--deb-version "$$MINA_DEB_VERSION" \
+		--branch $(BRANCH_NAME) \
+		--network $(NETWORK_NAME) \
+		--deb-suffix generic \
+		--custom-suffix generic \
+		--load-only \
+		--no-cache
+
+	cp _build/mina-devnet-config_*.deb .
+
+	@export BUILD_DIR=./_build && \
+	export MINA_DEB_CODENAME=$(CODENAME) && \
+	export KEEP_MY_TAGS_INTACT=true && \
+	. ./scripts/export-git-env-vars.sh && \
+	./scripts/docker/build.sh \
+		--deb-codename $(CODENAME) \
+		--service mina-rosetta-config \
+		--version "$$MINA_DOCKER_TAG" \
+		--deb-version "$$MINA_DEB_VERSION" \
+		--branch $(BRANCH_NAME) \
+		--network $(NETWORK_NAME) \
+		--custom-suffix configured \
+		--custom-arg "--build-arg image_name=mina-rosetta" \
+		--no-cache \
+		--load-only
+
 
 	$(info 📦 stopping local Debian repository)
 	@./scripts/debian/aptly.sh stop

@@ -61,7 +61,7 @@ let ReleaseSpec =
           }
       , default =
           { deps = [] : List Command.TaggedKey.Type
-          , network = Network.Type.TestnetGeneric
+          , network = Network.Type.Devnet
           , arch = Arch.Type.Amd64
           , version = "\\\${MINA_DOCKER_TAG}"
           , service = Artifacts.Type.Daemon

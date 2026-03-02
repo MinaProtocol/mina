@@ -39,7 +39,6 @@ let fromNetwork =
       ->  merge
             { Devnet = Profile.Devnet
             , Mainnet = Profile.Mainnet
-            , TestnetGeneric = Profile.Devnet
             , PreMesa1 = Profile.Devnet
             }
             network
@@ -67,11 +66,17 @@ let toSuffixLowercase =
 let toLabelSegment =
           \(profile : Profile)
       ->  merge
-            { Devnet = "devnet"
+            { Devnet = "-devnet"
             , Mainnet = "-mainnet"
             , Lightnet = "-lightnet"
             , Dev = "-dev"
             }
+            profile
+
+let toExtraLabelSegment =
+          \(profile : Profile)
+      ->  merge
+            { Devnet = "", Mainnet = "", Lightnet = "-lightnet", Dev = "-dev" }
             profile
 
 in  { Type = Profile
@@ -82,4 +87,5 @@ in  { Type = Profile
     , fromNetwork = fromNetwork
     , toSuffixLowercase = toSuffixLowercase
     , toLabelSegment = toLabelSegment
+    , toExtraLabelSegment = toExtraLabelSegment
     }
