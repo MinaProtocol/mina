@@ -133,8 +133,6 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
           "SNARK work $work_ids received from $address. Starting proof \
            generation"
           ~metadata ;
-        let%bind () = after (Time.Span.of_sec 0.5) in
-        (* Pause to wait for stdout to flush *)
         let id = Spec.Partitioned.Poly.get_id partitioned_spec in
         match%bind
           Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec
