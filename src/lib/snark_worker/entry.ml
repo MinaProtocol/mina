@@ -77,8 +77,21 @@ let rec submit_work ~logger ~metadata ~shutdown_on_disconnect ~daemon_address
       log_result
         "Result $work_ids rejected by $address since it has wrong shape"
 
+(** Reads daemon address from a local coordinator file or uses a default.
+
+    Looks for snark_coordinator file; if present parses as host:port.
+    Falls back to default on parse failure or missing/unknown file.  *)
+let get_daemon_address default =
+  let path = "snark_coordinator" in
+  match%bind Sys.file_exists path with
+  | `Yes -> (
+      let%map s = Reader.file_contents path in
+      try Host_and_port.of_string (String.strip s) with _ -> default )
+  | `No | `Unknown ->
+      return default
+
 let main ~logger ~proof_level ~constraint_constants ~signature_kind
-    daemon_address shutdown_on_disconnect =
+    default_daemon_address shutdown_on_disconnect =
   let%bind state =
     Prod.Impl.Worker_state.create ~constraint_constants ~proof_level
       ~signature_kind ()
@@ -88,16 +101,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
   [%log debug] "Snark worker working directory $dir"
     ~metadata:[ ("dir", `String cwd) ] ;
   let rec go () =
-    let%bind daemon_address =
-      let path = "snark_coordinator" in
-      match%bind Sys.file_exists path with
-      | `Yes -> (
-          let%map s = Reader.file_contents path in
-          try Host_and_port.of_string (String.strip s)
-          with _ -> daemon_address )
-      | `No | `Unknown ->
-          return daemon_address
-    in
+    let%bind daemon_address = get_daemon_address default_daemon_address in
     [%log debug]
       !"Snark worker using daemon $addr"
       ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
