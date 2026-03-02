@@ -78,6 +78,83 @@ let emit_metrics ~logger ~elapsed = function
   | Sub_zkapp_command { spec = sub_zkapp_spec; _ } ->
       Metrics.emit_subzkapp_metrics ~logger ~sub_zkapp_spec ~elapsed
 
+let handle_result ~logger ~shutdown_on_disconnect daemon_address wire_result
+    metadata =
+  match%bind
+    submit_work ~logger ~metadata ~shutdown_on_disconnect ~daemon_address
+      wire_result ()
+  with
+  | Error e ->
+      [%log error] "Error submitting work"
+        ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+      after @@ Time.Span.of_sec @@ retry_pause 10.
+      >>| const (`Result (daemon_address, wire_result, metadata))
+  | Ok () ->
+      return `No_spec
+
+let handle_failed ~logger ~shutdown_on_disconnect daemon_address e
+    partitioned_id =
+  let%bind () =
+    match%map
+      dispatch Rpc_failed_to_generate_snark.Stable.Latest.rpc
+        shutdown_on_disconnect (e, partitioned_id) daemon_address
+    with
+    | Error e ->
+        [%log error] "Couldn't inform the daemon about the SNARK work failure"
+          ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+    | Ok () ->
+        ()
+  in
+  [%log error] "Error performing work"
+    ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+  after @@ Time.Span.of_sec @@ retry_pause 10. >>| const `No_spec
+
+let handle_spec ~logger ~state daemon_address partitioned_spec =
+  let metadata =
+    [ ("address", `String (Host_and_port.to_string daemon_address))
+    ; ( "work_ids"
+      , Spec.Partitioned.Stable.Latest.statement partitioned_spec
+        |> Mina_state.Snarked_ledger_state.to_yojson )
+    ]
+  in
+  [%log info]
+    "SNARK work $work_ids received from $address. Starting proof generation"
+    ~metadata ;
+  let partitioned_id = Spec.Partitioned.Poly.get_id partitioned_spec in
+  match%bind Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec with
+  | Error e ->
+      return (`Failed (daemon_address, e, partitioned_id))
+  | Ok ({ data = elapsed; _ } as data) ->
+      let wire_result =
+        Result.Partitioned.Stable.Latest.{ id = partitioned_id; data }
+      in
+      emit_metrics ~logger ~elapsed partitioned_spec ;
+      return (`Result (daemon_address, wire_result, metadata))
+
+let handle_no_spec ~logger ~shutdown_on_disconnect default_daemon_address =
+  let%bind daemon_address = get_daemon_address default_daemon_address in
+  [%log debug] "Snark worker using daemon $addr"
+    ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
+  match%bind
+    dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect ()
+      daemon_address
+  with
+  | Error e ->
+      [%log error] "Error getting work"
+        ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+      after @@ Time.Span.of_sec @@ retry_pause 10. >>| const `No_spec
+  | Ok None ->
+      let random_delay =
+        Prod.Impl.Worker_state.worker_wait_time
+        +. (0.5 *. Random.float Prod.Impl.Worker_state.worker_wait_time)
+      in
+      (* No work to be done -- quietly take a brief nap *)
+      [%log info] "No jobs available. Napping for $time seconds"
+        ~metadata:[ ("time", `Float random_delay) ] ;
+      after (Time.Span.of_sec random_delay) >>| const `No_spec
+  | Ok (Some partitioned_spec) ->
+      return (`Spec (daemon_address, partitioned_spec))
+
 let main ~logger ~proof_level ~constraint_constants ~signature_kind
     default_daemon_address shutdown_on_disconnect =
   let%bind state =
@@ -89,79 +166,16 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
     ~metadata:[ ("dir", `String cwd) ] ;
   Deferred.forever `No_spec
   @@ function
-  | `Result (daemon_address, wire_result, metadata) as result -> (
-      match%bind
-        submit_work ~logger ~metadata ~shutdown_on_disconnect ~daemon_address
-          wire_result ()
-      with
-      | Error e ->
-          [%log error] "Error submitting work"
-            ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-          after @@ Time.Span.of_sec @@ retry_pause 10. >>| const result
-      | Ok () ->
-          return `No_spec )
+  | `Result (daemon_address, wire_result, metadata) ->
+      handle_result ~logger ~shutdown_on_disconnect daemon_address wire_result
+        metadata
   | `Failed (daemon_address, e, partitioned_id) ->
-      let%bind () =
-        match%map
-          dispatch Rpc_failed_to_generate_snark.Stable.Latest.rpc
-            shutdown_on_disconnect (e, partitioned_id) daemon_address
-        with
-        | Error e ->
-            [%log error]
-              "Couldn't inform the daemon about the SNARK work failure"
-              ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-        | Ok () ->
-            ()
-      in
-      [%log error] "Error performing work"
-        ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-      after @@ Time.Span.of_sec @@ retry_pause 10. >>| const `No_spec
-  | `Spec (daemon_address, partitioned_spec) -> (
-      let metadata =
-        [ ("address", `String (Host_and_port.to_string daemon_address))
-        ; ( "work_ids"
-          , Spec.Partitioned.Stable.Latest.statement partitioned_spec
-            |> Mina_state.Snarked_ledger_state.to_yojson )
-        ]
-      in
-      [%log info]
-        "SNARK work $work_ids received from $address. Starting proof generation"
-        ~metadata ;
-      let partitioned_id = Spec.Partitioned.Poly.get_id partitioned_spec in
-      match%bind
-        Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec
-      with
-      | Error e ->
-          return (`Failed (daemon_address, e, partitioned_id))
-      | Ok ({ data = elapsed; _ } as data) ->
-          let wire_result =
-            Result.Partitioned.Stable.Latest.{ id = partitioned_id; data }
-          in
-          emit_metrics ~logger ~elapsed partitioned_spec ;
-          return (`Result (daemon_address, wire_result, metadata)) )
-  | `No_spec -> (
-      let%bind daemon_address = get_daemon_address default_daemon_address in
-      [%log debug] "Snark worker using daemon $addr"
-        ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
-      match%bind
-        dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect ()
-          daemon_address
-      with
-      | Error e ->
-          [%log error] "Error getting work"
-            ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-          after @@ Time.Span.of_sec @@ retry_pause 10. >>| const `No_spec
-      | Ok None ->
-          let random_delay =
-            Prod.Impl.Worker_state.worker_wait_time
-            +. (0.5 *. Random.float Prod.Impl.Worker_state.worker_wait_time)
-          in
-          (* No work to be done -- quietly take a brief nap *)
-          [%log info] "No jobs available. Napping for $time seconds"
-            ~metadata:[ ("time", `Float random_delay) ] ;
-          after (Time.Span.of_sec random_delay) >>| const `No_spec
-      | Ok (Some partitioned_spec) ->
-          return (`Spec (daemon_address, partitioned_spec)) )
+      handle_failed ~logger ~shutdown_on_disconnect daemon_address e
+        partitioned_id
+  | `Spec (daemon_address, partitioned_spec) ->
+      handle_spec ~logger ~state daemon_address partitioned_spec
+  | `No_spec ->
+      handle_no_spec ~logger ~shutdown_on_disconnect default_daemon_address
 
 let command_from_rpcs ~commit_id ~proof_level:default_proof_level
     ~constraint_constants =
