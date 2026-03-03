@@ -18,11 +18,7 @@ in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
-            [ Artifacts.Type.LogProc
-            , Artifacts.Type.Daemon
-            , Artifacts.Type.DaemonAppsOnly
-            , Artifacts.Type.DaemonConfig
-            ]
+            [ Artifacts.Type.LogProc, Artifacts.Type.DaemonAppsOnly ]
           , network = Network.Type.Devnet
           , profile = Profiles.Type.Lightnet
           , tags =
