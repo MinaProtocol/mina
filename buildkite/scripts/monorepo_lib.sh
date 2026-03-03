@@ -197,6 +197,8 @@ select_job() {
     # Remove quotes from beginning and end of string
     dirtyWhen="${dirtyWhen%\"}"
     dirtyWhen="${dirtyWhen#\"}"
+    # Unescape YAML-escaped backslashes (dhall-to-yaml outputs \\\\ for regex \\)
+    dirtyWhen="${dirtyWhen//\\\\/\\}"
     if cat "$git_diff_file" | grep -E "$dirtyWhen" > /dev/null; then
       echo 1
     else
