@@ -145,7 +145,8 @@ let toDebianName =
             , DaemonPrefork = "daemon_${Network.lowerName network}_prefork"
             , DaemonLegacyHardfork =
                 "daemon_${Network.lowerName network}_hardfork_config"
-            , DaemonAutoHardfork = ""
+            , DaemonAutoHardfork =
+                "daemon_${Network.lowerName network}_postfork"
             , DaemonAppsOnly = "daemon_${Network.lowerName network}_generic"
             , LogProc = "logproc"
             , Archive = "archive_${Network.lowerName network}"
