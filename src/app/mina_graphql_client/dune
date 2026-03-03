@@ -1,0 +1,12 @@
+(executable
+ (name mina_graphql_client_app)
+ (package mina_graphql_client_app)
+ (public_name mina-graphql-client)
+ (libraries
+  ;; opam libraries
+  async async_kernel core uri async_unix
+  ;; local libraries
+  mina_graphql_client graphql_lib logger mina_numbers currency signature_lib
+  mina_base mina_transaction)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_let ppx_mina)))
