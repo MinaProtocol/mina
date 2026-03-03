@@ -40,7 +40,8 @@ let Spec =
           , network : Network.Type
           , additionalDirtyWhen : List S.Type
           , softFail : B/SoftFail
-          , timeout : Natural
+          , syncTimeout : Natural
+          , newBlockTimeout : Natural
           , profile : Profiles.Type
           , scope : List PipelineScope.Type
           , repo : DockerRepo.Type
@@ -51,7 +52,8 @@ let Spec =
           , network = Network.Type.Devnet
           , additionalDirtyWhen = [] : List S.Type
           , softFail = B/SoftFail.Boolean False
-          , timeout = 1500
+          , syncTimeout = 1500
+          , newBlockTimeout = 600
           , profile = Profiles.Type.Devnet
           , scope = PipelineScope.Full
           , repo = DockerRepo.Type.InternalEurope
@@ -71,9 +73,10 @@ let command
                                                       spec.dockerType}"
                       , "source ./buildkite/scripts/export-git-env-vars.sh"
                       , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
-                                                                             spec.network} --tag \\\${MINA_DOCKER_TAG} --timeout ${Natural/show
-                                                                                                                                     spec.timeout} --repo ${DockerRepo.show
-                                                                                                                                                              spec.repo} --run-compatibility-test develop --run-load-test --branch \\\${BUILDKITE_BRANCH} --commit \\\${BUILDKITE_COMMIT} --metrics-mode --perf-output-file /workdir/rosetta.perf"
+                                                                             spec.network} --tag \\\${MINA_DOCKER_TAG} --sync-timeout ${Natural/show
+                                                                                                                                          spec.syncTimeout} --new-block-timeout ${Natural/show
+                                                                                                                                                                                    spec.newBlockTimeout} --repo ${DockerRepo.show
+                                                                                                                                                                                                                     spec.repo} --run-compatibility-test develop --run-load-test --branch \\\${BUILDKITE_BRANCH} --commit \\\${BUILDKITE_COMMIT} --metrics-mode --perf-output-file /workdir/rosetta.perf"
                       ]
                   ]
                 # RunInToolchain.runInToolchain
