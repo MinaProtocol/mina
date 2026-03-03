@@ -171,6 +171,7 @@ let get_account_data ~logger node_uri ~account_id =
                    impossible"
                 acc.nonce
           ; total_balance = acc.balance.total
+          ; delegate = acc.delegate
           ; liquid_balance_opt = acc.balance.liquid
           ; locked_balance_opt = acc.balance.locked
           }

@@ -113,6 +113,9 @@ module Get_account_data =
   query ($public_key: PublicKey!) @encoders(module: "Encoders"){
     account(publicKey: $public_key) {
       nonce
+      delegateAccount {
+        publicKey
+      }
       balance {
         total @ppxCustom(module: "Scalars.Balance")
       }
@@ -195,6 +198,14 @@ module Query_metrics =
         transactionPoolSize
       }
     }
+  }
+|}]
+
+module Genesis_ledger_export =
+[%graphql
+{|
+  query {
+    fork_config
   }
 |}]
 
