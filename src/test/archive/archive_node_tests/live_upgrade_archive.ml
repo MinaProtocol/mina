@@ -20,7 +20,6 @@ open Common
 type t = Mina_automation_fixture.Archive.after_bootstrap
 
 let test_case (test_data : t) =
-  let open Deferred.Let_syntax in
   let daemon = Daemon.default () in
   let archive_uri = test_data.archive.config.postgres_uri in
   let temp_dir = test_data.temp_dir in
@@ -28,7 +27,7 @@ let test_case (test_data : t) =
     unpack_precomputed_blocks ~temp_dir test_data.network_data
   in
   let logger = Logger.create () in
-  let log_file = temp_dir ^ "/live_upgrade.log" in
+  let log_file = temp_dir ^/ "live_upgrade.log" in
   let upgrade_path =
     Archive.Scripts.filepath `Upgrade
     |> Option.value_exn ~message:"Failed to find upgrade script"
@@ -51,12 +50,14 @@ let test_case (test_data : t) =
       ~sleep:5 precomputed_blocks
   in
   [%log info] "Loaded all precomputed blocks" ;
+
   let%bind () = Ivar.read upgrade_script_finished in
-  let%bind () =
+
+  let%map () =
     assert_replayer_run_against_last_block
       ~replayer_input_file_path:
         (Network_data.replayer_input_file_path test_data.network_data)
       archive_uri temp_dir
   in
 
-  Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+  Mina_automation_fixture.Intf.Passed
