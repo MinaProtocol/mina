@@ -786,6 +786,18 @@ copy_common_daemon_post_automode_apps_and_configs() {
 }
 
 
+## MESA POSTFORK PACKAGE ##
+
+#
+# Builds mina-mesa-postfork-mesa tailored package for automode package
+#
+# Output: mina-mesa-postfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Contains the postfork mesa binaries placed in "/usr/lib/mina/mesa",
+# dispatcher symlinks, configuration files, and mesa seed list.
+# Used as the post-hardfork runtime in automode packages.
+#
 build_daemon_mesa_postfork_deb() {
 
   NAME="mina-mesa-postfork-mesa"
@@ -804,6 +816,20 @@ build_daemon_mesa_postfork_deb() {
   build_deb $NAME
 }
 
+## END MESA POSTFORK PACKAGE ##
+
+## DEVNET POSTFORK PACKAGE ##
+
+#
+# Builds mina-devnet-postfork-mesa tailored package for automode package
+#
+# Output: mina-devnet-postfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Contains the postfork devnet binaries placed in "/usr/lib/mina/mesa",
+# dispatcher symlinks, configuration files, and devnet seed list.
+# Used as the post-hardfork runtime in automode packages.
+#
 build_daemon_devnet_postfork_deb() {
 
   NAME="mina-devnet-postfork-mesa"
@@ -821,6 +847,40 @@ build_daemon_devnet_postfork_deb() {
 
   build_deb $NAME
 }
+
+
+## END DEVNET POSTFORK PACKAGE ##
+
+## MAINNET POSTFORK PACKAGE ##
+
+#
+# Builds mina-mainnet-postfork-mesa tailored package for automode package
+#
+# Output: mina-mainnet-postfork-mesa_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Contains the postfork mainnet binaries placed in "/usr/lib/mina/mesa",
+# dispatcher symlinks, configuration files, and mainnet seed list.
+# Used as the post-hardfork runtime in automode packages.
+#
+build_daemon_mainnet_postfork_deb() {
+
+  NAME="mina-mainnet-postfork-mesa"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building mainnet postfork deb for hardfork automode :"
+
+  create_control_file $NAME "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_post_automode_apps_and_configs \
+    "mainnet" \
+    "mainnet" \
+    'seed-lists/mainnet_seeds.txt'
+
+  build_deb $NAME
+}
+## END MAINNET POSTFORK PACKAGE ##
 
 
 ## TESTNET GENERIC PACKAGE ##
