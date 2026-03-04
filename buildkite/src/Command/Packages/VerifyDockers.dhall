@@ -108,7 +108,7 @@ let verify
                   }
                   spec.buildFlag
 
-          let genericFlag = if spec.generic then "--generic " else ""
+          let genericFlag = if spec.generic then " --generic " else ""
 
           in      ". ./buildkite/scripts/export-git-env-vars.sh && "
               ++  "./buildkite/scripts/release/manager.sh verify "

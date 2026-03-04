@@ -127,7 +127,7 @@ let generateStep =
 
           let debSuffix =
                 merge
-                  { None = if spec.generic then "--deb-suffix generic" else ""
+                  { None = if spec.generic then " --deb-suffix generic" else ""
                   , Some = \(s : Text) -> " --deb-suffix " ++ s
                   }
                   spec.deb_suffix
