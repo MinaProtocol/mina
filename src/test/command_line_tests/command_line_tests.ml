@@ -14,7 +14,7 @@ module BackgroundMode = struct
       Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
     in
     let%bind process = Daemon.start daemon in
-    let%bind result = Daemon.Client.wait_for_bootstrap process.client () in
+    let%bind result = Daemon.wait_for_node_init process in
     let%bind () =
       match result with
       | Ok () ->
@@ -41,14 +41,10 @@ module DaemonRecover = struct
        Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
      in
      let%bind process = Daemon.start daemon in
-     let%bind.Deferred.Result () =
-       Daemon.Client.wait_for_bootstrap process.client ()
-     in
+     let%bind.Deferred.Result () = Daemon.wait_for_node_init process in
      let%bind.Deferred.Result _ = Daemon.Process.force_kill process in
      let%bind process = Daemon.start daemon in
-     let%bind.Deferred.Result () =
-       Daemon.Client.wait_for_bootstrap process.client ()
-     in
+     let%bind.Deferred.Result () = Daemon.wait_for_node_init process in
      let%map () = Daemon.Client.stop_daemon process.client in
      Ok () )
     >>| function
@@ -130,9 +126,7 @@ module ExportSnarkedLedger = struct
       Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
     in
     let%bind process = Daemon.start daemon in
-    let%bind bootstrap_result =
-      Daemon.Client.wait_for_bootstrap process.client ()
-    in
+    let%bind bootstrap_result = Daemon.wait_for_node_init process in
     let%bind bootstrap_ok =
       match bootstrap_result with
       | Ok () ->
@@ -435,7 +429,7 @@ module AutoHardforkConfigGeneration = struct
         ~block_producer_key:bp_key_path daemon
     in
     (* Wait for daemon to bootstrap *)
-    let%bind result = Daemon.Client.wait_for_bootstrap process.client () in
+    let%bind result = Daemon.wait_for_node_init process in
     let%bind () =
       match result with
       | Ok () ->
@@ -615,7 +609,7 @@ module ConfigFileOverride = struct
     |> Yojson.Safe.to_file override_file ;
     (* Start daemon with override config file *)
     let%bind process = Daemon.start ~config_files:[ override_file ] daemon in
-    let%bind result = Daemon.Client.wait_for_bootstrap process.client () in
+    let%bind result = Daemon.wait_for_node_init process in
     let%bind () =
       match result with
       | Ok () ->
@@ -634,10 +628,10 @@ module ConfigFileOverride = struct
     in
     let%bind () = Daemon.Client.stop_daemon process.client in
     (* Parse and verify the merged config *)
-    let of_option opt ~error =
-      Result.of_option opt ~error:(Error.of_string error) |> Deferred.return
-    in
-    let verification =
+    let validate () =
+      let of_option opt ~error =
+        Result.of_option opt ~error:(Error.of_string error) |> Deferred.return
+      in
       let open Deferred.Or_error.Let_syntax in
       let%bind merged_config =
         Yojson.Safe.from_string output
@@ -687,11 +681,13 @@ module ConfigFileOverride = struct
             Deferred.Or_error.error_string
               "Merged config missing ledger (should be preserved from base)"
       in
-      Deferred.Or_error.return ()
-    in
-    verification
+      in
+    validate ()
     >>| function
-    | Ok () -> Mina_automation_fixture.Intf.Passed | Error err -> Failed err
+    | Ok () ->
+        Mina_automation_fixture.Intf.Passed
+    | Error err ->
+        Mina_automation_fixture.Intf.Failed err
 end
 
 module PeerListUrlInvalidScheme = struct

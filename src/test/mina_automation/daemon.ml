@@ -44,46 +44,6 @@ module Client = struct
     in
     ()
 
-  (** [daemon_status t] retrieves the status of the daemon running on the specified port.
-    It executes the command `client status -daemon-port <port>` using the provided executor.
-    
-    @param t The daemon instance containing the executor and port information.
-    @return The result of the executor run, which may be ignored if the command fails.
-  *)
-  let daemon_status t =
-    Executor.run t.executor
-      ~args:[ "client"; "status"; "-daemon-port"; string_of_int t.port ]
-      ~ignore_failure:true ()
-
-  (** [wait_for_bootstrap t ?client_delay ?retry_delay ?retry_attempts ()] waits for the daemon to bootstrap.
-    @param t The daemon instance containing the executor and port information.
-    @param client_delay The delay before connecting to the daemon.
-    @param retry_delay The delay between retries.
-    @param retry_attempts The number of retries.
-    @return A deferred result indicating the success or failure of the operation. 
-  *)
-  let wait_for_bootstrap t ?(client_delay = 60.) ?(retry_delay = 60.)
-      ?(retry_attempts = 40) () =
-    Async.printf "Waiting initial %d s. before connecting\n"
-      (int_of_float client_delay) ;
-    let%bind _ =
-      Deferred.map (after @@ Time.Span.of_sec client_delay) ~f:Or_error.return
-    in
-    let rec go retries_remaining =
-      let%bind output = daemon_status t in
-      Async.printf "%s" output ;
-      if String.is_substring output ~substring:"Synced" then
-        Deferred.Or_error.ok_unit
-      else if retries_remaining > 0 then (
-        Async.printf "Daemon not responding.. retrying (%i/%i)\n"
-          (retry_attempts - retries_remaining)
-          retry_attempts ;
-        let%bind () = after @@ Time.Span.of_sec retry_delay in
-        go (retries_remaining - 1) )
-      else Deferred.Or_error.error_string output
-    in
-    go retry_attempts
-
   let ledger_hash t ~ledger_file =
     Executor.run t.executor
       ~args:[ "ledger"; "hash"; "--ledger-file"; ledger_file ]
@@ -209,6 +169,71 @@ module Process = struct
   *)
   let force_kill t = Utils.force_kill t.process
 end
+
+let wait_for_node_init ?(initial_delay_sec = 10.) ?(poll_interval_sec = 5.)
+    ?(timeout_sec = 600.) (process : Process.t) =
+  let node_uri =
+    Uri.make ~scheme:"http" ~host:"localhost" ~port:process.config.rest_port
+      ~path:"/graphql" ()
+  in
+  let log_filter =
+    [ Structured_log_events.string_of_id
+        Transition_router
+        .starting_transition_frontier_controller_structured_events_id
+    ]
+  in
+  Async.printf "Waiting initial %.0f s. before connecting to GraphQL\n"
+    initial_delay_sec ;
+  let%bind () = after @@ Time.Span.of_sec initial_delay_sec in
+  let rec start_filter () =
+    match%bind
+      Mina_graphql_client.Client.start_filtered_log node_uri ~logger ~log_filter
+        ~retry_delay_sec:poll_interval_sec
+    with
+    | Ok () ->
+        Deferred.Or_error.return ()
+    | Error _ ->
+        Async.printf "GraphQL not ready, retrying...\n" ;
+        let%bind () = after @@ Time.Span.of_sec poll_interval_sec in
+        start_filter ()
+  in
+  let deadline = Time.add (Time.now ()) (Time.Span.of_sec timeout_sec) in
+  let%bind filter_result =
+    Deferred.choose
+      [ Deferred.choice (start_filter () >>| fun r -> `Result r) Fn.id
+      ; Deferred.choice
+          (after @@ Time.Span.of_sec timeout_sec >>| fun () -> `Timeout)
+          Fn.id
+      ]
+  in
+  match filter_result with
+  | `Timeout ->
+      Deferred.Or_error.error_string
+        "Timed out waiting for GraphQL server to become available"
+  | `Result (Error e) ->
+      Deferred.return (Error e)
+  | `Result (Ok ()) ->
+      let rec poll () =
+        if Time.( >= ) (Time.now ()) deadline then
+          Deferred.Or_error.error_string
+            "Timed out waiting for node initialization event"
+        else
+          let%bind entries =
+            Mina_graphql_client.Client.get_filtered_log_entries
+              ~last_log_index_seen:0 node_uri
+          in
+          match entries with
+          | Ok msgs when Array.length msgs > 0 ->
+              Async.printf "Node initialization detected via GraphQL\n" ;
+              Deferred.Or_error.ok_unit
+          | Ok _ ->
+              let%bind () = after @@ Time.Span.of_sec poll_interval_sec in
+              poll ()
+          | Error _ ->
+              let%bind () = after @@ Time.Span.of_sec poll_interval_sec in
+              poll ()
+      in
+      poll ()
 
 let archive_blocks t ~archive_address ~format blocks =
   let format_arg =
