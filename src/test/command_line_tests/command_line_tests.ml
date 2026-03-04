@@ -885,6 +885,159 @@ module PeerListUrlValidHttps = struct
                    (Core.Signal.to_string signal) ) ) )
 end
 
+(** Verify the daemon sends node-status reports to the configured URL.
+
+    Starts a mock HTTP server, boots the daemon with [--node-status-url]
+    pointing at it, waits for bootstrap, then polls the mock for collected
+    payloads and validates expected JSON fields are present. *)
+module NodeStatusReport = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let mock_server_port =
+    match Sys.getenv "MINA_NODE_STATUS_MOCK_PORT" with
+    | Some s -> (
+        match Option.try_with (fun () -> Int.of_string s) with
+        | Some port ->
+            port
+        | None ->
+            19876 )
+    | None ->
+        19876
+
+  let required_status_fields =
+    [ "block_height_at_best_tip"; "sync_status"; "peer_id" ]
+
+  (** Extract the inner payload: if the top-level object has a ["data"] key
+      use its value, otherwise use the object as-is. *)
+  let extract_data json =
+    match json with
+    | `Assoc fields -> (
+        match List.Assoc.find fields ~equal:String.equal "data" with
+        | Some d ->
+            d
+        | None ->
+            json )
+    | _ ->
+        json
+
+  (** Check that all [required_status_fields] are present in [json]. *)
+  let validate_status_payload raw_body =
+    try
+      let data = Yojson.Safe.from_string raw_body |> extract_data in
+      let has_field name =
+        match data with
+        | `Assoc fields ->
+            List.Assoc.mem fields ~equal:String.equal name
+        | _ ->
+            false
+      in
+      let missing =
+        List.filter required_status_fields ~f:(fun f -> not (has_field f))
+      in
+      if List.is_empty missing then Ok ()
+      else
+        Error
+          (sprintf "Missing fields in node status: %s"
+             (String.concat ~sep:", " missing) )
+    with exn -> Error (sprintf "Invalid JSON: %s" (Exn.to_string exn))
+
+  (** Poll [/collected-status] until at least one payload arrives. *)
+  let poll_for_status ~port ~timeout_min =
+    let start_time = Core.Time.now () in
+    let timeout = Core.Time.Span.of_min timeout_min in
+    let rec go () =
+      let%bind statuses = Node_status_mock_server.collected_status ~port in
+      if not (List.is_empty statuses) then Deferred.return (Ok statuses)
+      else if
+        Core.Time.Span.( > )
+          (Core.Time.diff (Core.Time.now ()) start_time)
+          timeout
+      then Deferred.return (Error "Timed out waiting for node status reports")
+      else
+        let%bind () = after (Core.Time.Span.of_sec 5.) in
+        go ()
+    in
+    go ()
+
+  let test_case (test : t) =
+    let port = mock_server_port in
+    let mock_ref = ref None in
+    let process_ref = ref None in
+    Monitor.protect
+      (fun () ->
+        (* 1. Start mock server *)
+        let%bind mock = Node_status_mock_server.start ~port in
+        mock_ref := Some mock ;
+        let%bind () = Node_status_mock_server.health_check ~port () in
+        (* 2. Setup and start daemon *)
+        let daemon = Daemon.of_config test.config in
+        let%bind () = Daemon.Config.generate_keys test.config in
+        let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+        let%bind () =
+          Mina_automation_fixture.Daemon.generate_random_config daemon
+            ledger_file
+        in
+        let status_url = sprintf "http://localhost:%d/node-status" port in
+        let%bind process =
+          Daemon.start ~node_status_url:status_url ~simplified_node_stats:false
+            daemon
+        in
+        process_ref := Some process ;
+        (* 3. Wait for bootstrap *)
+        let%bind result = Daemon.Client.wait_for_bootstrap process.client () in
+        match result with
+        | Error e ->
+            let () = printf "Error:\n%s\n" (Error.to_string_hum e) in
+            let log_file = Daemon.Config.ConfigDirs.mina_log test.config.dirs in
+            let%bind logs = Reader.file_contents log_file in
+            let () = printf "Daemon logs:\n%s\n" logs in
+            let%bind () = Writer.flushed (Lazy.force Writer.stdout) in
+            Deferred.return
+              (Mina_automation_fixture.Intf.Failed
+                 (Error.tag e ~tag:"Bootstrap failed") )
+        | Ok () ->
+            (* 4. Poll for status reports *)
+            let%bind status_result = poll_for_status ~port ~timeout_min:3. in
+            (* 5. Validate *)
+            Deferred.return
+              ( match status_result with
+              | Error msg ->
+                  Mina_automation_fixture.Intf.Failed (Error.of_string msg)
+              | Ok statuses -> (
+                  match validate_status_payload (List.hd_exn statuses) with
+                  | Ok () ->
+                      Mina_automation_fixture.Intf.Passed
+                  | Error msg ->
+                      Mina_automation_fixture.Intf.Failed (Error.of_string msg)
+                  ) ) )
+      ~finally:(fun () ->
+        let%bind () =
+          match !process_ref with
+          | None ->
+              Deferred.unit
+          | Some process -> (
+              let%bind stop_result =
+                Monitor.try_with (fun () ->
+                    Daemon.Client.stop_daemon process.client )
+              in
+              match stop_result with
+              | Ok () ->
+                  Deferred.unit
+              | Error _exn ->
+                  (* Fall back to forcefully killing the daemon; ignore any errors *)
+                  let%map _ =
+                    Monitor.try_with (fun () ->
+                        Daemon.Process.force_kill process )
+                  in
+                  () )
+        in
+        match !mock_ref with
+        | None ->
+            Deferred.unit
+        | Some mock ->
+            Node_status_mock_server.stop mock )
+end
+
 let () =
   let open Alcotest in
   run "Test commadline."
@@ -1015,5 +1168,13 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (PeerListUrlHttpWarning) ) )
+        ] )
+    ; ( "node-status-report"
+      , [ test_case
+            "The mina daemon sends node status reports to configured URL" `Slow
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (NodeStatusReport) ) )
         ] )
     ]
