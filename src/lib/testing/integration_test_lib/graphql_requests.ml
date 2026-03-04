@@ -66,5 +66,5 @@ let export_genesis_ledger ~logger node_uri =
   Result.bind response (fun r ->
       (r.Graphql.Genesis_ledger_export.fork_config :> Yojson.Safe.t)
       |> Runtime_config.of_yojson
-      |> Result.map_error (fun msg -> Error.of_string msg) )
+      |> Result.map_error (fun msg -> Core.Error.of_string msg) )
   |> Malleable_error.or_hard_error

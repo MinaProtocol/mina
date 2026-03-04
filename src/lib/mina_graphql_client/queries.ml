@@ -201,9 +201,7 @@ module Query_metrics =
   }
 |}]
 
-module Genesis_ledger_export =
-[%graphql
-{|
+module Genesis_ledger_export = [%graphql {|
   query {
     fork_config
   }
