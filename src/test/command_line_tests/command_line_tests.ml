@@ -637,55 +637,61 @@ module ConfigFileOverride = struct
     let of_option opt ~error =
       Result.of_option opt ~error:(Error.of_string error) |> Deferred.return
     in
-    let open Deferred.Or_error.Let_syntax in
-    let%bind merged_config =
-      Yojson.Safe.from_string output
-      |> Runtime_config.of_yojson
-      |> Result.map_error ~f:Error.of_string
-      |> Deferred.return
-    in
-    (* Verify fork B won (override) *)
-    let%bind proof =
-      of_option merged_config.proof ~error:"Merged config missing proof field"
-    in
-    let%bind fork =
-      of_option proof.fork ~error:"Merged config missing proof.fork field"
-    in
-    let%bind () =
-      if Runtime_config.Fork_config.equal fork fork_b then
-        Deferred.Or_error.return ()
-      else
-        Deferred.Or_error.error_string
-          "Merged proof.fork does not match expected fork B"
-    in
-    (* Verify daemon.network_id preserved from base *)
-    let%bind daemon_merged =
-      of_option merged_config.daemon ~error:"Merged config missing daemon field"
-    in
-    let expected_network_id = "obvious-base-config-network-id-for-test" in
-    let%bind () =
-      match daemon_merged.network_id with
-      | Some id when String.equal id expected_network_id ->
+    let verification =
+      let open Deferred.Or_error.Let_syntax in
+      let%bind merged_config =
+        Yojson.Safe.from_string output
+        |> Runtime_config.of_yojson
+        |> Result.map_error ~f:Error.of_string
+        |> Deferred.return
+      in
+      (* Verify fork B won (override) *)
+      let%bind proof =
+        of_option merged_config.proof ~error:"Merged config missing proof field"
+      in
+      let%bind fork =
+        of_option proof.fork ~error:"Merged config missing proof.fork field"
+      in
+      let%bind () =
+        if Runtime_config.Fork_config.equal fork fork_b then
           Deferred.Or_error.return ()
-      | Some id ->
+        else
           Deferred.Or_error.error_string
-            (sprintf "daemon.network_id is %s, expected %s" id
-               expected_network_id )
-      | None ->
-          Deferred.Or_error.error_string
-            (sprintf "daemon.network_id is None, expected Some %s"
-               expected_network_id )
+            "Merged proof.fork does not match expected fork B"
+      in
+      (* Verify daemon.network_id preserved from base *)
+      let%bind daemon_merged =
+        of_option merged_config.daemon
+          ~error:"Merged config missing daemon field"
+      in
+      let expected_network_id = "obvious-base-config-network-id-for-test" in
+      let%bind () =
+        match daemon_merged.network_id with
+        | Some id when String.equal id expected_network_id ->
+            Deferred.Or_error.return ()
+        | Some id ->
+            Deferred.Or_error.error_string
+              (sprintf "daemon.network_id is %s, expected %s" id
+                 expected_network_id )
+        | None ->
+            Deferred.Or_error.error_string
+              (sprintf "daemon.network_id is None, expected Some %s"
+                 expected_network_id )
+      in
+      (* Verify ledger preserved from base *)
+      let%bind () =
+        match merged_config.ledger with
+        | Some _ ->
+            Deferred.Or_error.return ()
+        | None ->
+            Deferred.Or_error.error_string
+              "Merged config missing ledger (should be preserved from base)"
+      in
+      Deferred.Or_error.return ()
     in
-    (* Verify ledger preserved from base *)
-    let%bind () =
-      match merged_config.ledger with
-      | Some _ ->
-          Deferred.Or_error.return ()
-      | None ->
-          Deferred.Or_error.error_string
-            "Merged config missing ledger (should be preserved from base)"
-    in
-    Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+    verification
+    >>| function
+    | Ok () -> Mina_automation_fixture.Intf.Passed | Error err -> Failed err
 end
 
 let () =
