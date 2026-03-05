@@ -696,7 +696,7 @@ end
 
 let () =
   let open Alcotest in
-  run "Test commadline."
+  run "Test commandline."
     [ ( "new-background"
       , [ test_case "The mina daemon works in background mode" `Quick
             (Mina_automation_runner.Runner.run_blocking
@@ -742,7 +742,7 @@ let () =
         ] )
     ; ( "advanced-compile-time-constants"
       , [ test_case
-            "The mina cli does not print log when printing compile time \
+            "The mina cli does not print log when printing compile-time \
              constants"
             `Quick
             (Mina_automation_runner.Runner.run_blocking
@@ -752,7 +752,7 @@ let () =
         ] )
     ; ( "advanced-constraint-system-digests"
       , [ test_case
-            "The mina cli does not print log when printing constrain system \
+            "The mina cli does not print log when printing constraint system \
              digests"
             `Quick
             (Mina_automation_runner.Runner.run_blocking
