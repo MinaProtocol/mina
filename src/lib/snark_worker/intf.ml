@@ -60,7 +60,7 @@ end
 
 module type Rpcs_versioned_S = sig
   module Get_work : sig
-    module V2 : sig
+    module V3 : sig
       type query = unit [@@deriving bin_io]
 
       type response =
@@ -71,7 +71,7 @@ module type Rpcs_versioned_S = sig
       val rpc : (query, response) Rpc.Rpc.t
     end
 
-    module Latest = V2
+    module Latest = V3
   end
 
   module Submit_work : sig
@@ -87,7 +87,7 @@ module type Rpcs_versioned_S = sig
   end
 
   module Failed_to_generate_snark : sig
-    module V2 : sig
+    module V3 : sig
       type query =
         Error.t
         * Selector.Spec.Stable.Latest.t
@@ -99,6 +99,6 @@ module type Rpcs_versioned_S = sig
       val rpc : (query, response) Rpc.Rpc.t
     end
 
-    module Latest = V2
+    module Latest = V3
   end
 end
