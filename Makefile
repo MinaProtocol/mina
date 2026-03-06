@@ -496,9 +496,9 @@ test-ppx: ## Test PPX extensions
 .PHONY: run-test-executive
 run-test-executive: ## Run the test executive locally, with the given images
 	@command -v mina-test-executive >/dev/null || \
-		{ echo "mina-test-executive not found in PATH. Use `make install`" >&2; exit 1; }
+		{ echo "mina-test-executive not found in PATH. Use 'make install'" >&2; exit 1; }
 	@command -v mina-logproc >/dev/null || \
-		{ echo "mina-logproc not found in PATH. Use `make install`" >&2; exit 1; }
+		{ echo "mina-logproc not found in PATH. Use 'make install'" >&2; exit 1; }
 	@test -n "$(TEST_NAME)" || (echo "TEST_NAME is not set" >&2; exit 1)
 	@test -n "$(MINA_IMAGE)" || (echo "MINA_IMAGE is not set. It should be a docker image" >&2; exit 1)
 	@test -n "$(ARCHIVE_IMAGE)" || (echo "ARCHIVE_IMAGE is not set. It should be docker image" >&2; exit 1)

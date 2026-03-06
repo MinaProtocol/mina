@@ -45,4 +45,4 @@ source buildkite/scripts/debian/update.sh --verbose
 source buildkite/scripts/debian/install.sh "mina-test-executive"
 
 # This should be shared with a local UX
-make -C ../../ run-test-executive
+make run-test-executive
