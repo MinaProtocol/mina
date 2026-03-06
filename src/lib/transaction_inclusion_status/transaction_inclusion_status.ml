@@ -50,4 +50,3 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
           (Transaction_hash.hash_command cmd)
       then State.Pending
       else State.Unknown
-
