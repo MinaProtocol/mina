@@ -54,7 +54,9 @@ let test_data_roundtrip () =
          let blocks, root_block_hash = blocks_of_data ~max_block_size data in
          let result = Or_error.ok_exn (data_of_blocks blocks root_block_hash) in
          if not (Bigstring.equal data result) then
-           failwithf "Data roundtrip failed: expected length %d, got length %d"
+           failwithf
+             "Data roundtrip failed: data content mismatch (expected length \
+              %d, got length %d)"
              (Bigstring.length data) (Bigstring.length result) () ) )
 
 let test_schema_consistency () =
@@ -90,7 +92,8 @@ let test_aligned_data_roundtrip () =
     ()
     ( if not (Bigstring.equal data result) then
       failwithf
-        "Aligned data roundtrip failed: expected length %d, got length %d"
+        "Aligned data roundtrip failed: data content mismatch (expected length \
+         %d, got length %d)"
         (Bigstring.length data) (Bigstring.length result) () )
 
 let () =
