@@ -15,9 +15,9 @@
   mina_signature_kind
   mina_stdlib
   network_pool
-  proof_cache_tag
   pipe_lib
   precomputed_values
+  proof_cache_tag
   signature_lib
   transaction_inclusion_status
   transition_frontier
