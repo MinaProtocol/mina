@@ -1,7 +1,41 @@
+(** ZkApp account state and related types.
+
+    This module defines the zkApp-specific state that can be attached to an
+    account. zkApp accounts can store application state, emit events and
+    actions, and be authorized by zero-knowledge proofs.
+
+    {2 Application State}
+
+    Each zkApp account has 8 field elements of application state that can
+    store arbitrary data defined by the zkApp developer. This state is
+    updated via account updates with proof authorization.
+
+    {2 Events and Actions}
+
+    zkApps can emit two types of data:
+    - {!module:Events}: Ephemeral data emitted during execution, queryable
+      via archive nodes but not stored on-chain
+    - {!module:Actions}: Sequenced data that updates the [action_state],
+      enabling zkApps to process actions in a verifiable manner
+
+    Both are represented as arrays of field elements, with encoding
+    determined by the zkApp developer.
+
+    {2 Verification Keys}
+
+    The [verification_key] field stores the zkSNARK verification key used
+    to authorize proof-based account updates. This key is hashed and the
+    hash is included in signed data to ensure proofs are verified against
+    the expected key. *)
+
 open Core_kernel
 open Snark_params.Tick
 open Zkapp_basic
 
+(** A single event: an array of field elements.
+
+    The encoding of event data is determined by the zkApp developer. Events
+    are hashed using the zkapp_event hash prefix. *)
 module Event = struct
   (* Arbitrary hash input, encoding determined by the zkApp's developer. *)
   type t = Field.t array [@@deriving compare, sexp]
@@ -18,6 +52,10 @@ module Event = struct
     Generator.map ~f:Array.of_list @@ Generator.list Field.gen
 end
 
+(** Functor for creating event/action list types with proper hashing.
+
+    Events and actions are stored as lists that are hashed into a single
+    field element using a Merkle-list-like construction. *)
 module Make_events (Inputs : sig
   val salt_phrase : string
 
@@ -92,6 +130,10 @@ struct
       ~name:Inputs.deriver_name events obj
 end
 
+(** Events emitted by zkApp account updates.
+
+    Events are ephemeral data that can be queried from archive nodes but
+    are not stored on-chain. Useful for logging and off-chain indexing. *)
 module Events = struct
   include Make_events (struct
     let salt_phrase = "MinaZkappEventsEmpty"
@@ -102,6 +144,7 @@ module Events = struct
   end)
 end
 
+(** Internal implementation for actions. *)
 module Actions_impl = Make_events (struct
   let salt_phrase = "MinaZkappActionsEmpty"
 
@@ -110,6 +153,12 @@ module Actions_impl = Make_events (struct
   let deriver_name = "Actions"
 end)
 
+(** Actions (sequenced events) emitted by zkApp account updates.
+
+    Unlike events, actions update the account's [action_state] field,
+    creating a verifiable sequence that zkApps can process. The action
+    state is a rolling hash of all actions, enabling zkApps to prove
+    they have processed all actions up to a certain point. *)
 module Actions = struct
   type var = Actions_impl.var
 
@@ -145,6 +194,10 @@ module Actions = struct
     , empty_stack_msg )]
 end
 
+(** URI storage for zkApp metadata.
+
+    A string (max 255 characters) that can store a URI pointing to
+    additional zkApp metadata, documentation, or frontend. *)
 module Zkapp_uri = struct
   [%%versioned_binable
   module Stable = struct
@@ -192,6 +245,19 @@ module Zkapp_uri = struct
     (sexp_of_t, t_of_sexp, equal, to_yojson, of_yojson, max_length, check)]
 end
 
+(** Polymorphic zkApp account type.
+
+    Parameterized to support different representations for values and
+    circuit variables.
+
+    Fields:
+    - [app_state]: 8 field elements of application-defined state
+    - [verification_key]: Optional VK for proof authorization
+    - [zkapp_version]: Version number for the zkApp contract
+    - [action_state]: 5 field elements tracking action history
+    - [last_action_slot]: Slot when actions were last emitted
+    - [proved_state]: Whether state was set by a proof (vs signature)
+    - [zkapp_uri]: URI pointing to zkApp metadata *)
 module Poly = struct
   [%%versioned
   module Stable = struct
@@ -254,6 +320,7 @@ type t =
 
 let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
+(** SNARK circuit representation of zkApp account state. *)
 module Checked = struct
   type t =
     ( Pickles.Impls.Step.Field.t Zkapp_state.V.t
@@ -389,6 +456,10 @@ let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
     ~zkapp_uri:(f zkapp_uri_to_input)
   |> List.reduce_exn ~f:append
 
+(** Default zkApp account state.
+
+    Used when converting a regular account to a zkApp account. All state
+    is zeroed, no verification key, and proved_state is false. *)
 let default : _ Poly.t =
   (* These are the permissions of a "user"/"non zkapp" account. *)
   { app_state =
@@ -404,10 +475,12 @@ let default : _ Poly.t =
   ; zkapp_uri = ""
   }
 
+(** Compute the cryptographic hash of a zkApp account. *)
 let digest (t : t) =
   Random_oracle.(
     hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
 
+(** Hash of the default zkApp account. Computed lazily. *)
 let default_digest = lazy (digest default)
 
 let action_state_deriver obj =
@@ -416,6 +489,7 @@ let action_state_deriver obj =
   let open Pickles_types.Vector.Vector_5 in
   iso ~map:of_list_exn ~contramap:to_list (list_5 (o ())) obj
 
+(** GraphQL deriver for zkApp accounts. *)
 let deriver obj =
   let open Fields_derivers_zkapps in
   let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
@@ -428,6 +502,7 @@ let deriver obj =
        ~last_action_slot:!.global_slot_since_genesis
        ~proved_state:!.bool ~zkapp_uri:!.string obj
 
+(** Generator for random URIs (for testing). *)
 let gen_uri =
   let open Quickcheck in
   let open Generator.Let_syntax in
@@ -437,6 +512,7 @@ let gen_uri =
   let%map domain = Generator.of_list [ "com"; "org"; "net"; "info" ] in
   Printf.sprintf "https://%s.%s" (String.concat ~sep:"." parts) domain
 
+(** Quickcheck generator for random zkApp accounts. *)
 let gen : t Quickcheck.Generator.t =
   let open Quickcheck in
   let open Generator.Let_syntax in
@@ -454,6 +530,10 @@ let gen : t Quickcheck.Generator.t =
   ; zkapp_uri
   }
 
+(** ZkApp account type for the Mesa hardfork.
+
+    Reflects format changes during the Mesa hardfork, such as expanding
+    the app_state from 8 to 32 slots. *)
 module Hardfork = struct
   type t =
     ( Zkapp_state.Hardfork.Value.t
