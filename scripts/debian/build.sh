@@ -38,8 +38,13 @@ resolve_and_build_package() {
     return
   fi
 
-  if [[ "$package" =~ ^daemon_(mainnet|devnet|mesa)_(config|generic|hardfork_config|prefork)$ ]]; then
+  if [[ "$package" =~ ^daemon_(mainnet|devnet|mesa)_(config|generic|hardfork_config|prefork|postfork)$ ]]; then
     "build_daemon_${BASH_REMATCH[2]}_deb" "${BASH_REMATCH[1]}"
+    return
+  fi
+
+  if [[ "$package" =~ ^prefork_(mainnet|devnet|mesa)_genesis_ledger$ ]]; then
+    build_prefork_genesis_ledger_deb "${BASH_REMATCH[1]}"
     return
   fi
 

@@ -870,7 +870,7 @@ test_build_delegation_verify_deb() {
 }
 
 test_build_prefork_devnet_genesis_ledger_deb() {
-    safe_build build_prefork_devnet_genesis_ledger_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_prefork_genesis_ledger_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-create-devnet-prefork-genesis-ledger" "$CAPTURED_DEB_NAME"
@@ -881,7 +881,7 @@ test_build_prefork_devnet_genesis_ledger_deb() {
 }
 
 test_build_prefork_mainnet_genesis_ledger_deb() {
-    safe_build build_prefork_mainnet_genesis_ledger_deb || { log_fail "build exited non-zero"; return; }
+    safe_build build_prefork_genesis_ledger_deb mainnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
     assert_eq "deb name" "mina-create-mainnet-prefork-genesis-ledger" "$CAPTURED_DEB_NAME"
