@@ -38,7 +38,7 @@ resolve_and_build_package() {
     return
   fi
 
-  if [[ "$package" =~ ^daemon_(mainnet|devnet)_(config|generic|hardfork_config|prefork)$ ]]; then
+  if [[ "$package" =~ ^daemon_(mainnet|devnet|mesa)_(config|generic|hardfork_config|prefork)$ ]]; then
     "build_daemon_${BASH_REMATCH[2]}_deb" "${BASH_REMATCH[1]}"
     return
   fi

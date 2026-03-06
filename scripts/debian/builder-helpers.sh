@@ -701,7 +701,7 @@ build_daemon_devnet_postfork_deb() {
 
   copy_common_daemon_post_automode_apps_and_configs \
     "devnet" \
-    "testnet" \
+    "mesa" \
     'seed-lists/devnet_seeds.txt'
 
   build_deb $NAME
