@@ -84,7 +84,7 @@ signature_of_network() {
     mainnet)
       printf "mainnet"
       ;;
-    devnet)
+    devnet|mesa)
       printf "testnet"
       ;;
     *)
@@ -280,7 +280,7 @@ copy_common_daemon_configs() {
   # devnet/mainnet also copy the magic config (config_$GITHASH_CONFIG.json).
   # This config is automatically picked up by the daemon on startup.
   case "${NETWORK_NAME}" in
-    devnet|mainnet)
+    devnet|mainnet|mesa)
       cp ../genesis_ledgers/"${NETWORK_NAME}".json \
         "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
       cp ../genesis_ledgers/${NETWORK_NAME}.json "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
@@ -508,11 +508,15 @@ build_daemon_deb() {
   case "${network}" in
     mainnet)
       package_name="mina-mainnet"
-      seed_list_url="mina-seed-lists/${network}_seeds.txt"
+      seed_list_url='mina-seed-lists/mainnet_seeds.txt'
       ;;
     devnet)
       package_name="${MINA_DEB_NAME}"
-      seed_list_url="seed-lists/${network}_seeds.txt"
+      seed_list_url='seed-lists/devnet_seeds.txt'
+      ;;
+    mesa)
+      package_name="mina-mesa"
+      seed_list_url='o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt'
       ;;
     *)
       echo "Unknown network name provided: ${network}"; exit 1
@@ -894,6 +898,9 @@ build_archive_deb () {
     devnet)
       package_name="$MINA_ARCHIVE_DEB_NAME"
       ;;
+    mesa)
+      package_name="mina-archive-mesa${DEB_SUFFIX}"
+      ;;
     *)
       echo "Unknown network name provided: ${network}" >&2
       exit 1
@@ -986,6 +993,36 @@ build_prefork_devnet_genesis_ledger_deb() {
   echo "--- Building Mina Generic devnet create prefork genesis tool:"
 
   DEB_NAME="mina-create-devnet-prefork-genesis-ledger"
+
+  create_control_file "$DEB_NAME" \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Utility to verify post hardfork ledger for Mina'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binaries
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
+
+  build_deb "$DEB_NAME"
+}
+
+## CREATE MESA PREFORK GENESIS PACKAGE ##
+
+#
+# Builds mina-create-prefork-genesis package for prefork genesis creation
+#
+# Output: mina-create-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Utility for creating prefork genesis ledgers for postfork verification.
+# Contains the runtime_genesis_ledger tool for Mina protocol.
+#
+build_prefork_mesa_genesis_ledger_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Generic mesa create prefork genesis tool:"
+
+  DEB_NAME="mina-create-mesa-prefork-genesis-ledger"
 
   create_control_file "$DEB_NAME" \
     "${SHARED_DEPS}${DAEMON_DEPS}" \
