@@ -240,8 +240,11 @@ module Make_str (A : Wire_types.Concrete) = struct
     module V1 = struct
       (** Staged ledger hash has two parts
       1) merkle root of the pending coinbases
-      2) ledger hash, aux hash, and the FIFO order of the coinbase stacks(Non snark).
-      Only part 1 is required for blockchain snark computation and therefore the remaining fields of the staged ledger are grouped together as "Non_snark"
+      2) ledger hash, aux hash, and the FIFO order of the coinbase stacks(Non
+         snark).
+         Only part 1 is required for blockchain snark computation and therefore
+         the remaining fields of the staged ledger are grouped together as
+         "Non_snark"
       *)
       type t =
         ( Non_snark.Stable.V1.t
