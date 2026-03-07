@@ -1297,11 +1297,12 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                   ()
               | Some "http" ->
                   [%log warn]
-                    "The --peer-list-url $url uses HTTP instead of HTTPS. \
-                     This is insecure and not recommended."
+                    "The --peer-list-url $url uses HTTP instead of HTTPS. This \
+                     is insecure and not recommended."
                     ~metadata:[ ("url", `String url) ]
               | _ ->
                   Mina_stdlib.Mina_user_error.raisef
+                    ~where:"validating peer-list-url scheme"
                     "The --peer-list-url must be a valid URL starting with \
                      http:// or https://, but got: %s"
                     url ) ;

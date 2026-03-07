@@ -715,19 +715,19 @@ module PeerListUrlInvalidScheme = struct
     with
     | `Timeout ->
         let%bind _ = Daemon.Process.force_kill process in
-        Deferred.Or_error.return
+        Deferred.return
           (Mina_automation_fixture.Intf.Failed
              (Error.of_string "Daemon did not exit within 30 seconds") )
     | `Result (Ok ()) ->
-        Deferred.Or_error.return
+        Deferred.return
           (Mina_automation_fixture.Intf.Failed
              (Error.of_string
                 "Daemon exited with code 0, expected non-zero for invalid \
                  peer-list-url scheme" ) )
     | `Result (Error (`Exit_non_zero _)) ->
-        Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+        Deferred.return Mina_automation_fixture.Intf.Passed
     | `Result (Error (`Signal signal)) ->
-        Deferred.Or_error.return
+        Deferred.return
           (Mina_automation_fixture.Intf.Failed
              (Error.of_string
                 (sprintf "Daemon terminated by signal: %s"
@@ -752,19 +752,19 @@ module PeerListUrlNoScheme = struct
     with
     | `Timeout ->
         let%bind _ = Daemon.Process.force_kill process in
-        Deferred.Or_error.return
+        Deferred.return
           (Mina_automation_fixture.Intf.Failed
              (Error.of_string "Daemon did not exit within 30 seconds") )
     | `Result (Ok ()) ->
-        Deferred.Or_error.return
+        Deferred.return
           (Mina_automation_fixture.Intf.Failed
              (Error.of_string
                 "Daemon exited with code 0, expected non-zero for \
                  peer-list-url without scheme" ) )
     | `Result (Error (`Exit_non_zero _)) ->
-        Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+        Deferred.return Mina_automation_fixture.Intf.Passed
     | `Result (Error (`Signal signal)) ->
-        Deferred.Or_error.return
+        Deferred.return
           (Mina_automation_fixture.Intf.Failed
              (Error.of_string
                 (sprintf "Daemon terminated by signal: %s"
@@ -849,10 +849,10 @@ module PeerListUrlValidHttps = struct
     | `Timeout ->
         (* Still running = good, the URL was accepted *)
         let%bind _ = Daemon.Process.force_kill process in
-        Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+        Deferred.return Mina_automation_fixture.Intf.Passed
     | `Result (Ok ()) ->
         (* Exited cleanly - also fine, URL was accepted *)
-        Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+        Deferred.return Mina_automation_fixture.Intf.Passed
     | `Result (Error (`Exit_non_zero exit_code)) ->
         (* Check if exit was due to URL validation by reading logs *)
         let log_file = Daemon.Config.ConfigDirs.mina_log test.config.dirs in
@@ -868,17 +868,17 @@ module PeerListUrlValidHttps = struct
           String.is_substring logs
             ~substring:"peer-list-url must be a valid URL"
         then
-          Deferred.Or_error.return
+          Deferred.return
             (Mina_automation_fixture.Intf.Failed
                (Error.of_string "Daemon rejected valid https peer-list-url") )
         else
           (* Non-zero exit for other reasons is acceptable *)
-          Deferred.Or_error.return
+          Deferred.return
             (Mina_automation_fixture.Intf.Warning
                (sprintf "Daemon exited with code %d (not due to URL validation)"
                   exit_code ) )
     | `Result (Error (`Signal signal)) ->
-        Deferred.Or_error.return
+        Deferred.return
           (Mina_automation_fixture.Intf.Failed
              (Error.of_string
                 (sprintf "Daemon terminated by signal: %s"
