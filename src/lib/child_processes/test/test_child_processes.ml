@@ -39,8 +39,7 @@ let test_can_launch_and_get_stdout () =
         | Some (Ok (Ok ())) ->
             ()
         | _ ->
-            Alcotest.fail
-              "Expected termination status to be Some (Ok (Ok ()))"
+            Alcotest.fail "Expected termination status to be Some (Ok (Ok ()))"
       in
       Deferred.unit )
 
@@ -102,12 +101,8 @@ let test_spawn_two_processes () =
           ~conf_dir ~args:[ "loop" ] ~stdout:`Chunks ~stderr:`Chunks
           ~termination:`Ignore ()
       in
-      let%bind process1 =
-        mk_process () |> Deferred.map ~f:Or_error.ok_exn
-      in
-      let%bind process2 =
-        mk_process () |> Deferred.map ~f:Or_error.ok_exn
-      in
+      let%bind process1 = mk_process () |> Deferred.map ~f:Or_error.ok_exn in
+      let%bind process2 = mk_process () |> Deferred.map ~f:Or_error.ok_exn in
       let%bind () = after process_wait_timeout in
       (* process1 should have been killed when process2 started *)
       ( match Child_processes.termination_status process1 with
@@ -144,8 +139,7 @@ let test_lockfile_already_exists () =
       | Some (Ok (Ok ())) ->
           ()
       | _ ->
-          Alcotest.fail
-            "Expected termination_status to be Some (Ok (Ok ()))" ) ;
+          Alcotest.fail "Expected termination_status to be Some (Ok (Ok ()))" ) ;
       Deferred.unit )
 
 let () =
@@ -155,15 +149,13 @@ let () =
       , [ test_case "can launch and get stdout" `Quick
             test_can_launch_and_get_stdout
         ] )
-    ; ( "killing_works"
-      , [ test_case "killing works" `Quick test_killing_works ] )
+    ; ("killing_works", [ test_case "killing works" `Quick test_killing_works ])
     ; ( "spawn_two_processes"
-      , [ test_case "if you spawn two processes it kills the earlier one"
-            `Quick test_spawn_two_processes
+      , [ test_case "if you spawn two processes it kills the earlier one" `Quick
+            test_spawn_two_processes
         ] )
     ; ( "lockfile_already_exists"
-      , [ test_case
-            "if the lockfile already exists, then it would be cleaned" `Quick
-            test_lockfile_already_exists
+      , [ test_case "if the lockfile already exists, then it would be cleaned"
+            `Quick test_lockfile_already_exists
         ] )
     ]

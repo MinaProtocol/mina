@@ -132,7 +132,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
         Deferred.unit
   in
   match%bind Sys.file_exists lockpath with
-  | `Yes ->
+  | `Yes -> (
       let%bind pid_str = Reader.file_contents lockpath in
       if String.is_empty pid_str then (
         [%log warn]
@@ -140,7 +140,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
            if it still exists"
           name lockpath ;
         try_cleanup_lock_file ~pid_metadata:(`String "<empty>") () )
-      else (
+      else
         let pid_opt = try Some (Pid.of_string pid_str) with _ -> None in
         match pid_opt with
         | None ->
@@ -164,9 +164,8 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
               if try_killing_previous_instance then
                 match Signal.send Signal.term (`Pid pid) with
                 | `No_such_process ->
-                    [%log debug]
-                      "Couldn't kill %s with PID %s, does not exist" name
-                      pid_str ;
+                    [%log debug] "Couldn't kill %s with PID %s, does not exist"
+                      name pid_str ;
                     Deferred.unit
                 | `Ok -> (
                     [%log debug] "Successfully sent TERM signal to %s (%s)" name
