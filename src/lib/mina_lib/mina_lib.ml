@@ -2421,12 +2421,11 @@ let create ~commit_id ?wallets (config : Config.t) =
             [%log' warn config.logger]
               "Precomputed blocks will be included in logs. These blocks can \
                be very large (potentially several MB each) and may be \
-               truncated by logging services or log aggregators with line \
-               size limits. Consider using --precomputed-blocks-file to \
-               write blocks to a dedicated file instead, or ensure your \
-               logging infrastructure is configured to handle large log \
-               entries. Truncated blocks cannot be used for archive \
-               recovery." ;
+               truncated by logging services or log aggregators with line size \
+               limits. Consider using --precomputed-blocks-file to write \
+               blocks to a dedicated file instead, or ensure your logging \
+               infrastructure is configured to handle large log entries. \
+               Truncated blocks cannot be used for archive recovery." ;
           let precomputed_block_writer =
             ref
               ( Option.map config.precomputed_blocks_path ~f:(fun path ->
