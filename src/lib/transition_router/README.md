@@ -31,8 +31,11 @@ only its local frontier. This happens in two cases:
 
 - The node has no local frontier (e.g., first start or corrupted state).
 - The network's best tip is so far ahead of the node's best tip that
-  catchup is not feasible (more than ~295 blocks beyond the local best tip,
-  where 295 = 290 + 5 slack blocks).
+  catchup is not feasible (more than `k + 5` blocks beyond the local best
+  tip, where `k` is the consensus security parameter and 5 is a small slack
+  constant; on mainnet `k = 290`, so the threshold is 295 blocks). Note:
+  the code currently hardcodes 290 rather than reading `k` from the
+  consensus constants.
 
 In bootstrap mode, the **bootstrap controller** reconstructs the root of the
 transition frontier from scratch by downloading the snarked ledger, scan state,
@@ -118,9 +121,11 @@ function uses a multi-stage check:
    **root** consensus state. If the root is already preferred (`Keep`), the
    transition does not trigger bootstrap.
 2. If the candidate is preferred (`Take`), checks whether it is more than
-   295 blocks (290 + 5 slack) beyond the node's current **best tip**. If so,
-   the entire frontier is considered useless and bootstrap is triggered
-   immediately.
+   `k + 5` blocks beyond the node's current **best tip**, where `k` is the
+   consensus security parameter (290 on mainnet) and 5 is a slack constant.
+   If so, the entire frontier is considered useless and bootstrap is
+   triggered immediately. (The value 290 is hardcoded in
+   `transition_router.ml` rather than derived from `consensus_constants`.)
 3. Otherwise, falls through to `Consensus.Hooks.should_bootstrap`, which
    applies the full consensus-level bootstrap check comparing the candidate
    against the frontier root.
