@@ -140,7 +140,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
            if it still exists"
           name lockpath ;
         try_cleanup_lock_file ~pid_metadata:(`String "<empty>") () )
-      else
+      else (
         let pid_opt = try Some (Pid.of_string pid_str) with _ -> None in
         match pid_opt with
         | None ->
