@@ -767,6 +767,58 @@ module PeerListUrlNoScheme = struct
                 (Core.Signal.to_string signal) ) )
 end
 
+module PeerListUrlHttpWarning = struct
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let test_case (test : t) =
+    let daemon = Daemon.of_config test.config in
+    let%bind () = Daemon.Config.generate_keys test.config in
+    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+    let%bind () =
+      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+    in
+    let%bind process =
+      Daemon.start
+        ~peer_list_url:"http://bootnodes.minaprotocol.com/networks/devnet.txt"
+        daemon
+    in
+    (* The daemon should not crash immediately from URL validation.
+       Give it a few seconds to get past the peer-list-url check. *)
+    let%bind () = after (Core.Time.Span.of_sec 5.) in
+    (* Check if the process is still running *)
+    let%bind process_status =
+      Async.Clock.with_timeout (Core.Time.Span.of_sec 1.)
+        (Process.wait process.process)
+    in
+    let%bind () =
+      match process_status with
+      | `Timeout ->
+          (* Still running, kill it *)
+          let%map _ = Daemon.Process.force_kill process in
+          ()
+      | `Result _ ->
+          Deferred.return ()
+    in
+    (* Read log file and check for HTTP warning *)
+    let log_file = Daemon.Config.ConfigDirs.mina_log test.config.dirs in
+    let%bind log_exists = Sys.file_exists log_file in
+    let%map logs =
+      match log_exists with
+      | `Yes ->
+          Reader.file_contents log_file
+      | `No | `Unknown ->
+          Deferred.return ""
+    in
+    if
+      String.is_substring logs ~substring:"HTTP instead of HTTPS"
+      || String.is_substring logs ~substring:"insecure"
+    then Mina_automation_fixture.Intf.Passed
+    else
+      Mina_automation_fixture.Intf.Failed
+        (Error.of_string
+           "Expected warning about HTTP being insecure in daemon logs" )
+end
+
 module PeerListUrlValidHttps = struct
   type t = Mina_automation_fixture.Daemon.before_bootstrap
 
@@ -948,5 +1000,15 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (PeerListUrlValidHttps) ) )
+        ] )
+    ; ( "peer-list-url-http-warning"
+      , [ test_case
+            "The mina daemon warns when --peer-list-url uses http:// instead \
+             of https://"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (PeerListUrlHttpWarning) ) )
         ] )
     ]
