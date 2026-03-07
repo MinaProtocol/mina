@@ -11,12 +11,15 @@ When a Mina node starts up, or when it falls too far behind the canonical chain,
 it must first synchronize its state with the rest of the network before it can
 participate in consensus. The transition router orchestrates this by:
 
-1. Waiting for the node to reach sufficient network connectivity.
-2. Downloading the best tip from a sample of peers.
-3. Loading the local persistent frontier (if one exists).
-4. Deciding, based on the downloaded best tip and local frontier state, whether
+1. Waiting until the chain's genesis timestamp has been reached
+   (`wait_till_genesis`). If the node starts before the chain launch time, it
+   blocks and logs periodic status updates until the genesis time arrives.
+2. Waiting for the node to reach sufficient network connectivity.
+3. Downloading the best tip from a sample of peers.
+4. Loading the local persistent frontier (if one exists).
+5. Deciding, based on the downloaded best tip and local frontier state, whether
    to enter **bootstrap mode** or **normal participation mode**.
-5. Continuously monitoring the network for transitions that require switching
+6. Continuously monitoring the network for transitions that require switching
    from normal participation back into bootstrap mode.
 
 ## Operational Modes
@@ -27,8 +30,9 @@ Bootstrap mode is activated when the node cannot catch up to the network using
 only its local frontier. This happens in two cases:
 
 - The node has no local frontier (e.g., first start or corrupted state).
-- The network's best tip is so far ahead of the node's frontier root that
-  catchup is not feasible (more than ~290 blocks beyond the local best tip).
+- The network's best tip is so far ahead of the node's best tip that
+  catchup is not feasible (more than ~295 blocks beyond the local best tip,
+  where 295 = 290 + 5 slack blocks).
 
 In bootstrap mode, the **bootstrap controller** reconstructs the root of the
 transition frontier from scratch by downloading the snarked ledger, scan state,
@@ -107,10 +111,19 @@ the point of the swap onward.
 ### `is_transition_for_bootstrap`
 
 Determines whether a newly observed transition header is so far ahead of the
-local frontier root that the node must bootstrap again rather than catch up. The
-heuristic checks whether the candidate is more than ~290 blocks beyond the
-node's current best tip (the maximum number of blocks that can be caught up
-within a standard catchup window).
+local frontier that the node must bootstrap again rather than catch up. The
+function uses a multi-stage check:
+
+1. Runs `Consensus.Hooks.select` comparing the candidate against the frontier
+   **root** consensus state. If the root is already preferred (`Keep`), the
+   transition does not trigger bootstrap.
+2. If the candidate is preferred (`Take`), checks whether it is more than
+   295 blocks (290 + 5 slack) beyond the node's current **best tip**. If so,
+   the entire frontier is considered useless and bootstrap is triggered
+   immediately.
+3. Otherwise, falls through to `Consensus.Hooks.should_bootstrap`, which
+   applies the full consensus-level bootstrap check comparing the candidate
+   against the frontier root.
 
 ### `download_best_tip`
 
@@ -122,21 +135,32 @@ initialization to determine the starting operational mode.
 
 Attempts to load the node's previously persisted transition frontier from disk.
 Returns `None` if no usable frontier is found (e.g., bootstrap is required or
-the persistent state is out of sync).
+the persistent state is out of sync). Note: the node will crash (`failwith`)
+if the persistent frontier is malformed or if frontier initialization fails
+with an unrecoverable error.
 
 ## Initial Validator
 
-The `Initial_validator` submodule performs lightweight, synchronous checks on
+The `Initial_validator` submodule performs a series of validation checks on
 each incoming block or header before it enters the main processing pipeline:
 
 - **Time received**: the block must not arrive too early or too late relative
   to the expected slot time.
 - **Genesis protocol state**: the block's genesis state hash must match the
   node's genesis state.
+- **Blockchain SNARK proof**: the header's blockchain proof is verified through
+  the external verifier process. This check is asynchronous and uses the
+  `Interruptible` monad so it can be cancelled if the libp2p validation
+  callback expires.
 - **Delta block chain proof**: the header's delta transition chain proof must
   be valid.
 - **Protocol version**: the block's protocol version must be compatible with
   the node's version.
+- **Duplicate block detection**: the `Duplicate_block_detector` tracks blocks
+  by (producer, epoch, slot). If a different block hash is seen for the same
+  producer and slot as a previously observed block, an error is logged to flag
+  potential double-block production. This check does not reject the block but
+  serves as a protocol monitoring signal.
 
 Blocks that fail initial validation are dropped and the sending peer's trust
 score is penalized accordingly.
