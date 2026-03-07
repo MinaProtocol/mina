@@ -55,8 +55,9 @@ available it naps for a randomised interval to avoid busy-polling.
 
 - `snark_worker.ml` – Top-level module re-exporting RPCs, entry point, and the
   production implementation.
-- `intf.ml` – RPC master-module signatures and the `Work_S` / `Rpcs_versioned_S`
-  interfaces.
+- `intf.ml` – Legacy interface signatures (`Work_S` / `Rpcs_versioned_S`) from
+  the original RPC design.  The current RPC protocol is defined in the individual
+  `rpc_*.ml` modules using `Spec.Partitioned` / `Result.Partitioned` types.
 - `prod.ml` – Production implementation: `Worker_state` creation and the
   `perform_partitioned` / `perform_single` proof-generation functions.
 - `entry.ml` – The `main` polling loop and the `command_from_rpcs` CLI command
