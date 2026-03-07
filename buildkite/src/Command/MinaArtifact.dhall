@@ -257,7 +257,8 @@ let docker_step
                     , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
-                    , deb_suffix = Some "generic"
+                    , generic = True
+                    , verify = True
                     , arch = spec.arch
                     , size = size
                     }
@@ -342,7 +343,7 @@ let docker_step
                     , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
-                    , deb_suffix = Some "generic"
+                    , generic = True
                     , verify = True
                     , arch = spec.arch
                     , if_ = spec.if_
