@@ -149,7 +149,7 @@ usage bounded.
 |----------|-----------------|-----------|---------------|
 | `get_work` (V3) | Worker → Daemon | `unit` | `Spec.Partitioned.t option` |
 | `submit_work` (V3) | Worker → Daemon | `Result.Partitioned.t` | `` `Ok ``, `` `Removed ``, or `` `SpecUnmatched `` |
-| `failed_to_generate_snark` (V2) | Worker → Daemon | `(Error.t * Spec.Partitioned.id * pubkey)` | `unit` |
+| `failed_to_generate_snark` (V3) | Worker → Daemon | `(Wrapped_error.t * Id.Any.t)` | `unit` |
 
 Versioning follows [RFC 0013](../rfcs/0013-rpc-versioning.md).
 
@@ -230,7 +230,7 @@ system) for sending invalid proofs.
 |-------------|---------|-------------|
 | `--run-snark-worker <pubkey>` | (none) | Enable the integrated SNARK worker |
 | `--snark-worker-fee <fee>` | 1 (nanomina) | Fee charged per proof |
-| `--work-selection seq\|rand` | `seq` | Work selection strategy |
+| `--work-selection seq\|rand\|roffset` | `rand` | Work selection strategy |
 | `--work-reassignment-wait <ms>` | 420000 ms | Timeout before a job is reassigned |
 
 ---

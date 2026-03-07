@@ -66,6 +66,8 @@ to `Mina_ledger.Ledger`, `Staged_ledger`, and `Transition_frontier`.
    - The fee is high enough to cover account-creation cost (if the prover has no
      account yet).
    - The prover account has permission to receive fees.
+   - The proof statement is still referenced by at least one block in the
+     current transition frontier (i.e. the scan-state slot has not been pruned).
    - The proof statement matches the claimed statement.
    - The proof itself is cryptographically valid (via `Batcher.Snark_pool`).
 
@@ -115,7 +117,7 @@ they appear in a block.
 
 ### `network_pool_base.ml`
 
-`Network_pool_base.Make` wraps a `Resource_pool_base_intf` and adds:
+`Network_pool_base.Make` wraps a `Resource_pool_intf` and adds:
 
 - A gossip-network sink that receives diffs from peers, verifies them, and
   applies them to the resource pool.
