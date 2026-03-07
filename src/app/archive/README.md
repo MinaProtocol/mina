@@ -178,7 +178,7 @@ single log entries. This can cause truncation in two ways:
    line length of 1 MB (1,048,576 bytes). Log entries exceeding this limit
    are replaced with a truncation notice in the normal log, while the full
    content is redirected to a separate file named `mina-oversized-logs.log`
-   in the daemon's configuration directory (typically `~/.mina-config/`).
+   in the daemon's configuration directory (defaults to `~/.mina-config/`, configurable via `--config-directory`).
 
 2. **External logging service limits**: Log aggregators and shipping services
    (such as Loki, Elasticsearch, Splunk, Fluentd, etc.) typically impose
@@ -205,8 +205,7 @@ single JSON line, bypassing the logging subsystem entirely and avoiding any
 size-based truncation.
 
 If you must use `--log-precomputed-blocks` with an external logging service,
-ensure that service is configured to handle log entries of at least 10 MB to
-safely accommodate the largest possible precomputed blocks.
+ensure that service is configured to handle log entries of at least 10 MB (a conservative guideline, as blocks of several MB have been observed in practice).
 
 ### Recovering Blocks from the Oversized Log File
 
