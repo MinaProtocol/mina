@@ -136,4 +136,16 @@ Returns the best tip block along with the root block of the frontier, and a merk
 
 **Response**: `result node_status error`
 
-This acts as a telemetry RPC which asks a peer to provide information about their node status. Daemons do not have to respond to this request, and node operators may pass a command line flag to opt-out of responding to these node status requests.
+This acts as a telemetry mechanism which asks a peer to provide information about their node status. The node status payload is set via the libp2p helper's `SetNodeStatus` IPC call, and retrieved from a peer via `GetPeerNodeStatus`. Daemons do not have to respond to this request, and node operators may pass a command line flag to opt-out of responding to node status requests.
+
+### get\_completed\_snarks
+
+**Query**: `unit`
+
+**Response**: `optional [transaction_snark_work]`
+
+Returns available completed SNARK work from the peer's SNARK pool. Used by SNARK coordinators and block producers to obtain SNARK proofs for pending scan state slots.
+
+---
+
+For a comprehensive overview of all node network traffic including message sizes, latency requirements, bandwidth estimates, and monitoring guidance, see [RFC 0065](../../../../rfcs/0065-network-traffic-documentation.md).
