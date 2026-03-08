@@ -770,8 +770,8 @@ let export_ledger =
     Command.Param.(
       flag "--state-hash" ~aliases:[ "state-hash" ]
         ~doc:
-          "STATE-HASH State hash, if printing a staged ledger (default: state \
-           hash for the best tip)"
+          "STATE-HASH State hash, if printing a staged ledger or snarked \
+           ledger (default: state hash for the best tip)"
         (optional string))
   in
   let ledger_kind =
