@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "--- Bootstrapping mina-build tooling"
+
+APP_DIR="${BUILDKITE_BUILD_CHECKOUT_PATH:-$PWD}"
+TOOLS_DIR="${APP_DIR}"
+CI_VERSION_FILE="${APP_DIR}/.buildkite/mina-build.version"
+
+CI_REPO="https://github.com/MinaProtocol/mina-build.git"
+
+# read version / branch
+CI_REF="$(cat "$CI_VERSION_FILE")"
+
+echo "Using mina-build ref: ${CI_REF}"
+
+# clean previous tools
+rm -rf "$TOOLS_DIR"
+
+# clone repo
+echo "--- Cloning mina-build"
+
+git clone \
+  --depth 1 \
+  --branch "$CI_REF" \
+  "$CI_REPO" \
+  "$TOOLS_DIR"
+
+# remove git metadata
+echo "--- Removing git metadata"
+
+rm -rf "$TOOLS_DIR/.git"
+
+# export environment
+export APP_DIR
+export CI_DIR="$TOOLS_DIR"
+
+echo "mina-build ready at $CI_DIR"
