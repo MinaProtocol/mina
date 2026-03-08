@@ -1,0 +1,92 @@
+name: Build Instructions Validation
+
+# Validates that the Mina build instructions (README-dev.md) remain correct
+# and up-to-date by running the corresponding shell scripts.
+#
+# Runs weekly to catch drift without impacting normal PR CI times.
+# Can also be triggered manually via workflow_dispatch.
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Every Sunday at 00:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ------------------------------------------------------------------
+  # Fast job: static analysis of all build-instruction shell scripts
+  # ------------------------------------------------------------------
+  validate-scripts:
+    name: Shellcheck build instruction scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck on build instruction scripts
+        run: shellcheck scripts/build-instructions/*.sh
+
+  # ------------------------------------------------------------------
+  # Slow job: actually exercise the Linux build instructions end-to-end
+  # ------------------------------------------------------------------
+  test-linux-build-instructions:
+    name: Test Linux build instructions (Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Initialize git submodules
+        run: bash scripts/build-instructions/submodules.sh
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bubblewrap \
+            cmake \
+            libboost-dev \
+            libboost-program-options-dev \
+            libffi-dev \
+            libgmp-dev \
+            libjemalloc-dev \
+            liblmdb-dev \
+            libpq-dev \
+            librocksdb-dev \
+            libsodium-dev \
+            libssl-dev \
+            opam \
+            pkg-config \
+            zlib1g-dev
+
+      - name: Initialise opam
+        run: opam init --disable-sandboxing --yes
+
+      - name: Cache opam switch
+        uses: actions/cache@v4
+        with:
+          path: ~/.opam
+          key: opam-${{ runner.os }}-${{ hashFiles('opam.export') }}
+          restore-keys: opam-${{ runner.os }}-
+
+      - name: Set up opam repositories and import switch
+        run: bash scripts/build-instructions/linux-opam-setup.sh
+
+      - name: Pin external OCaml packages
+        run: bash scripts/build-instructions/linux-pin-deps.sh
+
+      - name: Install Go (required for libp2p helper)
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Validate build (type-check, skipping full codegen)
+        run: opam exec -- dune build @check

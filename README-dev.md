@@ -35,16 +35,17 @@ Quick start instructions:
 3.  Pull in the submodules:
 
     ```sh
-    git submodule update --init --recursive
+    bash scripts/build-instructions/submodules.sh
     ```
 
-    If this command fails with `git@github.com: Permission denied (publickey).` then you need to set up SSH keys on your machine. Follow the [Generating a new SSH key and adding it to the ssh-agent](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent) instructions.
-
-4.  Run:
+    This is equivalent to:
 
     ```sh
+    git submodule update --init --recursive
     git config --local --add submodule.recurse true
     ```
+
+    If the command fails with `git@github.com: Permission denied (publickey).` then you need to set up SSH keys on your machine. Follow the [Generating a new SSH key and adding it to the ssh-agent](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent) instructions.
 
 ### Developer Setup (Docker)
 
@@ -93,7 +94,7 @@ You can build Mina using Docker. Using Docker works in any dev environment. See 
 4. Pin dependencies that override opam versions:
 
     ```sh
-    scripts/pin-external-packages.sh
+    bash scripts/build-instructions/linux-pin-deps.sh
     ```
 
 5. Install the correct version of golang:
@@ -128,16 +129,34 @@ You can build Mina using Docker. Using Docker works in any dev environment. See 
 
 Mina has a variety of opam and system dependencies.
 
+The following steps are also available as standalone, CI-validated shell scripts
+under [`scripts/build-instructions/`](scripts/build-instructions/). Running those
+scripts directly is the recommended approach because the scripts are automatically
+verified by the weekly [Build Instructions Validation](.github/workflows/build-instructions.yml)
+GitHub Actions workflow, ensuring they stay up-to-date.
+
 To get all of the required opam dependencies, run:
 
 ```sh
+bash scripts/build-instructions/linux-opam-setup.sh
+```
+
+This is equivalent to:
+
+```sh
 opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git
-opam switch import opam.export
+opam switch import --yes opam.export
 ```
 
 **NOTE**: The `switch` command provides a `dune_wrapper` binary that you can use instead of dune and fails early if your switch becomes out of sync with the `opam.export` file.
 
-Some dependencies that are not taken from `opam` or integrated with `dune` must be added manually. Run the `scripts/pin-external-packages.sh` script.
+Some dependencies that are not taken from `opam` or integrated with `dune` must be added manually:
+
+```sh
+bash scripts/build-instructions/linux-pin-deps.sh
+```
+
+This runs `scripts/pin-external-packages.sh`.
 
 A number of C libraries are expected to be available in the system and are also listed in the Dockerfiles. Unlike most of the C libraries that are installed using `apt` in the Dockerfiles, the libraries for RocksDB are automatically installed when building Mina by using a `dune` rule in the library `ocaml-rocksdb`.
 
