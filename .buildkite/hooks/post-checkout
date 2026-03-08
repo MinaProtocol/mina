@@ -4,7 +4,7 @@ set -euo pipefail
 echo "--- Bootstrapping mina-build tooling"
 
 APP_DIR="${BUILDKITE_BUILD_CHECKOUT_PATH:-$PWD}"
-TOOLS_DIR="${APP_DIR}"
+TOOLS_DIR="${APP_DIR}/.buildkite"
 CI_VERSION_FILE="${APP_DIR}/.buildkite/mina-build.version"
 
 CI_REPO="https://github.com/MinaProtocol/mina-build.git"
@@ -30,6 +30,9 @@ git clone \
 echo "--- Removing git metadata"
 
 rm -rf "$TOOLS_DIR/.git"
+
+# merge tools into app dir
+cp -r "$TOOLS_DIR" "$APP_DIR"
 
 # export environment
 export APP_DIR
