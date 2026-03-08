@@ -54,3 +54,11 @@ Pipfile.lock
 _coverage/
 
 CLAUDE.local.md
+
+# CI artifacts/scripts
+buildkite/
+scripts/docker
+scripts/debian
+scripts/github
+scripts/merged-to-proof-systems.sh
+scripts/merged-to-kimchi-stubs-vendors.sh
