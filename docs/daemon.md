@@ -40,11 +40,18 @@ These flags are supported in the `daemon` object of the config file:
 
 ## Environment variables
 
-The daemon will read some environment variables on startup.
+The daemon reads a number of environment variables on startup. See
+[environment-variables.md](environment-variables.md) for the full reference.
 
-`MINA_CLIENT_TRUSTLIST` is a comma-separated list of CIDR masks, for example `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` would allow any client on an RFC1918 private network to control the daemon. This list can be edited with `mina advanced client-trustlist` commands.
+A few of the most commonly used ones:
 
-There are other environment variables, but they aren't documented yet.
+- `MINA_CLIENT_TRUSTLIST` – comma-separated list of CIDR masks allowed to
+  connect to the client (RPC) port, e.g.
+  `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16`. Editable at runtime with
+  `mina advanced client-trustlist`.
+- `MINA_PRIVKEY_PASS` – passphrase for wallet and block-producer private keys.
+- `MINA_BP_PRIVKEY` – path to the block-producer private key file.
+- `MINA_CONFIG_FILE` – path to a runtime configuration JSON file.
 
 ## Client/Daemon interface
 
