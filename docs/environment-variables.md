@@ -14,7 +14,8 @@ daemon's client (RPC) port. Only the listed IP ranges may issue RPC commands.
 By default only `127.0.0.0/8` (localhost) is trusted.
 
 **Example:**
-```
+
+```sh
 MINA_CLIENT_TRUSTLIST="10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 ```
 
@@ -28,7 +29,8 @@ genesis constants and other runtime configuration from this file, overriding
 compiled-in defaults where specified.
 
 **Example:**
-```
+
+```sh
 MINA_CONFIG_FILE=/etc/mina/runtime_config.json
 ```
 
@@ -232,7 +234,8 @@ Default: `0`
 PostgreSQL connection URI used by archive-node unit tests.
 
 **Example:**
-```
+
+```sh
 MINA_TEST_POSTGRES="postgresql://localhost:5432/archivedb"
 ```
 
