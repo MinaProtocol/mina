@@ -156,9 +156,11 @@ fee-per-weight-unit (and all commands from the same sender with higher nonces)
 are evicted via `Indexed_pool.remove_lowest_fee`. This continues until the pool
 is within its size limit.
 
-A new command is rejected outright with `Overloaded` if the pool is already
-full and the new command's fee is not strictly greater than the current minimum
-pool fee.
+Separately, the verified diff pipeline between verification and application has
+bounded capacity. If the pipe overflows (i.e., verified diffs arrive faster than
+they can be applied), the entire diff is dropped and every command in it is
+rejected with the `Overloaded` error. This is handled by
+`reject_overloaded_diff` in `pool_sink.ml`.
 
 > **Note**: `pool_max_size` should be kept consistent across gossiping nodes.
 > Nodes with a larger pool limit may forward many low-fee transactions that
@@ -187,7 +189,7 @@ values is returned:
 | `Bad_token` | The command uses a non-default token in a context that requires the default token |
 | `Unwanted_fee_token` | The command pays fees in a non-default token that this pool does not accept |
 | `Expired` | The command's `valid_until` slot has already passed |
-| `Overloaded` | The pool is full and this command's fee is too low to displace an existing command |
+| `Overloaded` | The verified diff pipeline overflowed; the entire diff was dropped before it could be applied to the pool |
 | `Fee_payer_account_not_found` | The fee payer account does not exist in the best tip ledger |
 | `Fee_payer_not_permitted_to_send` | The fee payer account's permissions do not allow sending or nonce increments |
 | `After_slot_tx_end` | The current slot is past the network-configured `slot_tx_end` (used for controlled network shutdown) |
@@ -199,11 +201,12 @@ penalising the sender.
 ## Locally Generated Commands
 
 Transactions submitted via this node's own RPC (as opposed to received from
-peers) are tracked in two hash tables:
+peers) are tracked in two mutable reference-wrapped maps (functional
+`Transaction_hash.Map.t` values inside `ref` cells), keyed by transaction hash:
 
 - **`locally_generated_uncommitted`**: Commands that are in the pool but have
-  not yet been included in the best tip. Indexed by the command itself; the
-  value is the time of submission and a batch number.
+  not yet been included in the best tip. Each entry stores the time of
+  submission, a batch number, and the command itself.
 - **`locally_generated_committed`**: Commands that have been included in the
   best tip. These are retained so the node can detect if they are later rolled
   back by a chain reorganization.
@@ -217,9 +220,12 @@ transactions in the pool even when other transactions are dropped for space.
 The transaction pool includes several layers of protection against
 denial-of-service attacks:
 
-1. **Rate limiting**: The `Resource_pool_diff_intf` enforces a maximum of
-   `max_per_15_seconds = 10` transaction submissions per peer per 15-second
-   window.
+1. **Rate limiting**: The `Resource_pool_diff_intf` specifies a
+   `max_per_15_seconds = 10` capacity parameter. This is combined with a
+   15-second window to compute a rate, which is then projected over the
+   underlying `rate_limiter.ml` sliding window (5 minutes). The result is a
+   score-based budget per peer that refills as older entries age out of the
+   5-minute window, rather than a strict 15-second bucket.
 2. **Pool size cap**: `pool_max_size` bounds memory usage. Low-fee transactions
    are evicted when the cap is reached, making it expensive to fill the pool
    with junk.
@@ -249,14 +255,18 @@ when verifying incoming zkApp commands.
 | `transaction_pool.ml` | The main mutable resource pool: gossip verification/application, transition frontier diff handling, locally generated tracking |
 | `indexed_pool.ml` / `indexed_pool.mli` | Purely functional multi-indexed data structure underlying the pool |
 | `batcher.ml` / `batcher.mli` | Batches signature and proof verification requests for efficiency |
-| `locally_generated.ml` / `locally_generated.mli` | Hash table tracking locally submitted commands and their submission metadata |
+| `locally_generated.ml` / `locally_generated.mli` | Mutable map (ref-wrapped `Transaction_hash.Map.t`) tracking locally submitted commands and their submission metadata |
 | `rate_limiter.ml` / `rate_limiter.mli` | Per-sender rate limiting for incoming gossip diffs |
 | `command_error.ml` | Error type for `Indexed_pool` operations (distinct from the network-level `Diff_error`) |
 | `network_pool_base.ml` | Generic network pool infrastructure shared by the transaction pool and snark pool |
 | `intf.ml` | Module type signatures for resource pools and their diffs |
 | `snark_pool.ml` / `snark_pool.mli` | Analogous pool for completed SNARK work (not transaction pool, but shares infrastructure) |
 | `f_sequence.ml` / `f_sequence.mli` | Finger-tree-based functional sequence used for per-sender command queues |
-| `writer_result.ml` | Monad for accumulating `Update.t` values while performing computations on `Indexed_pool.t` |
+| `writer_result.ml` | General-purpose writer+result monad that threads an accumulated log of written values (`Tree.t`) alongside a `Result.t`; used in the indexed pool context to accumulate `Update.t` values during pool operations |
 | `with_nonce.ml` | Helper for commands annotated with a specific nonce |
+| `mocks.ml` | Mock implementations of ledger, staged ledger, and transition frontier for use in tests |
+| `priced_proof.ml` | Type pairing a SNARK proof with its associated fee and prover (used by the snark pool) |
+| `snark_pool_diff.ml` | Diff implementation for the SNARK pool: defines how solved-work entries are gossiped and applied |
 | `pool_sink.ml` | A sink that discards all incoming pool diffs (used in contexts where a pool is not needed) |
+| `test.ml` | Top-level test registration for the network pool (snark pool tests) |
 | `test/` | Unit tests for the indexed pool and transaction pool |
