@@ -55,7 +55,7 @@ At a high level, the block producer:
 | `src/lib/block_producer/block_producer.ml` | Main block-producer loop and block-building logic |
 | `src/lib/vrf_evaluator/vrf_evaluator.ml` | Out-of-process VRF evaluation worker |
 | `src/lib/prover/intf.ml` | Interface for the out-of-process blockchain SNARK prover |
-| `src/lib/consensus/proof_of_stake.ml` | `Hooks.get_epoch_data_for_vrf`, `Hooks.get_block_data`, `Hooks.generate_transition` |
+| `src/lib/consensus/proof_of_stake.ml` | `Consensus.Hooks.get_epoch_data_for_vrf`, `Consensus.Hooks.get_block_data`, `Consensus.Hooks.select`; `Consensus_state_hooks.generate_transition` |
 | `src/lib/staged_ledger/staged_ledger.ml` | `create_diff`, `apply_diff_unchecked` |
 | `src/lib/transition_frontier/transition_frontier.ml` | `Breadcrumb.build`, transition registry |
 | `src/lib/mina_lib/mina_lib.ml` | Wires all components and calls `Block_producer.run` |
@@ -168,7 +168,7 @@ diff falls below it, an empty diff is substituted instead.
 ### 2. Consensus transition generation
 
 ```ocaml
-Consensus.Hooks.generate_transition
+Consensus_state_hooks.generate_transition
   ~previous_protocol_state ~blockchain_state ~current_time
   ~block_data ~supercharge_coinbase ~snarked_ledger_hash
   ~genesis_ledger_hash ~supply_increase ~logger ~constraint_constants
@@ -221,7 +221,7 @@ Breadcrumb.build
   ~logger ~precomputed_values ~verifier ~get_completed_work ~trust_system
   ~parent:crumb ~transition ~sender:None
   ~skip_staged_ledger_verification:`Proofs
-  ~transition_receipt_time ?transaction_pool_proxy ()
+  ~transition_receipt_time ~transaction_pool_proxy ()
 ```
 
 The breadcrumb is written to `transition_writer` (a `Strict_pipe`).  The
@@ -299,7 +299,7 @@ Runtime configuration also influences behaviour:
 
 Failed transactions that could not be applied to the staged ledger during diff
 creation are reported to the error collection service via
-`report_transaction_inclusion_failures` (see `Mina_client.report_node_error`).
+`report_transaction_inclusion_failures` (see `Node_error_service.send_dynamic_report`).
 
 ---
 
