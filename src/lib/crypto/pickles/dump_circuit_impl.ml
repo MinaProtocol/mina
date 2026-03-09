@@ -35,7 +35,14 @@ let dump output_dir name circuit ~input_typ ~return_typ =
   in
   let path = output_dir ^ "/" ^ name ^ ".json" in
   Out_channel.write_all path ~data:(json ^ "\n") ;
-  Printf.printf "Wrote %s\n" path
+  Printf.printf "Wrote %s\n" path ;
+  (* Write cached constants *)
+  let constants_path = output_dir ^ "/" ^ name ^ "_cached_constants.json" in
+  let constants_json =
+    Kimchi_pasta_constraint_system.Vesta_constraint_system.dump_cached_constants cs
+  in
+  Out_channel.write_all constants_path ~data:(constants_json ^ "\n") ;
+  Printf.printf "Wrote %s\n" constants_path
 
 (* ---- Field arithmetic circuits ---- *)
 
@@ -474,7 +481,98 @@ let dump_tock output_dir name circuit ~input_typ ~return_typ =
   in
   let path = output_dir ^ "/" ^ name ^ ".json" in
   Out_channel.write_all path ~data:(json ^ "\n") ;
-  Printf.printf "Wrote %s\n" path
+  Printf.printf "Wrote %s\n" path ;
+  (* Write cached constants *)
+  let constants_path = output_dir ^ "/" ^ name ^ "_cached_constants.json" in
+  let constants_json =
+    Kimchi_pasta_constraint_system.Pallas_constraint_system.dump_cached_constants cs
+  in
+  Out_channel.write_all constants_path ~data:(constants_json ^ "\n") ;
+  Printf.printf "Wrote %s\n" constants_path
+
+(* ---- Label-tracked dump for Tock circuits ----
+   Uses set_constraint_logger to record label stack and constraint type
+   for every constraint added during circuit generation. Outputs a
+   _labels.jsonl file with one JSON object per constraint event. *)
+
+let constraint_type_name (c : WrapImpl.Constraint.t) : string =
+  match c with
+  | Boolean _ -> "Boolean"
+  | Equal _ -> "Equal"
+  | Square _ -> "Square"
+  | R1CS _ -> "R1CS"
+  | Basic _ -> "Basic"
+  | Poseidon _ -> "Poseidon"
+  | EC_add_complete _ -> "EC_add_complete"
+  | EC_scale _ -> "EC_scale"
+  | EC_endoscale _ -> "EC_endoscale"
+  | EC_endoscalar _ -> "EC_endoscalar"
+  | Lookup _ -> "Lookup"
+  | RangeCheck0 _ -> "RangeCheck0"
+  | RangeCheck1 _ -> "RangeCheck1"
+  | ForeignFieldAdd _ -> "ForeignFieldAdd"
+  | ForeignFieldMul _ -> "ForeignFieldMul"
+  | Xor _ -> "Xor"
+  | Rot64 _ -> "Rot64"
+  | AddFixedLookupTable _ -> "AddFixedLookupTable"
+  | AddRuntimeTableCfg _ -> "AddRuntimeTableCfg"
+  | Raw _ -> "Raw"
+
+let json_escape s =
+  String.concat_map s ~f:(fun c ->
+    match c with
+    | '"' -> "\\\""
+    | '\\' -> "\\\\"
+    | '\n' -> "\\n"
+    | _ -> String.make 1 c)
+
+let dump_tock_with_labels output_dir name circuit ~input_typ ~return_typ =
+  let module PCS = Kimchi_pasta_snarky_backend.Pallas_based_plonk.R1CS_constraint_system in
+  let events = ref [] in
+  let label_stack = ref [] in
+  WrapImpl.set_constraint_logger
+    (fun ?at_label_boundary constraint_opt ->
+       ( match at_label_boundary with
+         | Some (`Start, lab) ->
+             label_stack := lab :: !label_stack ;
+             PCS.set_gate_label_stack !label_stack
+         | Some (`End, _lab) ->
+             label_stack := (match !label_stack with _ :: rest -> rest | [] -> []) ;
+             PCS.set_gate_label_stack !label_stack
+         | None -> () ) ;
+       match constraint_opt with
+       | Some c ->
+           let path = String.concat ~sep:"/" (List.rev !label_stack) in
+           events := (path, constraint_type_name c) :: !events
+       | None -> () ) ;
+  let cs =
+    WrapImpl.constraint_system ~input_typ ~return_typ circuit
+  in
+  WrapImpl.clear_constraint_logger () ;
+  PCS.set_gate_label_stack [] ;
+  let json = PCS.to_json cs in
+  let path = output_dir ^ "/" ^ name ^ ".json" in
+  Out_channel.write_all path ~data:(json ^ "\n") ;
+  Printf.printf "Wrote %s\n" path ;
+  (* Write label events as JSONL *)
+  let labels_path = output_dir ^ "/" ^ name ^ "_labels.jsonl" in
+  let events_rev = List.rev !events in
+  let lines = List.map events_rev ~f:(fun (path, ctype) ->
+    Printf.sprintf "{\"label\":\"%s\",\"constraint\":\"%s\"}"
+      (json_escape path) (json_escape ctype)) in
+  Out_channel.write_all labels_path
+    ~data:(String.concat ~sep:"\n" lines ^ "\n") ;
+  Printf.printf "Wrote %s (%d constraint events)\n" labels_path (List.length events_rev) ;
+  (* Write gate-level labels as JSONL *)
+  let gate_labels_path = output_dir ^ "/" ^ name ^ "_gate_labels.jsonl" in
+  let gate_labels_data = PCS.dump_gate_labels cs in
+  Out_channel.write_all gate_labels_path ~data:(gate_labels_data ^ "\n") ;
+  Printf.printf "Wrote %s\n" gate_labels_path ;
+  (* Write cached constants *)
+  let constants_path = output_dir ^ "/" ^ name ^ "_cached_constants.json" in
+  let constants_json = PCS.dump_cached_constants cs in
+  Out_channel.write_all constants_path ~data:(constants_json ^ "\n") ;
+  Printf.printf "Wrote %s\n" constants_path
 
 let linearization_tock_circuit (inputs : WrapImpl.Field.t array) () =
   let open WrapImpl in
@@ -1401,6 +1499,708 @@ let finalize_other_proof_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
   in
   ()
 
+(* IVP Wrap circuit: Wrap_verifier.incrementally_verify_proof on Tock/Pallas
+
+   Input layout (177 fields):
+   PackedStepPublicInput (n=1, dw=15), OCaml to_data order:
+     0-1:   cip (split: sDiv2, sOdd)
+     2-3:   b (split)
+     4-5:   zetaToSrsLength (split)
+     6-7:   zetaToDomainSize (split)
+     8-9:   perm (split)
+     10:    sponge_digest (255-bit)
+     11-12: beta, gamma (128-bit)
+     13-15: alpha, zeta, xi (128-bit)
+     16-30: bulletproofChallenges[0..14] (128-bit)
+     31:    should_finalize (1-bit)
+     32:    messages_for_next_step_proof (255-bit)
+     33:    messages_for_next_wrap_proof[0] (255-bit)
+   IVP DeferredValues (Type1 shifted, d=16):
+     34-37: alpha, beta, gamma, zeta (scalar challenges)
+     38-40: perm, zetaToSrsLength, zetaToDomainSize (Type1)
+     41-42: combinedInnerProduct, b (Type1)
+     43:    xi (scalar challenge)
+     44-59: bulletproofChallenges[0..15] (scalar challenges)
+   Messages:
+     60-89:   wComm[0..14] (15 × 2)
+     90-91:   zComm (2)
+     92-105:  tComm[0..6] (7 × 2)
+   Opening proof:
+     106-107: delta (2)
+     108-109: sg (2)
+     110-173: lr[0..15] (16 × 4)
+     174:     z1 (Type1)
+     175:     z2 (Type1)
+   Verify:
+     176:     claimedDigest
+*)
+let ivp_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let read_pt i : Wrap_main_inputs.Inner_curve.t =
+    (inputs.(i), inputs.(i + 1))
+  in
+  (* ---- Public input (tagged array for x_hat MSM) ---- *)
+  let public_input =
+    let split i =
+      `Field (inputs.(i), Boolean.Unsafe.of_cvar inputs.(i + 1))
+    in
+    let packed n i = `Packed_bits (inputs.(i), n) in
+    Array.concat
+      [ Array.init 5 ~f:(fun j -> split (2 * j))
+      ; [| packed 255 10
+         ; packed 128 11 ; packed 128 12
+         ; packed 128 13 ; packed 128 14 ; packed 128 15 |]
+      ; Array.init 15 ~f:(fun j -> packed 128 (16 + j))
+      ; [| packed 1 31 ; packed 255 32 ; packed 255 33 |]
+      ]
+  in
+  (* ---- Plonk deferred values ---- *)
+  let feature_flags =
+    Kimchi_backend_common.Plonk_types.Features.map
+      Kimchi_backend_common.Plonk_types.Features.none_bool
+      ~f:(fun _ -> Boolean.false_)
+  in
+  let plonk
+    : ( Field.t
+      , Field.t Import.Scalar_challenge.t
+      , Field.t Shifted_value.Type1.t
+      , (Field.t Shifted_value.Type1.t, Boolean.var) Opt.t
+      , (Field.t Import.Scalar_challenge.t, Boolean.var) Opt.t
+      , Boolean.var )
+      Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t =
+    { alpha = { Kimchi_types.inner = inputs.(34) }
+    ; beta = inputs.(35)
+    ; gamma = inputs.(36)
+    ; zeta = { Kimchi_types.inner = inputs.(37) }
+    ; perm = Shifted_value.Type1.Shifted_value inputs.(38)
+    ; zeta_to_srs_length = Shifted_value.Type1.Shifted_value inputs.(39)
+    ; zeta_to_domain_size = Shifted_value.Type1.Shifted_value inputs.(40)
+    ; feature_flags
+    ; joint_combiner = Opt.Nothing
+    }
+  in
+  let advice =
+    { Import.Types.Step.Bulletproof.Advice.
+      combined_inner_product = Shifted_value.Type1.Shifted_value inputs.(41)
+    ; b = Shifted_value.Type1.Shifted_value inputs.(42)
+    }
+  in
+  let xi : Wrap_verifier.Scalar_challenge.t =
+    { Kimchi_types.inner = inputs.(43) }
+  in
+  let claimed_bp_challenges =
+    Array.init 16 ~f:(fun j -> inputs.(44 + j))
+  in
+  (* ---- Messages ---- *)
+  let messages =
+    { Kimchi_backend_common.Plonk_types.Messages.In_circuit.
+      w_comm = Vector.init Nat.N15.n ~f:(fun j -> [| read_pt (60 + 2 * j) |])
+    ; z_comm = [| read_pt 90 |]
+    ; t_comm = Array.init 7 ~f:(fun j -> read_pt (92 + 2 * j))
+    ; lookup = Opt.Nothing
+    }
+  in
+  (* ---- Opening proof ---- *)
+  let openings_proof =
+    { Kimchi_backend_common.Plonk_types.Openings.Bulletproof.
+      lr = Array.init 16 ~f:(fun j ->
+        (read_pt (110 + 4 * j), read_pt (110 + 4 * j + 2)))
+    ; z_1 = Shifted_value.Type1.Shifted_value inputs.(174)
+    ; z_2 = Shifted_value.Type1.Shifted_value inputs.(175)
+    ; delta = read_pt 106
+    ; challenge_polynomial_commitment = read_pt 108
+    }
+  in
+  let claimed_digest = inputs.(176) in
+  (* ---- SRS (Step/Fp SRS for verifying Step proofs) ---- *)
+  let srs = Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl 16) in
+  (* ---- Verification key (dummy, all commitments = Vesta generator) ---- *)
+  let dummy_pt = Wrap_main_inputs.Inner_curve.Params.one in
+  let dummy_comm = [| Wrap_main_inputs.Inner_curve.constant dummy_pt |] in
+  let verification_key =
+    { Plonk_verification_key_evals.Step.
+      sigma_comm = Vector.init Nat.N7.n ~f:(fun _ -> dummy_comm)
+    ; coefficients_comm = Vector.init Nat.N15.n ~f:(fun _ -> dummy_comm)
+    ; generic_comm = dummy_comm
+    ; psm_comm = dummy_comm
+    ; complete_add_comm = dummy_comm
+    ; mul_comm = dummy_comm
+    ; emul_comm = dummy_comm
+    ; endomul_scalar_comm = dummy_comm
+    ; xor_comm = Opt.Nothing
+    ; range_check0_comm = Opt.Nothing
+    ; range_check1_comm = Opt.Nothing
+    ; foreign_field_add_comm = Opt.Nothing
+    ; foreign_field_mul_comm = Opt.Nothing
+    ; rot_comm = Opt.Nothing
+    ; lookup_table_comm =
+        Vector.init Plonk_types.Lookup_sorted_minus_1.n ~f:(fun _ -> Opt.Nothing)
+    ; lookup_table_ids = Opt.Nothing
+    ; runtime_tables_selector = Opt.Nothing
+    ; lookup_selector_lookup = Opt.Nothing
+    ; lookup_selector_xor = Opt.Nothing
+    ; lookup_selector_range_check = Opt.Nothing
+    ; lookup_selector_ffmul = Opt.Nothing
+    }
+  in
+  (* ---- Sponge ---- *)
+  let sponge_params =
+    Sponge.Params.map Tock_field_sponge.params ~f:Field.constant
+  in
+  let sponge = Wrap_verifier.Opt.create sponge_params in
+  (* ---- Step domains (1 branch, domain 2^16) ---- *)
+  let step_domains = Vector.[
+    { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 16 }
+  ] in
+  (* ---- which_branch (single branch, always selected) ---- *)
+  let which_branch =
+    Wrap_verifier.One_hot_vector.of_vector_unsafe Vector.[ Boolean.true_ ]
+  in
+  (* ---- Call IVP ---- *)
+  let digest, (`Success _success, bp_challenges) =
+    Wrap_verifier.incrementally_verify_proof
+      (module Nat.N0)
+      ~actual_proofs_verified_mask:Vector.[]
+      ~step_domains
+      ~srs
+      ~verification_key
+      ~xi
+      ~sponge
+      ~public_input
+      ~sg_old:Vector.[]
+      ~advice
+      ~messages
+      ~which_branch
+      ~openings_proof
+      ~plonk
+  in
+  (* ---- Assert digest matches (matches PureScript verify assertions) ---- *)
+  Field.Assert.equal digest claimed_digest ;
+  (* ---- Assert bulletproof challenges match ---- *)
+  Array.iteri bp_challenges
+    ~f:(fun i { Import.Bulletproof_challenge.prechallenge =
+                  { Kimchi_types.inner = c } } ->
+      Field.Assert.equal c claimed_bp_challenges.(i) ) ;
+  ()
+
+(* x_hat sub-circuit: public input commitment (MSM) from IVP wrap.
+
+   Input layout (34 fields):
+     0-9:   PerProofTuple via split (5 × 2: sDiv2, sOdd)
+     10:    packed 255 (digest)
+     11-12: packed 128 (sg)
+     13-15: packed 128 (old bp challenges × 3)
+     16-30: packed 128 (w_comm challenges × 15)
+     31:    packed 1 (proofs_verified)
+     32-33: packed 255 (app_state × 2)
+
+   Runs on Tock/Wrap side (Fq field, Vesta inner curve).
+   Uses SRS Lagrange basis for domain 2^16 with 45 entries (after tag expansion).
+*)
+let xhat_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let module Inner_curve = Wrap_main_inputs.Inner_curve in
+  let module Ops = Plonk_curve_ops.Make (Impls.Wrap) (Inner_curve) in
+  (* SRS setup — set_urs_info called externally before circuit generation *)
+  let srs = Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl 16) in
+  (* Single branch, domain 2^16 — lagrange helpers below are inlined for this case *)
+  (* Build tagged public_input — same as IVP wrap *)
+  let public_input =
+    let split i =
+      `Field (inputs.(i), Boolean.Unsafe.of_cvar inputs.(i + 1))
+    in
+    let packed n i = `Packed_bits (inputs.(i), n) in
+    Array.concat
+      [ Array.init 5 ~f:(fun j -> split (2 * j))
+      ; [| packed 255 10
+         ; packed 128 11 ; packed 128 12
+         ; packed 128 13 ; packed 128 14 ; packed 128 15 |]
+      ; Array.init 15 ~f:(fun j -> packed 128 (16 + j))
+      ; [| packed 1 31 ; packed 255 32 ; packed 255 33 |]
+      ]
+  in
+  (* Expand tags: Field(x,b) -> [Field(x,255); Field(b,1)], Packed(x,n) -> [Field(x,n)] *)
+  let public_input =
+    Array.concat_map public_input ~f:(function
+      | `Field (x, b) ->
+          [| `Field (x, Field.size_in_bits)
+           ; `Field ((b :> Field.t), 1)
+          |]
+      | `Packed_bits (x, n) ->
+          [| `Field (x, n) |] )
+  in
+  (* Helper: get SRS lagrange commitment at index i for domain 2^16 *)
+  let lagrange_pt i =
+    let d = Int.pow 2 16 in
+    let chunks =
+      (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i).unshifted
+    in
+    Array.map chunks ~f:(function
+      | Finite g ->
+          Inner_curve.constant (Inner_curve.Constant.of_affine g)
+      | Infinity ->
+          assert false )
+  in
+  (* For single-branch, the domain-masking reduces to identity.
+     lagrange ~domain srs i = lagrange_pt i
+     scaled_lagrange ~domain c srs i = scale each point by c *)
+  let scaled_lagrange_pt c i =
+    let d = Int.pow 2 16 in
+    let chunks =
+      (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i).unshifted
+    in
+    Array.map chunks ~f:(function
+      | Finite g ->
+          Inner_curve.Constant.scale (Inner_curve.Constant.of_affine g) c
+          |> Inner_curve.constant
+      | Infinity ->
+          assert false )
+  in
+  let lagrange_with_correction_pt ~input_length i =
+    let actual_shift =
+      Ops.bits_per_chunk * Ops.chunks_needed ~num_bits:input_length
+    in
+    let rec field2pow f k =
+      if k = 1 then f
+      else
+        let j = k - 1 in
+        Inner_curve.Constant.Scalar.(f * field2pow f j)
+    in
+    let two_to_actual_shift =
+      field2pow (Inner_curve.Constant.Scalar.of_int 2) actual_shift
+    in
+    let d = Int.pow 2 16 in
+    let chunks =
+      (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i).unshifted
+    in
+    Array.map chunks ~f:(function
+      | Finite g ->
+          let open Inner_curve.Constant in
+          let g = of_affine g in
+          ( Inner_curve.constant g
+          , Inner_curve.constant (negate (scale g two_to_actual_shift)) )
+      | Infinity ->
+          assert false )
+  in
+  (* Partition into constant_part and non_constant_part *)
+  let constant_part, non_constant_part =
+    List.partition_map
+      Array.(to_list (mapi public_input ~f:(fun i t -> (i, t))))
+      ~f:(fun (i, t) ->
+        match[@warning "-4"] t with
+        | `Field (Constant c, _) ->
+            First
+              ( if Field.Constant.(equal zero) c then None
+              else if Field.Constant.(equal one) c then
+                Some (lagrange_pt i)
+              else
+                Some
+                  (scaled_lagrange_pt
+                     (Inner_curve.Constant.Scalar.project
+                        (Field.Constant.unpack c) )
+                     i ) )
+        | `Field x ->
+            Second (i, x) )
+  in
+  (* Build terms *)
+  let terms =
+    List.map non_constant_part ~f:(fun (i, x) ->
+        match x with
+        | b, 1 ->
+            assert_ (Constraint.boolean (b :> Field.t)) ;
+            `Cond_add
+              (Boolean.Unsafe.of_cvar b, lagrange_pt i)
+        | x, n ->
+            `Add_with_correction
+              ( (x, n)
+              , lagrange_with_correction_pt ~input_length:n i ) )
+  in
+  (* Compute correction = sum of correction points from Add_with_correction terms *)
+  let correction =
+    with_label __LOC__ (fun () ->
+        List.reduce_exn
+          (List.filter_map terms ~f:(function
+            | `Cond_add _ ->
+                None
+            | `Add_with_correction (_, chunks) ->
+                Some (Array.map ~f:snd chunks) ) )
+          ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None)) )
+  in
+  (* Module matching Wrap_verifier.Other_field.With_top_bit0 *)
+  let module With_top_bit0 = struct
+    module Constant = Wrap_main_inputs.Other_field
+    type t = Impls.Wrap.Other_field.t
+    let typ = Impls.Wrap.Other_field.typ_unchecked
+  end in
+  (* Fold: init = correction + constant_parts, then fold non-constant terms *)
+  let x_hat =
+    with_label __LOC__ (fun () ->
+        let init =
+          List.fold
+            (List.filter_map ~f:Fn.id constant_part)
+            ~init:correction
+            ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None))
+        in
+        List.fold terms ~init ~f:(fun acc term ->
+            match term with
+            | `Cond_add (b, g) ->
+                with_label __LOC__ (fun () ->
+                    Array.map2_exn acc g ~f:(fun acc g ->
+                        Inner_curve.if_ b
+                          ~then_:(Ops.add_fast g acc)
+                          ~else_:acc ) )
+            | `Add_with_correction ((x, num_bits), chunks) ->
+                Array.map2_exn acc chunks ~f:(fun acc (g, _) ->
+                    Ops.add_fast acc
+                      (Ops.scale_fast2'
+                         (module With_top_bit0)
+                         g x ~num_bits ) ) ) )
+    |> Array.map ~f:Inner_curve.negate
+  in
+  (* Add blinding generator H *)
+  let _x_hat =
+    with_label "x_hat blinding" (fun () ->
+        Array.map x_hat ~f:(fun x_hat ->
+            Ops.add_fast x_hat
+              (Inner_curve.constant (Lazy.force Wrap_main_inputs.Generators.h)) ) )
+  in
+  ()
+
+(* bullet_reduce sub-circuit: 16 rounds of endo_inv + endo + add_fast, then reduce.
+
+   Input layout (80 fields):
+     0-63:  lr[0..15] (16 × 4 fields: l.x, l.y, r.x, r.y)
+     64-79: scalar_challenges[0..15]
+
+   Runs on Tock/Wrap side (Fq field, Vesta inner curve).
+*)
+module WrapOps = Plonk_curve_ops.Make (Impls.Wrap) (Wrap_main_inputs.Inner_curve)
+
+(* ft_comm sub-circuit: linearization polynomial commitment from IVP wrap.
+
+   Input layout (17 fields):
+     0-13: t_comm (7 points × 2 coords)
+     14:   perm (Type1 shifted scalar)
+     15:   zeta_to_srs_length (Type1 shifted scalar)
+     16:   zeta_to_domain_size (Type1 shifted scalar)
+
+   sigma_comm_last is a constant (Vesta generator, matching IVP's dummy_comm).
+   Runs on Tock/Wrap side (Fq field, Vesta inner curve).
+*)
+let ftcomm_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let module Inner_curve = Wrap_main_inputs.Inner_curve in
+  let read_pt i : Inner_curve.t = (inputs.(i), inputs.(i + 1)) in
+  let t_comm = Array.init 7 ~f:(fun j -> read_pt (2 * j)) in
+  let plonk =
+    { Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.
+      (* Only perm, zeta_to_srs_length, zeta_to_domain_size matter for ft_comm *)
+      alpha = { Kimchi_types.inner = Field.zero }  (* unused *)
+    ; beta = Field.zero  (* unused *)
+    ; gamma = Field.zero  (* unused *)
+    ; zeta = { Kimchi_types.inner = Field.zero }  (* unused *)
+    ; perm = Shifted_value.Type1.Shifted_value inputs.(14)
+    ; zeta_to_srs_length = Shifted_value.Type1.Shifted_value inputs.(15)
+    ; zeta_to_domain_size = Shifted_value.Type1.Shifted_value inputs.(16)
+    ; feature_flags =
+        Kimchi_backend_common.Plonk_types.Features.map
+          Kimchi_backend_common.Plonk_types.Features.none_bool
+          ~f:(fun _ -> Boolean.false_)
+    ; joint_combiner = Opt.Nothing
+    }
+  in
+  let scale_fast = WrapOps.scale_fast
+      ~num_bits:Wrap_main_inputs.Inner_curve.Constant.Scalar.size_in_bits
+  in
+  (* sigma_comm_last = constant Vesta generator (matching IVP's dummy_comm) *)
+  let dummy_pt = Wrap_main_inputs.Inner_curve.Params.one in
+  let sigma_comm_last = Inner_curve.constant dummy_pt in
+  (* Dummy verification key with the right shape *)
+  let dummy_comm = [| sigma_comm_last |] in
+  let verification_key =
+    { Plonk_verification_key_evals.Step.
+      sigma_comm = Vector.init Nat.N7.n ~f:(fun _ -> dummy_comm)
+    ; coefficients_comm = Vector.init Nat.N15.n ~f:(fun _ -> dummy_comm)
+    ; generic_comm = dummy_comm
+    ; psm_comm = dummy_comm
+    ; complete_add_comm = dummy_comm
+    ; mul_comm = dummy_comm
+    ; emul_comm = dummy_comm
+    ; endomul_scalar_comm = dummy_comm
+    ; xor_comm = Opt.Nothing
+    ; range_check0_comm = Opt.Nothing
+    ; range_check1_comm = Opt.Nothing
+    ; foreign_field_add_comm = Opt.Nothing
+    ; foreign_field_mul_comm = Opt.Nothing
+    ; rot_comm = Opt.Nothing
+    ; lookup_table_comm =
+        Vector.init Plonk_types.Lookup_sorted_minus_1.n ~f:(fun _ -> Opt.Nothing)
+    ; lookup_table_ids = Opt.Nothing
+    ; runtime_tables_selector = Opt.Nothing
+    ; lookup_selector_lookup = Opt.Nothing
+    ; lookup_selector_xor = Opt.Nothing
+    ; lookup_selector_range_check = Opt.Nothing
+    ; lookup_selector_ffmul = Opt.Nothing
+    }
+  in
+  let _ft_comm =
+    Common.ft_comm
+      ~add:(WrapOps.add_fast ?check_finite:None)
+      ~scale:scale_fast ~negate:Inner_curve.negate
+      ~verification_key:
+        (Plonk_verification_key_evals.Step.forget_optional_commitments
+           verification_key )
+      ~plonk ~t_comm
+  in
+  ()
+
+(* combine_poly sub-circuit: Split_commitments.combine from IVP wrap bulletproof.
+
+   Input layout (37 fields):
+     0-1:   x_hat (1 point)
+     2-3:   ft_comm (1 point)
+     4-5:   z_comm (1 point)
+     6-35:  w_comm[0..14] (15 points)
+     36:    xi (scalar challenge)
+
+   Constant bases (from dummy verifier key): generic, psm, complete_add, mul,
+   emul, endomul_scalar (6), coefficients_comm[0..14] (15), sigma_comm_init[0..5] (6).
+   Total: 18 variable + 27 constant = 45 bases.
+
+   Runs on Tock/Wrap side (Fq field, Vesta inner curve).
+*)
+let combine_poly_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let module Inner_curve = Wrap_main_inputs.Inner_curve in
+  let read_pt i : Inner_curve.t = (inputs.(i), inputs.(i + 1)) in
+  let x_hat = [| read_pt 0 |] in
+  let ft_comm = read_pt 2 in
+  let z_comm = [| read_pt 4 |] in
+  let w_comm = Vector.init Nat.N15.n ~f:(fun j ->
+    [| read_pt (6 + 2 * j) |]) in
+  let xi : Wrap_verifier.Scalar_challenge.t =
+    { Kimchi_types.inner = inputs.(36) }
+  in
+  (* Verification key: all dummy (Vesta generator) *)
+  let dummy_pt = Wrap_main_inputs.Inner_curve.Params.one in
+  let dummy_comm = [| Inner_curve.constant dummy_pt |] in
+  let m =
+    Plonk_verification_key_evals.Step.forget_optional_commitments
+      { Plonk_verification_key_evals.Step.
+        sigma_comm = Vector.init Nat.N7.n ~f:(fun _ -> dummy_comm)
+      ; coefficients_comm = Vector.init Nat.N15.n ~f:(fun _ -> dummy_comm)
+      ; generic_comm = dummy_comm
+      ; psm_comm = dummy_comm
+      ; complete_add_comm = dummy_comm
+      ; mul_comm = dummy_comm
+      ; emul_comm = dummy_comm
+      ; endomul_scalar_comm = dummy_comm
+      ; xor_comm = Opt.Nothing
+      ; range_check0_comm = Opt.Nothing
+      ; range_check1_comm = Opt.Nothing
+      ; foreign_field_add_comm = Opt.Nothing
+      ; foreign_field_mul_comm = Opt.Nothing
+      ; rot_comm = Opt.Nothing
+      ; lookup_table_comm =
+          Vector.init Plonk_types.Lookup_sorted_minus_1.n ~f:(fun _ -> Opt.Nothing)
+      ; lookup_table_ids = Opt.Nothing
+      ; runtime_tables_selector = Opt.Nothing
+      ; lookup_selector_lookup = Opt.Nothing
+      ; lookup_selector_xor = Opt.Nothing
+      ; lookup_selector_range_check = Opt.Nothing
+      ; lookup_selector_ffmul = Opt.Nothing
+      }
+  in
+  let sigma_comm_init, [ _ ] =
+    Vector.split m.sigma_comm (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
+  in
+  (* Assemble without_degree_bound exactly as in wrap_verifier.ml:1356-1408 *)
+  let len_1, len_1_add = Plonk_types.(Columns.add Permuts_minus_1.n) in
+  let len_2, len_2_add = Plonk_types.(Columns.add len_1) in
+  let _len_3, len_3_add = Nat.N9.add len_2 in
+  let _len_4, len_4_add = Nat.N6.add Plonk_types.Lookup_sorted.n in
+  let len_5, len_5_add = Nat.N11.add Nat.N8.n in
+  let len_6, len_6_add = Nat.N45.add len_5 in
+  let without_degree_bound =
+    let append_chain len second first =
+      Vector.append first second len
+    in
+    (* sg_old = empty (0 proofs verified) *)
+    Vector.[]
+    |> append_chain
+         (snd (Nat.N0.add len_6))
+         ( [ x_hat
+           ; [| ft_comm |]
+           ; z_comm
+           ; m.generic_comm
+           ; m.psm_comm
+           ; m.complete_add_comm
+           ; m.mul_comm
+           ; m.emul_comm
+           ; m.endomul_scalar_comm
+           ]
+         |> append_chain len_3_add
+              (Vector.append w_comm
+                 (Vector.append m.coefficients_comm sigma_comm_init
+                    len_1_add )
+                 len_2_add )
+         |> Vector.map ~f:Opt.just
+         |> append_chain len_6_add
+              ( [ Opt.Nothing  (* range_check0 *)
+                ; Opt.Nothing  (* range_check1 *)
+                ; Opt.Nothing  (* foreign_field_add *)
+                ; Opt.Nothing  (* foreign_field_mul *)
+                ; Opt.Nothing  (* xor *)
+                ; Opt.Nothing  (* rot *)
+                ]
+              |> append_chain len_4_add
+                   (Vector.init Plonk_types.Lookup_sorted.n
+                      ~f:(fun _ -> Opt.Nothing))
+              |> append_chain len_5_add
+                   [ Opt.Nothing  (* lookup aggreg *)
+                   ; Opt.Nothing  (* lookup_table *)
+                   ; Opt.Nothing  (* runtime *)
+                   ; Opt.Nothing  (* runtime_tables_selector *)
+                   ; Opt.Nothing  (* lookup_selector_xor *)
+                   ; Opt.Nothing  (* lookup_selector_lookup *)
+                   ; Opt.Nothing  (* lookup_selector_range_check *)
+                   ; Opt.Nothing  (* lookup_selector_ffmul *)
+                   ] ) )
+  in
+  (* Inline Split_commitments.combine logic for all-Just, single-chunk,
+     no-degree-bound case. Matches wrap_verifier.ml:496-565 exactly. *)
+  let module IC = Wrap_main_inputs.Inner_curve in
+  let module SC = Wrap_verifier.Scalar_challenge in
+  (* reduce_without_degree_bound = fun x -> [x], so flat = to_list *)
+  let flat = Vector.to_list without_degree_bound in
+  (* go (List.rev flat) — process reversed, skipping Nothing, init first Just *)
+  let open Impls.Wrap in
+  let _combined =
+    let combine_point_add (p : IC.t) (q : IC.t) =
+      WrapOps.add_fast p q
+    in
+    let scale_and_add ~(acc : IC.t * Boolean.var) ~xi
+        (p : (IC.t array, Boolean.var) Opt.t) =
+      let acc_point, acc_non_zero = acc in
+      match p with
+      | Opt.Nothing -> acc
+      | Opt.Just p_arr ->
+        let p0 = p_arr.(Array.length p_arr - 1) in
+        let base_point =
+          IC.(if_ acc_non_zero
+                ~then_:(combine_point_add p0 (SC.endo acc_point xi))
+                ~else_:p0)
+        in
+        let point = ref base_point in
+        for i = Array.length p_arr - 2 downto 0 do
+          point := combine_point_add p_arr.(i) (SC.endo !point xi)
+        done ;
+        let point = IC.(if_ Boolean.true_ ~then_:!point ~else_:acc_point) in
+        let non_zero = Boolean.(Boolean.true_ &&& Boolean.true_ ||| acc_non_zero) in
+        (point, non_zero)
+      | Opt.Maybe (keep, p_arr) ->
+        let p0 = p_arr.(Array.length p_arr - 1) in
+        let base_point =
+          IC.(if_ acc_non_zero
+                ~then_:(combine_point_add p0 (SC.endo acc_point xi))
+                ~else_:p0)
+        in
+        let point = ref base_point in
+        for i = Array.length p_arr - 2 downto 0 do
+          point := combine_point_add p_arr.(i) (SC.endo !point xi)
+        done ;
+        let point = IC.(if_ keep ~then_:!point ~else_:acc_point) in
+        let non_zero = Boolean.(keep &&& Boolean.true_ ||| acc_non_zero) in
+        (point, non_zero)
+    in
+    let without_degree_bound_tagged =
+      List.map flat ~f:(Opt.map ~f:(Array.map ~f:(fun x -> x)))
+    in
+    let rec go = function
+      | [] -> failwith "empty"
+      | init :: comms -> (
+        match init with
+        | Opt.Nothing -> go comms
+        | Opt.Just p ->
+          let init_point = p.(Array.length p - 1) in
+          let init_acc = (init_point, Boolean.(Boolean.true_ &&& Boolean.true_)) in
+          List.fold_left comms ~init:init_acc ~f:(fun acc p ->
+            scale_and_add ~acc ~xi p)
+        | Opt.Maybe (keep, p) ->
+          let init_point = p.(Array.length p - 1) in
+          let init_acc = (init_point, Boolean.(keep &&& Boolean.true_)) in
+          List.fold_left comms ~init:init_acc ~f:(fun acc p ->
+            scale_and_add ~acc ~xi p) )
+    in
+    let (point, non_zero) = go (List.rev without_degree_bound_tagged) in
+    Boolean.Assert.is_true non_zero ;
+    point
+  in
+  ()
+
+(* Single bullet_reduce round: endoInv(l, u) + endo(r, u) + add_fast
+   Input: l.x, l.y, r.x, r.y, scalar = 5 fields *)
+let bullet_reduce_one_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let l : Wrap_main_inputs.Inner_curve.t = (inputs.(0), inputs.(1)) in
+  let r : Wrap_main_inputs.Inner_curve.t = (inputs.(2), inputs.(3)) in
+  let pre = Import.Scalar_challenge.create inputs.(4) in
+  let left_term = Wrap_verifier.Scalar_challenge.endo_inv l pre in
+  let right_term = Wrap_verifier.Scalar_challenge.endo r pre in
+  let _result = WrapOps.add_fast left_term right_term in
+  ()
+
+let bullet_reduce_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let read_pt i : Wrap_main_inputs.Inner_curve.t =
+    (inputs.(i), inputs.(i + 1))
+  in
+  let lr = Array.init 16 ~f:(fun j ->
+    (read_pt (4 * j), read_pt (4 * j + 2)))
+  in
+  let prechallenges = Array.init 16 ~f:(fun j ->
+    Import.Scalar_challenge.create inputs.(64 + j))
+  in
+  let terms =
+    Array.map2_exn lr prechallenges ~f:(fun (l, r) pre ->
+      let left_term = Wrap_verifier.Scalar_challenge.endo_inv l pre in
+      let right_term = Wrap_verifier.Scalar_challenge.endo r pre in
+      WrapOps.add_fast left_term right_term)
+  in
+  let _result =
+    Array.reduce_exn terms ~f:(WrapOps.add_fast ?check_finite:None)
+  in
+  ()
+
+let group_map_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let module Inner_curve = Wrap_main_inputs.Inner_curve in
+  let module M =
+    Group_map.Bw19.Make (Field.Constant) (Field)
+      (struct
+        let params =
+          Group_map.Bw19.Params.create
+            (module Field.Constant)
+            { b = Inner_curve.Params.b }
+      end)
+  in
+  let group_map =
+    Snarky_group_map.Checked.wrap
+      (module Impl)
+      ~potential_xs:M.potential_xs
+      ~y_squared:(fun ~x ->
+        Field.(
+          (x * x * x)
+          + (constant Inner_curve.Params.a * x)
+          + constant Inner_curve.Params.b) )
+    |> unstage
+  in
+  let _x, _y = group_map inputs.(0) in
+  ()
+
 (* ---- Entry point ---- *)
 
 let run ~output_dir =
@@ -1497,4 +2297,27 @@ let run ~output_dir =
     ~input_typ:array151_field ~return_typ:Impl.Typ.unit ;
   let array148_wrap = Impls.Wrap.Typ.array ~length:148 Impls.Wrap.Field.typ in
   dump_tock' "finalize_other_proof_wrap_circuit" finalize_other_proof_wrap_circuit
-    ~input_typ:array148_wrap ~return_typ:Impls.Wrap.Typ.unit
+    ~input_typ:array148_wrap ~return_typ:Impls.Wrap.Typ.unit ;
+  (* IVP needs the Tick URS for Generators.h (blinding generator) *)
+  Backend.Tick.Keypair.set_urs_info [] ;
+  let array34_wrap = Impls.Wrap.Typ.array ~length:34 Impls.Wrap.Field.typ in
+  dump_tock' "xhat_circuit" xhat_circuit
+    ~input_typ:array34_wrap ~return_typ:Impls.Wrap.Typ.unit ;
+  let array177_wrap = Impls.Wrap.Typ.array ~length:177 Impls.Wrap.Field.typ in
+  dump_tock_with_labels output_dir "ivp_wrap_circuit" ivp_wrap_circuit
+    ~input_typ:array177_wrap ~return_typ:Impls.Wrap.Typ.unit ;
+  let array80_wrap = Impls.Wrap.Typ.array ~length:80 Impls.Wrap.Field.typ in
+  dump_tock' "bullet_reduce_circuit" bullet_reduce_circuit
+    ~input_typ:array80_wrap ~return_typ:Impls.Wrap.Typ.unit ;
+  let array5_wrap = Impls.Wrap.Typ.array ~length:5 Impls.Wrap.Field.typ in
+  dump_tock' "bullet_reduce_one_circuit" bullet_reduce_one_circuit
+    ~input_typ:array5_wrap ~return_typ:Impls.Wrap.Typ.unit ;
+  let array17_wrap = Impls.Wrap.Typ.array ~length:17 Impls.Wrap.Field.typ in
+  dump_tock' "ftcomm_circuit" ftcomm_circuit
+    ~input_typ:array17_wrap ~return_typ:Impls.Wrap.Typ.unit ;
+  let array37_wrap = Impls.Wrap.Typ.array ~length:37 Impls.Wrap.Field.typ in
+  dump_tock' "combine_poly_circuit" combine_poly_circuit
+    ~input_typ:array37_wrap ~return_typ:Impls.Wrap.Typ.unit ;
+  let array1_wrap = Impls.Wrap.Typ.array ~length:1 Impls.Wrap.Field.typ in
+  dump_tock' "group_map_circuit" group_map_circuit
+    ~input_typ:array1_wrap ~return_typ:Impls.Wrap.Typ.unit
