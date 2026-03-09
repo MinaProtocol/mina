@@ -1,40 +1,21 @@
-# Snark Worker Library
+# Snark Worker
 
-This directory contains the Mina SNARK worker library implementation. The SNARK
-worker is responsible for generating zero-knowledge proofs (SNARKs) required by
-the Mina protocol.
+## Background
 
-## Overview
+This library implements a SNARK worker. A SNARK worker is an abstraction of a running process, generating proofs as it polls work from the SNARK coordinator, and submitting the proofs back to the coordinator so the coordinator can broadcast the resulting proofs to other Mina nodes, or include them in a block, etc.
 
-The SNARK worker operates as either:
+A SNARK coordinator is a Mina node exposing a "server" endpoint accessible by SNARK workers, implementing all RPCs necessary. These endpoints are defined in function `setup_local_server` in `src/app/cli/src/init/mina_run.ml`. The RPCs include requesting work specs, submitting completed proofs, and reporting failures via `failed_to_generate_snark`.
 
-1. An integrated service within the Mina daemon
-2. A standalone process (see the [`standalone/`](./standalone/) directory)
+## What is a work?
 
-SNARK workers generate proofs for transactions and receive fees for their work,
-creating an economic incentive for proof generation in the Mina network.
+The exact definition of a "work" differs before and after the Mesa HF.
 
-## Library Structure
+### Before Mesa HF
 
-- `snark_worker.ml/mli` - Main implementation and interface
-- `intf.ml` - Core interfaces for the SNARK worker
-- `functor.ml` - Functor for creating SNARK worker implementations
-- `prod.ml` - Production implementation of the SNARK worker
-- `rpcs.ml` - RPC definitions for communication between daemon and worker
-- `debug.ml` - Debugging utilities
+A SNARK work is one or two single works, where a single work is either requesting a proof for a transaction (command, fee transfer, or coinbase), or a proof that is a merge of 2 proofs. The snark worker should return one or two proofs corresponding to the single work.
 
-## Standalone Worker
+### After Mesa HF
 
-For information about the standalone SNARK worker executable, see the
-[standalone README](./standalone/README.md).
+A SNARK work is anything that requires generating one proof, which is one of: a proof for a non-zkApp command, a proof for a zkApp segment, or a proof that merges 2 proofs. The snark worker should return one proof exactly.
 
-## Usage
-
-The library is primarily used:
-
-1. Internally by the Mina daemon to process SNARK work
-2. By external SNARK workers that connect to a Mina daemon to perform proof
-   generation
-
-SNARK workers communicate with the Mina daemon via a set of versioned RPCs for
-requesting work and submitting completed proofs.
+With Mesa HF, we can utilize more parallelism on SNARK workers, hence the number of segments per zkApp command is less relevant for proof generation latency.
