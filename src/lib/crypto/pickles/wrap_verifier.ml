@@ -972,7 +972,7 @@ struct
         (* == IVC Step 6: Handle lookup arguments (if present) ==
            Extract and process lookup-related commitments. This section handles
            runtime tables, sorted columns, and the joint_combiner challenge. *)
-        (* let runtime_comm =
+        let runtime_comm =
           match messages.lookup with
           | Nothing
           | Maybe (_, { runtime = Nothing; _ })
@@ -986,8 +986,8 @@ struct
               Pickles_types.Opt.Maybe (b, runtime)
           | Just { runtime = Just runtime; _ } ->
               Pickles_types.Opt.Just runtime
-        in *)
-        (* let absorb_runtime_tables () =
+        in
+        let absorb_runtime_tables () =
           match runtime_comm with
           | Nothing ->
               ()
@@ -998,9 +998,9 @@ struct
               let z = Array.map runtime ~f:(fun z -> (Boolean.true_, z)) in
               absorb sponge Without_degree_bound z
         in
-        absorb_runtime_tables () ; *)
-        (* let joint_combiner = Types.Opt.Nothing
-          (* let compute_joint_combiner (l : _ Messages.Lookup.In_circuit.t) =
+        absorb_runtime_tables () ;
+        let joint_combiner =
+          let compute_joint_combiner (l : _ Messages.Lookup.In_circuit.t) =
             let absorb_sorted_1 sponge =
               let (first :: _) = l.sorted in
               let z = Array.map first ~f:(fun z -> (Boolean.true_, z)) in
@@ -1069,13 +1069,12 @@ struct
                 { inner =
                     Field.if_ b ~then_:joint_combiner_if_true.inner
                       ~else_:joint_combiner_if_false.inner
-                } *)
-          in *)
-          (* match messages.lookup with
-          (* | Nothing -> *)
-          _ ->
+                }
+          in
+          match messages.lookup with
+          | Nothing ->
               Types.Opt.Nothing
-          (* | Maybe (b, l) ->
+          | Maybe (b, l) ->
               Opt.consume_all_pending sponge ;
               let sponge2 = Opt.copy sponge in
               let joint_combiner = compute_joint_combiner l in
@@ -1089,12 +1088,12 @@ struct
               Types.Opt.Maybe (b, joint_combiner)
           | Just l ->
               Opt.consume_all_pending sponge ;
-              Types.Opt.just (compute_joint_combiner l) *)
-        in *)
-        (* let lookup_table_comm = *)
-          (* let compute_lookup_table_comm (l : _ Messages.Lookup.In_circuit.t)
-              joint_combiner = Types.Opt.Nothing *)
-            (* let (first_column :: second_column :: rest) = m.lookup_table_comm in
+              Types.Opt.just (compute_joint_combiner l)
+        in
+        let lookup_table_comm =
+          let compute_lookup_table_comm (l : _ Messages.Lookup.In_circuit.t)
+              joint_combiner =
+            let (first_column :: second_column :: rest) = m.lookup_table_comm in
             let second_column_with_runtime =
               match (second_column, l.runtime) with
               | Types.Opt.Nothing, comm | comm, Types.Opt.Nothing ->
@@ -1214,11 +1213,9 @@ struct
                         Types.Opt.Just
                           (Array.map2_exn ~f:Inner_curve.( + ) scaled_acc comm)
                     ) )
-          in *)
-          (* in *)
-          (* match (messages.lookup, joint_combiner) with
-            _ -> Types.Opt.Nothing
-          (* | Types.Opt.Nothing, Types.Opt.Nothing ->
+          in
+          match (messages.lookup, joint_combiner) with
+          | Types.Opt.Nothing, Types.Opt.Nothing ->
               Types.Opt.Nothing
           | ( Types.Opt.Maybe (b_l, l)
             , Types.Opt.Maybe (_b_joint_combiner, joint_combiner) ) -> (
@@ -1235,14 +1232,14 @@ struct
               compute_lookup_table_comm l joint_combiner
           | ( (Types.Opt.Nothing | Maybe _ | Just _)
             , (Types.Opt.Nothing | Maybe _ | Just _) ) ->
-              assert false *)
-        in *)
+              assert false
+        in
         let lookup_sorted =
-          (* let lookup_sorted_minus_1 =
+          let lookup_sorted_minus_1 =
             Nat.to_int Plonk_types.Lookup_sorted_minus_1.n
-          in *)
-          Vector.init Plonk_types.Lookup_sorted.n ~f:(fun i -> Types.Opt.Nothing)
-              (* match messages.lookup with
+          in
+          Vector.init Plonk_types.Lookup_sorted.n ~f:(fun i ->
+              match messages.lookup with
               | Types.Opt.Nothing ->
                   Types.Opt.Nothing
               | Types.Opt.Maybe (b, l) ->
@@ -1251,14 +1248,14 @@ struct
                     Types.Opt.Maybe (b, Option.value_exn (Vector.nth l.sorted i))
               | Types.Opt.Just l ->
                   if i = lookup_sorted_minus_1 then l.sorted_5th_column
-                  else Types.Opt.Just (Option.value_exn (Vector.nth l.sorted i)) ) *)
+                  else Types.Opt.Just (Option.value_exn (Vector.nth l.sorted i)) )
         in
         (* == IVC Step 7: Sample beta and gamma challenges ==
            These challenges are used in the permutation argument. *)
         let beta = Opt.challenge sponge in
         let gamma = Opt.challenge sponge in
         (* == IVC Step 8: Absorb lookup aggregation commitment (if used) == *)
-        (* let () =
+        let () =
           match messages.lookup with
           | Nothing ->
               ()
@@ -1270,7 +1267,7 @@ struct
                 Array.map l.aggreg ~f:(fun z -> (Boolean.true_, z))
               in
               absorb sponge Without_degree_bound aggreg
-        in *)
+        in
         (* == IVC Step 9: Absorb permutation commitment (z_comm) == *)
         let z_comm = messages.z_comm in
         absorb_g z_comm ;
@@ -1401,10 +1398,8 @@ struct
                       |> append_chain len_5_add
                            [ Pickles_types.Opt.map messages.lookup ~f:(fun l ->
                                  l.aggreg )
-                           (* ; lookup_table_comm *)
-                           ; Pickles_types.Opt.Nothing
-                           (* ; runtime_comm *)
-                           ; Pickles_types.Opt.Nothing
+                           ; lookup_table_comm
+                           ; runtime_comm
                            ; m.runtime_tables_selector
                            ; m.lookup_selector_xor
                            ; m.lookup_selector_lookup
@@ -1436,8 +1431,7 @@ struct
           ; beta
           ; gamma
           ; zeta
-          (* ; joint_combiner *)
-          ; joint_combiner = Types.Opt.Nothing
+          ; joint_combiner
           ; feature_flags = plonk.feature_flags
           } ;
         (* Return sponge digest and bulletproof challenges for finalization *)
