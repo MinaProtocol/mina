@@ -673,7 +673,7 @@ let send_rosetta_transactions_graphql =
              Format.eprintf "@[<v>Error:@,%a@,@]@."
                (Yojson.Safe.pretty_print ?std:None)
                (Error_json.error_to_yojson err) ;
-             Core_kernel.exit 1 ) )
+             exit 1 ) )
 
 module Export_logs = struct
   let pp_export_result tarfile = printf "Exported logs to %s\n%!" tarfile
@@ -802,7 +802,8 @@ let export_ledger =
            if Option.is_some state_hash then (
              Format.eprintf "A state hash should not be given for %s@."
                ledger_kind ;
-             Core_kernel.exit 1 )
+             exit 1 )
+           else Deferred.unit
          in
          let response =
            match ledger_kind with
@@ -819,11 +820,11 @@ let export_ledger =
                Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_snarked_ledger.rpc
                  state_hash port
            | "staking-epoch-ledger" ->
-               check_for_state_hash () ;
+               let%bind () = check_for_state_hash () in
                Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc
                  Daemon_rpcs.Get_staking_ledger.Current port
            | "next-epoch-ledger" ->
-               check_for_state_hash () ;
+               let%bind () = check_for_state_hash () in
                Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc
                  Daemon_rpcs.Get_staking_ledger.Next port
            | _ ->
@@ -1805,7 +1806,7 @@ let add_peers_graphql =
                      "Could not parse %s as a peer address. It should use the \
                       format /ip4/IPADDR/tcp/PORT/p2p/PEERID"
                      peer ;
-                   Core.exit 1 )
+                   exit 1 )
          in
          let seed = Option.value ~default:true seed in
          let%map response =

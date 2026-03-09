@@ -1738,14 +1738,14 @@ let audit_type_shapes : Command.t =
         (Canonical.to_string_hum canonical) )
     else incr good
   in
-  Command.basic ~summary:"Audit shapes of versioned types"
+  Command.async ~summary:"Audit shapes of versioned types"
     (Command.Param.return (fun () ->
          let bad, good = (ref 0, ref 0) in
          Ppx_version_runtime.Shapes.iteri
            ~f:(fun ~key:path ~data:(shape, ty_decl) ->
              handle_shape path shape ty_decl good bad ) ;
          Core.printf "good shapes:\n\t%d\nbad shapes:\n\t%d\n%!" !good !bad ;
-         if !bad > 0 then Core.exit 1 ) )
+         if !bad > 0 then exit 1 else Deferred.unit ) )
 
 (*NOTE A previous version of this function included compile time ppx that didn't compile, and was never
   evaluated under any build profile
@@ -2248,16 +2248,15 @@ let () =
   (* intercept command-line processing for "version", because we don't
      use the Jane Street scripts that generate their version information
   *)
-  (let is_version_cmd s =
-     List.mem [ "version"; "-version"; "--version" ] s ~equal:String.equal
-   in
-   match Sys.get_argv () with
-   | [| _mina_exe; version |] when is_version_cmd version ->
-       Mina_version.print_version ()
-   | _ ->
-       Command.run
-         (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
-            (mina_commands logger ~itn_features) ) ) ;
-  Core.exit 0
+  let is_version_cmd s =
+    List.mem [ "version"; "-version"; "--version" ] s ~equal:String.equal
+  in
+  match Sys.get_argv () with
+  | [| _mina_exe; version |] when is_version_cmd version ->
+      Mina_version.print_version ()
+  | _ ->
+      Command.run
+        (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
+           (mina_commands logger ~itn_features) )
 
 let linkme = ()

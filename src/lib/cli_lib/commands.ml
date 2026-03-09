@@ -153,7 +153,8 @@ let validate_transaction =
       (* TODO upgrade to yojson 2.0.0 when possible to use seq_from_channel
        * instead of the deprecated stream interface *)
       let jsons = Yojson.Safe.stream_from_channel In_channel.stdin in
-      ( match
+      let%bind.Deferred () =
+        match
           Or_error.try_with (fun () ->
               Streams.iter
                 (fun transaction_json ->
@@ -179,13 +180,14 @@ let validate_transaction =
                            (Error_json.error_to_yojson err) ) )
                 jsons )
         with
-      | Ok () ->
-          ()
-      | Error err ->
-          Format.eprintf "@[<v>Error:@,%s@,@]@."
-            (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
-          Format.printf "Invalid transaction.@." ;
-          Core_kernel.exit 1 ) ;
+        | Ok () ->
+            Deferred.unit
+        | Error err ->
+            Format.eprintf "@[<v>Error:@,%s@,@]@."
+              (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
+            Format.printf "Invalid transaction.@." ;
+            exit 1
+      in
       if !num_fails > 0 then (
         Format.printf "Some transactions failed to verify@." ;
         exit 1 )

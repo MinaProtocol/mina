@@ -69,7 +69,7 @@ let main ~archive_uri () =
           add_error missing_blocks_error ;
           Deferred.List.iter missing_blocks
             ~f:(fun (block_id, state_hash, height, parent_hash) ->
-              match%map
+              match%bind
                 Mina_caqti.Pool.use
                   (fun db -> Sql.Missing_blocks_gap.run db height)
                   pool
@@ -83,11 +83,12 @@ let main ~archive_uri () =
                       ; ("parent_hash", `String parent_hash)
                       ; ("parent_height", `Int (height - 1))
                       ; ("missing_blocks_gap", `Int gap_size)
-                      ]
+                      ] ;
+                  Deferred.unit
               | Error msg ->
                   [%log error] "Error getting missing blocks gap"
                     ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
-                  Core_kernel.exit 1 ) )
+                  exit 1 ) )
       in
       [%log info] "Querying for gaps in chain statuses" ;
       let%bind highest_canonical =
@@ -175,7 +176,7 @@ let main ~archive_uri () =
               ; ("state_hash", `String state_hash)
               ; ("chain_status", `String chain_status)
               ] ) ;
-      Core.exit (get_exit_code ())
+      exit (get_exit_code ())
 
 let () =
   Command.(

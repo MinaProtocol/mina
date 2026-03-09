@@ -207,7 +207,7 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
       Signal.handle [ Signal.term ] ~f:(fun _signal ->
           [%log info]
             !"Received signal to terminate. Aborting snark worker process" ;
-          Core.exit 0 ) ;
+          Deferred.don't_wait_for (exit 0) ) ;
       main ~logger ~proof_level ~constraint_constants ~signature_kind
         daemon_port
         (Option.value ~default:true shutdown_on_disconnect))

@@ -19,12 +19,15 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
   let account_creation_fee_int =
     Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
   in
-  if fee < min_fee then (
-    Format.eprintf "Minimum fee is %d@." min_fee ;
-    Core.exit 1 ) ;
-  if not @@ Option.is_some @@ Sys.getenv Secrets.Keypair.env then (
-    Format.eprintf "Please set environment variable %s@." Secrets.Keypair.env ;
-    Core.exit 1 ) ;
+  let%bind () =
+    if fee < min_fee then (
+      Format.eprintf "Minimum fee is %d@." min_fee ;
+      exit 1 )
+    else if not @@ Option.is_some @@ Sys.getenv Secrets.Keypair.env then (
+      Format.eprintf "Please set environment variable %s@." Secrets.Keypair.env ;
+      exit 1 )
+    else Deferred.unit
+  in
   let%bind fee_payer_keypair =
     Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina fee payer keypair"
       privkey_path
@@ -59,19 +62,19 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
   in
   let%bind fee_payer_initial_nonce =
     (* inferred nonce considers txns in pool, in addition to ledger *)
-    match%map
+    match%bind
       Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_inferred_nonce.rpc
         fee_payer_account_id port
     with
     | Ok (Ok (Some nonce)) ->
-        Account.Nonce.of_uint32 nonce
+        Deferred.return @@ Account.Nonce.of_uint32 nonce
     | Ok (Ok None) ->
         Format.eprintf "No account found for fee payer@." ;
-        Core.exit 1
+        exit 1
     | Ok (Error err) | Error err ->
         Format.eprintf "Failed to get fee payer nonce: %s@."
           (Error.to_string_hum err) ;
-        Core.exit 1
+        exit 1
   in
   Format.printf "Fee payer public key: %s, initial nonce = %d@."
     ( Account_id.public_key fee_payer_account_id
@@ -98,12 +101,15 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
     let total_fees = num_chunks * fee in
     Currency.Amount.of_nanomina_int_exn (amount + total_fees)
   in
-  if Currency.Amount.( > ) amount_and_fees fee_payer_balance_as_amount then (
-    Format.eprintf
-      !"Amount plus fees (%{sexp: Currency.Amount.t}) is greater than fee \
-        payer balance (%{sexp: Currency.Amount.t})@."
-      amount_and_fees fee_payer_balance_as_amount ;
-    Core.exit 1 ) ;
+  let%bind () =
+    if Currency.Amount.( > ) amount_and_fees fee_payer_balance_as_amount then (
+      Format.eprintf
+        !"Amount plus fees (%{sexp: Currency.Amount.t}) is greater than fee \
+          payer balance (%{sexp: Currency.Amount.t})@."
+        amount_and_fees fee_payer_balance_as_amount ;
+      exit 1 )
+    else Deferred.unit
+  in
   let amount_per_key = amount / num_accounts in
   let chunk_amounts =
     Array.init num_chunks ~f:(fun i ->
@@ -118,15 +124,18 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
   let chunk_total = Array.fold chunk_amounts ~init:0 ~f:( + ) in
   top_off_chunks 0 chunk_total ;
   assert (Array.fold chunk_amounts ~init:0 ~f:( + ) = amount) ;
-  let zkapps =
-    List.mapi keypair_chunks ~f:(fun i kps ->
+  let%bind zkapps =
+    Deferred.List.mapi keypair_chunks ~f:(fun i kps ->
         let num_updates = List.length kps in
         let chunk_amount = chunk_amounts.(i) in
-        if Int.is_negative chunk_amount then (
-          Format.eprintf
-            "Calculated negative amount for chunk of account updates; increase \
-             amount or lower fee@." ;
-          Core.exit 1 ) ;
+        let%map () =
+          if Int.is_negative chunk_amount then (
+            Format.eprintf
+              "Calculated negative amount for chunk of account updates; \
+               increase amount or lower fee@." ;
+            exit 1 )
+          else Deferred.unit
+        in
         let amount_per_update =
           (chunk_amount / num_updates) - account_creation_fee_int
         in
@@ -223,20 +232,21 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
           (List.map ~f:Zkapp_command.read_all_proofs_from_disk zkapps_batch)
           port
       in
-      ( match res with
-      | Ok res_inner -> (
-          match res_inner with
-          | Ok zkapps ->
-              Format.printf "Successfully sent %d zkApps to transaction pool@."
-                (List.length zkapps)
-          | Error err ->
-              Format.eprintf "When sending zkApps, got error: %s@."
-                (Error.to_string_hum err) ;
-              Core.exit 1 )
-      | Error err ->
-          Format.printf "Failed to send zkApps, error: %s@."
-            (Error.to_string_hum err) ;
-          Core.exit 1 ) ;
+      let%bind () =
+        match res with
+        | Ok (Ok zkapps) ->
+            Format.printf "Successfully sent %d zkApps to transaction pool@."
+              (List.length zkapps) ;
+            Deferred.unit
+        | Ok (Error err) ->
+            Format.eprintf "When sending zkApps, got error: %s@."
+              (Error.to_string_hum err) ;
+            exit 1
+        | Error err ->
+            Format.printf "Failed to send zkApps, error: %s@."
+              (Error.to_string_hum err) ;
+            exit 1
+      in
       let batch_pks =
         List.map zkapps_batch ~f:(fun zkapp ->
             let acct_update_pks =
