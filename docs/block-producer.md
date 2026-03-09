@@ -63,7 +63,7 @@ At a high level, the block producer:
 The block producer is started from `Mina_lib` once it has confirmed that at
 least one block-producer keypair is configured:
 
-```
+```ocaml
 Block_producer.run
   ~context ~vrf_evaluator ~prover ~verifier ~trust_system
   ~get_completed_work ~transaction_resource_pool
@@ -102,9 +102,8 @@ VRF evaluator and to reset the evaluation state.
 ---
 
 ## Block production scheduling
-[block-production-scheduling]: #block-production-scheduling
 
-![](https://raw.githubusercontent.com/MinaProtocol/mina-resources/main/docs/res/block_production_fsm.png)
+![Block production finite state machine](https://raw.githubusercontent.com/MinaProtocol/mina-resources/main/docs/res/block_production_fsm.png)
 
 The core scheduling loop is `check_next_block_timing` (called recursively).
 On every invocation it:
@@ -143,7 +142,7 @@ new slot arrives or the chain tip changes):
 
 ### 1. Staged-ledger diff creation
 
-```
+```ocaml
 Staged_ledger.create_diff
   ~constraint_constants ~global_slot staged_ledger ~logger
   ~coinbase_receiver ~current_state_view ~transactions_by_fee
@@ -168,7 +167,7 @@ diff falls below it, an empty diff is substituted instead.
 
 ### 2. Consensus transition generation
 
-```
+```ocaml
 Consensus.Hooks.generate_transition
   ~previous_protocol_state ~blockchain_state ~current_time
   ~block_data ~supercharge_coinbase ~snarked_ledger_hash
@@ -186,7 +185,7 @@ The resulting structures are packaged into an `Internal_transition` and a
 
 ### 3. Blockchain SNARK proving
 
-```
+```ocaml
 Prover.prove prover
   ~prev_state:previous_protocol_state
   ~prev_state_proof:previous_protocol_state_proof
@@ -202,7 +201,7 @@ silently discarded (the loop continues).
 Concurrently, a **delta block chain proof** is constructed from the transition
 frontier:
 
-```
+```ocaml
 Transition_chain_prover.prove
   ~length:consensus_constants.delta ~frontier previous_state_hash
 ```
@@ -217,7 +216,7 @@ through the `Validation` pipeline (genesis state hash check, frontier
 dependency check, etc.).  Proof validation is skipped here with
 `` `This_block_was_generated_internally ``.
 
-```
+```ocaml
 Breadcrumb.build
   ~logger ~precomputed_values ~verifier ~get_completed_work ~trust_system
   ~parent:crumb ~transition ~sender:None
@@ -240,7 +239,7 @@ the best tip's *parent* instead.
 Once the breadcrumb is accepted into the frontier, the block is broadcast to
 peers:
 
-```
+```ocaml
 Mina_networking.broadcast_state net
   (Breadcrumb.block_with_hash breadcrumb
    |> With_hash.map ~f:Mina_block.read_all_proofs_from_disk)
