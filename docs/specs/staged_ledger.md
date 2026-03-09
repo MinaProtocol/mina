@@ -62,11 +62,25 @@ The frozen ledger hash is carried in the blockchain state as
 `snarked_ledger_hash` and is updated only when the scan state emits a new
 ledger proof.
 
-The full snarked ledger state (as captured in `Snarked_ledger_state`) also
-records a `source` and `target` register pair that the ledger proof transitions
-between, together with a `supply_increase`, `fee_excess`, and `local_state`.
-This makes it possible to chain ledger proofs across blocks without replaying
-all transactions.
+The full snarked ledger state (as captured in `Snarked_ledger_state`) records
+the following top-level fields:
+
+| Field | Description |
+|-------|-------------|
+| `source` | A `Registers.t` representing the ledger state before the proven transactions. |
+| `target` | A `Registers.t` representing the ledger state after the proven transactions. |
+| `connecting_ledger_left` | Ledger hash connecting the left boundary of the proof. |
+| `connecting_ledger_right` | Ledger hash connecting the right boundary of the proof. |
+| `supply_increase` | The increase in total currency supply from coinbase rewards. |
+| `fee_excess` | The net fee excess that must balance to zero across a completed tree. |
+| `sok_digest` | A "statement of knowledge" digest binding the proof to the prover. |
+
+Each `Registers.t` contains `first_pass_ledger`, `second_pass_ledger`,
+`pending_coinbase_stack`, and `local_state`. Note that `local_state` is not a
+top-level field of the snarked ledger state; it is nested inside each register.
+
+This structure makes it possible to chain ledger proofs across blocks without
+replaying all transactions.
 
 ### When the Snarked Ledger Hash Advances
 
@@ -210,18 +224,28 @@ Implementation: `src/lib/mina_base/staged_ledger_hash.ml`
 ## Staged Ledger Diff
 
 A **staged-ledger-diff** (`src/lib/staged_ledger_diff/staged_ledger_diff.ml`)
-describes all the changes made to the staged ledger by a single block. It
-contains:
+describes all the changes made to the staged ledger by a single block.
+
+At the top level, the diff type is `{ diff : Diff.t }`, where `Diff.t` is a
+pair of prediffs:
+
+```
+Diff.t = Pre_diff_with_at_most_two_coinbase.t
+       * Pre_diff_with_at_most_one_coinbase.t option
+```
+
+The first prediff is always present; the second is optional and used when the
+diff must be split across two scan state trees to satisfy the fee-excess
+invariant (see [Fee Excess](#fee-excess) below).
+
+Each prediff contains the following fields:
 
 | Field | Description |
 |-------|-------------|
 | `completed_works` | List of snark work (`Snark_work.t`) covering pending jobs in the scan state. |
 | `commands` | List of user commands (payments, delegations, zkApp transactions) to apply. |
-| `coinbase` | The coinbase transaction for the block producer (may be split into two parts). |
+| `coinbase` | The coinbase transaction(s) for the block producer. The first prediff allows at most two coinbase parts (`At_most_two`); the second allows at most one (`At_most_one`). |
 | `internal_command_statuses` | Statuses for internal commands (fee transfers, coinbase). |
-
-The diff is split into at most two **prediffs** to satisfy the fee-excess
-invariant described in [Fee Excess](#fee-excess) below.
 
 ---
 
