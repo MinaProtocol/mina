@@ -20,8 +20,8 @@ from the pool and the new transaction takes its place.
   deprioritize it. Submit a replacement with a higher fee to speed up
   inclusion.
 - **Cancel a transaction** – if you no longer want a pending transaction
-  executed, replace it with a zero-amount payment to yourself (or to the
-  original recipient) using the same nonce. The Mina CLI has a dedicated
+  executed, replace it with a zero-amount payment to the original recipient
+  using the same nonce. The Mina CLI has a dedicated
   command that handles this for you (see below).
 
 ## Cancelling a Transaction with the CLI
@@ -49,6 +49,9 @@ On success you will see output similar to:
 Fee to cancel transaction is 0.001 mina.
 🛑 Cancelled transaction! Cancel ID: <NEW_TRANSACTION_ID>
 ```
+
+> **Note:** The exact fee shown depends on the original transaction's fee. The
+> cancellation fee is always the original fee plus `1 nanomina`.
 
 Keep the new transaction ID — it is the replacement that will be included in
 the blockchain instead of the original.
@@ -80,20 +83,27 @@ mina client get-nonce --address <PUBLIC_KEY>
 
 | Scenario | Minimum new fee |
 |---|---|
-| Replace a single pending transaction | `old_fee + 1 nanomina` |
-| Replace a transaction that has N later transactions queued behind it | `old_fee + (1 nanomina × (N + 1))` |
+| Replace a single pending transaction (no dependents) | `old_fee + 1 nanomina` |
+| Replace a transaction with queued dependents (all re-applied successfully) | `old_fee + 1 nanomina` |
+| Replace a transaction with queued dependents (some fail to re-apply) | `old_fee + 1 nanomina + sum of dropped dependents' fees` |
 
-The `(N + 1)` factor accounts for the replaced transaction itself (`1`) plus
-each of the N dependent transactions queued after it. Each slot in the queue
-consumes `1 nanomina` of the fee increment, so dropping more dependent
-transactions requires a proportionally larger fee increase.
+When a transaction in the middle of a sender's queue is replaced, all later
+transactions from the same sender are temporarily removed. The node then
+re-applies them one by one in nonce order:
 
-When a transaction in the middle of a queue is replaced, all later
-transactions from the same sender that were queued behind it are temporarily
-removed from the pool. The node then attempts to re-add them in order; each
-re-added transaction consumes `1 nanomina` from the fee increment. Any
-transaction whose fee cannot be covered by the remaining increment is dropped
-and must be resubmitted separately.
+- If a dependent transaction is **successfully re-applied**, it does not
+  consume any of the fee increment.
+- If a dependent transaction **fails to re-apply** (for example, because the
+  replacement changes the balance or nonce in a way that invalidates it), its
+  full fee is deducted from the remaining fee increment, and it is dropped.
+  Dropped transactions must be resubmitted separately.
+
+After all dependents are processed, the remaining fee increment must still be
+at least `1 nanomina` (the `replace_fee` constant). If it is not, the entire
+replacement is rejected.
+
+In practice, if all dependents can be re-applied, only `old_fee + 1 nanomina`
+is needed regardless of the number of dependents.
 
 ### Why is an increment required?
 
