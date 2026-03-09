@@ -20,15 +20,17 @@ let run (module F : Intf.Fixture) =
       )
     (fun () ->
       match%bind F.test_case test_case_after_setup with
-      | Ok result ->
-          return result
-      | Error err ->
+      | Failed err ->
           let%map () = F.on_test_fail test_case_after_setup in
-          Intf.Failed (Error.to_string_hum err) )
+          Intf.Failed err
+      | result ->
+          return result )
 
 let run_blocking test_case () =
   match Async.Thread_safe.block_on_async_exn (fun () -> run test_case) with
   | Intf.Passed ->
       ()
-  | Warning msg | Failed msg ->
+  | Warning msg ->
       Alcotest.fail msg
+  | Failed err ->
+      Alcotest.fail (Error.to_string_hum err)
