@@ -620,7 +620,7 @@ let cancel_transaction_graphql =
            (* fee amount "inspired by" network_pool/indexed_pool.ml *)
            Currency.Fee.of_uint64 (fee + replace_fee)
          in
-         printf "Fee to cancel transaction is %s coda.\n"
+         printf "Fee to cancel transaction is %s mina.\n"
            (Currency.Fee.to_mina_string cancel_fee) ;
          let cancel_query =
            let input =
