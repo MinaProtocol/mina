@@ -35,7 +35,7 @@ and protocol implementors enough detail to work with Mina proofs independently.
 | **Pending coinbase collection** | A collection that tracks coinbase recipients and protocol state for each block in the chain. |
 | **Transaction SNARK / proof** | A zero-knowledge proof that certifies applying a set of transactions to a ledger is valid. |
 | **Ledger proof** | A transaction SNARK emitted by the scan state that certifies a ledger state resulting from applying all transactions in a completed scan state tree. |
-| **Snark work** | A bundle of at most two proofs submitted by a snark worker; defined in `transaction_snark_work.ml`. |
+| **Snark work** | A bundle of at most two proofs submitted by a snark worker; defined in `src/lib/transaction_snark_work/transaction_snark_work.ml`. |
 | **Work statement / statement** | A fact about the ledger state that is proven by a transaction SNARK. |
 | **Snark worker** | A Mina node that generates transaction SNARKs for a fee. |
 | **User command** | A user-submitted transaction: a payment, stake delegation, or zkApp transaction. |
@@ -99,7 +99,7 @@ A staged ledger comprises three components:
 
 ### Ledger
 
-The staged ledger's underlying Merkle ledger (`src/lib/mina_base/ledger.ml`)
+The staged ledger's underlying Merkle ledger (`src/lib/mina_ledger/ledger.ml`)
 contains all transactions from the chain ending at a given block, including
 those not yet covered by a ledger proof. This ledger is always ahead of the
 snarked ledger.
@@ -171,7 +171,7 @@ For a step-by-step visual walkthrough of the scan state, see
 
 ### Pending Coinbase Collection
 
-The pending coinbase collection (`src/lib/pending_coinbase/`) records, for each
+The pending coinbase collection (`src/lib/mina_base/pending_coinbase.ml`) records, for each
 block in the chain, the coinbase recipient and the protocol state. It is a
 stack-based structure that allows the transaction SNARK to commit to the
 coinbase value without including the full coinbase transaction in the SNARK
@@ -209,7 +209,7 @@ Implementation: `src/lib/mina_base/staged_ledger_hash.ml`
 
 ## Staged Ledger Diff
 
-A **staged-ledger-diff** (`src/lib/staged_ledger/staged_ledger_diff.ml`)
+A **staged-ledger-diff** (`src/lib/staged_ledger_diff/staged_ledger_diff.ml`)
 describes all the changes made to the staged ledger by a single block. It
 contains:
 
@@ -351,14 +351,14 @@ The following invariants are maintained at all times:
 | Path | Description |
 |------|-------------|
 | `src/lib/staged_ledger/staged_ledger.ml` | Main staged ledger implementation: `create_diff`, `apply`, `apply_diff_unchecked`. |
-| `src/lib/staged_ledger/staged_ledger_diff.ml` | Staged ledger diff type definition. |
+| `src/lib/staged_ledger_diff/staged_ledger_diff.ml` | Staged ledger diff type definition. |
 | `src/lib/transaction_snark_scan_state/transaction_snark_scan_state.ml` | Scan state instantiated with transaction SNARKs. |
 | `src/lib/parallel_scan/` | Abstract parallel scan data structure underlying the scan state. |
 | `src/lib/parallel_scan/scan_state.md` | Detailed walkthrough of the scan state with worked examples. |
 | `src/lib/mina_base/staged_ledger_hash.ml` | Staged ledger hash definition and computation. |
-| `src/lib/mina_base/ledger.ml` | Core Merkle ledger implementation. |
+| `src/lib/mina_ledger/ledger.ml` | Core Merkle ledger implementation. |
 | `src/lib/mina_base/frozen_ledger_hash.ml` | Frozen (snarked) ledger hash. |
 | `src/lib/mina_state/blockchain_state.ml` | Blockchain state, including `staged_ledger_hash` and `snarked_ledger_hash`. |
 | `src/lib/mina_state/snarked_ledger_state.ml` | Snarked ledger state structure used in ledger proofs. |
-| `src/lib/pending_coinbase/` | Pending coinbase collection implementation. |
+| `src/lib/mina_base/pending_coinbase.ml` | Pending coinbase collection implementation. |
 | `src/lib/ledger_proof/ledger_proof.ml` | Ledger proof (wraps a `Transaction_snark.t`). |
