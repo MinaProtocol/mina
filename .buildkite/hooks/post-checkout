@@ -33,7 +33,9 @@ rm -rf "$CLONE_DIR/mina-build/.git"
 # merge tools into app dir
 echo "--- Merging mina-build tools into app directory"
 
-cp -rT "$CLONE_DIR/mina-build" "$APP_DIR"
+# remove license and readme files to avoid confusion with the app's own license and readme
+find "$CLONE_DIR/mina-build" -type f \( -name "LICENSE" -o -iname "README.md" \) -delete
+cp -rT --no-clobber "$CLONE_DIR/mina-build" "$APP_DIR"
 
 # export environment
 export APP_DIR
