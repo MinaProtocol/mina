@@ -898,10 +898,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       exit 1
   | Ok pool -> (
       [%log info] "Successfully created Caqti pool for Postgresql" ;
-      (* load from runtime config in same way as daemon
-         except that we don't consider loading from a tar file
-      *)
-      let query_db = Mina_caqti.query pool in
+      (* This is eta-expanded because bisect_ppx breaks let generalization here
+         otherwise, causing a build failure. *)
+      let query_db ~f = Mina_caqti.query ~f pool in
+      (* Load from runtime config in same way as daemon. *)
       let genesis_dir =
         Option.value ~default:Cache_dir.autogen_path genesis_dir_opt
       in
