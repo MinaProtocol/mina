@@ -159,8 +159,9 @@ is within its size limit.
 Separately, the verified diff pipeline between verification and application has
 bounded capacity. If the pipe overflows (i.e., verified diffs arrive faster than
 they can be applied), the entire diff is dropped and every command in it is
-rejected with the `Overloaded` error. This is handled by
-`reject_overloaded_diff` in `pool_sink.ml`.
+rejected with the `Overloaded` error. This is handled by the `on_overflow`
+callback in `pool_sink.ml`, which calls `reject_overloaded_diff` (defined in
+`transaction_pool.ml`).
 
 > **Note**: `pool_max_size` should be kept consistent across gossiping nodes.
 > Nodes with a larger pool limit may forward many low-fee transactions that
@@ -267,6 +268,6 @@ when verifying incoming zkApp commands.
 | `mocks.ml` | Mock implementations of ledger, staged ledger, and transition frontier for use in tests |
 | `priced_proof.ml` | Type pairing a SNARK proof with its associated fee and prover (used by the snark pool) |
 | `snark_pool_diff.ml` | Diff implementation for the SNARK pool: defines how solved-work entries are gossiped and applied |
-| `pool_sink.ml` | A sink that discards all incoming pool diffs (used in contexts where a pool is not needed) |
+| `pool_sink.ml` | Sink infrastructure for receiving and dispatching pool diffs: handles verification throttling, rate limiting, pipe overflow, and provides both active and void (no-op) sink variants |
 | `test.ml` | Top-level test registration for the network pool (snark pool tests) |
 | `test/` | Unit tests for the indexed pool and transaction pool |
