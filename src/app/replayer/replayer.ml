@@ -158,9 +158,11 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
   ; last_snarked_ledger_hash
   }
 
-(* map from global slots (since genesis) to state hash, ledger hash, snarked ledger hash triples *)
+(* map from global slots (since genesis) to state hash, ledger hash, snarked ledger hash, and global slot since hard fork *)
 let global_slot_hashes_tbl :
-    (Int64.t, State_hash.t * Ledger_hash.t * Frozen_ledger_hash.t) Hashtbl.t =
+    ( Int64.t
+    , State_hash.t * Ledger_hash.t * Frozen_ledger_hash.t * Int64.t )
+    Hashtbl.t =
   Int64.Table.create ()
 
 let get_slot_hashes slot = Hashtbl.find global_slot_hashes_tbl slot
@@ -630,6 +632,140 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
         [ ("max_canonical_slot", `String (Int64.to_string max_canonical_slot)) ] ;
     Deferred.unit )
 
+type hard_fork_target = Compatible | Mesa
+
+let create_genesis_db_and_tar ~logger ~genesis_dir ~ledger_depth ~populate
+    ~generate_tar =
+  Mina_stdlib_unix.File_system.with_temp_dir (genesis_dir ^/ "replayer_working")
+    ~f:(fun working_dir ->
+      let merkle_root =
+        populate ~directory_name:working_dir ~depth:ledger_depth
+      in
+      [%log info] "Genesis ledger merkle root $merkle_root"
+        ~metadata:
+          [ ("merkle_root", `String (Ledger_hash.to_base58_check merkle_root)) ] ;
+      let%bind tar_path =
+        Deferred.Or_error.ok_exn
+        @@ generate_tar ~logger ~target_dir:genesis_dir
+             ~ledger_name_prefix:"genesis_ledger" ~root_hash:merkle_root
+             ~ledger_dirname:working_dir ()
+      in
+      [%log info] "Generated genesis ledger tar at $tar_path"
+        ~metadata:[ ("tar_path", `String tar_path) ] ;
+      let%map s3_data_hash = Genesis_ledger_helper.sha3_hash tar_path in
+      (merkle_root, s3_data_hash) )
+
+let apply_hard_fork_migration ~logger
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~ledger
+    ~genesis_dir ~scheduled_genesis_since_hf ~hard_fork_output_file
+    ~hard_fork_target =
+  [%log info] "Applying hard fork migration to produce post-fork input" ;
+  (* Get the last block's slots from global_slot_hashes_tbl *)
+  let slots = Int64.Table.keys global_slot_hashes_tbl in
+  let last_slot_since_genesis =
+    match List.max_elt slots ~compare:Int64.compare with
+    | Some s ->
+        s
+    | None ->
+        [%log fatal] "No blocks found in global slot hashes table" ;
+        Core_kernel.exit 1
+  in
+  let _state_hash, _ledger_hash, _snarked_hash, last_slot_since_hard_fork =
+    Int64.Table.find_exn global_slot_hashes_tbl last_slot_since_genesis
+  in
+  (* Convert int64 slots to typed slots *)
+  let block_global_slot =
+    Mina_numbers.Global_slot_since_hard_fork.of_uint32
+      (Unsigned.UInt32.of_int64 last_slot_since_hard_fork)
+  in
+  let block_global_slot_since_genesis =
+    Mina_numbers.Global_slot_since_genesis.of_uint32
+      (Unsigned.UInt32.of_int64 last_slot_since_genesis)
+  in
+  (* Same calculation as move_hard_fork_consensus_to_scheduled_genesis
+     (mina_lib.ml) *)
+  let global_slot_span =
+    Mina_numbers.Global_slot_since_hard_fork.diff scheduled_genesis_since_hf
+      block_global_slot
+    |> Option.value_exn
+         ~message:
+           "Hard fork genesis cannot be scheduled before the hard fork block"
+  in
+  let new_start_slot_since_genesis =
+    Mina_numbers.Global_slot_since_genesis.add block_global_slot_since_genesis
+      global_slot_span
+  in
+  let slots_metadata =
+    `Assoc
+      [ ( "block_global_slot_since_genesis"
+        , `String (Int64.to_string last_slot_since_genesis) )
+      ; ( "block_global_slot_since_hard_fork"
+        , `String (Int64.to_string last_slot_since_hard_fork) )
+      ; ( "new_start_slot_since_genesis"
+        , `Int
+            (Mina_numbers.Global_slot_since_genesis.to_int
+               new_start_slot_since_genesis ) )
+      ]
+  in
+  [%log info] "Computed post-fork genesis slots $slots"
+    ~metadata:[ ("slots", slots_metadata) ] ;
+  let ledger_depth = constraint_constants.ledger_depth in
+  let%bind accounts = Ledger.to_list ledger in
+  let%bind merkle_root, s3_data_hash =
+    match hard_fork_target with
+    | Mesa ->
+        let hard_fork_slot = new_start_slot_since_genesis in
+        let addrs_and_accounts =
+          List.mapi accounts ~f:(fun i acct ->
+              ( Ledger.Hardfork_db.Addr.of_int_exn ~ledger_depth i
+              , Account.Hardfork.migrate_from_berkeley
+                  ~hardfork_slot:hard_fork_slot acct ) )
+        in
+        create_genesis_db_and_tar ~logger ~genesis_dir ~ledger_depth
+          ~populate:(fun ~directory_name ~depth ->
+            let db = Ledger.Hardfork_db.create ~directory_name ~depth () in
+            Ledger.Hardfork_db.set_batch_accounts db addrs_and_accounts ;
+            Ledger.Hardfork_db.merkle_root db )
+          ~generate_tar:Genesis_ledger_helper.Ledger.generate_tar_hardfork
+    | Compatible ->
+        let addrs_and_accounts =
+          List.mapi accounts ~f:(fun i acct ->
+              (Ledger.Db.Addr.of_int_exn ~ledger_depth i, acct) )
+        in
+        create_genesis_db_and_tar ~logger ~genesis_dir ~ledger_depth
+          ~populate:(fun ~directory_name ~depth ->
+            let db = Ledger.Db.create ~directory_name ~depth () in
+            Ledger.Db.set_batch_accounts db addrs_and_accounts ;
+            Ledger.Db.merkle_root db )
+          ~generate_tar:Genesis_ledger_helper.Ledger.generate_tar_stable
+  in
+  let new_start_slot_int64 =
+    Mina_numbers.Global_slot_since_genesis.to_int new_start_slot_since_genesis
+    |> Int64.of_int
+  in
+  let hard_fork_input : input =
+    { target_epoch_ledgers_state_hash = None
+    ; start_slot_since_genesis = new_start_slot_int64
+    ; genesis_ledger =
+        { base = Hash
+        ; num_accounts = None
+        ; balances = []
+        ; hash = Some (Ledger_hash.to_base58_check merkle_root)
+        ; s3_data_hash = Some s3_data_hash
+        ; name = None
+        ; add_genesis_winner = Some false
+        }
+    ; first_pass_ledger_hashes = []
+    ; last_snarked_ledger_hash = None
+    }
+  in
+  let input_json = input_to_yojson hard_fork_input in
+  [%log info] "Writing hard fork output to $hard_fork_output_file"
+    ~metadata:[ ("hard_fork_output_file", `String hard_fork_output_file) ] ;
+  Out_channel.with_file hard_fork_output_file ~f:(fun oc ->
+      Yojson.Safe.to_channel oc input_json ) ;
+  Deferred.unit
+
 let fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
     ~global_slot_hashes_tbl =
   let slots = Int64.Table.keys global_slot_hashes_tbl in
@@ -639,7 +775,7 @@ let fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
   in
   let chain_oldest_state_hash =
     Option.value_map (Int64.Table.find global_slot_hashes_tbl chain_oldest_slot)
-      ~default:"<none>" ~f:(fun (sh, _, _) -> State_hash.to_base58_check sh)
+      ~default:"<none>" ~f:(fun (sh, _, _, _) -> State_hash.to_base58_check sh)
   in
   let%bind chain_oldest_parent_state_hash =
     match%map
@@ -677,9 +813,46 @@ let fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
       ] ;
   Core_kernel.exit 1
 
+let hard_fork_params ~logger ~stop_slot_config_file ~hard_fork_output_file =
+  match hard_fork_output_file with
+  | Some output_file -> (
+      let file =
+        match stop_slot_config_file with
+        | Some f ->
+            f
+        | None ->
+            [%log fatal]
+              "--stop-slot-config-file is required when \
+               --hard-fork-output-file is set" ;
+            Core_kernel.exit 1
+      in
+      let hf_json = Yojson.Safe.from_file file in
+      let hf_runtime_config =
+        match Runtime_config.of_yojson hf_json with
+        | Ok cfg ->
+            cfg
+        | Error msg ->
+            [%log fatal] "Could not parse hard fork config $file: $error"
+              ~metadata:[ ("file", `String file); ("error", `String msg) ] ;
+            Core_kernel.exit 1
+      in
+      match
+        Runtime_config.scheduled_hard_fork_genesis_slot hf_runtime_config
+      with
+      | Some slot ->
+          Some (slot, output_file)
+      | None ->
+          [%log fatal]
+            "Hard fork config must have daemon.slot_chain_end and \
+             daemon.hard_fork_genesis_slot_delta" ;
+          Core_kernel.exit 1 )
+  | None ->
+      None
+
 let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
     ~checkpoint_interval ~checkpoint_output_folder_opt ~checkpoint_file_prefix
-    ~genesis_dir_opt ~log_json ~log_level ~log_filename ~file_log_level
+    ~genesis_dir_opt ~stop_slot_config_file ~hard_fork_output_file
+    ~hard_fork_target ~log_json ~log_level ~log_filename ~file_log_level
     ~constraint_constants ~proof_level () =
   Cli_lib.Stdout_log.setup log_json log_level ;
   Option.iter log_filename ~f:(fun log_filename ->
@@ -690,6 +863,22 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let logger = Logger.create () in
+  let hard_fork_target =
+    match hard_fork_target with
+    | "mesa" ->
+        Mesa
+    | "compatible" ->
+        Compatible
+    | other ->
+        [%log fatal]
+          "Unknown --hard-fork-target value: $value (expected mesa or \
+           compatible)"
+          ~metadata:[ ("value", `String other) ] ;
+        Core_kernel.exit 1
+  in
+  let hard_fork_params_opt =
+    hard_fork_params ~logger ~stop_slot_config_file ~hard_fork_output_file
+  in
   let json = Yojson.Safe.from_file input_file in
   let input =
     match input_of_yojson json with
@@ -709,16 +898,17 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       exit 1
   | Ok pool -> (
       [%log info] "Successfully created Caqti pool for Postgresql" ;
-      (* load from runtime config in same way as daemon
-         except that we don't consider loading from a tar file
-      *)
-      let query_db = Mina_caqti.query pool in
+      (* This is eta-expanded because bisect_ppx breaks let generalization here
+         otherwise, causing a build failure. *)
+      let query_db ~f = Mina_caqti.query ~f pool in
+      (* Load from runtime config in same way as daemon. *)
+      let genesis_dir =
+        Option.value ~default:Cache_dir.autogen_path genesis_dir_opt
+      in
       let%bind packed_ledger =
         match%bind
-          Genesis_ledger_helper.Ledger.load ~proof_level
-            ~genesis_dir:
-              (Option.value ~default:Cache_dir.autogen_path genesis_dir_opt)
-            ~logger ~constraint_constants ~genesis_backing_type:Stable_db
+          Genesis_ledger_helper.Ledger.load ~proof_level ~genesis_dir ~logger
+            ~constraint_constants ~genesis_backing_type:Stable_db
             input.genesis_ledger
         with
         | Error e ->
@@ -773,6 +963,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               Deferred.List.iter block_infos
                 ~f:(fun
                      { global_slot_since_genesis
+                     ; global_slot_since_hard_fork
                      ; state_hash
                      ; ledger_hash
                      ; snarked_ledger_hash_id
@@ -789,7 +980,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                     ~data:
                       ( State_hash.of_base58_check_exn state_hash
                       , Ledger_hash.of_base58_check_exn ledger_hash
-                      , Frozen_ledger_hash.of_base58_check_exn snarked_hash ) )
+                      , Frozen_ledger_hash.of_base58_check_exn snarked_hash
+                      , global_slot_since_hard_fork ) )
             in
             return (Int.Set.of_list ids, oldest_block_id) )
       in
@@ -818,7 +1010,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         let least_slot =
           Option.value_exn @@ List.min_elt slots ~compare:Int64.compare
         in
-        let state_hash, _ledger_hash, _snarked_hash =
+        let state_hash, _ledger_hash, _snarked_hash, _slot_since_hf =
           Int64.Table.find_exn global_slot_hashes_tbl least_slot
         in
         let%bind { staking_epoch_data_id; next_epoch_data_id; _ } =
@@ -1242,7 +1434,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               [%log fatal]
                 "Missing state hash information for current global slot" ;
               Core.exit 1
-          | Some (state_hash, _ledger_hash, _snarked_hash) ->
+          | Some (state_hash, _ledger_hash, _snarked_hash, _slot_since_hf) ->
               [%log spam]
                 ~metadata:
                   [ ( "state_hash"
@@ -1269,7 +1461,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                   "Missing ledger hash information for last global slot, which \
                    is not the start slot" ;
                 Core.exit 1 )
-          | Some (state_hash, ledger_hash, snarked_hash) ->
+          | Some (state_hash, ledger_hash, snarked_hash, _slot_since_hf) ->
               let write_checkpoint_file ~checkpoint_output_folder_opt
                   ~checkpoint_file_prefix () =
                 let write_checkpoint () =
@@ -1712,6 +1904,19 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
           ~last_block_id:oldest_block_id sorted_internal_cmds sorted_user_cmds
           sorted_zkapp_cmds
       in
+      let%bind () =
+        match hard_fork_params_opt with
+        | Some (scheduled_genesis_since_hf, hard_fork_output_file) ->
+            (* Note that the [ledger] here is a mutable ledger mask, so
+               apply_commands does modify it in-place when it applies the
+               transactions to the ledger. Thus the [ledger] here will be the
+               final staged ledger of the replayer run. *)
+            apply_hard_fork_migration ~logger ~constraint_constants ~ledger
+              ~genesis_dir ~scheduled_genesis_since_hf ~hard_fork_output_file
+              ~hard_fork_target
+        | None ->
+            Deferred.unit
+      in
       match input.target_epoch_ledgers_state_hash with
       | None ->
           [%log info] "No target epoch ledger hash supplied, not writing output" ;
@@ -1785,11 +1990,32 @@ let () =
            Param.flag "--checkpoint-file-prefix"
              ~doc:"string Checkpoint file prefix (default: 'replayer')"
              Param.(optional_with_default "replayer" string)
+         and stop_slot_config_file =
+           Param.flag "--stop-slot-config-file"
+             ~doc:
+               "PATH Runtime config file with daemon.slot_chain_end and \
+                daemon.hard_fork_genesis_slot_delta (required with \
+                --hard-fork-output-file)"
+             Param.(optional string)
+         and hard_fork_output_file =
+           Param.flag "--hard-fork-output-file"
+             ~doc:
+               "PATH Output file for the post-fork replayer input. Enables \
+                hard fork migration when provided."
+             Param.(optional string)
+         and hard_fork_target =
+           Param.flag "--hard-fork-target"
+             ~doc:
+               "mesa|compatible Hard fork target. Controls what migration if \
+                any will be performed when producing the post-fork replayer \
+                input. (default: mesa)"
+             Param.(optional_with_default "mesa" string)
          and log_json = Cli_lib.Flag.Log.json
          and log_level = Cli_lib.Flag.Log.level
          and file_log_level = Cli_lib.Flag.Log.file_log_level
          and log_filename = Cli_lib.Flag.Log.file in
          main ~input_file ~output_file_opt ~archive_uri ~checkpoint_interval
            ~continue_on_error ~checkpoint_output_folder_opt
-           ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level
+           ~checkpoint_file_prefix ~genesis_dir_opt ~stop_slot_config_file
+           ~hard_fork_output_file ~hard_fork_target ~log_json ~log_level
            ~file_log_level ~log_filename ~constraint_constants ~proof_level )))
