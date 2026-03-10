@@ -161,7 +161,8 @@ let generateStep =
 
           let customSuffix =
                 merge
-                  { DaemonConfig = archCustomSuffix
+                  { Profile = ""
+                  , DaemonConfig = archCustomSuffix
                   , DaemonLegacyHardfork = ""
                   , DaemonAppsOnly = ""
                   , DaemonPrefork = ""

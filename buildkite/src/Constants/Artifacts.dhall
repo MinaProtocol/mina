@@ -12,7 +12,8 @@ let Repo = ./DockerRepo.dhall
 
 let Artifact
     : Type
-    = < DaemonLegacyHardfork
+    = < Profile
+      | DaemonLegacyHardfork
       | DaemonAppsOnly
       | DaemonPrefork
       | DaemonAutoHardfork
@@ -31,8 +32,9 @@ let Artifact
       | DaemonStorageToolbox
       >
 
-let All =
-      [ Artifact.DaemonLegacyHardfork
+let AllButTests =
+      [ Artifact.Profile
+      , Artifact.DaemonLegacyHardfork
       , Artifact.DaemonPrefork
       , Artifact.DaemonAutoHardfork
       , Artifact.DaemonAutomode
@@ -48,8 +50,9 @@ let All =
       , Artifact.CreatePreforkGenesis
       , Artifact.DelegationVerifier
       , Artifact.DaemonStorageToolbox
-      , Artifact.FunctionalTestSuite
       ]
+
+let All = AllButTests # [ Artifact.FunctionalTestSuite ]
 
 let Main =
       [ Artifact.DaemonConfig
@@ -61,7 +64,8 @@ let Main =
 let capitalName =
           \(artifact : Artifact)
       ->  merge
-            { DaemonPrefork = "DaemonPrefork"
+            { Profile = "Profile"
+            , DaemonPrefork = "DaemonPrefork"
             , DaemonLegacyHardfork = "DaemonLegacyHardfork"
             , DaemonAutoHardfork = "DaemonAutoHardfork"
             , DaemonAutomode = "DaemonAutomode"
@@ -84,7 +88,8 @@ let capitalName =
 let lowerName =
           \(artifact : Artifact)
       ->  merge
-            { DaemonPrefork = "daemon_prefork"
+            { Profile = "profile"
+            , DaemonPrefork = "daemon_prefork"
             , DaemonLegacyHardfork = "daemon_hardfork"
             , DaemonAutoHardfork = "daemon_auto_hardfork"
             , DaemonAutomode = "daemon_automode"
@@ -107,7 +112,9 @@ let lowerName =
 let dockerServiceName =
           \(artifact : Artifact)
       ->  merge
-            { DaemonPrefork = ""
+            { Profile = ""
+            , Daemon = "mina-daemon"
+            , DaemonPrefork = ""
             , DaemonLegacyHardfork = "mina-daemon-legacy-hardfork"
             , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
             , DaemonAutomode = ""
@@ -130,7 +137,8 @@ let dockerServiceName =
 let dockerName =
           \(artifact : Artifact)
       ->  merge
-            { DaemonConfig = "mina-daemon"
+            { Profile = dockerServiceName artifact
+            , DaemonConfig = "mina-daemon"
             , DaemonPrefork = dockerServiceName artifact
             , DaemonLegacyHardfork = dockerServiceName artifact
             , DaemonAutoHardfork = dockerServiceName artifact
@@ -162,7 +170,8 @@ let toDebianName =
           \(artifact : Artifact)
       ->  \(network : Network.Type)
       ->  merge
-            { DaemonPrefork = "daemon_${Network.lowerName network}_prefork"
+            { Profile = "profile_${Network.lowerName network}"
+            , DaemonPrefork = "daemon_${Network.lowerName network}_prefork"
             , DaemonLegacyHardfork =
                 "daemon_${Network.lowerName network}_hardfork_config"
             , DaemonAutoHardfork =
@@ -194,7 +203,8 @@ let toDebianNames =
                   (List Text)
                   (     \(a : Artifact)
                     ->  merge
-                          { DaemonPrefork = [ toDebianName a network ]
+                          { Profile = [ toDebianName a network ]
+                          , DaemonPrefork = [ toDebianName a network ]
                           , DaemonLegacyHardfork = [ toDebianName a network ]
                           , DaemonAutoHardfork = [ toDebianName a network ]
                           , DaemonAutomode = [ toDebianName a network ]
@@ -266,7 +276,10 @@ let dockerTag =
           let extra_build_flags_part = BuildFlags.toLabelSegment spec.buildFlags
 
           in  merge
-                { DaemonPrefork = ""
+                { Profile = "${spec.version}"
+                , Daemon =
+                    "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
+                , DaemonPrefork = ""
                 , DaemonAutomode = ""
                 , DaemonLegacyHardfork =
                     "${spec.version}${network_part}${extraordinary_profile_part}"
@@ -481,4 +494,5 @@ in  { Type = Artifact
     , fullDockerTag = fullDockerTag
     , All = All
     , Main = Main
+    , AllButTests = AllButTests
     }
