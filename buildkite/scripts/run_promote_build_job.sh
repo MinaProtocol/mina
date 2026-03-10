@@ -1,0 +1,100 @@
+#!/bin/bash
+
+# Usage (in buildkite definition)
+
+# steps:
+#  - commands:
+#      - "./buildkite/scripts/run_promote_build_job.sh | buildkite-agent pipeline upload"
+#    label: ":pipeline: run promote dockers build job"
+#    agents:
+#       size: "generic"
+#    plugins:
+#      "docker#v3.5.0":
+#        environment:
+#          - BUILDKITE_AGENT_ACCESS_TOKEN
+#          - "ARTIFACTS=Archive,Daemon"
+#          - "REMOVE_PROFILE_FROM_NAME=1"
+#          - "PROFILE=Hardfork"
+#          - "NETWORK=Devnet"
+#          - "FROM_VERSION=3.0.0devnet-tooling-dkijania-hardfork-package-gen-in-nightly-b37f50e"
+#          - "NEW_VERSION=3.0.0fake-ddb6fc4"
+#          - "CODENAMES=Focal,Bullseye"
+#          - "FROM_CHANNEL=Unstable"
+#          - "TO_CHANNEL=Experimental"
+#        image: europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ci-toolchain-base:v4
+#        mount-buildkite-agent: true
+#        propagate-environment: true
+
+
+set -x
+
+ARTIFACTS_DHALL_DEF="(./buildkite/src/Constants/Artifacts.dhall)"
+DEBIAN_VERSION_DHALL_DEF="(./buildkite/src/Constants/DebianVersions.dhall)"
+PROMOTE_PACKAGE_DHALL_DEF="(./buildkite/src/Entrypoints/PublishPackages.dhall)"
+PROFILES_DHALL_DEF="(./buildkite/src/Constants/Profiles.dhall)"
+NETWORK_DHALL_DEF="(./buildkite/src/Constants/Network.dhall)"
+DEBIAN_CHANNEL_DHALL_DEF="(./buildkite/src/Constants/DebianChannel.dhall)"
+DEBIAN_REPO_DHALL_DEF="(./buildkite/src/Constants/DebianRepo.dhall)"
+
+function usage() {
+  if [[ -n "$1" ]]; then
+    echo -e "${RED}☞  $1${CLEAR}\n";
+  fi
+  echo "  ARTIFACTS                   The comma delimitered artifacts names. For example: 'Daemon,Archive' "
+  echo "  CODENAMES                   The Debian codenames (Bullseye, Focal etc.)"
+  echo "  VERSION                     The new Debian version or new Docker tag"
+  echo "  PROFILE                     The Docker and Debian profile (Standard, Lightnet)"
+  echo "  NETWORK                     The Docker and Debian network (Devnet, Mainnet)"
+  echo "  CHANNEL                     Target debian channel"
+  echo "  REPO                        Source debian repository"
+  echo "  BUILD_ID                    The Buildkite build ID. If defined, script will use it to generate debian package version"
+  echo "  DOCKER_REPO                 The Docker repository. If defined, script will publish docker to target repository. Otherwise it will only create docker image locally"
+  echo "  VERIFY                      The Verify flag. If set, script will verify the artifacts before promoting them"
+  echo ""
+  exit 1
+}
+
+if [[ -z "$ARTIFACTS" ]]; then usage "No artifacts defined for promoting!"; exit 1; fi;
+if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; exit 1; fi;
+if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
+if [[ -z "$DOCKER_REPO" ]]; then usage "Docker repo is not set!"; exit 1; fi;
+if [[ -z "$NETWORK" ]]; then NETWORK="Devnet"; fi;
+if [[ -z "$CHANNEL" ]]; then CHANNEL="Unstable"; fi;
+if [[ -z "$REPO" ]]; then REPO="Nightly"; fi;
+if [[ -z "$VERIFY" ]]; then VERIFY=0; fi;
+if [[ -z "$VERSION" ]]; then usage "Version is not set!"; exit 1; fi;
+if [[ -z "$NEW_VERSION" ]];  then usage "New Version is not set!"; exit 1; fi;
+if [[ -z "$BUILD_ID" ]]; then usage "Build ID is not set!"; exit 1; fi;
+
+DHALL_DOCKER_REPO="DockerRepo.Type.$DOCKER_REPO"
+
+if [[ $VERIFY -eq 1 ]]; then
+    DHALL_VERIFY="True"
+  else 
+    DHALL_VERIFY="False"
+fi
+
+function to_dhall_list() {
+  local input_str="$1"
+  local dhall_type="$2"
+  local arr=(${input_str//,/ })
+  local dhall_list=""
+
+  if [[ ${#arr[@]} -eq 0 || -z "${arr[0]}" ]]; then
+    dhall_list="([] : List $dhall_type)"
+  elif [[ ${#arr[@]} -eq 1 ]]; then
+    dhall_list="[$dhall_type.${arr[0]}]"
+  else
+    for i in "${arr[@]}"; do
+      dhall_list="${dhall_list}, $dhall_type.${i}"
+    done
+    dhall_list="[${dhall_list:1}]"
+  fi
+
+  echo "$dhall_list"
+}
+
+DHALL_ARTIFACTS=$(to_dhall_list "$ARTIFACTS" "$ARTIFACTS_DHALL_DEF.Type")
+DHALL_CODENAMES=$(to_dhall_list "$CODENAMES" "$DEBIAN_VERSION_DHALL_DEF.DebVersion")
+
+echo $PROMOTE_PACKAGE_DHALL_DEF'.promote_artifacts '"$DHALL_ARTIFACTS"' "'"${VERSION}"'" "'"${NEW_VERSION}"'" "amd64" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${CHANNEL}"' '$DEBIAN_REPO_DHALL_DEF'.Type.'"${REPO}"' '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_DOCKER_REPO}' '${DHALL_VERIFY}' "'"${BUILD_ID}"'" ' | dhall-to-yaml --quoted

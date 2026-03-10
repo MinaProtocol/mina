@@ -2,7 +2,7 @@ open Core_kernel
 open Mina_base
 
 module type Base_ledger_intf =
-  Merkle_ledger.Base_ledger_intf.S
+  Merkle_ledger.Intf.Ledger.S
     with type account := Account.t
      and type key := Signature_lib.Public_key.Compressed.t
      and type token_id := Token_id.t

@@ -1,11 +1,6 @@
 open Core_kernel
 
-[%%versioned:
-module Stable : sig
-  module V1 : sig
-    type t
-  end
-end]
+type t [@@deriving bin_io]
 
 module Level : sig
   type t =
@@ -30,6 +25,8 @@ module Time : sig
   val to_yojson : t -> Yojson.Safe.t
 
   val of_yojson : Yojson.Safe.t -> (t, string) Result.t
+
+  val pp : Format.formatter -> t -> unit
 
   val pretty_to_string : t -> string
 
@@ -120,7 +117,13 @@ end
 module Consumer_registry : sig
   type id = string
 
-  val register : id:id -> processor:Processor.t -> transport:Transport.t -> unit
+  val register :
+       ?commit_id:string
+    -> id:id
+    -> processor:Processor.t
+    -> transport:Transport.t
+    -> unit
+    -> unit
 end
 
 type 'a log_function =
@@ -133,7 +136,11 @@ type 'a log_function =
   -> 'a
 
 val create :
-  ?metadata:(string, Yojson.Safe.t) List.Assoc.t -> ?id:string -> unit -> t
+     ?metadata:(string, Yojson.Safe.t) List.Assoc.t
+  -> ?id:string
+  -> ?itn_features:bool
+  -> unit
+  -> t
 
 val null : unit -> t
 

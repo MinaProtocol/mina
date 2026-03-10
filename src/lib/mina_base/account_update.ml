@@ -1,14 +1,6 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_util
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
-
 open Signature_lib
 module Impl = Pickles.Impls.Step
 open Mina_numbers
@@ -20,6 +12,10 @@ module type Type = sig
   type t
 end
 
+module Events = Zkapp_account.Events
+module Actions = Zkapp_account.Actions
+module Zkapp_uri = Zkapp_account.Zkapp_uri
+
 module Authorization_kind = struct
   [%%versioned
   module Stable = struct
@@ -28,19 +24,7 @@ module Authorization_kind = struct
       type t =
             Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
         | Signature
-        | Proof of
-            (Field.t
-            [@version_asserted]
-            [@to_yojson fun t -> `String (Snark_params.Tick.Field.to_string t)]
-            [@of_yojson
-              function
-              | `String s ->
-                  let field = Snark_params.Tick.Field.of_string s in
-                  let s' = Snark_params.Tick.Field.to_string field in
-                  if String.equal s s' then Ok field
-                  else Error "Invalid JSON for field"
-              | _ ->
-                  Error "expected JSON string"] )
+        | Proof of (Field.t[@version_asserted])
         | None_given
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -62,8 +46,6 @@ module Authorization_kind = struct
         (Random_oracle_input.Chunked.packeds
            [| (f is_signed, 1); (f is_proved, 1) |] )
         (Random_oracle_input.Chunked.field verification_key_hash)
-
-    [%%ifdef consensus_mechanism]
 
     module Checked = struct
       type t =
@@ -89,7 +71,6 @@ module Authorization_kind = struct
 
     let deriver obj =
       let open Fields_derivers_zkapps in
-      let open Fields in
       let ( !. ) = ( !. ) ~t_fields_annots in
       let verification_key_hash =
         needs_custom_js ~js_type:field ~name:"VerificationKeyHash" field
@@ -97,8 +78,6 @@ module Authorization_kind = struct
       Fields.make_creator obj ~is_signed:!.bool ~is_proved:!.bool
         ~verification_key_hash:!.verification_key_hash
       |> finish "AuthorizationKindStructured" ~t_toplevel_annots
-
-    [%%endif]
   end
 
   let to_control_tag : t -> Control.Tag.t = function
@@ -144,14 +123,10 @@ module Authorization_kind = struct
 
   let to_input x = Structured.to_input (to_structured x)
 
-  [%%ifdef consensus_mechanism]
-
   module Checked = Structured.Checked
 
   let typ =
     Structured.typ |> Typ.transport ~there:to_structured ~back:of_structured_exn
-
-  [%%endif]
 end
 
 module May_use_token = struct
@@ -492,8 +467,17 @@ module May_use_token = struct
 
   let deriver obj =
     let open Fields_derivers_zkapps in
-    iso_record ~of_record:As_record.to_variant ~to_record:As_record.of_variant
-      As_record.deriver obj
+    let may_use_token =
+      iso_record ~of_record:As_record.to_variant ~to_record:As_record.of_variant
+        As_record.deriver
+    in
+    needs_custom_js
+      ~js_type:
+        (js_record
+           [ ("parentsOwnToken", js_layout bool)
+           ; ("inheritFromParent", js_layout bool)
+           ] )
+      ~name:"MayUseToken" may_use_token obj
 
   module Checked = struct
     type t = Boolean.var As_record.t
@@ -696,7 +680,7 @@ module Update = struct
         ; verification_key :
             Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
         ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
-        ; zkapp_uri : string Set_or_keep.Stable.V1.t
+        ; zkapp_uri : Zkapp_uri.Stable.V1.t Set_or_keep.Stable.V1.t
         ; token_symbol :
             Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
         ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
@@ -714,7 +698,8 @@ module Update = struct
     let%bind app_state =
       let%bind fields =
         let field_gen = Snark_params.Tick.Field.gen in
-        Quickcheck.Generator.list_with_length 8 (Set_or_keep.gen field_gen)
+        Quickcheck.Generator.list_with_length Zkapp_state.max_size_int
+          (Set_or_keep.gen field_gen)
       in
       (* won't raise because length is correct *)
       Quickcheck.Generator.return (Zkapp_state.V.of_list_exn fields)
@@ -908,8 +893,8 @@ module Update = struct
                    } ) )
       ; Set_or_keep.typ ~dummy:Permissions.empty Permissions.typ
       ; Set_or_keep.optional_typ
-          (Data_as_hash.optional_typ ~hash:Zkapp_account.hash_zkapp_uri
-             ~non_preimage:(Zkapp_account.hash_zkapp_uri_opt None)
+          (Data_as_hash.lazy_optional_typ ~hash:Zkapp_account.hash_zkapp_uri
+             ~non_preimage:(lazy (Zkapp_account.hash_zkapp_uri_opt None))
              ~dummy_value:"" )
           ~to_option:Fn.id ~of_option:Fn.id
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
@@ -948,82 +933,47 @@ module Update = struct
          obj
 end
 
-module Events = Zkapp_account.Events
-module Actions = Zkapp_account.Actions
-
 module Account_precondition = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-            Mina_wire_types.Mina_base.Account_update.Account_precondition.V1.t =
-        | Full of Zkapp_precondition.Account.Stable.V2.t
-        | Nonce of Account.Nonce.Stable.V1.t
-        | Accept
+      type t = Zkapp_precondition.Account.Stable.V2.t
       [@@deriving sexp, yojson, hash]
+
+      let (_ :
+            ( t
+            , Mina_wire_types.Mina_base.Account_update.Account_precondition.V1.t
+            )
+            Type_equal.t ) =
+        Type_equal.T
 
       let to_latest = Fn.id
 
-      let to_full = function
-        | Full s ->
-            s
-        | Nonce n ->
-            { Zkapp_precondition.Account.accept with
-              nonce = Check { lower = n; upper = n }
-            }
-        | Accept ->
-            Zkapp_precondition.Account.accept
-
-      let equal p q = Zkapp_precondition.Account.equal (to_full p) (to_full q)
-
-      let compare p q =
-        Zkapp_precondition.Account.compare (to_full p) (to_full q)
+      [%%define_locally Zkapp_precondition.Account.(equal, compare)]
     end
   end]
 
-  [%%define_locally Stable.Latest.(to_full, equal, compare)]
+  [%%define_locally Stable.Latest.(equal, compare)]
 
   let gen : t Quickcheck.Generator.t =
+    (* we used to have 3 constructors, Full, Nonce, and Accept for the type t
+       nowadays, the generator creates these 3 different kinds of values, but all mapped to t
+    *)
     Quickcheck.Generator.variant3 Zkapp_precondition.Account.gen
       Account.Nonce.gen Unit.quickcheck_generator
     |> Quickcheck.Generator.map ~f:(function
-         | `A x ->
-             Full x
-         | `B x ->
-             Nonce x
+         | `A precondition ->
+             precondition
+         | `B n ->
+             Zkapp_precondition.Account.nonce n
          | `C () ->
-             Accept )
-
-  let of_full (p : Zkapp_precondition.Account.t) =
-    let module A = Zkapp_precondition.Account in
-    if A.equal p A.accept then Accept
-    else
-      match p.nonce with
-      | Ignore ->
-          Full p
-      | Check { lower; upper } as n ->
-          if
-            A.equal p { A.accept with nonce = n }
-            && Account.Nonce.equal lower upper
-          then Nonce lower
-          else Full p
+             Zkapp_precondition.Account.accept )
 
   module Tag = struct
     type t = Full | Nonce | Accept [@@deriving equal, compare, sexp, yojson]
   end
 
-  let tag : t -> Tag.t = function
-    | Full _ ->
-        Full
-    | Nonce _ ->
-        Nonce
-    | Accept ->
-        Accept
-
-  let deriver obj =
-    let open Fields_derivers_zkapps.Derivers in
-    iso_record ~of_record:of_full ~to_record:to_full
-      Zkapp_precondition.Account.deriver obj
+  let deriver obj = Zkapp_precondition.Account.deriver obj
 
   let digest (t : t) =
     let digest x =
@@ -1031,7 +981,7 @@ module Account_precondition = struct
         hash ~init:Hash_prefix_states.account_update_account_precondition
           (pack_input x))
     in
-    to_full t |> Zkapp_precondition.Account.to_input |> digest
+    t |> Zkapp_precondition.Account.to_input |> digest
 
   module Checked = struct
     type t = Zkapp_precondition.Account.Checked.t
@@ -1048,16 +998,9 @@ module Account_precondition = struct
   end
 
   let typ () : (Zkapp_precondition.Account.Checked.t, t) Typ.t =
-    Typ.transport (Zkapp_precondition.Account.typ ()) ~there:to_full
-      ~back:(fun s -> Full s)
+    Zkapp_precondition.Account.typ ()
 
-  let nonce = function
-    | Full { nonce; _ } ->
-        nonce
-    | Nonce nonce ->
-        Check { lower = nonce; upper = nonce }
-    | Accept ->
-        Ignore
+  let nonce ({ nonce; _ } : t) = nonce
 end
 
 module Preconditions = struct
@@ -1089,8 +1032,7 @@ module Preconditions = struct
   let to_input ({ network; account; valid_while } : t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Zkapp_precondition.Protocol_state.to_input network
-      ; Zkapp_precondition.Account.to_input
-          (Account_precondition.to_full account)
+      ; Zkapp_precondition.Account.to_input account
       ; Zkapp_precondition.Valid_while.to_input valid_while
       ]
 
@@ -1107,10 +1049,6 @@ module Preconditions = struct
     end) =
     struct
       type t = V.var
-    end
-
-    module Int_as_prover_ref = struct
-      type t = int As_prover.Ref.t
     end
 
     type t =
@@ -1139,7 +1077,7 @@ module Preconditions = struct
 
   let accept =
     { network = Zkapp_precondition.Protocol_state.accept
-    ; account = Account_precondition.Accept
+    ; account = Zkapp_precondition.Account.accept
     ; valid_while = Ignore
     }
 end
@@ -1152,7 +1090,10 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Pickles.Backend.Tick.Field.Stable.V1.t array list
+        type t =
+          Pickles.Backend.Tick.Field.Stable.V1.t
+          Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
+          list
         [@@deriving sexp, equal, hash, compare, yojson]
 
         let to_latest = Fn.id
@@ -1422,7 +1363,7 @@ module Body = struct
                    ; upper = valid_until
                    }
              } )
-        ; account = Account_precondition.Nonce t.nonce
+        ; account = Zkapp_precondition.Account.nonce t.nonce
         ; valid_while = Ignore
         }
     ; use_full_commitment = true
@@ -1454,7 +1395,7 @@ module Body = struct
                    ; upper = valid_until
                    }
              } )
-        ; account = Account_precondition.Nonce t.nonce
+        ; account = Zkapp_precondition.Account.nonce t.nonce
         ; valid_while = Ignore
         }
     ; use_full_commitment = true
@@ -1465,31 +1406,19 @@ module Body = struct
     }
 
   let to_fee_payer_exn (t : t) : Fee_payer.t =
-    let { public_key
-        ; token_id = _
-        ; update = _
-        ; balance_change
-        ; increment_nonce = _
-        ; events = _
-        ; actions = _
-        ; call_data = _
-        ; preconditions
-        ; use_full_commitment = _
-        ; may_use_token = _
-        ; authorization_kind = _
-        } =
-      t
-    in
+    let { public_key; preconditions; balance_change; _ } = t in
     let fee =
       Currency.Fee.of_uint64
         (balance_change.magnitude |> Currency.Amount.to_uint64)
     in
     let nonce =
-      match preconditions.account with
-      | Nonce nonce ->
-          Mina_numbers.Account_nonce.of_uint32 nonce
-      | Full _ | Accept ->
-          failwith "Expected a nonce for fee payer account precondition"
+      if Zkapp_precondition.Account.is_nonce preconditions.account then
+        match preconditions.account.nonce with
+        | Check { lower; upper = _ } ->
+            lower
+        | Ignore ->
+            failwith "Unexpected Ignore for fee payer precondition nonce"
+      else failwith "Expected a nonce for fee payer account precondition"
     in
     let valid_until =
       match preconditions.network.global_slot_since_genesis with
@@ -1506,10 +1435,6 @@ module Body = struct
     end) =
     struct
       type t = V.var
-    end
-
-    module Int_as_prover_ref = struct
-      type t = int As_prover.Ref.t
     end
 
     type t =
@@ -1565,9 +1490,11 @@ module Body = struct
         ; Authorization_kind.Checked.to_input authorization_kind
         ]
 
-    let digest (t : t) =
+    let digest ~signature_kind (t : t) =
       Random_oracle.Checked.(
-        hash ~init:Hash_prefix.zkapp_body (pack_input (to_input t)))
+        hash
+          ~init:(Hash_prefix.zkapp_body ~signature_kind)
+          (pack_input (to_input t)))
   end
 
   let typ () : (Checked.t, t) Typ.t =
@@ -1638,8 +1565,11 @@ module Body = struct
       ; Authorization_kind.to_input authorization_kind
       ]
 
-  let digest (t : t) =
-    Random_oracle.(hash ~init:Hash_prefix.zkapp_body (pack_input (to_input t)))
+  let digest ~signature_kind (t : t) =
+    Random_oracle.(
+      hash
+        ~init:(Hash_prefix.zkapp_body ~signature_kind)
+        (pack_input (to_input t)))
 
   module Digested = struct
     type t = Random_oracle.Digest.t
@@ -1678,30 +1608,133 @@ module Body = struct
     ; may_use_token
     ; authorization_kind
     }
+
+  let gen_with_events_and_actions =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map public_key = Public_key.Compressed.gen
+    and token_id = Token_id.gen
+    and update = Update.gen ()
+    and balance_change = Currency.Amount.Signed.gen
+    and increment_nonce = Quickcheck.Generator.bool
+    and events = return [ [| Field.zero |]; [| Field.zero |] ]
+    and actions = return [ [| Field.zero |]; [| Field.zero |] ]
+    and call_data = Field.gen
+    and preconditions = Preconditions.gen
+    and use_full_commitment = Quickcheck.Generator.bool
+    and implicit_account_creation_fee = Quickcheck.Generator.bool
+    and may_use_token = May_use_token.gen
+    and authorization_kind = Authorization_kind.gen in
+    { public_key
+    ; token_id
+    ; update
+    ; balance_change
+    ; increment_nonce
+    ; events
+    ; actions
+    ; call_data
+    ; preconditions
+    ; use_full_commitment
+    ; implicit_account_creation_fee
+    ; may_use_token
+    ; authorization_kind
+    }
+end
+
+module Poly = struct
+  (** This is a helper module to make writing the sexp/yojson/binable instances
+      of types in this module easier. By going through this, the aux field of
+      the Account_update types is properly ignored when serializing and
+      deserializing.
+
+      The to_yojson and sexp_of_t functions created with this module will ignore
+      the aux field entirely when writing their respective formats. The
+      of_yojson and t_of_sexp functions will expect the aux field to be absent
+      when parsing. *)
+  module Wire = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('body, 'authorization) t =
+              ( 'body
+              , 'authorization )
+              Mina_wire_types.Mina_base.Account_update.Poly.V1.t =
+          { body : 'body; authorization : 'authorization }
+        [@@deriving yojson, sexp]
+      end
+    end]
+  end
+
+  (** An account update in a zkApp transaction *)
+  type ('body, 'authorization, 'aux) t =
+    { body : 'body; authorization : 'authorization; aux : 'aux }
+  [@@deriving annot, equal, hash, compare, fields]
+
+  let of_wire (w : _ Wire.Stable.V1.t) : _ t =
+    { body = w.body; authorization = w.authorization; aux = () }
+
+  let to_wire (t : _ t) : _ Wire.Stable.V1.t =
+    { body = t.body; authorization = t.authorization }
+
+  let to_yojson body authorization =
+    Fn.compose (Wire.Stable.V1.to_yojson body authorization) to_wire
+
+  let of_yojson body authorization =
+    let of_wire' = Result.map ~f:of_wire in
+    Fn.compose of_wire' (Wire.Stable.V1.of_yojson body authorization)
+
+  let sexp_of_t body authorization =
+    Fn.compose (Wire.Stable.V1.sexp_of_t body authorization) to_wire
+
+  let t_of_sexp body authorization =
+    Fn.compose of_wire (Wire.Stable.V1.t_of_sexp body authorization)
 end
 
 module T = struct
+  module Without_aux = struct
+    [%%versioned_binable
+    module Stable = struct
+      module V1 = struct
+        type ('body, 'authorization) t = ('body, 'authorization, unit) Poly.t
+        [@@deriving equal, hash, compare]
+
+        [%%define_locally Poly.(to_yojson, of_yojson, sexp_of_t, t_of_sexp)]
+
+        include
+          Binable.Of_binable2_without_uuid
+            (Poly.Wire.Stable.V1)
+            (struct
+              type nonrec ('x, 'y) t = ('x, 'y) t
+
+              let of_binable t = Poly.of_wire t
+
+              let to_binable = Poly.to_wire
+            end)
+      end
+    end]
+  end
+
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        (** An account update in a zkApp transaction *)
         type t =
-          { body : Body.Graphql_repr.Stable.V1.t
-          ; authorization : Control.Stable.V2.t
-          }
-        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+          ( Body.Graphql_repr.Stable.V1.t
+          , Control.Stable.V2.t )
+          Without_aux.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
       end
     end]
 
     let deriver obj =
+      let open Poly in
       let open Fields_derivers_zkapps.Derivers in
-      let ( !. ) = ( !. ) ~t_fields_annots in
+      let ( !. ) ?skip_data = ( !. ) ?skip_data ~t_fields_annots in
       Fields.make_creator obj
         ~body:!.Body.Graphql_repr.deriver
         ~authorization:!.Control.deriver
+        ~aux:(( !. ) ~skip_data:() skip)
       |> finish "ZkappAccountUpdate" ~t_toplevel_annots
   end
 
@@ -1710,10 +1743,8 @@ module T = struct
     module Stable = struct
       module V1 = struct
         type t =
-          { body : Body.Simple.Stable.V1.t
-          ; authorization : Control.Stable.V2.t
-          }
-        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+          (Body.Simple.Stable.V1.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
       end
@@ -1722,47 +1753,108 @@ module T = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       (** A account_update to a zkApp transaction *)
-      type t = Mina_wire_types.Mina_base.Account_update.V1.t =
-        { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
-      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+      type t = (Body.Stable.V1.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
   end]
 
-  let of_graphql_repr ({ body; authorization } : Graphql_repr.t) : t =
-    { authorization; body = Body.of_graphql_repr body }
+  (** Auxiliary data in an [Account_update.t], not intended for serialization.
+      The [to_yojson] and [sexp_of_t] instances here are written to be
+      compatible with [Account_update.Poly.Without_aux.t], so that types of the
+      form [(_, _, Aux_data.t) Account_update.Poly.t] can still have [@@deriving
+      sexp_of, to_yojson] applied to them. *)
+  module Aux_data = struct
+    type t =
+      { actions_hash : Field.t
+            (** The cached hash of the actions in an account update body *)
+      }
 
-  let to_graphql_repr ({ body; authorization } : t) ~call_depth : Graphql_repr.t
-      =
-    { authorization; body = Body.to_graphql_repr ~call_depth body }
+    let of_body ~body : t =
+      let actions = Zkapp_account.Actions.of_event_list body.Body.actions in
+      { actions_hash = actions.hash }
+  end
 
-  let gen : t Quickcheck.Generator.t =
+  module With_aux = struct
+    type ('body, 'authorization) t = ('body, 'authorization, Aux_data.t) Poly.t
+
+    [%%define_locally Poly.(to_yojson, sexp_of_t)]
+  end
+
+  type t = (Body.t, Control.t) With_aux.t [@@deriving sexp_of, to_yojson]
+
+  let of_graphql_repr ({ Poly.body; authorization; aux = () } : Graphql_repr.t)
+      : Stable.Latest.t =
+    { authorization; body = Body.of_graphql_repr body; aux = () }
+
+  let to_graphql_repr ({ body; authorization; aux = () } : Stable.Latest.t)
+      ~call_depth : Graphql_repr.t =
+    { authorization; body = Body.to_graphql_repr ~call_depth body; aux = () }
+
+  let with_no_aux ~body ~authorization : _ Poly.t =
+    { body; authorization; aux = () }
+
+  let with_aux ~body ~authorization : _ Poly.t =
+    { body; authorization; aux = Aux_data.of_body ~body }
+
+  let gen : Stable.Latest.t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%map body = Body.gen and authorization = Control.gen_with_dummies in
-    { body; authorization }
+    { Poly.body; authorization; aux = () }
 
-  let quickcheck_generator : t Quickcheck.Generator.t = gen
+  let gen_with_events_and_actions : Stable.Latest.t Quickcheck.Generator.t =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map body = Body.gen_with_events_and_actions
+    and authorization = Control.gen_with_dummies in
+    { Poly.body; authorization; aux = () }
 
-  let quickcheck_observer : t Quickcheck.Observer.t =
+  let quickcheck_generator : Stable.Latest.t Quickcheck.Generator.t = gen
+
+  let quickcheck_observer : Stable.Latest.t Quickcheck.Observer.t =
     Quickcheck.Observer.of_hash (module Stable.Latest)
 
   let quickcheck_shrinker : t Quickcheck.Shrinker.t =
     Quickcheck.Shrinker.empty ()
 
-  let of_simple (p : Simple.t) : t =
-    { body = Body.of_simple p.body; authorization = p.authorization }
+  let of_simple (p : Simple.t) : Stable.Latest.t =
+    { body = Body.of_simple p.body; authorization = p.authorization; aux = () }
 
-  let digest (t : t) = Body.digest t.body
+  let digest ~signature_kind t = Body.digest ~signature_kind t.Poly.body
 
   module Checked = struct
     type t = Body.Checked.t
 
-    let digest (t : t) = Body.Checked.digest t
+    let digest ~signature_kind (t : t) = Body.Checked.digest ~signature_kind t
   end
 end
+
+let map_proofs ~f p =
+  let map_auth = function
+    | Control.Poly.Proof p ->
+        Control.Poly.Proof (f p)
+    | Signature s ->
+        Signature s
+    | None_given ->
+        None_given
+  in
+  { Poly.authorization = map_auth p.Poly.authorization
+  ; body = p.Poly.body
+  ; aux = p.Poly.aux
+  }
+
+let forget_proofs p = map_proofs ~f:(const ()) p
+
+let reset_aux (p : _ Poly.t) =
+  T.with_aux ~body:p.body ~authorization:p.authorization
+
+let forget_aux (p : _ Poly.t) = { p with aux = () }
+
+let forget_proofs_and_aux p = forget_proofs @@ forget_aux p
 
 module Fee_payer = struct
   [%%versioned
@@ -1772,17 +1864,19 @@ module Fee_payer = struct
         { body : Body.Fee_payer.Stable.V1.t
         ; authorization : Signature.Stable.V1.t
         }
-      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+      [@@deriving sexp, annot, equal, hash, compare, fields, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
+  let make ~body ~authorization : t = { body; authorization }
+
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let%map body = Body.Fee_payer.gen in
     let authorization = Signature.dummy in
-    { body; authorization }
+    make ~body ~authorization
 
   let quickcheck_generator : t Quickcheck.Generator.t = gen
 
@@ -1796,9 +1890,8 @@ module Fee_payer = struct
     Account_id.create t.body.public_key Token_id.default
 
   let to_account_update (t : t) : T.t =
-    { authorization = Control.Signature t.authorization
-    ; body = Body.of_fee_payer t.body
-    }
+    T.with_aux ~body:(Body.of_fee_payer t.body)
+      ~authorization:(Control.Poly.Signature t.authorization)
 
   let deriver obj =
     let open Fields_derivers_zkapps.Derivers in
@@ -1810,15 +1903,44 @@ end
 
 include T
 
-let account_id (t : t) : Account_id.t =
+let read_all_proofs_from_disk (p : t) : Stable.Latest.t =
+  forget_aux @@ map_proofs ~f:Proof_cache_tag.read_proof_from_disk p
+
+let write_all_proofs_to_disk ~proof_cache_db (p : Stable.Latest.t) : t =
+  reset_aux
+  @@ map_proofs ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) p
+
+let account_id (t : (Body.t, _, _) Poly.t) : Account_id.t =
   Account_id.create t.body.public_key t.body.token_id
 
-let verification_key_update_to_option (t : t) :
+let verification_key_update_to_option (t : (Body.t, _, _) Poly.t) :
     Verification_key_wire.t option Zkapp_basic.Set_or_keep.t =
   Zkapp_basic.Set_or_keep.map ~f:Option.some t.body.update.verification_key
 
-let of_fee_payer ({ body; authorization } : Fee_payer.t) : t =
-  { authorization = Signature authorization; body = Body.of_fee_payer body }
+let check_authorization (type proof aux)
+    (p : (Body.t, (proof, Signature.t) Control.Poly.t, aux) Poly.t) :
+    unit Or_error.t =
+  match (p.authorization, p.body.authorization_kind) with
+  | None_given, None_given | Proof _, Proof _ | Signature _, Signature ->
+      Ok ()
+  | _ ->
+      let err =
+        let expected =
+          Authorization_kind.to_control_tag p.body.authorization_kind
+        in
+        let got = Control.tag p.authorization in
+        Error.create "Authorization kind does not match the authorization"
+          [ ("expected", expected); ("got", got) ]
+          [%sexp_of: (string * Control.Tag.t) list]
+      in
+      Error err
+
+let of_fee_payer_no_aux ({ body; authorization } : Fee_payer.t) :
+    (Body.t, (_, Signature.t) Control.Poly.t, _) Poly.t =
+  with_no_aux ~body:(Body.of_fee_payer body)
+    ~authorization:(Control.Poly.Signature authorization)
+
+let of_fee_payer t = reset_aux @@ of_fee_payer_no_aux t
 
 (** The change in balance to apply to the target account of this account_update.
       When this is negative, the amount will be withdrawn from the account and
@@ -1839,7 +1961,7 @@ let public_key (t : t) : Public_key.Compressed.t = t.body.public_key
 
 let token_id (t : t) : Token_id.t = t.body.token_id
 
-let use_full_commitment (t : t) : bool = t.body.use_full_commitment
+let use_full_commitment t : bool = t.Poly.body.Body.use_full_commitment
 
 let implicit_account_creation_fee (t : t) : bool =
   t.body.implicit_account_creation_fee

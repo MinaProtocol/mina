@@ -29,16 +29,13 @@ let disable_tracing ~logger () =
   [%log internal] "@internal_tracing_disabled" ;
   enabled := false
 
-let enable_tracing ~logger () =
+let enable_tracing ~commit_id ~logger () =
   (* Reset the last block information, we don't want it around when tracing gets restarted *)
   last_block_id := no_block ;
   enabled := true ;
   [%log internal] "@internal_tracing_enabled" ;
   [%log internal] "@mina_node_metadata"
-    ~metadata:
-      [ ("version", `String Mina_version.commit_id)
-      ; ("branch", `String Mina_version.branch)
-      ]
+    ~metadata:[ ("version", `String commit_id) ]
 
 let register_toggle_callback (f : bool -> unit Async_kernel.Deferred.t) =
   toggle_callbacks := !toggle_callbacks @ [ f ]
@@ -48,10 +45,11 @@ let call_toggle_callbacks enable =
     ~f:(fun cb -> cb enable)
     ~how:`Parallel !toggle_callbacks
 
-let toggle ~logger ?(force = false) = function
+let toggle ~commit_id ~logger ?(force = false) = function
   | `Enabled ->
       if force || not (is_enabled ()) then (
-        enable_tracing ~logger () ; call_toggle_callbacks true )
+        enable_tracing ~commit_id ~logger () ;
+        call_toggle_callbacks true )
       else Async_kernel.Deferred.unit
   | `Disabled ->
       if force || is_enabled () then (
@@ -254,5 +252,4 @@ module For_itn_logger = struct
     else []
 end
 
-module Context_logger = Internal_tracing_context_logger
 module Context_call = Internal_tracing_context_call

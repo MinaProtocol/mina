@@ -49,10 +49,7 @@ end
 
 module Account_precondition = struct
   module V1 = struct
-    type t =
-      | Full of Mina_base_zkapp_precondition.Account.V2.t
-      | Nonce of Mina_numbers.Account_nonce.V1.t
-      | Accept
+    type t = Mina_base_zkapp_precondition.Account.V2.t
   end
 end
 
@@ -111,6 +108,13 @@ module Fee_payer = struct
   end
 end
 
+module Poly = struct
+  module V1 = struct
+    type ('body, 'authorization) t =
+      { body : 'body; authorization : 'authorization }
+  end
+end
+
 module V1 = struct
-  type t = { body : Body.V1.t; authorization : Mina_base_control.V2.t }
+  type t = (Body.V1.t, Mina_base_control.V2.t) Poly.V1.t
 end

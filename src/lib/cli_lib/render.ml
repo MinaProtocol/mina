@@ -40,7 +40,7 @@ module String_list_formatter = struct
 end
 
 module Prove_receipt = struct
-  type t = Receipt.Chain_hash.t * User_command.t list [@@deriving yojson]
+  type t = Receipt.Chain_hash.t * User_command.t list [@@deriving to_yojson]
 
   let to_text proof =
     sprintf "Merkle List of transactions:\n%s"

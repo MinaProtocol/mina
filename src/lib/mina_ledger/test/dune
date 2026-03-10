@@ -1,0 +1,14 @@
+(test
+ (name test_mina_ledger)
+ (package mina_ledger)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane))
+ (libraries
+  ; opam libraries
+  alcotest
+  alcotest-async
+  ; local libraries
+  mina_base
+  mina_ledger))

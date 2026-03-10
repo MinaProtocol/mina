@@ -2,17 +2,16 @@ open Core_kernel
 open Kimchi_backend_common
 
 module Rounds : sig
-  open Pickles_types
-
-  module Wrap : Nat.Add.Intf_transparent
+  open Plonkish_prelude
+  module Wrap = Nat.N15
 
   module Wrap_vector : Vector.With_version(Wrap).S
 
-  module Step : Nat.Add.Intf_transparent
+  module Step = Nat.N16
 
   module Step_vector : Vector.With_version(Step).S
 end = struct
-  open Pickles_types
+  open Plonkish_prelude
   module Wrap = Nat.N15
   module Step = Nat.N16
 
@@ -67,26 +66,12 @@ end = struct
 end
 
 (* why use a functor here? *)
-module Bigint256 =
-  Kimchi_backend_common.Bigint.Make
-    (Pasta_bindings.BigInt256)
-    (struct
-      let length_in_bytes = 32
-    end)
+module Bigint256 = Kimchi_pasta_snarky_backend.Bigint256
 
 (* the two pasta fields and curves *)
 
-module Fp = Field.Make (struct
-  module Bigint = Bigint256
-  include Pasta_bindings.Fp
-  module Vector = Kimchi_bindings.FieldVectors.Fp
-end)
-
-module Fq = Field.Make (struct
-  module Bigint = Bigint256
-  include Pasta_bindings.Fq
-  module Vector = Kimchi_bindings.FieldVectors.Fq
-end)
+module Fp = Kimchi_pasta_snarky_backend.Vesta_based_plonk.Field
+module Fq = Kimchi_pasta_snarky_backend.Pallas_based_plonk.Field
 
 module Vesta = struct
   module Params = struct
@@ -147,3 +132,11 @@ module Fp_poly_comm = Kimchi_backend_common.Poly_comm.Make (struct
      fun unshifted shifted : t -> { shifted; unshifted }
   end
 end)
+
+(* poseidon params *)
+
+let poseidon_params_fp =
+  Kimchi_pasta_snarky_backend.Vesta_based_plonk.poseidon_params
+
+let poseidon_params_fq =
+  Kimchi_pasta_snarky_backend.Pallas_based_plonk.poseidon_params

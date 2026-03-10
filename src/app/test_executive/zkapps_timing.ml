@@ -15,24 +15,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let config =
+  let config ~constants =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node-a-key"
-          ; balance = "8000000000"
-          ; timing = Untimed
-          }
-        ; { account_name = "node-b-key"
-          ; balance = "1000000000"
-          ; timing = Untimed
-          }
-        ; { account_name = "node-c-key"
-          ; balance = "1000000000"
-          ; timing = Untimed
-          }
-        ]
+        (let open Test_account in
+        [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
+        ; create ~account_name:"node-b-key" ~balance:"1000000000" ()
+        ; create ~account_name:"node-c-key" ~balance:"1000000000" ()
+        ])
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -41,21 +33,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_archive_nodes = 1
     }
 
-  let run network t =
+  let run ~config:Test_config.{ signature_kind; _ } network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let all_nodes = Network.all_nodes network in
+    let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data all_mina_nodes) )
     in
     let block_producer_nodes =
       Network.block_producers network |> Core.String.Map.data
     in
     let node = List.hd_exn block_producer_nodes in
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.compiled
-    in
+    let constraint_constants = Network.constraint_constants network in
     let block_window_duration_ms =
       constraint_constants.block_window_duration_ms
     in
@@ -66,10 +57,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; private_key = fee_payer_sk
       }
     in
-    let ( zkapp_command_create_account_with_timing
-        , timing_account_id
-        , timing_update
-        , timed_account_keypair ) =
+    let%bind.Async.Deferred ( zkapp_command_create_account_with_timing
+                            , timing_account_id
+                            , timing_update
+                            , timed_account_keypair ) =
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 10 in
@@ -111,9 +102,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
           Token_id.default
       in
-
-      ( Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-          zkapp_command_spec
+      let%map.Async.Deferred deploy_zkapp =
+        Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+          ~signature_kind zkapp_command_spec
+      in
+      ( deploy_zkapp
       , timing_account_id
       , zkapp_command_spec.snapp_update
       , zkapp_keypair )
@@ -156,16 +149,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-      return
+      Malleable_error.lift
       @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-           zkapp_command_spec
+           ~signature_kind zkapp_command_spec
     in
     (* Create a timed account that with initial liquid balance being 0, and vesting 1 mina at each slot.
        This account would be used to test the edge case of vesting. See `zkapp_command_transfer_from_third_timed_account`
     *)
-    let ( zkapp_command_create_third_account_with_timing
-        , third_timed_account_id
-        , third_timed_account_keypair ) =
+    let%bind.Async.Deferred ( zkapp_command_create_third_account_with_timing
+                            , third_timed_account_id
+                            , third_timed_account_keypair ) =
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 100 in
@@ -207,12 +200,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
           Token_id.default
       in
-      ( Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-          zkapp_command_spec
-      , timing_account_id
-      , zkapp_keypair )
+      let%map.Async.Deferred deploy_zkapp =
+        Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+          ~signature_kind zkapp_command_spec
+      in
+      (deploy_zkapp, timing_account_id, zkapp_keypair)
     in
-    let zkapp_command_with_zero_vesting_period =
+    let%bind.Async.Deferred zkapp_command_with_zero_vesting_period =
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 10 in
@@ -250,7 +244,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-        zkapp_command_spec
+        ~signature_kind zkapp_command_spec
     in
     let%bind zkapp_command_transfer_from_timed_account =
       let open Mina_base in
@@ -281,7 +275,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       return
-      @@ Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+      @@ Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+           zkapp_command_spec
     in
     let%bind zkapp_command_invalid_transfer_from_timed_account =
       let open Mina_base in
@@ -312,7 +307,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       return
-      @@ Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+      @@ Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+           zkapp_command_spec
     in
     let%bind.Deferred zkapp_command_update_timing =
       let open Mina_base in
@@ -559,7 +555,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; preconditions =
             Some
               { network = Zkapp_precondition.Protocol_state.accept
-              ; account = Nonce (Account.Nonce.succ nonce)
+              ; account =
+                  Zkapp_precondition.Account.nonce (Account.Nonce.succ nonce)
               ; valid_while =
                   Check
                     Zkapp_precondition.Closed_interval.
@@ -569,7 +566,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               }
         }
       in
-      Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+      Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+        zkapp_command_spec
     in
     let%bind.Deferred () =
       after (Time.Span.of_ms (float_of_int block_window_duration_ms))

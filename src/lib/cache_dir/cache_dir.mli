@@ -15,7 +15,4 @@ val env_path : string
 val possible_paths : string -> string list
 
 val load_from_s3 :
-     string list
-  -> string list
-  -> logger:Logger.t
-  -> unit Async_kernel.Deferred.Or_error.t
+  string -> string -> logger:Logger.t -> unit Async_kernel.Deferred.Or_error.t

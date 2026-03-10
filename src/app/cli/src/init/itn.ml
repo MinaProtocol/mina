@@ -6,18 +6,17 @@ open Signature_lib
 open Mina_base
 open Mina_transaction
 
-let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
+let create_accounts ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) port
+    (privkey_path, key_prefix, num_accounts, fee, amount) =
   let keys_per_zkapp = 8 in
   let zkapps_per_block = 10 in
   let pk_check_wait = Time.Span.of_sec 10. in
   let pk_check_timeout = Time.Span.of_min 30. in
   let min_fee =
-    Currency.Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee
+    Currency.Fee.to_nanomina_int genesis_constants.minimum_user_command_fee
   in
   let account_creation_fee_int =
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.compiled
-    in
     Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
   in
   if fee < min_fee then (
@@ -178,14 +177,16 @@ let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
           }
         in
         fee_payer_current_nonce := Account.Nonce.succ !fee_payer_current_nonce ;
-        Transaction_snark.For_tests.multiple_transfers multispec )
+        Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+          multispec )
   in
+  (* TODO do not compute hashes and remove Zkapp_command.read_all_proofs_from_disk *)
   let zkapps_batches = List.chunks_of zkapps ~length:zkapps_per_block in
   Deferred.List.iter zkapps_batches ~f:(fun zkapps_batch ->
       Format.printf "Processing batch of %d zkApps@." (List.length zkapps_batch) ;
       List.iteri zkapps_batch ~f:(fun i zkapp ->
           let txn_hash =
-            Transaction_hash.hash_command (Zkapp_command zkapp)
+            Transaction_hash.hash_zkapp_command_with_hashes zkapp
             |> Transaction_hash.to_base58_check
           in
           Format.printf " zkApp %d, transaction hash: %s@." i txn_hash ;
@@ -219,7 +220,8 @@ let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
                 balance_change_str ) ) ;
       let%bind res =
         Daemon_rpcs.Client.dispatch Daemon_rpcs.Send_zkapp_commands.rpc
-          zkapps_batch port
+          (List.map ~f:Zkapp_command.read_all_proofs_from_disk zkapps_batch)
+          port
       in
       ( match res with
       | Ok res_inner -> (
@@ -248,33 +250,19 @@ let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
       in
       let num_batch_pks = List.length batch_pks in
       Format.eprintf "Number of batch keys: %d@." num_batch_pks ;
-      (* check ledger at intervals for presence of all pks *)
-      let rec check_for_pks () =
-        let%bind res =
-          Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc None port
-        in
-        match res with
-        | Ok (Ok accounts) ->
-            Format.printf "Succesfully downloaded daemon ledger@." ;
-            let key_set =
-              Signature_lib.Public_key.Compressed.Hash_set.of_list
-                (List.map accounts ~f:(fun acct -> acct.public_key))
+      (* check for presence of all pks *)
+      let check_for_pks () =
+        Deferred.List.for_all batch_pks ~f:(fun pk ->
+            let account_id = Account_id.create pk Token_id.default in
+            let%map res =
+              Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_balance.rpc account_id
+                port
             in
-            let pk_count =
-              List.count batch_pks ~f:(fun pk -> Hash_set.mem key_set pk)
-            in
-            Format.eprintf "Number of batch keys in ledger: %d@." pk_count ;
-            Deferred.return (pk_count = num_batch_pks)
-        | Ok (Error err) ->
-            Format.eprintf "Error in getting daemon ledger: %s@."
-              (Error.to_string_hum err) ;
-            let%bind () = after (Time.Span.of_sec 10.) in
-            check_for_pks ()
-        | Error err ->
-            Format.eprintf "Error in getting daemon ledger: %s@."
-              (Error.to_string_hum err) ;
-            let%bind () = after (Time.Span.of_sec 10.) in
-            check_for_pks ()
+            match res with
+            | Ok (Ok (Some balance)) when Currency.Balance.(balance > zero) ->
+                true
+            | Ok (Ok (Some _)) | Ok (Ok None) | Ok (Error _) | Error _ ->
+                false )
       in
       let rec check_loop () =
         let%bind got_pks = check_for_pks () in

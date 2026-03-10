@@ -1,9 +1,12 @@
+open Core_kernel
 open Mina_base
 open Snark_params
 
 val genesis_constants : Genesis_constants.t
 
 val proof_level : Genesis_constants.Proof_level.t
+
+val signature_kind : Mina_signature_kind.t
 
 val consensus_constants : Consensus.Constants.t
 
@@ -54,7 +57,8 @@ type pass_number = Pass_1 | Pass_2
     Raises if either the snark generation or application fails
 *)
 val check_zkapp_command_with_merges_exn :
-     ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
+     ?logger:Logger.t
+  -> ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
   -> ?ignore_outside_snark:bool
   -> ?global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> ?state_body:Transaction_protocol_state.Block_data.t
@@ -64,16 +68,16 @@ val check_zkapp_command_with_merges_exn :
 
 (** Verification key of a trivial smart contract *)
 val trivial_zkapp :
-  ( [> `VK of (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t ]
+  ( [> `VK of
+       (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+       Async.Deferred.t ]
   * [> `Prover of
        ( unit
        , unit
        , unit
        , Zkapp_statement.t
-       , ( unit
-         * unit
-         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
-         Async.Deferred.t )
+       , (unit * unit * Pickles_types.Nat.N2.n Pickles.Proof.t) Async.Deferred.t
+       )
        Pickles.Prover.t ] )
   Lazy.t
 
@@ -85,16 +89,16 @@ val test_snapp_update :
      ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> ?snapp_permissions:Permissions.t
-  -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+  -> vk:
+       (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
+       Async.Deferred.t
   -> zkapp_prover:
        ( unit
        , unit
        , unit
        , Zkapp_statement.t
-       , ( unit
-         * unit
-         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
-         Async.Deferred.t )
+       , (unit * unit * Pickles_types.Nat.N2.n Pickles.Proof.t) Async.Deferred.t
+       )
        Pickles.Prover.t
   -> Transaction_snark.For_tests.Update_states_spec.t
   -> init_ledger:Mina_transaction_logic.For_tests.Init_ledger.t
@@ -102,9 +106,12 @@ val test_snapp_update :
   -> unit
 
 val permissions_from_update :
-     Account_update.Update.t
-  -> auth:Permissions.Auth_required.t
-  -> Permissions.Auth_required.t Permissions.Poly.t
+     auth:Permissions.Auth_required.t
+  -> ?txn_version:Mina_numbers.Txn_version.t
+  -> Account_update.Update.t
+  -> ( Permissions.Auth_required.t
+     , Mina_numbers.Txn_version.t )
+     Permissions.Poly.t
 
 val pending_coinbase_stack_target :
      Mina_transaction.Transaction.Valid.t
@@ -116,7 +123,7 @@ val pending_coinbase_stack_target :
 module Wallet : sig
   type t = { private_key : Signature_lib.Private_key.t; account : Account.t }
 
-  val random_wallets : ?n:int -> unit -> t array
+  val random_wallets : ?n:int -> unit -> t array Quickcheck.Generator.t
 
   val user_command_with_wallet :
        t array

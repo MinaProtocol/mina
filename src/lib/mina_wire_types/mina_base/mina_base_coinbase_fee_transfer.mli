@@ -1,5 +1,3 @@
-open Utils
-
 module Types : sig
   module type S = sig
     module V1 : sig

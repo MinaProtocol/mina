@@ -1,0 +1,16 @@
+(test
+ (name test_interruptible)
+ (package interruptible)
+ (libraries
+  alcotest
+  async
+  async_kernel
+  async_unix
+  core
+  core_kernel
+  interruptible
+  run_in_thread)
+ (preprocess
+  (pps ppx_deriving.std ppx_let ppx_sexp_conv ppx_version))
+ (instrumentation
+  (backend bisect_ppx)))

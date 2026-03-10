@@ -1,9 +1,11 @@
 package main
 
 import (
+	"codanet"
 	"fmt"
 
 	"github.com/go-errors/errors"
+	ipld "github.com/ipfs/go-ipld-format"
 )
 
 // TODO: wrap these in a new type, encode them differently in the rpc mainloop
@@ -47,4 +49,8 @@ func needsConfigure() error {
 
 func needsDHT() error {
 	return badRPC(errors.New("helper not yet joined to pubsub"))
+}
+
+func isBlockNotFound(block BitswapBlockLink, err error) bool {
+	return err == ipld.ErrNotFound{Cid: codanet.BlockHashToCid(block)}
 }

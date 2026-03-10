@@ -1,0 +1,19 @@
+(test
+ (name rocksdb_tests)
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  async_unix
+  base.base_internalhash_types
+  base.caml
+  core
+  core.uuid
+  core_kernel
+  core_kernel.uuid
+  rocks
+  ;; local libraries
+  mina_stdlib_unix
+  rocksdb)
+ (preprocess
+  (pps ppx_version ppx_jane)))

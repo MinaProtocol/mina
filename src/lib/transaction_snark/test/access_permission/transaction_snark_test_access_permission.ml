@@ -10,9 +10,15 @@ module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 
 let%test_module "Access permission tests" =
   ( module struct
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let () = Backtrace.elide := false
 
-    let sk = Private_key.create ()
+    let sk = Quickcheck.random_value Private_key.gen
 
     let pk = Public_key.of_private_key_exn sk
 
@@ -21,19 +27,17 @@ let%test_module "Access permission tests" =
     let account_id = Account_id.create pk_compressed Token_id.default
 
     let tag, _, p_module, Pickles.Provers.[ prover ] =
-      Zkapps_examples.compile () ~cache:Cache_dir.cache
+      Zkapps_examples.compile () ~cache:Cache_dir.cache ~proof_cache
         ~auxiliary_typ:Impl.Typ.unit
-        ~branches:(module Nat.N1)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
-        ~constraint_constants:
-          (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants )
         ~choices:(fun ~self:_ -> [ Zkapps_empty_update.rule pk_compressed ])
 
     module P = (val p_module)
 
-    let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
+    let vk =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Pickles.Side_loaded.Verification_key.of_compiled tag )
 
     let vk_hash = Mina_base.Verification_key_wire.digest_vk vk
 
@@ -48,6 +52,7 @@ let%test_module "Access permission tests" =
         | Account_update.Authorization_kind.Proof _ ->
             { body = { account_update.body with authorization_kind = auth_kind }
             ; authorization = account_update.authorization
+            ; aux = account_update.aux
             }
         | Account_update.Authorization_kind.Signature ->
             { body =
@@ -55,16 +60,20 @@ let%test_module "Access permission tests" =
                   authorization_kind = auth_kind
                 ; increment_nonce = true
                 ; preconditions =
-                    { account = Nonce Mina_numbers.Account_nonce.(succ zero)
+                    { account =
+                        Zkapp_precondition.Account.nonce
+                          Mina_numbers.Account_nonce.(succ zero)
                     ; network = account_update.body.preconditions.network
                     ; valid_while = Ignore
                     }
                 }
             ; authorization = Signature Signature.dummy
+            ; aux = account_update.aux
             }
         | Account_update.Authorization_kind.None_given ->
             { body = { account_update.body with authorization_kind = auth_kind }
             ; authorization = None_given
+            ; aux = account_update.aux
             }
       in
       let deploy_account_update_body : Account_update.Body.t =
@@ -80,7 +89,7 @@ let%test_module "Access permission tests" =
         ; preconditions =
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
-            ; account = Accept
+            ; account = Zkapp_precondition.Account.accept
             ; valid_while = Ignore
             }
         ; may_use_token = No
@@ -90,14 +99,13 @@ let%test_module "Access permission tests" =
       in
       let deploy_account_update : Account_update.t =
         (* TODO: This is a pain. *)
-        { body = deploy_account_update_body
-        ; authorization = Signature Signature.dummy
-        }
+        Account_update.with_aux ~body:deploy_account_update_body
+          ~authorization:(Control.Poly.Signature Signature.dummy)
       in
       let account_updates =
         []
-        |> Zkapp_command.Call_forest.cons account_update
-        |> Zkapp_command.Call_forest.cons deploy_account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind deploy_account_update
       in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         (* TODO: This is a pain. *)
@@ -108,13 +116,13 @@ let%test_module "Access permission tests" =
       in
       let fee_payer =
         (* TODO: This is a pain. *)
-        { Account_update.Fee_payer.body =
+        Account_update.Fee_payer.make
+          ~body:
             { Account_update.Body.Fee_payer.dummy with
               public_key = pk_compressed
             ; fee = Currency.Fee.of_nanomina_int_exn 100
             }
-        ; authorization = Signature.dummy
-        }
+          ~authorization:Signature.dummy
       in
       let full_commitment =
         (* TODO: This is a pain. *)
@@ -122,7 +130,7 @@ let%test_module "Access permission tests" =
           transaction_commitment
           ~memo_hash:(Signed_command_memo.hash memo)
           ~fee_payer_hash:
-            (Zkapp_command.Digest.Account_update.create
+            (Zkapp_command.Digest.Account_update.create ~signature_kind
                (Account_update.of_fee_payer fee_payer) )
       in
       (* TODO: Make this better. *)
@@ -134,7 +142,7 @@ let%test_module "Access permission tests" =
             when Public_key.Compressed.equal public_key pk_compressed ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign sk
+                  Schnorr.Chunked.sign ~signature_kind sk
                     (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
@@ -144,6 +152,7 @@ let%test_module "Access permission tests" =
           Zkapp_command.Call_forest.map account_updates ~f:(function
             | ({ body = { public_key; use_full_commitment; _ }
                ; authorization = Signature _
+               ; aux = _
                } as account_update :
                 Account_update.t )
               when Public_key.Compressed.equal public_key pk_compressed ->
@@ -153,8 +162,8 @@ let%test_module "Access permission tests" =
                 in
                 { account_update with
                   authorization =
-                    Control.Signature
-                      (Schnorr.Chunked.sign sk
+                    Control.Poly.Signature
+                      (Schnorr.Chunked.sign ~signature_kind sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->
@@ -221,4 +230,11 @@ let%test_module "Access permission tests" =
         (Proof vk_hash) Signature
 
     let%test_unit "Signature with Signature" = run_test Signature Signature
+
+    let () =
+      match Sys.getenv_opt "PROOF_CACHE_OUT" with
+      | Some path ->
+          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+      | None ->
+          ()
   end )

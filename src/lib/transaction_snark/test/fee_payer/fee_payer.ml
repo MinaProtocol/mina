@@ -9,6 +9,12 @@ open Mina_transaction
 
 let%test_module "Fee payer tests" =
   ( module struct
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let memo = Signed_command_memo.create_from_string_exn "Fee payer tests"
@@ -158,8 +164,9 @@ let%test_module "Fee payer tests" =
                 }
               in
               let zkapp_command =
-                Transaction_snark.For_tests.deploy_snapp test_spec
-                  ~constraint_constants
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    Transaction_snark.For_tests.deploy_snapp
+                      ~constraint_constants ~signature_kind test_spec )
               in
               let txn_state_view =
                 Mina_state.Protocol_state.Body.view U.genesis_state_body
@@ -171,8 +178,8 @@ let%test_module "Fee payer tests" =
               ( match
                   let mask = Ledger.Mask.create ~depth:U.ledger_depth () in
                   let ledger0 = Ledger.register_mask ledger mask in
-                  Ledger.apply_transactions ledger0 ~constraint_constants
-                    ~global_slot ~txn_state_view
+                  Ledger.apply_transactions ~signature_kind ledger0
+                    ~constraint_constants ~global_slot ~txn_state_view
                     [ Transaction.Command (Zkapp_command zkapp_command) ]
                 with
               | Error _ ->
@@ -182,10 +189,12 @@ let%test_module "Fee payer tests" =
               (*Sparse ledger application fails*)
               match
                 let sparse_ledger =
-                  Sparse_ledger.of_any_ledger
-                    (Ledger.Any_ledger.cast
-                       (module Ledger.Mask.Attached)
-                       ledger )
+                  Sparse_ledger.of_ledger_subset_exn ledger
+                    ( init_ledger |> Array.to_list
+                    |> List.map ~f:(fun (kp, _) ->
+                           Account_id.create
+                             (Public_key.compress kp.public_key)
+                             Token_id.default ) )
                 in
                 Sparse_ledger.apply_transaction_first_pass ~constraint_constants
                   ~global_slot ~txn_state_view sparse_ledger
@@ -314,4 +323,11 @@ let%test_module "Fee payer tests" =
                     List.is_empty
                       (Zkapp_command.account_updates_list zkapp_command) ) ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
+
+    let () =
+      match Sys.getenv "PROOF_CACHE_OUT" with
+      | Some path ->
+          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+      | None ->
+          ()
   end )

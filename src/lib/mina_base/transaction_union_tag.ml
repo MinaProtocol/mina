@@ -1,18 +1,6 @@
 (* transaction_union_tag.ml *)
-
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Mina_base_import
-
-[%%endif]
 
 type t = Payment | Stake_delegation | Fee_transfer | Coinbase
 [@@deriving enum, equal, sexp]
@@ -52,16 +40,12 @@ module Bits = struct
 
   let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
-  [%%ifdef consensus_mechanism]
-
   type var = Boolean.var * Boolean.var * Boolean.var
 
   let typ = Typ.tuple3 Boolean.typ Boolean.typ Boolean.typ
 
   let constant (b1, b2, b3) =
     Boolean.(var_of_value b1, var_of_value b2, var_of_value b3)
-
-  [%%endif]
 end
 
 module Unpacked = struct
@@ -76,15 +60,11 @@ module Unpacked = struct
       }
     [@@deriving equal, hlist]
 
-    [%%ifdef consensus_mechanism]
-
     let typ (bool : ('bool_var, 'bool) Typ.t) : ('bool_var t, 'bool t) Typ.t =
       Typ.of_hlistable
         [ bool; bool; bool; bool; bool ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
-
-    [%%endif]
   end
 
   type t = bool Poly.t [@@deriving equal]
@@ -137,8 +117,6 @@ module Unpacked = struct
         bits
     | None ->
         raise (Invalid_argument "Transaction_union_tag.Unpacked.to_bits_t")
-
-  [%%ifdef consensus_mechanism]
 
   type var = Boolean.var Poly.t
 
@@ -230,8 +208,6 @@ module Unpacked = struct
   let to_bits t = Bits.to_bits (to_bits_var t)
 
   let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
-
-  [%%endif]
 end
 
 let unpacked_t_of_t = function
@@ -247,8 +223,6 @@ let unpacked_t_of_t = function
 let to_bits tag = Bits.to_bits (Unpacked.to_bits_t (unpacked_t_of_t tag))
 
 let to_input_legacy tag = Random_oracle.Input.Legacy.bitstring (to_bits tag)
-
-[%%ifdef consensus_mechanism]
 
 let t_of_unpacked_t (unpacked : Unpacked.t) : t =
   match
@@ -318,5 +292,3 @@ let%test_module "predicates" =
           (Option.value_exn (of_enum i))
       done
   end )
-
-[%%endif]

@@ -22,5 +22,5 @@ val get_status :
      frontier_broadcast_pipe:
        Transition_frontier.t Option.t Broadcast_pipe.Reader.t
   -> transaction_pool:Network_pool.Transaction_pool.t
-  -> User_command.t
+  -> User_command.Stable.Latest.t
   -> State.t

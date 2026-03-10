@@ -1,0 +1,13 @@
+(library
+ (name lmdb_storage)
+ (public_name lmdb_storage)
+ (libraries
+  ;; opam libraries
+  lmdb
+  ;; local libraries
+  blake2
+  mina_stdlib_unix)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson ppx_jane ppx_mina ppx_version)))

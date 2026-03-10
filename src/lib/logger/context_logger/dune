@@ -1,0 +1,20 @@
+(library
+ (name context_logger)
+ (public_name logger.context_logger)
+ (library_flags -linkall)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries
+  ;; opam libraries
+  base.base_internalhash_types
+  core_kernel
+  sexplib0
+  async_kernel
+  ;; local libraries
+  logger)
+ (preprocess
+  (pps ppx_jane ppx_mina ppx_version ppx_deriving_yojson))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis
+  "Context logger: useful for passing logger down the deep callstacks"))

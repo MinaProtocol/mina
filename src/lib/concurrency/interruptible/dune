@@ -1,0 +1,16 @@
+(library
+ (name interruptible)
+ (public_name interruptible)
+ (library_flags -linkall)
+ (libraries
+  ;; opam libraries
+  async_kernel
+  core_kernel
+  ;; local libraries
+  run_in_thread)
+ (preprocess
+  (pps ppx_deriving.std ppx_jane ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis
+  "Interruptible monad (deferreds, that can be triggered to cancel)"))

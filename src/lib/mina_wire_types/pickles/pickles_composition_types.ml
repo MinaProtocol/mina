@@ -60,8 +60,7 @@ module Wrap = struct
               ; gamma : 'challenge
               ; zeta : 'scalar_challenge
               ; joint_combiner : 'scalar_challenge option
-              ; feature_flags :
-                  'bool Pickles_types.Plonk_types.Features.Stable.V1.t
+              ; feature_flags : 'bool Pickles_types.Plonk_types.Features.V1.t
               }
           end
         end

@@ -1,3 +1,0 @@
-(lang dune 2.7)
-(name archive_lib)
-(implicit_transitive_deps false)

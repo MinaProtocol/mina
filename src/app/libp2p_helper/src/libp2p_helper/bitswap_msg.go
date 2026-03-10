@@ -18,7 +18,7 @@ func fromAddResourcePush(m ipcPushMessage) (pushMessage, error) {
 func (m AddResourcePush) handle(app *app) {
 	d, err := AddResourcePushT(m).Data()
 	if err != nil {
-		app.P2p.Logger.Errorf("AddResourcePush.handle: error %w", err)
+		app.P2p.Logger.Errorf("AddResourcePush.handle: error %s", err)
 		return
 	}
 	app.bitswapCtx.addCmds <- bitswapAddCmd{
@@ -27,12 +27,12 @@ func (m AddResourcePush) handle(app *app) {
 	}
 }
 
-type DeleteResourcePushT = ipc.Libp2pHelperInterface_DeleteResource
-type DeleteResourcePush DeleteResourcePushT
+type RemoveResourcePushT = ipc.Libp2pHelperInterface_RemoveResource
+type RemoveResourcePush RemoveResourcePushT
 
-func fromDeleteResourcePush(m ipcPushMessage) (pushMessage, error) {
-	i, err := m.DeleteResource()
-	return DeleteResourcePush(i), err
+func fromRemoveResourcePush(m ipcPushMessage) (pushMessage, error) {
+	i, err := m.RemoveResource()
+	return RemoveResourcePush(i), err
 }
 
 func extractRootBlockList(l ipc.RootBlockId_List) ([]root, error) {
@@ -52,14 +52,14 @@ func extractRootBlockList(l ipc.RootBlockId_List) ([]root, error) {
 	return ids, nil
 }
 
-func (m DeleteResourcePush) handle(app *app) {
-	idsM, err := DeleteResourcePushT(m).Ids()
+func (m RemoveResourcePush) handle(app *app) {
+	idsM, err := RemoveResourcePushT(m).Ids()
 	var links []root
 	if err == nil {
 		links, err = extractRootBlockList(idsM)
 	}
 	if err != nil {
-		app.P2p.Logger.Errorf("DeleteResourcePush.handle: error %w", err)
+		app.P2p.Logger.Errorf("RemoveResourcePush.handle: error %s", err)
 		return
 	}
 	app.bitswapCtx.deleteCmds <- bitswapDeleteCmd{links}
@@ -80,7 +80,7 @@ func (m DownloadResourcePush) handle(app *app) {
 		links, err = extractRootBlockList(idsM)
 	}
 	if err != nil {
-		app.P2p.Logger.Errorf("DownloadResourcePush.handle: error %w", err)
+		app.P2p.Logger.Errorf("DownloadResourcePush.handle: error %s", err)
 		return
 	}
 	app.bitswapCtx.downloadCmds <- bitswapDownloadCmd{
@@ -97,7 +97,7 @@ func fromTestDecodeBitswapBlocksReq(req ipcRpcRequest) (rpcRequest, error) {
 	return TestDecodeBitswapBlocksReq(i), err
 }
 
-func (m TestDecodeBitswapBlocksReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m TestDecodeBitswapBlocksReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	blocks, err := TestDecodeBitswapBlocksReqT(m).Blocks()
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
@@ -156,7 +156,7 @@ func fromTestEncodeBitswapBlocksReq(req ipcRpcRequest) (rpcRequest, error) {
 	return TestEncodeBitswapBlocksReq(i), err
 }
 
-func (m TestEncodeBitswapBlocksReq) handle(app *app, seqno uint64) *capnp.Message {
+func (m TestEncodeBitswapBlocksReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	mr := TestEncodeBitswapBlocksReqT(m)
 
 	data, err := mr.Data()

@@ -2,9 +2,6 @@ open Core_kernel
 
 let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
     ~consensus_constants ~genesis_body_reference =
-  let genesis_ledger_hash =
-    Mina_ledger.Ledger.merkle_root (Lazy.force genesis_ledger)
-  in
   let protocol_constants =
     Consensus.Constants.to_protocol_constants consensus_constants
   in
@@ -26,10 +23,12 @@ let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
       ~previous_state_hash:
         (Option.value_map constraint_constants.fork
            ~default:negative_one_protocol_state_hash
-           ~f:(fun { previous_state_hash; _ } -> previous_state_hash) )
+           ~f:(fun { state_hash; _ } -> state_hash) )
       ~blockchain_state:
         (Blockchain_state.genesis ~constraint_constants ~consensus_constants
-           ~genesis_ledger_hash ~genesis_body_reference )
+           ~genesis_ledger_hash:
+             (Consensus.Genesis_data.Hashed.hash genesis_ledger)
+           ~genesis_body_reference )
       ~consensus_state:genesis_consensus_state ~constants:protocol_constants
   in
   With_hash.of_data ~hash_data:Protocol_state.hashes state

@@ -1,4 +1,5 @@
 (* extract_blocks.ml -- dump extensional blocks from archive db *)
+
 [@@@coverage exclude_file]
 
 open Core_kernel
@@ -49,8 +50,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let%bind creator = pk_of_id block.creator_id in
   let%bind block_winner = pk_of_id block.block_winner_id in
   let last_vrf_output =
-    (* keep hex encoding *)
-    block.last_vrf_output
+    Base64.decode_exn ~alphabet:Base64.uri_safe_alphabet block.last_vrf_output
   in
   let%bind snarked_ledger_hash_str =
     query_db ~f:(fun db ->
@@ -97,19 +97,22 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let timestamp = Block_time.of_string_exn block.timestamp in
   let chain_status = Chain_status.of_string block.chain_status in
   let%bind protocol_version =
-    let%map { major; minor; patch } =
+    let%map { transaction; network; patch } =
       query_db ~f:(fun db ->
           Processor.Protocol_versions.load db block.protocol_version_id )
     in
-    Protocol_version.create_exn ~major ~minor ~patch
+    Protocol_version.create ~transaction ~network ~patch
   in
   let%bind proposed_protocol_version =
     Option.value_map block.proposed_protocol_version_id ~default:(return None)
       ~f:(fun id ->
-        let%map { major; minor; patch } =
+        let%map { transaction; network; patch } =
           query_db ~f:(fun db -> Processor.Protocol_versions.load db id)
         in
-        Some (Protocol_version.create_exn ~major ~minor ~patch) )
+        let protocol_version =
+          Protocol_version.create ~transaction ~network ~patch
+        in
+        Some protocol_version )
   in
   (* commands, accounts_accessed, accounts_created, tokens_used to be filled in later *)
   return
@@ -461,9 +464,10 @@ let check_state_hash ~logger state_hash_opt =
               [ ("state_hash", `String state_hash)
               ; ("error", Error_json.error_to_yojson err)
               ] ;
-          Core.exit 1 )
+          Stdlib.exit 1 )
 
-let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
+let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
+    ~output_folder ~network ~include_block_height_in_name () =
   ( match (start_state_hash_opt, end_state_hash_opt, all_blocks) with
   | None, None, true | None, Some _, false | Some _, Some _, false ->
       ()
@@ -477,7 +481,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
   (* sanity-check input state hashes *)
   check_state_hash ~logger start_state_hash_opt ;
   check_state_hash ~logger end_state_hash_opt ;
-  match Caqti_async.connect_pool ~max_size:128 archive_uri with
+  match Mina_caqti.connect_pool ~max_size:128 archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]
@@ -508,7 +512,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
                 [%log error]
                   "No subchain available from an unparented block (possibly \
                    the genesis block) to block with given end state hash" ;
-                Core.exit 1 ) ;
+                Stdlib.exit 1 ) ;
               blocks
           | Some start_state_hash, Some end_state_hash ->
               [%log info]
@@ -533,7 +537,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
                    available; try omitting the start state hash, to get a \
                    chain from an unparented block to the block with the end \
                    state hash" ;
-                Core.exit 1 ) ;
+                Stdlib.exit 1 ) ;
               blocks
           | _ ->
               (* unreachable *)
@@ -617,8 +621,20 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
             [%log info] "Writing block with $state_hash"
               ~metadata:
                 [ ("state_hash", State_hash.to_yojson block.state_hash) ] ;
+
+            let network_prefix =
+              network
+              |> Option.value_map ~default:"" ~f:(fun network -> network ^ "-")
+            in
+            let height_prefix =
+              if include_block_height_in_name then
+                Unsigned.UInt32.to_string block.height ^ "-"
+              else ""
+            in
             let output_file =
-              State_hash.to_base58_check block.state_hash ^ ".json"
+              output_folder ^ "/" ^ network_prefix ^ height_prefix
+              ^ State_hash.to_base58_check block.state_hash
+              ^ ".json"
             in
             (* use Latest.to_yojson to get versioned JSON *)
             Async_unix.Writer.with_file output_file ~f:(fun writer ->
@@ -657,6 +673,17 @@ let () =
          and all_blocks =
            Param.flag "--all-blocks" Param.no_arg
              ~doc:"Extract all blocks in the archive database"
+         and output_folder =
+           Param.flag "--output-folder" ~doc:"Output folder for blocks jsons"
+             Param.(optional_with_default "." string)
+         and network =
+           Param.flag "--network"
+             ~doc:"Network name which will be a prefix of each individual file"
+             Param.(optional string)
+         and include_block_height_in_name =
+           Param.flag "--include-block-height-in-name"
+             ~doc:"Includes block height in block name" Param.no_arg
          in
+
          main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
-        )))
+           ~output_folder ~network ~include_block_height_in_name )))

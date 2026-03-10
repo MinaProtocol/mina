@@ -116,12 +116,12 @@ is specified in the `config.json`, in `data` section (see the
 example mentioned above). For example an end condition:
 `"index": 50` will make `rosetta-cli to check first 50 blocks. 
 
-**IMPORTANT** as of version 0.8.2 of `rosetta-sdk-go`, rosetta-cli
+**IMPORTANT** as of version 0.8.3 of `rosetta-sdk-go`, rosetta-cli
 is unable to run the `mina.ros` file, which will only work with
 [Mina Foundation's fork](https://github.com/MinaProtocol/rosetta-sdk-go/tree/pallas_signer_stake_delegation).
 Therefore, whenever it is required to run the Construction API
-tests against v.0.8.2 of `rosetta-sdk-go`, `mina-no-delegation-tests.ros`
+tests against v.0.8.3 of `rosetta-sdk-go`, `mina-no-delegation-tests.ros`
 config should be used for that instead of `mina.ros`, which is used
-in the CI. `mina-no-delegation-tests.ros` should be deleted once
+in the CI. Alternatively, one can also use [our `rosetta-cli` fork](https://github.com/MinaProtocol/rosetta-cli) which is built against our fork of `rosetta-sdk-go`. `mina-no-delegation-tests.ros` should be deleted once
 [PR #464](https://github.com/coinbase/rosetta-sdk-go/pull/464) to
 `rosetta-sdk-go` is merged.

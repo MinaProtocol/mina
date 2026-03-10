@@ -52,8 +52,6 @@ DROP TABLE zkapp_network_precondition;
 
 DROP TABLE zkapp_account_precondition;
 
-DROP TABLE zkapp_account_precondition_values;
-
 DROP TABLE zkapp_accounts;
 
 DROP TABLE zkapp_epoch_data;
@@ -88,8 +86,6 @@ DROP TABLE zkapp_token_id_bounds;
 
 DROP TYPE zkapp_auth_required_type;
 
-DROP TYPE zkapp_precondition_type;
-
 DROP TABLE snarked_ledger_hashes;
 
 DROP TABLE timing_info;
@@ -109,3 +105,7 @@ DROP TABLE zkapp_events;
 DROP TABLE token_symbols;
 
 DROP TABLE voting_for;
+
+DROP TABLE zkapp_field;
+
+DROP TABLE zkapp_verification_key_hashes;

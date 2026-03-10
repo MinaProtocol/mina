@@ -11,9 +11,9 @@ end
 module Wrap = struct
   module Challenges_vector = struct
     type challenge_constant =
-      Pickles_limb_vector.Constant.Make(Pickles_types.Nat.N2).t
+      Pickles_types.Nat.two Pickles_limb_vector.Constant.t
 
-    type 'a wrap_bp_vec = 'a Kimchi_pasta.Basic.Rounds.Wrap_vector.Stable.V1.t
+    type 'a wrap_bp_vec = ('a, Pickles_types.Nat.fifteen) Pickles_types.Vector.t
 
     type t =
       challenge_constant Kimchi_types.scalar_challenge

@@ -1,0 +1,16 @@
+(tests
+ (names main)
+ (flags
+  (:standard -warn-error +a)
+  -open
+  Core_kernel)
+ (preprocess
+  (pps ppx_jane))
+ (libraries
+  ; Opam
+  core_kernel
+  alcotest
+  ; Mina
+  plonkish_prelude)
+ (action
+  (run %{test})))

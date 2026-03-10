@@ -70,6 +70,8 @@ struct
     (* input must be at least as long as the version byte and checksum *)
     if len < version_len + checksum_len then
       raise (Invalid_base58_check_length M.description) ;
+    if not (Char.equal decoded.[0] version_byte) then
+      raise (Invalid_base58_version_byte (decoded.[0], M.description)) ;
     let checksum =
       String.sub decoded
         ~pos:(String.length decoded - checksum_len)
@@ -80,8 +82,6 @@ struct
     in
     if not (String.equal checksum (compute_checksum payload)) then
       raise (Invalid_base58_checksum M.description) ;
-    if not (Char.equal decoded.[0] version_byte) then
-      raise (Invalid_base58_version_byte (decoded.[0], M.description)) ;
     payload
 
   let decode s =
@@ -104,53 +104,3 @@ struct
 end
 
 module Version_bytes = Version_bytes
-
-let%test_module "base58check tests" =
-  ( module struct
-    module Base58_check = Make (struct
-      let description = "Base58check tests"
-
-      let version_byte = '\x53'
-    end)
-
-    open Base58_check
-
-    let test_roundtrip payload =
-      let encoded = encode payload in
-      let payload' = decode_exn encoded in
-      String.equal payload payload'
-
-    let%test "empty_string" = test_roundtrip ""
-
-    let%test "nonempty_string" =
-      test_roundtrip "Somewhere, over the rainbow, way up high"
-
-    let%test "longer_string" =
-      test_roundtrip
-        "Someday, I wish upon a star, wake up where the clouds are far behind \
-         me, where trouble melts like lemon drops, High above the chimney top, \
-         that's where you'll find me"
-
-    let%test "invalid checksum" =
-      try
-        let encoded = encode "Bluer than velvet were her eyes" in
-        let bytes = Bytes.of_string encoded in
-        let len = Bytes.length bytes in
-        let last_ch = Bytes.get bytes (len - 1) in
-        (* change last byte to invalidate checksum *)
-        let new_last_ch =
-          if Char.equal last_ch '\xFF' then '\x00'
-          else Char.of_int_exn (Char.to_int last_ch + 1)
-        in
-        Bytes.set bytes (len - 1) new_last_ch ;
-        let encoded_bad_checksum = Bytes.to_string bytes in
-        let _payload = decode_exn encoded_bad_checksum in
-        false
-      with Invalid_base58_checksum _ -> true
-
-    let%test "invalid length" =
-      try
-        let _payload = decode_exn "abcd" in
-        false
-      with Invalid_base58_check_length _ -> true
-  end )

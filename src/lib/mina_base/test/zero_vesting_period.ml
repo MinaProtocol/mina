@@ -1,16 +1,23 @@
+(** Testing
+    -------
+    Component:  Mina base
+    Invocation: dune exec src/lib/mina_base/test/main.exe -- \
+                  test '^zero vesting period$'
+    Subject:    Test zero vesting period detection
+ *)
+
 open Core_kernel
 open Mina_base
 
-let%test_module "zero_vesting" =
-  ( module struct
-    let mk_zkapp_with_vesting_period n =
-      sprintf
-        {json|
+let mk_zkapp_with_vesting_period n =
+  let res =
+    sprintf
+      {json|
 {
   "fee_payer": {
     "body": {
       "public_key": "B62qkb7Sed1VVsogq7qXzi79JNx9MkcbRihwwuSphUtBiEFPNTQfzNR",
-      "fee": "0.01",
+      "fee": "2.0",
       "valid_until": null,
       "nonce": "0"
     },
@@ -112,7 +119,25 @@ let%test_module "zero_vesting" =
                   "epoch_length": [ "Ignore" ]
                 }
               },
-              "account": [ "Accept" ],
+              "account": {
+                "balance": [ "Ignore" ],
+                "nonce": [ "Ignore" ],
+                "receipt_chain_hash": [ "Ignore" ],
+                "delegate": [ "Ignore" ],
+                "state": [
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ]
+                ],
+                "action_state": [ "Ignore" ],
+                "proved_state": [ "Ignore" ],
+                "is_new": [ "Ignore" ]
+              },
               "valid_while": [ "Ignore" ]
             },
             "use_full_commitment": true,
@@ -125,10 +150,10 @@ let%test_module "zero_vesting" =
             "7mXAxX8GG74Dvgf8t4bdFDuiv9LnXeQmPcev9aSyZKxgsJNsSsJBz92Vqi7uzarkj5nwj9ngVbcya5cizm9af1G4RU6JA7q4"
           ]
         },
-        "account_update_digest": "0x324D57B61E07061A094A9E064984738480D8D3BF336A4CD33993A9FE6B37A823",
+        "account_update_digest": null,
         "calls": []
       },
-      "stack_hash": "0x3C28388F95EAF826FCC6CF06DBDD4A2E694FA7C5A281E0A623560F3A5BAF94AB"
+      "stack_hash": null
     },
     {
       "elt": {
@@ -202,7 +227,25 @@ let%test_module "zero_vesting" =
                   "epoch_length": [ "Ignore" ]
                 }
               },
-              "account": [ "Accept" ],
+              "account": {
+                "balance": [ "Ignore" ],
+                "nonce": [ "Ignore" ],
+                "receipt_chain_hash": [ "Ignore" ],
+                "delegate": [ "Ignore" ],
+                "state": [
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ],
+                  [ "Ignore" ]
+                ],
+                "action_state": [ "Ignore" ],
+                "proved_state": [ "Ignore" ],
+                "is_new": [ "Ignore" ]
+              },
               "valid_while": [ "Ignore" ]
             },
             "use_full_commitment": false,
@@ -214,43 +257,47 @@ let%test_module "zero_vesting" =
           },
           "authorization": [ "None_given" ]
         },
-        "account_update_digest": "0x1581BF4B656B5D89E65A7B9322F460D9AEAF08ABDD62CD6DD6D6FE1EE266035E",
+        "account_update_digest": null,
         "calls": []
       },
-      "stack_hash": "0x1C66CA0E7429D1D71E51BF1A5240D5A5C712DB9C4B7C31034A7A0115B612E83A"
+      "stack_hash": null
     }
   ],
   "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
 }
 
       |json}
-        n
-      |> Yojson.Safe.from_string |> Zkapp_command.of_yojson
-      |> Result.ok_or_failwith
+      n
+    |> Yojson.Safe.from_string |> Zkapp_command.Stable.Latest.of_yojson
+  in
+  match res with
+  | Ppx_deriving_yojson_runtime.Result.Ok zkapp ->
+      zkapp
+  | Ppx_deriving_yojson_runtime.Result.Error err ->
+      failwith err
 
-    let zkapp_zero_vesting_period = mk_zkapp_with_vesting_period 0
+let zkapp_zero_vesting_period = mk_zkapp_with_vesting_period 0
 
-    let%test "zero vesting period is error" =
-      match
-        User_command.check_well_formedness
-          ~genesis_constants:Genesis_constants.for_unit_tests
-          (Zkapp_command zkapp_zero_vesting_period)
-      with
-      | Error [ Zero_vesting_period ] ->
-          true
-      | Ok _ | Error _ ->
-          false
+let zero_vesting_period_is_error () =
+  match
+    User_command.check_well_formedness
+      ~genesis_constants:Genesis_constants.For_unit_tests.t
+      (Zkapp_command zkapp_zero_vesting_period)
+  with
+  | Error [ Zero_vesting_period ] ->
+      ()
+  | Ok _ | Error _ ->
+      assert false
 
-    let zkapp_nonzero_vesting_period = mk_zkapp_with_vesting_period 1
+let zkapp_nonzero_vesting_period = mk_zkapp_with_vesting_period 1
 
-    let%test "nonzero vesting period is ok" =
-      match
-        User_command.check_well_formedness
-          ~genesis_constants:Genesis_constants.for_unit_tests
-          (Zkapp_command zkapp_nonzero_vesting_period)
-      with
-      | Ok () ->
-          true
-      | Error errs ->
-          false
-  end )
+let nonzero_vesting_period_ok () =
+  match
+    User_command.check_well_formedness
+      ~genesis_constants:Genesis_constants.For_unit_tests.t
+      (Zkapp_command zkapp_nonzero_vesting_period)
+  with
+  | Ok () ->
+      ()
+  | Error _ ->
+      assert false

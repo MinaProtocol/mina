@@ -86,7 +86,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Malleable_error.hard_error_format
           "Node '%s' did not have a network keypair, if node is a block \
            producer this should not happen"
-          (Engine.Network.Node.id node)
+          (Engine.Network.Node.infra_id node)
 
   let pub_key_of_node =
     make_get_key ~f:(fun nk ->
@@ -152,11 +152,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (node, response) )
 
   let assert_peers_completely_connected nodes_and_responses =
-    (* this check checks if every single peer in the network is connected to every other peer, in graph theory this network would be a complete graph.  this property will only hold true on small networks *)
+    (* this check checks if every single peer in the network is connected to
+       every other peer, in graph theory this network would be a complete graph.
+       this property will only hold true on small networks *)
     let check_peer_connected_to_all_others ~nodes_by_peer_id ~peer_id
         ~connected_peers =
-      let get_node_id p =
-        p |> String.Map.find_exn nodes_by_peer_id |> Engine.Network.Node.id
+      let get_node_infra_id p =
+        p
+        |> String.Map.find_exn nodes_by_peer_id
+        |> Engine.Network.Node.infra_id
       in
       let expected_peers =
         nodes_by_peer_id |> String.Map.keys
@@ -165,7 +169,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Malleable_error.List.iter expected_peers ~f:(fun p ->
           let error =
             Printf.sprintf "node %s (id=%s) is not connected to node %s (id=%s)"
-              (get_node_id peer_id) peer_id (get_node_id p) p
+              (get_node_infra_id peer_id)
+              peer_id (get_node_infra_id p) p
             |> Error.of_string
           in
           Malleable_error.ok_if_true
@@ -184,17 +189,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~connected_peers )
 
   let assert_peers_cant_be_partitioned ~max_disconnections nodes_and_responses =
-    (* this check checks that the network does NOT become partitioned into isolated subgraphs, even if n nodes are hypothetically removed from the network.*)
+    (* this check checks that the network does NOT become partitioned into
+       isolated subgraphs, even if n nodes are hypothetically removed from the
+       network.*)
     let _, responses = List.unzip nodes_and_responses in
-    let open Graph_algorithms in
     let () =
       Out_channel.with_file "/tmp/network-graph.dot" ~f:(fun c ->
           G.output_graph c (graph_of_adjacency_list responses) )
     in
-    (* Check that the network cannot be disconnected by removing up to max_disconnections number of nodes. *)
+    (* Check that the network cannot be disconnected by removing up to
+       max_disconnections number of nodes. *)
     match
-      Nat.take
-        (Graph_algorithms.connectivity (module String) responses)
+      Mina_stdlib.Nat.take
+        (Mina_stdlib.Graph_algorithms.connectivity (module String) responses)
         max_disconnections
     with
     | `Failed_after n ->
@@ -205,7 +212,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let send_zkapp_batch ~logger node_uri zkapp_commands =
     List.iter zkapp_commands ~f:(fun zkapp_command ->
-        [%log info] "Sending zkApp"
+        [%log info] "Sending $zkapp_command"
           ~metadata:
             [ ("zkapp_command", Mina_base.Zkapp_command.to_yojson zkapp_command)
             ; ( "memo"
@@ -368,11 +375,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     *)
     let app_states_compat =
       let fs_requested =
-        Pickles_types.Vector.Vector_8.to_list requested_update.app_state
+        Mina_base.Zkapp_state.V.to_list requested_update.app_state
       in
-      let fs_ledger =
-        Pickles_types.Vector.Vector_8.to_list ledger_update.app_state
-      in
+      let fs_ledger = Mina_base.Zkapp_state.V.to_list ledger_update.app_state in
       List.for_all2_exn fs_requested fs_ledger ~f:(fun req ledg ->
           compatible_item req ledg ~equal:Pickles.Backend.Tick.Field.equal )
     in
@@ -423,10 +428,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* [logs] is a string containing the entire replayer output *)
   let check_replayer_logs ~logger logs =
-    let log_level_substring level = sprintf {|"level":"%s"|} level in
-    let error_log_substring = log_level_substring "Error" in
-    let fatal_log_substring = log_level_substring "Fatal" in
-    let info_log_substring = log_level_substring "Info" in
+    let error_log_substring = "Error" in
+    let fatal_log_substring = "Fatal" in
+    let info_log_substring = "Info" in
     let split_logs = String.split logs ~on:'\n' in
     let error_logs =
       split_logs
@@ -449,4 +453,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     else
       let error = String.concat error_logs ~sep:"\n  " in
       Malleable_error.hard_error_string ("Replayer errors:\n  " ^ error)
+
+  let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
+      ~vesting_increment : Mina_base.Account_timing.t =
+    let open Currency in
+    Timed
+      { initial_minimum_balance = Balance.of_nanomina_int_exn min_balance
+      ; cliff_time = Mina_numbers.Global_slot_since_genesis.of_int cliff_time
+      ; cliff_amount = Amount.of_nanomina_int_exn cliff_amount
+      ; vesting_period = Mina_numbers.Global_slot_span.of_int vesting_period
+      ; vesting_increment = Amount.of_nanomina_int_exn vesting_increment
+      }
 end

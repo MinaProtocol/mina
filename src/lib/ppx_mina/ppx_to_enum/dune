@@ -3,5 +3,7 @@
  (public_name ppx_to_enum)
  (kind ppx_deriver)
  (libraries compiler-libs.common ppxlib base)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppxlib.metaquot)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppxlib.metaquot)))

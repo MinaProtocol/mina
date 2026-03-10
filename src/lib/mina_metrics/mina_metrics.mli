@@ -49,6 +49,54 @@ module Runtime : sig
   val long_async_job : Long_job_histogram.t
 end
 
+module Process_memory : sig
+  val rss_update_interval_mins : float ref
+
+  module Daemon : sig
+    val set_pid : Pid.t -> unit
+
+    val clear_pid : unit -> unit
+  end
+
+  module Prover : sig
+    val set_pid : Pid.t -> unit
+
+    val clear_pid : unit -> unit
+  end
+
+  module Verifier : sig
+    val set_pid : Pid.t -> unit
+
+    val clear_pid : unit -> unit
+  end
+
+  (* NOTE: this only tracks memory used by the SNARK workers that is spawned by
+     the coordinator. SNARK workers spawned manually is not tracked. *)
+  module Snark_worker : sig
+    val set_pid : Pid.t -> unit
+
+    val clear_pid : unit -> unit
+  end
+
+  module Uptime_snark_worker : sig
+    val set_pid : Pid.t -> unit
+
+    val clear_pid : unit -> unit
+  end
+
+  module Vrf_evaluator : sig
+    val set_pid : Pid.t -> unit
+
+    val clear_pid : unit -> unit
+  end
+
+  module Libp2p_helper : sig
+    val set_pid : Pid.t -> unit
+
+    val clear_pid : unit -> unit
+  end
+end
+
 module Cryptography : sig
   val blockchain_proving_time_ms : Gauge.t
 
@@ -60,11 +108,14 @@ module Cryptography : sig
 
   val snark_work_zkapp_base_time_sec : Counter.t
 
-  val snark_work_base_time_sec : Counter.t
+  val snark_work_nonzkapp_base_time_sec : Counter.t
 
+  (* WARN: At snark worker side this metrics is just wrong. This is because
+     there's no way to know how many full zkapp command is processed by a
+     worker. *)
   val snark_work_zkapp_base_submissions : Counter.t
 
-  val snark_work_base_submissions : Counter.t
+  val snark_work_nonzkapp_base_submissions : Counter.t
 
   val zkapp_transaction_length : Counter.t
 
@@ -250,6 +301,14 @@ module Network : sig
 
   val get_ancestry_rpc_responses_failed : Counter.t
 
+  val get_completed_snarks_rpcs_sent : Counter.t * Gauge.t
+
+  val get_completed_snarks_rpcs_received : Counter.t * Gauge.t
+
+  val get_completed_snarks_rpc_requests_failed : Counter.t
+
+  val get_completed_snarks_rpc_responses_failed : Counter.t
+
   val ban_notify_rpcs_sent : Counter.t * Gauge.t
 
   val ban_notify_rpcs_received : Counter.t * Gauge.t
@@ -311,17 +370,11 @@ end
 
 module Pipe : sig
   module Drop_on_overflow : sig
-    val bootstrap_sync_ledger : Counter.t
-
     val verified_network_pool_diffs : Counter.t
 
     val transition_frontier_valid_transitions : Counter.t
 
     val transition_frontier_primary_transitions : Counter.t
-
-    val router_transition_frontier_controller : Counter.t
-
-    val router_bootstrap_controller : Counter.t
 
     val router_verified_transitions : Counter.t
 
@@ -424,6 +477,8 @@ module Transition_frontier : sig
     val update : float -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 
   val recently_finalized_staged_txns : Gauge.t
@@ -486,6 +541,8 @@ module Block_latency : sig
     val update : float -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 
   module Gossip_time : sig
@@ -494,6 +551,8 @@ module Block_latency : sig
     val update : Time.Span.t -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 
   module Inclusion_time : sig
@@ -502,6 +561,8 @@ module Block_latency : sig
     val update : Time.Span.t -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 
   module Validation_acceptance_time : sig
@@ -510,6 +571,8 @@ module Block_latency : sig
     val update : Time.Span.t -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 end
 
@@ -553,3 +616,5 @@ module Archive : sig
   val create_archive_server :
     ?forward_uri:Uri.t -> port:int -> logger:Logger.t -> unit -> t Deferred.t
 end
+
+val initialize_all : Time.Span.t -> unit

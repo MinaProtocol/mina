@@ -1,2 +1,0 @@
-/dns4/seed-1.berkeley-qa.o1test.net/tcp/10000/p2p/{"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"6xiehh2sByvvsWFP49mffjnyrMjzfZpercy11YN","pwsalt":"8CbyBr81W8Ujei2ov5TaiotKbVqx","pwdiff":[134217728,6],"ciphertext":"6sMK59SmmEMmJ1fCUo7mzVqS1KBwymNnTWGbrnxj3rrhCBTfr6zBiM2HMNSzSHUu9g3M3ECU246Bttf25LBKFn8V1PDEZpWXCFrQExPaWpVXn2gNLTsZ5x5NLzeXybpcs9VR54e59fv1Bv8toahZYTb6uuonei6etnouDViaEvhfVGgsSZ66M2dzX5SVQRYneusoF4SZQ7Dkko25bY9h5FDgMDRLbrFALEoVLggLjvYqRuKvpufaYX7KNCZ22uVrT5si8qwCSVi3iGcmC2EZpQAQnb8H2TCPB6mZb"}
-

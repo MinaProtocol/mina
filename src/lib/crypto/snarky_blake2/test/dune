@@ -1,0 +1,15 @@
+(tests
+ (names test)
+ (libraries
+  alcotest
+  base
+  blake2
+  core_kernel
+  crypto_params
+  digestif
+  snark_params
+  snarky
+  snarky.backendless
+  snarky_blake2)
+ (preprocess
+  (pps ppx_let ppx_sexp_conv ppx_version)))

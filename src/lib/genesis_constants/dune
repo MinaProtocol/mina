@@ -2,38 +2,50 @@
  (name genesis_constants)
  (public_name genesis_constants)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-   ;; opam libraries
-   ppx_inline_test.config
-   base
-   bin_prot.shape
-   core_kernel
-   base.caml
-   sexplib0
-   integers
-   ;; local libraries
-   mina_wire_types
-   unsigned_extended
-   mina_numbers
-   pickles
-   currency
-   blake2
-   data_hash_lib
-   mina_compile_config
-   pickles.backend
-   snark_keys_header
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
-   test_util
-   ppx_version.runtime
- )
- (preprocessor_deps ../../config.mlh)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps
-               ppx_mina ppx_version ppx_optcomp ppx_bin_prot ppx_compare ppx_hash
-               ppx_fields_conv ppx_compare ppx_deriving.ord
-               ppx_sexp_conv ppx_let ppx_custom_printf ppx_deriving_yojson
-               h_list.ppx
-               ppx_inline_test))
+  ;; opam libraries
+  ppx_inline_test.config
+  base
+  bin_prot.shape
+  core_kernel
+  base.caml
+  sexplib0
+  integers
+  ;; local libraries
+  mina_node_config.intf
+  mina_node_config.for_unit_tests
+  mina_node_config
+  mina_wire_types
+  unsigned_extended
+  mina_numbers
+  pickles
+  currency
+  blake2
+  data_hash_lib
+  pickles.backend
+  snark_keys_header
+  kimchi_pasta
+  kimchi_pasta.basic
+  test_util
+  ppx_version.runtime)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_mina
+   ppx_version
+   ppx_bin_prot
+   ppx_compare
+   ppx_hash
+   ppx_fields_conv
+   ppx_compare
+   ppx_deriving.ord
+   ppx_sexp_conv
+   ppx_let
+   ppx_custom_printf
+   ppx_deriving_yojson
+   h_list.ppx
+   ppx_inline_test))
  (synopsis "Coda genesis constants"))

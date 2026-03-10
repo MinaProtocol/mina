@@ -56,7 +56,7 @@ Poly.
   , of_hlist )]
 
 let snarked_ledger_hash (t : _ Poly.t) =
-  t.ledger_proof_statement.target.first_pass_ledger
+  Snarked_ledger_state.snarked_ledger_hash t.ledger_proof_statement
 
 let snarked_local_state (t : _ Poly.t) =
   t.ledger_proof_statement.target.local_state

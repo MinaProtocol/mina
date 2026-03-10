@@ -9,11 +9,19 @@ open Mina_base
 
 let%test_module "Zkapp payments tests" =
   ( module struct
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let memo = Signed_command_memo.create_from_string_exn "Zkapp payments tests"
 
     [@@@warning "-32"]
 
     let constraint_constants = U.constraint_constants
+
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
     let merkle_root_after_zkapp_command_exn t
         ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t)
@@ -37,19 +45,21 @@ let%test_module "Zkapp payments tests" =
       let new_state : _ Zkapp_state.V.t =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:Field.of_int
       in
-      Zkapp_command.of_simple
+      Zkapp_command.of_simple ~signature_kind:U.signature_kind ~proof_cache_db
         { fee_payer =
-            { body =
+            Account_update.Fee_payer.make
+              ~body:
                 { public_key = acct1.account.public_key
                 ; fee = Fee.of_nanomina_int_exn full_amount
                 ; valid_until = None
                 ; nonce = acct1.account.nonce
                 }
-            ; authorization = Signature.dummy
-            }
+              ~authorization:Signature.dummy
         ; account_updates =
-            [ { body =
-                  { public_key = acct1.account.public_key
+            [ Account_update.with_no_aux
+                ~body:
+                  { Account_update.Body.Simple.public_key =
+                      acct1.account.public_key
                   ; update =
                       { app_state =
                           Pickles_types.Vector.map new_state ~f:(fun x ->
@@ -74,17 +84,18 @@ let%test_module "Zkapp payments tests" =
                   ; preconditions =
                       { Account_update.Preconditions.network =
                           Zkapp_precondition.Protocol_state.accept
-                      ; account = Accept
+                      ; account = Zkapp_precondition.Account.accept
                       ; valid_while = Ignore
                       }
                   ; use_full_commitment = false
                   ; may_use_token = No
                   ; authorization_kind = Signature
                   }
-              ; authorization = Signature Signature.dummy
-              }
-            ; { body =
-                  { public_key = acct2.account.public_key
+                ~authorization:(Control.Poly.Signature Signature.dummy)
+            ; Account_update.with_no_aux
+                ~body:
+                  { Account_update.Body.Simple.public_key =
+                      acct2.account.public_key
                   ; update = Account_update.Update.noop
                   ; token_id = Token_id.default
                   ; balance_change = Amount.Signed.(of_unsigned receiver_amount)
@@ -97,22 +108,21 @@ let%test_module "Zkapp payments tests" =
                   ; preconditions =
                       { Account_update.Preconditions.network =
                           Zkapp_precondition.Protocol_state.accept
-                      ; account = Accept
+                      ; account = Zkapp_precondition.Account.accept
                       ; valid_while = Ignore
                       }
                   ; use_full_commitment = false
                   ; may_use_token = No
                   ; authorization_kind = None_given
                   }
-              ; authorization = None_given
-              }
+                ~authorization:Control.Poly.None_given
             ]
         ; memo
         }
 
     let%test_unit "merkle_root_after_zkapp_command_exn_immutable" =
       Test_util.with_randomness 123456789 (fun () ->
-          let wallets = U.Wallet.random_wallets () in
+          let wallets = Quickcheck.random_value (U.Wallet.random_wallets ()) in
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Array.iter
                 (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))
@@ -217,7 +227,8 @@ let%test_module "Zkapp payments tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.multiple_transfers test_spec
+                    Transaction_snark.For_tests.multiple_transfers
+                      ~constraint_constants test_spec
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -283,10 +294,18 @@ let%test_module "Zkapp payments tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.multiple_transfers test_spec
+                    Transaction_snark.For_tests.multiple_transfers
+                      ~constraint_constants test_spec
                   in
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:
                       (Transaction_status.Failure.Overflow, Pass_2)
                     ledger [ zkapp_command ] ) ) )
+
+    let () =
+      match Sys.getenv "PROOF_CACHE_OUT" with
+      | Some path ->
+          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+      | None ->
+          ()
   end )

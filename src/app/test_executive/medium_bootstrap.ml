@@ -9,23 +9,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
 
   type dsl = Dsl.t
 
-  let config =
+  let config ~constants =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       k = 2
     ; requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node-c-key"; balance = "0"; timing = Untimed }
-        ]
+        (let open Test_account in
+        [ create ~account_name:"node-a-key" ~balance:"1000" ()
+        ; create ~account_name:"node-b-key" ~balance:"1000" ()
+        ; create ~account_name:"node-c-key" ~balance:"0" ()
+        ])
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -36,32 +38,33 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   (*
      There are 3 cases of bootstrap that we need to test:
 
-     1: short bootstrap-- bootstrap where node has been down for less than 2k+1 blocks
-     2: medium bootstrap-- bootstrap where node has been down for more than 2k+1 blocks, OR equivalently when the blockchain is longer than 2k+1 blocks and a node goes down and resets to a fresh state, thereby resetting at the genesis block, before reconnecting to the network
-     3: long bootstrap-- bootstrap where node has been down for more than 42k slots (2 epochs) where each epoch emitted at least 1 parallel scan state proof
+     1: short bootstrap-- bootstrap where node has been down for less than 2k+1
+        blocks
+     2: medium bootstrap-- bootstrap where node has been down for more than 2k+1
+        blocks, OR equivalently when the blockchain is longer than 2k+1 blocks and
+        a node goes down and resets to a fresh state, thereby resetting at the
+        genesis block, before reconnecting to the network
+     3: long bootstrap-- bootstrap where node has been down for more than 42k
+        slots (2 epochs) where each epoch emitted at least 1 parallel scan state
+        proof
   *)
 
   (* this test is the medium bootstrap test *)
 
-  let run network t =
+  let run ~config:_ network t =
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let all_nodes = Network.all_nodes network in
+    let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       section_hard "Wait for nodes to initialize"
         (wait_for t
-           (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes)) )
+           (Wait_condition.nodes_to_initialize
+              (Core.String.Map.data all_mina_nodes) ) )
     in
-    let node_a =
-      Core.String.Map.find_exn (Network.block_producers network) "node-a"
-    in
-    let node_b =
-      Core.String.Map.find_exn (Network.block_producers network) "node-b"
-    in
-    let node_c =
-      Core.String.Map.find_exn (Network.block_producers network) "node-c"
-    in
+    let node_a = Network.block_producer_exn network "node-a" in
+    let node_b = Network.block_producer_exn network "node-b" in
+    let node_c = Network.block_producer_exn network "node-c" in
     let%bind () =
       section_hard "blocks are produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
@@ -84,7 +87,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "network is fully connected after one node was restarted"
         (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
          let%bind final_connectivity_data =
-           fetch_connectivity_data ~logger (Core.String.Map.data all_nodes)
+           fetch_connectivity_data ~logger (Core.String.Map.data all_mina_nodes)
          in
          assert_peers_completely_connected final_connectivity_data )
     in
@@ -116,7 +119,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "network is fully connected after one node was restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
        let%bind final_connectivity_data =
-         fetch_connectivity_data ~logger (Core.String.Map.data all_nodes)
+         fetch_connectivity_data ~logger (Core.String.Map.data all_mina_nodes)
        in
        assert_peers_completely_connected final_connectivity_data )
 end

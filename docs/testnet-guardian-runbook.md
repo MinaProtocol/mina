@@ -50,7 +50,7 @@ Some strings to look for: `Received a block`, `apply_diff block info`, `Number o
 
 Publish the multiaddresses of the seed nodes on `#QA-net details` channel for the rest of the team to connect to the QA-net.
 Seeds nodes can be looked up here: https://console.cloud.google.com/compute. Usually there are two seed nodes per tesnet, click on the seed node instance to go to the page that has details about the instance required to ssh into it.
-<img src="res/gcloud_ssh.png" alt="ssh info" width="300"/>
+<img src="https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/gcloud_ssh.png" alt="ssh info" width="300"/>
 
 `docker exec -it <container> /bin/bash` into coda-daemon container and follow [this](#multiaddress) to get the multiaddress of the node. These are then published on the website (https://codaprotocol.com/docs/getting-started) for users to connect to the testnet.
 
@@ -144,7 +144,7 @@ Following is the list of events that could occur after the release
 |--|------|--------|-------------|--|
 | 1| Issues preventing the users from completing the task | Since, we already tested all the challenges, either the user did the task incorrectly or in a different way that was missed by the engineering team. Usually, the community responds quickly to issues involving the challenges. Let the user know of the alternative way to finish the task. If the errors are real protocol/product bugs, create an issue and request the user to attach coda logs to the issue| Minor | |
 | 2| Users' nodes crashing intermittently | If these are not one of the known bugs then create an issue for the same. Request the user to attach the latest crash report| Minor | |
-| 3| Users' nodes crashing persistently | If it is for a specific user, might be that they did something differently when starting the node or their environment is not as expected. For example, connection timeouts (eventually causing the dameons to crash) between daemon and prover or daemon and snark workers could be because of resource constraints. If the cause is not determined, create an issue and request the user to attach the crash report | Major | Engineering team |
+| 3| Users' nodes crashing persistently | If it is for a specific user, might be that they did something differently when starting the node or their environment is not as expected. For example, connection timeouts (eventually causing the daemons to crash) between daemon and prover or daemon and snark workers could be because of resource constraints. If the cause is not determined, create an issue and request the user to attach the crash report | Major | Engineering team |
 |4| Unstable testnet | Create an issue for the protocol team to investigate. Coordinate with the owners of this event to discuss further actions based on the findings by the protocol team   | Critical | Aneesha, Brandon, Engineer investigating the issue|
 
 ## Change Log

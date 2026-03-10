@@ -1,6 +1,6 @@
 (** This module provides the implementation for actively "syncing" the
  *  persistent frontier database. A [Sync] job can be created, and can
- *  then be sent diffs to accumulate and apply to the databse in chunks
+ *  then be sent diffs to accumulate and apply to the database in chunks
  *  (using the [Diff_buffer]).
  *)
 
@@ -14,7 +14,7 @@ val create :
   -> logger:Logger.t
   -> time_controller:Block_time.Controller.t
   -> db:Database.t
-  -> persistent_root_instance:Persistent_root.Instance.t
+  -> dequeue_snarked_ledger:(unit -> unit)
   -> t
 
 val notify : t -> diffs:Diff.Lite.E.t list -> unit

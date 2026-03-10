@@ -1,11 +1,17 @@
 (library
  (name proof_carrying_data)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_deriving_yojson ppx_version ppx_jane))
  (libraries
-   ;; opam libraries
-   core_kernel bin_prot.shape base base.caml sexplib0
-   ;; local libraries
-   ppx_version.runtime)
- (public_name proof_carrying_data)
-)
+  ;; opam libraries
+  core_kernel
+  bin_prot.shape
+  base
+  base.caml
+  sexplib0
+  ;; local libraries
+  mina_wire_types
+  ppx_version.runtime)
+ (public_name proof_carrying_data))

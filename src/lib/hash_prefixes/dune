@@ -1,6 +1,8 @@
 (library
  (name hash_prefixes)
  (public_name hash_prefixes)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
-)
+ (libraries mina_signature_kind)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

@@ -1,1 +1,0 @@
-<*.{ml,byte,native}>: package(ctypes.stubs)

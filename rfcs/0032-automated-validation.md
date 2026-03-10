@@ -31,11 +31,11 @@ From the list of validation queries, the automated validation can solve for othe
 
 Below is a diagram which displays how the system is initialized given the validation queries and resource database. From the information computed during this initialization, the automated validation service can create the various processes and external resources (such as log sinks on google cloud) necessary to perform the requested validations on the requested resources.
 
-![](./res/automated_validation_init_architecture.conv.tex.png)
+![](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/automated_validation_init_architecture.conv.tex.png)
 
 The following diagram shows the runtime architecture of the processes in the system once initialization has been completed. Note how this diagram shows that statistics may consume multiple providers, and validations may consume multiple statistics.
 
-![](./res/automated_validation_runtime_architecture.conv.tex.png)
+![](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/automated_validation_runtime_architecture.conv.tex.png)
 
 #### Resources
 [detailed-design-architecture-resources]: #detailed-design-architecture-resources

@@ -7,10 +7,6 @@ module Spec : sig
     | S3 of { bucket_prefix : string; install_path : string }
 end
 
-val may_download : unit -> bool
-
-val set_downloads_enabled : bool -> unit
-
 module T (M : sig
   type _ t
 end) : sig

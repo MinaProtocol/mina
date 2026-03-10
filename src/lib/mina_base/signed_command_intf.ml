@@ -1,7 +1,5 @@
 (* user_command_intf.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Mina_base_import
 open Core_kernel
 open Snark_params.Tick
@@ -18,12 +16,13 @@ module type Gen_intf = sig
      * and an amount $\in [1,max_amount]$
     *)
     val payment :
-         ?sign_type:[ `Fake | `Real ]
+         ?sign_type:[ `Fake | `Real of Mina_signature_kind.t ]
       -> key_gen:
            (Signature_keypair.t * Signature_keypair.t) Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
       -> ?min_amount:int
       -> max_amount:int
+      -> ?min_fee:Currency.Fee.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -35,11 +34,12 @@ module type Gen_intf = sig
      * and an amount $\in [1,max_amount]$
     *)
     val payment_with_random_participants :
-         ?sign_type:[ `Fake | `Real ]
+         ?sign_type:[ `Fake | `Real of Mina_signature_kind.t ]
       -> keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
       -> ?min_amount:int
       -> max_amount:int
+      -> ?min_fee:Currency.Fee.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -48,6 +48,7 @@ module type Gen_intf = sig
          key_gen:
            (Signature_keypair.t * Signature_keypair.t) Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
+      -> ?min_fee:Currency.Fee.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -55,6 +56,7 @@ module type Gen_intf = sig
     val stake_delegation_with_random_participants :
          keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
+      -> ?min_fee:Currency.Fee.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -64,7 +66,7 @@ module type Gen_intf = sig
     *)
     val sequence :
          ?length:int
-      -> ?sign_type:[ `Fake | `Real ]
+      -> ?sign_type:[ `Fake | `Real of Mina_signature_kind.t ]
       -> ( Signature_lib.Keypair.t
          * Currency.Amount.t
          * Mina_numbers.Account_nonce.t
@@ -83,6 +85,8 @@ module type S = sig
   include Comparable.S with type t := t
 
   include Hashable.S with type t := t
+
+  val signature : t -> Signature.t
 
   val payload : t -> Signed_command_payload.t
 
@@ -114,11 +118,6 @@ module type S = sig
 
   val valid_until : t -> Global_slot_since_genesis.t
 
-  (* for filtering *)
-  val minimum_fee : Currency.Fee.t
-
-  val has_insufficient_fee : t -> bool
-
   val tag : t -> Transaction_union_tag.t
 
   val tag_string : t -> string
@@ -148,21 +147,21 @@ module type S = sig
   end
 
   val sign_payload :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t
     -> Signature_lib.Private_key.t
     -> Signed_command_payload.t
     -> Signature.t
 
   val sign :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t
     -> Signature_keypair.t
     -> Signed_command_payload.t
     -> With_valid_signature.t
 
-  val check_signature : ?signature_kind:Mina_signature_kind.t -> t -> bool
+  val check_signature : signature_kind:Mina_signature_kind.t -> t -> bool
 
   val create_with_signature_checked :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t
     -> Signature.t
     -> Public_key.Compressed.t
     -> Signed_command_payload.t
@@ -171,18 +170,16 @@ module type S = sig
   val check_valid_keys : t -> bool
 
   module For_tests : sig
-    (** the signature kind is an argument, to match `sign`, but ignored *)
     val fake_sign :
-         ?signature_kind:Mina_signature_kind.t
-      -> Signature_keypair.t
-      -> Signed_command_payload.t
-      -> With_valid_signature.t
+      Signature_keypair.t -> Signed_command_payload.t -> With_valid_signature.t
   end
 
   (** checks signature and keys *)
-  val check : t -> With_valid_signature.t option
+  val check :
+    signature_kind:Mina_signature_kind.t -> t -> With_valid_signature.t option
 
-  val check_only_for_signature : t -> With_valid_signature.t option
+  val check_only_for_signature :
+    signature_kind:Mina_signature_kind.t -> t -> With_valid_signature.t option
 
   val to_valid_unsafe :
        t
@@ -234,11 +231,15 @@ module type Full = sig
 
     module V2 : sig
       type t =
-        ( Payload.Stable.V2.t
-        , Public_key.Stable.V1.t
-        , Signature.Stable.V1.t )
+        ( Payload.Stable.Latest.t
+        , Public_key.Stable.Latest.t
+        , Signature.Stable.Latest.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, hash, yojson, version]
+      [@@deriving sexp, hash, version]
+
+      val to_yojson : t -> Yojson.Safe.t
+
+      val of_yojson : Yojson.Safe.t -> (t, string) result
 
       include Comparable.S with type t := t
 
@@ -264,5 +265,5 @@ module type Full = sig
     end
   end]
 
-  include S with type t = Stable.V2.t and type t_v1 = Stable.V1.t
+  include S with type t = Stable.V2.t and type t_v1 := Stable.V1.t
 end

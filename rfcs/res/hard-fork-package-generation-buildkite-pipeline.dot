@@ -1,0 +1,9 @@
+digraph G {
+  graph [rankdir=LR,splines=line]
+
+  {node [shape=point,width=0.01,height=0.01]; j0}
+  {node [shape=box]; build_daemon; generate_network_config; migrate_staged_ledger; migrate_next_staking_ledger; migrate_staking_ledger; package_deb; package_dockerhub}
+
+  {build_daemon, generate_network_config, migrate_staged_ledger, migrate_next_staking_ledger, migrate_staking_ledger} -> j0 [dir=none]
+  j0 -> package_deb -> package_dockerhub
+}

@@ -10,7 +10,7 @@ open Mina_base
 open Mina_state
 open Network_peer
 
-type t [@@deriving sexp, equal, compare, to_yojson]
+type t [@@deriving equal, compare, to_yojson]
 
 type display =
   { state_hash : string
@@ -25,16 +25,21 @@ val create :
   -> staged_ledger:Staged_ledger.t
   -> just_emitted_a_proof:bool
   -> transition_receipt_time:Time.t option
+  -> accounts_created:Account_id.t list
   -> t
 
 val build :
      ?skip_staged_ledger_verification:[ `All | `Proofs ]
+  -> ?transaction_pool_proxy:Staged_ledger.transaction_pool_proxy
   -> logger:Logger.t
   -> precomputed_values:Precomputed_values.t
   -> verifier:Verifier.t
   -> trust_system:Trust_system.t
   -> parent:t
   -> transition:Mina_block.almost_valid_block
+  -> get_completed_work:
+       (   Transaction_snark_work.Statement.t
+        -> Transaction_snark_work.Checked.t option )
   -> sender:Envelope.Sender.t option
   -> transition_receipt_time:Time.t option
   -> unit
@@ -78,6 +83,12 @@ val mask : t -> Mina_ledger.Ledger.Mask.Attached.t
 val display : t -> display
 
 val name : t -> string
+
+val staged_ledger_hash : t -> Staged_ledger_hash.t
+
+(** The accounts created in the block that this breadcrumb represents
+    For convenience of implementation, it's by definition an empty list for the root *)
+val accounts_created : t -> Account_id.t list
 
 module For_tests : sig
   val gen :

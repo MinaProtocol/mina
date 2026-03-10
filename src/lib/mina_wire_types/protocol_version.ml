@@ -1,18 +1,18 @@
 open Utils
 
 module Types = struct
-  module type S = V1S0
+  module type S = V2S0
 end
 
 module type Concrete = sig
-  module V1 : sig
-    type t = { major : int; minor : int; patch : int }
+  module V2 : sig
+    type t = { transaction : int; network : int; patch : int }
   end
 end
 
 module M = struct
-  module V1 = struct
-    type t = { major : int; minor : int; patch : int }
+  module V2 = struct
+    type t = { transaction : int; network : int; patch : int }
   end
 end
 

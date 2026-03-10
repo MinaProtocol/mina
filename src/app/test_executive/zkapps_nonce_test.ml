@@ -16,20 +16,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let config =
+  let config ~constants =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node-a-key"
-          ; balance = "8000000000"
-          ; timing = Untimed
-          }
-        ; { account_name = "node-b-key"; balance = "1000000"; timing = Untimed }
-        ; { account_name = "fish1"; balance = "3000"; timing = Untimed }
-        ; { account_name = "fish2"; balance = "3000"; timing = Untimed }
-        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
-        ]
+        (let open Test_account in
+        [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
+        ; create ~account_name:"node-b-key" ~balance:"1000000" ()
+        ; create ~account_name:"fish1" ~balance:"3000" ()
+        ; create ~account_name:"fish2" ~balance:"3000" ()
+        ; create ~account_name:"snark-node-key" ~balance:"0" ()
+        ])
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -54,7 +52,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let num_proofs = 2
 
-  let padding_payments () =
+  let padding_payments ~config () =
     let needed_for_padding =
       Test_config.transactions_needed_for_ledger_proofs config ~num_proofs
     in
@@ -88,19 +86,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~sender_pub_key ~receiver_pub_key ~amount:Currency.Amount.one ~fee
         >>| ignore )
 
-  let run network t =
+  let run ~config network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let block_producer_nodes =
       Network.block_producers network |> Core.String.Map.data
     in
-    let node =
-      Core.String.Map.find_exn (Network.block_producers network) "node-a"
-    in
-    let fish1_kp =
-      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
-        .keypair
-    in
+    let node = Network.block_producer_exn network "node-a" in
+    let fish1_kp = (Network.genesis_keypair_exn network "fish1").keypair in
     let fish1_pk = Signature_lib.Public_key.compress fish1_kp.public_key in
     let fish1_account_id =
       Mina_base.Account_id.create fish1_pk Mina_base.Token_id.default
@@ -127,7 +120,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       let fee = Currency.Fee.of_nanomina_int_exn 3_000_000 in
       send_padding_transactions block_producer_nodes ~fee ~logger
-        ~n:(padding_payments ())
+        ~n:(padding_payments ~config ())
     in
     (*wait for the rest*)
     let%bind () =
@@ -136,7 +129,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (List.filter
               ~f:(fun n ->
                 String.(Network.Node.id n <> Network.Node.id first_bp) )
-              (Core.String.Map.data (Network.all_nodes network)) ) )
+              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
     in
     let keymap =
       List.fold [ fish1_kp ] ~init:Signature_lib.Public_key.Compressed.Map.empty
@@ -145,8 +138,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~key:(Signature_lib.Public_key.compress public_key)
             ~data:private_key )
     in
-    (*Transaction that updates fee payer account in account_updates.
-      The account update should fail due to failing nonce condition if the next transaction with the same fee payer is added to the same block
+    (* Transaction that updates fee payer account in account_updates.
+       The account update should fail due to failing nonce condition if the next
+       transaction with the same fee payer is added to the same block
     *)
     let%bind.Deferred invalid_nonce_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
@@ -158,7 +152,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
-                     ; account = Nonce (Account.Nonce.of_int 1)
+                     ; account =
+                         Zkapp_precondition.Account.nonce
+                           (Account.Nonce.of_int 1)
                      ; valid_while = Ignore
                      } )
                 []
@@ -170,7 +166,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
-    (*Transaction that updates fee payer account in account_updates but passes
+    (* Transaction that updates fee payer account in account_updates but passes
        because the nonce precondition is true. There should be no other fee
        payer updates in the same block*)
     let%bind.Deferred valid_zkapp_cmd_from_fish1 =
@@ -183,7 +179,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
-                     ; account = Nonce (Account.Nonce.of_int 2)
+                     ; account =
+                         Zkapp_precondition.Account.nonce
+                           (Account.Nonce.of_int 2)
                      ; valid_while = Ignore
                      } )
                 []
@@ -195,11 +193,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
-    (*Set fee payer send permission to Proof. New transactions with the same
-      fee payer are accepted into the pool.
-      Only the ones that make it to the same block are applied.
-      The remaining ones in the pool should be evicted because the fee payer will
-      no longer have the permission to send with Signature authorization*)
+    (* Set fee payer send permission to Proof. New transactions with the same
+       fee payer are accepted into the pool.
+       Only the ones that make it to the same block are applied.
+       The remaining ones in the pool should be evicted because the fee payer
+       will no longer have the permission to send with Signature authorization *)
     let%bind.Deferred set_permission_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
@@ -245,10 +243,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
-    (*Transaction that doesn't make it into a block and should be evicted from
-      the pool after fee payer's send permission is changed
-      Making it a low fee transaction to prevent from getting into a block, to
-      test transaction pruning*)
+    (* Transaction that doesn't make it into a block and should be evicted from
+       the pool after fee payer's send permission is changed.
+       Making it a low fee transaction to prevent from getting into a block, to
+       test transaction pruning *)
     let%bind.Deferred invalid_fee_invalid_permission_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
@@ -364,7 +362,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  block was produced" ) )
     in
     let%bind () =
-      (*wait for blocks required to produce 2 proofs given 0.75 slot fill rate + some buffer*)
+      (* wait for blocks required to produce 2 proofs given 0.75 slot fill rate +
+         some buffer *)
       section_hard "Wait for proof to be emitted"
         ( wait_for t
         @@ Wait_condition.ledger_proofs_emitted_since_genesis

@@ -8,6 +8,8 @@ open Mina_base
 
 let state_body = U.genesis_state_body
 
+let signature_kind = U.signature_kind
+
 let constraint_constants = U.constraint_constants
 
 let consensus_constants = U.consensus_constants
@@ -143,11 +145,11 @@ let%test_module "Transaction union tests" =
             |> Or_error.ok_exn
           in
           let supply_increase =
-            Mina_ledger.Ledger.Transaction_applied.supply_increase
-              applied_transaction
+            Mina_transaction_logic.Transaction_applied.supply_increase
+              ~constraint_constants applied_transaction
             |> Or_error.ok_exn
           in
-          Transaction_snark.check_transaction txn_in_block
+          Transaction_snark.check_transaction ~signature_kind txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
             ~constraint_constants:U.constraint_constants
             ~sok_message:
@@ -171,7 +173,7 @@ let%test_module "Transaction union tests" =
 
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
-          let wallets = U.Wallet.random_wallets () in
+          let wallets = Quickcheck.random_value (U.Wallet.random_wallets ()) in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               Array.iter
                 (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))
@@ -226,8 +228,8 @@ let%test_module "Transaction union tests" =
                 in
                 Currency.Amount.Signed.create ~magnitude ~sgn:Sgn.Neg
               in
-              Transaction_snark.check_user_command ~constraint_constants
-                ~sok_message
+              Transaction_snark.check_user_command ~signature_kind
+                ~constraint_constants ~sok_message
                 ~source_first_pass_ledger:(Ledger.merkle_root ledger)
                 ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state
@@ -243,7 +245,10 @@ let%test_module "Transaction union tests" =
 
     let%test_unit "account creation fee - user commands" =
       Test_util.with_randomness 123456789 (fun () ->
-          let wallets = U.Wallet.random_wallets ~n:3 () |> Array.to_list in
+          let wallets =
+            Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ())
+            |> Array.to_list
+          in
           let sender = List.hd_exn wallets in
           let receivers = List.tl_exn wallets in
           let txns_per_receiver = 2 in
@@ -294,7 +299,10 @@ let%test_module "Transaction union tests" =
 
     let%test_unit "account creation fee - fee transfers" =
       Test_util.with_randomness 123456789 (fun () ->
-          let receivers = U.Wallet.random_wallets ~n:3 () |> Array.to_list in
+          let receivers =
+            Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ())
+            |> Array.to_list
+          in
           let txns_per_receiver = 3 in
           let fee = 8_000_000_000 in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
@@ -329,7 +337,9 @@ let%test_module "Transaction union tests" =
 
     let%test_unit "account creation fee - coinbase" =
       Test_util.with_randomness 123456789 (fun () ->
-          let wallets = U.Wallet.random_wallets ~n:3 () in
+          let wallets =
+            Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ())
+          in
           let receiver = wallets.(0) in
           let other = wallets.(1) in
           let dummy_account = wallets.(2) in
@@ -386,7 +396,7 @@ let%test_module "Transaction union tests" =
         ~carryforward1 ~carryforward2 =
       let module T = (val Lazy.force U.snark_module) in
       Test_util.with_randomness 123456789 (fun () ->
-          let wallets = U.Wallet.random_wallets () in
+          let wallets = Quickcheck.random_value (U.Wallet.random_wallets ()) in
           (*let state_body = Lazy.force state_body in
             let state_body_hash = Lazy.force state_body_hash in*)
           let state_body_hash1, state_body1 = state_hash_and_body1 in
@@ -510,7 +520,9 @@ let%test_module "Transaction union tests" =
                 ( Ledger.apply_user_command ~constraint_constants ledger
                     ~txn_global_slot:current_global_slot t1
                   |> Or_error.ok_exn
-                  : Ledger.Transaction_applied.Signed_command_applied.t ) ;
+                  : Mina_transaction_logic.Transaction_applied
+                    .Signed_command_applied
+                    .t ) ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
@@ -573,8 +585,12 @@ let%test_module "Transaction union tests" =
         let open Staged_ledger_diff in
         let state_body0 =
           Mina_state.Protocol_state.negative_one
-            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
-            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+            ~genesis_ledger:
+              (Consensus.Genesis_data.Ledger.to_hashed
+                 Genesis_ledger.for_unit_tests )
+            ~genesis_epoch_data:
+              (Consensus.Genesis_data.Epoch.to_hashed
+                 Consensus.Genesis_data.Epoch.for_unit_tests )
             ~constraint_constants ~consensus_constants ~genesis_body_reference
           |> Mina_state.Protocol_state.body
         in
@@ -596,8 +612,12 @@ let%test_module "Transaction union tests" =
         let state_body0 =
           let open Staged_ledger_diff in
           Mina_state.Protocol_state.negative_one
-            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
-            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+            ~genesis_ledger:
+              (Consensus.Genesis_data.Ledger.to_hashed
+                 Genesis_ledger.for_unit_tests )
+            ~genesis_epoch_data:
+              (Consensus.Genesis_data.Epoch.to_hashed
+                 Consensus.Genesis_data.Epoch.for_unit_tests )
             ~constraint_constants ~consensus_constants ~genesis_body_reference
           |> Mina_state.Protocol_state.body
         in
@@ -654,7 +674,9 @@ let%test_module "Transaction union tests" =
           ~memo ~body
       in
       let signer = Signature_lib.Keypair.of_private_key_exn signer in
-      let user_command = Signed_command.sign signer payload in
+      let user_command =
+        Signed_command.sign ~signature_kind:U.signature_kind signer payload
+      in
       U.test_transaction_union ?expected_failure ledger
         (Command (Signed_command user_command)) ;
       let fee_payer = Signed_command.Payload.fee_payer payload in
@@ -674,7 +696,7 @@ let%test_module "Transaction union tests" =
                        charges fee" =
           Test_util.with_randomness 123456789 (fun () ->
               Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                  let wallets = U.Wallet.random_wallets ~n:2 () in
+                  let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                   let signer = wallets.(0).private_key in
                   let fee_payer_pk = wallets.(0).account.public_key in
                   let source_pk = fee_payer_pk in
@@ -711,7 +733,7 @@ let%test_module "Transaction union tests" =
         let%test_unit "transfer non-default tokens to an existing account" =
           Test_util.with_randomness 123456789 (fun () ->
               Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                  let wallets = U.Wallet.random_wallets ~n:2 () in
+                  let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                   let signer = wallets.(0).private_key in
                   let fee_payer_pk = wallets.(0).account.public_key in
                   let source_pk = fee_payer_pk in
@@ -760,7 +782,7 @@ let%test_module "Transaction union tests" =
                        transfer" =
           Test_util.with_randomness 123456789 (fun () ->
               Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                  let wallets = U.Wallet.random_wallets ~n:2 () in
+                  let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                   let signer = wallets.(0).private_key in
                   let fee_payer_pk = wallets.(0).account.public_key in
                   let source_pk = fee_payer_pk in
@@ -799,7 +821,7 @@ let%test_module "Transaction union tests" =
         let%test_unit "insufficient source balance for non-default token transfer" =
           Test_util.with_randomness 123456789 (fun () ->
               Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                  let wallets = U.Wallet.random_wallets ~n:2 () in
+                  let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                   let signer = wallets.(0).private_key in
                   let fee_payer_pk = wallets.(0).account.public_key in
                   let source_pk = fee_payer_pk in
@@ -837,7 +859,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "transfer non-existing source" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 let fee_payer_pk = wallets.(0).account.public_key in
                 let source_pk = wallets.(1).account.public_key in
@@ -868,7 +890,9 @@ let%test_module "Transaction union tests" =
     let%test_unit "delegation delegatee does not exist" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              let wallets = U.Wallet.random_wallets ~n:2 () in
+              let wallets =
+                Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ())
+              in
               let signer = wallets.(0).private_key in
               let fee_payer_pk = wallets.(0).account.public_key in
               let source_pk = fee_payer_pk in
@@ -901,7 +925,9 @@ let%test_module "Transaction union tests" =
     let%test_unit "delegation delegator does not exist" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              let wallets = U.Wallet.random_wallets ~n:3 () in
+              let wallets =
+                Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ())
+              in
               let signer = wallets.(0).private_key in
               let fee_payer_pk = wallets.(0).account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
@@ -932,7 +958,9 @@ let%test_module "Transaction union tests" =
     let%test_unit "Payment to and from same key" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              let wallets = U.Wallet.random_wallets ~n:2 () in
+              let wallets =
+                Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ())
+              in
               let signer = wallets.(0).private_key in
               let fee_payer_pk = wallets.(0).account.public_key in
               let receiver_pk = wallets.(0).account.public_key in
@@ -959,7 +987,9 @@ let%test_module "Transaction union tests" =
     let%test_unit "Payment with source balance insufficient- untimed" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              let wallets = U.Wallet.random_wallets ~n:2 () in
+              let wallets =
+                Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ())
+              in
               let signer = wallets.(0).private_key in
               let fee_payer_pk = wallets.(0).account.public_key in
               let receiver_pk = wallets.(1).account.public_key in
@@ -979,7 +1009,9 @@ let%test_module "Transaction union tests" =
     let%test_unit "Payment with insufficient account creation fee- untimed" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-              let wallets = U.Wallet.random_wallets ~n:2 () in
+              let wallets =
+                Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ())
+              in
               let signer = wallets.(0).private_key in
               let fee_payer_pk = wallets.(0).account.public_key in
               let receiver_pk = wallets.(1).account.public_key in
@@ -1000,7 +1032,9 @@ let%test_module "Transaction union tests" =
 
     let%test_unit "timed account - transactions" =
       Test_util.with_randomness 123456789 (fun () ->
-          let wallets = U.Wallet.random_wallets ~n:3 () in
+          let wallets =
+            Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ())
+          in
           let sender = wallets.(0) in
           let receivers = Array.to_list wallets |> List.tl_exn in
           let txns_per_receiver = 2 in
@@ -1074,7 +1108,7 @@ let%test_module "Transaction union tests" =
     (*let%test_unit "create own new token" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:1 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:1 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee payer is the new token owner. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1110,7 +1144,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create new token for a different pk" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee payer and new token owner are distinct. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1146,7 +1180,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create new token for a different pk new accounts disabled" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee payer and new token owner are distinct. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1182,7 +1216,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create own new token account" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and receiver are the same, token owner differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1231,7 +1265,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create new token account for a different pk" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:3 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer, receiver, and token owner differ. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1281,7 +1315,7 @@ let%test_module "Transaction union tests" =
                      token" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and token owner are the same, receiver differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1330,7 +1364,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create new own locked token account in a locked token" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and receiver are the same, token owner differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1380,7 +1414,7 @@ let%test_module "Transaction union tests" =
                      fee-payer" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:3 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer, receiver, and token owner differ. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1424,7 +1458,7 @@ let%test_module "Transaction union tests" =
                      non-owner fee-payer" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:3 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer, receiver, and token owner differ. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1467,7 +1501,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create new token account fails if account exists" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:3 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer, receiver, and token owner differ. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1513,7 +1547,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create new token account fails if receiver is token owner" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Receiver and token owner are the same, fee-payer differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1559,7 +1593,7 @@ let%test_module "Transaction union tests" =
                      doesn't own the token" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:3 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer, receiver, and token owner differ. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1601,7 +1635,7 @@ let%test_module "Transaction union tests" =
                      also the account creation target and does not exist" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:3 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:3 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer, receiver, and token owner are the same. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1637,7 +1671,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "create new token account works for default token" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and receiver are the same, token owner differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1681,7 +1715,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "mint tokens in owner's account" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:1 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:1 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer, receiver, and token owner are the same. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1726,7 +1760,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "mint tokens in another pk's account" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and token owner are the same, receiver differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1777,7 +1811,7 @@ let%test_module "Transaction union tests" =
                      token owner" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and token owner are the same, receiver differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1821,7 +1855,7 @@ let%test_module "Transaction union tests" =
           =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and token owner are the same, receiver differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1861,7 +1895,7 @@ let%test_module "Transaction union tests" =
                      to mint" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and receiver are the same, token owner differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -1907,7 +1941,7 @@ let%test_module "Transaction union tests" =
       let%test_unit "mint tokens fails if the receiver account is not present" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-                let wallets = U.Wallet.random_wallets ~n:2 () in
+                let wallets = Quickcheck.random_value (U.Wallet.random_wallets ~n:2 ()) in
                 let signer = wallets.(0).private_key in
                 (* Fee-payer and fee payer are the same, receiver differs. *)
                 let fee_payer_pk = wallets.(0).account.public_key in
@@ -2021,6 +2055,8 @@ let%test_module "legacy transactions using zkApp accounts" =
     let memo = Signed_command_memo.create_from_string_exn "zkApp-legacy-txns"
 
     let `VK vk, `Prover _zkapp_prover = Lazy.force U.trivial_zkapp
+
+    let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
     let account ledger pk =
       let location =

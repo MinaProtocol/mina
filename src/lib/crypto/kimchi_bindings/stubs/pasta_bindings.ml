@@ -61,6 +61,8 @@ module Fp = struct
 
   external print : t -> unit = "caml_pasta_fp_print"
 
+  external print_rust : t -> unit = "caml_pasta_fp_print_rust"
+
   external copy : t -> t -> unit = "caml_pasta_fp_copy"
 
   external mut_add : t -> t -> unit = "caml_pasta_fp_mut_add"
@@ -127,6 +129,8 @@ module Fq = struct
   external of_string : string -> t = "caml_pasta_fq_of_string"
 
   external print : t -> unit = "caml_pasta_fq_print"
+
+  external print_rust : t -> unit = "caml_pasta_fq_print_rust"
 
   external copy : t -> t -> unit = "caml_pasta_fq_copy"
 
