@@ -211,6 +211,15 @@ let in_stable_versioned_module module_path =
   | _ ->
       false
 
+let validate_versioned_ext_required in_versioned_ext module_path =
+  make_deriving_validator
+    ~pred:(fun _has_bin_io has_version ->
+      has_version
+      && (not in_versioned_ext)
+      && in_stable_versioned_module module_path)
+    "Type with `[@@deriving version]` in `Stable.Vn` module must use \
+     `%%versioned`"
+
 (* traverse AST, collect errors *)
 let lint_ast =
   object (self)
@@ -408,8 +417,15 @@ let lint_ast =
                 if acc.in_functor then validate_neither_bin_io_nor_version
                 else validate_version_if_bin_io
           in
+          let versioned_ext_required_fun =
+            if not acc.in_functor then
+              validate_versioned_ext_required acc.in_versioned_ext
+                acc.module_path
+            else no_errors_fun
+          in
           let deriving_errors =
-            List.concat_map type_decls ~f:deriving_errors_fun
+            List.concat_map type_decls ~f:(fun td ->
+                deriving_errors_fun td @ versioned_ext_required_fun td )
           in
           acc_with_accum_errors acc deriving_errors
       | Pstr_extension ((name, _payload), _attrs)

@@ -32,10 +32,9 @@ positive-tests :
 
 negative-tests :
 # version syntax
-# TODO uncomment these after fixing issue with this test
-# @ echo -n "Missing %%versioned, should fail..."
-# @ ! dune build bad_version_syntax_missing_versioned.cma ${REDIRECT}
-# @ echo "OK"
+	@ echo -n "Missing %%versioned, should fail..."
+	@ ! dune build bad_version_syntax_missing_versioned.cma ${REDIRECT}
+	@ echo "OK"
 	@ echo -n "%%versioned in functor body, should fail..."
 	@ ! dune build bad_versioned_in_functor.cma ${REDIRECT}
 	@ echo "OK"
