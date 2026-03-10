@@ -48,6 +48,7 @@ if [ -z "$DEBS" ]; then
 else
   # shellcheck disable=SC2206
   debs=(${DEBS//,/ })
+  ./buildkite/scripts/cache/manager.sh read --root "$ROOT" "debians/$MINA_DEB_CODENAME/mina-*-profile*" $LOCAL_DEB_FOLDER
   for i in "${debs[@]}"; do
     case $i in
       mina-devnet-generic*)
