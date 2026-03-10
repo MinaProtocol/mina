@@ -189,7 +189,8 @@ let docker_step
           let size = Size.XLarge
 
           in  merge
-                { DaemonAutoHardfork =
+                { Profile = [] : List DockerImage.ReleaseSpec.Type
+                , DaemonAutoHardfork =
                   [ DockerImage.ReleaseSpec::{
                     , deps =
                           deps
