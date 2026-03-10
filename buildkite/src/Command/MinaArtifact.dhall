@@ -78,7 +78,7 @@ let MinaBuildSpec =
           , debVersion = DebianVersions.DebVersion.Bullseye
           , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
-          , network = Network.Type.TestnetGeneric
+          , network = Network.Type.Devnet
           , toolchainSelectMode = Toolchain.SelectionMode.ByDebianAndArch
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
           , scope = PipelineScope.Full
@@ -86,7 +86,7 @@ let MinaBuildSpec =
           , debianRepo = DebianRepo.Type.Unstable
           , extraBuildEnvs = [] : List Text
           , suffix = None Text
-          , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
+          , deb_legacy_version = "3.3.0-compatible-4fa3a5b"
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
           , if_ = None B/If
@@ -252,6 +252,23 @@ let docker_step
                     }
                   ]
                 , DaemonPrefork = [] : List DockerImage.ReleaseSpec.Type
+                , DaemonAppsOnly =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps = deps
+                    , service = Artifacts.Type.DaemonAppsOnly
+                    , network = spec.network
+                    , deb_codename = spec.debVersion
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , docker_publish = spec.docker_publish
+                    , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
+                    , generic = True
+                    , verify = True
+                    , arch = spec.arch
+                    , size = size
+                    }
+                  ]
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
                 , LogProc = [] : List DockerImage.ReleaseSpec.Type
                 , CreatePreforkGenesis = [] : List DockerImage.ReleaseSpec.Type
@@ -311,9 +328,28 @@ let docker_step
                     , network = spec.network
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
+                    , verify = True
+                    , arch = spec.arch
+                    , if_ = spec.if_
+                    , size = size
+                    }
+                  ]
+                , RosettaAppsOnly =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps = deps
+                    , service = Artifacts.Type.RosettaAppsOnly
+                    , network = spec.network
+                    , deb_codename = spec.debVersion
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , docker_publish = spec.docker_publish
+                    , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
+                    , generic = True
                     , verify = True
                     , arch = spec.arch
                     , if_ = spec.if_
@@ -339,7 +375,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = Artifacts.Type.FunctionalTestSuite
-                    , network = Network.Type.TestnetGeneric
+                    , network = Network.Type.Devnet
                     , deb_codename = spec.debVersion
                     , build_flags = spec.buildFlags
                     , docker_publish = spec.docker_publish

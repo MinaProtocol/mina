@@ -32,6 +32,7 @@ function usage() {
   echo "      --deb-profile         The profile string for the debian package to install"
   echo "      --deb-build-flags     The build-flags string for the debian package to install"
   echo "      --deb-suffix          The debian suffix to use for the docker image"
+  echo "  -c, --custom-suffix       A custom suffix to append to the docker tag (e.g. -instrumented)"
   echo "  -p, --platform            The target platform for the docker build (e.g. linux/amd64). Default=linux/amd64"
   echo "  -l, --load-only           Load the built image into local docker daemon only, do not push to remote registry"
   echo ""
@@ -45,6 +46,7 @@ function usage() {
 DOCKER_ACTION="push"
 # By default we use cache
 NO_CACHE=""
+CUSTOM_ARG=""
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -s|--service) SERVICE="$2"; shift;;
@@ -64,9 +66,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
-  --deb-suffix)
-      # shellcheck disable=SC2034
-      DOCKER_DEB_SUFFIX="--build-arg deb_suffix=$2"; shift;;
+  --deb-suffix) export DOCKER_DEB_SUFFIX="$2"; shift;;
   --deb-repo-key)
       # shellcheck disable=SC2034
       DEB_REPO_KEY="$2"; shift;;
@@ -115,33 +115,11 @@ fi
 
 PLATFORM="--platform ${INPUT_PLATFORM}"
 
-# Unfortunately we cannot use the same naming convention for all architectures
-# for all tooling in toolchain or mina docker
-# therefore we need to define couple of naming conventions
-
-# Canonical style naming convention : aarch/x86_64
-# Debian style naming convention : arm64/amd64
-case "${INPUT_PLATFORM}" in
-      linux/amd64)
-        CANONICAL_ARCH="x86_64"
-        DEBIAN_ARCH="x86_64"
-        ;;
-      linux/arm64)
-        CANONICAL_ARCH="aarch64"
-        DEBIAN_ARCH="arm64"
-        ;;
-      *)
-        echo "unsupported platform"; exit 1
-        ;;
-esac
-
 if [[ -z "${DOCKER_REGISTRY:-}" ]]; then
   echo "Docker registry is not set. Using the default ($USER/mina-protocol)"
   DOCKER_REGISTRY="$USER/mina-protocol"
 fi
 
-CANONICAL_ARCH_ARG="--build-arg CANONICAL_ARCH=$CANONICAL_ARCH"
-DEBIAN_ARCH_ARG="--build-arg DEBIAN_ARCH=$DEBIAN_ARCH"
 DOCKER_REPO_ARG="--build-arg docker_repo=$DOCKER_REGISTRY"
 
 if [[ -z "${INPUT_RELEASE:-}" ]]; then
@@ -216,34 +194,11 @@ case "${SERVICE}" in
           echo "Please provide the --deb-legacy-version argument."
           exit 1
         fi
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon-hardfork"
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon-auto-hardfork"
         DOCKER_CONTEXT="dockerfiles/"
         ;;
     mina-toolchain)
-        DOCKERFILE_PATH_SCRIPT_1="dockerfiles/stages/1-build-deps"
-        DOCKERFILE_PATH_SCRIPT_2_AND_MORE="dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
-        case "${INPUT_CODENAME}" in
-          bullseye)
-            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-bullseye $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
-            ;;
-          focal)
-            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-focal $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
-            ;;
-          jammy)
-              DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-jammy $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
-              ;;
-          noble)
-            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-noble $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
-            ;;
-          bookworm)
-            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-bookworm $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
-            ;;
-          *)
-            echo "Unsupported debian codename: $INPUT_CODENAME"
-            echo "Supported codenames are: bullseye, focal, noble"
-            exit 1
-            ;;
-        esac
+        DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
         ;;
     mina-batch-txn)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-txn-burst"
@@ -288,9 +243,9 @@ BUILD_NETWORK="--allow=network.host"
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT:-}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
-  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -t "$HASHTAG" -
+  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG  $DEB_REPO $BRANCH $REPO $LEGACY_VERSION $CUSTOM_ARG -t "$TAG" -t "$HASHTAG" -
 else
-  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $BRANCH $REPO $LEGACY_VERSION $CUSTOM_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."

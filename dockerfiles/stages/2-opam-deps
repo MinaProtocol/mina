@@ -5,7 +5,7 @@
 # - Includes the entire mina codebase and submodules in "${MINA_DIR}" (must be writable by opam user)
 # - Largely mirrors/replaces ./scripts/setup-opam.sh
 #################################################################################################
-FROM build-deps-$deb_codename AS opam-deps
+FROM build-deps AS opam-deps
 
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina

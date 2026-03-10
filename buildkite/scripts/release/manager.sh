@@ -1391,6 +1391,7 @@ function verify_help(){
     printf "  %-25s %s\n" "--arch" "[string] architecture (amd64 or arm64)";
     printf "  %-25s %s\n" "--profile" "[string] build profile to publish. e.g lightnet, mainnet. default: $DEFAULT_PROFILE";
     printf "  %-25s %s\n" "--build-flag" "[string] build flag which was used while building mina. e.g instrumented";
+    printf "  %-25s %s\n" "--generic" "[bool] verify generic docker images (with -generic suffix in tag)";
     echo ""
     echo "Example:"
     echo ""
@@ -1405,26 +1406,24 @@ function combine_docker_suffixes() {
     local network=$1
     local __profile=$2
     local __build_flag=$3
+    local __generic=${4:-0}
 
-    if [[ "$__profile" == "lightnet" ]]; then
-        local __docker_suffix=$__profile
-    else
-        local __docker_suffix=""
+    local __parts=("${network}")
+
+    if [[ "$__generic" == "1" ]]; then
+        __parts+=("generic")
     fi
 
     if [[ -n "$__build_flag" ]]; then
-        if [[ -n "$__docker_suffix" ]]; then
-            echo "-${network}-${__docker_suffix}-${__build_flag}"
-        else
-            echo "-${network}-${__build_flag}"
-        fi
-    else
-        if [[ -n "$__docker_suffix" ]]; then
-            echo "-${network}-${__docker_suffix}"
-        else
-            echo "-${network}"
-        fi
+        __parts+=("$__build_flag")
     fi
+
+    if [[ "$__profile" == "lightnet" ]]; then
+        __parts+=("$__profile")
+    fi
+
+    local IFS='-'
+    echo "-${__parts[*]}"
 }
 
 function verify(){
@@ -1445,6 +1444,7 @@ function verify(){
     local __profile=$DEFAULT_PROFILE
     local __docker_repo="$DEFAULT_DOCKER_REPO"
     local __build_flag=""
+    local __generic=0
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -1504,6 +1504,10 @@ function verify(){
                 __build_flag=${2:?$error_message}
                 shift 2;
             ;;
+            --generic )
+                __generic=1
+                shift 1;
+            ;;
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
@@ -1527,6 +1531,7 @@ function verify(){
     echo " - Architectures: $__archs"
     echo " - Profile: $__profile"
     echo " - Build flag: $__build_flag"
+    echo " - Generic: $__generic"
     echo ""
 
     # Only require deb-s3 and aws if we are dealing with debians
@@ -1577,7 +1582,7 @@ function verify(){
                                         __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
 
                                 local __docker_suffix_combined
-                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag")
+                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag" "$__generic")
 
                                 if [[ $__only_dockers == 0 ]]; then
 
@@ -1619,7 +1624,7 @@ function verify(){
                                 __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
 
                                 local __docker_suffix_combined
-                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag")
+                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag" "$__generic")
 
                                 if [[ $__only_dockers == 0 ]]; then
 
@@ -1662,7 +1667,7 @@ function verify(){
                                     __artifact_full_name=$(get_artifact_with_suffix $artifact $network $__profile)
 
                                     local __docker_suffix_combined
-                                    __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag")
+                                    __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag" "$__generic")
 
 
                                 if [[ $__only_dockers == 0 ]]; then

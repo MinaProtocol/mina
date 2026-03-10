@@ -94,6 +94,17 @@ module Client = struct
       ~args:[ "ledger"; "currency"; "--ledger-file"; ledger_file ]
       ()
 
+  let ledger_export_snarked_ledger t =
+    Executor.run t.executor
+      ~args:
+        [ "ledger"
+        ; "export"
+        ; "snarked-ledger"
+        ; "--daemon-port"
+        ; string_of_int t.port
+        ]
+      ()
+
   let test_ledger t ~(n : int) =
     Executor.run t.executor
       ~args:[ "ledger"; "test"; "generate-accounts"; "-n"; string_of_int n ]
@@ -110,6 +121,16 @@ module Client = struct
 
   let advanced_constraint_system_digests t =
     Executor.run t.executor ~args:[ "advanced"; "constraint-system-digests" ] ()
+
+  let advanced_runtime_config t ~rest_port =
+    Executor.run t.executor
+      ~args:
+        [ "advanced"
+        ; "runtime-config"
+        ; "--rest-server"
+        ; sprintf "http://localhost:%d/graphql" rest_port
+        ]
+      ()
 end
 
 module Config = struct
@@ -226,7 +247,7 @@ let default () = { config = Config.default (); executor = Executor.AutoDetect }
 
 let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
-let start ?hardfork_handling ?block_producer_key ?env t =
+let start ?hardfork_handling ?block_producer_key ?config_files ?env t =
   let open Deferred.Let_syntax in
   let base_args =
     [ "daemon"
@@ -252,10 +273,18 @@ let start ?hardfork_handling ?block_producer_key ?env t =
   let opt_arg key value_opt =
     match value_opt with None -> [] | Some value -> [ key; value ]
   in
+  let config_file_args =
+    match config_files with
+    | None ->
+        []
+    | Some files ->
+        List.concat_map files ~f:(fun f -> [ "--config-file"; f ])
+  in
   let args =
     base_args
     @ opt_arg "--hardfork-handling" hardfork_handling
     @ opt_arg "--block-producer-key" block_producer_key
+    @ config_file_args
   in
   [%log debug] "Starting daemon" ;
 
