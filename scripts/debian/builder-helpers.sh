@@ -628,3 +628,23 @@ build_create_legacy_genesis_deb() {
 
   build_deb mina-create-legacy-genesis
 }
+
+build_daemon_recovery_storage_toolbox_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Berkeley daemon recovery storage toolbox:"
+
+  ROCKSDB_VERSION="5.7.12"
+  MINA_VERSION="${GITTAG}"
+
+  create_control_file mina-daemon-recovery-storage-toolbox \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    "Toolbox for Mina Daemon storage compatible with rocksdb in version $ROCKSDB_VERSION and mina in $MINA_VERSION"
+
+  mkdir -p "${BUILDDIR}/usr/lib/mina/storage/$ROCKSDB_VERSION/$MINA_VERSION"
+
+  # Binaries
+  cp ./default/src/app/rocksdb-scanner/rocksdb_scanner.exe \
+    "${BUILDDIR}/usr/lib/mina/storage/$ROCKSDB_VERSION/$MINA_VERSION/mina-rocksdb-scanner"
+
+  build_deb mina-daemon-recovery-storage-toolbox
+}

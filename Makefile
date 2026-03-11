@@ -164,6 +164,7 @@ build-daemon-utils: ocaml_checks reformat-diff libp2p_helper ## Build daemon uti
 		src/app/validate_keypair/validate_keypair.exe \
 		src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
 		src/lib/snark_worker/standalone/run_snark_worker.exe \
+		src/app/rocksdb-scanner/rocksdb_scanner.exe \
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
@@ -583,10 +584,15 @@ debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
 debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devnet hardfork
 	$(call build_debian_package,daemon_devnet_hardfork)
 
+.PHONY: debian-daemon-storage-toolbox
+debian-daemon-storage-toolbox: ## Build the Debian daemon storage toolbox package
+	$(call build_debian_package,daemon_storage_toolbox)
+
 .PHONY: debian-download-create-legacy-hardfork
 debian-download-create-legacy-hardfork: ## Download and create legacy hardfork Debian packages
 	$(info 📦 Downloading legacy hardfork Debian packages for debian $(CODENAME))
 	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-legacy-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend hetzner --target _build
+
 ########################################
 # Docker images
 

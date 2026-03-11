@@ -248,6 +248,8 @@ let docker_step
                     , if = spec.if
                     }
                   ]
+                , DaemonRecoveryStorageToolbox =
+                    [] : List DockerImage.ReleaseSpec.Type
                 , Archive =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
