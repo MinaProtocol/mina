@@ -4,10 +4,13 @@ ARG network=mainnet
 ARG docker_repo=gcr.io/o1labs-192920
 ARG image_name=mina-daemon
 ARG custom_suffix=""
+ARG image_profile=""
+ARG image_build_flags=""
+ARG deb_suffix=""
 
 # This Dockerfile is used to build a Docker image that contains only the Mina daemon configuration package.
 # It is intended to be used as a base image for other images that require the Mina daemon configuration, without including the full Mina daemon package and its dependencies.
-FROM ${docker_repo}/${image_name}:${deb_version}-${deb_codename}-${network}-generic${custom_suffix}
+FROM ${docker_repo}/${image_name}:${deb_version}-${deb_codename}-${network}-generic${image_profile}${image_build_flags}${deb_suffix}${custom_suffix}
 
 # In multi-stage builds, Docker requires to re-declare ARG variables after each FROM 
 # to make them available in that stage. 
@@ -20,4 +23,10 @@ ARG TARGETARCH
 WORKDIR /root/
 
 COPY mina-${network}-config_${deb_version}_${TARGETARCH}.deb mina-${network}-config.deb
-RUN dpkg -i mina-${network}-config.deb && rm mina-${network}-config.deb
+RUN if [ ! -f "mina-${network}-config.deb" ]; then \
+        echo "ERROR: Expected config package 'mina-${network}-config_${deb_version}_${TARGETARCH}.deb' in build context, but it was not found or not copied to 'mina-${network}-config.deb'."; \
+        echo "Ensure the cache artifact exists with the correct network, deb_version, and TARGETARCH."; \
+        exit 1; \
+    fi && \
+    dpkg -i mina-${network}-config.deb && \
+    rm mina-${network}-config.deb
