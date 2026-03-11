@@ -20,8 +20,6 @@
   currency
   integration_test_lib
   mina_graphql_client
-  transition_router
-  structured_log_events
   mina_runtime_config
   mina_caqti
   mina_ledger

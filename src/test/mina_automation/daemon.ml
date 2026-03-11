@@ -170,77 +170,39 @@ module Process = struct
   let force_kill t = Utils.force_kill t.process
 end
 
-let wait_for_node_init ?(initial_delay_sec = 10.) ?(poll_interval_sec = 5.)
+let wait_for_node_init ?(initial_delay_sec = 2.) ?(poll_interval_sec = 5.)
     ?(timeout_sec = 600.) (process : Process.t) =
   let node_uri =
     Uri.make ~scheme:"http" ~host:"localhost" ~port:process.config.rest_port
       ~path:"/graphql" ()
   in
-  let log_filter =
-    [ Structured_log_events.string_of_id
-        Transition_router
-        .starting_transition_frontier_controller_structured_events_id
-    ]
-  in
-  Async.printf "Waiting initial %.0f s. before connecting to GraphQL\n"
+  Async.printf "Waiting initial %.0f s. before polling GraphQL for node init\n"
     initial_delay_sec ;
   let%bind () = after @@ Time.Span.of_sec initial_delay_sec in
   let deadline = Time.add (Time.now ()) (Time.Span.of_sec timeout_sec) in
-  let rec start_filter () =
+  let rec poll () =
     if Time.( >= ) (Time.now ()) deadline then
       Deferred.Or_error.error_string
-        "Timed out waiting for GraphQL server to become available"
+        "Timed out waiting for node initialization event"
     else
-      match%bind
-        Mina_graphql_client.Client.start_filtered_log node_uri ~logger
-          ~log_filter ~retry_delay_sec:poll_interval_sec
-      with
-      | Ok () ->
-          Deferred.Or_error.return ()
+      let%bind entries =
+        Mina_graphql_client.Client.get_filtered_log_entries
+          ~last_log_index_seen:0 node_uri
+      in
+      match entries with
+      | Ok msgs when Array.length msgs > 0 ->
+          Async.printf "Node initialization detected via GraphQL\n" ;
+          Deferred.Or_error.ok_unit
+      | Ok _ ->
+          let%bind () = after @@ Time.Span.of_sec poll_interval_sec in
+          poll ()
       | Error e ->
           Async.printf "GraphQL not ready (%s), retrying...\n"
             (Error.to_string_hum e) ;
           let%bind () = after @@ Time.Span.of_sec poll_interval_sec in
-          start_filter ()
+          poll ()
   in
-  let%bind filter_result =
-    Deferred.choose
-      [ Deferred.choice (start_filter () >>| fun r -> `Result r) Fn.id
-      ; Deferred.choice
-          (after @@ Time.Span.of_sec timeout_sec >>| fun () -> `Timeout)
-          Fn.id
-      ]
-  in
-  match filter_result with
-  | `Timeout ->
-      Deferred.Or_error.error_string
-        "Timed out waiting for GraphQL server to become available"
-  | `Result (Error e) ->
-      Deferred.return (Error e)
-  | `Result (Ok ()) ->
-      let rec poll () =
-        if Time.( >= ) (Time.now ()) deadline then
-          Deferred.Or_error.error_string
-            "Timed out waiting for node initialization event"
-        else
-          let%bind entries =
-            Mina_graphql_client.Client.get_filtered_log_entries
-              ~last_log_index_seen:0 node_uri
-          in
-          match entries with
-          | Ok msgs when Array.length msgs > 0 ->
-              Async.printf "Node initialization detected via GraphQL\n" ;
-              Deferred.Or_error.ok_unit
-          | Ok _ ->
-              let%bind () = after @@ Time.Span.of_sec poll_interval_sec in
-              poll ()
-          | Error e ->
-              Async.printf "Error polling log entries: %s, retrying...\n"
-                (Error.to_string_hum e) ;
-              let%bind () = after @@ Time.Span.of_sec poll_interval_sec in
-              poll ()
-      in
-      poll ()
+  poll ()
 
 let archive_blocks t ~archive_address ~format blocks =
   let format_arg =
@@ -280,7 +242,7 @@ let default () = { config = Config.default (); executor = Executor.AutoDetect }
 let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
 let start ?hardfork_handling ?block_producer_key ?config_files ?peer_list_url
-    ?env t =
+    ?start_filtered_logs ?env t =
   let open Deferred.Let_syntax in
   let base_args =
     [ "daemon"
@@ -313,12 +275,20 @@ let start ?hardfork_handling ?block_producer_key ?config_files ?peer_list_url
     | Some files ->
         List.concat_map files ~f:(fun f -> [ "--config-file"; f ])
   in
+  let start_filtered_log_args =
+    match start_filtered_logs with
+    | None ->
+        []
+    | Some filters ->
+        List.concat_map filters ~f:(fun f -> [ "--start-filtered-logs"; f ])
+  in
   let args =
     base_args
     @ opt_arg "--hardfork-handling" hardfork_handling
     @ opt_arg "--block-producer-key" block_producer_key
     @ config_file_args
     @ opt_arg "--peer-list-url" peer_list_url
+    @ start_filtered_log_args
   in
   [%log debug] "Starting daemon" ;
 
