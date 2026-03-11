@@ -247,7 +247,8 @@ let default () = { config = Config.default (); executor = Executor.AutoDetect }
 
 let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
-let start ?hardfork_handling ?block_producer_key ?config_files ?env t =
+let start ?hardfork_handling ?block_producer_key ?config_files ?peer_list_url
+    ?env t =
   let open Deferred.Let_syntax in
   let base_args =
     [ "daemon"
@@ -285,6 +286,7 @@ let start ?hardfork_handling ?block_producer_key ?config_files ?env t =
     @ opt_arg "--hardfork-handling" hardfork_handling
     @ opt_arg "--block-producer-key" block_producer_key
     @ config_file_args
+    @ opt_arg "--peer-list-url" peer_list_url
   in
   [%log debug] "Starting daemon" ;
 

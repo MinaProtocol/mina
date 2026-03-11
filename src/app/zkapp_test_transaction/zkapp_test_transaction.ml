@@ -87,6 +87,8 @@ let create_zkapp_account =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+       if Currency.Amount.(equal amount zero) then
+         failwith "Receiver amount must be greater than 0" ;
        create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
          ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ))
 

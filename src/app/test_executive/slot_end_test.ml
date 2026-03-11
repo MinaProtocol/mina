@@ -151,8 +151,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Malleable_error.ok_if_true ~error:(Error.of_string s) ~error_type:`Soft
     in
     let%bind blocks =
-      Integration_test_lib.Graphql_requests
-      .must_get_best_chain_for_slot_end_test ~max_length:(2 * num_slots) ~logger
+      Integration_test_lib.Graphql_requests.must_get_detailed_best_chain
+        ~max_length:(2 * num_slots) ~logger
         (Network.Node.get_ingress_uri receiver)
     in
     let%bind () =

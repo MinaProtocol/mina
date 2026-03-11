@@ -2417,6 +2417,15 @@ let create ~commit_id ?wallets (config : Config.t) =
                 ~precomputed_values:config.precomputed_values
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 archive_process_port ) ;
+          if config.log_precomputed_blocks then
+            [%log' warn config.logger]
+              "Precomputed blocks will be included in logs. These blocks can \
+               be very large (potentially several MB each) and may be \
+               truncated by logging services or log aggregators with line size \
+               limits. Consider using --precomputed-blocks-file to write \
+               blocks to a dedicated file instead, or ensure your logging \
+               infrastructure is configured to handle large log entries. \
+               Truncated blocks cannot be used for archive recovery." ;
           let precomputed_block_writer =
             ref
               ( Option.map config.precomputed_blocks_path ~f:(fun path ->
