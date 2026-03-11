@@ -23,6 +23,12 @@ let path () =
           "Could not find released mina daemon environment. App is not \
            executable outside the dune" )
 
+let default_init_log_filters =
+  [ Structured_log_events.string_of_id
+      Transition_router
+      .starting_transition_frontier_controller_structured_events_id
+  ]
+
 (** 
   Module [Client] provides functions to interact with a Mina daemon.
 *)
@@ -242,7 +248,7 @@ let default () = { config = Config.default (); executor = Executor.AutoDetect }
 let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
 let start ?hardfork_handling ?block_producer_key ?config_files ?peer_list_url
-    ?start_filtered_logs ?env t =
+    ?(start_filtered_logs = default_init_log_filters) ?env t =
   let open Deferred.Let_syntax in
   let base_args =
     [ "daemon"
@@ -276,11 +282,8 @@ let start ?hardfork_handling ?block_producer_key ?config_files ?peer_list_url
         List.concat_map files ~f:(fun f -> [ "--config-file"; f ])
   in
   let start_filtered_log_args =
-    match start_filtered_logs with
-    | None ->
-        []
-    | Some filters ->
-        List.concat_map filters ~f:(fun f -> [ "--start-filtered-logs"; f ])
+    List.concat_map start_filtered_logs ~f:(fun f ->
+        [ "--start-filtered-logs"; f ] )
   in
   let args =
     base_args
