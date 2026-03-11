@@ -355,7 +355,7 @@ and the rest of the daemon, see
 
 ## `network_pool_base.ml`
 
-`Network_pool_base.Make` wraps a `Resource_pool_intf` and adds:
+`Network_pool_base.Make` wraps a `Resource_pool_base_intf` and adds:
 
 - A gossip-network sink that receives diffs from peers, verifies them, and
   applies them to the resource pool.
