@@ -31,6 +31,7 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 		"--value-transfer-txns",
 		"--transaction-interval", strconv.Itoa(t.Config.PaymentInterval),
 		"--root", t.Config.Root,
+		"--archive-server-port", "3086",
 	)
 
 	cmd.Args = append(cmd.Args, extraArgs...)
