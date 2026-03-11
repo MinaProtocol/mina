@@ -185,19 +185,24 @@ let wait_for_node_init ?(initial_delay_sec = 10.) ?(poll_interval_sec = 5.)
   Async.printf "Waiting initial %.0f s. before connecting to GraphQL\n"
     initial_delay_sec ;
   let%bind () = after @@ Time.Span.of_sec initial_delay_sec in
-  let rec start_filter () =
-    match%bind
-      Mina_graphql_client.Client.start_filtered_log node_uri ~logger ~log_filter
-        ~retry_delay_sec:poll_interval_sec
-    with
-    | Ok () ->
-        Deferred.Or_error.return ()
-    | Error _ ->
-        Async.printf "GraphQL not ready, retrying...\n" ;
-        let%bind () = after @@ Time.Span.of_sec poll_interval_sec in
-        start_filter ()
-  in
   let deadline = Time.add (Time.now ()) (Time.Span.of_sec timeout_sec) in
+  let rec start_filter () =
+    if Time.( >= ) (Time.now ()) deadline then
+      Deferred.Or_error.error_string
+        "Timed out waiting for GraphQL server to become available"
+    else
+      match%bind
+        Mina_graphql_client.Client.start_filtered_log node_uri ~logger
+          ~log_filter ~retry_delay_sec:poll_interval_sec
+      with
+      | Ok () ->
+          Deferred.Or_error.return ()
+      | Error e ->
+          Async.printf "GraphQL not ready (%s), retrying...\n"
+            (Error.to_string_hum e) ;
+          let%bind () = after @@ Time.Span.of_sec poll_interval_sec in
+          start_filter ()
+  in
   let%bind filter_result =
     Deferred.choose
       [ Deferred.choice (start_filter () >>| fun r -> `Result r) Fn.id
@@ -229,7 +234,9 @@ let wait_for_node_init ?(initial_delay_sec = 10.) ?(poll_interval_sec = 5.)
           | Ok _ ->
               let%bind () = after @@ Time.Span.of_sec poll_interval_sec in
               poll ()
-          | Error _ ->
+          | Error e ->
+              Async.printf "Error polling log entries: %s, retrying...\n"
+                (Error.to_string_hum e) ;
               let%bind () = after @@ Time.Span.of_sec poll_interval_sec in
               poll ()
       in
