@@ -134,18 +134,13 @@ log_info "Package: ${PACKAGE}"
 log_info "New debian path: ${NEW_DEBIAN_PATH}"
 
 # Step 1: Install current mina from packages.o1test.net
-log_info "--- Step 1: Installing ${PACKAGE} from ${REPO} ---"
 
-echo "deb [trusted=yes] https://${REPO} ${CODENAME} ${CHANNEL}" | $SUDO tee /etc/apt/sources.list.d/mina-test.list
-
-./buildkite/scripts/debian/update.sh
+./buildkite/scripts/debian/install_official.sh --repo "${REPO}" --codename "${CODENAME}" --channel "${CHANNEL}" --package "${PACKAGE}"
 
 $SUDO apt-get install -y -qq lsb-release ca-certificates wget gnupg
 
 log_info "Available versions of ${PACKAGE}:"
 apt-cache policy "${PACKAGE}"
-
-$SUDO apt-get install -y --allow-downgrades "${PACKAGE}"
 
 # Step 2: Record pre-upgrade state
 log_info "--- Step 2: Recording pre-upgrade state ---"
