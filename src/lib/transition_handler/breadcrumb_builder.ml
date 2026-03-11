@@ -24,7 +24,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
             ; ( "transition_hashes"
               , `List
                   (List.map subtrees_of_enveloped_transitions ~f:(fun subtree ->
-                       Rose_tree.to_yojson
+                       Mina_stdlib.Rose_tree.to_yojson
                          (fun (enveloped_transitions, _vc) ->
                            let transition, _ =
                              enveloped_transitions |> Cached.peek
@@ -49,12 +49,12 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
              [ ("Check", `String "Before creating breadcrumb") ] )
         |> Deferred.return
       in
-      Rose_tree.Deferred.Or_error.fold_map_over_subtrees
+      Mina_stdlib.Rose_tree.Deferred.Or_error.fold_map_over_subtrees
         subtree_of_enveloped_transitions
         ~init:(Cached.pure init_breadcrumb, None)
         ~f:(fun (cached_parent, _parent_vc)
-                ( Rose_tree.T ((cached_enveloped_transition, valid_cb), _) as
-                subtree ) ->
+                ( Mina_stdlib.Rose_tree.T
+                    ((cached_enveloped_transition, valid_cb), _) as subtree ) ->
           let%map.Deferred cached_result =
             Cached.transform cached_enveloped_transition
               ~f:(fun enveloped_transition ->
@@ -123,7 +123,9 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                            new_breadcrumb )
                     | Error err -> (
                         (* propagate bans through subtree *)
-                        let subtree_nodes = Rose_tree.flatten subtree in
+                        let subtree_nodes =
+                          Mina_stdlib.Rose_tree.flatten subtree
+                        in
                         let ip_address_set =
                           let sender_from_tree_node node =
                             Envelope.Incoming.sender (Cached.peek node)

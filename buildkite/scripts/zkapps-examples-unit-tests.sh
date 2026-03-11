@@ -11,6 +11,8 @@ profile=$1
 
 if [ "$NIGHTLY" = true ]
 then
+
+  # shellcheck disable=SC1090
   source ~/.profile
 
   echo "--- Building zkapps_examples"

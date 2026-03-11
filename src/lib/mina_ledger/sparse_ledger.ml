@@ -63,10 +63,10 @@ let of_ledger_subset_exn_impl ~path_query ~path_add (oledger : Ledger.t) keys =
       ~f:(fun (sl, accs, ne_paths, epaths) (key, mloc) ->
         process_location sl key (mloc, accs, ne_paths, epaths) )
   in
-  Debug_assert.debug_assert (fun () ->
-      [%test_eq: Ledger_hash.t]
-        (Ledger.merkle_root oledger)
-        ((merkle_root sl :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) ) ;
+  assert (
+    Ledger_hash.equal
+      (Ledger.merkle_root oledger)
+      ((merkle_root sl :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) ) ;
   sl
 
 let of_ledger_subset_exn =
@@ -118,16 +118,19 @@ let apply_user_command ~constraint_constants ~txn_global_slot =
 
 let apply_transaction_first_pass ~constraint_constants ~global_slot
     ~txn_state_view =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   apply_transaction_logic
-    (T.apply_transaction_first_pass ~constraint_constants ~global_slot
-       ~txn_state_view )
+    (T.apply_transaction_first_pass ~signature_kind ~constraint_constants
+       ~global_slot ~txn_state_view )
 
 let apply_transaction_second_pass =
   apply_transaction_logic T.apply_transaction_second_pass
 
 let apply_transactions ~constraint_constants ~global_slot ~txn_state_view =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   apply_transaction_logic
-    (T.apply_transactions ~constraint_constants ~global_slot ~txn_state_view)
+    (T.apply_transactions ~signature_kind ~constraint_constants ~global_slot
+       ~txn_state_view )
 
 let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
     ~global_slot ~state_view ~fee_excess ~supply_increase ~first_pass_ledger

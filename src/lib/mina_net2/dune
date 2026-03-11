@@ -26,7 +26,7 @@
   blake2
   error_json
   child_processes
-  file_system
+  mina_stdlib_unix
   logger
   network_peer
   pipe_lib
@@ -36,7 +36,7 @@
   staged_ledger_diff
   ppx_version.runtime
   consensus
-  bounded_types)
+  mina_stdlib)
  (inline_tests
   (flags -verbose -show-counts))
  (instrumentation

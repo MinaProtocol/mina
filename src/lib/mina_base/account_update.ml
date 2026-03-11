@@ -698,7 +698,8 @@ module Update = struct
     let%bind app_state =
       let%bind fields =
         let field_gen = Snark_params.Tick.Field.gen in
-        Quickcheck.Generator.list_with_length 8 (Set_or_keep.gen field_gen)
+        Quickcheck.Generator.list_with_length Zkapp_state.max_size_int
+          (Set_or_keep.gen field_gen)
       in
       (* won't raise because length is correct *)
       Quickcheck.Generator.return (Zkapp_state.V.of_list_exn fields)
@@ -1091,7 +1092,7 @@ module Body = struct
       module V1 = struct
         type t =
           Pickles.Backend.Tick.Field.Stable.V1.t
-          Bounded_types.ArrayN16.Stable.V1.t
+          Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
           list
         [@@deriving sexp, equal, hash, compare, yojson]
 

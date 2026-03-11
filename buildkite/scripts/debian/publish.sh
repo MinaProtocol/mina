@@ -2,6 +2,7 @@
 set -eox pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+# shellcheck disable=SC1090
 source "${SCRIPTPATH}/../export-git-env-vars.sh"
 
 DOWNLOAD_FOLDER=_build

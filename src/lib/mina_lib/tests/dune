@@ -53,7 +53,7 @@
   syncable_ledger
   sync_handler
   with_hash
-  bounded_types)
+  mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

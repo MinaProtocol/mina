@@ -35,46 +35,6 @@ let new_event (k : event_kind) : event =
 let new_thread_event ?(include_name = "") tid event_kind =
   { (new_event event_kind) with tid; name = include_name }
 
-(*
-
-let trace name f =
-  let new_ctx =
-    O1trace.Thread_registry.assign_tid name
-      (Scheduler.current_execution_context ())
-  in
-  log_thread_existence name new_ctx.tid ;
-  match Scheduler.within_context new_ctx f with
-  | Error () ->
-      failwithf
-        "traced task `%s` failed, exception reported to parent monitor" name
-        ()
-  | Ok x ->
-      x
-
-let trace_event (name : string) =
-  Option.iter !current_wr ~f:(fun wr ->
-      emit_event wr { (new_event Event) with name })
-
-let recurring_prefix x = "R&" ^ x
-
-let _trace_recurring name f = trace (recurring_prefix name) f
-
-let _trace_recurring_task (name : string) (f : unit -> unit Deferred.t) =
-  trace_task (recurring_prefix name) (fun () ->
-      trace_event "started another" ;
-      f ())
-
-let measure (name : string) (f : unit -> 'a) : 'a =
-  match !current_wr with
-  | Some wr ->
-      emit_event wr { (new_event Measure_start) with name } ;
-      let res = f () in
-      emit_event wr (new_event Measure_end) ;
-      res
-  | None ->
-      f ()
-*)
-
 module T = struct
   include
     O1trace.Plugins.Register_plugin

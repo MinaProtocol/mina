@@ -65,4 +65,4 @@ val gen_imperative_rose_tree :
      ?p:float
   -> 'a Generator.t
   -> ('a -> 'a) Generator.t
-  -> 'a Rose_tree.t Generator.t
+  -> 'a Mina_stdlib.Rose_tree.t Generator.t

@@ -12,13 +12,9 @@ NETWORK_NAME=$2
 WAIT_BETWEEN_POLLING_GRAPHQL=$3
 WAIT_AFTER_FINAL_CHECK=$4
 
-# Don't prompt for answers during apt-get install
-export DEBIAN_FRONTEND=noninteractive
-
-sudo apt-get update
-sudo apt-get install -y git apt-transport-https ca-certificates tzdata curl
-
 git config --global --add safe.directory /workdir
+
+source buildkite/scripts/debian/update.sh --verbose
 
 source buildkite/scripts/export-git-env-vars.sh
 

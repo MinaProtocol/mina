@@ -425,9 +425,17 @@ module Snark_pool = struct
 
   type t = (proof_envelope, partial, unit) batcher [@@deriving sexp]
 
-  let verify (t : t) (p : proof_envelope) : bool Deferred.Or_error.t =
-    let open Deferred.Or_error.Let_syntax in
-    match%map verify t p with Ok () -> true | Error _ -> false
+  let verify (t : t) (p : proof_envelope) :
+      (unit, [> `Crash of Error.t | `Invalid of Verifier.invalid ]) result
+      Deferred.t =
+    let%map.Deferred verification_result = verify t p in
+    match verification_result with
+    | Ok (Ok ()) ->
+        Ok ()
+    | Ok (Error invalid) ->
+        Error (`Invalid invalid)
+    | Error e ->
+        Error (`Crash e)
 
   let create ~proof_cache_db ~logger verifier : t =
     create
@@ -474,13 +482,16 @@ module Snark_pool = struct
   end
 
   let verify' (t : t) ps =
-    let open Deferred.Or_error.Let_syntax in
+    let open Deferred.Let_syntax in
     let%map invalid =
-      Deferred.Or_error.List.filter_map ps ~f:(fun p ->
-          match%map verify t p with true -> None | false -> Some p )
+      Deferred.List.filter_map ps ~f:(fun p ->
+          match%map verify t p with
+          | Ok () ->
+              None
+          | Error e ->
+              Some (Work_key.of_proof_envelope p, e) )
     in
-    `Invalid
-      (Work_key.Set.of_list (List.map invalid ~f:Work_key.of_proof_envelope))
+    `Invalid (Work_key.Map.of_alist_exn invalid)
 
   let%test_module "With valid and invalid proofs" =
     ( module struct
@@ -539,9 +550,11 @@ module Snark_pool = struct
       let run_test proof_lists =
         let batcher = create ~proof_cache_db ~logger verifier in
         Deferred.List.iter proof_lists ~f:(fun (invalid_proofs, proof_list) ->
-            let%map r = verify' batcher proof_list in
-            let (`Invalid ps) = Or_error.ok_exn r in
-            assert (Work_key.Set.equal ps invalid_proofs) )
+            let%map (`Invalid pfs_and_reasons) = verify' batcher proof_list in
+            assert (
+              Work_key.Set.equal
+                (Work_key.Map.key_set pfs_and_reasons)
+                invalid_proofs ) )
 
       let gen ~(valid_count : [ `Any | `Count of int ])
           ~(invalid_count : [ `Any | `Count of int ]) =

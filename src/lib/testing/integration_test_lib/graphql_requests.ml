@@ -121,6 +121,9 @@ module Graphql = struct
     query ($public_key: PublicKey!) @encoders(module: "Encoders"){
       account(publicKey: $public_key) {
         nonce
+        delegateAccount {
+          publicKey
+        }
         balance {
           total @ppxCustom(module: "Scalars.Balance")
         }
@@ -205,6 +208,14 @@ module Graphql = struct
       }
     }
   |}]
+
+  module Genesis_ledger_export =
+  [%graphql
+  {|
+         query {
+           fork_config
+         }
+         |}]
 
   module StartFilteredLog =
   [%graphql
@@ -446,6 +457,7 @@ let get_account ~logger node_uri ~account_id =
 type account_data =
   { nonce : Mina_numbers.Account_nonce.t
   ; total_balance : Currency.Balance.t
+  ; delegate : Signature_lib.Public_key.Compressed.t option
   ; liquid_balance_opt : Currency.Balance.t option
   ; locked_balance_opt : Currency.Balance.t option
   }
@@ -474,6 +486,7 @@ let get_account_data ~logger node_uri ~account_id =
                 "the nonce from get_balance is None, which should be impossible"
               acc.nonce
         ; total_balance = acc.balance.total
+        ; delegate = acc.delegate
         ; liquid_balance_opt = acc.balance.liquid
         ; locked_balance_opt = acc.balance.locked
         }
@@ -481,6 +494,20 @@ let get_account_data ~logger node_uri ~account_id =
 let must_get_account_data ~logger node_uri ~account_id =
   get_account_data ~logger node_uri ~account_id
   |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+let export_genesis_ledger ~logger node_uri =
+  let open Deferred.Let_syntax in
+  [%log info] "Exporting genesis ledger"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let q = Graphql.Genesis_ledger_export.(make @@ makeVariables ()) in
+  let%bind response =
+    exec_graphql_request ~logger ~node_uri ~query_name:"fork_config" q
+  in
+  Result.bind response ~f:(fun r ->
+      (r.Graphql.Genesis_ledger_export.fork_config :> Yojson.Safe.t)
+      |> Runtime_config.of_yojson
+      |> Result.map_error ~f:(fun msg -> Error.of_string msg) )
+  |> Malleable_error.or_hard_error
 
 let permissions_of_account_permissions account_permissions :
     Mina_base.Permissions.t =
@@ -939,8 +966,7 @@ let must_send_payment_with_raw_sig ~logger node_uri ~sender_pub_key
 
 let sign_and_send_payment ~logger node_uri
     ~(sender_keypair : Import.Signature_keypair.t) ~receiver_pub_key ~amount
-    ~fee ~nonce ~memo ~valid_until =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    ~fee ~nonce ~memo ~valid_until ~signature_kind =
   let sender_pub_key =
     sender_keypair.public_key |> Signature_lib.Public_key.compress
   in
@@ -966,14 +992,6 @@ let sign_and_send_payment ~logger node_uri
   in
   send_payment_with_raw_sig ~logger node_uri ~sender_pub_key ~receiver_pub_key
     ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature
-
-let must_sign_and_send_payment ~logger node_uri
-    ~(sender_keypair : Import.Signature_keypair.t) ~receiver_pub_key ~amount
-    ~fee ~nonce ~memo ~valid_until =
-  sign_and_send_payment ~logger node_uri
-    ~(sender_keypair : Import.Signature_keypair.t)
-    ~receiver_pub_key ~amount ~fee ~nonce ~memo ~valid_until
-  |> Deferred.bind ~f:Malleable_error.or_hard_error
 
 let send_test_payments ~(repeat_count : Unsigned.UInt32.t)
     ~(repeat_delay_ms : Unsigned.UInt32.t) ~logger node_uri

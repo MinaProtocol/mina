@@ -46,7 +46,7 @@ type output =
 
 module type Get_command_ids = sig
   val run :
-       Caqti_async.connection
+       (module Mina_caqti.CONNECTION)
     -> state_hash:string
     -> start_slot:int64
     -> (int list, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
@@ -167,7 +167,7 @@ let get_slot_hashes slot = Hashtbl.find global_slot_hashes_tbl slot
 
 let process_block_infos_of_state_hash ~logger pool ~state_hash ~start_slot ~f =
   match%bind
-    Caqti_async.Pool.use
+    Mina_caqti.Pool.use
       (fun db -> Sql.Block_info.run db ~state_hash ~start_slot)
       pool
   with
@@ -606,7 +606,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
       let%map input =
         create_replayer_checkpoint ~ledger ~start_slot_since_genesis
       in
-      input_to_yojson input |> Yojson.Safe.pretty_to_string
+      input_to_yojson input
     in
     let checkpoint_file =
       let checkpoint_filename =
@@ -622,13 +622,60 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
     [%log info] "Writing checkpoint file"
       ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
     Out_channel.with_file checkpoint_file ~f:(fun oc ->
-        Out_channel.output_string oc replayer_checkpoint ) )
+        Yojson.Safe.to_channel oc replayer_checkpoint ) )
   else (
     [%log info] "Not writing checkpoint file at slot %Ld, because not canonical"
       last_global_slot_since_genesis
       ~metadata:
         [ ("max_canonical_slot", `String (Int64.to_string max_canonical_slot)) ] ;
     Deferred.unit )
+
+let fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
+    ~global_slot_hashes_tbl =
+  let slots = Int64.Table.keys global_slot_hashes_tbl in
+  let chain_oldest_slot =
+    Option.value ~default:Int64.minus_one
+      (List.min_elt slots ~compare:Int64.compare)
+  in
+  let chain_oldest_state_hash =
+    Option.value_map (Int64.Table.find global_slot_hashes_tbl chain_oldest_slot)
+      ~default:"<none>" ~f:(fun (sh, _, _) -> State_hash.to_base58_check sh)
+  in
+  let%bind chain_oldest_parent_state_hash =
+    match%map
+      Mina_caqti.Pool.use
+        (fun db -> Sql.Parent_block.get_parent_hash db chain_oldest_state_hash)
+        pool
+    with
+    | Ok hash ->
+        hash
+    | Error _ ->
+        (* This is a separate database transaction, so technically we could have
+           lost connection or the block could have been deleted between now and
+           when the chain query was run. *)
+        "<chain endpoint data no longer retrievable>"
+  in
+  let%bind chain_oldest_height =
+    match%map
+      Mina_caqti.Pool.use
+        (fun db -> Sql.Block.get_height_by_state_hash db chain_oldest_state_hash)
+        pool
+    with
+    | Ok height ->
+        height
+    | Error _ ->
+        Int64.minus_one
+  in
+  [%log fatal]
+    "Block chain leading to target state hash does not include genesis block"
+    ~metadata:
+      [ ("target_state_hash", `String target_state_hash)
+      ; ("chain_oldest_state_hash", `String chain_oldest_state_hash)
+      ; ( "chain_oldest_parent_state_hash"
+        , `String chain_oldest_parent_state_hash )
+      ; ("chain_oldest_height", `String (Int64.to_string chain_oldest_height))
+      ] ;
+  Core_kernel.exit 1
 
 let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
     ~checkpoint_interval ~checkpoint_output_folder_opt ~checkpoint_file_prefix
@@ -641,6 +688,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         ~transport:(Logger_file_system.evergrowing ~log_filename)
         () ) ;
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -653,7 +701,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
              msg )
   in
   let archive_uri = Uri.of_string archive_uri in
-  match Caqti_async.connect_pool ~max_size:128 archive_uri with
+  match Mina_caqti.connect_pool ~max_size:128 archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]
@@ -670,7 +718,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
           Genesis_ledger_helper.Ledger.load ~proof_level
             ~genesis_dir:
               (Option.value ~default:Cache_dir.autogen_path genesis_dir_opt)
-            ~logger ~constraint_constants input.genesis_ledger
+            ~logger ~constraint_constants ~genesis_backing_type:Stable_db
+            input.genesis_ledger
         with
         | Error e ->
             [%log fatal]
@@ -744,20 +793,23 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             in
             return (Int.Set.of_list ids, oldest_block_id) )
       in
-      if Int64.equal input.start_slot_since_genesis 0L then
-        (* check that genesis block is in chain to target hash                                                                                                                                                                                          assumption: genesis block occupies global slot 0
+      let%bind () =
+        if Int64.equal input.start_slot_since_genesis 0L then
+          (* check that genesis block is in chain to target hash
+             assumption: genesis block occupies global slot 0
 
-           if nonzero start slot, can't assume there's a block at that slot *)
-        if Int64.Table.mem global_slot_hashes_tbl Int64.zero then
-          [%log info]
-            "Block chain leading to target state hash includes genesis block, \
-             length = %d"
-            (Int.Set.length block_ids)
-        else (
-          [%log fatal]
-            "Block chain leading to target state hash does not include genesis \
-             block" ;
-          Core_kernel.exit 1 ) ;
+             if nonzero start slot, can't assume there's a block at that slot *)
+          if Int64.Table.mem global_slot_hashes_tbl Int64.zero then (
+            [%log info]
+              "Block chain leading to target state hash includes genesis \
+               block, length = %d"
+              (Int.Set.length block_ids) ;
+            Deferred.unit )
+          else
+            fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
+              ~global_slot_hashes_tbl
+        else Deferred.unit
+      in
       (* some mutable state, less painful than passing epoch ledgers throughout *)
       let staking_epoch_ledger = ref ledger in
       let next_epoch_ledger = ref ledger in
@@ -788,7 +840,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       (* end mutable state *)
       let get_command_ids (module Command_ids : Get_command_ids) name =
         match%bind
-          Caqti_async.Pool.use
+          Mina_caqti.Pool.use
             (fun db ->
               Command_ids.run db ~state_hash:target_state_hash
                 ~start_slot:input.start_slot_since_genesis )
@@ -824,7 +876,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         Deferred.List.map internal_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
-              Caqti_async.Pool.use
+              Mina_caqti.Pool.use
                 (fun db ->
                   Sql.Internal_command.run db
                     ~start_slot:input.start_slot_since_genesis
@@ -881,7 +933,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         Deferred.List.map user_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
-              Caqti_async.Pool.use (fun db -> Sql.User_command.run db id) pool
+              Mina_caqti.Pool.use (fun db -> Sql.User_command.run db id) pool
             with
             | Ok [] ->
                 failwithf "Expected at least one user command with id %d" id ()
@@ -912,7 +964,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         Deferred.List.map zkapp_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
-              Caqti_async.Pool.use (fun db -> Sql.Zkapp_command.run db id) pool
+              Mina_caqti.Pool.use (fun db -> Sql.Zkapp_command.run db id) pool
             with
             | Ok [] ->
                 failwithf "Expected at least one zkApp command with id %d" id ()
@@ -1284,7 +1336,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                   let%bind phase_1s =
                     Deferred.List.mapi txns ~f:(fun n txn ->
                         match
-                          Ledger.apply_transaction_first_pass
+                          Ledger.apply_transaction_first_pass ~signature_kind
                             ~constraint_constants
                             ~global_slot:
                               (Mina_numbers.Global_slot_since_genesis.of_uint32
@@ -1683,11 +1735,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                       ~next_epoch_ledger:!next_epoch_ledger
                       ~next_seed:!next_seed input.genesis_ledger
                   in
-                  output_to_yojson output |> Yojson.Safe.pretty_to_string
+                  output_to_yojson output
                 in
                 return
                 @@ Out_channel.with_file output_file ~f:(fun oc ->
-                       Out_channel.output_string oc output ) )
+                       Yojson.Safe.to_channel oc output ) )
               else (
                 [%log error] "There were %d errors, not writing output"
                   !error_count ;

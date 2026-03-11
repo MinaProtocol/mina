@@ -150,7 +150,7 @@ module Zkapp_uri = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Bounded_types.String.Stable.V1.t
+        type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
         [@@deriving sexp, equal, compare, hash, yojson]
 
         let to_latest = Fn.id
@@ -176,9 +176,9 @@ module Zkapp_uri = struct
 
       include
         Binable.Of_binable_without_uuid
-          (Bounded_types.String.Stable.V1)
+          (Mina_stdlib.Bounded_types.String.Stable.V1)
           (struct
-            type t = Bounded_types.String.Stable.V1.t
+            type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
 
             let to_binable = Fn.id
 
@@ -440,10 +440,7 @@ let gen_uri =
 let gen : t Quickcheck.Generator.t =
   let open Quickcheck in
   let open Generator.Let_syntax in
-  let app_state =
-    Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
-        F.random () )
-  in
+  let%bind app_state = Zkapp_state.Value.gen in
   let%bind zkapp_version = Mina_numbers.Zkapp_version.gen in
   let%bind seq_state = Generator.list_with_length 5 Field.gen in
   let%map zkapp_uri = gen_uri in
@@ -456,3 +453,66 @@ let gen : t Quickcheck.Generator.t =
   ; proved_state = false
   ; zkapp_uri
   }
+
+module Hardfork = struct
+  type t =
+    ( Zkapp_state.Hardfork.Value.t
+    , Verification_key_wire.Stable.Latest.t option
+    , Mina_numbers.Zkapp_version.Stable.Latest.t
+    , F.Stable.Latest.t
+    , Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
+    , bool
+    , Zkapp_uri.Stable.Latest.t )
+    Poly.Stable.Latest.t
+  [@@deriving sexp, equal, hash, compare, yojson, bin_io_unversioned]
+
+  let of_stable (account : Stable.Latest.t) : t =
+    { app_state = Zkapp_state.Hardfork.Value.of_stable account.app_state
+    ; verification_key = account.verification_key
+    ; zkapp_version = account.zkapp_version
+    ; action_state = account.action_state
+    ; last_action_slot = account.last_action_slot
+    ; proved_state = account.proved_state
+    ; zkapp_uri = account.zkapp_uri
+    }
+
+  (** Convert a Mesa zkApp account to a stable Berkeley zkApp account. Raises if
+    we can't convert back to stable Berkeley zkApp account. *)
+  let to_stable_exn (account : t) : Stable.Latest.t =
+    { app_state = Zkapp_state.Hardfork.Value.to_stable_exn account.app_state
+    ; verification_key = account.verification_key
+    ; zkapp_version = account.zkapp_version
+    ; action_state = account.action_state
+    ; last_action_slot = account.last_action_slot
+    ; proved_state = account.proved_state
+    ; zkapp_uri = account.zkapp_uri
+    }
+
+  let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
+    let open Random_oracle.Input.Chunked in
+    let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
+    let app_state v =
+      Random_oracle.Input.Chunked.field_elements
+        (Pickles_types.Vector.to_array v)
+    in
+    Poly.Fields.fold ~init:[] ~app_state:(f app_state)
+      ~verification_key:
+        (f
+           (Fn.compose field
+              (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
+      ~zkapp_version:(f Mina_numbers.Zkapp_version.to_input)
+      ~action_state:(f app_state)
+      ~last_action_slot:(f Mina_numbers.Global_slot_since_genesis.to_input)
+      ~proved_state:
+        (f (fun b -> Random_oracle.Input.Chunked.packed (field_of_bool b, 1)))
+      ~zkapp_uri:(f zkapp_uri_to_input)
+    |> List.reduce_exn ~f:append
+
+  let digest (t : t) =
+    Random_oracle.(
+      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
+
+  let default = of_stable default
+
+  let default_digest = lazy (digest default)
+end

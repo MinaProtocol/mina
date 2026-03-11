@@ -157,8 +157,8 @@ module Pre_diff_with_at_most_two_coinbase = struct
   type t =
     (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
 
-  let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let write_all_proofs_to_disk ~signature_kind ~proof_cache_db :
+      Stable.Latest.t -> t =
     Pre_diff_two.map
       ~f1:(Transaction_snark_work.write_all_proofs_to_disk ~proof_cache_db)
       ~f2:
@@ -191,8 +191,8 @@ module Pre_diff_with_at_most_one_coinbase = struct
   type t =
     (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
 
-  let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let write_all_proofs_to_disk ~signature_kind ~proof_cache_db :
+      Stable.Latest.t -> t =
     Pre_diff_one.map
       ~f1:(Transaction_snark_work.write_all_proofs_to_disk ~proof_cache_db)
       ~f2:
@@ -251,16 +251,16 @@ module Diff = struct
     Pre_diff_with_at_most_two_coinbase.t
     * Pre_diff_with_at_most_one_coinbase.t option
 
-  let write_all_proofs_to_disk ~proof_cache_db
+  let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
       (( pre_diff_with_at_most_two_coinbase
        , pre_diff_with_at_most_one_coinbase_opt ) :
         Stable.Latest.t ) : t =
     ( Pre_diff_with_at_most_two_coinbase.write_all_proofs_to_disk
-        ~proof_cache_db pre_diff_with_at_most_two_coinbase
+        ~signature_kind ~proof_cache_db pre_diff_with_at_most_two_coinbase
     , Option.map pre_diff_with_at_most_one_coinbase_opt
         ~f:
           (Pre_diff_with_at_most_one_coinbase.write_all_proofs_to_disk
-             ~proof_cache_db ) )
+             ~signature_kind ~proof_cache_db ) )
 
   let read_all_proofs_from_disk
       (( pre_diff_with_at_most_two_coinbase
@@ -300,8 +300,11 @@ end]
 
 type t = { diff : Diff.t } [@@deriving fields]
 
-let write_all_proofs_to_disk ~proof_cache_db t =
-  { diff = Diff.write_all_proofs_to_disk ~proof_cache_db t.Stable.Latest.diff }
+let write_all_proofs_to_disk ~signature_kind ~proof_cache_db t =
+  { diff =
+      Diff.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+        t.Stable.Latest.diff
+  }
 
 let read_all_proofs_from_disk t =
   { Stable.Latest.diff = Diff.read_all_proofs_from_disk t.diff }

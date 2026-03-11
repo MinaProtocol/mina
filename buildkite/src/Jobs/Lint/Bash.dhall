@@ -1,5 +1,3 @@
-let B = ../../External/Buildkite.dhall
-
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -15,8 +13,6 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
-
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -38,16 +34,10 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchainBullseye
-                  ([] : List Text)
-                  (     "sudo apt-get update"
-                    ++  " && sudo apt-get install shellcheck"
-                    ++  " && make check-bash "
-                  )
+                RunInToolchain.runInToolchain ([] : List Text) "make check-bash"
             , label = "Bash: shellcheck"
             , key = "check-bash"
             , target = Size.Multi
-            , soft_fail = Some (B/SoftFail.Boolean True)
             , docker = None Docker.Type
             }
         ]

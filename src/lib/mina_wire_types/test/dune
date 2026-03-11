@@ -37,7 +37,7 @@
   pasta_bindings
   blake2
   staged_ledger_diff
-  bounded_types)
+  mina_stdlib)
  (preprocess
   (pps ppx_version))
  (instrumentation

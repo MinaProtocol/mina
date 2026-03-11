@@ -21,7 +21,7 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
   if Bool.equal precomputed extensional then
     failwith "Must provide exactly one of -precomputed and -extensional" ;
   let logger = Logger.create () in
-  match Caqti_async.connect_pool archive_uri with
+  match Mina_caqti.connect_pool archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]
@@ -76,7 +76,8 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
         in
         make_add_block of_yojson
           (Processor.add_block_aux_extensional ~proof_cache_db
-             ~genesis_constants ~logger ~pool ~delete_older_than:None )
+             ~genesis_constants ~logger ~pool ~delete_older_than:None
+             ~signature_kind:Mina_signature_kind.t_DEPRECATED )
       in
       Deferred.List.iter files ~f:(fun file ->
           In_channel.with_file file ~f:(fun in_channel ->

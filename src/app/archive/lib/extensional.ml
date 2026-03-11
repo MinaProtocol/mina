@@ -24,7 +24,7 @@ module User_command = struct
       *)
       type t =
         { sequence_no : int
-        ; command_type : Bounded_types.String.Stable.V1.t
+        ; command_type : Mina_stdlib.Bounded_types.String.Stable.V1.t
         ; fee_payer : Public_key.Compressed.Stable.V1.t
         ; source : Public_key.Compressed.Stable.V1.t
         ; receiver : Public_key.Compressed.Stable.V1.t
@@ -37,7 +37,7 @@ module User_command = struct
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
-        ; status : Bounded_types.String.Stable.V1.t
+        ; status : Mina_stdlib.Bounded_types.String.Stable.V1.t
         ; failure_reason : Transaction_status.Failure.Stable.V2.t option
         }
       [@@deriving yojson, equal]
@@ -63,13 +63,13 @@ module Internal_command = struct
       type t =
         { sequence_no : int
         ; secondary_sequence_no : int
-        ; command_type : Bounded_types.String.Stable.V1.t
+        ; command_type : Mina_stdlib.Bounded_types.String.Stable.V1.t
         ; receiver : Public_key.Compressed.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
-        ; status : Bounded_types.String.Stable.V1.t
+        ; status : Mina_stdlib.Bounded_types.String.Stable.V1.t
         ; failure_reason : Transaction_status.Failure.Stable.V2.t option
         }
       [@@deriving yojson, equal]
@@ -95,7 +95,7 @@ module Zkapp_command = struct
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
-        ; status : Bounded_types.String.Stable.V1.t
+        ; status : Mina_stdlib.Bounded_types.String.Stable.V1.t
         ; failure_reasons :
             Transaction_status.Failure.Collection.Display.Stable.V1.t option
         }

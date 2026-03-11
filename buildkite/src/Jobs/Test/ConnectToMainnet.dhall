@@ -10,26 +10,21 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let ConnectToNetwork = ../../Command/ConnectToNetwork.dhall
-
-let Profiles = ../../Constants/Profiles.dhall
-
-let Artifacts = ../../Constants/Artifacts.dhall
 
 let Network = ../../Constants/Network.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let Profile = ../../Constants/Profiles.dhall
+
 let network = Network.Type.Mainnet
 
 let dependsOn =
       Dockers.dependsOn
-        Dockers.Type.Bullseye
-        network
-        Profiles.Type.Standard
-        Artifacts.Type.Daemon
+        Dockers.DepsSpec::{ network = network, profile = Profile.Type.Mainnet }
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -42,11 +37,13 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "ConnectToMainnet"
-        , mode = PipelineMode.Type.Stable
+        , scope =
+          [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
+          , PipelineTag.Type.Rosetta
           ]
         }
       , steps =

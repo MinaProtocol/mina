@@ -160,6 +160,7 @@ class BenchmarkType(Enum):
     zkapp = 'zkapp'
     ledger_export = 'ledger-export'
     ledger_apply = 'ledger-apply'
+    archive = 'archive'
 
     def __str__(self):
         return self.value
@@ -443,6 +444,75 @@ class LedgerApplyBenchmark(Benchmark):
                 csvwriter.writerow(("ledger-apply",final_time, preparation_steps_mean,"ledger-apply", branch))
 
         return [output_filename]
+
+class ArchiveBenchmark(Benchmark):
+    """
+     Concrete implementation of Benchmark for archive benchmark.
+     It requires input json file with benchmark data in format
+     {
+        "final_time":"0.4000" # In ms
+        , "preparation_steps_mean": "0.432"
+     }
+    """
+
+    name = MeasurementColumn("Name", 0)
+    time = FieldColumn("time",  1, "ms")
+    category = TagColumn("category", 2)
+    branch = TagColumn("gitbranch", 3)
+
+    def __init__(self):
+        Benchmark.__init__(self, BenchmarkType.archive)
+
+    # This benchmark requires an input file with benchmark data
+    # and does not run any command. It is used to parse existing data.
+    # As a result, run method is empty.
+    def run(self, path=None):
+        pass
+
+    def fields(self):
+        return [
+            self.time
+        ]
+
+    def name_header(self):
+        return self.name
+
+    def branch_header(self):
+        return self.branch
+
+    def default_path(self):
+        return ""
+
+    def headers(self):
+        return [
+            ArchiveBenchmark.name, ArchiveBenchmark.time,
+            ArchiveBenchmark.category, ArchiveBenchmark.branch
+        ]
+
+    # format of input file: 
+    # [{"operation":"Zkapp_account_update.add","avg_time_ms":4.994700819672131}
+    # ,{"operation":"Zkapp_account_update_body.add","avg_time_ms":3.1188038147138974}
+    # , ...
+    # ]
+    def parse(self, content, output_filename, influxdb, branch):
+
+        operation = "operation"
+        avg_time_ms = "avg_time_ms"
+        
+        data = json.loads(content)
+            
+        with open(output_filename, 'w') as csvfile:
+            if influxdb:
+                csvfile.write(
+                    self.headers_to_influx(self.headers()) + "\n")
+            for item in data:
+                operation_name = item[operation]
+                avg_time = item[avg_time_ms]
+                csvwriter = csv.writer(csvfile)
+                csvwriter.writerow((operation_name, avg_time, "archive", branch))
+                
+        return [output_filename]
+
 
 class ZkappLimitsBenchmark(Benchmark):
     """

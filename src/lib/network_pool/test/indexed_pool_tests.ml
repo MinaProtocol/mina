@@ -407,8 +407,11 @@ let dummy_state_view =
     let compile_time_genesis =
       (*not using Precomputed_values.for_unit_test because of dependency cycle*)
       Mina_state.Genesis_protocol_state.t
-        ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
-        ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+        ~genesis_ledger:
+          (Consensus.Genesis_data.Ledger.to_hashed Genesis_ledger.for_unit_tests)
+        ~genesis_epoch_data:
+          (Consensus.Genesis_data.Epoch.to_hashed
+             Consensus.Genesis_data.Epoch.for_unit_tests )
         ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
         ~constraint_constants ~consensus_constants
     in
@@ -444,6 +447,7 @@ let init_permissionless_ledger ledger account_info =
         { account with balance; permissions = Permissions.empty } )
 
 let apply_to_ledger ledger cmd =
+  let signature_kind = Mina_signature_kind.Testnet in
   match Transaction_hash.User_command_with_valid_signature.command cmd with
   | User_command.Signed_command c ->
       let (`If_this_is_used_it_should_have_a_comment_justifying_it v) =
@@ -458,7 +462,8 @@ let apply_to_ledger ledger cmd =
           )
   | User_command.Zkapp_command p -> (
       let applied, _ =
-        Mina_ledger.Ledger.apply_zkapp_command_unchecked ~constraint_constants
+        Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
+          ~constraint_constants
           ~global_slot:dummy_state_view.global_slot_since_genesis
           ~state_view:dummy_state_view ledger p
         |> Or_error.ok_exn

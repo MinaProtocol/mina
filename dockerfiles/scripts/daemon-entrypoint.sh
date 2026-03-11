@@ -7,6 +7,8 @@ shopt -s nullglob
 
 INPUT_ARGS="$@"
 
+MINA_APP="${MINA_APP:-mina}"
+
 # stderr is mostly used to print "reading password from environment varible ..."
 # prover and verifier logs are also sparse, mostly memory stats and debug info
 declare -a VERBOSE_LOG_FILES=('mina-stderr.log' '.mina-config/mina-prover.log' '.mina-config/mina-verifier.log')
@@ -59,7 +61,7 @@ rm -f .mina-config/.mina-lock
 export MINA_PRIVKEY_PASS MINA_LIBP2P_PASS UPTIME_PRIVKEY_PASS
 
 # Run the daemon in the foreground
-mina ${INPUT_ARGS} ${EXTRA_FLAGS} ${APPENDED_FLAGS} 2>mina-stderr.log
+${MINA_APP} ${INPUT_ARGS} ${EXTRA_FLAGS} ${APPENDED_FLAGS} 2>mina-stderr.log
 export MINA_EXIT_CODE="$?"
 echo "Mina process exited with status code ${MINA_EXIT_CODE}"
 

@@ -1011,7 +1011,7 @@ let%test_module "Account precondition tests" =
                 (module Mina_ledger.Ledger.Ledger_inner)
                 init_ledger ledger ;
               match
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:psv.global_slot_since_genesis ~state_view:psv
                   ledger zkapp_command_with_invalid_fee_payer

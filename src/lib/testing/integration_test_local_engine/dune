@@ -57,7 +57,6 @@
   mina_state
   mina_stdlib
   mina_transaction
-  file_system
   pickles
   pickles_types
   pickles.backend

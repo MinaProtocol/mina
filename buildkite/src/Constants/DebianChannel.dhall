@@ -3,6 +3,7 @@ let Channel
     = < Unstable
       | Develop
       | Compatible
+      | Master
       | Itn
       | Umt
       | UmtMainnet
@@ -19,6 +20,7 @@ let capitalName =
             { Unstable = "Unstable"
             , Develop = "Develop"
             , Compatible = "Compatible"
+            , Master = "Master"
             , Itn = "Itn"
             , Umt = "Umt"
             , UmtMainnet = "UmtMainnet"
@@ -36,6 +38,7 @@ let lowerName =
             { Unstable = "unstable"
             , Develop = "develop"
             , Compatible = "compatible"
+            , Master = "master"
             , Itn = "itn"
             , Umt = "umt"
             , UmtMainnet = "umt-mainnet"

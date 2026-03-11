@@ -4,6 +4,7 @@ open Async
 open Currency
 open Signature_lib
 open Mina_base
+module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -262,10 +263,10 @@ end
 module type S = sig
   val name : string
 
-  (** Return a string that tells a human what the consensus view of an instant in time is.
-    *
-    * This is mostly useful for PoStake and other consensus mechanisms that have their own
-    * notions of time.
+  (** Return a string that tells a human what the consensus view of an instant
+      in time is.
+      This is mostly useful for PoStake and other consensus mechanisms that have
+      their own notions of time.
   *)
   val time_hum : constants:Constants.t -> Block_time.t -> string
 
@@ -294,19 +295,37 @@ module type S = sig
       -> t
   end
 
-  module Genesis_epoch_data : sig
-    module Data : sig
-      type t =
-        { ledger : Mina_ledger.Ledger.t Lazy.t; seed : Mina_base.Epoch_seed.t }
+  module Genesis_data : sig
+    module Hashed : sig
+      type t
+
+      val hash : t -> Mina_base.Frozen_ledger_hash.t
     end
 
-    type tt = { staking : Data.t; next : Data.t option }
+    module Epoch : sig
+      module Data : sig
+        type 'ledger t = { ledger : 'ledger; seed : Mina_base.Epoch_seed.t }
 
-    type t = tt option
+        val to_hashed : Genesis_ledger.Packed.t t -> Hashed.t t
+      end
 
-    val for_unit_tests : t
+      type 'ledger tt =
+        { staking : 'ledger Data.t; next : 'ledger Data.t option }
 
-    val compiled : t
+      type 'ledger t = 'ledger tt option
+
+      val for_unit_tests : Genesis_ledger.Packed.t t
+
+      val compiled : Genesis_ledger.Packed.t t
+
+      val to_hashed : Genesis_ledger.Packed.t t -> Hashed.t t
+    end
+
+    module Ledger : sig
+      type t = Genesis_ledger.Packed.t
+
+      val to_hashed : t -> Hashed.t
+    end
   end
 
   module Data : sig
@@ -316,8 +335,8 @@ module type S = sig
 
         module Ledger_snapshot : sig
           type t =
-            | Genesis_epoch_ledger of Mina_ledger.Ledger.t
-            | Ledger_db of Mina_ledger.Ledger.Db.t
+            | Genesis_epoch_ledger of Genesis_ledger.Packed.t
+            | Ledger_root of Root_ledger.t
 
           val close : t -> unit
 
@@ -328,12 +347,13 @@ module type S = sig
       type t [@@deriving to_yojson]
 
       val create :
-           Signature_lib.Public_key.Compressed.Set.t
-        -> context:(module CONTEXT)
-        -> genesis_ledger:Mina_ledger.Ledger.t Lazy.t
-        -> genesis_epoch_data:Genesis_epoch_data.t
+           context:(module CONTEXT)
+        -> genesis_ledger:Genesis_ledger.Packed.t
+        -> genesis_epoch_data:Genesis_ledger.Packed.t Genesis_data.Epoch.t
         -> epoch_ledger_location:string
         -> genesis_state_hash:State_hash.t
+        -> epoch_ledger_backing_type:Root_ledger.Config.backing_type
+        -> Signature_lib.Public_key.Compressed.Set.t
         -> t
 
       val current_block_production_keys :
@@ -458,7 +478,9 @@ module type S = sig
 
       val of_time_exn : constants:Constants.t -> Block_time.t -> t
 
-      (** Gets the corresponding a reasonable consensus time that is considered to be "old" and not accepted by other peers by the consensus mechanism *)
+      (** Gets the corresponding a reasonable consensus time that is considered
+          to be "old" and not accepted by other peers by the consensus
+          mechanism *)
       val get_old : constants:Constants.t -> t -> t
 
       val to_uint32 : t -> Unsigned.UInt32.t
@@ -505,8 +527,8 @@ module type S = sig
         -> (var, Value.t) Snark_params.Tick.Typ.t
 
       val negative_one :
-           genesis_ledger:Mina_ledger.Ledger.t Lazy.t
-        -> genesis_epoch_data:Genesis_epoch_data.t
+           genesis_ledger:Genesis_data.Hashed.t
+        -> genesis_epoch_data:Genesis_data.Hashed.t Genesis_data.Epoch.t
         -> constants:Constants.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> Value.t
@@ -514,16 +536,16 @@ module type S = sig
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Mina_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
-        -> genesis_ledger:Mina_ledger.Ledger.t Lazy.t
-        -> genesis_epoch_data:Genesis_epoch_data.t
+        -> genesis_ledger:Genesis_data.Hashed.t
+        -> genesis_epoch_data:Genesis_data.Hashed.t Genesis_data.Epoch.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> constants:Constants.t
         -> Value.t
 
       val create_genesis :
            negative_one_protocol_state_hash:Mina_base.State_hash.t
-        -> genesis_ledger:Mina_ledger.Ledger.t Lazy.t
-        -> genesis_epoch_data:Genesis_epoch_data.t
+        -> genesis_ledger:Genesis_data.Hashed.t
+        -> genesis_epoch_data:Genesis_data.Hashed.t Genesis_data.Epoch.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> constants:Constants.t
         -> Value.t
@@ -684,10 +706,9 @@ module type S = sig
 
     type select_status = [ `Keep | `Take ] [@@deriving equal]
 
-    (**
-     * Select between two ledger builder controller tips given the consensus
-     * states for the two tips. Returns `\`Keep` if the first tip should be
-     * kept, or `\`Take` if the second tip should be taken instead.
+    (** Select between two ledger builder controller tips given the consensus
+        states for the two tips. Returns `\`Keep` if the first tip should be
+        kept, or `\`Take` if the second tip should be taken instead.
     *)
     val select :
          context:(module CONTEXT)
@@ -712,14 +733,12 @@ module type S = sig
       -> coinbase_receiver:Coinbase_receiver.t
       -> Block_data.t
 
-    (**
-     * A hook for managing local state when the locked tip is updated.
-     *)
+    (** A hook for managing local state when the locked tip is updated. *)
     val frontier_root_transition :
          Consensus_state.Value.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> snarked_ledger:Mina_ledger.Ledger.Db.t
+      -> snarked_ledger:Root_ledger.t
       -> genesis_ledger_hash:Mina_base.Frozen_ledger_hash.t
       -> unit
 
@@ -732,6 +751,14 @@ module type S = sig
            Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> candidate:
            Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
+      -> bool
+
+    (** Same as [should_bootstrap] but uses lengths instead of consensus
+        states *)
+    val should_bootstrap_len :
+         context:(module CONTEXT)
+      -> existing:Unsigned.UInt32.t
+      -> candidate:Unsigned.UInt32.t
       -> bool
 
     val get_epoch_ledger :
@@ -756,8 +783,8 @@ module type S = sig
     (** Data needed to synchronize the local state. *)
     type local_state_sync [@@deriving to_yojson]
 
-    (**
-     * Predicate indicating whether or not the local state requires synchronization.
+    (** Predicate indicating whether or not the local state requires
+        synchronization.
      *)
     val required_local_state_sync :
          constants:Constants.t
@@ -765,11 +792,10 @@ module type S = sig
       -> local_state:Local_state.t
       -> local_state_sync option
 
-    (**
-     * Synchronize local state over the network.
+    (** Synchronize local state over the network.
 
-     * [glue_sync_ledger] is [Mina_networking.glue_sync_ledger], with the [Mina_networking.t] argument
-       already supplied
+        [glue_sync_ledger] is [Mina_networking.glue_sync_ledger], with the
+        [Mina_networking.t] argument already supplied
      *)
     val sync_local_state :
          context:(module CONTEXT_WITH_LEDGER_SYNC)
