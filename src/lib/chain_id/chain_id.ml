@@ -12,7 +12,6 @@ module Inputs = struct
 end
 
 let of_inputs (inputs : Inputs.t) =
-  (* if this changes, also change Mina_commands.chain_id_inputs *)
   let genesis_state_hash =
     State_hash.to_base58_check inputs.genesis_state_hash
   in

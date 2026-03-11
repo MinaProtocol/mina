@@ -65,7 +65,6 @@ let make_hashed_ledgers (config : Runtime_config.t) :
                     Mina_base.Frozen_ledger_hash.of_base58_check_exn staking
                 ; total_currency = Currency.Amount.zero
                 }
-                (* TODO: check if this of_string is right *)
             ; seed = Mina_base.Epoch_seed.of_base58_check_exn staking_seed
             }
         ; next =
@@ -75,7 +74,6 @@ let make_hashed_ledgers (config : Runtime_config.t) :
                         Mina_base.Frozen_ledger_hash.of_base58_check_exn next
                     ; total_currency = Currency.Amount.zero
                     }
-                    (* TODO: check if this of_string is right *)
                 ; seed = Mina_base.Epoch_seed.of_base58_check_exn next_seed
                 } )
         } )
