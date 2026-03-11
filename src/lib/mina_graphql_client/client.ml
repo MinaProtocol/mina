@@ -3,9 +3,6 @@ open Async
 open Mina_base
 open Mina_transaction
 
-(* exclude from bisect_ppx to avoid type error on GraphQL modules *)
-[@@@coverage exclude_file]
-
 let default_node_password = "naughty blue worm"
 
 (** this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
@@ -66,7 +63,7 @@ let get_peer_id ~logger node_uri =
   in
   [%log info] "get_peer_id, finished exec_graphql_request" ;
   let self_id_obj = query_result_obj.daemonStatus.addrsAndPorts.peer in
-  let%bind self_id =
+  let%map self_id =
     match self_id_obj with
     | None ->
         Deferred.Or_error.error_string "Peer not found"
@@ -78,7 +75,7 @@ let get_peer_id ~logger node_uri =
   [%log info] "get_peer_id, result of graphql query (self_id,[peers]) (%s,%s)"
     self_id
     (String.concat ~sep:" " peer_ids) ;
-  return (self_id, peer_ids)
+  (self_id, peer_ids)
 
 let get_global_slot_since_hard_fork ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
@@ -87,7 +84,7 @@ let get_global_slot_since_hard_fork ~logger node_uri =
   let query_obj =
     Queries.Global_slot_since_hard_fork.(make @@ makeVariables ())
   in
-  let%bind query_result_obj =
+  let%map query_result_obj =
     exec_graphql_request ~logger ~node_uri
       ~query_name:"global_slot_since_hard_fork" query_obj
   in
@@ -97,7 +94,7 @@ let get_global_slot_since_hard_fork ~logger node_uri =
   in
   [%log info] "global_slot_since_hard_fork, result of graphql query = %s"
     (Mina_numbers.Global_slot_since_hard_fork.to_string res) ;
-  return res
+  res
 
 let get_best_chain ?max_length ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
