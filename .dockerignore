@@ -2,7 +2,7 @@
 !src/opam.export
 !coda.deb
 !mina.deb
-!mina-devnet-config_*.deb
+!mina-*-config_*.deb
 !coda-discovery.deb
 !scripts/run-demo.sh
 !src/external/**/*

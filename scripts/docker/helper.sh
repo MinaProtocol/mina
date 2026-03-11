@@ -111,7 +111,7 @@ function export_docker_tag() {
         CUSTOM_SUFFIX=""
     else
         CUSTOM_SUFFIX="-${CUSTOM_SUFFIX}"
-        CUSTOM_SUFFIX_ARG="--build-arg custom_suffix=${CUSTOM_SUFIX}"
+        CUSTOM_SUFFIX_ARG="--build-arg custom_suffix=${CUSTOM_SUFFIX}"
     fi
 
 
