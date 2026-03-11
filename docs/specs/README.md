@@ -6,6 +6,10 @@
 * [Block structure](types_and_structures/block.md)
 * [Consensus](consensus/README.md)
 
+# Ledger specifications
+
+* [Staged ledger and snarked ledger](staged_ledger.md)
+
 # Loading the URS
 
 **Inputs:**

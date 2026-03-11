@@ -5,9 +5,6 @@
   (flags -verbose -show-counts))
  (instrumentation
   (backend bisect_ppx))
- (preprocessor_deps
-  ../../../graphql-ppx-config.inc
-  ../../../../graphql_schema.json)
  (preprocess
   (pps
    ppx_base
@@ -22,10 +19,7 @@
    ppx_compare
    ppx_assert
    lens.ppx_deriving
-   ppx_pipebang
-   graphql_ppx
-   --
-   %{read-lines:../../../graphql-ppx-config.inc}))
+   ppx_pipebang))
  (libraries
   ;; opam libraries
   result
@@ -70,6 +64,7 @@
   pickles_types
   with_hash
   data_hash_lib
+  mina_graphql_client
   generated_graphql_queries
   mina_graphql
   graphql_lib

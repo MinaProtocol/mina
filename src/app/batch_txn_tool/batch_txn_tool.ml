@@ -3,7 +3,7 @@ open Async
 open Signature_lib
 open Unsigned
 open Mina_base
-open Integration_test_lib
+open Mina_graphql_client
 
 let gen_keys count =
   Quickcheck.random_value ~seed:`Nondeterministic
@@ -118,7 +118,7 @@ let get_nonce ~logger ~(ingress_uri : Uri.t) ~(pub_key : Account.key) =
   let account_id = Account_id.create pub_key Mina_base.Token_id.default in
   let%bind nonce =
     let%bind querry_result =
-      Graphql_requests.get_account_data ingress_uri ~logger ~account_id
+      Client.get_account_data ingress_uri ~logger ~account_id
     in
     match querry_result with
     | Ok res ->
@@ -257,7 +257,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
       (Currency.Amount.to_string initial_send_amount)
       (Currency.Fee.to_string fee_amount) ;
     let%bind res =
-      Graphql_requests.sign_and_send_payment ~logger node_ingress_uri
+      Client.sign_and_send_payment ~logger node_ingress_uri
         ~sender_keypair:sender_kp ~receiver_pub_key ~amount:base_send_amount
         ~fee:fee_amount ~nonce ~memo:""
         ~valid_until:Mina_numbers.Global_slot_since_genesis.max_value
