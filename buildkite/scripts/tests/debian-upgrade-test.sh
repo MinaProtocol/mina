@@ -18,7 +18,7 @@ YELLOW='\033[0;33m'
 # Configuration - can be overridden via environment variables
 REPO="${REPO:-packages.o1test.net}"
 CODENAME="${CODENAME:-bullseye}"
-CHANNEL="${CHANNEL:-devnet}"
+CHANNEL="${CHANNEL:-alpha}"
 PACKAGE="${PACKAGE:-mina-devnet}"
 NEW_DEBIAN_PATH="${NEW_DEBIAN_PATH:-}"  # Path pattern in cache, e.g., "debians/bullseye/mina-devnet_*.deb"
 
@@ -49,7 +49,7 @@ function usage() {
     echo "Options:"
     echo "  -r, --repo          Repository URL (default: packages.o1test.net)"
     echo "  -c, --codename      Debian codename (default: bullseye)"
-    echo "  -C, --channel       Repository channel (default: devnet)"
+    echo "  -C, --channel       Repository channel (default: alpha)"
     echo "  -p, --package       Package name (default: mina-devnet)"
     echo "  -n, --new-debian    Path to new debian in cache (required)"
     echo "  -h, --help          Show this help message"
