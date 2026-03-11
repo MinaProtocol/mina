@@ -63,7 +63,6 @@ HARDFORK_HANDLING=
 # ================================================
 # Globals (assigned during execution of script)
 
-ARCHIVE_ADDRESS_CLI_ARG=""
 ROOT="${HOME}/.mina-network"
 SNARK_COORDINATOR_PUBKEY=""
 NODES_FOLDER=""
@@ -313,6 +312,10 @@ exec-daemon() {
 
   if [ -n "$NODE_STATUS_URL" ]; then
     extra_opts+=( --node-status-url "$NODE_STATUS_URL" )
+  fi
+
+  if [ -n "$ARCHIVE_SERVER_PORT" ]; then
+    extra_opts+=( --archive-address "$ARCHIVE_SERVER_PORT" )
   fi
 
   # shellcheck disable=SC2068
@@ -707,7 +710,6 @@ EOF
 
   psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" -c "SELECT * FROM user_commands;" &>/dev/null
 
-  ARCHIVE_ADDRESS_CLI_ARG="-archive-address ${ARCHIVE_SERVER_PORT}"
 fi
 
 # ================================================
@@ -1010,10 +1012,9 @@ case "${SEED}" in
         --snark-worker-fee 0.001 \
         --demo-mode \
         --external-ip "$(hostname -i)" \
-        --seed \
-        ${ARCHIVE_ADDRESS_CLI_ARG}
+        --seed
     else
-      spawn-daemon seed "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY} "${ARCHIVE_ADDRESS_CLI_ARG}"
+      spawn-daemon seed "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY}
     fi
     SEED_PID=$!
 
@@ -1061,7 +1062,7 @@ for ((i = 0; i < WHALES; i++)); do
   KEY_FILE=${ROOT}/online_whale_keys/online_whale_account_${i}
   mkdir -p "${FOLDER}"
   spawn-daemon "whale_${i}" "${FOLDER}" $((WHALE_START_PORT + i * 6)) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
-    -libp2p-keypair "${ROOT}"/libp2p_keys/whale_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
+    -libp2p-keypair "${ROOT}"/libp2p_keys/whale_${i}
   WHALE_PIDS[${i}]=$!
 done
 
@@ -1072,7 +1073,7 @@ for ((i = 0; i < FISH; i++)); do
   KEY_FILE=${ROOT}/online_fish_keys/online_fish_account_${i}
   mkdir -p "${FOLDER}"
   spawn-daemon "fish_${i}" "${FOLDER}" $((FISH_START_PORT + i * 6)) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
-    -libp2p-keypair "${ROOT}"/libp2p_keys/fish_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
+    -libp2p-keypair "${ROOT}"/libp2p_keys/fish_${i}
   FISH_PIDS[${i}]=$!
 done
 
@@ -1082,7 +1083,7 @@ for ((i = 0; i < NODES; i++)); do
   FOLDER=${NODES_FOLDER}/node_${i}
   mkdir -p "${FOLDER}"
   spawn-daemon "plain_${i}" "${FOLDER}" $((NODE_START_PORT + i * 6)) -peer ${SEED_PEER_ID} \
-    -libp2p-keypair "${ROOT}"/libp2p_keys/node_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
+    -libp2p-keypair "${ROOT}"/libp2p_keys/node_${i}
   NODE_PIDS[${i}]=$!
 done
 
