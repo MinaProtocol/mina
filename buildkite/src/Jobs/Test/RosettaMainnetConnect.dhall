@@ -17,7 +17,8 @@ in  Pipeline.build
           Connectivity.Spec::{
           , network = Network.Type.Mainnet
           , profile = Profile.Type.Mainnet
-          , timeout = 2400
+          , syncTimeout = 2400
+          , newBlockTimeout = 2400
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           , excludeIf =

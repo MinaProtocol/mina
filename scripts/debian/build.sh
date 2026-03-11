@@ -23,35 +23,60 @@ source "${SCRIPTPATH}"/../export-git-env-vars.sh
 # shellcheck disable=SC1090
 BUILD_DIR="${BUILD_DIR}" source "${SCRIPTPATH}/builder-helpers.sh"
 
-if [ $# -eq 0 ]
-  then
-    echo "No arguments supplied. Building all known debian packages"
-    build_logproc_deb
-    build_archive_testnet_generic_deb
-    build_archive_devnet_deb
-    build_archive_mainnet_deb
-    build_batch_txn_deb
-    build_daemon_testnet_generic_deb
-    build_daemon_mainnet_deb
-    build_daemon_mainnet_config_deb
-    build_daemon_devnet_deb
-    build_daemon_devnet_config_deb
-    build_rosetta_testnet_generic_deb
-    build_rosetta_mainnet_deb
-    build_rosetta_devnet_deb
-    build_test_executive_deb
-    build_functional_test_suite_deb
-    build_zkapp_test_transaction_deb
-    build_delegation_verify_deb
-  else
-    for i in "$@"; do
-      if [[ $(type -t "build_${i}_deb") == function ]]
-      then
-          echo "Building $i debian package"
-          "build_${i}_deb"
-      else
-        echo "invalid debian package name '$i'"
-        exit 1
-      fi
-    done
+resolve_and_build_package() {
+  local package="$1"
+
+  # TODO: consider further refactor on dhall's side so we can remove the name 
+  # resolving logic
+  if [[ $(type -t "build_${package}_deb") == function ]]; then
+    "build_${package}_deb"
+    return
+  fi
+
+  if [[ "$package" =~ ^(archive|daemon|rosetta)_(mainnet|devnet|mesa)$ ]]; then
+    "build_${BASH_REMATCH[1]}_deb" "${BASH_REMATCH[2]}"
+    return
+  fi
+
+  if [[ "$package" =~ ^daemon_(mainnet|devnet|mesa)_(config|generic|hardfork_config|prefork|postfork)$ ]]; then
+    "build_daemon_${BASH_REMATCH[2]}_deb" "${BASH_REMATCH[1]}"
+    return
+  fi
+
+  if [[ "$package" =~ ^prefork_(mainnet|devnet|mesa)_genesis_ledger$ ]]; then
+    build_prefork_genesis_ledger_deb "${BASH_REMATCH[1]}"
+    return
+  fi
+
+  echo "Invalid debian package name '$package'"
+  exit 1
+}
+
+default_targets=(
+  logproc
+  archive_devnet
+  archive_mainnet
+  batch_txn
+  daemon_mainnet
+  daemon_mainnet_config
+  daemon_mainnet_generic
+  daemon_devnet
+  daemon_devnet_config
+  daemon_devnet_generic
+  rosetta_mainnet
+  rosetta_devnet
+  test_executive
+  functional_test_suite
+  zkapp_test_transaction
+  delegation_verify
+)
+
+targets=("$@")
+if [ $# -eq 0 ]; then
+  echo "No arguments supplied. Building all known debian packages"
+  targets=("${default_targets[@]}")
 fi
+
+for t in "${targets[@]}"; do
+  resolve_and_build_package "$t"
+done

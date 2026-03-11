@@ -11,7 +11,7 @@ echo " Includes mina daemon, archive-node, rosetta"
 [[ ${MINA_BUILD_MAINNET} ]] && echo " MINA_BUILD_MAINNET is true so this includes the mainnet and devnet packages for mina-daemon as well"
 
 
-echo "--- Prepare debian packages"
+echo "--- Building debian packages"
 export BRANCH_NAME="$BUILDKITE_BRANCH"
 ./scripts/debian/build.sh "$@"
 

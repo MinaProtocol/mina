@@ -50,7 +50,7 @@ let compaction_interval = Some (2 * block_window_duration)
 
 let vrf_poll_interval = 5000
 
-let zkapp_cmd_limit = None
+let zkapp_cmd_limit = Some 12
 
 let sync_ledger_max_subtree_depth = 8
 

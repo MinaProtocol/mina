@@ -20,7 +20,7 @@ let Network = ../../Constants/Network.dhall
 
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
-let network = Network.Type.TestnetGeneric
+let network = Network.Type.Devnet
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
@@ -31,7 +31,10 @@ let dirtyWhen =
 
 let rosettaDocker =
       Artifacts.fullDockerTag
-        Artifacts.Tag::{ artifact = Artifacts.Type.Rosetta, network = network }
+        Artifacts.Tag::{
+        , artifact = Artifacts.Type.RosettaAppsOnly
+        , network = network
+        }
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -73,7 +76,7 @@ in  Pipeline.build
                 Dockers.dependsOn
                   Dockers.DepsSpec::{
                   , codename = Dockers.Type.Bullseye
-                  , artifact = Artifacts.Type.Rosetta
+                  , artifact = Artifacts.Type.RosettaAppsOnly
                   , network = network
                   }
             }

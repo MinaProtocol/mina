@@ -27,6 +27,7 @@
     }
   },
   "daemon": {
-    "network_id": "devnet"
+    "network_id": "devnet",
+    "peer_list_url": "https://bootnodes.minaprotocol.com/networks/devnet.txt"
   }
 }

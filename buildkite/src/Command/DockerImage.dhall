@@ -55,13 +55,14 @@ let ReleaseSpec =
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
           , docker_repo : DockerRepo.Type
+          , generic : Bool
           , verify : Bool
           , size : Size
           , if_ : Optional B/If
           }
       , default =
           { deps = [] : List Command.TaggedKey.Type
-          , network = Network.Type.TestnetGeneric
+          , network = Network.Type.Devnet
           , arch = Arch.Type.Amd64
           , version = "\\\${MINA_DOCKER_TAG}"
           , service = Artifacts.Type.Daemon
@@ -83,6 +84,7 @@ let ReleaseSpec =
           , verify = False
           , deb_suffix = None Text
           , if_ = None B/If
+          , generic = False
           }
       }
 
@@ -125,7 +127,9 @@ let generateStep =
 
           let debSuffix =
                 merge
-                  { None = "", Some = \(s : Text) -> " --deb-suffix " ++ s }
+                  { None = if spec.generic then " --deb-suffix generic" else ""
+                  , Some = \(s : Text) -> " --deb-suffix " ++ s
+                  }
                   spec.deb_suffix
 
           let maybeVerify =
@@ -145,6 +149,7 @@ let generateStep =
                             , buildFlag = spec.build_flags
                             , archs = [ spec.arch ]
                             , repo = spec.docker_repo
+                            , generic = spec.generic
                             }
 
                 else  ""

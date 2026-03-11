@@ -8,7 +8,7 @@ let router ~signature_kind ~graphql_uri ~minimum_user_command_fee
        ( (Caqti_async.connection, [> Caqti_error.connect ]) Mina_caqti.Pool.t
        , [ `App of Errors.t ] )
        Deferred.Result.t
-       lazy_t ) ~logger route body =
+       lazy_t ) ~logger ~safe_mode route body =
   let open Deferred.Result.Let_syntax in
   let get_graphql_uri_or_error () =
     match graphql_uri with
@@ -47,14 +47,14 @@ let router ~signature_kind ~graphql_uri ~minimum_user_command_fee
         let%bind graphql_uri = get_graphql_uri_or_error () in
         Account.router tl body ~graphql_uri ~logger ~with_db
           ~minimum_user_command_fee
-    | "mempool" :: tl ->
+    | "mempool" :: tl when not safe_mode ->
         let%bind graphql_uri = get_graphql_uri_or_error () in
         Mempool.router tl body ~graphql_uri ~logger ~minimum_user_command_fee
     | "block" :: tl ->
         let%bind graphql_uri = get_graphql_uri_or_error () in
         Block.router tl body ~graphql_uri ~logger ~with_db:with_db'
           ~minimum_user_command_fee
-    | "construction" :: tl ->
+    | "construction" :: tl when not safe_mode ->
         Construction.router tl body ~signature_kind ~get_graphql_uri_or_error
           ~logger ~with_db:with_db' ~minimum_user_command_fee
           ~account_creation_fee
@@ -108,7 +108,7 @@ let pg_log_data ~logger ~pool : unit Deferred.t =
       Deferred.unit
 
 let server_handler ~signature_kind ~pool ~graphql_uri ~logger
-    ~minimum_user_command_fee ~account_creation_fee ~body _sock req =
+    ~minimum_user_command_fee ~account_creation_fee ~body ~safe_mode _sock req =
   let uri = Cohttp_async.Request.uri req in
   let%bind body = Cohttp_async.Body.to_string body in
   let route = List.tl_exn (String.split ~on:'/' (Uri.path uri)) in
@@ -116,10 +116,10 @@ let server_handler ~signature_kind ~pool ~graphql_uri ~logger
     match Yojson.Safe.from_string body with
     | body ->
         router route body ~signature_kind ~pool ~graphql_uri ~logger
-          ~minimum_user_command_fee ~account_creation_fee
+          ~minimum_user_command_fee ~account_creation_fee ~safe_mode
     | exception Yojson.Json_error "Blank input data" ->
         router route `Null ~signature_kind ~pool ~graphql_uri ~logger
-          ~minimum_user_command_fee ~account_creation_fee
+          ~minimum_user_command_fee ~account_creation_fee ~safe_mode
     | exception Yojson.Json_error err ->
         Errors.create ~context:"JSON in request malformed"
           (`Json_parse (Some err))
@@ -173,6 +173,12 @@ let command ?signature_kind ~minimum_user_command_fee ~account_creation_fee () =
   and port =
     flag "--port" ~aliases:[ "port" ] ~doc:"Port to expose Rosetta server"
       (required int)
+  and safe_mode =
+    flag "--safe-mode" ~aliases:[ "safe-mode" ]
+      ~doc:
+        "Enable safe mode, meaning only data safe to expose to public would be \
+         routed. And any mutation should be banned."
+      no_arg
   and signature_kind =
     Option.value_map signature_kind ~default:Cli_lib.Flag.signature_kind
       ~f:Command.Param.return
@@ -235,7 +241,7 @@ let command ?signature_kind ~minimum_user_command_fee ~account_creation_fee () =
                   ignore (exit 1) ) )
         (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
         (server_handler ~signature_kind ~pool ~graphql_uri ~logger
-           ~minimum_user_command_fee ~account_creation_fee )
+           ~minimum_user_command_fee ~account_creation_fee ~safe_mode )
     in
     [%log info]
       ~metadata:[ ("port", `Int port) ]
