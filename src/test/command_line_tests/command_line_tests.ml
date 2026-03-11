@@ -3,12 +3,6 @@ open Async
 open Mina_automation
 open Signature_lib
 
-let init_log_filters =
-  [ Structured_log_events.string_of_id
-      Transition_router
-      .starting_transition_frontier_controller_structured_events_id
-  ]
-
 module BackgroundMode = struct
   type t = Mina_automation_fixture.Daemon.before_bootstrap
 
@@ -19,9 +13,7 @@ module BackgroundMode = struct
     let%bind () =
       Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
     in
-    let%bind process =
-      Daemon.start ~start_filtered_logs:init_log_filters daemon
-    in
+    let%bind process = Daemon.start daemon in
     let%bind result = Daemon.wait_for_node_init process in
     let%bind () =
       match result with
@@ -48,14 +40,10 @@ module DaemonRecover = struct
      let%bind () =
        Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
      in
-     let%bind process =
-       Daemon.start ~start_filtered_logs:init_log_filters daemon
-     in
+     let%bind process = Daemon.start daemon in
      let%bind.Deferred.Result () = Daemon.wait_for_node_init process in
      let%bind.Deferred.Result _ = Daemon.Process.force_kill process in
-     let%bind process =
-       Daemon.start ~start_filtered_logs:init_log_filters daemon
-     in
+     let%bind process = Daemon.start daemon in
      let%bind.Deferred.Result () = Daemon.wait_for_node_init process in
      let%map () = Daemon.Client.stop_daemon process.client in
      Ok () )
@@ -137,9 +125,7 @@ module ExportSnarkedLedger = struct
     let%bind () =
       Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
     in
-    let%bind process =
-      Daemon.start ~start_filtered_logs:init_log_filters daemon
-    in
+    let%bind process = Daemon.start daemon in
     let%bind bootstrap_result = Daemon.wait_for_node_init process in
     let%bind bootstrap_ok =
       match bootstrap_result with
@@ -440,8 +426,7 @@ module AutoHardforkConfigGeneration = struct
     (* Start daemon with migrate-exit flag and block producer key *)
     let%bind process =
       Daemon.start ~hardfork_handling:"migrate-exit"
-        ~block_producer_key:bp_key_path ~start_filtered_logs:init_log_filters
-        daemon
+        ~block_producer_key:bp_key_path daemon
     in
     (* Wait for daemon to bootstrap *)
     let%bind result = Daemon.wait_for_node_init process in
@@ -623,10 +608,7 @@ module ConfigFileOverride = struct
     Runtime_config.to_yojson override_config
     |> Yojson.Safe.to_file override_file ;
     (* Start daemon with override config file *)
-    let%bind process =
-      Daemon.start ~config_files:[ override_file ]
-        ~start_filtered_logs:init_log_filters daemon
-    in
+    let%bind process = Daemon.start ~config_files:[ override_file ] daemon in
     let%bind result = Daemon.wait_for_node_init process in
     let%bind () =
       match result with
