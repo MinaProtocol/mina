@@ -26,6 +26,7 @@ in  Pipeline.build
             , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Devnet
           , tags =
