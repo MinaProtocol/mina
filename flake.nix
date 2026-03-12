@@ -63,6 +63,11 @@
     flake = false;
   };
 
+  inputs.kimchi-stubs-vendors = {
+    url = "github:MinaProtocol/kimchi-stubs-vendors/0077943ca86ca74a36095cd1b2ad4c1ca08d4bd5";
+    flake = false;
+  };
+
   inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
 
   inputs.nix-utils.url = "github:juliosueiras-nix/nix-utils";
@@ -104,7 +109,10 @@
     in {
       overlays = {
         misc = import ./nix/misc.nix;
-        rust = import ./nix/rust.nix { proof-systems-src = inputs.proof-systems; };
+        rust = import ./nix/rust.nix {
+          proof-systems-src = inputs.proof-systems;
+          kimchi-stubs-vendors-src = inputs.kimchi-stubs-vendors;
+        };
         go = import ./nix/go.nix;
         javascript = import ./nix/javascript.nix;
         ocaml = pkgs: prev: {

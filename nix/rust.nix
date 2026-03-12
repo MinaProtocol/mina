@@ -1,5 +1,5 @@
 # An overlay defining Rust parts&dependencies of Mina
-{ proof-systems-src }:
+{ proof-systems-src, kimchi-stubs-vendors-src }:
 final: prev:
 let
   rustPlatformFor = rust:
@@ -79,28 +79,26 @@ in {
     toolchain = rustChannelFromToolchainFileOf
       ../src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml;
     rust_platform = rustPlatformFor toolchain.rust;
-    # Combine kimchi_bindings/stubs from the main repo with proof-systems from
-    # the dedicated flake input, preserving the relative path layout that
-    # Cargo.toml expects (path = "../../proof-systems/...").
+    # Combine kimchi_bindings/stubs from the main repo with proof-systems and
+    # kimchi-stubs-vendors from dedicated flake inputs, preserving the relative
+    # path layout that Cargo.toml and .cargo/config.toml expect.
     combinedSrc = final.runCommand "kimchi-bindings-stubs-src" { } ''
       mkdir -p $out/lib/crypto
       cp -r ${final.lib.sourceByRegex ../src [
-        "^lib(/crypto(/kimchi_bindings(/stubs(/.*)?)?)?)?$"
+        "^lib(/crypto(/kimchi_bindings(/stubs(/(Cargo\\.(toml|lock)|rust-toolchain\\.toml|\\.cargo(/.*)?|src(/.*)?|build\\.rs))?)?)?)?$"
       ]}/lib/crypto/kimchi_bindings $out/lib/crypto/kimchi_bindings
+      chmod -R u+w $out/lib/crypto/kimchi_bindings
       cp -r ${proof-systems-src} $out/lib/crypto/proof-systems
+      cp -r ${kimchi-stubs-vendors-src} $out/lib/crypto/kimchi_bindings/stubs/kimchi-stubs-vendors
     '';
   in rust_platform.buildRustPackage {
     pname = "kimchi_bindings_stubs";
     version = proofSystemsVersion;
     src = combinedSrc;
     sourceRoot = "kimchi-bindings-stubs-src/lib/crypto/kimchi_bindings/stubs";
+    cargoVendorDir = "kimchi-stubs-vendors";
     nativeBuildInputs = [ final.ocamlPackages_mina.ocaml ];
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
-    cargoLock = let fixupLockFile = path: builtins.readFile path;
-    in {
-      lockFileContents =
-        fixupLockFile ../src/lib/crypto/kimchi_bindings/stubs/Cargo.lock;
-    };
     # FIXME: tests fail
     doCheck = false;
     dontUpdateAutotoolsGnuConfigScripts = true;

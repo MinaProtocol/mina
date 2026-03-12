@@ -179,6 +179,23 @@
         "type": "github"
       }
     },
+    "kimchi-stubs-vendors": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1771867366,
+        "narHash": "sha256-TtLbwnvG6q4mz5X1S8zSONSzlZyXTT7d45ljHFDKOAc=",
+        "owner": "MinaProtocol",
+        "repo": "kimchi-stubs-vendors",
+        "rev": "0077943ca86ca74a36095cd1b2ad4c1ca08d4bd5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "MinaProtocol",
+        "repo": "kimchi-stubs-vendors",
+        "rev": "0077943ca86ca74a36095cd1b2ad4c1ca08d4bd5",
+        "type": "github"
+      }
+    },
     "mirage-opam-overlays": {
       "flake": false,
       "locked": {
@@ -468,6 +485,7 @@
         "flake-compat": "flake-compat",
         "flockenzeit": "flockenzeit",
         "gitignore-nix": "gitignore-nix",
+        "kimchi-stubs-vendors": "kimchi-stubs-vendors",
         "nix-filter": "nix-filter",
         "nix-npm-buildPackage": "nix-npm-buildPackage",
         "nix-utils": "nix-utils",
