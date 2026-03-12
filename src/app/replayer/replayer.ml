@@ -836,11 +836,24 @@ let hard_fork_params ~logger ~stop_slot_config_file ~hard_fork_output_file =
               ~metadata:[ ("file", `String file); ("error", `String msg) ] ;
             Core_kernel.exit 1
       in
-      match
+      let genesis_slot =
         Runtime_config.scheduled_hard_fork_genesis_slot hf_runtime_config
-      with
-      | Some slot ->
-          Some (slot, output_file)
+      in
+      let slot_chain_end = Runtime_config.slot_chain_end hf_runtime_config in
+      let current_genesis_global_slot =
+        let open Option.Let_syntax in
+        let%bind proof = hf_runtime_config.proof in
+        let%map { global_slot_since_genesis; _ } = proof.fork in
+        Mina_numbers.Global_slot_since_genesis.of_int global_slot_since_genesis
+      in
+      match Option.both genesis_slot slot_chain_end with
+      | Some (slot, slot_chain_end_hf) ->
+          let slot_chain_end_since_genesis =
+            Mina_numbers.Global_slot_since_hard_fork
+            .to_global_slot_since_genesis ~current_genesis_global_slot
+              slot_chain_end_hf
+          in
+          Some (slot, slot_chain_end_since_genesis, output_file)
       | None ->
           [%log fatal]
             "Hard fork config must have daemon.slot_chain_end and \
@@ -848,6 +861,51 @@ let hard_fork_params ~logger ~stop_slot_config_file ~hard_fork_output_file =
           Core_kernel.exit 1 )
   | None ->
       None
+
+(* When producing a hard fork checkpoint, filter out blocks at or beyond
+   slot_chain_end so the replayer only processes pre-fork blocks. The post-fork
+   genesis block's parent links back into the pre-fork chain, so the recursive
+   chain query can return blocks from both sides of the fork boundary. *)
+let filter_block_infos_for_hard_fork ~logger ~target_state_hash
+    ~hard_fork_params_opt block_infos =
+  match hard_fork_params_opt with
+  | Some (_, slot_chain_end_since_genesis, _) ->
+      let stop_slot =
+        Mina_numbers.Global_slot_since_genesis.to_uint32
+          slot_chain_end_since_genesis
+        |> Unsigned.UInt32.to_int64
+      in
+      [%log info]
+        "Filtering blocks to those before slot_chain_end (global slot since \
+         genesis %Ld)"
+        stop_slot ;
+      let block_infos =
+        List.filter block_infos ~f:(fun (bi : Sql.Block_info.t) ->
+            Int64.( < ) bi.global_slot_since_genesis stop_slot )
+      in
+      ( match
+          List.max_elt block_infos ~compare:(fun bi1 bi2 ->
+              Int64.compare bi1.global_slot_since_genesis
+                bi2.global_slot_since_genesis )
+        with
+      | Some bi ->
+          [%log info]
+            "Replayer target changed from state hash $old_target to \
+             $new_target at global slot since genesis %Ld"
+            bi.global_slot_since_genesis
+            ~metadata:
+              [ ("old_target", `String target_state_hash)
+              ; ("new_target", `String bi.state_hash)
+              ]
+      | None ->
+          [%log fatal]
+            "No blocks remain after filtering at slot_chain_end; original \
+             target was $old_target"
+            ~metadata:[ ("old_target", `String target_state_hash) ] ;
+          Core_kernel.exit 1 ) ;
+      block_infos
+  | None ->
+      block_infos
 
 let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
     ~checkpoint_interval ~checkpoint_output_folder_opt ~checkpoint_file_prefix
@@ -951,6 +1009,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         process_block_infos_of_state_hash ~logger pool
           ~state_hash:target_state_hash
           ~start_slot:input.start_slot_since_genesis ~f:(fun block_infos ->
+            let block_infos =
+              filter_block_infos_for_hard_fork ~logger ~target_state_hash
+                ~hard_fork_params_opt block_infos
+            in
             let ({ id = oldest_block_id; _ } : Sql.Block_info.t) =
               Option.value_exn
                 (List.min_elt block_infos ~compare:(fun bi1 bi2 ->
@@ -1906,7 +1968,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       in
       let%bind () =
         match hard_fork_params_opt with
-        | Some (scheduled_genesis_since_hf, hard_fork_output_file) ->
+        | Some
+            ( scheduled_genesis_since_hf
+            , _slot_chain_end_since_genesis
+            , hard_fork_output_file ) ->
             (* Note that the [ledger] here is a mutable ledger mask, so
                apply_commands does modify it in-place when it applies the
                transactions to the ledger. Thus the [ledger] here will be the
