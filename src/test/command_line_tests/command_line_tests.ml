@@ -788,7 +788,7 @@ module PeerListUrlHttpWarning = struct
     in
     (* The daemon should not crash immediately from URL validation.
        Give it a few seconds to get past the peer-list-url check. *)
-    let%bind () = after (Core.Time.Span.of_sec 5.) in
+    let%bind () = after (Core.Time.Span.of_sec 10.) in
     (* Check if the process is still running *)
     let%bind process_status =
       Async.Clock.with_timeout (Core.Time.Span.of_sec 1.)
