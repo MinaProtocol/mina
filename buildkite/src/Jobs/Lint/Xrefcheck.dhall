@@ -39,7 +39,7 @@ in  Pipeline.build
                   }
                   (     "awesome_bot --allow-dupe "
                     ++  "--allow-redirect "
-                    ++  "--allow 403,401 "
+                    ++  "--allow 403,401,429 "
                     ++  "--skip-save-results "
                     ++  "--files "
                     ++  "`find . -name \"*.md\" "
