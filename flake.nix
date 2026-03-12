@@ -53,6 +53,16 @@
 
   inputs.nix-filter.url = "github:numtide/nix-filter";
 
+  inputs.proof-systems = {
+    # Pinned to the same commit used in the proof systems git submodule
+    # If you want to hack locally with an overriden proof systems, add the
+    # argument `--override-input proof-systems "github:o1-labs/proof-systems/<commit>"`
+    # to your `nix develop` or `nix build` command. Use the URI "path:/path/to/my/proof-systems"
+    # if you want to use a local proof systems repo.
+    url = "github:o1-labs/proof-systems/5f4fa349beedad1453ef29bb843cdce950466d76";
+    flake = false;
+  };
+
   inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
 
   inputs.nix-utils.url = "github:juliosueiras-nix/nix-utils";
@@ -94,7 +104,7 @@
     in {
       overlays = {
         misc = import ./nix/misc.nix;
-        rust = import ./nix/rust.nix;
+        rust = import ./nix/rust.nix { proof-systems-src = inputs.proof-systems; };
         go = import ./nix/go.nix;
         javascript = import ./nix/javascript.nix;
         ocaml = pkgs: prev: {
