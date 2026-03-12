@@ -15,29 +15,24 @@
 # versions.
 #
 # Note: The dump+backup approach temporarily requires roughly 2x the disk
-# space of the original database. Use --backup-dir to place backups on a
-# separate filesystem if needed.
+# space of the original database.
 #
 # Exit codes:
 #   0 - All databases converted successfully (or none found)
 #   1 - One or more databases failed to convert
 #   2 - Argument or validation error
-#
-# Environment variable defaults (overridable via command-line arguments):
-#   NODE_DIR        - Path to the Mina node configuration directory
 
 set -euo pipefail
 
 # --- Default configuration ---
-CURRENT_SCANNER="/usr/lib/mina/storage/10.5.2/3.3.0/mina-rocksdb-scanner"
-STABLE_SCANNER="/usr/lib/mina/storage/5.7.12/3.3.0/mina-rocksdb-scanner"
-NODE_DIR="${NODE_DIR:-~/.mina-config}"
+CURRENT_SCANNER=""
+STABLE_SCANNER=""
+NODE_DIR=""
 
 # --- Flag defaults ---
 DRY_RUN=false
 VERBOSE=false
 YES=false
-BACKUP_DIR=""
 
 # --- Logging ---
 RED='\033[0;31m'
@@ -77,34 +72,26 @@ Required Arguments:
   --stable-scanner PATH    Path to the stable (legacy) scanner binary
 
 Optional Arguments:
-  --backup-dir PATH        Directory to store database backups and dumps
-                           (default: alongside original DB as <db_path>.bak)
   --dry-run                List what would be done without making changes
   --yes, -y                Skip confirmation prompt (for CI/automation)
   --verbose, -v            Show detailed output during operations
   --help, -h               Show this help message
 
-Environment Variable Defaults:
-  NODE_DIR=${NODE_DIR}
-
 Examples:
-  # Local development (uses env var defaults for scanners)
+  # Basic usage
   $0 --node-dir ~/.mina-config \\
-     --current-scanner /usr/lib/mina/10.5.2/3.3.0/mina-rocksdb-scanner \\
-     --stable-scanner /usr/lib/mina/5.7.12/3.3.0/mina-rocksdb-scanner
+     --current-scanner /usr/lib/mina/storage/10.5.2/3.3.0/mina-rocksdb-scanner \\
+     --stable-scanner /usr/lib/mina/storage/5.7.12/3.3.0/mina-rocksdb-scanner
 
   # Production use with auto-confirm (CI/automation)
-  $0 --node-dir /var/lib/mina --yes \\
-     --current-scanner /usr/lib/mina/10.5.2/3.3.0/mina-rocksdb-scanner \\
-     --stable-scanner /usr/lib/mina/5.7.12/3.3.0/mina-rocksdb-scanner
+  $0 --node-dir ~/.mina-config --yes \\
+     --current-scanner /usr/lib/mina/storage/10.5.2/3.3.0/mina-rocksdb-scanner \\
+     --stable-scanner /usr/lib/mina/storage/5.7.12/3.3.0/mina-rocksdb-scanner
 
   # Dry run to preview what would happen
-  $0 --node-dir ~/.mina-config --dry-run
-
-  # With explicit backup directory (useful when disk space is tight)
-  $0 --node-dir /var/lib/mina --backup-dir /tmp/rocksdb-backups \\
-     --current-scanner /usr/lib/mina/10.5.2/3.3.0/mina-rocksdb-scanner \\
-     --stable-scanner /usr/lib/mina/5.7.12/3.3.0/mina-rocksdb-scanner
+  $0 --node-dir ~/.mina-config --dry-run \\
+     --current-scanner /usr/lib/mina/storage/10.5.2/3.3.0/mina-rocksdb-scanner \\
+     --stable-scanner /usr/lib/mina/storage/5.7.12/3.3.0/mina-rocksdb-scanner
 EOF
     exit "${1:-2}"
 }
@@ -122,7 +109,12 @@ is_rocksdb() {
     # Check for RocksDB signature files:
     # - CURRENT: Points to the current manifest
     # - MANIFEST-*: The database manifest/ledger
-    if [[ -f "$dir/CURRENT" ]] && compgen -G "$dir/MANIFEST-*" > /dev/null; then
+    local has_current
+    has_current=$(ls "$dir"/CURRENT 2>/dev/null)
+    local has_manifest
+    has_manifest=$(ls "$dir"/MANIFEST-* 2>/dev/null | head -n 1)
+
+    if [[ -n "$has_current" && -n "$has_manifest" ]]; then
         return 0
     else
         return 1
@@ -152,21 +144,8 @@ downgrade_db() {
     local db_path="$1"
     local current_bin="$2"
     local stable_bin="$3"
-
-    # Compute a collision-safe name for backup/dump files
-    local relative_path="${db_path#"$NODE_DIR"/}"
-    local safe_name="${relative_path//\//_}"
-
-    # Determine backup and dump file locations
-    local backup_path
-    local dump_file
-    if [[ -n "$BACKUP_DIR" ]]; then
-        backup_path="${BACKUP_DIR}/${safe_name}.bak"
-        dump_file="${BACKUP_DIR}/${safe_name}_dump.txt"
-    else
-        backup_path="${db_path}.bak"
-        dump_file="${db_path}_dump.txt"
-    fi
+    local dump_file="${db_path}_dump.txt"
+    local backup_path="${db_path}.bak"
 
     if [[ "$DRY_RUN" == true ]]; then
         log_info "[DRY RUN] Would dump:    $db_path -> $dump_file"
@@ -226,10 +205,6 @@ while [[ $# -gt 0 ]]; do
             STABLE_SCANNER="$2"
             shift 2
             ;;
-        --backup-dir)
-            BACKUP_DIR="$2"
-            shift 2
-            ;;
         --dry-run)
             DRY_RUN=true
             shift
@@ -258,14 +233,6 @@ if [[ -z "${NODE_DIR:-}" || -z "${CURRENT_SCANNER:-}" || -z "${STABLE_SCANNER:-}
     usage 2
 fi
 
-# --- Expand tilde in all paths ---
-NODE_DIR="${NODE_DIR/#\~/$HOME}"
-CURRENT_SCANNER="${CURRENT_SCANNER/#\~/$HOME}"
-STABLE_SCANNER="${STABLE_SCANNER/#\~/$HOME}"
-if [[ -n "$BACKUP_DIR" ]]; then
-    BACKUP_DIR="${BACKUP_DIR/#\~/$HOME}"
-fi
-
 # --- Verify node directory exists ---
 if [[ ! -d "$NODE_DIR" ]]; then
     log_error "Node directory does not exist: $NODE_DIR"
@@ -279,14 +246,6 @@ for bin in "$CURRENT_SCANNER" "$STABLE_SCANNER"; do
         exit 2
     fi
 done
-
-# --- Verify/create backup directory ---
-if [[ -n "$BACKUP_DIR" ]]; then
-    if [[ ! -d "$BACKUP_DIR" ]]; then
-        log_info "Creating backup directory: $BACKUP_DIR"
-        mkdir -p "$BACKUP_DIR"
-    fi
-fi
 
 # --- Cleanup trap ---
 CURRENT_DB_PATH=""
