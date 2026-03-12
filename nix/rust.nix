@@ -69,6 +69,10 @@ let
         allRefs = true;
       }).narHash;
     }) package;
+  proofSystemsVersion =
+    (fromTOML (builtins.readFile
+      ../src/lib/crypto/proof-systems/Cargo.toml)).workspace.package.version;
+
 in {
   kimchi_bindings_stubs = let
     toolchain = rustChannelFromToolchainFileOf
@@ -76,7 +80,7 @@ in {
     rust_platform = rustPlatformFor toolchain.rust;
   in rust_platform.buildRustPackage {
     pname = "kimchi_bindings_stubs";
-    version = "0.1.0";
+    version = proofSystemsVersion;
     src = final.lib.sourceByRegex ../src [
       "^lib(/crypto(/kimchi_bindings(/stubs(/.*)?)?)?)?$"
       "^lib(/crypto(/proof-systems(/.*)?)?)?$"
@@ -101,7 +105,7 @@ in {
     rust_platform = rustPlatformFor toolchain.rust;
   in rust_platform.buildRustPackage {
     pname = "kimchi_stubs_static_lib";
-    version = "0.1.0";
+    version = proofSystemsVersion;
     src = final.lib.sourceByRegex ../src
       [ "^lib(/crypto(/proof-systems(/.*)?)?)?$" ];
     sourceRoot = "source/lib/crypto/proof-systems";
@@ -180,7 +184,7 @@ in {
     };
   in rustPlatform.buildRustPackage {
     pname = "plonk_wasm";
-    version = "0.1.0";
+    version = proofSystemsVersion;
     src = final.lib.sourceByRegex ../src [
       "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
       "^lib(/crypto(/proof-systems(/.*)?)?)?$"
