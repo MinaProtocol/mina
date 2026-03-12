@@ -93,8 +93,8 @@ let of_config ~logger ~signature_kind ~(genesis_constants : Genesis_constants.t)
         ~default:genesis_constants config
       |> Result.ok
     in
-    let%bind constraint_constants =
-      Option.map
+    let constraint_constants =
+      Option.value_map ~default:constraint_constants
         ~f:
           (Genesis_ledger_helper.make_constraint_constants
              ~default:constraint_constants )
@@ -119,7 +119,8 @@ let of_config ~logger ~signature_kind ~(genesis_constants : Genesis_constants.t)
         (Chain_id.to_string chain_id) )
     chain_id_opt ;
   let config_modifier : string -> string =
-    Option.value_map ~default:ident
+    Option.value_map
+      ~default:(fun s -> chain_state ^/ s)
       ~f:(fun x s -> chain_state ^/ Chain_id.to_string x ^/ s)
       chain_id_opt
   in
