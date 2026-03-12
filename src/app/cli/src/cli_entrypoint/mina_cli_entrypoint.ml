@@ -1302,7 +1302,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                    ~f:(fun { Runtime_config.Daemon.peer_list_url; _ } ->
                      peer_list_url ) )
           in
-          let chain_id = Lazy.force chain_id |> Chain_id.to_string in
           Option.iter seed_peer_list_url ~f:(fun url ->
               match Uri.scheme (Uri.of_string url) with
               | Some "https" ->
@@ -1327,6 +1326,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               {|No peers were given.
 
 Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
+          let chain_id = Lazy.force chain_id |> Chain_id.to_string in
           [%log info] "Daemon will use chain id %s" chain_id ;
           [%log info] "Daemon running protocol version %s"
             Protocol_version.(to_string current) ;
