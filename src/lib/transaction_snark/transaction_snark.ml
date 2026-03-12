@@ -3574,23 +3574,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     verify_impl
       ~f:(Pickles.verify (module Nat.N2) (module Statement.With_sok) key)
 
-  let constraint_system_digests ~signature_kind ~constraint_constants () =
-    let digest = Tick.R1CS_constraint_system.digest in
-    [ ( "transaction-merge"
-      , digest
-          Merge.(
-            Tick.constraint_system ~input_typ:Statement.With_sok.typ
-              ~return_typ:Tick.Typ.unit (fun x ->
-                let open Tick in
-                Checked.map ~f:ignore @@ main x )) )
-    ; ( "transaction-base"
-      , digest
-          Base.(
-            Tick.constraint_system ~input_typ:Statement.With_sok.typ
-              ~return_typ:Tick.Typ.unit
-              (main ~signature_kind ~constraint_constants)) )
-    ]
-
   (** Return the constraint system for the transaction-merge circuit. *)
   let merge_constraint_system () =
     Merge.(
@@ -3642,6 +3625,25 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~constraint_constants stmt
         in
         Checked.return () )
+
+  let constraint_system_digests ~signature_kind ~constraint_constants () =
+    let digest = Tick.R1CS_constraint_system.digest in
+    [ ("transaction-merge", digest (merge_constraint_system ()))
+    ; ( "transaction-base"
+      , digest (base_constraint_system ~signature_kind ~constraint_constants) )
+    ; ( "zkapp-opt_signed-opt_signed"
+      , digest
+          (zkapp_opt_signed_opt_signed_constraint_system ~signature_kind
+             ~constraint_constants ) )
+    ; ( "zkapp-opt_signed"
+      , digest
+          (zkapp_opt_signed_constraint_system ~signature_kind
+             ~constraint_constants ) )
+    ; ( "zkapp-proved"
+      , digest
+          (zkapp_proved_constraint_system ~signature_kind ~constraint_constants)
+      )
+    ]
 
   module Account_update_group = Zkapp_command.Make_update_group (struct
     type local_state =
