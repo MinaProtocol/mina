@@ -45,7 +45,8 @@ in  Pipeline.build
         , excludeIf =
           [ Expr.Type.DescendantOf
               { ancestor = MainlineBranch.Type.Mesa
-              , reason = "Cannot connect to Canary network on Mesa until redeploy"
+              , reason =
+                  "Cannot connect to Canary network on Mesa until redeploy"
               }
           ]
         }
