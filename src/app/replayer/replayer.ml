@@ -658,16 +658,21 @@ let create_genesis_db_and_tar ~logger ~genesis_dir ~ledger_depth ~populate
 let apply_hard_fork_migration ~logger
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~ledger
     ~genesis_dir ~scheduled_genesis_since_hf ~hard_fork_output_file
-    ~hard_fork_target =
+    ~hard_fork_target ~stop_slot_since_genesis =
   [%log info] "Applying hard fork migration to produce post-fork input" ;
-  (* Get the last block's slots from global_slot_hashes_tbl *)
-  let slots = Int64.Table.keys global_slot_hashes_tbl in
+  (* Get the last block's slots from global_slot_hashes_tbl, filtering out
+     blocks at or beyond slot_chain_end *)
+  let slots =
+    Int64.Table.keys global_slot_hashes_tbl
+    |> List.filter ~f:(fun s -> Int64.( < ) s stop_slot_since_genesis)
+  in
   let last_slot_since_genesis =
     match List.max_elt slots ~compare:Int64.compare with
     | Some s ->
         s
     | None ->
-        [%log fatal] "No blocks found in global slot hashes table" ;
+        [%log fatal]
+          "No blocks found before slot_chain_end in global slot hashes table" ;
         Core_kernel.exit 1
   in
   let _state_hash, _ledger_hash, _snarked_hash, last_slot_since_hard_fork =
@@ -836,11 +841,13 @@ let hard_fork_params ~logger ~stop_slot_config_file ~hard_fork_output_file =
               ~metadata:[ ("file", `String file); ("error", `String msg) ] ;
             Core_kernel.exit 1
       in
-      match
+      let genesis_slot =
         Runtime_config.scheduled_hard_fork_genesis_slot hf_runtime_config
-      with
-      | Some slot ->
-          Some (slot, output_file)
+      in
+      let slot_chain_end = Runtime_config.slot_chain_end hf_runtime_config in
+      match Option.both genesis_slot slot_chain_end with
+      | Some (slot, slot_chain_end_hf) ->
+          Some (slot, slot_chain_end_hf, output_file, hf_runtime_config)
       | None ->
           [%log fatal]
             "Hard fork config must have daemon.slot_chain_end and \
@@ -1290,6 +1297,22 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         ; "3NLHTdvTPXxUn8YFy4z59NxDcX9DYhthFtv8aPNMmpm2pYuA6Tf6"
         ]
       in
+      (* Compute the stop slot in global-slot-since-genesis terms so that
+         apply_commands can stop replaying at slot_chain_end. *)
+      let stop_slot_since_genesis_opt =
+        Option.map hard_fork_params_opt ~f:(fun (_, slot_chain_end_hf, _, _) ->
+            let chain_end_i64 =
+              Mina_numbers.Global_slot_since_hard_fork.to_uint32
+                slot_chain_end_hf
+              |> Unsigned.UInt32.to_int64
+            in
+            let offset =
+              Hashtbl.choose global_slot_hashes_tbl
+              |> Option.value_map ~default:0L ~f:(fun (sg, (_, _, _, shf)) ->
+                     Int64.(sg - shf) )
+            in
+            Int64.(chain_end_i64 + offset) )
+      in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands ~last_global_slot_since_genesis ~last_block_id
           ~(block_txns : Mina_transaction.Transaction.t list)
@@ -1685,188 +1708,235 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             []
           else return block_txns
         in
-        match (internal_cmds, user_cmds, zkapp_cmds) with
-        | [], [], [] ->
-            (* all done *)
-            let%bind _ =
-              run_transactions_on_slot_change ~last_block:true block_txns ()
-            in
-            Deferred.return
-              (staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed)
-        | ic :: ics, [], [] ->
-            (* only internal commands *)
-            let%bind block_txns0 =
-              check_for_complete_block
-                ~cmd_global_slot_since_genesis:ic.global_slot_since_genesis
-            in
-            let%bind block_txns, ics' =
-              let%map txn, ics' =
-                internal_cmds_to_transaction ~logger ~pool ic ics
+        (* Stop replaying if the next command is at or beyond slot_chain_end *)
+        let next_cmd_slot =
+          List.filter_opt
+            [ Option.map (List.hd internal_cmds)
+                ~f:(fun (ic : Sql.Internal_command.t) ->
+                  ic.global_slot_since_genesis )
+            ; Option.map (List.hd user_cmds)
+                ~f:(fun (uc : Sql.User_command.t) ->
+                  uc.global_slot_since_genesis )
+            ; Option.map (List.hd zkapp_cmds)
+                ~f:(fun (zkc : Sql.Zkapp_command.t) ->
+                  zkc.global_slot_since_genesis )
+            ]
+          |> List.min_elt ~compare:Int64.compare
+        in
+        let reached_chain_end =
+          Option.both stop_slot_since_genesis_opt next_cmd_slot
+          |> Option.value_map ~default:false ~f:(fun (stop_slot, next) ->
+                 Int64.( >= ) next stop_slot )
+        in
+        if reached_chain_end then (
+          [%log info] "Reached slot_chain_end, stopping replay at slot %Ld"
+            (Option.value_exn next_cmd_slot) ;
+          let%bind _ =
+            run_transactions_on_slot_change ~last_block:true block_txns ()
+          in
+          Deferred.return
+            (staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed) )
+        else
+          match (internal_cmds, user_cmds, zkapp_cmds) with
+          | [], [], [] ->
+              (* all done *)
+              let%bind _ =
+                run_transactions_on_slot_change ~last_block:true block_txns ()
               in
-              ( Option.value_map txn ~default:block_txns0 ~f:(fun txn ->
-                    txn :: block_txns0 )
-              , ics' )
-            in
-            apply_commands ~block_txns
-              ~last_global_slot_since_genesis:ic.global_slot_since_genesis
-              ~last_block_id:ic.block_id ics' user_cmds zkapp_cmds
-        | [], uc :: ucs, [] ->
-            (* only user commands *)
-            let%bind block_txns =
-              check_for_complete_block
-                ~cmd_global_slot_since_genesis:uc.global_slot_since_genesis
-            in
-            let%bind txn = user_command_to_transaction ~logger ~pool uc in
-            apply_commands ~block_txns:(txn :: block_txns)
-              ~last_global_slot_since_genesis:uc.global_slot_since_genesis
-              ~last_block_id:uc.block_id internal_cmds ucs zkapp_cmds
-        | [], [], zkc :: zkcs ->
-            (* only zkApp commands *)
-            let%bind block_txns =
-              check_for_complete_block
-                ~cmd_global_slot_since_genesis:zkc.global_slot_since_genesis
-            in
-            let%bind txn =
-              zkapp_command_to_transaction ~proof_cache_db ~logger ~pool zkc
-            in
-            apply_commands ~block_txns:(txn :: block_txns)
-              ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
-              ~last_block_id:zkc.block_id internal_cmds user_cmds zkcs
-        | [], uc :: ucs, zkc :: zkcs -> (
-            (* no internal commands *)
-            let seqs =
-              [ get_user_cmd_sequence uc; get_zkapp_cmd_sequence zkc ]
-            in
-            match command_type_of_sequences seqs with
-            | `User_command ->
-                let%bind block_txns =
-                  check_for_complete_block
-                    ~cmd_global_slot_since_genesis:uc.global_slot_since_genesis
+              Deferred.return
+                ( staking_epoch_ledger
+                , staking_seed
+                , next_epoch_ledger
+                , next_seed )
+          | ic :: ics, [], [] ->
+              (* only internal commands *)
+              let%bind block_txns0 =
+                check_for_complete_block
+                  ~cmd_global_slot_since_genesis:ic.global_slot_since_genesis
+              in
+              let%bind block_txns, ics' =
+                let%map txn, ics' =
+                  internal_cmds_to_transaction ~logger ~pool ic ics
                 in
-                let%bind txn = user_command_to_transaction ~logger ~pool uc in
-                apply_commands ~block_txns:(txn :: block_txns)
-                  ~last_global_slot_since_genesis:uc.global_slot_since_genesis
-                  ~last_block_id:uc.block_id internal_cmds ucs zkapp_cmds
-            | `Zkapp_command ->
-                let%bind block_txns =
-                  check_for_complete_block
-                    ~cmd_global_slot_since_genesis:zkc.global_slot_since_genesis
-                in
-                let%bind txn =
-                  zkapp_command_to_transaction ~proof_cache_db ~logger ~pool zkc
-                in
-                apply_commands ~block_txns:(txn :: block_txns)
-                  ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
-                  ~last_block_id:zkc.block_id internal_cmds user_cmds zkcs )
-        | ic :: ics, [], zkc :: zkcs -> (
-            (* no user commands *)
-            let seqs =
-              [ get_internal_cmd_sequence ic; get_zkapp_cmd_sequence zkc ]
-            in
-            match command_type_of_sequences seqs with
-            | `Internal_command ->
-                let%bind block_txns0 =
-                  check_for_complete_block
-                    ~cmd_global_slot_since_genesis:ic.global_slot_since_genesis
-                in
-                let%bind block_txns, ics' =
-                  let%map txn, ics' =
-                    internal_cmds_to_transaction ~logger ~pool ic ics
+                ( Option.value_map txn ~default:block_txns0 ~f:(fun txn ->
+                      txn :: block_txns0 )
+                , ics' )
+              in
+              apply_commands ~block_txns
+                ~last_global_slot_since_genesis:ic.global_slot_since_genesis
+                ~last_block_id:ic.block_id ics' user_cmds zkapp_cmds
+          | [], uc :: ucs, [] ->
+              (* only user commands *)
+              let%bind block_txns =
+                check_for_complete_block
+                  ~cmd_global_slot_since_genesis:uc.global_slot_since_genesis
+              in
+              let%bind txn = user_command_to_transaction ~logger ~pool uc in
+              apply_commands ~block_txns:(txn :: block_txns)
+                ~last_global_slot_since_genesis:uc.global_slot_since_genesis
+                ~last_block_id:uc.block_id internal_cmds ucs zkapp_cmds
+          | [], [], zkc :: zkcs ->
+              (* only zkApp commands *)
+              let%bind block_txns =
+                check_for_complete_block
+                  ~cmd_global_slot_since_genesis:zkc.global_slot_since_genesis
+              in
+              let%bind txn =
+                zkapp_command_to_transaction ~proof_cache_db ~logger ~pool zkc
+              in
+              apply_commands ~block_txns:(txn :: block_txns)
+                ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
+                ~last_block_id:zkc.block_id internal_cmds user_cmds zkcs
+          | [], uc :: ucs, zkc :: zkcs -> (
+              (* no internal commands *)
+              let seqs =
+                [ get_user_cmd_sequence uc; get_zkapp_cmd_sequence zkc ]
+              in
+              match command_type_of_sequences seqs with
+              | `User_command ->
+                  let%bind block_txns =
+                    check_for_complete_block
+                      ~cmd_global_slot_since_genesis:
+                        uc.global_slot_since_genesis
                   in
-                  ( Option.value_map txn ~default:block_txns0 ~f:(fun txn ->
-                        txn :: block_txns0 )
-                  , ics' )
-                in
-                apply_commands ~block_txns
-                  ~last_global_slot_since_genesis:ic.global_slot_since_genesis
-                  ~last_block_id:ic.block_id ics' user_cmds zkapp_cmds
-            | `Zkapp_command ->
-                let%bind block_txns =
-                  check_for_complete_block
-                    ~cmd_global_slot_since_genesis:zkc.global_slot_since_genesis
-                in
-                let%bind txn =
-                  zkapp_command_to_transaction ~proof_cache_db ~logger ~pool zkc
-                in
-                apply_commands ~block_txns:(txn :: block_txns)
-                  ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
-                  ~last_block_id:zkc.block_id internal_cmds user_cmds zkcs )
-        | ic :: ics, uc :: ucs, [] -> (
-            (* no zkApp commands *)
-            let seqs =
-              [ get_internal_cmd_sequence ic; get_user_cmd_sequence uc ]
-            in
-            match command_type_of_sequences seqs with
-            | `Internal_command ->
-                let%bind block_txns0 =
-                  check_for_complete_block
-                    ~cmd_global_slot_since_genesis:ic.global_slot_since_genesis
-                in
-                let%bind block_txns, ics' =
-                  let%map txn, ics' =
-                    internal_cmds_to_transaction ~logger ~pool ic ics
+                  let%bind txn = user_command_to_transaction ~logger ~pool uc in
+                  apply_commands ~block_txns:(txn :: block_txns)
+                    ~last_global_slot_since_genesis:uc.global_slot_since_genesis
+                    ~last_block_id:uc.block_id internal_cmds ucs zkapp_cmds
+              | `Zkapp_command ->
+                  let%bind block_txns =
+                    check_for_complete_block
+                      ~cmd_global_slot_since_genesis:
+                        zkc.global_slot_since_genesis
                   in
-                  ( Option.value_map txn ~default:block_txns0 ~f:(fun txn ->
-                        txn :: block_txns0 )
-                  , ics' )
-                in
-                apply_commands ~block_txns
-                  ~last_global_slot_since_genesis:ic.global_slot_since_genesis
-                  ~last_block_id:ic.block_id ics' user_cmds zkapp_cmds
-            | `User_command ->
-                let%bind block_txns =
-                  check_for_complete_block
-                    ~cmd_global_slot_since_genesis:uc.global_slot_since_genesis
-                in
-                let%bind txn = user_command_to_transaction ~logger ~pool uc in
-                apply_commands ~block_txns:(txn :: block_txns)
-                  ~last_global_slot_since_genesis:uc.global_slot_since_genesis
-                  ~last_block_id:uc.block_id internal_cmds ucs zkapp_cmds )
-        | ic :: ics, uc :: ucs, zkc :: zkcs -> (
-            (* internal, user, and zkApp commands *)
-            let seqs =
-              [ get_internal_cmd_sequence ic
-              ; get_user_cmd_sequence uc
-              ; get_zkapp_cmd_sequence zkc
-              ]
-            in
-            match command_type_of_sequences seqs with
-            | `Internal_command ->
-                let%bind block_txns0 =
-                  check_for_complete_block
-                    ~cmd_global_slot_since_genesis:ic.global_slot_since_genesis
-                in
-                let%bind block_txns, ics' =
-                  let%map txn, ics' =
-                    internal_cmds_to_transaction ~logger ~pool ic ics
+                  let%bind txn =
+                    zkapp_command_to_transaction ~proof_cache_db ~logger ~pool
+                      zkc
                   in
-                  ( Option.value_map txn ~default:block_txns0 ~f:(fun txn ->
-                        txn :: block_txns0 )
-                  , ics' )
-                in
-                apply_commands ~block_txns
-                  ~last_global_slot_since_genesis:ic.global_slot_since_genesis
-                  ~last_block_id:ic.block_id ics' user_cmds zkapp_cmds
-            | `User_command ->
-                let%bind block_txns =
-                  check_for_complete_block
-                    ~cmd_global_slot_since_genesis:uc.global_slot_since_genesis
-                in
-                let%bind txn = user_command_to_transaction ~logger ~pool uc in
-                apply_commands ~block_txns:(txn :: block_txns)
-                  ~last_global_slot_since_genesis:uc.global_slot_since_genesis
-                  ~last_block_id:uc.block_id internal_cmds ucs zkapp_cmds
-            | `Zkapp_command ->
-                let%bind block_txns =
-                  check_for_complete_block
-                    ~cmd_global_slot_since_genesis:zkc.global_slot_since_genesis
-                in
-                let%bind txn =
-                  zkapp_command_to_transaction ~proof_cache_db ~logger ~pool zkc
-                in
-                apply_commands ~block_txns:(txn :: block_txns)
-                  ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
-                  ~last_block_id:zkc.block_id internal_cmds user_cmds zkcs )
+                  apply_commands ~block_txns:(txn :: block_txns)
+                    ~last_global_slot_since_genesis:
+                      zkc.global_slot_since_genesis ~last_block_id:zkc.block_id
+                    internal_cmds user_cmds zkcs )
+          | ic :: ics, [], zkc :: zkcs -> (
+              (* no user commands *)
+              let seqs =
+                [ get_internal_cmd_sequence ic; get_zkapp_cmd_sequence zkc ]
+              in
+              match command_type_of_sequences seqs with
+              | `Internal_command ->
+                  let%bind block_txns0 =
+                    check_for_complete_block
+                      ~cmd_global_slot_since_genesis:
+                        ic.global_slot_since_genesis
+                  in
+                  let%bind block_txns, ics' =
+                    let%map txn, ics' =
+                      internal_cmds_to_transaction ~logger ~pool ic ics
+                    in
+                    ( Option.value_map txn ~default:block_txns0 ~f:(fun txn ->
+                          txn :: block_txns0 )
+                    , ics' )
+                  in
+                  apply_commands ~block_txns
+                    ~last_global_slot_since_genesis:ic.global_slot_since_genesis
+                    ~last_block_id:ic.block_id ics' user_cmds zkapp_cmds
+              | `Zkapp_command ->
+                  let%bind block_txns =
+                    check_for_complete_block
+                      ~cmd_global_slot_since_genesis:
+                        zkc.global_slot_since_genesis
+                  in
+                  let%bind txn =
+                    zkapp_command_to_transaction ~proof_cache_db ~logger ~pool
+                      zkc
+                  in
+                  apply_commands ~block_txns:(txn :: block_txns)
+                    ~last_global_slot_since_genesis:
+                      zkc.global_slot_since_genesis ~last_block_id:zkc.block_id
+                    internal_cmds user_cmds zkcs )
+          | ic :: ics, uc :: ucs, [] -> (
+              (* no zkApp commands *)
+              let seqs =
+                [ get_internal_cmd_sequence ic; get_user_cmd_sequence uc ]
+              in
+              match command_type_of_sequences seqs with
+              | `Internal_command ->
+                  let%bind block_txns0 =
+                    check_for_complete_block
+                      ~cmd_global_slot_since_genesis:
+                        ic.global_slot_since_genesis
+                  in
+                  let%bind block_txns, ics' =
+                    let%map txn, ics' =
+                      internal_cmds_to_transaction ~logger ~pool ic ics
+                    in
+                    ( Option.value_map txn ~default:block_txns0 ~f:(fun txn ->
+                          txn :: block_txns0 )
+                    , ics' )
+                  in
+                  apply_commands ~block_txns
+                    ~last_global_slot_since_genesis:ic.global_slot_since_genesis
+                    ~last_block_id:ic.block_id ics' user_cmds zkapp_cmds
+              | `User_command ->
+                  let%bind block_txns =
+                    check_for_complete_block
+                      ~cmd_global_slot_since_genesis:
+                        uc.global_slot_since_genesis
+                  in
+                  let%bind txn = user_command_to_transaction ~logger ~pool uc in
+                  apply_commands ~block_txns:(txn :: block_txns)
+                    ~last_global_slot_since_genesis:uc.global_slot_since_genesis
+                    ~last_block_id:uc.block_id internal_cmds ucs zkapp_cmds )
+          | ic :: ics, uc :: ucs, zkc :: zkcs -> (
+              (* internal, user, and zkApp commands *)
+              let seqs =
+                [ get_internal_cmd_sequence ic
+                ; get_user_cmd_sequence uc
+                ; get_zkapp_cmd_sequence zkc
+                ]
+              in
+              match command_type_of_sequences seqs with
+              | `Internal_command ->
+                  let%bind block_txns0 =
+                    check_for_complete_block
+                      ~cmd_global_slot_since_genesis:
+                        ic.global_slot_since_genesis
+                  in
+                  let%bind block_txns, ics' =
+                    let%map txn, ics' =
+                      internal_cmds_to_transaction ~logger ~pool ic ics
+                    in
+                    ( Option.value_map txn ~default:block_txns0 ~f:(fun txn ->
+                          txn :: block_txns0 )
+                    , ics' )
+                  in
+                  apply_commands ~block_txns
+                    ~last_global_slot_since_genesis:ic.global_slot_since_genesis
+                    ~last_block_id:ic.block_id ics' user_cmds zkapp_cmds
+              | `User_command ->
+                  let%bind block_txns =
+                    check_for_complete_block
+                      ~cmd_global_slot_since_genesis:
+                        uc.global_slot_since_genesis
+                  in
+                  let%bind txn = user_command_to_transaction ~logger ~pool uc in
+                  apply_commands ~block_txns:(txn :: block_txns)
+                    ~last_global_slot_since_genesis:uc.global_slot_since_genesis
+                    ~last_block_id:uc.block_id internal_cmds ucs zkapp_cmds
+              | `Zkapp_command ->
+                  let%bind block_txns =
+                    check_for_complete_block
+                      ~cmd_global_slot_since_genesis:
+                        zkc.global_slot_since_genesis
+                  in
+                  let%bind txn =
+                    zkapp_command_to_transaction ~proof_cache_db ~logger ~pool
+                      zkc
+                  in
+                  apply_commands ~block_txns:(txn :: block_txns)
+                    ~last_global_slot_since_genesis:
+                      zkc.global_slot_since_genesis ~last_block_id:zkc.block_id
+                    internal_cmds user_cmds zkcs )
       in
       let%bind start_slot_since_genesis =
         let%map slot_opt =
@@ -1906,14 +1976,24 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       in
       let%bind () =
         match hard_fork_params_opt with
-        | Some (scheduled_genesis_since_hf, hard_fork_output_file) ->
+        | Some
+            ( scheduled_genesis_since_hf
+            , _slot_chain_end_hf
+            , hard_fork_output_file
+            , _hf_runtime_config ) ->
             (* Note that the [ledger] here is a mutable ledger mask, so
                apply_commands does modify it in-place when it applies the
                transactions to the ledger. Thus the [ledger] here will be the
                final staged ledger of the replayer run. *)
+            let stop_slot =
+              Option.value_exn stop_slot_since_genesis_opt
+                ~message:
+                  "stop_slot_since_genesis_opt must be set when \
+                   hard_fork_params_opt is set"
+            in
             apply_hard_fork_migration ~logger ~constraint_constants ~ledger
               ~genesis_dir ~scheduled_genesis_since_hf ~hard_fork_output_file
-              ~hard_fork_target
+              ~hard_fork_target ~stop_slot_since_genesis:stop_slot
         | None ->
             Deferred.unit
       in
