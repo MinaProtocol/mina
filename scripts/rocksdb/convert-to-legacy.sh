@@ -24,15 +24,13 @@
 #   2 - Argument or validation error
 #
 # Environment variable defaults (overridable via command-line arguments):
-#   CURRENT_SCANNER - Path to the current (newer) RocksDB scanner binary
-#   STABLE_SCANNER  - Path to the stable (legacy) scanner binary
 #   NODE_DIR        - Path to the Mina node configuration directory
 
 set -euo pipefail
 
-# --- Default configuration (overridable via environment variables) ---
-CURRENT_SCANNER="${CURRENT_SCANNER:-/usr/lib/mina/storage/10.5.2/3.3.0/mina-rocksdb-scanner}"
-STABLE_SCANNER="${STABLE_SCANNER:-/usr/lib/mina/storage/5.7.12/3.3.0/mina-rocksdb-scanner}"
+# --- Default configuration ---
+CURRENT_SCANNER="/usr/lib/mina/storage/10.5.2/3.3.0/mina-rocksdb-scanner"
+STABLE_SCANNER="/usr/lib/mina/storage/5.7.12/3.3.0/mina-rocksdb-scanner"
 NODE_DIR="${NODE_DIR:-~/.mina-config}"
 
 # --- Flag defaults ---
@@ -87,8 +85,6 @@ Optional Arguments:
   --help, -h               Show this help message
 
 Environment Variable Defaults:
-  CURRENT_SCANNER=${CURRENT_SCANNER}
-  STABLE_SCANNER=${STABLE_SCANNER}
   NODE_DIR=${NODE_DIR}
 
 Examples:
