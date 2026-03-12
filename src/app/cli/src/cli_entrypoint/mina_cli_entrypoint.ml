@@ -1303,6 +1303,21 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                      peer_list_url ) )
           in
           let chain_id = Lazy.force chain_id |> Chain_id.to_string in
+          Option.iter seed_peer_list_url ~f:(fun url ->
+              match Uri.scheme (Uri.of_string url) with
+              | Some "https" ->
+                  ()
+              | Some "http" ->
+                  [%log warn]
+                    "The --peer-list-url $url uses HTTP instead of HTTPS. This \
+                     is insecure and not recommended."
+                    ~metadata:[ ("url", `String url) ]
+              | _ ->
+                  Mina_stdlib.Mina_user_error.raisef
+                    ~where:"validating peer-list-url scheme"
+                    "The --peer-list-url must be a valid URL starting with \
+                     http:// or https://, but got: %s"
+                    url ) ;
           if is_seed then [%log info] "Starting node as a seed node"
           else if demo_mode then [%log info] "Starting node in demo mode"
           else if

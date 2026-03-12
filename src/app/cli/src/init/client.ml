@@ -620,7 +620,7 @@ let cancel_transaction_graphql =
            (* fee amount "inspired by" network_pool/indexed_pool.ml *)
            Currency.Fee.of_uint64 (fee + replace_fee)
          in
-         printf "Fee to cancel transaction is %s coda.\n"
+         printf "Fee to cancel transaction is %s mina.\n"
            (Currency.Fee.to_mina_string cancel_fee) ;
          let cancel_query =
            let input =
@@ -770,8 +770,8 @@ let export_ledger =
     Command.Param.(
       flag "--state-hash" ~aliases:[ "state-hash" ]
         ~doc:
-          "STATE-HASH State hash, if printing a staged ledger (default: state \
-           hash for the best tip)"
+          "STATE-HASH State hash, if printing a staged ledger or snarked \
+           ledger (default: state hash for the best tip)"
         (optional string))
   in
   let ledger_kind =
