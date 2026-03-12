@@ -6,13 +6,13 @@ function cleanup
   remove_active_stacks() {
       for stack in $(docker stack ls --format "{{.Name}}"); do
           echo "Removing stack: $stack"
-          docker stack rm $stack
+          docker stack rm "${stack}"
       done
   }
   while [[ $(docker stack ls | wc -l) -gt 1 ]]; do
       echo "Active Docker stacks found. Removing them..."
       remove_active_stacks
-      sleep 5 
+      sleep 5
   done
 }
 
@@ -24,14 +24,14 @@ fi
 
 cleanup
 
-TEST_NAME="$1"
+# Export the variables to be used later in the Makefile target
+export TEST_NAME="$1"
 DOCKER_REPO="$2"
 MINA_DOCKER_NAME="mina-daemon"
 MINA_ARCHIVE_DOCKER_NAME="mina-archive"
 
-
-MINA_IMAGE="$DOCKER_REPO/$MINA_DOCKER_NAME:$MINA_DOCKER_TAG-devnet-generic"
-ARCHIVE_IMAGE="$DOCKER_REPO/$MINA_ARCHIVE_DOCKER_NAME:$MINA_DOCKER_TAG-devnet"
+export MINA_IMAGE="$DOCKER_REPO/$MINA_DOCKER_NAME:$MINA_DOCKER_TAG-devnet-generic"
+export ARCHIVE_IMAGE="$DOCKER_REPO/$MINA_ARCHIVE_DOCKER_NAME:$MINA_DOCKER_TAG-devnet"
 
 if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
   echo "Skipping $TEST_NAME"
@@ -44,8 +44,5 @@ source buildkite/scripts/debian/update.sh --verbose
 
 source buildkite/scripts/debian/install.sh "mina-test-executive"
 
-mina-test-executive local "$TEST_NAME" \
-  --mina-image "$MINA_IMAGE" \
-  --archive-image "$ARCHIVE_IMAGE" \
-  | tee "$TEST_NAME.local.test.log" \
-  | mina-logproc -i inline -f '!(.level in ["Debug", "Spam"])'
+# This should be shared with a local UX
+make -C ../../ run-test-executive
