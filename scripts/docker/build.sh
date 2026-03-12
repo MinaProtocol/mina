@@ -218,9 +218,9 @@ case "${SERVICE}" in
     mina-rosetta)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
         ;;
-    mina-rosetta-config)
+    mina-rosetta-configured)
         DOCKERFILE_PATH="dockerfiles/stages/install-config"
-        DOCKER_CONTEXT="./"
+        DOCKER_CONTEXT="dockerfiles/"
         SERVICE="mina-rosetta"
         ;;
     mina-zkapp-test-transaction)
