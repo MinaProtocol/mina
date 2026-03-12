@@ -574,6 +574,80 @@ let dump_tock_with_labels output_dir name circuit ~input_typ ~return_typ =
   Out_channel.write_all constants_path ~data:(constants_json ^ "\n") ;
   Printf.printf "Wrote %s\n" constants_path
 
+(* ---- Label-tracked dump for Tick circuits ----
+   Same as dump_tock_with_labels but for Step/Tick (Vesta-based) circuits. *)
+
+let constraint_type_name_tick (c : Impl.Constraint.t) : string =
+  match c with
+  | Boolean _ -> "Boolean"
+  | Equal _ -> "Equal"
+  | Square _ -> "Square"
+  | R1CS _ -> "R1CS"
+  | Basic _ -> "Basic"
+  | Poseidon _ -> "Poseidon"
+  | EC_add_complete _ -> "EC_add_complete"
+  | EC_scale _ -> "EC_scale"
+  | EC_endoscale _ -> "EC_endoscale"
+  | EC_endoscalar _ -> "EC_endoscalar"
+  | Lookup _ -> "Lookup"
+  | RangeCheck0 _ -> "RangeCheck0"
+  | RangeCheck1 _ -> "RangeCheck1"
+  | ForeignFieldAdd _ -> "ForeignFieldAdd"
+  | ForeignFieldMul _ -> "ForeignFieldMul"
+  | Xor _ -> "Xor"
+  | Rot64 _ -> "Rot64"
+  | AddFixedLookupTable _ -> "AddFixedLookupTable"
+  | AddRuntimeTableCfg _ -> "AddRuntimeTableCfg"
+  | Raw _ -> "Raw"
+
+let dump_tick_with_labels output_dir name circuit ~input_typ ~return_typ =
+  let module VCS = Kimchi_pasta_snarky_backend.Vesta_based_plonk.R1CS_constraint_system in
+  let events = ref [] in
+  let label_stack = ref [] in
+  Impl.set_constraint_logger
+    (fun ?at_label_boundary constraint_opt ->
+       ( match at_label_boundary with
+         | Some (`Start, lab) ->
+             label_stack := lab :: !label_stack ;
+             VCS.set_gate_label_stack !label_stack
+         | Some (`End, _lab) ->
+             label_stack := (match !label_stack with _ :: rest -> rest | [] -> []) ;
+             VCS.set_gate_label_stack !label_stack
+         | None -> () ) ;
+       match constraint_opt with
+       | Some c ->
+           let path = String.concat ~sep:"/" (List.rev !label_stack) in
+           events := (path, constraint_type_name_tick c) :: !events
+       | None -> () ) ;
+  let cs =
+    Impl.constraint_system ~input_typ ~return_typ circuit
+  in
+  Impl.clear_constraint_logger () ;
+  VCS.set_gate_label_stack [] ;
+  let json = Kimchi_pasta_constraint_system.Vesta_constraint_system.to_json cs in
+  let path = output_dir ^ "/" ^ name ^ ".json" in
+  Out_channel.write_all path ~data:(json ^ "\n") ;
+  Printf.printf "Wrote %s\n" path ;
+  (* Write label events as JSONL *)
+  let labels_path = output_dir ^ "/" ^ name ^ "_labels.jsonl" in
+  let events_rev = List.rev !events in
+  let lines = List.map events_rev ~f:(fun (path, ctype) ->
+    Printf.sprintf "{\"label\":\"%s\",\"constraint\":\"%s\"}"
+      (json_escape path) (json_escape ctype)) in
+  Out_channel.write_all labels_path
+    ~data:(String.concat ~sep:"\n" lines ^ "\n") ;
+  Printf.printf "Wrote %s (%d constraint events)\n" labels_path (List.length events_rev) ;
+  (* Write gate-level labels as JSONL *)
+  let gate_labels_path = output_dir ^ "/" ^ name ^ "_gate_labels.jsonl" in
+  let gate_labels_data = VCS.dump_gate_labels cs in
+  Out_channel.write_all gate_labels_path ~data:(gate_labels_data ^ "\n") ;
+  Printf.printf "Wrote %s\n" gate_labels_path ;
+  (* Write cached constants *)
+  let constants_path = output_dir ^ "/" ^ name ^ "_cached_constants.json" in
+  let constants_json = Kimchi_pasta_constraint_system.Vesta_constraint_system.dump_cached_constants cs in
+  Out_channel.write_all constants_path ~data:(constants_json ^ "\n") ;
+  Printf.printf "Wrote %s\n" constants_path
+
 let linearization_tock_circuit (inputs : WrapImpl.Field.t array) () =
   let open WrapImpl in
   let pair i = (inputs.(i), inputs.(i + 1)) in
@@ -1684,6 +1758,178 @@ let ivp_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
       Field.Assert.equal c claimed_bp_challenges.(i) ) ;
   ()
 
+(* Step IVP circuit: verifies a Wrap proof via IPA (Step/Tick/Fp side).
+
+   The Step IVP runs on the Fp field and verifies Pallas commitments.
+   Compared to the Wrap IVP (ivp_wrap_circuit above), key differences:
+   - Field: Tick/Fp (not Tock/Fq)
+   - Inner curve: Pallas (not Vesta)
+   - SRS: Fq/Pallas SRS, domain 2^15 (not Fp/Vesta SRS, domain 2^16)
+   - Shifted values: Type2 with Other_field.t = (Field.t, Boolean.var)
+   - IPA rounds: 15 (not 16)
+   - Takes sponge_after_index parameter (pre-absorbed verification key)
+   - Proof bundled as Wrap_proof.Checked.t (not separate messages/openings)
+   - Public input: Wrap statement (Type1 Fields, not Type2 SplitFields)
+
+   Input layout (175 fields):
+     Public input (Wrap statement packed for x_hat MSM):
+       0-4:     Field × 5 (Type1 shifted): cip, b, ztSrs, ztDs, perm
+       5-6:     Packed_bits 128 × 2 (challenges): beta, gamma
+       7-9:     Packed_bits 128 × 3 (scalar challenges): alpha, zeta, xi
+       10-12:   Packed_bits 255 × 3 (digests): sponge, msg_wrap, msg_step
+       13-28:   Packed_bits 128 × 16 (bp challenges, Backend.Tick.Rounds.n)
+       29:      Packed_bits 10 × 1 (branch_data)
+     Private input:
+       30:      plonk.alpha (scalar_challenge)
+       31:      plonk.beta
+       32:      plonk.gamma
+       33:      plonk.zeta (scalar_challenge)
+       34-35:   plonk.perm (Other_field = field + bool)
+       36-37:   plonk.zeta_to_srs_length
+       38-39:   plonk.zeta_to_domain_size
+       40-41:   advice.combined_inner_product
+       42-43:   advice.b
+       44:      xi (scalar_challenge)
+       45-59:   claimed_bp_challenges (15 = Tock.Rounds.n)
+       60-89:   w_comm (15 × 2)
+       90-91:   z_comm (1 × 2)
+       92-105:  t_comm (7 × 2)
+       106-107: delta (2)
+       108-109: challenge_polynomial_commitment (2)
+       110-169: lr (15 × 4)
+       170-171: z_1 (Other_field, Type2 shifted)
+       172-173: z_2 (Other_field, Type2 shifted)
+       174:     claimed_digest
+*)
+let ivp_step_circuit (inputs : Impls.Step.Field.t array) () =
+  let open Impls.Step in
+  let open Pickles_types in
+  let read_pt i : Step_main_inputs.Inner_curve.t =
+    (inputs.(i), inputs.(i + 1))
+  in
+  let read_other_field i : Impls.Step.Other_field.t =
+    (inputs.(i), Boolean.Unsafe.of_cvar inputs.(i + 1))
+  in
+  (* ---- Public input (Wrap statement packed for x_hat MSM) ---- *)
+  let public_input =
+    let packed n i = `Packed_bits (inputs.(i), n) in
+    Array.concat
+      [ Array.init 5 ~f:(fun j -> `Field inputs.(j))
+      ; [| packed 128 5 ; packed 128 6 |]
+      ; [| packed 128 7 ; packed 128 8 ; packed 128 9 |]
+      ; [| packed 255 10 ; packed 255 11 ; packed 255 12 |]
+      ; Array.init 16 ~f:(fun j -> packed 128 (13 + j))
+      ; [| packed 10 29 |]
+      ]
+  in
+  (* ---- Plonk deferred values (Type2 shifted, cross-field) ---- *)
+  let feature_flags =
+    Kimchi_backend_common.Plonk_types.Features.map
+      Kimchi_backend_common.Plonk_types.Features.none_bool
+      ~f:(fun _ -> Boolean.false_)
+  in
+  let plonk
+    : ( Field.t
+      , Field.t Kimchi_backend_common.Scalar_challenge.t
+      , Impls.Step.Other_field.t Shifted_value.Type2.t
+      , (Impls.Step.Other_field.t Shifted_value.Type2.t, Boolean.var) Opt.t
+      , (Field.t Kimchi_backend_common.Scalar_challenge.t, Boolean.var) Opt.t
+      , Boolean.var )
+      Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t =
+    { alpha = { Kimchi_types.inner = inputs.(30) }
+    ; beta = inputs.(31)
+    ; gamma = inputs.(32)
+    ; zeta = { Kimchi_types.inner = inputs.(33) }
+    ; perm = Shifted_value.Type2.Shifted_value (read_other_field 34)
+    ; zeta_to_srs_length = Shifted_value.Type2.Shifted_value (read_other_field 36)
+    ; zeta_to_domain_size = Shifted_value.Type2.Shifted_value (read_other_field 38)
+    ; feature_flags
+    ; joint_combiner = Opt.Nothing
+    }
+  in
+  let advice =
+    { Composition_types.Step.Bulletproof.Advice.
+      combined_inner_product = Shifted_value.Type2.Shifted_value (read_other_field 40)
+    ; b = Shifted_value.Type2.Shifted_value (read_other_field 42)
+    }
+  in
+  let xi : Field.t Kimchi_backend_common.Scalar_challenge.t =
+    { Kimchi_types.inner = inputs.(44) }
+  in
+  let claimed_bp_challenges =
+    Array.init 15 ~f:(fun j -> inputs.(45 + j))
+  in
+  (* ---- Messages ---- *)
+  let messages =
+    { Kimchi_backend_common.Plonk_types.Messages.In_circuit.
+      w_comm = Vector.init Nat.N15.n ~f:(fun j -> [| read_pt (60 + 2 * j) |])
+    ; z_comm = [| read_pt 90 |]
+    ; t_comm = Array.init 7 ~f:(fun j -> read_pt (92 + 2 * j))
+    ; lookup = Opt.Nothing
+    }
+  in
+  (* ---- Opening proof ---- *)
+  let opening =
+    { Kimchi_backend_common.Plonk_types.Openings.Bulletproof.
+      lr = Array.init 15 ~f:(fun j ->
+        (read_pt (110 + 4 * j), read_pt (110 + 4 * j + 2)))
+    ; z_1 = Shifted_value.Type2.Shifted_value (read_other_field 170)
+    ; z_2 = Shifted_value.Type2.Shifted_value (read_other_field 172)
+    ; delta = read_pt 106
+    ; challenge_polynomial_commitment = read_pt 108
+    }
+  in
+  let proof : Wrap_proof.Checked.t = { messages ; opening } in
+  let claimed_digest = inputs.(174) in
+  (* ---- SRS (Pallas SRS, domain 2^15 for Wrap proofs) ---- *)
+  let srs = Kimchi_bindings.Protocol.SRS.Fq.create (1 lsl 15) in
+  (* ---- Verification key (dummy, all commitments = Pallas generator) ---- *)
+  let dummy_pt = Step_main_inputs.Inner_curve.Params.one in
+  let dummy_comm = [| Step_main_inputs.Inner_curve.constant dummy_pt |] in
+  let verification_key =
+    { Plonk_verification_key_evals.
+      sigma_comm = Vector.init Nat.N7.n ~f:(fun _ -> dummy_comm)
+    ; coefficients_comm = Vector.init Nat.N15.n ~f:(fun _ -> dummy_comm)
+    ; generic_comm = dummy_comm
+    ; psm_comm = dummy_comm
+    ; complete_add_comm = dummy_comm
+    ; mul_comm = dummy_comm
+    ; emul_comm = dummy_comm
+    ; endomul_scalar_comm = dummy_comm
+    }
+  in
+  (* ---- Sponge ---- *)
+  let sponge = Step_main_inputs.Sponge.create Step_main_inputs.sponge_params in
+  (* ---- Sponge after index (absorb verification key) ---- *)
+  let sponge_after_index =
+    Step_verifier.For_tests_only.sponge_after_index verification_key
+  in
+  (* ---- Call Step IVP ---- *)
+  let digest, (`Success _success, bp_challenges) =
+    Step_verifier.For_tests_only.incrementally_verify_proof
+      (module Nat.N0)
+      ~srs
+      ~domain:(`Known (Pickles_base.Domain.Pow_2_roots_of_unity 15))
+      ~srs
+      ~verification_key
+      ~xi
+      ~sponge
+      ~sponge_after_index
+      ~public_input
+      ~sg_old:Vector.[]
+      ~advice
+      ~proof
+      ~plonk
+  in
+  (* ---- Assert digest matches ---- *)
+  Field.Assert.equal digest claimed_digest ;
+  (* ---- Assert bulletproof challenges match ---- *)
+  Array.iteri bp_challenges
+    ~f:(fun i { Import.Bulletproof_challenge.prechallenge =
+                  { Kimchi_types.inner = c } } ->
+      Field.Assert.equal c claimed_bp_challenges.(i) ) ;
+  ()
+
 (* x_hat sub-circuit: public input commitment (MSM) from IVP wrap.
 
    Input layout (34 fields):
@@ -2201,123 +2447,325 @@ let group_map_circuit (inputs : Impls.Wrap.Field.t array) () =
   let _x, _y = group_map inputs.(0) in
   ()
 
+(* x_hat sub-circuit for Step IVP: public input commitment using multiscale_known.
+   Input layout (30 fields) — same as Step IVP public_input indices 0-29:
+     0-4:   Field (255-bit)
+     5-6:   packed 128
+     7-9:   packed 128
+     10-12: packed 255
+     13-28: packed 128
+     29:    packed 10
+
+   Uses multiscale_known (pure constant corrections, no in-circuit Ops.add_fast
+   for correction combining). Runs on Tick/Step side (Fp field, Pallas inner curve).
+*)
+let xhat_step_circuit (inputs : Impl.Field.t array) () =
+  let open Impl in
+  let module Inner_curve = Step_main_inputs.Inner_curve in
+  let srs = Kimchi_bindings.Protocol.SRS.Fq.create (1 lsl 15) in
+  let public_input =
+    let packed n i = `Packed_bits (inputs.(i), n) in
+    Array.concat
+      [ Array.init 5 ~f:(fun j -> `Field inputs.(j))
+      ; [| packed 128 5 ; packed 128 6 |]
+      ; [| packed 128 7 ; packed 128 8 ; packed 128 9 |]
+      ; [| packed 255 10 ; packed 255 11 ; packed 255 12 |]
+      ; Array.init 16 ~f:(fun j -> packed 128 (13 + j))
+      ; [| packed 10 29 |]
+      ]
+  in
+  let domain = Pickles_base.Domain.Pow_2_roots_of_unity 15 in
+  let lagrange_commitment ~domain:d srs i =
+    let d = Pickles_base.Domain.size d in
+    let chunks =
+      (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment srs d i).unshifted
+    in
+    match[@warning "-8"] chunks with
+    | [| Finite g |] -> Inner_curve.Constant.of_affine g
+    | _ -> assert false
+  in
+  let x_hat =
+    with_label "x_hat" (fun () ->
+        Step_verifier.For_tests_only.multiscale_known
+          (Array.mapi public_input ~f:(fun i x ->
+               (x, lagrange_commitment ~domain srs i) ) )
+        |> Inner_curve.negate )
+  in
+  let _x_hat =
+    with_label "x_hat blinding" (fun () ->
+        Ops.add_fast x_hat
+          (Inner_curve.constant (Lazy.force Step_main_inputs.Generators.h)) )
+  in
+  ()
+
+(* ---- Step-field sub-circuits (Tick/Fp, Pallas inner curve) ---- *)
+
+(* Single bullet_reduce round on Step field.
+   Input: l.x, l.y, r.x, r.y, scalar = 5 fields *)
+let bullet_reduce_one_step_circuit (inputs : Impl.Field.t array) () =
+  let open Impl in
+  let l : Step_main_inputs.Inner_curve.t = (inputs.(0), inputs.(1)) in
+  let r : Step_main_inputs.Inner_curve.t = (inputs.(2), inputs.(3)) in
+  let pre = Import.Scalar_challenge.create inputs.(4) in
+  let left_term = Step_SC.endo_inv l pre in
+  let right_term = Step_SC.endo r pre in
+  let _result = Ops.add_fast left_term right_term in
+  ()
+
+(* bullet_reduce on Step field: 15 rounds (Wrap proof IPA).
+   Input layout (75 fields):
+     0-59:  lr[0..14] (15 × 4 fields: l.x, l.y, r.x, r.y)
+     60-74: scalar_challenges[0..14] *)
+let bullet_reduce_step_circuit (inputs : Impl.Field.t array) () =
+  let open Impl in
+  let read_pt i : Step_main_inputs.Inner_curve.t =
+    (inputs.(i), inputs.(i + 1))
+  in
+  let lr = Array.init 15 ~f:(fun j ->
+    (read_pt (4 * j), read_pt (4 * j + 2)))
+  in
+  let prechallenges = Array.init 15 ~f:(fun j ->
+    Import.Scalar_challenge.create inputs.(60 + j))
+  in
+  let terms =
+    Array.map2_exn lr prechallenges ~f:(fun (l, r) pre ->
+      let left_term = Step_SC.endo_inv l pre in
+      let right_term = Step_SC.endo r pre in
+      Ops.add_fast left_term right_term)
+  in
+  let _result =
+    Array.reduce_exn terms ~f:(Ops.add_fast ?check_finite:None)
+  in
+  ()
+
+(* group_map on Step field (Pallas inner curve). Input: 1 field *)
+let group_map_step_circuit (inputs : Impl.Field.t array) () =
+  let open Impl in
+  let module Inner_curve = Step_main_inputs.Inner_curve in
+  let module M =
+    Group_map.Bw19.Make (Field.Constant) (Field)
+      (struct
+        let params =
+          Group_map.Bw19.Params.create
+            (module Field.Constant)
+            { b = Inner_curve.Params.b }
+      end)
+  in
+  let group_map =
+    Snarky_group_map.Checked.wrap
+      (module Impl)
+      ~potential_xs:M.potential_xs
+      ~y_squared:(fun ~x ->
+        Field.(
+          (x * x * x)
+          + (constant Inner_curve.Params.a * x)
+          + constant Inner_curve.Params.b) )
+    |> unstage
+  in
+  let _x, _y = group_map inputs.(0) in
+  ()
+
+(* ft_comm on Step field (Pallas inner curve).
+   Input layout (17 fields):
+     0-13: t_comm (7 points × 2 coords)
+     14:   perm (Type2 shifted value, cross-field)
+     15:   zeta_to_srs_length (Type2 shifted value)
+     16:   zeta_to_domain_size (Type2 shifted value)
+
+   Note: Step IVP uses Type2 shifted values (cross-field Fp→Fq). *)
+let ftcomm_step_circuit (inputs : Impl.Field.t array) () =
+  let open Impl in
+  let open Pickles_types in
+  let module Inner_curve = Step_main_inputs.Inner_curve in
+  let read_pt i : Inner_curve.t = (inputs.(i), inputs.(i + 1)) in
+  let t_comm = Array.init 7 ~f:(fun j -> read_pt (2 * j)) in
+  let read_other_field i : Impls.Step.Other_field.t =
+    (inputs.(i), Boolean.Unsafe.of_cvar inputs.(i + 1))
+  in
+  let plonk =
+    { Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.
+      alpha = { Kimchi_types.inner = Field.zero }
+    ; beta = Field.zero
+    ; gamma = Field.zero
+    ; zeta = { Kimchi_types.inner = Field.zero }
+    ; perm = Shifted_value.Type2.Shifted_value (read_other_field 14)
+    ; zeta_to_srs_length = Shifted_value.Type2.Shifted_value (read_other_field 16)
+    ; zeta_to_domain_size = Shifted_value.Type2.Shifted_value (read_other_field 18)
+    ; feature_flags =
+        Kimchi_backend_common.Plonk_types.Features.map
+          Kimchi_backend_common.Plonk_types.Features.none_bool
+          ~f:(fun _ -> Boolean.false_)
+    ; joint_combiner = Opt.Nothing
+    }
+  in
+  let scale_fast2 p (s : Impls.Step.Other_field.t Shifted_value.Type2.t) =
+    with_label __LOC__ (fun () ->
+        Ops.scale_fast2 p s ~num_bits:Field.size_in_bits )
+  in
+  let dummy_pt = Inner_curve.Params.one in
+  let sigma_comm_last = Inner_curve.constant dummy_pt in
+  let dummy_comm = [| sigma_comm_last |] in
+  let verification_key =
+    { Plonk_verification_key_evals.
+      sigma_comm = Vector.init Nat.N7.n ~f:(fun _ -> dummy_comm)
+    ; coefficients_comm = Vector.init Nat.N15.n ~f:(fun _ -> dummy_comm)
+    ; generic_comm = dummy_comm
+    ; psm_comm = dummy_comm
+    ; complete_add_comm = dummy_comm
+    ; mul_comm = dummy_comm
+    ; emul_comm = dummy_comm
+    ; endomul_scalar_comm = dummy_comm
+    }
+  in
+  let _ft_comm =
+    Common.ft_comm
+      ~add:(Ops.add_fast ?check_finite:None)
+      ~scale:scale_fast2 ~negate:Inner_curve.negate
+      ~verification_key
+      ~plonk ~t_comm
+  in
+  ()
+
 (* ---- Entry point ---- *)
 
 let run ~output_dir =
-  let dump name circuit ~input_typ ~return_typ =
-    dump output_dir name circuit ~input_typ ~return_typ
+  let dump_step name circuit ~input_typ ~return_typ =
+    dump_tick_with_labels output_dir name circuit ~input_typ ~return_typ
   in
-  dump "mul_circuit" mul_circuit
+  let dump_wrap name circuit ~input_typ ~return_typ =
+    dump_tock_with_labels output_dir name circuit ~input_typ ~return_typ
+  in
+  (* Basic Step circuits *)
+  dump_step "mul_step_circuit" mul_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Field.typ ;
-  dump "inv_circuit" inv_circuit
+  dump_step "inv_step_circuit" inv_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Field.typ ;
-  dump "div_circuit" div_circuit
+  dump_step "div_step_circuit" div_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Field.typ ;
-  dump "equals_circuit" equals_circuit
+  dump_step "equals_step_circuit" equals_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Boolean.typ ;
-  dump "if_circuit" if_circuit
+  dump_step "if_step_circuit" if_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Field.typ ;
-  dump "assert_equal_circuit" assert_equal_circuit
+  dump_step "assert_equal_step_circuit" assert_equal_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
-  dump "assert_square_circuit" assert_square_circuit
+  dump_step "assert_square_step_circuit" assert_square_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
-  dump "pow2_pow_circuit" pow2_pow_circuit
+  dump_step "pow2_pow_step_circuit" pow2_pow_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
-  dump "assert_non_zero_circuit" assert_non_zero_circuit
+  dump_step "assert_non_zero_step_circuit" assert_non_zero_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
-  dump "assert_not_equal_circuit" assert_not_equal_circuit
+  dump_step "assert_not_equal_step_circuit" assert_not_equal_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
-  dump "unpack_circuit" unpack_circuit
+  dump_step "unpack_step_circuit" unpack_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit ;
-  dump "bool_and_circuit" bool_and_circuit
+  dump_step "bool_and_step_circuit" bool_and_circuit
     ~input_typ:Impl.Boolean.typ ~return_typ:Impl.Boolean.typ ;
-  dump "bool_or_circuit" bool_or_circuit
+  dump_step "bool_or_step_circuit" bool_or_circuit
     ~input_typ:Impl.Boolean.typ ~return_typ:Impl.Boolean.typ ;
-  dump "bool_xor_circuit" bool_xor_circuit
+  dump_step "bool_xor_step_circuit" bool_xor_circuit
     ~input_typ:Impl.Boolean.typ ~return_typ:Impl.Boolean.typ ;
-  dump "bool_all_circuit" bool_all_circuit
+  dump_step "bool_all_step_circuit" bool_all_circuit
     ~input_typ:Impl.Boolean.typ ~return_typ:Impl.Boolean.typ ;
-  dump "bool_any_circuit" bool_any_circuit
+  dump_step "bool_any_step_circuit" bool_any_circuit
     ~input_typ:Impl.Boolean.typ ~return_typ:Impl.Boolean.typ ;
-  dump "bool_assert_circuit" bool_assert_circuit
+  dump_step "bool_assert_step_circuit" bool_assert_circuit
     ~input_typ:Impl.Boolean.typ ~return_typ:Impl.Typ.unit ;
   let point_typ = Impl.Typ.(Impl.Field.typ * Impl.Field.typ) in
   let two_point_typ = Impl.Typ.(point_typ * point_typ) in
-  dump "add_complete_circuit" add_complete_circuit
+  dump_step "add_complete_step_circuit" add_complete_circuit
     ~input_typ:two_point_typ ~return_typ:point_typ ;
-  dump "endo_scalar_circuit" endo_scalar_circuit
+  dump_step "endo_scalar_step_circuit" endo_scalar_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Field.typ ;
-  dump "endo_mul_circuit" endo_mul_circuit
+  dump_step "endo_mul_step_circuit" endo_mul_circuit
     ~input_typ:Impl.Typ.(point_typ * Impl.Field.typ) ~return_typ:point_typ ;
-  dump "var_base_mul_circuit" var_base_mul_circuit
+  dump_step "var_base_mul_step_circuit" var_base_mul_circuit
     ~input_typ:Impl.Typ.(point_typ * Impl.Field.typ) ~return_typ:point_typ ;
-  dump "scale_fast2_128_circuit" scale_fast2_128_circuit
+  dump_step "scale_fast2_128_step_circuit" scale_fast2_128_circuit
     ~input_typ:Impl.Typ.(point_typ * Impl.Field.typ) ~return_typ:point_typ ;
   let array3_field = Impl.Typ.array ~length:3 Impl.Field.typ in
-  dump "poseidon_circuit" poseidon_circuit
+  dump_step "poseidon_step_circuit" poseidon_circuit
     ~input_typ:array3_field ~return_typ:array3_field ;
-  dump "pow7_circuit" pow7_circuit
+  dump_step "pow7_step_circuit" pow7_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Field.typ ;
-  dump "pow8_circuit" pow8_circuit
+  dump_step "pow8_step_circuit" pow8_circuit
     ~input_typ:Impl.Field.typ ~return_typ:Impl.Field.typ ;
   let array90_field = Impl.Typ.array ~length:90 Impl.Field.typ in
-  dump "linearization_tick_circuit" linearization_tick_circuit
+  dump_step "linearization_step_circuit" linearization_tick_circuit
     ~input_typ:array90_field ~return_typ:Impl.Field.typ ;
-  let dump_tock' name circuit ~input_typ ~return_typ =
-    dump_tock output_dir name circuit ~input_typ ~return_typ
-  in
   let array90_wrap = WrapImpl.Typ.array ~length:90 WrapImpl.Field.typ in
-  dump_tock' "linearization_tock_circuit" linearization_tock_circuit
+  dump_wrap "linearization_wrap_circuit" linearization_tock_circuit
     ~input_typ:array90_wrap ~return_typ:WrapImpl.Field.typ ;
   let array91_field = Impl.Typ.array ~length:91 Impl.Field.typ in
-  dump "ft_eval0_circuit" ft_eval0_circuit
+  dump_step "ft_eval0_step_circuit" ft_eval0_circuit
     ~input_typ:array91_field ~return_typ:Impl.Field.typ ;
   (* Phase 1 sub-circuits *)
   let array4_field = Impl.Typ.array ~length:4 Impl.Field.typ in
-  dump "expand_plonk_circuit" expand_plonk_circuit
+  dump_step "expand_plonk_step_circuit" expand_plonk_circuit
     ~input_typ:array4_field ~return_typ:Impl.Typ.unit ;
   let array34_field = Impl.Typ.array ~length:34 Impl.Field.typ in
-  dump "challenge_digest_circuit" challenge_digest_circuit
+  dump_step "challenge_digest_step_circuit" challenge_digest_circuit
     ~input_typ:array34_field ~return_typ:Impl.Typ.unit ;
   let array20_field = Impl.Typ.array ~length:20 Impl.Field.typ in
-  dump "b_correct_circuit" b_correct_circuit
+  dump_step "b_correct_step_circuit" b_correct_circuit
     ~input_typ:array20_field ~return_typ:Impl.Typ.unit ;
   let array18_field = Impl.Typ.array ~length:18 Impl.Field.typ in
-  dump "plonk_checks_passed_circuit" plonk_checks_passed_circuit
+  dump_step "plonk_checks_passed_step_circuit" plonk_checks_passed_circuit
     ~input_typ:array18_field ~return_typ:Impl.Typ.unit ;
   let array124_field = Impl.Typ.array ~length:124 Impl.Field.typ in
-  dump "sponge_and_challenges_circuit" sponge_and_challenges_circuit
+  dump_step "sponge_and_challenges_step_circuit" sponge_and_challenges_circuit
     ~input_typ:array124_field ~return_typ:Impl.Typ.unit ;
   let array129_field = Impl.Typ.array ~length:129 Impl.Field.typ in
-  dump "cip_circuit" cip_circuit
+  dump_step "cip_step_circuit" cip_circuit
     ~input_typ:array129_field ~return_typ:Impl.Typ.unit ;
   (* Pickles sub-circuits *)
   let array151_field = Impl.Typ.array ~length:151 Impl.Field.typ in
-  dump "finalize_other_proof_circuit" finalize_other_proof_circuit
+  dump_step "finalize_other_proof_step_circuit" finalize_other_proof_circuit
     ~input_typ:array151_field ~return_typ:Impl.Typ.unit ;
   let array148_wrap = Impls.Wrap.Typ.array ~length:148 Impls.Wrap.Field.typ in
-  dump_tock' "finalize_other_proof_wrap_circuit" finalize_other_proof_wrap_circuit
+  dump_wrap "finalize_other_proof_wrap_circuit" finalize_other_proof_wrap_circuit
     ~input_typ:array148_wrap ~return_typ:Impls.Wrap.Typ.unit ;
   (* IVP needs the Tick URS for Generators.h (blinding generator) *)
   Backend.Tick.Keypair.set_urs_info [] ;
   let array34_wrap = Impls.Wrap.Typ.array ~length:34 Impls.Wrap.Field.typ in
-  dump_tock' "xhat_circuit" xhat_circuit
+  dump_wrap "xhat_wrap_circuit" xhat_circuit
     ~input_typ:array34_wrap ~return_typ:Impls.Wrap.Typ.unit ;
   let array177_wrap = Impls.Wrap.Typ.array ~length:177 Impls.Wrap.Field.typ in
-  dump_tock_with_labels output_dir "ivp_wrap_circuit" ivp_wrap_circuit
+  dump_wrap "ivp_wrap_circuit" ivp_wrap_circuit
     ~input_typ:array177_wrap ~return_typ:Impls.Wrap.Typ.unit ;
+  (* Step IVP needs the Tock URS for Step_main_inputs.Generators.h *)
+  Backend.Tock.Keypair.set_urs_info [] ;
+  let array175_field = Impl.Typ.array ~length:175 Impl.Field.typ in
+  dump_step "ivp_step_circuit" ivp_step_circuit
+    ~input_typ:array175_field ~return_typ:Impl.Typ.unit ;
+  (* Wrap sub-circuits *)
   let array80_wrap = Impls.Wrap.Typ.array ~length:80 Impls.Wrap.Field.typ in
-  dump_tock' "bullet_reduce_circuit" bullet_reduce_circuit
+  dump_wrap "bullet_reduce_wrap_circuit" bullet_reduce_circuit
     ~input_typ:array80_wrap ~return_typ:Impls.Wrap.Typ.unit ;
   let array5_wrap = Impls.Wrap.Typ.array ~length:5 Impls.Wrap.Field.typ in
-  dump_tock' "bullet_reduce_one_circuit" bullet_reduce_one_circuit
+  dump_wrap "bullet_reduce_one_wrap_circuit" bullet_reduce_one_circuit
     ~input_typ:array5_wrap ~return_typ:Impls.Wrap.Typ.unit ;
   let array17_wrap = Impls.Wrap.Typ.array ~length:17 Impls.Wrap.Field.typ in
-  dump_tock' "ftcomm_circuit" ftcomm_circuit
+  dump_wrap "ftcomm_wrap_circuit" ftcomm_circuit
     ~input_typ:array17_wrap ~return_typ:Impls.Wrap.Typ.unit ;
   let array37_wrap = Impls.Wrap.Typ.array ~length:37 Impls.Wrap.Field.typ in
-  dump_tock' "combine_poly_circuit" combine_poly_circuit
+  dump_wrap "combine_poly_wrap_circuit" combine_poly_circuit
     ~input_typ:array37_wrap ~return_typ:Impls.Wrap.Typ.unit ;
   let array1_wrap = Impls.Wrap.Typ.array ~length:1 Impls.Wrap.Field.typ in
-  dump_tock' "group_map_circuit" group_map_circuit
-    ~input_typ:array1_wrap ~return_typ:Impls.Wrap.Typ.unit
+  dump_wrap "group_map_wrap_circuit" group_map_circuit
+    ~input_typ:array1_wrap ~return_typ:Impls.Wrap.Typ.unit ;
+  (* Step sub-circuits *)
+  let array5_field = Impl.Typ.array ~length:5 Impl.Field.typ in
+  dump_step "bullet_reduce_one_step_circuit" bullet_reduce_one_step_circuit
+    ~input_typ:array5_field ~return_typ:Impl.Typ.unit ;
+  let array75_field = Impl.Typ.array ~length:75 Impl.Field.typ in
+  dump_step "bullet_reduce_step_circuit" bullet_reduce_step_circuit
+    ~input_typ:array75_field ~return_typ:Impl.Typ.unit ;
+  let array1_field = Impl.Typ.array ~length:1 Impl.Field.typ in
+  dump_step "group_map_step_circuit" group_map_step_circuit
+    ~input_typ:array1_field ~return_typ:Impl.Typ.unit ;
+  let array20_field_ftcomm = Impl.Typ.array ~length:20 Impl.Field.typ in
+  dump_step "ftcomm_step_circuit" ftcomm_step_circuit
+    ~input_typ:array20_field_ftcomm ~return_typ:Impl.Typ.unit ;
+  let array30_field = Impl.Typ.array ~length:30 Impl.Field.typ in
+  dump_step "xhat_step_circuit" xhat_step_circuit
+    ~input_typ:array30_field ~return_typ:Impl.Typ.unit

@@ -1319,4 +1319,10 @@ include Make (Step_main_inputs)
 
 module For_tests_only = struct
   let side_loaded_domain = side_loaded_domain
+
+  let incrementally_verify_proof = incrementally_verify_proof
+
+  let sponge_after_index = sponge_after_index
+
+  let multiscale_known = multiscale_known
 end
