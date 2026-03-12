@@ -68,6 +68,11 @@
     flake = false;
   };
 
+  inputs.snarky = {
+    url = "github:o1-labs/snarky/9f55ef7c2f2570365aeb24b6ddfc713f48be3117";
+    flake = false;
+  };
+
   inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
 
   inputs.nix-utils.url = "github:juliosueiras-nix/nix-utils";

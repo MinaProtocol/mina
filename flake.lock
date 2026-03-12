@@ -497,7 +497,25 @@
         "opam-nix": "opam-nix",
         "opam-repository": "opam-repository",
         "proof-systems": "proof-systems",
+        "snarky": "snarky",
         "utils": "utils"
+      }
+    },
+    "snarky": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1767824453,
+        "narHash": "sha256-+vZBEyun21AqGFDJW+QQ1qUTZrZsPYEyHQ5et1C1KDA=",
+        "owner": "o1-labs",
+        "repo": "snarky",
+        "rev": "9f55ef7c2f2570365aeb24b6ddfc713f48be3117",
+        "type": "github"
+      },
+      "original": {
+        "owner": "o1-labs",
+        "repo": "snarky",
+        "rev": "9f55ef7c2f2570365aeb24b6ddfc713f48be3117",
+        "type": "github"
       }
     },
     "systems": {
