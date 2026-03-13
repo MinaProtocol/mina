@@ -637,7 +637,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         =
       let%bind pk =
         Public_key.decompress_var pk
-        (*           (Account_id.Checked.public_key fee_payer_id) *)
       in
       Schnorr.Chunked.Checked.verifies ~signature_kind shifted signature pk
         (Random_oracle.Input.Chunked.field payload_digest)

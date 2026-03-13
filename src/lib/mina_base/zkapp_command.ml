@@ -785,9 +785,15 @@ module Transaction_commitment = struct
 
   let typ = Snark_params.Tick.Field.typ
 
+  (** Create a partial transaction commitment from the account updates hash.
+      This commitment only depends on the account updates forest, not the fee
+      payer or memo. Account updates sign this when [use_full_commitment = false]. *)
   let create ~(account_updates_hash : Digest.Forest.t) : t =
     (account_updates_hash :> t)
 
+  (** Create the full transaction commitment by hashing together the memo,
+      fee payer, and partial commitment. Fee payer always signs this.
+      Account updates sign this when [use_full_commitment = true]. *)
   let create_complete (t : t) ~memo_hash
       ~(fee_payer_hash : Digest.Account_update.t) =
     Random_oracle.hash ~init:Hash_prefix.account_update_cons
