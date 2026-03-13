@@ -230,4 +230,5 @@ let () =
               check_two_elements_are_never_the_same
           ] )
     ; Valid_size.tests
+    ; Nonce_related.tests
     ]
