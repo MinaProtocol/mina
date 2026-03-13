@@ -199,7 +199,6 @@ let docker_step
                     , if_ = spec.if_
                     }
                   ]
-                , DaemonConfig = [] : List DockerImage.ReleaseSpec.Type
                 , DaemonAutoHardfork =
                   [ DockerImage.ReleaseSpec::{
                     , deps =
@@ -245,7 +244,6 @@ let docker_step
                     , size = size
                     }
                   ]
-                , DaemonPrefork = [] : List DockerImage.ReleaseSpec.Type
                 , DaemonAppsOnly =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
@@ -263,9 +261,32 @@ let docker_step
                     , size = size
                     }
                   ]
+                , DaemonConfig =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps =
+                          deps
+                        # DockerVersion.dependsOn
+                            DockerVersion.DepsSpec::{
+                            , codename = DockerVersion.ofDebian spec.debVersion
+                            , network = spec.network
+                            , profile = spec.profile
+                            , artifact = Artifacts.Type.DaemonAppsOnly
+                            , buildFlags = spec.buildFlags
+                            }
+                    , service = Artifacts.Type.DaemonConfig
+                    , network = spec.network
+                    , deb_codename = spec.debVersion
+                    , docker_publish = spec.docker_publish
+                    , deb_install_mode =
+                        DockerImage.DebianInstallMode.DownloadOnly
+                    , arch = spec.arch
+                    , size = size
+                    }
+                  ]
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
                 , LogProc = [] : List DockerImage.ReleaseSpec.Type
                 , CreatePreforkGenesis = [] : List DockerImage.ReleaseSpec.Type
+                , DaemonPrefork = [] : List DockerImage.ReleaseSpec.Type
                 , BatchTxn =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
@@ -347,6 +368,27 @@ let docker_step
                     , verify = True
                     , arch = spec.arch
                     , if_ = spec.if_
+                    , size = size
+                    }
+                  ]
+                , RosettaConfig =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps =
+                          deps
+                        # DockerVersion.dependsOn
+                            DockerVersion.DepsSpec::{
+                            , codename = DockerVersion.ofDebian spec.debVersion
+                            , network = spec.network
+                            , profile = spec.profile
+                            , artifact = Artifacts.Type.RosettaAppsOnly
+                            }
+                    , service = Artifacts.Type.RosettaConfig
+                    , network = spec.network
+                    , deb_codename = spec.debVersion
+                    , docker_publish = spec.docker_publish
+                    , deb_install_mode =
+                        DockerImage.DebianInstallMode.DownloadOnly
+                    , arch = spec.arch
                     , size = size
                     }
                   ]
