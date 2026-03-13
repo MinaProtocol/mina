@@ -956,3 +956,28 @@ build_prefork_genesis_ledger_deb() {
 }
 
 ## END CREATE PREFORK GENESIS PACKAGE ##
+
+
+build_daemon_storage_toolbox_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Berkeley daemon storage toolbox:"
+
+  ROCKSDB_VERSION="10.5.2"
+  MINA_VERSION="${GITTAG}"
+
+  create_control_file mina-daemon-storage-toolbox \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    "Toolbox for Mina Daemon storage compatible with rocksdb in version $ROCKSDB_VERSION and mina in $MINA_VERSION"
+
+  mkdir -p "${BUILDDIR}/usr/lib/mina/storage/$ROCKSDB_VERSION/$MINA_VERSION"
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binaries
+  cp ./default/src/app/rocksdb-scanner/rocksdb_scanner.exe \
+    "${BUILDDIR}/usr/lib/mina/storage/$ROCKSDB_VERSION/$MINA_VERSION/mina-rocksdb-scanner"
+
+  cp ../scripts/rocksdb/convert-to-legacy.sh \
+    "${BUILDDIR}/usr/local/bin/mina-storage-converter"
+
+  build_deb mina-daemon-storage-toolbox
+}

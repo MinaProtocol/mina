@@ -304,6 +304,7 @@ let docker_step
                     , size = size
                     }
                   ]
+                , DaemonStorageToolbox = [] : List DockerImage.ReleaseSpec.Type
                 , Archive =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps

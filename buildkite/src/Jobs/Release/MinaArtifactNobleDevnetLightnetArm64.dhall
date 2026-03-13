@@ -20,7 +20,10 @@ in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
-            [ Artifacts.Type.LogProc, Artifacts.Type.DaemonAppsOnly ]
+            [ Artifacts.Type.LogProc
+            , Artifacts.Type.DaemonAppsOnly
+            , Artifacts.Type.DaemonStorageToolbox
+            ]
           , network = Network.Type.Devnet
           , arch = Arch.Type.Arm64
           , profile = Profiles.Type.Lightnet
