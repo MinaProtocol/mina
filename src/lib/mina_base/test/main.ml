@@ -224,5 +224,10 @@ let () =
           ; test_case "No odd slot difference discrepancies" `Quick
               no_odd_vesting_discrepancies
           ] )
+    ; Transaction_commitments.
+        ( "transaction commitments"
+        , [ test_case "check_two_elements_are_never_the_same" `Quick
+              check_two_elements_are_never_the_same
+          ] )
     ; Valid_size.tests
     ]
