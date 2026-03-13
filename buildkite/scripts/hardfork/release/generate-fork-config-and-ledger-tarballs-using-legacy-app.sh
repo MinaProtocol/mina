@@ -51,11 +51,11 @@ else
   MINA_DEB_CODENAME=$CODENAME ./buildkite/scripts/debian/install.sh mina-logproc 1
 fi
 
-MINA_DEB_CODENAME=$CODENAME FORCE_VERSION=$FORCE_VERSION ROOT="legacy" ./buildkite/scripts/debian/install.sh mina-create-legacy-genesis 1
+MINA_DEB_CODENAME=$CODENAME FORCE_VERSION=$FORCE_VERSION ROOT="legacy" ./buildkite/scripts/debian/install.sh mina-create-$NETWORK-prefork-genesis-ledger 1
 
 curl "${CONFIG_JSON_GZ_URL}" > config.json.gz && gunzip config.json.gz
 
-./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe mina-create-legacy-genesis --config "config.json" --workdir "$WORKDIR"
+./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe mina-create-prefork-genesis --config "config.json" --workdir "$WORKDIR"
 
 echo "--- Caching legacy ledger tarballs and hashes"
 

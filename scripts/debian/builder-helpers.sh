@@ -804,9 +804,9 @@ build_delegation_verify_deb () {
 ## CREATE PREFORK GENESIS PACKAGE ##
 
 #
-# Builds mina-create-prefork-genesis package for prefork genesis creation
+# Builds mina-create-devnet-prefork-genesis package for prefork genesis creation
 #
-# Output: mina-create-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-create-devnet-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Utility for creating prefork genesis ledgers for post-hardfork verification.
