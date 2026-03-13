@@ -108,7 +108,7 @@ is_rocksdb() {
 
     # Check for RocksDB signature files:
     # - CURRENT: Points to the current manifest
-    # - MANIFEST-*: The database manifest/ledger
+    # - MANIFEST-*: The database manifest
     local has_current
     has_current=$(ls "$dir"/CURRENT 2>/dev/null)
     local has_manifest
@@ -166,7 +166,7 @@ downgrade_db() {
     # Step 2: Back up original DB (move, not delete)
     log_info "Backing up DB: $db_path -> $backup_path"
     if [[ -d "$backup_path" ]]; then
-        log_warn "Removing stale backup at $backup_path"
+        log_verbose "Removing backup at $backup_path"
         rm -rf "$backup_path"
     fi
     mv "$db_path" "$backup_path"
@@ -304,8 +304,6 @@ for db_path in "${db_list[@]}"; do
         log_error "Failed to process: $db_path (continuing with remaining databases)"
     fi
 done
-
-CURRENT_DB_PATH=""
 
 # --- Summary ---
 echo ""
