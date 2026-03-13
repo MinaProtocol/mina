@@ -224,4 +224,5 @@ let () =
           ; test_case "No odd slot difference discrepancies" `Quick
               no_odd_vesting_discrepancies
           ] )
+    ; Valid_size.tests
     ]
