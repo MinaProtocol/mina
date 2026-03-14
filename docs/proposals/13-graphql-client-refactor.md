@@ -187,3 +187,7 @@ The types themselves don't change. The module paths are preserved. The build sys
 ## Effort Estimate
 
 Small --- 1-2 days. Mechanical refactor with no protocol or behavioral changes.
+
+## Further Reading
+
+- **[Proposal 14: RPC vs GraphQL Architecture](14-rpc-vs-graphql-architecture.md)** --- Detailed analysis of both interfaces, why the server can never be lightweight (and why it doesn't matter), dependency weight comparison, and guidelines for new tooling.

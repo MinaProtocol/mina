@@ -19,6 +19,7 @@ This directory contains proposals for improving the Mina Protocol L1 operator ex
 | 11 | [Bugs Found](11-bugs-found.md) | Critical (bugs) | Small (1-2d) | Proposed |
 | 12 | [Health Check App](12-health-check-app.md) | Critical | Medium (4-5d) | Proposed |
 | 13 | [GraphQL Client Refactor](13-graphql-client-refactor.md) | Critical | Small (1-2d) | Proposed |
+| 14 | [RPC vs GraphQL Architecture](14-rpc-vs-graphql-architecture.md) | Reference | N/A | Reference Doc |
 
 ## Quick Wins (< 1 day each)
 
