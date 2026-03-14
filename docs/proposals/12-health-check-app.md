@@ -33,6 +33,36 @@ Even the existing `mina_graphql_client` library has a transitive dependency on `
 
 The health check binary must use **raw HTTP/JSON** to query endpoints — NOT any `mina_*` OCaml libraries that have transitive dependencies on daemon internals. The daemon is a black box queried over the network, exactly as `curl` would.
 
+## Prerequisite: GraphQL Client Library Refactor
+
+> **See [Proposal 13: Decouple mina_graphql_client](13-graphql-client-refactor.md)**
+
+The original design called for raw `cohttp-async` HTTP calls with no `mina_*` library dependencies, because the `mina_graphql_client` library currently pulls in the entire daemon through a transitive dependency on `mina_graphql` (server-side).
+
+However, the root cause is that `mina_graphql_client` depends on `mina_graphql` for just 3 lines of code (input type constructors). Proposal 13 extracts these into a lightweight shared library, making `mina_graphql_client` genuinely lightweight.
+
+**After the Proposal 13 refactor is complete**, the health check app should use `mina_graphql_client` instead of raw HTTP. This gives us:
+- Type-safe GraphQL queries (compile-time checked against the schema)
+- Built-in retry logic with exponential backoff
+- Structured error handling
+- No code duplication
+
+### Updated Dependencies (post-refactor)
+
+```
+(libraries
+  core
+  async
+  mina_graphql_client  ; NOW lightweight after Proposal 13
+  caqti                ; DB abstraction for archive checks
+  caqti-async
+  caqti-driver-postgresql
+  yojson
+  uri)
+```
+
+This replaces the original design's `cohttp-async` with the proper typed client library.
+
 ## Proposed Design
 
 ### Binary Name
