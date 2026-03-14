@@ -574,11 +574,12 @@ build_profile_deb() {
   # Store node config hint (based on NETWORK_NAME)
   mkdir -p "${BUILDDIR}/etc/coda/build_config"
   case "${network}" in
-    mainnet)
-      printf "mainnet" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
+    mainnet|devnet)
+      printf "${network}" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
       ;;
-    devnet)
-      printf "devnet" > "${BUILDDIR}/etc/coda/build_config/PROFILE"
+    *)
+      printf "Unknown network ${network} provided for profile deb" >&2
+      exit 1
       ;;
   esac
 
