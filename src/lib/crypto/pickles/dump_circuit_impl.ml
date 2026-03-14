@@ -2462,7 +2462,7 @@ let group_map_circuit (inputs : Impls.Wrap.Field.t array) () =
 let xhat_step_circuit (inputs : Impl.Field.t array) () =
   let open Impl in
   let module Inner_curve = Step_main_inputs.Inner_curve in
-  let srs = Kimchi_bindings.Protocol.SRS.Fq.create (1 lsl 15) in
+  let srs = Kimchi_bindings.Protocol.SRS.Fq.create (1 lsl 16) in
   let public_input =
     let packed n i = `Packed_bits (inputs.(i), n) in
     Array.concat
@@ -2474,7 +2474,7 @@ let xhat_step_circuit (inputs : Impl.Field.t array) () =
       ; [| packed 10 29 |]
       ]
   in
-  let domain = Pickles_base.Domain.Pow_2_roots_of_unity 15 in
+  let domain = Pickles_base.Domain.Pow_2_roots_of_unity 16 in
   let lagrange_commitment ~domain:d srs i =
     let d = Pickles_base.Domain.size d in
     let chunks =
