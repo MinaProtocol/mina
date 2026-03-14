@@ -17,6 +17,7 @@ This directory contains proposals for improving the Mina Protocol L1 operator ex
 | 09 | [Docs Improvements](09-docs-improvements.md) | Medium | Medium-Large | Proposed |
 | 10 | [Load Testing & Local Network](10-load-testing-and-local-network.md) | Nice-to-have | Medium (1-2w) | Proposed |
 | 11 | [Bugs Found](11-bugs-found.md) | Critical (bugs) | Small (1-2d) | Proposed |
+| 12 | [Health Check App](12-health-check-app.md) | Critical | Medium (4-5d) | Proposed |
 
 ## Quick Wins (< 1 day each)
 

@@ -10,49 +10,76 @@ No lightweight health endpoints exist for any Mina service. The daemon's `/statu
 - **Archive**: No HTTP endpoints at all. Only Prometheus metrics via `--metrics-port`.
 - **Rosetta**: No `/healthz`. Only way to check is calling a real Rosetta endpoint like `POST /network/list`.
 
-## Proposed Changes
+## Two-Part Solution
+
+### Part A: Server-Side Endpoints (this proposal)
+
+Add lightweight HTTP health endpoints directly to each service. These are the simplest possible health probes — a single HTTP call with no external tooling needed.
+
+### Part B: Standalone Health Check App (see [Proposal 12](12-health-check-app.md))
+
+A separate `mina-health-check` binary that performs comprehensive diagnostic checks from the outside. Covers daemon, archive, system resources, and more. Ships as its own Debian package.
+
+---
+
+## Part A: Server-Side Health Endpoints
 
 ### Daemon (`src/app/cli/src/init/mina_run.ml`)
 
 Add two endpoints to the existing REST server:
 
-- `GET /healthz` --- Liveness probe
+- `GET /healthz` — Liveness probe
   - Returns HTTP 200 + `{"status": "ok", "sync_status": "Synced"}` when sync status is `Synced`
   - Returns HTTP 503 + `{"status": "unhealthy", "sync_status": "Bootstrapping"}` otherwise
-  - Lightweight --- no heavy computation
+  - Must be lightweight — no heavy computation, no DB queries
 
-- `GET /ready` --- Readiness probe
-  - Returns HTTP 200 once node has completed initial bootstrapping and GraphQL is accepting queries
-  - Returns HTTP 503 during bootstrap
+- `GET /ready` — Readiness probe
+  - Returns HTTP 200 once the node has completed initial bootstrapping and GraphQL is accepting queries
+  - Returns HTTP 503 during bootstrap phase
 
 - Change `GET /` to return minimal useful info: `{"version": "...", "sync_status": "...", "chain_id": "..."}`
 
 ### Archive (`src/app/archive/`)
 
-Add a simple HTTP server (or piggyback on metrics port) with:
+Add a simple HTTP server (or piggyback on the existing metrics port) with:
 
-- `GET /healthz` --- Returns 200 if PostgreSQL connection is alive, 503 otherwise
+- `GET /healthz` — Returns 200 if PostgreSQL connection is alive, 503 otherwise
 - Response body: `{"status": "ok", "max_block_height": 12345, "missing_blocks": 0}`
 
 ### Rosetta (`src/app/rosetta/`)
 
 Add:
 
-- `GET /healthz` --- Returns 200 if DB pool is reachable, 503 otherwise
-- `GET /ready` --- Returns 200 if both archive DB and daemon GraphQL are reachable
+- `GET /healthz` — Returns 200 if DB pool is reachable, 503 otherwise
+- `GET /ready` — Returns 200 if both archive DB and daemon GraphQL are reachable
 
 ## Files to Modify
 
-- `src/app/cli/src/init/mina_run.ml` (daemon REST routes)
-- `src/app/archive/lib/` (add HTTP health server)
-- `src/app/rosetta/lib/rosetta.ml` (add health routes)
+- `src/app/cli/src/init/mina_run.ml` (daemon REST routes, lines ~589-609)
+- `src/app/archive/lib/` (add HTTP health server or extend metrics server)
+- `src/app/rosetta/lib/rosetta.ml` (add health routes to existing Cohttp server)
 
 ## Impact
 
 - Unblocks Kubernetes liveness/readiness probes for all three services
-- Enables simple monitoring scripts (`curl -f http://localhost:3085/healthz`)
+- Enables simple monitoring: `curl -sf http://localhost:3085/healthz || alert`
 - Standard pattern used by every other L1 (Ethereum beacon API, Cosmos, Solana)
+
+## Relationship to Proposal 12
+
+The server-side endpoints (this proposal) and the standalone app ([Proposal 12](12-health-check-app.md)) are complementary:
+
+| | Server-side `/healthz` | `mina-health-check` app |
+|---|---|---|
+| Purpose | Single-service liveness/readiness | Comprehensive multi-service diagnostics |
+| Scope | One service per endpoint | Daemon + archive + system resources |
+| Use case | K8s probes, load balancers | Operator triage, monitoring hosts |
+| Requires | Running service with HTTP port | Network access to services |
+| Output | HTTP status code + tiny JSON | Rich multi-check report |
+| Install | Built into each service | Separate Debian package |
+
+Both should be implemented. The server-side endpoints are simpler and should come first.
 
 ## Effort Estimate
 
-Small --- 1-2 days per service. No protocol changes needed.
+Small — 1-2 days per service. No protocol changes needed.

@@ -1,3 +1,5 @@
+> **Note**: This proposal has been superseded by [Proposal 12: Standalone Health Check App](12-health-check-app.md), which achieves the same goals without the CLI binary bloat. The `mina doctor` concept is implemented as the standalone `mina-health-check` binary instead of a subcommand.
+
 # Proposal: `mina doctor` Diagnostic Command
 
 ## Problem
