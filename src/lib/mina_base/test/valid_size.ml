@@ -3,16 +3,20 @@ open Mina_base.Zkapp_command
 open Mina_base
 
 let tree_gen :
-    (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Call_forest.Tree.t
+    ( Account_update.t
+    , Digest.Account_update.t
+    , Digest.Forest.t )
+    Call_forest.Tree.t
     Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map account_gen =
-    (Account_update.gen_with_events_and_actions :
-      Account_update.Stable.Latest.t Quickcheck.Generator.t)
+    ( Account_update.gen_with_events_and_actions
+      : Account_update.Stable.Latest.t Quickcheck.Generator.t )
   in
   let account_update =
     Account_update.write_all_proofs_to_disk
-      ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ()) account_gen
+      ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
+      account_gen
   in
   { Call_forest.Tree.account_update
   ; account_update_digest =
@@ -32,7 +36,7 @@ let zkapp_type_gen =
   let%bind fee_payer = Account_update.Fee_payer.gen in
   let%bind account_updates = gen_call_forest in
   let%map memo = Signed_command_memo.gen in
-  ({ fee_payer; account_updates; memo } : t), length
+  (({ fee_payer; account_updates; memo } : t), length)
 
 let genesis_constant_error limit events actions : Genesis_constants.t =
   { Genesis_constants.Compiled.genesis_constants with
@@ -49,13 +53,14 @@ let genesis_constant_error limit events actions : Genesis_constants.t =
 let valid_size_errors_expensive () =
   Quickcheck.test ~trials:50 zkapp_type_gen ~f:(fun (x, y) ->
       let actual =
-        valid_size ~genesis_constants:(genesis_constant_error 1. (2 * y) (2 * y))
+        valid_size
+          ~genesis_constants:(genesis_constant_error 1. (2 * y) (2 * y))
         @@ read_all_proofs_from_disk x
       in
       Alcotest.(check bool)
-        "zkapp transaction too expensive"
-        true
-        (Or_error.equal (fun () () -> true)
+        "zkapp transaction too expensive" true
+        (Or_error.equal
+           (fun () () -> true)
            actual
            (Error (Error.of_string "zkapp transaction too expensive")) ) )
 
@@ -63,32 +68,33 @@ let valid_size_errors_events () =
   Quickcheck.test ~trials:50 zkapp_type_gen ~f:(fun (x, y) ->
       let expected =
         Error
-          (Error.of_string
-          @@ sprintf "too many event elements (%d, max allowed is %d)" (2 * y) y)
+          ( Error.of_string
+          @@ sprintf "too many event elements (%d, max allowed is %d)" (2 * y) y
+          )
       in
       let actual =
         valid_size ~genesis_constants:(genesis_constant_error 100000. y (2 * y))
         @@ read_all_proofs_from_disk x
       in
       Alcotest.(check bool)
-        "too many event elements"
-        true (Or_error.equal (fun () () -> true) actual expected) )
+        "too many event elements" true
+        (Or_error.equal (fun () () -> true) actual expected) )
 
 let valid_size_errors_actions () =
   Quickcheck.test ~trials:50 zkapp_type_gen ~f:(fun (x, y) ->
       let expected =
         Error
-          (Error.of_string
+          ( Error.of_string
           @@ sprintf "too many sequence event elements (%d, max allowed is %d)"
-               (2 * y) y)
+               (2 * y) y )
       in
       let actual =
         valid_size ~genesis_constants:(genesis_constant_error 100000. (2 * y) y)
         @@ read_all_proofs_from_disk x
       in
       Alcotest.(check bool)
-        "too many sequence event elements"
-        true (Or_error.equal (fun () () -> true) actual expected) )
+        "too many sequence event elements" true
+        (Or_error.equal (fun () () -> true) actual expected) )
 
 let returns_ok () =
   Quickcheck.test ~trials:50 zkapp_type_gen ~f:(fun (x, y) ->

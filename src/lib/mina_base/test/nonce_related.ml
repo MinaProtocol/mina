@@ -42,8 +42,8 @@ let target_nonce_on_success_overflow () =
 let nonce_increments_test () =
   Quickcheck.test ~trials:50 Valid_size.zkapp_type_gen ~f:(fun (x, _y) ->
       let total_nonce (input : int Public_key.Compressed.Map.t) : int =
-        Public_key.Compressed.Map.fold input ~init:0 ~f:(fun ~key:_ ~data accum ->
-            data + accum )
+        Public_key.Compressed.Map.fold input ~init:0
+          ~f:(fun ~key:_ ~data accum -> data + accum)
       in
       [%test_pred: int * int]
         (fun (a, b) -> a >= b)
