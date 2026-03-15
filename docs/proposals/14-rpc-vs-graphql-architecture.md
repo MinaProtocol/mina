@@ -280,6 +280,89 @@ The only leak is 3 calls to `Mina_graphql.Types.Input.SendPaymentInput.make_inpu
 
 Both approaches work. RPC would force a dependency on `daemon_rpcs` (25+ deps including `consensus`, `transition_frontier`) with no benefit.
 
+## Why a Lightweight RPC Client Is Not Feasible
+
+### The question
+
+Given that we're making `mina_graphql_client` lightweight (Proposal 13), should we do the same for RPC --- create a standalone lightweight RPC client library that doesn't pull in heavy daemon dependencies?
+
+### The answer: No
+
+The RPC and GraphQL architectures are fundamentally different in a way that makes this asymmetric.
+
+### GraphQL has a language-independent schema contract
+
+```
+graphql_schema.json (495KB, checked into repo)
+       |
+       +---> graphql_ppx reads it at compile time
+              +---> generates lightweight typed OCaml client code
+                    (no server-side imports needed)
+```
+
+The `graphql_ppx` preprocessor generates client types from the JSON schema without importing any server code. The schema JSON is the clean boundary. That's why Proposal 13 only needs to extract 3 input constructors --- everything else is already decoupled.
+
+### RPC has no schema --- the OCaml types ARE the protocol
+
+The RPC response type `Status.t` (in `src/lib/daemon_rpcs/types.ml`, lines 462-494) contains:
+
+```ocaml
+type t = {
+  sync_status       : Sync_status.Stable.Latest.t
+  catchup_status    : (Transition_frontier.Full_catchup_tree.Node.State.Enum.t * int) list option
+  consensus_time_best_tip : Consensus.Data.Consensus_time.Stable.Latest.t option
+  consensus_time_now      : Consensus.Data.Consensus_time.Stable.Latest.t
+  consensus_configuration : Consensus.Configuration.Stable.Latest.t
+  peers             : Network_peer.Peer.Display.Stable.Latest.t list
+  addrs_and_ports   : Node_addrs_and_ports.Display.Stable.Latest.t
+  next_block_production   : Next_producer_timing.t option
+  histograms        : Histograms.t option
+  metrics           : Metrics.t
+  ...
+} [@@deriving bin_io_unversioned]
+```
+
+`bin_prot` serialization requires **the exact same OCaml type definition** on both client and server to deserialize. You cannot parse a `Consensus.Data.Consensus_time.Stable.Latest.t` without importing the `consensus` library. You cannot parse `Transition_frontier.Full_catchup_tree.Node.State.Enum.t` without importing `transition_frontier`.
+
+### What extraction would require
+
+To create a lightweight RPC client, you would need to duplicate every type referenced in every RPC's query and response:
+
+| RPC response type field | Source library | That library's deps |
+|------------------------|----------------|---------------------|
+| `Sync_status.Stable.Latest.t` | `sync_status` | lightweight |
+| `Consensus.Data.Consensus_time.Stable.Latest.t` | `consensus` | `mina_base`, `signature_lib`, `snark_params`, `genesis_constants`, ... |
+| `Consensus.Configuration.Stable.Latest.t` | `consensus` | same as above |
+| `Transition_frontier.Full_catchup_tree.Node.State.Enum.t` | `transition_frontier` | `consensus`, `staged_ledger`, `mina_block`, `verifier`, ... |
+| `Network_peer.Peer.Display.Stable.Latest.t` | `network_peer` | lightweight |
+| `Node_addrs_and_ports.Display.Stable.Latest.t` | `node_addrs_and_ports` | `network_peer` |
+| `Trust_system.Peer_status.Stable.Latest.t` | `trust_system` | `network_peer`, `logger` |
+| `Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t` | `network_pool` | `mina_base`, `transaction_snark_work`, ... |
+| `Mina_networking.Node_status.Stable.Latest.t` | `mina_networking` | `consensus`, `transition_frontier`, `network_pool`, ... |
+
+You would need to:
+
+1. **Duplicate all these types** into a new `daemon_rpcs_types_lightweight` library
+2. **Keep them in perfect sync** --- `bin_prot` derives serialization format from the OCaml type structure. Same field names, same field order, same variant constructors, same nesting. One mismatch -> silent data corruption or crash.
+3. **Track changes across 10+ libraries** --- any change to `Consensus.Configuration.t` or `Transition_frontier.Node.State.Enum.t` in the source library must be immediately mirrored in the duplicate.
+4. **No tooling exists** to verify the duplicates match --- unlike Protocol Buffers or FlatBuffers, `bin_prot` has no schema validation tool. The only check is runtime deserialization.
+
+### The fundamental asymmetry
+
+| | GraphQL | RPC |
+|---|---|---|
+| Shared contract | `graphql_schema.json` (language-independent) | OCaml types with `bin_io` (OCaml-only) |
+| Client code generation | `graphql_ppx` generates from JSON schema | None --- must import actual type definitions |
+| Can decouple client from server? | Yes, already done via PPX + schema JSON | No --- types ARE the coupling |
+| Effort to make lightweight | Extract 3 input constructors (1-2 days) | Duplicate entire type ecosystem (weeks, fragile, ongoing maintenance) |
+| Cross-language support | Yes, any HTTP client | No, bin_prot is OCaml-only |
+
+### Conclusion
+
+The right strategy is to **invest in GraphQL for all external/operator tooling** and accept that RPC is --- and should remain --- an internal OCaml-to-OCaml mechanism. Attempting to make RPC lightweight would be high effort, fragile, and provide no benefit over the GraphQL path.
+
+Any functionality currently only available via RPC (tracing, visualizations) that operators need should be exposed via GraphQL as well, rather than trying to make the RPC interface externally accessible.
+
 ## Action Items
 
 1. **Proposal 13** --- Extract 3 input constructors to fix the `mina_graphql_client` dependency leak. This unblocks lightweight typed GraphQL clients. (1-2 days)
