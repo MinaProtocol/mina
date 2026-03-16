@@ -54,6 +54,11 @@ let () =
   let unfinalized = Lazy.force Unfinalized.Constant.dummy in
   let dv = unfinalized.deferred_values in
 
+  (* Extract expanded zeta/alpha from the dummy for debugging *)
+  let expand_sc sc = Pickles__Common.Ipa.Wrap.endo_to_field sc in
+  fq "unfinalized.zeta_expanded" (expand_sc dv.plonk.zeta) ;
+  fq "unfinalized.alpha_expanded" (expand_sc dv.plonk.alpha) ;
+
   let sv2 (Plonkish_prelude.Shifted_value.Type2.Shifted_value v) = v in
   fq "unfinalized.plonk.perm" (sv2 dv.plonk.perm) ;
   fq "unfinalized.plonk.zeta_to_srs_length" (sv2 dv.plonk.zeta_to_srs_length) ;
