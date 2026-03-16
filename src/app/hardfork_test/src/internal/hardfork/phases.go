@@ -303,6 +303,9 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 	delete(config, "ledger")
 	t.Logger.Info("Removed .ledger from daemon.json")
 
+	delete(config, "daemon")
+	t.Logger.Info("Removed .daemon from daemon.json")
+
 	if genesis, ok := config["genesis"].(map[string]any); ok {
 		delete(genesis, "genesis_state_timestamp")
 		t.Logger.Info("Removed .genesis.genesis_state_timestamp from daemon.json")
