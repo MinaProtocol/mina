@@ -18,7 +18,7 @@ type LedgerHashes struct {
 
 // GenerateForkLedgers generates the hardfork ledgers using the specified executable
 func (t *HardforkTest) GenerateForkLedgers(executablePath, forkConfigPath, ledgersDir, hashesFile string) error {
-	t.Logger.Info("Generating hardfork ledgers...")
+	t.Logger.Info("Generating hardfork ledgers with %s...", executablePath)
 
 	// Create hardfork ledgers directory
 	os.RemoveAll(ledgersDir)
