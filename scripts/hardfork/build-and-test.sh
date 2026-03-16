@@ -3,9 +3,9 @@
 # This scripts builds a designated PREFORK branch and current branch with nix
 # 0. Prepare environment if needed
 # 1. Build PREFORK as a prefork build;
-# 2. Build "develop" branch as a postfork build
-# 3. Upload to nix cache, the reason for not uploading cache for following 2 
-# steps is that they change for each PR. 
+# 2. Build current branch as a postfork build
+# 3. Upload to nix cache, the reason for not uploading cache for following 2
+# steps is that they change for each PR.
 # 4. Build hardfork_test on current branch;
 # 5. Execute hardfork_test on them.
 
@@ -140,8 +140,8 @@ git checkout $PREFORK
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet"
 
-# 2. Build "develop" branch as a postfork build
-git checkout develop
+# 2. Build current branch as a postfork build
+git checkout "$TEST_COMMIT"
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devnet"
 
