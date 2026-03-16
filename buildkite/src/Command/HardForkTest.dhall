@@ -66,6 +66,7 @@ in  { pipeline =
                     , label = label
                     , key = key
                     , target = Size.Integration
+                    , artifact_paths = [ S.contains "hardfork-test-artifacts/*" ]
                     , soft_fail = Some (B/SoftFail.Boolean False)
                     , docker = None Docker.Type
                     , timeout_in_minutes = Some +420

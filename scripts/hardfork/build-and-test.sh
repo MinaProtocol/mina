@@ -172,6 +172,17 @@ SLOT_TX_END=${SLOT_TX_END:-$((RANDOM%120+30))}
 SLOT_CHAIN_END=${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}
 
 NETWORK_ROOT=$(mktemp -d --tmpdir hardfork-network.XXXXXXX)
+ARTIFACT_DIR="hardfork-test-artifacts"
+
+upload_config_artifacts() {
+  mkdir -p "$ARTIFACT_DIR"
+  cp "$NETWORK_ROOT/daemon.json" "$ARTIFACT_DIR/prefork-daemon.json" 2>/dev/null || true
+  cp "$NETWORK_ROOT/nodes/seed/daemon.json" "$ARTIFACT_DIR/postfork-daemon.json" 2>/dev/null || true
+  if [ -n "${BUILDKITE:-}" ] && command -v buildkite-agent &>/dev/null; then
+    buildkite-agent artifact upload "$ARTIFACT_DIR/*" 2>/dev/null || true
+  fi
+}
+trap upload_config_artifacts EXIT
 
 hardfork_test/bin/hardfork_test \
   --main-mina-exe prefork-devnet/bin/mina \

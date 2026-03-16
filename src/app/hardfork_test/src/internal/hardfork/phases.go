@@ -15,6 +15,21 @@ import (
 
 type HFHandler func(*HardforkTest, *BlockAnalysisResult) error
 
+// logConfigFile reads a config file from disk and logs its contents
+func (t *HardforkTest) logConfigFile(label string, path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Logger.Error("Could not read %s config at %s: %v", label, path, err)
+		return
+	}
+	var buf bytes.Buffer
+	if err := json.Indent(&buf, data, "", "  "); err != nil {
+		t.Logger.Error("Config file %s at %s is not valid JSON: %v", label, path, err)
+		return
+	}
+	t.Logger.Info("=== %s config (%s) ===\n%s\n=== end %s config ===", label, path, buf.String(), label)
+}
+
 // RunMainNetworkPhase runs the main network and validates its operation
 // and returns the fork config bytes and block analysis result
 func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown HFHandler) (*BlockAnalysisResult, error) {
@@ -25,6 +40,10 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 	}
 
 	defer t.gracefulShutdown(mainNetCmd, "Main network")
+
+	// Log pre-fork daemon config
+	preforkConfigPath := filepath.Join(t.Config.Root, "daemon.json")
+	t.logConfigFile("pre-fork", preforkConfigPath)
 
 	t.WaitForBestTip(t.Config.AnyPortOfType(config.PORT_REST), func(block client.BlockData) bool {
 		return block.Slot >= 1
@@ -188,6 +207,8 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 		return err
 	}
 
+	t.logConfigFile("post-fork (legacy)", patchedConfigFile)
+
 	return nil
 }
 
@@ -246,6 +267,8 @@ func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnal
 	if err != nil {
 		return err
 	}
+
+	t.logConfigFile("post-fork (advanced)", forkConfigFile)
 
 	return nil
 }
