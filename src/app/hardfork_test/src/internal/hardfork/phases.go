@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -274,6 +276,31 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 	return nil
 }
 
+// ComputeChainId computes the chain_id for the given config files using the
+// post-fork mina binary's `internal chain-id --from-config-hashes-only` command.
+// Returns empty string if the chain_id cannot be computed (e.g. config lacks hashes).
+func (t *HardforkTest) ComputeChainId(configFiles ...string) (string, error) {
+	args := []string{"internal", "chain-id"}
+	for _, f := range configFiles {
+		args = append(args, "--config-file", f)
+	}
+	args = append(args, "--from-config-hashes-only")
+	cmd := exec.Command(t.Config.ForkMinaExe, args...)
+	output, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return "", fmt.Errorf("mina internal chain-id failed (exit %d): %s",
+				exitErr.ExitCode(), string(exitErr.Stderr))
+		}
+		return "", fmt.Errorf("failed to run mina internal chain-id: %w", err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+type MoveFileSpec struct {
+	from, to string
+}
+
 func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 	t.Logger.Info("Cleaning up deamon.json generate by mina-local-network so we're not using prefork genesis info...")
 	networkDaemonConfig := filepath.Join(t.Config.Root, "daemon.json")
@@ -307,23 +334,38 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 	}
 
 	t.Logger.Info("`daemon.json` successfully sanitized, now moving fork config & ledgers in place for fork network")
-	filesToMove := []string{"daemon.json", "genesis"}
-	for _, info := range t.Config.AllDaemonInfos() {
-		for _, fileToMove := range filesToMove {
-			// NOTE: all *Fork functions will generate a "fork_data/{daemon.json, genesis}"
-			oldPath := filepath.Join(info.NodeDir, "fork_data", fileToMove)
-			newPath := filepath.Join(info.NodeDir, fileToMove)
 
-			if _, err = os.Stat(newPath); err == nil {
-				t.Logger.Info("Target file/folder %s exists, removing it first", newPath)
-				err = os.RemoveAll(newPath)
+	for _, info := range t.Config.AllDaemonInfos() {
+		forkDataBase := filepath.Join(info.NodeDir, "fork_data")
+		// NOTE: Compute chain_id from the merged config (fork + shared) to determine
+		// the nested directory structure the post-fork daemon will use. The daemon
+		// loads its config-directory daemon.json first, then overlays --config-file
+		// args, so we pass both in the same order.
+		forkConfigFile := filepath.Join(forkDataBase, "daemon.json")
+		chainId, err := t.ComputeChainId(forkConfigFile, networkDaemonConfig)
+		if err != nil {
+			return fmt.Errorf("failed to compute chain_id from fork config on node at %s: %v", info.NodeDir, err)
+		}
+		t.Logger.Info("Computed chain_id for fork config at %s: %s", info.NodeDir, chainId)
+		chainStateDir := filepath.Join(info.NodeDir, chainId)
+		os.Mkdir(chainStateDir, 0755)
+		filesToMove := []MoveFileSpec{
+			{from: forkConfigFile, to: filepath.Join(info.NodeDir, "daemon.json")},
+			{from: filepath.Join(forkDataBase, "genesis"), to: filepath.Join(chainStateDir, "genesis")},
+		}
+		for _, spec := range filesToMove {
+			// NOTE: all *Fork functions will generate a "fork_data/{daemon.json, genesis}"
+
+			if _, err = os.Stat(spec.to); err == nil {
+				t.Logger.Info("Target file/folder %s exists, removing it first", spec.to)
+				err = os.RemoveAll(spec.to)
 				if err != nil {
-					return fmt.Errorf("Failed to remove existing file/folder %s: %v", newPath, err)
+					return fmt.Errorf("Failed to remove existing file/folder %s: %v", spec.to, err)
 				}
 			}
-			err := os.Rename(oldPath, newPath)
+			err := os.Rename(spec.from, spec.to)
 			if err != nil {
-				return fmt.Errorf("Error moving fork data %s -> %s on node %s: %v", oldPath, newPath, info.NodeDir, err)
+				return fmt.Errorf("Error moving fork data %s -> %s on node %s: %v", spec.from, spec.to, info.NodeDir, err)
 			}
 		}
 	}
