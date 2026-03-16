@@ -25,3 +25,6 @@ val scalar_chal :
 
 val chal :
   unit -> (Core_kernel.Int64.t, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
+
+(** Enable trace logging: each Ro call prints its key to stderr. *)
+val enable_trace : unit -> unit
