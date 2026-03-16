@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -297,6 +299,26 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 	return nil
 }
 
+// ComputeChainId computes the chain_id for a given config file using the
+// post-fork mina binary's `internal chain-id --from-config-hashes-only` command.
+// Returns empty string if the chain_id cannot be computed (e.g. config lacks hashes).
+func (t *HardforkTest) ComputeChainId(configFile string) (string, error) {
+	cmd := exec.Command(t.Config.ForkMinaExe,
+		"internal", "chain-id",
+		"--config-file", configFile,
+		"--from-config-hashes-only",
+	)
+	output, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return "", fmt.Errorf("mina internal chain-id failed (exit %d): %s",
+				exitErr.ExitCode(), string(exitErr.Stderr))
+		}
+		return "", fmt.Errorf("failed to run mina internal chain-id: %w", err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
 func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 	t.Logger.Info("Cleaning up deamon.json generate by mina-local-network so we're not using prefork genesis info...")
 	networkDaemonConfig := filepath.Join(t.Config.Root, "daemon.json")
@@ -330,12 +352,32 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 	}
 
 	t.Logger.Info("`daemon.json` successfully sanitized, now moving fork config & ledgers in place for fork network")
+
+	// Compute chain_id from the fork config to determine the nested directory
+	// structure the post-fork daemon will use for chain state locations.
+	firstDaemon := t.Config.AllDaemonInfos()[0]
+	forkConfigFile := filepath.Join(firstDaemon.NodeDir, "fork_data", "daemon.json")
+	chainId, err := t.ComputeChainId(forkConfigFile)
+	if err != nil {
+		return fmt.Errorf("failed to compute chain_id from fork config: %v", err)
+	}
+	t.Logger.Info("Computed chain_id for fork config: %s", chainId)
+
 	filesToMove := []string{"daemon.json", "genesis"}
 	for _, info := range t.Config.AllDaemonInfos() {
 		for _, fileToMove := range filesToMove {
 			// NOTE: all *Fork functions will generate a "fork_data/{daemon.json, genesis}"
 			oldPath := filepath.Join(info.NodeDir, "fork_data", fileToMove)
 			newPath := filepath.Join(info.NodeDir, fileToMove)
+
+			// Genesis ledgers must be placed under the chain_id subdirectory
+			// so the post-fork daemon finds them at <conf_dir>/<chain_id>/genesis
+			if fileToMove == "genesis" && chainId != "" {
+				newPath = filepath.Join(info.NodeDir, chainId, "genesis")
+				if err := os.MkdirAll(filepath.Dir(newPath), 0755); err != nil {
+					return fmt.Errorf("Failed to create chain_id directory: %v", err)
+				}
+			}
 
 			if _, err = os.Stat(newPath); err == nil {
 				t.Logger.Info("Target file/folder %s exists, removing it first", newPath)
