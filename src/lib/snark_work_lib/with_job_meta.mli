@@ -1,3 +1,9 @@
+(** Attaches metadata to a job specification.
+
+    Includes the job ID for tracking and the sok_message (statement of
+    knowledge) for prover attribution and fee payment.
+*)
+
 [%%versioned:
 module Stable : sig
   module V1 : sig
@@ -10,4 +16,5 @@ module Stable : sig
   end
 end]
 
+(** Transform the spec while preserving metadata. *)
 val map : f_spec:('s1 -> 's2) -> ('s1, 'id) t -> ('s2, 'id) t
