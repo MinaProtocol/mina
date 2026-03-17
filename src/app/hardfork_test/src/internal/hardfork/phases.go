@@ -299,15 +299,18 @@ func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGene
 	return nil
 }
 
-// ComputeChainId computes the chain_id for a given config file using the
+// ComputeChainId computes the chain_id for the given config files using the
 // post-fork mina binary's `internal chain-id --from-config-hashes-only` command.
+// Config files are combined in order (later files override earlier ones), matching
+// how the daemon merges its config-directory daemon.json with --config-file args.
 // Returns empty string if the chain_id cannot be computed (e.g. config lacks hashes).
-func (t *HardforkTest) ComputeChainId(configFile string) (string, error) {
-	cmd := exec.Command(t.Config.ForkMinaExe,
-		"internal", "chain-id",
-		"--config-file", configFile,
-		"--from-config-hashes-only",
-	)
+func (t *HardforkTest) ComputeChainId(configFiles ...string) (string, error) {
+	args := []string{"internal", "chain-id"}
+	for _, f := range configFiles {
+		args = append(args, "--config-file", f)
+	}
+	args = append(args, "--from-config-hashes-only")
+	cmd := exec.Command(t.Config.ForkMinaExe, args...)
 	output, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -353,11 +356,13 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 
 	t.Logger.Info("`daemon.json` successfully sanitized, now moving fork config & ledgers in place for fork network")
 
-	// Compute chain_id from the fork config to determine the nested directory
-	// structure the post-fork daemon will use for chain state locations.
+	// Compute chain_id from the merged config (fork + shared) to determine the
+	// nested directory structure the post-fork daemon will use. The daemon loads
+	// its config-directory daemon.json first, then overlays --config-file args,
+	// so we pass both in the same order.
 	firstDaemon := t.Config.AllDaemonInfos()[0]
 	forkConfigFile := filepath.Join(firstDaemon.NodeDir, "fork_data", "daemon.json")
-	chainId, err := t.ComputeChainId(forkConfigFile)
+	chainId, err := t.ComputeChainId(forkConfigFile, networkDaemonConfig)
 	if err != nil {
 		return fmt.Errorf("failed to compute chain_id from fork config: %v", err)
 	}
