@@ -337,11 +337,16 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 
 	for _, info := range t.Config.AllDaemonInfos() {
 		forkDataBase := filepath.Join(info.NodeDir, "fork_data")
+		forkConfigFile := filepath.Join(forkDataBase, "daemon.json")
+		forkConfigContent, err := os.ReadFile(forkConfigFile)
+		if err != nil {
+			return fmt.Errorf("Can't read fork config from node %s: %v", info.NodeDir, err)
+		}
+		t.Logger.Info("Node %s will be using fork config of content: %s", string(forkConfigContent))
 		// NOTE: Compute chain_id from the merged config (fork + shared) to determine
 		// the nested directory structure the post-fork daemon will use. The daemon
 		// loads its config-directory daemon.json first, then overlays --config-file
 		// args, so we pass both in the same order.
-		forkConfigFile := filepath.Join(forkDataBase, "daemon.json")
 		chainId, err := t.ComputeChainId(forkConfigFile, networkDaemonConfig)
 		if err != nil {
 			return fmt.Errorf("failed to compute chain_id from fork config on node at %s: %v", info.NodeDir, err)
