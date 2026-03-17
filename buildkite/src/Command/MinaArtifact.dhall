@@ -271,6 +271,7 @@ let docker_step
                             , network = spec.network
                             , profile = spec.profile
                             , artifact = Artifacts.Type.DaemonAppsOnly
+                            , arch = spec.arch
                             , buildFlags = spec.buildFlags
                             }
                     , service = Artifacts.Type.DaemonConfig
