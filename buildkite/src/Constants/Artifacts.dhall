@@ -30,6 +30,7 @@ let Artifact
       | Toolchain
       | CreatePreforkGenesis
       | DelegationVerifier
+      | DaemonStorageToolbox
       >
 
 let AllButTests =
@@ -50,6 +51,7 @@ let AllButTests =
       , Artifact.Toolchain
       , Artifact.CreatePreforkGenesis
       , Artifact.DelegationVerifier
+      , Artifact.DaemonStorageToolbox
       ]
 
 let Main =
@@ -83,6 +85,7 @@ let capitalName =
             , FunctionalTestSuite = "FunctionalTestSuite"
             , Toolchain = "Toolchain"
             , CreatePreforkGenesis = "CreatePreforkGenesis"
+            , DaemonStorageToolbox = "DaemonStorageToolbox"
             }
             artifact
 
@@ -105,6 +108,7 @@ let lowerName =
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , CreatePreforkGenesis = "create_prefork_genesis"
+            , DaemonStorageToolbox = "daemon_storage_toolbox"
             , Toolchain = "toolchain"
             , DelegationVerifier = "delegation_verifier"
             }
@@ -130,6 +134,7 @@ let dockerName =
             , Toolchain = "mina-toolchain"
             , CreatePreforkGenesis = ""
             , DelegationVerifier = "mina-delegation-verifier"
+            , DaemonStorageToolbox = "mina-daemon-storage-toolbox"
             , DaemonConfig = "mina-daemon-configured"
             }
             artifact
@@ -167,6 +172,7 @@ let toDebianName =
             , CreatePreforkGenesis =
                 "prefork_${Network.lowerName network}_genesis_ledger"
             , DaemonConfig = "daemon_${Network.lowerName network}_config"
+            , DaemonStorageToolbox = "daemon_storage_toolbox"
             }
             artifact
 
@@ -196,6 +202,7 @@ let toDebianNames =
                           , FunctionalTestSuite = [ "functional_test_suite" ]
                           , CreatePreforkGenesis = [ toDebianName a network ]
                           , DelegationVerifier = [ "delegation_verify" ]
+                          , DaemonStorageToolbox = [ "daemon_storage_toolbox" ]
                           , Toolchain = [] : List Text
                           }
                           a
@@ -279,6 +286,7 @@ let dockerTag =
                 , DelegationVerifier = "${spec.version}"
                 , CreatePreforkGenesis = "${spec.version}"
                 , DaemonConfig = "${spec.version}"
+                , DaemonStorageToolbox = "${spec.version}"
                 }
                 spec.artifact
 

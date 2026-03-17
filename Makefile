@@ -652,6 +652,10 @@ debian-build-daemon-devnet-prefork: ## Build the Debian daemon package for autom
 debian-build-daemon-mainnet-prefork: ## Build the Debian daemon package for automote mainnet pre hardfork
 	$(call build_debian_package,daemon_prefork_mainnet)
 
+.PHONY: debian-daemon-storage-toolbox
+debian-daemon-storage-toolbox: ## Build the Debian daemon storage toolbox package
+	$(call build_debian_package,daemon_storage_toolbox)
+
 .PHONY: debian-download-create-legacy-hardfork
 debian-download-create-legacy-hardfork: ## Download and create legacy hardfork Debian packages
 	$(info 📦 Downloading legacy hardfork Debian packages for debian $(CODENAME))

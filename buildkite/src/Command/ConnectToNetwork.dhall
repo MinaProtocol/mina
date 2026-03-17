@@ -22,7 +22,7 @@ in  { step =
               , commands =
                   RunInToolchain.runInToolchain
                     DebianVersions.overrideEnvs
-                    "./buildkite/scripts/connect/connect-to-network.sh ${mina_suffix} ${testnet} ${wait_between_graphql_poll} ${wait_before_final_check} "
+                    "./buildkite/scripts/connect/connect-to-network.sh --mina-debian-network ${mina_suffix} --network-name ${testnet} --wait-between-polling ${wait_between_graphql_poll} --wait-after-final-check ${wait_before_final_check} "
               , label = "Connect to ${testnet}"
               , soft_fail = Some soft_fail
               , key = "connect-to-${testnet}"
