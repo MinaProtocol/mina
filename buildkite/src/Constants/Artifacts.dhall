@@ -24,6 +24,7 @@ let Artifact
       | FunctionalTestSuite
       | Toolchain
       | CreateLegacyGenesis
+      | DaemonRecoveryStorageToolbox
       >
 
 let AllButTests =
@@ -38,6 +39,7 @@ let AllButTests =
       , Artifact.ZkappTestTransaction
       , Artifact.Toolchain
       , Artifact.CreateLegacyGenesis
+      , Artifact.DaemonRecoveryStorageToolbox
       ]
 
 let Main =
@@ -60,6 +62,7 @@ let capitalName =
             , FunctionalTestSuite = "FunctionalTestSuite"
             , Toolchain = "Toolchain"
             , CreateLegacyGenesis = "CreateLegacyGenesis"
+            , DaemonRecoveryStorageToolbox = "DaemonRecoveryStorageToolbox"
             }
             artifact
 
@@ -77,6 +80,7 @@ let lowerName =
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , CreateLegacyGenesis = "create_legacy_genesis"
+            , DaemonRecoveryStorageToolbox = "daemon_storage_toolbox"
             , Toolchain = "toolchain"
             }
             artifact
@@ -96,6 +100,8 @@ let dockerName =
             , FunctionalTestSuite = "mina-test-suite"
             , Toolchain = "mina-toolchain"
             , CreateLegacyGenesis = "mina-create-legacy-genesis"
+            , DaemonRecoveryStorageToolbox =
+                "mina-daemon-recovery-storage-toolbox"
             }
             artifact
 
@@ -124,6 +130,7 @@ let toDebianName =
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = ""
             , CreateLegacyGenesis = "create_legacy_genesis"
+            , DaemonRecoveryStorageToolbox = "daemon_recovery_storage_toolbox"
             }
             artifact
 
@@ -146,6 +153,8 @@ let toDebianNames =
                           , Rosetta = [ toDebianName a network ]
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
+                          , DaemonRecoveryStorageToolbox =
+                            [ toDebianName a network ]
                           , CreateLegacyGenesis = [ "create_legacy_genesis" ]
                           , Toolchain = [] : List Text
                           }
@@ -218,6 +227,7 @@ let dockerTag =
                 , FunctionalTestSuite = "${spec.version}${build_flags_part}"
                 , Toolchain = "${spec.version}"
                 , CreateLegacyGenesis = "${spec.version}"
+                , DaemonRecoveryStorageToolbox = "${spec.version}"
                 }
                 spec.artifact
 
