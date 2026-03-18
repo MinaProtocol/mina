@@ -184,31 +184,18 @@ let wait_for_node_init ?(initial_delay_sec = 2.) ?(poll_interval_sec = 5.)
   in
   Async.printf "Waiting initial %.0f s. before polling GraphQL for node init\n"
     initial_delay_sec ;
-  let%bind () = after @@ Time.Span.of_sec initial_delay_sec in
-  let deadline = Time.add (Time.now ()) (Time.Span.of_sec timeout_sec) in
-  let rec poll () =
-    if Time.( >= ) (Time.now ()) deadline then
-      Deferred.Or_error.error_string
-        "Timed out waiting for node initialization event"
-    else
-      let%bind entries =
-        Mina_graphql_client.Client.get_filtered_log_entries
-          ~last_log_index_seen:0 node_uri
-      in
-      match entries with
-      | Ok msgs when Array.length msgs > 0 ->
-          Async.printf "Node initialization detected via GraphQL\n" ;
-          Deferred.Or_error.ok_unit
-      | Ok _ ->
-          let%bind () = after @@ Time.Span.of_sec poll_interval_sec in
-          poll ()
-      | Error e ->
-          Async.printf "GraphQL not ready (%s), retrying...\n"
-            (Error.to_string_hum e) ;
-          let%bind () = after @@ Time.Span.of_sec poll_interval_sec in
-          poll ()
-  in
-  poll ()
+  Mina_graphql_client.Client.poll_filtered_log_entries ~initial_delay_sec
+    ~poll_interval_sec ~timeout_sec
+    ~on_entries:(fun entries ->
+      if Array.length entries > 0 then (
+        Async.printf "Node initialization detected via GraphQL\n" ;
+        Deferred.return `Stop )
+      else Deferred.return `Continue )
+    ~on_error:(fun e ->
+      Async.printf "GraphQL not ready (%s), retrying...\n"
+        (Error.to_string_hum e) ;
+      Deferred.return `Continue )
+    node_uri
 
 let archive_blocks t ~archive_address ~format blocks =
   let format_arg =
