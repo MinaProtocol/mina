@@ -122,10 +122,7 @@ func (t *HardforkTest) Run() error {
 	beforeShutdown := func(t *HardforkTest, analysis *BlockAnalysisResult, forkMethods []config.ForkMethod) error {
 		t.Logger.Info("Phase 2: Forking with fork method `%s`...", t.Config.ForkMethods)
 
-		if err := t.ForkPhase(analysis, mainGenesisTs, forkMethods); err != nil {
-			return err
-		}
-		return nil
+		return t.ForkPhase(analysis, mainGenesisTs, forkMethods)
 	}
 
 	analysis, err := t.RunMainNetworkPhase(mainGenesisTs, beforeShutdown)
