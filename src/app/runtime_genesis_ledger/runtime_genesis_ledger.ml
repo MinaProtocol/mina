@@ -90,6 +90,7 @@ let is_dirty_proof = function
       ; coinbase_amount = None
       ; supercharged_coinbase_factor = None
       ; account_creation_fee = None
+      ; _
       } ->
       false
   | _ ->
