@@ -1676,7 +1676,7 @@ let mk_fee_payer ~fee ~pk ~nonce : Account_update.Fee_payer.t =
     ~body:{ public_key = pk; fee; valid_until = None; nonce }
     ~authorization:Signature.dummy
 
-let gen_max_cost_zkapp_command_from ?memo ?fee_range ?(n_updates : int = 5)
+let gen_max_cost_zkapp_command_from ?memo ?fee_range ?(n_updates : int = 15)
     ~(fee_payer_pk : Signature_lib.Public_key.Compressed.t)
     ~(account_state_tbl : (Account.t * role) Account_id.Table.t) ~vk
     ~(genesis_constants : Genesis_constants.t) () =
@@ -1916,7 +1916,7 @@ let%test_module _ =
       in
       ()
 
-    let gen_and_test_tx ?(n_expected_updates = 5) ~keymap
+    let gen_and_test_tx ?(n_expected_updates = 15) ~keymap
         (generator : Zkapp_command.t Quickcheck.Generator.t) =
       let command =
         Quickcheck.Generator.generate generator ~size:1
@@ -1982,7 +1982,7 @@ let%test_module _ =
           :: List.init 3 ~f:gen_account
           |> Public_key.Compressed.Map.of_alist_exn
         in
-        let n_updates = 5 in
+        let n_updates = 15 in
         let max_cost_cmd_gen =
           gen_max_cost_zkapp_command_from ~n_updates
             ~fee_payer_pk:fee_payer_account.public_key ~account_state_tbl ~vk
