@@ -69,6 +69,8 @@ type Config struct {
 	ClientMaxRetries              int // Max number of retries for client requests
 
 	ForkMethods ForkMethodSet
+
+	DaemonInfos []DaemonInfo
 }
 
 // DefaultConfig returns the default configuration with values
@@ -121,56 +123,75 @@ const (
 const PORT_PER_NODE = 6
 
 type DaemonInfo struct {
-	StartPort int
-	NodeDir   string
+	StartPort  int
+	NodeDir    string
+	ForkMethod ForkMethod
 }
 
-func (c *Config) AllDaemonInfos() []DaemonInfo {
+func (d *DaemonInfo) Port(ty PortType) int {
+	return d.StartPort + int(ty)
+}
+
+func (c *Config) InitDaemonInfos() {
 	nodesBase := filepath.Join(c.Root, "nodes")
 
 	result := []DaemonInfo{
-		{StartPort: c.SeedStartPort, NodeDir: filepath.Join(nodesBase, "seed")},
-		{StartPort: c.SnarkCoordinatorPort, NodeDir: filepath.Join(nodesBase, "snark_coordinator")},
+		{
+			StartPort:  c.SeedStartPort,
+			NodeDir:    filepath.Join(nodesBase, "seed"),
+			ForkMethod: c.ForkMethods.RandomChoose(),
+		},
+		{
+			StartPort:  c.SnarkCoordinatorPort,
+			NodeDir:    filepath.Join(nodesBase, "snark_coordinator"),
+			ForkMethod: c.ForkMethods.RandomChoose(),
+		},
 	}
 
 	for whale_id := 0; whale_id < c.NumWhales; whale_id++ {
 		result = append(result, DaemonInfo{
-			StartPort: c.WhaleStartPort + whale_id*PORT_PER_NODE,
-			NodeDir:   filepath.Join(nodesBase, fmt.Sprintf("whale_%d", whale_id)),
+			StartPort:  c.WhaleStartPort + whale_id*PORT_PER_NODE,
+			NodeDir:    filepath.Join(nodesBase, fmt.Sprintf("whale_%d", whale_id)),
+			ForkMethod: c.ForkMethods.RandomChoose(),
 		})
 	}
 
 	for fish_id := 0; fish_id < c.NumFish; fish_id++ {
 		result = append(result, DaemonInfo{
-			StartPort: c.FishStartPort + fish_id*PORT_PER_NODE,
-			NodeDir:   filepath.Join(nodesBase, fmt.Sprintf("fish_%d", fish_id)),
+			StartPort:  c.FishStartPort + fish_id*PORT_PER_NODE,
+			NodeDir:    filepath.Join(nodesBase, fmt.Sprintf("fish_%d", fish_id)),
+			ForkMethod: c.ForkMethods.RandomChoose(),
 		})
 	}
 
 	for node_id := 0; node_id < c.NumNodes; node_id++ {
 		result = append(result, DaemonInfo{
-			StartPort: c.NodeStartPort + node_id*PORT_PER_NODE,
-			NodeDir:   filepath.Join(nodesBase, fmt.Sprintf("plain_%d", node_id)),
+			StartPort:  c.NodeStartPort + node_id*PORT_PER_NODE,
+			NodeDir:    filepath.Join(nodesBase, fmt.Sprintf("plain_%d", node_id)),
+			ForkMethod: c.ForkMethods.RandomChoose(),
 		})
 	}
 
-	return result
+	// TODO: ensure there's at least one daemon not running in auto mode, o.w. we
+	// will not be able to do any kind of validation.
+
+	c.DaemonInfos = result
 }
 
-func (c *Config) AllPortOfType(ty PortType) []int {
-	all_ports := []int{}
-
-	for _, info := range c.AllDaemonInfos() {
-		all_ports = append(all_ports, info.StartPort+int(ty))
+func (c *Config) AllDaemonInfos(tag string, pred func(*DaemonInfo) bool) []*DaemonInfo {
+	candidates := []*DaemonInfo{}
+	for _, info := range c.DaemonInfos {
+		if pred(&info) {
+			candidates = append(candidates, &info)
+		}
 	}
-	return all_ports
+	return candidates
+
 }
 
-func (c *Config) AnyPortOfType(ty PortType) int {
-	candidates_ports := c.AllPortOfType(ty)
-
-	idx := rand.Intn(len(candidates_ports))
-	return candidates_ports[idx]
+func (c *Config) SampleDaemonInfo(tag string, pred func(*DaemonInfo) bool) *DaemonInfo {
+	candidates := c.AllDaemonInfos(tag, pred)
+	return candidates[rand.Intn(len(candidates))]
 }
 
 func (c *Config) ForkGenesisTsGivenMainGenesisTs(mainGenesisTs int64) int64 {

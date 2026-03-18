@@ -165,7 +165,7 @@ func (t *HardforkTest) CollectEpochHashes(mainGenesisTs int64) (*SnarkedHashByEp
 	snarkedHashByEpoch := make(SnarkedHashByEpoch)
 	lastSlotPerEpoch := make(map[int]int)
 	for time.Now().Before(slotChainEnd) {
-		recentBlocks, err := t.Client.RecentBlocks(t.Config.AnyPortOfType(config.PORT_REST), config.ProtocolK)
+		recentBlocks, err := t.Client.RecentBlocks(t.Config.SampleDaemonInfo("any", func(di *config.DaemonInfo) bool { return true }).Port(config.PORT_REST), config.ProtocolK)
 		if err != nil {
 			return nil, err
 		}
@@ -190,32 +190,32 @@ func (t *HardforkTest) CollectEpochHashes(mainGenesisTs int64) (*SnarkedHashByEp
 }
 
 func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, error) {
-	allRestPorts := t.Config.AllPortOfType(config.PORT_REST)
+	allNonAutoDaemons := t.Config.AllDaemonInfos("non-auto", func(di *config.DaemonInfo) bool { return di.ForkMethod != config.Auto })
 
 	var wg sync.WaitGroup
 
-	states := make([]*ConsensusState, len(allRestPorts)) // store results
-	errors := make([]error, len(allRestPorts))
+	states := make([]*ConsensusState, len(allNonAutoDaemons)) // store results
+	errors := make([]error, len(allNonAutoDaemons))
 
-	for i, port := range allRestPorts {
+	for i, daemon := range allNonAutoDaemons {
 		wg.Add(1)
 		go func(i, port int) {
 			defer wg.Done()
 			state, err := t.ConsensusStateOnNode(port)
 			states[i] = state
 			errors[i] = err
-		}(i, port)
+		}(i, daemon.Port(config.PORT_REST))
 	}
 
 	wg.Wait()
 
-	for i, port := range allRestPorts {
+	for i, daemon := range allNonAutoDaemons {
 		if errors[i] != nil {
-			return nil, fmt.Errorf("Failed to query consensus state on port %d: %w", port, errors[i])
+			return nil, fmt.Errorf("Failed to query consensus state on daemon at %s: %w", daemon.NodeDir, errors[i])
 		}
 	}
 
-	for i := range allRestPorts {
+	for i, daemon := range allNonAutoDaemons {
 		if i == 0 {
 			continue
 		}
@@ -225,13 +225,13 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, error) {
 
 		if state.LastBlockBeforeTxEnd != last_state.LastBlockBeforeTxEnd {
 			return nil, fmt.Errorf(
-				"Port %d and %d doesn't agree on last block seen before tx end! The previous has %v while the later has %v",
-				allRestPorts[i-1], allRestPorts[i], last_state, state)
+				"Daemon %s and %s doesn't agree on last block seen before tx end! The previous has %v while the later has %v",
+				allNonAutoDaemons[i-1].NodeDir, daemon.NodeDir, last_state, state)
 		}
 	}
 
-	if len(allRestPorts) == 0 {
-		return nil, fmt.Errorf("Unreachable: no nodes are running!")
+	if len(allNonAutoDaemons) == 0 {
+		return nil, fmt.Errorf("No nodes are running after slot-chain-end!")
 	}
 
 	return states[0], nil
@@ -240,10 +240,10 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, error) {
 // AnalyzeBlocks performs comprehensive block analysis including finding genesis epoch hashes
 func (t *HardforkTest) AnalyzeBlocks(mainGenesisTs int64) (*BlockAnalysisResult, error) {
 
-	portUsed := t.Config.AnyPortOfType(config.PORT_REST)
-	genesisBlock, err := t.Client.GenesisBlock(portUsed)
+	daemonForGenesisBlock := t.Config.SampleDaemonInfo("any", func(di *config.DaemonInfo) bool { return true })
+	genesisBlock, err := t.Client.GenesisBlock(daemonForGenesisBlock.Port(config.PORT_REST))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get genesis block on port %d: %w", portUsed, err)
+		return nil, fmt.Errorf("failed to get genesis block on port %d: %w", config.PORT_REST, err)
 	}
 	t.Logger.Info("Genesis block: %v", genesisBlock)
 

@@ -19,7 +19,6 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 		filepath.Join(t.ScriptDir, "../mina-local-network/mina-local-network.sh"),
 		"--seed", fmt.Sprintf("spawn:%d", t.Config.SeedStartPort),
 		"--snark-coordinator-start-port", strconv.Itoa(t.Config.SnarkCoordinatorPort),
-
 		"--whale-start-port", strconv.Itoa(t.Config.WhaleStartPort),
 		"--fish-start-port", strconv.Itoa(t.Config.FishStartPort),
 		"--node-start-port", strconv.Itoa(t.Config.NodeStartPort),
@@ -31,6 +30,7 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 		"--value-transfer-txns",
 		"--transaction-interval", strconv.Itoa(t.Config.PaymentInterval),
 		"--root", t.Config.Root,
+		"--hardfork-genesis-slot-delta", strconv.Itoa(t.Config.HfSlotDelta),
 	)
 
 	cmd.Args = append(cmd.Args, extraArgs...)
@@ -78,7 +78,8 @@ func (t *HardforkTest) RunForkNetwork() (*exec.Cmd, error) {
 
 // WaitUntilBestChainQuery calculates and waits until it's time to query the best chain
 func (t *HardforkTest) WaitUntilBestChainQuery(slotDurationSec int, genesisSlot int) {
-	t.WaitForBestTip(t.Config.AnyPortOfType(config.PORT_REST), func(block client.BlockData) bool {
+	info := t.Config.SampleDaemonInfo("any", func(di *config.DaemonInfo) bool { return true })
+	t.WaitForBestTip(info.Port(config.PORT_REST), func(block client.BlockData) bool {
 		return block.Slot >= t.Config.BestChainQueryFrom+genesisSlot
 	}, fmt.Sprintf("best tip reached slot %d", t.Config.BestChainQueryFrom),
 		time.Duration(2*t.Config.BestChainQueryFrom*slotDurationSec)*time.Second,
