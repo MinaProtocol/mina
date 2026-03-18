@@ -18,7 +18,7 @@ YELLOW='\033[0;33m'
 # Configuration - can be overridden via environment variables
 REPO="${REPO:-packages.o1test.net}"
 CODENAME="${CODENAME:-bullseye}"
-CHANNEL="${CHANNEL:-devnet}"
+CHANNEL="${CHANNEL:-alpha}"
 PACKAGE="${PACKAGE:-mina-devnet}"
 NEW_DEBIAN_PATH="${NEW_DEBIAN_PATH:-}"  # Path pattern in cache, e.g., "debians/bullseye/mina-devnet_*.deb"
 
@@ -49,7 +49,7 @@ function usage() {
     echo "Options:"
     echo "  -r, --repo          Repository URL (default: packages.o1test.net)"
     echo "  -c, --codename      Debian codename (default: bullseye)"
-    echo "  -C, --channel       Repository channel (default: devnet)"
+    echo "  -C, --channel       Repository channel (default: alpha)"
     echo "  -p, --package       Package name (default: mina-devnet)"
     echo "  -n, --new-debian    Path to new debian in cache (required)"
     echo "  -h, --help          Show this help message"
@@ -134,18 +134,13 @@ log_info "Package: ${PACKAGE}"
 log_info "New debian path: ${NEW_DEBIAN_PATH}"
 
 # Step 1: Install current mina from packages.o1test.net
-log_info "--- Step 1: Installing ${PACKAGE} from ${REPO} ---"
 
-echo "deb [trusted=yes] https://${REPO} ${CODENAME} ${CHANNEL}" | $SUDO tee /etc/apt/sources.list.d/mina-test.list
-
-./buildkite/scripts/debian/update.sh
+./buildkite/scripts/debian/install_official.sh --repo "${REPO}" --codename "${CODENAME}" --channel "${CHANNEL}" --package "${PACKAGE}"
 
 $SUDO apt-get install -y -qq lsb-release ca-certificates wget gnupg
 
 log_info "Available versions of ${PACKAGE}:"
 apt-cache policy "${PACKAGE}"
-
-$SUDO apt-get install -y --allow-downgrades "${PACKAGE}"
 
 # Step 2: Record pre-upgrade state
 log_info "--- Step 2: Recording pre-upgrade state ---"
