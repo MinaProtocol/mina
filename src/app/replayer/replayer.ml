@@ -889,7 +889,8 @@ let filter_block_infos_for_hard_fork ~logger ~target_state_hash
           else (
             [%log info]
               "Reached hard fork boundary: replayer target changed from state \
-               hash $old_target to $new_target at global slot since genesis %Ld"
+               hash $old_target to $new_target at global slot since genesis \
+               %Ld"
               bi.global_slot_since_genesis
               ~metadata:
                 [ ("old_target", `String target_state_hash)
