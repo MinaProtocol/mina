@@ -293,19 +293,25 @@ exec-daemon() {
   LIBP2P_METRICS_PORT=$((BASE_PORT + 4))
 
 
-  local extra_opts=()
+  local common_extra_args=()
 
   # ITN features: only enabled when ITN_KEYS is provided
   # This only takes effect for daemons
   if [ -n "$ITN_KEYS" ]; then
     ITN_GRAPHQL_PORT=$((BASE_PORT + 5))
 
-    extra_opts+=( --itn-keys "$ITN_KEYS" )
-    extra_opts+=( --itn-graphql-port "${ITN_GRAPHQL_PORT}" )
+    common_extra_args+=( --itn-keys "$ITN_KEYS" )
+    common_extra_args+=( --itn-graphql-port "${ITN_GRAPHQL_PORT}" )
   fi
 
   if [ -n "$NODE_STATUS_URL" ]; then
-    extra_opts+=( --node-status-url "$NODE_STATUS_URL" )
+    common_extra_args+=( --node-status-url "$NODE_STATUS_URL" )
+  fi
+
+  local per_daemon_extra_args=""
+  if [ -f "${FOLDER}/extra_args.txt" ]; then
+    per_daemon_extra_args=$(cat "${FOLDER}/extra_args.txt")
+    echo "Daemon at ${FOLDER} will use extra args: ${per_daemon_extra_args}"
   fi
 
   # shellcheck disable=SC2068
@@ -322,7 +328,7 @@ exec-daemon() {
     --precomputed-blocks-file "${FOLDER}"/precomputed_blocks.log \
     --log-precomputed-blocks ${LOG_PRECOMPUTED_BLOCKS} \
     --proof-level "${PROOF_LEVEL}" \
-    $@ ${extra_opts[@]}
+    $@ ${common_extra_args[@]} ${per_daemon_extra_args}
 }
 
 # Executes the Mina Snark Worker
