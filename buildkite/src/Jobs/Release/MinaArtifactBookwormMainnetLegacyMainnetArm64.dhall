@@ -2,6 +2,8 @@ let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
 
+let Arch = ../../Constants/Arch.dhall
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
@@ -29,6 +31,7 @@ in  Pipeline.build
           , debVersion = DebianVersions.DebVersion.Bookworm
           , network = Network.Type.MainnetLegacy
           , profile = Profiles.Type.Mainnet
+          , arch = Arch.Type.Arm64
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }

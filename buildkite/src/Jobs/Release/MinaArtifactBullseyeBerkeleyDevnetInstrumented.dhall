@@ -17,6 +17,7 @@ in  Pipeline.build
             , Artifacts.Type.Archive
             , Artifacts.Type.FunctionalTestSuite
             , Artifacts.Type.CreateLegacyGenesis
+            , Artifacts.Type.DaemonRecoveryStorageToolbox
             ]
           , buildFlags = BuildFlags.Type.Instrumented
           , tags =

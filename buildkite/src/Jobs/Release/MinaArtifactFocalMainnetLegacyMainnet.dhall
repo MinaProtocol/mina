@@ -17,7 +17,10 @@ let Network = ../../Constants/Network.dhall
 in  Pipeline.build
       ( ArtifactPipelines.onlyDebianPipeline
           ArtifactPipelines.MinaBuildSpec::{
-          , artifacts = [ Artifacts.Type.Daemon ]
+          , artifacts =
+            [ Artifacts.Type.Daemon
+            , Artifacts.Type.DaemonRecoveryStorageToolbox
+            ]
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release

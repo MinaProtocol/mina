@@ -8,11 +8,11 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let PipelineScope = ../../Pipeline/Scope.dhall
 
-let DebianVersions = ../../Constants/DebianVersions.dhall
-
 let Network = ../../Constants/Network.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let Arch = ../../Constants/Arch.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.onlyDebianPipeline
@@ -26,9 +26,9 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             ]
-          , debVersion = DebianVersions.DebVersion.Bookworm
-          , network = Network.Type.MainnetLegacy
-          , profile = Profiles.Type.Mainnet
+          , network = Network.Type.DevnetLegacy
+          , arch = Arch.Type.Arm64
+          , debVersion = DebianVersions.DebVersion.Noble
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }
