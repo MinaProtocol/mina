@@ -869,7 +869,7 @@ let hard_fork_params ~logger ~stop_slot_config_file ~hard_fork_output_file =
 let filter_block_infos_for_hard_fork ~logger ~target_state_hash
     ~hard_fork_params_opt block_infos =
   match hard_fork_params_opt with
-  | Some (_, slot_chain_end_since_genesis, _) ->
+  | Some (_, slot_chain_end_since_genesis, hard_fork_output_file) ->
       let stop_slot =
         Mina_numbers.Global_slot_since_genesis.to_uint32
           slot_chain_end_since_genesis
@@ -889,14 +889,20 @@ let filter_block_infos_for_hard_fork ~logger ~target_state_hash
                 bi2.global_slot_since_genesis )
         with
       | Some bi ->
-          [%log info]
-            "Replayer target changed from state hash $old_target to \
-             $new_target at global slot since genesis %Ld"
-            bi.global_slot_since_genesis
-            ~metadata:
-              [ ("old_target", `String target_state_hash)
-              ; ("new_target", `String bi.state_hash)
-              ]
+          if String.equal bi.state_hash target_state_hash then
+            [%log info] "Replayer target unchanged after hard fork filtering"
+          else
+            [%log info]
+              "Reached hard fork boundary: replayer target changed from state \
+               hash $old_target to $new_target at global slot since genesis \
+               %Ld. Replayer will only process pre-fork blocks and produce \
+               hard fork output to $output_file"
+              bi.global_slot_since_genesis
+              ~metadata:
+                [ ("old_target", `String target_state_hash)
+                ; ("new_target", `String bi.state_hash)
+                ; ("output_file", `String hard_fork_output_file)
+                ]
       | None ->
           [%log fatal]
             "No blocks remain after filtering at slot_chain_end; original \
