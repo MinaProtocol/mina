@@ -595,10 +595,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
        keep-running (the "legacy" hard fork mode). See
        https://github.com/MinaProtocol/MIPs/pull/32. This option currently only
        controls the ledger sync feature (keeping migrated versions of the root
-       and epoch ledger databases alongside the stable ones). TODO: the code
-       will eventually need to be updated so this option also causes the daemon
-       to generate and save its own hard fork config at the [slot_chain_end] and
-       then shut down. *)
+       and epoch ledger databases alongside the stable ones). *)
     flag "--hardfork-handling" ~aliases:[ "hardfork-handling" ]
       ~doc:
         "keep-running|migrate-exit Internal flag, controlling how the daemon \
