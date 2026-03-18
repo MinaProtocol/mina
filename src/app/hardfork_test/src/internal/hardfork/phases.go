@@ -15,11 +15,21 @@ import (
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
 
-type HFHandler func(*HardforkTest, *BlockAnalysisResult) error
+type HFHandler func(*HardforkTest, *BlockAnalysisResult, []config.ForkMethod) error
 
 // RunMainNetworkPhase runs the main network and validates its operation
 // and returns the fork config bytes and block analysis result
 func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown HFHandler) (*BlockAnalysisResult, error) {
+
+	daemonInfos := t.Config.AllDaemonInfos()
+	numDaemons := len(daemonInfos)
+	forkMethodsPerDaemon := make([]config.ForkMethod, numDaemons)
+	for idx, info := range daemonInfos {
+		forkMethodToUse := t.Config.ForkMethods.RandomChoose()
+		forkMethodsPerDaemon[idx] = forkMethodToUse
+		t.Logger.Info("Planning to use fork method %s on node %s", forkMethodToUse.String(), info.NodeDir)
+	}
+
 	// Start the main network
 	mainNetCmd, err := t.RunMainNetwork(mainGenesisTs)
 	if err != nil {
@@ -59,7 +69,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 		return nil, err
 	}
 
-	if err := beforeShutdown(t, analysis); err != nil {
+	if err := beforeShutdown(t, analysis, forkMethodsPerDaemon); err != nil {
 		return nil, err
 	}
 
@@ -229,17 +239,15 @@ func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnal
 	return nil
 }
 
-func (t *HardforkTest) ForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) error {
+func (t *HardforkTest) ForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64, forkMethods []config.ForkMethod) error {
 	daemonInfos := t.Config.AllDaemonInfos()
 	numDaemons := len(daemonInfos)
 	errors := make([]error, numDaemons)
-	forkMethodsPerDaemon := make([]config.ForkMethod, numDaemons)
 
 	var wg sync.WaitGroup
 	for idx, info := range daemonInfos {
 		wg.Add(1)
-		forkMethodToUse := t.Config.ForkMethods.RandomChoose()
-		forkMethodsPerDaemon[idx] = forkMethodToUse
+		forkMethodToUse := forkMethods[idx]
 		go func(idx int, info config.DaemonInfo, forkMethod config.ForkMethod) {
 			defer wg.Done()
 			t.Logger.Info("Forking node at port %d with method %s", info.StartPort, forkMethod.String())
@@ -255,7 +263,7 @@ func (t *HardforkTest) ForkPhase(analysis *BlockAnalysisResult, mainGenesisTs in
 
 	for i, info := range daemonInfos {
 		if errors[i] != nil {
-			return fmt.Errorf("%s fork on daemon %v failed: %v", forkMethodsPerDaemon[i].String(), info, errors[i])
+			return fmt.Errorf("%s fork on daemon %v failed: %v", forkMethods[i].String(), info, errors[i])
 		}
 	}
 
