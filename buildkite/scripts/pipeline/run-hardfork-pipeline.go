@@ -320,10 +320,27 @@ func main() {
 		fmt.Printf("Using config URL: %s\n\n", resolvedConfigURL)
 	}
 
-	// Default CODENAMES_CONFIG to <codename>_Amd64 if not explicitly provided
+	// Default CODENAMES_CONFIG to <codename>_Amd64 (per codename) if not explicitly provided
 	resolvedCodenamesConfig := *codenamesConfig
-	if resolvedCodenamesConfig == "" {
-		resolvedCodenamesConfig = *codename + "_Amd64"
+	if resolvedCodenamesConfig == "" && *codename != "" {
+		codenameParts := strings.Split(*codename, ",")
+		var configParts []string
+		for _, part := range codenameParts {
+			trimmed := strings.TrimSpace(part)
+			if trimmed == "" {
+				continue
+			}
+			configParts = append(configParts, trimmed+"_Amd64")
+		}
+		if len(configParts) > 0 {
+			resolvedCodenamesConfig = strings.Join(configParts, ",")
+		}
+	}
+
+	// Validate required configuration URL before creating the build.
+	if resolvedConfigURL == "" {
+		fmt.Fprintf(os.Stderr, "error: CONFIG_JSON_GZ_URL (resolvedConfigURL) must be non-empty; refusing to create a build that will immediately fail\n")
+		os.Exit(1)
 	}
 
 	// Prepare environment variables
