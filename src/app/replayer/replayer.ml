@@ -814,18 +814,8 @@ let fail_with_broken_chain_to_genesis ~logger pool ~target_state_hash
   Core_kernel.exit 1
 
 let hard_fork_params ~logger ~stop_slot_config_file ~hard_fork_output_file =
-  match hard_fork_output_file with
-  | Some output_file -> (
-      let file =
-        match stop_slot_config_file with
-        | Some f ->
-            f
-        | None ->
-            [%log fatal]
-              "--stop-slot-config-file is required when \
-               --hard-fork-output-file is set" ;
-            Core_kernel.exit 1
-      in
+  match stop_slot_config_file with
+  | Some file -> (
       let hf_json = Yojson.Safe.from_file file in
       let hf_runtime_config =
         match Runtime_config.of_yojson hf_json with
@@ -853,13 +843,18 @@ let hard_fork_params ~logger ~stop_slot_config_file ~hard_fork_output_file =
             .to_global_slot_since_genesis ~current_genesis_global_slot
               slot_chain_end_hf
           in
-          Some (slot, slot_chain_end_since_genesis, output_file)
+          Some (slot, slot_chain_end_since_genesis, hard_fork_output_file)
       | None ->
           [%log fatal]
             "Hard fork config must have daemon.slot_chain_end and \
              daemon.hard_fork_genesis_slot_delta" ;
           Core_kernel.exit 1 )
   | None ->
+      if Option.is_some hard_fork_output_file then (
+        [%log fatal]
+          "--stop-slot-config-file is required when --hard-fork-output-file is \
+           set" ;
+        Core_kernel.exit 1 ) ;
       None
 
 (* When producing a hard fork checkpoint, filter out blocks at or beyond
@@ -891,18 +886,25 @@ let filter_block_infos_for_hard_fork ~logger ~target_state_hash
       | Some bi ->
           if String.equal bi.state_hash target_state_hash then
             [%log info] "Replayer target unchanged after hard fork filtering"
-          else
+          else (
             [%log info]
               "Reached hard fork boundary: replayer target changed from state \
-               hash $old_target to $new_target at global slot since genesis \
-               %Ld. Replayer will only process pre-fork blocks and produce \
-               hard fork output to $output_file"
+               hash $old_target to $new_target at global slot since genesis %Ld"
               bi.global_slot_since_genesis
               ~metadata:
                 [ ("old_target", `String target_state_hash)
                 ; ("new_target", `String bi.state_hash)
-                ; ("output_file", `String hard_fork_output_file)
-                ]
+                ] ;
+            match hard_fork_output_file with
+            | Some file ->
+                [%log info]
+                  "Replayer will only process pre-fork blocks and produce hard \
+                   fork output to $output_file"
+                  ~metadata:[ ("output_file", `String file) ]
+            | None ->
+                [%log info]
+                  "No --hard-fork-output-file specified; replayer will stop at \
+                   the hard fork boundary without producing hard fork output" )
       | None ->
           [%log fatal]
             "No blocks remain after filtering at slot_chain_end; original \
@@ -1977,7 +1979,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         | Some
             ( scheduled_genesis_since_hf
             , _slot_chain_end_since_genesis
-            , hard_fork_output_file ) ->
+            , Some hard_fork_output_file ) ->
             (* Note that the [ledger] here is a mutable ledger mask, so
                apply_commands does modify it in-place when it applies the
                transactions to the ledger. Thus the [ledger] here will be the
@@ -1985,6 +1987,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             apply_hard_fork_migration ~logger ~constraint_constants ~ledger
               ~genesis_dir ~scheduled_genesis_since_hf ~hard_fork_output_file
               ~hard_fork_target
+        | Some (_, _, None) ->
+            [%log info]
+              "Reached hard fork boundary; no --hard-fork-output-file \
+               specified, skipping hard fork migration output" ;
+            Deferred.unit
         | None ->
             Deferred.unit
       in
@@ -2065,8 +2072,9 @@ let () =
            Param.flag "--stop-slot-config-file"
              ~doc:
                "PATH Runtime config file with daemon.slot_chain_end and \
-                daemon.hard_fork_genesis_slot_delta (required with \
-                --hard-fork-output-file)"
+                daemon.hard_fork_genesis_slot_delta. When provided, the \
+                replayer stops at the hard fork boundary. Required with \
+                --hard-fork-output-file."
              Param.(optional string)
          and hard_fork_output_file =
            Param.flag "--hard-fork-output-file"
