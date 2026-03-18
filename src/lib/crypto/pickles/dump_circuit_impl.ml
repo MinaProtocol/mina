@@ -1930,6 +1930,73 @@ let ivp_step_circuit (inputs : Impls.Step.Field.t array) () =
       Field.Assert.equal c claimed_bp_challenges.(i) ) ;
   ()
 
+(* hash_messages_for_next_step_proof sub-circuit.
+
+   Hashes the Messages_for_next_step_proof struct into a single digest.
+   Uses sponge_after_index (VK hash) as the sponge initial state, then
+   absorbs to_field_elements_without_index (app_state + sg + bp_challenges).
+
+   This is the non-opt version (no proofs_verified_mask). For app_state = unit,
+   MaxProofsVerified = 2, WrapIPARounds = 15:
+
+   Input layout (90 fields):
+     0-55:  VK commitments (28 comms × 2 coords)
+            sigma_comm (7), coefficients_comm (15),
+            generic_comm, psm_comm, complete_add_comm, mul_comm, emul_comm,
+            endomul_scalar_comm
+     56-57: sg_old[0] (x, y)
+     58-72: bp_challenges[0] (15 fields)
+     73-74: sg_old[1] (x, y)
+     75-89: bp_challenges[1] (15 fields)
+
+   Output: asserts digest equals a claimed value (field at index 90).
+   Total: 91 fields.
+*)
+let hash_messages_for_next_step_proof_circuit (inputs : Impls.Step.Field.t array) () =
+  let open Impls.Step in
+  let open Pickles_types in
+  let read_pt i : Step_main_inputs.Inner_curve.t =
+    (inputs.(i), inputs.(i + 1))
+  in
+  (* ---- Build VK from inputs ---- *)
+  let read_comm i = [| read_pt i |] in
+  let verification_key =
+    { Plonk_verification_key_evals.
+      sigma_comm = Vector.init Nat.N7.n ~f:(fun j -> read_comm (2 * j))
+    ; coefficients_comm = Vector.init Nat.N15.n ~f:(fun j -> read_comm (14 + 2 * j))
+    ; generic_comm = read_comm 44
+    ; psm_comm = read_comm 46
+    ; complete_add_comm = read_comm 48
+    ; mul_comm = read_comm 50
+    ; emul_comm = read_comm 52
+    ; endomul_scalar_comm = read_comm 54
+    }
+  in
+  (* ---- Compute sponge_after_index ---- *)
+  let sponge_after_index =
+    Step_verifier.For_tests_only.sponge_after_index verification_key
+  in
+  (* ---- Build Messages_for_next_step_proof ---- *)
+  let sg0 = read_pt 56 in
+  let bp0 = Vector.init Backend.Tock.Rounds.n ~f:(fun j -> inputs.(58 + j)) in
+  let sg1 = read_pt 73 in
+  let bp1 = Vector.init Backend.Tock.Rounds.n ~f:(fun j -> inputs.(75 + j)) in
+  (* ---- Hash ---- *)
+  let sponge = Step_main_inputs.Sponge.copy sponge_after_index in
+  (* to_field_elements_without_index with app_state = unit:
+     just sg + bp_challenges for each proof *)
+  let absorb_proof sg bp =
+    List.iter (Step_main_inputs.Inner_curve.to_field_elements sg)
+      ~f:(fun x -> Step_main_inputs.Sponge.absorb sponge (`Field x)) ;
+    Vector.iter bp ~f:(fun x -> Step_main_inputs.Sponge.absorb sponge (`Field x))
+  in
+  absorb_proof sg0 bp0 ;
+  absorb_proof sg1 bp1 ;
+  let digest = Step_main_inputs.Sponge.squeeze_field sponge in
+  (* ---- Assert digest matches claimed ---- *)
+  let claimed = inputs.(90) in
+  Field.Assert.equal digest claimed
+
 (* x_hat sub-circuit: public input commitment (MSM) from IVP wrap.
 
    Input layout (34 fields):
@@ -2737,6 +2804,10 @@ let run ~output_dir =
   let array175_field = Impl.Typ.array ~length:175 Impl.Field.typ in
   dump_step "ivp_step_circuit" ivp_step_circuit
     ~input_typ:array175_field ~return_typ:Impl.Typ.unit ;
+  let array91_field = Impl.Typ.array ~length:91 Impl.Field.typ in
+  dump_step "hash_messages_for_next_step_proof_circuit"
+    hash_messages_for_next_step_proof_circuit
+    ~input_typ:array91_field ~return_typ:Impl.Typ.unit ;
   (* Wrap sub-circuits *)
   let array80_wrap = Impls.Wrap.Typ.array ~length:80 Impls.Wrap.Field.typ in
   dump_wrap "bullet_reduce_wrap_circuit" bullet_reduce_circuit
