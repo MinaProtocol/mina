@@ -1626,12 +1626,12 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                          hashes" ;
                       First_pass_ledger_hashes.set_last_snarked_hash
                         snarked_hash )
-                    else
+                    else (
                       [%log error]
                         "Current snarked ledger hash does not appear among \
                          first-pass ledger hashes" ;
-                    if continue_on_error then incr error_count
-                    else Core_kernel.exit 1
+                      if continue_on_error then incr error_count
+                      else Core_kernel.exit 1 )
                 | Some (_hash, n) ->
                     [%log spam]
                       "Found snarked ledger hash among first-pass ledger hashes" ;

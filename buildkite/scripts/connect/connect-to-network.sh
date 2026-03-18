@@ -151,9 +151,10 @@ mina client stop-daemon
 wait "$DAEMON_PID"
 
 # --- Step 3: Convert RocksDB to legacy format ---
-# mina-storage-converter auto-discovers current and stable scanners under /usr/lib/mina/
 mina-storage-converter \
     --node-dir /home/opam/.mina-config \
+    --current-scanner /usr/lib/mina/storage/10.5.2/3.3.0/mina-rocksdb-scanner \
+    --stable-scanner /usr/lib/mina/storage/5.7.12/3.3.0/mina-rocksdb-scanner \
     --yes --verbose
 
 if [[ "$MINA_DEBIAN_NETWORK" == "mainnet" ]]; then

@@ -26,7 +26,7 @@ ENV MINA_DEB=mina-${network}${SUFFIX}
 # Prefork genesis ledger package name and version.
 # Create genesis debian is used for post hf verification.
 # It contains only runtime-genesis-ledger app which is moderately small
-ENV MINA_CREATE_GENESIS_DEB=mina-create-mainnet-prefork-genesis-ledger
+ENV MINA_CREATE_GENESIS_DEB=mina-create-${network}-prefork-genesis-ledger
 
 ENV DEBIAN_FRONTEND noninteractive
 
