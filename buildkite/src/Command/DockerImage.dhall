@@ -141,10 +141,34 @@ let generateStep =
                   }
                   spec.deb_suffix
 
-          let customSuffix =
+          let archCustomSuffix =
                 merge
                   { Arm64 = " --custom-suffix -arm64 ", Amd64 = "" }
                   spec.arch
+
+          let customSuffix =
+                merge
+                  { DaemonConfig = archCustomSuffix
+                  , Daemon = ""
+                  , DaemonLegacyHardfork = ""
+                  , DaemonAppsOnly = ""
+                  , DaemonPrefork = ""
+                  , DaemonAutoHardfork = ""
+                  , LogProc = ""
+                  , Archive = ""
+                  , TestExecutive = ""
+                  , BatchTxn = ""
+                  , Rosetta = ""
+                  , RosettaAppsOnly = ""
+                  , RosettaConfig = archCustomSuffix
+                  , ZkappTestTransaction = ""
+                  , FunctionalTestSuite = ""
+                  , Toolchain = ""
+                  , CreatePreforkGenesis = ""
+                  , DelegationVerifier = ""
+                  , DaemonStorageToolbox = ""
+                  }
+                  spec.service
 
           let maybeVerify =
                       if     spec.verify
