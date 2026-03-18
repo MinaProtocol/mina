@@ -141,6 +141,11 @@ let generateStep =
                   }
                   spec.deb_suffix
 
+          let customSuffix =
+                merge
+                  { Arm64 = " --custom-suffix -arm64 ", Amd64 = "" }
+                  spec.arch
+
           let maybeVerify =
                       if     spec.verify
                          &&  DockerPublish.shouldPublish
@@ -210,6 +215,7 @@ let generateStep =
                 ++  " --platform ${Arch.platform spec.arch}"
                 ++  " --docker-registry ${DockerRepo.show spec.docker_repo}"
                 ++  loadOnlyArg
+                ++  customSuffix
 
           let remoteRepoCmds =
                 [ Cmd.run
