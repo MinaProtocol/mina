@@ -17,9 +17,7 @@
   init
   mina_automation
   mina_automation.fixture
-  mina_automation.runner
-  transition_router
-  structured_log_events)
+  mina_automation.runner)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
