@@ -388,7 +388,6 @@ let generateHfRelatedStepsForCodename =
                     "-${DebianVersions.lowerName
                           codename.DebVersion}-docker-image"
                 , size = spec.size
-                , deb_legacy_version = spec.deb_legacy_version
                 }
 
           let dockerDaemonStep = DockerImage.stepKey dockerDaemonSpec
