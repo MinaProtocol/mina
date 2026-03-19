@@ -38,10 +38,10 @@
     | Circuit                     | Constraints | Public Input | Auxiliary Input |
     |-----------------------------|-------------|--------------|-----------------|
     | transaction-merge           | 632         | 300          | 1,895           |
-    | transaction-base            | 12,875      | 300          | 37,502          |
-    | zkapp-opt_signed-opt_signed | 14,537      | 300          | 56,588          |
-    | zkapp-opt_signed            | 8,026       | 300          | 32,166          |
-    | zkapp-proved                | 4,249       | 300          | 30,732          |
+    | transaction-base            | 12,879      | 300          | 37,507          |
+    | zkapp-opt_signed-opt_signed | 14,529      | 300          | 56,582          |
+    | zkapp-opt_signed            | 8,022       | 300          | 32,163          |
+    | zkapp-proved                | 4,245       | 300          | 30,729          |
     v}
 
     {b Devnet profile:}
