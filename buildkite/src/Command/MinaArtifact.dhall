@@ -278,6 +278,8 @@ let docker_step
                     , network = spec.network
                     , deb_codename = spec.debVersion
                     , docker_publish = spec.docker_publish
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
                     , deb_install_mode =
                         DockerImage.DebianInstallMode.DownloadOnly
                     , arch = spec.arch
