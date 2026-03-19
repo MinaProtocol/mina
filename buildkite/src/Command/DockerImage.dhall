@@ -141,6 +141,35 @@ let generateStep =
                   }
                   spec.deb_suffix
 
+          let archCustomSuffix =
+                merge
+                  { Arm64 = " --custom-suffix arm64 ", Amd64 = "" }
+                  spec.arch
+
+          let customSuffix =
+                merge
+                  { DaemonConfig = archCustomSuffix
+                  , Daemon = ""
+                  , DaemonLegacyHardfork = ""
+                  , DaemonAppsOnly = ""
+                  , DaemonPrefork = ""
+                  , DaemonAutoHardfork = ""
+                  , LogProc = ""
+                  , Archive = ""
+                  , TestExecutive = ""
+                  , BatchTxn = ""
+                  , Rosetta = ""
+                  , RosettaAppsOnly = ""
+                  , RosettaConfig = archCustomSuffix
+                  , ZkappTestTransaction = ""
+                  , FunctionalTestSuite = ""
+                  , Toolchain = ""
+                  , CreatePreforkGenesis = ""
+                  , DelegationVerifier = ""
+                  , DaemonStorageToolbox = ""
+                  }
+                  spec.service
+
           let maybeVerify =
                       if     spec.verify
                          &&  DockerPublish.shouldPublish
@@ -210,6 +239,7 @@ let generateStep =
                 ++  " --platform ${Arch.platform spec.arch}"
                 ++  " --docker-registry ${DockerRepo.show spec.docker_repo}"
                 ++  loadOnlyArg
+                ++  customSuffix
 
           let remoteRepoCmds =
                 [ Cmd.run

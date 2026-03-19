@@ -14,7 +14,6 @@ in  Pipeline.build
           , artifacts =
             [ Artifacts.Type.Daemon
             , Artifacts.Type.DaemonAppsOnly
-            , Artifacts.Type.DaemonConfig
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
