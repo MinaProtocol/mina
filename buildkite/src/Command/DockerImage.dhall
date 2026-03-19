@@ -171,7 +171,7 @@ let generateStep =
                   , DaemonStorageToolbox = ""
                   }
                   spec.service
-                  
+
           let storageRepairVersionSuffix =
                 merge
                   { None = ""

@@ -259,6 +259,8 @@ let docker_step
                     , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
+                    , deb_storage_repair_version = Some
+                        spec.deb_storage_repair_version
                     , generic = True
                     , verify = True
                     , arch = spec.arch
