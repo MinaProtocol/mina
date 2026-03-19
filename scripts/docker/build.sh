@@ -100,7 +100,7 @@ else
   BRANCH="--build-arg MINA_BRANCH=$INPUT_BRANCH"
 fi
 
-if [[ -z "$INPUT_STORAGE_REPAIR_VERSION" ]]; then
+if [[ -z "${INPUT_STORAGE_REPAIR_VERSION:-}" ]]; then
   echo "Debian storage repair version is not set. Using the default (unset)"
   DEB_STORAGE_REPAIR_VERSION=""
 else
