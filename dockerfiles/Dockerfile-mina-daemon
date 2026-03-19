@@ -12,6 +12,7 @@ ARG deb_repo="http://packages.o1test.net"
 ARG deb_profile
 ARG deb_suffix
 ARG deb_legacy_version
+ARG deb_storage_repair_version
 
 ARG GCLOUD_VERSION=476.0.0
 
@@ -33,7 +34,6 @@ ENV MINA_STORAGE_DEB=mina-daemon-storage-toolbox
 
 # Storage recovery toolbox for fixing daemon storage
 ENV MINA_STORAGE_REPAIR_DEB=mina-daemon-recovery-storage-toolbox
-
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -102,7 +102,7 @@ RUN echo "Building image with version $deb_version from repo $deb_release $deb_c
   && apt-get install --no-install-recommends --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version" \
   "${MINA_STORAGE_DEB}=${deb_version}" \
   "${MINA_CREATE_GENESIS_DEB}=${deb_legacy_version}" \
-  "${MINA_STORAGE_REPAIR_DEB}=${deb_legacy_version}" \
+  "${MINA_STORAGE_REPAIR_DEB}=${deb_storage_repair_version}" \
   && rm -rf /var/lib/apt/lists/*
 
 

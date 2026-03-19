@@ -63,6 +63,7 @@ let MinaBuildSpec =
           , buildScript : Text
           , arch : Arch.Type
           , deb_legacy_version : Text
+          , deb_storage_repair_version : Text
           , docker_publish : DockerPublish.Type
           , suffix : Optional Text
           , if_ : Optional B/If
@@ -83,6 +84,7 @@ let MinaBuildSpec =
           , extraBuildEnvs = [] : List Text
           , suffix = None Text
           , deb_legacy_version = "3.3.0-compatible-4fa3a5b"
+          , deb_storage_repair_version = "3.3.0-master-35445f7"
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
           , if_ = None B/If
@@ -193,6 +195,8 @@ let docker_step
                     , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
+                    , deb_storage_repair_version = Some
+                        spec.deb_storage_repair_version
                     , verify = True
                     , arch = spec.arch
                     , size = size

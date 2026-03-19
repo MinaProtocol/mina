@@ -66,6 +66,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-release) INPUT_RELEASE="$2"; shift;;
   --deb-version) INPUT_VERSION="$2"; shift;;
   --deb-legacy-version) INPUT_LEGACY_VERSION="$2"; shift;;
+  --deb-storage-repair-version) INPUT_STORAGE_REPAIR_VERSION="$2"; shift;;
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
@@ -97,6 +98,13 @@ if [[ -z "${INPUT_BRANCH:-}" ]]; then
   BRANCH="--build-arg MINA_BRANCH=compatible"
 else
   BRANCH="--build-arg MINA_BRANCH=$INPUT_BRANCH"
+fi
+
+if [[ -z "$INPUT_STORAGE_REPAIR_VERSION" ]]; then
+  echo "Debian storage repair version is not set. Using the default (unset)"
+  DEB_STORAGE_REPAIR_VERSION=""
+else
+  DEB_STORAGE_REPAIR_VERSION="--build-arg deb_storage_repair_version=$INPUT_STORAGE_REPAIR_VERSION"
 fi
 
 if [[ -z "${MINA_REPO:-}" ]]; then
@@ -259,9 +267,9 @@ BUILD_NETWORK="--allow=network.host"
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT:-}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
-  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG  $DEB_REPO $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG -t "$TAG" -t "$HASHTAG" -
+  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG  $DEB_REPO $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $DEB_STORAGE_REPAIR_VERSION $CUSTOM_ARG -t "$TAG" -t "$HASHTAG" -
 else
-  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $DEB_STORAGE_REPAIR_VERSION $CUSTOM_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."
