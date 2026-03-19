@@ -598,7 +598,12 @@ module Make (L : Ledger_intf.S) :
             | `Existing _ ->
                 return ()
             | `New ->
-                Result.fail Transaction_status.Failure.Receiver_not_present
+                (* Allow delegation to the empty public key (unstaking) *)
+                if
+                  Signature_lib.Public_key.Compressed.(
+                    equal (Account_id.public_key receiver) empty)
+                then return ()
+                else Result.fail Transaction_status.Failure.Receiver_not_present
           in
           let%bind () =
             Result.ok_if_true
@@ -615,10 +620,12 @@ module Make (L : Ledger_intf.S) :
                 ~txn_global_slot:current_global_slot ~account:fee_payer_account
               |> Result.map_error ~f:timing_error_to_user_command_status
             in
-            { fee_payer_account with
-              delegate = Some (Account_id.public_key receiver)
-            ; timing
-            }
+            let new_delegate =
+              let pk = Account_id.public_key receiver in
+              if Signature_lib.Public_key.Compressed.(equal pk empty) then None
+              else Some pk
+            in
+            { fee_payer_account with delegate = new_delegate; timing }
           in
           ( [ (fee_payer_location, fee_payer_account) ]
           , Transaction_applied.Signed_command_applied.Body.Stake_delegation

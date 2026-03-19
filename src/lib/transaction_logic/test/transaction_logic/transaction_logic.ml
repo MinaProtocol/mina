@@ -17,36 +17,6 @@ let expect_failure ~error = function
   | Error e ->
       failwithf "Unexpected error: '%s'." (Error.to_string_hum e) ()
 
-let signed_command ?(valid_until = Global_slot_since_genesis.max_value) ?signer
-    ~sender ~receiver ~fee amount =
-  let open Mina_transaction.Transaction in
-  let open Test_account in
-  let signer =
-    Option.value_map ~f:Test_account.public_key signer ~default:sender.pk
-    |> Public_key.decompress_exn
-  in
-  let amt = amount in
-  let rcv = receiver.pk in
-  let fee' = fee in
-  let valid = valid_until in
-  let payload =
-    let open Signed_command_payload in
-    Poly.
-      { body = Body.Payment { receiver_pk = rcv; amount = amt }
-      ; common =
-          (let open Signed_command.Payload.Common.Poly in
-          { fee = fee'
-          ; fee_payer_pk = sender.pk
-          ; nonce = sender.nonce
-          ; valid_until = valid
-          ; memo = Signed_command_memo.dummy
-          })
-      }
-  in
-  Command
-    (User_command.Signed_command
-       Signed_command.Poly.{ payload; signer; signature = Signature.dummy } )
-
 let balance_to_fee b = Balance.to_amount b |> Amount.to_fee
 
 let setup =
@@ -83,7 +53,7 @@ let simple_payment () =
   Quickcheck.test ~trials:1000 setup
     ~f:(fun (global_slot, sender, receiver, amount, fee) ->
       let accounts = [ sender; receiver ] in
-      let txn = signed_command ~fee ~sender ~receiver amount in
+      let txn = signed_command ~fee ~sender (payment_body ~receiver ~amount) in
       let txn_state_view = protocol_state in
       let ledger =
         match Ledger_helpers.ledger_of_accounts accounts with
@@ -103,7 +73,10 @@ let simple_payment_signer_different_from_fee_payer () =
   Quickcheck.test ~trials:1000 setup
     ~f:(fun (global_slot, sender, receiver, amount, fee) ->
       let accounts = [ sender; receiver ] in
-      let txn = signed_command ~signer:receiver ~fee ~sender ~receiver amount in
+      let txn =
+        signed_command ~signer:receiver ~fee ~sender
+          (payment_body ~receiver ~amount)
+      in
       let txn_state_view = protocol_state in
       let ledger =
         match Ledger_helpers.ledger_of_accounts accounts with
