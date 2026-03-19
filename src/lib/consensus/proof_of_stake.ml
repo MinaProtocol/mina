@@ -43,53 +43,38 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let name = "proof_of_stake"
 
-  let compute_delegatee_table keys ~iter_accounts =
-    let open Mina_base in
-    let outer_table = Public_key.Compressed.Table.create () in
-    iter_accounts (fun i (acct : Account.t) ->
-        if
-          Option.is_some acct.delegate
-          (* Only default tokens may delegate. *)
-          && Token_id.equal acct.token_id Token_id.default
-          && Public_key.Compressed.Set.mem keys (Option.value_exn acct.delegate)
-        then
-          Public_key.Compressed.Table.update outer_table
-            (Option.value_exn acct.delegate) ~f:(function
-            | None ->
-                Account.Index.Table.of_alist_exn [ (i, acct) ]
-            | Some table ->
-                Account.Index.Table.add_exn table ~key:i ~data:acct ;
-                table ) ) ;
-    (* TODO: this metric tracking currently assumes that the result of
-       compute_delegatee_table is called with the full set of block production
-       keypairs every time the set changes, which is true right now, but this
-       should be control flow should be refactored to make this clearer *)
-    let num_delegators =
-      Public_key.Compressed.Table.fold outer_table ~init:0
-        ~f:(fun ~key:_ ~data sum -> sum + Account.Index.Table.length data)
-    in
-    Mina_metrics.Gauge.set Mina_metrics.Consensus.staking_keypairs
-      (Float.of_int @@ Public_key.Compressed.Set.length keys) ;
-    Mina_metrics.Gauge.set Mina_metrics.Consensus.stake_delegators
-      (Float.of_int num_delegators) ;
-    outer_table
-
-  let compute_delegatee_table_ledger_root keys ledger =
-    O1trace.sync_thread "compute_delegatee_table_ledger_root" (fun () ->
-        compute_delegatee_table keys ~iter_accounts:(fun f ->
-            Mina_ledger.Ledger.Any_ledger.M.iteri
-              (Root_ledger.as_unmasked ledger) ~f:(fun i acct -> f i acct) ) )
-
-  let compute_delegatee_table_ledger_any keys ledger =
-    O1trace.sync_thread "compute_delegatee_table_ledger_any" (fun () ->
-        compute_delegatee_table keys ~iter_accounts:(fun f ->
-            Mina_ledger.Ledger.Any_ledger.M.iteri ledger ~f:(fun i acct ->
-                f i acct ) ) )
-
-  let compute_delegatee_table_genesis_ledger keys ledger =
-    O1trace.sync_thread "compute_delegatee_table_genesis_ledger" (fun () ->
-        compute_delegatee_table keys ~iter_accounts:(fun f ->
-            Mina_ledger.Ledger.iteri ledger ~f:(fun i acct -> f i acct) ) )
+  let compute_delegatee_table keys ledger =
+    O1trace.sync_thread "compute_delegatee_table" (fun () ->
+        let open Mina_base in
+        let outer_table = Public_key.Compressed.Table.create () in
+        Mina_ledger.Ledger.iteri ledger ~f:(fun i (acct : Account.t) ->
+            (* Only default tokens may delegate. *)
+            match acct.delegate with
+            | Some delegate
+              when Token_id.equal acct.token_id Token_id.default
+                   && Public_key.Compressed.Set.mem keys delegate ->
+                Public_key.Compressed.Table.update outer_table delegate
+                  ~f:(function
+                  | None ->
+                      Account.Index.Table.of_alist_exn [ (i, acct) ]
+                  | Some table ->
+                      Account.Index.Table.add_exn table ~key:i ~data:acct ;
+                      table )
+            | _ ->
+                () ) ;
+        (* TODO: this metric tracking currently assumes that the result of
+           compute_delegatee_table is called with the full set of block production
+           keypairs every time the set changes, which is true right now, but this
+           should be control flow should be refactored to make this clearer *)
+        let num_delegators =
+          Public_key.Compressed.Table.fold outer_table ~init:0
+            ~f:(fun ~key:_ ~data sum -> sum + Account.Index.Table.length data)
+        in
+        Mina_metrics.Gauge.set Mina_metrics.Consensus.staking_keypairs
+          (Float.of_int @@ Public_key.Compressed.Set.length keys) ;
+        Mina_metrics.Gauge.set Mina_metrics.Consensus.stake_delegators
+          (Float.of_int num_delegators) ;
+        outer_table )
 
   module Typ = Snark_params.Tick.Typ
 
@@ -277,9 +262,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             | Genesis_epoch_ledger ledger ->
                 Genesis_ledger.Packed.t ledger
                 |> Lazy.force
-                |> compute_delegatee_table_genesis_ledger keys
+                |> compute_delegatee_table keys
             | Ledger_root ledger ->
-                compute_delegatee_table_ledger_root keys ledger
+                Mina_ledger.Root.as_masked ledger
+                |> compute_delegatee_table keys
 
           let close = function
             | Genesis_epoch_ledger _ ->
@@ -636,9 +622,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let reset_snapshot (t : t) id ledger =
         let delegatee_table =
-          compute_delegatee_table_ledger_root
-            (current_block_production_keys t)
-            ledger
+          Root_ledger.as_masked ledger
+          |> compute_delegatee_table (current_block_production_keys t)
         in
         match id with
         | Staking_epoch_snapshot ->
@@ -3069,9 +3054,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                  Local_state.Snapshot.Ledger_snapshot.Ledger_root
                    (Root_ledger.create_checkpoint snarked_ledger ~config ()) )
             ; delegatee_table =
-                compute_delegatee_table_ledger_any
+                compute_delegatee_table
                   (Local_state.current_block_production_keys local_state)
-                  (Root_ledger.as_unmasked snarked_ledger)
+                  (Root_ledger.as_masked snarked_ledger)
             } ) )
 
     let should_bootstrap_len ~context:(module Context : CONTEXT) ~existing
@@ -3671,7 +3656,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let ledger = Lazy.force Genesis_ledger.t in
         let delegatee_table =
-          compute_delegatee_table_genesis_ledger block_producer_pubkeys ledger
+          compute_delegatee_table block_producer_pubkeys ledger
         in
         let epoch_snapshot =
           { Local_state.Snapshot.delegatee_table
