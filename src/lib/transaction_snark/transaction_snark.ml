@@ -345,7 +345,12 @@ module Make_str (A : Wire_types.Concrete) = struct
                 in
                 let receiver_not_present =
                   let id = Account.identifier receiver_account in
-                  if Account_id.equal Account_id.empty id then true
+                  if Account_id.equal Account_id.empty id then
+                    (* Receiver account doesn't exist. This is only a failure
+                       if we're NOT unstaking (receiver is the empty pk). *)
+                    not
+                      (Public_key.Compressed.equal payload.body.receiver_pk
+                         Public_key.Compressed.empty )
                   else if Account_id.equal receiver id then false
                   else fail "bad receiver account ID"
                 in
@@ -1368,6 +1373,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           let if_ b ~then_ ~else_ =
             run_checked (Public_key.Compressed.Checked.if_ b ~then_ ~else_)
+
+          let empty = Public_key.Compressed.var_of_t Public_key.Compressed.empty
         end
 
         module Protocol_state_precondition = struct
@@ -2598,10 +2605,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                       Token_id.Checked.if_ is_empty_and_writeable
                         ~then_:(Account_id.Checked.token_id fee_payer)
                         ~else_:account.token_id )
-                and delegate =
-                  Public_key.Compressed.Checked.if_ is_empty_and_writeable
-                    ~then_:(Account_id.Checked.public_key fee_payer)
-                    ~else_:account.delegate
                 in
                 { Account.Poly.balance
                 ; public_key
@@ -2609,7 +2612,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; token_symbol = account.token_symbol
                 ; nonce = next_nonce
                 ; receipt_chain_hash
-                ; delegate
+                ; delegate = account.delegate
                 ; voting_for = account.voting_for
                 ; timing
                 ; permissions = account.permissions
@@ -2639,11 +2642,26 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let receiver_overflow = ref Boolean.false_ in
       let receiver_balance_update_permitted = ref Boolean.true_ in
+      let%bind is_unstaking_tx =
+        let%bind receiver_is_empty =
+          Public_key.Compressed.Checked.(
+            equal empty (Account_id.Checked.public_key receiver))
+        in
+        Boolean.(is_stake_delegation &&& receiver_is_empty)
+      in
       let%bind root_after_receiver_update =
+        let%bind receiver_to_query =
+          (* If is_unstaking_tx, the receiver is the empty public key
+             which doesn't exist in the ledger. We use the
+             fee-payer as a proxy and discard the resulting ledger root below.
+          *)
+          Account_id.Checked.if_ is_unstaking_tx ~then_:fee_payer
+            ~else_:receiver
+        in
         [%with_label_ "Update receiver"] (fun () ->
             Frozen_ledger_hash.modify_account_recv
               ~depth:constraint_constants.ledger_depth
-              root_after_fee_payer_update receiver
+              root_after_fee_payer_update receiver_to_query
               ~f:(fun ~is_empty_and_writeable account ->
                 (* this account is:
                    - the receiver for payments
@@ -2670,10 +2688,20 @@ module Make_str (A : Wire_types.Concrete) = struct
                     ; permitted_to_receive
                     ]
                   >>= Boolean.( &&& ) permitted_to_access
+                  (* This check might not be needed because if is_unstaking_tx we
+                     ultimately restore the old root, but it's a cheap check
+                     for peace of mind.
+                  *)
+                  >>= Boolean.( &&& ) (Boolean.not is_unstaking_tx)
                 in
                 receiver_balance_update_permitted := permitted_to_receive ;
                 let%bind is_empty_failure =
-                  let must_not_be_empty = is_stake_delegation in
+                  (* Stake delegation to a non-existent account (with a real
+                     public key) is a failure. Unstaking (delegation to empty
+                     pk) is NOT a failure — it's handled by the root reset. *)
+                  let%bind must_not_be_empty =
+                    Boolean.(is_stake_delegation &&& not is_unstaking_tx)
+                  in
                   Boolean.(is_empty_and_writeable &&& must_not_be_empty)
                 in
                 let%bind () =
@@ -2801,15 +2829,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Balance.Checked.if_ update_account ~then_:balance
                     ~else_:account.balance
                 in
-                let%bind may_delegate =
-                  (* Only default tokens may participate in delegation. *)
-                  Boolean.(is_empty_and_writeable &&& token_default)
-                in
-                let%map delegate =
-                  Public_key.Compressed.Checked.if_ may_delegate
-                    ~then_:(Account_id.Checked.public_key receiver)
-                    ~else_:account.delegate
-                and public_key =
+                let%map public_key =
                   Public_key.Compressed.Checked.if_ is_empty_and_writeable
                     ~then_:(Account_id.Checked.public_key receiver)
                     ~else_:account.public_key
@@ -2824,12 +2844,16 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; token_symbol = account.token_symbol
                 ; nonce = account.nonce
                 ; receipt_chain_hash = account.receipt_chain_hash
-                ; delegate
+                ; delegate = account.delegate
                 ; voting_for = account.voting_for
                 ; timing = account.timing
                 ; permissions = account.permissions
                 ; zkapp = account.zkapp
                 } ) )
+        (* If it's an unstaking tx, reset the root  *)
+        >>= fun root_if_updated ->
+        Frozen_ledger_hash.if_ is_unstaking_tx
+          ~then_:root_after_fee_payer_update ~else_:root_if_updated
       in
       let%bind user_command_fails =
         Boolean.(!receiver_overflow ||| user_command_fails)
