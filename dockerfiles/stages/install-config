@@ -13,7 +13,7 @@ ARG version=latest
 
 # This Dockerfile is used to build a Docker image that contains only the Mina daemon configuration package.
 # It is intended to be used as a base image for other images that require the Mina daemon configuration, without including the full Mina daemon package and its dependencies.
-FROM ${docker_repo}/${image_name}:${version}-${network}${build_flags_suffix:+-${build_flags_suffix}}-generic${custom_suffix}
+FROM ${docker_repo}/${image_name}:${version}-${network}${build_flags_suffix}-generic${custom_suffix}
 
 # In multi-stage builds, Docker requires to re-declare ARG variables after each FROM 
 # to make them available in that stage. 

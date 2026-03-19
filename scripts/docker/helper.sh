@@ -75,6 +75,8 @@ function export_suffixes () {
     local __build_flags="${DEB_BUILD_FLAGS:-}"
     if [[ "$__build_flags" == "none" ]]; then
         __build_flags=""
+    else
+        __build_flags="-${__build_flags}"
     fi
     export BUILD_FLAGS_SUFFIX_ARG="--build-arg build_flags_suffix=${__build_flags}"
 }
