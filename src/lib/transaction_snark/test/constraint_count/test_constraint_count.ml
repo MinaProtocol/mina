@@ -56,28 +56,28 @@ let dev_expected_values =
       ; digest = "b8879f677f622a1d86648030701f43e1"
       }
   ; transaction_base =
-      { constraints = 12875
+      { constraints = 12879
       ; public_input_size = 300
-      ; auxiliary_input_size = 37502
-      ; digest = "740db2397b0b01806a48f061a2e2b063"
+      ; auxiliary_input_size = 37507
+      ; digest = "1dfb98ac348b112fd877a935e93de981"
       }
   ; zkapp_opt_signed_opt_signed =
-      { constraints = 14537
+      { constraints = 14529
       ; public_input_size = 300
-      ; auxiliary_input_size = 56588
-      ; digest = "bf6e31ff58a18638715ced1521ff540b"
+      ; auxiliary_input_size = 56582
+      ; digest = "3c17640df988a325da4a49713a23d8b0"
       }
   ; zkapp_opt_signed =
-      { constraints = 8026
+      { constraints = 8022
       ; public_input_size = 300
-      ; auxiliary_input_size = 32166
-      ; digest = "107286d7281652f1e24cde752383d172"
+      ; auxiliary_input_size = 32163
+      ; digest = "7b771733f5dbf3838c3c64f88e07e97f"
       }
   ; zkapp_proved =
-      { constraints = 4249
+      { constraints = 4245
       ; public_input_size = 300
-      ; auxiliary_input_size = 30732
-      ; digest = "c8e741c536932ff2c548ee50e2f2c6ff"
+      ; auxiliary_input_size = 30729
+      ; digest = "2316419866b83b1bf87e2a17842de90e"
       }
   }
 
