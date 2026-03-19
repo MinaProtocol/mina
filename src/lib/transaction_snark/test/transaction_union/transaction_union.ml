@@ -895,7 +895,6 @@ let%test_module "Transaction union tests" =
               in
               let signer = wallets.(0).private_key in
               let fee_payer_pk = wallets.(0).account.public_key in
-              let source_pk = fee_payer_pk in
               let receiver_pk = wallets.(1).account.public_key in
               let fee_token = Token_id.default in
               let accounts =
@@ -916,10 +915,7 @@ let%test_module "Transaction union tests" =
               assert (
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
-              assert (
-                Public_key.Compressed.equal
-                  (Option.value_exn fee_payer_account.delegate)
-                  source_pk ) ;
+              assert (Option.is_none fee_payer_account.delegate) ;
               assert (Option.is_none receiver_account) ) )
 
     let%test_unit "delegation delegator does not exist" =

@@ -691,7 +691,7 @@ let%test_module "Runtime config" =
       assert (
         Receipt.Chain_hash.equal account.receipt_chain_hash
           test_account.receipt_chain_hash ) ;
-      assert (Option.is_some account.delegate) ;
+      assert (Option.is_none account.delegate) ;
       assert (
         Option.equal Public_key.Compressed.equal account.delegate
           test_account.delegate ) ;
