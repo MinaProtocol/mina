@@ -231,7 +231,9 @@ let generateDockerForCodename =
                                 DockerImage.DebianInstallMode.DownloadOnly
                             , deb_legacy_version = spec.deb_legacy_version
                             , size = spec.size
-                            , version = version
+                            , version =
+                                "${version}-${DebianVersions.lowerName
+                                                codename.DebVersion}"
                             , deb_version = spec.version
                             , step_key_suffix =
                                 "-${DebianVersions.lowerName
@@ -246,8 +248,12 @@ let generateDockerForCodename =
                             , deb_install_mode =
                                 DockerImage.DebianInstallMode.DownloadOnly
                             , deb_legacy_version = spec.deb_legacy_version
+                            , image_name = Some
+                                (Artifacts.dockerName Artifacts.Type.Rosetta)
                             , size = spec.size
-                            , version = version
+                            , version =
+                                "${version}-${DebianVersions.lowerName
+                                                codename.DebVersion}"
                             , deb_version = spec.version
                             , step_key_suffix =
                                 "-${DebianVersions.lowerName
