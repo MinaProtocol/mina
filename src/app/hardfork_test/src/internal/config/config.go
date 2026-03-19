@@ -172,8 +172,20 @@ func (c *Config) InitDaemonInfos() {
 		})
 	}
 
-	// TODO: ensure there's at least one daemon not running in auto mode, o.w. we
-	// will not be able to do any kind of validation.
+	allAuto := true
+	for _, info := range result {
+		if info.ForkMethod != Auto {
+			allAuto = false
+			break
+		}
+	}
+
+	if allAuto {
+		// NOTE: ensure there's at least one daemon not running in auto mode, o.w. we
+		// can't check on anything after slot-chain-end
+		nonAutoForkMehtods := []ForkMethod{Legacy, Advanced}
+		result[rand.Intn(len(result))].ForkMethod = nonAutoForkMehtods[rand.Intn(len(nonAutoForkMehtods))]
+	}
 
 	c.DaemonInfos = result
 }
