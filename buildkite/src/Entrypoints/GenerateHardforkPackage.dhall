@@ -45,6 +45,8 @@ let List/map = Prelude.List.map
 let DebianArchPair =
       { DebVersion : DebianVersions.DebVersion, Arch : Arch.Type }
 
+let defaultMinaArtifactSpec = MinaArtifact.MinaBuildSpec::{=}
+
 let Spec =
       { Type =
           { codenames : List DebianArchPair
@@ -57,7 +59,7 @@ let Spec =
           , use_artifacts_from_buildkite_build : Optional Text
           , hardfork_shift_slot_delta : Optional Natural
           , size : Size
-          , mina_create_legacy_genesis_version : Text
+          , deb_legacy_version : Text
           }
       , default =
           { codenames =
@@ -75,7 +77,7 @@ let Spec =
           , use_artifacts_from_buildkite_build = None Text
           , hardfork_shift_slot_delta = None Natural
           , size = Size.XLarge
-          , mina_create_legacy_genesis_version = "3.3.0-2b689c8"
+          , deb_legacy_version = defaultMinaArtifactSpec.deb_legacy_version
           }
       }
 
@@ -94,18 +96,6 @@ let generateReferenceTarballsCommand =
                   }
                   spec.use_artifacts_from_buildkite_build
 
-          let hardforkShiftSlotDeltaArg =
-                merge
-                  { Some =
-                          \(delta : Natural)
-                      ->      "--hardfork-shift-slot-delta "
-                          ++  Natural/show delta
-                          ++  " --prefork-genesis-config /workdir/genesis_ledgers/${Network.lowerName
-                                                                                      spec.network}.json"
-                  , None = ""
-                  }
-                  spec.hardfork_shift_slot_delta
-
           in  Command.build
                 Command.Config::{
                 , commands =
@@ -115,8 +105,8 @@ let generateReferenceTarballsCommand =
                       codename.Arch
                       [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
                       "./buildkite/scripts/hardfork/release/generate-fork-config-and-ledger-tarballs-using-legacy-app.sh --network ${Network.lowerName
-                                                                                                                                       spec.network} --version ${spec.mina_create_legacy_genesis_version}  --codename ${DebianVersions.lowerName
-                                                                                                                                                                                                                          codename.DebVersion} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg} ${hardforkShiftSlotDeltaArg}"
+                                                                                                                                       spec.network} --version ${spec.deb_legacy_version}  --codename ${DebianVersions.lowerName
+                                                                                                                                                                                                          codename.DebVersion} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg}"
                 , label =
                     "Generate hardfork reference tarballs for ${DebianVersions.lowerName
                                                                   codename.DebVersion}"
@@ -212,6 +202,7 @@ let generateDockerForCodename =
                     "-${DebianVersions.lowerName
                           codename.DebVersion}-docker-image"
                 , size = spec.size
+                , deb_legacy_version = spec.deb_legacy_version
                 }
 
           let buildOrGetArtifacts =
@@ -278,6 +269,7 @@ let generateDockerForCodename =
                     , step_key_suffix =
                         "-${DebianVersions.lowerName
                               codename.DebVersion}-docker-image"
+                    , deb_legacy_version = spec.deb_legacy_version
                     }
                 , DockerImage.generateStep
                     DockerImage.ReleaseSpec::{
@@ -292,6 +284,7 @@ let generateDockerForCodename =
                     , step_key_suffix =
                         "-${DebianVersions.lowerName
                               codename.DebVersion}-docker-image"
+                    , deb_legacy_version = spec.deb_legacy_version
                     }
                 ]
 
@@ -338,6 +331,7 @@ let generateHfRelatedStepsForCodename =
                     "-${DebianVersions.lowerName
                           codename.DebVersion}-docker-image"
                 , size = spec.size
+                , deb_legacy_version = spec.deb_legacy_version
                 }
 
           let dockerDaemonStep = DockerImage.stepKey dockerDaemonSpec
