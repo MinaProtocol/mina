@@ -21,6 +21,7 @@ in  Pipeline.build
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.FunctionalTestSuite
             , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , buildFlags = BuildFlags.Type.Instrumented
           , tags =
