@@ -79,6 +79,51 @@ $ replayer --input-file INPUT.json --archive-uri URI [OPTIONS]
 
 - `--genesis-ledger-dir PATH`: Directory containing the genesis ledger files.
 
+### Hard Fork Parameters
+
+When replaying transactions from an archive database that spans a hard fork, the
+replayer may encounter blocks from both sides of the fork boundary. This happens
+because the post-fork genesis block's parent hash points back into the pre-fork
+chain, so a recursive query following the chain from a post-fork target state
+hash will return blocks from both the pre-fork and post-fork chains. If the
+replayer is not aware of the hard fork, it will attempt to replay across the
+boundary and fail with ledger hash mismatch errors, since the pre-fork and
+post-fork ledger states are fundamentally different.
+
+To handle this, the replayer provides hard fork parameters that allow it to
+detect the fork boundary, stop before crossing it, and optionally produce the
+migration output needed to continue replaying on the post-fork chain.
+
+- `--stop-slot-config-file PATH`: Runtime config file containing
+  `daemon.slot_chain_end` and `daemon.hard_fork_genesis_slot_delta`. When
+  provided, the replayer reads `slot_chain_end` from the config and filters out
+  any blocks at or beyond that global slot, ensuring it only processes pre-fork
+  blocks. Required when `--hard-fork-output-file` is set.
+
+- `--hard-fork-output-file PATH`: Output file for the post-fork replayer input.
+  When provided together with `--stop-slot-config-file`, the replayer performs
+  hard fork migration on the final pre-fork ledger and writes the resulting
+  configuration to this file. This output can then be used as the input file for
+  a subsequent replayer run on the post-fork chain.
+
+- `--hard-fork-target mesa|compatible`: Controls what migration is performed when
+  producing the post-fork replayer input (default: `mesa`).
+
+#### Hard Fork Behavior
+
+- **With `--stop-slot-config-file` and `--hard-fork-output-file`**: The replayer
+  processes all pre-fork blocks, performs the hard fork migration on the final
+  ledger, and writes the post-fork replayer input to the specified file.
+
+- **With `--stop-slot-config-file` only**: The replayer processes all pre-fork
+  blocks and stops gracefully at the hard fork boundary without producing any
+  hard fork output. This is useful when you want to validate the pre-fork ledger
+  state without generating migration artifacts.
+
+- **Without any hard fork parameters**: The replayer has no awareness of the fork
+  boundary. If the archive database contains blocks from both sides of a hard
+  fork, the replayer will attempt to replay across the boundary and fail.
+
 ### Logging Options
 
 - `--log-json`: Output logs in JSON format.

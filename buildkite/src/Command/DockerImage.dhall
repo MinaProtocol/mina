@@ -59,6 +59,7 @@ let ReleaseSpec =
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
           , docker_repo : DockerRepo.Type
+          , image_name : Optional Text
           , generic : Bool
           , verify : Bool
           , size : Size
@@ -87,6 +88,7 @@ let ReleaseSpec =
           , step_key_suffix = "-docker-image"
           , verify = False
           , deb_suffix = None Text
+          , image_name = None Text
           , if_ = None B/If
           , generic = False
           }
@@ -140,6 +142,42 @@ let generateStep =
                   , Some = \(s : Text) -> " --deb-suffix " ++ s
                   }
                   spec.deb_suffix
+
+          let imageNameArg =
+                merge
+                  { None = ""
+                  , Some = \(name : Text) -> " --image-name " ++ name
+                  }
+                  spec.image_name
+
+          let archCustomSuffix =
+                merge
+                  { Arm64 = " --custom-suffix arm64 ", Amd64 = "" }
+                  spec.arch
+
+          let customSuffix =
+                merge
+                  { DaemonConfig = archCustomSuffix
+                  , Daemon = ""
+                  , DaemonLegacyHardfork = ""
+                  , DaemonAppsOnly = ""
+                  , DaemonPrefork = ""
+                  , DaemonAutoHardfork = ""
+                  , LogProc = ""
+                  , Archive = ""
+                  , TestExecutive = ""
+                  , BatchTxn = ""
+                  , Rosetta = ""
+                  , RosettaAppsOnly = ""
+                  , RosettaConfig = archCustomSuffix
+                  , ZkappTestTransaction = ""
+                  , FunctionalTestSuite = ""
+                  , Toolchain = ""
+                  , CreatePreforkGenesis = ""
+                  , DelegationVerifier = ""
+                  , DaemonStorageToolbox = ""
+                  }
+                  spec.service
 
           let maybeVerify =
                       if     spec.verify
@@ -210,6 +248,8 @@ let generateStep =
                 ++  " --platform ${Arch.platform spec.arch}"
                 ++  " --docker-registry ${DockerRepo.show spec.docker_repo}"
                 ++  loadOnlyArg
+                ++  customSuffix
+                ++  imageNameArg
 
           let remoteRepoCmds =
                 [ Cmd.run
