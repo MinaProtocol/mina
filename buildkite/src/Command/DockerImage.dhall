@@ -143,7 +143,7 @@ let generateStep =
 
           let archCustomSuffix =
                 merge
-                  { Arm64 = " --custom-suffix -arm64 ", Amd64 = "" }
+                  { Arm64 = " --custom-suffix arm64 ", Amd64 = "" }
                   spec.arch
 
           let customSuffix =
