@@ -211,7 +211,7 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 	return nil
 }
 
-func (t *HardforkTest) validateAndPrepareAutoForkData(daemon config.DaemonInfo, forkDataPath string, analysis BlockAnalysisResult, mainGenesisTs int64) error {
+func (t *HardforkTest) validateAutoForkData(daemon config.DaemonInfo, forkDataPath string, analysis BlockAnalysisResult, mainGenesisTs int64) error {
 
 	forkConfigFile := filepath.Join(forkDataPath, "daemon.json")
 
@@ -234,12 +234,7 @@ func (t *HardforkTest) validateAndPrepareAutoForkData(daemon config.DaemonInfo, 
 		return err
 	}
 
-	if err := os.Rename(forkDataPath, filepath.Join(daemon.NodeDir, "fork_data")); err != nil {
-		return err
-	}
-
 	return nil
-
 }
 
 func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnalysisResult, mainGenesisTs int64) error {
@@ -253,7 +248,7 @@ func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnal
 		return fmt.Errorf("failed to check on activated file for advanced generate fork config: %w", err)
 	}
 
-	return t.validateAndPrepareAutoForkData(daemon, forkDataPath, analysis, mainGenesisTs)
+	return t.validateAutoForkData(daemon, forkDataPath, analysis, mainGenesisTs)
 }
 
 func (t *HardforkTest) autoFork(daemon config.DaemonInfo, analysis BlockAnalysisResult, mainGenesisTs int64) error {
@@ -280,7 +275,15 @@ func (t *HardforkTest) autoFork(daemon config.DaemonInfo, analysis BlockAnalysis
 		return fmt.Errorf("Node %s haven't create activated file, meaning it's not completed auto config generation!")
 	}
 
-	return t.validateAndPrepareAutoForkData(daemon, forkDataPath, analysis, mainGenesisTs)
+	if err := t.validateAutoForkData(daemon, forkDataPath, analysis, mainGenesisTs); err != nil {
+		return err
+	}
+
+	if err := os.Rename(forkDataPath, filepath.Join(daemon.NodeDir, "fork_data")); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (t *HardforkTest) ForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) error {
