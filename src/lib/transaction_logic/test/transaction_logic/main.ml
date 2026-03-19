@@ -20,4 +20,13 @@ let () =
               (coinbase_order_of_created_accounts_is_correct
                  ~with_fee_transfer:true )
           ] )
+    ; Unstaking.
+        ( "unstaking"
+        , [ test_case "Opt-in from default unstaked state" `Quick
+              opt_in_from_default_unstaked
+          ; test_case "Opt-out via delegation to empty" `Quick
+              opt_out_via_empty_delegation
+          ; test_case "Payments between unstaked accounts" `Quick
+              payments_with_unstaked_accounts
+          ] )
     ]
