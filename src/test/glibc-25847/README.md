@@ -353,8 +353,8 @@ the daemon.
 
 | Distribution | glibc | Affected? |
 |---|---|---|
-| Debian 11 (bullseye) | 2.31 | **Very likely** (see note) |
-| Debian 12 (bookworm) | 2.36 | **Very likely** (see note) |
+| Debian 11 (bullseye) | 2.31 | **Yes** (confirmed by source inspection, see note) |
+| Debian 12 (bookworm) | 2.36 | **Yes** (confirmed by source inspection, see note) |
 | Ubuntu 18.04 | 2.27 | **Yes** |
 | Ubuntu 20.04 | 2.31 | [Backport applied](https://bugs.launchpad.net/ubuntu/+source/glibc/+bug/1899800) in 2.31-0ubuntu9.9 |
 | Ubuntu 22.04 | 2.35 | **Likely** (predates fix, no backport found in [changelog](https://www.ubuntuupdates.org/package/core/jammy/main/updates/glibc)) |
@@ -363,12 +363,33 @@ the daemon.
 | Any with glibc 2.41+ | 2.41+ | **No** (fixed) |
 | Ubuntu 16.04 | 2.23 | No (predates buggy rewrite) |
 
-Note on Debian 11/12: Both ship glibc versions in the affected range, and the
-[Debian bug report](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=986724) does not
-mention backporting — the fix was only applied in glibc 2.41-1 for trixie. Additionally,
-the Mina daemon freeze that motivated this reproducer occurred in a Docker image running
-Debian 11 (glibc 2.31), and the observed deadlock pattern (all threads stuck on
-`caml_master_lock` with `busy=0`) matches the bug and the
+Note on Debian 11/12: Direct inspection of the glibc source shipped with
+[Debian 11 (2.31-13+deb11u11)](https://sources.debian.org/src/glibc/2.31-13+deb11u11/nptl/pthread_cond_signal.c/)
+and
+[Debian 12 (2.36-9+deb12u13)](https://sources.debian.org/src/glibc/2.36-9+deb12u13/nptl/pthread_cond_signal.c/)
+confirms both contain the vulnerable code. Specifically:
+
+- `pthread_cond_signal.c` uses
+  [`__condvar_quiesce_and_switch_g1`](https://sources.debian.org/src/glibc/2.31-13+deb11u11/nptl/pthread_cond_common.c/)
+  and the old `+2` signal encoding (`atomic_fetch_add_relaxed(..., 2)`).
+- `pthread_cond_wait.c` contains the broken signal-stealing recovery path that re-posts
+  signals via `atomic_compare_exchange_weak_relaxed(..., s + 2)` — this is the code path
+  where the bug manifests (re-posting a signal to a group with no actual futex waiters).
+- Neither Debian release's
+  [patch series](https://sources.debian.org/src/glibc/2.31-13+deb11u11/debian/patches/series/)
+  includes any patch addressing bug #25847, and the
+  [Debian bug report](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=986724) does not
+  mention backporting — the fix was only applied in glibc 2.41-1 for trixie.
+
+For comparison, the
+[fixed version in Debian 13](https://sources.debian.org/src/glibc/2.41-12+deb13u2/nptl/pthread_cond_signal.c/)
+replaces `__condvar_quiesce_and_switch_g1` with a rewritten `__condvar_switch_g1`, changes
+the signal encoding from `+2` to `+1`, and eliminates the signal-stealing recovery
+entirely.
+
+Additionally, the Mina daemon freeze that motivated this reproducer occurred in a Docker
+image running Debian 11 (glibc 2.31), and the observed deadlock pattern (all threads stuck
+on `caml_master_lock` with `busy=0`) matches the bug and the
 [OCaml community reports](https://discuss.ocaml.org/t/is-there-a-known-recent-linux-locking-bug-that-affects-the-ocaml-runtime/6542)
 exactly.
 
