@@ -476,7 +476,10 @@ build_daemon_config_deb() {
 
   copy_common_daemon_configs "${network}"
 
-  build_deb "${package_name}"
+  # Config package doesn't have any binaries, but we need to include
+  # the common utils for hardfork packages that rely on some of the configs here.
+  # that's why we are using all as architecture.
+  ARCHITECTURE=all build_deb "${package_name}"
 }
 ## END CONFIG PACKAGE ##
 
@@ -771,8 +774,10 @@ build_daemon_hardfork_config_deb() {
 
   copy_common_daemon_hardfork_configs "${network}"
 
-  build_deb "${package_name}"
-
+  # Config package doesn't have any binaries, but we need to include
+  # the common utils for hardfork packages that rely on some of the configs here.
+  # that's why we are using all as architecture.
+  ARCHITECTURE=all build_deb "${package_name}"
 }
 
 ## END HARDFORK PACKAGE ##
@@ -924,7 +929,38 @@ build_delegation_verify_deb () {
 ## CREATE PREFORK GENESIS PACKAGE ##
 
 #
-# Builds mina-create-NETWORK-prefork-genesis package for prefork genesis creation
+# Builds mina-create-devnet-prefork-genesis package for prefork genesis creation
+#
+# Output: mina-create-devnet-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Utility for creating prefork genesis ledgers for post-hardfork verification.
+# Contains the runtime_genesis_ledger tool for Mina protocol.
+#
+build_prefork_devnet_genesis_ledger_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Generic devnet create prefork genesis tool:"
+
+  DEB_NAME="mina-create-devnet-prefork-genesis-ledger"
+
+  create_control_file "$DEB_NAME" \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Utility to verify post hardfork ledger for Mina'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binaries
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
+
+  build_deb "$DEB_NAME"
+}
+
+#
+# Builds mina-create-mainnet-prefork-genesis package for prefork genesis creation
+#
+# Output: mina-create-mainnet-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Output: mina-create-${NETWORK}-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}

@@ -7,7 +7,7 @@ set -e
 # Default values
 LEDGER_NAME="legacy_ledgers"
 HASH_NAME="legacy_hashes.json"
-MINA_LEGACY_GENESIS_EXE="mina-create-legacy-genesis"
+MINA_LEGACY_GENESIS_EXE="mina-create-prefork-genesis"
 HARD_FORK_SHIFT_SLOT_DELTA=""
 PREFORK_GENESIS_CONFIG=""
 

@@ -12,10 +12,8 @@ in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
-            [ Artifacts.Type.Daemon
-            , Artifacts.Type.DaemonAppsOnly
+            [ Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.CreatePreforkGenesis
-            , Artifacts.Type.DaemonConfig
             , Artifacts.Type.LogProc
             ]
           , profile = Profiles.Type.Lightnet
