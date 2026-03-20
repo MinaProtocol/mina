@@ -609,34 +609,25 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
       (optional_with_default Hardfork_handling.Keep_running
          Hardfork_handling.arg )
   in
-  let to_pubsub_topic_mode_option =
-    let open Gossip_net.Libp2p in
-    function
-    | `String "ro" ->
-        Some RO
-    | `String "rw" ->
-        Some RW
-    | `String "none" ->
-        Some N
-    | `Null ->
-        None
-    | _ ->
-        raise (Error.to_exn (Error.of_string "Invalid pubsub topic mode"))
-  in
   fun () ->
-    let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
     O1trace.thread "mina" (fun () ->
         let open Deferred.Let_syntax in
-        let%bind () = Mina_stdlib_unix.File_system.create_dir conf_dir in
         let () =
-          if is_background then (
-            Core.printf "Starting background mina daemon. (Log Dir: %s)\n%!"
-              conf_dir ;
+          if is_background then
             Daemon.daemonize ~allow_threads_to_have_been_created:true
               ~redirect_stdout:`Dev_null ?cd:working_dir
-              ~redirect_stderr:`Dev_null () )
+              ~redirect_stderr:`Dev_null ()
           else Option.iter working_dir ~f:Caml.Sys.chdir
         in
+        Signal.handle
+          Signal.[ term; int ]
+          ~f:(fun _signal ->
+            don't_wait_for @@ Mina_stdlib_unix.Exit_handlers.exit_async 0 ) ;
+        let conf_dir = Mina_lib.Conf_dir.compute_conf_dir_exn conf_dir in
+        if is_background then
+          Core.printf "Starting background mina daemon. (Log Dir: %s)\n%!"
+            conf_dir ;
+        let%bind () = Mina_stdlib_unix.File_system.create_dir conf_dir in
         (* NOTE: invocation of memtrace must happen after daemonization *)
         Memtrace.trace_if_requested ~context:"mina" () ;
         Stdout_log.setup log_json log_level ;
@@ -1255,11 +1246,27 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               ~default:Cli_lib.Default.max_connections max_connections
           in
           let pubsub_v1 = Gossip_net.Libp2p.N in
+
           (* TODO uncomment after introducing Bitswap-based block retrieval *)
           (* let pubsub_v1 =
                or_from_config to_pubsub_topic_mode_option "pubsub-v1"
                  ~default:Cli_lib.Default.pubsub_v1 pubsub_v1
              in *)
+          let to_pubsub_topic_mode_option =
+            let open Gossip_net.Libp2p in
+            function
+            | `String "ro" ->
+                Some RO
+            | `String "rw" ->
+                Some RW
+            | `String "none" ->
+                Some N
+            | `Null ->
+                None
+            | _ ->
+                raise
+                  (Error.to_exn (Error.of_string "Invalid pubsub topic mode"))
+          in
           let pubsub_v0 =
             or_from_config to_pubsub_topic_mode_option "pubsub-v0"
               ~default:Cli_lib.Default.pubsub_v0 None

@@ -128,8 +128,7 @@ let start_auto_hardfork_config_generation ~logger mina =
           | Ok () ->
               [%log info]
                 "Successfully generated hardfork config, shutting down daemon" ;
-              (* Shutdown like Stop_daemon *)
-              Scheduler.yield () >>= fun () -> exit 0
+              Mina_stdlib_unix.Exit_handlers.exit_async 0
           | Error e ->
               [%log error]
                 "Failed to generate hardfork config: %s. Daemon will continue \
@@ -446,7 +445,7 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
           | Error err ->
               return (Error err) )
     ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
-          Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
+          don't_wait_for @@ Mina_stdlib_unix.Exit_handlers.exit_async 0 ;
           Deferred.unit )
     ; implement Daemon_rpcs.Snark_job_list.rpc (fun () () ->
           return (snark_job_list_json mina |> Participating_state.active_error) )

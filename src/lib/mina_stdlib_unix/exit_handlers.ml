@@ -30,3 +30,5 @@ let register_async_shutdown_handler ~logger ~description
     ()
   in
   Shutdown.at_shutdown logging_thunk
+
+let exit_async code = Scheduler.yield () >>= fun () -> exit code
