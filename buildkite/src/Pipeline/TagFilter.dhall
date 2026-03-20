@@ -22,17 +22,17 @@ let Filter
       | DockerBuildArm64
       | DockerBuildAmd64
       | DockerBuildArm64Devnet
-      | DockerBuildArm64DevnetNoble
-      | DockerBuildArm64DevnetBookworm
+      | DockerBuildArm64DevnetTrixie
       | DockerBuildAmd64Devnet
-      | DockerBuildAmd64DevnetNoble
       | DockerBuildAmd64DevnetJammy
+      | DockerBuildAmd64DevnetTrixie
+      | DockerBuildAmd64DevnetQuesting
       | DockerBuildAmd64DevnetBookworm
       | DockerBuildAmd64DevnetBullseye
       | DockerBuildAmd64DevnetFocal
       | DockerBuildArm64Mainnet
-      | DockerBuildArm64MainnetNoble
-      | DockerBuildArm64MainnetBookworm
+      | DockerBuildArm64MainnetQuesting
+      | DockerBuildArm64MainnetTrixie
       | DockerBuildAmd64Mainnet
       | DockerBuildAmd64MainnetNoble
       | DockerBuildAmd64MainnetJammy
@@ -40,10 +40,9 @@ let Filter
       | DockerBuildAmd64MainnetBullseye
       | DockerBuildAmd64MainnetFocal
       | DockerBuildArm64Lightnet
-      | DockerBuildAmd64LightnetBookworm
-      | DockerBuildAmd64LightnetBullseye
+      | DockerBuildAmd64LightnetTrixie
+      | DockerBuildAmd64LightnetQuesting
       | DockerBuildAmd64Lightnet
-      | DockerBuildArm64LightnetBookworm
       >
 
 let tags
@@ -72,6 +71,8 @@ let tags
               , Tag.Type.Bookworm
               , Tag.Type.Bullseye
               , Tag.Type.Focal
+              , Tag.Type.Trixie
+              , Tag.Type.Questing
               , Tag.Type.Devnet
               , Tag.Type.Mainnet
               , Tag.Type.Lightnet
@@ -91,23 +92,23 @@ let tags
               [ Tag.Type.Docker, Tag.Type.Lightnet, Tag.Type.Arm64 ]
             , DockerBuildAmd64Lightnet =
               [ Tag.Type.Docker, Tag.Type.Lightnet, Tag.Type.Amd64 ]
-            , DockerBuildArm64DevnetNoble =
+            , DockerBuildArm64DevnetTrixie =
               [ Tag.Type.Docker
               , Tag.Type.Devnet
               , Tag.Type.Arm64
-              , Tag.Type.Noble
+              , Tag.Type.Trixie
               ]
-            , DockerBuildAmd64DevnetNoble =
+            , DockerBuildAmd64DevnetTrixie =
               [ Tag.Type.Docker
               , Tag.Type.Devnet
               , Tag.Type.Amd64
-              , Tag.Type.Noble
+              , Tag.Type.Trixie
               ]
-            , DockerBuildArm64MainnetNoble =
+            , DockerBuildAmd64DevnetQuesting =
               [ Tag.Type.Docker
-              , Tag.Type.Mainnet
-              , Tag.Type.Arm64
-              , Tag.Type.Noble
+              , Tag.Type.Devnet
+              , Tag.Type.Amd64
+              , Tag.Type.Questing
               ]
             , DockerBuildAmd64MainnetNoble =
               [ Tag.Type.Docker
@@ -127,39 +128,15 @@ let tags
               , Tag.Type.Amd64
               , Tag.Type.Jammy
               ]
-            , DockerBuildArm64DevnetBookworm =
-              [ Tag.Type.Docker
-              , Tag.Type.Devnet
-              , Tag.Type.Arm64
-              , Tag.Type.Bookworm
-              ]
             , DockerBuildAmd64DevnetBookworm =
               [ Tag.Type.Docker
               , Tag.Type.Devnet
               , Tag.Type.Amd64
               , Tag.Type.Bookworm
               ]
-            , DockerBuildArm64MainnetBookworm =
-              [ Tag.Type.Docker
-              , Tag.Type.Mainnet
-              , Tag.Type.Arm64
-              , Tag.Type.Bookworm
-              ]
             , DockerBuildAmd64MainnetBookworm =
               [ Tag.Type.Docker
               , Tag.Type.Mainnet
-              , Tag.Type.Amd64
-              , Tag.Type.Bookworm
-              ]
-            , DockerBuildArm64LightnetBookworm =
-              [ Tag.Type.Docker
-              , Tag.Type.Lightnet
-              , Tag.Type.Arm64
-              , Tag.Type.Bookworm
-              ]
-            , DockerBuildAmd64LightnetBookworm =
-              [ Tag.Type.Docker
-              , Tag.Type.Lightnet
               , Tag.Type.Amd64
               , Tag.Type.Bookworm
               ]
@@ -175,12 +152,6 @@ let tags
               , Tag.Type.Amd64
               , Tag.Type.Bullseye
               ]
-            , DockerBuildAmd64LightnetBullseye =
-              [ Tag.Type.Docker
-              , Tag.Type.Lightnet
-              , Tag.Type.Amd64
-              , Tag.Type.Bullseye
-              ]
             , DockerBuildAmd64DevnetFocal =
               [ Tag.Type.Docker
               , Tag.Type.Devnet
@@ -192,6 +163,30 @@ let tags
               , Tag.Type.Mainnet
               , Tag.Type.Amd64
               , Tag.Type.Focal
+              ]
+            , DockerBuildArm64MainnetQuesting =
+              [ Tag.Type.Docker
+              , Tag.Type.Mainnet
+              , Tag.Type.Arm64
+              , Tag.Type.Questing
+              ]
+            , DockerBuildArm64MainnetTrixie =
+              [ Tag.Type.Docker
+              , Tag.Type.Mainnet
+              , Tag.Type.Arm64
+              , Tag.Type.Trixie
+              ]
+            , DockerBuildAmd64LightnetTrixie =
+              [ Tag.Type.Docker
+              , Tag.Type.Lightnet
+              , Tag.Type.Amd64
+              , Tag.Type.Trixie
+              ]
+            , DockerBuildAmd64LightnetQuesting =
+              [ Tag.Type.Docker
+              , Tag.Type.Lightnet
+              , Tag.Type.Amd64
+              , Tag.Type.Questing
               ]
             }
             filter
@@ -221,29 +216,26 @@ let show
             , DockerBuildAmd64Mainnet = "DockerBuildAmd64Mainnet"
             , DockerBuildArm64Lightnet = "DockerBuildArm64Lightnet"
             , DockerBuildAmd64Lightnet = "DockerBuildAmd64Lightnet"
-            , DockerBuildArm64DevnetNoble = "DockerBuildArm64DevnetNoble"
-            , DockerBuildAmd64DevnetNoble = "DockerBuildAmd64DevnetNoble"
-            , DockerBuildArm64MainnetNoble = "DockerBuildArm64MainnetNoble"
+            , DockerBuildArm64DevnetTrixie = "DockerBuildArm64DevnetTrixie"
+            , DockerBuildAmd64DevnetTrixie = "DockerBuildAmd64DevnetTrixie"
+            , DockerBuildAmd64DevnetQuesting = "DockerBuildAmd64DevnetQuesting"
             , DockerBuildAmd64MainnetNoble = "DockerBuildAmd64MainnetNoble"
             , DockerBuildAmd64DevnetJammy = "DockerBuildAmd64DevnetJammy"
             , DockerBuildAmd64MainnetJammy = "DockerBuildAmd64MainnetJammy"
-            , DockerBuildArm64DevnetBookworm = "DockerBuildArm64DevnetBookworm"
             , DockerBuildAmd64DevnetBookworm = "DockerBuildAmd64DevnetBookworm"
-            , DockerBuildArm64MainnetBookworm =
-                "DockerBuildArm64MainnetBookworm"
             , DockerBuildAmd64MainnetBookworm =
                 "DockerBuildAmd64MainnetBookworm"
-            , DockerBuildArm64LightnetBookworm =
-                "DockerBuildArm64LightnetBookworm"
-            , DockerBuildAmd64LightnetBookworm =
-                "DockerBuildAmd64LightnetBookworm"
             , DockerBuildAmd64DevnetBullseye = "DockerBuildAmd64DevnetBullseye"
             , DockerBuildAmd64MainnetBullseye =
                 "DockerBuildAmd64MainnetBullseye"
-            , DockerBuildAmd64LightnetBullseye =
-                "DockerBuildAmd64LightnetBullseye"
             , DockerBuildAmd64DevnetFocal = "DockerBuildAmd64DevnetFocal"
             , DockerBuildAmd64MainnetFocal = "DockerBuildAmd64MainnetFocal"
+            , DockerBuildArm64MainnetQuesting =
+                "DockerBuildArm64MainnetQuesting"
+            , DockerBuildArm64MainnetTrixie = "DockerBuildArm64MainnetTrixie"
+            , DockerBuildAmd64LightnetTrixie = "DockerBuildAmd64LightnetTrixie"
+            , DockerBuildAmd64LightnetQuesting =
+                "DockerBuildAmd64LightnetQuesting"
             }
             filter
 

@@ -32,6 +32,8 @@ let Tag
       | Noble
       | Focal
       | Jammy
+      | Trixie
+      | Questing
       | Archive
       >
 
@@ -62,6 +64,8 @@ let capitalName =
             , Noble = "Noble"
             , Focal = "Focal"
             , Jammy = "Jammy"
+            , Trixie = "Trixie"
+            , Questing = "Questing"
             , Archive = "Archive"
             }
             tag
@@ -93,6 +97,8 @@ let lowerName =
             , Noble = "noble"
             , Focal = "focal"
             , Jammy = "jammy"
+            , Trixie = "trixie"
+            , Questing = "questing"
             , Archive = "archive"
             }
             tag

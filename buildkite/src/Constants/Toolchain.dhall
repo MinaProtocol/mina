@@ -17,6 +17,8 @@ let runner =
             , Jammy = RunInToolchain.runInToolchainJammy
             , Focal = RunInToolchain.runInToolchain
             , Noble = RunInToolchain.runInToolchainNoble arch
+            , Trixie = RunInToolchain.runInToolchainTrixie arch
+            , Questing = RunInToolchain.runInToolchainQuesting arch
             }
             debVersion
 

@@ -10,14 +10,14 @@ export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-generic' 'mina-
 function export_base_image () {
     # Determine the proper image for ubuntu or debian
     case "${DEB_CODENAME##*=}" in
-    focal|jammy|noble)
+    focal|jammy|noble|questing)
         IMAGE="ubuntu:${DEB_CODENAME##*=}"
     ;;
     bullseye)
         IMAGE="debian:${DEB_CODENAME##*=}-slim"
     ;;
-    bookworm)
-        IMAGE="europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bookworm"
+    bookworm|trixie)
+        IMAGE="europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:${DEB_CODENAME##*=}"
     ;;
     esac
     export IMAGE="--build-arg image=${IMAGE}"

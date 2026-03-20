@@ -37,9 +37,9 @@ in  Pipeline.build
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Devnet
             , PipelineTag.Type.Arm64
-            , PipelineTag.Type.Bookworm
+            , PipelineTag.Type.Questing
             ]
-          , debVersion = DebianVersions.DebVersion.Bookworm
+          , debVersion = DebianVersions.DebVersion.Questing
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }

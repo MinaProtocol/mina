@@ -2,6 +2,8 @@ let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
@@ -28,6 +30,7 @@ in  Pipeline.build
             , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Devnet
+          , debVersion = DebianVersions.DebVersion.Questing
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
@@ -35,8 +38,9 @@ in  Pipeline.build
             , PipelineTag.Type.Rosetta
             , PipelineTag.Type.Devnet
             , PipelineTag.Type.Amd64
-            , PipelineTag.Type.Bullseye
+            , PipelineTag.Type.Questing
             ]
-          , scope = [ PipelineScope.Type.Release ]
+          , scope =
+            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }
       )

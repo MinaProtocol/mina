@@ -1,12 +1,18 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let Network = ../../Constants/Network.dhall
 
-let BuildFlags = ../../Constants/BuildFlags.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let Artifacts = ../../Constants/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
+
+let Profiles = ../../Constants/Profiles.dhall
+
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
@@ -14,24 +20,30 @@ in  Pipeline.build
           , artifacts =
             [ Artifacts.Type.Daemon
             , Artifacts.Type.DaemonAppsOnly
+            , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.DaemonConfig
+            , Artifacts.Type.DaemonPrefork
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
-            , Artifacts.Type.FunctionalTestSuite
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.DaemonStorageToolbox
             ]
-          , buildFlags = BuildFlags.Type.Instrumented
+          , network = Network.Type.Mainnet
+          , debVersion = DebianVersions.DebVersion.Questing
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
-            , PipelineTag.Type.Docker
-            , PipelineTag.Type.Devnet
+            , PipelineTag.Type.Stable
+            , PipelineTag.Type.Rosetta
+            , PipelineTag.Type.Mainnet
             , PipelineTag.Type.Amd64
-            , PipelineTag.Type.Bullseye
+            , PipelineTag.Type.Questing
             ]
+          , profile = Profiles.Type.Mainnet
+          , scope =
+            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }
       )

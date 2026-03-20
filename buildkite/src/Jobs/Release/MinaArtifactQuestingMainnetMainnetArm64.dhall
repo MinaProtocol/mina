@@ -14,22 +14,35 @@ let Network = ../../Constants/Network.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let Arch = ../../Constants/Arch.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
-            [ Artifacts.Type.LogProc
+            [ Artifacts.Type.Daemon
             , Artifacts.Type.DaemonAppsOnly
+            , Artifacts.Type.DaemonConfig
+            , Artifacts.Type.DaemonPrefork
+            , Artifacts.Type.LogProc
+            , Artifacts.Type.Archive
+            , Artifacts.Type.Rosetta
+            , Artifacts.Type.ZkappTestTransaction
+            , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.DaemonStorageToolbox
             ]
-          , network = Network.Type.Devnet
-          , profile = Profiles.Type.Lightnet
+          , network = Network.Type.Mainnet
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
+            , PipelineTag.Type.Mainnet
+            , PipelineTag.Type.Arm64
+            , PipelineTag.Type.Questing
             ]
-          , debVersion = DebianVersions.DebVersion.Noble
+          , debVersion = DebianVersions.DebVersion.Questing
+          , arch = Arch.Type.Arm64
+          , profile = Profiles.Type.Mainnet
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }

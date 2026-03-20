@@ -22,10 +22,22 @@
     , arm64 =
         "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-noble-testnet-generic-arm64"
     }
+, minaToolchainTrixie =
+    { amd64 =
+        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-trixie-testnet-generic"
+    , arm64 =
+        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-trixie-testnet-generic-arm64"
+    }
+, minaToolchainQuesting =
+    { amd64 =
+        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-questing-testnet-generic"
+    , arm64 =
+        "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-questing-testnet-generic-arm64"
+    }
 , minaToolchainJammy.amd64 =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-jammy-testnet-generic"
 , minaToolchain =
-    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-bullseye-testnet-generic"
+    "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/mina-toolchain:9e6535f-trixie-testnet-generic"
 , postgres =
     "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/postgres:12.4-alpine"
 , xrefcheck =

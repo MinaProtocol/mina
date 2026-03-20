@@ -12,7 +12,7 @@ let Arch = ./Arch.dhall
 
 let Docker
     : Type
-    = < Bookworm | Bullseye | Jammy | Focal | Noble >
+    = < Bookworm | Bullseye | Jammy | Focal | Noble | Trixie | Questing >
 
 let capitalName =
           \(docker : Docker)
@@ -22,6 +22,8 @@ let capitalName =
             , Jammy = "Jammy"
             , Focal = "Focal"
             , Noble = "Noble"
+            , Trixie = "Trixie"
+            , Questing = "Questing"
             }
             docker
 
@@ -33,6 +35,8 @@ let lowerName =
             , Jammy = "jammy"
             , Focal = "focal"
             , Noble = "noble"
+            , Trixie = "trixie"
+            , Questing = "questing"
             }
             docker
 
@@ -48,7 +52,7 @@ let DepsSpec =
           , suffix : Text
           }
       , default =
-          { codename = Docker.Bullseye
+          { codename = Docker.Trixie
           , prefix = "MinaArtifact"
           , network = Network.Type.Devnet
           , profile = Profiles.Type.Devnet
@@ -92,6 +96,8 @@ let ofDebian =
             , Jammy = Docker.Jammy
             , Focal = Docker.Focal
             , Noble = Docker.Noble
+            , Trixie = Docker.Trixie
+            , Questing = Docker.Questing
             }
             debian
 

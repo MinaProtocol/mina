@@ -60,6 +60,34 @@ let runInToolchainBookworm
 
           in  runInToolchainImage image arch environment innerScript
 
+let runInToolchainQuesting
+    : Arch.Type -> List Text -> Text -> List Cmd.Type
+    =     \(arch : Arch.Type)
+      ->  \(environment : List Text)
+      ->  \(innerScript : Text)
+      ->  let image =
+                merge
+                  { Amd64 = ContainerImages.minaToolchainQuesting.amd64
+                  , Arm64 = ContainerImages.minaToolchainQuesting.arm64
+                  }
+                  arch
+
+          in  runInToolchainImage image arch environment innerScript
+
+let runInToolchainTrixie
+    : Arch.Type -> List Text -> Text -> List Cmd.Type
+    =     \(arch : Arch.Type)
+      ->  \(environment : List Text)
+      ->  \(innerScript : Text)
+      ->  let image =
+                merge
+                  { Amd64 = ContainerImages.minaToolchainTrixie.amd64
+                  , Arm64 = ContainerImages.minaToolchainTrixie.arm64
+                  }
+                  arch
+
+          in  runInToolchainImage image arch environment innerScript
+
 let runInToolchainBullseye
     : Arch.Type -> List Text -> Text -> List Cmd.Type
     =     \(arch : Arch.Type)
@@ -90,4 +118,6 @@ in  { runInToolchain = runInToolchain
     , runInToolchainBookworm = runInToolchainBookworm
     , runInToolchainBullseye = runInToolchainBullseye
     , runInToolchainJammy = runInToolchainJammy
+    , runInToolchainTrixie = runInToolchainTrixie
+    , runInToolchainQuesting = runInToolchainQuesting
     }

@@ -8,7 +8,8 @@ let Arch = ./Arch.dhall
 
 let S = ../Lib/SelectFiles.dhall
 
-let DebVersion = < Bookworm | Bullseye | Jammy | Focal | Noble >
+let DebVersion =
+      < Bookworm | Bullseye | Jammy | Focal | Noble | Trixie | Questing >
 
 let capitalName =
           \(debVersion : DebVersion)
@@ -18,6 +19,8 @@ let capitalName =
             , Jammy = "Jammy"
             , Focal = "Focal"
             , Noble = "Noble"
+            , Trixie = "Trixie"
+            , Questing = "Questing"
             }
             debVersion
 
@@ -29,6 +32,8 @@ let lowerName =
             , Jammy = "jammy"
             , Focal = "focal"
             , Noble = "noble"
+            , Trixie = "trixie"
+            , Questing = "questing"
             }
             debVersion
 
@@ -43,7 +48,7 @@ let DepsSpec =
           , arch : Arch.Type
           }
       , default =
-          { deb_version = DebVersion.Bullseye
+          { deb_version = DebVersion.Trixie
           , network = Network.Type.Devnet
           , profile = Profiles.Type.Devnet
           , build_flag = BuildFlags.Type.None
@@ -110,6 +115,8 @@ let dirtyWhen =
             , Jammy = minimalDirtyWhen
             , Focal = minimalDirtyWhen
             , Noble = minimalDirtyWhen
+            , Trixie = minimalDirtyWhen
+            , Questing = minimalDirtyWhen
             }
             debVersion
 

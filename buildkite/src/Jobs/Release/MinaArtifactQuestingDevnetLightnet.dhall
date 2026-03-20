@@ -12,8 +12,6 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Arch = ../../Constants/Arch.dhall
-
 let Profiles = ../../Constants/Profiles.dhall
 
 in  Pipeline.build
@@ -25,14 +23,15 @@ in  Pipeline.build
             , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Devnet
-          , arch = Arch.Type.Arm64
           , profile = Profiles.Type.Lightnet
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
+            , PipelineTag.Type.Devnet
+            , PipelineTag.Type.Questing
             ]
-          , debVersion = DebianVersions.DebVersion.Bookworm
+          , debVersion = DebianVersions.DebVersion.Questing
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }
