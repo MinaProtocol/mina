@@ -10,7 +10,6 @@
   core_kernel
   ppxlib
   compiler-libs.common
-  ocaml-migrate-parsetree
   base
   ;; local libraries
   interpolator_lib)

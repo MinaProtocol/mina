@@ -6,7 +6,6 @@
   async_unix
   stdio
   base.caml
-  ocaml-migrate-parsetree
   core
   async
   ppxlib
