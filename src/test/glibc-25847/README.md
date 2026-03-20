@@ -258,7 +258,9 @@ unrepaired. This means even a `pthread_cond_broadcast` watchdog is not 100% reli
 affected glibc versions.
 
 **Affected versions**: glibc 2.27 through 2.40.
-**Fixed**: glibc 2.41 (January 2025). No backport exists for any affected distribution.
+**Fixed**: glibc 2.41 (January 2025). Ubuntu 20.04 received a
+[backport](https://bugs.launchpad.net/ubuntu/+source/glibc/+bug/1899800) in glibc
+2.31-0ubuntu9.9 (April 2022); no other affected distribution has backported the fix.
 
 ### How It Hits OCaml
 
@@ -351,15 +353,29 @@ the daemon.
 
 | Distribution | glibc | Affected? |
 |---|---|---|
-| Debian 11 (bullseye) | 2.31 | **Yes** (our incident) |
-| Debian 12 (bookworm) | 2.36 | **Yes** |
+| Debian 11 (bullseye) | 2.31 | **Very likely** (see note) |
+| Debian 12 (bookworm) | 2.36 | **Very likely** (see note) |
 | Ubuntu 18.04 | 2.27 | **Yes** |
-| Ubuntu 20.04 | 2.31 | **Yes** (confirmed by OCaml community) |
-| Ubuntu 22.04 | 2.35 | **Yes** |
-| Ubuntu 24.04 | 2.39 | **Yes** |
+| Ubuntu 20.04 | 2.31 | [Backport applied](https://bugs.launchpad.net/ubuntu/+source/glibc/+bug/1899800) in 2.31-0ubuntu9.9 |
+| Ubuntu 22.04 | 2.35 | **Likely** (predates fix, no backport found in [changelog](https://www.ubuntuupdates.org/package/core/jammy/main/updates/glibc)) |
+| Ubuntu 24.04 | 2.39 | **Likely** (predates fix, no backport found in [changelog](https://launchpad.net/ubuntu/+source/glibc/+changelog)) |
 | [Debian 13 (trixie)](https://packages.debian.org/source/trixie/glibc) | 2.41 | **No** (fixed) |
 | Any with glibc 2.41+ | 2.41+ | **No** (fixed) |
 | Ubuntu 16.04 | 2.23 | No (predates buggy rewrite) |
+
+Note on Debian 11/12: Both ship glibc versions in the affected range, and the
+[Debian bug report](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=986724) does not
+mention backporting — the fix was only applied in glibc 2.41-1 for trixie. Additionally,
+the Mina daemon freeze that motivated this reproducer occurred in a Docker image running
+Debian 11 (glibc 2.31), and the observed deadlock pattern (all threads stuck on
+`caml_master_lock` with `busy=0`) matches the bug and the
+[OCaml community reports](https://discuss.ocaml.org/t/is-there-a-known-recent-linux-locking-bug-that-affects-the-ocaml-runtime/6542)
+exactly.
+
+Note on Ubuntu 20.04: The OCaml community
+[confirmed](https://discuss.ocaml.org/t/is-there-a-known-recent-linux-locking-bug-that-affects-the-ocaml-runtime/6542)
+deadlocks within seconds on stock glibc 2.31, resolved by a one-line patch. Ubuntu later
+applied an official backport in 2.31-0ubuntu9.9 (April 2022).
 
 ## Nix Flake
 
