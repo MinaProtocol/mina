@@ -37,7 +37,7 @@
   ppx_inline_test.config
   async_unix
   stdio
-  sexp_diff_kernel
+  sexp_diff
   ;; local libraries
   key_gen
   visualization

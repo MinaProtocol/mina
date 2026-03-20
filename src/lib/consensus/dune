@@ -23,7 +23,7 @@
   result
   core_kernel.uuid
   async_rpc_kernel
-  sexp_diff_kernel
+  sexp_diff
   ;; local libraries
   mina_wire_types
   mina_base.util
