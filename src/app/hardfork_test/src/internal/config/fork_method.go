@@ -15,7 +15,7 @@ const (
 )
 
 func (m ForkMethod) String() string {
-	names := [...]string{"legacy", "advanced"}
+	names := [...]string{"legacy", "advanced", "auto"}
 	if m < 0 || int(m) > len(names)-1 {
 		panic(fmt.Errorf("Can't convert fork method %d to string", int(m)))
 	}
