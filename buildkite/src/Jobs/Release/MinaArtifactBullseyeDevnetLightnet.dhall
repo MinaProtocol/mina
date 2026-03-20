@@ -14,6 +14,7 @@ in  Pipeline.build
           , artifacts =
             [ Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.DaemonStorageToolbox
             , Artifacts.Type.LogProc
             ]
           , profile = Profiles.Type.Lightnet

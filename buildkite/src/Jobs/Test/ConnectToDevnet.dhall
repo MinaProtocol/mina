@@ -58,7 +58,7 @@ in  Pipeline.build
             "${Network.lowerName network}"
             "${Network.lowerName network}"
             "40s"
-            "2m"
+            "25min"
             (B/SoftFail.Boolean False)
         ]
       }

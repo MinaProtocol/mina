@@ -6,7 +6,7 @@ set -eox pipefail
 MINA_DEBIAN_NETWORK=""
 NETWORK_NAME=""
 WAIT_BETWEEN_POLLING_GRAPHQL=""
-WAIT_AFTER_FINAL_CHECK=""
+SYNC_TIMEOUT=""
 STABLE_VERSION="3.3.0*"
 
 usage() {
@@ -16,12 +16,12 @@ Usage: $0 [OPTIONS]
 All arguments are mandatory:
   --mina-debian-network <val>        Mina debian network name
   --network-name <val>               Testnet name (used for seeds URL and validation)
-  --wait-between-polling <val>       Seconds to wait between GraphQL polling
-  --wait-after-final-check <val>     Seconds to wait after the final check
+  --wait-between-polling <val>       Duration to wait between GraphQL polling
+  --sync-timeout <val>               Duration to wait before considering the sync is failed
   --help                             Display this help message
 
 Example:
-  $0 --mina-debian-network devnet --network-name devnet --wait-between-polling 10 --wait-after-final-check 120
+  $0 --mina-debian-network devnet --network-name devnet --wait-between-polling 10s --sync-timeout 20min
 EOF
     exit 1
 }
@@ -41,8 +41,8 @@ while [[ $# -gt 0 ]]; do
             WAIT_BETWEEN_POLLING_GRAPHQL="$2"
             shift 2
             ;;
-        --wait-after-final-check)
-            WAIT_AFTER_FINAL_CHECK="$2"
+        --sync-timeout)
+            SYNC_TIMEOUT="$2"
             shift 2
             ;;
         --stable-version)
@@ -60,7 +60,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- Validation ---
-if [[ -z "$MINA_DEBIAN_NETWORK" || -z "$NETWORK_NAME" || -z "$WAIT_BETWEEN_POLLING_GRAPHQL" || -z "$WAIT_AFTER_FINAL_CHECK" ]]; then
+if [[ -z "$MINA_DEBIAN_NETWORK" || -z "$NETWORK_NAME" || -z "$WAIT_BETWEEN_POLLING_GRAPHQL" || -z "$SYNC_TIMEOUT" ]]; then
     echo "Error: All four required arguments must be provided."
     usage
 fi
@@ -98,31 +98,26 @@ start_daemon_and_wait_for_sync() {
 
     DAEMON_PID="$!"
 
-    # Attempt to connect to the GraphQL client every X seconds for 24 retries
-    num_status_retries=24
-    for ((i=1;i<=$num_status_retries;i++)); do
-        sleep "$WAIT_BETWEEN_POLLING_GRAPHQL"
-        set +e
-        "$MINA" client status
-        status_exit_code=$?
-        set -e
+    local deadline
+    deadline=$(date -d "+ $SYNC_TIMEOUT" +%s)
 
-        if [ $status_exit_code -eq 0 ]; then
+    local sync_status=""
+    while [ "$(date +%s)" -lt $deadline ]; do
+        sync_status=$( { curl -s -m 5 'http://localhost:3085/graphql' \
+            -H 'accept: application/json' \
+            -H 'content-type: application/json' \
+            --data-raw '{"query":"query { syncStatus }"}' \
+            | jq -r .data.syncStatus ; } 2>/dev/null || echo "CONNECT_ERROR" )
+
+        if [[ "$sync_status" == "SYNCED" ]]; then
             break
-        elif [ $i -eq $num_status_retries ]; then
-            echo "Error: Daemon failed to become responsive after $num_status_retries retries."
-            exit $status_exit_code
         fi
+
+        sleep "$WAIT_BETWEEN_POLLING_GRAPHQL"
     done
 
-    # Final check for peer connectivity
-    sleep "$WAIT_AFTER_FINAL_CHECK"
-    "$MINA" client status
-
-    if [ "$("$MINA" advanced get-peers | wc -l)" -gt 0 ]; then
-        echo "Found some peers"
-    else
-        echo "No peers found"
+    if [[ "$sync_status" != "SYNCED" ]]; then
+        echo "Error: Daemon failed to sync into network withint timeout of $SYNC_TIMEOUT, current status: $sync_status"
         exit 1
     fi
 
