@@ -22,6 +22,7 @@ type HFHandler func(*HardforkTest, *BlockAnalysisResult) error
 // and returns the fork config bytes and block analysis result
 func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown HFHandler) (*BlockAnalysisResult, error) {
 
+	t.Logger.Info("Supported fork method: %s", t.Config.ForkMethods)
 	for _, info := range t.Config.DaemonInfos {
 		t.Logger.Info("Planning to use fork method %s on node %s", info.ForkMethod, info.NodeDir)
 
