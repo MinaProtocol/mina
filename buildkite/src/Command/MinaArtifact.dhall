@@ -388,6 +388,8 @@ let docker_step
                             }
                     , service = Artifacts.Type.RosettaConfig
                     , network = spec.network
+                    , image_name = Some
+                        (Artifacts.dockerName Artifacts.Type.Rosetta)
                     , deb_codename = spec.debVersion
                     , docker_publish = spec.docker_publish
                     , deb_install_mode =

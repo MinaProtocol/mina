@@ -21,6 +21,7 @@ function usage() {
     echo -e "${RED}☞  $1${CLEAR}\n";
   fi
   echo "Usage: $0 [-s service-to-release] [-v service-version] [-n network]"
+  echo "  -i, --image-name          (Optional) Custom image name for the built docker image. Default is based on service name and version (e.g. mina-daemon:3.3.0-devnet)"
   echo "  -s, --service             The Service being released to Dockerhub"
   echo "  -v, --version             The version to be used in the docker image tag"
   echo "  -n, --network             The network configuration to use (devnet or mainnet). Default=devnet"
@@ -51,6 +52,7 @@ NO_CACHE=""
 CUSTOM_ARG=""
 
 while [[ "$#" -gt 0 ]]; do case $1 in
+  -i|--image-name) IMAGE_NAME="$2"; shift;;
   -s|--service) SERVICE="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -n|--network) INPUT_NETWORK="$2"; shift;;
@@ -64,10 +66,11 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --custom-suffix) export CUSTOM_SUFFIX="$2"; shift;;
   --deb-codename) INPUT_CODENAME="$2"; shift;;
   --deb-release) INPUT_RELEASE="$2"; shift;;
-  --deb-version) INPUT_VERSION="$2"; shift;;
+  --deb-version) DEB_VERSION="$2"; shift;;
   --deb-legacy-version) INPUT_LEGACY_VERSION="$2"; shift;;
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --deb-repo) INPUT_REPO="$2"; shift;;
+  --deb-arch) DEB_ARCH="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
   --deb-suffix) export DOCKER_DEB_SUFFIX="$2"; shift;;
   --deb-repo-key)
@@ -92,6 +95,12 @@ if [[ -n "${INPUT_LEGACY_VERSION:-}" ]]; then
   LEGACY_VERSION="--build-arg deb_legacy_version=$INPUT_LEGACY_VERSION"
 fi
 
+if [[ -z "${IMAGE_NAME:-}" ]]; then
+  IMAGE_NAME_ARG=""
+else
+  IMAGE_NAME_ARG="--build-arg image_name=$IMAGE_NAME"
+fi
+
 if [[ -z "${INPUT_BRANCH:-}" ]]; then
   echo "Branch is not set. Using the default (compatible)"
   BRANCH="--build-arg MINA_BRANCH=compatible"
@@ -104,6 +113,13 @@ if [[ -z "${MINA_REPO:-}" ]]; then
   REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
 else
   REPO="--build-arg MINA_REPO=$MINA_REPO"
+fi
+
+if [[ -z "${DEB_ARCH:-}" ]]; then
+  echo "Debian architecture is not set. Using the default (all)"
+  DEB_ARCH="--build-arg deb_arch=all"
+else
+  DEB_ARCH="--build-arg deb_arch=$DEB_ARCH"
 fi
 
 if [[ -z "${INPUT_CODENAME:-}" ]]; then
@@ -133,12 +149,15 @@ else
   DEB_RELEASE="--build-arg deb_release=$INPUT_RELEASE"
 fi
 
-if [[ -z "${INPUT_VERSION:-}" ]]; then
+if [[ -z "${DEB_VERSION:-}" ]]; then
   echo "Debian version is not set. Using the default ($VERSION)"
   DEB_VERSION="--build-arg deb_version=$VERSION"
 else
-  DEB_VERSION="--build-arg deb_version=$INPUT_VERSION"
+  DEB_VERSION="--build-arg deb_version=$DEB_VERSION"
 fi
+
+VERSION_ARG="--build-arg version=$VERSION"
+
 
 if [[ -z "${DEB_PROFILE:-}" ]]; then
   echo "Debian profile is not set. Using the default (devnet)"
@@ -259,9 +278,9 @@ BUILD_NETWORK="--allow=network.host"
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT:-}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
-  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG  $DEB_REPO $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG -t "$TAG" -t "$HASHTAG" -
+  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG  $DEB_REPO $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG -t "$TAG" -t "$HASHTAG" -
 else
-  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."

@@ -476,7 +476,10 @@ build_daemon_config_deb() {
 
   copy_common_daemon_configs "${network}"
 
-  build_deb "${package_name}"
+  # Config package doesn't have any binaries, but we need to include
+  # the common utils for hardfork packages that rely on some of the configs here.
+  # that's why we are using all as architecture.
+  ARCHITECTURE=all build_deb "${package_name}"
 }
 ## END CONFIG PACKAGE ##
 
@@ -654,8 +657,10 @@ build_daemon_hardfork_config_deb() {
 
   copy_common_daemon_hardfork_configs "${network}"
 
-  build_deb "${package_name}"
-
+  # Config package doesn't have any binaries, but we need to include
+  # the common utils for hardfork packages that rely on some of the configs here.
+  # that's why we are using all as architecture.
+  ARCHITECTURE=all build_deb "${package_name}"
 }
 
 ## END HARDFORK PACKAGE ##
@@ -804,9 +809,9 @@ build_delegation_verify_deb () {
 ## CREATE PREFORK GENESIS PACKAGE ##
 
 #
-# Builds mina-create-prefork-genesis package for prefork genesis creation
+# Builds mina-create-devnet-prefork-genesis package for prefork genesis creation
 #
-# Output: mina-create-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-create-devnet-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Utility for creating prefork genesis ledgers for post-hardfork verification.
