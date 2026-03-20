@@ -175,7 +175,8 @@ run_test() {
     local progress_interval=10
     local elapsed=0
     local -a prev_cycles=()
-    for i in $(seq "$N_INSTANCES"); do prev_cycles+=("-1"); done
+    local -a live_stuck=()
+    for i in $(seq "$N_INSTANCES"); do prev_cycles+=("-1"); live_stuck+=("0"); done
 
     while true; do
         sleep "$progress_interval"
@@ -194,6 +195,9 @@ run_test() {
                 marker=" done"
             elif [ "$cycle" -gt 0 ] && [ "$cycle" -eq "${prev_cycles[$((i-1))]}" ]; then
                 marker=" ${RED}STUCK${NC}"
+                if [ "${live_stuck[$((i-1))]}" -eq 0 ]; then
+                    live_stuck[$((i-1))]="$cycle"
+                fi
                 if [ "$first_stuck" -eq 0 ]; then first_stuck=$i; fi
             fi
             prev_cycles[$((i-1))]="$cycle"
@@ -285,11 +289,15 @@ run_test() {
         fi
     done
 
-    # Check for deadlocked instances by looking for ones that stopped producing
-    # output well before the timeout. An instance that deadlocked will have its
-    # last log line's cycle number much lower than expected.
+    # Detect deadlocked instances using two methods:
+    # 1. Live detection: cycle count was observed unchanged between consecutive
+    #    progress checks during the run (recorded in live_stuck[]).
+    # 2. Threshold detection: final cycle count is below 80% of the timeout,
+    #    meaning the instance stopped producing output well before it should have.
+    # An instance flagged by either method is counted as deadlocked.
     echo ""
     echo "--- Log analysis ---"
+    local expected_min=$(( TIMEOUT * 80 / 100 ))
     for i in $(seq "$N_INSTANCES"); do
         local log="$log_dir/instance_${i}.log"
         local lines
@@ -300,14 +308,21 @@ run_test() {
         last_cycle=$(echo "$last" | sed -n 's/.*cycle=\([0-9]\+\).*/\1/p')
         last_cycle="${last_cycle:-0}"
 
-        # If the instance ran for the full timeout, we'd expect cycle ~= TIMEOUT.
-        # If cycle is much less, the instance likely deadlocked.
-        # Use 80% of timeout as threshold to account for startup time.
-        local expected_min=$(( TIMEOUT * 80 / 100 ))
-
+        local stuck_at="${live_stuck[$((i-1))]}"
+        local below_threshold=false
         if [ "$last_cycle" -gt 0 ] && [ "$last_cycle" -lt "$expected_min" ]; then
+            below_threshold=true
+        fi
+
+        if [ "$stuck_at" -gt 0 ] && $below_threshold; then
             deadlock_count=$((deadlock_count + 1))
-            echo -e "  Instance $i: ${RED}DEADLOCKED at cycle $last_cycle (~${last_cycle}s)${NC}"
+            echo -e "  Instance $i: ${RED}DEADLOCKED at cycle $stuck_at (~${stuck_at}s) — detected live + below threshold${NC}"
+        elif $below_threshold; then
+            deadlock_count=$((deadlock_count + 1))
+            echo -e "  Instance $i: ${RED}DEADLOCKED at cycle $last_cycle (~${last_cycle}s) — below threshold${NC}"
+        elif [ "$stuck_at" -gt 0 ]; then
+            deadlock_count=$((deadlock_count + 1))
+            echo -e "  Instance $i: ${RED}DEADLOCKED at cycle $stuck_at (~${stuck_at}s) — detected live${NC}"
         else
             echo -e "  Instance $i: cycle=$last_cycle ($lines log lines)"
         fi
