@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snarky_integer
 open Util
 module Floating_point = Floating_point
@@ -208,7 +208,7 @@ module Exp = struct
       Bignum.(
         acc
         + x
-          * of_int (Coeff_integer_part.to_int params.linear_term_integer_part))
+          * of_int (Coeff_integer_part.to_int params.linear_term_integer_part) )
   end
 
   (* Zip together coefficients and powers of x and sum *)
