@@ -1930,6 +1930,122 @@ let ivp_step_circuit (inputs : Impls.Step.Field.t array) () =
       Field.Assert.equal c claimed_bp_challenges.(i) ) ;
   ()
 
+(* Step_verifier.verify circuit calling the production function directly.
+
+   Uses Per_proof_witness.typ to allocate the statement proof_state and
+   wrap proof (matching production step_main.ml:verify_one), and
+   Unfinalized.typ for the unfinalized proof. Then calls Step_verifier.verify
+   with the exact same arguments as production code.
+
+   Input layout: flat field array containing:
+   - Per_proof_witness fields (via Per_proof_witness.typ with app_state=unit, N0)
+     Contains: wrap_proof, proof_state (Type1, Tick.Rounds bp challenges),
+     prev_proof_evals, empty prev_challenges/commitments for N0
+   - Unfinalized proof fields (via Unfinalized.typ)
+   - is_base_case boolean (1 field)
+   - messages_for_next_wrap_proof digest (1 field)
+   - messages_for_next_step_proof digest (1 field)
+
+   Reference: step_verifier.ml:1242-1315, step_main.ml:17-117
+*)
+let step_verify_circuit (inputs : Impls.Step.Field.t array) () =
+  let open Impls.Step in
+  let open Pickles_types in
+  let feature_flags =
+    Kimchi_backend_common.Plonk_types.Features.Full.none
+  in
+  (* ---- Allocate Per_proof_witness via its Typ ---- *)
+  let ppw_typ =
+    Per_proof_witness.typ Typ.unit Nat.N0.n ~feature_flags ~num_chunks:1
+  in
+  let (Typ ppw_typ_record) = ppw_typ in
+  let ppw_size = ppw_typ_record.size_in_field_elements in
+  let ppw_fields = Array.sub inputs ~pos:0 ~len:ppw_size in
+  let ppw =
+    ppw_typ_record.var_of_fields
+      (ppw_fields, ppw_typ_record.constraint_system_auxiliary ())
+  in
+  let pos = ref ppw_size in
+  (* ---- Allocate Unfinalized via its Typ ---- *)
+  let unfinalized_typ =
+    Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
+  in
+  let (Typ unfinalized_typ_record) = unfinalized_typ in
+  let unfinalized_size = unfinalized_typ_record.size_in_field_elements in
+  let unfinalized_fields = Array.sub inputs ~pos:!pos ~len:unfinalized_size in
+  let unfinalized : Unfinalized.t =
+    unfinalized_typ_record.var_of_fields
+      (unfinalized_fields, unfinalized_typ_record.constraint_system_auxiliary ())
+  in
+  pos := !pos + unfinalized_size ;
+  (* ---- Extra inputs ---- *)
+  let is_base_case = Boolean.Unsafe.of_cvar inputs.(!pos) in
+  pos := !pos + 1 ;
+  let messages_for_next_wrap_proof = inputs.(!pos) in
+  pos := !pos + 1 ;
+  let messages_for_next_step_proof = inputs.(!pos) in
+  pos := !pos + 1 ;
+  (* ---- Build statement from Per_proof_witness (mirrors step_main.ml:77-80) ---- *)
+  (* ppw.proof_state has messages_for_next_wrap_proof : unit because it's
+     computed fresh by hash_messages. We update it with a real digest, exactly
+     as step_main.ml does: { proof_state with messages_for_next_wrap_proof } *)
+  let statement =
+    { Import.Types.Wrap.Statement.
+      proof_state =
+        { ppw.proof_state with messages_for_next_wrap_proof }
+    ; messages_for_next_step_proof
+    }
+  in
+  (* ---- SRS and VK (dummy) ---- *)
+  let srs = Kimchi_bindings.Protocol.SRS.Fq.create (1 lsl 15) in
+  let dummy_pt = Step_main_inputs.Inner_curve.Params.one in
+  let dummy_comm = [| Step_main_inputs.Inner_curve.constant dummy_pt |] in
+  let verification_key =
+    { Plonk_verification_key_evals.
+      sigma_comm = Vector.init Nat.N7.n ~f:(fun _ -> dummy_comm)
+    ; coefficients_comm = Vector.init Nat.N15.n ~f:(fun _ -> dummy_comm)
+    ; generic_comm = dummy_comm
+    ; psm_comm = dummy_comm
+    ; complete_add_comm = dummy_comm
+    ; mul_comm = dummy_comm
+    ; emul_comm = dummy_comm
+    ; endomul_scalar_comm = dummy_comm
+    }
+  in
+  let sponge_after_index =
+    Step_verifier.For_tests_only.sponge_after_index verification_key
+  in
+  let _success =
+    Step_verifier.verify
+      ~proofs_verified:(module Nat.N0)
+      ~is_base_case
+      ~sg_old:Vector.[]
+      ~sponge_after_index
+      ~lookup_parameters:
+        { use = Opt.Flag.No
+        ; zero =
+            { var =
+                { challenge = Field.zero
+                ; scalar = Shifted_value Field.zero
+                }
+            ; value =
+                { challenge = Limb_vector.Challenge.Constant.zero
+                ; scalar =
+                    Shifted_value.Type1.Shifted_value Field.Constant.zero
+                }
+            }
+        }
+      ~feature_flags:(Kimchi_backend_common.Plonk_types.Features.of_full feature_flags)
+      ~proof:ppw.wrap_proof
+      ~srs
+      ~wrap_domain:(`Known (Pickles_base.Domain.Pow_2_roots_of_unity 15))
+      ~wrap_verification_key:verification_key
+      statement
+      unfinalized
+  in
+  ()
+
+
 (* hash_messages_for_next_step_proof sub-circuit.
 
    Hashes the Messages_for_next_step_proof struct into a single digest.
@@ -2839,4 +2955,23 @@ let run ~output_dir =
     ~input_typ:array20_field_ftcomm ~return_typ:Impl.Typ.unit ;
   let array30_field = Impl.Typ.array ~length:30 Impl.Field.typ in
   dump_step "xhat_step_circuit" xhat_step_circuit
-    ~input_typ:array30_field ~return_typ:Impl.Typ.unit
+    ~input_typ:array30_field ~return_typ:Impl.Typ.unit ;
+  (* Step verify circuit — last to avoid shifting other circuits' variable IDs *)
+  let step_verify_input_size =
+    let feature_flags =
+      Kimchi_backend_common.Plonk_types.Features.Full.none
+    in
+    let (Impl.Typ.Typ ppw_r) =
+      Per_proof_witness.typ Impl.Typ.unit Pickles_types.Nat.N0.n ~feature_flags ~num_chunks:1
+    in
+    let (Impl.Typ.Typ unf_r) =
+      Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
+    in
+    ppw_r.size_in_field_elements + unf_r.size_in_field_elements + 3
+    (* +3 for: is_base_case, messages_for_next_wrap_proof, messages_for_next_step_proof *)
+  in
+  let step_verify_input_typ =
+    Impl.Typ.array ~length:step_verify_input_size Impl.Field.typ
+  in
+  dump_step "step_verify_circuit" step_verify_circuit
+    ~input_typ:step_verify_input_typ ~return_typ:Impl.Typ.unit
