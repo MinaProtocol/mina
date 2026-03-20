@@ -15,14 +15,14 @@ in  { step =
         ->  \(mina_suffix : Text)
         ->  \(testnet : Text)
         ->  \(wait_between_graphql_poll : Text)
-        ->  \(wait_before_final_check : Text)
+        ->  \(sync_timeout : Text)
         ->  \(soft_fail : B/SoftFail)
         ->  Command.build
               Command.Config::{
               , commands =
                   RunInToolchain.runInToolchain
                     DebianVersions.overrideEnvs
-                    "./buildkite/scripts/connect/connect-to-network.sh --mina-debian-network ${mina_suffix} --network-name ${testnet} --wait-between-polling ${wait_between_graphql_poll} --wait-after-final-check ${wait_before_final_check} "
+                    "./buildkite/scripts/connect/connect-to-network.sh --mina-debian-network ${mina_suffix} --network-name ${testnet} --wait-between-polling ${wait_between_graphql_poll} --sync-timeout ${sync_timeout} "
               , label = "Connect to ${testnet}"
               , soft_fail = Some soft_fail
               , key = "connect-to-${testnet}"
