@@ -399,8 +399,7 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 
 		extraArgsToRemove := filepath.Join(info.NodeDir, "extra_args.txt")
 		// Remove extra_args.txt that's no longer needed post-fork
-		_, err = os.Stat(extraArgsToRemove)
-		if err != nil {
+		if _, err = os.Stat(extraArgsToRemove); err == nil {
 			err = os.Remove(extraArgsToRemove)
 			if err != nil {
 				return fmt.Errorf("Failed to remove extra_args.txt for node %s", info.NodeDir)
