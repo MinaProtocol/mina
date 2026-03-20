@@ -515,7 +515,7 @@ build_daemon_deb() {
       ;;
     devnet)
       package_name="${MINA_DEB_NAME}"
-      seed_list_url='seed-lists/devnet_seeds.txt'
+      seed_list_url="https://storage.googleapis.com/o1labs-gitops-infrastructure/pre-mesa/pre-mesa-seeds.txt"
       ;;
     mesa)
       package_name="mina-mesa"
