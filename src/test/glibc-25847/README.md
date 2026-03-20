@@ -268,7 +268,9 @@ OCaml's `st_thread_yield` (in `otherlibs/systhreads/st_posix.h`) implements coop
 thread scheduling using `pthread_cond_signal` and `pthread_cond_wait`:
 
 ```c
-// Simplified from st_thread_yield in OCaml 4.14.2
+// Simplified from st_thread_yield in OCaml 4.14.2.
+// The full code first checks waiters == 0 and returns immediately if no
+// thread is waiting — the path below is only taken when waiters > 0.
 pthread_mutex_lock(&m->lock);
 m->busy = 0;
 pthread_cond_signal(&m->is_free);   // Wake a competitor
@@ -281,10 +283,11 @@ m->waiters--;
 pthread_mutex_unlock(&m->lock);
 ```
 
-The `do-while` loop always enters `pthread_cond_wait` before checking `busy`, even if
-`busy` is already 0. The thread *must* receive a condvar signal to wake up. When glibc
-#25847 causes `pthread_cond_signal` to silently fail, the competitor never wakes, and the
-yielding thread enters `pthread_cond_wait` with no one left to signal it.
+When this path is taken, the `do-while` loop always enters `pthread_cond_wait` before
+checking `busy`, even if `busy` is already 0. The thread *must* receive a condvar signal
+to wake up. When glibc #25847 causes `pthread_cond_signal` to silently fail, the
+competitor never wakes, and the yielding thread enters `pthread_cond_wait` with no one
+left to signal it.
 
 The `do-while` pattern was deliberately introduced in
 [OCaml PR #2112](https://github.com/ocaml/ocaml/pull/2112) (Feb 2019) to fix yield
@@ -329,7 +332,7 @@ On the daemon side, each connection triggers:
 
 That's **4 `In_thread` operations per connection**, each involving a blocking section
 transition (release master lock condvar -> syscall -> reacquire master lock condvar). At
-~10-18 connections/sec, this generates ~40-70 condvar operations/sec of real syscall work.
+~10-18 connections/sec, this generates ~40-72 condvar operations/sec of real syscall work.
 
 Meanwhile, the Async scheduler is driving `epoll_wait` cycles for TCP socket events,
 creating the mixed condvar signal pattern:
@@ -458,8 +461,8 @@ exactly.
 
 Note on Ubuntu 20.04: The OCaml community
 [confirmed](https://discuss.ocaml.org/t/is-there-a-known-recent-linux-locking-bug-that-affects-the-ocaml-runtime/6542)
-deadlocks within seconds on stock glibc 2.31, resolved by a one-line patch. Ubuntu later
-applied an official backport in 2.31-0ubuntu9.9 (April 2022).
+deadlocks within hours under load on stock glibc 2.31, resolved by a one-line patch.
+Ubuntu later applied an official backport in 2.31-0ubuntu9.9 (April 2022).
 
 ## Nix Flake
 
