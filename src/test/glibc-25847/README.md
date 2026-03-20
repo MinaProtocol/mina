@@ -349,6 +349,69 @@ lifecycle. The test replicates this cross-process pattern directly: a separate c
 process opens connections to the server, just as the verifier child opened connections to
 the daemon.
 
+## Risk in ITN vs Non-ITN Environments
+
+The deadlock is probabilistic — it requires specific thread preemption timing during
+condvar group rotation. The probability of triggering it depends on the rate of condvar
+operations: more operations per second means more chances for the race condition per unit
+time. ITN environments dramatically increase this rate.
+
+### ITN Environments (Elevated Risk)
+
+With `ITN_FEATURES` enabled, every `[%log internal]` entry from a child process dispatches
+via `Rpc.Connection.with_client` — a **new TCP connection per message** (see
+[The ITN Logger Pattern](#the-itn-logger-pattern) above). During active SNARK
+verification, the verifier generates ~10-18 log messages/sec, each producing 4
+`In_thread` blocking section transitions on the daemon side (~40-72 condvar ops/sec of
+real syscall work).
+
+This is the workload that was running when the frozen daemon deadlocked. The stuck thread
+pool workers were named `"shutdown"` and `"fcntl_getfl"` — TCP connection lifecycle
+operations from this exact pattern (see
+[Evidence from the Frozen Daemon](#evidence-from-the-frozen-daemon) above).
+
+### Non-ITN Environments (Lower but Non-Zero Risk)
+
+Without `ITN_FEATURES`, the per-message TCP connection churn disappears:
+
+- **Child process communication**: Rpc_parallel maintains a single long-lived TCP
+  connection per child process (verifier, prover, VRF evaluator). These don't generate
+  per-message connection churn — one connection setup at spawn time, then multiplexed RPC
+  calls over the existing connection.
+- **libp2p_helper**: Communicates via stdin/stdout pipes, not TCP. No `In_thread`
+  operations for libp2p I/O.
+- **Remaining `In_thread` sources**: fd operations for new peer connections, GraphQL
+  HTTP requests (including the k8s readiness probe every ~2 minutes), and occasional
+  file I/O still generate `In_thread` blocking section transitions, but at much lower
+  frequency than the ITN logger's per-message pattern.
+- **No baseline condvar activity without `In_thread` work**: The condvar is effectively
+  dormant when no thread pool workers are contending for the master lock.
+  `Thread.yield()` checks `waiters == 0` and [returns immediately](https://github.com/ocaml/ocaml/blob/4.14.2/otherlibs/systhreads/st_posix.h#L175-L178)
+  without calling `pthread_cond_signal` or `pthread_cond_wait`. The `epoll_wait`
+  blocking section calls `pthread_cond_signal` in `st_masterlock_release`, but with
+  zero waiters this is a no-op at the futex level — it does not drive the group
+  rotations that the glibc bug requires. The condvar's internal state only becomes
+  active when `In_thread` operations create real contention.
+
+A non-ITN daemon is not immune — the condvar race can trigger on any `In_thread`
+operation. But without the ITN logger's per-message TCP connection churn, `In_thread`
+activity is sporadic (peer connections, occasional file I/O, GraphQL probes) rather than
+sustained. The expected time to deadlock stretches from days (as observed in the ITN
+incident after ~2 days of sustained operation) to potentially weeks or months.
+
+### Why the Test Triggers Quickly
+
+This reproducer generates ~14,000 condvar ops/sec per server — roughly 200x the ITN
+daemon's ~70 ops/sec. This compresses the expected time to deadlock from days to minutes.
+The C reproducers for glibc #25847 trigger even faster (<1 minute) because they use
+synchronized concurrent condvar bursts from multiple threads, whereas OCaml's serialized
+master lock means only one signal/wait pair proceeds at a time.
+
+Pure OCaml reproducers (yield loops, blocking section bursts) didn't trigger in 5-minute
+runs during investigation. The per-message TCP connection pattern — creating real fd
+lifecycle `In_thread` work interleaved with the scheduler's `epoll_wait` cycles — is what
+generates enough mixed-signal condvar activity to trigger the bug reliably.
+
 ## Affected Distributions
 
 | Distribution | glibc | Affected? |
