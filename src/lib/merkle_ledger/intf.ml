@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module type LOCATION = sig
   module Addr : module type of Merkle_address

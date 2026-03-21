@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Make (Inputs : Intf.Inputs.Intf) : sig
   include
