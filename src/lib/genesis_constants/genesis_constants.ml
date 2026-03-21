@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (** Proof level controls how proofs are handled during execution.
 
@@ -91,22 +91,23 @@ module Helpers = struct
     TODO: #4659 move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)
 
   let genesis_timestamp_of_string str =
-    let default_zone = Time.Zone.of_utc_offset ~hours:(-8) in
-    Time.of_string_gen
+    let default_zone = Time_float.Zone.of_utc_offset ~hours:(-8) in
+    Time_float.of_string_gen
       ~find_zone:(fun _ -> assert false)
       ~default_zone:(fun () -> default_zone)
       str
 
   let of_time t =
-    Time.to_span_since_epoch t |> Time.Span.to_ms |> Int64.of_float
+    Time_float.to_span_since_epoch t |> Time_float.Span.to_ms |> Int64.of_float
 
   let to_time t =
-    t |> Int64.to_float |> Time.Span.of_ms |> Time.of_span_since_epoch
+    t |> Int64.to_float |> Time_float.Span.of_ms
+    |> Time_float.of_span_since_epoch
 
   let validate_time time_str =
     match time_str with
     | None ->
-        Ok (of_time (Time.now ()))
+        Ok (of_time (Time_float.now ()))
     | Some time_str -> (
         match
           Result.try_with (fun () -> genesis_timestamp_of_string time_str)
@@ -125,8 +126,10 @@ module Helpers = struct
             Error err_message_verbose )
 
   let genesis_timestamp_to_string time =
-    Int64.to_float time |> Time.Span.of_ms |> Time.of_span_since_epoch
-    |> Time.to_string_iso8601_basic ~zone:(Time.Zone.of_utc_offset ~hours:(-8))
+    Int64.to_float time |> Time_float.Span.of_ms
+    |> Time_float.of_span_since_epoch
+    |> Time_float.to_string_iso8601_basic
+         ~zone:(Time_float.Zone.of_utc_offset ~hours:(-8))
 end
 
 include Helpers
@@ -171,11 +174,11 @@ module Protocol = struct
           ; ("delta", `Int t.delta)
           ; ( "genesis_state_timestamp"
             , `String
-                (Time.to_string_abs
-                   (Time.of_span_since_epoch
-                      (Time.Span.of_ms
+                (Time_float.to_string_abs
+                   (Time_float.of_span_since_epoch
+                      (Time_float.Span.of_ms
                          (Int64.to_float t.genesis_state_timestamp) ) )
-                   ~zone:Time.Zone.utc ) )
+                   ~zone:Time_float.Zone.utc ) )
           ]
 
       let of_yojson = function
@@ -215,10 +218,11 @@ module Protocol = struct
           ; slots_per_sub_window = t.slots_per_sub_window
           ; grace_period_slots = t.grace_period_slots
           ; genesis_state_timestamp =
-              Time.to_string_abs
-                (Time.of_span_since_epoch
-                   (Time.Span.of_ms (Int64.to_float t.genesis_state_timestamp)) )
-                ~zone:Time.Zone.utc
+              Time_float.to_string_abs
+                (Time_float.of_span_since_epoch
+                   (Time_float.Span.of_ms
+                      (Int64.to_float t.genesis_state_timestamp) ) )
+                ~zone:Time_float.Zone.utc
           }
         in
         T.sexp_of_t t'
@@ -257,9 +261,9 @@ module T = struct
           ]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
-      ^ Time.to_string_abs ~zone:Time.Zone.utc
-          (Time.of_span_since_epoch
-             (Time.Span.of_ms
+      ^ Time_float.to_string_abs ~zone:Time_float.Zone.utc
+          (Time_float.of_span_since_epoch
+             (Time_float.Span.of_ms
                 (Int64.to_float t.protocol.genesis_state_timestamp) ) )
     in
     Blake2.digest_string str |> Blake2.to_hex
@@ -283,11 +287,11 @@ module type S = sig
     val t : t
   end
 
-  val genesis_timestamp_of_string : string -> Time.t
+  val genesis_timestamp_of_string : string -> Time_float.t
 
-  val of_time : Time.t -> int64
+  val of_time : Time_float.t -> int64
 
-  val to_time : int64 -> Time.t
+  val to_time : int64 -> Time_float.t
 
   val validate_time : string option -> (int64, string) result
 
@@ -356,7 +360,7 @@ module Make (Node_config : Node_config_intf.S) : S = struct
           Node_config.supercharged_coinbase_factor
 
         let pending_coinbase_depth =
-          Core_kernel.Int.ceil_log2
+          Int.ceil_log2
             ( (transaction_capacity_log_2 + 1)
               * (Node_config.scan_state_work_delay + 1)
             + 1 )
