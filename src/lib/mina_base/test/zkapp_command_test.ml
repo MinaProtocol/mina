@@ -5,7 +5,7 @@
     Subject:    Test zkApp commands.
  *)
 
-open Core_kernel
+open Core
 open Mina_base
 open Zkapp_command
 

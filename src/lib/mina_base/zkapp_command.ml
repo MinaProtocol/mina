@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Signature_lib
 
 module Poly = struct
@@ -189,8 +189,8 @@ let to_simple (t : t) : Simple.t =
       Call_forest.map ~f:Account_update.read_all_proofs_from_disk
         t.account_updates
       |> Call_forest.to_account_updates_map
-           ~f:(fun ~depth { Account_update.Poly.body = b; authorization; aux }
-              ->
+           ~f:(fun
+               ~depth { Account_update.Poly.body = b; authorization; aux } ->
              { Account_update.Poly.authorization
              ; body =
                  { Account_update.Body.Simple.public_key =
@@ -304,7 +304,14 @@ let account_access_statuses (t : (_, _, _) with_forest)
   in
   Call_forest.fold t.account_updates ~init ~f:(fun acc p ->
       (Account_update.account_id p, status_sym) :: acc )
-  |> List.rev |> List.stable_dedup
+  |> List.rev
+  |> Staged.unstage
+       (List.stable_dedup_staged ~compare:(fun (a1, s1) (a2, s2) ->
+            let c = Account_id.compare a1 a2 in
+            if c <> 0 then c
+            else
+              let to_int = function `Accessed -> 0 | `Not_accessed -> 1 in
+              Int.compare (to_int s1) (to_int s2) ) )
 
 let accounts_referenced (t : (_, _, _) with_forest) =
   List.map (account_access_statuses t Applied) ~f:(fun (acct_id, _status) ->
@@ -536,11 +543,11 @@ end = struct
     in
     get_batch locations
     |> List.filter_map ~f:(fun ((_, account) : _ * Account.t option) ->
-           let open Option.Let_syntax in
-           let account = Option.value_exn account in
-           let%bind zkapp = account.zkapp in
-           let%map verification_key = zkapp.verification_key in
-           (Account.identifier account, verification_key) )
+        let open Option.Let_syntax in
+        let account = Option.value_exn account in
+        let%bind zkapp = account.zkapp in
+        let%map verification_key = zkapp.verification_key in
+        (Account.identifier account, verification_key) )
     |> Account_id.Map.of_alist_exn
 
   (* Ensures that there's a verification_key available for all account_updates
@@ -566,8 +573,7 @@ end = struct
               let vks_overriden' =
                 match Account_update.verification_key_update_to_option p with
                 | Zkapp_basic.Set_or_keep.Set vk_next ->
-                    Account_id.Map.set !vks_overridden ~key:account_id
-                      ~data:vk_next
+                    Map.set !vks_overridden ~key:account_id ~data:vk_next
                 | Zkapp_basic.Set_or_keep.Keep ->
                     !vks_overridden
               in
@@ -584,7 +590,7 @@ end = struct
                     (* only lookup _past_ vk setting, ie exclude the new one we
                      * potentially set in this account_update (use the non-'
                      * vks_overrided) . *)
-                    match Account_id.Map.find !vks_overridden account_id with
+                    match Map.find !vks_overridden account_id with
                     | Some (Some vk) -> (
                         match
                           ok_if_vk_hash_expected ~got:vk ~expected:vk_hash
@@ -614,7 +620,7 @@ end = struct
                   in
                   match prioritized_vk with
                   | Some prioritized_vk ->
-                      Account_id.Table.update tbl account_id ~f:(fun _ ->
+                      Hashtbl.update tbl account_id ~f:(fun _ ->
                           With_hash.hash prioritized_vk ) ;
                       (* return the updated overrides *)
                       vks_overridden := vks_overriden' ;
@@ -887,7 +893,7 @@ let account_updates_deriver obj =
   and to_zkapp_command_with_depth ps : Account_update.Graphql_repr.t list =
     ps
     |> Call_forest.to_account_updates_map ~f:(fun ~depth p ->
-           Account_update.to_graphql_repr ~call_depth:depth p )
+        Account_update.to_graphql_repr ~call_depth:depth p )
   in
   let open Fields_derivers_zkapps.Derivers in
   let inner = (list @@ Account_update.Graphql_repr.deriver @@ o ()) @@ o () in
@@ -915,7 +921,7 @@ let of_json x = Fields_derivers_zkapps.(of_json (deriver @@ Derivers.o ())) x
 let account_updates_of_json x =
   Fields_derivers_zkapps.(
     of_json
-      ((list @@ Account_update.Graphql_repr.deriver @@ o ()) @@ derivers ()))
+      ((list @@ Account_update.Graphql_repr.deriver @@ o ()) @@ derivers ()) )
     x
 
 let zkapp_command_to_json x =
@@ -1036,9 +1042,9 @@ end = struct
     let zkapp_account_updatess =
       []
       :: List.map zkapp_commands ~f:(fun zkapp_command ->
-             all_account_updates_list'
-               ~of_fee_payer:Account_update.of_fee_payer_no_aux
-               ~of_account_update:Account_update.forget_aux zkapp_command )
+          all_account_updates_list'
+            ~of_fee_payer:Account_update.of_fee_payer_no_aux
+            ~of_account_update:Account_update.forget_aux zkapp_command )
     in
     let rec group_by_zkapp_command_rev (zkapp_commands : _ list list) stmtss acc
         =
@@ -1063,7 +1069,7 @@ end = struct
             ~spec:(zkapp_segment_of_controls [ a1 ])
             ~before ~after
           :: acc
-      | ( ({ Account_update.Poly.authorization = Control.Poly.Proof _ as a1; _ }
+      | ( ( { Account_update.Poly.authorization = Control.Poly.Proof _ as a1; _ }
           :: zkapp_command )
           :: zkapp_commands
         , (before :: (after :: _ as stmts)) :: stmtss ) ->
@@ -1077,7 +1083,7 @@ end = struct
             :: acc )
       | ( []
           :: ({ authorization = Proof _ as a1; _ } :: zkapp_command)
-             :: zkapp_commands
+          :: zkapp_commands
         , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
           (* This account_update is part of a new transaction, and contains a proof, don't
              pair it with other account updates.
@@ -1089,7 +1095,7 @@ end = struct
                 ~spec:(zkapp_segment_of_controls [ a1 ])
                 ~before ~after
             :: acc )
-      | ( ({ authorization = a1; _ }
+      | ( ( { authorization = a1; _ }
           :: ({ authorization = Proof _; _ } :: _ as zkapp_command) )
           :: zkapp_commands
         , (before :: (after :: _ as stmts)) :: stmtss ) ->
@@ -1114,9 +1120,9 @@ end = struct
                 ~spec:(zkapp_segment_of_controls [ a1 ])
                 ~before ~after
             :: acc )
-      | ( ({ authorization = (Signature _ | None_given) as a1; _ }
+      | ( ( { authorization = (Signature _ | None_given) as a1; _ }
           :: { authorization = (Signature _ | None_given) as a2; _ }
-             :: zkapp_command )
+          :: zkapp_command )
           :: zkapp_commands
         , (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
           (* The next two zkapp_command do not contain proofs, and are within the same
@@ -1132,9 +1138,9 @@ end = struct
                 ~before ~after
             :: acc )
       | ( []
-          :: ({ authorization = a1; _ }
+          :: ( { authorization = a1; _ }
              :: ({ authorization = Proof _; _ } :: _ as zkapp_command) )
-             :: zkapp_commands
+          :: zkapp_commands
         , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
           (* This account_update is in the next transaction, and the next account_update contains a
              proof, don't pair it with this account_update.
@@ -1147,10 +1153,10 @@ end = struct
                 ~before ~after
             :: acc )
       | ( []
-          :: ({ authorization = (Signature _ | None_given) as a1; _ }
+          :: ( { authorization = (Signature _ | None_given) as a1; _ }
              :: { authorization = (Signature _ | None_given) as a2; _ }
-                :: zkapp_command )
-             :: zkapp_commands
+             :: zkapp_command )
+          :: zkapp_commands
         , [ _ ] :: (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
           (* The next two zkapp_command do not contain proofs, and are within the same
              new transaction. Pair them.
@@ -1165,9 +1171,9 @@ end = struct
                 ~before ~after
             :: acc )
       | ( [ { authorization = (Signature _ | None_given) as a1; _ } ]
-          :: ({ authorization = (Signature _ | None_given) as a2; _ }
+          :: ( { authorization = (Signature _ | None_given) as a2; _ }
              :: zkapp_command )
-             :: zkapp_commands
+          :: zkapp_commands
         , (before :: _after1) :: (_before2 :: (after :: _ as stmts)) :: stmtss )
         ->
           (* The next two zkapp_command do not contain proofs, and the second is within
@@ -1184,7 +1190,7 @@ end = struct
             :: acc )
       | ( []
           :: ({ authorization = a1; _ } :: zkapp_command)
-             :: (({ authorization = Proof _; _ } :: _) :: _ as zkapp_commands)
+          :: (({ authorization = Proof _; _ } :: _) :: _ as zkapp_commands)
         , [ _ ] :: (before :: ([ after ] as stmts)) :: (_ :: _ as stmtss) ) ->
           (* The next transaction contains a proof, and this account_update is in a new
              transaction, don't pair it with the next account_update.
@@ -1198,12 +1204,13 @@ end = struct
             :: acc )
       | ( []
           :: [ { authorization = (Signature _ | None_given) as a1; _ } ]
-             :: ({ authorization = (Signature _ | None_given) as a2; _ }
-                :: zkapp_command )
-                :: zkapp_commands
+          :: ( { authorization = (Signature _ | None_given) as a2; _ }
+             :: zkapp_command )
+          :: zkapp_commands
         , [ _ ]
           :: [ before; _after1 ]
-             :: (_before2 :: (after :: _ as stmts)) :: stmtss ) ->
+          :: (_before2 :: (after :: _ as stmts))
+          :: stmtss ) ->
           (* The next two zkapp_command do not contain proofs, the first is within a
              new transaction, and the second is within another new transaction.
              Pair them.
@@ -1318,7 +1325,7 @@ let zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
   Float.(
     (proof_cost * of_int proof_segments)
     + (signed_pair_cost * of_int signed_pair_segments)
-    + (signed_single_cost * of_int signed_single_segments))
+    + (signed_single_cost * of_int signed_single_segments) )
 
 (* Zkapp_command transactions are filtered using this predicate
    - when adding to the transaction pool
@@ -1333,8 +1340,7 @@ let valid_size (type aux) ~(genesis_constants : Genesis_constants.t)
   in
   let statement_tuple = ((), (), ()) in
   let statements, num_event_elements, num_action_elements =
-    Call_forest.fold t.account_updates
-      ~init:([ statement_tuple ], 0, 0)
+    Call_forest.fold t.account_updates ~init:([ statement_tuple ], 0, 0)
       ~f:(fun (acc, num_event_elements, num_action_elements) account_update ->
         let account_update_evs_elements =
           events_elements account_update.body.events
@@ -1368,7 +1374,7 @@ let valid_size (type aux) ~(genesis_constants : Genesis_constants.t)
     Float.(
       zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
         ~genesis_constants ()
-      < cost_limit)
+      < cost_limit )
   in
   let valid_event_elements = num_event_elements <= max_event_elements in
   let valid_action_elements = num_action_elements <= max_action_elements in

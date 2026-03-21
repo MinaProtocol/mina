@@ -5,7 +5,7 @@
     Subject:    Test slot reduction vesting parameter update equations.
  *)
 
-open Core_kernel
+open Core
 open Currency
 open Mina_base
 open Mina_numbers

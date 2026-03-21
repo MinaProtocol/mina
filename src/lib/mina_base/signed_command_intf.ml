@@ -1,7 +1,7 @@
 (* user_command_intf.ml *)
 
 open Mina_base_import
-open Core_kernel
+open Core
 open Snark_params.Tick
 open Mina_numbers
 

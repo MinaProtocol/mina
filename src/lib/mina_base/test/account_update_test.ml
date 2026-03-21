@@ -5,7 +5,7 @@
     Subject:    Test account updates.
  *)
 
-open Core_kernel
+open Core
 open Mina_numbers
 open Mina_base
 open Account_update

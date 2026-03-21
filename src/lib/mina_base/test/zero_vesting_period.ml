@@ -6,7 +6,7 @@
     Subject:    Test zero vesting period detection
  *)
 
-open Core_kernel
+open Core
 open Mina_base
 
 let mk_zkapp_with_vesting_period n =

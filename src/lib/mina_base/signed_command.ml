@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base_import
 open Mina_numbers
 
@@ -71,7 +71,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let accounts_referenced (t : t) =
         List.map (account_access_statuses t Applied)
-          ~f:(fun (acct_id, _status) -> acct_id)
+          ~f:(fun (acct_id, _status) -> acct_id )
     end
 
     module V1 = struct
@@ -163,8 +163,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         "delegation"
 
   let to_input_legacy (payload : Payload.t) =
-    Transaction_union_payload.(
-      to_input_legacy (of_user_command_payload payload))
+    Transaction_union_payload.(to_input_legacy (of_user_command_payload payload))
 
   let sign_payload ~signature_kind (private_key : Signature_lib.Private_key.t)
       (payload : Payload.t) : Signature.t =
@@ -289,7 +288,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
            let%bind command_senders =
              Quickcheck_lib.shuffle
              @@ List.concat_mapi command_splits ~f:(fun idx cmds ->
-                    List.init cmds ~f:(Fn.const idx) )
+                 List.init cmds ~f:(Fn.const idx) )
            in
            (* within the accounts, how will the currency be split into separate
               payments? *)
@@ -309,7 +308,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                n_accounts
            in
            return (command_senders, currency_splits) )
-          |> (* We need to ensure each command has enough currency for a fee of 2
+          |>
+          (* We need to ensure each command has enough currency for a fee of 2
                 or more, so it'll be enough to buy the requisite transaction
                 snarks. It's important that the backtracking from filter goes and
                 redraws command_splits as well as currency_splits, so we don't get
@@ -342,7 +342,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Currency.Fee.(
                 gen_incl (of_string "6000000000")
                   (min (of_string "10000000000")
-                     (Currency.Amount.to_fee this_split) ))
+                     (Currency.Amount.to_fee this_split) ) )
             in
             let amount =
               Option.value_exn Currency.Amount.(this_split - of_fee fee)
@@ -459,7 +459,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let filter_by_participant user_commands public_key =
     List.filter user_commands ~f:(fun user_command ->
-        Core_kernel.List.exists
+        List.exists
           (accounts_referenced user_command)
           ~f:
             (Fn.compose

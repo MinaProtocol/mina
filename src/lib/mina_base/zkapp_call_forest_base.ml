@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let empty = Outside_hash_image.t
 

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 include Data_hash.Make_full_size (struct
   let version_byte = Base58_check.Version_bytes.epoch_seed

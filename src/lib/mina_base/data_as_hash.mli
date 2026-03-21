@@ -121,7 +121,7 @@ val deriver :
           ref
       ; of_json :
           ([> `Assoc of (string * Yojson.Safe.t) list ] -> 'z As_record.t) ref
-      ; of_json_creator : Yojson.Safe.t Core_kernel.String.Map.t ref
+      ; of_json_creator : Yojson.Safe.t Core.String.Map.t ref
       ; skip : bool ref
       ; to_json :
           ('w As_record.t -> [> `Assoc of (string * Yojson.Safe.t) list ]) ref

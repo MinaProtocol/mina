@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base_util
 open Snark_params.Tick
 module Frozen_ledger_hash = Frozen_ledger_hash0
@@ -47,7 +47,8 @@ module Auth_required = struct
         | Either
         | Proof
         | Signature
-        | Impossible (* Both and either can both be subsumed in verification key.
+        | Impossible
+          (* Both and either can both be subsumed in verification key.
                         It is good to have "Either" as a separate thing to spare the owner from
                         having to make a proof instead of a signature. Both, I'm not sure if there's
                         a good justification for. *)
@@ -361,7 +362,7 @@ module Poly = struct
   end]
 
   let to_input controller txn_version t =
-    let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
+    let f mk acc field = mk (Core.Field.get field t) :: acc in
     Stable.Latest.Fields.fold ~init:[] ~edit_state:(f controller)
       ~send:(f controller) ~set_delegate:(f controller)
       ~set_permissions:(f controller)
@@ -522,7 +523,7 @@ module Checked = struct
     }
 
   let constant (t : Stable.Latest.t) : t =
-    let open Core_kernel.Field in
+    let open Core.Field in
     let a f = Auth_required.Checked.constant (get f t) in
     Poly.Fields.map ~edit_state:a ~send:a ~receive:a ~set_delegate:a
       ~set_permissions:a
