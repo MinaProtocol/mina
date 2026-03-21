@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 module Test_input : Transaction_snark_tests.Test_zkapp_update.Input_intf =

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Currency
 open Signature_lib
 module U = Transaction_snark_tests.Util

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_ledger
 open Signature_lib
 open Mina_base

@@ -4,7 +4,7 @@
     The output file is named based on the current profile (dev, devnet, lightnet,
     mainnet). *)
 
-open Core_kernel
+open Core
 
 let () =
   Format.eprintf "Profile: %s@." Node_config.profile ;

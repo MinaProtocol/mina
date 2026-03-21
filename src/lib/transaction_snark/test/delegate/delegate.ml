@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 module U = Transaction_snark_tests.Util
 
