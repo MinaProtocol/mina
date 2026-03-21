@@ -171,8 +171,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
               Structured_log_events.repr ) =
           { id = [%e evar (event_name ^ "_structured_events_id")]
           ; event_name = [%e estring event_path]
-          ; arguments =
-              Core_kernel.String.Set.of_list [%e elist ~f:estring label_names]
+          ; arguments = String.Set.of_list [%e elist ~f:estring label_names]
           ; log =
               (function
               | [%p record_pattern] ->
@@ -190,7 +189,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
           ; parse =
               (fun args ->
                 let result =
-                  let args_list = Core_kernel.String.Map.of_alist_exn args in
+                  let args_list = String.Map.of_alist_exn args in
                   (* We use this to avoid an unused value warning. *)
                   ignore args_list ;
                   [%e
@@ -198,10 +197,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                       ~f:(fun
                           { pld_name = { txt = name; _ }; pld_type; _ } acc ->
                         [%expr
-                          let module Result = Core_kernel.Result in
-                          match
-                            Core_kernel.Map.find args_list [%e estring name]
-                          with
+                          match Map.find args_list [%e estring name] with
                           | Some [%p pvar name] ->
                               Result.bind
                                 ([%of_yojson: [%t pld_type]] [%e evar name])
@@ -212,7 +208,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                                   estring
                                     (sprintf "%s, parse: missing argument %s"
                                        event_path name )]] )
-                      ~init:[%expr Core_kernel.Result.return [%e record_expr]]]
+                      ~init:[%expr Result.return [%e record_expr]]]
                 in
                 match result with Ok ev -> Some ev | Error _ -> None )
           }]
