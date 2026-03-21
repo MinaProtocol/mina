@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_transaction_logic
 open Currency
 open Mina_base
