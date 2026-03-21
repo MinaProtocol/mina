@@ -1,7 +1,7 @@
 (** Step Verifier Implementation - see step_verifier.mli for documentation. *)
 
 (* q > p *)
-open Core_kernel
+open Core
 module SC = Scalar_challenge
 open Import
 open Common

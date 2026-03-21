@@ -4,7 +4,7 @@
  (name pickles)
  (public_name pickles)
  (modules_without_implementation full_signature type intf pickles_intf)
- (flags -open Core_kernel)
+ (flags -open Core)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -30,7 +30,7 @@
   result
   base.caml
   bignum.bigint
-  core_kernel
+  core
   base64
   digestif
   ppx_inline_test.config

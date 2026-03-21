@@ -171,21 +171,21 @@ let test_tick_shifts_memoized () =
   let shifts2 = Common.tick_shifts ~log2_size:12 in
   Alcotest.(check bool)
     "tick_shifts is memoized" true
-    (Core_kernel.phys_equal shifts1 shifts2)
+    (Core.phys_equal shifts1 shifts2)
 
 let test_tock_shifts_memoized () =
   let shifts1 = Common.tock_shifts ~log2_size:12 in
   let shifts2 = Common.tock_shifts ~log2_size:12 in
   Alcotest.(check bool)
     "tock_shifts is memoized" true
-    (Core_kernel.phys_equal shifts1 shifts2)
+    (Core.phys_equal shifts1 shifts2)
 
 let test_tick_shifts_different_sizes () =
   let shifts1 = Common.tick_shifts ~log2_size:10 in
   let shifts2 = Common.tick_shifts ~log2_size:11 in
   Alcotest.(check bool)
     "different sizes produce different arrays" false
-    (Core_kernel.phys_equal shifts1 shifts2)
+    (Core.phys_equal shifts1 shifts2)
 
 (** {2 Profiling Tests} *)
 
@@ -348,14 +348,14 @@ let test_wrap_compute_challenges_all () =
   in
   let chals_list = Pickles_types.Vector.to_list chals_computed in
   let chals_strings =
-    Core_kernel.List.map chals_list ~f:Backend.Tock.Field.to_string
+    Core.List.map chals_list ~f:Backend.Tock.Field.to_string
   in
   Alcotest.(check int)
     "Wrap.compute_challenges length" 15
-    (Core_kernel.List.length chals_list) ;
+    (Core.List.length chals_list) ;
   (* First print all mismatches *)
   let has_mismatch = ref false in
-  Core_kernel.List.iteri chals_strings ~f:(fun i actual ->
+  Core.List.iteri chals_strings ~f:(fun i actual ->
       let expected = wrap_compute_challenges_expected.(i) in
       if not (String.equal expected actual) then (
         Printf.printf "  ; \"%s\" (* %d *)\n" actual i ;
@@ -390,14 +390,14 @@ let test_step_compute_challenges_all () =
   in
   let chals_list = Pickles_types.Vector.to_list chals_computed in
   let chals_strings =
-    Core_kernel.List.map chals_list ~f:Backend.Tick.Field.to_string
+    Core.List.map chals_list ~f:Backend.Tick.Field.to_string
   in
   Alcotest.(check int)
     "Step.compute_challenges length" 16
-    (Core_kernel.List.length chals_list) ;
+    (Core.List.length chals_list) ;
   (* First print all mismatches *)
   let has_mismatch = ref false in
-  Core_kernel.List.iteri chals_strings ~f:(fun i actual ->
+  Core.List.iteri chals_strings ~f:(fun i actual ->
       let expected = step_compute_challenges_expected.(i) in
       if not (String.equal expected actual) then (
         Printf.printf "  ; \"%s\" (* %d *)\n" actual i ;

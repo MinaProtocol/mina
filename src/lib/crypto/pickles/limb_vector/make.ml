@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 
 module T (Impl : Snarky_backendless.Snark_intf.Run) (N : Pickles_types.Nat.Intf) =

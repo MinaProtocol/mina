@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 module Sponge_lib = Sponge
 

@@ -1,6 +1,6 @@
-open Core_kernel
+open Core
 
-let output_file = Out_channel.create Sys.argv.(1)
+let output_file = Out_channel.create (Sys.get_argv ()).(1)
 
 let output_string str = Out_channel.output_string output_file str
 
@@ -41,7 +41,7 @@ module Gate_type = struct
     [@@deriving hash, eq, compare, sexp]
   end
 
-  include Core_kernel.Hashable.Make (T)
+  include Core.Hashable.Make (T)
   include T
 end
 
@@ -55,12 +55,12 @@ module Lookup_pattern = struct
     [@@deriving hash, eq, compare, sexp]
   end
 
-  include Core_kernel.Hashable.Make (T)
+  include Core.Hashable.Make (T)
   include T
 end
 
 module Column = struct
-  open Core_kernel
+  open Core
 
   module T = struct
     type t =

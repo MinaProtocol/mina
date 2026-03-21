@@ -18,7 +18,7 @@
 *)
 
 module S = Sponge
-open Core_kernel
+open Core
 open Util
 module SC = Scalar_challenge
 open Pickles_types
@@ -65,21 +65,19 @@ module G = struct
 end
 
 module Make
-    (Inputs : Intf.Wrap_main_inputs.S
-                with type Impl.field = Backend.Tock.Field.t
-                 and type Impl.field_var = Wrap_main_inputs.Impl.field_var
-                 and type Impl.Bigint.t = Backend.Tock.Bigint.t
-                 and type Impl.Constraint.t = Backend.Tock.Constraint.t
-                 and type 'a Impl.Internal_Basic.Checked.t =
-                  'a Wrap_main_inputs.Impl.Internal_Basic.Checked.t
-                 and type ('var, 'value, 'aux) Impl.Internal_Basic.Typ.typ' =
-                  ( 'var
-                  , 'value
-                  , 'aux )
-                  Wrap_main_inputs.Impl.Internal_Basic.Typ.typ'
-                 and type ('var, 'value) Impl.Internal_Basic.Typ.typ =
-                  ('var, 'value) Wrap_main_inputs.Impl.Internal_Basic.Typ.typ
-                 and type Inner_curve.Constant.Scalar.t = Backend.Tick.Field.t) =
+    (Inputs :
+      Intf.Wrap_main_inputs.S
+        with type Impl.field = Backend.Tock.Field.t
+         and type Impl.field_var = Wrap_main_inputs.Impl.field_var
+         and type Impl.Bigint.t = Backend.Tock.Bigint.t
+         and type Impl.Constraint.t = Backend.Tock.Constraint.t
+         and type 'a Impl.Internal_Basic.Checked.t =
+          'a Wrap_main_inputs.Impl.Internal_Basic.Checked.t
+         and type ('var, 'value, 'aux) Impl.Internal_Basic.Typ.typ' =
+          ('var, 'value, 'aux) Wrap_main_inputs.Impl.Internal_Basic.Typ.typ'
+         and type ('var, 'value) Impl.Internal_Basic.Typ.typ =
+          ('var, 'value) Wrap_main_inputs.Impl.Internal_Basic.Typ.typ
+         and type Inner_curve.Constant.Scalar.t = Backend.Tick.Field.t) =
 struct
   open Inputs
   open Impl
@@ -119,7 +117,7 @@ struct
             printf
               !"%s: %{sexp:Backend.Tock.Field.t}, %{sexp:Backend.Tock.Field.t}\n\
                 %!"
-              lab (read_var x) (read_var y))
+              lab (read_var x) (read_var y) )
 
   let print_bool lab x =
     if debug then
@@ -209,8 +207,7 @@ struct
       This optimization is important for preserving exact serialization of
       protocol circuits when features are unused.
   *)
-  let choose_key :
-      type n.
+  let choose_key : type n.
          n One_hot_vector.t
       -> ( (Inner_curve.t array, (Inner_curve.t array, Boolean.var) Opt.t) index'
          , n )
@@ -249,75 +246,67 @@ struct
                 ~f_opt:(fun (yes_1, maybe_1, no_1) (yes_2, maybe_2, no_2) ->
                   (yes_1 @ yes_2, maybe_1 @ maybe_2, no_1 @ no_2) ) )
       |> Plonk_verification_key_evals.Step.map ~f:Fn.id ~f_opt:(function
-           | [], [], _nones ->
-               (* We only have `Nothing`s, so we can emit exactly `Nothing`
+        | [], [], _nones ->
+            (* We only have `Nothing`s, so we can emit exactly `Nothing`
                   without further computation.
                *)
-               Opt.Nothing
-           | justs, [], [] ->
-               (* Special case: we don't need to compute the 'maybe' bool
+            Opt.Nothing
+        | justs, [], [] ->
+            (* Special case: we don't need to compute the 'maybe' bool
                   because we know statically that all entries are `Just`.
                *)
-               let sum =
-                 justs
-                 |> List.map ~f:(fun ((b : Boolean.var), g) ->
-                        Array.map g ~f:(Double.map ~f:(( * ) (b :> t))) )
-                 |> List.reduce_exn
-                      ~f:(Array.map2_exn ~f:(Double.map2 ~f:( + )))
-               in
-               Opt.just sum
-           | justs, maybes, nones ->
-               let is_none =
-                 List.reduce nones
+            let sum =
+              justs
+              |> List.map ~f:(fun ((b : Boolean.var), g) ->
+                  Array.map g ~f:(Double.map ~f:(( * ) (b :> t))) )
+              |> List.reduce_exn ~f:(Array.map2_exn ~f:(Double.map2 ~f:( + )))
+            in
+            Opt.just sum
+        | justs, maybes, nones ->
+            let is_none =
+              List.reduce nones ~f:(fun (b1 : Boolean.var) (b2 : Boolean.var) ->
+                  Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t)) )
+            in
+            let none_sum =
+              let num_chunks = (* TODO *) Plonk_checks.num_chunks_by_default in
+              Option.map is_none ~f:(fun (b : Boolean.var) ->
+                  Array.init num_chunks ~f:(fun _ ->
+                      Double.map Inner_curve.one ~f:(( * ) (b :> t)) ) )
+            in
+            let just_is_yes, just_sum =
+              justs
+              |> List.map ~f:(fun ((b : Boolean.var), g) ->
+                  (b, Array.map g ~f:(Double.map ~f:(( * ) (b :> t)))) )
+              |> List.reduce
+                   ~f:(fun ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2) ->
+                     ( Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t))
+                     , Array.map2_exn ~f:(Double.map2 ~f:( + )) g1 g2 ) )
+              |> fun x -> (Option.map ~f:fst x, Option.map ~f:snd x)
+            in
+            let maybe_is_yes, maybe_sum =
+              maybes
+              |> List.map ~f:(fun ((b : Boolean.var), (b_g : Boolean.var), g) ->
+                  ( Boolean.Unsafe.of_cvar Field.(mul (b :> t) (b_g :> t))
+                  , Array.map g ~f:(Double.map ~f:(( * ) (b :> t))) ) )
+              |> List.reduce
+                   ~f:(fun ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2) ->
+                     ( Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t))
+                     , Array.map2_exn ~f:(Double.map2 ~f:( + )) g1 g2 ) )
+              |> fun x -> (Option.map ~f:fst x, Option.map ~f:snd x)
+            in
+            let is_yes =
+              [| just_is_yes; maybe_is_yes |]
+              |> Array.filter_map ~f:Fn.id
+              |> Array.reduce_exn
                    ~f:(fun (b1 : Boolean.var) (b2 : Boolean.var) ->
-                     Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t)) )
-               in
-               let none_sum =
-                 let num_chunks =
-                   (* TODO *) Plonk_checks.num_chunks_by_default
-                 in
-                 Option.map is_none ~f:(fun (b : Boolean.var) ->
-                     Array.init num_chunks ~f:(fun _ ->
-                         Double.map Inner_curve.one ~f:(( * ) (b :> t)) ) )
-               in
-               let just_is_yes, just_sum =
-                 justs
-                 |> List.map ~f:(fun ((b : Boolean.var), g) ->
-                        (b, Array.map g ~f:(Double.map ~f:(( * ) (b :> t)))) )
-                 |> List.reduce
-                      ~f:(fun ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2)
-                         ->
-                        ( Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t))
-                        , Array.map2_exn ~f:(Double.map2 ~f:( + )) g1 g2 ) )
-                 |> fun x -> (Option.map ~f:fst x, Option.map ~f:snd x)
-               in
-               let maybe_is_yes, maybe_sum =
-                 maybes
-                 |> List.map
-                      ~f:(fun ((b : Boolean.var), (b_g : Boolean.var), g) ->
-                        ( Boolean.Unsafe.of_cvar Field.(mul (b :> t) (b_g :> t))
-                        , Array.map g ~f:(Double.map ~f:(( * ) (b :> t))) ) )
-                 |> List.reduce
-                      ~f:(fun ((b1 : Boolean.var), g1) ((b2 : Boolean.var), g2)
-                         ->
-                        ( Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t))
-                        , Array.map2_exn ~f:(Double.map2 ~f:( + )) g1 g2 ) )
-                 |> fun x -> (Option.map ~f:fst x, Option.map ~f:snd x)
-               in
-               let is_yes =
-                 [| just_is_yes; maybe_is_yes |]
-                 |> Array.filter_map ~f:Fn.id
-                 |> Array.reduce_exn
-                      ~f:(fun (b1 : Boolean.var) (b2 : Boolean.var) ->
-                        Boolean.Unsafe.of_cvar ((b1 :> t) + (b2 :> t)) )
-               in
-               let sum =
-                 [| none_sum; maybe_sum; just_sum |]
-                 |> Array.filter_map ~f:Fn.id
-                 |> Array.reduce_exn
-                      ~f:(Array.map2_exn ~f:(Double.map2 ~f:( + )))
-               in
-               Opt.Maybe (is_yes, sum) )
+                     Boolean.Unsafe.of_cvar ((b1 :> t) + (b2 :> t)) )
+            in
+            let sum =
+              [| none_sum; maybe_sum; just_sum |]
+              |> Array.filter_map ~f:Fn.id
+              |> Array.reduce_exn ~f:(Array.map2_exn ~f:(Double.map2 ~f:( + )))
+            in
+            Opt.Maybe (is_yes, sum) )
       |> Plonk_verification_key_evals.Step.map
            ~f:(fun g -> Array.map ~f:(Double.map ~f:Util.Wrap.seal) g)
            ~f_opt:(function
@@ -351,8 +340,7 @@ struct
     |> Vector.map2
          (which_branch :> (Boolean.var, n) Vector.t)
          ~f:(fun b pts ->
-           Array.map pts ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y))
-           )
+           Array.map pts ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y)) )
     |> Vector.reduce_exn ~f:(Array.map2_exn ~f:(Double.map2 ~f:Field.( + )))
 
   let scaled_lagrange (type n) c
@@ -375,8 +363,7 @@ struct
     |> Vector.map2
          (which_branch :> (Boolean.var, n) Vector.t)
          ~f:(fun b pts ->
-           Array.map pts ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y))
-           )
+           Array.map pts ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y)) )
     |> Vector.reduce_exn ~f:(Array.map2_exn ~f:(Double.map2 ~f:Field.( + )))
 
   let lagrange_with_correction (type n) ~input_length
@@ -462,7 +449,7 @@ struct
             Field.(
               (x * x * x)
               + (constant Inner_curve.Params.a * x)
-              + constant Inner_curve.Params.b) )
+              + constant Inner_curve.Params.b ) )
         |> unstage )
     in
     fun x -> Lazy.force f x
@@ -505,8 +492,11 @@ struct
         Pcs_batch.combine_split_commitments
           ~reduce_with_degree_bound:(fun _ -> assert false)
           ~reduce_without_degree_bound:(fun x -> [ x ])
-          ~scale_and_add:(fun ~(acc : Curve_opt.t) ~xi
-                              (p : (Point.t array, Boolean.var) Opt.t) ->
+          ~scale_and_add:(fun
+              ~(acc : Curve_opt.t)
+              ~xi
+              (p : (Point.t array, Boolean.var) Opt.t)
+            ->
             (* match acc.non_zero, keep with
                | false, false -> acc
                | true, false -> acc
@@ -523,7 +513,7 @@ struct
                       ((* In this branch, the accumulator was zero, so there
                           is no harm in putting the potentially junk
                           underlying point here. *)
-                       Point.underlying p ))
+                       Point.underlying p ) )
               in
               let point = ref base_point in
               for i = Array.length p - 2 downto 0 do
@@ -723,9 +713,10 @@ struct
       (m2 : (_, Scalar_challenge.t, _) Plonk.Minimal.In_circuit.t) =
     iter2 m1 m2
       ~chal:(fun c1 c2 -> Field.Assert.equal c1 c2)
-      ~scalar_chal:(fun ({ inner = t1 } : _ Import.Scalar_challenge.t)
-                        ({ inner = t2 } : Scalar_challenge.t) ->
-        Field.Assert.equal t1 t2 )
+      ~scalar_chal:(fun
+          ({ inner = t1 } : _ Import.Scalar_challenge.t)
+          ({ inner = t2 } : Scalar_challenge.t)
+        -> Field.Assert.equal t1 t2 )
 
   let index_to_field_elements ~g (m : _ Plonk_verification_key_evals.Step.t) =
     let { Plonk_verification_key_evals.Step.sigma_comm
@@ -898,14 +889,14 @@ struct
                 | `Field (Constant c, _) ->
                     First
                       ( if Field.Constant.(equal zero) c then None
-                      else if Field.Constant.(equal one) c then
-                        Some (lagrange ~domain srs i)
-                      else
-                        Some
-                          (scaled_lagrange ~domain
-                             (Inner_curve.Constant.Scalar.project
-                                (Field.Constant.unpack c) )
-                             srs i ) )
+                        else if Field.Constant.(equal one) c then
+                          Some (lagrange ~domain srs i)
+                        else
+                          Some
+                            (scaled_lagrange ~domain
+                               (Inner_curve.Constant.Scalar.project
+                                  (Field.Constant.unpack c) )
+                               srs i ) )
                 | `Field x ->
                     Second (i, x) )
           in
@@ -930,7 +921,7 @@ struct
                         | `Cond_add _ ->
                             None
                         | `Add_with_correction (_, chunks) ->
-                            Some (Array.map ~f:snd chunks) ) )
+                            Some (Array.map ~f:snd chunks) ))
                       ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None)) )
               in
               with_label __LOC__ (fun () ->
@@ -1480,7 +1471,7 @@ struct
 
   let shift2 =
     Shifted_value.Type2.Shift.(
-      map ~f:Field.constant (create (module Field.Constant)))
+      map ~f:Field.constant (create (module Field.Constant)) )
 
   let map_plonk_to_field plonk =
     Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
@@ -1690,12 +1681,12 @@ struct
               let a =
                 Evals.In_circuit.to_list e
                 |> List.map ~f:(function
-                     | Plonkish_prelude.Opt.Nothing ->
-                         [||]
-                     | Just a ->
-                         Array.map a ~f:Pickles_types.Opt.just
-                     | Maybe (b, a) ->
-                         Array.map a ~f:(Pickles_types.Opt.maybe b) )
+                  | Plonkish_prelude.Opt.Nothing ->
+                      [||]
+                  | Just a ->
+                      Array.map a ~f:Pickles_types.Opt.just
+                  | Maybe (b, a) ->
+                      Array.map a ~f:(Pickles_types.Opt.maybe b) )
               in
               let sg_evals =
                 Vector.map sg_evals ~f:(fun x -> [| Pickles_types.Opt.just x |])

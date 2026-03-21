@@ -1,8 +1,8 @@
-open Core_kernel
+open Core
 
 (* Check if circuit data dumping is enabled via environment variable *)
 let should_dump_circuit_data () =
-  match Sys.getenv_opt "MINA_DUMP_CIRCUIT_DATA" with
+  match Sys.getenv "MINA_DUMP_CIRCUIT_DATA" with
   | Some "true" | Some "1" | Some "yes" ->
       true
   | _ ->
@@ -286,7 +286,7 @@ module Wrap = struct
                    Kimchi_pasta.Pallas_based_plonk.Keypair.vk_commitments vk
                ; data =
                    (let open Kimchi_bindings.Protocol.Index.Fq in
-                   { constraints = domain_d1_size pk.index })
+                    { constraints = domain_d1_size pk.index } )
                }
              in
              ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t) ;

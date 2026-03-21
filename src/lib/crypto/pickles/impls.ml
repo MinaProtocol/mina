@@ -1,5 +1,5 @@
 open Pickles_types
-open Core_kernel
+open Core
 open Import
 open Backend
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl

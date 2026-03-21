@@ -8,7 +8,6 @@
   result
   base.caml
   bignum.bigint
-  core_kernel
   base64
   digestif
   ppx_inline_test.config

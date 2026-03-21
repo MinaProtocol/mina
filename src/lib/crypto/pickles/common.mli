@@ -57,7 +57,7 @@ val group_map :
      (module Group_map.Field_intf.S_unchecked with type t = 'a)
   -> a:'a
   -> b:'a
-  -> ('a -> 'a * 'a) Core_kernel.Staged.t
+  -> ('a -> 'a * 'a) Core.Staged.t
 
 (** [bits_to_bytes bits] converts a list of booleans to a byte string.
     Each group of 8 bits is packed into a character. *)
@@ -296,7 +296,7 @@ end
     @param app_state Function to convert application state to field elements
     @param messages The messages structure containing VK, app state, and challenges *)
 val hash_messages_for_next_step_proof :
-     app_state:('a -> Kimchi_pasta.Basic.Fp.Stable.Latest.t Core_kernel.Array.t)
+     app_state:('a -> Kimchi_pasta.Basic.Fp.Stable.Latest.t Core.Array.t)
   -> ( Backend.Tock.Curve.Affine.t array
      (* the type for the verification key *)
      , 'a
