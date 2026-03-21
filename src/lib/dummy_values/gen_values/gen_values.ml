@@ -18,12 +18,12 @@ let str ~loc =
   let open E in
   [%str
     let blockchain_proof () =
-      Core_kernel.Binable.of_string
+      Core.Binable.of_string
         (module Pickles.Proof.Proofs_verified_2.Stable.Latest)
         [%e estring blockchain_proof_string]
 
     let transaction_proof () =
-      Core_kernel.Binable.of_string
+      Core.Binable.of_string
         (module Pickles.Proof.Proofs_verified_2.Stable.Latest)
         [%e estring transaction_proof_string]]
 
