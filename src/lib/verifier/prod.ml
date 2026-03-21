@@ -1,6 +1,6 @@
 (* prod.ml *)
 
-open Core_kernel
+open Core
 open Async
 open Mina_base
 open Mina_state
@@ -209,9 +209,10 @@ module Worker = struct
     end
 
     module Functions
-        (C : Rpc_parallel.Creator
-               with type worker_state := Worker_state.t
-                and type connection_state := Connection_state.t) =
+        (C :
+          Rpc_parallel.Creator
+            with type worker_state := Worker_state.t
+             and type connection_state := Connection_state.t) =
     struct
       let verify_blockchains (w : Worker_state.t) (chains : Blockchain.t list) =
         let (module M) = Worker_state.get w in
@@ -376,14 +377,15 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
       Monitor.try_with ~here:[%here] ~name:"Verifier RPC worker" ~run:`Now
         ~rest:
           (`Call
-            (fun exn ->
-              let err = Error.of_exn ~backtrace:`Get exn in
-              [%log error] "Error from verifier worker $err"
-                ~metadata:[ ("err", Error_json.error_to_yojson err) ] ) )
+             (fun exn ->
+               let err = Error.of_exn ~backtrace:`Get exn in
+               [%log error] "Error from verifier worker $err"
+                 ~metadata:[ ("err", Error_json.error_to_yojson err) ] ) )
         (fun () ->
           Worker.spawn_in_foreground_exn
-            ~connection_timeout:(Time.Span.of_min 1.) ~on_failure
-            ~shutdown_on:Connection_closed ~connection_state_init_arg:()
+            ~connection_timeout:(Time_float.Span.of_min 1.)
+            ~on_failure ~shutdown_on:Connection_closed
+            ~connection_state_init_arg:()
             { conf_dir
             ; enable_internal_tracing
             ; internal_trace_filename
@@ -456,7 +458,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
           (* If we don't hear back that the process has died after 10 seconds,
              begin creating a new process anyway.
           *)
-          (let%map () = after (Time.Span.of_sec 10.) in
+          (let%map () = after (Time_float.Span.of_sec 10.) in
            Ivar.fill_if_empty create_worker_trigger () ) ;
         let () =
           match e with
@@ -473,7 +475,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
                     ~metadata:[ ("exn", Error_json.error_to_yojson err) ]
               | _ ->
                   () ) ;
-              match Signal.send Signal.kill (`Pid pid) with
+              match Signal_unix.send Signal.kill (`Pid pid) with
               | `No_such_process ->
                   [%log info] "verifier failed to get sigkill (no such process)"
                     ~metadata:[ ("verifier_pid", `Int (Pid.to_int pid)) ] ;
@@ -515,7 +517,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
                    "Failed to create a new verifier process: $err. Retrying..."
                    ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
                  (* Wait 5s before retrying. *)
-                 let%bind () = after Time.Span.(of_sec 5.) in
+                 let%bind () = after Time_float.Span.(of_sec 5.) in
                  try_create_worker ()
            in
            try_create_worker () ) )
@@ -524,7 +526,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
   { worker = worker_ref; logger }
 
 let with_retry ~logger f =
-  let pause = Time.Span.of_sec 5. in
+  let pause = Time_float.Span.of_sec 5. in
   let rec go attempts_remaining =
     [%log trace] "Verifier trying with $attempts_remaining"
       ~metadata:[ ("attempts_remaining", `Int attempts_remaining) ] ;
@@ -556,7 +558,7 @@ let verify_blockchain_snarks { worker; logger } chains =
                 worker
           in
           Deferred.any
-            [ ( after (Time.Span.of_min 3.)
+            [ ( after (Time_float.Span.of_min 3.)
               >>| fun _ ->
               Or_error.return
               @@ `Stop (Error.of_string "verify_blockchain_snarks timeout") )
@@ -651,8 +653,8 @@ let verify_commands_impl { worker; logger } commands =
       Worker.Connection.run connection ~f:Worker.functions.verify_commands
         ~arg:commands_serialized
       |> Deferred.Or_error.map ~f:(fun results ->
-             let results = finalize_verification_results commands results in
-             `Continue results ) )
+          let results = finalize_verification_results commands results in
+          `Continue results ) )
 
 let verify_commands t ts =
   let logger = t.logger in
