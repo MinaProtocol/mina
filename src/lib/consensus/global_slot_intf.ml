@@ -1,5 +1,5 @@
 module type Full = sig
-  open Core_kernel
+  open Core
 
   module Poly : sig
     [%%versioned:

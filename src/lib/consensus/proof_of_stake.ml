@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 open Signed
 open Unsigned
 open Currency
@@ -8,9 +8,7 @@ open Signature_lib
 open Snark_params
 open Num_util
 module Root_ledger = Mina_ledger.Root
-
 module Segment_id = Mina_numbers.Nat.Make32 ()
-
 module Wire_types = Mina_wire_types.Consensus_proof_of_stake
 
 module Make_sig (A : Wire_types.Types.S) = struct
@@ -51,25 +49,25 @@ module Make_str (A : Wire_types.Concrete) = struct
           Option.is_some acct.delegate
           (* Only default tokens may delegate. *)
           && Token_id.equal acct.token_id Token_id.default
-          && Public_key.Compressed.Set.mem keys (Option.value_exn acct.delegate)
+          && Set.mem keys (Option.value_exn acct.delegate)
         then
-          Public_key.Compressed.Table.update outer_table
-            (Option.value_exn acct.delegate) ~f:(function
+          Hashtbl.update outer_table (Option.value_exn acct.delegate)
+            ~f:(function
             | None ->
                 Account.Index.Table.of_alist_exn [ (i, acct) ]
             | Some table ->
-                Account.Index.Table.add_exn table ~key:i ~data:acct ;
+                Hashtbl.add_exn table ~key:i ~data:acct ;
                 table ) ) ;
     (* TODO: this metric tracking currently assumes that the result of
        compute_delegatee_table is called with the full set of block production
        keypairs every time the set changes, which is true right now, but this
        should be control flow should be refactored to make this clearer *)
     let num_delegators =
-      Public_key.Compressed.Table.fold outer_table ~init:0
-        ~f:(fun ~key:_ ~data sum -> sum + Account.Index.Table.length data)
+      Hashtbl.fold outer_table ~init:0 ~f:(fun ~key:_ ~data sum ->
+          sum + Hashtbl.length data )
     in
     Mina_metrics.Gauge.set Mina_metrics.Consensus.staking_keypairs
-      (Float.of_int @@ Public_key.Compressed.Set.length keys) ;
+      (Float.of_int @@ Set.length keys) ;
     Mina_metrics.Gauge.set Mina_metrics.Consensus.stake_delegators
       (Float.of_int num_delegators) ;
     outer_table
@@ -78,7 +76,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     O1trace.sync_thread "compute_delegatee_table_ledger_root" (fun () ->
         compute_delegatee_table keys ~iter_accounts:(fun f ->
             Mina_ledger.Ledger.Any_ledger.M.iteri
-              (Root_ledger.as_unmasked ledger) ~f:(fun i acct -> f i acct) ) )
+              (Root_ledger.as_unmasked ledger) ~f:(fun i acct -> f i acct ) ) )
 
   let compute_delegatee_table_ledger_any keys ledger =
     O1trace.sync_thread "compute_delegatee_table_ledger_any" (fun () ->
@@ -163,7 +161,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           uint32_of_int64
           @@ Int64.Infix.(
                Time.Span.to_ms time_since_epoch
-               / Time.Span.to_ms constants.slot_duration_ms)
+               / Time.Span.to_ms constants.slot_duration_ms )
         in
         (epoch, slot)
     end
@@ -318,8 +316,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               Public_key.Compressed.Table.t
           }
 
-        let delegators t key =
-          Public_key.Compressed.Table.find t.delegatee_table key
+        let delegators t key = Hashtbl.find t.delegatee_table key
 
         let to_yojson { ledger; delegatee_table } =
           `Assoc
@@ -330,13 +327,13 @@ module Make_str (A : Wire_types.Concrete) = struct
               , `Assoc
                   ( Hashtbl.to_alist delegatee_table
                   |> List.map ~f:(fun (key, delegators) ->
-                         ( Public_key.Compressed.to_string key
-                         , `Assoc
-                             ( Hashtbl.to_alist delegators
-                             |> List.map ~f:(fun (addr, account) ->
-                                    ( Int.to_string addr
-                                    , Mina_base.Account.to_yojson account ) ) )
-                         ) ) ) )
+                      ( Public_key.Compressed.to_string key
+                      , `Assoc
+                          ( Hashtbl.to_alist delegators
+                          |> List.map ~f:(fun (addr, account) ->
+                              ( Int.to_string addr
+                              , Mina_base.Account.to_yojson account ) ) ) ) ) )
+              )
             ]
 
         let ledger t = t.ledger
@@ -372,12 +369,10 @@ module Make_str (A : Wire_types.Concrete) = struct
               , [%to_yojson: Snapshot.t] t.next_epoch_snapshot )
             ; ( "last_checked_slot_and_epoch"
               , `Assoc
-                  ( Public_key.Compressed.Table.to_alist
-                      t.last_checked_slot_and_epoch
+                  ( Hashtbl.to_alist t.last_checked_slot_and_epoch
                   |> List.map ~f:(fun (key, epoch_and_slot) ->
-                         ( Public_key.Compressed.to_string key
-                         , [%to_yojson: Epoch.t * Slot.t] epoch_and_slot ) ) )
-              )
+                      ( Public_key.Compressed.to_string key
+                      , [%to_yojson: Epoch.t * Slot.t] epoch_and_slot ) ) ) )
             ]
       end
 
@@ -405,16 +400,16 @@ module Make_str (A : Wire_types.Concrete) = struct
         !local_state.last_epoch_delegatee_table
 
       let current_block_production_keys t =
-        Public_key.Compressed.Table.keys !t.Data.last_checked_slot_and_epoch
+        Hashtbl.keys !t.Data.last_checked_slot_and_epoch
         |> Public_key.Compressed.Set.of_list
 
       let make_last_checked_slot_and_epoch_table old_table new_keys ~default =
-        let module Set = Public_key.Compressed.Set in
-        let module Table = Public_key.Compressed.Table in
-        let last_checked_slot_and_epoch = Table.create () in
+        let last_checked_slot_and_epoch =
+          Public_key.Compressed.Table.create ()
+        in
         Set.iter new_keys ~f:(fun pk ->
-            let data = Option.value (Table.find old_table pk) ~default in
-            Table.add_exn last_checked_slot_and_epoch ~key:pk ~data ) ;
+            let data = Option.value (Hashtbl.find old_table pk) ~default in
+            Hashtbl.add_exn last_checked_slot_and_epoch ~key:pk ~data ) ;
         last_checked_slot_and_epoch
 
       let epoch_ledger_uuids_to_yojson
@@ -434,7 +429,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Result.(
             map_error
               (try_with (fun () -> Uuid.of_string str))
-              ~f:(fun ex -> Exn.to_string ex))
+              ~f:(fun ex -> Exn.to_string ex) )
         in
         let%bind staking = json |> member "staking" |> to_string |> uuid in
         let%bind next = json |> member "next" |> to_string |> uuid in
@@ -484,10 +479,14 @@ module Make_str (A : Wire_types.Concrete) = struct
         let ledger_config uuid =
           Root_ledger.Config.(
             with_directory ~backing_type:epoch_ledger_backing_type
-              ~directory_name:(epoch_ledger_location ^ Uuid.to_string uuid))
+              ~directory_name:(epoch_ledger_location ^ Uuid.to_string uuid) )
         in
         let epoch_ledger_uuids =
-          if Sys.file_exists epoch_ledger_uuids_location then (
+          if
+            [%equal: [ `No | `Yes | `Unknown ]]
+              (Sys_unix.file_exists epoch_ledger_uuids_location)
+              `Yes
+          then (
             let epoch_ledger_uuids =
               match
                 epoch_ledger_uuids_from_file epoch_ledger_uuids_location
@@ -594,7 +593,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                    in
                    ( epoch
                    , UInt32.(
-                       if compare slot zero > 0 then sub slot one else slot) )
+                       if compare slot zero > 0 then sub slot one else slot ) )
                   )
           ; last_epoch_delegatee_table = None
           ; epoch_ledger_uuids = old.epoch_ledger_uuids
@@ -696,7 +695,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               make_checked (fun () ->
                   Token_id.(
                     Checked.Assert.equal account.token_id
-                      (Checked.constant default)) ) )
+                      (Checked.constant default) ) ) )
         in
         let%bind () =
           [%with_label_ "Block stake winner matches account pk"] (fun () ->
@@ -796,7 +795,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             Snarky_backendless.Request.Handler.(
               push
                 (push fail (create_single pending_coinbase_handler))
-                (create_single ledger_handler))
+                (create_single ledger_handler) )
           in
           fun (With { request; respond }) ->
             match request with
@@ -1200,7 +1199,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Global_sub_window.(
             add prev_global_sub_window
               (constant constants.sub_windows_per_window)
-            >= next_global_sub_window)
+            >= next_global_sub_window )
         in
 
         (* Compute the current window (equivalent to ring-shifting)
@@ -1289,7 +1288,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               let%bind x =
                 add prev_global_sub_window constants.sub_windows_per_window
               in
-              x >= next_global_sub_window)
+              x >= next_global_sub_window )
           in
           let if_ cond ~then_ ~else_ =
             let%bind cond = cond and then_ = then_ and else_ = else_ in
@@ -1299,11 +1298,11 @@ module Make_str (A : Wire_types.Concrete) = struct
             Checked.List.mapi prev_sub_window_densities ~f:(fun i density ->
                 let%bind gt_prev_sub_window =
                   Sub_window.Checked.(
-                    constant (UInt32.of_int i) > prev_relative_sub_window)
+                    constant (UInt32.of_int i) > prev_relative_sub_window )
                 in
                 let%bind lt_next_sub_window =
                   Sub_window.Checked.(
-                    constant (UInt32.of_int i) < next_relative_sub_window)
+                    constant (UInt32.of_int i) < next_relative_sub_window )
                 in
                 let%bind within_range =
                   Sub_window.Checked.(
@@ -1316,7 +1315,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     if_
                       (prev_relative_sub_window < next_relative_sub_window)
                       ~then_:Boolean.(gt_prev_sub_window &&& lt_next_sub_window)
-                      ~else_:Boolean.(gt_prev_sub_window ||| lt_next_sub_window))
+                      ~else_:Boolean.(gt_prev_sub_window ||| lt_next_sub_window) )
                 in
                 if_
                   (Checked.return same_sub_window)
@@ -1348,7 +1347,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             Checked.List.mapi current_sub_window_densities ~f:(fun i density ->
                 let%bind is_next_sub_window =
                   Sub_window.Checked.(
-                    constant (UInt32.of_int i) = next_relative_sub_window)
+                    constant (UInt32.of_int i) = next_relative_sub_window )
                 in
                 if_
                   (Checked.return is_next_sub_window)
@@ -1384,7 +1383,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 to_int
                 @@ min (succ constants.sub_windows_per_window)
                 @@ Global_sub_window.sub next_global_sub_window
-                     prev_global_sub_window)
+                     prev_global_sub_window )
             in
             let n = Array.length prev_sub_window_densities in
             let current_sub_window_densities =
@@ -1480,7 +1479,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let gen_length =
             Quickcheck.Generator.union
             @@ List.init (Length.to_int constants.slots_per_sub_window)
-                 ~f:(fun n -> Quickcheck.Generator.return @@ Length.of_int n)
+                 ~f:(fun n -> Quickcheck.Generator.return @@ Length.of_int n )
 
           let gen_min_window_density =
             let open Quickcheck.Generator in
@@ -1509,11 +1508,11 @@ module Make_str (A : Wire_types.Concrete) = struct
                 , prev_sub_window_densities
                 , prev_min_window_density )
               ~f:(fun
-                   ( prev_global_slot
-                   , prev_sub_window_densities
-                   , prev_min_window_density )
-                   next_global_slot
-                 ->
+                  ( prev_global_slot
+                  , prev_sub_window_densities
+                  , prev_min_window_density )
+                  next_global_slot
+                ->
                 let min_window_density, sub_window_densities =
                   f ~constants ~prev_global_slot ~next_global_slot
                     ~prev_sub_window_densities ~prev_min_window_density
@@ -1531,11 +1530,11 @@ module Make_str (A : Wire_types.Concrete) = struct
                 , prev_sub_window_densities
                 , prev_min_window_density )
               ~f:(fun
-                   ( prev_global_slot
-                   , prev_sub_window_densities
-                   , prev_min_window_density )
-                   next_global_slot
-                 ->
+                  ( prev_global_slot
+                  , prev_sub_window_densities
+                  , prev_min_window_density )
+                  next_global_slot
+                ->
                 let%bind min_window_density, sub_window_densities =
                   f ~constants ~prev_global_slot ~next_global_slot
                     ~prev_sub_window_densities ~prev_min_window_density
@@ -1543,13 +1542,14 @@ module Make_str (A : Wire_types.Concrete) = struct
                 return
                   (next_global_slot, sub_window_densities, min_window_density) )
 
-          let%test_unit "the actual implementation is equivalent to the \
-                         reference implementation" =
+          let%test_unit
+              "the actual implementation is equivalent to the reference \
+               implementation" =
             Quickcheck.test ~trials:100 gen
               ~f:(fun
-                   ( ((prev_global_slot : Global_slot.t), next_global_slots)
-                   , (prev_min_window_density, prev_sub_window_densities) )
-                 ->
+                  ( ((prev_global_slot : Global_slot.t), next_global_slots)
+                  , (prev_min_window_density, prev_sub_window_densities) )
+                ->
                 let _, _, min_window_density1 =
                   update_several_times
                     ~f:(update_min_window_density ~incr_window:true)
@@ -1568,8 +1568,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                 in
                 assert (Length.(equal min_window_density1 min_window_density2)) )
 
-          let%test_unit "Inside snark computation is equivalent to outside \
-                         snark computation" =
+          let%test_unit
+              "Inside snark computation is equivalent to outside snark \
+               computation" =
             Quickcheck.test ~trials:100 gen
               ~f:(fun (slots, min_window_densities) ->
                 Test_util.test_equal
@@ -1826,7 +1827,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         UInt32.Infix.(
           ( Mina_numbers.Global_slot_since_hard_fork.to_uint32
           @@ Global_slot.slot_number slot )
-          / constants.checkpoint_window_size_in_slots)
+          / constants.checkpoint_window_size_in_slots )
 
       let same_checkpoint_window_unchecked ~constants slot1 slot2 =
         UInt32.equal
@@ -1866,7 +1867,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       current global slot %{sexp: Global_slot.t}"
                     next_global_slot
                     previous_consensus_state.curr_global_slot_since_hard_fork )
-               ~f:(fun diff -> Ok diff)
+               ~f:(fun diff -> Ok diff )
         in
         let%map total_currency =
           let total, `Overflow overflow =
@@ -1882,10 +1883,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         and () =
           if
             Consensus_transition.(
-              equal consensus_transition Consensus_transition.genesis)
+              equal consensus_transition Consensus_transition.genesis )
             || Global_slot.(
                  previous_consensus_state.curr_global_slot_since_hard_fork
-                 < next_global_slot)
+                 < next_global_slot )
           then Ok ()
           else
             Or_error.errorf
@@ -1952,7 +1953,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Run.Field.(
             Slot.Checked.to_field slot1
             - Slot.Checked.to_field r1
-            + Length.Checked.to_field checkpoint_window_size_in_slots)
+            + Length.Checked.to_field checkpoint_window_size_in_slots )
         in
         Slot.Checked.( < )
           (Global_slot.slot_number slot2)
@@ -2022,7 +2023,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~constraint_constants ~constants : Value.t =
         let staking_seed =
           Option.value_map genesis_epoch_data ~default:Epoch_seed.initial
-            ~f:(fun data -> data.staking.seed)
+            ~f:(fun data -> data.staking.seed )
         in
         let producer_vrf_result =
           let _, sk = Vrf.Precomputed.genesis_winner in
@@ -2060,7 +2061,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let is_genesis_state (t : Value.t) =
         Mina_numbers.Global_slot_since_hard_fork.(
           equal zero
-            (Global_slot.slot_number t.curr_global_slot_since_hard_fork))
+            (Global_slot.slot_number t.curr_global_slot_since_hard_fork) )
 
       let is_genesis (global_slot : Global_slot.Checked.t) =
         let open Mina_numbers.Global_slot_since_hard_fork in
@@ -2145,10 +2146,11 @@ module Make_str (A : Wire_types.Concrete) = struct
           exists Public_key.Compressed.typ
             ~request:As_prover.(return Vrf.Coinbase_receiver_pk)
         in
-        let%bind ( threshold_satisfied
-                 , vrf_result
-                 , truncated_vrf_result
-                 , winner_account ) =
+        let%bind
+            ( threshold_satisfied
+            , vrf_result
+            , truncated_vrf_result
+            , winner_account ) =
           let%bind (module M) = Inner_curve.Checked.Shifted.create () in
           Vrf.Checked.check ~constraint_constants
             (module M)
@@ -2166,7 +2168,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let%bind () =
           [%with_label_ "Total currency is greater than or equal to zero"]
-            (fun () -> Boolean.Assert.is_true (Boolean.not overflow))
+            (fun () -> Boolean.Assert.is_true (Boolean.not overflow) )
         in
         let%bind has_ancestor_in_same_checkpoint_window =
           same_checkpoint_window ~constants ~prev:prev_global_slot
@@ -2381,7 +2383,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Snarky_backendless.Request.Handler.(
             push
               (push fail (create_single pending_coinbase_handler))
-              (create_single ledger_handler))
+              (create_single ledger_handler) )
         in
         fun (With { request; respond }) ->
           match request with
@@ -2606,7 +2608,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                    Ledger_hash.equal
                      (Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
                      (Local_state.Snapshot.Ledger_snapshot.merkle_root
-                        !local_state.next_epoch_snapshot.ledger ))
+                        !local_state.next_epoch_snapshot.ledger ) )
             then (
               Local_state.Snapshot.Ledger_snapshot.remove
                 !local_state.staking_epoch_snapshot.ledger
@@ -2671,7 +2673,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               glue_sync_ledger ~preferred:[] query_reader response_writer ;
               match%bind
                 Mina_ledger.Sync_ledger.Root.fetch sync_ledger
-                  target_ledger_hash ~data:() ~equal:(fun () () -> true)
+                  target_ledger_hash ~data:() ~equal:(fun () () -> true )
               with
               | `Ok ledger ->
                   [%log info]
@@ -2690,23 +2692,23 @@ module Make_str (A : Wire_types.Concrete) = struct
           match requested_syncs with
           | One required_sync ->
               let open Async.Deferred.Let_syntax in
-              let start = Core.Time.now () in
+              let start = Time_float.now () in
               let%map result = sync required_sync in
               let { snapshot_id; _ } = required_sync in
               ( match snapshot_id with
               | Staking_epoch_snapshot ->
                   Mina_metrics.(
                     Counter.inc Bootstrap.staking_epoch_ledger_sync_ms
-                      Core.Time.(diff (now ()) start |> Span.to_ms))
+                      Time_float.(diff (now ()) start |> Span.to_ms) )
               | Next_epoch_snapshot ->
                   Mina_metrics.(
                     Counter.inc Bootstrap.next_epoch_ledger_sync_ms
-                      Core.Time.(diff (now ()) start |> Span.to_ms)) ) ;
+                      Time_float.(diff (now ()) start |> Span.to_ms) ) ) ;
               result
           | Both { staking; next } ->
               (*Sync staking ledger before syncing the next ledger*)
               let open Deferred.Or_error.Let_syntax in
-              let start = Core.Time.now () in
+              let start = Time_float.now () in
               let%bind () =
                 sync
                   { snapshot_id = Staking_epoch_snapshot
@@ -2715,14 +2717,14 @@ module Make_str (A : Wire_types.Concrete) = struct
               in
               Mina_metrics.(
                 Counter.inc Bootstrap.staking_epoch_ledger_sync_ms
-                  Core.Time.(diff (now ()) start |> Span.to_ms)) ;
-              let start = Core.Time.now () in
+                  Time_float.(diff (now ()) start |> Span.to_ms) ) ;
+              let start = Time_float.now () in
               let%map () =
                 sync { snapshot_id = Next_epoch_snapshot; expected_root = next }
               in
               Mina_metrics.(
                 Counter.inc Bootstrap.next_epoch_ledger_sync_ms
-                  Core.Time.(diff (now ()) start |> Span.to_ms)) )
+                  Time_float.(diff (now ()) start |> Span.to_ms) ) )
 
     let received_within_window ~constants (epoch, slot) ~time_received =
       let open Int64 in
@@ -2731,7 +2733,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let time_received =
         Time.(
           of_span_since_epoch
-            (Span.of_ms (Mina_stdlib.Unix_timestamp.to_int64 time_received)))
+            (Span.of_ms (Mina_stdlib.Unix_timestamp.to_int64 time_received)) )
       in
       let slot_diff =
         Epoch.diff_in_slots ~constants
@@ -3170,18 +3172,16 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     module Make_state_hooks
         (Blockchain_state : Intf.Blockchain_state)
-        (Protocol_state : Intf.Protocol_state
-                            with type blockchain_state :=
-                              Blockchain_state.Value.t
-                             and type blockchain_state_var :=
-                              Blockchain_state.var
-                             and type consensus_state := Consensus_state.Value.t
-                             and type consensus_state_var := Consensus_state.var)
-        (Snark_transition : Intf.Snark_transition
-                              with type blockchain_state_var :=
-                                Blockchain_state.var
-                               and type consensus_transition_var :=
-                                Consensus_transition.var) :
+        (Protocol_state :
+          Intf.Protocol_state
+            with type blockchain_state := Blockchain_state.Value.t
+             and type blockchain_state_var := Blockchain_state.var
+             and type consensus_state := Consensus_state.Value.t
+             and type consensus_state_var := Consensus_state.var)
+        (Snark_transition :
+          Intf.Snark_transition
+            with type blockchain_state_var := Blockchain_state.var
+             and type consensus_transition_var := Consensus_transition.var) :
       State_hooks_intf
         with type blockchain_state := Blockchain_state.Value.t
          and type protocol_state := Protocol_state.Value.t
@@ -3310,8 +3310,11 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%map producer_vrf_result = Vrf.Output.gen in
           fun ~(previous_protocol_state :
                  Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
-                 ) ~(snarked_ledger_hash : Mina_base.Frozen_ledger_hash.t)
-              ~coinbase_receiver ~supercharge_coinbase ->
+                 )
+            ~(snarked_ledger_hash : Mina_base.Frozen_ledger_hash.t)
+            ~coinbase_receiver
+            ~supercharge_coinbase
+          ->
             let prev =
               Protocol_state.consensus_state
                 (With_hash.data previous_protocol_state)
@@ -3319,7 +3322,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let blockchain_length = Length.succ prev.blockchain_length in
             let curr_global_slot_since_hard_fork =
               Global_slot.(
-                prev.curr_global_slot_since_hard_fork + slot_advancement)
+                prev.curr_global_slot_since_hard_fork + slot_advancement )
             in
             let global_slot_since_genesis =
               Mina_numbers.Global_slot_since_genesis.add
@@ -3434,14 +3437,14 @@ module Make_str (A : Wire_types.Concrete) = struct
             assert (
               Mina_numbers.Global_slot_since_genesis.(
                 equal fork.global_slot_since_genesis
-                  previous_consensus_state.global_slot_since_genesis) ) ;
+                  previous_consensus_state.global_slot_since_genesis ) ) ;
             assert (
               Mina_numbers.Length.(
                 equal
                   (succ fork.blockchain_length)
-                  previous_consensus_state.blockchain_length) ) ) ;
+                  previous_consensus_state.blockchain_length ) ) ) ;
         let global_slot =
-          Core_kernel.Time.now () |> Time.of_time
+          Time_float.now () |> Time.of_time
           |> Epoch_and_slot.of_time_exn ~constants
           |> Global_slot.of_epoch_and_slot ~constants
         in
@@ -3515,12 +3518,12 @@ module Make_str (A : Wire_types.Concrete) = struct
               Mina_numbers.Global_slot_since_genesis.(
                 equal
                   (add fork.global_slot_since_genesis slot_diff)
-                  next_consensus_state.global_slot_since_genesis) ) ;
+                  next_consensus_state.global_slot_since_genesis ) ) ;
             assert (
               Mina_numbers.Length.(
                 equal
                   (succ (succ fork.blockchain_length))
-                  next_consensus_state.blockchain_length) ) ) ;
+                  next_consensus_state.blockchain_length ) ) ) ;
         (* build pieces needed to apply "update_var" *)
         let checked_computation =
           let open Snark_params.Tick in
@@ -3593,15 +3596,15 @@ module Make_str (A : Wire_types.Concrete) = struct
           Or_error.ok_exn @@ Snark_params.Tick.run_and_check checked_computation
         in
         let diff =
-          Sexp_diff_kernel.Algo.diff
+          Sexp_diff.Algo.diff
             ~original:(Value.sexp_of_t checked_value)
             ~updated:(Value.sexp_of_t next_consensus_state)
             ()
         in
         if not (Value.equal checked_value next_consensus_state) then (
           eprintf "Different states:\n%s\n%!"
-            (Sexp_diff_kernel.Display.display_with_ansi_colors
-               (Sexp_diff_kernel.Display.Display_options.create
+            (Sexp_diff.Display.display_with_ansi_colors
+               (Sexp_diff.Display.Display_options.create
                   ~collapse_threshold:1000 Two_column )
                diff ) ;
           failwith "Test failed" )
@@ -3610,8 +3613,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           =
         test_update constraint_constants
 
-      let%test_unit "update, update_var agree starting from same genesis state \
-                     after fork" =
+      let%test_unit
+          "update, update_var agree starting from same genesis state after fork"
+          =
         let constraint_constants_with_fork =
           let fork_constants =
             Some
@@ -3619,8 +3623,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Result.ok_or_failwith
                     (State_hash.of_yojson
                        (`String
-                         "3NL3bc213VQEFx6XTLbc3HxHqHH9ANbhHxRxSnBcRzXcKgeFA6TY"
-                         ) )
+                          "3NL3bc213VQEFx6XTLbc3HxHqHH9ANbhHxRxSnBcRzXcKgeFA6TY"
+                       ) )
               ; blockchain_length = Mina_numbers.Length.of_int 100
               ; global_slot_since_genesis =
                   Mina_numbers.Global_slot_since_genesis.of_int 200
@@ -3785,7 +3789,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Amount.(
             genesis_currency
             + of_nanomina_int_exn
-                (height * to_nanomina_int constraint_constants.coinbase_amount))
+                (height * to_nanomina_int constraint_constants.coinbase_amount) )
 
       (* TODO: Deprecate this in favor of just returning a constant in the monad from the outside. *)
       let opt_gen opt ~gen =
@@ -4296,16 +4300,18 @@ module Make_str (A : Wire_types.Concrete) = struct
         assert_hashed_consensus_state_pair ~assertion:"do not trigger selection"
           ~f:is_not_selected
 
-      let%test_unit "generator sanity check: equal states are always in short \
-                     fork range" =
+      let%test_unit
+          "generator sanity check: equal states are always in short fork range"
+          =
         let constants = Lazy.force Constants.for_unit_tests in
         Quickcheck.test (gen_spot ()) ~f:(fun state ->
             assert_consensus_state_pair (state, state)
               ~assertion:"within long range" ~f:(fun (a, b) ->
                 Hooks.is_short_range a b ~constants ) )
 
-      let%test_unit "generator sanity check: gen_spot_pair_short_aligned \
-                     always generates pairs of states in short fork range" =
+      let%test_unit
+          "generator sanity check: gen_spot_pair_short_aligned always \
+           generates pairs of states in short fork range" =
         let constants = Lazy.force Constants.for_unit_tests in
         Quickcheck.test (gen_spot_pair_short_aligned ()) ~f:(fun (a, b) ->
             assert_consensus_state_pair
@@ -4313,8 +4319,9 @@ module Make_str (A : Wire_types.Concrete) = struct
               ~assertion:"within short range"
               ~f:(fun (a, b) -> Hooks.is_short_range a b ~constants) )
 
-      let%test_unit "generator sanity check: gen_spot_pair_short_misaligned \
-                     always generates pairs of states in short fork range" =
+      let%test_unit
+          "generator sanity check: gen_spot_pair_short_misaligned always \
+           generates pairs of states in short fork range" =
         let constants = Lazy.force Constants.for_unit_tests in
         Quickcheck.test (gen_spot_pair_short_misaligned ()) ~f:(fun (a, b) ->
             assert_consensus_state_pair
@@ -4322,8 +4329,9 @@ module Make_str (A : Wire_types.Concrete) = struct
               ~assertion:"within short range"
               ~f:(fun (a, b) -> Hooks.is_short_range a b ~constants) )
 
-      let%test_unit "generator sanity check: gen_spot_pair_long always \
-                     generates pairs of states in long fork range" =
+      let%test_unit
+          "generator sanity check: gen_spot_pair_long always generates pairs \
+           of states in long fork range" =
         let constants = Lazy.force Constants.for_unit_tests in
         Quickcheck.test gen_spot_pair_long ~f:(fun (a, b) ->
             assert_consensus_state_pair
@@ -4351,22 +4359,23 @@ module Make_str (A : Wire_types.Concrete) = struct
              () )
           ~f:assert_selected
 
-      let%test_unit "selection case: aligned checkpoints & equal lengths & \
-                     different vrfs" =
+      let%test_unit
+          "selection case: aligned checkpoints & equal lengths & different vrfs"
+          =
         Quickcheck.test
           (gen_spot_pair_short_aligned ~blockchain_length_relativity:`Equal
              ~vrf_output_relativity:`Ascending () )
           ~f:assert_selected
 
-      let%test_unit "selection case: aligned checkpoints & equal lengths & \
-                     equal vrfs & different hashes" =
+      let%test_unit
+          "selection case: aligned checkpoints & equal lengths & equal vrfs & \
+           different hashes" =
         Quickcheck.test
           (gen_spot_pair_short_aligned ~blockchain_length_relativity:`Equal
-             ~vrf_output_relativity:`Equal () )
-          ~f:(fun (a, b) ->
+             ~vrf_output_relativity:`Equal () ) ~f:(fun (a, b) ->
             if
               State_hash.(
-                With_state_hashes.state_hash b > With_state_hashes.state_hash a)
+                With_state_hashes.state_hash b > With_state_hashes.state_hash a )
             then assert_selected (a, b)
             else assert_selected (b, a) )
 
@@ -4380,8 +4389,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       (* TODO: This test always succeeds, but this could be a false positive as the blockchain length equality constraint
        * is broken for misaligned short forks.
        *)
-      let%test_unit "selection case: misaligned checkpoints & equal lengths & \
-                     different vrfs" =
+      let%test_unit
+          "selection case: misaligned checkpoints & equal lengths & different \
+           vrfs" =
         Quickcheck.test
           (gen_spot_pair_short_misaligned ~blockchain_length_relativity:`Equal
              ~vrf_output_relativity:`Ascending () )
@@ -4412,8 +4422,8 @@ module Make_str (A : Wire_types.Concrete) = struct
          failwith "TODO"
       *)
 
-      let%test_unit "selection invariant: candidate selections are not \
-                     commutative" =
+      let%test_unit
+          "selection invariant: candidate selections are not commutative" =
         let select existing candidate =
           Hooks.select ~context:(module Context) ~existing ~candidate
         in
