@@ -16,7 +16,7 @@
     NOTE: Expected values vary by profile (dev, devnet, lightnet, mainnet) as
     constraint counts depend on configuration parameters like ledger depth. *)
 
-open Core_kernel
+open Core
 
 (** Expected values for the blockchain-step circuit *)
 type circuit_stats =
