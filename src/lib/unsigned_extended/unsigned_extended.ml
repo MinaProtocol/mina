@@ -1,6 +1,6 @@
 (* unsigned_extended.ml *)
 
-open Core_kernel
+open Core
 include Intf
 open Snark_params
 open Tick
@@ -8,10 +8,11 @@ open Tick
 module type Unsigned_intf = Unsigned.S
 
 module Extend
-    (Unsigned : Unsigned.S) (M : sig
+    (Unsigned : Unsigned.S)
+    (M : sig
       val length : int
     end) : S with type t = Unsigned.t = struct
-  assert (M.length < Field.size_in_bits - 3)
+  assert (M.length < Field.size_in_bits - 3) ;;
 
   let length_in_bits = M.length
 
@@ -32,7 +33,7 @@ module Extend
       else
         Bignum_bigint.(
           of_int64 i64 - of_int64 Int64.min_value + of_int64 Int64.max_value
-          + one)
+          + one )
   end
 
   include T
@@ -122,7 +123,8 @@ module UInt64 = struct
         let of_binable = Unsigned.UInt64.of_int64
       end
 
-      include Binable.Of_binable (Int64_for_version_tags.Stable.V1) (M)
+      include
+        Binable.Of_binable_without_uuid (Int64_for_version_tags.Stable.V1) (M)
     end
   end]
 
@@ -195,7 +197,8 @@ module UInt32 = struct
         let of_binable = Unsigned.UInt32.of_int32
       end
 
-      include Binable.Of_binable (Int32_for_version_tags.Stable.V1) (M)
+      include
+        Binable.Of_binable_without_uuid (Int32_for_version_tags.Stable.V1) (M)
     end
   end]
 

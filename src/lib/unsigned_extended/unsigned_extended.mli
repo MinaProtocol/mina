@@ -1,4 +1,5 @@
 open Intf
+open Core
 
 type nonrec uint64 = uint64
 
