@@ -275,7 +275,7 @@ IMPORTANT: debians should be placed in _build folder
 
 2. Build docker:
 ```
-./scripts/docker/build.sh --service mina-daemon -v 3.0.0-dkijania-local-debian-build-a099fc7 --network devnet --deb-codename focal --deb-version 3.0.0-dkijania-local-debian-build-a099fc7 
+./buildkite/scripts/docker/build.sh --service mina-daemon -v 3.0.0-dkijania-local-debian-build-a099fc7 --network devnet --deb-codename focal --deb-version 3.0.0-dkijania-local-debian-build-a099fc7 
 ```
 
 Where:

@@ -623,7 +623,7 @@ define build_docker_image
 	MINA_DEB_CODENAME=$(CODENAME) \
 	KEEP_MY_TAGS_INTACT=true \
 	. ./scripts/export-git-env-vars.sh \
-	&& ./scripts/docker/build.sh \
+	&& ./buildkite/scripts/docker/build.sh \
 		--deb-codename $(CODENAME) \
 		--service $(1) \
 		--version "$$MINA_DEB_VERSION" \
@@ -639,7 +639,7 @@ endef
 .PHONY: docker-build-toolchain
 docker-build-toolchain: ## Build the toolchain to be used in CI
 	@BUILD_DIR=./_build \
-		./scripts/docker/build.sh \
+		./buildkite/scripts/docker/build.sh \
 		--deb-codename $(CODENAME) \
 		--service mina-toolchain \
 		--version mina-toolchain-$(CODENAME)-$(GITHASH)
@@ -716,7 +716,7 @@ hardfork-docker: ocaml_checks ## Generate hardfork packages
 	MINA_DEB_CODENAME=$(CODENAME) \
 	KEEP_MY_TAGS_INTACT=true \
 	. ./scripts/export-git-env-vars.sh \
-	&& ./scripts/docker/build.sh \
+	&& ./buildkite/scripts/docker/build.sh \
 		--deb-codename $(CODENAME) \
 		--service mina-daemon \
 		--version "$$MINA_DEB_VERSION" \

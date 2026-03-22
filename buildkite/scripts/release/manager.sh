@@ -495,7 +495,7 @@ function promote_and_verify_docker() {
     echo "    📦 Target version: $(calculate_docker_tag $__publish_to_docker_io $__artifact $__target_version $__codename "$__network ")"
     echo ""
     if [[ $__dry_run == 0 ]]; then
-        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/promote.sh \
+        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../docker/promote.sh \
             -q \
             -n "$__artifact" \
             -v $__artifact_full_source_version \
@@ -510,7 +510,7 @@ function promote_and_verify_docker() {
             echo "    📋 Verifying: $__artifact docker for '$__network' network and '$__codename' codename with '$__target_version' version"
             echo ""
 
-            prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
+            prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../docker/verify.sh \
                 -p "$__artifact" \
                 -v "$__target_version" \
                 -c "$__codename" \
@@ -1418,7 +1418,7 @@ function verify(){
 
                                     echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $artifact $__version $__codename "$network" "$__arch")"
 
-                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
+                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../docker/verify.sh \
                                         -p "$artifact" \
                                         -v $__version \
                                         -c "$__codename" \
@@ -1460,7 +1460,7 @@ function verify(){
                                     echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename $network "$__arch" )"
                                     echo ""
 
-                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
+                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../docker/verify.sh \
                                         -p "$artifact" \
                                         -v $__version \
                                         -c "$__codename" \
@@ -1498,7 +1498,7 @@ function verify(){
                                 if [[ $__only_debians == 0 ]]; then
                                       echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename "$network" "$__arch" )"
                                 echo ""
-                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
+                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../docker/verify.sh \
                                         -p "$artifact" \
                                         -v $__version \
                                         -c "$__codename" \

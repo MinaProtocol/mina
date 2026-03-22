@@ -97,7 +97,7 @@ let stepLabel =
 
 let generateStep =
           \(spec : ReleaseSpec.Type)
-      ->  let installBuildx = "./scripts/docker/setup_buildx.sh"
+      ->  let installBuildx = "./buildkite/scripts/docker/setup_buildx.sh"
 
           let exportMinaDebCmd =
                 "export MINA_DEB_CODENAME=${DebianVersions.lowerName
@@ -168,7 +168,7 @@ let generateStep =
                 "docker system prune --all --force --filter until=24h"
 
           let buildDockerCmd =
-                    "./scripts/docker/build.sh"
+                    "./buildkite/scripts/docker/build.sh"
                 ++  " --service ${Artifacts.dockerName spec.service}"
                 ++  " --network ${Network.lowerName spec.network}"
                 ++  " --version ${spec.version}"
@@ -192,7 +192,7 @@ let generateStep =
                            spec.docker_publish
                            spec.service
 
-                then      "./scripts/docker/release.sh"
+                then      "./buildkite/scripts/docker/release.sh"
                       ++  " --service ${Artifacts.dockerName spec.service}"
                       ++  " --version ${spec.version}"
                       ++  " --network ${Network.lowerName spec.network}"

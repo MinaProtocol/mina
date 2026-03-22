@@ -3,7 +3,7 @@
 # Verify that the Docker image for a given package and version is working correctly.
 # This script pulls the Docker image and runs a set of simplest commands (fetch help and version) 
 # to ensure that the package dependencies are correctly resolved.
-# Usage: ./scripts/docker/verify.sh -p <package> -c <codename> [-s <suffix>] [-r <repo>] [-v <version>]
+# Usage: ./buildkite/scripts/docker/verify.sh -p <package> -c <codename> [-s <suffix>] [-r <repo>] [-v <version>]
 
 set -eo pipefail
 
