@@ -55,7 +55,7 @@ for i in "${debs[@]}"; do
 done
 
 # Start aptly
-source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background --wait
+source ./buildkite/scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background --wait
 
 # Install debians
 echo "Installing mina packages: $DEBS"
@@ -69,4 +69,4 @@ $SUDO apt-get install --yes --allow-downgrades "${debs_with_version[@]}"
 
 
 # Cleaning up
-source ./scripts/debian/aptly.sh stop  --clean
+source ./buildkite/scripts/debian/aptly.sh stop  --clean

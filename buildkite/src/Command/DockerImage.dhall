@@ -118,7 +118,7 @@ let generateStep =
 
                 then  " && echo Skipping local debian repo teardown "
 
-                else  " && ./scripts/debian/aptly.sh stop"
+                else  " && ./buildkite/scripts/debian/aptly.sh stop"
 
           let suffix =
                 Extensions.joinOptionals

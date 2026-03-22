@@ -120,7 +120,7 @@ deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
   --codename "${DEB_CODENAME}" \
   "${GPG_OPTS[@]}" \
   "${DEB_NAMES}"
-) && break || (MINA_DEB_BUCKET=${BUCKET} scripts/debian/clear-s3-lockfile.sh); done
+) && break || (MINA_DEB_BUCKET=${BUCKET} buildkite/scripts/debian/clear-s3-lockfile.sh); done
 
 invalidate_cache "$BUCKET" "$DEB_CODENAME"
 

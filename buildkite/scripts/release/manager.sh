@@ -85,7 +85,7 @@ mkdir -p $DEBIAN_CACHE_FOLDER
 # imports
 ################################################################################
 # shellcheck disable=SC1090
-. $SCRIPTPATH/../../../scripts/debian/reversion-helper.sh
+. $SCRIPTPATH/../debian/reversion-helper.sh
 
 
 ################################################################################
@@ -440,7 +440,7 @@ function publish_debian() {
     echo "     📦  Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network" "$__arch")"
     if [[ $__dry_run == 0 ]]; then
         # shellcheck disable=SC2068
-        prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/publish.sh \
+        prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../debian/deb-s3-publish.sh \
             --names "$DEBIAN_CACHE_FOLDER/$__codename/${__new_artifact_name}_${__target_version}_${__arch}.deb" \
             --version $__target_version \
             --bucket $__debian_repo \
@@ -454,7 +454,7 @@ function publish_debian() {
 
             echo "     📋 Verifying: $__new_artifact_name debian to $__channel channel with $__target_version version"
 
-            prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/verify.sh \
+            prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../debian/verify.sh \
                 -p $__new_artifact_name \
                 --version $__target_version \
                 -m $__codename \
@@ -555,7 +555,7 @@ function promote_debian() {
 
     if [[ $__dry_run == 0 ]]; then
         echo "    🗃️  Promoting $__artifact debian from $__codename/$__source_version to $__codename/$__target_version"
-        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/reversion.sh \
+        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../debian/reversion.sh \
                 --deb ${__artifact_full_name} \
                 --version ${__source_version} \
                 --new-version ${__target_version} \
@@ -567,7 +567,7 @@ function promote_debian() {
         if [[ $__verify == 1 ]]; then
             echo "     📋 Verifying: $__artifact debian to $__target_channel channel with $__target_version version"
 
-            prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
+            prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../debian/verify.sh \
                 -p $__new_artifact_name \
                 --version $__target_version \
                 -m $__codename \
@@ -1376,7 +1376,7 @@ function verify(){
                             if [[ $__only_dockers == 0 ]]; then
                                     echo "     📋  Verifying: $artifact debian on $__channel channel with $__version version for $__codename codename"
 
-                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
+                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../debian/verify.sh \
                                         -p $artifact \
                                         --version $__version \
                                         -m $__codename \
@@ -1402,7 +1402,7 @@ function verify(){
                                if [[ $__only_dockers == 0 ]]; then
                                     echo "     📋  Verifying: $artifact debian on $__channel channel with $__version version for $__codename codename"
                                     
-                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
+                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../debian/verify.sh \
                                         -p $__artifact_full_name \
                                         --version $__version \
                                         -m $__codename \
@@ -1443,7 +1443,7 @@ function verify(){
                                     echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
                                     echo ""
 
-                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
+                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../debian/verify.sh \
                                         -p $__artifact_full_name \
                                         --version $__version \
                                         -m $__codename \
@@ -1484,7 +1484,7 @@ function verify(){
                               if [[ $__only_dockers == 0 ]]; then
                                 echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
                                 echo ""
-                                       prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
+                                       prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../debian/verify.sh \
                                         -p $__artifact_full_name \
                                         --version $__version \
                                         -m $__codename \

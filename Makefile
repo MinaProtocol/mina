@@ -536,7 +536,7 @@ define build_debian_package
 	DUNE_PROFILE=$(DUNE_PROFILE) \
 	MINA_DEB_CODENAME="$(CODENAME)" \
 	BRANCH_NAME="$(BRANCH_NAME)" \
-	./scripts/debian/build.sh $(1)  \
+	./buildkite/scripts/debian/build.sh $(1)  \
 		&& echo "✅ Build complete"
 endef
 
@@ -600,9 +600,9 @@ debian-download-create-legacy-hardfork: ## Download and create legacy hardfork D
 start-local-debian-repo: ## Start a local Debian repository
 	$(info 📦 Starting local Debian repository with codename $(CODENAME))
 
-	@./scripts/debian/aptly.sh stop || true
+	@./buildkite/scripts/debian/aptly.sh stop || true
 
-	@./scripts/debian/aptly.sh start \
+	@./buildkite/scripts/debian/aptly.sh start \
 		--codename $(CODENAME) \
 		--debians _build \
 		--component unstable \
@@ -632,7 +632,7 @@ define build_docker_image
 		--no-cache
 
 	$(info 📦 stopping local Debian repository)
-	@./scripts/debian/aptly.sh stop
+	@./buildkite/scripts/debian/aptly.sh stop
 endef
 
 
@@ -726,7 +726,7 @@ hardfork-docker: ocaml_checks ## Generate hardfork packages
 		--no-cache
 
 	$(info 📦 stopping local Debian repository)
-	@./scripts/debian/aptly.sh stop
+	@./buildkite/scripts/debian/aptly.sh stop
 
 ########################################
 # Generate odoc documentation

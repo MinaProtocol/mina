@@ -23,7 +23,7 @@ else
   SIGN_ARG="--sign $SIGN"
 fi
 
-source scripts/debian/publish.sh \
+source buildkite/scripts/debian/deb-s3-publish.sh \
   --names "${DOWNLOAD_FOLDER}/mina-*.deb" \
   --release $MINA_DEB_RELEASE \
   --version $MINA_DEB_VERSION \

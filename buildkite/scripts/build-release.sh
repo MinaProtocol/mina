@@ -12,7 +12,7 @@ echo " Includes mina daemon, archive-node, rosetta"
 
 
 echo "--- Prepare debian packages"
-BRANCH_NAME="$BUILDKITE_BRANCH" ./scripts/debian/build.sh "$@"
+BRANCH_NAME="$BUILDKITE_BRANCH" ./buildkite/scripts/debian/build.sh "$@"
 
 echo "--- Git diff after build is complete:"
 git diff --exit-code -- .

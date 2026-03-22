@@ -254,7 +254,7 @@ make build
 ```
 2. Build debian for mina-devnet (example for ubuntu 18.04):
 ```
-./scripts/debian/build.sh daemon_devnet
+./buildkite/scripts/debian/build.sh daemon_devnet
 ```
 
 ## Building docker locally
@@ -268,7 +268,7 @@ Steps:
 
 1. Start local debian repository
 ```
-./scripts/debian/aptly.sh start -b -c focal -d _build/ -m unstable -l -p 8081
+./buildkite/scripts/debian/aptly.sh start -b -c focal -d _build/ -m unstable -l -p 8081
 ```
 
 IMPORTANT: debians should be placed in _build folder

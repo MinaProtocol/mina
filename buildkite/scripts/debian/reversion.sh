@@ -52,7 +52,7 @@ else
 fi
 
 function rebuild_deb() {
-  source scripts/debian/reversion-helper.sh
+  source buildkite/scripts/debian/reversion-helper.sh
 
   wget https://s3.us-west-2.amazonaws.com/${REPO}/pool/${CODENAME}/m/mi/${DEB}_${VERSION}.deb
   reversion --deb ${DEB} \
@@ -66,4 +66,4 @@ function rebuild_deb() {
 }
 
 rebuild_deb
-source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}_${ARCH}.deb" --arch "${ARCH}" --version "${NEW_VERSION}" --codename "${CODENAME}" --release "${NEW_SUITE}" --bucket "${NEW_REPO}" ${SIGN_ARG}
+source buildkite/scripts/debian/deb-s3-publish.sh --names "${NEW_NAME}_${NEW_VERSION}_${ARCH}.deb" --arch "${ARCH}" --version "${NEW_VERSION}" --codename "${CODENAME}" --release "${NEW_SUITE}" --bucket "${NEW_REPO}" ${SIGN_ARG}

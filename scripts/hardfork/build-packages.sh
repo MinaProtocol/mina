@@ -89,4 +89,4 @@ echo "--- New genesis config"
 head new_config.json
 
 echo "--- Build hardfork package for Debian ${MINA_DEB_CODENAME}"
-RUNTIME_CONFIG_JSON=$PWD/new_config.json LEDGER_TARBALLS="$(echo $PWD/hardfork_ledgers/*.tar.gz)" ./scripts/debian/build.sh "$@"
+RUNTIME_CONFIG_JSON=$PWD/new_config.json LEDGER_TARBALLS="$(echo $PWD/hardfork_ledgers/*.tar.gz)" ./buildkite/scripts/debian/build.sh "$@"

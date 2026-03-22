@@ -16,4 +16,4 @@ mkdir -p $LOCAL_DEB_FOLDER
 source ./buildkite/scripts/export-git-env-vars.sh
 ./buildkite/scripts/cache/manager.sh read --root legacy/debians "$MINA_DEB_CODENAME/*" _build
 ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/*" _build
-./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background --wait
+./buildkite/scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background --wait
