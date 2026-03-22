@@ -479,7 +479,7 @@ benchmarks: ocaml_checks ## Build benchmarking tools
 .PHONY: test-coverage
 test-coverage: SHELL := /bin/bash
 test-coverage: libp2p_helper ## Run tests with coverage instrumentation
-	scripts/create_coverage_profiles.sh
+	buildkite/scripts/create_coverage_profiles.sh
 
 .PHONY: coverage-html
 coverage-html: ## Generate HTML report from coverage data
@@ -524,7 +524,7 @@ doc_diagrams: $(addsuffix .png,$(wildcard $(doc_diagram_sources))) ## Generate d
 .PHONY: export_git_env_vars
 export_git_env_vars: ## Export git environment variables for use in scripts
 	KEEP_MY_TAGS_INTACT=true \
-		./scripts/export-git-env-vars.sh
+		./buildkite/scripts/export-git-env-vars-core.sh
 
 ########################################
 # Debian packages
@@ -622,7 +622,7 @@ define build_docker_image
 	@BUILD_DIR=./_build \
 	MINA_DEB_CODENAME=$(CODENAME) \
 	KEEP_MY_TAGS_INTACT=true \
-	. ./scripts/export-git-env-vars.sh \
+	. ./buildkite/scripts/export-git-env-vars-core.sh \
 	&& ./buildkite/scripts/docker/build.sh \
 		--deb-codename $(CODENAME) \
 		--service $(1) \
@@ -715,7 +715,7 @@ hardfork-docker: ocaml_checks ## Generate hardfork packages
 	@BUILD_DIR=./_build \
 	MINA_DEB_CODENAME=$(CODENAME) \
 	KEEP_MY_TAGS_INTACT=true \
-	. ./scripts/export-git-env-vars.sh \
+	. ./buildkite/scripts/export-git-env-vars-core.sh \
 	&& ./buildkite/scripts/docker/build.sh \
 		--deb-codename $(CODENAME) \
 		--service mina-daemon \

@@ -4,7 +4,7 @@ set -eo pipefail
 
 
 # shellcheck disable=SC1091
-source ./scripts/export-git-env-vars.sh
+source ./buildkite/scripts/export-git-env-vars-core.sh
 
 PWD=$(pwd)
 

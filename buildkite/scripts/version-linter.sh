@@ -25,7 +25,7 @@ pr_branch=${BUILDKITE_BRANCH}
 release_branch=origin/$1
 
 echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} ${release_branch}"
-./scripts/version-linter.py ${pr_branch} ${base_branch} ${release_branch}
+./buildkite/scripts/version-linter.py ${pr_branch} ${base_branch} ${release_branch}
 
 echo "--- Install Mina"
 source buildkite/scripts/export-git-env-vars.sh

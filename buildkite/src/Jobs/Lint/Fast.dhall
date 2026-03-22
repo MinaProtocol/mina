@@ -15,8 +15,8 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 let commands =
-      [ Cmd.run "./scripts/lint_codeowners.sh"
-      , Cmd.run "./scripts/lint_rfcs.sh"
+      [ Cmd.run "./buildkite/scripts/lint_codeowners.sh"
+      , Cmd.run "./buildkite/scripts/lint_rfcs.sh"
       , Cmd.run "make check-snarky-submodule"
       ]
 

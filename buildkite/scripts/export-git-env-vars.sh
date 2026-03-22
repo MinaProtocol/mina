@@ -7,9 +7,9 @@ export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=bullseye}
 
 if [[ -n "$BUILDKITE_BRANCH" ]]; then
    # shellcheck disable=SC1090
-   BRANCH_NAME=${BUILDKITE_BRANCH} MINA_DEB_CODENAME=${MINA_DEB_CODENAME} source ./scripts/export-git-env-vars.sh
+   BRANCH_NAME=${BUILDKITE_BRANCH} MINA_DEB_CODENAME=${MINA_DEB_CODENAME} source ./buildkite/scripts/export-git-env-vars-core.sh
 else 
-   MINA_DEB_CODENAME=${MINA_DEB_CODENAME} source ./scripts/export-git-env-vars.sh
+   MINA_DEB_CODENAME=${MINA_DEB_CODENAME} source ./buildkite/scripts/export-git-env-vars-core.sh
 fi
 set +a
 

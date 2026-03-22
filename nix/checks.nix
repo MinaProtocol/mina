@@ -7,7 +7,7 @@ inputs: pkgs: {
     # todo: submodules :(
     buildPhase = ''
       mkdir -p src/lib/snarky
-      bash ./scripts/lint_codeowners.sh
+      bash ./buildkite/scripts/lint_codeowners.sh
     '';
     installPhase = "touch $out";
     meta.checkDescription = "CODEOWNERS file";
@@ -15,7 +15,7 @@ inputs: pkgs: {
   # todo: this check succeeds with 0 rfcs
   lint-rfcs = pkgs.runCommand "lint-rfcs" { meta.checkDescription = "RFCs"; } ''
     ln -s ${../rfcs} ./rfcs
-    bash ${../scripts/lint_rfcs.sh}
+    bash ${../buildkite/scripts/lint_rfcs.sh}
     touch $out
   '';
   # todo: ./scripts/check-snarky-submodule.sh # submodule issue

@@ -25,5 +25,5 @@ echo "--- Run fuzzy zkapp tests"
 time dune exec "${path}" --profile="${profile}" -- --timeout "${timeout}" --individual-test-timeout "${individual_test_timeout}" --seed "${RANDOM}"
 STATUS=$?
 if [ "$STATUS" -ne 0 ]; then
-  ./scripts/link-coredumps.sh && exit "$STATUS"
+  ./buildkite/scripts/link-coredumps.sh && exit "$STATUS"
 fi

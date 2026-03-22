@@ -37,7 +37,7 @@ export ERROR_ON_PROOF=true
 # only retry those tests that failed.
 echo "--- Run unit tests"
 time dune runtest "${path}" --profile="${profile}" || \
-(./scripts/link-coredumps.sh && \
+(./buildkite/scripts/link-coredumps.sh && \
  echo "--- Retrying failed unit tests" && \
  time dune runtest "${path}" --profile="${profile}" || \
- (./scripts/link-coredumps.sh && false))
+ (./buildkite/scripts/link-coredumps.sh && false))

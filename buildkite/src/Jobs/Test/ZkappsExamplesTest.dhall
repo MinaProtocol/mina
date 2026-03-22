@@ -39,7 +39,7 @@ in  Pipeline.build
           let unitDirtyWhen =
                 [ S.strictlyStart (S.contains "src")
                 , S.exactly "buildkite/src/Jobs/Test/ZkappsExamplesTest" "dhall"
-                , S.exactly "scripts/link-coredumps" "sh"
+                , S.exactly "buildkite/scripts/link-coredumps" "sh"
                 , S.exactly "buildkite/scripts/zkapps-examples-unit-tests" "sh"
                 ]
 
