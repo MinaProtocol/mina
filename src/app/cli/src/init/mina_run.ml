@@ -107,8 +107,8 @@ let start_auto_hardfork_config_generation ~logger mina =
             after (Block_time.Span.to_time_span span)
           in
           [%log info]
-            "Auto HF: reached slot_chain_end time, now waiting for best tip to reach \
-             slot_tx_end: %s"
+            "Auto HF: reached slot_chain_end time, now waiting for best tip to \
+             reach slot_tx_end: %s"
             (Mina_numbers.Global_slot_since_hard_fork.to_string slot_tx_end) ;
           let%bind () = wait_for_best_tip ~logger ~slot_tx_end mina in
           let network_id =
@@ -127,13 +127,14 @@ let start_auto_hardfork_config_generation ~logger mina =
           match result with
           | Ok () ->
               [%log info]
-                "Auto HF: successfully generated hardfork config, shutting down daemon" ;
+                "Auto HF: successfully generated hardfork config, shutting \
+                 down daemon" ;
               (* Shutdown like Stop_daemon *)
               Scheduler.yield () >>= fun () -> exit 0
           | Error e ->
               [%log error]
-                "Auto HF: failed to generate hardfork config: %s. Daemon will continue \
-                 running"
+                "Auto HF: failed to generate hardfork config: %s. Daemon will \
+                 continue running"
                 (Error.to_string_hum e) ;
               Deferred.unit )
       | _ ->
