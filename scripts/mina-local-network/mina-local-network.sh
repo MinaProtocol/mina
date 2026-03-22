@@ -803,10 +803,6 @@ if [ ! -d "${ROOT}" ]; then
   chmod -R 0700 "${ROOT}"/libp2p_keys
 fi
 
-if [ -d "${EXTRA_FILES_ROOT}" ]; then
-  cp -r "${EXTRA_FILES_ROOT}/." "${ROOT}/"
-fi
-
 printf "\n"
 echo "================================"
 printf "\n"
@@ -970,6 +966,14 @@ if ! config_mode_is_inherit "$CONFIG_MODE"; then
   mkdir -p "${NODES_FOLDER}"/snark_coordinator
   mkdir -p "${NODES_FOLDER}"/snark_workers
 fi
+
+if [ -d "${EXTRA_FILES_ROOT}" ]; then
+  cp -r "${EXTRA_FILES_ROOT}/." "${ROOT}/"
+fi
+
+echo "network directory hierarchy before spawning nodes:"
+tree "${ROOT}"
+
 
 # ----------
 
