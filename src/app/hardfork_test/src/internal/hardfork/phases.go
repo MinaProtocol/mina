@@ -24,6 +24,13 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 
 	t.Logger.Info("Supported fork method: %s", t.Config.ForkMethods)
 	extraFilesRoot, err := os.MkdirTemp("", "auto-mode-extra-files")
+	defer func() {
+		err := os.RemoveAll(extraFilesRoot)
+		if err != nil {
+			t.Logger.Error("Failed to remove temporary extra files root at %s: %v", extraFilesRoot, err)
+		}
+	}()
+
 	for _, info := range t.Config.DaemonInfos {
 		t.Logger.Info("Planning to use fork method %s on node %s", info.ForkMethod, info.Name)
 
