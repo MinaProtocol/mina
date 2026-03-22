@@ -2113,6 +2113,52 @@ let hash_messages_for_next_step_proof_circuit (inputs : Impls.Step.Field.t array
   let claimed = inputs.(90) in
   Field.Assert.equal digest claimed
 
+(* hash_messages_for_next_wrap_proof sub-circuit.
+
+   Computes the wrap proof message digest by hashing sg + expanded bp challenges.
+   Runs in the Wrap field (Fq).
+
+   For max_proofs_verified = 1, padded to 2:
+   - 1 dummy challenge vector (15 fields, absorbed into sponge)
+   - 1 real challenge vector (15 fields, absorbed into sponge)
+   - sg point (x, y) (2 fields, absorbed into sponge)
+   - Total absorbed: 32 fields
+
+   Input layout (33 fields):
+     0-14:  dummy bp challenges (WrapIPARounds = 15 expanded fields)
+     15-29: real bp challenges (WrapIPARounds = 15 expanded fields)
+     30-31: sg (x, y)
+     32:    claimed_digest
+
+   Output: asserts digest equals claimed value.
+*)
+let hash_messages_for_next_wrap_proof_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  (* Build Messages_for_next_wrap_proof from flat inputs.
+     Input layout (33 fields):
+       0-14:  expanded bp challenges vector 0 (WrapIPARounds = 15)
+       15-29: expanded bp challenges vector 1 (WrapIPARounds = 15)
+       30-31: sg (x, y)
+       32:    claimed_digest
+
+     Uses max_proofs_verified = 2 (matching MaxProofsVerified convention).
+     Both challenge vectors are circuit variables. *)
+  let chals0 = Vector.init Backend.Tock.Rounds.n ~f:(fun j -> inputs.(j)) in
+  let chals1 = Vector.init Backend.Tock.Rounds.n ~f:(fun j -> inputs.(15 + j)) in
+  let sg : Wrap_main_inputs.Inner_curve.t = (inputs.(30), inputs.(31)) in
+  let t : ( Wrap_main_inputs.Inner_curve.t
+          , ((Impls.Wrap.Field.t, Backend.Tock.Rounds.n) Vector.t, Nat.N2.n) Vector.t )
+          Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
+    { challenge_polynomial_commitment = sg
+    ; old_bulletproof_challenges = Vector.[ chals0; chals1 ]
+    }
+  in
+  let digest =
+    Wrap_hack.Checked.hash_messages_for_next_wrap_proof Nat.N2.n t
+  in
+  Field.Assert.equal digest inputs.(32)
+
 (* x_hat sub-circuit: public input commitment (MSM) from IVP wrap.
 
    Input layout (34 fields):
@@ -2924,6 +2970,10 @@ let run ~output_dir =
   dump_step "hash_messages_for_next_step_proof_circuit"
     hash_messages_for_next_step_proof_circuit
     ~input_typ:array91_field ~return_typ:Impl.Typ.unit ;
+  let array33_wrap = Impls.Wrap.Typ.array ~length:33 Impls.Wrap.Field.typ in
+  dump_wrap "hash_messages_for_next_wrap_proof_circuit"
+    hash_messages_for_next_wrap_proof_circuit
+    ~input_typ:array33_wrap ~return_typ:Impls.Wrap.Typ.unit ;
   (* Wrap sub-circuits *)
   let array80_wrap = Impls.Wrap.Typ.array ~length:80 Impls.Wrap.Field.typ in
   dump_wrap "bullet_reduce_wrap_circuit" bullet_reduce_circuit
