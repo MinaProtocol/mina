@@ -1,0 +1,4 @@
+(executable
+ (name dump_spec_pack)
+ (libraries composition_types pickles_types kimchi_pasta_snarky_backend
+   plonkish_prelude kimchi_backend_common core_kernel))
