@@ -3,8 +3,9 @@ open Pickles_types
 open Composition_types
 open Kimchi_pasta_snarky_backend.Step_impl
 
-(* Dump the Spec.pack output for a Wrap.Statement.In_circuit with specific
-   non-zero field values, so PureScript can compare field-by-field. *)
+(* Dump Spec.pack output AND compute x_hat for specific field values.
+   Uses Field.of_int to create distinct constants so we can trace
+   the exact contribution of each entry to x_hat. *)
 let () =
   let feature_flags_bool = Plonk_types.Features.none_bool in
   let feature_flags_opt =
@@ -29,8 +30,6 @@ let () =
       lookup_parameters
       feature_flags_opt
   in
-  (* Use distinct non-zero field_var values so we can trace which entry is which.
-     Field.of_int gives us field_var constants. *)
   let fv i = Field.of_int i in
   let sc i = Kimchi_backend_common.Scalar_challenge.create (fv i) in
   let sv i = Shifted_value.Type1.Shifted_value (fv i) in
@@ -42,9 +41,6 @@ let () =
   let feature_flags_var =
     Plonk_types.Features.map feature_flags_bool ~f:(fun _ -> Boolean.false_)
   in
-  (* Use distinct values:
-     fq: 101-105, challenge: 201-202, scalar_challenge: 301-303,
-     digest: 401-403, bp: 501-516, branch_data: 999 *)
   let bp_vec = Vector.init Backend.Tick.Rounds.n ~f:(fun i -> bp (501 + i)) in
   let statement_data =
     Wrap.Statement.In_circuit.to_data
@@ -68,24 +64,28 @@ let () =
       (module Branch_data.Checked.Step)
       spec
       statement_data
+    (* Strip Type1 wrappers like step_verifier.ml:1260-1264 *)
+    |> Array.map ~f:(function
+         | `Field (Shifted_value.Type1.Shifted_value x) -> `Field x
+         | `Packed_bits (x, n) -> `Packed_bits (x, n) )
   in
-  (* After pack, step_verifier.ml:1260-1264 strips Type1.Shifted_value from Field entries *)
-  let packed =
-    Array.map packed ~f:(function
-      | `Field (Shifted_value.Type1.Shifted_value x) -> `Field x
-      | `Packed_bits (x, n) -> `Packed_bits (x, n) )
-  in
-  printf "Total entries from Spec.pack: %d\n" (Array.length packed) ;
+  printf "Total entries: %d\n" (Array.length packed) ;
+  printf "\nField values (non-constant entries for publicInputCommit):\n" ;
+  let non_const_count = ref 0 in
   Array.iteri packed ~f:(fun i entry ->
-      let value, kind =
+      let value, kind, is_const =
         match entry with
-        | `Field x -> (x, sprintf "Field(255)")
-        | `Packed_bits (x, n) -> (x, sprintf "Packed_bits(%d)" n)
+        | `Field (Constant c) -> (c, "Field(255)", true)
+        | `Field _ -> (Field.Constant.zero, "Field(255)", false)
+        | `Packed_bits (Constant c, n) -> (c, sprintf "PB(%d)" n, true)
+        | `Packed_bits (_, n) -> (Field.Constant.zero, sprintf "PB(%d)" n, false)
       in
-      (* Read the constant value from the field_var *)
-      match value with
-      | Constant c ->
-          printf "  [%2d] %-16s = %s (constant)\n" i kind
-            (Kimchi_pasta_basic.Fp.to_string c)
-      | _ ->
-          printf "  [%2d] %-16s = <non-constant>\n" i kind )
+      if is_const then
+        printf "  [%2d] %-10s const=%s\n" i kind (Kimchi_pasta_basic.Fp.to_string value)
+      else begin
+        printf "  [%2d] %-10s <var> (lagrange base %d)\n" i kind !non_const_count ;
+        incr non_const_count
+      end ) ;
+  printf "\nNon-constant entries (consume lagrange bases): %d\n" !non_const_count ;
+  printf "Constant entries (folded into correction): %d\n"
+    (Array.length packed - !non_const_count)
