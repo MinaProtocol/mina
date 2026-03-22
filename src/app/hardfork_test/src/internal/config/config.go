@@ -124,7 +124,7 @@ const PORT_PER_NODE = 6
 
 type DaemonInfo struct {
 	StartPort  int
-	NodeDir    string
+	Name       string
 	ForkMethod ForkMethod
 }
 
@@ -132,18 +132,20 @@ func (d *DaemonInfo) Port(ty PortType) int {
 	return d.StartPort + int(ty)
 }
 
-func (c *Config) InitDaemonInfos() {
-	nodesBase := filepath.Join(c.Root, "nodes")
+func (d *DaemonInfo) NodeDirRel() string {
+	return filepath.Join("nodes", d.Name)
+}
 
+func (c *Config) InitDaemonInfos() {
 	result := []DaemonInfo{
 		{
 			StartPort:  c.SeedStartPort,
-			NodeDir:    filepath.Join(nodesBase, "seed"),
+			Name:       "seed",
 			ForkMethod: c.ForkMethods.RandomChoose(),
 		},
 		{
 			StartPort:  c.SnarkCoordinatorPort,
-			NodeDir:    filepath.Join(nodesBase, "snark_coordinator"),
+			Name:       "snark_coordinator",
 			ForkMethod: c.ForkMethods.RandomChoose(),
 		},
 	}
@@ -151,7 +153,7 @@ func (c *Config) InitDaemonInfos() {
 	for whale_id := 0; whale_id < c.NumWhales; whale_id++ {
 		result = append(result, DaemonInfo{
 			StartPort:  c.WhaleStartPort + whale_id*PORT_PER_NODE,
-			NodeDir:    filepath.Join(nodesBase, fmt.Sprintf("whale_%d", whale_id)),
+			Name:       fmt.Sprintf("whale_%d", whale_id),
 			ForkMethod: c.ForkMethods.RandomChoose(),
 		})
 	}
@@ -159,7 +161,7 @@ func (c *Config) InitDaemonInfos() {
 	for fish_id := 0; fish_id < c.NumFish; fish_id++ {
 		result = append(result, DaemonInfo{
 			StartPort:  c.FishStartPort + fish_id*PORT_PER_NODE,
-			NodeDir:    filepath.Join(nodesBase, fmt.Sprintf("fish_%d", fish_id)),
+			Name:       fmt.Sprintf("fish_%d", fish_id),
 			ForkMethod: c.ForkMethods.RandomChoose(),
 		})
 	}
@@ -167,7 +169,7 @@ func (c *Config) InitDaemonInfos() {
 	for node_id := 0; node_id < c.NumNodes; node_id++ {
 		result = append(result, DaemonInfo{
 			StartPort:  c.NodeStartPort + node_id*PORT_PER_NODE,
-			NodeDir:    filepath.Join(nodesBase, fmt.Sprintf("plain_%d", node_id)),
+			Name:       fmt.Sprintf("plain_%d", node_id),
 			ForkMethod: c.ForkMethods.RandomChoose(),
 		})
 	}

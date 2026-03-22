@@ -211,7 +211,7 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, error) {
 
 	for i, daemon := range allNonAutoDaemons {
 		if errors[i] != nil {
-			return nil, fmt.Errorf("Failed to query consensus state on daemon at %s: %w", daemon.NodeDir, errors[i])
+			return nil, fmt.Errorf("Failed to query consensus state on node %s: %w", daemon.Name, errors[i])
 		}
 	}
 
@@ -226,7 +226,7 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, error) {
 		if state.LastBlockBeforeTxEnd != last_state.LastBlockBeforeTxEnd {
 			return nil, fmt.Errorf(
 				"Daemon %s and %s doesn't agree on last block seen before tx end! The previous has %v while the later has %v",
-				allNonAutoDaemons[i-1].NodeDir, daemon.NodeDir, last_state, state)
+				allNonAutoDaemons[i-1].Name, daemon.Name, last_state, state)
 		}
 	}
 

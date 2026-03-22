@@ -23,22 +23,24 @@ type HFHandler func(*HardforkTest, *BlockAnalysisResult) error
 func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown HFHandler) (*BlockAnalysisResult, error) {
 
 	t.Logger.Info("Supported fork method: %s", t.Config.ForkMethods)
+	extraFilesRoot, err := os.MkdirTemp("", "auto-mode-extra-files")
 	for _, info := range t.Config.DaemonInfos {
-		t.Logger.Info("Planning to use fork method %s on node %s", info.ForkMethod, info.NodeDir)
+		t.Logger.Info("Planning to use fork method %s on node %s", info.ForkMethod, info.Name)
 
 		if info.ForkMethod == config.Auto {
-			if err := os.MkdirAll(info.NodeDir, 0755); err != nil {
-				return nil, fmt.Errorf("Failed to create node dir at %s: %v", info.NodeDir, err)
+			nodeDirAbsExtra := filepath.Join(extraFilesRoot, info.NodeDirRel())
+			if err := os.MkdirAll(nodeDirAbsExtra, 0755); err != nil {
+				return nil, fmt.Errorf("Failed to create node dir extra at %s: %v", nodeDirAbsExtra, err)
 			}
 			extra_args := []byte("--hardfork-handling migrate-exit")
-			if err := os.WriteFile(path.Join(info.NodeDir, "extra_args.txt"), extra_args, 0644); err != nil {
-				return nil, fmt.Errorf("Failed to write extra_args.txt: %v", info.NodeDir, err)
+			if err := os.WriteFile(path.Join(nodeDirAbsExtra, "extra_args.txt"), extra_args, 0644); err != nil {
+				return nil, fmt.Errorf("Failed to write extra_args.txt for node %s: %v", info.Name, err)
 			}
 		}
 	}
 
 	// Start the main network
-	mainNetCmd, err := t.RunMainNetwork(mainGenesisTs)
+	mainNetCmd, err := t.RunMainNetwork(extraFilesRoot, mainGenesisTs)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +153,9 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 		return err
 	}
 
-	forkDataPrepatchPath := filepath.Join(daemon.NodeDir, "fork_data_prepatch")
+	nodeDir := filepath.Join(t.Config.Root, daemon.NodeDirRel())
+
+	forkDataPrepatchPath := filepath.Join(nodeDir, "fork_data_prepatch")
 
 	if err := os.MkdirAll(forkDataPrepatchPath, 0755); err != nil {
 		return err
@@ -182,7 +186,7 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 		return err
 	}
 
-	forkDataPath := filepath.Join(daemon.NodeDir, "fork_data")
+	forkDataPath := filepath.Join(nodeDir, "fork_data")
 	patchedConfigFile := filepath.Join(forkDataPath, "daemon.json")
 	patchedLedgersDir := filepath.Join(forkDataPath, "genesis")
 
@@ -240,7 +244,9 @@ func (t *HardforkTest) validateAutoForkData(daemon config.DaemonInfo, forkDataPa
 
 func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnalysisResult, mainGenesisTs int64) error {
 
-	forkDataPath := filepath.Join(daemon.NodeDir, "fork_data")
+	nodeDir := filepath.Join(t.Config.Root, daemon.NodeDirRel())
+
+	forkDataPath := filepath.Join(nodeDir, "fork_data")
 	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, daemon.StartPort+int(config.PORT_CLIENT)); err != nil {
 		return err
 	}
@@ -253,7 +259,10 @@ func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnal
 }
 
 func (t *HardforkTest) autoFork(daemon config.DaemonInfo, analysis BlockAnalysisResult, mainGenesisTs int64) error {
-	forkDataPath := filepath.Join(daemon.NodeDir, "auto-fork-mesa-devnet")
+
+	nodeDir := filepath.Join(t.Config.Root, daemon.NodeDirRel())
+
+	forkDataPath := filepath.Join(nodeDir, "auto-fork-mesa-devnet")
 	activatedFile := filepath.Join(forkDataPath, "activated")
 
 	timeOutInstant := time.Unix(mainGenesisTs+int64((t.Config.SlotChainEnd+2)*t.Config.MainSlot), 0)
@@ -280,7 +289,7 @@ func (t *HardforkTest) autoFork(daemon config.DaemonInfo, analysis BlockAnalysis
 		return err
 	}
 
-	if err := os.Rename(forkDataPath, filepath.Join(daemon.NodeDir, "fork_data")); err != nil {
+	if err := os.Rename(forkDataPath, filepath.Join(nodeDir, "fork_data")); err != nil {
 		return err
 	}
 
@@ -381,39 +390,41 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 	t.Logger.Info("`daemon.json` successfully sanitized, now moving fork config & ledgers in place for fork network")
 
 	for _, info := range t.Config.DaemonInfos {
-		forkDataBase := filepath.Join(info.NodeDir, "fork_data")
+		nodeDir := filepath.Join(t.Config.Root, info.NodeDirRel())
+
+		forkDataBase := filepath.Join(nodeDir, "fork_data")
 		forkConfigFile := filepath.Join(forkDataBase, "daemon.json")
 		forkConfigContent, err := os.ReadFile(forkConfigFile)
 		if err != nil {
-			return fmt.Errorf("Can't read fork config from node %s: %v", info.NodeDir, err)
+			return fmt.Errorf("Can't read fork config from node %s: %v", info.Name, err)
 		}
-		t.Logger.Info("Node %s will be using fork config of content: %s", info.NodeDir, string(forkConfigContent))
+		t.Logger.Info("Node %s will be using fork config of content: %s", info.Name, string(forkConfigContent))
 		// NOTE: Compute chain_id from the merged config (fork + shared) to determine
 		// the nested directory structure the post-fork daemon will use. The daemon
 		// loads its config-directory daemon.json first, then overlays --config-file
 		// args, so we pass both in the same order.
 		chainId, err := t.ComputeChainId(forkConfigFile, networkDaemonConfig)
 		if err != nil {
-			return fmt.Errorf("failed to compute chain_id from fork config on node at %s: %v", info.NodeDir, err)
+			return fmt.Errorf("failed to compute chain_id from fork config on node %s: %v", info.Name, err)
 		}
-		t.Logger.Info("Computed chain_id for fork config at %s: %s", info.NodeDir, chainId)
+		t.Logger.Info("Computed chain_id for fork config for node %s: %s", info.Name, chainId)
 
-		extraArgsToRemove := filepath.Join(info.NodeDir, "extra_args.txt")
+		extraArgsToRemove := filepath.Join(nodeDir, "extra_args.txt")
 		// Remove extra_args.txt that's no longer needed post-fork
 		if _, err = os.Stat(extraArgsToRemove); err == nil {
 			err = os.Remove(extraArgsToRemove)
 			if err != nil {
-				return fmt.Errorf("Failed to remove extra_args.txt for node %s", info.NodeDir)
+				return fmt.Errorf("Failed to remove extra_args.txt for node %s", info.Name)
 			}
 		}
 
-		chainStateDir := filepath.Join(info.NodeDir, chainId)
+		chainStateDir := filepath.Join(nodeDir, chainId)
 		err = os.MkdirAll(chainStateDir, 0755)
 		if err != nil {
 			return err
 		}
 		filesToMove := []MoveFileSpec{
-			{from: forkConfigFile, to: filepath.Join(info.NodeDir, "daemon.json")},
+			{from: forkConfigFile, to: filepath.Join(nodeDir, "daemon.json")},
 			{from: filepath.Join(forkDataBase, "genesis"), to: filepath.Join(chainStateDir, "genesis")},
 		}
 		for _, spec := range filesToMove {
@@ -428,7 +439,7 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 			}
 			err := os.Rename(spec.from, spec.to)
 			if err != nil {
-				return fmt.Errorf("Error moving fork data %s -> %s on node %s: %v", spec.from, spec.to, info.NodeDir, err)
+				return fmt.Errorf("Error moving fork data %s -> %s on node %s: %v", spec.from, spec.to, info.Name, err)
 			}
 		}
 	}
