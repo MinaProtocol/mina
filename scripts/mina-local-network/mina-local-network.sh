@@ -971,9 +971,6 @@ if [ -d "${EXTRA_FILES_ROOT}" ]; then
   cp -r "${EXTRA_FILES_ROOT}/." "${ROOT}/"
 fi
 
-echo "network directory hierarchy before spawning nodes:"
-tree "${ROOT}"
-
 
 # ----------
 
