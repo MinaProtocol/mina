@@ -76,10 +76,10 @@ if [[ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ]]; then
 fi
 
 # Check if PR is bypassed by a !ci-bypass-changelog comment
-pip install -r scripts/github/github_info/requirements.txt
+pip install -r buildkite/scripts/github/github_info/requirements.txt
 
 COMMENTED_CODE=0
-(python3 scripts/github/github_info is_pr_commented --comment "$BYPASS_PHRASE" \
+(python3 buildkite/scripts/github/github_info is_pr_commented --comment "$BYPASS_PHRASE" \
   --by $GITHUB_USERS_ELIGIBLE_FOR_BYPASS --pr "$BUILDKITE_PULL_REQUEST") \
    || COMMENTED_CODE=$?
 

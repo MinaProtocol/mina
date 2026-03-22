@@ -22,7 +22,7 @@ in  Pipeline.build
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
           , S.strictlyStart (S.contains "buildkite/scripts/changelog.sh")
-          , S.strictlyStart (S.contains "scripts/github/github_info")
+          , S.strictlyStart (S.contains "buildkite/scripts/github/github_info")
           , S.exactly "buildkite/src/Jobs/Lint/Changelog" "dhall"
           ]
         , path = "Lint"

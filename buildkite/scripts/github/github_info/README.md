@@ -15,13 +15,13 @@ pip install -r requirements.txt
 To check if a pull request has a specific comment by any of the specified users, run the following command:
 
 ```bash
-python3 scripts/github/github_info is_pr_commented --pr <PR_NUMBER> --comment <COMMENT> --by <USER1> <USER2> ...
+python3 buildkite/scripts/github/github_info is_pr_commented --pr <PR_NUMBER> --comment <COMMENT> --by <USER1> <USER2> ...
 ```
 
 ### Example
 
 ```bash
-python3 scripts/github/github_info is_pr_commented --pr 1234 --comment "!ci-bypass-changelog" --by dkijania
+python3 buildkite/scripts/github/github_info is_pr_commented --pr 1234 --comment "!ci-bypass-changelog" --by dkijania
 ```
 
 ## Notes
