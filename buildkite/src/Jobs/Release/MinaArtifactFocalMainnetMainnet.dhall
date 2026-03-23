@@ -29,6 +29,7 @@ in  Pipeline.build
             , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , debVersion = DebianVersions.DebVersion.Focal
           , network = Network.Type.Mainnet

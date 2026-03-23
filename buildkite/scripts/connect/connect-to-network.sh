@@ -1,27 +1,84 @@
 #!/bin/bash
 
-set -eo pipefail
+set -eox pipefail
 
-if [[ $# -ne 4 ]]; then
-    echo "Usage: $0 '<mina-debian-network>''<testnet-name>' '<wait-between-polling-graphql>''<wait-after-final-check>' "
+# --- Initialization ---
+MINA_DEBIAN_NETWORK=""
+NETWORK_NAME=""
+WAIT_BETWEEN_POLLING_GRAPHQL=""
+WAIT_AFTER_FINAL_CHECK=""
+STABLE_VERSION="3.3.0*"
+
+usage() {
+    cat << EOF
+Usage: $0 [OPTIONS]
+
+All arguments are mandatory:
+  --mina-debian-network <val>        Mina debian network name
+  --network-name <val>               Testnet name (used for seeds URL and validation)
+  --wait-between-polling <val>       Seconds to wait between GraphQL polling
+  --wait-after-final-check <val>     Seconds to wait after the final check
+  --help                             Display this help message
+
+Example:
+  $0 --mina-debian-network devnet --network-name devnet --wait-between-polling 10 --wait-after-final-check 120
+EOF
     exit 1
+}
+
+# --- Long-Flag Parsing ---
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --mina-debian-network)
+            MINA_DEBIAN_NETWORK="$2"
+            shift 2
+            ;;
+        --network-name)
+            NETWORK_NAME="$2"
+            shift 2
+            ;;
+        --wait-between-polling)
+            WAIT_BETWEEN_POLLING_GRAPHQL="$2"
+            shift 2
+            ;;
+        --wait-after-final-check)
+            WAIT_AFTER_FINAL_CHECK="$2"
+            shift 2
+            ;;
+        --stable-version)
+            STABLE_VERSION="$2"
+            shift 2
+            ;;
+        --help)
+            usage
+            ;;
+        *)
+            echo "Error: Unknown argument '$1'"
+            usage
+            ;;
+    esac
+done
+
+# --- Validation ---
+if [[ -z "$MINA_DEBIAN_NETWORK" || -z "$NETWORK_NAME" || -z "$WAIT_BETWEEN_POLLING_GRAPHQL" || -z "$WAIT_AFTER_FINAL_CHECK" ]]; then
+    echo "Error: All four required arguments must be provided."
+    usage
 fi
 
-MINA_DEBIAN_NETWORK=$1
-NETWORK_NAME=$2
-WAIT_BETWEEN_POLLING_GRAPHQL=$3
-WAIT_AFTER_FINAL_CHECK=$4
+# --- Main Script Logic ---
 
 git config --global --add safe.directory /workdir
 
 source buildkite/scripts/debian/update.sh --verbose
-
 source buildkite/scripts/export-git-env-vars.sh
+source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK},mina-daemon-storage-toolbox" 1
 
-source buildkite/scripts/debian/install.sh "mina-${MINA_DEBIAN_NETWORK}" 1
+# Legacy scanner installs to a separate versioned path under /usr/lib/mina/
+FORCE_VERSION="*" ROOT="legacy" ./buildkite/scripts/debian/install.sh "mina-daemon-recovery-storage-toolbox" 1
+
 
 # Remove lockfile if present
-rm /home/opam/.mina-config/.mina-lock ||:
+rm /home/opam/.mina-config/.mina-lock || true
 
 mkdir -p /home/opam/libp2p-keys/
 # Pre-generated random password for this quick test
@@ -30,50 +87,81 @@ mina libp2p generate-keypair --privkey-path /home/opam/libp2p-keys/key
 # Set permissions on the keypair so the daemon doesn't complain
 chmod -R 0700 /home/opam/libp2p-keys/
 
-# Restart in the background
-mina daemon \
-  --peer-list-url "https://storage.googleapis.com/seed-lists/${NETWORK_NAME}_seeds.txt" \
-  --libp2p-keypair "/home/opam/libp2p-keys/key" \
-& # -background
+start_daemon_and_wait_for_sync() {
+    local MINA="$1"
 
-# Attempt to connect to the GraphQL client every 10s for up to 8 minutes
-num_status_retries=24
-for ((i=1;i<=$num_status_retries;i++)); do
-  sleep $WAIT_BETWEEN_POLLING_GRAPHQL
-  set +e
-  mina client status
-  status_exit_code=$?
-  set -e
-  if [ $status_exit_code -eq 0 ]; then
-    break
-  elif [ $i -eq $num_status_retries ]; then
-    exit $status_exit_code
-  fi
-done
+    # Start the daemon in the background
+    "$MINA" daemon \
+      --peer-list-url "https://storage.googleapis.com/seed-lists/${NETWORK_NAME}_seeds.txt" \
+      --libp2p-keypair "/home/opam/libp2p-keys/key" \
+    &
 
-# Check that the daemon has connected to peers and is still up after 2 mins
-sleep "$WAIT_AFTER_FINAL_CHECK"
-mina client status
-if [ "$(mina advanced get-peers | wc -l)" -gt 0 ]; then
-    echo "Found some peers"
+    DAEMON_PID="$!"
+
+    # Attempt to connect to the GraphQL client every X seconds for 24 retries
+    num_status_retries=24
+    for ((i=1;i<=$num_status_retries;i++)); do
+        sleep "$WAIT_BETWEEN_POLLING_GRAPHQL"
+        set +e
+        "$MINA" client status
+        status_exit_code=$?
+        set -e
+
+        if [ $status_exit_code -eq 0 ]; then
+            break
+        elif [ $i -eq $num_status_retries ]; then
+            echo "Error: Daemon failed to become responsive after $num_status_retries retries."
+            exit $status_exit_code
+        fi
+    done
+
+    # Final check for peer connectivity
+    sleep "$WAIT_AFTER_FINAL_CHECK"
+    "$MINA" client status
+
+    if [ "$("$MINA" advanced get-peers | wc -l)" -gt 0 ]; then
+        echo "Found some peers"
+    else
+        echo "No peers found"
+        exit 1
+    fi
+
+    # Check network id via GraphQL
+    NETWORK_ID=$(curl -s 'http://localhost:3085/graphql' \
+        -H 'accept: application/json' \
+        -H 'content-type: application/json' \
+        --data-raw '{"query":"query MyQuery {\n  networkID\n}\n","variables":null,"operationName":"MyQuery"}' \
+        | jq -r .data.networkID)
+
+    EXPECTED_NETWORK="mina:$NETWORK_NAME"
+
+    if [[ "$NETWORK_ID" == "$EXPECTED_NETWORK" ]]; then
+        echo "Network id correct ($NETWORK_ID)"
+    else
+        echo "Network id incorrect (expected: $EXPECTED_NETWORK, got: $NETWORK_ID)"
+        exit 1
+    fi
+}
+
+# --- Step 1: Test with current mina ---
+start_daemon_and_wait_for_sync mina
+
+# --- Step 2: Stop daemon ---
+mina client stop-daemon
+wait "$DAEMON_PID"
+
+# --- Step 3: Convert RocksDB to legacy format ---
+mina-storage-converter \
+    --node-dir /home/opam/.mina-config \
+    --current-scanner /usr/lib/mina/storage/10.5.2/3.3.0/mina-rocksdb-scanner \
+    --stable-scanner /usr/lib/mina/storage/5.7.12/3.3.0/mina-rocksdb-scanner \
+    --yes --verbose
+
+if [[ "$MINA_DEBIAN_NETWORK" == "mainnet" ]]; then
+    source buildkite/scripts/debian/install_official.sh --package "mina-mainnet" --channel stable --version "$STABLE_VERSION"
 else
-    echo "No peers found"
-    exit 1
+    source buildkite/scripts/debian/install_official.sh --package "mina-${MINA_DEBIAN_NETWORK}" --version "$STABLE_VERSION"
 fi
 
-# Check network id
-NETWORK_ID=$(curl 'http://localhost:3085/graphql' \
-   -H 'accept: application/json' \
-   -H 'content-type: application/json' \
-   --data-raw '{"query":"query MyQuery {\n  networkID\n}\n","variables":null,"operationName":"MyQuery"}' \
-  | jq -r .data.networkID)
-
-EXPECTED_NETWORK=mina:$NETWORK_NAME
-
-if [[ "$NETWORK_ID" == "$EXPECTED_NETWORK" ]]; then
-    echo "Network id correct ($NETWORK_ID)"
-else
-    echo "Network id incorrect (expected: $EXPECTED_NETWORK got: $NETWORK_ID)"
-    exit 1
-fi
-
+# --- Step 4: Test with legacy mina ---
+start_daemon_and_wait_for_sync mina

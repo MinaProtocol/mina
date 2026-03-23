@@ -28,6 +28,7 @@ in  Pipeline.build
             , Artifacts.Type.Rosetta
             , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , debVersion = DebianVersions.DebVersion.Bookworm
           , network = Network.Type.Mainnet
