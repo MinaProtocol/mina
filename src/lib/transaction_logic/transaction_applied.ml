@@ -314,6 +314,102 @@ let supply_increase :
   Option.value_map total ~default:(Or_error.error_string "overflow")
     ~f:(fun v -> Ok v)
 
+(* Compute the stake_change for a single applied transaction.
+   [get_account] looks up an account by Account_id in the post-tx ledger.
+   This is correct because non-delegation txs don't change delegate fields.
+   For Stake_delegation, previous_delegate is captured in the applied record. *)
+let stake_change ~(get_account_after : Account_id.t -> Account.t option) (t : t)
+    : Currency.Amount.Signed.t =
+  let open Currency in
+  let add a b =
+    Option.value ~default:Amount.Signed.zero (Amount.Signed.add a b)
+  in
+  let neg amt = Amount.Signed.negate (Amount.Signed.of_unsigned amt) in
+  let pos amt = Amount.Signed.of_unsigned amt in
+  let lookup pk = get_account_after (Account_id.create pk Token_id.default) in
+  let adjust pk delta =
+    match lookup pk with
+    | Some { delegate = Some _; _ } ->
+        delta
+    | _ ->
+        Amount.Signed.zero
+  in
+  let balance_of pk =
+    match lookup pk with
+    | Some { balance; _ } ->
+        Balance.to_amount balance
+    | None ->
+        Amount.zero
+  in
+  match t.varying with
+  | Command (Signed_command sc) -> (
+      match sc.body with
+      | Failed ->
+          Amount.Signed.zero
+      | Payment _ ->
+          (* For signed commands, fee_payer = sender *)
+          let cmd = sc.common.user_command.data in
+          let fee_payer_pk = UC.fee_payer_pk cmd in
+          let receiver_pk = UC.receiver_pk cmd in
+          let fee = UC.fee cmd in
+          let amount = Option.value ~default:Amount.zero (UC.amount cmd) in
+          let fee_plus_amount =
+            Option.value ~default:Amount.zero
+              (Amount.add (Amount.of_fee fee) amount)
+          in
+          add
+            (adjust fee_payer_pk (neg fee_plus_amount))
+            (adjust receiver_pk (pos amount))
+      | Stake_delegation { previous_delegate } -> (
+          let cmd = sc.common.user_command.data in
+          let fee_payer_pk = UC.fee_payer_pk cmd in
+          let fee = UC.fee cmd in
+          let new_delegate =
+            let pk = UC.receiver_pk cmd in
+            if Public_key.Compressed.(equal pk empty) then None else Some pk
+          in
+          let post_balance = balance_of fee_payer_pk in
+          let pre_balance =
+            Option.value ~default:Amount.zero
+              (Amount.add post_balance (Amount.of_fee fee))
+          in
+          match (previous_delegate, new_delegate) with
+          | Some _, None ->
+              neg pre_balance
+          | None, Some _ ->
+              pos post_balance
+          | Some _, Some _ ->
+              neg (Amount.of_fee fee)
+          | None, None ->
+              Amount.Signed.zero ) )
+  | Command (Zkapp_command zc) ->
+      let cmd = zc.command.data in
+      let fp_contrib =
+        adjust
+          (Zkapp_command.fee_payer_pk cmd)
+          (neg (Amount.of_fee (Zkapp_command.fee cmd)))
+      in
+      List.fold (Zkapp_command.account_updates_list cmd) ~init:fp_contrib
+        ~f:(fun acc (au : Account_update.t) ->
+          let pk = Account_update.account_id au |> Account_id.public_key in
+          let delta = au.body.balance_change in
+          add acc
+            (adjust pk
+               (Amount.Signed.create ~magnitude:delta.magnitude ~sgn:delta.sgn) ) )
+  | Fee_transfer ft ->
+      One_or_two.fold (Fee_transfer.to_singles ft.fee_transfer.data)
+        ~init:Amount.Signed.zero ~f:(fun acc { receiver_pk; fee; _ } ->
+          add acc (adjust receiver_pk (pos (Amount.of_fee fee))) )
+  | Coinbase { coinbase = { data; _ }; _ } ->
+      let ft_contrib =
+        match data.fee_transfer with
+        | Some { receiver_pk; fee; _ } ->
+            adjust receiver_pk (pos (Amount.of_fee fee))
+        | None ->
+            Amount.Signed.zero
+      in
+      add (adjust data.receiver (pos data.amount)) ft_contrib
+
 let transaction : t -> Transaction.t =
  fun { varying; _ } ->
   match varying with

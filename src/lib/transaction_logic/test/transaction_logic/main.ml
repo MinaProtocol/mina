@@ -28,5 +28,13 @@ let () =
               opt_out_via_empty_delegation
           ; test_case "Payments between unstaked accounts" `Quick
               payments_with_unstaked_accounts
+          ; test_case "stake_change: unstaked payment = 0" `Quick
+              stake_change_unstaked_payment
+          ; test_case "stake_change: staked payment = -fee" `Quick
+              stake_change_staked_payment
+          ; test_case "stake_change: opt-out = -balance" `Quick
+              stake_change_opt_out
+          ; test_case "stake_change: opt-in = +(balance - fee)" `Quick
+              stake_change_opt_in
           ] )
     ]

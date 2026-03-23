@@ -581,8 +581,12 @@ module T = struct
       ; fee_excess = pre_stmt.fee_excess
       ; supply_increase
       ; stake_change =
-          Currency.Amount.Signed.zero
-          (* TODO: compute real stake_change from applied transaction and ledger *)
+          Mina_transaction_logic.Transaction_applied.stake_change
+            ~get_account_after:(fun aid ->
+              Option.bind
+                (Ledger.location_of_account ledger aid)
+                ~f:(Ledger.get ledger) )
+            applied_txn
       ; sok_digest = ()
       }
     in

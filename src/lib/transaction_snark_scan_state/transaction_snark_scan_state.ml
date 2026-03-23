@@ -280,9 +280,10 @@ let create_expected_statement ~constraint_constants
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
   let empty_local_state = Mina_state.Local_state.empty () in
-  let%bind ( target_first_pass_merkle_root
-           , target_second_pass_merkle_root
-           , supply_increase ) =
+  let%bind ( supply_increase
+           , applied_transaction
+           , first_pass_ledger_after_apply
+           , second_pass_ledger_after_apply ) =
     let%bind first_pass_ledger_after_apply, partially_applied_transaction =
       Sparse_ledger.apply_transaction_first_pass ~constraint_constants
         ~global_slot:block_global_slot ~txn_state_view:state_view
@@ -292,21 +293,22 @@ let create_expected_statement ~constraint_constants
       Sparse_ledger.apply_transaction_second_pass second_pass_ledger_witness
         partially_applied_transaction
     in
-    let target_first_pass_merkle_root =
-      Sparse_ledger.merkle_root first_pass_ledger_after_apply
-      |> Frozen_ledger_hash.of_ledger_hash
-    in
-    let target_second_pass_merkle_root =
-      Sparse_ledger.merkle_root second_pass_ledger_after_apply
-      |> Frozen_ledger_hash.of_ledger_hash
-    in
     let%map supply_increase =
       Mina_transaction_logic.Transaction_applied.supply_increase
         ~constraint_constants applied_transaction
     in
-    ( target_first_pass_merkle_root
-    , target_second_pass_merkle_root
-    , supply_increase )
+    ( supply_increase
+    , applied_transaction
+    , first_pass_ledger_after_apply
+    , second_pass_ledger_after_apply )
+  in
+  let target_first_pass_merkle_root =
+    Sparse_ledger.merkle_root first_pass_ledger_after_apply
+    |> Frozen_ledger_hash.of_ledger_hash
+  in
+  let target_second_pass_merkle_root =
+    Sparse_ledger.merkle_root second_pass_ledger_after_apply
+    |> Frozen_ledger_hash.of_ledger_hash
   in
   let%bind pending_coinbase_before =
     match init_stack with
@@ -347,8 +349,22 @@ let create_expected_statement ~constraint_constants
   ; fee_excess
   ; supply_increase
   ; stake_change =
-      Currency.Amount.Signed.zero
-      (* TODO: compute real stake_change from applied transaction, like supply_increase above *)
+      Mina_transaction_logic.Transaction_applied.stake_change
+        ~get_account_after:(fun account_id ->
+          Option.try_with (fun () ->
+              let loc =
+                Sparse_ledger.find_index_exn second_pass_ledger_after_apply
+                  account_id
+              in
+              let (account : Account.t) =
+                Sparse_ledger.get_exn second_pass_ledger_after_apply loc
+              in
+              if
+                Signature_lib.Public_key.Compressed.(
+                  equal empty account.public_key)
+              then failwith "empty account"
+              else account ) )
+        applied_transaction
   ; sok_digest = ()
   }
 
