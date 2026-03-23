@@ -58,7 +58,7 @@ export DB_HOST=127.0.0.1
 export DB_PORT=5432
 export DB_NAME="$POSTGRES_DBNAME"
 export PGPASSWORD="$POSTGRES_USERNAME"
-export PRECOMPUTED_BLOCKS_URL="https://storage.googleapis.com/mina_network_block_data"
+export PRECOMPUTED_BLOCKS_URL=${PRECOMPUTED_BLOCKS_URL:="https://storage.googleapis.com/mina_network_block_data"}
 
 # Genesis Ledger
 if [ -n "$MINA_GENESIS_LEDGER_URL" ]; then
