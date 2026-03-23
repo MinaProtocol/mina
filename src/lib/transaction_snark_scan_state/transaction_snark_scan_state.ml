@@ -153,6 +153,7 @@ module Job_view = struct
                   ]
               ] )
         ; ("Supply Increase", Currency.Amount.Signed.to_yojson s.supply_increase)
+        ; ("Stake Change", Currency.Amount.Signed.to_yojson s.stake_change)
         ]
     in
     let job_to_yojson =
@@ -345,6 +346,9 @@ let create_expected_statement ~constraint_constants
   ; connecting_ledger_right = connecting_merkle_root
   ; fee_excess
   ; supply_increase
+  ; stake_change =
+      Currency.Amount.Signed.zero
+      (* TODO: compute real stake_change from applied transaction, like supply_increase above *)
   ; sok_digest = ()
   }
 
@@ -638,6 +642,7 @@ struct
           ; connecting_ledger_left = _
           ; connecting_ledger_right = _
           ; supply_increase = _
+          ; stake_change = _
           ; sok_digest = ()
           } as t ) ->
         let open Or_error.Let_syntax in

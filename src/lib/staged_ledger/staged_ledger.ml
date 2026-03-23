@@ -580,6 +580,9 @@ module T = struct
       ; connecting_ledger_right = connecting_ledger
       ; fee_excess = pre_stmt.fee_excess
       ; supply_increase
+      ; stake_change =
+          Currency.Amount.Signed.zero
+          (* TODO: compute real stake_change from applied transaction and ledger *)
       ; sok_digest = ()
       }
     in

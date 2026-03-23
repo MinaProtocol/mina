@@ -384,6 +384,7 @@ module Values (S : Sample) = struct
         ; connecting_ledger_right = field ()
         ; supply_increase =
             (* TODO: insure uniqueness *) Currency.Amount.Signed.zero
+        ; stake_change = Currency.Amount.Signed.zero
         ; fee_excess = fee_excess ()
         ; sok_digest = ()
         }

@@ -110,12 +110,16 @@ let txn_statement_ledger_hashes_equal
         !(Currency.Amount.Signed.Checked.equal s1.supply_increase
             s2.supply_increase )
       in
+      let stake_change_eq =
+        !(Currency.Amount.Signed.Checked.equal s1.stake_change s2.stake_change)
+      in
       Impl.Boolean.all
         [ source_eq
         ; target_eq
         ; left_ledger_eq
         ; right_ledger_eq
         ; supply_increase_eq
+        ; stake_change_eq
         ] )
 
 (* Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
@@ -189,6 +193,14 @@ let%snarkydef_ step ~(logger : Logger.t)
           (Signed.create_var ~magnitude:(var_of_t zero) ~sgn:Sgn.Checked.pos)
         ~else_:txn_snark.supply_increase)
   in
+  let%bind stake_change =
+    Currency.Amount.(
+      Signed.Checked.if_ txn_stmt_ledger_hashes_didn't_change
+        ~then_:
+          (Signed.create_var ~magnitude:(var_of_t zero) ~sgn:Sgn.Checked.pos)
+        ~else_:txn_snark.stake_change)
+  in
+  ignore stake_change ;
   let%bind `Success updated_consensus_state, consensus_state =
     with_label __LOC__ (fun () ->
         Consensus_state_hooks.next_state_checked ~constraint_constants
