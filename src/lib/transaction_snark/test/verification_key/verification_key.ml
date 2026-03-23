@@ -78,13 +78,13 @@ let%test_module "Update account verification key" =
         failwith "already oldest version"
       else oldest
 
-    let%test_unit "account update using Signature auth when perm is set to \
-                   Proof" =
+    let%test_unit
+        "account update using Signature auth when perm is set to Proof" =
       mk_update_perm_check ~current_auth:Signature ~account_perm:Proof
         ~txn_version:older_version ()
 
-    let%test_unit "account update using Signature auth when perm is set to \
-                   Impossible" =
+    let%test_unit
+        "account update using Signature auth when perm is set to Impossible" =
       mk_update_perm_check ~current_auth:Signature ~account_perm:Impossible
         ~txn_version:older_version ()
 
@@ -98,7 +98,7 @@ let%test_module "Update account verification key" =
         ~txn_version:older_version ()
 
     let () =
-      match Sys.getenv_opt "PROOF_CACHE_OUT" with
+      match Sys.getenv "PROOF_CACHE_OUT" with
       | Some path ->
           Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
       | None ->

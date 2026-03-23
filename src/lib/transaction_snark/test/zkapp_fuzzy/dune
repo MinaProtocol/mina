@@ -8,6 +8,7 @@
   async_unix
   async.async_command
   core
+  core_unix.command_unix
   base
   core_kernel
   yojson
