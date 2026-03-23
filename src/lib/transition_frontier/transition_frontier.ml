@@ -165,11 +165,11 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
           ~constraint_constants:precomputed_values.constraint_constants
           ~persistent_root_instance persistent_frontier_instance
       |> Result.map_error ~f:(function
-           | `Sync_cannot_be_running ->
-               `Failure "sync job is already running on persistent frontier"
-           | `Not_found _ as err ->
-               `Failure
-                 (Persistent_frontier.Database.Error.not_found_message err) ) )
+        | `Sync_cannot_be_running ->
+            `Failure "sync job is already running on persistent frontier"
+        | `Not_found _ as err ->
+            `Failure (Persistent_frontier.Database.Error.not_found_message err) )
+      )
   in
   { logger
   ; catchup_state =
@@ -189,11 +189,11 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
   }
 
 let time ~logger ~label f =
-  let start = Time.now () in
+  let start = Time_float.now () in
   let x = f () in
-  let stop = Time.now () in
+  let stop = Time_float.now () in
   [%log info] "%s took %s" label
-    (Time.Span.to_string_hum (Time.diff stop start)) ;
+    (Time_float.Span.to_string_hum (Time_float.diff stop start)) ;
   x
 
 let rec load_with_max_length :
@@ -318,8 +318,8 @@ let rec load_with_max_length :
   with
   | Error `Not_initialized ->
       (* TODO: this case can be optimized to not create the
-         * database twice through rocks -- currently on clean bootup,
-         * this code path will reinitialize the rocksdb twice *)
+       * database twice through rocks -- currently on clean bootup,
+       * this code path will reinitialize the rocksdb twice *)
       [%str_log info] Persisted_frontier_fresh_boot ;
       reset_and_continue ()
   | Error `Invalid_version ->
@@ -356,12 +356,11 @@ let rec load_with_max_length :
           ~max_length ~verifier ~consensus_local_state ~persistent_root
           ~persistent_frontier ~retry_with_fresh_db:false ~catchup_mode ()
         >>| Result.map_error ~f:(function
-              | `Persistent_frontier_malformed ->
-                  `Failure
-                    "failed to destroy and create new persistent frontier \
-                     database"
-              | err ->
-                  err ) )
+          | `Persistent_frontier_malformed ->
+              `Failure
+                "failed to destroy and create new persistent frontier database"
+          | err ->
+              err ) )
       else return (Error `Persistent_frontier_malformed)
   | Ok snarked_ledger_hash -> (
       match%bind
@@ -458,8 +457,8 @@ let add_breadcrumb_exn t breadcrumb =
   Catchup_state.apply_diffs t.catchup_state diffs ;
   [%log internal] "Apply_full_frontier_diffs"
     ~metadata:[ ("count", `Int (List.length diffs)) ] ;
-  let (`New_root_and_diffs_with_mutants
-        (new_root_identifier, diffs_with_mutants) ) =
+  let (`New_root_and_diffs_with_mutants (new_root_identifier, diffs_with_mutants)
+        ) =
     (* Root DB moves here *)
     Full_frontier.apply_diffs t.full_frontier diffs
       ~has_long_catchup_job:
@@ -503,10 +502,10 @@ let add_breadcrumb_exn t breadcrumb =
   in
   sync_result
   |> Result.map_error ~f:(fun `Sync_must_be_running ->
-         Failure
-           "Cannot add breadcrumb because persistent frontier sync job is not \
-            running, which indicates that transition frontier initialization \
-            has not been performed correctly" )
+      Failure
+        "Cannot add breadcrumb because persistent frontier sync job is not \
+         running, which indicates that transition frontier initialization has \
+         not been performed correctly" )
   |> Result.ok_exn ;
   [%log internal] "Synchronize_persistent_frontier_done" ;
   [%log internal] "Notify_frontier_extensions" ;
@@ -573,14 +572,14 @@ module For_tests = struct
 
   let rec deferred_rose_tree_iter (Mina_stdlib.Rose_tree.T (root, trees)) ~f =
     let%bind () = f root in
-    Deferred.List.iter trees ~f:(deferred_rose_tree_iter ~f)
+    Deferred.List.iter trees ~how:`Sequential ~f:(deferred_rose_tree_iter ~f)
 
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
   let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~verifier
       ~(precomputed_values : Precomputed_values.t) () =
     let constraint_constants = precomputed_values.constraint_constants in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
-        let transition_receipt_time = Some (Time.now ()) in
+        let transition_receipt_time = Some (Time_float.now ()) in
         let genesis_transition =
           Mina_block.Validated.lift (Mina_block.genesis ~precomputed_values)
         in
@@ -630,20 +629,20 @@ module For_tests = struct
         let clean_temp_dirs _ =
           if not !cleaned then (
             let process_info =
-              Unix.create_process ~prog:"rm" ~args:[ "-rf"; temp_dir ]
+              Core_unix.create_process ~prog:"rm" ~args:[ "-rf"; temp_dir ]
             in
-            Unix.waitpid process_info.pid
+            Core_unix.waitpid process_info.pid
             |> Result.map_error ~f:(function
-                 | `Exit_non_zero n ->
-                     Printf.sprintf "error (exit code %d)" n
-                 | `Signal _ ->
-                     "error (received unexpected signal)" )
+              | `Exit_non_zero n ->
+                  Printf.sprintf "error (exit code %d)" n
+              | `Signal _ ->
+                  "error (received unexpected signal)" )
             |> Result.ok_or_failwith ;
             cleaned := true )
         in
-        Unix.mkdir_p temp_dir ;
-        Unix.mkdir root_dir ;
-        Unix.mkdir frontier_dir ;
+        Core_unix.mkdir_p temp_dir ;
+        Core_unix.mkdir root_dir ;
+        Core_unix.mkdir frontier_dir ;
         let persistent_root =
           Persistent_root.create ~logger ~backing_type:Stable_db
             ~directory:root_dir
@@ -661,7 +660,7 @@ module For_tests = struct
               ~f:(fun instance ->
                 Persistent_frontier.Database.close instance.db ) ;
             Option.iter persistent_root.Persistent_root.Factory_type.instance
-              ~f:(fun instance -> Root_ledger.close instance.snarked_ledger) ;
+              ~f:(fun instance -> Root_ledger.close instance.snarked_ledger ) ;
             clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 
@@ -783,10 +782,10 @@ module For_tests = struct
       (fun consensus_local_state ->
         Consensus.Data.Local_state.(
           Snapshot.Ledger_snapshot.close
-          @@ staking_epoch_ledger consensus_local_state) ;
+          @@ staking_epoch_ledger consensus_local_state ) ;
         Consensus.Data.Local_state.(
           Snapshot.Ledger_snapshot.close
-          @@ next_epoch_ledger consensus_local_state) ) ;
+          @@ next_epoch_ledger consensus_local_state ) ) ;
     frontier
 
   let gen_with_branch ?logger ~verifier ?trust_system ?consensus_local_state
