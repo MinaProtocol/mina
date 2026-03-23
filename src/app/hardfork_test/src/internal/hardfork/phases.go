@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path"
@@ -289,6 +290,36 @@ func (t *HardforkTest) autoFork(daemon config.DaemonInfo, analysis BlockAnalysis
 	}
 
 	if !forkActivated {
+		// NOTE: for debug, remove me later
+		// ----------------------------------------------
+		absRoot, _ := filepath.Abs(nodeDir)
+		filepath.WalkDir(absRoot, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+
+			// 计算当前路径相对于根目录的深度
+			relPath, _ := filepath.Rel(absRoot, path)
+			if relPath == "." {
+				fmt.Println(filepath.Base(absRoot) + "/")
+				return nil
+			}
+
+			// 根据层级计算缩进
+			depth := strings.Count(relPath, string(os.PathSeparator))
+			indent := strings.Repeat("  ", depth)
+
+			// 区分目录和文件显示
+			if d.IsDir() {
+				fmt.Printf("%s└── %s/\n", indent, d.Name())
+			} else {
+				fmt.Printf("%s├── %s\n", indent, d.Name())
+			}
+
+			return nil
+		})
+		// ----------------------------------------------
+
 		return fmt.Errorf("Node %s haven't create activated file at %s, meaning it's not completed auto config generation!", activatedFile, daemon.Name)
 	}
 
