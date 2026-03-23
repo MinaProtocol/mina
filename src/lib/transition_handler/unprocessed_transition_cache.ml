@@ -3,7 +3,7 @@
  * frontier. This is used in order to drop duplicate transitions which are still
  * being handled by various threads in the transition frontier controller. *)
 
-open Core_kernel
+open Core
 open Mina_base
 open Network_peer
 
