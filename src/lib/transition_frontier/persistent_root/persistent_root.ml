@@ -8,7 +8,7 @@ module Ledger_transfer_any =
 module Root_ledger = Mina_ledger.Root
 
 let with_file ?size filename access_level ~f =
-  let open Unix in
+  let open Core_unix in
   let shared, mode =
     match access_level with
     | `Read ->
@@ -16,23 +16,22 @@ let with_file ?size filename access_level ~f =
     | `Write ->
         (true, [ O_RDWR; O_TRUNC; O_CREAT ])
   in
-  let fd = Unix.openfile filename ~mode in
+  let fd = openfile filename ~mode in
   let buf_size =
     match size with
     | None ->
-        Int64.to_int_exn Unix.(fstat fd).st_size
+        Int64.to_int_exn (fstat fd).st_size
     | Some sz ->
         sz
   in
   (* Bigstring.map_file has been removed. We copy its old implementation. *)
   let buf =
     Bigarray.(
-      array1_of_genarray
-        (Core.Unix.map_file fd char c_layout ~shared [| buf_size |]))
+      array1_of_genarray (map_file fd char c_layout ~shared [| buf_size |]) )
   in
   let x = f buf in
   Bigstring.unsafe_destroy buf ;
-  Unix.close fd ;
+  close fd ;
   x
 
 (* TODO: create a reusable singleton factory abstraction *)
@@ -87,7 +86,7 @@ module Config = struct
         using a distinct root subdirectory *)
   let make_potential_snarked_ledger t =
     let uuid = Uuid_unix.create () in
-    make_instance_config ("snarked_ledger" ^ Uuid.to_string_hum uuid) t
+    make_instance_config ("snarked_ledger" ^ Uuid.to_string uuid) t
 
   (** The name of the file recording the [Root_identifier.t] of the snarked
         root *)
@@ -111,16 +110,16 @@ module Instance = struct
   let potential_snarked_ledgers_of_yojson json =
     Yojson.Safe.Util.to_list json
     |> List.map ~f:(fun json ->
-           match json with
-           | `String directory_name ->
-               Root_ledger.Config.with_directory
-                 ~backing_type:Root_ledger.Config.Stable_db ~directory_name
-           | _ ->
-               Root_ledger.Config.of_yojson json |> Result.ok_or_failwith )
+        match json with
+        | `String directory_name ->
+            Root_ledger.Config.with_directory
+              ~backing_type:Root_ledger.Config.Stable_db ~directory_name
+        | _ ->
+            Root_ledger.Config.of_yojson json |> Result.ok_or_failwith )
 
   let load_potential_snarked_ledgers_from_disk factory =
     let location = Config.potential_snarked_ledgers factory in
-    if phys_equal (Sys.file_exists location) `Yes then
+    if phys_equal (Sys_unix.file_exists location) `Yes then
       Yojson.Safe.from_file location |> potential_snarked_ledgers_of_yojson
     else []
 
@@ -303,7 +302,7 @@ let set_root_identifier t new_root_identifier =
 (* defaults to genesis *)
 let load_root_identifier t =
   let file = Config.root_identifier t in
-  match Unix.access file [ `Exists; `Read ] with
+  match Core_unix.access file [ `Exists; `Read ] with
   | Error _ ->
       None
   | Ok () ->
