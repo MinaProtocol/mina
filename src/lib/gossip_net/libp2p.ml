@@ -28,7 +28,7 @@ let v0_topic = "coda/consensus-messages/0.0.1"
 
 module Config = struct
   type t =
-    { timeout : Time.Span.t
+    { timeout : Time_float.Span.t
     ; initial_peers : Mina_net2.Multiaddr.t list
     ; addrs_and_ports : Node_addrs_and_ports.t
     ; metrics_port : int option
@@ -51,7 +51,7 @@ module Config = struct
     ; validation_queue_size : int
     ; mutable keypair : Mina_net2.Keypair.t option
     ; all_peers_seen_metric : bool
-    ; known_private_ip_nets : Core.Unix.Cidr.t list
+    ; known_private_ip_nets : Core_unix.Cidr.t list
     }
   [@@deriving make]
 end
@@ -117,7 +117,7 @@ let on_gossip_decode_failure (config : Config.t) envelope (err : Error.t) =
   Trust_system.(
     record config.trust_system config.logger peer
       Actions.
-        (Decoding_failed, Some ("failed to decode gossip message", metadata)))
+        (Decoding_failed, Some ("failed to decode gossip message", metadata)) )
   |> don't_wait_for ;
   ()
 
@@ -140,7 +140,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         (rpc : (query, response) Rpc_interface.rpc) =
       let (module Impl) = Rpc_interface.implementation rpc in
       let log_rate_limiter_occasionally rl =
-        let t = Time.Span.of_min 1. in
+        let t = Time_float.Span.of_min 1. in
         every t (fun () ->
             [%log debug]
               ~metadata:
@@ -156,7 +156,8 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         Mina_metrics.(Counter.inc_one @@ fst Impl.received_counter) ;
         Mina_metrics.(Gauge.inc_one @@ snd Impl.received_counter) ;
         match
-          Network_pool.Rate_limiter.add rl (Remote peer) ~now:(Time.now ())
+          Network_pool.Rate_limiter.add rl (Remote peer)
+            ~now:(Time_float.now ())
             ~score:(Impl.rate_limit_cost request)
         with
         | `Capacity_exceeded ->
@@ -175,7 +176,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                   (* TODO: kill trust system (#11723) *)
                   Trust_system.(
                     record_envelope_sender trust_system logger sender
-                      Actions.(Made_request, Some msg))
+                      Actions.(Made_request, Some msg) )
                 in
                 let%map response =
                   Impl.handle_request ctx ~version request_env
@@ -211,7 +212,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
 *)
     let peers_snapshot = ref []
 
-    let peers_snapshot_max_staleness = Time.Span.of_sec 30.
+    let peers_snapshot_max_staleness = Time_float.Span.of_sec 30.
 
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
@@ -337,11 +338,11 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                     { banned_peers =
                         Trust_system.peer_statuses config.trust_system
                         |> List.filter_map ~f:(fun (peer, status) ->
-                               match status.banned with
-                               | Banned_until _ ->
-                                   Some peer
-                               | _ ->
-                                   None )
+                            match status.banned with
+                            | Banned_until _ ->
+                                Some peer
+                            | _ ->
+                                None )
                     ; trusted_peers =
                         List.filter_map ~f:Mina_net2.Multiaddr.to_peer
                           config.initial_peers
@@ -365,7 +366,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                                call \"$rpc\" with version $version"
                             , [ ("rpc", `String rpc_tag)
                               ; ("version", `Int version)
-                              ] ) )) ;
+                              ] ) ) ) ;
                 `Close_connection
               in
               Rpc.Implementations.create_exn
@@ -402,7 +403,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                                     , [ ( "exn"
                                         , `String
                                             (Exn.to_string handshake_error) )
-                                      ] ) ))
+                                      ] ) ) )
                       | Ok rpc_connection -> (
                           let%bind () =
                             Async_rpc_kernel.Rpc.Connection.close_finished
@@ -546,8 +547,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                    | Error e ->
                        [%log' warn config.logger]
                          "starting libp2p up failed: $error"
-                         ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                   ) ) ;
+                         ~metadata:[ ("error", Error_json.error_to_yojson e) ] ) ) ;
             { publish_v0
             ; publish_v1_block
             ; publish_v1_tx
@@ -600,7 +600,8 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                           ~default:2.5
                         |> Float.min (base_time /. 2.)
                       in
-                      Time.Span.(of_min (base_time |> plus_or_minus ~delta))
+                      Time_float.Span.(
+                        of_min (base_time |> plus_or_minus ~delta) )
                     in
                     don't_wait_for
                       ( after restart_after
@@ -672,7 +673,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       in
       let%map () =
         Deferred.List.iter (Trust_system.peer_statuses config.trust_system)
-          ~f:(function
+          ~how:`Sequential ~f:(function
           | ( addr
             , { banned = Trust_system.Banned_status.Banned_until expiration; _ }
             ) ->
@@ -710,7 +711,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
           O1trace.thread "snapshot_peers" (fun () ->
               let%map peers = peers t in
               Mina_metrics.(
-                Gauge.set Network.peers (List.length peers |> Int.to_float)) ;
+                Gauge.set Network.peers (List.length peers |> Int.to_float) ) ;
               peers_snapshot :=
                 List.map peers
                   ~f:
@@ -748,10 +749,9 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         Hash_set.(diff (Peer.Hash_set.of_list peers) except |> to_list)
         n
 
-    let try_call_rpc_with_dispatch :
-        type r q.
+    let try_call_rpc_with_dispatch : type r q.
            ?heartbeat_timeout:Time_ns.Span.t
-        -> ?timeout:Time.Span.t
+        -> ?timeout:Time_float.Span.t
         -> rpc_counter:Mina_metrics.Counter.t * Mina_metrics.Gauge.t
         -> rpc_failed_counter:Mina_metrics.Counter.t
         -> rpc_name:string
@@ -794,17 +794,17 @@ module Make (Rpc_interface : RPC_INTERFACE) :
               transport
               ~on_handshake_error:
                 (`Call
-                  (fun exn ->
-                    let%map () =
-                      Trust_system.(
-                        record t.config.trust_system t.config.logger peer
-                          Actions.
-                            ( Outgoing_connection_error
-                            , Some
-                                ( "Handshake error: $exn"
-                                , [ ("exn", `String (Exn.to_string exn)) ] ) ))
-                    in
-                    Or_error.error_string "handshake error" ) ) )
+                   (fun exn ->
+                     let%map () =
+                       Trust_system.(
+                         record t.config.trust_system t.config.logger peer
+                           Actions.
+                             ( Outgoing_connection_error
+                             , Some
+                                 ( "Handshake error: $exn"
+                                 , [ ("exn", `String (Exn.to_string exn)) ] ) ) )
+                     in
+                     Or_error.error_string "handshake error" ) ) )
         >>= function
         | Ok (Ok result) ->
             (* call succeeded, result is valid *)
@@ -834,7 +834,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                     record t.config.trust_system t.config.logger peer
                       Actions.
                         ( Outgoing_connection_error
-                        , Some ("Closed connection", []) ))
+                        , Some ("Closed connection", []) ) )
                 in
                 Error err
             | _ ->
@@ -845,7 +845,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                         ( Outgoing_connection_error
                         , Some
                             ( "RPC call failed, reason: $exn"
-                            , [ ("exn", Error_json.error_to_yojson err) ] ) ))
+                            , [ ("exn", Error_json.error_to_yojson err) ] ) ) )
                 in
                 Error err )
         | Error monitor_exn ->
@@ -874,10 +874,9 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       in
       call ()
 
-    let try_call_rpc :
-        type q r.
+    let try_call_rpc : type q r.
            ?heartbeat_timeout:Time_ns.Span.t
-        -> ?timeout:Time.Span.t
+        -> ?timeout:Time_float.Span.t
         -> t
         -> Peer.t
         -> _
@@ -923,7 +922,8 @@ module Make (Rpc_interface : RPC_INTERFACE) :
             ~rpc_failed_counter:Impl.failed_request_counter ~rpc_name:Impl.name
             t peer transport
             (fun conn qs ->
-              Deferred.Or_error.List.map ?how qs ~f:(fun q ->
+              Deferred.Or_error.List.map
+                ~how:(Option.value ~default:`Sequential how) qs ~f:(fun q ->
                   Impl.dispatch_multi conn q ) )
             qs
           >>| fun data ->

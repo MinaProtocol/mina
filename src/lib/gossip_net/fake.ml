@@ -61,8 +61,8 @@ module Make (Rpc_interface : RPC_INTERFACE) :
     let get_initial_peers { nodes } local_ip =
       Hashtbl.data nodes |> List.concat
       |> List.filter_map ~f:(fun node ->
-             if Unix.Inet_addr.equal node.peer.host local_ip then None
-             else Some node.peer )
+          if Core_unix.Inet_addr.equal node.peer.host local_ip then None
+          else Some node.peer )
 
     let lookup_node t peer =
       let error = Error.of_string "peer does not exist" in
@@ -98,7 +98,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                     >>= fun () ->
                     let msg =
                       Envelope.(
-                        Incoming.wrap ~data:msg ~sender:(Sender.Remote sender))
+                        Incoming.wrap ~data:msg ~sender:(Sender.Remote sender) )
                     in
                     send_f intf.sinks
                       ( msg
@@ -106,8 +106,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                           () ) )
                   ~init:Deferred.unit ) )
 
-    let call_rpc :
-        type q r.
+    let call_rpc : type q r.
            t
         -> _
         -> sender_id:Peer.Id.t
@@ -142,8 +141,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       }
 
     let rpc_hook ~rpc_mocks ctx t =
-      let hook :
-          type q r.
+      let hook : type q r.
              Peer.Id.t
           -> (q, r) Rpc_interface.rpc
           -> q
@@ -162,7 +160,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
               let (module Impl) = Rpc_interface.implementation rpc in
               let latest_version =
                 (* this is assumed safe since there should always be at least one version *)
-                Int.Set.max_elt (Impl.versions ())
+                Set.max_elt (Impl.versions ())
                 |> Option.value_exn ~error:(Error.of_string "no versions?")
               in
               Impl.handle_request ctx ~version:latest_version query_env
@@ -201,7 +199,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       in
       Network.(
         attach_interface network local_ip
-          { sinks; rpc_hook = rpc_hook ~rpc_mocks ctx t }) ;
+          { sinks; rpc_hook = rpc_hook ~rpc_mocks ctx t } ) ;
       return t
 
     let peers { peer_table; _ } = Hashtbl.data peer_table |> Deferred.return
@@ -247,7 +245,9 @@ module Make (Rpc_interface : RPC_INTERFACE) :
 
     let query_peer' ?how ?heartbeat_timeout ?timeout t peer rpc qs =
       let%map rs =
-        Deferred.List.map ?how qs
+        Deferred.List.map
+          ~how:(Option.value ~default:`Sequential how)
+          qs
           ~f:(query_peer ?timeout ?heartbeat_timeout t peer rpc)
       in
       with_return (fun { return } ->
