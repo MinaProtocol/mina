@@ -273,16 +273,19 @@ func (t *HardforkTest) autoFork(daemon config.DaemonInfo, analysis BlockAnalysis
 	forkDataPath := filepath.Join(nodeDir, "auto-fork-mesa-devnet")
 	activatedFile := filepath.Join(forkDataPath, "activated")
 
-	timeOutInstant := time.Unix(mainGenesisTs+int64((t.Config.SlotChainEnd+2)*t.Config.MainSlot), 0)
+	deadline := time.Unix(mainGenesisTs+int64(t.Config.SlotChainEnd*t.Config.MainSlot), 0).Add(time.Duration(5) * time.Minute)
 
 	forkActivated := false
 
-	for time.Now().Before(timeOutInstant) {
-
-		_, err := os.Stat(activatedFile)
-
-		if err == nil {
+	for {
+		if _, err := os.Stat(activatedFile); err == nil {
 			forkActivated = true
+			break
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("error accessing existing file %s: %w", activatedFile, err)
+		}
+
+		if time.Now().After(deadline) {
 			break
 		}
 
