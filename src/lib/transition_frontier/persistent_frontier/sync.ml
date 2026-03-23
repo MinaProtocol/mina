@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 
 (* TODO: *new* convert into an extension *)
 type t = { worker : Worker.t; buffer : Diff_buffer.t }
@@ -12,7 +12,7 @@ let create ~constraint_constants ~logger ~time_controller ~db
     ~dequeue_snarked_ledger =
   let worker = Worker.create { db; logger; dequeue_snarked_ledger } in
   let flush_size =
-    Sys.getenv_opt "MINA_FRONTIER_DIFF_BUFFER_FLUSH_SIZE"
+    Sys.getenv "MINA_FRONTIER_DIFF_BUFFER_FLUSH_SIZE"
     |> Option.bind ~f:Stdlib.int_of_string_opt
   in
   let capacity = Diff_buffer.Capacity.make ?flush:flush_size () in

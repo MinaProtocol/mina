@@ -1,6 +1,6 @@
 (* TODO: flush on timeout interval in addition to meeting flush capacity *)
 open Async_kernel
-open Core_kernel
+open Core
 open Frontier_base
 
 let max_latency
