@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Currency
 open Async
 
@@ -61,7 +61,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                   let best_tip_staged_ledger =
                     Inputs.Transition_frontier.best_tip_staged_ledger frontier
                   in
-                  let start_time = Time.now () in
+                  let start_time = Time_float.now () in
                   ( match
                       Inputs.Staged_ledger.all_work_pairs best_tip_staged_ledger
                         ~get_state:
@@ -73,13 +73,13 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                         "Error occured when updating available work: $error"
                         ~metadata:[ ("error", Error_json.error_to_yojson e) ]
                   | Ok new_available_jobs ->
-                      let end_time = Time.now () in
+                      let end_time = Time_float.now () in
                       [%log info] "Updating new available work took $time ms"
                         ~metadata:
                           [ ( "time"
                             , `Float
-                                ( Time.diff end_time start_time
-                                |> Time.Span.to_ms ) )
+                                ( Time_float.diff end_time start_time
+                                |> Time_float.Span.to_ms ) )
                           ] ;
                       let old_available_jobs = t.available_jobs in
                       let old_job_keys =
@@ -92,16 +92,11 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                         |> Job_key.Set.of_list
                       in
                       let removed_job_keys =
-                        Job_key.Set.diff old_job_keys new_job_keys
+                        Set.diff old_job_keys new_job_keys
                       in
-                      let added_job_keys =
-                        Job_key.Set.diff new_job_keys old_job_keys
-                      in
+                      let added_job_keys = Set.diff new_job_keys old_job_keys in
                       List.iter old_available_jobs ~f:(fun job ->
-                          if
-                            Job_key.Set.mem removed_job_keys
-                              (Job_key.of_job job)
-                          then
+                          if Set.mem removed_job_keys (Job_key.of_job job) then
                             [%log internal] "Snark_work_removed"
                               ~metadata:
                                 [ ( "work_ids"
@@ -110,8 +105,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                                 ; ("txs", yojson_summary job)
                                 ] ) ;
                       List.iter new_available_jobs ~f:(fun job ->
-                          if Job_key.Set.mem added_job_keys (Job_key.of_job job)
-                          then
+                          if Set.mem added_job_keys (Job_key.of_job job) then
                             [%log internal] "Snark_work_added"
                               ~metadata:
                                 [ ( "work_ids"
@@ -120,7 +114,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                                 ; ("txs", yojson_summary job)
                                 ] ) ;
                       t.jobs_scheduled <-
-                        Job_key.Set.inter t.jobs_scheduled new_job_keys ) ;
+                        Set.inter t.jobs_scheduled new_job_keys ) ;
                   Deferred.unit )
               |> Deferred.don't_wait_for ) ;
           Deferred.unit )
@@ -135,7 +129,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
           [ ("work_ids", Transaction_snark_work.Statement.compact_json statement)
           ; ("txs", yojson_summary job)
           ] ;
-      t.jobs_scheduled <- Job_key.Set.add t.jobs_scheduled statement
+      t.jobs_scheduled <- Set.add t.jobs_scheduled statement
 
     let does_not_have_better_fee ~snark_pool ~fee
         (statements : Inputs.Transaction_snark_work.Statement.t) : bool =
@@ -151,7 +145,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       O1trace.sync_thread "work_lib_all_unscheduled_expensive_works" (fun () ->
           List.filter t.available_jobs ~f:(fun job ->
               let job_key = Job_key.of_job job in
-              (not (Job_key.Set.mem t.jobs_scheduled job_key))
+              (not (Set.mem t.jobs_scheduled job_key))
               && does_not_have_better_fee ~snark_pool ~fee job_key ) )
   end
 

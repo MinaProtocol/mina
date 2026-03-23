@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Make (Lib : Intf.Lib_intf) = struct
   let work ~snark_pool ~fee ~logger (state : Lib.State.t) =
