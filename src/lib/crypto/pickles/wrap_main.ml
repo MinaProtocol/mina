@@ -406,6 +406,41 @@ let wrap_main
                         Wrap_hack.Checked.pad_challenges
                           old_bulletproof_challenges
                       in
+                      (* === WRAP FOP DUMP === *)
+                      as_prover As_prover.(fun () ->
+                        let fp x = Kimchi_pasta_basic.Fq.to_string (read Field.typ x) in
+                        let b x = Bool.to_string (read Boolean.typ x) in
+                        let sv (Shifted_value.Type2.Shifted_value x) = fp x in
+                        let sc { Kimchi_backend_common.Scalar_challenge.inner } = fp inner in
+                        printf "\n=== WRAP WIRING DUMP: finalize_other_proof input (circuit vars) ===\n" ;
+                        printf "[should_finalize]: %s\n" (b should_finalize) ;
+                        printf "[sponge_digest]: %s\n" (fp sponge_digest_before_evaluations) ;
+                        printf "[dv.plonk.alpha]: %s\n" (sc deferred_values.plonk.alpha) ;
+                        printf "[dv.plonk.beta]: %s\n" (fp deferred_values.plonk.beta) ;
+                        printf "[dv.plonk.gamma]: %s\n" (fp deferred_values.plonk.gamma) ;
+                        printf "[dv.plonk.zeta]: %s\n" (sc deferred_values.plonk.zeta) ;
+                        printf "[dv.plonk.perm]: %s\n" (sv deferred_values.plonk.perm) ;
+                        printf "[dv.plonk.zeta_to_srs_length]: %s\n" (sv deferred_values.plonk.zeta_to_srs_length) ;
+                        printf "[dv.plonk.zeta_to_domain_size]: %s\n" (sv deferred_values.plonk.zeta_to_domain_size) ;
+                        printf "[dv.combined_inner_product]: %s\n" (sv deferred_values.combined_inner_product) ;
+                        printf "[dv.b]: %s\n" (sv deferred_values.b) ;
+                        printf "[dv.xi]: %s\n" (sc deferred_values.xi) ;
+                        (* Also dump Unfinalized.Constant.dummy for comparison *)
+                        let dummy = Lazy.force Pickles__.Unfinalized.Constant.dummy in
+                        let dsv (Shifted_value.Type2.Shifted_value x) =
+                          Kimchi_pasta_basic.Fq.to_string x in
+                        let dchal c =
+                          Kimchi_pasta_basic.Fq.to_string
+                            (Limb_vector.Challenge.Constant.to_tock_field c) in
+                        printf "--- Unfinalized.Constant.dummy for reference ---\n" ;
+                        printf "[dummy.plonk.alpha]: %s\n" (dchal (let { Kimchi_backend_common.Scalar_challenge.inner } = dummy.deferred_values.plonk.alpha in inner)) ;
+                        printf "[dummy.plonk.beta]: %s\n" (dchal dummy.deferred_values.plonk.beta) ;
+                        printf "[dummy.plonk.gamma]: %s\n" (dchal dummy.deferred_values.plonk.gamma) ;
+                        printf "[dummy.plonk.perm]: %s\n" (dsv dummy.deferred_values.plonk.perm) ;
+                        printf "[dummy.cip]: %s\n" (dsv dummy.deferred_values.combined_inner_product) ;
+                        printf "[dummy.b]: %s\n" (dsv dummy.deferred_values.b) ;
+                        printf "=== END WRAP DUMP ===\n\n%!"
+                      ) ;
                       let finalized, chals =
                         with_label __LOC__ (fun () ->
                             Wrap_verifier.finalize_other_proof

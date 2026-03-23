@@ -355,6 +355,7 @@ let wrap
     let k x = respond (Provide x) in
     match request with
     | Evals ->
+        Core_kernel.printf "=== WRAP HANDLER: Req.Evals ===\n%!" ;
         k prev_evals
     | Step_accs ->
         let module M =

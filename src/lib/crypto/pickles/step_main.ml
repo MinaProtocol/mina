@@ -27,6 +27,37 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
       (must_verify : B.t) : _ Vector.t * B.t =
     Boolean.Assert.( = ) unfinalized.should_finalize must_verify ;
     let deferred_values = proof_state.deferred_values in
+    (* === DUMP: Per_proof_witness.proof_state.deferred_values === *)
+    as_prover As_prover.(fun () ->
+      let fp x = Kimchi_pasta_basic.Fp.to_string (read Field.typ x) in
+      let b x = Bool.to_string (read Boolean.typ x) in
+      let sc { Kimchi_backend_common.Scalar_challenge.inner } = fp inner in
+      let sv (Shifted_value.Type1.Shifted_value x) = fp x in
+      let plonk = deferred_values.plonk in
+      printf "\n=== STEP WIRING DUMP: verify_one deferred_values ===\n" ;
+      printf "[plonk.alpha]: %s\n" (sc plonk.alpha) ;
+      printf "[plonk.beta]: %s\n" (fp plonk.beta) ;
+      printf "[plonk.gamma]: %s\n" (fp plonk.gamma) ;
+      printf "[plonk.zeta]: %s\n" (sc plonk.zeta) ;
+      printf "[plonk.perm]: %s\n" (sv plonk.perm) ;
+      printf "[plonk.zeta_to_srs_length]: %s\n" (sv plonk.zeta_to_srs_length) ;
+      printf "[plonk.zeta_to_domain_size]: %s\n" (sv plonk.zeta_to_domain_size) ;
+      printf "[dv.combined_inner_product]: %s\n" (sv deferred_values.combined_inner_product) ;
+      printf "[dv.b]: %s\n" (sv deferred_values.b) ;
+      printf "[dv.xi]: %s\n" (sc deferred_values.xi) ;
+      printf "[dv.bulletproof_challenges]: %d entries\n"
+        (List.length (Pickles_types.Vector.to_list deferred_values.bulletproof_challenges)) ;
+      List.iteri (Pickles_types.Vector.to_list deferred_values.bulletproof_challenges) ~f:(fun i bp ->
+        printf "  [%d]: %s\n" i (sc bp.Composition_types.Bulletproof_challenge.prechallenge)) ;
+      let bd = deferred_values.branch_data in
+      printf "[dv.branch_data.domain_log2]: %s\n" (fp bd.domain_log2) ;
+      printf "[dv.branch_data.proofs_verified_mask]:\n" ;
+      List.iteri (Pickles_types.Vector.to_list bd.proofs_verified_mask) ~f:(fun i x ->
+        printf "  [%d]: %s\n" i (b x)) ;
+      printf "[ps.sponge_digest]: %s\n" (fp proof_state.sponge_digest_before_evaluations) ;
+      printf "[must_verify]: %s\n" (b must_verify) ;
+      printf "=== END DUMP ===\n\n%!"
+    ) ;
     let finalized, chals =
       with_label __LOC__ (fun () ->
           let sponge_digest = proof_state.sponge_digest_before_evaluations in
