@@ -68,7 +68,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 		return nil, err
 	}
 
-	t.Logger.Info("Network analayze result: %v", analysis)
+	t.Logger.Info("Network analyze result: %v", analysis)
 
 	if err := t.ValidateSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd); err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 		return nil, err
 	}
 
-	nonAutoDaemon := t.Config.SampleDaemonInfo("any", func(di *config.DaemonInfo) bool { return di.ForkMethod != config.Auto })
+	nonAutoDaemon := t.Config.SampleDaemonInfo("non-auto", func(di *config.DaemonInfo) bool { return di.ForkMethod != config.Auto })
 	if err := t.ValidateNoNewBlocks(nonAutoDaemon.Port(config.PORT_REST)); err != nil {
 		return nil, err
 	}

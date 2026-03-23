@@ -194,17 +194,20 @@ func (c *Config) InitDaemonInfos() {
 
 func (c *Config) AllDaemonInfos(tag string, pred func(*DaemonInfo) bool) []*DaemonInfo {
 	candidates := []*DaemonInfo{}
-	for _, info := range c.DaemonInfos {
-		if pred(&info) {
-			candidates = append(candidates, &info)
+	for i := range c.DaemonInfos {
+		info := &c.DaemonInfos[i]
+		if pred(info) {
+			candidates = append(candidates, info)
 		}
 	}
 	return candidates
-
 }
 
 func (c *Config) SampleDaemonInfo(tag string, pred func(*DaemonInfo) bool) *DaemonInfo {
 	candidates := c.AllDaemonInfos(tag, pred)
+	if len(candidates) == 0 {
+		panic(fmt.Sprintf("No node satify condition %s!", tag))
+	}
 	return candidates[rand.Intn(len(candidates))]
 }
 

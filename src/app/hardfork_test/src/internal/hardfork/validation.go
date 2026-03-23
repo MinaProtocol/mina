@@ -34,6 +34,7 @@ func (t *HardforkTest) WaitForBestTip(port int, pred func(client.BlockData) bool
 		}
 
 		if pred(*bestTip) {
+			t.Logger.Info("Condition %s satisfied for daemon at port %d", predDescription, port)
 			return nil
 		}
 
