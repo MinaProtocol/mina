@@ -15,7 +15,7 @@ let to_peer t =
   match String.split ~on:'/' t with
   | [ ""; "ip4"; ip4_str; "tcp"; tcp_str; "p2p"; peer_id ] -> (
       try
-        let host = Unix.Inet_addr.of_string ip4_str in
+        let host = Core_unix.Inet_addr.of_string ip4_str in
         let libp2p_port = Int.of_string tcp_str in
         Some (Peer.create host ~libp2p_port ~peer_id)
       with _ -> None )
@@ -25,7 +25,7 @@ let to_peer t =
 let of_peer ({ host; libp2p_port; peer_id } : Peer.t) =
   (* assume host is IPv4 address *)
   sprintf "/ip4/%s/tcp/%d/p2p/%s"
-    (Unix.Inet_addr.to_string host)
+    (Core_unix.Inet_addr.to_string host)
     libp2p_port peer_id
 
 let valid_as_peer t =
@@ -40,11 +40,11 @@ let valid_as_peer t =
 let of_file_contents contents : t list =
   String.split ~on:'\n' contents
   |> List.filter_map ~f:(fun full_line ->
-         let s = String.strip full_line in
-         if valid_as_peer s then Some s
-         else if String.is_empty s then None
-         else (
-           [%log' error (Logger.create ())]
-             "Invalid peer $peer found in peers list"
-             ~metadata:[ ("peer", `String s) ] ;
-           None ) )
+      let s = String.strip full_line in
+      if valid_as_peer s then Some s
+      else if String.is_empty s then None
+      else (
+        [%log' error (Logger.create ())]
+          "Invalid peer $peer found in peers list"
+          ~metadata:[ ("peer", `String s) ] ;
+        None ) )

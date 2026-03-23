@@ -49,14 +49,14 @@ let or_timeout ?(timeout = 60) ~msg action =
   Deferred.(
     (* HACK yield to facilitate scheduler to switch between processes
        This shouldn't be necessary, but is required for test not to stall. *)
-    after (Time.Span.of_ms 100.)
+    after (Time_float.Span.of_ms 100.)
     >>= fun () ->
     choose
       [ choice action Fn.id
       ; choice
-          (after (Time.Span.of_int_sec timeout))
+          (after (Time_float.Span.of_int_sec timeout))
           (fun () -> Timeout msg |> raise)
-      ])
+      ] )
 
 let%test_module "all-ipc test" =
   ( module struct
@@ -282,12 +282,12 @@ let%test_module "all-ipc test" =
       let%bind () =
         open_stream a ~protocol ~peer:ad.c_peerid
         >>= (fun stream3_res ->
-              match stream3_res with
-              | Ok s ->
-                  let s_in, _ = Libp2p_stream.pipes s in
-                  Pipe.read s_in >>| expectEof
-              | _ ->
-                  Deferred.unit )
+        match stream3_res with
+        | Ok s ->
+            let s_in, _ = Libp2p_stream.pipes s in
+            Pipe.read s_in >>| expectEof
+        | _ ->
+            Deferred.unit )
         |> or_timeout ~msg:"Stream 3 opening to fail"
       in
 
@@ -326,7 +326,7 @@ let%test_module "all-ipc test" =
           ~f:(fun b_acc pid ->
             b_acc
             && List.fold peers ~init:false ~f:(fun acc p ->
-                   acc || String.equal p.peer_id pid ) ) ) ;
+                acc || String.equal p.peer_id pid ) ) ) ;
 
       (* Ban Carol in Alice's gating config *)
       let%bind _ =

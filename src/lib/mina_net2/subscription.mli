@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Network_peer
 module Id = Libp2p_ipc.Subscription_id
