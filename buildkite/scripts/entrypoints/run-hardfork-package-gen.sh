@@ -58,7 +58,7 @@ function usage() {
   VERSION                            (Optional) The version of the hardfork package to generate (e.g. 3.0.0devnet-tooling-dkijania-hardfork-package-gen-in-nightly-b37f50e)
   PRECOMPUTED_FORK_BLOCK_PREFIX      (Optional) The prefix for precomputed fork block URLs (e.g. gs://mina_network_block_data/mainnet)
   USE_ARTIFACTS_FROM_BUILDKITE_BUILD (Optional) The Buildkite build number to use artifacts from (e.g. 1234)
-  HARDFORK_GENESIS_SLOT_DELTA        (Optional) Number of slots to delay the hard fork genesis slot by (e.g. 0 for no delay)
+  PREFORK_GENESIS_CONFIG             (Optional) Path to prefork genesis config containing daemon.slot_chain_end and daemon.hard_fork_genesis_slot_delta
   USE_GENERIC_DOCKERS_FROM_VERSION   (Optional) Docker version to build config docker on top of (e.g. 3.3.0-compatible-aa34232)
 EOF
   exit 1
@@ -121,12 +121,12 @@ else
   USE_ARTIFACTS_FROM_BUILDKITE_BUILD="(Some \"${USE_ARTIFACTS_FROM_BUILDKITE_BUILD}\")"
 fi
 
-# Format HARDFORK_GENESIS_SLOT_DELTA as Optional Natural for Dhall
-if [[ -z "${HARDFORK_GENESIS_SLOT_DELTA:-}" ]]; then
-  HARDFORK_GENESIS_SLOT_DELTA="(None Natural)"
+# Format PREFORK_GENESIS_CONFIG as Optional Text for Dhall
+if [[ -z "${PREFORK_GENESIS_CONFIG:-}" ]]; then
+  PREFORK_GENESIS_CONFIG="(None Text)"
 else
   # shellcheck disable=SC2089
-  HARDFORK_GENESIS_SLOT_DELTA="(Some ${HARDFORK_GENESIS_SLOT_DELTA})"
+  PREFORK_GENESIS_CONFIG="(Some \"${PREFORK_GENESIS_CONFIG}\")"
 fi
 
 # Format USE_GENERIC_DOCKERS_FROM_VERSION as Optional Text for Dhall
@@ -176,6 +176,6 @@ printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s %s\n
   "$VERSION" \
   "$PRECOMPUTED_FORK_BLOCK_PREFIX" \
   "$USE_ARTIFACTS_FROM_BUILDKITE_BUILD" \
-  "$HARDFORK_GENESIS_SLOT_DELTA" \
+  "$PREFORK_GENESIS_CONFIG" \
   "$USE_GENERIC_DOCKERS_FROM_VERSION" \
    | dhall-to-yaml --quoted
