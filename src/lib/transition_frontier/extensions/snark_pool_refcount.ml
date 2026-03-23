@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Frontier_base
 module Work = Transaction_snark_work.Statement
 
@@ -30,18 +30,18 @@ module T = struct
   let add_to_table t scan_state =
     t.refcount_map <-
       List.fold (get_work scan_state) ~init:t.refcount_map
-        ~f:(Work.Map.update ~f:(Option.value_map ~default:1 ~f:(( + ) 1)))
+        ~f:(Map.update ~f:(Option.value_map ~default:1 ~f:(( + ) 1)))
 
   (** Returns the elements that were removed from the table. *)
   let remove_from_table t scan_state : Work.t list =
     let res, refc =
       List.fold (get_work scan_state) ~init:([], t.refcount_map)
         ~f:(fun (res, refc) work ->
-          match Work.Map.find refc work with
+          match Map.find refc work with
           | Some 1 ->
-              (work :: res, Work.Map.remove refc work)
+              (work :: res, Map.remove refc work)
           | Some count ->
-              (res, Work.Map.set refc ~key:work ~data:(count - 1))
+              (res, Map.set refc ~key:work ~data:(count - 1))
           | None ->
               failwith "Removed a breadcrumb we didn't know about" )
     in
