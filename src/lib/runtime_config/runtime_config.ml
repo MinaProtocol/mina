@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Fork_config = struct
   (* Note that length might be smaller than the gernesis_slot
@@ -836,11 +836,11 @@ module Accounts = struct
     try
       Result.return
       @@ List.map t ~f:(fun x ->
-             match Single.of_json_layout x with
-             | Ok x ->
-                 x
-             | Error err ->
-                 raise (Stop err) )
+          match Single.of_json_layout x with
+          | Ok x ->
+              x
+          | Error err ->
+              raise (Stop err) )
     with Stop err -> Error err
 
   let to_yojson x = Json_layout.Accounts.to_yojson (to_json_layout x)
@@ -1254,8 +1254,9 @@ module Genesis = struct
         ]
     in
     let%map genesis_state_timestamp =
-      Time.(gen_incl epoch (of_string "2050-01-01 00:00:00Z"))
-      |> Quickcheck.Generator.map ~f:Time.to_string
+      Time_float.(
+        gen_incl epoch (of_string_with_utc_offset "2050-01-01 00:00:00Z") )
+      |> Quickcheck.Generator.map ~f:Time_float.to_string_utc
     in
     { k = Some k
     ; delta = Some delta
