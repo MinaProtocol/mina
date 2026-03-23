@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Tree = struct
   type 'a t = Empty | Leaf of 'a | Node of 'a t * 'a t [@@deriving sexp]

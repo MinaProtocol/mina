@@ -1,7 +1,6 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Network_peer
-
 module Id = Unique_id.Int ()
 
 type ('init, 'result) elt =
@@ -61,8 +60,7 @@ let call_verifier t (ps : 'proof list) = t.verifier ps
    We could implement the trusted/untrusted batches from the snark pool batching RFC #4882
    to further mitigate possible DoS/DDoS here
 *)
-let rec determine_outcome :
-    type p r partial.
+let rec determine_outcome : type p r partial.
        (p, r) elt list
     -> [ `Valid of r
        | `Potentially_invalid of partial * Error.t
@@ -292,7 +290,7 @@ module Transaction_pool = struct
               | `Valid c ->
                   `Valid c
               | `Valid_assuming x ->
-                  `Valid_assuming x ) ) )
+                  `Valid_assuming x )) )
 
   let list_of_array_map a ~f = List.init (Array.length a) ~f:(fun i -> f a.(i))
 
@@ -445,7 +443,7 @@ module Snark_pool = struct
         *)
       ~max_weight_per_call:
         (Option.value_map ~default:1000 ~f:Int.of_string
-           (Sys.getenv_opt "MAX_VERIFIER_BATCH_SIZE") )
+           (Sys.getenv "MAX_VERIFIER_BATCH_SIZE") )
       ~compare_init:compare_envelope ~logger
       (fun ps0 ->
         [%log debug] "Dispatching $num_proofs snark pool proofs to verifier"
@@ -484,7 +482,7 @@ module Snark_pool = struct
   let verify' (t : t) ps =
     let open Deferred.Let_syntax in
     let%map invalid =
-      Deferred.List.filter_map ps ~f:(fun p ->
+      Deferred.List.filter_map ps ~how:`Sequential ~f:(fun p ->
           match%map verify t p with
           | Ok () ->
               None
@@ -549,12 +547,11 @@ module Snark_pool = struct
 
       let run_test proof_lists =
         let batcher = create ~proof_cache_db ~logger verifier in
-        Deferred.List.iter proof_lists ~f:(fun (invalid_proofs, proof_list) ->
+        Deferred.List.iter proof_lists ~how:`Sequential
+          ~f:(fun (invalid_proofs, proof_list) ->
             let%map (`Invalid pfs_and_reasons) = verify' batcher proof_list in
             assert (
-              Work_key.Set.equal
-                (Work_key.Map.key_set pfs_and_reasons)
-                invalid_proofs ) )
+              Work_key.Set.equal (Map.key_set pfs_and_reasons) invalid_proofs ) )
 
       let gen ~(valid_count : [ `Any | `Count of int ])
           ~(invalid_count : [ `Any | `Count of int ]) =
@@ -583,8 +580,7 @@ module Snark_pool = struct
                 run_test proof_lists ) )
 
       let%test_unit "some invalid proofs" =
-        Quickcheck.test ~trials:10
-          (gen ~valid_count:`Any ~invalid_count:`Any)
+        Quickcheck.test ~trials:10 (gen ~valid_count:`Any ~invalid_count:`Any)
           ~f:(fun proof_lists ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 run_test proof_lists ) )

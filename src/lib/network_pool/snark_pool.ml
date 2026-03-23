@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Pipe_lib
 open Network_peer
@@ -9,7 +9,7 @@ module Snark_tables = struct
         Ledger_proof.Cached.t One_or_two.t Priced_proof.t
         Transaction_snark_work.Statement.Map.t
     ; rebroadcastable :
-        (Ledger_proof.Cached.t One_or_two.t Priced_proof.t * Core.Time.t)
+        (Ledger_proof.Cached.t One_or_two.t Priced_proof.t * Core.Time_float.t)
         Transaction_snark_work.Statement.Map.t
     }
 end
@@ -30,7 +30,7 @@ module type S = sig
   module For_tests : sig
     val get_rebroadcastable :
          Resource_pool.t
-      -> has_timed_out:(Time.t -> [ `Timed_out | `Ok ])
+      -> has_timed_out:(Time_float.t -> [ `Timed_out | `Ok ])
       -> Resource_pool.Diff.t list
   end
 
@@ -80,13 +80,14 @@ module type Transition_frontier_intf = sig
 end
 
 module Make
-    (Base_ledger : Intf.Base_ledger_intf) (Staged_ledger : sig
+    (Base_ledger : Intf.Base_ledger_intf)
+    (Staged_ledger : sig
       type t
 
       val ledger : t -> Base_ledger.t
     end)
-    (Transition_frontier : Transition_frontier_intf
-                             with type staged_ledger := Staged_ledger.t) =
+    (Transition_frontier :
+      Transition_frontier_intf with type staged_ledger := Staged_ledger.t) =
 struct
   module Resource_pool = struct
     module T = struct
@@ -122,9 +123,9 @@ struct
       let best_tip_ledger t =
         t.frontier ()
         |> Option.map ~f:(fun tf ->
-               Transition_frontier.best_tip tf
-               |> Transition_frontier.Breadcrumb.staged_ledger
-               |> Staged_ledger.ledger )
+            Transition_frontier.best_tip tf
+            |> Transition_frontier.Breadcrumb.staged_ledger
+            |> Staged_ledger.ledger )
 
       let best_tip_table t =
         t.frontier () |> Option.map ~f:Transition_frontier.best_tip_table
@@ -132,7 +133,7 @@ struct
       let work_is_referenced t work =
         t.frontier ()
         |> Option.value_map ~default:false ~f:(fun tf ->
-               Transition_frontier.work_is_referenced tf work )
+            Transition_frontier.work_is_referenced tf work )
 
       let snark_pool_json t : Yojson.Safe.t =
         `List
@@ -170,10 +171,10 @@ struct
         let account_ids =
           !(t.snark_tables).all |> Map.data
           |> List.map ~f:(fun { Priced_proof.fee = { prover; _ }; _ } ->
-                 prover )
+              prover )
           |> List.dedup_and_sort ~compare:Public_key.Compressed.compare
           |> List.map ~f:(fun prover ->
-                 (prover, Account_id.create prover Token_id.default) )
+              (prover, Account_id.create prover Token_id.default) )
           |> Public_key.Compressed.Map.of_alist_exn
         in
         (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
@@ -211,13 +212,13 @@ struct
           } ;
         Mina_metrics.(
           Gauge.set Snark_work.snark_pool_size
-            (Float.of_int @@ Map.length !(t.snark_tables).all))
+            (Float.of_int @@ Map.length !(t.snark_tables).all) )
 
       let handle_transition_frontier_diff u t =
         match u with
         | `New_best_tip ledger ->
             O1trace.sync_thread "apply_new_best_tip_ledger_to_snark_pool"
-              (fun () -> handle_new_best_tip_ledger t ledger)
+              (fun () -> handle_new_best_tip_ledger t ledger )
         | `Refcount_update refcount_update ->
             O1trace.sync_thread "apply_refcount_update_to_snark_pool" (fun () ->
                 handle_refcount_update t refcount_update )
@@ -238,9 +239,9 @@ struct
                   (Transition_frontier.best_tip_diff_pipe tf) ~f:(fun _ ->
                     Strict_pipe.Writer.write tf_diff_writer
                       (`New_best_tip
-                        ( Transition_frontier.best_tip tf
-                        |> Transition_frontier.Breadcrumb.staged_ledger
-                        |> Staged_ledger.ledger ) ) )
+                         ( Transition_frontier.best_tip tf
+                         |> Transition_frontier.Breadcrumb.staged_ledger
+                         |> Staged_ledger.ledger ) ) )
                 |> Deferred.don't_wait_for ;
                 return ()
             | None ->
@@ -285,25 +286,25 @@ struct
             { all = Map.set !(t.snark_tables).all ~key:work ~data:{ proof; fee }
             ; rebroadcastable =
                 ( if is_local then
-                  Map.set !(t.snark_tables).rebroadcastable ~key:work
-                    ~data:({ proof; fee }, Time.now ())
-                else
-                  (* Stop rebroadcasting locally generated snarks if they are
+                    Map.set !(t.snark_tables).rebroadcastable ~key:work
+                      ~data:({ proof; fee }, Time_float.now ())
+                  else
+                    (* Stop rebroadcasting locally generated snarks if they are
                      overwritten. No-op if there is no rebroadcastable SNARK with that
                      statement. *)
-                  Map.remove !(t.snark_tables).rebroadcastable work )
+                    Map.remove !(t.snark_tables).rebroadcastable work )
             } ;
           (*when snark work is added to the pool*)
           Mina_metrics.(
             Gauge.set Snark_work.useful_snark_work_received_time_sec
-              Time.(
+              Time_float.(
                 let x = now () |> to_span_since_epoch |> Span.to_sec in
-                x -. Mina_metrics.time_offset_sec) ;
+                x -. Mina_metrics.time_offset_sec ) ;
             Gauge.set Snark_work.snark_pool_size
               (Float.of_int @@ Map.length !(t.snark_tables).all) ;
             Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
               ( fee.Mina_base.Fee_with_prover.fee
-              |> Currency.Fee.to_nanomina_int |> Float.of_int )) ;
+              |> Currency.Fee.to_nanomina_int |> Float.of_int ) ) ;
           `Added )
         else
           let origin = if is_local then "locally generated" else "gossiped" in
@@ -411,7 +412,7 @@ struct
                   , Mina_base.Permissions.Auth_required.to_yojson
                       (Option.value_map account_opt
                          ~default:Mina_base.Permissions.user_default
-                         ~f:(fun (a : Mina_base.Account.t) -> a.permissions) )
+                         ~f:(fun (a : Mina_base.Account.t) -> a.permissions ) )
                         .receive )
                 :: metadata ) ;
             invalid "prover not permitted to receive fees" )
@@ -425,8 +426,8 @@ struct
           else
             let%bind.Deferred.Result _ = statement_check () in
             let log ?punish e =
-              Deferred.List.iter (One_or_two.to_list proofs) ~f:(fun (_, s) ->
-                  log_and_punish ?punish s e )
+              Deferred.List.iter (One_or_two.to_list proofs) ~how:`Sequential
+                ~f:(fun (_, s) -> log_and_punish ?punish s e )
             in
             let proof_env =
               Envelope.Incoming.wrap
@@ -488,11 +489,11 @@ struct
       | Some best_tips ->
           Map.to_alist !(t.snark_tables).rebroadcastable
           |> List.filter_map ~f:(fun (stmt, (snark, _time)) ->
-                 if Set.mem best_tips stmt then
-                   Some
-                     (Diff.Cached.read_all_proofs_from_disk
-                        (Diff.Cached.Add_solved_work (stmt, snark)) )
-                 else None )
+              if Set.mem best_tips stmt then
+                Some
+                  (Diff.Cached.read_all_proofs_from_disk
+                     (Diff.Cached.Add_solved_work (stmt, snark)) )
+              else None )
 
     let remove_solved_work t work =
       t.snark_tables :=
@@ -655,7 +656,8 @@ let%test_module "random set test" =
           (List.unzip sample_solved_work |> fst)
       in
       let%map () =
-        Deferred.List.iter sample_solved_work ~f:(fun (work, fee) ->
+        Deferred.List.iter sample_solved_work ~how:`Sequential
+          ~f:(fun (work, fee) ->
             let%map res = apply_diff pool work fee in
             assert (Result.is_ok res) )
       in
@@ -675,8 +677,7 @@ let%test_module "random set test" =
             ~f:(fun acc (work, fee, some_other_pk) ->
               (*Making it invalid by forging*)
               let invalid_sok_digest =
-                Sok_message.(
-                  digest @@ create ~prover:some_other_pk ~fee:fee.fee)
+                Sok_message.(digest @@ create ~prover:some_other_pk ~fee:fee.fee)
               in
               ( work
               , One_or_two.map work ~f:(fun statement ->
@@ -707,7 +708,7 @@ let%test_module "random set test" =
                   (List.map invalid_work_lst ~f:(fun (stmt, _, _, _) -> stmt))
               in
               let%map () =
-                Deferred.List.iter invalid_work_lst
+                Deferred.List.iter invalid_work_lst ~how:`Sequential
                   ~f:(fun (statements, proofs, fee, _) ->
                     let diff =
                       Mock_snark_pool.Resource_pool.Diff.Add_solved_work
@@ -723,9 +724,9 @@ let%test_module "random set test" =
               [%test_eq: Transaction_snark_work.Info.t list] completed_works
                 (Mock_snark_pool.Resource_pool.all_completed_work t) ) )
 
-    let%test_unit "When two priced proofs of the same work are inserted into \
-                   the snark pool, the fee of the work is at most the minimum \
-                   of those fees" =
+    let%test_unit
+        "When two priced proofs of the same work are inserted into the snark \
+         pool, the fee of the work is at most the minimum of those fees" =
       Quickcheck.test ~trials:5
         (Async.Quickcheck.Generator.tuple4 (gen ())
            Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
@@ -746,9 +747,9 @@ let%test_module "random set test" =
               in
               assert (Currency.Fee.(fee <= fee_upper_bound)) ) )
 
-    let%test_unit "A priced proof of a work will replace an existing priced \
-                   proof of the same work only if it's fee is smaller than the \
-                   existing priced proof" =
+    let%test_unit
+        "A priced proof of a work will replace an existing priced proof of the \
+         same work only if it's fee is smaller than the existing priced proof" =
       Quickcheck.test ~trials:5
         (Quickcheck.Generator.tuple4 (gen ())
            Mocks.Transaction_snark_work.Statement.gen Fee_with_prover.gen
@@ -778,8 +779,9 @@ let%test_module "random set test" =
         (Quickcheck.random_value ~seed:(`Deterministic "worktest")
            Transaction_snark.Statement.gen )
 
-    let%test_unit "Work that gets fed into apply_and_broadcast will be \
-                   received in the pool's reader" =
+    let%test_unit
+        "Work that gets fed into apply_and_broadcast will be received in the \
+         pool's reader" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let frontier_broadcast_pipe_r, _ =
             Broadcast_pipe.create (Some (Mocks.Transition_frontier.create []))
@@ -831,9 +833,9 @@ let%test_module "random set test" =
             (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) ;
           Deferred.unit )
 
-    let%test_unit "when creating a network, the incoming diffs and locally \
-                   generated diffs in reader pipes will automatically get \
-                   process" =
+    let%test_unit
+        "when creating a network, the incoming diffs and locally generated \
+         diffs in reader pipes will automatically get process" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let work_count = 10 in
           let works =
@@ -870,17 +872,16 @@ let%test_module "random set test" =
             in
             List.map (List.take works per_reader) ~f:create_work
             |> List.map ~f:(fun work ->
-                   ( Envelope.Incoming.local work
-                   , Mina_net2.Validation_callback.create_without_expiration ()
-                   ) )
+                ( Envelope.Incoming.local work
+                , Mina_net2.Validation_callback.create_without_expiration () ) )
             |> List.iter ~f:(fun diff ->
-                   Mock_snark_pool.Remote_sink.push remote_sink diff
-                   |> Deferred.don't_wait_for ) ;
+                Mock_snark_pool.Remote_sink.push remote_sink diff
+                |> Deferred.don't_wait_for ) ;
             (* locally generated diffs *)
             List.map (List.drop works per_reader) ~f:create_work
             |> List.iter ~f:(fun diff ->
-                   Mock_snark_pool.Local_sink.push local_sink (diff, Fn.const ())
-                   |> Deferred.don't_wait_for ) ;
+                Mock_snark_pool.Local_sink.push local_sink (diff, Fn.const ())
+                |> Deferred.don't_wait_for ) ;
             don't_wait_for
             @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
                  ~f:(fun With_nonce.{ message = work_command; _ } ->

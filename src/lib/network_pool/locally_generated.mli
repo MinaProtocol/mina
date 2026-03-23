@@ -1,6 +1,6 @@
 type key = Mina_transaction.Transaction_hash.User_command_with_valid_signature.t
 
-type value = Core_kernel.Time.t * [ `Batch of int ]
+type value = Core.Time_float.t * [ `Batch of int ]
 
 type t
 
@@ -16,7 +16,7 @@ val update : t -> key -> f:(value option -> value) -> unit
 
 val filteri_inplace : t -> f:(key:key -> data:value -> bool) -> unit
 
-val to_alist : t -> (key * (Core_kernel.Time.t * [ `Batch of int ])) list
+val to_alist : t -> (key * (Core.Time_float.t * [ `Batch of int ])) list
 
 val iter_intersection : t -> t -> f:(key:key -> value -> value -> unit) -> unit
 
