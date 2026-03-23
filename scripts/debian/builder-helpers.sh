@@ -471,15 +471,19 @@ build_daemon_config_deb() {
 
   local package_name="mina-${network}-config"
 
+  # Config package doesn't have any binaries, but we need to include
+  # the common utils for hardfork packages that rely on some of the configs here.
+  # that's why we are using all as architecture.
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
   create_control_file "${package_name}" "" \
      "Mina Protocol Config for daemons running under ${network}" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_configs "${network}"
 
-  # Config package doesn't have any binaries, but we need to include
-  # the common utils for hardfork packages that rely on some of the configs here.
-  # that's why we are using all as architecture.
-  ARCHITECTURE=all build_deb "${package_name}"
+  build_deb "${package_name}"
+  ARCHITECTURE="${saved_arch}"
 }
 ## END CONFIG PACKAGE ##
 
@@ -652,15 +656,19 @@ build_daemon_hardfork_config_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building hardfork config for ${network} network deb without keys:"
 
+  # Config package doesn't have any binaries, but we need to include
+  # the common utils for hardfork packages that rely on some of the configs here.
+  # that's why we are using all as architecture.
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
   create_control_file "${package_name}" "" \
     "Mina Protocol hardfork config for the ${network} Network" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_hardfork_configs "${network}"
 
-  # Config package doesn't have any binaries, but we need to include
-  # the common utils for hardfork packages that rely on some of the configs here.
-  # that's why we are using all as architecture.
-  ARCHITECTURE=all build_deb "${package_name}"
+  build_deb "${package_name}"
+  ARCHITECTURE="${saved_arch}"
 }
 
 ## END HARDFORK PACKAGE ##
