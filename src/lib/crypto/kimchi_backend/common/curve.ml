@@ -1,5 +1,5 @@
 open Kimchi_pasta_snarky_backend.Intf
-open Core_kernel
+open Core
 
 module type Input_intf = sig
   module BaseField : sig

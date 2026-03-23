@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Kimchi_pasta_snarky_backend.Intf
 
 module type Inputs_intf = sig

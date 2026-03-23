@@ -113,7 +113,7 @@ module type Inputs_intf = sig
 end
 
 module Make (Inputs : Inputs_intf) = struct
-  open Core_kernel
+  open Core
 
   type t = { index : Inputs.Index.t; cs : Inputs.Constraint_system.t }
 
