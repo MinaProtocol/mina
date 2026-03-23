@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Signature_lib
 open Base_quickcheck
 

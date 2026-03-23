@@ -1,5 +1,5 @@
 module Bignum_bigint = Bigint
-open Core_kernel
+open Core
 
 module type Message_intf = sig
   type field

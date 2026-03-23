@@ -26,7 +26,7 @@
   ;; opam libraries
   sexplib0
   result
-  core_kernel
+  core
   base.caml
   bin_prot.shape
   ;; local libraries

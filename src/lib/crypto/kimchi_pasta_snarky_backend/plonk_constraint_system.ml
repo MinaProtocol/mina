@@ -51,7 +51,7 @@ end
 
 (** A row indexing in a constraint system. *)
 module Row = struct
-  open Core_kernel
+  open Core
 
   (** Either a public input row,
       or a non-public input row that starts at index 0.
@@ -71,7 +71,7 @@ end
 
 (** A position represents the position of a cell in the constraint system. *)
 module Position = struct
-  open Core_kernel
+  open Core
 
   (** A position is a row and a column. *)
   type 'row t = { row : 'row; col : int } [@@deriving hash, sexp, compare]
@@ -106,7 +106,7 @@ end
 
 (** A gate. *)
 module Gate_spec = struct
-  open Core_kernel
+  open Core
 
   (* TODO: split kind/coeffs from row/wired_to *)
 
@@ -150,7 +150,7 @@ end
 (** The PLONK constraints. *)
 module Plonk_constraint = struct
   module T = struct
-    open Core_kernel
+    open Core
 
     type ('field_var, 'fp) basic =
       | Boolean of 'field_var
@@ -343,7 +343,7 @@ module Plonk_constraint = struct
   include T
 
   module Make (Fp : Field.S) = struct
-    open Core_kernel
+    open Core
     include T
 
     type t = (Fp.t Snarky_backendless.Cvar.t, Fp.t) basic [@@deriving sexp]
@@ -760,7 +760,7 @@ end
 module Internal_var = Core_kernel.Unique_id.Int ()
 
 module V = struct
-  open Core_kernel
+  open Core
 
   module T = struct
     (** Variables linking uses of the same data between different gates.
@@ -929,7 +929,7 @@ module Make
     (Params : sig
       val params : Fp.t Params.t
     end) : sig
-  open Core_kernel
+  open Core
 
   type nonrec t = (Fp.t, Gates.t) t
 
@@ -1012,7 +1012,7 @@ module Make
 
   val dump_extra_circuit_data : t -> string -> unit
 end = struct
-  open Core_kernel
+  open Core
   module Constraint = Plonk_constraint.Make (Fp)
 
   type constraint_ = Constraint.t

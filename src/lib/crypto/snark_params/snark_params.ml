@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Bitstring_lib
 open Snark_bits
 

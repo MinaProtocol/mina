@@ -12,7 +12,7 @@
     - {!Plonk_constraint.EC_scale} for the constraint using this type
     - [kimchi/src/circuits/polynomials/varbasemul.rs] for Rust impl *)
 
-open Core_kernel
+open Core
 
 (** Round state for variable-base scalar multiplication.
 
