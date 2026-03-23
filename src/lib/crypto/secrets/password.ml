@@ -1,7 +1,7 @@
 open Core
 
 let read_hidden_line ~error_help_message prompt : Bytes.t Async.Deferred.t =
-  let open Unix in
+  let open Core_unix in
   let open Async_unix in
   let open Async.Deferred.Let_syntax in
   let isatty = isatty stdin in
