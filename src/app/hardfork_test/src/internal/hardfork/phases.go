@@ -320,7 +320,7 @@ func (t *HardforkTest) autoFork(daemon config.DaemonInfo, analysis BlockAnalysis
 		})
 		// ----------------------------------------------
 
-		return fmt.Errorf("Node %s haven't create activated file at %s, meaning it's not completed auto config generation!", activatedFile, daemon.Name)
+		return fmt.Errorf("Node %s haven't create an activated file at %s, meaning it's not completed auto config generation!", daemon.Name, activatedFile)
 	}
 
 	if err := t.validateAutoForkData(daemon, forkDataPath, analysis, mainGenesisTs); err != nil {
