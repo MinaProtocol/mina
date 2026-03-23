@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snark_work_lib
 
 (** [t] is a pool for zkapp segments and mergeable proofs corresponding to a
@@ -26,7 +26,7 @@ val next_subzkapp_job_spec :
    invalid or some corresponded segment proof is already present in [t] *)
 val submit_proof :
      proof:Ledger_proof.t
-  -> elapsed:Core_kernel_private.Span_float.t
+  -> elapsed:Time_float.Span.t
   -> range:Id.Range.Stable.Latest.t
   -> t
   -> unit Or_error.t
@@ -37,5 +37,5 @@ val try_finalize :
      t
   -> ( (Spec.Single.t, Id.Single.t) With_job_meta.t
      * Ledger_proof.t
-     * Time.Stable.Span.V1.t )
+     * Time_float.Stable.Span.V1.t )
      option

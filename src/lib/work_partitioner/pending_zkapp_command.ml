@@ -1,6 +1,6 @@
 (* NOTE: Assumption: order of merging segments satisfy associativity. *)
 
-open Core_kernel
+open Core
 open Snark_work_lib
 module Range = Id.Range.Stable.Latest
 module RangeMap = Map.Make (Range)
@@ -13,7 +13,7 @@ type t =
   ; mutable pending_mergeable_proofs : Ledger_proof.t RangeMap.t
         (* A map tracking all proofs for this zkapp we have in coordinator and
            their corresponding range of segments. *)
-  ; mutable elapsed : Time.Stable.Span.V1.t
+  ; mutable elapsed : Time_float.Stable.Span.V1.t
         (** The total work time for all SNARK workers combined to prove this
             specific zkapp command. I.e. the time it would take a single SNARK
             worker to generate the final proof of this command. *)
@@ -29,7 +29,7 @@ let create_and_yield_segment ~job
   let unscheduled_segments_with_range =
     unscheduled_segments
     |> Mina_stdlib.Nonempty_list.mapi ~f:(fun idx spec ->
-           (spec, Id.Range.{ first = idx; last = idx }) )
+        (spec, Id.Range.{ first = idx; last = idx }) )
   in
   let ( (first_segment_spec, first_segment_range)
       , unscheduled_segments_with_range_rest ) =
@@ -38,7 +38,7 @@ let create_and_yield_segment ~job
   ( { job
     ; unscheduled_segments = Queue.of_list unscheduled_segments_with_range_rest
     ; pending_mergeable_proofs = RangeMap.empty
-    ; elapsed = Time.Span.zero
+    ; elapsed = Time_float.Span.zero
     ; proofs_in_flight = 1
     }
   , first_segment_spec
@@ -57,15 +57,13 @@ let next_merge (t : t) =
       , proof2 ) =
     t.proofs_in_flight <- t.proofs_in_flight + 1 ;
     t.pending_mergeable_proofs <-
-      RangeMap.remove
-        (RangeMap.remove t.pending_mergeable_proofs last_range)
-        this_range ;
+      Map.remove (Map.remove t.pending_mergeable_proofs last_range) this_range ;
     let new_range =
       Range.{ first = first_segment_of_proof1; last = last_segment_of_proof2 }
     in
     (Spec.Sub_zkapp.Stable.Latest.Merge { proof1; proof2 }, new_range)
   in
-  RangeMap.to_sequence ~order:`Increasing_key t.pending_mergeable_proofs
+  Map.to_sequence ~order:`Increasing_key t.pending_mergeable_proofs
   |> Sequence.fold_until ~init:None ~finish:(const None)
        ~f:(fun last_element_opt (this_range, proof2) ->
          match last_element_opt with
@@ -88,15 +86,16 @@ let next_subzkapp_job_spec (t : t) :
     (Spec.Sub_zkapp.Stable.Latest.t * Range.t) option =
   match next_merge t with Some _ as ret -> ret | None -> next_segment t
 
-let submit_proof ~(proof : Ledger_proof.t) ~(elapsed : Time.Stable.Span.V1.t)
+let submit_proof ~(proof : Ledger_proof.t)
+    ~(elapsed : Time_float.Stable.Span.V1.t)
     ~range:(Range.{ first; last } as range) (t : t) =
   let should_accept =
     first <= last
-    && RangeMap.closest_key t.pending_mergeable_proofs `Greater_or_equal_to
+    && Map.closest_key t.pending_mergeable_proofs `Greater_or_equal_to
          Range.{ first = last; last }
        |> Option.value_map ~default:true
-            ~f:(fun (Range.{ first = next_first; _ }, _) -> last < next_first)
-    && RangeMap.closest_key t.pending_mergeable_proofs `Less_or_equal_to
+            ~f:(fun (Range.{ first = next_first; _ }, _) -> last < next_first )
+    && Map.closest_key t.pending_mergeable_proofs `Less_or_equal_to
          Range.{ first; last = first }
        |> Option.value_map ~default:true
             ~f:(fun (Range.{ last = previous_last; _ }, _) ->
@@ -104,9 +103,9 @@ let submit_proof ~(proof : Ledger_proof.t) ~(elapsed : Time.Stable.Span.V1.t)
   in
   if should_accept then (
     t.pending_mergeable_proofs <-
-      RangeMap.add_exn ~key:range ~data:proof t.pending_mergeable_proofs ;
+      Map.add_exn ~key:range ~data:proof t.pending_mergeable_proofs ;
     t.proofs_in_flight <- t.proofs_in_flight - 1 ;
-    t.elapsed <- Time.Span.(t.elapsed + elapsed) ;
+    t.elapsed <- Time_float.Span.(t.elapsed + elapsed) ;
     Ok () )
   else
     let msg =
@@ -121,10 +120,10 @@ let try_finalize (t : t) =
   if
     t.proofs_in_flight = 0
     && Queue.is_empty t.unscheduled_segments
-    && RangeMap.length t.pending_mergeable_proofs = 1
+    && Map.length t.pending_mergeable_proofs = 1
   then
     Some
       ( t.job
-      , RangeMap.min_elt_exn t.pending_mergeable_proofs |> Tuple2.get2
+      , Map.min_elt_exn t.pending_mergeable_proofs |> Tuple2.get2
       , t.elapsed )
   else None
