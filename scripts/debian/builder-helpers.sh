@@ -474,6 +474,9 @@ build_daemon_config_deb() {
   # Config package doesn't have any binaries, but we need to include
   # the common utils for hardfork packages that rely on some of the configs here.
   # that's why we are using all as architecture.
+
+  # Save and reset architecture to all for config package, since it doesn't contain any binaries but we want to make sure it's available for all architectures.
+  # We will restore the original architecture after building the package.
   local saved_arch="${ARCHITECTURE}"
   ARCHITECTURE=all
 
@@ -659,6 +662,9 @@ build_daemon_hardfork_config_deb() {
   # Config package doesn't have any binaries, but we need to include
   # the common utils for hardfork packages that rely on some of the configs here.
   # that's why we are using all as architecture.
+
+  # Save and reset architecture to all for hardfork config package, since it doesn't contain any binaries but we want to make sure it's available for all architectures.
+  # We will restore the original architecture after building the package.
   local saved_arch="${ARCHITECTURE}"
   ARCHITECTURE=all
 
