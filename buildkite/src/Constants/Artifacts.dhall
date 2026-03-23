@@ -24,11 +24,13 @@ let Artifact
       | BatchTxn
       | Rosetta
       | RosettaAppsOnly
+      | RosettaConfig
       | ZkappTestTransaction
       | FunctionalTestSuite
       | Toolchain
       | CreatePreforkGenesis
       | DelegationVerifier
+      | DaemonStorageToolbox
       >
 
 let AllButTests =
@@ -45,9 +47,11 @@ let AllButTests =
       , Artifact.Rosetta
       , Artifact.ZkappTestTransaction
       , Artifact.RosettaAppsOnly
+      , Artifact.RosettaConfig
       , Artifact.Toolchain
       , Artifact.CreatePreforkGenesis
       , Artifact.DelegationVerifier
+      , Artifact.DaemonStorageToolbox
       ]
 
 let Main =
@@ -75,11 +79,13 @@ let capitalName =
             , BatchTxn = "BatchTxn"
             , Rosetta = "Rosetta"
             , RosettaAppsOnly = "RosettaAppsOnly"
+            , RosettaConfig = "RosettaConfig"
             , ZkappTestTransaction = "ZkappTestTransaction"
             , DelegationVerifier = "DelegationVerifier"
             , FunctionalTestSuite = "FunctionalTestSuite"
             , Toolchain = "Toolchain"
             , CreatePreforkGenesis = "CreatePreforkGenesis"
+            , DaemonStorageToolbox = "DaemonStorageToolbox"
             }
             artifact
 
@@ -98,9 +104,11 @@ let lowerName =
             , BatchTxn = "batch_txn"
             , Rosetta = "rosetta"
             , RosettaAppsOnly = "rosetta_apps_only"
+            , RosettaConfig = "rosetta_config"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , CreatePreforkGenesis = "create_prefork_genesis"
+            , DaemonStorageToolbox = "daemon_storage_toolbox"
             , Toolchain = "toolchain"
             , DelegationVerifier = "delegation_verifier"
             }
@@ -120,12 +128,14 @@ let dockerName =
             , BatchTxn = "mina-batch-txn"
             , Rosetta = "mina-rosetta"
             , RosettaAppsOnly = "mina-rosetta"
+            , RosettaConfig = "mina-rosetta-config"
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
             , FunctionalTestSuite = "mina-test-suite"
             , Toolchain = "mina-toolchain"
             , CreatePreforkGenesis = ""
             , DelegationVerifier = "mina-delegation-verifier"
-            , DaemonConfig = ""
+            , DaemonStorageToolbox = "mina-daemon-storage-toolbox"
+            , DaemonConfig = "mina-daemon-configured"
             }
             artifact
 
@@ -145,7 +155,8 @@ let toDebianName =
             , DaemonPrefork = "daemon_${Network.lowerName network}_prefork"
             , DaemonLegacyHardfork =
                 "daemon_${Network.lowerName network}_hardfork_config"
-            , DaemonAutoHardfork = ""
+            , DaemonAutoHardfork =
+                "daemon_${Network.lowerName network}_postfork"
             , DaemonAppsOnly = "daemon_${Network.lowerName network}_generic"
             , LogProc = "logproc"
             , Archive = "archive_${Network.lowerName network}"
@@ -153,6 +164,7 @@ let toDebianName =
             , BatchTxn = "batch_txn"
             , Rosetta = "rosetta_${Network.lowerName network}"
             , RosettaAppsOnly = ""
+            , RosettaConfig = "rosetta_config_${Network.lowerName network}"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = ""
@@ -160,6 +172,7 @@ let toDebianName =
             , CreatePreforkGenesis =
                 "prefork_${Network.lowerName network}_genesis_ledger"
             , DaemonConfig = "daemon_${Network.lowerName network}_config"
+            , DaemonStorageToolbox = "daemon_storage_toolbox"
             }
             artifact
 
@@ -184,10 +197,12 @@ let toDebianNames =
                           , BatchTxn = [ "batch_txn" ]
                           , Rosetta = [ toDebianName a network ]
                           , RosettaAppsOnly = [ toDebianName a network ]
+                          , RosettaConfig = [ toDebianName a network ]
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
                           , CreatePreforkGenesis = [ toDebianName a network ]
                           , DelegationVerifier = [ "delegation_verify" ]
+                          , DaemonStorageToolbox = [ "daemon_storage_toolbox" ]
                           , Toolchain = [] : List Text
                           }
                           a
@@ -260,6 +275,8 @@ let dockerTag =
                 , BatchTxn = "${spec.version}"
                 , Rosetta =
                     "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
+                , RosettaConfig =
+                    "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
                 , RosettaAppsOnly =
                     "${spec.version}${network_part}-generic${extraordinary_profile_part}${extra_build_flags_part}"
                 , ZkappTestTransaction = "${spec.version}"
@@ -269,6 +286,7 @@ let dockerTag =
                 , DelegationVerifier = "${spec.version}"
                 , CreatePreforkGenesis = "${spec.version}"
                 , DaemonConfig = "${spec.version}"
+                , DaemonStorageToolbox = "${spec.version}"
                 }
                 spec.artifact
 

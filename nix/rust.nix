@@ -14,8 +14,8 @@ let
     };
   toolchainHashes = {
     "1.92.0" = "sha256-sqSWJDUxc+zaz1nBWMAJKTAGBuGWP25GCftIOlCEAtA=";
-    "nightly-2024-09-05" =
-      "sha256-3aoA7PuH09g8F+60uTUQhnHrb/ARDLueSOD08ZVsWe0=";
+    "nightly-2025-12-11" =
+      "sha256-Z8PetnKGSZjqRtodJ20XqBoTe2qNG0RaklrVW7AQ3JE=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
     # That is,
     # 1. Put the correct version name;
@@ -111,8 +111,6 @@ in {
     in {
       lockFileContents =
         fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
-      outputHashes =
-        narHashesFromCargoLock ../src/lib/crypto/proof-systems/Cargo.lock;
     };
     buildPhase = ''
       cargo build -p kimchi-stubs --release --lib
@@ -146,7 +144,7 @@ in {
     '';
   };
 
-  kimchi_wasm = let
+  plonk_wasm = let
     lock = ../src/lib/crypto/proof-systems/Cargo.lock;
 
     deps = builtins.listToAttrs (map (pkg: {
@@ -188,7 +186,7 @@ in {
       '';
     };
   in rustPlatform.buildRustPackage {
-    pname = "kimchi_wasm";
+    pname = "plonk_wasm";
     version = "0.1.0";
     src = final.lib.sourceByRegex ../src [
       "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
@@ -220,9 +218,17 @@ in {
       runHook preBuild
       (
       set -x
-      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs kimchi-wasm -- --features nodejs -Z build-std=panic_abort,std
-      wasm-pack build --mode no-install --target web --out-dir $out/web kimchi-wasm -Z build-std=panic_abort,std
+      export RUSTFLAGS="\
+      -C target-feature=+atomics,+bulk-memory,+mutable-globals \
+      -C link-arg=--import-memory \
+      -C link-arg=--shared-memory \
+      -C link-arg=--export=__wasm_init_tls \
+      -C link-arg=--export=__tls_base \
+      -C link-arg=--export=__tls_size \
+      -C link-arg=--export=__tls_align \
+      -C link-arg=--max-memory=4294967296"
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs plonk-wasm -- --features nodejs -Z build-std=panic_abort,std
+      wasm-pack build --mode no-install --target web --out-dir $out/web plonk-wasm -Z build-std=panic_abort,std
       )
       runHook postBuild
     '';

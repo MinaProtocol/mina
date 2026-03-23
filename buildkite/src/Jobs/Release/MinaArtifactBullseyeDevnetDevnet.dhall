@@ -15,6 +15,7 @@ in  Pipeline.build
             [ Artifacts.Type.Daemon
             , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonConfig
+            , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.DaemonPrefork
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.LogProc
@@ -23,6 +24,7 @@ in  Pipeline.build
             , Artifacts.Type.TestExecutive
             , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Devnet
           , tags =

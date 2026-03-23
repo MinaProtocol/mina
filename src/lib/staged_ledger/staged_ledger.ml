@@ -31,7 +31,7 @@ module Pre_statement = struct
     ; first_pass_ledger_target_hash : Ledger_hash.t
     ; pending_coinbase_stack_source : Pending_coinbase.Stack_versioned.t
     ; pending_coinbase_stack_target : Pending_coinbase.Stack_versioned.t
-    ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
+    ; init_stack : Pending_coinbase.Stack_versioned.t
     }
 end
 
@@ -44,11 +44,7 @@ module T = struct
       | Non_zero_fee_excess of
           Scan_state.Space_partition.t * Transaction.t With_status.t list
       | Invalid_proofs of
-          ( Ledger_proof.t
-          * Transaction_snark.Statement.t
-          * Mina_base.Sok_message.t )
-          list
-          * Error.t
+          (Ledger_proof.t * Transaction_snark.Statement.t) list * Error.t
       | Couldn't_reach_verifier of Error.t
       | Pre_diff of Pre_diff_info.Error.t
       | Insufficient_work of string
@@ -76,16 +72,12 @@ module T = struct
             pre_diff_error
       | Invalid_proofs (ts, err) ->
           Format.asprintf
-            !"Verification failed for proofs with (statement, work_id, \
-              prover): %{sexp: (Transaction_snark.Statement.t * int * string) \
-              list}\n\
+            !"Verification failed for proofs with (statement, work_id): \
+              %{sexp: (Transaction_snark.Statement.t * int) list}\n\
               Error:\n\
               %s"
-            (List.map ts ~f:(fun (_p, s, m) ->
-                 ( s
-                 , Transaction_snark.Statement.hash s
-                 , Yojson.Safe.to_string
-                   @@ Public_key.Compressed.to_yojson m.prover ) ) )
+            (List.map ts ~f:(fun (_p, s) ->
+                 (s, Transaction_snark.Statement.hash s) ) )
             (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err))
       | Insufficient_work str ->
           str
@@ -119,25 +111,19 @@ module T = struct
   let verify_proofs ~logger ~verifier proofs =
     let statements () =
       `List
-        (List.map proofs ~f:(fun (_, s, _) ->
+        (List.map proofs ~f:(fun (_, s) ->
              Transaction_snark.Statement.to_yojson s ) )
     in
     let log_error err_str ~metadata =
       [%log warn]
         ~metadata:
-          ( [ ("statements", statements ())
-            ; ("error", `String err_str)
-            ; ( "sok_messages"
-              , `List
-                  (List.map proofs ~f:(fun (_, _, m) -> Sok_message.to_yojson m))
-              )
-            ]
+          ( [ ("statements", statements ()); ("error", `String err_str) ]
           @ metadata )
         "Invalid transaction snark for statement $statement: $error" ;
       Deferred.return (Or_error.error_string err_str)
     in
     if
-      List.exists proofs ~f:(fun (proof, statement, _msg) ->
+      List.exists proofs ~f:(fun (proof, statement) ->
           not
             (Transaction_snark.Statement.equal
                (Ledger_proof.statement proof)
@@ -147,7 +133,7 @@ module T = struct
         ~metadata:
           [ ( "statements_from_proof"
             , `List
-                (List.map proofs ~f:(fun (p, _, _) ->
+                (List.map proofs ~f:(fun (p, _) ->
                      Transaction_snark.Statement.to_yojson
                        (Ledger_proof.statement p) ) ) )
           ]
@@ -155,7 +141,7 @@ module T = struct
       let start = Time.now () in
       match%map
         Verifier.verify_transaction_snarks verifier
-          (List.map proofs ~f:(fun (proof, _, msg) -> (proof, msg)))
+          (List.map proofs ~f:(fun (proof, _) -> proof))
       with
       | Ok b ->
           let time_ms = Time.abs_diff (Time.now ()) start |> Time.Span.to_ms in
@@ -163,7 +149,7 @@ module T = struct
             ~metadata:
               [ ( "work_id"
                 , `List
-                    (List.map proofs ~f:(fun (_, s, _) ->
+                    (List.map proofs ~f:(fun (_, s) ->
                          `Int (Transaction_snark.Statement.hash s) ) ) )
               ; ("time", `Float time_ms)
               ]
@@ -174,7 +160,7 @@ module T = struct
             ~metadata:
               [ ( "statement"
                 , `List
-                    (List.map proofs ~f:(fun (_, s, _) ->
+                    (List.map proofs ~f:(fun (_, s) ->
                          Transaction_snark.Statement.to_yojson s ) ) )
               ; ("error", Error_json.error_to_yojson e)
               ]
@@ -189,25 +175,40 @@ module T = struct
                match f x with Some y -> y | None -> return None ) ) )
 
   let verify ~logger ~verifier job_msg_proofs =
-    let open Deferred.Let_syntax in
-    match
-      map_opt job_msg_proofs ~f:(fun (job, msg, proof) ->
-          Option.map (Scan_state.statement_of_job job) ~f:(fun s ->
-              (proof, s, msg) ) )
-    with
-    | None ->
-        Deferred.return
-          ( Or_error.error_string "Error creating statement from job"
-          |> to_staged_ledger_or_error )
-    | Some proof_statement_msgs -> (
-        match%map verify_proofs ~logger ~verifier proof_statement_msgs with
-        | Ok (Ok ()) ->
-            Ok ()
-        | Ok (Error err) ->
-            Error
-              (Staged_ledger_error.Invalid_proofs (proof_statement_msgs, err))
-        | Error e ->
-            Error (Couldn't_reach_verifier e) )
+    let%bind.Deferred.Result proof_statement_msgs =
+      map_opt job_msg_proofs ~f:(fun (job, _msg, proof) ->
+          Option.map (Scan_state.statement_of_job job) ~f:(fun s -> (proof, s)) )
+      |> function
+      | None ->
+          Deferred.return
+            ( Or_error.error_string "Error creating statement from job"
+            |> to_staged_ledger_or_error )
+      | Some proof_statement_msgs ->
+          Deferred.Result.return proof_statement_msgs
+    in
+    let%bind.Deferred.Result () =
+      Deferred.return @@ Result.all_unit
+      @@ List.map job_msg_proofs ~f:(fun (_, msg, proof) ->
+             if
+               Sok_message.Digest.equal
+                 (Ledger_proof.sok_digest proof)
+                 (Sok_message.digest msg)
+             then Ok ()
+             else
+               Error
+                 (Staged_ledger_error.Invalid_proofs
+                    ( proof_statement_msgs
+                    , Error.of_string
+                        "proof's sok message digest does not match the sok \
+                         message" ) ) )
+    in
+    match%map verify_proofs ~logger ~verifier proof_statement_msgs with
+    | Ok (Ok ()) ->
+        Ok ()
+    | Ok (Error err) ->
+        Error (Staged_ledger_error.Invalid_proofs (proof_statement_msgs, err))
+    | Error e ->
+        Error (Couldn't_reach_verifier e)
 
   module Statement_scanner = struct
     include Scan_state.Make_statement_scanner (struct
@@ -222,10 +223,11 @@ module T = struct
 
     let verify ~verifier:{ logger; verifier } ts =
       verify_proofs ~logger ~verifier
-        (List.map ts ~f:(fun (p, m) ->
-             ( Ledger_proof.Cached.read_proof_from_disk p
-             , Ledger_proof.Cached.statement p
-             , m ) ) )
+        (List.map ts
+           ~f:(fun ({ data = proof; _ } : Scan_state.Ledger_proof_with_hash.t)
+              ->
+             ( Ledger_proof.Cached.read_proof_from_disk proof
+             , Ledger_proof.Cached.statement proof ) ) )
   end
 
   module Statement_scanner_with_proofs =
@@ -414,7 +416,7 @@ module T = struct
       ; pending_coinbase_collection
       } : Staged_ledger_hash.t =
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-      Scan_state.(Stable.Latest.hash @@ read_all_proofs_from_disk scan_state)
+      (Scan_state.hash scan_state)
       (Ledger.merkle_root ledger)
       pending_coinbase_collection
 
@@ -517,9 +519,7 @@ module T = struct
       ; first_pass_ledger_target_hash = target_ledger_hash
       ; pending_coinbase_stack_source = pending_coinbase_stack_state.pc.source
       ; pending_coinbase_stack_target = pending_coinbase_target
-      ; init_stack =
-          Transaction_snark.Pending_coinbase_stack_state.Init_stack.Base
-            pending_coinbase_stack_state.init_stack
+      ; init_stack = pending_coinbase_stack_state.init_stack
       }
     , { Stack_state_with_init_stack.pc =
           { source = pending_coinbase_target; target = pending_coinbase_target }
@@ -583,14 +583,15 @@ module T = struct
       ; sok_digest = ()
       }
     in
-    ( { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn
-      ; state_hash = state_and_body_hash
-      ; first_pass_ledger_witness = pre_stmt.first_pass_ledger_witness
-      ; second_pass_ledger_witness = ledger_witness
-      ; init_stack = pre_stmt.init_stack
-      ; statement
-      ; block_global_slot = global_slot
-      }
+    ( Scan_state.Transaction_with_witness.create
+        ~transaction_with_status:
+          (Mina_transaction_logic.Transaction_applied.transaction_with_status
+             applied_txn )
+        ~state_hash:state_and_body_hash
+        ~first_pass_ledger_witness:pre_stmt.first_pass_ledger_witness
+        ~second_pass_ledger_witness:ledger_witness
+        ~init_stack:pre_stmt.init_stack ~statement
+        ~block_global_slot:global_slot
     , Mina_transaction_logic.Transaction_applied.new_accounts applied_txn )
 
   let apply_transactions_first_pass ~yield ~constraint_constants ~global_slot
@@ -771,11 +772,7 @@ module T = struct
       List.fold_right ~init:(Ok []) data
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
           let%map.Or_error acc = acc in
-          let t =
-            d.transaction_with_info
-            |> Mina_transaction_logic.Transaction_applied
-               .transaction_with_status
-          in
+          let t = d.transaction_with_status in
           t :: acc )
     in
     let total_fee_excess txns =
@@ -2489,8 +2486,10 @@ let%test_module "staged ledger tests" =
       Quickcheck.random_value ~seed:(`Deterministic prover_seed)
         Public_key.Compressed.gen
 
-    let proofs stmts : Ledger_proof.Cached.t One_or_two.t =
-      let sok_digest = Sok_message.Digest.default in
+    let proofs ~fee ~prover (stmts : Transaction_snark_work.Statement.t) :
+        Ledger_proof.Cached.t One_or_two.t =
+      let sok_message = Sok_message.create ~fee ~prover in
+      let sok_digest = Sok_message.digest sok_message in
       One_or_two.map stmts ~f:(fun statement ->
           Ledger_proof.Cached.create ~statement ~sok_digest
             ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag) )
@@ -2498,16 +2497,18 @@ let%test_module "staged ledger tests" =
     let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
         : Transaction_snark_work.Checked.t option =
       let prover = stmt_to_prover stmts in
+      let fee = work_fee in
       Some
         (Transaction_snark_work.Checked.create_unsafe
-           { fee = work_fee; proofs = proofs stmts; prover } )
+           { fee; proofs = proofs ~fee ~prover stmts; prover } )
 
     let stmt_to_work_zero_fee ~prover
         (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
+      let fee = Currency.Fee.zero in
       Some
         (Transaction_snark_work.Checked.create_unsafe
-           { fee = Currency.Fee.zero; proofs = proofs stmts; prover } )
+           { fee; proofs = proofs ~fee ~prover stmts; prover } )
 
     (* Fixed public key for when there is only one snark worker. *)
     let snark_worker_pk =
@@ -2516,9 +2517,11 @@ let%test_module "staged ledger tests" =
 
     let stmt_to_work_one_prover (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
+      let fee = work_fee in
+      let prover = snark_worker_pk in
       Some
         (Transaction_snark_work.Checked.create_unsafe
-           { fee = work_fee; proofs = proofs stmts; prover = snark_worker_pk } )
+           { fee; proofs = proofs ~fee ~prover stmts; prover } )
 
     let coinbase_first_prediff = function
       | Staged_ledger_diff.At_most_two.Zero ->
@@ -3164,13 +3167,12 @@ let%test_module "staged ledger tests" =
 
     let%test_unit "Zero proof-fee should not create a fee transfer" =
       let signature_kind = Mina_signature_kind.Testnet in
+      let fee = Currency.Fee.zero in
+      let prover = snark_worker_pk in
       let stmt_to_work_zero_fee stmts =
         Some
           (Transaction_snark_work.Checked.create_unsafe
-             { fee = Currency.Fee.zero
-             ; proofs = proofs stmts
-             ; prover = snark_worker_pk
-             } )
+             { fee; proofs = proofs ~fee ~prover stmts; prover } )
       in
       let expected_proof_count = 3 in
       Quickcheck.test
@@ -3262,14 +3264,14 @@ let%test_module "staged ledger tests" =
                     let partitions =
                       Sl.Scan_state.partition_if_overflowing scan_state
                     in
+                    let fee = Fee.zero in
+                    let prover = snark_worker_pk in
                     let work_done =
                       List.map
                         ~f:(fun stmts ->
                           Transaction_snark_work.Checked.create_unsafe
-                            { fee = Fee.zero
-                            ; proofs = proofs stmts
-                            ; prover = snark_worker_pk
-                            } )
+                            { fee; proofs = proofs ~fee ~prover stmts; prover }
+                          )
                         work
                     in
                     let cmds_this_iter = cmds_this_iter |> Sequence.to_list in
@@ -3328,14 +3330,13 @@ let%test_module "staged ledger tests" =
       in
       let stmt_to_work stmts =
         let prover = stmt_to_prover stmts in
+        let fee =
+          Currency.Fee.(sub work_fee (of_nanomina_int_exn 1))
+          |> Option.value_exn
+        in
         Some
           (Transaction_snark_work.Checked.create_unsafe
-             { fee =
-                 Currency.Fee.(sub work_fee (of_nanomina_int_exn 1))
-                 |> Option.value_exn
-             ; proofs = proofs stmts
-             ; prover
-             } )
+             { fee; proofs = proofs ~fee ~prover stmts; prover } )
       in
       Quickcheck.test
         Quickcheck.Generator.(
@@ -3397,9 +3398,10 @@ let%test_module "staged ledger tests" =
           (List.find work_list ~f:(fun s ->
                Transaction_snark_work.Statement.compare s stmts = 0 ) )
       then
+        let fee = work_fee in
         Some
           (Transaction_snark_work.Checked.create_unsafe
-             { fee = work_fee; proofs = proofs stmts; prover } )
+             { fee; proofs = proofs ~fee ~prover stmts; prover } )
       else None
 
     (** Like test_simple but with a random number of completed jobs available.
@@ -3596,7 +3598,7 @@ let%test_module "staged ledger tests" =
              Transaction_snark_work.Statement.compare s stmts = 0 ) )
         ~f:(fun (_, fee) ->
           Transaction_snark_work.Checked.create_unsafe
-            { fee; proofs = proofs stmts; prover } )
+            { fee; proofs = proofs ~fee ~prover stmts; prover } )
 
     (** Like test_random_number_of_proofs but with random proof fees.
                    *)

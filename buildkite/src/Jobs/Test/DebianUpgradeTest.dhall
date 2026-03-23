@@ -41,7 +41,7 @@ let buildTestCmd
                       ''
                       ./buildkite/scripts/tests/debian-upgrade-test.sh \
                         --codename bullseye \
-                        --channel devnet \
+                        --channel alpha \
                         --package mina-devnet \
                         --new-debian "debians/bullseye/mina-devnet_*.deb"
                       ''

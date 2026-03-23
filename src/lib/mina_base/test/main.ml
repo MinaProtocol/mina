@@ -169,6 +169,7 @@ let () =
           ; test_case "Wire embedded in t." `Quick wire_embedded_in_t
           ; test_case "Wire embedded in graphql." `Quick
               wire_embedded_in_graphql
+          ; test_case "Latest zkApp version." `Quick latest_zkapp_version
           ; test_case "JSON roundtrip dummy." `Quick
               Test_derivers.json_roundtrip_dummy
           ; test_case "Full circuit." `Quick Test_derivers.full_circuit
@@ -224,4 +225,11 @@ let () =
           ; test_case "No odd slot difference discrepancies" `Quick
               no_odd_vesting_discrepancies
           ] )
+    ; Transaction_commitments.
+        ( "transaction commitments"
+        , [ test_case "check_two_elements_are_never_the_same" `Quick
+              check_two_elements_are_never_the_same
+          ] )
+    ; Valid_size.tests
+    ; Nonce_related.tests
     ]

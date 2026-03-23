@@ -32,6 +32,10 @@ let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
 
 let Arch = ../Constants/Arch.dhall
 
+let DebianInstallMode
+    : Type
+    = < ThroughLocalRepo | NoInstall | DownloadOnly >
+
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
@@ -42,7 +46,7 @@ let ReleaseSpec =
           , repo : Text
           , arch : Arch.Type
           , no_cache : Bool
-          , no_debian : Bool
+          , deb_install_mode : DebianInstallMode
           , deb_codename : DebianVersions.DebVersion
           , deb_release : Text
           , deb_version : Text
@@ -68,6 +72,7 @@ let ReleaseSpec =
           , service = Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"
           , repo = "\\\${BUILDKITE_REPO}"
+          , deb_install_mode = DebianInstallMode.ThroughLocalRepo
           , deb_root_folder = "\\\${BUILDKITE_BUILD_ID}"
           , deb_codename = DebianVersions.DebVersion.Bullseye
           , deb_release = "unstable"
@@ -78,7 +83,6 @@ let ReleaseSpec =
           , deb_repo = DebianRepo.Type.Local
           , docker_publish = DockerPublish.Type.Essential
           , no_cache = False
-          , no_debian = False
           , docker_repo = DockerRepo.Type.InternalEurope
           , step_key_suffix = "-docker-image"
           , verify = False
@@ -111,19 +115,79 @@ let generateStep =
           let maybeCacheOption = if spec.no_cache then "--no-cache" else ""
 
           let maybeStartDebianRepo =
-                      if spec.no_debian
-
-                then  " && echo Skipping local debian repo setup "
-
-                else  " && ./buildkite/scripts/debian/start_local_repo.sh --root ${spec.deb_root_folder} --arch ${Arch.lowerName
+                merge
+                  { ThroughLocalRepo =
+                      " && ./buildkite/scripts/debian/start_local_repo.sh --root ${spec.deb_root_folder} --arch ${Arch.lowerName
                                                                                                                     spec.arch}"
+                  , DownloadOnly =
+                      " && ROOT=${spec.deb_root_folder} LOCAL_DEB_FOLDER=\"dockerfiles\" ./buildkite/scripts/debian/read_all_from_cache.sh "
+                  , NoInstall = " && echo Skipping local debian repo setup "
+                  }
+                  spec.deb_install_mode
 
           let maybeStopDebianRepo =
-                      if spec.no_debian
+                merge
+                  { ThroughLocalRepo = " && ./scripts/debian/aptly.sh stop"
+                  , DownloadOnly =
+                      " && echo Skipping local debian repo teardown "
+                  , NoInstall = " && echo Skipping local debian repo teardown "
+                  }
+                  spec.deb_install_mode
 
-                then  " && echo Skipping local debian repo teardown "
+          let debSuffix =
+                merge
+                  { None = if spec.generic then " --deb-suffix generic" else ""
+                  , Some = \(s : Text) -> " --deb-suffix " ++ s
+                  }
+                  spec.deb_suffix
 
-                else  " && ./scripts/debian/aptly.sh stop"
+          let maybeVerify =
+                      if     spec.verify
+                         &&  DockerPublish.shouldPublish
+                               spec.docker_publish
+                               spec.service
+
+                then      " && "
+                      ++  VerifyDockers.verify
+                            VerifyDockers.Spec::{
+                            , artifacts = [ spec.service ]
+                            , networks = [ spec.network ]
+                            , version = spec.deb_version
+                            , codenames = [ spec.deb_codename ]
+                            , profile = spec.deb_profile
+                            , buildFlag = spec.build_flags
+                            , archs = [ spec.arch ]
+                            , repo = spec.docker_repo
+                            , generic = spec.generic
+                            }
+
+                else  ""
+
+          let pruneDockerImages =
+                    "if [ -z \"\\\${SKIP_DOCKER_PRUNE:-}\" ]; then "
+                ++  "docker system prune --all --force "
+                ++  merge
+                      { Arm64 = ""
+                      , XLarge = "--filter until=24h"
+                      , Large = "--filter until=24h"
+                      , Medium = "--filter until=24h"
+                      , Small = "--filter until=24h"
+                      , Integration = "--filter until=24h"
+                      , QA = "--filter until=24h"
+                      , Multi = "--filter until=24h"
+                      , Perf = "--filter until=24h"
+                      }
+                      spec.size
+                ++  "; else echo 'Skipping docker prune due to SKIP_DOCKER_PRUNE'; fi"
+
+          let loadOnlyArg =
+                      if DockerPublish.shouldPublish
+                           spec.docker_publish
+                           spec.service
+
+                then  ""
+
+                else  " --load-only "
 
           let debSuffix =
                 merge
@@ -248,6 +312,7 @@ let generateStep =
                 }
 
 in  { generateStep = generateStep
+    , DebianInstallMode = DebianInstallMode
     , ReleaseSpec = ReleaseSpec
     , stepKey = stepKey
     , stepLabel = stepLabel
