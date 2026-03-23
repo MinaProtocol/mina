@@ -471,12 +471,12 @@ build_daemon_config_deb() {
 
   local package_name="mina-${network}-config"
 
-  # Config package doesn't have any binaries, but we need to include
-  # the common utils for hardfork packages that rely on some of the configs here.
-  # that's why we are using all as architecture.
+  # Config package contains only architecture-independent configuration data
+  # (no binaries), so we build it with Architecture: all to make it usable on
+  # all supported architectures.
 
-  # Save and reset architecture to all for config package, since it doesn't contain any binaries but we want to make sure it's available for all architectures.
-  # We will restore the original architecture after building the package.
+  # Save and override architecture to "all" for the config package; restore
+  # the original architecture after building the package.
   local saved_arch="${ARCHITECTURE}"
   ARCHITECTURE=all
 
@@ -643,12 +643,11 @@ copy_common_daemon_hardfork_configs() {
 ## HARDFORK PACKAGE ##
 
 #
-# Builds mina-${NETWORK}-hardfork package for specified network
+# Builds mina-${NETWORK}-config package for specified network with hardfork configuration
 #
-# Output: mina-${NETWORK}-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+# Output: mina-${NETWORK}-config_${MINA_DEB_VERSION}_all.deb
 #
-# Config only package with hardfork-specific runtime config and ledgers. 
+# Config only package with hardfork-specific runtime config and ledgers.
 # Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
 #
 build_daemon_hardfork_config_deb() {
@@ -659,12 +658,12 @@ build_daemon_hardfork_config_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building hardfork config for ${network} network deb without keys:"
 
-  # Config package doesn't have any binaries, but we need to include
-  # the common utils for hardfork packages that rely on some of the configs here.
-  # that's why we are using all as architecture.
+  # Config package contains only architecture-independent configuration data
+  # (no binaries), so we build it with Architecture: all to make it usable on
+  # all supported architectures.
 
-  # Save and reset architecture to all for hardfork config package, since it doesn't contain any binaries but we want to make sure it's available for all architectures.
-  # We will restore the original architecture after building the package.
+  # Save and override architecture to "all" for the hardfork config package; restore
+  # the original architecture after building the package.
   local saved_arch="${ARCHITECTURE}"
   ARCHITECTURE=all
 
