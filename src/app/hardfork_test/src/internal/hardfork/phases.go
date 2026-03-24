@@ -200,20 +200,9 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 	return nil
 }
 
-func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnalysisResult, mainGenesisTs int64) error {
-
-	nodeDir := daemon.NodeDirRel(t.Config.Root)
-
-	forkDataPath := filepath.Join(nodeDir, "fork_data")
-	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, daemon.StartPort+int(config.PORT_CLIENT)); err != nil {
-		return err
-	}
+func (t *HardforkTest) validateAutoForkData(daemon config.DaemonInfo, forkDataPath string, analysis BlockAnalysisResult, mainGenesisTs int64) error {
 
 	forkConfigFile := filepath.Join(forkDataPath, "daemon.json")
-
-	if _, err := os.Stat(filepath.Join(forkDataPath, "activated")); err != nil {
-		return fmt.Errorf("failed to check on activated file for advanced generate fork config: %w", err)
-	}
 
 	forkConfigBytes, err := os.ReadFile(forkConfigFile)
 	if err != nil {
@@ -230,8 +219,64 @@ func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnal
 		return fmt.Errorf("failed to unmarshal fork config: %w", err)
 	}
 
-	err = t.ValidateFinalForkConfig(analysis.Consensus.LastBlockBeforeTxEnd, config, forkGenesisTs, mainGenesisTs)
-	if err != nil {
+	if err := t.ValidateFinalForkConfig(analysis.Consensus.LastBlockBeforeTxEnd, config, forkGenesisTs, mainGenesisTs); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnalysisResult, mainGenesisTs int64) error {
+
+	nodeDir := daemon.NodeDirRel(t.Config.Root)
+
+	forkDataPath := filepath.Join(nodeDir, "fork_data")
+	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, daemon.StartPort+int(config.PORT_CLIENT)); err != nil {
+		return err
+	}
+
+	if _, err := os.Stat(filepath.Join(forkDataPath, "activated")); err != nil {
+		return fmt.Errorf("failed to check on activated file for advanced generate fork config: %w", err)
+	}
+
+	return t.validateAutoForkData(daemon, forkDataPath, analysis, mainGenesisTs)
+}
+
+func (t *HardforkTest) autoFork(daemon config.DaemonInfo, analysis BlockAnalysisResult, mainGenesisTs int64) error {
+
+	nodeDir := daemon.NodeDirRel(t.Config.Root)
+
+	forkDataPath := filepath.Join(nodeDir, "auto-fork-mesa-devnet")
+	activatedFile := filepath.Join(forkDataPath, "activated")
+
+	deadline := time.Unix(mainGenesisTs+int64(t.Config.SlotChainEnd*t.Config.MainSlot), 0).Add(time.Duration(5) * time.Minute)
+
+	forkActivated := false
+
+	for {
+		if _, err := os.Stat(activatedFile); err == nil {
+			forkActivated = true
+			break
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("error accessing existing file %s: %w", activatedFile, err)
+		}
+
+		if time.Now().After(deadline) {
+			break
+		}
+
+		time.Sleep(time.Duration(t.Config.PollingIntervalSeconds) * time.Second)
+	}
+
+	if !forkActivated {
+		return fmt.Errorf("Node %s haven't create an activated file at %s, meaning it's not completed auto config generation!", daemon.Name, activatedFile)
+	}
+
+	if err := t.validateAutoForkData(daemon, forkDataPath, analysis, mainGenesisTs); err != nil {
+		return err
+	}
+
+	if err := os.Rename(forkDataPath, filepath.Join(nodeDir, "fork_data")); err != nil {
 		return err
 	}
 
