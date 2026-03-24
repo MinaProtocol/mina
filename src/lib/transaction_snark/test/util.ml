@@ -223,7 +223,9 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                         Mina_transaction_logic.Transaction_applied
                         .supply_increase ~constraint_constants applied_txn
                         |> Or_error.ok_exn
-                    ; stake_change = Currency.Amount.Signed.zero
+                    ; stake_change =
+                        Currency.Amount.Signed.zero
+                        (* TODO: compute real stake_change once zkapp circuit supports it *)
                     ; sok_digest = ()
                     }
                   in
@@ -682,6 +684,16 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
           ~constraint_constants txn
         |> Or_error.ok_exn )
   in
+  let stake_change =
+    Option.value_map applied_transaction ~default:Amount.Signed.zero
+      ~f:(fun txn ->
+        Mina_transaction_logic.Transaction_applied.stake_change
+          ~get_account_after:(fun aid ->
+            Option.bind
+              (Ledger.location_of_account ledger aid)
+              ~f:(Ledger.get ledger) )
+          txn )
+  in
   let k () =
     Transaction_snark.check_transaction ~constraint_constants ~sok_message
       ~source_first_pass_ledger ~target_first_pass_ledger
@@ -691,7 +703,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
             pending_coinbase_stack
         ; target = pending_coinbase_stack_target
         }
-      ~supply_increase
+      ~supply_increase ~stake_change
       { transaction = txn; block_data = state_body; global_slot }
       (unstage @@ Sparse_ledger.handler sparse_ledger)
       ~signature_kind

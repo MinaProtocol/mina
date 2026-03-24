@@ -2433,6 +2433,14 @@ module Make_str (A : Wire_types.Concrete) = struct
         Boolean.(is_coinbase_or_fee_transfer &&& fee_may_be_charged)
       in
       (* a couple of references, hard to thread the values *)
+      let fee_payer_delegate_pre =
+        ref (Public_key.Compressed.var_of_t Public_key.Compressed.empty)
+      in
+      let fee_payer_balance_pre = ref Currency.Balance.(var_of_t zero) in
+      let receiver_delegate_pre =
+        ref (Public_key.Compressed.var_of_t Public_key.Compressed.empty)
+      in
+      let source_delegation_permitted = ref Boolean.false_ in
       let burned_tokens = ref Currency.Amount.(var_of_t zero) in
       let zero_fee =
         Currency.Amount.(Signed.create_var ~magnitude:(var_of_t zero))
@@ -2452,6 +2460,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                    - the fee-receiver for a coinbase
                    - the second receiver for a fee transfer
                 *)
+                fee_payer_delegate_pre := account.delegate ;
+                fee_payer_balance_pre := account.balance ;
                 let%bind next_nonce =
                   Account.Nonce.Checked.succ_if account.nonce is_user_command
                 in
@@ -2669,6 +2679,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                    - the receiver for a coinbase
                    - the first receiver for a fee transfer
                 *)
+                receiver_delegate_pre := account.delegate ;
                 let permitted_to_access =
                   Account.Checked.has_permission
                     ~signature_verifies:Boolean.false_ ~to_:`Access account
@@ -2934,6 +2945,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     Boolean.all
                       [ is_stake_delegation; permitted_to_update_delegate ]
                   in
+                  source_delegation_permitted := delegation_permitted ;
                   let%bind fee_receiver_update_permitted =
                     Boolean.all
                       [ is_coinbase_or_fee_transfer; permitted_to_receive ]
@@ -3078,6 +3090,102 @@ module Make_str (A : Wire_types.Concrete) = struct
             let%map () = Boolean.Assert.is_true (Boolean.not overflow) in
             amt )
       in
+      let%bind stake_change =
+        [%with_label_ "Calculate stake change"] (fun () ->
+            let%bind fee_payer_is_staked =
+              let%map is_empty =
+                Public_key.Compressed.Checked.equal !fee_payer_delegate_pre
+                  Public_key.Compressed.Checked.empty
+              in
+              Boolean.not is_empty
+            in
+            let%bind receiver_is_staked =
+              let%map is_empty =
+                Public_key.Compressed.Checked.equal !receiver_delegate_pre
+                  Public_key.Compressed.Checked.empty
+              in
+              Boolean.not is_empty
+            in
+            let zero = Amount.(Signed.Checked.of_unsigned (var_of_t zero)) in
+            let adjust is_staked delta =
+              Amount.Signed.Checked.if_ is_staked ~then_:delta ~else_:zero
+            in
+            let pos amt = Amount.Signed.Checked.of_unsigned amt in
+            let neg amt =
+              Amount.Signed.Checked.negate
+                (Amount.Signed.Checked.of_unsigned amt)
+            in
+            let fee_amt = Amount.Checked.of_fee fee in
+            (* Internal commands (fee_transfer, coinbase):
+               fee_payer gets +fee, receiver gets +receiver_increase *)
+            let%bind internal_sc =
+              let%bind fp = adjust fee_payer_is_staked (pos fee_amt) in
+              let%bind recv =
+                adjust receiver_is_staked (pos receiver_increase)
+              in
+              Amount.Signed.Checked.add fp recv
+            in
+            (* Payment: fee_payer=sender loses fee+amount, receiver gains amount *)
+            let%bind payment_sc =
+              let%bind fee_plus_amount =
+                Amount.Checked.add fee_amt payload.body.amount
+              in
+              let%bind fp = adjust fee_payer_is_staked (neg fee_plus_amount) in
+              let%bind recv =
+                adjust receiver_is_staked (pos payload.body.amount)
+              in
+              Amount.Signed.Checked.add fp recv
+            in
+            (* Delegation: 4-case on (fee_payer_is_staked, set_to_unstaked)
+                   unstaking=true       unstaking=false
+               staked    Some→None: -pre_bal   Some→Some: -fee
+               unstaked  None→None: 0          None→Some: +post_bal
+               If delegation was not permitted, delegate doesn't change
+               and stake_change is just the fee adjustment. *)
+            let%bind delegation_sc =
+              let%bind set_to_unstaked =
+                Public_key.Compressed.Checked.equal
+                  (Account_id.Checked.public_key receiver)
+                  Public_key.Compressed.Checked.empty
+              in
+              let pre_bal =
+                pos (Balance.Checked.to_amount !fee_payer_balance_pre)
+              in
+              let neg_pre_bal = Amount.Signed.Checked.negate pre_bal in
+              let neg_fee = neg fee_amt in
+              let%bind post_bal = Amount.Signed.Checked.add pre_bal neg_fee in
+              let%bind was_staked_case =
+                Amount.Signed.Checked.if_ set_to_unstaked ~then_:neg_pre_bal
+                  ~else_:neg_fee
+              in
+              let%bind was_unstaked_case =
+                Amount.Signed.Checked.if_ set_to_unstaked ~then_:zero
+                  ~else_:post_bal
+              in
+              let%bind permitted_sc =
+                Amount.Signed.Checked.if_ fee_payer_is_staked
+                  ~then_:was_staked_case ~else_:was_unstaked_case
+              in
+              let%bind not_permitted_sc = adjust fee_payer_is_staked neg_fee in
+              Amount.Signed.Checked.if_
+                !source_delegation_permitted
+                ~then_:permitted_sc ~else_:not_permitted_sc
+            in
+            (* Select: delegation vs payment within user commands *)
+            let%bind user_command_sc =
+              Amount.Signed.Checked.if_ is_stake_delegation ~then_:delegation_sc
+                ~else_:payment_sc
+            in
+            (* Select: user command vs internal command *)
+            let%bind sc =
+              Amount.Signed.Checked.if_ is_user_command ~then_:user_command_sc
+                ~else_:internal_sc
+            in
+            (* Failed user command: only fee deducted from fee_payer *)
+            let%bind failed_sc = adjust fee_payer_is_staked (neg fee_amt) in
+            Amount.Signed.Checked.if_ user_command_fails ~then_:failed_sc
+              ~else_:sc )
+      in
       let%map final_root =
         (* Ensure that only the fee-payer was charged if this was an invalid user
            command.
@@ -3085,7 +3193,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         Frozen_ledger_hash.if_ user_command_fails
           ~then_:root_after_fee_payer_update ~else_:root_after_source_update
       in
-      (final_root, fee_excess, supply_increase)
+      (final_root, fee_excess, supply_increase, stake_change)
 
     (* Someday:
        write the following soundness tests:
@@ -3132,7 +3240,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         exists Mina_numbers.Global_slot_since_genesis.typ
           ~request:(As_prover.return Global_slot)
       in
-      let%bind fee_payment_root_after, fee_excess, supply_increase =
+      let%bind fee_payment_root_after, fee_excess, supply_increase, stake_change
+          =
         apply_tagged_transaction ~signature_kind ~constraint_constants
           (module Shifted)
           statement.source.first_pass_ledger global_slot pending_coinbase_init
@@ -3181,6 +3290,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; [%with_label_ "equal supply_increases"] (fun () ->
               Currency.Amount.Signed.Checked.assert_equal supply_increase
                 statement.supply_increase )
+        ; [%with_label_ "equal stake_changes"] (fun () ->
+              Currency.Amount.Signed.Checked.assert_equal stake_change
+                statement.stake_change )
         ; [%with_label_ "equal fee excesses"] (fun () ->
               Fee_excess.assert_equal_checked fee_excess statement.fee_excess )
         ]
@@ -3289,6 +3401,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind supply_increase =
         Amount.Signed.Checked.add s1.supply_increase s2.supply_increase
       in
+      let%bind stake_change =
+        Amount.Signed.Checked.add s1.stake_change s2.stake_change
+      in
       let%bind () =
         make_checked (fun () ->
             Local_state.Checked.assert_equal s.source.local_state
@@ -3308,6 +3423,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; [%with_label_ "equal supply increases"] (fun () ->
                 Amount.Signed.Checked.assert_equal supply_increase
                   s.supply_increase )
+          ; [%with_label_ "equal stake changes"] (fun () ->
+                Amount.Signed.Checked.assert_equal stake_change s.stake_change )
           ; [%with_label_ "equal source fee payment ledger hashes"] (fun () ->
                 Frozen_ledger_hash.assert_equal s.source.first_pass_ledger
                   s1.source.first_pass_ledger )
@@ -3445,8 +3562,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   end
 
   let check_transaction_union ~signature_kind ?(preeval = false)
-      ~constraint_constants ~supply_increase ~source_first_pass_ledger
-      ~target_first_pass_ledger sok_message init_stack
+      ~constraint_constants ~supply_increase ~stake_change
+      ~source_first_pass_ledger ~target_first_pass_ledger sok_message init_stack
       pending_coinbase_stack_state transaction state_body global_slot handler =
     if preeval then failwith "preeval currently disabled" ;
     let sok_digest = Sok_message.digest sok_message in
@@ -3455,9 +3572,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         init_stack
     in
     let statement : Statement.With_sok.t =
-      Statement.Poly.with_empty_local_state ~supply_increase
-        ~stake_change:Currency.Amount.Signed.zero ~source_first_pass_ledger
-        ~target_first_pass_ledger
+      Statement.Poly.with_empty_local_state ~supply_increase ~stake_change
+        ~source_first_pass_ledger ~target_first_pass_ledger
         ~source_second_pass_ledger:target_first_pass_ledger
         ~target_second_pass_ledger:target_first_pass_ledger
         ~pending_coinbase_stack_state
@@ -3481,7 +3597,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let check_transaction ~signature_kind ?preeval ~constraint_constants
       ~sok_message ~source_first_pass_ledger ~target_first_pass_ledger
-      ~init_stack ~pending_coinbase_stack_state ~supply_increase
+      ~init_stack ~pending_coinbase_stack_state ~supply_increase ~stake_change
       (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
       handler =
     let transaction =
@@ -3499,18 +3615,20 @@ module Make_str (A : Wire_types.Concrete) = struct
           "Called non-account_update transaction with zkapp_command transaction"
     | `Transaction t ->
         check_transaction_union ~signature_kind ?preeval ~constraint_constants
-          ~supply_increase ~source_first_pass_ledger ~target_first_pass_ledger
-          sok_message init_stack pending_coinbase_stack_state
+          ~supply_increase ~stake_change ~source_first_pass_ledger
+          ~target_first_pass_ledger sok_message init_stack
+          pending_coinbase_stack_state
           (Transaction_union.of_transaction t)
           state_body global_slot handler
 
   let check_user_command ~signature_kind ~constraint_constants ~sok_message
       ~source_first_pass_ledger ~target_first_pass_ledger ~init_stack
-      ~pending_coinbase_stack_state ~supply_increase t_in_block handler =
+      ~pending_coinbase_stack_state ~supply_increase ~stake_change t_in_block
+      handler =
     let user_command = Transaction_protocol_state.transaction t_in_block in
     check_transaction ~signature_kind ~constraint_constants ~sok_message
       ~source_first_pass_ledger ~target_first_pass_ledger ~init_stack
-      ~pending_coinbase_stack_state ~supply_increase
+      ~pending_coinbase_stack_state ~supply_increase ~stake_change
       { t_in_block with transaction = Command (Signed_command user_command) }
       handler
 

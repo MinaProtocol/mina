@@ -367,6 +367,22 @@ let%test_module "account timing check" =
           ~constraint_constants txn_applied
         |> Or_error.ok_exn
       in
+      let stake_change =
+        Mina_transaction_logic.Transaction_applied.stake_change
+          ~get_account_after:(fun account_id ->
+            Option.try_with (fun () ->
+                let loc =
+                  Mina_ledger.Sparse_ledger.find_index_exn sparse_ledger_after
+                    account_id
+                in
+                let (account : Account.t) =
+                  Mina_ledger.Sparse_ledger.get_exn sparse_ledger_after loc
+                in
+                if Public_key.Compressed.(equal empty account.public_key) then
+                  failwith "empty account"
+                else account ) )
+          txn_applied
+      in
       Transaction_snark.check_transaction ~constraint_constants ~sok_message
         ~source_first_pass_ledger:
           (Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_before)
@@ -377,7 +393,7 @@ let%test_module "account timing check" =
           { source = Pending_coinbase.Stack.empty
           ; target = coinbase_stack_target
           }
-        ~supply_increase
+        ~supply_increase ~stake_change
         { Transaction_protocol_state.Poly.block_data = state_body
         ; transaction = validated_transaction
         ; global_slot = txn_global_slot

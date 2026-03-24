@@ -51,9 +51,33 @@ let%test_module "Transaction union tests" =
         Mina_state.Protocol_state.Body.consensus_state state_body
         |> Consensus.Data.Consensus_state.global_slot_since_genesis
       in
-      let target =
-        Ledger.merkle_root_after_user_command_exn ledger
-          ~txn_global_slot:current_global_slot user_command
+      let target, stake_change =
+        let mask =
+          Mina_ledger.Ledger.Mask.create
+            ~depth:(Mina_ledger.Ledger.depth ledger)
+            ()
+        in
+        let masked_ledger = Mina_ledger.Ledger.register_mask ledger mask in
+        let applied =
+          Or_error.ok_exn
+            (Mina_ledger.Ledger.apply_user_command ~constraint_constants
+               ~txn_global_slot:current_global_slot masked_ledger user_command )
+        in
+        let target = Ledger.merkle_root masked_ledger in
+        let stake_change =
+          Mina_transaction_logic.Transaction_applied.stake_change
+            ~get_account_after:(fun aid ->
+              Option.bind
+                (Mina_ledger.Ledger.location_of_account masked_ledger aid)
+                ~f:(Mina_ledger.Ledger.get masked_ledger) )
+            { previous_hash = Frozen_ledger_hash.empty_hash
+            ; varying = Command (Signed_command applied)
+            }
+        in
+        ignore
+          ( Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__ masked_ledger
+            : Mina_ledger.Ledger.unattached_mask ) ;
+        (target, stake_change)
       in
       let user_command_in_block =
         { Transaction_protocol_state.Poly.transaction = user_command
@@ -75,8 +99,7 @@ let%test_module "Transaction union tests" =
               ~target_second_pass_ledger:target ~connecting_ledger_left:target
               ~connecting_ledger_right:target ~sok_digest
               ~fee_excess:(Or_error.ok_exn (Transaction.fee_excess txn))
-              ~supply_increase:user_command_supply_increase
-              ~stake_change:Currency.Amount.Signed.zero
+              ~supply_increase:user_command_supply_increase ~stake_change
               ~pending_coinbase_stack_state
           in
           T.of_user_command ~init_stack ~statement user_command_in_block handler )
@@ -150,6 +173,22 @@ let%test_module "Transaction union tests" =
               ~constraint_constants applied_transaction
             |> Or_error.ok_exn
           in
+          let stake_change =
+            Mina_transaction_logic.Transaction_applied.stake_change
+              ~get_account_after:(fun account_id ->
+                Option.try_with (fun () ->
+                    let loc =
+                      Mina_ledger.Sparse_ledger.find_index_exn
+                        sparse_ledger_after account_id
+                    in
+                    let (account : Account.t) =
+                      Mina_ledger.Sparse_ledger.get_exn sparse_ledger_after loc
+                    in
+                    if Public_key.Compressed.(equal empty account.public_key)
+                    then failwith "empty account"
+                    else account ) )
+              applied_transaction
+          in
           Transaction_snark.check_transaction ~signature_kind txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
             ~constraint_constants:U.constraint_constants
@@ -162,7 +201,7 @@ let%test_module "Transaction union tests" =
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
               { source = source_stack; target = pending_coinbase_stack_target }
-            ~supply_increase )
+            ~supply_increase ~stake_change )
 
     let%test_unit "coinbase with new state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -235,6 +274,7 @@ let%test_module "Transaction union tests" =
                 ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state
                 ~supply_increase:user_command_supply_increase
+                ~stake_change:Currency.Amount.Signed.zero
                 { transaction = t1
                 ; block_data = state_body
                 ; global_slot = current_global_slot
