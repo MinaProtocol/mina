@@ -65,7 +65,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 		return nil, err
 	}
 
-	t.Logger.Info("Network analayze result: %v", analysis)
+	t.Logger.Info("Network analyze result: %v", analysis)
 
 	if err := t.ValidateSlotOccupancy(analysis.GenesisBlock, analysis.Consensus.LastBlockBeforeTxEnd); err != nil {
 		return nil, err
