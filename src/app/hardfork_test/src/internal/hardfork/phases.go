@@ -322,6 +322,8 @@ func (t *HardforkTest) ForkPhase(analysis *BlockAnalysisResult, mainGenesisTs in
 				errors[idx] = t.legacyFork(info, *analysis, mainGenesisTs)
 			case config.Advanced:
 				errors[idx] = t.advancedFork(info, *analysis, mainGenesisTs)
+			case config.Auto:
+				errors[idx] = t.autoFork(info, *analysis, mainGenesisTs)
 			}
 		}(idx, info)
 	}
