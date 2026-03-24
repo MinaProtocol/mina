@@ -28,7 +28,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 
 	defer t.gracefulShutdown(mainNetCmd, "Main network")
 
-	t.WaitForBestTip(t.Config.AnyPortOfType(config.PORT_REST), func(block client.BlockData) bool {
+	t.WaitForBestTip(t.Config.AnyDaemon().Port(config.PORT_REST), func(block client.BlockData) bool {
 		return block.Slot >= 1
 	}, fmt.Sprintf("best tip reached slot 1"),
 		time.Until(
@@ -55,7 +55,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 		return nil, err
 	}
 
-	if err := t.ValidateNoNewBlocks(t.Config.AnyPortOfType(config.PORT_REST)); err != nil {
+	if err := t.ValidateNoNewBlocks(t.Config.AnyDaemon().Port(config.PORT_REST)); err != nil {
 		return nil, err
 	}
 
@@ -89,20 +89,20 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 	t.Logger.Info("Fork network genesis slot: %d", expectedGenesisSlot)
 
 	// Validate fork network blocks
-	if err := t.ValidateFirstBlockOfForkChain(t.Config.AnyPortOfType(config.PORT_REST), latestPreForkHeight, expectedGenesisSlot); err != nil {
+	if err := t.ValidateFirstBlockOfForkChain(t.Config.AnyDaemon().Port(config.PORT_REST), latestPreForkHeight, expectedGenesisSlot); err != nil {
 		return err
 	}
 
 	// Wait until best chain query time
 	t.WaitUntilBestChainQuery(t.Config.ForkSlot, int(expectedGenesisSlot))
 
-	genesisBlock, err := t.Client.GenesisBlock(t.Config.AnyPortOfType(config.PORT_REST))
+	genesisBlock, err := t.Client.GenesisBlock(t.Config.AnyDaemon().Port(config.PORT_REST))
 	if err != nil {
 		return err
 	}
 
 	// Check block height at slot BestChainQueryFrom
-	bestTip, err := t.Client.BestTip(t.Config.AnyPortOfType(config.PORT_REST))
+	bestTip, err := t.Client.BestTip(t.Config.AnyDaemon().Port(config.PORT_REST))
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 	}
 
 	// Validate user commands in blocks
-	if err := t.ValidateBlockWithUserCommandCreatedForkNetwork(t.Config.AnyPortOfType(config.PORT_REST)); err != nil {
+	if err := t.ValidateBlockWithUserCommandCreatedForkNetwork(t.Config.AnyDaemon().Port(config.PORT_REST)); err != nil {
 		return err
 	}
 
@@ -127,12 +127,14 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 // in place before genesis of fork network
 func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalysisResult, mainGenesisTs int64) error {
 
+	nodeDir := daemon.NodeDirRel(t.Config.Root)
+
 	forkConfigBytes, err := t.GetForkConfig(daemon.StartPort + int(config.PORT_REST))
 	if err != nil {
 		return err
 	}
 
-	forkDataPrepatchPath := filepath.Join(daemon.NodeDir, "fork_data_prepatch")
+	forkDataPrepatchPath := filepath.Join(nodeDir, "fork_data_prepatch")
 
 	if err := os.MkdirAll(forkDataPrepatchPath, 0755); err != nil {
 		return err
@@ -163,7 +165,7 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 		return err
 	}
 
-	forkDataPath := filepath.Join(daemon.NodeDir, "fork_data")
+	forkDataPath := filepath.Join(nodeDir, "fork_data")
 	patchedConfigFile := filepath.Join(forkDataPath, "daemon.json")
 	patchedLedgersDir := filepath.Join(forkDataPath, "genesis")
 
@@ -195,7 +197,9 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 
 func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnalysisResult, mainGenesisTs int64) error {
 
-	forkDataPath := filepath.Join(daemon.NodeDir, "fork_data")
+	nodeDir := daemon.NodeDirRel(t.Config.Root)
+
+	forkDataPath := filepath.Join(nodeDir, "fork_data")
 	if err := t.AdvancedGenerateHardForkConfig(forkDataPath, daemon.StartPort+int(config.PORT_CLIENT)); err != nil {
 		return err
 	}
@@ -230,32 +234,28 @@ func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnal
 }
 
 func (t *HardforkTest) ForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) error {
-	daemonInfos := t.Config.AllDaemonInfos()
-	numDaemons := len(daemonInfos)
+	numDaemons := len(t.Config.DaemonInfos)
 	errors := make([]error, numDaemons)
-	forkMethodsPerDaemon := make([]config.ForkMethod, numDaemons)
 
 	var wg sync.WaitGroup
-	for idx, info := range daemonInfos {
+	for idx, info := range t.Config.DaemonInfos {
 		wg.Add(1)
-		forkMethodToUse := t.Config.ForkMethods.RandomChoose()
-		forkMethodsPerDaemon[idx] = forkMethodToUse
-		go func(idx int, info config.DaemonInfo, forkMethod config.ForkMethod) {
+		go func(idx int, info config.DaemonInfo) {
 			defer wg.Done()
-			t.Logger.Info("Forking node at port %d with method %s", info.StartPort, forkMethod.String())
-			switch forkMethod {
+			t.Logger.Info("Forking node %s with method %s", info.Name, info.ForkMethod.String())
+			switch info.ForkMethod {
 			case config.Legacy:
 				errors[idx] = t.legacyFork(info, *analysis, mainGenesisTs)
 			case config.Advanced:
 				errors[idx] = t.advancedFork(info, *analysis, mainGenesisTs)
 			}
-		}(idx, info, forkMethodToUse)
+		}(idx, info)
 	}
 	wg.Wait()
 
-	for i, info := range daemonInfos {
+	for i, info := range t.Config.DaemonInfos {
 		if errors[i] != nil {
-			return fmt.Errorf("%s fork on daemon %v failed: %v", forkMethodsPerDaemon[i].String(), info, errors[i])
+			return fmt.Errorf("%s fork on daemon %s failed: %w", info.ForkMethod, info.Name, errors[i])
 		}
 	}
 
@@ -324,27 +324,28 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 
 	t.Logger.Info("`daemon.json` successfully sanitized, now moving fork config & ledgers in place for fork network")
 
-	for _, info := range t.Config.AllDaemonInfos() {
-		forkDataBase := filepath.Join(info.NodeDir, "fork_data")
+	for _, info := range t.Config.DaemonInfos {
+		nodeDir := info.NodeDirRel(t.Config.Root)
+		forkDataBase := filepath.Join(nodeDir, "fork_data")
 		forkConfigFile := filepath.Join(forkDataBase, "daemon.json")
 		forkConfigContent, err := os.ReadFile(forkConfigFile)
 		if err != nil {
-			return fmt.Errorf("Can't read fork config from node %s: %v", info.NodeDir, err)
+			return fmt.Errorf("Can't read fork config from node %s: %v", info.Name, err)
 		}
-		t.Logger.Info("Node %s will be using fork config of content: %s", info.NodeDir, string(forkConfigContent))
+		t.Logger.Info("Node %s will be using fork config of content: %s", info.Name, string(forkConfigContent))
 		// NOTE: Compute chain_id from the merged config (fork + shared) to determine
 		// the nested directory structure the post-fork daemon will use. The daemon
 		// loads its config-directory daemon.json first, then overlays --config-file
 		// args, so we pass both in the same order.
 		chainId, err := t.ComputeChainId(forkConfigFile, networkDaemonConfig)
 		if err != nil {
-			return fmt.Errorf("failed to compute chain_id from fork config on node at %s: %v", info.NodeDir, err)
+			return fmt.Errorf("failed to compute chain_id from fork config on node %s: %w", info.Name, err)
 		}
-		t.Logger.Info("Computed chain_id for fork config at %s: %s", info.NodeDir, chainId)
-		chainStateDir := filepath.Join(info.NodeDir, chainId)
+		t.Logger.Info("Computed chain_id for fork config on node %s: %s", info.Name, chainId)
+		chainStateDir := filepath.Join(nodeDir, chainId)
 		os.Mkdir(chainStateDir, 0755)
 		filesToMove := []MoveFileSpec{
-			{from: forkConfigFile, to: filepath.Join(info.NodeDir, "daemon.json")},
+			{from: forkConfigFile, to: filepath.Join(nodeDir, "daemon.json")},
 			{from: filepath.Join(forkDataBase, "genesis"), to: filepath.Join(chainStateDir, "genesis")},
 		}
 		for _, spec := range filesToMove {
@@ -359,7 +360,7 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 			}
 			err := os.Rename(spec.from, spec.to)
 			if err != nil {
-				return fmt.Errorf("Error moving fork data %s -> %s on node %s: %v", spec.from, spec.to, info.NodeDir, err)
+				return fmt.Errorf("Error moving fork data %s -> %s on node %s: %v", spec.from, spec.to, info.Name, err)
 			}
 		}
 	}

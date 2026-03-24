@@ -78,7 +78,7 @@ func (t *HardforkTest) RunForkNetwork() (*exec.Cmd, error) {
 
 // WaitUntilBestChainQuery calculates and waits until it's time to query the best chain
 func (t *HardforkTest) WaitUntilBestChainQuery(slotDurationSec int, genesisSlot int) {
-	t.WaitForBestTip(t.Config.AnyPortOfType(config.PORT_REST), func(block client.BlockData) bool {
+	t.WaitForBestTip(t.Config.AnyDaemon().Port(config.PORT_REST), func(block client.BlockData) bool {
 		return block.Slot >= t.Config.BestChainQueryFrom+genesisSlot
 	}, fmt.Sprintf("best tip reached slot %d", t.Config.BestChainQueryFrom),
 		time.Duration(2*t.Config.BestChainQueryFrom*slotDurationSec)*time.Second,
