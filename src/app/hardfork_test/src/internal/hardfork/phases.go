@@ -36,7 +36,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 				Add(time.Duration(2*t.Config.MainSlot)*time.Second)),
 	)
 
-	analysis, err := t.AnalyzeBlocks(mainGenesisTs)
+	analysis, err := t.AnalyzeBlocksOnMainNetwork(mainGenesisTs)
 	if err != nil {
 		return nil, err
 	}
@@ -88,17 +88,22 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 
 	t.Logger.Info("Fork network genesis slot: %d", expectedGenesisSlot)
 
-	// Validate fork network blocks
-	if err := t.ValidateFirstBlockOfForkChain(t.Config.AnyDaemon().Port(config.PORT_REST), latestPreForkHeight, expectedGenesisSlot); err != nil {
-		return err
-	}
-
 	// Wait until best chain query time
 	t.WaitUntilBestChainQuery(t.Config.ForkSlot, int(expectedGenesisSlot))
 
-	genesisBlock, err := t.Client.GenesisBlock(t.Config.AnyDaemon().Port(config.PORT_REST))
+	commonGenesisBlock, err := t.GenesisBlockAcrossNetwork()
 	if err != nil {
-		return err
+		return fmt.Errorf("No common genesis for fork network: %w", err)
+	}
+
+	// Check earliest height
+	if commonGenesisBlock.BlockHeight != latestPreForkHeight+1 {
+		return fmt.Errorf("Unexpected common genesis height %d(%v) of fork network, expected %d", commonGenesisBlock.BlockHeight, commonGenesisBlock, latestPreForkHeight+1)
+	}
+
+	// Check earliest slot
+	if commonGenesisBlock.Slot != int(expectedGenesisSlot) {
+		return fmt.Errorf("Unexpected common genesis slot %d(%v) of fork network, expected %d", commonGenesisBlock.Slot, commonGenesisBlock, int(expectedGenesisSlot))
 	}
 
 	// Check block height at slot BestChainQueryFrom
@@ -110,7 +115,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, mainGenesisT
 	t.Logger.Info("Block height is %d at slot %d.", bestTip.BlockHeight, bestTip.Slot)
 
 	// Validate slot occupancy
-	if err := t.ValidateSlotOccupancy(*genesisBlock, *bestTip); err != nil {
+	if err := t.ValidateSlotOccupancy(*commonGenesisBlock, *bestTip); err != nil {
 		return err
 	}
 
