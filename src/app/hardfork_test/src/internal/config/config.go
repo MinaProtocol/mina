@@ -175,18 +175,26 @@ func (c *Config) InitDaemonInfos() {
 	}
 
 	allAuto := true
+	nonAuto := true
 	for _, info := range result {
-		if info.ForkMethod != Auto {
+		if info.ForkMethod == Auto {
+			nonAuto = false
+		} else {
 			allAuto = false
-			break
 		}
 	}
 
+	// below 2 branches won't be run into simulataneously, so it's fine.
 	if allAuto {
 		// NOTE: ensure there's at least one daemon not running in auto mode, o.w. we
 		// can't check on anything after slot-chain-end
 		nonAutoForkMehtods := []ForkMethod{Legacy, Advanced}
 		result[rand.Intn(len(result))].ForkMethod = nonAutoForkMehtods[rand.Intn(len(nonAutoForkMehtods))]
+	}
+
+	if nonAuto {
+		// TODO: REVERT THIS
+		result[rand.Intn(len(result))].ForkMethod = Auto
 	}
 
 	c.DaemonInfos = result
