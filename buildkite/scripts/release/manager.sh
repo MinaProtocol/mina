@@ -456,9 +456,20 @@ function publish_debian() {
     local __new_artifact_name=${15:-""}
     local __skip_cache_invalidation=${SKIP_CACHE_INVALIDATION:-0}
 
-    get_cached_debian_or_download $__backend $__artifact $__codename "$__network" "$__arch" "$__profile"
     local __artifact_full_name
     __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network $__profile)
+
+    if [[ -z ${__new_artifact_name+x} || -z ${__new_artifact_name} || ${__new_artifact_name} == "" ]]; then
+        __new_artifact_name=$__artifact_full_name
+    fi
+
+    echo " 🍥  Publishing $__artifact debian to $__channel channel with $__target_version version"
+    echo "     📦  Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network" "$__arch")"
+    if [[ $__dry_run == 1 ]]; then
+        return 0
+    fi
+
+    get_cached_debian_or_download $__backend $__artifact $__codename "$__network" "$__arch" "$__profile"
     local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
 
     if [[ $__debian_sign_key != "" ]]; then
@@ -468,11 +479,6 @@ function publish_debian() {
         local __sign_arg=()
         local __signed_arg=""
     fi
-
-    if [[ -z ${__new_artifact_name+x} || -z ${__new_artifact_name} || ${__new_artifact_name} == "" ]]; then
-        __new_artifact_name=$__artifact_full_name
-    fi
-
 
     if [[ $__source_version != "$__target_version" ]]; then
         echo " 🗃️  Rebuilding $__artifact debian from $__source_version to $__target_version"
@@ -491,8 +497,6 @@ function publish_debian() {
         rm -rf "$__session_dir"
     fi
 
-    echo " 🍥  Publishing $__artifact debian to $__channel channel with $__target_version version"
-    echo "     📦  Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network" "$__arch")"
     if [[ $__dry_run == 0 ]]; then
         # shellcheck disable=SC2068,SC2046
         prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/publish.sh \
@@ -586,7 +590,7 @@ function promote_debian() {
     local __dry_run=$9
     local __debian_repo=${10}
     local __arch=${11}
-    local __debian_sign_key=${12}
+    local __debian_sign_key=${12:-""}
     local __skip_cache_invalidation=${SKIP_CACHE_INVALIDATION:-0}
 
     if [[ $__debian_sign_key != "" ]]; then
