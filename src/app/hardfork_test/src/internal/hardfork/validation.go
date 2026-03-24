@@ -239,7 +239,7 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, error) {
 }
 
 // AnalyzeBlocks performs comprehensive block analysis including finding genesis epoch hashes
-func (t *HardforkTest) AnalyzeBlocks(mainGenesisTs int64) (*BlockAnalysisResult, error) {
+func (t *HardforkTest) AnalyzeBlocksOnMainNetwork(mainGenesisTs int64) (*BlockAnalysisResult, error) {
 
 	daemonForGenesisBlock := t.Config.SampleDaemonInfo("any", func(di *config.DaemonInfo) bool { return true })
 	genesisBlock, err := t.Client.GenesisBlock(daemonForGenesisBlock.Port(config.PORT_REST))
@@ -297,52 +297,6 @@ func (t *HardforkTest) FindStakingHash(
 	return hash, nil
 }
 
-// waitForEarliestBlock waits for the earliest block to appear in the fork network with retry mechanism
-// Returns the height and slot of the earliest block, or an error if max retries exceeded
-func (t *HardforkTest) waitForEarliestBlockInForkNetwork(port int) (height int, slot int, err error) {
-	for attempt := 1; attempt <= t.Config.ForkEarliestBlockMaxRetries; attempt++ {
-		genesisBlock, queryError := t.Client.GenesisBlock(port)
-		if queryError == nil && genesisBlock.BlockHeight > 0 {
-			return genesisBlock.BlockHeight, genesisBlock.Slot, nil
-		}
-
-		if attempt < t.Config.ForkEarliestBlockMaxRetries {
-			t.Logger.Debug("Waiting for earliest block (attempt %d/%d)...", attempt, t.Config.ForkEarliestBlockMaxRetries)
-			time.Sleep(time.Duration(t.Config.ForkSlot) * time.Second)
-		} else {
-			err = queryError
-		}
-	}
-
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get earliest block after %d attempts: %w", t.Config.ForkEarliestBlockMaxRetries, err)
-	}
-	return 0, 0, fmt.Errorf("no blocks found after %d attempts", t.Config.ForkEarliestBlockMaxRetries)
-}
-
-// ValidateFirstBlockOfForkChain checks that the fork network is producing blocks
-func (t *HardforkTest) ValidateFirstBlockOfForkChain(port int, latestPreForkHeight int, expectedGenesisSlot int64) error {
-	// Wait for the earliest block to appear
-	earliestHeight, earliestSlot, err := t.waitForEarliestBlockInForkNetwork(port)
-	if err != nil {
-		return err
-	}
-
-	// Check earliest height
-	if earliestHeight != latestPreForkHeight+1 {
-		t.Logger.Error("Assertion failed: unexpected block height %d at the beginning of the fork", earliestHeight)
-		return fmt.Errorf("unexpected block height %d at beginning of fork", earliestHeight)
-	}
-
-	// Check earliest slot
-	if earliestSlot < int(expectedGenesisSlot) {
-		t.Logger.Error("Assertion failed: unexpected slot %d at the beginning of the fork", earliestSlot)
-		return fmt.Errorf("unexpected slot %d at beginning of fork", earliestSlot)
-	}
-
-	return nil
-}
-
 // ValidateBlockWithUserCommandCreated checks that blocks contain user commands
 func (t *HardforkTest) ValidateBlockWithUserCommandCreatedForkNetwork(port int) error {
 	allBlocksEmpty := true
@@ -367,4 +321,30 @@ func (t *HardforkTest) ValidateBlockWithUserCommandCreatedForkNetwork(port int) 
 	}
 
 	return nil
+}
+
+func (t *HardforkTest) GenesisBlockAcrossNetwork() (*client.BlockData, error) {
+	seenBlock := false
+	var commonGenesisBlock *client.BlockData
+	var daemonReturningCommonGenesisBlock config.DaemonInfo
+
+	for _, info := range t.Config.DaemonInfos {
+		ourGenesisBlock, err := t.Client.GenesisBlock(info.Port(config.PORT_REST))
+		if err != nil {
+			return nil, fmt.Errorf("Failed to query genesis block on node %s: %v", info.Name, err)
+		}
+		if seenBlock {
+			if ourGenesisBlock != commonGenesisBlock {
+				return nil, fmt.Errorf("Node %s has genesis block %v, while node %s has genesis block %v, they don't agree", daemonReturningCommonGenesisBlock.Name, commonGenesisBlock, info.Name, ourGenesisBlock)
+			}
+		} else {
+			seenBlock = true
+			commonGenesisBlock = ourGenesisBlock
+			daemonReturningCommonGenesisBlock = info
+		}
+	}
+	if !seenBlock {
+		panic("Unreachable(GenesisBlockAcrossNetwork): No daemon is running!")
+	}
+	return commonGenesisBlock, nil
 }
