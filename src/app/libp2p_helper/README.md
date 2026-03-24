@@ -53,6 +53,19 @@ See [Go Protocol buffers - avoiding
 conflicts](https://github.com/bazelbuild/rules_go/blob/master/proto/core.rst#avoiding-conflicts): [Option 2: Use pre-generated .pb.go files](https://github.com/bazelbuild/rules_go/blob/master/proto/core.rst#option-2-use-pre-generated-pb-go-files).
 for more info.
 
+## Configuration
+
+### Environment Variables
+
+#### LIBP2P_ENABLE_MDNS
+
+Controls whether mDNS (Multicast DNS) local network peer discovery is enabled.
+
+- **Default**: `false` (mDNS is **disabled** for security)
+- **Values**: `"true"` to enable, any other value or unset to disable
+- **Use case**: mDNS is only needed for local development/testing where multiple nodes run on the same network. **Production deployments should keep this disabled** as nodes discover each other via seed peers and DHT.
+- **Security**: Disabling mDNS prevents the node from broadcasting on cloud provider internal networks and discovering other VMs, which can trigger abuse reports.
+
 ## How it works
 
 libp2p_helper serves as a middleware between libp2p and Ocaml process. They communicate using a number of internal messages.
