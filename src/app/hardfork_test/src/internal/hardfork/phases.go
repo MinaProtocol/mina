@@ -422,7 +422,9 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 		}
 		t.Logger.Info("Computed chain_id for fork config on node %s: %s", info.Name, chainId)
 		chainStateDir := filepath.Join(nodeDir, chainId)
-		os.Mkdir(chainStateDir, 0755)
+		if err = os.Mkdir(chainStateDir, 0755); err != nil {
+			return err
+		}
 		filesToMove := []MoveFileSpec{
 			{from: forkConfigFile, to: filepath.Join(nodeDir, "daemon.json")},
 			{from: filepath.Join(forkDataBase, "genesis"), to: filepath.Join(chainStateDir, "genesis")},
