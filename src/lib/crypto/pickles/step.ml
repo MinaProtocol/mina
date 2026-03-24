@@ -740,13 +740,10 @@ struct
       | Req.Compute_prev_proof_parts prev_proof_requests ->
           k (compute_prev_proof_parts prev_proof_requests)
       | Req.Proof_with_datas ->
-          Core_kernel.printf "\n=== STEP HANDLER: Req.Proof_with_datas ===\n%!" ;
           k (Option.value_exn !witnesses)
       | Req.Wrap_index ->
-          Core_kernel.printf "=== STEP HANDLER: Req.Wrap_index ===\n%!" ;
           k self_dlog_plonk_index
       | Req.App_state ->
-          Core_kernel.printf "=== STEP HANDLER: Req.App_state ===\n%!" ;
           k next_state
       | Req.Return_value res ->
           return_value := Some res ;
@@ -755,30 +752,9 @@ struct
           auxiliary_value := Some res ;
           k ()
       | Req.Unfinalized_proofs ->
-          let v = Lazy.force unfinalized_proofs in
-          Core_kernel.printf "=== STEP HANDLER: Req.Unfinalized_proofs (%d proofs) ===\n"
-            (List.length (Pickles_types.Vector.to_list v)) ;
-          List.iteri (Pickles_types.Vector.to_list v) ~f:(fun i u ->
-            let dv = u.deferred_values in
-            let sv (Shifted_value.Type2.Shifted_value x) =
-              Backend.Tock.Field.to_string x in
-            Core_kernel.printf "  [%d] should_finalize: %b\n" i u.should_finalize ;
-            Core_kernel.printf "  [%d] sponge_digest: (limb_vector)\n" i ;
-            Core_kernel.printf "  [%d] combined_inner_product: %s\n" i (sv dv.combined_inner_product) ;
-            Core_kernel.printf "  [%d] b: %s\n" i (sv dv.b) ;
-            Core_kernel.printf "  [%d] bp_challenges: %d\n" i
-              (List.length (Pickles_types.Vector.to_list dv.bulletproof_challenges))
-          ) ;
-          Core_kernel.printf "%!" ;
-          k v
+          k (Lazy.force unfinalized_proofs)
       | Req.Messages_for_next_wrap_proof ->
-          let v = Lazy.force messages_for_next_wrap_proof_padded in
-          Core_kernel.printf "=== STEP HANDLER: Req.Messages_for_next_wrap_proof (%d digests) ===\n"
-            (List.length (Pickles_types.Vector.to_list v)) ;
-          List.iteri (Pickles_types.Vector.to_list v) ~f:(fun i _d ->
-            Core_kernel.printf "  [%d]: (digest)\n" i) ;
-          Core_kernel.printf "%!" ;
-          k v
+          k (Lazy.force messages_for_next_wrap_proof_padded)
       | Req.Wrap_domain_indices ->
           let all_possible_domains = Wrap_verifier.all_possible_domains () in
           let wrap_domain_indices =
@@ -791,10 +767,6 @@ struct
                 in
                 Pickles_base.Proofs_verified.of_int_exn domain_index )
           in
-          Core_kernel.printf "=== STEP HANDLER: Req.Wrap_domain_indices ===\n" ;
-          List.iteri (Pickles_types.Vector.to_list wrap_domain_indices) ~f:(fun i d ->
-            Core_kernel.printf "  [%d]: %d\n" i (Pickles_base.Proofs_verified.to_int d)) ;
-          Core_kernel.printf "%!" ;
           k wrap_domain_indices
       | _ -> (
           match handler with
