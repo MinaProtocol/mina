@@ -473,9 +473,11 @@ let generateHfRelatedStepsForCodename =
                           Toolchain.SelectionMode.ByDebianAndArch
                           codename.DebVersion
                           codename.Arch
-                          [ "NETWORK_NAME=${Network.lowerName spec.network}"
-                          , "MINA_DEB_CODENAME=${lowerNameCodename}"
-                          ]
+                          (   [ "NETWORK_NAME=${Network.lowerName spec.network}"
+                              , "MINA_DEB_CODENAME=${lowerNameCodename}"
+                              ]
+                            # DebianVersions.overrideEnvs
+                          )
                           "mkdir -p _build && ./buildkite/scripts/cache/manager.sh read hardfork /workdir && RUNTIME_CONFIG_JSON=/workdir/hardfork/new_config.json LEDGER_TARBALLS='/workdir/hardfork/ledgers/*.tar.gz' ./buildkite/scripts/debian/build.sh --codenames ${debianCodenamesList} --arch all daemon_${Network.lowerName
                                                                                                                                                                                                                                                                                                                      spec.network}_hardfork_config"
                     , label =
