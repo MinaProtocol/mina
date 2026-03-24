@@ -1113,11 +1113,11 @@ Network participants information:
 EOF
 if [[ -n "${SEED_PID}" ]]; then
   cat <<EOF
-          Seed:
-                  Instance #0:
-                    pid ${SEED_PID}
-                    status: ${MINA_EXE} client status -daemon-port ${SEED_START_PORT}
-                    data dir: ${NODES_FOLDER}/seed
+  Seed:
+    Instance #0:
+      pid ${SEED_PID}
+      status: ${MINA_EXE} client status -daemon-port ${SEED_START_PORT}
+      data dir: ${NODES_FOLDER}/seed
 EOF
 fi
 
