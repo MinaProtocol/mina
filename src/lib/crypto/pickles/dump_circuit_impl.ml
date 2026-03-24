@@ -2220,6 +2220,74 @@ let full_step_verify_one_circuit (inputs : Impls.Step.Field.t array) () =
   ()
 
 
+(* Full step verify_one circuit with N2 (2 previous proofs).
+   Same as full_step_verify_one_circuit but with Per_proof_witness N2.
+   Input size: ppw(N2,Field)=270 + unfinalized=32 + 2 = 304 fields.
+*)
+let full_step_verify_one_n2_circuit (inputs : Impls.Step.Field.t array) () =
+  let open Impls.Step in
+  let open Pickles_types in
+  let feature_flags =
+    Kimchi_backend_common.Plonk_types.Features.Full.none
+  in
+  let ppw_typ =
+    Per_proof_witness.typ Field.typ Nat.N2.n ~feature_flags ~num_chunks:1
+  in
+  let (Typ ppw_typ_record) = ppw_typ in
+  let ppw_size = ppw_typ_record.size_in_field_elements in
+  let ppw_fields = Array.sub inputs ~pos:0 ~len:ppw_size in
+  let ppw =
+    ppw_typ_record.var_of_fields
+      (ppw_fields, ppw_typ_record.constraint_system_auxiliary ())
+  in
+  let pos = ref ppw_size in
+  let unfinalized_typ =
+    Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
+  in
+  let (Typ unfinalized_typ_record) = unfinalized_typ in
+  let unfinalized_size = unfinalized_typ_record.size_in_field_elements in
+  let unfinalized_fields = Array.sub inputs ~pos:!pos ~len:unfinalized_size in
+  let unfinalized : Unfinalized.t =
+    unfinalized_typ_record.var_of_fields
+      (unfinalized_fields, unfinalized_typ_record.constraint_system_auxiliary ())
+  in
+  pos := !pos + unfinalized_size ;
+  let messages_for_next_wrap_proof = inputs.(!pos) in
+  pos := !pos + 1 ;
+  let must_verify = Boolean.Unsafe.of_cvar inputs.(!pos) in
+  pos := !pos + 1 ;
+  let srs = Kimchi_bindings.Protocol.SRS.Fq.create (1 lsl 15) in
+  let dummy_pt = Step_main_inputs.Inner_curve.Params.one in
+  let dummy_comm = [| Step_main_inputs.Inner_curve.constant dummy_pt |] in
+  let verification_key =
+    { Plonk_verification_key_evals.
+      sigma_comm = Vector.init Nat.N7.n ~f:(fun _ -> dummy_comm)
+    ; coefficients_comm = Vector.init Nat.N15.n ~f:(fun _ -> dummy_comm)
+    ; generic_comm = dummy_comm
+    ; psm_comm = dummy_comm
+    ; complete_add_comm = dummy_comm
+    ; mul_comm = dummy_comm
+    ; emul_comm = dummy_comm
+    ; endomul_scalar_comm = dummy_comm
+    }
+  in
+  let d : _ Types_map.For_step.t =
+    { max_proofs_verified = (module Nat.N2 : Nat.Add.Intf with type n = Nat.N2.n)
+    ; public_input = Field.typ
+    ; wrap_domain = `Known (Pickles_base.Domain.Pow_2_roots_of_unity 14)
+    ; step_domains = `Known (Vector.singleton { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 16 })
+    ; wrap_key = verification_key
+    ; feature_flags
+    ; num_chunks = 1
+    ; zk_rows = 3
+    }
+  in
+  let _chals, _verified =
+    Step_main_for_dump.verify_one ~srs
+      ppw d messages_for_next_wrap_proof unfinalized must_verify
+  in
+  ()
+
 (* hash_messages_for_next_step_proof sub-circuit.
 
    Hashes the Messages_for_next_step_proof struct into a single digest.
@@ -3235,4 +3303,22 @@ let run ~output_dir =
     Impl.Typ.array ~length:step_verify_n2_input_size Impl.Field.typ
   in
   dump_step "step_verify_n2_circuit" step_verify_n2_circuit
-    ~input_typ:step_verify_n2_input_typ ~return_typ:Impl.Typ.unit
+    ~input_typ:step_verify_n2_input_typ ~return_typ:Impl.Typ.unit ;
+  (* Full step verify_one N2 circuit *)
+  let full_step_verify_one_n2_input_size =
+    let feature_flags =
+      Kimchi_backend_common.Plonk_types.Features.Full.none
+    in
+    let (Impl.Typ.Typ ppw_r) =
+      Per_proof_witness.typ Impl.Field.typ Pickles_types.Nat.N2.n ~feature_flags ~num_chunks:1
+    in
+    let (Impl.Typ.Typ unf_r) =
+      Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
+    in
+    ppw_r.size_in_field_elements + unf_r.size_in_field_elements + 2
+  in
+  let full_step_verify_one_n2_input_typ =
+    Impl.Typ.array ~length:full_step_verify_one_n2_input_size Impl.Field.typ
+  in
+  dump_step "full_step_verify_one_n2_circuit" full_step_verify_one_n2_circuit
+    ~input_typ:full_step_verify_one_n2_input_typ ~return_typ:Impl.Typ.unit
