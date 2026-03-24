@@ -189,16 +189,17 @@ func (t *HardforkTest) CollectEpochHashes(mainGenesisTs int64) (*SnarkedHashByEp
 	return &snarkedHashByEpoch, nil
 }
 
-func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, error) {
+func (t *HardforkTest) ConsensusAcrossNodesAfterSlotChainEnd() (*ConsensusState, error) {
+	allAliveDaemons := t.Config.AllDaemonSatisfying("alive(non-auto)", func(di *config.DaemonInfo) bool { return di.ForkMethod != config.Auto })
 
 	var wg sync.WaitGroup
 
-	states := make([]*ConsensusState, len(t.Config.DaemonInfos)) // store results
-	errors := make([]error, len(t.Config.DaemonInfos))
+	states := make([]*ConsensusState, len(allAliveDaemons)) // store results
+	errors := make([]error, len(allAliveDaemons))
 
-	for i, daemon := range t.Config.DaemonInfos {
+	for i, daemon := range allAliveDaemons {
 		wg.Add(1)
-		go func(i int, daemon config.DaemonInfo) {
+		go func(i int, daemon *config.DaemonInfo) {
 			defer wg.Done()
 			state, err := t.ConsensusStateOnNode(daemon.Port(config.PORT_REST))
 			states[i] = state
@@ -208,13 +209,13 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, error) {
 
 	wg.Wait()
 
-	for i, daemon := range t.Config.DaemonInfos {
+	for i, daemon := range allAliveDaemons {
 		if errors[i] != nil {
 			return nil, fmt.Errorf("Failed to query consensus state on node %s: %w", daemon.Name, errors[i])
 		}
 	}
 
-	for i := range t.Config.DaemonInfos {
+	for i := range allAliveDaemons {
 		if i == 0 {
 			continue
 		}
@@ -225,12 +226,12 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, error) {
 		if state.LastBlockBeforeTxEnd != last_state.LastBlockBeforeTxEnd {
 			return nil, fmt.Errorf(
 				"Node %s and node %s doesn't agree on last block seen before tx end! The previous has %v while the later has %v",
-				t.Config.DaemonInfos[i-1].Name, t.Config.DaemonInfos[i].Name, last_state, state)
+				allAliveDaemons[i-1].Name, allAliveDaemons[i].Name, last_state, state)
 		}
 	}
 
-	if len(t.Config.DaemonInfos) == 0 {
-		return nil, fmt.Errorf("Unreachable: no nodes are running!")
+	if len(allAliveDaemons) == 0 {
+		return nil, fmt.Errorf("Unreachable: no nodes are running after slot-chain-end!")
 	}
 
 	return states[0], nil
@@ -259,7 +260,7 @@ func (t *HardforkTest) AnalyzeBlocks(mainGenesisTs int64) (*BlockAnalysisResult,
 	// slot chain end; sleeping ensures we have definitely reached that instant.
 	time.Sleep(time.Until(t.Config.MainSlotChainEnd(mainGenesisTs)))
 
-	consensus, err := t.ConsensusAcrossNodes()
+	consensus, err := t.ConsensusAcrossNodesAfterSlotChainEnd()
 	if err != nil {
 		return nil, err
 	}
