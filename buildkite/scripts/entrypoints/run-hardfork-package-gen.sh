@@ -12,14 +12,14 @@ set -euox pipefail
 #   ./run-hardfork-package-gen.sh
 #
 # REQUIRED ENVIRONMENT VARIABLES:
-#   CODENAMES_CONFIG              	   - Comma-separated list of Debian codenames to include in the package generation. Fist one will be used for validations
+#   CODENAMES_CONFIG                   - Comma-separated list of Debian codenames to include in the package generation. Fist one will be used for validations
 #   NETWORK                            - Target network name (e.g., "Devnet", "Mainnet")
 #   GENESIS_TIMESTAMP                  - Genesis timestamp in ISO format (e.g., "2024-04-07T11:45:00Z")
 #   CONFIG_JSON_GZ_URL                 - URL to the gzipped genesis config JSON file
 #   VERSION                            - Version string for the hardfork package (optional, if not set, defaults to calculated from git)
 #   PRECOMPUTED_FORK_BLOCK_PREFIX      - (Optional) Prefix for precomputed fork block URLs (e.g., "gs://mina_network_block_data/mainnet")
 #   USE_ARTIFACTS_FROM_BUILDKITE_BUILD - (Optional) Buildkite build number to use artifacts from (e.g., "1234")
-#   HARDFORK_GENESIS_SLOT_DELTA        - (Optional) Number of slots to delay the hard fork genesis slot by (e.g., "0" for no delay)
+#   USE_GENERIC_DOCKERS_FROM_VERSION   - (Optional) Docker version to build config docker on top of (e.g., "3.3.0-compatible-aa34232")
 #
 # EXAMPLE:
 #   export CODENAMES_CONFIG="Bullseye_Amd64,Focal_Arm64"
@@ -48,14 +48,15 @@ function usage() {
     echo -e "${RED}☞  $1${CLEAR}\n";
   fi
   cat << EOF
-  CODENAMES_CONFIG              The Debian codenames config (Bullseye_Amd64, Focal_Arm64 etc.)
-  NETWORK                       The Docker and Debian network (Devnet, Mainnet)
-  GENESIS_TIMESTAMP             The Genesis timestamp in ISO format (e.g. 2024-04-07T11:45:00Z)
-  CONFIG_JSON_GZ_URL            The URL to the gzipped genesis config JSON file
-  VERSION                       (Optional) The version of the hardfork package to generate (e.g. 3.0.0devnet-tooling-dkijania-hardfork-package-gen-in-nightly-b37f50e)
-  PRECOMPUTED_FORK_BLOCK_PREFIX (Optional) The prefix for precomputed fork block URLs (e.g. gs://mina_network_block_data/mainnet)
+  CODENAMES_CONFIG                   The Debian codenames config (Bullseye_Amd64, Focal_Arm64 etc.)
+  NETWORK                            The Docker and Debian network (Devnet, Mainnet)
+  GENESIS_TIMESTAMP                  The Genesis timestamp in ISO format (e.g. 2024-04-07T11:45:00Z)
+  CONFIG_JSON_GZ_URL                 The URL to the gzipped genesis config JSON file
+  VERSION                            (Optional) The version of the hardfork package to generate (e.g. 3.0.0devnet-tooling-dkijania-hardfork-package-gen-in-nightly-b37f50e)
+  PRECOMPUTED_FORK_BLOCK_PREFIX      (Optional) The prefix for precomputed fork block URLs (e.g. gs://mina_network_block_data/mainnet)
   USE_ARTIFACTS_FROM_BUILDKITE_BUILD (Optional) The Buildkite build number to use artifacts from (e.g. 1234)
-  HARDFORK_GENESIS_SLOT_DELTA   (Optional) Number of slots to delay the hard fork genesis slot by (e.g. 0 for no delay)
+  HARDFORK_GENESIS_SLOT_DELTA        (Optional) Number of slots to delay the hard fork genesis slot by (e.g. 0 for no delay)
+  USE_GENERIC_DOCKERS_FROM_VERSION   (Optional) Docker version to build config docker on top of (e.g. 3.3.0-compatible-aa34232)
 EOF
   exit 1
 }
@@ -125,6 +126,14 @@ else
   HARDFORK_GENESIS_SLOT_DELTA="(Some ${HARDFORK_GENESIS_SLOT_DELTA})"
 fi
 
+# Format USE_GENERIC_DOCKERS_FROM_VERSION as Optional Text for Dhall
+if [[ -z "${USE_GENERIC_DOCKERS_FROM_VERSION:-}" ]]; then
+  USE_GENERIC_DOCKERS_FROM_VERSION="(None Text)"
+else
+  # shellcheck disable=SC2089
+  USE_GENERIC_DOCKERS_FROM_VERSION="(Some \"${USE_GENERIC_DOCKERS_FROM_VERSION}\")"
+fi
+
 
 # Format PRECOMPUTED_FORK_BLOCK_PREFIX as Optional Text for Dhall
 if [[ -z "${PRECOMPUTED_FORK_BLOCK_PREFIX:-}" ]]; then
@@ -153,7 +162,7 @@ else
 fi
 
 # shellcheck disable=SC2089
-printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s\n' \
+printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s %s\n' \
   "$GENERATE_HARDFORK_PACKAGE_DHALL_DEF" \
   "$DHALL_CODENAMES" \
   "$NETWORK_DHALL_DEF" \
@@ -164,4 +173,6 @@ printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s %s %s\n' \
   "$VERSION" \
   "$PRECOMPUTED_FORK_BLOCK_PREFIX" \
   "$USE_ARTIFACTS_FROM_BUILDKITE_BUILD" \
-  "$HARDFORK_GENESIS_SLOT_DELTA" | dhall-to-yaml --quoted
+  "$HARDFORK_GENESIS_SLOT_DELTA" \
+  "$USE_GENERIC_DOCKERS_FROM_VERSION" \
+   | dhall-to-yaml --quoted
