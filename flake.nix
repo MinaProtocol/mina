@@ -30,7 +30,7 @@
   inputs.describe-dune.inputs.flake-utils.follows = "utils";
 
   inputs.o1-opam-repository.url =
-    "github:o1-labs/opam-repository/dd90c5c72b7b7caeca3db3224b2503924deea08a";
+    "github:o1-labs/opam-repository/39b27eed96d44064fe1c4e9db7fd8f57c6a7db46";
   inputs.o1-opam-repository.flake = false;
 
   # The version must be the same as the version used in:
