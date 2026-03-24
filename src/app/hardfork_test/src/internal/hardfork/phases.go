@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -20,8 +21,31 @@ type HFHandler func(*HardforkTest, *BlockAnalysisResult) error
 // RunMainNetworkPhase runs the main network and validates its operation
 // and returns the fork config bytes and block analysis result
 func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown HFHandler) (*BlockAnalysisResult, error) {
+	t.Logger.Info("Supported fork method: %s", t.Config.ForkMethods)
+	extraFilesRoot, err := os.MkdirTemp("", "auto-mode-extra-files")
+	defer func() {
+		err := os.RemoveAll(extraFilesRoot)
+		if err != nil {
+			t.Logger.Error("Failed to remove temporary extra files root at %s: %v", extraFilesRoot, err)
+		}
+	}()
+
+	for _, info := range t.Config.DaemonInfos {
+		t.Logger.Info("Planning to use fork method %s on node %s", info.ForkMethod, info.Name)
+
+		if info.ForkMethod == config.Auto {
+			nodeDirAbsExtra := info.NodeDirRel(extraFilesRoot)
+			if err := os.MkdirAll(nodeDirAbsExtra, 0755); err != nil {
+				return nil, fmt.Errorf("Failed to create node dir extra at %s: %v", nodeDirAbsExtra, err)
+			}
+			extra_args := []byte("--hardfork-handling migrate-exit")
+			if err := os.WriteFile(path.Join(nodeDirAbsExtra, "extra_args.txt"), extra_args, 0644); err != nil {
+				return nil, fmt.Errorf("Failed to write extra_args.txt for node %s: %v", info.Name, err)
+			}
+		}
+	}
 	// Start the main network
-	mainNetCmd, err := t.RunMainNetwork(mainGenesisTs)
+	mainNetCmd, err := t.RunMainNetwork(extraFilesRoot, mainGenesisTs)
 	if err != nil {
 		return nil, err
 	}
@@ -411,6 +435,14 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 			err := os.Rename(spec.from, spec.to)
 			if err != nil {
 				return fmt.Errorf("Error moving fork data %s -> %s on node %s: %v", spec.from, spec.to, info.Name, err)
+			}
+		}
+		extraArgsToRemove := filepath.Join(nodeDir, "extra_args.txt")
+		// Remove extra_args.txt that's no longer needed post-fork
+		if _, err = os.Stat(extraArgsToRemove); err == nil {
+			err = os.Remove(extraArgsToRemove)
+			if err != nil {
+				return fmt.Errorf("Failed to remove extra_args.txt for node %s", info.Name)
 			}
 		}
 	}
