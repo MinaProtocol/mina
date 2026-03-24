@@ -145,7 +145,7 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 	dec.DisallowUnknownFields()
 
 	if err := dec.Decode(&prepatchConfig); err != nil {
-		return fmt.Errorf("failed to unmarshal legacy prepatch fork config: %w", err)
+		return fmt.Errorf("failed to unmarshal legacy prepatch fork config: %w, here's the config: '%s'", err, string(forkConfigBytes))
 	}
 
 	// Validate fork config data
@@ -159,7 +159,7 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 
 	prepatchLedgersDir := filepath.Join(forkDataPrepatchPath, "ledgers")
 	prepatchHashesFile := filepath.Join(forkDataPrepatchPath, "ledger_hashes.json")
-	if err := t.GenerateAndValidateHashesAndLedgers(&analysis, prepatchConfigFile, prepatchLedgersDir, prepatchHashesFile); err != nil {
+	if err := t.GenerateAndValidateHashesAndLedgers(analysis, prepatchConfigFile, prepatchLedgersDir, prepatchHashesFile); err != nil {
 		return err
 	}
 
@@ -188,29 +188,6 @@ func (t *HardforkTest) legacyFork(daemon config.DaemonInfo, analysis BlockAnalys
 	err = t.ValidateFinalForkConfig(analysis.Consensus.LastBlockBeforeTxEnd, patchedConfig, forkGenesisTs, mainGenesisTs)
 	if err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func (t *HardforkTest) LegacyForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) error {
-	daemonInfos := t.Config.AllDaemonInfos()
-	errors := make([]error, len(daemonInfos))
-
-	var wg sync.WaitGroup
-	for idx, info := range daemonInfos {
-		wg.Add(1)
-		go func(idx int, info config.DaemonInfo) {
-			defer wg.Done()
-			errors[idx] = t.legacyFork(info, *analysis, mainGenesisTs)
-		}(idx, info)
-	}
-	wg.Wait()
-
-	for i, info := range daemonInfos {
-		if errors[i] != nil {
-			return fmt.Errorf("Legacy fork on daemon %v failed: %v", info, errors[i])
-		}
 	}
 
 	return nil
@@ -252,24 +229,33 @@ func (t *HardforkTest) advancedFork(daemon config.DaemonInfo, analysis BlockAnal
 	return nil
 }
 
-// Uses `mina advanced generate-hardfork-config CLI`
-func (t *HardforkTest) AdvancedForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) error {
+func (t *HardforkTest) ForkPhase(analysis *BlockAnalysisResult, mainGenesisTs int64) error {
 	daemonInfos := t.Config.AllDaemonInfos()
-	errors := make([]error, len(daemonInfos))
+	numDaemons := len(daemonInfos)
+	errors := make([]error, numDaemons)
+	forkMethodsPerDaemon := make([]config.ForkMethod, numDaemons)
 
 	var wg sync.WaitGroup
 	for idx, info := range daemonInfos {
 		wg.Add(1)
-		go func(idx int, info config.DaemonInfo) {
+		forkMethodToUse := t.Config.ForkMethods.RandomChoose()
+		forkMethodsPerDaemon[idx] = forkMethodToUse
+		go func(idx int, info config.DaemonInfo, forkMethod config.ForkMethod) {
 			defer wg.Done()
-			errors[idx] = t.advancedFork(info, *analysis, mainGenesisTs)
-		}(idx, info)
+			t.Logger.Info("Forking node at port %d with method %s", info.StartPort, forkMethod.String())
+			switch forkMethod {
+			case config.Legacy:
+				errors[idx] = t.legacyFork(info, *analysis, mainGenesisTs)
+			case config.Advanced:
+				errors[idx] = t.advancedFork(info, *analysis, mainGenesisTs)
+			}
+		}(idx, info, forkMethodToUse)
 	}
 	wg.Wait()
 
 	for i, info := range daemonInfos {
 		if errors[i] != nil {
-			return fmt.Errorf("Advanced fork on daemon %v failed: %v", info, errors[i])
+			return fmt.Errorf("%s fork on daemon %v failed: %v", forkMethodsPerDaemon[i].String(), info, errors[i])
 		}
 	}
 
@@ -317,6 +303,9 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 	delete(config, "ledger")
 	t.Logger.Info("Removed .ledger from daemon.json")
 
+	delete(config, "daemon")
+	t.Logger.Info("Removed .daemon from daemon.json")
+
 	if genesis, ok := config["genesis"].(map[string]any); ok {
 		delete(genesis, "genesis_state_timestamp")
 		t.Logger.Info("Removed .genesis.genesis_state_timestamp from daemon.json")
@@ -342,7 +331,7 @@ func (t *HardforkTest) CleanUpNetworkForForkPhase() error {
 		if err != nil {
 			return fmt.Errorf("Can't read fork config from node %s: %v", info.NodeDir, err)
 		}
-		t.Logger.Info("Node %s will be using fork config of content: %s", string(forkConfigContent))
+		t.Logger.Info("Node %s will be using fork config of content: %s", info.NodeDir, string(forkConfigContent))
 		// NOTE: Compute chain_id from the merged config (fork + shared) to determine
 		// the nested directory structure the post-fork daemon will use. The daemon
 		// loads its config-directory daemon.json first, then overlays --config-file
