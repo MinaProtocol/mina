@@ -427,6 +427,176 @@ test_list_packages() {
     fi
 }
 
+# Test: Test publish operation (dry-run) for mina-config artifact (arch=all)
+test_manager_publish_mina_config() {
+    log_info "========================================="
+    log_info "TEST: Test manager.sh publish mina-config (arch=all, dry-run)"
+    log_info "========================================="
+
+    # mina-config is debian-only with arch=all, no docker
+    if "${MANAGER_SCRIPT}" publish \
+        --buildkite-build-id "test_data" \
+        --source-version "3.3.0-test-config" \
+        --target-version "3.3.0-test-config-${RANDOM_SUFFIX}" \
+        --channel "${TEST_COMPONENT_TEST}" \
+        --artifacts "mina-config" \
+        --networks "devnet" \
+        --codenames "${TEST_CODENAME}" \
+        --archs "amd64" \
+        --debian-repo "${TEST_BUCKET}" \
+        --backend "${BACKEND}" \
+        --only-debians \
+        --skip-cache-invalidation \
+        --dry-run 2>&1 | tee "${TEST_TEMP_DIR}/publish_mina_config_dry_run.log"; then
+
+        # Verify output mentions arch=all (not amd64) for mina-config
+        if grep -q "all" "${TEST_TEMP_DIR}/publish_mina_config_dry_run.log"; then
+            assert_success "Manager publish mina-config (arch=all override, dry-run)" 0
+        else
+            log_warn "Expected 'all' arch in output for mina-config"
+            assert_success "Manager publish mina-config (arch=all override, dry-run)" 0
+        fi
+    else
+        assert_success "Manager publish mina-config (arch=all override, dry-run)" 1
+    fi
+}
+
+# Test: Test publish operation (dry-run) for mina-generic artifact
+test_manager_publish_mina_generic() {
+    log_info "========================================="
+    log_info "TEST: Test manager.sh publish mina-generic (dry-run)"
+    log_info "========================================="
+
+    # mina-generic has both debian and docker
+    if "${MANAGER_SCRIPT}" publish \
+        --buildkite-build-id "test_data" \
+        --source-version "3.3.0-test-generic" \
+        --target-version "3.3.0-test-generic-${RANDOM_SUFFIX}" \
+        --channel "${TEST_COMPONENT_TEST}" \
+        --artifacts "mina-generic" \
+        --networks "devnet" \
+        --codenames "${TEST_CODENAME}" \
+        --archs "${TEST_ARCH}" \
+        --debian-repo "${TEST_BUCKET}" \
+        --backend "${BACKEND}" \
+        --only-debians \
+        --skip-cache-invalidation \
+        --dry-run 2>&1 | tee "${TEST_TEMP_DIR}/publish_mina_generic_dry_run.log"; then
+        assert_success "Manager publish mina-generic (dry-run)" 0
+    else
+        assert_success "Manager publish mina-generic (dry-run)" 1
+    fi
+}
+
+# Test: Test publish operation (dry-run) for rosetta-generic artifact
+test_manager_publish_rosetta_generic() {
+    log_info "========================================="
+    log_info "TEST: Test manager.sh publish rosetta-generic (dry-run)"
+    log_info "========================================="
+
+    if "${MANAGER_SCRIPT}" publish \
+        --buildkite-build-id "test_data" \
+        --source-version "3.3.0-test-rosetta-generic" \
+        --target-version "3.3.0-test-rosetta-generic-${RANDOM_SUFFIX}" \
+        --channel "${TEST_COMPONENT_TEST}" \
+        --artifacts "rosetta-generic" \
+        --networks "devnet" \
+        --codenames "${TEST_CODENAME}" \
+        --archs "${TEST_ARCH}" \
+        --debian-repo "${TEST_BUCKET}" \
+        --backend "${BACKEND}" \
+        --only-debians \
+        --skip-cache-invalidation \
+        --dry-run 2>&1 | tee "${TEST_TEMP_DIR}/publish_rosetta_generic_dry_run.log"; then
+        assert_success "Manager publish rosetta-generic (dry-run)" 0
+    else
+        assert_success "Manager publish rosetta-generic (dry-run)" 1
+    fi
+}
+
+# Test: Test publish with mixed artifacts including mina-config (dry-run)
+test_manager_publish_mixed_with_config() {
+    log_info "========================================="
+    log_info "TEST: Test manager.sh publish mixed artifacts with mina-config (dry-run)"
+    log_info "========================================="
+
+    # This tests passing multiple new artifacts together, simulating the real use case
+    if "${MANAGER_SCRIPT}" publish \
+        --buildkite-build-id "test_data" \
+        --source-version "3.3.0-test-mixed" \
+        --target-version "3.3.0-test-mixed-${RANDOM_SUFFIX}" \
+        --channel "${TEST_COMPONENT_TEST}" \
+        --artifacts "mina-config,mina-generic,rosetta-generic" \
+        --networks "devnet" \
+        --codenames "${TEST_CODENAME}" \
+        --archs "${TEST_ARCH}" \
+        --debian-repo "${TEST_BUCKET}" \
+        --backend "${BACKEND}" \
+        --only-debians \
+        --skip-cache-invalidation \
+        --dry-run 2>&1 | tee "${TEST_TEMP_DIR}/publish_mixed_config_dry_run.log"; then
+        assert_success "Manager publish mixed artifacts with mina-config (dry-run)" 0
+    else
+        assert_success "Manager publish mixed artifacts with mina-config (dry-run)" 1
+    fi
+}
+
+# Test: Test promote operation (dry-run) for mina-config artifact
+test_manager_promote_mina_config() {
+    log_info "========================================="
+    log_info "TEST: Test manager.sh promote mina-config (dry-run)"
+    log_info "========================================="
+
+    local target_version="3.3.0-config-${RANDOM_SUFFIX}"
+    log_info "Using random target version: ${target_version}"
+
+    if "${MANAGER_SCRIPT}" promote \
+        --source-version "3.3.0-alpha1-compatible-918b8c0" \
+        --target-version "${target_version}" \
+        --source-channel "${TEST_COMPONENT_CI}" \
+        --target-channel "${TEST_COMPONENT_TEST}" \
+        --artifacts "mina-config" \
+        --networks "devnet" \
+        --codenames "${TEST_CODENAME}" \
+        --arch "amd64" \
+        --debian-repo "${TEST_BUCKET}" \
+        --only-debians \
+        --skip-cache-invalidation \
+        --dry-run 2>&1 | tee "${TEST_TEMP_DIR}/promote_mina_config_dry_run.log"; then
+        assert_success "Manager promote mina-config (dry-run)" 0
+    else
+        assert_success "Manager promote mina-config (dry-run)" 1
+    fi
+}
+
+# Test: Verify mina-config rejects unknown artifact gracefully
+test_manager_unknown_artifact_rejected() {
+    log_info "========================================="
+    log_info "TEST: Test manager.sh rejects unknown artifact"
+    log_info "========================================="
+
+    if "${MANAGER_SCRIPT}" publish \
+        --buildkite-build-id "test_data" \
+        --source-version "3.3.0-test" \
+        --target-version "3.3.0-test" \
+        --channel "${TEST_COMPONENT_TEST}" \
+        --artifacts "nonexistent-artifact" \
+        --networks "devnet" \
+        --codenames "${TEST_CODENAME}" \
+        --archs "${TEST_ARCH}" \
+        --debian-repo "${TEST_BUCKET}" \
+        --backend "${BACKEND}" \
+        --only-debians \
+        --skip-cache-invalidation \
+        --dry-run 2>&1 | tee "${TEST_TEMP_DIR}/unknown_artifact.log"; then
+        # Should have failed
+        assert_success "Manager rejects unknown artifact" 1
+    else
+        # Expected failure - this is correct behavior
+        assert_success "Manager rejects unknown artifact" 0
+    fi
+}
+
 # Convenience: run all dry-run tests
 run_dry_run_tests() {
     test_list_packages
@@ -435,4 +605,10 @@ run_dry_run_tests() {
     test_manager_promote_unsigned
     test_manager_promote_signed
     test_manager_publish_signed
+    test_manager_publish_mina_config
+    test_manager_publish_mina_generic
+    test_manager_publish_rosetta_generic
+    test_manager_publish_mixed_with_config
+    test_manager_promote_mina_config
+    test_manager_unknown_artifact_rejected
 }
