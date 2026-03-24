@@ -2,6 +2,7 @@ package hardfork
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -334,7 +335,7 @@ func (t *HardforkTest) GenesisBlockAcrossNetwork() (*client.BlockData, error) {
 			return nil, fmt.Errorf("Failed to query genesis block on node %s: %w", info.Name, err)
 		}
 		if seenBlock {
-			if ourGenesisBlock != commonGenesisBlock {
+			if !reflect.DeepEqual(ourGenesisBlock, commonGenesisBlock) {
 				return nil, fmt.Errorf("Node %s has genesis block %v, while node %s has genesis block %v, they don't agree", daemonReturningCommonGenesisBlock.Name, commonGenesisBlock, info.Name, ourGenesisBlock)
 			}
 		} else {
