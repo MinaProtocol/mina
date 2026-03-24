@@ -58,7 +58,7 @@ DEMO_MODE=false
 SLOT_TX_END=
 SLOT_CHAIN_END=
 HARDFORK_GENESIS_SLOT_DELTA=
-HARDFORK_HANDLING=
+EXTRA_FILES_ROOT=
 
 # ================================================
 # Globals (assigned during execution of script)
@@ -98,7 +98,7 @@ help() {
                                          |   Default: ${FISH}
 -n   |--nodes <#>                        | Number of non block-producing nodes to spin-up
                                          |   Default: ${NODES}
--s   |--seed                             | How to start the seed. Set to 'spawn:SEED_START_PORT' to spawn the seed in this script with Seed range start port, 'at:SEED_PEER_ID' to let the script discover the seed node at specific address. Regardless the option taken, this script will always store the seed peer ID used under ROOT/seed_peer_id.txt, when the seed node is/should be ready.
+-s   |--seed <mode>                      | How to start the seed. Set to 'spawn:SEED_START_PORT' to spawn the seed in this script with Seed range start port, 'at:SEED_PEER_ID' to let the script discover the seed node at specific address. Regardless the option taken, this script will always store the seed peer ID used under ROOT/seed_peer_id.txt, when the seed node is/should be ready.
                                          |   Default: ${SEED}
 -swp |--snark-coordinator-start-port <#> | Snark Worker Coordinator Node range start port. Set to empty to disable snark coodinator
                                          |   Default: ${SNARK_COORDINATOR_PORT}
@@ -142,31 +142,31 @@ help() {
                                          |   Default: ${LOG_PRECOMPUTED_BLOCKS}
 -pl  |--proof-level <proof-level>        | Proof level
                                          |   Default: ${PROOF_LEVEL}
--c   |--config                           | Config to use. Set to 'reset' to generate a new config, new keypairs and new ledgers, 'inherit' to reuse the one found in previously deployed networks
+-c   |--config <mode>                    | Config to use. Set to 'reset' to generate a new config, new keypairs and new ledgers, 'inherit' to reuse the one found in previously deployed networks
                                          |   Default: ${CONFIG_MODE}
--u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument). Set to 'fixed:TIMESTAMP' to be a fixed time, 'delay_sec:SECONDS' to be set genesis to be SECONDS in the future, or 'no' to do nothing.
+-u   |--update-genesis-timestamp <mode>  | Whether to update the Genesis Ledger timestamp (presence of argument). Set to 'fixed:TIMESTAMP' to be a fixed time, 'delay_sec:SECONDS' to be set genesis to be SECONDS in the future, or 'no' to do nothing.
                                          |   Default: ${UPDATE_GENESIS_TIMESTAMP}
 -st  |--override-slot-time <milliseconds>| Override the slot time for block production
                                          |   Default: value from executable
 -d   |--demo                             | Whether to run the demo (presence of argument). Demo mode is used to run the single node which is already bootstrapped and synced with the network.
                                          |   Default: false
--ste |--slot-transaction-end             | When set, stop adding transactions from this slot on.
+-ste |--slot-transaction-end <#>         | When set, stop adding transactions from this slot on.
                                          |   Default: None
--sce |--slot-chain-end                   | When set, stop producing blocks from this chain on.
+-sce |--slot-chain-end <#>               | When set, stop producing blocks from this chain on.
                                          |   Default: None
 --itn-keys <keys>                        | Use ITN keys for nodes authentication
                                          |   Default: not set
--hfd |--hardfork-genesis-slot-delta      | When set override the value 'hard_fork_genesis_slot_delta' in daemon config. 
---hardfork-handling                      | When set, passed to daemons participating the network.
-                                         |   Default: not set
--r   |--root                             | When set, override the root working folder (i.e. the value of ROOT) for this script. WARN: this script will clean up anything inside that folder when initializing any run!
+-hfd |--hardfork-genesis-slot-delta <#>  | When set override the value 'hard_fork_genesis_slot_delta' in daemon config. 
+-r   |--root <path>                      | When set, override the root working folder (i.e. the value of ROOT) for this script. WARN: this script will clean up anything inside that folder when initializing any run!
                                          |   Default: ${ROOT}
 --redirect-logs                          | When set, redirect logs for nodes (excluding workers) and archive to file instead of console output
                                          |   Default: ${REDIRECT_LOGS}
---on-exit                                | Possible Values : {grace_exit_all,kill_snark_workers} . Defines how script exit is handled. If set to 'grace_exit_all' mina CLI to stop all daemon nodes, and kill SNARK workers; If set to 'kill_snark_workers' to only kill SNARK workers but ignoring everything else.
+--on-exit <mode>                         | Possible Values : {grace_exit_all,kill_snark_workers} . Defines how script exit is handled. If set to 'grace_exit_all' mina CLI to stop all daemon nodes, and kill SNARK workers; If set to 'kill_snark_workers' to only kill SNARK workers but ignoring everything else.
                                          |   Default: ${ON_EXIT}
---node-status-url                        | Url of the node status collection service 
+--node-status-url <url>                  | Url of the node status collection service 
                                          |   Default: not set
+--extra-files-root <path>                | Directory of file tree need to be overlayed on a prepared network folder, useful when initializing from fresh but need some files set. 
+                                         |   Default: None
 -h   |--help                             | Displays this help message
 
 Available logging levels:
@@ -296,23 +296,25 @@ exec-daemon() {
   LIBP2P_METRICS_PORT=$((BASE_PORT + 4))
 
 
-  local extra_opts=()
+  local common_extra_args=()
 
   # ITN features: only enabled when ITN_KEYS is provided
   # This only takes effect for daemons
   if [ -n "$ITN_KEYS" ]; then
     ITN_GRAPHQL_PORT=$((BASE_PORT + 5))
 
-    extra_opts+=( --itn-keys "$ITN_KEYS" )
-    extra_opts+=( --itn-graphql-port "${ITN_GRAPHQL_PORT}" )
-  fi
-
-  if [ -n "$HARDFORK_HANDLING" ]; then
-    extra_opts+=( --hardfork-handling "$HARDFORK_HANDLING" )
+    common_extra_args+=( --itn-keys "$ITN_KEYS" )
+    common_extra_args+=( --itn-graphql-port "${ITN_GRAPHQL_PORT}" )
   fi
 
   if [ -n "$NODE_STATUS_URL" ]; then
-    extra_opts+=( --node-status-url "$NODE_STATUS_URL" )
+    common_extra_args+=( --node-status-url "$NODE_STATUS_URL" )
+  fi
+
+  local per_daemon_extra_args=""
+  if [ -f "${FOLDER}/extra_args.txt" ]; then
+    per_daemon_extra_args=$(cat "${FOLDER}/extra_args.txt")
+    echo "Daemon at ${FOLDER} will use extra args: ${per_daemon_extra_args}"
   fi
 
   # shellcheck disable=SC2068
@@ -329,7 +331,7 @@ exec-daemon() {
     --precomputed-blocks-file "${FOLDER}"/precomputed_blocks.log \
     --log-precomputed-blocks ${LOG_PRECOMPUTED_BLOCKS} \
     --proof-level "${PROOF_LEVEL}" \
-    $@ ${extra_opts[@]}
+    $@ ${common_extra_args[@]} ${per_daemon_extra_args}
 }
 
 # Executes the Mina Snark Worker
@@ -637,10 +639,6 @@ while [[ "$#" -gt 0 ]]; do
     HARDFORK_GENESIS_SLOT_DELTA="${2}"
     shift
     ;;
-  --hardfork-handling)
-    HARDFORK_HANDLING="${2}"
-    shift
-    ;;
   -r | --root)
     ROOT="${2}"
     shift
@@ -654,6 +652,10 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --node-status-url) 
     NODE_STATUS_URL="${2}"
+    shift
+    ;;
+  --extra-files-root)
+    EXTRA_FILES_ROOT="${2}"
     shift
     ;;
   *)
@@ -963,6 +965,10 @@ if ! config_mode_is_inherit "$CONFIG_MODE"; then
   mkdir -p "${NODES_FOLDER}"/seed
   mkdir -p "${NODES_FOLDER}"/snark_coordinator
   mkdir -p "${NODES_FOLDER}"/snark_workers
+fi
+
+if [ -d "${EXTRA_FILES_ROOT}" ]; then
+  cp -r "${EXTRA_FILES_ROOT}/." "${ROOT}/"
 fi
 
 # ----------
