@@ -79,7 +79,10 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 		return nil, err
 	}
 
-	if err := t.ValidateNoNewBlocks(t.Config.AnyDaemon().Port(config.PORT_REST)); err != nil {
+	nonAutoDaemon := t.Config.AnyDaemonSatisfying("non-auto", func(di *config.DaemonInfo) bool {
+		return di.ForkMethod != config.Auto
+	})
+	if err := t.ValidateNoNewBlocks(nonAutoDaemon.Port(config.PORT_REST)); err != nil {
 		return nil, err
 	}
 
