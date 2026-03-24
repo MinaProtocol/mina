@@ -2045,6 +2045,87 @@ let step_verify_circuit (inputs : Impls.Step.Field.t array) () =
   in
   ()
 
+(* Full step verify_one circuit: FOP + message hash + IVP + assertions.
+   Wraps Step_main.Make(Inductive_rule.Kimchi).verify_one with flat inputs.
+
+   Input layout:
+     Per_proof_witness (via Typ, app_state=unit, max_local=N0)
+     Unfinalized proof (via Typ)
+     messages_for_next_wrap_proof (1 field)
+     must_verify (1 field as boolean)
+*)
+module Step_main_for_dump = Step_main.Make(Inductive_rule.Kimchi)
+
+let full_step_verify_one_circuit (inputs : Impls.Step.Field.t array) () =
+  let open Impls.Step in
+  let open Pickles_types in
+  let feature_flags =
+    Kimchi_backend_common.Plonk_types.Features.Full.none
+  in
+  (* ---- Allocate Per_proof_witness via its Typ ---- *)
+  (* Simple_chain: app_state=Field.typ, max_local_max_proofs_verified=N1 *)
+  let ppw_typ =
+    Per_proof_witness.typ Field.typ Nat.N1.n ~feature_flags ~num_chunks:1
+  in
+  let (Typ ppw_typ_record) = ppw_typ in
+  let ppw_size = ppw_typ_record.size_in_field_elements in
+  let ppw_fields = Array.sub inputs ~pos:0 ~len:ppw_size in
+  let ppw =
+    ppw_typ_record.var_of_fields
+      (ppw_fields, ppw_typ_record.constraint_system_auxiliary ())
+  in
+  let pos = ref ppw_size in
+  (* ---- Allocate Unfinalized via its Typ ---- *)
+  let unfinalized_typ =
+    Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
+  in
+  let (Typ unfinalized_typ_record) = unfinalized_typ in
+  let unfinalized_size = unfinalized_typ_record.size_in_field_elements in
+  let unfinalized_fields = Array.sub inputs ~pos:!pos ~len:unfinalized_size in
+  let unfinalized : Unfinalized.t =
+    unfinalized_typ_record.var_of_fields
+      (unfinalized_fields, unfinalized_typ_record.constraint_system_auxiliary ())
+  in
+  pos := !pos + unfinalized_size ;
+  (* ---- Extra inputs ---- *)
+  let messages_for_next_wrap_proof = inputs.(!pos) in
+  pos := !pos + 1 ;
+  let must_verify = Boolean.Unsafe.of_cvar inputs.(!pos) in
+  pos := !pos + 1 ;
+  (* ---- Build Types_map.For_step.t (compile-time constants) ---- *)
+  let srs = Kimchi_bindings.Protocol.SRS.Fq.create (1 lsl 15) in
+  let dummy_pt = Step_main_inputs.Inner_curve.Params.one in
+  let dummy_comm = [| Step_main_inputs.Inner_curve.constant dummy_pt |] in
+  let verification_key =
+    { Plonk_verification_key_evals.
+      sigma_comm = Vector.init Nat.N7.n ~f:(fun _ -> dummy_comm)
+    ; coefficients_comm = Vector.init Nat.N15.n ~f:(fun _ -> dummy_comm)
+    ; generic_comm = dummy_comm
+    ; psm_comm = dummy_comm
+    ; complete_add_comm = dummy_comm
+    ; mul_comm = dummy_comm
+    ; emul_comm = dummy_comm
+    ; endomul_scalar_comm = dummy_comm
+    }
+  in
+  let d : _ Types_map.For_step.t =
+    { max_proofs_verified = (module Nat.N1 : Nat.Add.Intf with type n = Nat.N1.n)
+    ; public_input = Field.typ
+    ; wrap_domain = `Known (Pickles_base.Domain.Pow_2_roots_of_unity 14)
+    ; step_domains = `Known (Vector.singleton { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 16 })
+    ; wrap_key = verification_key
+    ; feature_flags
+    ; num_chunks = 1
+    ; zk_rows = 3
+    }
+  in
+  (* ---- Call verify_one ---- *)
+  let _chals, _verified =
+    Step_main_for_dump.verify_one ~srs
+      ppw d messages_for_next_wrap_proof unfinalized must_verify
+  in
+  ()
+
 
 (* hash_messages_for_next_step_proof sub-circuit.
 
@@ -3024,4 +3105,23 @@ let run ~output_dir =
     Impl.Typ.array ~length:step_verify_input_size Impl.Field.typ
   in
   dump_step "step_verify_circuit" step_verify_circuit
-    ~input_typ:step_verify_input_typ ~return_typ:Impl.Typ.unit
+    ~input_typ:step_verify_input_typ ~return_typ:Impl.Typ.unit ;
+  (* Full step verify_one circuit: FOP + message hash + IVP + assertions *)
+  let full_step_verify_one_input_size =
+    let feature_flags =
+      Kimchi_backend_common.Plonk_types.Features.Full.none
+    in
+    let (Impl.Typ.Typ ppw_r) =
+      Per_proof_witness.typ Impl.Field.typ Pickles_types.Nat.N1.n ~feature_flags ~num_chunks:1
+    in
+    let (Impl.Typ.Typ unf_r) =
+      Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
+    in
+    ppw_r.size_in_field_elements + unf_r.size_in_field_elements + 2
+    (* +2 for: messages_for_next_wrap_proof, must_verify *)
+  in
+  let full_step_verify_one_input_typ =
+    Impl.Typ.array ~length:full_step_verify_one_input_size Impl.Field.typ
+  in
+  dump_step "full_step_verify_one_circuit" full_step_verify_one_circuit
+    ~input_typ:full_step_verify_one_input_typ ~return_typ:Impl.Typ.unit

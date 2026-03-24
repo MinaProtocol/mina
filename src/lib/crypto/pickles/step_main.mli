@@ -1,4 +1,17 @@
 module Make (Inductive_rule : Inductive_rule.Intf) : sig
+  module B : sig
+    type t = Impls.Step.Boolean.var
+  end
+
+  val verify_one :
+       srs:Kimchi_bindings.Protocol.SRS.Fq.t
+    -> ('a, 'b, 'c) Per_proof_witness.t
+    -> ('a, 'd, 'b, 'e) Types_map.For_step.t
+    -> Impls.Step.Field.t
+    -> Unfinalized.t
+    -> B.t
+    -> (Impls.Step.Field.t, Kimchi_pasta_basic.Rounds.Step.n) Pickles_types.Vector.t * B.t
+
   (** [step_main] is the SNARK function corresponding to the input inductive rule. **)
   val step_main :
     'proofs_verified 'self_branches 'prev_vars 'prev_values 'var 'value 'a_var
