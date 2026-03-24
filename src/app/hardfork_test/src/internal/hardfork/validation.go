@@ -244,7 +244,7 @@ func (t *HardforkTest) AnalyzeBlocksOnMainNetwork(mainGenesisTs int64) (*BlockAn
 	daemonForGenesisBlock := t.Config.SampleDaemonInfo("any", func(di *config.DaemonInfo) bool { return true })
 	genesisBlock, err := t.Client.GenesisBlock(daemonForGenesisBlock.Port(config.PORT_REST))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get genesis block on port %d: %w", config.PORT_REST, err)
+		return nil, fmt.Errorf("failed to get genesis block on daemon %s: %w", daemonForGenesisBlock.Name, err)
 	}
 	t.Logger.Info("Genesis block: %v", genesisBlock)
 
@@ -331,7 +331,7 @@ func (t *HardforkTest) GenesisBlockAcrossNetwork() (*client.BlockData, error) {
 	for _, info := range t.Config.DaemonInfos {
 		ourGenesisBlock, err := t.Client.GenesisBlock(info.Port(config.PORT_REST))
 		if err != nil {
-			return nil, fmt.Errorf("Failed to query genesis block on node %s: %v", info.Name, err)
+			return nil, fmt.Errorf("Failed to query genesis block on node %s: %w", info.Name, err)
 		}
 		if seenBlock {
 			if ourGenesisBlock != commonGenesisBlock {
