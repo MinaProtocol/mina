@@ -68,6 +68,72 @@ let split_field (x : Field.t) : Field.t * Boolean.var =
   Field.(Assert.equal ((of_int 2 * y) + (is_odd :> t)) x) ;
   res
 
+(* The verify block of wrap_main: pack_statement + split_field + IVP + assertions.
+   This is the Wrap equivalent of Step_verifier.verify.
+
+   Extracted as a standalone function so it can be:
+   1. Called from wrap_main with pure data
+   2. Dumped as an independent circuit for equivalence testing
+*)
+let wrap_verify
+    (type branches)
+    ~num_chunks
+    ~max_proofs_verified
+    ~max_proofs_verified_n
+    ~feature_flags
+    ~sponge_params
+    ~actual_proofs_verified_mask
+    ~(step_domains : (Domains.t, branches) Vector.t)
+    ~step_plonk_index
+    ~srs
+    ~xi
+    ~plonk
+    ~combined_inner_product
+    ~b
+    ~public_input
+    ~prev_step_accs
+    ~messages
+    ~openings_proof
+    ~which_branch
+    ~new_bulletproof_challenges
+    ~sponge_digest_before_evaluations
+    ~messages_for_next_wrap_proof_digest
+    ~bulletproof_challenges
+    =
+  let sponge = Wrap_verifier.Opt.create sponge_params in
+  let ( sponge_digest_before_evaluations_actual
+      , (`Success bulletproof_success, bulletproof_challenges_actual) ) =
+    with_label __LOC__ (fun () ->
+        Wrap_verifier.incrementally_verify_proof max_proofs_verified
+          ~actual_proofs_verified_mask ~step_domains
+          ~verification_key:step_plonk_index ~srs ~xi ~sponge
+          ~public_input
+          ~sg_old:prev_step_accs
+          ~advice:{ Composition_types.Step.Bulletproof.Advice. b; combined_inner_product }
+          ~messages ~which_branch ~openings_proof ~plonk )
+  in
+  with_label __LOC__ (fun () ->
+      Boolean.Assert.is_true bulletproof_success ) ;
+  with_label __LOC__ (fun () ->
+      Field.Assert.equal messages_for_next_wrap_proof_digest
+        (Wrap_hack.Checked.hash_messages_for_next_wrap_proof
+           max_proofs_verified_n
+           { Types.Wrap.Proof_state.Messages_for_next_wrap_proof
+             .challenge_polynomial_commitment =
+               openings_proof.challenge_polynomial_commitment
+           ; old_bulletproof_challenges = new_bulletproof_challenges
+           } ) ) ;
+  with_label __LOC__ (fun () ->
+      Field.Assert.equal sponge_digest_before_evaluations
+        sponge_digest_before_evaluations_actual ) ;
+  Array.iter2_exn bulletproof_challenges_actual
+    (Vector.to_array bulletproof_challenges)
+    ~f:(fun
+         { prechallenge = { inner = x1 } }
+         ({ prechallenge = { inner = x2 } } :
+           _ SC.t Bulletproof_challenge.t )
+       -> with_label __LOC__ (fun () -> Field.Assert.equal x1 x2) )
+
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
     (type max_proofs_verified branches prev_varss max_local_max_proofs_verifieds)
@@ -464,61 +530,47 @@ let wrap_main
                  ~length:(Nat.to_int Backend.Tick.Rounds.n) )
               ~request:(fun () -> Req.Openings_proof)
           in
-          let ( sponge_digest_before_evaluations_actual
-              , (`Success bulletproof_success, bulletproof_challenges_actual) )
-              =
-            let messages =
-              with_label __LOC__ (fun () ->
-                  exists
-                    (Plonk_types.Messages.wrap_typ Inner_curve.typ feature_flags
-                       ~dummy:Inner_curve.Params.one
-                       ~commitment_lengths:
-                         (Commitment_lengths.default ~num_chunks) )
-                    ~request:(fun () -> Req.Messages) )
-            in
-            let sponge = Wrap_verifier.Opt.create sponge_params in
+          let messages =
             with_label __LOC__ (fun () ->
-                [%log internal] "Wrap_verifier_incrementally_verify_proof" ;
-                let res =
-                  Wrap_verifier.incrementally_verify_proof max_proofs_verified
-                    ~actual_proofs_verified_mask ~step_domains
-                    ~verification_key:step_plonk_index ~srs ~xi ~sponge
-                    ~public_input:
-                      (Array.map
-                         (pack_statement Max_proofs_verified.n prev_statement)
-                         ~f:(function
-                        | `Field (Shifted_value x) ->
-                            `Field (split_field x)
-                        | `Packed_bits (x, n) ->
-                            `Packed_bits (x, n) ) )
-                    ~sg_old:prev_step_accs
-                    ~advice:{ b; combined_inner_product }
-                    ~messages ~which_branch ~openings_proof ~plonk
-                in
-                [%log internal] "Wrap_verifier_incrementally_verify_proof_done" ;
-                res )
+                exists
+                  (Plonk_types.Messages.wrap_typ Inner_curve.typ feature_flags
+                     ~dummy:Inner_curve.Params.one
+                     ~commitment_lengths:
+                       (Commitment_lengths.default ~num_chunks) )
+                  ~request:(fun () -> Req.Messages) )
           in
-          with_label __LOC__ (fun () ->
-              Boolean.Assert.is_true bulletproof_success ) ;
-          with_label __LOC__ (fun () ->
-              Field.Assert.equal messages_for_next_wrap_proof_digest
-                (Wrap_hack.Checked.hash_messages_for_next_wrap_proof
-                   Max_proofs_verified.n
-                   { Types.Wrap.Proof_state.Messages_for_next_wrap_proof
-                     .challenge_polynomial_commitment =
-                       openings_proof.challenge_polynomial_commitment
-                   ; old_bulletproof_challenges = new_bulletproof_challenges
-                   } ) ) ;
-          with_label __LOC__ (fun () ->
-              Field.Assert.equal sponge_digest_before_evaluations
-                sponge_digest_before_evaluations_actual ) ;
-          Array.iter2_exn bulletproof_challenges_actual
-            (Vector.to_array bulletproof_challenges)
-            ~f:(fun
-                 { prechallenge = { inner = x1 } }
-                 ({ prechallenge = { inner = x2 } } :
-                   _ SC.t Bulletproof_challenge.t )
-               -> with_label __LOC__ (fun () -> Field.Assert.equal x1 x2) ) ;
+          let public_input =
+            Array.map
+              (pack_statement Max_proofs_verified.n prev_statement)
+              ~f:(function
+                | `Field (Shifted_value x) -> `Field (split_field x)
+                | `Packed_bits (x, n) -> `Packed_bits (x, n) )
+          in
+          [%log internal] "Wrap_verifier_incrementally_verify_proof" ;
+          wrap_verify
+            ~num_chunks
+            ~max_proofs_verified
+            ~max_proofs_verified_n:Max_proofs_verified.n
+            ~feature_flags
+            ~sponge_params
+            ~actual_proofs_verified_mask
+            ~step_domains
+            ~step_plonk_index
+            ~srs
+            ~xi
+            ~plonk
+            ~combined_inner_product
+            ~b
+            ~public_input
+            ~prev_step_accs
+            ~messages
+            ~openings_proof
+            ~which_branch
+            ~new_bulletproof_challenges
+            ~sponge_digest_before_evaluations
+            ~messages_for_next_wrap_proof_digest
+            ~bulletproof_challenges ;
+          [%log internal] "Wrap_verifier_incrementally_verify_proof_done" ;
           () )
   in
   Timer.clock __LOC__ ;
