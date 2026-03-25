@@ -31,7 +31,7 @@ module Pre_statement = struct
     ; first_pass_ledger_target_hash : Ledger_hash.t
     ; pending_coinbase_stack_source : Pending_coinbase.Stack_versioned.t
     ; pending_coinbase_stack_target : Pending_coinbase.Stack_versioned.t
-    ; init_stack : Pending_coinbase.Stack_versioned.t
+    ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
     }
 end
 
@@ -223,11 +223,9 @@ module T = struct
 
     let verify ~verifier:{ logger; verifier } ts =
       verify_proofs ~logger ~verifier
-        (List.map ts
-           ~f:(fun ({ data = proof; _ } : Scan_state.Ledger_proof_with_hash.t)
-              ->
-             ( Ledger_proof.Cached.read_proof_from_disk proof
-             , Ledger_proof.Cached.statement proof ) ) )
+        (List.map ts ~f:(fun (p, _m) ->
+             ( Ledger_proof.Cached.read_proof_from_disk p
+             , Ledger_proof.Cached.statement p ) ) )
   end
 
   module Statement_scanner_with_proofs =
@@ -416,7 +414,7 @@ module T = struct
       ; pending_coinbase_collection
       } : Staged_ledger_hash.t =
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-      (Scan_state.hash scan_state)
+      Scan_state.(Stable.Latest.hash @@ read_all_proofs_from_disk scan_state)
       (Ledger.merkle_root ledger)
       pending_coinbase_collection
 
@@ -519,7 +517,9 @@ module T = struct
       ; first_pass_ledger_target_hash = target_ledger_hash
       ; pending_coinbase_stack_source = pending_coinbase_stack_state.pc.source
       ; pending_coinbase_stack_target = pending_coinbase_target
-      ; init_stack = pending_coinbase_stack_state.init_stack
+      ; init_stack =
+          Transaction_snark.Pending_coinbase_stack_state.Init_stack.Base
+            pending_coinbase_stack_state.init_stack
       }
     , { Stack_state_with_init_stack.pc =
           { source = pending_coinbase_target; target = pending_coinbase_target }
@@ -583,15 +583,14 @@ module T = struct
       ; sok_digest = ()
       }
     in
-    ( Scan_state.Transaction_with_witness.create
-        ~transaction_with_status:
-          (Mina_transaction_logic.Transaction_applied.transaction_with_status
-             applied_txn )
-        ~state_hash:state_and_body_hash
-        ~first_pass_ledger_witness:pre_stmt.first_pass_ledger_witness
-        ~second_pass_ledger_witness:ledger_witness
-        ~init_stack:pre_stmt.init_stack ~statement
-        ~block_global_slot:global_slot
+    ( { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn
+      ; state_hash = state_and_body_hash
+      ; first_pass_ledger_witness = pre_stmt.first_pass_ledger_witness
+      ; second_pass_ledger_witness = ledger_witness
+      ; init_stack = pre_stmt.init_stack
+      ; statement
+      ; block_global_slot = global_slot
+      }
     , Mina_transaction_logic.Transaction_applied.new_accounts applied_txn )
 
   let apply_transactions_first_pass ~yield ~constraint_constants ~global_slot
@@ -772,7 +771,11 @@ module T = struct
       List.fold_right ~init:(Ok []) data
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
           let%map.Or_error acc = acc in
-          let t = d.transaction_with_status in
+          let t =
+            d.transaction_with_info
+            |> Mina_transaction_logic.Transaction_applied
+               .transaction_with_status
+          in
           t :: acc )
     in
     let total_fee_excess txns =

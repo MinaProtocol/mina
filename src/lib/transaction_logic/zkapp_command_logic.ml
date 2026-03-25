@@ -550,8 +550,6 @@ module type Controller_intf = sig
   val check : proof_verifies:bool -> signature_verifies:bool -> t -> bool
 
   val verification_key_perm_fallback_to_signature_with_older_version : t -> t
-
-  val access_perm_fallback_to_signature_with_older_version : t -> t
 end
 
 module type Txn_version_intf = sig
@@ -574,6 +572,8 @@ module type Account_intf = sig
   module Permissions : sig
     type controller
 
+    type txn_version
+
     val access : t -> controller
 
     val edit_state : t -> controller
@@ -587,6 +587,8 @@ module type Account_intf = sig
     val set_permissions : t -> controller
 
     val set_verification_key_auth : t -> controller
+
+    val set_verification_key_txn_version : t -> txn_version
 
     val set_zkapp_uri : t -> controller
 
@@ -707,12 +709,6 @@ module type Account_intf = sig
   val permissions : t -> Permissions.t
 
   val set_permissions : Permissions.t -> t -> t
-
-  type txn_version
-
-  val txn_version : t -> txn_version
-
-  val set_txn_version_to_current : t -> t
 end
 
 module Eff = struct
@@ -827,6 +823,7 @@ module type Inputs_intf = sig
   and Account :
     (Account_intf
       with type Permissions.controller := Controller.t
+       and type Permissions.txn_version := Txn_version.t
        and type timing := Timing.t
        and type balance := Balance.t
        and type receipt_chain_hash := Receipt_chain_hash.t
@@ -841,8 +838,7 @@ module type Inputs_intf = sig
        and type nonce := Nonce.t
        and type state_hash := State_hash.t
        and type token_id := Token_id.t
-       and type account_id := Account_id.t
-       and type txn_version = Txn_version.t)
+       and type account_id := Account_id.t)
 
   and Actions :
     (Actions_intf with type bool := Bool.t and type field := Field.t)
@@ -1550,18 +1546,11 @@ module Make (Inputs : Inputs_intf) = struct
        This must be done before updating zkApp fields!
     *)
     let a = Account.make_zkapp a in
-    let auth_with_fallback ~fallback_logic auth =
-      Account.txn_version a |> Txn_version.older_than_current
-      |> Controller.if_ ~then_:(fallback_logic auth) ~else_:auth
-    in
     (* Check that the account can be accessed with the given authorization. *)
     let local_state =
       let has_permission =
-        Account.Permissions.access a
-        |> auth_with_fallback
-             ~fallback_logic:
-               Controller.access_perm_fallback_to_signature_with_older_version
-        |> Controller.check ~proof_verifies ~signature_verifies
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.access a)
       in
       Local_state.add_check local_state Update_not_permitted_access
         has_permission
@@ -1625,13 +1614,21 @@ module Make (Inputs : Inputs_intf) = struct
       let verification_key =
         Account_update.Update.verification_key account_update
       in
+      let older_than_current_version =
+        Txn_version.older_than_current
+          (Account.Permissions.set_verification_key_txn_version a)
+      in
+      let original_auth = Account.Permissions.set_verification_key_auth a in
+      let auth =
+        Controller.if_ older_than_current_version
+          ~then_:
+            (Controller
+             .verification_key_perm_fallback_to_signature_with_older_version
+               original_auth )
+          ~else_:original_auth
+      in
       let has_permission =
-        Account.Permissions.set_verification_key_auth a
-        |> auth_with_fallback
-             ~fallback_logic:
-               Controller
-               .verification_key_perm_fallback_to_signature_with_older_version
-        |> Controller.check ~proof_verifies ~signature_verifies
+        Controller.check ~proof_verifies ~signature_verifies auth
       in
       let local_state =
         Local_state.add_check local_state Update_not_permitted_verification_key
@@ -1642,7 +1639,6 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.verification_key a)
       in
       let a = Account.set_verification_key verification_key a in
-      let a = Account.set_txn_version_to_current a in
       (a, local_state)
     in
     (* Update action state. *)

@@ -15,6 +15,10 @@ module Kimchi_gate_type = struct
     | EndoMul
     | EndoMulScalar
     | Lookup
+    | CairoClaim
+    | CairoInstruction
+    | CairoFlags
+    | CairoTransition
     | RangeCheck0
     | RangeCheck1
     | ForeignFieldAdd
@@ -1923,7 +1927,7 @@ end = struct
           let row =
             [| Some round.xt
              ; Some round.yt
-             ; Some round.inv
+             ; None
              ; None
              ; Some round.xp
              ; Some round.yp
