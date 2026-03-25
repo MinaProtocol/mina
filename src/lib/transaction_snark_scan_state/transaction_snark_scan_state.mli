@@ -22,10 +22,10 @@ val hash : t -> Staged_ledger_hash.Aux_hash.t
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_status : Mina_transaction.Transaction.t With_status.t
+    { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
     ; state_hash : State_hash.t * State_body_hash.t
     ; statement : Transaction_snark.Statement.t
-    ; init_stack : Pending_coinbase.Stack_versioned.t
+    ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
     ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
@@ -33,20 +33,24 @@ module Transaction_with_witness : sig
     }
 
   val create :
-       transaction_with_status:Mina_transaction.Transaction.t With_status.t
+       transaction_with_info:Mina_transaction_logic.Transaction_applied.t
     -> state_hash:State_hash.t * State_body_hash.t
     -> statement:Transaction_snark.Statement.t
-    -> init_stack:Pending_coinbase.Stack_versioned.t
+    -> init_stack:Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
     -> first_pass_ledger_witness:Mina_ledger.Sparse_ledger.t
     -> second_pass_ledger_witness:Mina_ledger.Sparse_ledger.t
     -> block_global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> t
 end
 
-module Ledger_proof_with_hash : sig
-  type t = (Ledger_proof.Cached.t, Aux_hash.t) With_hash.t
+module Ledger_proof_with_sok_message : sig
+  type t =
+    { proof : Ledger_proof.Cached.t
+    ; sok_msg : Sok_message.t
+    ; hash : Aux_hash.t
+    }
 
-  val create : Ledger_proof.Cached.t -> t
+  val create : proof:Ledger_proof.Cached.t -> sok_msg:Sok_message.t -> t
 end
 
 module Available_job : sig
@@ -66,7 +70,7 @@ module Make_statement_scanner (Verifier : sig
 
   val verify :
        verifier:t
-    -> Ledger_proof_with_hash.t list
+    -> Ledger_proof_with_sok_message.t list
     -> unit Or_error.t Deferred.Or_error.t
 end) : sig
   val check_invariants :
