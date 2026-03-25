@@ -40,6 +40,7 @@ if [[ -z "$REPO" ]]; then
 fi
 
 # Resolve which check script to run
+# shellcheck source=../verify/resolve-check-script.sh
 source "$CHECK_SCRIPTS_DIR/resolve-check-script.sh" "$PACKAGE"
 CHECK_SCRIPT_NAME=$(basename "$CHECK_SCRIPT")
 

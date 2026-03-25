@@ -13,3 +13,5 @@ case "${1:?package name required}" in
   mina-*)        CHECK_SCRIPT="$VERIFY_DIR/check-daemon.sh" ;;
   *) echo "Unknown package: $1"; exit 1 ;;
 esac
+
+export CHECK_SCRIPT
