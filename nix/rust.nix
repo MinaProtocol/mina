@@ -159,10 +159,10 @@ in {
       version = deps.wasm-bindgen.version;
       src = final.fetchCrate {
         inherit pname version;
-        sha256 = "sha256-3RJzK7mkYFrs7C/WkhW9Rr4LdP5ofb2FdYGz1P7Uxog=";
+        sha256 = "sha256-IPxP68xtNSpwJjV2yNMeepAS0anzGl02hYlSTvPocz8=";
       };
 
-      cargoHash = "sha256-tD0OY2PounRqsRiFh8Js5nyknQ809ZcHMvCOLrvYHRE=";
+      cargoHash = "sha256-pBeQaG6i65uJrJptZQLuIaCb/WCQMhba1Z1OhYqA8Zc=";
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;
@@ -172,18 +172,11 @@ in {
           libiconv
         ];
 
-      # wasm-bindgen-cli >= 0.2.100 no longer ships the `reference` test target
-      # in the crates.io tarball, so the old `--test=reference` check fails with:
-      # "error: no test target named `reference`".
-      #
-      # Keep a basic CI guardrail by smoke-testing the installed binary instead.
-      doCheck = false;
-      doInstallCheck = true;
-      installCheckPhase = ''
-        runHook preInstallCheck
-        "$out/bin/wasm-bindgen" --version | grep -F "wasm-bindgen ${version}"
-        runHook postInstallCheck
-      '';
+      checkInputs = [ final.nodejs ];
+
+      # other tests, like --test=wasm-bindgen, require it to be ran in the
+      # wasm-bindgen monorepo
+      cargoTestFlags = [ "--test=reference" ];
     };
   in rustPlatform.buildRustPackage {
     pname = "plonk_wasm";
@@ -218,15 +211,7 @@ in {
       runHook preBuild
       (
       set -x
-      export RUSTFLAGS="\
-      -C target-feature=+atomics,+bulk-memory,+mutable-globals \
-      -C link-arg=--import-memory \
-      -C link-arg=--shared-memory \
-      -C link-arg=--export=__wasm_init_tls \
-      -C link-arg=--export=__tls_base \
-      -C link-arg=--export=__tls_size \
-      -C link-arg=--export=__tls_align \
-      -C link-arg=--max-memory=4294967296"
+      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--max-memory=4294967296"
       wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs plonk-wasm -- --features nodejs -Z build-std=panic_abort,std
       wasm-pack build --mode no-install --target web --out-dir $out/web plonk-wasm -Z build-std=panic_abort,std
       )
