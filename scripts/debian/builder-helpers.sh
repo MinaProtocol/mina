@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+SCRIPTPATH="${SCRIPTPATH:-"$( cd "$(dirname "$0")" ; pwd -P )"}"
 BUILD_DIR=${BUILD_DIR:-"${SCRIPTPATH}/../../_build"}
 BUILD_URL=${BUILD_URL:-${BUILDKITE_BUILD_URL:-"local build from '$(hostname)' \
   host"}}
@@ -16,9 +16,10 @@ echo "--- Setting up the environment to build debian packages..."
 cd "${BUILD_DIR}" || exit 1
 
 
-GITHASH=$(git rev-parse --short=7 HEAD)
-GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
+source "${SCRIPTPATH}/../export-git-env-vars.sh"
 
+
+# SUGGESTED_DEPS should only be used for Suggests, not Depends.
 SUGGESTED_DEPS="jq, curl, wget"
 
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker-ce "
@@ -49,9 +50,9 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
-MINA_DEB_NAME="mina-berkeley"
-MINA_DEVNET_DEB_NAME="mina-devnet"
-DUNE_PROFILE="${DUNE_PROFILE}"
+MINA_DEB_NAME="mina-devnet"
+MINA_ARCHIVE_DEB_NAME="mina-archive-devnet"
+DUNE_PROFILE="${DUNE_PROFILE:-dev}"
 DEB_SUFFIX=""
 
 # Add suffix to debian to distinguish different profiles
@@ -63,7 +64,7 @@ case "${DUNE_PROFILE}" in
     _SUFFIX=${DUNE_PROFILE//_/-}
     DEB_SUFFIX="${_SUFFIX}"
     MINA_DEB_NAME="${MINA_DEB_NAME}-${DEB_SUFFIX}"
-    MINA_DEVNET_DEB_NAME="${MINA_DEVNET_DEB_NAME}-${DEB_SUFFIX}"
+    MINA_ARCHIVE_DEB_NAME="${MINA_ARCHIVE_DEB_NAME}-${DEB_SUFFIX}"
     ;;
 esac
 
@@ -72,10 +73,26 @@ esac
 if [[ -v DUNE_INSTRUMENT_WITH ]]; then
     INSTRUMENTED_SUFFIX=instrumented
     MINA_DEB_NAME="${MINA_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
+    MINA_ARCHIVE_DEB_NAME="${MINA_ARCHIVE_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
     DEB_SUFFIX="${DEB_SUFFIX}-${INSTRUMENTED_SUFFIX}"
 fi
 
 BUILDDIR="deb_build"
+
+signature_of_network() {
+  case "${network}" in
+    mainnet)
+      printf "mainnet"
+      ;;
+    devnet)
+      printf "testnet"
+      ;;
+    *)
+      echo "Unknown network name provided: ${network}" >&2
+      exit 1
+      ;;
+  esac
+}
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -85,16 +102,19 @@ create_control_file() {
   echo "Package Name: ${1}"
   echo "Dependencies: ${2}"
   echo "Description: ${3}"
-
+  if [ -n "${4:-}" ]; then
+    echo "Broken/Replaces: ${4}"
+  fi
   # Make sure the directory exists
   mkdir -p "${BUILDDIR}/DEBIAN"
 
-  # Also clean/create the binary directory that all packages need
+  # Also clean the binary directory that all packages need
   rm -rf "${BUILDDIR}/usr/local/bin"
-  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  CONTROL="${BUILDDIR}/DEBIAN/control"
 
   # Create the control file itself
-  cat << EOF > "${BUILDDIR}/DEBIAN/control"
+  cat << EOF > ${CONTROL}
 Package: ${1}
 Version: ${MINA_DEB_VERSION}
 License: Apache-2.0
@@ -106,7 +126,20 @@ Suite: ${MINA_DEB_RELEASE}
 Architecture: ${ARCHITECTURE}
 Maintainer: O(1)Labs <build@o1labs.org>
 Installed-Size:
-Depends: ${2}
+EOF
+
+  if [ -n "${2:-}" ]; then
+    echo "Depends: ${2}" >> ${CONTROL}
+  fi
+  if [ -n "${4:-}" ]; then
+    echo "Suggests: ${4}" >> ${CONTROL}
+  fi
+  if [ -n "${5:-}" ]; then
+    echo "Replaces: ${5}" >> ${CONTROL}
+    echo "Breaks: ${5}" >> ${CONTROL}
+  fi
+
+  cat <<EOF >> ${CONTROL}
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/
@@ -123,7 +156,7 @@ EOF
 
 # Function to ease package build
 build_deb() {
-
+  echo "--- Building ${1}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
   echo "------------------------------------------------------------"
   echo "build_deb inputs:"
   echo "Package Name: ${1}"
@@ -132,6 +165,19 @@ build_deb() {
   echo "------------------------------------------------------------"
   echo "Deb Contents:"
   find "${BUILDDIR}"
+
+  # If BUILD_DEB_CAPTURE_DIR is set (used by tests), capture the staging
+  # directory state to that directory instead of invoking fakeroot/dpkg-deb.
+  if [[ -n "${BUILD_DEB_CAPTURE_DIR:-}" ]]; then
+    echo "${1}" > "${BUILD_DEB_CAPTURE_DIR}/deb_name"
+    cp "${BUILDDIR}/DEBIAN/control" "${BUILD_DEB_CAPTURE_DIR}/control"
+    (cd "${BUILDDIR}" && find . -type f | sort) > "${BUILD_DEB_CAPTURE_DIR}/files"
+    rm -rf "${BUILD_DEB_CAPTURE_DIR}/last_build"
+    cp -a "${BUILDDIR}" "${BUILD_DEB_CAPTURE_DIR}/last_build"
+    rm -rf "${BUILDDIR}"
+    echo "--- Captured ${1} staging directory to ${BUILD_DEB_CAPTURE_DIR}"
+    return 0
+  fi
 
   # Build the package
   echo "------------------------------------------------------------"
@@ -145,8 +191,77 @@ build_deb() {
   ls -lh "${1}"_*.deb
   echo "deleting BUILDDIR ${BUILDDIR}"
   rm -rf "${BUILDDIR}"
+}
 
-  echo "--- Built ${1}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
+copy_hf_related_scripts() {
+
+  cp ../scripts/hardfork/create_runtime_config.sh \
+    "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
+  cp ../scripts/hardfork/mina-verify-packaged-fork-config \
+    "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
+
+}
+
+# Copies scripts and build utilities to debian package
+copy_common_daemon_utils() {
+  echo "------------------------------------------------------------"
+  echo "copy_common_daemon_utils inputs:"
+  echo "Seed List URL path: ${1} (like seed-lists/berkeley_seeds.txt)"
+
+  local MINA_BIN="${2:-${BUILDDIR}/usr/local/bin/mina}"
+
+  copy_hf_related_scripts
+
+  # Update the mina.service with a new default PEERS_URL based on Seed List \
+  # URL $1
+  mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
+  sed "s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/${1}%" \
+    ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
+
+  # Support bash completion
+  # NOTE: We do not list bash-completion as a required package,
+  #       but it needs to be present for this to be effective
+  mkdir -p "${BUILDDIR}/etc/bash_completion.d"
+  env COMMAND_OUTPUT_INSTALLATION_BASH=1 "${MINA_BIN}" > \
+    "${BUILDDIR}/etc/bash_completion.d/mina"
+
+}
+
+# Copies common daemon binaries only to debian package
+copy_common_daemon_apps() {
+
+  local network="${1}"
+
+  echo "------------------------------------------------------------"
+  echo "copy_common_daemon_apps inputs:"
+  echo "Signature Type: ${network} (mainnet or testnet)"
+
+  local TARGET_ROOT_DIR="${2:-${BUILDDIR}/usr/local/bin}"
+
+  local signature
+  signature=$(signature_of_network "$network")
+
+  echo "Target Root Dir: ${TARGET_ROOT_DIR}"
+
+  mkdir -p "${TARGET_ROOT_DIR}"
+
+  cp ../src/app/libp2p_helper/result/bin/libp2p_helper \
+    "${TARGET_ROOT_DIR}/coda-libp2p_helper"
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    "${TARGET_ROOT_DIR}/mina-create-genesis"
+  cp ./default/src/app/generate_keypair/generate_keypair.exe \
+    "${TARGET_ROOT_DIR}/mina-generate-keypair"
+  cp ./default/src/app/validate_keypair/validate_keypair.exe \
+    "${TARGET_ROOT_DIR}/mina-validate-keypair"
+  cp ./default/src/lib/snark_worker/standalone/run_snark_worker.exe \
+    "${TARGET_ROOT_DIR}/mina-standalone-snark-worker"
+  cp ./default/src/app/rocksdb-scanner/rocksdb_scanner.exe \
+    "${TARGET_ROOT_DIR}/mina-rocksdb-scanner"
+
+  # Copy signature-based Binaries
+  cp ./default/src/app/cli/src/mina_"${signature}"_signatures.exe \
+    "${TARGET_ROOT_DIR}/mina"
+
 }
 
 # Function to DRY copying config files into daemon packages
@@ -155,69 +270,25 @@ copy_common_daemon_configs() {
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_configs inputs:"
   echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
-  echo "Signature Type: ${2} (mainnet or testnet)"
-  echo "Seed List URL path: ${3} (like seed-lists/berkeley_seeds.txt)"
 
-  # Copy shared binaries
-  cp ../src/app/libp2p_helper/result/bin/libp2p_helper \
-    "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
-  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-    "${BUILDDIR}/usr/local/bin/mina-create-genesis"
-  cp ./default/src/app/generate_keypair/generate_keypair.exe \
-    "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
-  cp ./default/src/app/validate_keypair/validate_keypair.exe \
-    "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
-  cp ./default/src/lib/snark_worker/standalone/run_snark_worker.exe \
-    "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
-  cp ./default/src/app/rocksdb-scanner/rocksdb_scanner.exe \
-    "${BUILDDIR}/usr/local/bin/mina-rocksdb-scanner"
-
-  # Copy signature-based Binaries (based on signature type $2 passed into the \
-  # function)
-  cp ./default/src/app/cli/src/mina_"${2}"_signatures.exe \
-    "${BUILDDIR}/usr/local/bin/mina"
-
-  # Copy over Build Configs (based on $2)
-  mkdir -p "${BUILDDIR}/etc/coda/build_config"
-  # Use parameter expansion to either return "mainnet.mlh" or "devnet.mlh"
-  cp "../src/config/${2//test/dev}.mlh" \
-    "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
-  rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
+  local NETWORK_NAME="${1}"
 
   mkdir -p "${BUILDDIR}/var/lib/coda"
 
-  # Include all useful genesis ledgers
-  cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/mainnet.json"
-  cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
-  cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
-  # Set the default configuration based on Network name ($1)
-  cp ../genesis_ledgers/"${1}".json \
-    "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
-  cp ../scripts/hardfork/create_runtime_config.sh \
-    "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
-  cp ../scripts/hardfork/mina-verify-packaged-fork-config \
-    "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
-  # Update the mina.service with a new default PEERS_URL based on Seed List \
-  # URL $3
-  mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
-  sed "s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/${3}%" \
-    ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
-
-  # Copy the genesis ledgers and proofs as these are fairly small and very \
-  # valuable to have
-  # Genesis Ledger/proof/epoch ledger Copy
-  for f in /tmp/coda_cache_dir/genesis*; do
-      if [ -e "$f" ]; then
-          mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
-      fi
-  done
-
-  # Support bash completion
-  # NOTE: We do not list bash-completion as a required package,
-  #       but it needs to be present for this to be effective
-  mkdir -p "${BUILDDIR}/etc/bash_completion.d"
-  env COMMAND_OUTPUT_INSTALLATION_BASH=1 "${BUILDDIR}/usr/local/bin/mina" > \
-    "${BUILDDIR}/etc/bash_completion.d/mina"
+  # Include genesis ledgers for the network.
+  # We want to copy the genesis ledger for the network ($1) and in case of
+  # devnet/mainnet also copy the magic config (config_$GITHASH_CONFIG.json).
+  # This config is automatically picked up by the daemon on startup.
+  case "${NETWORK_NAME}" in
+    devnet|mainnet)
+      cp ../genesis_ledgers/"${NETWORK_NAME}".json \
+        "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+      cp ../genesis_ledgers/${NETWORK_NAME}.json "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
+      ;;
+    *)
+      echo "Unknown network name provided: ${NETWORK_NAME}"; exit 1
+      ;;
+  esac
 }
 
 ## LOGPROC PACKAGE ##
@@ -233,6 +304,8 @@ copy_common_daemon_configs() {
 build_logproc_deb() {
   create_control_file mina-logproc "${SHARED_DEPS}" \
     'Utility for processing mina-daemon log output'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
 
   # Binaries
   cp ./default/src/app/logproc/logproc.exe \
@@ -258,6 +331,8 @@ build_test_executive_deb () {
     'Tool to run automated tests against a full mina testnet with multiple \
     nodes.'
 
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
   # Binaries
   cp ./default/src/app/test_executive/test_executive.exe \
     "${BUILDDIR}/usr/local/bin/mina-test-executive"
@@ -280,6 +355,8 @@ build_batch_txn_deb() {
 
   create_control_file mina-batch-txn "${SHARED_DEPS}" \
     'Load transaction tool against a mina node.'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
 
   # Binaries
   cp ./default/src/app/batch_txn_tool/batch_txn_tool.exe \
@@ -305,6 +382,8 @@ build_functional_test_suite_deb() {
     'Test suite apps for mina.'
 
   mkdir -p "${BUILDDIR}/etc/mina/test/archive"
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
 
   cp -r ../src/test/archive/* "${BUILDDIR}"/etc/mina/test/archive/
 
@@ -334,17 +413,40 @@ build_functional_test_suite_deb() {
 }
 ## END TEST SUITE PACKAGE ##
 
-function copy_common_rosetta_configs () {
+## ROSETTA PACKAGE ##
+
+#
+# Builds mina-rosetta-NETWORK package for Rosetta API on specified network
+#
+# Output: mina-rosetta-${NETWORK}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}
+#
+# Rosetta API implementation for specified network
+#
+build_rosetta_deb() {
+
+  local network="$1"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building ${network} rosetta deb"
+
+  local package_name="mina-rosetta-${network}"
+
+  create_control_file "${package_name}" "${SHARED_DEPS}" \
+    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  local signature
+  signature=$(signature_of_network "$network")
 
   # Copy rosetta-based Binaries
-  cp ./default/src/app/rosetta/rosetta_"${1}"_signatures.exe \
+  cp "./default/src/app/rosetta/rosetta_${signature}_signatures.exe" \
     "${BUILDDIR}/usr/local/bin/mina-rosetta"
-  cp ./default/src/app/rosetta/ocaml-signer/signer_"${1}"_signatures.exe \
+  cp "./default/src/app/rosetta/ocaml-signer/signer_${signature}_signatures.exe" \
     "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
 
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta"
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta/scripts"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/"{rosetta-cli-config,scripts}
 
   # --- Copy artifacts
   cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
@@ -355,349 +457,226 @@ function copy_common_rosetta_configs () {
   cp ./default/src/app/rosetta/indexer_test/indexer_test.exe \
     "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
 
+  build_deb "${package_name}"
 }
+## END ROSETTA PACKAGE ##
 
-## ROSETTA MAINNET PACKAGE ##
+## CONFIG PACKAGE ##
+build_daemon_config_deb() {
 
-#
-# Builds mina-rosetta-mainnet package for mainnet Rosetta API
-#
-# Output: mina-rosetta-mainnet_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}
-#
-# Rosetta API implementation for mainnet with mainnet signature binaries.
-#
-build_rosetta_mainnet_deb() {
+  local network="$1"
 
   echo "------------------------------------------------------------"
-  echo "--- Building mainnet rosetta deb"
+  echo "--- Building ${network} config deb without keys:"
 
-  create_control_file mina-rosetta-mainnet "${SHARED_DEPS}" \
-    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+  local package_name="mina-${network}-config"
 
-  copy_common_rosetta_configs "mainnet"
+  # Config package contains only architecture-independent configuration data
+  # (no binaries), so we build it with Architecture: all to make it usable on
+  # all supported architectures.
 
-  build_deb mina-rosetta-mainnet
+  # Save and override architecture to "all" for the config package; restore
+  # the original architecture after building the package.
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
+  create_control_file "${package_name}" "" \
+     "Mina Protocol Config for daemons running under ${network}" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
+
+  copy_common_daemon_configs "${network}"
+
+  build_deb "${package_name}"
+  ARCHITECTURE="${saved_arch}"
 }
-## END ROSETTA MAINNET PACKAGE ##
+## END CONFIG PACKAGE ##
 
-## ROSETTA DEVNET PACKAGE ##
-
-#
-# Builds mina-rosetta-devnet package for devnet Rosetta API
-#
-# Output: mina-rosetta-devnet_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}
-#
-# Rosetta API implementation for devnet with testnet signature binaries.
-#
-build_rosetta_devnet_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building devnet rosetta deb"
-
-  create_control_file mina-rosetta-devnet "${SHARED_DEPS}" \
-    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
-
-  copy_common_rosetta_configs "testnet"
-
-  build_deb mina-rosetta-devnet
-}
-## END ROSETTA DEVNET PACKAGE ##
-
-## ROSETTA BERKELEY PACKAGE ##
+## DAEMON PACKAGE ##
 
 #
-# Builds mina-rosetta-berkeley package for Berkeley testnet Rosetta API
+# Builds mina-NETWORK package for specified network
 #
-# Output: mina-rosetta-berkeley_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}
-#
-# Rosetta API implementation for Berkeley testnet with testnet signature binaries.
-#
-build_rosetta_berkeley_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building berkeley rosetta deb"
-
-  create_control_file mina-rosetta-berkeley "${SHARED_DEPS}" \
-    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
-
-  copy_common_rosetta_configs "testnet"
-
-  build_deb mina-rosetta-berkeley
-}
-## END BERKELEY PACKAGE ##
-
-## MAINNET PACKAGE ##
-
-#
-# Builds mina-mainnet package for mainnet daemon
-#
-# Output: mina-mainnet_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: 
+# - If we're building for mainnet: mina-${NETWORK}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# - If we're building for devnet: ${MINA_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+#   Where MINA_DEB_NAME can be:
+#     - "mina-devnet" (default)
+#     - "mina-devnet-lightnet" (if DUNE_PROFILE=lightnet)
+#     - "mina-devnet-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#     - "mina-devnet-lightnet-instrumented" (both conditions)
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS} (includes libpq-dev, jemalloc, logproc)
 #
-# Full mainnet daemon package with mainnet signatures and mainnet genesis ledger
-# as default. Uses mainnet seed list and mainnet configuration.
+# Full daemon package with signature, genesis ledger and seed list for specified network.
 #
-build_daemon_mainnet_deb() {
+build_daemon_deb() {
+
+  local network="$1"
 
   echo "------------------------------------------------------------"
-  echo "--- Building mainnet deb without keys:"
+  echo "--- Building ${network} daemon deb without keys:"
 
-  create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+  local package_name seed_list_url
+  case "${network}" in
+    mainnet)
+      package_name="mina-mainnet"
+      seed_list_url="mina-seed-lists/${network}_seeds.txt"
+      ;;
+    devnet)
+      package_name="${MINA_DEB_NAME}"
+      seed_list_url="seed-lists/${network}_seeds.txt"
+      ;;
+    *)
+      echo "Unknown network name provided: ${network}"; exit 1
+      ;;
+  esac
 
-  copy_common_daemon_configs mainnet mainnet 'mina-seed-lists/mainnet_seeds.txt'
+  create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network}-config (>=${MINA_DEB_VERSION})" \
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION})"
 
-  build_deb mina-mainnet
+  copy_common_daemon_apps "${network}"
+
+  copy_common_daemon_utils "${seed_list_url}"
+
+  build_deb "${package_name}"
 }
-## END MAINNET PACKAGE ##
 
-## DEVNET PACKAGE ##
+## END DAEMON PACKAGE ##
+
+## PREFORK PACKAGE ##
+
+# For automode purpose. We need to control location for both runtimes
+CURRENT_CODENAME=berkeley
+AUTOMODE_CURRENT_DIR="${BUILDDIR}/usr/lib/mina/${CURRENT_CODENAME}"
+POSTFORK_CODENAME=mesa
 
 #
-# Builds devnet daemon package with profile-aware naming
+# Builds mina-NETWORK-prefork-POSTFORK_CODENAME tailored package for automode package
 #
-# Output: ${MINA_DEVNET_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Where MINA_DEVNET_DEB_NAME can be:
-#   - "mina-devnet" (default)
-#   - "mina-devnet-lightnet" (if DUNE_PROFILE=lightnet)
-#   - "mina-devnet-instrumented" (if DUNE_INSTRUMENT_WITH is set)
-#   - "mina-devnet-lightnet-instrumented" (both conditions)
-#
+# Output: mina-${NETWORK}-prefork-${POSTFORK_CODENAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Devnet daemon with testnet signatures and devnet genesis ledger as default.
-# Package name includes suffixes for different profiles and instrumentation.
-#
-build_daemon_devnet_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building testnet signatures deb without keys:"
-
-  create_control_file "${MINA_DEVNET_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
-
-  copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
-
-  build_deb "${MINA_DEVNET_DEB_NAME}"
-}
-## END DEVNET PACKAGE ##
-
-## MAINNET LEGACY PACKAGE ##
-
-#
-# Builds mina-mainnet-legacy package with legacy binary
-#
-# Output: mina-mainnet-legacy_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Contains only the legacy mainnet binary as "mina-legacy" without
+# Contains only the legacy binaries placed in "$AUTOMODE_CURRENT_DIR" without
 # configuration files or genesis ledgers.
 #
-build_daemon_mainnet_legacy_deb() {
+
+build_daemon_prefork_deb() {
+
+  local network="$1"
 
   echo "------------------------------------------------------------"
-  echo "--- Building mainnet legacy deb without keys:"
+  echo "--- Building mainnet berkeley deb for prefork automode :"
 
-  create_control_file mina-mainnet-legacy "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+  local package_name="mina-${network}-prefork-${POSTFORK_CODENAME}"
 
-  # Copy legacy binary
-  cp ./default/src/app/cli/src/mina_mainnet_signatures.exe \
-    "${BUILDDIR}/usr/local/bin/mina-legacy"
 
-  build_deb mina-mainnet-legacy
+  create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
+    "Mina Protocol Client and Daemon for prefork under network ${network}" "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_apps "${network}" "$AUTOMODE_CURRENT_DIR"
+
+  build_deb "${package_name}"
 }
-## END MAINNET LEGACY PACKAGE ##
+## END PREFORK PACKAGE ##
 
-## DEVNET LEGACY PACKAGE ##
-
-#
-# Builds mina-devnet-legacy package with legacy testnet binary
-#
-# Output: mina-devnet-legacy_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Contains only the legacy testnet binary as "mina-legacy" without
-# configuration files or genesis ledgers.
-#
-build_daemon_devnet_legacy_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building testnet signatures legacy deb without keys:"
-
-  create_control_file mina-devnet-legacy "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
-
-  # Copy legacy binary
-  cp ./default/src/app/cli/src/mina_testnet_signatures.exe \
-    "${BUILDDIR}/usr/local/bin/mina-legacy"
-
-  build_deb mina-devnet-legacy
-}
-## END DEVNET LEGACY PACKAGE ##
-
-## BERKELEY PACKAGE ##
+## GENERIC PACKAGE ##
 
 #
-# Builds Berkeley testnet daemon package with profile-aware naming
+# Builds Generic daemon package with profile-aware naming
 #
-# Output: ${MINA_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Where MINA_DEB_NAME can be:
-#   - "mina-berkeley" (default)
-#   - "mina-berkeley-lightnet" (if DUNE_PROFILE=lightnet)
-#   - "mina-berkeley-instrumented" (if DUNE_INSTRUMENT_WITH is set)
-#   - "mina-berkeley-lightnet-instrumented" (both conditions)
+# Output: ${MINA_GENERIC_DEB_NAME}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Where MINA_GENERIC_DEB_NAME can be:
+#   - "mina-NETWORK-generic" (default)
+#   - "mina-NETWORK-generic-lightnet" (if DUNE_PROFILE=lightnet)
+#   - "mina-NETWORK-generic-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#   - "mina-NETWORK-generic-lightnet-instrumented" (both conditions)
 #
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Berkeley testnet daemon with testnet signatures and berkeley genesis ledger
-# as default. Package name includes suffixes for different profiles.
+# Generic daemon with specified signatures, without any configs (like ledgers etc.).
+# Package name includes suffixes for different profiles.
 #
-build_daemon_berkeley_deb() {
+build_daemon_generic_deb() {
+
+  local network="$1"
 
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Berkeley testnet signatures deb without keys:"
+  echo "--- Building Mina Generic package for specified network without keys:"
 
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon for the Berkeley Network' \
-    "${SUGGESTED_DEPS}"
+  local _suffix="${DEB_SUFFIX#-}"
+  MINA_GENERIC_DEB_NAME="mina-${network}-generic${_suffix:+-${_suffix}}"
 
-  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
+  create_control_file "${MINA_GENERIC_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
+    "Mina Protocol Client and Daemon for the Generic ${network} Network" \
+    "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION})"
 
-  build_deb "${MINA_DEB_NAME}"
+  copy_common_daemon_apps "${network}"
+
+  copy_common_daemon_utils "seed-lists/${network}_seeds.txt"
+
+  build_deb "${MINA_GENERIC_DEB_NAME}"
 
 }
-## END BERKELEY PACKAGE ##
 
-#
-# Replaces runtime config and genesis ledgers with hardfork versions
-#
-# Parameters:
-#   $1 - Network name (mainnet, devnet, berkeley)
-#
-# Environment variables required:
-#   RUNTIME_CONFIG_JSON - path to hardfork runtime configuration
-#   LEDGER_TARBALLS - space-separated list of ledger tarball paths
-#
-# Copies hardfork-specific runtime config and ledgers, backing up existing
-# network ledger as .old.json before replacement.
-#
-replace_runtime_config_and_ledgers_with_hardforked_ones() {
+## END MAINNET GENERIC PACKAGE ##
+
+copy_common_daemon_hardfork_configs() {
   local NETWORK_NAME="${1}"
 
-  # Create the directory for the runtime config and ledgers if it doesn't exist
-  mkdir -p "${BUILDDIR}/var/lib/coda"
+  # Copy build config and ledgers
+  copy_common_daemon_configs ${NETWORK_NAME}
 
   { [ -z ${RUNTIME_CONFIG_JSON+x} ] || [ -z ${LEDGER_TARBALLS+x} ]; }  \
     && echo "required env vars were not provided" && exit 1
 
-  # Replace the runtime config and ledgers with the hardfork ones
-  cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+  # Replace ledgers
+  cp -r "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
   for ledger_tarball in $LEDGER_TARBALLS; do
     cp "${ledger_tarball}" "${BUILDDIR}/var/lib/coda/"
   done
 
-  # Overwrite outdated ledgers that are being updated by the hardfork (backing up the outdated ledgers)
-  if [ -f "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json" ]; then
-    mv "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.old.json"
-  fi
+  # Copy older genesis ledger as .old.json for backwards compatibility
+  cp "../genesis_ledgers/${NETWORK_NAME}.json" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.old.json"
+
   cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
 }
 
 
-## DEVNET HARDFORK PACKAGE ##
+## HARDFORK PACKAGE ##
 
 #
-# Builds mina-devnet-hardfork package for devnet hardfork
+# Builds mina-${NETWORK}-config package for specified network with hardfork configuration
 #
-# Output: mina-devnet-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+# Output: mina-${NETWORK}-config_${MINA_DEB_VERSION}_all.deb
 #
-# Devnet daemon package with hardfork-specific runtime config and ledgers.
+# Config only package with hardfork-specific runtime config and ledgers.
 # Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
 #
-build_daemon_devnet_hardfork_deb() {
-  local __deb_name=mina-devnet-hardfork
+build_daemon_hardfork_config_deb() {
+
+  local network="$1"
+  local package_name="mina-${network}-config"
 
   echo "------------------------------------------------------------"
-  echo "--- Building hardfork testnet signatures deb without keys:"
+  echo "--- Building hardfork config for ${network} network deb without keys:"
 
-  create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
+  # Config package contains only architecture-independent configuration data
+  # (no binaries), so we build it with Architecture: all to make it usable on
+  # all supported architectures.
 
-  copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
+  # Save and override architecture to "all" for the hardfork config package; restore
+  # the original architecture after building the package.
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
 
-  replace_runtime_config_and_ledgers_with_hardforked_ones devnet
+  create_control_file "${package_name}" "" \
+    "Mina Protocol hardfork config for the ${network} Network" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
 
-  build_deb "${__deb_name}"
+  copy_common_daemon_hardfork_configs "${network}"
 
+  build_deb "${package_name}"
+  ARCHITECTURE="${saved_arch}"
 }
 
-## END DEVNET HARDFORK PACKAGE ##
-
-## BERKELEY HARDFORK PACKAGE ##
-
-#
-# Builds mina-berkeley-hardfork package for Berkeley hardfork
-#
-# Output: mina-berkeley-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Berkeley daemon package with hardfork-specific runtime config and ledgers.
-# Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
-#
-build_daemon_berkeley_hardfork_deb() {
-  local __deb_name=mina-berkeley-hardfork
-
-  echo "------------------------------------------------------------"
-  echo "--- Building hardfork berkeley signatures deb without keys:"
-
-  create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon for the Berkeley Network' "${SUGGESTED_DEPS}"
-
-  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
-
-  replace_runtime_config_and_ledgers_with_hardforked_ones berkeley
-
-  build_deb "${__deb_name}"
-
-}
-
-## END BERKELEY HARDFORK PACKAGE ##
-
-## MAINNET HARDFORK PACKAGE ##
-
-#
-# Builds mina-mainnet-hardfork package for mainnet hardfork
-#
-# Output: mina-mainnet-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
-#
-# Mainnet daemon package with hardfork-specific runtime config and ledgers.
-# Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
-# Note: Uses testnet signatures despite being mainnet hardfork package.
-#
-build_daemon_mainnet_hardfork_deb() {
-  local __deb_name=mina-mainnet-hardfork
-
-  echo "------------------------------------------------------------"
-  echo "--- Building hardfork mainnet signatures deb without keys:"
-
-  create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon for the Mainnet Network' "${SUGGESTED_DEPS}"
-
-  copy_common_daemon_configs mainnet testnet 'seed-lists/mainnet_seeds.txt'
-
-  replace_runtime_config_and_ledgers_with_hardforked_ones mainnet
-
-  build_deb "${__deb_name}"
-
-}
-
-## END MAINNET HARDFORK PACKAGE ##
+## END HARDFORK PACKAGE ##
 
 #
 # Copies common binaries and configuration for archive packages
@@ -710,6 +689,8 @@ build_daemon_mainnet_hardfork_deb() {
 #
 copy_common_archive_configs() {
   local ARCHIVE_DEB="${1}"
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
 
   cp ./default/src/app/archive/archive.exe \
     "${BUILDDIR}/usr/local/bin/mina-archive"
@@ -728,90 +709,55 @@ copy_common_archive_configs() {
     "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
   cp ./default/src/app/replayer/replayer.exe \
     "${BUILDDIR}/usr/local/bin/mina-replayer"
+  cp ./default/src/app/dump_slot_ledger/dump_slot_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-dump-slot-ledger"
 
   rsync -Huav ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/archive"
 
   build_deb "$ARCHIVE_DEB"
 }
 
-## ARCHIVE DEVNET PACKAGE ##
+## ARCHIVE PACKAGE ##
 
 #
 # Builds mina-archive-devnet package for devnet archive node
 #
-# Output: mina-archive-devnet_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: 
+# - If network is one of mainnet: mina-archive-${NETWORK}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# - O.w. if network is devnet: mina-archive-devnet-generic${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+#   Where DEB_SUFFIX can be:
+#     - "" (empty, default)
+#     - "-lightnet" (if DUNE_PROFILE=lightnet)
+#     - "-instrumented" (if DUNE_INSTRUMENT_WITH is set)
+#     - "-lightnet-instrumented" (both conditions)
 # Dependencies: ${ARCHIVE_DEPS} (libssl, libgomp, libpq-dev, libjemalloc)
-#
 # Archive node package for devnet with all archive utilities and SQL scripts.
-#
-build_archive_devnet_deb () {
-  ARCHIVE_DEB=mina-archive-devnet
+build_archive_deb () {
+
+  local network="$1"
+  local package_name
+  case "${network}" in
+    mainnet)
+      package_name="mina-archive-mainnet"
+      ;;
+    devnet)
+      package_name="$MINA_ARCHIVE_DEB_NAME"
+      ;;
+    *)
+      echo "Unknown network name provided: ${network}" >&2
+      exit 1
+      ;;
+  esac
 
   echo "------------------------------------------------------------"
-  echo "--- Building archive devnet deb"
+  echo "--- Building archive ${network} deb"
 
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
+  create_control_file "${package_name}" "${ARCHIVE_DEPS}" "Mina Archive Node for network ${network}"
 
-  copy_common_archive_configs "$ARCHIVE_DEB"
-
-}
-## END ARCHIVE DEVNET PACKAGE ##
-
-## ARCHIVE BERKELEY PACKAGE ##
-
-#
-# Builds Berkeley archive package with profile-aware naming
-#
-# Output: mina-archive-berkeley${DEB_SUFFIX}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Where DEB_SUFFIX can be:
-#   - "" (empty, default)
-#   - "-lightnet" (if DUNE_PROFILE=lightnet)
-#   - "-instrumented" (if DUNE_INSTRUMENT_WITH is set)
-#   - "-lightnet-instrumented" (both conditions)
-#
-# Dependencies: ${ARCHIVE_DEPS}
-#
-# Archive node package for Berkeley with suffix-aware naming for different profiles.
-#
-build_archive_berkeley_deb () {
-  ARCHIVE_DEB=mina-archive-berkeley${DEB_SUFFIX}
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive berkeley deb"
-
-
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
-
-  copy_common_archive_configs "$ARCHIVE_DEB"
+  copy_common_archive_configs "${package_name}"
 
 }
 ## END ARCHIVE PACKAGE ##
-
-## ARCHIVE MAINNET PACKAGE ##
-
-#
-# Builds mina-archive-mainnet package for mainnet archive node
-#
-# Output: mina-archive-mainnet_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${ARCHIVE_DEPS}
-#
-# Archive node package for mainnet with all archive utilities and SQL scripts.
-#
-build_archive_mainnet_deb () {
-  ARCHIVE_DEB=mina-archive-mainnet
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive mainnet deb"
-
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
-
-  copy_common_archive_configs "$ARCHIVE_DEB"
-
-}
-## END ARCHIVE MAINNET PACKAGE ##
 
 ## ZKAPP TEST TXN ##
 
@@ -819,17 +765,19 @@ build_archive_mainnet_deb () {
 # Builds mina-zkapp-test-transaction package for zkApp testing
 #
 # Output: mina-zkapp-test-transaction_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEBS}
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Utility for generating zkApp transactions in Mina GraphQL format for testing.
 #
 build_zkapp_test_transaction_deb () {
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Berkeley ZkApp test transaction tool:"
+  echo "--- Building Mina Generic testnet ZkApp test transaction tool:"
 
   create_control_file mina-zkapp-test-transaction \
     "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Utility to generate ZkApp transactions in Mina GraphQL format'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
 
   # Binaries
   cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
@@ -839,29 +787,147 @@ build_zkapp_test_transaction_deb () {
 }
 ## END ZKAPP TEST TXN PACKAGE ##
 
-## CREATE LEGACY GENESIS PACKAGE ##
+#
+# Builds mina-delegation-verify package for delegation verification
+#
+# Output: mina-delegation-verify_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Utility for verifying delegation in Mina GraphQL format.
+#
+build_delegation_verify_deb () {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Berkeley delegation verify tool:"
+
+  create_control_file mina-delegation-verify \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Utility to verify delegation in Mina GraphQL format'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binaries
+  cp ./default/src/app/delegation_verify/delegation_verify.exe \
+    "${BUILDDIR}/usr/local/bin/mina-delegation-verify"
+
+  mkdir -p "${BUILDDIR}/etc/mina/aws"
+
+  cp ./../src/app/delegation_verify/scripts/authenticate.sh \
+    "${BUILDDIR}/etc/mina/aws/authenticate.sh"
+
+  build_deb mina-delegation-verify
+}
+## END DELEGATION VERIFY PACKAGE ##
+
+
+## CREATE PREFORK GENESIS PACKAGE ##
 
 #
-# Builds mina-create-legacy-genesis package for legacy genesis creation
+# Builds mina-create-devnet-prefork-genesis package for prefork genesis creation
 #
-# Output: mina-create-legacy-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEBS}
+# Output: mina-create-devnet-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
-# Utility for creating legacy genesis ledgers for post-hardfork verification.
+# Utility for creating prefork genesis ledgers for post-hardfork verification.
 # Contains the runtime_genesis_ledger tool for Mina protocol.
 #
-build_create_legacy_genesis_deb() {
+build_prefork_devnet_genesis_ledger_deb() {
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Berkeley create legacy genesis tool:"
+  echo "--- Building Mina Generic devnet create prefork genesis tool:"
 
-  create_control_file mina-create-legacy-genesis \
+  DEB_NAME="mina-create-devnet-prefork-genesis-ledger"
+
+  create_control_file "$DEB_NAME" \
     "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Utility to verify post hardfork ledger for Mina'
 
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
   # Binaries
   cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-    "${BUILDDIR}/usr/local/bin/mina-create-legacy-genesis"
+    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
 
-  build_deb mina-create-legacy-genesis
+  build_deb "$DEB_NAME"
 }
-## END CREATE LEGACY GENESIS PACKAGE ##
+
+#
+# Builds mina-create-mainnet-prefork-genesis package for prefork genesis creation
+#
+# Output: mina-create-mainnet-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Utility for creating prefork genesis ledgers for post-hardfork verification.
+# Contains the runtime_genesis_ledger tool for Mina protocol.
+#
+build_prefork_mainnet_genesis_ledger_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Generic mainnet create prefork genesis tool:"
+
+  DEB_NAME="mina-create-mainnet-prefork-genesis-ledger"
+
+  create_control_file "$DEB_NAME" \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Utility to verify post hardfork ledger for Mina'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binaries
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
+
+  build_deb "$DEB_NAME"
+}
+
+#
+# Builds mina-create-testnet-generic-prefork-genesis package for prefork genesis creation
+#
+# Output: mina-create-testnet-generic-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Utility for creating prefork genesis ledgers for post-hardfork verification.
+# Contains the runtime_genesis_ledger tool for Mina protocol.
+#
+build_prefork_testnet_generic_genesis_ledger_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Generic testnet create prefork genesis tool:"
+
+  DEB_NAME="mina-create-testnet-generic-prefork-genesis-ledger"
+
+  create_control_file "$DEB_NAME" \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Utility to verify post hardfork ledger for Mina'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binaries
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
+
+  build_deb "$DEB_NAME"
+}
+
+## END CREATE PREFORK GENESIS PACKAGE ##
+
+
+build_daemon_storage_toolbox_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Berkeley daemon storage toolbox:"
+
+  ROCKSDB_VERSION="10.5.2"
+  MINA_VERSION="${GITTAG}"
+
+  create_control_file mina-daemon-storage-toolbox \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    "Toolbox for Mina Daemon storage compatible with rocksdb in version $ROCKSDB_VERSION and mina in $MINA_VERSION"
+
+  mkdir -p "${BUILDDIR}/usr/lib/mina/storage/$ROCKSDB_VERSION/$MINA_VERSION"
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binaries
+  cp ./default/src/app/rocksdb-scanner/rocksdb_scanner.exe \
+    "${BUILDDIR}/usr/lib/mina/storage/$ROCKSDB_VERSION/$MINA_VERSION/mina-rocksdb-scanner"
+
+  cp ../scripts/rocksdb/convert-to-legacy.sh \
+    "${BUILDDIR}/usr/local/bin/mina-storage-converter"
+
+  build_deb mina-daemon-storage-toolbox
+}

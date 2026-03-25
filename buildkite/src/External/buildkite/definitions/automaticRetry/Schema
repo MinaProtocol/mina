@@ -1,0 +1,7 @@
+{ Type = { exit_status : Optional (./properties/exit_status/Type ) 
+, limit : Optional (./properties/limit/Type ) 
+} 
+, default = { exit_status = None ((./properties/exit_status/Type )) 
+, limit = None ((./properties/limit/Type )) 
+} 
+}

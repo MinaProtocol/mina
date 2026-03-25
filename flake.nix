@@ -16,7 +16,6 @@
   inputs.nixpkgs-old.url = "github:nixos/nixpkgs/nixos-23.05-small";
   inputs.nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
-  inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
   inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
   inputs.nix-npm-buildPackage.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.url = "github:tweag/opam-nix";
@@ -60,7 +59,7 @@
 
   inputs.flockenzeit.url = "github:balsoft/Flockenzeit";
 
-  outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
+  outputs = inputs@{ self, nixpkgs, utils, nix-npm-buildPackage
     , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
     , nix-utils, flockenzeit, nixpkgs-old, nixpkgs-unstable, ... }:
     let
@@ -326,7 +325,6 @@
             nix-npm-buildPackage.overlays.default
             (final: prev: {
               rpmDebUtils = final.callPackage "${nix-utils}/utils/rpm-deb" { };
-              mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
               nix-npm-buildPackage =
                 pkgs.callPackage inputs.nix-npm-buildPackage {
                   nodejs = pkgs.nodejs-16_x;
@@ -347,6 +345,32 @@
         # Nix-built `dpkg` archives with Mina in them
         debianPackages = pkgs.callPackage ./nix/debian.nix { };
 
+        # Pinned to match the version used in CI (dockerfiles/Dockerfile-toolchain-base).
+        # Only x86_64 binaries are available from upstream.
+        dhall = let
+          srcs = {
+            x86_64-linux = pkgs.fetchurl {
+              url = "https://github.com/dhall-lang/dhall-haskell/releases/download/1.30.0/dhall-1.30.0-x86_64-linux.tar.bz2";
+              sha256 = "sha256-aEVCHenDzED0FAoSeMQI3470m/gIbufzdzDS7ajOlAI=";
+            };
+            x86_64-darwin = pkgs.fetchurl {
+              url = "https://github.com/dhall-lang/dhall-haskell/releases/download/1.30.0/dhall-1.30.0-x86_64-macos.tar.bz2";
+              sha256 = "sha256-mYXQ6yTBv23Fzl2CEAuSvndD3jkNR+XGlHbLEY90RA8=";
+            };
+          };
+        in if srcs ? ${system} then
+          pkgs.stdenv.mkDerivation {
+            pname = "dhall";
+            version = "1.30.0";
+            src = srcs.${system};
+            sourceRoot = ".";
+            installPhase = ''
+              install -Dm755 bin/dhall $out/bin/dhall
+            '';
+          }
+        else
+          null;
+
         # Packages for the development environment that are not needed to build mina-dev.
         # For instance dependencies for tests.
         devShellPackages = with pkgs; [
@@ -362,7 +386,7 @@
             (python-pkgs: [ python-pkgs.click python-pkgs.requests ]))
           jq
           rocksdb-mina.tools
-        ];
+        ] ++ lib.optional (dhall != null) dhall;
       in {
 
         inherit ocamlPackages;

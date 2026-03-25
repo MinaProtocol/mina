@@ -28,6 +28,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PublishPackages = ../../Command/Packages/Publish.dhall
 
+let DockerRepo = ../../Constants/DockerRepo.dhall
+
 let new_tags =
           \(codename : DebianVersions.DebVersion)
       ->  \(channel : DebianChannel.Type)
@@ -72,7 +74,7 @@ let specs_for_branch =
           , channel = channel
           , new_docker_tags = new_tags
           , target_version = targetVersion
-          , publish_to_docker_io = False
+          , docker_repo = DockerRepo.Type.Internal
           , backend = "local"
           , verify = True
           , branch = "\\\${BUILDKITE_BRANCH}"

@@ -1,4 +1,12 @@
 ########################################
+## Functions
+
+# Check that a required environment variable is defined
+define check_env_var
+	@if [ -z "$($(1))" ]; then echo "Error: $(1) env var is not defined" >&2; exit 1; fi
+endef
+
+########################################
 ## Configuration
 
 # Current OCaml version
@@ -12,6 +20,8 @@ ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
 endif
 
+########################################
+## Branch and versioning
 # Default branch name
 # This is used for versioning and release purposes when building docker or debian
 # For example when BRANCH_NAME=fix-branch:
@@ -47,6 +57,13 @@ GITLONGHASH := $(shell git rev-parse HEAD)
 
 # Unique signature of libp2p code tree
 LIBP2P_HELPER_SIG := $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
+
+# Database for archive
+PG_USER ?= mina
+PG_PW 	?= minaminamina
+PG_DB 	?= archive
+PG_HOST	?= localhost
+PG_PORT	?= 5432
 
 ########################################
 .PHONY: help
@@ -223,6 +240,7 @@ build-archive-utils: ocaml_checks reformat-diff ## Build archive node and relate
 		src/app/extract_blocks/extract_blocks.exe \
 		src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
 		src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
+		src/app/dump_slot_ledger/dump_slot_ledger.exe \
 		--profile=$(DUNE_PROFILE)  \
 		&& echo "✅ Build complete"
 
@@ -247,6 +265,14 @@ build-test-utils: ocaml_checks reformat-diff ## Build test utilities
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
+.PHONY: build-delegation-verify
+build-delegation-verify: ocaml_checks reformat-diff ## Build delegation verify tool
+	$(info 🏗️  Building delegation verify tool with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/delegation_verify/delegation_verify.exe \
+		--profile=$(DUNE_PROFILE) \
+		&& echo "✅ Build complete"
 
 .PHONY: build-rosetta
 build-rosetta: ocaml_checks ## Build Rosetta API components
@@ -541,10 +567,6 @@ define build_debian_package
 		&& echo "✅ Build complete"
 endef
 
-.PHONY: debian-build-archive-berkeley
-debian-build-archive-berkeley: ## Build the Debian archive package
-	$(call build_debian_package,archive_berkeley)
-
 .PHONY: debian-build-archive-devnet
 debian-build-archive-devnet: ## Build the Debian archive package for devnet
 	$(call build_debian_package,archive_devnet)
@@ -553,9 +575,9 @@ debian-build-archive-devnet: ## Build the Debian archive package for devnet
 debian-build-archive-mainnet: ## Build the Debian archive package for mainnet
 	$(call build_debian_package,archive_mainnet)
 
-.PHONY: debian-build-daemon-berkeley
-debian-build-daemon-berkeley: ## Build the Debian daemon package for berkeley
-	$(call build_debian_package,daemon_berkeley)
+.PHONY: debian-build-daemon-devnet-generic
+debian-build-daemon-devnet-generic: ## Build the Debian daemon package for devnet-generic
+	$(call build_debian_package,daemon_devnet_generic)
 
 .PHONY: debian-build-daemon-devnet
 debian-build-daemon-devnet: ## Build the Debian daemon package for devnet
@@ -565,13 +587,46 @@ debian-build-daemon-devnet: ## Build the Debian daemon package for devnet
 debian-build-daemon-mainnet: ## Build the Debian daemon package for mainnet
 	$(call build_debian_package,daemon_mainnet)
 
+.PHONY: debian-build-daemon-mainnet-generic
+debian-build-daemon-mainnet-generic: ## Build the Debian daemon package for mainnet-generic
+	$(call build_debian_package,daemon_mainnet_generic)
+
+.PHONY: debian-build-daemon-devnet-prefork
+debian-build-daemon-devnet-prefork: ## Build the Debian daemon package for automote devnet pre hardfork
+	$(call build_debian_package,daemon_devnet_prefork)
+
+.PHONY: debian-build-daemon-mainnet-prefork
+debian-build-daemon-mainnet-prefork: ## Build the Debian daemon package for automote mainnet pre hardfork
+	$(call build_debian_package,daemon_mainnet_prefork)
+
+.PHONY: debian-build-config-mainnet
+debian-build-config-mainnet: ## Build the Debian config package for mainnet
+	$(call build_debian_package,daemon_mainnet_config)
+
 .PHONY: debian-build-logproc
 debian-build-logproc: ## Build the Debian logproc package
 	$(call build_debian_package,logproc)
 
-.PHONY: debian-build-rosetta-berkeley
-debian-build-rosetta-berkeley: ## Build the Debian Rosetta package
-	$(call build_debian_package,rosetta_berkeley)
+.PHONY: debian-build-functional-tests
+debian-build-functional-tests: ## Build the Debian Functional tests package
+	$(call build_debian_package,functional_test_suite)
+
+.PHONY: debian-build-prefork-genesis-ledger
+debian-build-prefork-genesis-ledger: ## Build the Debian Create Legacy Genesis package
+	$(call check_env_var,NETWORK_NAME)
+	$(call build_debian_package,prefork_$(NETWORK_NAME)_genesis_ledger)
+
+.PHONY: debian-build-rosetta-devnet-generic
+debian-build-rosetta-devnet-generic: ## Build the Debian Rosetta package
+	$(call build_debian_package,rosetta_devnet_generic)
+
+.PHONY: debian-build-rosetta-mainnet-generic
+debian-build-rosetta-mainnet-generic: ## Build the Debian Rosetta package
+	$(call build_debian_package,rosetta_mainnet_generic)
+
+.PHONY: debian-build-zkapp-test-transaction
+debian-build-zkapp-test-transaction: ## Build the Debian Zkapp Test Transaction package for devnet
+	$(call build_debian_package,zkapp_test_transaction)
 
 .PHONY: debian-build-rosetta-devnet
 debian-build-rosetta-devnet: ## Build the Debian Rosetta package for devnet
@@ -585,10 +640,50 @@ debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
 debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devnet hardfork
 	$(call build_debian_package,daemon_devnet_hardfork)
 
+.PHONY: debian-daemon-storage-toolbox
+debian-daemon-storage-toolbox: ## Build the Debian daemon storage toolbox package
+	$(call build_debian_package,daemon_storage_toolbox)
+
 .PHONY: debian-download-create-legacy-hardfork
 debian-download-create-legacy-hardfork: ## Download and create legacy hardfork Debian packages
 	$(info 📦 Downloading legacy hardfork Debian packages for debian $(CODENAME))
-	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-legacy-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend hetzner --target _build
+	$(call check_env_var,NETWORK_NAME)
+
+	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-$(NETWORK_NAME)-prefork-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend hetzner --target _build
+
+.PHONY: debian-reversion
+debian-reversion: ## Reversion a .deb package (DEB, NEW_VERSION required; NEW_SUITE, NEW_NAME, OUTPUT optional)
+	$(call check_env_var,DEB)
+	$(call check_env_var,NEW_VERSION)
+	@./scripts/debian/reversion.sh "$(DEB)" "$(NEW_VERSION)" \
+		$(if $(NEW_SUITE),--suite "$(NEW_SUITE)") \
+		$(if $(NEW_NAME),--name "$(NEW_NAME)") \
+		$(if $(OUTPUT),--output "$(OUTPUT)")
+
+########################################
+# Release management
+
+.PHONY: cache-get-prefork-debians
+cache-get-prefork-debians: ## Download debian packages for prefork genesis creation
+	$(info 📦 Downloading prefork Debian packages for debian $(CODENAME))
+
+	$(call check_env_var,NETWORK_NAME)
+
+	@./buildkite/scripts/release/manager.sh pull --artifacts mina-$(NETWORK_NAME)-prefork  --from-special-folder berkeley/debians/$(CODENAME)  --backend hetzner --target _build
+
+.PHONY: cache-get-create-prefork-genesis-debians
+cache-get-create-prefork-genesis-debians: ## Download debian packages for prefork genesis creation
+	$(info 📦 Downloading prefork genesis creation Debian packages for debian $(CODENAME))
+	$(call check_env_var,NETWORK_NAME)
+	@./buildkite/scripts/release/manager.sh pull --artifacts mina-$(NETWORK_NAME)-create-genesis-ledger  --from-special-folder berkeley/debians/$(CODENAME)  --backend hetzner --target _build
+
+.PHONY: cache-put-debian
+cache-put-debian: ## Upload debian packages for prefork genesis creation
+	$(info 📦 Uploading Debian packages for debian $(CODENAME) to CI cache)
+	$(call check_env_var,TARGET)
+	$(call check_env_var,DEB_PATH)
+	@./buildkite/scripts/release/manager.sh persist --codename $(CODENAME)  --target $(TARGET)  --backend hetzner --local-debian-path $(DEB_PATH)
+
 ########################################
 # Docker images
 
@@ -640,11 +735,6 @@ docker-build-toolchain: ## Build the toolchain to be used in CI
 		--service mina-toolchain \
 		--version mina-toolchain-$(CODENAME)-$(GITHASH)
 
-.PHONY: docker-build-archive-berkeley
-docker-build-archive-berkeley: SHELL := /bin/bash
-docker-build-archive-berkeley: start-local-debian-repo ## Build the archive Docker image
-	$(call build_docker_image,mina-archive,berkeley)
-
 .PHONY: docker-build-archive-devnet
 docker-build-archive-devnet: SHELL := /bin/bash
 docker-build-archive-devnet: start-local-debian-repo ## Build the archive Docker image for devnet
@@ -655,10 +745,10 @@ docker-build-archive-mainnet: SHELL := /bin/bash
 docker-build-archive-mainnet: start-local-debian-repo ## Build the archive Docker image for mainnet
 	$(call build_docker_image,mina-archive,mainnet)
 
-.PHONY: docker-build-daemon-berkeley
-docker-build-daemon-berkeley: SHELL := /bin/bash
-docker-build-daemon-berkeley: start-local-debian-repo ## Build the daemon Docker image
-	$(call build_docker_image,mina-daemon,berkeley)
+.PHONY: docker-build-daemon-devnet-generic
+docker-build-daemon-devnet-generic: SHELL := /bin/bash
+docker-build-daemon-devnet-generic: start-local-debian-repo ## Build the daemon Docker image
+	$(call build_docker_image,mina-daemon,devnet-generic)
 
 .PHONY: docker-build-daemon-devnet
 docker-build-daemon-devnet: SHELL := /bin/bash
@@ -671,9 +761,9 @@ docker-build-daemon-mainnet: start-local-debian-repo ## Build the daemon Docker 
 	$(call build_docker_image,mina-daemon,mainnet)
 
 .PHONY: docker-build-rosetta
-docker-build-rosetta-berkeley: SHELL := /bin/bash
-docker-build-rosetta-berkeley: start-local-debian-repo ## Build the Rosetta Docker image
-	$(call build_docker_image,mina-rosetta,berkeley)
+docker-build-rosetta-devnet-generic: SHELL := /bin/bash
+docker-build-rosetta-devnet-generic: start-local-debian-repo ## Build the Rosetta Docker image
+	$(call build_docker_image,mina-rosetta,devnet-generic)
 
 .PHONY: docker-build-rosetta-devnet
 docker-build-rosetta-devnet: SHELL := /bin/bash
@@ -688,38 +778,116 @@ docker-build-rosetta-mainnet: start-local-debian-repo ## Build the Rosetta Docke
 ########################################
 # Generate hardfork packages
 
-.PHONY: hardfork-debian
-hardfork-debian: SHELL := /bin/bash
-hardfork-debian: ocaml_checks ## Generate hardfork packages
-	$(info 📦 Generating hardfork packages for network $(NETWORK_NAME))
+.PHONY: debian-build-hardfork-config
+debian-build-hardfork-config: SHELL := /bin/bash
+debian-build-hardfork-config: #ocaml_checks ## Generate hardfork packages
+	$(info 📦 Generating hardfork debian packages for network $(NETWORK_NAME))
+
+	$(call check_env_var,NETWORK_NAME)
+	$(call check_env_var,CODENAME)
+	$(call check_env_var,BRANCH_NAME)
 
 	@BUILD_DIR=./_build \
 	MINA_DEB_CODENAME=$(CODENAME) \
 	BRANCH_NAME=$(BRANCH_NAME) \
 	KEEP_MY_TAGS_INTACT=true \
-	./scripts/hardfork/build-packages.sh daemon_devnet_hardfork
+	./scripts/hardfork/release/build-packages.sh daemon_$(NETWORK_NAME)_hardfork_config
 
 
-.PHONY: hardfork-docker
-hardfork-docker: SHELL := /bin/bash
-hardfork-docker: ocaml_checks ## Generate hardfork packages
+
+.PHONY: docker-build-daemon-hardfork-docker
+docker-build-daemon-hardfork-docker: SHELL := /bin/bash
+docker-build-daemon-hardfork-docker: ## Generate hardfork packages
 	$(info 📦 Generating hardfork docker for network $(NETWORK_NAME))
 
-	$(MAKE) hardfork-debian
+	$(call check_env_var,NETWORK_NAME)
+	$(call check_env_var,CODENAME)
+	$(call check_env_var,BRANCH_NAME)
+
+	$(MAKE) debian-build-config-$(NETWORK_NAME)
 	$(MAKE) start-local-debian-repo
 
-	@BUILD_DIR=./_build \
-	MINA_DEB_CODENAME=$(CODENAME) \
-	KEEP_MY_TAGS_INTACT=true \
-	. ./scripts/export-git-env-vars.sh \
-	&& ./scripts/docker/build.sh \
+	@export BUILD_DIR=./_build && \
+	export MINA_DEB_CODENAME=$(CODENAME) && \
+	export KEEP_MY_TAGS_INTACT=true && \
+	. ./scripts/export-git-env-vars.sh && \
+	./scripts/docker/build.sh \
 		--deb-codename $(CODENAME) \
 		--service mina-daemon \
-		--version "$$MINA_DEB_VERSION" \
+		--version "$$MINA_DOCKER_TAG" \
+		--deb-version "$$MINA_DEB_VERSION" \
 		--branch $(BRANCH_NAME) \
 		--network $(NETWORK_NAME) \
-		--deb-suffix hardfork \
+		--deb-suffix generic \
+		--custom-suffix generic \
+		--load-only
 		--no-cache
+
+	cp _build/mina-devnet-config_*.deb .
+
+	@export BUILD_DIR=./_build && \
+	export MINA_DEB_CODENAME=$(CODENAME) && \
+	export KEEP_MY_TAGS_INTACT=true && \
+	. ./scripts/export-git-env-vars.sh && \
+	./scripts/docker/build.sh \
+		--deb-codename $(CODENAME) \
+		--service mina-daemon-config \
+		--version "$$MINA_DOCKER_TAG" \
+		--deb-version "$$MINA_DEB_VERSION" \
+		--branch $(BRANCH_NAME) \
+		--network $(NETWORK_NAME) \
+		--custom-suffix configured \
+		--no-cache \
+		--load-only
+
+	$(info 📦 stopping local Debian repository)
+	@./scripts/debian/aptly.sh stop
+
+.PHONY: docker-build-hardfork-rosetta-docker
+docker-build-hardfork-rosetta-docker: SHELL := /bin/bash
+docker-build-hardfork-rosetta-docker: ## Generate hardfork packages
+	$(info 📦 Generating hardfork docker for network $(NETWORK_NAME))
+	$(call check_env_var,NETWORK_NAME)
+	$(call check_env_var,CODENAME)
+	$(call check_env_var,BRANCH_NAME)
+
+	$(MAKE) debian-build-config-$(NETWORK_NAME)
+	$(MAKE) start-local-debian-repo
+
+	@export BUILD_DIR=./_build && \
+	export MINA_DEB_CODENAME=$(CODENAME) && \
+	export KEEP_MY_TAGS_INTACT=true && \
+	. ./scripts/export-git-env-vars.sh && \
+	./scripts/docker/build.sh \
+		--deb-codename $(CODENAME) \
+		--service mina-rosetta \
+		--version "$$MINA_DOCKER_TAG" \
+		--deb-version "$$MINA_DEB_VERSION" \
+		--branch $(BRANCH_NAME) \
+		--network $(NETWORK_NAME) \
+		--deb-suffix generic \
+		--custom-suffix generic \
+		--load-only \
+		--no-cache
+
+	cp _build/mina-devnet-config_*.deb .
+
+	@export BUILD_DIR=./_build && \
+	export MINA_DEB_CODENAME=$(CODENAME) && \
+	export KEEP_MY_TAGS_INTACT=true && \
+	. ./scripts/export-git-env-vars.sh && \
+	./scripts/docker/build.sh \
+		--deb-codename $(CODENAME) \
+		--service mina-rosetta-config \
+		--version "$$MINA_DOCKER_TAG" \
+		--deb-version "$$MINA_DEB_VERSION" \
+		--branch $(BRANCH_NAME) \
+		--network $(NETWORK_NAME) \
+		--custom-suffix configured \
+		--custom-arg "--build-arg image_name=mina-rosetta" \
+		--no-cache \
+		--load-only
+
 
 	$(info 📦 stopping local Debian repository)
 	@./scripts/debian/aptly.sh stop
@@ -730,3 +898,35 @@ hardfork-docker: ocaml_checks ## Generate hardfork packages
 .PHONY: ml-docs
 ml-docs: ocaml_checks ## Generate OCaml documentation
 	dune build --profile=$(DUNE_PROFILE) @doc
+
+
+########################################
+# PostgreSQL, used for the archive node
+
+.PHONY: postgres-setup
+postgres-setup: ## Set up PostgreSQL database for archive node
+	@echo "Setting up PostgreSQL database: ${PG_DB} with user: ${PG_USER}"
+	@sudo -u postgres createuser -d -r -s $(PG_USER) 2>/dev/null || true
+	@sudo -u postgres psql -c "ALTER USER $(PG_USER) PASSWORD '$(PG_PW)'" 2>/dev/null || true
+	@sudo -u postgres createdb -O $(PG_USER) $(PG_DB) 2>/dev/null || true
+	@sudo -u postgres createdb -O $(PG_USER) $(PG_USER) 2>/dev/null || true
+	@echo "PostgreSQL setup complete"
+
+.PHONY: postgres-login
+postgres-login: ## Login to PostgreSQL database
+	@echo "Connecting to PostgreSQL database: ${PG_DB} as user: ${PG_USER}"
+	@PGPASSWORD=$(PG_PW) psql -h $(PG_HOST) -p $(PG_PORT) -U $(PG_USER) -d $(PG_DB)
+
+.PHONY: postgres-clean
+postgres-clean:
+	@echo "Dropping DB: ${PG_DB} and user: ${PG_USER}"
+	@sudo -u postgres psql -c "DROP DATABASE IF EXISTS ${PG_DB}"
+	@sudo -u postgres psql -c "DROP DATABASE IF EXISTS ${PG_USER}"
+	@sudo -u postgres psql -c "DROP ROLE IF EXISTS ${PG_USER}"
+	@echo "Cleanup complete."
+
+.PHONY: regenerate-archive
+regenerate-archive: ## Regenerate archive database with test data
+	@echo "Regenerating archive database using configured PG variables"
+	@PG_USER=$(PG_USER) PG_PW=$(PG_PW) PG_DB=$(PG_DB) PG_HOST=$(PG_HOST) PG_PORT=$(PG_PORT) \
+	./scripts/regenerate-archive.sh

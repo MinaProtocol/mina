@@ -8,11 +8,14 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Arch = ../../Constants/Arch.dhall
 
+let Size = ../../Command/Size.dhall
+
 in  MinaArtifactToolchain.pipeline
       DockerImage.ReleaseSpec::{
       , service = Artifacts.Type.Toolchain
       , deb_codename = DebianVersions.DebVersion.Bookworm
       , no_cache = True
-      , no_debian = True
+      , deb_install_mode = DockerImage.DebianInstallMode.NoInstall
       , arch = Arch.Type.Arm64
+      , size = Size.Arm64
       }

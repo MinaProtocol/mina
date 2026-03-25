@@ -1,6 +1,8 @@
 ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim
 FROM ${image}
 
+ARG TARGETARCH
+
 # Run with `docker build --build-arg deb_version=<version>`
 ARG deb_version
 ARG deb_codename=bullseye
@@ -9,6 +11,8 @@ ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
 ARG deb_profile
 ARG deb_suffix
+
+ARG GCLOUD_VERSION=476.0.0
 
 # if --build-arg deb_suffix is defined, add hypen at beginning.
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
@@ -50,6 +54,7 @@ RUN apt-get update --quiet --yes \
         apt-transport-https \
         dnsutils \
         tzdata \
+        python3 \
         postgresql \
         postgresql-contrib \
         apt-utils \
@@ -60,11 +65,18 @@ RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mi
 
 # Install google-cloud-sdk for mina dumps handling
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-  && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
-  && apt-get update --quiet --yes \
-  && apt-get install --quiet --yes --no-install-recommends google-cloud-sdk kubectl google-cloud-sdk-gke-gcloud-auth-plugin \
-  && rm -rf /var/lib/apt/lists/*
+
+RUN case "${TARGETARCH}" in \
+        "amd64") GCLOUD_ARCH="x86_64" ;; \
+        "arm64") GCLOUD_ARCH="arm" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    curl -sSfL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}-linux-${GCLOUD_ARCH}.tar.gz" | \
+    tar -xz -C /opt/ && \
+    /opt/google-cloud-sdk/install.sh --quiet && \
+    /opt/google-cloud-sdk/bin/gcloud components install gke-gcloud-auth-plugin kubectl --quiet
+
+ENV PATH="/opt/google-cloud-sdk/bin:${PATH}"
 
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 

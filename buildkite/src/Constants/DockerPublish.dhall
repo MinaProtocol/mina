@@ -8,17 +8,24 @@ let isEssential =
           \(service : Artifacts.Type)
       ->  merge
             { Daemon = True
+            , DaemonConfig = True
+            , DaemonPrefork = True
+            , DaemonAppsOnly = True
             , LogProc = False
             , Archive = True
             , TestExecutive = False
             , BatchTxn = False
             , Rosetta = True
+            , RosettaAppsOnly = True
+            , RosettaConfig = True
             , ZkappTestTransaction = False
             , FunctionalTestSuite = True
             , Toolchain = True
             , DaemonAutoHardfork = True
             , DaemonLegacyHardfork = True
-            , CreateLegacyGenesis = False
+            , CreatePreforkGenesis = False
+            , DelegationVerifier = True
+            , DaemonStorageToolbox = False
             }
             service
 

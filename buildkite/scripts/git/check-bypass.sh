@@ -36,6 +36,11 @@ GITHUB_USERS_ELIGIBLE_FOR_BYPASS="amc-ie deepthiskumar Trivo25 45930 SanabriaRus
 
 BYPASS_PHRASE=$1
 
+# If not a pull request, bypass check is not applicable
+if [[ -z "${BUILDKITE_PULL_REQUEST:-}" || "${BUILDKITE_PULL_REQUEST:-}" == "false" ]]; then
+    echo "⚙️  Not a pull request build. Bypass check not applicable."
+    exit 2
+fi
 
 # Check if PR is bypassed by a !ci-bypass-changelog comment
 pip install -r scripts/github/github_info/requirements.txt

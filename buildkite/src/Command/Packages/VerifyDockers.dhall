@@ -20,6 +20,8 @@ let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let DockerRepo = ../../Constants/DockerRepo.dhall
+
 let Spec =
       { Type =
           { artifacts : List Artifact.Type
@@ -30,6 +32,8 @@ let Spec =
           , profile : Profiles.Type
           , archs : List Arch.Type
           , buildFlag : BuildFlags.Type
+          , repo : DockerRepo.Type
+          , generic : Bool
           }
       , default =
           { artifacts = [] : List Package.Type
@@ -42,6 +46,8 @@ let Spec =
           , profile = Profiles.Type.Devnet
           , buildFlag = BuildFlags.Type.None
           , archs = [ Arch.Type.Amd64 ]
+          , repo = DockerRepo.Type.InternalEurope
+          , generic = False
           }
       }
 
@@ -57,7 +63,7 @@ let joinNetworks
             ( Prelude.List.map
                 Network.Type
                 Text
-                (\(network : Network.Type) -> Network.lowerName network)
+                (\(network : Network.Type) -> Network.debianSuffix network)
                 spec.networks
             )
 
@@ -102,15 +108,19 @@ let verify
                   }
                   spec.buildFlag
 
+          let genericFlag = if spec.generic then " --generic " else ""
+
           in      ". ./buildkite/scripts/export-git-env-vars.sh && "
               ++  "./buildkite/scripts/release/manager.sh verify "
               ++  "--artifacts ${joinArtifacts spec} "
               ++  "--networks ${joinNetworks spec} "
               ++  "--version ${spec.version} "
               ++  "--codenames ${joinCodenames spec} "
+              ++  "--docker-repo ${DockerRepo.show spec.repo} "
               ++  profileFlag
               ++  archFlag
               ++  buildFlag
+              ++  genericFlag
               ++  "--only-dockers "
 
 in  { verify = verify, Spec = Spec }
