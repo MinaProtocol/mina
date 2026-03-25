@@ -658,6 +658,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               Ledger_hash.var * Sparse_ledger.t Prover_value.t
           ; fee_excess : Amount.Signed.var
           ; supply_increase : Amount.Signed.var
+          ; stake_change : Amount.Signed.var
           ; protocol_state : Zkapp_precondition.Protocol_state.View.Checked.t
           ; block_global_slot :
               Mina_numbers.Global_slot_since_genesis.Checked.var
@@ -1736,6 +1737,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             let set_supply_increase t supply_increase =
               { t with supply_increase }
 
+            let stake_change { stake_change; _ } = stake_change
+
+            let set_stake_change t stake_change = { t with stake_change }
+
             let first_pass_ledger { first_pass_ledger; _ } = first_pass_ledger
 
             let second_pass_ledger { second_pass_ledger; _ } =
@@ -1908,6 +1913,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 , V.create (fun () -> !witness.global_second_pass_ledger) )
             ; fee_excess = Amount.Signed.(Checked.constant zero)
             ; supply_increase = Amount.Signed.(Checked.constant zero)
+            ; stake_change = Amount.Signed.(Checked.constant zero)
             ; protocol_state =
                 Mina_state.Protocol_state.Body.view_checked state_body
             ; block_global_slot
@@ -1929,6 +1935,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 statement.source.local_state.full_transaction_commitment
             ; excess = statement.source.local_state.excess
             ; supply_increase = statement.source.local_state.supply_increase
+            ; stake_change = statement.source.local_state.stake_change
             ; ledger =
                 ( statement.source.local_state.ledger
                 , V.create (fun () -> !witness.local_state_init.ledger) )
@@ -3842,12 +3849,13 @@ module Make_str (A : Wire_types.Concrete) = struct
           sparse_ledger
     in
     let supply_increase = Amount.(Signed.of_unsigned zero) in
+    let stake_change = Amount.(Signed.of_unsigned zero) in
     let state_view = Mina_state.Protocol_state.Body.view state_body in
-    let _, _, will_succeeds_rev, states_rev =
-      List.fold_left ~init:(fee_excess, supply_increase, [], [])
+    let _, _, _, will_succeeds_rev, states_rev =
+      List.fold_left ~init:(fee_excess, supply_increase, stake_change, [], [])
         zkapp_commands_with_context
         ~f:(fun
-             (fee_excess, supply_increase, will_succeeds_rev, statess_rev)
+             (fee_excess, supply_increase, stake_change, will_succeeds_rev, statess_rev)
              ( _
              , _
              , first_pass_ledger
@@ -3892,6 +3900,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           ( final_state.fee_excess
           , final_state.supply_increase
+          , final_state.stake_change
           , will_succeed :: will_succeeds_rev
           , states_with_connecting_ledger :: statess_rev ) )
     in
@@ -4128,6 +4137,21 @@ module Make_str (A : Wire_types.Concrete) = struct
           | Some supply_increase ->
               supply_increase
         in
+        let stake_change =
+          match
+            Amount.Signed.(
+              add target_global.stake_change
+                (negate source_global.stake_change))
+          with
+          | None ->
+              failwith
+                (sprintf
+                   !"unexpected stake change. source %{sexp: \
+                     Amount.Signed.t} target %{sexp: Amount.Signed.t}"
+                   target_global.stake_change source_global.stake_change )
+          | Some stake_change ->
+              stake_change
+        in
         let call_stack_hash s =
           List.hd s
           |> Option.value_map ~default:Call_stack_digest.empty
@@ -4171,7 +4195,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; connecting_ledger_left = connecting_ledger
           ; connecting_ledger_right = connecting_ledger
           ; supply_increase
-          ; stake_change = Currency.Amount.Signed.zero
+          ; stake_change
           ; fee_excess
           ; sok_digest = Sok_message.Digest.default
           }
