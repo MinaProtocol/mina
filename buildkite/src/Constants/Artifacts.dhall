@@ -114,11 +114,6 @@ let lowerName =
             }
             artifact
 
--- Service name passed to scripts/docker/build.sh --service flag.
--- build.sh uses this to select the correct Dockerfile for each artifact.
--- May differ from the actual image name in the registry, because build.sh
--- can internally rename the service (e.g. mina-daemon-configured builds
--- using dockerfiles/stages/install-config but pushes as mina-daemon).
 let dockerServiceName =
           \(artifact : Artifact)
       ->  merge
@@ -144,10 +139,6 @@ let dockerServiceName =
             }
             artifact
 
--- Returns the actual image name as it appears in the docker registry.
--- For most artifacts this is the same as dockerServiceName, but for some
--- (like DaemonConfig) build.sh renames the image before pushing.
--- Use this when referring to images by name (verify, promote, pull).
 let dockerName =
           \(artifact : Artifact)
       ->  merge
