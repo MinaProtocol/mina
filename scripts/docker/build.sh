@@ -221,6 +221,9 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/stages/install-config"
         DOCKER_CONTEXT="dockerfiles/"
         SERVICE="mina-daemon"
+        # The --version arg points to the base generic image for the Dockerfile FROM.
+        # Override VERSION_ARG to keep it, then set VERSION to current commit for output tags.
+        VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
         ;;
     mina-daemon-legacy-hardfork)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
@@ -249,6 +252,7 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/stages/install-config"
         DOCKER_CONTEXT="dockerfiles/"
         SERVICE="mina-rosetta"
+        VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
         ;;
     mina-zkapp-test-transaction)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
@@ -277,6 +281,13 @@ case "${SERVICE}" in
         exit 1
         ;;
 esac
+
+if [[ -n "${VERSION_ARG_OVERRIDE:-}" ]]; then
+  # For services like mina-daemon-configured, the build arg version (base image)
+  # differs from the output tag version (current commit).
+  VERSION_ARG="$VERSION_ARG_OVERRIDE"
+  VERSION="$MINA_DOCKER_TAG"
+fi
 
 export_version
 export_docker_tag

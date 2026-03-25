@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"sort"
+	"math/rand"
 	"strings"
 )
 
@@ -13,9 +13,12 @@ const (
 	Advanced
 )
 
-var forkMethodToString = map[ForkMethod]string{
-	Legacy:   "legacy",
-	Advanced: "advanced",
+func (m ForkMethod) String() string {
+	names := [...]string{"legacy", "advanced"}
+	if m < 0 || int(m) > len(names)-1 {
+		panic(fmt.Errorf("Can't convert fork method %d to string", int(m)))
+	}
+	return names[m]
 }
 
 var stringToForkMethod = map[string]ForkMethod{
@@ -23,29 +26,52 @@ var stringToForkMethod = map[string]ForkMethod{
 	"advanced": Advanced,
 }
 
-func (m *ForkMethod) String() string {
-	if s, ok := forkMethodToString[*m]; ok {
-		return s
-	}
-	panic(fmt.Sprintf("Can't convert fork method %d to string", int(*m)))
-}
-
-func validKeys(m map[string]ForkMethod) string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
+func validForkMethods() string {
+	keys := make([]string, 0, len(stringToForkMethod))
+	for k := range stringToForkMethod {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
 	return strings.Join(keys, "|")
 }
 
-func (m *ForkMethod) Set(s string) error {
-	v, ok := stringToForkMethod[s]
+type ForkMethodSet map[ForkMethod]struct{}
+
+func (s *ForkMethodSet) Set(val string) error {
+	method, ok := stringToForkMethod[val]
 	if !ok {
-		return fmt.Errorf("invalid mode %q (valid: %s)", s, validKeys(stringToForkMethod))
+		return fmt.Errorf("invalid fork method: %q (valid: %s)", val, validForkMethods())
 	}
-	*m = v
+	(*s)[method] = struct{}{}
 	return nil
 }
 
-func (m *ForkMethod) Type() string { return "fork method" }
+func (s *ForkMethodSet) Type() string {
+	return "forkMethodList"
+}
+
+func (s *ForkMethodSet) String() string {
+	result := ""
+	if s != nil {
+		var res []string
+		for m := range *s {
+			res = append(res, m.String())
+		}
+		result = strings.Join(res, ", ")
+	}
+	return fmt.Sprintf("[%s]", result)
+}
+
+func (s *ForkMethodSet) RandomChoose() ForkMethod {
+	if s == nil || len(*s) == 0 {
+		panic("choosing fork method from empty set")
+	}
+
+	keys := make([]ForkMethod, 0, len(*s))
+	for k := range *s {
+		keys = append(keys, k)
+	}
+
+	randomIndex := rand.Intn(len(keys))
+
+	return keys[randomIndex]
+}
