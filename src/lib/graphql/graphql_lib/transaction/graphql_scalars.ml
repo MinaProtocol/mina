@@ -33,7 +33,7 @@ let%test_module "Roundtrip tests" =
       ( module struct
         module TransactionHash_gen = struct
           include Mina_transaction.Transaction_hash
-          open Core_kernel
+          open Core
 
           let gen =
             Mina_base.Coinbase.Gen.gen

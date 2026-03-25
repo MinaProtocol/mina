@@ -1,6 +1,6 @@
 (* uptime_service.ml -- proof of uptime for Mina delegation program *)
 
-open Core_kernel
+open Core
 open Async
 open Mina_base
 open Pipe_lib

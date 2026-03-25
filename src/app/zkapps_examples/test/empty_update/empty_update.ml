@@ -8,7 +8,7 @@
 *)
 
 open Transaction_snark_tests.Util
-open Core_kernel
+open Core
 open Mina_base
 open Signature_lib
 module Impl = Pickles.Impls.Step

@@ -1,5 +1,5 @@
 (* state_hash.ml -- defines the type for the protocol state hash *)
-open Core_kernel
+open Core
 open Snark_params.Tick
 
 include Data_hash.Make_full_size (struct

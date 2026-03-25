@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 module Cache = Disk_cache.Make (Pickles.Proof.Proofs_verified_2.Stable.Latest)
 
 type cache_db = Lmdb_cache of Cache.t | Identity_cache

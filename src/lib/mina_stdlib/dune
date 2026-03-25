@@ -14,7 +14,7 @@
   base.caml
   bin_prot
   bin_prot.shape
-  core_kernel
+  core
   ppx_inline_test.config
   result
   sexplib0

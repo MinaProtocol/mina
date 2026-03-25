@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 
 (** [report_time ~label ?extra_metadata elapsed] logs a performance metric with the given [label] and [elapsed] time.

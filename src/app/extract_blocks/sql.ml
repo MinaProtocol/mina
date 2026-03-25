@@ -52,7 +52,7 @@ module Subchain = struct
     Conn.collect_list query_from_start (end_state_hash, start_state_hash)
 
   let query_all =
-    let open Core_kernel in
+    let open Core in
     let comma_fields =
       String.concat Archive_lib.Processor.Block.Fields.names ~sep:","
     in

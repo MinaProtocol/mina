@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 module Mina_currency = Currency
 open Rosetta_lib

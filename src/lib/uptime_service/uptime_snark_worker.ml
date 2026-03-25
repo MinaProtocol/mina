@@ -1,6 +1,6 @@
 (* uptime_snark_worker.ml *)
 
-open Core_kernel
+open Core
 open Async
 open Mina_base
 

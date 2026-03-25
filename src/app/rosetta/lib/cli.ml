@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let required_uri =
   Command.Param.(required (Command.Arg_type.map string ~f:Uri.of_string))

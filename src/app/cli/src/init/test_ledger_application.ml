@@ -1,6 +1,6 @@
 (* test_ledger_application.ml -- code to test application of transactions to a specific ledger *)
 
-open Core_kernel
+open Core
 open Async_kernel
 open Mina_ledger
 open Mina_base

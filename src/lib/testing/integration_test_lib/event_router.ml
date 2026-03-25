@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 module Timeout = Timeout_lib.Core_time
 
 module Make (Engine : Intf.Engine.S) () :

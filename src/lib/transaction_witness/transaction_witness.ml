@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Zkapp_command_segment_witness = struct
   open Mina_base

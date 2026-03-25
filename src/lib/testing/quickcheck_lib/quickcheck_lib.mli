@@ -1,6 +1,6 @@
 (* quickcheck_lib.mli *)
 
-open Core_kernel
+open Core
 open Quickcheck
 
 (** [of_array array] selects a random element from [array] to select an element *)

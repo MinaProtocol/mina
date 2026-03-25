@@ -56,7 +56,7 @@ mutation ($sender: PublicKey!,
 |}]
 
 (* Avoid shadowing graphql_ppx functions *)
-open Core_kernel
+open Core
 open Async
 open Rosetta_lib
 

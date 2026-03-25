@@ -1,6 +1,6 @@
 (* validate_keypair.ml *)
 
-open Core_kernel
+open Core
 open Async
 
 let () =

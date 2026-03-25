@@ -4,7 +4,7 @@
    of archive db data
 *)
 
-open Core_kernel
+open Core
 open Async
 open Mina_base
 

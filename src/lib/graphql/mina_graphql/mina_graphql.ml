@@ -1936,7 +1936,8 @@ module Queries = struct
               ~typ:(non_null Types.Input.PublicKey.arg_typ)
           ; arg' "token"
               ~doc:"Token of account being retrieved (defaults to MINA)"
-              ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
+              ~typ:Types.Input.TokenId.arg_typ
+              ~default:(`String (Token_id.to_string Token_id.default))
           ]
       ~resolve:(fun { ctx = mina; _ } () pk token ->
         Option.bind (Utils.get_ledger_and_breadcrumb mina)
@@ -2183,7 +2184,8 @@ module Queries = struct
               ~typ:(non_null Types.Input.PublicKey.arg_typ)
           ; arg' "token"
               ~doc:"Token of account being retrieved (defaults to MINA)"
-              ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
+              ~typ:Types.Input.TokenId.arg_typ
+              ~default:(`String (Token_id.to_string Token_id.default))
           ; arg "maxLength"
               ~doc:
                 "The maximum number of blocks to search for actions. If there \

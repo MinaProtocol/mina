@@ -1,6 +1,6 @@
 let%test_module "Epoch ledger sync tests" =
   ( module struct
-    open Core_kernel
+    open Core
     open Async
     open Mina_base
     open Pipe_lib

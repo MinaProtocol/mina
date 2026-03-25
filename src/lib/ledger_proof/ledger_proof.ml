@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 module type S = Ledger_proof_intf.S

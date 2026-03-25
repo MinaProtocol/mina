@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Lmdb_storage
 
 module F (Db : Generic.Db) = struct

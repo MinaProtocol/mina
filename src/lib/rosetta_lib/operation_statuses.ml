@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Rosetta_models
 
 type t = [ `Success | `Failed ] [@@deriving to_representatives, equal]

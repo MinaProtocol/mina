@@ -3,7 +3,7 @@ open Signature_lib
 (* Alias ocamlp-streams before it's hidden by open
    Core_kernel *)
 module Streams = Stream
-open Core_kernel
+open Core
 open Async
 
 let generate_keypair =
@@ -70,7 +70,7 @@ let generate_test_ledger =
 let validate_keypair =
   Command.async ~summary:"Validate a public, private keypair"
     (let open Command.Let_syntax in
-    let open Core_kernel in
+    let open Core in
     let%map_open privkey_path = Flag.privkey_write_path
     and signature_kind = Flag.signature_kind in
     Exceptions.handle_nicely

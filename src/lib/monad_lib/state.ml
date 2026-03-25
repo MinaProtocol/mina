@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Base = struct
   type ('a, 's) t = 's -> 'a * 's

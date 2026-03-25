@@ -30,7 +30,7 @@ let%test_module "Roundtrip tests" =
     let%test_module "PrecomputedBlockProof" =
       ( module struct
         module PrecomputedBlockProof_gen = struct
-          open Core_kernel
+          open Core
           module Nat = Pickles_types.Nat
           include Mina_block.Precomputed.Proof
 

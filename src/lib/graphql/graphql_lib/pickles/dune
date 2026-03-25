@@ -10,7 +10,7 @@
  (libraries
   ;; opam libraries
   base
-  core_kernel
+  core
   graphql
   sexplib0
   yojson

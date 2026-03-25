@@ -3,7 +3,7 @@ Core module to run any defined app on various contexts
 *)
 
 open Integration_test_lib
-open Core_kernel
+open Core
 open Async
 
 module type AppPaths = sig

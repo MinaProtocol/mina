@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (*State monad with or_error (a monad of type (state -> (a * state) Or_error.t))  *)
 module type State_intf = sig

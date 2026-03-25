@@ -1,5 +1,5 @@
 (* coding.ml -- hex encoding/decoding for Rosetta *)
-open Core_kernel
+open Core
 module Field = Snark_params.Tick.Field
 module Scalar = Snark_params.Tick.Inner_curve.Scalar
 open Signature_lib

@@ -1,6 +1,6 @@
 (* sql.ml -- (Postgresql) SQL queries for replayer *)
 
-open Core_kernel
+open Core
 
 module Block_info = struct
   type t =

@@ -27,7 +27,7 @@ module Network_Data = struct
     }
 end
 
-open Core_kernel
+open Core
 open Async
 open Mina_automation
 

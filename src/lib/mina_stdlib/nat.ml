@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 type tt = Z | S of t
 

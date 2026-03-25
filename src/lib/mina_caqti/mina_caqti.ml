@@ -1,7 +1,7 @@
 (* mina_caqti.ml -- Mina helpers for the Caqti database bindings *)
 
 open Async
-open Core_kernel
+open Core
 open Mina_base
 
 (* custom Caqti types for generating type annotations on queries *)

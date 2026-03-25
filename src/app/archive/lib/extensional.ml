@@ -1,6 +1,6 @@
 (* extensional.ml -- extensional representations of archive db data *)
 
-open Core_kernel
+open Core
 open Mina_base
 open Mina_transaction
 open Signature_lib

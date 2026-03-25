@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 (* TODO: abstract stackdriver specific log details *)

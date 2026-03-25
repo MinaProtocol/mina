@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Rosetta_lib
 open Alcotest
 module Amount_of = Rosetta_lib.Amount_of
