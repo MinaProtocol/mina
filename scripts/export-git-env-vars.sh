@@ -42,8 +42,8 @@ if [[ -v BRANCH_NAME ]]; then
 else
    # Always use actual HEAD for branch resolution — OVERRIDE_GITHASH is a
    # short hash from another commit and git name-rev cannot resolve it.
-   _GIT_HEAD_HASH=$(git rev-parse --short=7 --verify HEAD)
-   GITBRANCH=$(git name-rev --name-only $_GIT_HEAD_HASH | sed "s/remotes\/origin\///g" | sed 's!/!-!g; s!_!-!g; s!#!-!g' )
+   _GIT_HEAD_HASH=$(git rev-parse --verify HEAD)
+   GITBRANCH=$(git name-rev --name-only "$_GIT_HEAD_HASH" | sed "s/remotes\/origin\///g" | sed 's!/!-!g; s!_!-!g; s!#!-!g' )
 fi
 
 GITTAG=${OVERRIDE_TAG:-$(find_most_recent_numeric_tag HEAD)}
