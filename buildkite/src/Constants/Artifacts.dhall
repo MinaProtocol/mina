@@ -114,12 +114,12 @@ let lowerName =
             }
             artifact
 
-let dockerName =
+let dockerServiceName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "mina-daemon"
             , DaemonPrefork = ""
-            , DaemonLegacyHardfork = "mina-daemon-pre-hardfork"
+            , DaemonLegacyHardfork = "mina-daemon-legacy-hardfork"
             , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
             , DaemonAppsOnly = "mina-daemon"
             , Archive = "mina-archive"
@@ -136,6 +136,31 @@ let dockerName =
             , DelegationVerifier = "mina-delegation-verifier"
             , DaemonStorageToolbox = "mina-daemon-storage-toolbox"
             , DaemonConfig = "mina-daemon-configured"
+            }
+            artifact
+
+let dockerName =
+          \(artifact : Artifact)
+      ->  merge
+            { DaemonConfig = "mina-daemon"
+            , Daemon = dockerServiceName artifact
+            , DaemonPrefork = dockerServiceName artifact
+            , DaemonLegacyHardfork = dockerServiceName artifact
+            , DaemonAutoHardfork = dockerServiceName artifact
+            , DaemonAppsOnly = dockerServiceName artifact
+            , Archive = dockerServiceName artifact
+            , TestExecutive = dockerServiceName artifact
+            , LogProc = dockerServiceName artifact
+            , BatchTxn = dockerServiceName artifact
+            , Rosetta = dockerServiceName artifact
+            , RosettaAppsOnly = dockerServiceName artifact
+            , RosettaConfig = "mina-rosetta"
+            , ZkappTestTransaction = dockerServiceName artifact
+            , FunctionalTestSuite = dockerServiceName artifact
+            , Toolchain = dockerServiceName artifact
+            , CreatePreforkGenesis = dockerServiceName artifact
+            , DelegationVerifier = dockerServiceName artifact
+            , DaemonStorageToolbox = dockerServiceName artifact
             }
             artifact
 
@@ -470,6 +495,7 @@ in  { Type = Artifact
     , lowerName = lowerName
     , toDebianName = toDebianName
     , toDebianNames = toDebianNames
+    , dockerServiceName = dockerServiceName
     , dockerName = dockerName
     , dockerNames = dockerNames
     , dockerTag = dockerTag

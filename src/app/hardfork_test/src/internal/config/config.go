@@ -68,7 +68,7 @@ type Config struct {
 	HTTPClientTimeoutSeconds      int // HTTP client timeout for GraphQL requests
 	ClientMaxRetries              int // Max number of retries for client requests
 
-	ForkMethod ForkMethod
+	ForkMethods ForkMethodSet
 }
 
 // DefaultConfig returns the default configuration with values
@@ -103,7 +103,7 @@ func DefaultConfig() *Config {
 		FishStartPort:        5000,
 		NodeStartPort:        6000,
 
-		ForkMethod: Legacy,
+		ForkMethods: make(ForkMethodSet),
 	}
 }
 

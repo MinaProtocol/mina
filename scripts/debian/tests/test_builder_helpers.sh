@@ -609,6 +609,7 @@ test_build_daemon_mainnet_config_deb() {
     load_captured_state
     assert_eq "deb name" "mina-mainnet-config" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-config"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
 
     # Config-only package: no Depends on libraries
     assert_control_no_field "$CAPTURED_CONTROL" "Depends"
@@ -653,6 +654,7 @@ test_build_daemon_devnet_config_deb() {
     load_captured_state
     assert_eq "deb name" "mina-devnet-config" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-config"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
     assert_control_no_field "$CAPTURED_CONTROL" "Depends"
 
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
@@ -790,6 +792,7 @@ test_build_daemon_devnet_hardfork_config_deb() {
     load_captured_state
     assert_eq "deb name" "mina-devnet-config" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-config"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
     assert_control_no_field "$CAPTURED_CONTROL" "Depends"
 
     # Hardfork runtime config replaces the standard one
@@ -821,6 +824,7 @@ test_build_daemon_mainnet_hardfork_config_deb() {
     load_captured_state
     assert_eq "deb name" "mina-mainnet-config" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-config"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
     assert_control_no_field "$CAPTURED_CONTROL" "Depends"
     assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
 
@@ -836,6 +840,45 @@ test_build_daemon_mainnet_hardfork_config_deb() {
 
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/mainnet.json"
     assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" "var/lib/coda/mainnet.json" '{"fork": true}'
+
+    unset RUNTIME_CONFIG_JSON LEDGER_TARBALLS
+}
+
+################################################################################
+# Tests: Architecture restoration after config packages
+################################################################################
+
+# Verifies that building a config deb (Architecture: all) followed by a
+# non-config deb preserves the original architecture for the second package.
+test_config_deb_restores_architecture() {
+    # Build config package (sets ARCHITECTURE=all internally)
+    safe_build build_daemon_config_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    # ARCHITECTURE should be restored to "amd64" after build_daemon_config_deb
+    assert_eq "ARCHITECTURE restored after config deb" "amd64" "$ARCHITECTURE"
+
+    # Build a non-config package and verify it uses the original architecture
+    safe_build build_logproc_deb || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
+}
+
+test_hardfork_config_deb_restores_architecture() {
+    export RUNTIME_CONFIG_JSON="${TEST_TMPDIR}/fork_config.json"
+    export LEDGER_TARBALLS="${TEST_TMPDIR}/ledger1.tar.gz ${TEST_TMPDIR}/ledger2.tar.gz"
+
+    # Build hardfork config package (sets ARCHITECTURE=all internally)
+    safe_build build_daemon_hardfork_config_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    # ARCHITECTURE should be restored to "amd64" after build_daemon_hardfork_config_deb
+    assert_eq "ARCHITECTURE restored after hardfork config deb" "amd64" "$ARCHITECTURE"
+
+    # Build a non-config package and verify it uses the original architecture
+    safe_build build_logproc_deb || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
 
     unset RUNTIME_CONFIG_JSON LEDGER_TARBALLS
 }
@@ -1085,6 +1128,10 @@ main() {
     # Codename dependency variants
     run_test test_codename_noble_deps
     run_test test_codename_noble_archive_deps
+
+    # Architecture restoration after config packages
+    run_test test_config_deb_restores_architecture
+    run_test test_hardfork_config_deb_restores_architecture
 
     # Control file structure
     run_test test_control_file_common_fields

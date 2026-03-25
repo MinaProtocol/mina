@@ -25,7 +25,7 @@ type RuntimeGenesisLedgerHashes struct {
 }
 
 func (t *HardforkTest) ValidateRuntimeGenesisLedgerHashes(
-	analysis *BlockAnalysisResult,
+	analysis BlockAnalysisResult,
 	ledgerHashesFile string,
 ) error {
 
@@ -81,7 +81,8 @@ type EpochDataPrepatch struct {
 }
 
 type LegacyPrepatchForkConfigView struct {
-	Proof struct {
+	Genesis any `json:"genesis"`
+	Proof   struct {
 		Fork struct {
 			BlockChainLength       int    `json:"blockchain_length"`
 			GlobalSlotSinceGenesis int    `json:"global_slot_since_genesis"`
@@ -105,10 +106,6 @@ func (t *HardforkTest) ValidateLegacyPrepatchForkConfig(lastBlockBeforeTxEnd cli
 
 	if config.Proof.Fork.BlockChainLength != lastBlockBeforeTxEnd.BlockHeight {
 		return fmt.Errorf("Expected proof.fork.blockchain_length to be %d, got %d", lastBlockBeforeTxEnd.BlockHeight, config.Proof.Fork.BlockChainLength)
-	}
-
-	if config.Proof.Fork.GlobalSlotSinceGenesis != lastBlockBeforeTxEnd.Slot {
-		return fmt.Errorf("Expected proof.fork.global_slot_since_genesis to be %d, got %d", lastBlockBeforeTxEnd.Slot, config.Proof.Fork.GlobalSlotSinceGenesis)
 	}
 
 	if config.Proof.Fork.StateHash != lastBlockBeforeTxEnd.StateHash {

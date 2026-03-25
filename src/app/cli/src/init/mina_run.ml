@@ -93,8 +93,8 @@ let start_auto_hardfork_config_generation ~logger mina =
             Block_time.to_time_exn chain_end_time
             |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
           in
-          [%log debug]
-            "Spawning background thread to wait for hardfork config \
+          [%log info]
+            "Auto HF: spawning background thread to wait for hardfork config \
              generation. Will wait until slot_chain_end: slot %s at %s"
             (Mina_numbers.Global_slot_since_hard_fork.to_string slot_chain_end)
             chain_end_time_str ;
@@ -106,9 +106,9 @@ let start_auto_hardfork_config_generation ~logger mina =
             in
             after (Block_time.Span.to_time_span span)
           in
-          [%log debug]
-            "Reached slot_chain_end time, now waiting for best tip to reach \
-             slot_tx_end: %s"
+          [%log info]
+            "Auto HF: reached slot_chain_end time, now waiting for best tip to \
+             reach slot_tx_end: %s"
             (Mina_numbers.Global_slot_since_hard_fork.to_string slot_tx_end) ;
           let%bind () = wait_for_best_tip ~logger ~slot_tx_end mina in
           let network_id =
@@ -117,7 +117,7 @@ let start_auto_hardfork_config_generation ~logger mina =
           let config_dir =
             config.conf_dir ^/ sprintf "auto-fork-mesa-%s" network_id
           in
-          [%log info] "Generating hardfork config in $config_dir"
+          [%log info] "Auto HF: generating hardfork config in $config_dir"
             ~metadata:[ ("config_dir", `String config_dir) ] ;
           let%bind result =
             Mina_lib.Hardfork_config.dump_reference_config
@@ -127,13 +127,14 @@ let start_auto_hardfork_config_generation ~logger mina =
           match result with
           | Ok () ->
               [%log info]
-                "Successfully generated hardfork config, shutting down daemon" ;
+                "Auto HF: successfully generated hardfork config, shutting \
+                 down daemon" ;
               (* Shutdown like Stop_daemon *)
               Scheduler.yield () >>= fun () -> exit 0
           | Error e ->
               [%log error]
-                "Failed to generate hardfork config: %s. Daemon will continue \
-                 running"
+                "Auto HF: failed to generate hardfork config: %s. Daemon will \
+                 continue running"
                 (Error.to_string_hum e) ;
               Deferred.unit )
       | _ ->

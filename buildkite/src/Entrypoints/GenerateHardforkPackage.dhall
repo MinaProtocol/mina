@@ -61,6 +61,7 @@ let Spec =
           , use_generic_dockers_from_version : Optional Text
           , size : Size
           , deb_legacy_version : Text
+          , deb_storage_repair_version : Text
           }
       , default =
           { codenames =
@@ -80,6 +81,8 @@ let Spec =
           , use_generic_dockers_from_version = None Text
           , size = Size.XLarge
           , deb_legacy_version = defaultMinaArtifactSpec.deb_legacy_version
+          , deb_storage_repair_version =
+              defaultMinaArtifactSpec.deb_storage_repair_version
           }
       }
 
@@ -208,7 +211,7 @@ let generateDockerForCodename =
                                       ++  " --backend local --artifacts mina-logproc,mina-${Network.lowerName
                                                                                               spec.network},mina-archive-${Network.lowerName
                                                                                                                              spec.network},mina-rosetta-${Network.lowerName
-                                                                                                                                                            spec.network},mina-zkapp-test-transaction "
+                                                                                                                                                            spec.network},mina-zkapp-test-transaction,mina-daemon-storage-toolbox "
                                       ++  " --buildkite-build-id ${cached_build_id}"
                                       ++  " --codename ${lowerNameCodename} "
                                       ++  " --target \\\${BUILDKITE_BUILD_ID} "
@@ -233,6 +236,7 @@ let generateDockerForCodename =
                           , Artifacts.Type.RosettaConfig
                           , Artifacts.Type.Rosetta
                           , Artifacts.Type.ZkappTestTransaction
+                          , Artifacts.Type.DaemonStorageToolbox
                           ]
                         , debVersion = codename.DebVersion
                         , profile = profile
@@ -258,6 +262,7 @@ let generateDockerForCodename =
                                 DockerImage.DebianInstallMode.DownloadOnly
                             , deb_legacy_version = spec.deb_legacy_version
                             , size = spec.size
+                            , verify = True
                             , version =
                                 "${version}-${DebianVersions.lowerName
                                                 codename.DebVersion}"
@@ -278,6 +283,7 @@ let generateDockerForCodename =
                             , image_name = Some
                                 (Artifacts.dockerName Artifacts.Type.Rosetta)
                             , size = spec.size
+                            , verify = True
                             , version =
                                 "${version}-${DebianVersions.lowerName
                                                 codename.DebVersion}"
@@ -295,6 +301,8 @@ let generateDockerForCodename =
                       , deb_codename = codename.DebVersion
                       , deb_profile = profile
                       , deb_legacy_version = spec.deb_legacy_version
+                      , deb_storage_repair_version = Some
+                          spec.deb_storage_repair_version
                       , size = spec.size
                       , deb_version = spec.version
                       , generic = True
@@ -309,7 +317,10 @@ let generateDockerForCodename =
                       , deb_codename = codename.DebVersion
                       , deb_profile = profile
                       , deb_legacy_version = spec.deb_legacy_version
+                      , deb_storage_repair_version = Some
+                          spec.deb_storage_repair_version
                       , size = spec.size
+                      , verify = True
                       , deb_version = spec.version
                       , step_key_suffix =
                           "-${DebianVersions.lowerName
@@ -322,6 +333,8 @@ let generateDockerForCodename =
                       , deb_codename = codename.DebVersion
                       , deb_profile = profile
                       , deb_legacy_version = spec.deb_legacy_version
+                      , deb_storage_repair_version = Some
+                          spec.deb_storage_repair_version
                       , size = spec.size
                       , deb_version = spec.version
                       , step_key_suffix =
@@ -336,6 +349,7 @@ let generateDockerForCodename =
                       , deb_profile = profile
                       , deb_legacy_version = spec.deb_legacy_version
                       , size = spec.size
+                      , verify = True
                       , deb_version = spec.version
                       , step_key_suffix =
                           "-${DebianVersions.lowerName
@@ -380,7 +394,10 @@ let generateHfRelatedStepsForCodename =
                   , network = spec.network
                   , version =
                       merge
-                        { Some = \(v : Text) -> v
+                        { Some =
+                                \(v : Text)
+                            ->  "${v}-${DebianVersions.lowerName
+                                          codename.DebVersion}"
                         , None = "\\\${MINA_DOCKER_TAG}"
                         }
                         spec.use_generic_dockers_from_version
@@ -486,9 +503,11 @@ let generateHfRelatedStepsForCodename =
                           Toolchain.SelectionMode.ByDebianAndArch
                           codename.DebVersion
                           codename.Arch
-                          [ "NETWORK_NAME=${Network.lowerName spec.network}"
-                          , "MINA_DEB_CODENAME=${lowerNameCodename}"
-                          ]
+                          (   [ "NETWORK_NAME=${Network.lowerName spec.network}"
+                              , "MINA_DEB_CODENAME=${lowerNameCodename}"
+                              ]
+                            # DebianVersions.overrideEnvs
+                          )
                           "mkdir -p _build && ./buildkite/scripts/cache/manager.sh read hardfork /workdir && RUNTIME_CONFIG_JSON=/workdir/hardfork/new_config.json LEDGER_TARBALLS='/workdir/hardfork/ledgers/*.tar.gz' ./buildkite/scripts/debian/build.sh --codenames ${debianCodenamesList} --arch all daemon_${Network.lowerName
                                                                                                                                                                                                                                                                                                                      spec.network}_hardfork_config"
                     , label =
