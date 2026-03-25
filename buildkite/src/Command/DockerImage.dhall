@@ -238,7 +238,7 @@ let generateStep =
 
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
-                ++  " --service ${Artifacts.dockerName spec.service}"
+                ++  " --service ${Artifacts.dockerServiceName spec.service}"
                 ++  " --network ${Network.debianSuffix spec.network}"
                 ++  " --version ${spec.version}"
                 ++  " --branch ${spec.branch}"
