@@ -48,7 +48,7 @@ ENV OPAMYES=1
 # Newer binutils in Trixie have stricter --as-needed behavior
 # Check if we're on Trixie and apply workaround
 RUN if grep -q "VERSION_CODENAME=trixie" /etc/os-release; then \
-    export OCAML_LDFLAGS="-Wl,--no-as-needed"; \
+    export CFLAGS="-Wno-implicit-function-declaration"; \
     echo "Applied Trixie linker workaround"; \
   else \
     echo "Not on Trixie, no workaround needed"; \
