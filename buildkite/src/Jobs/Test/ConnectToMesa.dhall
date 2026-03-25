@@ -42,11 +42,10 @@ in  Pipeline.build
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
           ]
-        , excludeIf =
+        , includeIf =
           [ Expr.Type.DescendantOf
               { ancestor = MainlineBranch.Type.Mesa
-              , reason =
-                  "Cannot connect to Canary network on Mesa until redeploy"
+              , reason = "Connect to Canary network on Mesa"
               }
           ]
         }
