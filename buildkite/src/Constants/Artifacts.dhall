@@ -119,7 +119,7 @@ let dockerServiceName =
       ->  merge
             { Daemon = "mina-daemon"
             , DaemonPrefork = ""
-            , DaemonLegacyHardfork = "mina-daemon-pre-hardfork"
+            , DaemonLegacyHardfork = "mina-daemon-legacy-hardfork"
             , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
             , DaemonAppsOnly = "mina-daemon"
             , Archive = "mina-archive"
