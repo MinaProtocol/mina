@@ -470,7 +470,7 @@ let glue_sync_ledger :
            Sl_downloader.Job.result
              (Sl_downloader.download downloader ~key:q ~attempts:Peer.Map.empty)
          with
-         | Error _ ->
+         | Error `Finished ->
              Deferred.unit
          | Ok (a, _) ->
              Linear_pipe.write_if_open response_writer

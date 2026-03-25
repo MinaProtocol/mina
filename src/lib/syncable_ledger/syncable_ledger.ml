@@ -474,7 +474,16 @@ end = struct
 
   let sexp_of_t _ = failwith "sexp_of_t: not implemented"
 
-  let desired_root_exn { desired_root; _ } = desired_root |> Option.value_exn
+  let desired_root_exn { desired_root; tree; _ } =
+    match desired_root with
+    | Some root ->
+        root
+    | None ->
+        let root_hash =
+          MT.merkle_root tree |> Root_hash.sexp_of_t |> Sexp.to_string_hum
+        in
+        failwithf "No desired root present for syncable ledger rooted at %s"
+          root_hash ()
 
   let destroy t =
     Linear_pipe.close_read t.answers ;
@@ -830,6 +839,12 @@ end = struct
       t.validity_listener <- Ivar.create () ;
       t.desired_root <- Some h ;
       t.auxiliary_data <- Some data ;
+      (* Secondary fix: new_goal should clear waiting_parents and waiting_content
+         when the goal changes, for the same reason handle_num_accounts clears
+         them on success: once the target root changes, any in-flight expectations
+         for the old goal are invalid. *)
+      Addr.Table.clear t.waiting_parents ;
+      Addr.Table.clear t.waiting_content ;
       Linear_pipe.write_without_pushback_if_open t.queries (h, Num_accounts) ;
       `New )
     else if

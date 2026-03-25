@@ -83,7 +83,7 @@ reading from its local ledger:
 
 - `Num_accounts` → reads `MT.num_accounts`, computes the content-root
   address via `funpow`, returns `Num_accounts (n, hash)`.
-- `What_child_hashes (a, depth)` → computes the `2^depth` addresses via
+- `What_child_hashes (a, depth)` → computes the `2^depth` child addresses via
   `intermediate_range`, reads each inner hash, returns `Child_hashes_are`.
 - `What_contents a` → reads all accounts under `a` via
   `MT.get_all_accounts_rooted_at_exn`, validates compactness, returns
@@ -267,98 +267,288 @@ Confirmed in production (ITN testnet, 2026-03-25) across 5 nodes. All
 `Downloader` results in the logs are `Num_accounts`; no other query type
 appears.
 
-### Root Cause: `handle_num_accounts` hash reconstruction fails for disk-loaded trees
+### Precise Root Cause Hypothesis (Revised): Silent Stalling of Linear Pipes
 
-The gate condition in `handle_num_accounts` (line 656) is:
+The original hypothesis about a hashing mismatch is likely incorrect because the snarked ledger syncing process (which is analogous) works correctly and generates new `Sync_ledger.Root` instances, including new pipes. The issue is more likely related to how asynchronous pipes are handled.
+
+The `Linear_pipe.iter t.answers ~f:handle_answer` in `main_loop` (syncable_ledger.ml:818) is responsible for processing incoming answers. This iteration will stop if `t.answers` is closed. `Linear_pipe.write_if_open` (which `min-networking.ml` uses) returns `false` silently if the reader side of the pipe is closed.
+
+Therefore, the most likely reasons for answers not being processed are:
+
+1.  **`handle_answer` stalls or fails silently**: If the `handle_answer` function, while processing an answer, encounters an unhandled exception or enters a `Deferred.t` computation that never resolves, the `Linear_pipe.iter` loop will effectively stall. This means `t.answers` is no longer being actively read from, causing its buffer to fill up and eventually leading to `Linear_pipe.write_if_open` returning `false` for subsequent writes.
+2.  **Implicit closure of query_reader**: The `Sl_downloader` in `min-networking.ml` is configured with `global_stop = Pipe_lib.Linear_pipe.closed query_reader`. If `query_reader` is closed, the downloader will stop making queries. `query_reader` is the reader-end of the pipe whose writer-end is `t.queries`. If `t.queries` is implicitly closed, `query_reader` will close, stopping the downloader and thus no answers will be written to `response_writer`. There is no explicit call to close `t.queries` in the epoch ledger sync path. This could happen if, for example, the `new_goal` function (which writes the initial `Num_accounts` query to `t.queries`) fails or stalls after writing, leaving the writer pipe in an unexpected state.
+
+---
+
+### Investigation of Option 1: `handle_answer` Stall via `record_envelope_sender`
+
+#### Stall Mechanism
+
+`handle_answer` (syncable_ledger.ml:676–816) is the function passed to
+`Linear_pipe.iter t.answers`. Every path through the `match (query, answer)`
+dispatch is wrapped in a `let%bind _ = ... in`, which means the iteration
+**does not advance to the next answer** until the current `handle_answer`
+invocation fully resolves.
+
+All four dispatch branches invoke `record_envelope_sender` (Trust_system):
+
+| Branch | Action recorded |
+|---|---|
+| `What_contents` → `Success` | `Fulfilled_request` (via `credit_fulfilled_request`) |
+| `What_contents` → `Hash_mismatch` | `Sent_bad_hash` |
+| `Num_accounts` → `Success` | `Fulfilled_request` |
+| `Num_accounts` → `Hash_mismatch` | `Sent_bad_hash` |
+| `What_child_hashes` → `Hash_mismatch` / `Invalid_length` | `Sent_bad_hash` |
+| `What_child_hashes` → `Good` | `Fulfilled_request` |
+| Mismatched query/answer | `Violated_protocol` |
+
+**In the observed bug**, every `Num_accounts` response triggers a
+`Hash_mismatch`, so every `handle_answer` call goes through `Sent_bad_hash`.
+If `record_envelope_sender` returns a `Deferred.t` that **never resolves**
+(or resolves very slowly), `handle_answer` suspends, `Linear_pipe.iter`
+stops pulling from `t.answers`, and the pipe buffer fills up.
+
+#### Cascade to `min-networking.ml`
+
+`glue_sync_ledger` (min-networking.ml:406–477) runs
+`Linear_pipe.iter_unordered ~max_concurrency:400 query_reader ~f:...`. Each
+fiber, after getting a downloader result, calls:
 
 ```ocaml
-let actual = complete_with_empties content_hash height (MT.depth t.tree) in
-if Hash.equal actual rh then ...
+Linear_pipe.write_if_open response_writer (...)
 ```
 
-`complete_with_empties` reconstructs the expected full-tree root by:
+`write_if_open` returns `unit Deferred.t`. If `response_writer`'s reader
+(`t.answers`) is not being drained, this write blocks waiting for buffer
+space. With `max_concurrency:400` the downloader can have up to 400 fibers
+all blocked on `write_if_open`. Once all 400 slots are occupied, no new
+download jobs can be dispatched — the `Sl_downloader` effectively stalls too,
+even though it is still alive.
 
-1. Taking `content_hash` (the peer-reported hash of the smallest non-empty
-   subtree) at height `Int.ceil_log2 n`.
-2. Padding it upward with empty-node hashes to `MT.depth t.tree`.
+The symptom that **only `Num_accounts` appears in logs** is consistent with
+this cascade: the downloader dispatches a `Num_accounts` query, the result
+arrives, the fiber tries to write it into `response_writer`, and blocks
+there. The write never completes so the result is never consumed by
+`handle_answer`, so the query is never reissued from within `handle_answer`'s
+`requeue_query()` — but the `Sl_downloader` may retry the key independently,
+producing another `Num_accounts` log entry.
 
-The computation is fully determined by three values: `content_hash`, `n`
-(account count), and `MT.depth t.tree` (the depth of the **local** ledger
-object). For this to produce `desired_root`, the local ledger's depth must
-agree with the depth the peer used when it computed its `content_root_addr`
-in `Responder.answer_query`:
+#### Concrete Stall Points in `handle_answer`
 
-```ocaml
-(* Responder side *)
-let content_root_addr =
-  funpow (MT.depth mt - height) (fun a -> Addr.child_exn ... Left) (Addr.root ())
-```
+1. **`record_envelope_sender` with `Sent_bad_hash`** (syncable_ledger.ml:749–762):
+   Called on every `Num_accounts` → `Hash_mismatch`. This is the highest-frequency
+   stall candidate.
 
-The peer computes `content_root_addr` using **its own** `MT.depth mt`.
+2. **`record_envelope_sender` with `Fulfilled_request`** (syncable_ledger.ml:718–722):
+   Called on `Success`, but in the bug the `Num_accounts` never succeeds so
+   this path is not reached.
 
-After a restart, the local epoch ledger object (`t.tree`) is the one restored
-from disk. Its `MT.depth` equals the **old epoch ledger's depth** (or the
-depth the ledger was created with at node startup for the snarked ledger). If
-this does not match the depth the peer uses for the same computation, the two
-sides compute different paddings and the hash check fails.
+3. **`desired_root_exn t` raising** (syncable_ledger.ml:696):
+   `desired_root_exn` calls `failwithf` if `t.desired_root = None`. In normal
+   operation this should never be `None` during `main_loop`, but if `destroy`
+   races with an in-flight `handle_answer`, it could happen. The exception
+   would be swallowed by `don't_wait_for` (line 900), silently terminating
+   `main_loop`.
 
-More concretely: in the epoch ledger sync path, the syncer is given a fresh
-ledger object of some fixed depth to fill in. The depth is chosen by the
-bootstrap code, not by the syncer. If the peer and the local node use
-different depth values (e.g. one uses 35, the other was initialised with a
-different depth at some point in the startup sequence), `complete_with_empties`
-produces a different root hash than the peer intended, `Hash_mismatch` is
-returned, `requeue_query` is called, and the loop begins.
+#### Instrumentation Points
 
-Because `handle_num_accounts` is the **only function** that calls
-`handle_node`, and `handle_node` is the **only function** that enqueues
-`What_child_hashes` or `What_contents`, a permanent `Hash_mismatch` from all
-peers results in an infinite `Num_accounts` loop with no forward progress.
+To confirm this hypothesis, add logging around the `record_envelope_sender`
+calls in `handle_answer`:
 
-### Secondary Issue: `new_goal` does not clear `waiting_parents` / `waiting_content`
-
-`new_goal` (line 811) replaces `desired_root` and emits a new `Num_accounts`
-but does **not** clear `waiting_parents` or `waiting_content`. If a goal
-change happens mid-sync, stale entries from the previous goal remain in both
-tables. Should `handle_num_accounts` later succeed, `add_subtree` and
-`add_content` will `find_exn` into those stale entries for addresses from the
-old goal that happen to share the same address value, producing either a
-silent hash mismatch (wrong expected hash) or an exception
-(`Option.value_exn` failure at line 579: "Forgot to wait for a node").
-
-### Affected Code Locations
-
-| File | Lines | Issue |
+| File | Lines | What to log |
 |---|---|---|
-| `syncable_ledger.ml` | 648–663 | `handle_num_accounts`: hash check can permanently fail for disk-restored trees; no escape path other than infinite `requeue_query` |
-| `syncable_ledger.ml` | 655 | `complete_with_empties` uses `MT.depth t.tree` of the local (potentially mismatched) ledger |
-| `syncable_ledger.ml` | 811–834 | `new_goal`: does not clear `waiting_parents` / `waiting_content` on goal change |
+| `syncable_ledger.ml` | 749 | Log before and after `record_envelope_sender` on `Sent_bad_hash` |
+| `min-networking.ml` | 476 | Log the bool result of `write_if_open` (returns `false` when reader closed, but blocks when buffer full) |
+| `Trust_system` | internal | Check whether the trust-system pipe is being drained; log its buffer depth |
 
-### Proposed Fix
+---
 
-**Primary fix** — in `handle_num_accounts`, if no peer's `Num_accounts`
-response produces a matching root hash after a reasonable number of attempts,
-log clearly and surface the failure rather than looping forever. The
-underlying cause (depth mismatch between the local ledger object and the
-epoch ledger the peers hold) must be found in the bootstrap path that creates
-or restores the ledger object passed to the syncer.
+### Investigation of Trust System Pipe Draining (Option 1, Part 2)
 
-Concretely, the depth of the `MT.t` passed to `Syncable_ledger.create` at
-epoch-ledger-sync time must match the depth the peer uses to compute
-`content_root_addr`. Both sides must derive depth from the same source of
-truth (e.g. the compile-time `ledger_depth` constant) rather than from the
-local ledger object's stored depth.
+#### `Trust_system.record_envelope_sender` Internal Blocking
 
-**Secondary fix** — `new_goal` should clear `waiting_parents` and
-`waiting_content` when the goal changes, for the same reason
-`handle_num_accounts` clears them on success: once the target root changes,
-any in-flight expectations for the old goal are invalid.
+The `record_envelope_sender` function (trust_system/trust_system.ml:185)
+directly calls `Peer_trust.Make(Action).record` (trust_system/peer_trust.ml:165).
+This `record` function contains synchronous writes to an internal
+`Strict_pipe.Synchronous` (`upcall_writer`, peer_trust.ml:105):
 
 ```ocaml
-(* new_goal, inside the `if not should_skip` branch, before writing Num_accounts *)
-Hashtbl.clear t.waiting_parents ;
-Hashtbl.clear t.waiting_content ;
+(* peer_trust.ml:179, 217 *)
+Strict_pipe.Writer.write upcall_writer (`Heartbeat peer)
+Strict_pipe.Writer.write upcall_writer (`Ban (peer, expiration))
 ```
 
-This mirrors the clear already done inside `handle_num_accounts` and ensures
-the tables never contain stale entries from a prior goal.
+As `strict_pipe.ml` defines, a `Strict_pipe.Synchronous` pipe's `write` operation
+is essentially `Pipe.write`, which will **block indefinitely** if the
+reader side of the pipe is not consuming messages. If the internal buffer fills,
+the write operation will not resolve, holding up the entire `let%bind` chain.
+
+#### Lack of `upcall_reader` Consumption in Production
+
+Crucially, in `Peer_trust.Make0.create` (peer_trust.ml:112), while the
+`upcall_reader` is created, there appears to be no explicit `don't_wait_for
+(Strict_pipe.Reader.iter ...)` or similar asynchronous loop within the
+`Peer_trust` module itself to drain messages from this `upcall_reader` during
+normal daemon operation. The only observed consumption is within the module's
+unit tests.
+
+**Confirmation:** A grep for `Peer_trust.upcall_pipe` in `src/app/cli/src/` and
+`src/lib/mina_lib/` returned no usage. This confirms that the `upcall_reader`
+is not being consumed by the daemon, which is the root cause of the trust
+system pipe blocking issue.
+
+#### Concrete Stall Path Confirmed
+
+1.  `Syncable_ledger.handle_answer` receives a `Num_accounts` answer, resulting
+    in `Hash_mismatch`.
+2.  It calls `Trust_system.record_envelope_sender` with `Actions.Sent_bad_hash`.
+3.  `Actions.Sent_bad_hash` translates to `Insta_ban` in `Peer_trust.to_trust_response`.
+4.  `Peer_trust.record` attempts to write a `(`Ban ...)` message to `upcall_writer`.
+5.  Since the `upcall_reader` is not being drained, `Strict_pipe.Writer.write`
+    blocks. The `Synchronous` pipe's buffer fills up and the write cannot complete.
+6.  This blocking propagates up the `Async.Deferred.t` chain, suspending
+    `Peer_trust.record`, then `Trust_system.record_envelope_sender`, and finally
+    `Syncable_ledger.handle_answer`.
+7.  `Syncable_ledger.main_loop`'s `Linear_pipe.iter t.answers` stops processing
+    new answers, causing `t.answers`'s buffer to fill.
+8.  `min-networking.ml:476`'s `Linear_pipe.write_if_open response_writer` then
+    blocks all 400 concurrent downloader fibers waiting for buffer space.
+9.  The `Sl_downloader` fully stalls. Only `Num_accounts` queries are observed
+    repeatedly, as the mechanism to issue `What_child_hashes` or
+    `What_contents` queries (`handle_node` within `handle_num_accounts`)
+    is never reached.
+
+#### Proposed Solution Update
+
+The primary fix must involve ensuring the `upcall_reader` of the `Peer_trust`
+module is consistently drained throughout the daemon's lifecycle, likely via a
+`don't_wait_for (Strict_pipe.Reader.iter ...)` call at the point where the
+`Peer_trust` module is instantiated in the daemon. This would prevent the
+`Strict_pipe.Writer.write` calls from blocking.
+
+---
+
+### Investigation of Option 2: Implicit Closure of `query_reader` / `Sl_downloader` Stall
+
+#### Clarifying What Option 2 Actually Means
+
+The earlier summary of Option 2 described "implicit closure of `query_reader`"
+as the mechanism.  After tracing the code, this needs to be decomposed into two
+distinct sub-scenarios:
+
+**Sub-scenario 2a — `global_stop` fires prematurely**
+
+In `glue_sync_ledger` (mina_networking.ml:419):
+
+```ocaml
+let global_stop = Pipe_lib.Linear_pipe.closed query_reader in
+```
+
+`Pipe_lib.Linear_pipe.closed` is defined as `Pipe.closed reader.pipe`
+(linear_pipe.ml:48). In Async, `Pipe.closed` on a *reader* resolves only when
+`Pipe.close_read` is called on that reader — **not** when the writer end is
+closed. The writer end closing causes the reader to see EOF when drained, but
+does not fire `Pipe.closed`.
+
+The only call to `close_read` on `t.query_reader` in the codebase is inside
+`destroy t` (syncable_ledger.ml:490):
+
+```ocaml
+let destroy t =
+  Linear_pipe.close_read t.answers ;
+  Linear_pipe.close_read t.query_reader
+```
+
+`destroy` is never called on the epoch ledger `sync_ledger` in
+`proof_of_stake.ml` — there is no `destroy` call anywhere in the
+`sync_local_state` function (proof_of_stake.ml:2585–2725). Therefore
+`global_stop` does **not** fire for epoch ledger sync under normal operation,
+and Sub-scenario 2a does not apply to the reported bug.
+
+**Sub-scenario 2b — `Sl_downloader` enters `\`Stalled` state**
+
+This is the real Option 2 risk. The `step` loop in `downloader.ml` selects
+among four peer states (line 887–945):
+
+```
+`No_peers      → wait for new peers via got_new_peers_r
+`Useful_but_busy → wait for flush or useful_peers signal
+`Stalled       → reset knowledge, sleep post_stall_retry_delay (1 min), retry
+`Useful (peer, might_know) → dispatch download
+```
+
+The `` `Stalled `` branch (line 923–931) fires when every known peer has been
+tried and every job has failed with every peer. In that state the downloader:
+
+1. Calls `Useful_peers.reset_knowledge` — clears all peer knowledge scores.
+2. Sleeps for `post_stall_retry_delay = Time.Span.of_min 1.`.
+3. Resumes `step`.
+
+During that 1-minute sleep, the downloader issues **no queries**. Any
+`Num_accounts` jobs enqueued by `requeue_query` in `handle_answer` sit in
+`t.pending` but are not dispatched. From the outside this is indistinguishable
+from the observed symptom: only `Num_accounts` queries appear in logs with no
+`What_child_hashes` or `What_contents`, because no query at all is dispatched
+for 60 seconds.
+
+This stall is distinct from Option 1: the `Linear_pipe.iter t.answers` loop is
+still running, but no download results arrive because the downloader is sleeping.
+
+#### Conditions That Trigger `` `Stalled ``
+
+The `Useful_peers` state machine reaches `` `Stalled `` when, after assigning
+download jobs to peers, every returned result is an error (`Failed_to_connect`
+or `Connected { data = Error _ }`), and the `attempts` map on each job records
+a `download` attempt for every peer.
+
+In the epoch ledger sync context, the `knowledge` function
+(mina_networking.ml:420–428) probes each peer by sending a direct RPC
+`(h, Num_accounts)`. If a peer responds `Ok _` it is tagged as
+`` `Call (fun (h', _) -> Ledger_hash.equal h' h) `` — meaning the downloader
+considers it willing to handle any query for root hash `h`. If the peer cannot
+be reached, it gets `` `Some [] `` — it is known to have no useful knowledge and
+is not selected for downloads.
+
+The `` `Stalled `` path is reached when:
+- All known peers either respond to the knowledge probe with `Ok` (are selected
+  for jobs) **and** then fail the actual batch download, or
+- All peers respond `` `Some [] `` so no peer is ever `Useful`, and the
+  downloader cycles through `` `No_peers `` → wait for `got_new_peers_r` →
+  `` `No_peers `` (since the peers list doesn't change).
+
+In practice the more likely trigger is a **transient network condition** where
+all peers pass the knowledge probe but the batch RPC then times out (10 s for
+knowledge, 2 s × batch_size for get). After enough failures, all peers exhaust
+their `worth_retrying` budget and `step` reaches `` `Stalled ``.
+
+#### Interaction with Option 1
+
+If Option 1 is the root cause (trust-system pipe blocking `handle_answer`), then
+`requeue_query` inside `handle_answer` is also never called. The `Sl_downloader`
+would have completed the first `Num_accounts` download and written the result to
+`response_writer`, but the result sits unread in the `t.answers` pipe buffer.
+The downloader does **not** issue a retry job for `Num_accounts` on its own —
+retries are only triggered by `requeue_query` inside `handle_answer`. So under
+Option 1 the downloader eventually sees all its active jobs resolved and may
+reach `` `Stalled `` after a time, layering a second stall on top.
+
+Under Option 2 alone (no Option 1), the downloader stalls for 1 minute then
+retries. If the underlying cause is purely transient, the sync would eventually
+succeed after one or more 1-minute pauses. The observed production symptom of
+**indefinite** non-progression across multiple rounds over an extended period
+(~30 responses across ~3 rounds) is harder to explain with Option 2 alone, and
+points more toward Option 1 (trust-system pipe block) as the primary cause,
+with Option 2 possibly contributing periodic 1-minute gaps.
+
+#### Summary: Option 2 Assessment
+
+| Sub-scenario | Applicable? | Impact |
+|---|---|---|
+| `destroy` closing `query_reader` → `global_stop` fires | **No** — `destroy` is never called in epoch sync path | Not a factor |
+| `Sl_downloader` `` `Stalled `` → 1-minute sleep | **Possible** under transient network conditions | Causes temporary pauses, not indefinite stall |
+| All peers return `` `Some [] `` → `` `No_peers `` loop | **Possible** if node has no reachable peers | Causes indefinite stall, but only if genuinely no peers |
+
+Option 2 is a **contributing factor** (particularly the `` `Stalled `` / peer
+knowledge reset path) but is insufficient on its own to explain indefinite
+non-progression with ~30 logged `Num_accounts` responses. Option 1 (trust-system
+pipe blockage) remains the primary hypothesis for the root cause.
