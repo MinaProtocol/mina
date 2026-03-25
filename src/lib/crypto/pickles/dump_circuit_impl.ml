@@ -1931,6 +1931,169 @@ let wrap_verify_circuit (inputs : Impls.Wrap.Field.t array) () =
     ~messages_for_next_wrap_proof_digest
     ~bulletproof_challenges
 
+(* Wrap verify circuit (N2): same as wrap_verify_circuit but with 2 previous proofs.
+
+   Input layout (212 fields):
+   0-176:   Same as wrap_verify_circuit (IVP wrap input)
+   177:     messages_for_next_wrap_proof_digest
+   178-192: new_bulletproof_challenges[0] (15 fields, Backend.Tock.Rounds.n)
+   193-207: new_bulletproof_challenges[1] (15 fields)
+   208-209: prev_step_accs[0] (2 fields)
+   210-211: prev_step_accs[1] (2 fields)
+*)
+let wrap_verify_n2_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let read_pt i : Wrap_main_inputs.Inner_curve.t =
+    (inputs.(i), inputs.(i + 1))
+  in
+  (* ---- Public input (same as wrap_verify_circuit) ---- *)
+  let public_input =
+    let split i =
+      `Field (inputs.(i), Boolean.Unsafe.of_cvar inputs.(i + 1))
+    in
+    let packed n i = `Packed_bits (inputs.(i), n) in
+    Array.concat
+      [ Array.init 5 ~f:(fun j -> split (2 * j))
+      ; [| packed 255 10
+         ; packed 128 11 ; packed 128 12
+         ; packed 128 13 ; packed 128 14 ; packed 128 15 |]
+      ; Array.init 15 ~f:(fun j -> packed 128 (16 + j))
+      ; [| packed 1 31 ; packed 255 32 ; packed 255 33 |]
+      ]
+  in
+  (* ---- Plonk deferred values (same as N1) ---- *)
+  let feature_flags =
+    Kimchi_backend_common.Plonk_types.Features.map
+      Kimchi_backend_common.Plonk_types.Features.none_bool
+      ~f:(fun _ -> Boolean.false_)
+  in
+  let plonk
+    : ( Field.t
+      , Field.t Import.Scalar_challenge.t
+      , Field.t Shifted_value.Type1.t
+      , (Field.t Shifted_value.Type1.t, Boolean.var) Opt.t
+      , (Field.t Import.Scalar_challenge.t, Boolean.var) Opt.t
+      , Boolean.var )
+      Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t =
+    { alpha = { Kimchi_types.inner = inputs.(34) }
+    ; beta = inputs.(35)
+    ; gamma = inputs.(36)
+    ; zeta = { Kimchi_types.inner = inputs.(37) }
+    ; perm = Shifted_value.Type1.Shifted_value inputs.(38)
+    ; zeta_to_srs_length = Shifted_value.Type1.Shifted_value inputs.(39)
+    ; zeta_to_domain_size = Shifted_value.Type1.Shifted_value inputs.(40)
+    ; feature_flags
+    ; joint_combiner = Opt.Nothing
+    }
+  in
+  let xi : Wrap_verifier.Scalar_challenge.t =
+    { Kimchi_types.inner = inputs.(43) }
+  in
+  let bulletproof_challenges =
+    Vector.init Backend.Tick.Rounds.n ~f:(fun j ->
+      { Import.Bulletproof_challenge.prechallenge =
+          { Kimchi_types.inner = inputs.(44 + j) } })
+  in
+  (* ---- Messages (same as N1) ---- *)
+  let messages =
+    { Kimchi_backend_common.Plonk_types.Messages.In_circuit.
+      w_comm = Vector.init Nat.N15.n ~f:(fun j -> [| read_pt (60 + 2 * j) |])
+    ; z_comm = [| read_pt 90 |]
+    ; t_comm = Array.init 7 ~f:(fun j -> read_pt (92 + 2 * j))
+    ; lookup = Opt.Nothing
+    }
+  in
+  (* ---- Opening proof (same as N1) ---- *)
+  let openings_proof =
+    { Kimchi_backend_common.Plonk_types.Openings.Bulletproof.
+      lr = Array.init 16 ~f:(fun j ->
+        (read_pt (110 + 4 * j), read_pt (110 + 4 * j + 2)))
+    ; z_1 = Shifted_value.Type1.Shifted_value inputs.(174)
+    ; z_2 = Shifted_value.Type1.Shifted_value inputs.(175)
+    ; delta = read_pt 106
+    ; challenge_polynomial_commitment = read_pt 108
+    }
+  in
+  let sponge_digest_before_evaluations = inputs.(176) in
+  let messages_for_next_wrap_proof_digest = inputs.(177) in
+  (* ---- N2 specific: 2 sets of new bp challenges + 2 prev_step_accs ---- *)
+  let new_bulletproof_challenges : ((Field.t, Backend.Tock.Rounds.n) Vector.t, Nat.N2.n) Vector.t =
+    Vector.[
+      Vector.init Backend.Tock.Rounds.n ~f:(fun j -> inputs.(178 + j)) ;
+      Vector.init Backend.Tock.Rounds.n ~f:(fun j -> inputs.(193 + j))
+    ]
+  in
+  let prev_step_accs : (Wrap_main_inputs.Inner_curve.t, Nat.N2.n) Vector.t =
+    Vector.[ read_pt 208 ; read_pt 210 ]
+  in
+  (* ---- SRS ---- *)
+  let srs = Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl 16) in
+  (* ---- Verification key (dummy) ---- *)
+  let dummy_pt = Wrap_main_inputs.Inner_curve.Params.one in
+  let dummy_comm = [| Wrap_main_inputs.Inner_curve.constant dummy_pt |] in
+  let verification_key =
+    { Plonk_verification_key_evals.Step.
+      sigma_comm = Vector.init Nat.N7.n ~f:(fun _ -> dummy_comm)
+    ; coefficients_comm = Vector.init Nat.N15.n ~f:(fun _ -> dummy_comm)
+    ; generic_comm = dummy_comm
+    ; psm_comm = dummy_comm
+    ; complete_add_comm = dummy_comm
+    ; mul_comm = dummy_comm
+    ; emul_comm = dummy_comm
+    ; endomul_scalar_comm = dummy_comm
+    ; xor_comm = Opt.Nothing
+    ; range_check0_comm = Opt.Nothing
+    ; range_check1_comm = Opt.Nothing
+    ; foreign_field_add_comm = Opt.Nothing
+    ; foreign_field_mul_comm = Opt.Nothing
+    ; rot_comm = Opt.Nothing
+    ; lookup_table_comm =
+        Vector.init Plonk_types.Lookup_sorted_minus_1.n ~f:(fun _ -> Opt.Nothing)
+    ; lookup_table_ids = Opt.Nothing
+    ; runtime_tables_selector = Opt.Nothing
+    ; lookup_selector_lookup = Opt.Nothing
+    ; lookup_selector_xor = Opt.Nothing
+    ; lookup_selector_range_check = Opt.Nothing
+    ; lookup_selector_ffmul = Opt.Nothing
+    }
+  in
+  let sponge_params =
+    Sponge.Params.map Tock_field_sponge.params ~f:Field.constant
+  in
+  let step_domains = Vector.[
+    { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 16 }
+  ] in
+  let which_branch =
+    Wrap_verifier.One_hot_vector.of_vector_unsafe Vector.[ Boolean.true_ ]
+  in
+  let actual_proofs_verified_mask : (Boolean.var, Nat.N2.n) Vector.t =
+    Vector.[ Boolean.true_ ; Boolean.true_ ]
+  in
+  Wrap_main.wrap_verify
+    ~num_chunks:1
+    ~max_proofs_verified:(module Nat.N2)
+    ~max_proofs_verified_n:Nat.N2.n
+    ~feature_flags:(Kimchi_backend_common.Plonk_types.Features.Full.none)
+    ~sponge_params
+    ~actual_proofs_verified_mask
+    ~step_domains
+    ~step_plonk_index:verification_key
+    ~srs
+    ~xi
+    ~plonk
+    ~combined_inner_product:(Shifted_value.Type1.Shifted_value inputs.(41))
+    ~b:(Shifted_value.Type1.Shifted_value inputs.(42))
+    ~public_input
+    ~prev_step_accs
+    ~messages
+    ~openings_proof
+    ~which_branch
+    ~new_bulletproof_challenges
+    ~sponge_digest_before_evaluations
+    ~messages_for_next_wrap_proof_digest
+    ~bulletproof_challenges
+
 (* Step IVP circuit: verifies a Wrap proof via IPA (Step/Tick/Fp side).
 
    The Step IVP runs on the Fp field and verifies Pallas commitments.
@@ -3379,6 +3542,9 @@ let run ~output_dir =
   let array196_wrap = Impls.Wrap.Typ.array ~length:196 Impls.Wrap.Field.typ in
   dump_wrap "wrap_verify_circuit" wrap_verify_circuit
     ~input_typ:array196_wrap ~return_typ:Impls.Wrap.Typ.unit ;
+  let array212_wrap = Impls.Wrap.Typ.array ~length:212 Impls.Wrap.Field.typ in
+  dump_wrap "wrap_verify_n2_circuit" wrap_verify_n2_circuit
+    ~input_typ:array212_wrap ~return_typ:Impls.Wrap.Typ.unit ;
   (* Step IVP needs the Tock URS for Step_main_inputs.Generators.h *)
   Backend.Tock.Keypair.set_urs_info [] ;
   let array175_field = Impl.Typ.array ~length:175 Impl.Field.typ in
