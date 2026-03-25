@@ -37,6 +37,9 @@ set -euox pipefail
 #   - Dhall configuration files in buildkite/src/
 #
 
+# Colors for output
+RED='\033[0;31m'
+CLEAR='\033[0m'
 
 DEBIAN_VERSION_DHALL_DEF="(./buildkite/src/Constants/DebianVersions.dhall)"
 ARCH_DHALL_DEF="(./buildkite/src/Constants/Arch.dhall)"
