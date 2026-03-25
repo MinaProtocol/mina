@@ -367,7 +367,10 @@ let generateHfRelatedStepsForCodename =
                   , network = spec.network
                   , version =
                       merge
-                        { Some = \(v : Text) -> v
+                        { Some =
+                                \(v : Text)
+                            ->  "${v}-${DebianVersions.lowerName
+                                          codename.DebVersion}"
                         , None = "\\\${MINA_DOCKER_TAG}"
                         }
                         spec.use_generic_dockers_from_version
