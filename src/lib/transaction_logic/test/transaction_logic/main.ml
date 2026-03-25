@@ -36,5 +36,15 @@ let () =
               stake_change_opt_out
           ; test_case "stake_change: opt-in = +(balance - fee)" `Quick
               stake_change_opt_in
+          ; test_case "zkapp stake_change: unstaked payment = 0" `Quick
+              zkapp_stake_change_unstaked
+          ; test_case "zkapp stake_change: staked fee_payer = -(fee+amount)"
+              `Quick zkapp_stake_change_staked_fee_payer
+          ; test_case "zkapp stake_change: delegate opt-in = +post_balance"
+              `Quick zkapp_stake_change_delegate_opt_in
+          ; test_case "zkapp stake_change: delegate opt-out = -pre_balance"
+              `Quick zkapp_stake_change_delegate_opt_out
+          ; test_case "zkapp stake_change: redelegate = -fee" `Quick
+              zkapp_stake_change_redelegate
           ] )
     ]

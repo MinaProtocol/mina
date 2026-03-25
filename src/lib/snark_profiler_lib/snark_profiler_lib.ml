@@ -826,6 +826,7 @@ let check_base_snarks ~genesis_constants ~constraint_constants ~logger
                          ~constraint_constants ~logger
                    }
                  ~supply_increase
+                 ~stake_change:Currency.Amount.Signed.zero
                  { Transaction_protocol_state.Poly.block_data =
                      Lazy.force
                      @@ state_body ~genesis_constants ~constraint_constants

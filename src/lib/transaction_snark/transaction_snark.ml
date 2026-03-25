@@ -3859,7 +3859,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       List.fold_left ~init:(fee_excess, supply_increase, stake_change, [], [])
         zkapp_commands_with_context
         ~f:(fun
-             (fee_excess, supply_increase, stake_change, will_succeeds_rev, statess_rev)
+             (fee_excess, supply_increase, _stake_change (* chaining not needed: statement uses target-source diff *), will_succeeds_rev, statess_rev)
              ( _
              , _
              , first_pass_ledger

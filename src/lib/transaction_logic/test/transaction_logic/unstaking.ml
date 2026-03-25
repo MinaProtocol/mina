@@ -304,3 +304,331 @@ let stake_change_opt_in () =
         ( delegate_and_assert_stake_change ~label:"opt-in" ledger sender
             ~new_delegate:validator.pk ~fee
           : Test_account.t ) )
+
+(* Zkapp: fee_payer unstaked, payment between unstaked accounts.
+   stake_change = 0 for both fee_payer and account_updates. *)
+let zkapp_stake_change_unstaked () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind sender = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind receiver = gen_account () in
+    let%bind amount =
+      Amount.gen_incl (Amount.of_mina_int_exn 1) (Amount.of_mina_int_exn 3)
+    in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (sender, receiver, amount, fee))
+    ~f:(fun (sender, receiver, amount, fee) ->
+      let accounts = [ sender; receiver ] in
+      let txn = Zkapp_cmd_builder.Simple_txn.make ~sender ~receiver amount in
+      let cmd =
+        Zkapp_cmd_builder.zkapp_cmd
+          ~noncemap:(Ledger_helpers.noncemap accounts)
+          ~fee:(sender.pk, fee)
+          [ (txn :> Zkapp_cmd_builder.transaction) ]
+      in
+      let ledger = mk_ledger accounts in
+      (* apply_zkapp_command_unchecked mutates ledger in place *)
+      let applied, _local =
+        Transaction_logic.apply_zkapp_command_unchecked ~signature_kind
+          ~constraint_constants ~global_slot ~state_view:protocol_state ledger
+          cmd
+        |> Or_error.ok_exn
+      in
+      (* ledger is now post-tx *)
+      let stake_change =
+        compute_stake_change ledger
+          { previous_hash = Ledger_hash.empty_hash
+          ; varying = Command (Zkapp_command applied)
+          }
+      in
+      assert_stake_change ~label:"zkapp unstaked payment"
+        ~expected:Amount.Signed.zero stake_change )
+
+(* Zkapp: fee_payer is staked (has delegate), sends payment.
+   stake_change = -fee from fee_payer. *)
+let zkapp_stake_change_staked_fee_payer () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind sender = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind receiver = gen_account () in
+    let%bind validator = gen_account () in
+    let%bind amount =
+      Amount.gen_incl (Amount.of_mina_int_exn 1) (Amount.of_mina_int_exn 3)
+    in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (sender, receiver, validator, amount, fee))
+    ~f:(fun (sender, receiver, validator, amount, fee) ->
+      let accounts = [ sender; receiver; validator ] in
+      let ledger = mk_ledger accounts in
+      (* First opt-in the sender via signed command *)
+      ignore
+        ( delegate_and_assert_stake_change ~label:"sender opt-in" ledger sender
+            ~new_delegate:validator.pk
+            ~fee:(Fee.of_nanomina_int_exn 1_000_000)
+          : Test_account.t ) ;
+      let sender' = sender_from_ledger ledger sender in
+      (* Now send a zkapp payment — both sender and receiver account_updates
+         are unstaked, but fee_payer (= sender) is staked so fee affects stake *)
+      let txn =
+        Zkapp_cmd_builder.Simple_txn.make ~sender:sender' ~receiver amount
+      in
+      let cmd =
+        Zkapp_cmd_builder.zkapp_cmd
+          ~noncemap:(Ledger_helpers.noncemap [ sender'; receiver ])
+          ~fee:(sender'.pk, fee)
+          [ (txn :> Zkapp_cmd_builder.transaction) ]
+      in
+      (* apply_zkapp_command_unchecked mutates ledger in place *)
+      let applied, _local =
+        Transaction_logic.apply_zkapp_command_unchecked ~signature_kind
+          ~constraint_constants ~global_slot ~state_view:protocol_state ledger
+          cmd
+        |> Or_error.ok_exn
+      in
+      (* ledger is now post-tx; fee_payer is staked so fee leaves staking.
+         Sender account_update also decreases sender's staked balance by
+         amount. Receiver is unstaked. Total = -(fee + amount) *)
+      let stake_change =
+        compute_stake_change ledger
+          { previous_hash = Ledger_hash.empty_hash
+          ; varying = Command (Zkapp_command applied)
+          }
+      in
+      let expected =
+        let fee_plus_amount =
+          Option.value_exn (Amount.add (Amount.of_fee fee) amount)
+        in
+        Amount.Signed.create ~magnitude:fee_plus_amount ~sgn:Sgn.Neg
+      in
+      assert_stake_change ~label:"zkapp staked fee_payer payment" ~expected
+        stake_change )
+
+(* Zkapp: account_update sets delegate from None to validator (opt-in).
+   Fee_payer is unstaked (0 from fee). The account_update has zero
+   balance_change but changes delegate None→Some, so its post-balance
+   enters staking. stake_change = +account_balance *)
+let zkapp_stake_change_delegate_opt_in () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind account = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind validator = gen_account () in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (account, validator, fee))
+    ~f:(fun (account, validator, fee) ->
+      let accounts = [ account; validator ] in
+      let delegate_update =
+        { Mina_base.Account_update.Update.noop with
+          delegate = Set validator.pk
+        }
+      in
+      let txn =
+        object
+          method updates =
+            let open Monad_lib.State.Let_syntax in
+            let%map body =
+              Zkapp_cmd_builder.update_body ~update:delegate_update ~account
+                Amount.Signed.zero
+            in
+            [ Zkapp_cmd_builder.update
+              @@ Mina_base.Account_update.with_aux ~body
+                   ~authorization:Zkapp_cmd_builder.dummy_auth
+            ]
+        end
+      in
+      let cmd =
+        Zkapp_cmd_builder.zkapp_cmd
+          ~noncemap:(Ledger_helpers.noncemap accounts)
+          ~fee:(account.pk, fee)
+          [ (txn :> Zkapp_cmd_builder.transaction) ]
+      in
+      let ledger = mk_ledger accounts in
+      let pre_balance =
+        Balance.to_amount (get_account_exn ledger account.pk).balance
+      in
+      (* apply_zkapp_command_unchecked mutates ledger in place *)
+      let applied, _local =
+        Transaction_logic.apply_zkapp_command_unchecked ~signature_kind
+          ~constraint_constants ~global_slot ~state_view:protocol_state ledger
+          cmd
+        |> Or_error.ok_exn
+      in
+      (* ledger is now post-tx; account opted in via account_update.
+         Fee_payer is unstaked: 0 from fee.
+         Account_update: None→Some, post_balance = pre_balance - fee.
+         stake_change = +(pre_balance - fee) *)
+      let stake_change =
+        compute_stake_change ledger
+          { previous_hash = Ledger_hash.empty_hash
+          ; varying = Command (Zkapp_command applied)
+          }
+      in
+      let expected =
+        let post_balance =
+          Option.value_exn (Amount.sub pre_balance (Amount.of_fee fee))
+        in
+        Amount.Signed.create ~magnitude:post_balance ~sgn:Sgn.Pos
+      in
+      assert_stake_change ~label:"zkapp delegate opt-in" ~expected stake_change
+      )
+
+(* Zkapp: account_update sets delegate from validator to empty (opt-out).
+   Account starts staked (via signed command delegation), then a zkapp
+   account_update sets delegate to empty. Fee_payer = same account, staked
+   at fee time so fee leaves staking. Account_update: Some→None, entire
+   pre-balance (at time of account_update = post_fee_balance) leaves staking.
+   But fee_payer and account_update are the same account — fee_payer uses
+   pre-tx delegate (staked), so fp_contrib = -fee. Account_update sees
+   Some→None, so its contrib = -pre_update_balance = -(post_fee_balance).
+   Total = -(fee + post_fee_balance) = -original_balance *)
+let zkapp_stake_change_delegate_opt_out () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind account = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind validator = gen_account () in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (account, validator, fee))
+    ~f:(fun (account, validator, fee) ->
+      let accounts = [ account; validator ] in
+      let ledger = mk_ledger accounts in
+      (* First opt-in via signed command *)
+      ignore
+        ( delegate_and_assert_stake_change ~label:"opt-in before zkapp opt-out"
+            ledger account ~new_delegate:validator.pk
+            ~fee:(Fee.of_nanomina_int_exn 1_000_000)
+          : Test_account.t ) ;
+      let account' = sender_from_ledger ledger account in
+      let pre_balance =
+        Balance.to_amount (get_account_exn ledger account'.pk).balance
+      in
+      (* Now opt-out via zkapp account_update *)
+      let delegate_update =
+        { Mina_base.Account_update.Update.noop with
+          delegate = Set Public_key.Compressed.empty
+        }
+      in
+      let txn =
+        object
+          method updates =
+            let open Monad_lib.State.Let_syntax in
+            let%map body =
+              Zkapp_cmd_builder.update_body ~update:delegate_update
+                ~account:account' Amount.Signed.zero
+            in
+            [ Zkapp_cmd_builder.update
+              @@ Mina_base.Account_update.with_aux ~body
+                   ~authorization:Zkapp_cmd_builder.dummy_auth
+            ]
+        end
+      in
+      let cmd =
+        Zkapp_cmd_builder.zkapp_cmd
+          ~noncemap:(Ledger_helpers.noncemap [ account' ])
+          ~fee:(account'.pk, fee)
+          [ (txn :> Zkapp_cmd_builder.transaction) ]
+      in
+      (* apply_zkapp_command_unchecked mutates ledger in place *)
+      let applied, _local =
+        Transaction_logic.apply_zkapp_command_unchecked ~signature_kind
+          ~constraint_constants ~global_slot ~state_view:protocol_state ledger
+          cmd
+        |> Or_error.ok_exn
+      in
+      (* ledger is now post-tx; account opted out.
+         Total stake_change = -pre_balance (entire staked balance leaves) *)
+      let stake_change =
+        compute_stake_change ledger
+          { previous_hash = Ledger_hash.empty_hash
+          ; varying = Command (Zkapp_command applied)
+          }
+      in
+      assert_stake_change ~label:"zkapp delegate opt-out"
+        ~expected:(Amount.Signed.create ~magnitude:pre_balance ~sgn:Sgn.Neg)
+        stake_change )
+
+(* Zkapp: account_update re-delegates from validator_a to validator_b.
+   Account stays staked throughout, so stake_change = -fee (only the
+   fee leaves staking, via the fee_payer = same account). *)
+let zkapp_stake_change_redelegate () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind account = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind validator_a = gen_account () in
+    let%bind validator_b = gen_account () in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (account, validator_a, validator_b, fee))
+    ~f:(fun (account, validator_a, validator_b, fee) ->
+      let accounts = [ account; validator_a; validator_b ] in
+      let ledger = mk_ledger accounts in
+      (* First opt-in via signed command *)
+      ignore
+        ( delegate_and_assert_stake_change ~label:"opt-in before redelegate"
+            ledger account ~new_delegate:validator_a.pk
+            ~fee:(Fee.of_nanomina_int_exn 1_000_000)
+          : Test_account.t ) ;
+      let account' = sender_from_ledger ledger account in
+      (* Re-delegate via zkapp account_update *)
+      let delegate_update =
+        { Mina_base.Account_update.Update.noop with
+          delegate = Set validator_b.pk
+        }
+      in
+      let txn =
+        object
+          method updates =
+            let open Monad_lib.State.Let_syntax in
+            let%map body =
+              Zkapp_cmd_builder.update_body ~update:delegate_update
+                ~account:account' Amount.Signed.zero
+            in
+            [ Zkapp_cmd_builder.update
+              @@ Mina_base.Account_update.with_aux ~body
+                   ~authorization:Zkapp_cmd_builder.dummy_auth
+            ]
+        end
+      in
+      let cmd =
+        Zkapp_cmd_builder.zkapp_cmd
+          ~noncemap:(Ledger_helpers.noncemap [ account' ])
+          ~fee:(account'.pk, fee)
+          [ (txn :> Zkapp_cmd_builder.transaction) ]
+      in
+      (* apply_zkapp_command_unchecked mutates ledger in place *)
+      let applied, _local =
+        Transaction_logic.apply_zkapp_command_unchecked ~signature_kind
+          ~constraint_constants ~global_slot ~state_view:protocol_state ledger
+          cmd
+        |> Or_error.ok_exn
+      in
+      (* ledger is now post-tx; account re-delegated (Some→Some).
+         Fee_payer staked: -fee. Account_update staked→staked with
+         zero balance_change: 0. Total = -fee *)
+      let stake_change =
+        compute_stake_change ledger
+          { previous_hash = Ledger_hash.empty_hash
+          ; varying = Command (Zkapp_command applied)
+          }
+      in
+      assert_stake_change ~label:"zkapp redelegate"
+        ~expected:
+          (Amount.Signed.create ~magnitude:(Amount.of_fee fee) ~sgn:Sgn.Neg)
+        stake_change )
