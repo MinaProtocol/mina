@@ -80,34 +80,6 @@ let make_hashed_ledgers (config : Runtime_config.t) :
   in
   (genesis_ledger, epoch_data)
 
-(** Compute chain_id from the hashes in the runtime config, without requiring
-    unpacked ledger data. Returns [None] if the config doesn't contain the
-    necessary hashes (genesis ledger hash, epoch data hashes). *)
-let chain_id_of_config ~logger ~signature_kind
-    ~(genesis_constants : Genesis_constants.t) ~constraint_constants
-    ~proof_level (config : Runtime_config.t) : Chain_id.t Option.t =
-  let open Option.Let_syntax in
-  let%bind genesis_constants =
-    Genesis_ledger_helper.make_genesis_constants ~logger
-      ~default:genesis_constants config
-    |> Result.ok
-  in
-  let constraint_constants =
-    Option.value_map ~default:constraint_constants
-      ~f:
-        (Genesis_ledger_helper.make_constraint_constants
-           ~default:constraint_constants )
-      config.proof
-  in
-  let%map genesis_ledger, genesis_epoch_data = make_hashed_ledgers config in
-  let constraint_system_digests =
-    Genesis_proof.constraint_system_digests ~signature_kind ~proof_level
-      ~constraint_constants
-  in
-  Chain_id.make ~genesis_constants ~constraint_constants ~genesis_ledger
-    ~genesis_epoch_data ~constraint_system_digests
-  |> Lazy.force
-
 (** Determine the locations of the chain state components based on the daemon
       runtime config *)
 let of_config ~logger ~signature_kind ~(genesis_constants : Genesis_constants.t)
@@ -115,8 +87,27 @@ let of_config ~logger ~signature_kind ~(genesis_constants : Genesis_constants.t)
     t * Chain_id.t Option.t =
   let chain_state = conf_dir in
   let chain_id_opt =
-    chain_id_of_config ~logger ~signature_kind ~genesis_constants
-      ~constraint_constants ~proof_level config
+    let open Option.Let_syntax in
+    let%bind genesis_constants =
+      Genesis_ledger_helper.make_genesis_constants ~logger
+        ~default:genesis_constants config
+      |> Result.ok
+    in
+    let constraint_constants =
+      Option.value_map ~default:constraint_constants
+        ~f:
+          (Genesis_ledger_helper.make_constraint_constants
+             ~default:constraint_constants )
+        config.proof
+    in
+    let%map genesis_ledger, genesis_epoch_data = make_hashed_ledgers config in
+    let constraint_system_digests =
+      Genesis_proof.constraint_system_digests ~signature_kind ~proof_level
+        ~constraint_constants
+    in
+    Chain_id.make ~genesis_constants ~constraint_constants ~genesis_ledger
+      ~genesis_epoch_data ~constraint_system_digests
+    |> Lazy.force
   in
   Option.value_map
     ~default:
