@@ -807,6 +807,45 @@ test_build_daemon_postfork_deb_unresolvable_prefork_hash() {
 }
 
 ################################################################################
+# Tests: Automode metapackages
+################################################################################
+
+test_build_daemon_devnet_automode_deb() {
+    safe_build build_daemon_automode_deb devnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-devnet-automode" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-automode"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-postfork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-prefork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-devnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-devnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Provides" "mina-devnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Conflicts" "mina-devnet"
+
+    # Metapackage should have NO binaries
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
+}
+
+test_build_daemon_mainnet_automode_deb() {
+    safe_build build_daemon_automode_deb mainnet || { log_fail "build exited non-zero"; return; }
+
+    load_captured_state
+    assert_eq "deb name" "mina-mainnet-automode" "$CAPTURED_DEB_NAME"
+    assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-automode"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-postfork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-prefork-mesa"
+    assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Breaks" "mina-mainnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Provides" "mina-mainnet"
+    assert_control_contains "$CAPTURED_CONTROL" "Conflicts" "mina-mainnet"
+
+    assert_file_not_captured "$CAPTURED_FILES" "usr/local/bin/mina"
+}
+
+################################################################################
 # Tests: Generic packages
 ################################################################################
 
@@ -1213,6 +1252,10 @@ main() {
     run_test test_build_daemon_mainnet_postfork_deb
     run_test test_build_daemon_postfork_deb_without_prefork_version
     run_test test_build_daemon_postfork_deb_unresolvable_prefork_hash
+
+    # Automode metapackages
+    run_test test_build_daemon_devnet_automode_deb
+    run_test test_build_daemon_mainnet_automode_deb
 
     # Generic packages
     run_test test_build_daemon_devnet_generic_deb

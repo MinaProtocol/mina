@@ -303,6 +303,7 @@ let docker_step
                 , LogProc = [] : List DockerImage.ReleaseSpec.Type
                 , CreatePreforkGenesis = [] : List DockerImage.ReleaseSpec.Type
                 , DaemonPrefork = [] : List DockerImage.ReleaseSpec.Type
+                , DaemonAutomode = [] : List DockerImage.ReleaseSpec.Type
                 , BatchTxn =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps

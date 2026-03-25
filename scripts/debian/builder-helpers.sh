@@ -713,6 +713,54 @@ build_daemon_postfork_deb() {
 
 }
 
+## AUTOMODE METAPACKAGE ##
+
+#
+# Builds mina-NETWORK-automode transitional metapackage
+#
+# Output: mina-${NETWORK}-automode_${MINA_DEB_VERSION}_all.deb
+#
+# This is an empty metapackage that depends on both prefork and postfork
+# automode packages. It Conflicts/Replaces/Provides mina-${NETWORK} so that
+# running `apt-get install mina-${NETWORK}-automode` will automatically
+# remove mina-${NETWORK} and pull in both automode runtimes.
+#
+
+build_daemon_automode_deb() {
+
+  local network="$1"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building ${network} automode transitional metapackage:"
+
+  local package_name="mina-${network}-automode"
+
+  # Automode metapackage is architecture-independent (no binaries).
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
+  local prefork_pkg="mina-${network}-prefork-${POSTFORK_CODENAME}"
+  local postfork_pkg="mina-${network}-postfork-${POSTFORK_CODENAME}"
+  local depends="${postfork_pkg} (>= ${MINA_DEB_VERSION}), ${prefork_pkg} (>= ${MINA_DEB_VERSION})"
+
+  create_control_file "${package_name}" "${depends}" \
+    "Transitional metapackage for Mina ${network} automode (installs both prefork and postfork runtimes)" \
+    "" "mina-${network}"
+
+  # Add Provides and Conflicts fields (create_control_file only writes Replaces+Breaks)
+  local CONTROL="${BUILDDIR}/DEBIAN/control"
+  echo "Provides: mina-${network}" >> "${CONTROL}"
+  echo "Conflicts: mina-${network}" >> "${CONTROL}"
+
+  echo "------------------------------------------------------------"
+  echo "Control File (with Provides/Conflicts):"
+  cat "${CONTROL}"
+
+  build_deb "${package_name}"
+  ARCHITECTURE="${saved_arch}"
+}
+## END AUTOMODE METAPACKAGE ##
+
 ## GENERIC PACKAGE ##
 
 #
