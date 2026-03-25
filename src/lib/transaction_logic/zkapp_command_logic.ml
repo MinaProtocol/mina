@@ -59,6 +59,8 @@ module type Balance_intf = sig
   val sub_amount_flagged : t -> amount -> t * [ `Underflow of bool ]
 
   val add_signed_amount_flagged : t -> signed_amount -> t * [ `Overflow of bool ]
+
+  val to_amount : t -> amount
 end
 
 module type Receipt_chain_hash_intf = sig
@@ -772,6 +774,8 @@ module type Inputs_intf = sig
     include Iffable with type bool := Bool.t
 
     val empty : t
+
+    val equal : t -> t -> Bool.t
   end
 
   module Token_id : Token_id_intf with type bool := Bool.t
@@ -1729,6 +1733,53 @@ module Make (Inputs : Inputs_intf) = struct
         Set_or_keep.set_or_keep ~if_:Public_key.if_ delegate base_delegate
       in
       let a = Account.set_delegate delegate a in
+      (* Accumulate stake_change based on delegation status transition.
+         This runs for every account_update, including the fee_payer
+         (whose balance_change is -fee and whose delegate never changes).
+         Account.balance a is the post-balance-change value. *)
+      let local_state =
+        let was_staked =
+          Bool.not (Public_key.equal base_delegate Public_key.empty)
+        in
+        let now_staked =
+          Bool.not (Public_key.equal delegate Public_key.empty)
+        in
+        let post_bal =
+          Amount.Signed.of_unsigned (Balance.to_amount (Account.balance a))
+        in
+        let was_staked_case =
+          (* staked→staked: +balance_change, staked→unstaked: -pre_bal *)
+          let neg_pre_bal =
+            (* pre_bal = post_bal - actual_balance_change.
+               Overflow cannot happen: pre_bal was a valid balance before
+               the balance change was applied. *)
+            let neg_change = Amount.Signed.negate actual_balance_change in
+            let sum, `Overflow _ =
+              Amount.Signed.add_flagged post_bal neg_change
+            in
+            Amount.Signed.negate sum
+          in
+          Amount.Signed.if_ now_staked ~then_:actual_balance_change
+            ~else_:neg_pre_bal
+        in
+        let was_unstaked_case =
+          (* unstaked→staked: +post_bal, unstaked→unstaked: 0 *)
+          Amount.Signed.if_ now_staked ~then_:post_bal
+            ~else_:Amount.(Signed.of_unsigned zero)
+        in
+        let contribution =
+          Amount.Signed.if_ was_staked ~then_:was_staked_case
+            ~else_:was_unstaked_case
+        in
+        let new_stake_change, `Overflow stake_change_overflow =
+          Amount.Signed.add_flagged local_state.stake_change contribution
+        in
+        let local_state =
+          Local_state.add_check local_state Local_supply_increase_overflow
+            Bool.(not stake_change_overflow)
+        in
+        { local_state with stake_change = new_stake_change }
+      in
       (a, local_state)
     in
     (* Update nonce. *)
@@ -1929,6 +1980,19 @@ module Make (Inputs : Inputs_intf) = struct
       Local_state.add_check local_state Global_supply_increase_overflow
         Bool.(not global_supply_increase_update_failed)
     in
+    (* add local stake change in global state *)
+    let new_global_stake_change, global_stake_change_update_failed =
+      let res, `Overflow overflow =
+        Amount.Signed.add_flagged
+          (Global_state.stake_change global_state)
+          local_state.stake_change
+      in
+      (res, overflow)
+    in
+    let local_state =
+      Local_state.add_check local_state Global_supply_increase_overflow
+        Bool.(not global_stake_change_update_failed)
+    in
     (* The first account_update must succeed. *)
     Bool.(
       assert_with_failure_status_tbl ~pos:__POS__
@@ -1976,6 +2040,12 @@ module Make (Inputs : Inputs_intf) = struct
              ~then_:new_global_supply_increase
              ~else_:(Global_state.supply_increase global_state) )
       in
+      let global_state =
+        Global_state.set_stake_change global_state
+          (Amount.Signed.if_ is_successful_last_party
+             ~then_:new_global_stake_change
+             ~else_:(Global_state.stake_change global_state) )
+      in
       Global_state.set_second_pass_ledger
         ~should_update:is_successful_last_party global_state local_state.ledger
     in
@@ -1992,6 +2062,7 @@ module Make (Inputs : Inputs_intf) = struct
          - success = true
          - account_update_index = Index.zero
          - supply_increase = Amount.Signed.zero
+         - stake_change = Amount.Signed.zero
       *)
       { local_state with
         ledger =
@@ -2008,6 +2079,10 @@ module Make (Inputs : Inputs_intf) = struct
           Amount.Signed.if_ is_last_account_update
             ~then_:Amount.(Signed.of_unsigned zero)
             ~else_:local_state.supply_increase
+      ; stake_change =
+          Amount.Signed.if_ is_last_account_update
+            ~then_:Amount.(Signed.of_unsigned zero)
+            ~else_:local_state.stake_change
       ; will_succeed =
           Bool.if_ is_last_account_update ~then_:Bool.true_
             ~else_:local_state.will_succeed

@@ -224,8 +224,12 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
                         .supply_increase ~constraint_constants applied_txn
                         |> Or_error.ok_exn
                     ; stake_change =
-                        Currency.Amount.Signed.zero
-                        (* TODO: compute real stake_change once zkapp circuit supports it *)
+                        Mina_transaction_logic.Transaction_applied.stake_change
+                          ~get_account_after:(fun aid ->
+                            Option.bind
+                              (Ledger.location_of_account ledger aid)
+                              ~f:(Ledger.get ledger) )
+                          applied_txn
                     ; sok_digest = ()
                     }
                   in

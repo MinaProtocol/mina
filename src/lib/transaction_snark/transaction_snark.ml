@@ -832,6 +832,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           let add_signed_amount_flagged x y =
             run_checked (add_signed_amount_flagged x y)
+
+          let to_amount = to_amount
         end
 
         module Receipt_chain_hash = struct
@@ -1376,6 +1378,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             run_checked (Public_key.Compressed.Checked.if_ b ~then_ ~else_)
 
           let empty = Public_key.Compressed.var_of_t Public_key.Compressed.empty
+
+          let equal a b = run_checked (Public_key.Compressed.Checked.equal a b)
         end
 
         module Protocol_state_precondition = struct
