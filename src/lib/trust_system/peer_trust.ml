@@ -2,7 +2,9 @@ open Core
 open Async_kernel
 open Pipe_lib
 
-let tmp_bans_are_disabled = false
+(* WARN: everywhere in the codebase nobody is reading upcall_reader, any async
+   thread banning a node will be blocked forever *)
+let tmp_bans_are_disabled = true
 
 module Trust_response = struct
   type t = Insta_ban | Trust_increase of float | Trust_decrease of float
