@@ -1,7 +1,7 @@
 { lib, dockerTools, buildEnv, ocamlPackages_mina, linkFarm, runCommand
-, dumb-init, tzdata, coreutils,  findutils, bashInteractive, python3, libp2p_helper, procps
-, postgresql, curl, jq, stdenv, rsync, bash, gnutar, gzip, currentTime
-, flockenzeit }:
+, dumb-init, tzdata, coreutils, findutils, bashInteractive, python3
+, libp2p_helper, procps, postgresql, curl, jq, stdenv, rsync, bash, gnutar, gzip
+, currentTime, flockenzeit }:
 let
   created = flockenzeit.lib.ISO-8601 currentTime;
 
@@ -46,32 +46,33 @@ let
     path = "${tzdata}/share/zoneinfo";
   }];
 
-  mkFullImage = name: packages: dockerTools.streamLayeredImage {
-    name = "${name}-full";
-    inherit created;
-    contents = [
-      dumb-init
-      coreutils
-      findutils
-      bashInteractive
-      python3
-      libp2p_helper
-      procps
-      curl
-      jq
-      localtime
-      zoneinfo
-    ] ++ packages;
-    extraCommands = ''
-      mkdir root tmp
-      chmod 777 tmp
-    '';
-    config = {
-      env = [ "MINA_TIME_OFFSET=0" ];
-      WorkingDir = "/root";
-      cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
+  mkFullImage = name: packages:
+    dockerTools.streamLayeredImage {
+      name = "${name}-full";
+      inherit created;
+      contents = [
+        dumb-init
+        coreutils
+        findutils
+        bashInteractive
+        python3
+        libp2p_helper
+        procps
+        curl
+        jq
+        localtime
+        zoneinfo
+      ] ++ packages;
+      extraCommands = ''
+        mkdir root tmp
+        chmod 777 tmp
+      '';
+      config = {
+        env = [ "MINA_TIME_OFFSET=0" ];
+        WorkingDir = "/root";
+        cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
+      };
     };
-  };
 in {
   mina-image-slim = dockerTools.streamLayeredImage {
     name = "mina";
