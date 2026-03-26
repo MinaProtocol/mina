@@ -154,20 +154,7 @@ reversion_deb() {
 
     rm -rf "${session_dir}"
     "${SESSION_DIR}/deb-session-open.sh" "${input_deb}" "${session_dir}"
-
-    # Get the original version before reversion so we can update deps too
-    local old_version
-    old_version=$(grep '^Version:' "${session_dir}/control/control" | awk '{print $2}')
-
-    "${SESSION_DIR}/deb-session-reversion.sh" "${session_dir}" "${new_version}"
-
-    # Also update dependency version constraints that reference the old version,
-    # so that pinned deps (e.g., mina-logproc (= OLD)) match the test repo versions.
-    local control_file="${session_dir}/control/control"
-    sed -i "s/(= ${old_version})/(= ${new_version})/g" "${control_file}"
-    sed -i "s/(>= ${old_version})/(>= ${new_version})/g" "${control_file}"
-    sed -i "s/(<= ${old_version})/(<= ${new_version})/g" "${control_file}"
-
+    "${SESSION_DIR}/deb-session-reversion.sh" --update-deps "${session_dir}" "${new_version}"
     "${SESSION_DIR}/deb-session-save.sh" "${session_dir}" "${output_deb}"
     rm -rf "${session_dir}"
 }
