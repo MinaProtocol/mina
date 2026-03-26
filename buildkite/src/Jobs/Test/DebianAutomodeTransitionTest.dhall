@@ -20,17 +20,27 @@ let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
-let dependsOn =
+let dependsOnDevnet =
       DebianVersions.dependsOn
         DebianVersions.DepsSpec::{
         , deb_version = DebianVersions.DebVersion.Bullseye
         , network = Network.Type.Devnet
         }
 
+let dependsOnMainnet =
+      DebianVersions.dependsOn
+        DebianVersions.DepsSpec::{
+        , deb_version = DebianVersions.DebVersion.Bullseye
+        , network = Network.Type.Mainnet
+        }
+
 let buildTestCmd
-    : Size -> Command.Type
-    =     \(cmd_target : Size)
-      ->  let key = "debian-automode-transition-test"
+    : Text -> Text -> List { name : Text, key : Text } -> Size -> Command.Type
+    =     \(network : Text)
+      ->  \(keySuffix : Text)
+      ->  \(deps : List { name : Text, key : Text })
+      ->  \(cmd_target : Size)
+      ->  let key = "debian-automode-transition-test-${keySuffix}"
 
           in  Command.build
                 Command.Config::{
@@ -41,13 +51,14 @@ let buildTestCmd
                       ''
                       ./buildkite/scripts/tests/debian-automode-transition-test.sh \
                         --codename bullseye \
-                        --network devnet
+                        --network ${network}
                       ''
-                , label = "Debian automode transition test (bullseye)"
+                , label =
+                    "Debian automode transition test (bullseye, ${network})"
                 , key = key
                 , target = cmd_target
                 , docker = None Docker.Type
-                , depends_on = dependsOn
+                , depends_on = deps
                 }
 
 in  Pipeline.build
@@ -76,5 +87,8 @@ in  Pipeline.build
                 , PipelineTag.Type.Stable
                 ]
               }
-      , steps = [ buildTestCmd Size.Large ]
+      , steps =
+        [ buildTestCmd "devnet" "devnet" dependsOnDevnet Size.Large
+        , buildTestCmd "mainnet" "mainnet" dependsOnMainnet Size.Large
+        ]
       }
