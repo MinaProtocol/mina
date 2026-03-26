@@ -670,6 +670,11 @@ end = struct
         (* If a peer misbehaves we still need the information we asked them for,
            so requeue in that case. *)
         let requeue_query () =
+          [%log warn] "Requeuing query that's not resolved"
+            ~metadata:
+              [ ("root_hash", Root_hash.to_yojson root_hash)
+              ; ("query", Query.to_yojson Addr.to_yojson query)
+              ] ;
           Linear_pipe.write_without_pushback t.queries (root_hash, query)
         in
         let credit_fulfilled_request () =
