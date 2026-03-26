@@ -12,7 +12,7 @@
   };
 
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11-small";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
   inputs.nixpkgs-old.url = "github:nixos/nixpkgs/nixos-23.05-small";
   inputs.nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
@@ -27,7 +27,6 @@
   inputs.dune-nix.inputs.flake-utils.follows = "utils";
 
   inputs.describe-dune.url = "github:o1-labs/describe-dune";
-  inputs.describe-dune.inputs.nixpkgs.follows = "nixpkgs";
   inputs.describe-dune.inputs.flake-utils.follows = "utils";
 
   inputs.o1-opam-repository.url =
