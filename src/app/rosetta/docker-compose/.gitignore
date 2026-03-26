@@ -1,5 +1,3 @@
 .env
-*.sk
-archive/
 mina_node/.mina-config/
 mina_rosetta/.mina-config/
