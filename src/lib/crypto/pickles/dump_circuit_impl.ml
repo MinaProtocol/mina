@@ -2094,6 +2094,404 @@ let wrap_verify_n2_circuit (inputs : Impls.Wrap.Field.t array) () =
     ~messages_for_next_wrap_proof_digest
     ~bulletproof_challenges
 
+(* Full wrap_main circuit.
+
+   Inlines the full wrap_main logic, replacing each `exists ~request` with
+   `var_of_fields` to allocate structured variables from a flat input array.
+
+   Layout: [wrap_statement | which_branch | prev_proof_state | prev_step_accs |
+            old_bp_chals | evals | wrap_domain_indices | openings_proof | messages]
+
+   Uses size_in_field_elements to compute offsets dynamically.
+
+   ---- Application-specific parameters ----
+
+   This fixture is for a single-branch fold operator (like running_sum):
+     branches           = 1    (one Step circuit variant)
+     step_widths        = [1]  (each branch verifies 1 previous proof)
+     Max_proofs_verified = N2  (always 2 in Pickles, padded)
+     Max_widths_by_slot = [N1; N0]  (slot 0 has 1 inner proof, slot 1 unused)
+     feature_flags      = Features.Full.none (no optional Kimchi gates)
+     num_chunks         = 1
+
+   ---- TODO: fixture variants for comprehensive coverage ----
+
+   1. Multi-branch (base+merge / IVC pattern):
+      branches=2, step_widths=[0,2], Max_widths_by_slot=[N2,N1].
+      Exercises Pseudo.choose / choose_key branch selection constraints,
+      and old_bp_chals with larger slot sizes.
+
+   2. Feature flags:
+      feature_flags with e.g. xor=true, range_check=true.
+      Changes VK structure (Opt.Just instead of Opt.Nothing),
+      feature flag consistency assertions, Messages.wrap_typ shape.
+
+   3. num_chunks > 1:
+      Affects Plonk_types.All_evals.wrap_typ and Commitment_lengths.
+      Relevant for very large circuits exceeding SRS degree.
+
+   4. Different step_domains:
+      Currently domain=2^16. Different step circuits may use different
+      domains, changing lagrange commitment counts and constant values
+      (but not circuit structure for single-branch).
+
+   5. CheckedType / Typ.check constraints:
+      The alloc_typ helper calls var_of_fields + constraint_system_auxiliary,
+      which may introduce check constraints (e.g. Boolean.typ asserts 0-or-1,
+      SizedF 128 asserts high bits zero). These should be audited against
+      production wrap_main's `exists` calls to ensure the same checks fire.
+      In particular, prev_proof_state uses wrap_typ with assert_16_bits,
+      and the openings_proof Typ uses transport/transport_var which may
+      elide or add checks vs the raw exists in production.
+*)
+let wrap_main_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let module Inner_curve = Wrap_main_inputs.Inner_curve in
+  let feature_flags = Plonk_types.Features.Full.none in
+  let num_chunks = 1 in
+  let pos = ref 0 in
+  let alloc_typ : type var value.
+      (var, value) Typ.t -> var =
+    fun typ ->
+      let (Typ r) = typ in
+      let size = r.size_in_field_elements in
+      let fields = Array.sub inputs ~pos:!pos ~len:size in
+      let var = r.var_of_fields (fields, r.constraint_system_auxiliary ()) in
+      pos := !pos + size ;
+      var
+  in
+  (* ---- 1. WrapStatement (public input) ---- *)
+  (* Manually parse, matching wrap_main.ml's destructuring of
+     Types.Wrap.Statement.In_circuit.t.
+     Fields: plonk(7 + feature_flags), xi, combined_inner_product, b,
+     branch_data, bulletproof_challenges(16), sponge_digest, msg_wrap, msg_step *)
+  let at i = inputs.(i) in
+  let feature_flags_var =
+    Kimchi_backend_common.Plonk_types.Features.map
+      Kimchi_backend_common.Plonk_types.Features.none_bool
+      ~f:(fun _ -> Boolean.false_)
+  in
+  let plonk
+      : ( Field.t
+        , Field.t Import.Scalar_challenge.t
+        , Field.t Shifted_value.Type1.t
+        , (Field.t Shifted_value.Type1.t, Boolean.var) Opt.t
+        , (Field.t Import.Scalar_challenge.t, Boolean.var) Opt.t
+        , Boolean.var )
+        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t =
+    { alpha = { Kimchi_types.inner = at 0 }
+    ; beta = at 1
+    ; gamma = at 2
+    ; zeta = { Kimchi_types.inner = at 3 }
+    ; perm = Shifted_value.Type1.Shifted_value (at 4)
+    ; zeta_to_srs_length = Shifted_value.Type1.Shifted_value (at 5)
+    ; zeta_to_domain_size = Shifted_value.Type1.Shifted_value (at 6)
+    ; feature_flags = feature_flags_var
+    ; joint_combiner = Opt.Nothing
+    }
+  in
+  let xi : Wrap_verifier.Scalar_challenge.t = { Kimchi_types.inner = at 7 } in
+  let combined_inner_product = Shifted_value.Type1.Shifted_value (at 8) in
+  let b = Shifted_value.Type1.Shifted_value (at 9) in
+  let branch_data = at 10 in
+  let bulletproof_challenges =
+    Vector.init Backend.Tick.Rounds.n ~f:(fun j ->
+      { Import.Bulletproof_challenge.prechallenge =
+          { Kimchi_types.inner = at (11 + j) } })
+  in
+  (* 11 + 16 = 27 *)
+  let sponge_digest_before_evaluations = at 27 in
+  let messages_for_next_wrap_proof_digest = at 28 in
+  let messages_for_next_step_proof = at 29 in
+  pos := 30 ;
+  (* ---- 2. which_branch (single field) ---- *)
+  let which_branch' = alloc_typ Field.typ in
+  let which_branch =
+    Wrap_verifier.One_hot_vector.of_index which_branch'
+      ~length:Nat.N1.n
+  in
+  (* ---- 3. Branch selection (single branch) ---- *)
+  let step_widths : (int, Nat.N1.n) Vector.t = Vector.[ 1 ] in
+  let actual_proofs_verified_mask =
+    Util.Wrap.ones_vector
+      ~first_zero:
+        (Wrap_verifier.Pseudo.choose (which_branch, step_widths) ~f:Field.of_int)
+      Nat.N2.n
+    |> Vector.rev
+  in
+  let step_domains : (Import.Domains.t, Nat.N1.n) Vector.t = Vector.[
+    { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 16 }
+  ] in
+  let domain_log2 =
+    Wrap_verifier.Pseudo.choose
+      ( which_branch
+      , Vector.map ~f:(fun ds -> Pickles_base.Domain.log2_size ds.h) step_domains )
+      ~f:Field.of_int
+  in
+  (* ---- 4. Assert branch_data ---- *)
+  Import.Branch_data.Checked.Wrap.pack
+    { proofs_verified_mask =
+        Vector.extend_front_exn actual_proofs_verified_mask Nat.N2.n Boolean.false_
+    ; domain_log2
+    }
+  |> Field.Assert.equal branch_data ;
+  (* ---- 5. prev_proof_state ---- *)
+  let prev_proof_state_typ =
+    let open Import.Types.Step.Proof_state in
+    wrap_typ
+      ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
+      (Vector.init Nat.N2.n ~f:(fun _ -> Plonk_types.Features.none))
+      (Shifted_value.Type2.wrap_typ Field.typ)
+  in
+  let prev_proof_state = alloc_typ prev_proof_state_typ in
+  (* ---- 6. step_plonk_index (dummy VK, single branch) ---- *)
+  let dummy_pt = Inner_curve.Params.one in
+  let dummy_comm = [| Inner_curve.constant dummy_pt |] in
+  let step_plonk_index =
+    let key =
+      { Plonk_verification_key_evals.Step.
+        sigma_comm = Vector.init Nat.N7.n ~f:(fun _ -> dummy_comm)
+      ; coefficients_comm = Vector.init Nat.N15.n ~f:(fun _ -> dummy_comm)
+      ; generic_comm = dummy_comm
+      ; psm_comm = dummy_comm
+      ; complete_add_comm = dummy_comm
+      ; mul_comm = dummy_comm
+      ; emul_comm = dummy_comm
+      ; endomul_scalar_comm = dummy_comm
+      ; xor_comm = Opt.Nothing
+      ; range_check0_comm = Opt.Nothing
+      ; range_check1_comm = Opt.Nothing
+      ; foreign_field_add_comm = Opt.Nothing
+      ; foreign_field_mul_comm = Opt.Nothing
+      ; rot_comm = Opt.Nothing
+      ; lookup_table_comm =
+          Vector.init Plonk_types.Lookup_sorted_minus_1.n ~f:(fun _ -> Opt.Nothing)
+      ; lookup_table_ids = Opt.Nothing
+      ; runtime_tables_selector = Opt.Nothing
+      ; lookup_selector_lookup = Opt.Nothing
+      ; lookup_selector_xor = Opt.Nothing
+      ; lookup_selector_range_check = Opt.Nothing
+      ; lookup_selector_ffmul = Opt.Nothing
+      }
+    in
+    Wrap_verifier.choose_key which_branch Vector.[ key ]
+  in
+  (* ---- 7. Feature flag consistency (all None for Features.none) ---- *)
+  let () =
+    let { Plonk_verification_key_evals.Step.
+          sigma_comm = _; coefficients_comm = _; generic_comm = _; psm_comm = _
+        ; complete_add_comm = _; mul_comm = _; emul_comm = _
+        ; endomul_scalar_comm = _
+        ; xor_comm; range_check0_comm; range_check1_comm
+        ; foreign_field_add_comm; foreign_field_mul_comm; rot_comm
+        ; lookup_table_comm =
+            [ lookup_table_comm0; lookup_table_comm1
+            ; lookup_table_comm2; lookup_table_comm3 ]
+        ; lookup_table_ids = _; runtime_tables_selector
+        ; lookup_selector_lookup; lookup_selector_xor
+        ; lookup_selector_range_check; lookup_selector_ffmul
+        } = step_plonk_index
+    in
+    let { Plonk_types.Features.Full.
+          range_check0; range_check1; foreign_field_add; foreign_field_mul
+        ; xor; rot; lookup; runtime_tables; uses_lookups = _
+        ; table_width_at_least_1; table_width_at_least_2; table_width_3
+        ; lookups_per_row_3 = _; lookups_per_row_4 = _
+        ; lookup_pattern_xor; lookup_pattern_range_check
+        } =
+      Plonk_checks.expand_feature_flags
+        (module struct type t = Boolean.var include Boolean end)
+        plonk.feature_flags
+    in
+    let commitment_flag = function
+      | Opt.Just _ -> Boolean.true_
+      | Opt.Maybe (b, _) -> b
+      | Opt.Nothing -> Boolean.false_
+    in
+    let assert_consistent comm flag =
+      Boolean.Assert.( = ) (commitment_flag comm) (Lazy.force flag)
+    in
+    assert_consistent xor_comm xor ;
+    assert_consistent range_check0_comm range_check0 ;
+    assert_consistent range_check1_comm range_check1 ;
+    assert_consistent foreign_field_add_comm foreign_field_add ;
+    assert_consistent foreign_field_mul_comm foreign_field_mul ;
+    assert_consistent rot_comm rot ;
+    assert_consistent lookup_table_comm0 table_width_at_least_1 ;
+    assert_consistent lookup_table_comm1 table_width_at_least_2 ;
+    assert_consistent lookup_table_comm2 table_width_3 ;
+    assert_consistent lookup_table_comm3 (lazy Boolean.false_) ;
+    assert_consistent runtime_tables_selector runtime_tables ;
+    assert_consistent lookup_selector_lookup lookup ;
+    assert_consistent lookup_selector_xor lookup_pattern_xor ;
+    assert_consistent lookup_selector_range_check lookup_pattern_range_check ;
+    assert_consistent lookup_selector_ffmul foreign_field_mul
+  in
+  (* ---- 8. prev_step_accs ---- *)
+  let prev_step_accs =
+    alloc_typ (Vector.wrap_typ Inner_curve.typ Nat.N2.n)
+  in
+  (* ---- 9. old_bp_chals (N1 single branch: [Vector N1 (Vector 15 Field.t)]) ---- *)
+  (* For single-branch N1: Max_widths_by_slot.maxes = [N1; N0].
+     Slot 0: 1 vector of 15 challenges = 15 fields.
+     Slot 1: 0 vectors = 0 fields.
+     Old_bulletproof_chals is a local GADT in wrap_main.ml, reproduced here. *)
+  let module Old_bulletproof_chals = struct
+    type t =
+      | T :
+          'n Nat.t
+          * ((Field.t, Backend.Tock.Rounds.n) Vector.t, 'n) Vector.t
+          -> t
+  end in
+  let old_bp_chals_slot0 : (Field.t, Backend.Tock.Rounds.n) Vector.t =
+    Vector.init Backend.Tock.Rounds.n ~f:(fun j -> inputs.(!pos + j))
+  in
+  pos := !pos + Nat.to_int Backend.Tock.Rounds.n ;
+  let old_bp_chals : (Old_bulletproof_chals.t, Nat.N2.n) Vector.t =
+    Vector.[
+      Old_bulletproof_chals.T (Nat.N1.n, Vector.[ old_bp_chals_slot0 ]) ;
+      Old_bulletproof_chals.T (Nat.N0.n, Vector.[])
+    ]
+  in
+  (* ---- 10. evals ---- *)
+  let evals_typ =
+    let ty = Plonk_types.All_evals.wrap_typ ~num_chunks Plonk_types.Features.Full.none in
+    Vector.wrap_typ ty Nat.N2.n
+  in
+  let evals = alloc_typ evals_typ in
+  (* ---- 11. wrap_domain_indices ---- *)
+  let wrap_domain_indices =
+    alloc_typ (Vector.wrap_typ Field.typ Nat.N2.n)
+  in
+  (* ---- 12. FOP loop ---- *)
+  let sponge_params =
+    Sponge.Params.map Tock_field_sponge.params ~f:Field.constant
+  in
+  let new_bulletproof_challenges =
+    let wrap_domains =
+      let all_possible_domains =
+        Wrap_verifier.all_possible_domains ()
+      in
+      let shifts ~log2_size = Common.tock_shifts ~log2_size in
+      let domain_generator ~log2_size =
+        Backend.Tock.Field.domain_generator ~log2_size |> Field.constant
+      in
+      Vector.map wrap_domain_indices ~f:(fun index ->
+        let which = Wrap_verifier.One_hot_vector.of_index index
+          ~length:Wrap_verifier.num_possible_domains in
+        Wrap_verifier.Pseudo.Domain.to_domain
+          ~shifts ~domain_generator
+          (which, all_possible_domains))
+    in
+    Vector.mapn
+      [ prev_proof_state.unfinalized_proofs
+      ; old_bp_chals
+      ; evals
+      ; wrap_domains
+      ]
+      ~f:(fun [ { deferred_values; sponge_digest_before_evaluations = sponge_digest
+                 ; should_finalize }
+              ; old_bulletproof_challenges
+              ; evals_i
+              ; wrap_domain
+              ] ->
+        let sponge =
+          let s = Wrap_main_inputs.Sponge.create sponge_params in
+          Wrap_main_inputs.Sponge.absorb s sponge_digest ; s
+        in
+        let (T (_max_local, old_bulletproof_challenges)) =
+          old_bulletproof_challenges
+        in
+        let old_bulletproof_challenges =
+          Wrap_hack.Checked.pad_challenges old_bulletproof_challenges
+        in
+        let finalized, chals =
+          Wrap_verifier.finalize_other_proof
+            (module Wrap_hack.Padded_length)
+            ~domain:(wrap_domain :> _ Plonk_checks.plonk_domain)
+            ~sponge ~old_bulletproof_challenges
+            deferred_values evals_i
+        in
+        Boolean.(Assert.any [ finalized; not should_finalize ]) ;
+        chals)
+  in
+  (* ---- 13. Build prev_statement + assert messages_for_next_step_proof ---- *)
+  let prev_statement =
+    let prev_messages_for_next_wrap_proof =
+      Vector.map2 prev_step_accs old_bp_chals
+        ~f:(fun sacc (T (max_local_max_proofs_verified, chals)) ->
+          Wrap_hack.Checked.hash_messages_for_next_wrap_proof
+            max_local_max_proofs_verified
+            { challenge_polynomial_commitment = sacc
+            ; old_bulletproof_challenges = chals
+            })
+    in
+    Field.Assert.equal messages_for_next_step_proof
+      prev_proof_state.messages_for_next_step_proof ;
+    { Import.Types.Step.Statement.
+      messages_for_next_wrap_proof = prev_messages_for_next_wrap_proof
+    ; proof_state = prev_proof_state
+    }
+  in
+  (* ---- 14. openings_proof ---- *)
+  let openings_proof_typ =
+    let shift = Common.Shifts.tick1 in
+    Plonk_types.Openings.Bulletproof.wrap_typ
+      ( Impls.Wrap.Typ.transport Wrap_verifier.Other_field.Packed.typ
+          ~there:(fun x ->
+            match Shifted_value.Type1.of_field (module Backend.Tick.Field) ~shift x with
+            | Shifted_value x -> x)
+          ~back:(fun x ->
+            Shifted_value.Type1.to_field (module Backend.Tick.Field) ~shift (Shifted_value x))
+        |> Impls.Wrap.Typ.transport_var
+             ~there:(fun (Shifted_value.Type1.Shifted_value x) -> x)
+             ~back:(fun x -> Shifted_value x) )
+      Inner_curve.typ
+      ~length:(Nat.to_int Backend.Tick.Rounds.n)
+  in
+  let openings_proof = alloc_typ openings_proof_typ in
+  (* ---- 15. messages ---- *)
+  let messages_typ =
+    Plonk_types.Messages.wrap_typ Inner_curve.typ
+      feature_flags
+      ~dummy:Inner_curve.Params.one
+      ~commitment_lengths:(Commitment_lengths.default ~num_chunks)
+  in
+  let messages = alloc_typ messages_typ in
+  (* ---- 16. pack_statement + wrap_verify ---- *)
+  let public_input =
+    Array.map
+      (Wrap_main.pack_statement Nat.N2.n prev_statement)
+      ~f:(function
+        | `Field (Shifted_value x) -> `Field (Wrap_main.split_field x)
+        | `Packed_bits (x, n) -> `Packed_bits (x, n))
+  in
+  let srs = Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl 16) in
+  Wrap_main.wrap_verify
+    ~num_chunks
+    ~max_proofs_verified:(module Nat.N2)
+    ~max_proofs_verified_n:Nat.N2.n
+    ~feature_flags
+    ~sponge_params
+    ~actual_proofs_verified_mask
+    ~step_domains
+    ~step_plonk_index
+    ~srs
+    ~xi
+    ~plonk
+    ~combined_inner_product
+    ~b
+    ~public_input
+    ~prev_step_accs
+    ~messages
+    ~openings_proof
+    ~which_branch
+    ~new_bulletproof_challenges
+    ~sponge_digest_before_evaluations
+    ~messages_for_next_wrap_proof_digest
+    ~bulletproof_challenges
+
 (* Step IVP circuit: verifies a Wrap proof via IPA (Step/Tick/Fp side).
 
    The Step IVP runs on the Fp field and verifies Pallas commitments.
@@ -3545,6 +3943,63 @@ let run ~output_dir =
   let array212_wrap = Impls.Wrap.Typ.array ~length:212 Impls.Wrap.Field.typ in
   dump_wrap "wrap_verify_n2_circuit" wrap_verify_n2_circuit
     ~input_typ:array212_wrap ~return_typ:Impls.Wrap.Typ.unit ;
+  (* Full wrap_main circuit: compute input size from Typ sizes *)
+  let wrap_main_input_size =
+    let open Pickles_types in
+    let typ_size : type v c. (v, c) Impls.Wrap.Typ.t -> int =
+      fun (Typ r) -> r.size_in_field_elements
+    in
+    let feature_flags = Kimchi_backend_common.Plonk_types.Features.Full.none in
+    let wrap_stmt_size = 30 in  (* manually parsed: plonk(7) + xi + cip + b + branch_data + bp_chals(16) + sponge + msg_wrap + msg_step *)
+    let which_branch_size = 1 in
+    let prev_proof_state_size = typ_size
+      (Import.Types.Step.Proof_state.wrap_typ
+         ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
+         (Vector.init Nat.N2.n ~f:(fun _ -> Plonk_types.Features.none))
+         (Shifted_value.Type2.wrap_typ Impls.Wrap.Field.typ)) in
+    let prev_step_accs_size = typ_size
+      (Vector.wrap_typ Wrap_main_inputs.Inner_curve.typ Nat.N2.n) in
+    let old_bp_chals_size = Nat.to_int Backend.Tock.Rounds.n in  (* N1 slot0: 1×15, slot1: 0×15 *)
+    let evals_size = typ_size
+      (Vector.wrap_typ
+         (Plonk_types.All_evals.wrap_typ ~num_chunks:1 feature_flags)
+         Nat.N2.n) in
+    let wrap_domain_indices_size = typ_size
+      (Vector.wrap_typ Impls.Wrap.Field.typ Nat.N2.n) in
+    let openings_proof_size = typ_size
+      (Plonk_types.Openings.Bulletproof.wrap_typ
+         ( Impls.Wrap.Typ.transport Wrap_verifier.Other_field.Packed.typ
+             ~there:(fun x ->
+               match Shifted_value.Type1.of_field (module Backend.Tick.Field)
+                       ~shift:Common.Shifts.tick1 x with
+               | Shifted_value x -> x)
+             ~back:(fun x ->
+               Shifted_value.Type1.to_field (module Backend.Tick.Field)
+                 ~shift:Common.Shifts.tick1 (Shifted_value x))
+           |> Impls.Wrap.Typ.transport_var
+                ~there:(fun (Shifted_value.Type1.Shifted_value x) -> x)
+                ~back:(fun x -> Shifted_value x) )
+         Wrap_main_inputs.Inner_curve.typ
+         ~length:(Nat.to_int Backend.Tick.Rounds.n)) in
+    let messages_size = typ_size
+      (Plonk_types.Messages.wrap_typ Wrap_main_inputs.Inner_curve.typ
+         feature_flags
+         ~dummy:Wrap_main_inputs.Inner_curve.Params.one
+         ~commitment_lengths:(Commitment_lengths.default ~num_chunks:1)) in
+    let total = wrap_stmt_size + which_branch_size + prev_proof_state_size
+      + prev_step_accs_size + old_bp_chals_size + evals_size
+      + wrap_domain_indices_size + openings_proof_size + messages_size in
+    Printf.printf "wrap_main_circuit input sizes: stmt=%d which=%d pps=%d accs=%d bpc=%d evals=%d wdi=%d op=%d msg=%d total=%d\n"
+      wrap_stmt_size which_branch_size prev_proof_state_size
+      prev_step_accs_size old_bp_chals_size evals_size
+      wrap_domain_indices_size openings_proof_size messages_size total ;
+    total
+  in
+  let wrap_main_input_typ =
+    Impls.Wrap.Typ.array ~length:wrap_main_input_size Impls.Wrap.Field.typ
+  in
+  dump_wrap "wrap_main_circuit" wrap_main_circuit
+    ~input_typ:wrap_main_input_typ ~return_typ:Impls.Wrap.Typ.unit ;
   (* Step IVP needs the Tock URS for Step_main_inputs.Generators.h *)
   Backend.Tock.Keypair.set_urs_info [] ;
   let array175_field = Impl.Typ.array ~length:175 Impl.Field.typ in
