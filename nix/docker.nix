@@ -91,9 +91,9 @@ in {
   };
 
   mina-image-full = mkFullImage "mina" [ mina-exe ]
-    (baseImage "mina-base" [ mina-daemon-scripts ]) [ ];
+    (baseImage "mina-base" [ mina-daemon-scripts ]);
 
   mina-archive-image-full =
     mkFullImage "mina-archive" [ ocamlPackages_mina.exes.archive ]
-    (baseImage "mina-base-archive" [ mina-archive-scripts gnutar gzip ]) [ ];
+    (baseImage "mina-base-archive" [ mina-archive-scripts gnutar gzip ]);
 }
