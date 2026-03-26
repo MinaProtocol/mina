@@ -73,13 +73,6 @@ fi
 # Update the Version field
 sed -i "s/^Version: .*$/Version: $NEW_VERSION/" "$CONTROL_FILE"
 
-# Also update dependency version constraints that reference the old version.
-# This ensures that pinned dependencies (e.g., Depends: mina-logproc (= OLD_VERSION))
-# are updated to reference the new version, keeping the package installable.
-sed -i "s/(= ${OLD_VERSION})/(= ${NEW_VERSION})/g" "$CONTROL_FILE"
-sed -i "s/(>= ${OLD_VERSION})/(>= ${NEW_VERSION})/g" "$CONTROL_FILE"
-sed -i "s/(<= ${OLD_VERSION})/(<= ${NEW_VERSION})/g" "$CONTROL_FILE"
-
 # Verify the change
 UPDATED_VERSION=$(grep '^Version:' "$CONTROL_FILE" | awk '{print $2}' || true)
 
@@ -93,4 +86,4 @@ fi
 echo "✓ Version replaced successfully"
 echo ""
 echo "Updated control file:"
-grep -E "^(Package|Version|Architecture|Depends):" "$CONTROL_FILE" || true
+grep -E "^(Package|Version|Architecture):" "$CONTROL_FILE" || true
