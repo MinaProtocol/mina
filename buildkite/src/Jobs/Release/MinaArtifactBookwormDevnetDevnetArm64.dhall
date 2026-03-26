@@ -20,6 +20,7 @@ in  Pipeline.build
           , artifacts =
             [ Artifacts.Type.LogProc
             , Artifacts.Type.Daemon
+            , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonPrefork
