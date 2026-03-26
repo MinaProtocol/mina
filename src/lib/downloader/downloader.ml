@@ -714,7 +714,7 @@ end = struct
   let enqueue t e =
     match Q.enqueue t.pending e with
     | `Ok ->
-        jobs_added t ; `Ok
+        jobs_added t ; flush_soon t ; `Ok
     | `Key_already_present ->
         `Key_already_present
 
@@ -798,8 +798,7 @@ end = struct
               enqueue_exn t
                 { x with
                   attempts = Map.set x.attempts ~key:peer ~data:Attempt.download
-                } ) ;
-          flush_soon t
+                } )
         in
         List.iter xs ~f:(fun x ->
             Hashtbl.set t.downloading ~key:x.key ~data:(peer, x, Time.now ()) ) ;
@@ -876,8 +875,7 @@ end = struct
                       { x with
                         attempts =
                           Map.set x.attempts ~key:peer ~data:Attempt.download
-                      } ) ;
-                flush_soon t ) )
+                      } ) ) )
 
   let to_yojson t : Yojson.Safe.t =
     check_invariant t ;
@@ -1113,5 +1111,5 @@ end = struct
         x
     | None, None ->
         let e = { J.key; attempts; res = Ivar.create () } in
-        enqueue_exn t e ; flush_soon t ; e
+        enqueue_exn t e ; e
 end
