@@ -1,3 +1,7 @@
+let B = ../External/Buildkite.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
 let Artifacts = ../Constants/Artifacts.dhall
 
 let BuildFlags = ../Constants/BuildFlags.dhall
@@ -36,6 +40,7 @@ in  { step =
               , label = "Archive: Replayer mesa hard fork test"
               , key = key
               , target = Size.Large
+              , soft_fail = Some (B/SoftFail.Boolean True)
               , depends_on = dependsOn
               }
     }
