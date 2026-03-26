@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -23,6 +22,9 @@ type HFHandler func(*HardforkTest, *BlockAnalysisResult) error
 func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown HFHandler) (*BlockAnalysisResult, error) {
 	t.Logger.Info("Supported fork method: %s", t.Config.ForkMethods)
 	extraFilesRoot, err := os.MkdirTemp("", "auto-mode-extra-files")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp dir for extra files: %w", err)
+	}
 	defer func() {
 		err := os.RemoveAll(extraFilesRoot)
 		if err != nil {
@@ -39,7 +41,7 @@ func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64, beforeShutdown H
 				return nil, fmt.Errorf("Failed to create node dir extra at %s: %v", nodeDirAbsExtra, err)
 			}
 			extra_args := []byte("--hardfork-handling migrate-exit")
-			if err := os.WriteFile(path.Join(nodeDirAbsExtra, "extra_args.txt"), extra_args, 0644); err != nil {
+			if err := os.WriteFile(filepath.Join(nodeDirAbsExtra, "extra_args.txt"), extra_args, 0644); err != nil {
 				return nil, fmt.Errorf("Failed to write extra_args.txt for node %s: %v", info.Name, err)
 			}
 		}

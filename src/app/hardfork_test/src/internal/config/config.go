@@ -183,8 +183,8 @@ func (c *Config) InitDaemonInfos() {
 		}
 	}
 	if allAuto {
-		nonAutoForkMehtods := []ForkMethod{Legacy, Advanced}
-		result[rand.Intn(len(result))].ForkMethod = nonAutoForkMehtods[rand.Intn(len(nonAutoForkMehtods))]
+		nonAutoForkMethods := []ForkMethod{Legacy, Advanced}
+		result[rand.Intn(len(result))].ForkMethod = nonAutoForkMethods[rand.Intn(len(nonAutoForkMethods))]
 	}
 
 	c.DaemonInfos = result
