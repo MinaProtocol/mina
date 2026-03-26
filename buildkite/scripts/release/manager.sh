@@ -142,7 +142,7 @@ function main_help(){
     echo " architectures: $DEFAULT_ARCHITECTURES"
     echo ""
     echo "Available values: "
-    echo " artifacts: mina-logproc,mina-archive,mina-rosetta,mina,mina-config,mina-generic,rosetta-generic,mina-postfork-mesa,mina-prefork-mesa"
+    echo " artifacts: mina-logproc,mina-archive,mina-rosetta,mina-daemon,mina-config,mina-generic,rosetta-generic,mina-postfork-mesa,mina-prefork-mesa"
     echo " networks: devnet,mainnet"
     echo " codenames: bullseye,focal"
     echo " channels: unstable,alpha,beta,stable"
