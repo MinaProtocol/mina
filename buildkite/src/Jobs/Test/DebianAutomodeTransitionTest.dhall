@@ -20,14 +20,14 @@ let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
+let Profiles = ../../Constants/Profiles.dhall
+
 let dependsOnDevnet =
       DebianVersions.dependsOn
         DebianVersions.DepsSpec::{
         , deb_version = DebianVersions.DebVersion.Bullseye
         , network = Network.Type.Devnet
         }
-
-let Profiles = ../../Constants/Profiles.dhall
 
 let dependsOnMainnet =
       DebianVersions.dependsOn
