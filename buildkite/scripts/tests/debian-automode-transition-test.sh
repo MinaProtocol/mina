@@ -212,7 +212,11 @@ apt-cache showpkg "${PKG_AUTOMODE}" 2>/dev/null | head -20 || true
 
 log_info "=== Step 4: Install ${PKG_DAEMON} v1 ==="
 
-$SUDO apt-get install -y -qq --allow-downgrades "${PKG_DAEMON}=${V1}"
+log_info "Package dependencies for ${PKG_DAEMON}=${V1}:"
+apt-cache depends "${PKG_DAEMON}=${V1}" 2>/dev/null || true
+apt-cache policy "${PKG_DAEMON}=${V1}" 2>/dev/null || true
+
+$SUDO apt-get install -y --allow-downgrades "${PKG_DAEMON}=${V1}"
 
 log_info "Installed ${PKG_DAEMON} v1"
 dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1
