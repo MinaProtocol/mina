@@ -657,9 +657,13 @@ copy_common_daemon_post_automode_apps_and_configs() {
     local prefork_githash_config
     prefork_githash_config=$(git rev-parse --short=8 "$prefork_short_hash" 2>/dev/null || echo "")
     if [[ -n "$prefork_githash_config" ]]; then
-      echo "Copying config for prefork daemon as config_${prefork_githash_config}.json"
-      cp "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json" \
-         "${BUILDDIR}/var/lib/coda/config_${prefork_githash_config}.json"
+      if [[ "$prefork_githash_config" == "$GITHASH_CONFIG" ]]; then
+        echo "Prefork githash (${prefork_githash_config}) is the same as postfork; skipping config copy."
+      else
+        echo "Copying config for prefork daemon as config_${prefork_githash_config}.json"
+        cp "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json" \
+           "${BUILDDIR}/var/lib/coda/config_${prefork_githash_config}.json"
+      fi
     else
       echo "WARNING: Could not resolve prefork commit hash from '${prefork_short_hash}'. Prefork config not shipped."
     fi
