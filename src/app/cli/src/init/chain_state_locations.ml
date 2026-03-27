@@ -13,6 +13,7 @@ type t =
   ; frontier : string  (** The transition frontier *)
   ; epoch_ledger : string  (** The epoch ledger snapshots *)
   ; proof_cache : string  (** The proof cache *)
+  ; proof_cache_meta : string  (** Metadata for the proof cache *)
   ; zkapp_vk_cache : string  (** The zkApp vk cache *)
   ; snark_pool : string  (** The snark pool *)
   }
@@ -31,6 +32,7 @@ let of_config ~conf_dir (config : Runtime_config.t) : t =
   ; frontier = chain_state ^/ "frontier"
   ; epoch_ledger = chain_state
   ; proof_cache = chain_state ^/ "proof_cache"
+  ; proof_cache_meta = chain_state ^/ "proof_cache_meta"
   ; zkapp_vk_cache = chain_state ^/ "zkapp_vk_cache"
   ; snark_pool = chain_state ^/ "snark_pool"
   }

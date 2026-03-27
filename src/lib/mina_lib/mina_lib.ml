@@ -1752,7 +1752,9 @@ let raise_on_initialization_error (`Initialization_error e) =
   Error.raise @@ Error.tag ~tag:"proof cache initialization error" e
 
 let initialize_proof_cache_db (config : Config.t) =
-  Proof_cache_tag.create_db ~logger:config.logger config.proof_cache_location
+  Proof_cache_tag.create_db ~logger:config.logger
+    ~disk_meta_location:config.proof_cache_meta_location
+    config.proof_cache_location
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
 let initialize_zkapp_vk_cache_db (config : Config.t) =
@@ -1943,14 +1945,15 @@ let create ~commit_id ?wallets (config : Config.t) =
           let get_current_frontier () =
             Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
           in
-          Mina_stdlib_unix.Exit_handlers.register_async_shutdown_handler
-            ~logger:config.logger
-            ~description:"Close transition frontier, if exists" (fun () ->
-              match get_current_frontier () with
-              | None ->
-                  Deferred.unit
-              | Some frontier ->
-                  Transition_frontier.close ~loc:__LOC__ frontier ) ;
+          Mina_stdlib_unix.Exit_handlers.(
+            register_async_shutdown_handler
+              ~priority:Priority.Transition_frontier ~logger:config.logger
+              ~description:"Close transition frontier, if exists" (fun () ->
+                match get_current_frontier () with
+                | None ->
+                    Deferred.unit
+                | Some frontier ->
+                    Transition_frontier.close ~loc:__LOC__ frontier )) ;
           (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
           let sync_status_ref = ref None in
           let get_node_status (net : Mina_networking.t) =
@@ -2095,7 +2098,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             notify_online_impl () |> don't_wait_for ;
             Deferred.unit
           in
-          let transaction_pool, tx_remote_sink, tx_local_sink =
+          let%bind transaction_pool, tx_remote_sink, tx_local_sink =
             (* make transaction pool return writer for local and incoming diffs *)
             Network_pool.Transaction_pool.create ~config:txn_pool_config
               ~constraint_constants ~consensus_constants
@@ -2108,10 +2111,13 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
-              ~trust_system:config.trust_system
-              ~disk_location:config.snark_pool_disk_location ~proof_cache_db
+              ~trust_system:config.trust_system ~proof_cache_db
+              ~persistence:
+                ( `Disk_location config.snark_pool_disk_location
+                , `Store_every (Time.Span.of_min 5.0) )
+              ()
           in
-          let snark_pool, snark_remote_sink, snark_local_sink =
+          let%bind snark_pool, snark_remote_sink, snark_local_sink =
             Network_pool.Snark_pool.create ~config:snark_pool_config
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
