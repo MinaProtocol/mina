@@ -8,6 +8,19 @@ let genesis_ledger_total_currency ~ledger =
              ~message:"failed to calculate total currency in genesis ledger"
       else sum )
 
+let genesis_ledger_total_stake ~ledger =
+  Mina_ledger.Ledger.foldi ~init:Currency.Amount.zero (Lazy.force ledger)
+    ~f:(fun _addr sum (account : Mina_base.Account.t) ->
+      if
+        Mina_base.(
+          Token_id.equal account.token_id Token_id.default
+          && Option.is_some account.delegate)
+      then
+        Currency.Amount.add sum (Currency.Balance.to_amount @@ account.balance)
+        |> Base.Option.value_exn ?here:None ?error:None
+             ~message:"failed to calculate total stake in genesis ledger"
+      else sum )
+
 let genesis_ledger_hash ~ledger =
   Mina_ledger.Ledger.merkle_root (Lazy.force ledger)
   |> Mina_base.Frozen_ledger_hash.of_ledger_hash
@@ -15,6 +28,7 @@ let genesis_ledger_hash ~ledger =
 module Hashed = struct
   type t =
     { total_currency : Currency.Amount.t
+    ; total_stake : Currency.Amount.t
     ; hash : Mina_base.Frozen_ledger_hash.t
     }
 
@@ -26,13 +40,11 @@ module Epoch = struct
     type 'ledger t = { ledger : 'ledger; seed : Mina_base.Epoch_seed.t }
 
     let to_hashed (t : Genesis_ledger.Packed.t t) : Hashed.t t =
-      let total_currency =
-        genesis_ledger_total_currency ~ledger:(Genesis_ledger.Packed.t t.ledger)
-      in
-      let hash =
-        genesis_ledger_hash ~ledger:(Genesis_ledger.Packed.t t.ledger)
-      in
-      { ledger = { hash; total_currency }; seed = t.seed }
+      let ledger = Genesis_ledger.Packed.t t.ledger in
+      let total_currency = genesis_ledger_total_currency ~ledger in
+      let total_stake = genesis_ledger_total_stake ~ledger in
+      let hash = genesis_ledger_hash ~ledger in
+      { ledger = { hash; total_currency; total_stake }; seed = t.seed }
   end
 
   type 'ledger tt = { staking : 'ledger Data.t; next : 'ledger Data.t option }
@@ -56,8 +68,9 @@ module Ledger = struct
   type t = Genesis_ledger.Packed.t
 
   let to_hashed (t : t) : Hashed.t =
-    { hash = genesis_ledger_hash ~ledger:(Genesis_ledger.Packed.t t)
-    ; total_currency =
-        genesis_ledger_total_currency ~ledger:(Genesis_ledger.Packed.t t)
+    let ledger = Genesis_ledger.Packed.t t in
+    { hash = genesis_ledger_hash ~ledger
+    ; total_currency = genesis_ledger_total_currency ~ledger
+    ; total_stake = genesis_ledger_total_stake ~ledger
     }
 end

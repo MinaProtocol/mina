@@ -1652,6 +1652,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               ; sub_window_densities : 'length list
               ; last_vrf_output : 'vrf_output
               ; total_currency : 'amount
+              ; total_stake : 'amount
               ; curr_global_slot_since_hard_fork : 'global_slot
               ; global_slot_since_genesis : 'global_slot_since_genesis
               ; staking_epoch_data : 'staking_epoch_data
@@ -1724,6 +1725,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; Typ.list ~length:sub_windows_per_window Length.typ
           ; Vrf.Output.Truncated.typ
           ; Amount.typ
+          ; Amount.typ
           ; Global_slot.typ
           ; Mina_numbers.Global_slot_since_genesis.typ
           ; Epoch_data.Staking.typ
@@ -1744,6 +1746,7 @@ module Make_str (A : Wire_types.Concrete) = struct
            ; sub_window_densities
            ; last_vrf_output
            ; total_currency
+           ; total_stake
            ; curr_global_slot_since_hard_fork
            ; global_slot_since_genesis
            ; staking_epoch_data
@@ -1764,6 +1767,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               (List.map ~f:Length.to_input sub_window_densities)
           ; Vrf.Output.Truncated.to_input last_vrf_output
           ; Amount.to_input total_currency
+          ; Amount.to_input total_stake
           ; Global_slot.to_input curr_global_slot_since_hard_fork
           ; Mina_numbers.Global_slot_since_genesis.to_input
               global_slot_since_genesis
@@ -1786,6 +1790,7 @@ module Make_str (A : Wire_types.Concrete) = struct
            ; sub_window_densities
            ; last_vrf_output
            ; total_currency
+           ; total_stake
            ; curr_global_slot_since_hard_fork
            ; global_slot_since_genesis
            ; staking_epoch_data
@@ -1806,6 +1811,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               (List.map ~f:Length.Checked.to_input sub_window_densities)
           ; Vrf.Output.Truncated.var_to_input last_vrf_output
           ; Amount.var_to_input total_currency
+          ; Amount.var_to_input total_stake
           ; Global_slot.Checked.to_input curr_global_slot_since_hard_fork
           ; Mina_numbers.Global_slot_since_genesis.Checked.to_input
               global_slot_since_genesis
@@ -1838,6 +1844,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~(consensus_transition : Consensus_transition.t)
           ~(previous_protocol_state_hash : Mina_base.State_hash.t)
           ~(supply_increase : Currency.Amount.Signed.t)
+          ~(stake_change : Currency.Amount.Signed.t)
           ~(snarked_ledger_hash : Mina_base.Frozen_ledger_hash.t)
           ~(genesis_ledger_hash : Mina_base.Frozen_ledger_hash.t)
           ~(producer_vrf_result : Random_oracle.Digest.t)
@@ -1879,6 +1886,17 @@ module Make_str (A : Wire_types.Concrete) = struct
                 Amount.Signed.t} previous total currency: %{sexp: Amount.t}"
               supply_increase previous_consensus_state.total_currency
           else Ok total
+        and total_stake =
+          let total, `Overflow overflow =
+            Amount.add_signed_flagged previous_consensus_state.total_stake
+              stake_change
+          in
+          if overflow then
+            Or_error.errorf
+              !"New total stake overflow. stake_change: %{sexp: \
+                Amount.Signed.t} previous total stake: %{sexp: Amount.t}"
+              stake_change previous_consensus_state.total_stake
+          else Ok total
         and () =
           if
             Consensus_transition.(
@@ -1919,6 +1937,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; sub_window_densities
         ; last_vrf_output = Vrf.Output.truncate producer_vrf_result
         ; total_currency
+        ; total_stake
         ; curr_global_slot_since_hard_fork = next_global_slot
         ; global_slot_since_genesis =
             Mina_numbers.Global_slot_since_genesis.add
@@ -1982,6 +2001,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             { ledger =
                 { hash = genesis_ledger.hash
                 ; total_currency = genesis_ledger.total_currency
+                ; total_stake = genesis_ledger.total_stake
                 }
             ; seed = Epoch_seed.initial
             }
@@ -2002,6 +2022,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                  ~f:(Fn.const max_sub_window_density)
         ; last_vrf_output = Vrf.Output.Truncated.dummy
         ; total_currency = genesis_ledger.total_currency
+        ; total_stake = genesis_ledger.total_stake
         ; curr_global_slot_since_hard_fork = Global_slot.zero ~constants
         ; global_slot_since_genesis
         ; staking_epoch_data =
@@ -2044,7 +2065,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ~constraint_constants )
              ~previous_protocol_state_hash:negative_one_protocol_state_hash
              ~consensus_transition ~supply_increase:Currency.Amount.Signed.zero
-             ~snarked_ledger_hash ~genesis_ledger_hash:snarked_ledger_hash
+             ~stake_change:Currency.Amount.Signed.zero ~snarked_ledger_hash
+             ~genesis_ledger_hash:snarked_ledger_hash
              ~block_stake_winner:genesis_winner_pk
              ~block_creator:genesis_winner_pk
              ~coinbase_receiver:genesis_winner_pk ~supercharge_coinbase:true )
@@ -2089,6 +2111,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           (transition_data : Consensus_transition.var)
           (previous_protocol_state_hash : Mina_base.State_hash.var)
           ~(supply_increase : Currency.Amount.Signed.var)
+          ~(stake_change : Currency.Amount.Signed.var)
           ~(previous_blockchain_state_ledger_hash :
              Mina_base.Frozen_ledger_hash.var ) ~genesis_ledger_hash
           ~constraint_constants
@@ -2168,6 +2191,14 @@ module Make_str (A : Wire_types.Concrete) = struct
           [%with_label_ "Total currency is greater than or equal to zero"]
             (fun () -> Boolean.Assert.is_true (Boolean.not overflow))
         in
+        let%bind new_total_stake, `Overflow stake_overflow =
+          Currency.Amount.Checked.add_signed_flagged previous_state.total_stake
+            stake_change
+        in
+        let%bind () =
+          [%with_label_ "Total stake does not overflow"] (fun () ->
+              Boolean.Assert.is_true (Boolean.not stake_overflow) )
+        in
         let%bind has_ancestor_in_same_checkpoint_window =
           same_checkpoint_window ~constants ~prev:prev_global_slot
             ~next:next_global_slot
@@ -2244,6 +2275,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; curr_global_slot_since_hard_fork = next_global_slot
             ; global_slot_since_genesis
             ; total_currency = new_total_currency
+            ; total_stake = new_total_stake
             ; staking_epoch_data
             ; next_epoch_data
             ; has_ancestor_in_same_checkpoint_window
@@ -2260,6 +2292,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; curr_slot : int
         ; global_slot_since_genesis : int
         ; total_currency : int
+        ; total_stake : int
         }
       [@@deriving yojson]
 
@@ -2275,6 +2308,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             Mina_numbers.Global_slot_since_genesis.to_int
               t.global_slot_since_genesis
         ; total_currency = Amount.to_nanomina_int t.total_currency
+        ; total_stake = Amount.to_nanomina_int t.total_stake
         }
 
       let curr_global_slot (t : Value.t) = t.curr_global_slot_since_hard_fork
@@ -3220,8 +3254,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let generate_transition
           ~(previous_protocol_state : Protocol_state.Value.t) ~blockchain_state
           ~current_time ~(block_data : Block_data.t) ~supercharge_coinbase
-          ~snarked_ledger_hash ~genesis_ledger_hash ~supply_increase ~logger
-          ~constraint_constants =
+          ~snarked_ledger_hash ~genesis_ledger_hash ~supply_increase
+          ~stake_change ~logger ~constraint_constants =
         [%log internal] "Generate_transition" ;
         let previous_consensus_state =
           Protocol_state.consensus_state previous_protocol_state
@@ -3251,7 +3285,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             (Consensus_state.update ~constants ~previous_consensus_state
                ~consensus_transition
                ~producer_vrf_result:block_data.Block_data.vrf_result
-               ~previous_protocol_state_hash ~supply_increase
+               ~previous_protocol_state_hash ~supply_increase ~stake_change
                ~snarked_ledger_hash ~genesis_ledger_hash
                ~block_stake_winner:block_data.stake_proof.delegator_pk
                ~block_creator
@@ -3277,11 +3311,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         let%snarkydef.Tick next_state_checked ~constraint_constants
             ~(prev_state : Protocol_state.var)
             ~(prev_state_hash : Mina_base.State_hash.var) transition
-            supply_increase =
+            supply_increase stake_change =
           Consensus_state.update_var ~constraint_constants
             (Protocol_state.consensus_state prev_state)
             (Snark_transition.consensus_transition transition)
-            prev_state_hash ~supply_increase
+            prev_state_hash ~supply_increase ~stake_change
             ~previous_blockchain_state_ledger_hash:
               ( Protocol_state.blockchain_state prev_state
               |> Blockchain_state.snarked_ledger_hash )
@@ -3366,6 +3400,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; sub_window_densities
             ; last_vrf_output = Vrf.Output.truncate producer_vrf_result
             ; total_currency
+            ; total_stake = prev.total_stake
             ; curr_global_slot_since_hard_fork
             ; global_slot_since_genesis
             ; staking_epoch_data
@@ -3496,7 +3531,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let next_consensus_state =
           update ~constants ~previous_consensus_state ~consensus_transition
-            ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
+            ~previous_protocol_state_hash ~supply_increase
+            ~stake_change:Currency.Amount.Signed.zero ~snarked_ledger_hash
             ~genesis_ledger_hash:snarked_ledger_hash ~producer_vrf_result
             ~block_stake_winner:producer_public_key_compressed
             ~block_creator:producer_public_key_compressed
@@ -3544,6 +3580,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%bind supply_increase =
             exists Amount.Signed.typ ~compute:(As_prover.return supply_increase)
           in
+          let%bind stake_change =
+            exists Amount.Signed.typ
+              ~compute:(As_prover.return Currency.Amount.Signed.zero)
+          in
           let%bind previous_blockchain_state_ledger_hash =
             exists Mina_base.Frozen_ledger_hash.typ
               ~compute:(As_prover.return snarked_ledger_hash)
@@ -3558,7 +3598,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           let result =
             update_var previous_state transition_data
-              previous_protocol_state_hash ~supply_increase
+              previous_protocol_state_hash ~supply_increase ~stake_change
               ~previous_blockchain_state_ledger_hash ~genesis_ledger_hash
               ~constraint_constants ~protocol_constants:constants_checked
           in
@@ -3962,6 +4002,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let%bind vrf_output = gen_vrf_output in
         (* Generate block reward information (unused in chain selection). *)
+        let%bind total_stake = Amount.gen_incl Amount.zero total_currency in
         let%map staker_pk = Public_key.Compressed.gen in
         { Consensus_state.Poly.blockchain_length
         ; epoch_count = curr_epoch
@@ -3969,6 +4010,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; sub_window_densities
         ; last_vrf_output = vrf_output
         ; total_currency
+        ; total_stake
         ; curr_global_slot_since_hard_fork
         ; staking_epoch_data
         ; next_epoch_data = next_staking_epoch_data
