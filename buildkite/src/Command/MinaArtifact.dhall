@@ -141,6 +141,7 @@ let build_artifacts
                                                  spec.debVersion}"
                         , "ARCHITECTURE=${Arch.lowerName spec.arch}"
                         , Network.buildMainnetEnv spec.network
+                        , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
                         ]
                       # BuildFlags.buildEnvs spec.buildFlags
                       # spec.extraBuildEnvs

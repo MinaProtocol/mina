@@ -650,6 +650,25 @@ copy_common_daemon_post_automode_apps_and_configs() {
 
   copy_common_daemon_configs "${prefork_network}"
 
+  # Also ship config for prefork daemon's commit-id-based config lookup.
+  # The prefork binary looks for config_<its_own_8char_hash>.json at startup.
+  if [[ -n "${PREFORK_LEGACY_VERSION:-}" ]]; then
+    local prefork_short_hash="${PREFORK_LEGACY_VERSION##*-}"
+    local prefork_githash_config
+    prefork_githash_config=$(git rev-parse --short=8 "$prefork_short_hash" 2>/dev/null || echo "")
+    if [[ -n "$prefork_githash_config" ]]; then
+      if [[ "$prefork_githash_config" == "$GITHASH_CONFIG" ]]; then
+        echo "Prefork githash (${prefork_githash_config}) is the same as postfork; skipping config copy."
+      else
+        echo "Copying config for prefork daemon as config_${prefork_githash_config}.json"
+        cp "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json" \
+           "${BUILDDIR}/var/lib/coda/config_${prefork_githash_config}.json"
+      fi
+    else
+      echo "WARNING: Could not resolve prefork commit hash from '${prefork_short_hash}'. Prefork config not shipped."
+    fi
+  fi
+
   # Copy seed list with correct URL for postfork runtime and
   # bash completion that points to the correct seed list URL
   copy_common_daemon_utils "${seed_list_url}" "${AUTOMODE_POSTFORK_DIR}/mina"
