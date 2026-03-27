@@ -94,9 +94,11 @@ sed -i "s/^Version: .*$/Version: $NEW_VERSION/" "$CONTROL_FILE"
 # Optionally update dependency version constraints
 if [[ "$UPDATE_DEPS" == "true" ]]; then
   echo "Updating dependency version constraints..."
-  sed -i "s/(= ${OLD_VERSION})/(= ${NEW_VERSION})/g" "$CONTROL_FILE"
-  sed -i "s/(>= ${OLD_VERSION})/(>= ${NEW_VERSION})/g" "$CONTROL_FILE"
-  sed -i "s/(<= ${OLD_VERSION})/(<= ${NEW_VERSION})/g" "$CONTROL_FILE"
+  sed -i "s/(= *${OLD_VERSION})/(= ${NEW_VERSION})/g" "$CONTROL_FILE"
+  sed -i "s/(>= *${OLD_VERSION})/(>= ${NEW_VERSION})/g" "$CONTROL_FILE"
+  sed -i "s/(<= *${OLD_VERSION})/(<= ${NEW_VERSION})/g" "$CONTROL_FILE"
+  sed -i "s/(>> *${OLD_VERSION})/(>> ${NEW_VERSION})/g" "$CONTROL_FILE"
+  sed -i "s/(<< *${OLD_VERSION})/(<< ${NEW_VERSION})/g" "$CONTROL_FILE"
 fi
 
 # Verify the change
