@@ -2505,6 +2505,148 @@ let wrap_main_circuit (inputs : Impls.Wrap.Field.t array) () =
     ~messages_for_next_wrap_proof_digest
     ~bulletproof_challenges)
 
+(* ====================================================================
+   Pseudo module sub-circuits: one_hot_vector, mask, choose, choose_key.
+   Both Step (Fp/Vesta) and Wrap (Fq/Pallas) variants.
+   ==================================================================== *)
+
+(* one_hot_vector: of_index with length=1 (single branch) *)
+let one_hot_n1_step_circuit (inputs : Impl.Field.t array) () =
+  let open Impl in
+  let open Pickles_types in
+  let _v = with_label "one_hot_n1" (fun () ->
+    One_hot_vector.Step.of_index inputs.(0) ~length:Nat.N1.n) in
+  ()
+
+let one_hot_n1_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let _v = with_label "one_hot_n1" (fun () ->
+    One_hot_vector.Wrap.of_index inputs.(0) ~length:Nat.N1.n) in
+  ()
+
+(* one_hot_vector: of_index with length=3 (wrap_domain selection) *)
+let one_hot_n3_step_circuit (inputs : Impl.Field.t array) () =
+  let open Impl in
+  let open Pickles_types in
+  let _v = with_label "one_hot_n3" (fun () ->
+    One_hot_vector.Step.of_index inputs.(0) ~length:Nat.N3.n) in
+  ()
+
+let one_hot_n3_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let _v = with_label "one_hot_n3" (fun () ->
+    One_hot_vector.Wrap.of_index inputs.(0) ~length:Nat.N3.n) in
+  ()
+
+(* pseudo_mask: mask with length=1 *)
+let pseudo_mask_n1_step_circuit (inputs : Impl.Field.t array) () =
+  let open Impl in
+  let open Pickles_types in
+  let bits = One_hot_vector.Step.of_index inputs.(0) ~length:Nat.N1.n in
+  let _result = with_label "pseudo_mask_n1" (fun () ->
+    Pseudo.Step.mask bits (Vector.map (Vector.[ inputs.(1) ]) ~f:Fn.id)) in
+  ()
+
+let pseudo_mask_n1_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let bits = One_hot_vector.Wrap.of_index inputs.(0) ~length:Nat.N1.n in
+  let _result = with_label "pseudo_mask_n1" (fun () ->
+    Pseudo.Wrap.mask bits (Vector.map (Vector.[ inputs.(1) ]) ~f:Fn.id)) in
+  ()
+
+(* pseudo_mask: mask with length=3 *)
+let pseudo_mask_n3_step_circuit (inputs : Impl.Field.t array) () =
+  let open Impl in
+  let open Pickles_types in
+  let bits = One_hot_vector.Step.of_index inputs.(0) ~length:Nat.N3.n in
+  let _result = with_label "pseudo_mask_n3" (fun () ->
+    Pseudo.Step.mask bits Vector.[ inputs.(1); inputs.(2); inputs.(3) ]) in
+  ()
+
+let pseudo_mask_n3_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let bits = One_hot_vector.Wrap.of_index inputs.(0) ~length:Nat.N3.n in
+  let _result = with_label "pseudo_mask_n3" (fun () ->
+    Pseudo.Wrap.mask bits Vector.[ inputs.(1); inputs.(2); inputs.(3) ]) in
+  ()
+
+(* pseudo_choose: choose with length=1, mapping ints to field constants *)
+let pseudo_choose_n1_step_circuit (inputs : Impl.Field.t array) () =
+  let open Impl in
+  let open Pickles_types in
+  let bits = One_hot_vector.Step.of_index inputs.(0) ~length:Nat.N1.n in
+  let _result = with_label "pseudo_choose_n1" (fun () ->
+    Pseudo.Step.choose (bits, Vector.[ 42 ]) ~f:Field.of_int) in
+  ()
+
+let pseudo_choose_n1_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let bits = One_hot_vector.Wrap.of_index inputs.(0) ~length:Nat.N1.n in
+  let _result = with_label "pseudo_choose_n1" (fun () ->
+    Pseudo.Wrap.choose (bits, Vector.[ 42 ]) ~f:Field.of_int) in
+  ()
+
+(* pseudo_choose: choose with length=3, mapping ints to field constants *)
+let pseudo_choose_n3_step_circuit (inputs : Impl.Field.t array) () =
+  let open Impl in
+  let open Pickles_types in
+  let bits = One_hot_vector.Step.of_index inputs.(0) ~length:Nat.N3.n in
+  let _result = with_label "pseudo_choose_n3" (fun () ->
+    Pseudo.Step.choose (bits, Vector.[ 13; 14; 15 ]) ~f:Field.of_int) in
+  ()
+
+let pseudo_choose_n3_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let bits = One_hot_vector.Wrap.of_index inputs.(0) ~length:Nat.N3.n in
+  let _result = with_label "pseudo_choose_n3" (fun () ->
+    Pseudo.Wrap.choose (bits, Vector.[ 13; 14; 15 ]) ~f:Field.of_int) in
+  ()
+
+(* choose_key: single branch (N1) with dummy VK, matching wrap_main dump *)
+let choose_key_n1_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let module Inner_curve = Wrap_main_inputs.Inner_curve in
+  let which_branch = with_label "one_hot" (fun () ->
+    Wrap_verifier.One_hot_vector.of_index inputs.(0) ~length:Nat.N1.n) in
+  let dummy_pt = Inner_curve.Params.one in
+  let dummy_comm = [| Inner_curve.constant dummy_pt |] in
+  let key =
+    { Plonk_verification_key_evals.Step.
+      sigma_comm = Vector.init Nat.N7.n ~f:(fun _ -> dummy_comm)
+    ; coefficients_comm = Vector.init Nat.N15.n ~f:(fun _ -> dummy_comm)
+    ; generic_comm = dummy_comm
+    ; psm_comm = dummy_comm
+    ; complete_add_comm = dummy_comm
+    ; mul_comm = dummy_comm
+    ; emul_comm = dummy_comm
+    ; endomul_scalar_comm = dummy_comm
+    ; xor_comm = Opt.Nothing
+    ; range_check0_comm = Opt.Nothing
+    ; range_check1_comm = Opt.Nothing
+    ; foreign_field_add_comm = Opt.Nothing
+    ; foreign_field_mul_comm = Opt.Nothing
+    ; rot_comm = Opt.Nothing
+    ; lookup_table_comm =
+        Vector.init Plonk_types.Lookup_sorted_minus_1.n ~f:(fun _ -> Opt.Nothing)
+    ; lookup_table_ids = Opt.Nothing
+    ; runtime_tables_selector = Opt.Nothing
+    ; lookup_selector_lookup = Opt.Nothing
+    ; lookup_selector_xor = Opt.Nothing
+    ; lookup_selector_range_check = Opt.Nothing
+    ; lookup_selector_ffmul = Opt.Nothing
+    }
+  in
+  let _index = with_label "choose_key" (fun () ->
+    Wrap_verifier.choose_key which_branch Vector.[ key ]) in
+  ()
+
 (* Step IVP circuit: verifies a Wrap proof via IPA (Step/Tick/Fp side).
 
    The Step IVP runs on the Fp field and verifies Pallas commitments.
@@ -4013,6 +4155,39 @@ let run ~output_dir =
   in
   dump_wrap "wrap_main_circuit" wrap_main_circuit
     ~input_typ:wrap_main_input_typ ~return_typ:Impls.Wrap.Typ.unit ;
+  (* ---- Pseudo module sub-circuits ---- *)
+  let array1_field_ps = Impl.Typ.array ~length:1 Impl.Field.typ in
+  let array1_wrap_ps = Impls.Wrap.Typ.array ~length:1 Impls.Wrap.Field.typ in
+  let array2_field_ps = Impl.Typ.array ~length:2 Impl.Field.typ in
+  let array2_wrap_ps = Impls.Wrap.Typ.array ~length:2 Impls.Wrap.Field.typ in
+  let array4_field_ps = Impl.Typ.array ~length:4 Impl.Field.typ in
+  let array4_wrap_ps = Impls.Wrap.Typ.array ~length:4 Impls.Wrap.Field.typ in
+  dump_step "one_hot_n1_step_circuit" one_hot_n1_step_circuit
+    ~input_typ:array1_field_ps ~return_typ:Impl.Typ.unit ;
+  dump_wrap "one_hot_n1_wrap_circuit" one_hot_n1_wrap_circuit
+    ~input_typ:array1_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
+  dump_step "one_hot_n3_step_circuit" one_hot_n3_step_circuit
+    ~input_typ:array1_field_ps ~return_typ:Impl.Typ.unit ;
+  dump_wrap "one_hot_n3_wrap_circuit" one_hot_n3_wrap_circuit
+    ~input_typ:array1_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
+  dump_step "pseudo_mask_n1_step_circuit" pseudo_mask_n1_step_circuit
+    ~input_typ:array2_field_ps ~return_typ:Impl.Typ.unit ;
+  dump_wrap "pseudo_mask_n1_wrap_circuit" pseudo_mask_n1_wrap_circuit
+    ~input_typ:array2_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
+  dump_step "pseudo_mask_n3_step_circuit" pseudo_mask_n3_step_circuit
+    ~input_typ:array4_field_ps ~return_typ:Impl.Typ.unit ;
+  dump_wrap "pseudo_mask_n3_wrap_circuit" pseudo_mask_n3_wrap_circuit
+    ~input_typ:array4_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
+  dump_step "pseudo_choose_n1_step_circuit" pseudo_choose_n1_step_circuit
+    ~input_typ:array1_field_ps ~return_typ:Impl.Typ.unit ;
+  dump_wrap "pseudo_choose_n1_wrap_circuit" pseudo_choose_n1_wrap_circuit
+    ~input_typ:array1_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
+  dump_step "pseudo_choose_n3_step_circuit" pseudo_choose_n3_step_circuit
+    ~input_typ:array1_field_ps ~return_typ:Impl.Typ.unit ;
+  dump_wrap "pseudo_choose_n3_wrap_circuit" pseudo_choose_n3_wrap_circuit
+    ~input_typ:array1_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
+  dump_wrap "choose_key_n1_wrap_circuit" choose_key_n1_wrap_circuit
+    ~input_typ:array1_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
   (* Step IVP needs the Tock URS for Step_main_inputs.Generators.h *)
   Backend.Tock.Keypair.set_urs_info [] ;
   let array175_field = Impl.Typ.array ~length:175 Impl.Field.typ in
