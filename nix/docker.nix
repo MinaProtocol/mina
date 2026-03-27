@@ -80,7 +80,7 @@ let
       config = {
         env = [ "MINA_TIME_OFFSET=0" ];
         WorkingDir = "/root";
-        cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
+        Entrypoint = [ "/bin/dumb-init" "/entrypoint.sh" ];
       };
     };
 in {
