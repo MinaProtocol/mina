@@ -2609,6 +2609,16 @@ let pseudo_choose_n3_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
   ()
 
 (* choose_key: single branch (N1) with dummy VK, matching wrap_main dump *)
+(* Minimal test: single (b :> t) * constant multiplication *)
+let scale_bool_const_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
+  let open Impls.Wrap in
+  let open Pickles_types in
+  let b = with_label "equals" (fun () ->
+    Field.equal (Field.of_int 0) inputs.(0)) in
+  let _result = with_label "scale" (fun () ->
+    Field.((b :> t) * Field.constant (Backend.Tock.Field.of_int 42))) in
+  ()
+
 let choose_key_n1_wrap_circuit (inputs : Impls.Wrap.Field.t array) () =
   let open Impls.Wrap in
   let open Pickles_types in
@@ -4185,6 +4195,8 @@ let run ~output_dir =
   dump_step "pseudo_choose_n3_step_circuit" pseudo_choose_n3_step_circuit
     ~input_typ:array1_field_ps ~return_typ:Impl.Typ.unit ;
   dump_wrap "pseudo_choose_n3_wrap_circuit" pseudo_choose_n3_wrap_circuit
+    ~input_typ:array1_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
+  dump_wrap "scale_bool_const_wrap_circuit" scale_bool_const_wrap_circuit
     ~input_typ:array1_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
   dump_wrap "choose_key_n1_wrap_circuit" choose_key_n1_wrap_circuit
     ~input_typ:array1_wrap_ps ~return_typ:Impls.Wrap.Typ.unit ;
