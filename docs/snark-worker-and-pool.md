@@ -24,11 +24,11 @@ workers* and collected in the *SNARK pool*.
 │                                                                             │
 │  ┌──────────────┐       ┌───────────────────┐      ┌──────────────────────┐│
 │  │ Work Selector│──────►│ Work Partitioner  │─RPC─►│  SNARK Worker        ││
-│  │              │◄──────│                   │◄─RPC─│  (integrated or      ││
+│  │              │       │                   │◄─RPC─│  (integrated or      ││
 │  └──────────────┘       └───────────────────┘      │   standalone)        ││
-│          │                        │                 └──────────────────────┘│
+│          ▲                        │                 └──────────────────────┘│
 │          │ pending_work           │ add_work (combined result)              │
-│          ▼                        ▼                                         │
+│          │                        ▼                                         │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
 │  │                         SNARK Pool                                    │  │
 │  │   snark_tables.all  /  snark_tables.rebroadcastable                   │  │
@@ -75,22 +75,12 @@ already has a proof.  Work is represented as a `Snark_work_lib.Selector.Single.S
 
 **Source:** `src/lib/work_partitioner/`
 
-The work partitioner sits between the work selector and the RPC layer.  Its
-two main responsibilities are:
+The work partitioner sits between the work selector and the SNARK worker RPC
+layer.  It breaks work-selector units into smaller chunks for individual workers
+and re-combines partial results into full proofs.
 
-1. **Partitioning** – ZK-app commands require multiple segment proofs that must
-   be generated sequentially or in parallel and then merged.  The partitioner
-   breaks a single work-selector unit into smaller `Spec.Partitioned.t` chunks
-   that each SNARK worker can process independently.
-
-2. **Combining** – When partial sub-zkapp results arrive from workers, the
-   partitioner combines them (merge proofs) and, once a full proof unit is
-   assembled, forwards the combined `Result.Combined.t` to the work selector
-   (which stores it in the SNARK pool via `Mina_lib.add_work`).
-
-The partitioner also handles *reassignment*: if a worker does not respond
-within `--work-reassignment-wait` seconds, the job is returned to the pending
-pool and reassigned to the next worker that asks.
+For detailed documentation, see the module's own README at
+`src/lib/work_partitioner/README.md`.
 
 ---
 
