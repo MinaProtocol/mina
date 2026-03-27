@@ -56,6 +56,7 @@ let
       ctypes = super.ctypes.overrideAttrs
         (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
 
+
       # Can't find sodium-static and ctypes
       sodium = super.sodium.overrideAttrs {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
@@ -190,11 +191,24 @@ EOFMAKE
         '';
       });
 
+      # conduit-async package is not being built properly by opam-nix
+      # The build phase is skipped, resulting in empty files
+      # Force a proper build phase
+      conduit-async = super.conduit-async.overrideAttrs (oa: {
+        buildPhase = ''
+          runHook preBuild
+          dune build -p conduit-async -j $NIX_BUILD_CORES
+          runHook postBuild
+        '';
+      });
+
       # cohttp-async linking issue: core's linux_ext needs core_unix_gettid symbol
       # The symbol should be in core's stub library but appears to be missing
       # This is likely because core.v0.14.1 was built without this function
       # Workaround: provide a stub implementation
       cohttp-async = super.cohttp-async.overrideAttrs (oa: {
+        buildInputs = oa.buildInputs ++ [ self.conduit-async ];
+
         # Add gcc to build inputs for compiling the stub
         nativeBuildInputs = (oa.nativeBuildInputs or [ ]) ++ [ pkgs.gcc ];
         # Create a stub library that provides the missing symbol
