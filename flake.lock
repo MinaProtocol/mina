@@ -31,11 +31,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1742933757,
-        "narHash": "sha256-FI8sVvIJuKscrnOUj/cqbZRVOxTzgBwYMyZSNcXq+58=",
+        "lastModified": 1774630915,
+        "narHash": "sha256-wRF/J/044ZEEklywC3tGtM6F1pvVJHHiD9E/iU+Q9bE=",
         "owner": "o1-labs",
         "repo": "dune-nix",
-        "rev": "5eedc211a4cfc3bae1833c5a85542be49b4a9f6b",
+        "rev": "4805cadb21fff7a44ce2aba4771b228fa77061e0",
         "type": "github"
       },
       "original": {
@@ -360,17 +360,17 @@
     "o1-opam-repository": {
       "flake": false,
       "locked": {
-        "lastModified": 1760589013,
-        "narHash": "sha256-pugmvJB2/Ajr9sRujabatKJKwjheZMYgDpg17djfX3Y=",
+        "lastModified": 1774349982,
+        "narHash": "sha256-uH2Oj9NKNA6ljbkGms8XqoK4U85wiGxCKtmXX2/wNXk=",
         "owner": "o1-labs",
         "repo": "opam-repository",
-        "rev": "dd90c5c72b7b7caeca3db3224b2503924deea08a",
+        "rev": "39b27eed96d44064fe1c4e9db7fd8f57c6a7db46",
         "type": "github"
       },
       "original": {
         "owner": "o1-labs",
         "repo": "opam-repository",
-        "rev": "dd90c5c72b7b7caeca3db3224b2503924deea08a",
+        "rev": "39b27eed96d44064fe1c4e9db7fd8f57c6a7db46",
         "type": "github"
       }
     },
