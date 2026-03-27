@@ -47,7 +47,7 @@ let sample_block_sexp =
              (full_transaction_commitment
               0x0000000000000000000000000000000000000000000000000000000000000000)
              (excess ((magnitude 0) (sgn Pos)))
-             (supply_increase ((magnitude 0) (sgn Pos))) (ledger 0)
+             (supply_increase ((magnitude 0) (sgn Pos))) (stake_change ((magnitude 0) (sgn Pos))) (ledger 0)
              (success true) (account_update_index 0) (failure_status_tbl ())
              (will_succeed true)))))
          (target
@@ -69,7 +69,7 @@ let sample_block_sexp =
              (full_transaction_commitment
               0x0000000000000000000000000000000000000000000000000000000000000000)
              (excess ((magnitude 0) (sgn Pos)))
-             (supply_increase ((magnitude 0) (sgn Pos))) (ledger 0)
+             (supply_increase ((magnitude 0) (sgn Pos))) (stake_change ((magnitude 0) (sgn Pos))) (ledger 0)
              (success true) (account_update_index 0) (failure_status_tbl ())
              (will_succeed true)))))
          (connecting_ledger_left
@@ -77,6 +77,7 @@ let sample_block_sexp =
          (connecting_ledger_right
           4958998934359971061501155897206360741418847934692582646141869034661458403276)
          (supply_increase ((magnitude 0) (sgn Pos)))
+         (stake_change ((magnitude 0) (sgn Pos)))
          (fee_excess
           ((fee_token_l
             0x0000000000000000000000000000000000000000000000000000000000000001)
@@ -536,6 +537,12 @@ let sample_block_json =
                     "Pos"
                   ]
                 },
+                "stake_change": {
+                  "magnitude": "0",
+                  "sgn": [
+                    "Pos"
+                  ]
+                },
                 "ledger": "jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd",
                 "success": true,
                 "account_update_index": "0",
@@ -570,6 +577,12 @@ let sample_block_json =
                     "Pos"
                   ]
                 },
+                "stake_change": {
+                  "magnitude": "0",
+                  "sgn": [
+                    "Pos"
+                  ]
+                },
                 "ledger": "jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd",
                 "success": true,
                 "account_update_index": "0",
@@ -580,6 +593,12 @@ let sample_block_json =
             "connecting_ledger_left": "jxeqCMyTEzGxMEgbKQCQo7YDfaXujF2LNaD7UQTpBt5oDPf3pTj",
             "connecting_ledger_right": "jxeqCMyTEzGxMEgbKQCQo7YDfaXujF2LNaD7UQTpBt5oDPf3pTj",
             "supply_increase": {
+              "magnitude": "0",
+              "sgn": [
+                "Pos"
+              ]
+            },
+            "stake_change": {
               "magnitude": "0",
               "sgn": [
                 "Pos"

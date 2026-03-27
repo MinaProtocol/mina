@@ -383,74 +383,55 @@ let stake_change ~(get_account_after : Account_id.t -> Account.t option) (t : t)
           | None, None ->
               Amount.Signed.zero ) )
   | Command (Zkapp_command zc) ->
-      (* Build a map from account_id to pre-tx account for delegate lookups *)
-      let pre_tx_accounts =
-        List.fold zc.accounts ~init:Account_id.Map.empty
-          ~f:(fun map (aid, acct_opt) ->
-            Account_id.Map.set map ~key:aid ~data:acct_opt )
-      in
-      let pre_delegate aid =
-        match Account_id.Map.find pre_tx_accounts aid with
-        | Some (Some acct) ->
-            acct.delegate
-        | _ ->
-            None
-      in
-      let post_delegate aid =
-        match get_account_after aid with
-        | Some acct ->
-            acct.delegate
-        | None ->
-            None
-      in
-      let post_balance aid =
-        match get_account_after aid with
-        | Some acct ->
-            Balance.to_amount acct.balance
-        | None ->
-            Amount.zero
-      in
-      (* Compute per-account contribution based on delegate transition.
-         Same 4-case table as zkapp_command_logic.ml accumulation. *)
-      let account_contribution aid balance_change =
-        let was_staked = Option.is_some (pre_delegate aid) in
-        let now_staked = Option.is_some (post_delegate aid) in
-        match (was_staked, now_staked) with
-        | true, true ->
-            balance_change
-        | true, false ->
-            (* pre_bal = post_bal - balance_change. Cannot overflow since
-               pre_bal was a valid balance before the change. *)
-            let pre_bal =
-              Option.value ~default:Amount.Signed.zero
-                (Amount.Signed.add
-                   (pos (post_balance aid))
-                   (Amount.Signed.negate balance_change) )
-            in
-            Amount.Signed.negate pre_bal
-        | false, true ->
-            pos (post_balance aid)
-        | false, false ->
-            Amount.Signed.zero
-      in
-      let cmd = zc.command.data in
-      (* Fee_payer can't change its delegate, so use pre-tx status for both *)
-      let fee_payer_aid =
-        Account_id.create (Zkapp_command.fee_payer_pk cmd) Token_id.default
-      in
-      let fp_was_staked = Option.is_some (pre_delegate fee_payer_aid) in
-      let fp_contrib =
-        if fp_was_staked then neg (Amount.of_fee (Zkapp_command.fee cmd))
-        else Amount.Signed.zero
-      in
-      List.fold (Zkapp_command.account_updates_list cmd) ~init:fp_contrib
-        ~f:(fun acc (au : Account_update.t) ->
-          let aid = Account_update.account_id au in
-          let delta = au.body.balance_change in
-          let balance_change =
-            Amount.Signed.create ~magnitude:delta.magnitude ~sgn:delta.sgn
+      (* Compute stake_change per unique account based on pre-tx vs post-tx
+         state, rather than per account_update. This avoids double-counting
+         when the same account appears in multiple account_updates. *)
+      List.fold zc.accounts ~init:Amount.Signed.zero
+        ~f:(fun acc (aid, pre_acct_opt) ->
+          let was_staked =
+            match pre_acct_opt with
+            | Some acct ->
+                Option.is_some acct.delegate
+            | None ->
+                false
           in
-          add acc (account_contribution aid balance_change) )
+          let now_staked =
+            match get_account_after aid with
+            | Some acct ->
+                Option.is_some acct.delegate
+            | None ->
+                false
+          in
+          let pre_bal =
+            match pre_acct_opt with
+            | Some acct ->
+                Balance.to_amount acct.balance
+            | None ->
+                Amount.zero
+          in
+          let post_bal =
+            match get_account_after aid with
+            | Some acct ->
+                Balance.to_amount acct.balance
+            | None ->
+                Amount.zero
+          in
+          let contribution =
+            match (was_staked, now_staked) with
+            | true, true ->
+                (* Still staked: stake_change = post_bal - pre_bal *)
+                Option.value ~default:Amount.Signed.zero
+                  (Amount.Signed.add (pos post_bal) (neg pre_bal))
+            | true, false ->
+                (* Opted out: entire pre_bal leaves staking *)
+                neg pre_bal
+            | false, true ->
+                (* Opted in: entire post_bal enters staking *)
+                pos post_bal
+            | false, false ->
+                Amount.Signed.zero
+          in
+          add acc contribution )
   | Fee_transfer ft ->
       One_or_two.fold (Fee_transfer.to_singles ft.fee_transfer.data)
         ~init:Amount.Signed.zero ~f:(fun acc { receiver_pk; fee; _ } ->

@@ -86,17 +86,16 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
       |> Int.( + ) 100_000_000_000_000_000
       |> Currency.Balance.of_nanomina_int_exn
     in
-    (* max balance to avoid overflow when adding deltas *)
+    (* max balance: total across all accounts must fit in Amount.t so that
+       stake_change (bounded by total balances) doesn't overflow in merges.
+       Use 1B MINA as a realistic total_currency cap. *)
     let max_balance =
-      let max_bal = Currency.Balance.of_mina_string_exn "2000000000.0" in
-      match
-        Currency.Balance.add_amount min_balance
-          (Currency.Balance.to_amount max_bal)
-      with
-      | None ->
-          failwith "zkapp_command_with_ledger: overflow for max_balance"
-      | Some _ ->
-          max_bal
+      let per_account =
+        Currency.Balance.of_nanomina_int_exn
+          (1_000_000_000_000_000_000 / max 1 num_keypairs_in_ledger)
+      in
+      if Currency.Balance.( < ) per_account min_balance then min_balance
+      else per_account
     in
     Quickcheck.Generator.list_with_length num_keypairs_in_ledger
       (Currency.Balance.gen_incl min_balance max_balance)
