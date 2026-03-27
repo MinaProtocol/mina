@@ -2207,35 +2207,36 @@ let wrap_main_circuit (inputs : Impls.Wrap.Field.t array) () =
   pos := 30 ;
   (* ---- 2. which_branch (single field) ---- *)
   let which_branch' = alloc_typ Field.typ in
-  let which_branch =
+  let which_branch = with_label "one_hot_which_branch" (fun () ->
     Wrap_verifier.One_hot_vector.of_index which_branch'
-      ~length:Nat.N1.n
+      ~length:Nat.N1.n)
   in
   (* ---- 3. Branch selection (single branch) ---- *)
   let step_widths : (int, Nat.N1.n) Vector.t = Vector.[ 1 ] in
-  let actual_proofs_verified_mask =
+  let actual_proofs_verified_mask = with_label "ones_vector" (fun () ->
     Util.Wrap.ones_vector
       ~first_zero:
         (Wrap_verifier.Pseudo.choose (which_branch, step_widths) ~f:Field.of_int)
       Nat.N2.n
-    |> Vector.rev
+    |> Vector.rev)
   in
   let step_domains : (Import.Domains.t, Nat.N1.n) Vector.t = Vector.[
     { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 16 }
   ] in
-  let domain_log2 =
+  let domain_log2 = with_label "domain_log2_choose" (fun () ->
     Wrap_verifier.Pseudo.choose
       ( which_branch
       , Vector.map ~f:(fun ds -> Pickles_base.Domain.log2_size ds.h) step_domains )
-      ~f:Field.of_int
+      ~f:Field.of_int)
   in
   (* ---- 4. Assert branch_data ---- *)
-  Import.Branch_data.Checked.Wrap.pack
-    { proofs_verified_mask =
-        Vector.extend_front_exn actual_proofs_verified_mask Nat.N2.n Boolean.false_
-    ; domain_log2
-    }
-  |> Field.Assert.equal branch_data ;
+  with_label "branch_data_assert" (fun () ->
+    Import.Branch_data.Checked.Wrap.pack
+      { proofs_verified_mask =
+          Vector.extend_front_exn actual_proofs_verified_mask Nat.N2.n Boolean.false_
+      ; domain_log2
+      }
+    |> Field.Assert.equal branch_data) ;
   (* ---- 5. prev_proof_state ---- *)
   let prev_proof_state_typ =
     let open Import.Types.Step.Proof_state in
@@ -2244,7 +2245,8 @@ let wrap_main_circuit (inputs : Impls.Wrap.Field.t array) () =
       (Vector.init Nat.N2.n ~f:(fun _ -> Plonk_types.Features.none))
       (Shifted_value.Type2.wrap_typ Field.typ)
   in
-  let prev_proof_state = alloc_typ prev_proof_state_typ in
+  let prev_proof_state = with_label "alloc_prev_proof_state" (fun () ->
+    alloc_typ prev_proof_state_typ) in
   (* ---- 6. step_plonk_index (dummy VK, single branch) ---- *)
   let dummy_pt = Inner_curve.Params.one in
   let dummy_comm = [| Inner_curve.constant dummy_pt |] in
@@ -2275,10 +2277,11 @@ let wrap_main_circuit (inputs : Impls.Wrap.Field.t array) () =
       ; lookup_selector_ffmul = Opt.Nothing
       }
     in
-    Wrap_verifier.choose_key which_branch Vector.[ key ]
+    with_label "choose_key" (fun () ->
+      Wrap_verifier.choose_key which_branch Vector.[ key ])
   in
   (* ---- 7. Feature flag consistency (all None for Features.none) ---- *)
-  let () =
+  let () = with_label "feature_flag_consistency" (fun () ->
     let { Plonk_verification_key_evals.Step.
           sigma_comm = _; coefficients_comm = _; generic_comm = _; psm_comm = _
         ; complete_add_comm = _; mul_comm = _; emul_comm = _
@@ -2326,11 +2329,11 @@ let wrap_main_circuit (inputs : Impls.Wrap.Field.t array) () =
     assert_consistent lookup_selector_lookup lookup ;
     assert_consistent lookup_selector_xor lookup_pattern_xor ;
     assert_consistent lookup_selector_range_check lookup_pattern_range_check ;
-    assert_consistent lookup_selector_ffmul foreign_field_mul
+    assert_consistent lookup_selector_ffmul foreign_field_mul)
   in
   (* ---- 8. prev_step_accs ---- *)
-  let prev_step_accs =
-    alloc_typ (Vector.wrap_typ Inner_curve.typ Nat.N2.n)
+  let prev_step_accs = with_label "alloc_prev_step_accs" (fun () ->
+    alloc_typ (Vector.wrap_typ Inner_curve.typ Nat.N2.n))
   in
   (* ---- 9. old_bp_chals (N1 single branch: [Vector N1 (Vector 15 Field.t)]) ---- *)
   (* For single-branch N1: Max_widths_by_slot.maxes = [N1; N0].
@@ -2359,10 +2362,10 @@ let wrap_main_circuit (inputs : Impls.Wrap.Field.t array) () =
     let ty = Plonk_types.All_evals.wrap_typ ~num_chunks Plonk_types.Features.Full.none in
     Vector.wrap_typ ty Nat.N2.n
   in
-  let evals = alloc_typ evals_typ in
+  let evals = with_label "alloc_evals" (fun () -> alloc_typ evals_typ) in
   (* ---- 11. wrap_domain_indices ---- *)
-  let wrap_domain_indices =
-    alloc_typ (Vector.wrap_typ Field.typ Nat.N2.n)
+  let wrap_domain_indices = with_label "alloc_wrap_domain_indices" (fun () ->
+    alloc_typ (Vector.wrap_typ Field.typ Nat.N2.n))
   in
   (* ---- 12. FOP loop ---- *)
   let sponge_params =
@@ -2377,58 +2380,66 @@ let wrap_main_circuit (inputs : Impls.Wrap.Field.t array) () =
       let domain_generator ~log2_size =
         Backend.Tock.Field.domain_generator ~log2_size |> Field.constant
       in
-      Vector.map wrap_domain_indices ~f:(fun index ->
-        let which = Wrap_verifier.One_hot_vector.of_index index
-          ~length:Wrap_verifier.num_possible_domains in
-        Wrap_verifier.Pseudo.Domain.to_domain
-          ~shifts ~domain_generator
-          (which, all_possible_domains))
+      with_label "compute_wrap_domains" (fun () ->
+        Vector.map wrap_domain_indices ~f:(fun index ->
+          with_label "one_hot_wrap_domain" (fun () ->
+            let which = Wrap_verifier.One_hot_vector.of_index index
+              ~length:Wrap_verifier.num_possible_domains in
+            Wrap_verifier.Pseudo.Domain.to_domain
+              ~shifts ~domain_generator
+              (which, all_possible_domains))))
     in
-    Vector.mapn
-      [ prev_proof_state.unfinalized_proofs
-      ; old_bp_chals
-      ; evals
-      ; wrap_domains
-      ]
-      ~f:(fun [ { deferred_values; sponge_digest_before_evaluations = sponge_digest
-                 ; should_finalize }
-              ; old_bulletproof_challenges
-              ; evals_i
-              ; wrap_domain
-              ] ->
-        let sponge =
-          let s = Wrap_main_inputs.Sponge.create sponge_params in
-          Wrap_main_inputs.Sponge.absorb s sponge_digest ; s
-        in
-        let (T (_max_local, old_bulletproof_challenges)) =
-          old_bulletproof_challenges
-        in
-        let old_bulletproof_challenges =
-          Wrap_hack.Checked.pad_challenges old_bulletproof_challenges
-        in
-        let finalized, chals =
-          Wrap_verifier.finalize_other_proof
-            (module Wrap_hack.Padded_length)
-            ~domain:(wrap_domain :> _ Plonk_checks.plonk_domain)
-            ~sponge ~old_bulletproof_challenges
-            deferred_values evals_i
-        in
-        Boolean.(Assert.any [ finalized; not should_finalize ]) ;
-        chals)
+    with_label "fop_loop" (fun () ->
+      Vector.mapn
+        [ prev_proof_state.unfinalized_proofs
+        ; old_bp_chals
+        ; evals
+        ; wrap_domains
+        ]
+        ~f:(fun [ { deferred_values; sponge_digest_before_evaluations = sponge_digest
+                   ; should_finalize }
+                ; old_bulletproof_challenges
+                ; evals_i
+                ; wrap_domain
+                ] ->
+          with_label "fop_proof" (fun () ->
+            let sponge =
+              let s = Wrap_main_inputs.Sponge.create sponge_params in
+              Wrap_main_inputs.Sponge.absorb s sponge_digest ; s
+            in
+            let (T (_max_local, old_bulletproof_challenges)) =
+              old_bulletproof_challenges
+            in
+            let old_bulletproof_challenges =
+              Wrap_hack.Checked.pad_challenges old_bulletproof_challenges
+            in
+            let finalized, chals =
+              with_label "finalize_other_proof" (fun () ->
+                Wrap_verifier.finalize_other_proof
+                  (module Wrap_hack.Padded_length)
+                  ~domain:(wrap_domain :> _ Plonk_checks.plonk_domain)
+                  ~sponge ~old_bulletproof_challenges
+                  deferred_values evals_i)
+            in
+            with_label "fop_assert" (fun () ->
+              Boolean.(Assert.any [ finalized; not should_finalize ])) ;
+            chals)))
   in
   (* ---- 13. Build prev_statement + assert messages_for_next_step_proof ---- *)
   let prev_statement =
-    let prev_messages_for_next_wrap_proof =
+    let prev_messages_for_next_wrap_proof = with_label "hash_messages_for_next_wrap_proof" (fun () ->
       Vector.map2 prev_step_accs old_bp_chals
         ~f:(fun sacc (T (max_local_max_proofs_verified, chals)) ->
-          Wrap_hack.Checked.hash_messages_for_next_wrap_proof
-            max_local_max_proofs_verified
-            { challenge_polynomial_commitment = sacc
-            ; old_bulletproof_challenges = chals
-            })
+          with_label "hash_msg_per_proof" (fun () ->
+            Wrap_hack.Checked.hash_messages_for_next_wrap_proof
+              max_local_max_proofs_verified
+              { challenge_polynomial_commitment = sacc
+              ; old_bulletproof_challenges = chals
+              })))
     in
-    Field.Assert.equal messages_for_next_step_proof
-      prev_proof_state.messages_for_next_step_proof ;
+    with_label "assert_messages_for_next_step_proof" (fun () ->
+      Field.Assert.equal messages_for_next_step_proof
+        prev_proof_state.messages_for_next_step_proof) ;
     { Import.Types.Step.Statement.
       messages_for_next_wrap_proof = prev_messages_for_next_wrap_proof
     ; proof_state = prev_proof_state
@@ -2450,7 +2461,8 @@ let wrap_main_circuit (inputs : Impls.Wrap.Field.t array) () =
       Inner_curve.typ
       ~length:(Nat.to_int Backend.Tick.Rounds.n)
   in
-  let openings_proof = alloc_typ openings_proof_typ in
+  let openings_proof = with_label "alloc_openings_proof" (fun () ->
+    alloc_typ openings_proof_typ) in
   (* ---- 15. messages ---- *)
   let messages_typ =
     Plonk_types.Messages.wrap_typ Inner_curve.typ
@@ -2458,16 +2470,17 @@ let wrap_main_circuit (inputs : Impls.Wrap.Field.t array) () =
       ~dummy:Inner_curve.Params.one
       ~commitment_lengths:(Commitment_lengths.default ~num_chunks)
   in
-  let messages = alloc_typ messages_typ in
+  let messages = with_label "alloc_messages" (fun () -> alloc_typ messages_typ) in
   (* ---- 16. pack_statement + wrap_verify ---- *)
-  let public_input =
+  let public_input = with_label "pack_statement_split_field" (fun () ->
     Array.map
       (Wrap_main.pack_statement Nat.N2.n prev_statement)
       ~f:(function
         | `Field (Shifted_value x) -> `Field (Wrap_main.split_field x)
-        | `Packed_bits (x, n) -> `Packed_bits (x, n))
+        | `Packed_bits (x, n) -> `Packed_bits (x, n)))
   in
   let srs = Kimchi_bindings.Protocol.SRS.Fp.create (1 lsl 16) in
+  with_label "wrap_verify" (fun () ->
   Wrap_main.wrap_verify
     ~num_chunks
     ~max_proofs_verified:(module Nat.N2)
@@ -2490,7 +2503,7 @@ let wrap_main_circuit (inputs : Impls.Wrap.Field.t array) () =
     ~new_bulletproof_challenges
     ~sponge_digest_before_evaluations
     ~messages_for_next_wrap_proof_digest
-    ~bulletproof_challenges
+    ~bulletproof_challenges)
 
 (* Step IVP circuit: verifies a Wrap proof via IPA (Step/Tick/Fp side).
 
