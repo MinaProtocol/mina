@@ -89,6 +89,29 @@ in {
       lockFileContents =
         fixupLockFile ../src/lib/crypto/kimchi_bindings/stubs/Cargo.lock;
     };
+    # Patch boxroot to fix OCaml 4.14 compatibility
+    postPatch = ''
+      echo "Patching boxroot for OCaml 4.14 compatibility..."
+      # Patch the vendored source in kimchi-stubs-vendors
+      if [ -f "kimchi-stubs-vendors/ocaml-boxroot-sys/vendor/boxroot/boxroot.c" ]; then
+        sed -i 's/try_free_chunks(pools\.free)/try_free_chunks()/' \
+          kimchi-stubs-vendors/ocaml-boxroot-sys/vendor/boxroot/boxroot.c
+        # Update the checksum in .cargo-checksum.json to match the patched file
+        sed -i 's/66f638ad9dd2fd077541e54a6af3772fb40b4a81d87e813b021e597e5e2e73ba/630e77067f70643467ee46e3d19eca24040c35dd2dd2c6673cfba588ffbe3d9b/' \
+          kimchi-stubs-vendors/ocaml-boxroot-sys/.cargo-checksum.json
+        echo "Patched kimchi-stubs-vendors/ocaml-boxroot-sys/vendor/boxroot/boxroot.c"
+      fi
+      # Also patch in cargo-vendor-dir
+      chmod -R +w "$NIX_BUILD_TOP/cargo-vendor-dir" || true
+      if [ -f "$NIX_BUILD_TOP/cargo-vendor-dir/ocaml-boxroot-sys-0.2.0/vendor/boxroot/boxroot.c" ]; then
+        sed -i 's/try_free_chunks(pools\.free)/try_free_chunks()/' \
+          "$NIX_BUILD_TOP/cargo-vendor-dir/ocaml-boxroot-sys-0.2.0/vendor/boxroot/boxroot.c"
+        sed -i 's/66f638ad9dd2fd077541e54a6af3772fb40b4a81d87e813b021e597e5e2e73ba/630e77067f70643467ee46e3d19eca24040c35dd2dd2c6673cfba588ffbe3d9b/' \
+          "$NIX_BUILD_TOP/cargo-vendor-dir/ocaml-boxroot-sys-0.2.0/.cargo-checksum.json"
+        echo "Patched cargo-vendor-dir"
+      fi
+      chmod -R -w "$NIX_BUILD_TOP/cargo-vendor-dir" || true
+    '';
     # FIXME: tests fail
     doCheck = false;
     dontUpdateAutotoolsGnuConfigScripts = true;
@@ -112,6 +135,29 @@ in {
       lockFileContents =
         fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
     };
+    # Patch boxroot to fix OCaml 4.14 compatibility
+    postPatch = ''
+      echo "Patching boxroot for OCaml 4.14 compatibility..."
+      # Patch the vendored source in kimchi-stubs-vendors
+      if [ -f "kimchi-stubs-vendors/ocaml-boxroot-sys/vendor/boxroot/boxroot.c" ]; then
+        sed -i 's/try_free_chunks(pools\.free)/try_free_chunks()/' \
+          kimchi-stubs-vendors/ocaml-boxroot-sys/vendor/boxroot/boxroot.c
+        # Update the checksum in .cargo-checksum.json to match the patched file
+        sed -i 's/66f638ad9dd2fd077541e54a6af3772fb40b4a81d87e813b021e597e5e2e73ba/630e77067f70643467ee46e3d19eca24040c35dd2dd2c6673cfba588ffbe3d9b/' \
+          kimchi-stubs-vendors/ocaml-boxroot-sys/.cargo-checksum.json
+        echo "Patched kimchi-stubs-vendors/ocaml-boxroot-sys/vendor/boxroot/boxroot.c"
+      fi
+      # Also patch in cargo-vendor-dir
+      chmod -R +w "$NIX_BUILD_TOP/cargo-vendor-dir" || true
+      if [ -f "$NIX_BUILD_TOP/cargo-vendor-dir/ocaml-boxroot-sys-0.2.0/vendor/boxroot/boxroot.c" ]; then
+        sed -i 's/try_free_chunks(pools\.free)/try_free_chunks()/' \
+          "$NIX_BUILD_TOP/cargo-vendor-dir/ocaml-boxroot-sys-0.2.0/vendor/boxroot/boxroot.c"
+        sed -i 's/66f638ad9dd2fd077541e54a6af3772fb40b4a81d87e813b021e597e5e2e73ba/630e77067f70643467ee46e3d19eca24040c35dd2dd2c6673cfba588ffbe3d9b/' \
+          "$NIX_BUILD_TOP/cargo-vendor-dir/ocaml-boxroot-sys-0.2.0/.cargo-checksum.json"
+        echo "Patched cargo-vendor-dir"
+      fi
+      chmod -R -w "$NIX_BUILD_TOP/cargo-vendor-dir" || true
+    '';
     buildPhase = ''
       cargo build -p kimchi-stubs --release --lib
     '';

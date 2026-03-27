@@ -76,8 +76,153 @@ let
       lld_wrapped = pkgs.writeShellScriptBin "ld.lld"
         ''${pkgs.llvmPackages.bintools}/bin/ld.lld "$@"'';
 
-      core =
-        super.core.overrideAttrs { propagatedBuildInputs = [ pkgs.tzdata ]; };
+      # core package needs tzdata
+      # Also needs to ensure unix_stubs.c is compiled with core_unix_gettid symbol
+      core = super.core.overrideAttrs (oa: {
+        propagatedBuildInputs = [ pkgs.tzdata ];
+        # The core package is missing the core_unix_gettid symbol in its stub library
+        # This is needed by linux_ext but wasn't compiled in
+        # We need to ensure the C stubs are properly built
+        postPatch = (oa.postPatch or "") + ''
+          # Check if unix_stubs.c exists and has core_unix_gettid
+          if [ -f src/unix_stubs.c ]; then
+            if grep -q "core_unix_gettid" src/unix_stubs.c; then
+              echo "core_unix_gettid found in unix_stubs.c - should be compiled"
+            else
+              echo "WARNING: core_unix_gettid NOT found in unix_stubs.c"
+            fi
+          else
+            echo "WARNING: unix_stubs.c not found"
+          fi
+        '';
+      });
+
+      # Add postgresql dependency for conf-postgresql
+      conf-postgresql = super.conf-postgresql.overrideAttrs (oa: {
+        buildInputs = (oa.buildInputs or [ ]) ++ [ pkgs.postgresql_16 ];
+        propagatedBuildInputs = (oa.propagatedBuildInputs or [ ]) ++ [ pkgs.postgresql_16 ];
+      });
+
+      # postgresql package needs pg_config in PATH
+      # Modern PostgreSQL packages don't include pg_config binary anymore
+      # Create a pg_config wrapper that uses pkg-config instead
+      postgresql = super.postgresql.overrideAttrs (oa: {
+        nativeBuildInputs = (oa.nativeBuildInputs or [ ]) ++ [ pkgs.postgresql_16.dev pkgs.pkg-config ];
+        # Create a pg_config wrapper script that uses pkg-config
+        postPatch = (oa.postPatch or "") + ''
+          mkdir -p bin
+          cat > bin/pg_config <<EOF
+#!/bin/sh
+# Wrapper for pg_config using pkg-config
+# The discover script calls: pg_config --includedir --libdir --version
+# and expects output on separate lines
+
+# Debug: log the call
+echo "pg_config called with: \$@" >&2
+
+# If multiple arguments, process each one on a separate line
+if [ \$# -gt 1 ]; then
+  for arg in "\$@"; do
+    \$0 "\$arg"
+  done
+  exit 0
+fi
+
+# Single argument processing
+case "\$1" in
+  --includedir)
+    RESULT=\$(pkg-config --variable=includedir libpq 2>/dev/null || echo "${pkgs.postgresql_16.dev}/include")
+    echo "Returning includedir: \$RESULT" >&2
+    echo "\$RESULT"
+    ;;
+  --libdir)
+    RESULT=\$(pkg-config --variable=libdir libpq 2>/dev/null || echo "${pkgs.postgresql_16.dev}/lib")
+    echo "Returning libdir: \$RESULT" >&2
+    echo "\$RESULT"
+    ;;
+  --version)
+    # The discover script expects format like "PostgreSQL 16.13"
+    VERSION=\$(pkg-config --modversion libpq 2>/dev/null || echo "16.13")
+    RESULT="PostgreSQL \$VERSION"
+    echo "Returning version: \$RESULT" >&2
+    echo "\$RESULT"
+    ;;
+  *)
+    echo "pg_config wrapper: unsupported option \$1" >&2
+    exit 1
+    ;;
+esac
+EOF
+          chmod +x bin/pg_config
+          export PATH="$PWD/bin:$PATH"
+          echo "Created pg_config wrapper at $PWD/bin/pg_config"
+          # Test the wrapper
+          echo "Testing pg_config wrapper:"
+          ./bin/pg_config --version || echo "pg_config test failed"
+        '';
+      });
+
+      # num package has broken Makefile that tries to install to OCaml compiler directory
+      # Fix by using ocamlfind install and creating a findlib META file
+      num = super.num.overrideAttrs (oa: {
+        postPatch = (oa.postPatch or "") + ''
+          # The Makefile tries to install directly to STDLIBDIR which is read-only
+          # Replace the install commands to use ocamlfind
+          sed -i 's|^install:|install-disabled:|' src/Makefile
+          
+          # Create a proper META file for findlib
+          cat > META <<'EOFMETA'
+version = "1.1"
+description = "Arbitrary-precision rational arithmetic"
+requires = ""
+archive(byte) = "nums.cma"
+archive(native) = "nums.cmxa"
+plugin(byte) = "nums.cma"
+plugin(native) = "nums.cmxs"
+EOFMETA
+
+          cat >> src/Makefile <<'EOFMAKE'
+
+install:
+	mkdir -p $(OCAMLFIND_DESTDIR)/num
+	ocamlfind install num ../META $(TOINSTALL) -optional $(TOINSTALL_STUBS) -ldconf ignore
+EOFMAKE
+        '';
+      });
+
+      # cohttp-async linking issue: core's linux_ext needs core_unix_gettid symbol
+      # The symbol should be in core's stub library but appears to be missing
+      # This is likely because core.v0.14.1 was built without this function
+      # Workaround: provide a stub implementation
+      cohttp-async = super.cohttp-async.overrideAttrs (oa: {
+        # Add gcc to build inputs for compiling the stub
+        nativeBuildInputs = (oa.nativeBuildInputs or [ ]) ++ [ pkgs.gcc ];
+        # Create a stub library that provides the missing symbol
+        preBuild = (oa.preBuild or "") + ''
+          # Create a stub implementation of core_unix_gettid
+          cat > core_unix_gettid_stub.c <<'EOF'
+#include <caml/mlvalues.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+
+/* Stub implementation of core_unix_gettid for core.v0.14.1 compatibility */
+CAMLprim value core_unix_gettid(value v_unit) {
+  return Val_long((long)syscall(SYS_gettid));
+}
+EOF
+          # Find OCaml include directory - use ocaml-base-compiler which has the headers
+          OCAML_INC=$(ocamlc -where)
+          echo "Using OCaml include directory: $OCAML_INC"
+          # Compile the stub
+          gcc -c -fPIC core_unix_gettid_stub.c -o core_unix_gettid_stub.o -I"$OCAML_INC"
+          # Create a static library
+          ar rcs libcore_unix_gettid_stub.a core_unix_gettid_stub.o
+          # Add to library path
+          export LIBRARY_PATH="$PWD:''${LIBRARY_PATH:-}"
+          export NIX_LDFLAGS="$NIX_LDFLAGS -L$PWD -lcore_unix_gettid_stub"
+          echo "Created stub library at $PWD/libcore_unix_gettid_stub.a"
+        '';
+      });
     };
 
   scope =
