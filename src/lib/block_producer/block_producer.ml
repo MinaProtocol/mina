@@ -1232,7 +1232,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
       (* if the producer starts before genesis, sleep until genesis *)
       let now = Block_time.now time_controller in
       if Block_time.( >= ) now genesis_state_timestamp then start ()
-      else
+      else (
         [%log warn]
           ~metadata:
             [ ( "time_till_genesis"
@@ -1243,7 +1243,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             ]
           "Node started before genesis: waiting $time_till_genesis \
            milliseconds before starting block producer" ;
-      upon (schedule ~time_controller genesis_state_timestamp) start )
+        upon (schedule ~time_controller genesis_state_timestamp) start ) )
 
 let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
     ~time_controller ~frontier_reader ~transition_writer ~precomputed_blocks =
