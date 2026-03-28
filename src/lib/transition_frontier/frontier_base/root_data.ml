@@ -16,6 +16,30 @@ module Common = struct
     end
   end]
 
+  module Serializable_type = struct
+    type raw_serializable = Stable.Latest.t
+
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          { scan_state : Staged_ledger.Scan_state.Serializable_type.Stable.V2.t
+          ; pending_coinbase : Pending_coinbase.Stable.V2.t
+          }
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let to_raw_serializable : t -> raw_serializable =
+     fun { scan_state; pending_coinbase } ->
+      { scan_state =
+          Staged_ledger.Scan_state.Serializable_type.to_raw_serializable
+            scan_state
+      ; pending_coinbase
+      }
+  end
+
   type t =
     { scan_state : Staged_ledger.Scan_state.t
     ; pending_coinbase : Pending_coinbase.t
@@ -37,6 +61,12 @@ module Common = struct
   let read_all_proofs_from_disk { scan_state; pending_coinbase } =
     { Stable.Latest.pending_coinbase
     ; scan_state = Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
+    }
+
+  let to_serializable_type : t -> Serializable_type.t =
+   fun { scan_state; pending_coinbase } ->
+    { scan_state = Staged_ledger.Scan_state.to_serializable_type scan_state
+    ; pending_coinbase
     }
 end
 
@@ -95,6 +125,32 @@ module Limited = struct
     end
   end]
 
+  module Serializable_type = struct
+    [%%versioned
+    module Stable = struct
+      module V3 = struct
+        type t =
+          { transition : Mina_block.Validated.Serializable_type.Stable.V2.t
+          ; protocol_states :
+              Mina_state.Protocol_state.Value.Stable.V2.t
+              Mina_base.State_hash.With_state_hashes.Stable.V1.t
+              list
+          ; common : Common.Serializable_type.Stable.V2.t
+          }
+        [@@deriving fields]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let hashes t =
+      Mina_block.Validated.Serializable_type.Stable.Latest.hashes t.transition
+
+    let create ~transition ~scan_state ~pending_coinbase ~protocol_states =
+      let common = { Common.Serializable_type.scan_state; pending_coinbase } in
+      { transition; common; protocol_states }
+  end
+
   type t =
     { transition : Mina_block.Validated.t
     ; protocol_states :
@@ -143,6 +199,30 @@ module Minimal = struct
       let pending_coinbase t = t.common.Common.Stable.Latest.pending_coinbase
     end
   end]
+
+  module Serializable_type = struct
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        type t =
+          { hash : State_hash.Stable.V1.t
+          ; common : Common.Serializable_type.Stable.V2.t
+          }
+        [@@deriving fields]
+
+        let of_limited ~common hash = { hash; common }
+
+        let to_latest = Fn.id
+
+        let common t = t.common
+
+        let scan_state t = t.common.Common.Serializable_type.scan_state
+
+        let pending_coinbase t =
+          t.common.Common.Serializable_type.pending_coinbase
+      end
+    end]
+  end
 
   type t = { hash : State_hash.t; common : Common.t } [@@deriving fields]
 

@@ -65,6 +65,49 @@ module Stable = struct
   end
 end]
 
+module Serializable_type = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t =
+        { header : Header.Stable.V2.t
+        ; body : Staged_ledger_diff.Body.Serializable_type.Stable.V1.t
+        }
+      [@@deriving fields]
+
+      let to_latest = Fn.id
+
+      let transactions ~constraint_constants block =
+        transactions_impl
+          ~get_transactions:
+            Staged_ledger.Pre_diff_info.get_transactions_serializable
+          ~constraint_constants block.header block.body.staged_ledger_diff
+
+      module Creatable = struct
+        let id = "block"
+
+        type nonrec t = t
+
+        type 'a creator =
+             header:Header.t
+          -> body:Staged_ledger_diff.Body.Serializable_type.Stable.Latest.t
+          -> 'a
+
+        let map_creator c ~f ~header ~body = f (c ~header ~body)
+
+        let create ~header ~body = { header; body }
+      end
+
+      include (
+        Allocation_functor.Make.Basic
+          (Creatable) :
+            Allocation_functor.Intf.Output.Basic_intf
+              with type t := t
+               and type 'a creator := 'a Creatable.creator )
+    end
+  end]
+end
+
 type t = { header : Header.t; body : Staged_ledger_diff.Body.t }
 [@@deriving fields]
 
@@ -126,3 +169,6 @@ let read_all_proofs_from_disk { header; body } =
   { Stable.Latest.header
   ; body = Staged_ledger_diff.Body.read_all_proofs_from_disk body
   }
+
+let to_serializable_type { header; body } : Serializable_type.t =
+  { header; body = Staged_ledger_diff.Body.to_serializable_type body }

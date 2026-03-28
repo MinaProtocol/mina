@@ -368,7 +368,9 @@ let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
         breadcrumb_added t b
     | E (Root_transitioned { new_root; garbage = Full hs; _ }) ->
         List.iter (Diff.Node_list.to_lite hs) ~f:(remove_node t) ;
-        let h = (Root_data.Limited.Stable.Latest.hashes new_root).state_hash in
+        let h =
+          (Root_data.Limited.Serializable_type.hashes new_root).state_hash
+        in
         if Hashtbl.mem t.nodes h then prune t ~root_hash:h
         else (
           [%log' debug t.logger]

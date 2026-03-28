@@ -17,6 +17,21 @@ val write_proof_to_disk :
 
 val create_identity_db : unit -> cache_db
 
+module Serializable_type : sig
+  type cache_tag := t
+
+  [%%versioned:
+  module Stable : sig
+    module V2 : sig
+      type t
+    end
+  end]
+
+  val of_cache_tag : cache_tag -> t
+
+  val to_proof : t -> Pickles.Proof.Proofs_verified_2.Stable.Latest.t
+end
+
 module For_tests : sig
   val create_db : unit -> cache_db
 end

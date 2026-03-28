@@ -30,6 +30,13 @@ module type S = sig
        , Error.t )
        result
 
+  val get_transactions_serializable :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> coinbase_receiver:Public_key.Compressed.t
+    -> supercharge_coinbase:bool
+    -> Staged_ledger_diff.Serializable_type.t
+    -> (Transaction.Serializable_type.t With_status.t list, Error.t) result
+
   val get_transactions_stable :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> coinbase_receiver:Public_key.Compressed.t
@@ -288,6 +295,10 @@ module Transaction_data_getter_checked =
 module Transaction_data_getter_stable =
   Transaction_data_getter (Transaction_snark_work.Stable.Latest)
 
+module Transaction_data_getter_serializable =
+  Transaction_data_getter
+    (Transaction_snark_work.Serializable_type.Stable.Latest)
+
 let get_individual_info (type c)
     ~(get_transaction_data :
           constraint_constants:Genesis_constants.Constraint_constants.t
@@ -530,6 +541,19 @@ let get_unchecked ~constraint_constants ~coinbase_receiver ~supercharge_coinbase
     ~coinbase_amount:
       (Staged_ledger_diff.With_valid_signatures.coinbase ~constraint_constants
          ~supercharge_coinbase t )
+
+let get_transactions_serializable ~constraint_constants ~coinbase_receiver
+    ~supercharge_coinbase ({ diff } : Staged_ledger_diff.Serializable_type.t) =
+  let open Result.Let_syntax in
+  let open Transaction_data_getter_serializable in
+  let%map transactions, _, _, _ =
+    get_impl ~get_transaction_data ~constraint_constants
+      ~to_user_command:With_status.data ~diff ~coinbase_receiver
+      ~coinbase_amount:
+        (Staged_ledger_diff.Diff.Serializable_type.coinbase
+           ~constraint_constants ~supercharge_coinbase diff )
+  in
+  transactions
 
 let get_transactions_stable ~constraint_constants ~coinbase_receiver
     ~supercharge_coinbase ({ diff } : Staged_ledger_diff.Stable.Latest.t) =

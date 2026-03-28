@@ -484,7 +484,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   let body_ref_computed =
     Staged_ledger_diff.Body.compute_reference
       ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-    @@ Staged_ledger_diff.Body.read_all_proofs_from_disk body
+    @@ Staged_ledger_diff.Body.to_serializable_type body
   in
   let%bind.Deferred.Result () =
     if Blake2.equal body_ref_computed body_ref_from_header then

@@ -13,6 +13,22 @@ module Stable = struct
   end
 end]
 
+module Serializable_type = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t = Transaction_snark.Serializable_type.Stable.V2.t
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let to_raw_serializable =
+    Transaction_snark.Serializable_type.to_raw_serializable
+
+  let statement (t : t) = Transaction_snark.Serializable_type.statement t
+end
+
 let statement (t : t) = Transaction_snark.statement t
 
 let statement_with_sok (t : t) = Transaction_snark.statement_with_sok t
@@ -55,6 +71,11 @@ module Cached = struct
   let create ~(statement : Mina_state.Snarked_ledger_state.t) ~sok_digest ~proof
       : t =
     { Proof_carrying_data.proof; data = { statement with sok_digest } }
+
+  let to_serializable_type : t -> Serializable_type.Stable.Latest.t =
+   fun { Proof_carrying_data.data = statement; proof } ->
+    Transaction_snark.Serializable_type.create ~statement
+      ~proof:(Proof_cache_tag.Serializable_type.of_cache_tag proof)
 end
 
 module For_tests = struct

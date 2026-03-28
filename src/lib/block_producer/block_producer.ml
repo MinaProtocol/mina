@@ -346,10 +346,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
           , ledger_proof_opt
           , is_new_stack
           , pending_coinbase_update ) ->
-          let diff_unwrapped =
-            Staged_ledger_diff.read_all_proofs_from_disk
-            @@ Staged_ledger_diff.forget diff
-          in
+          let diff_unwrapped = Staged_ledger_diff.forget diff in
           let%bind protocol_state, consensus_transition_data =
             lift_sync (fun () ->
                 let previous_ledger_hash =
@@ -380,7 +377,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 let body_reference =
                   Staged_ledger_diff.Body.compute_reference
                     ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-                    (Body.Stable.Latest.create diff_unwrapped)
+                    (Body.Serializable_type.create
+                       (Staged_ledger_diff.to_serializable_type diff_unwrapped) )
                 in
                 let blockchain_state =
                   (* We use the time of the beginning of the slot because if things
