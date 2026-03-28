@@ -136,12 +136,11 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 [%log internal] "Create_staged_ledger_diff" ;
                 (* TODO: handle transaction inclusion failures here *)
                 let diff_result =
-                  Staged_ledger.create_diff ~constraint_constants
-                    ~global_slot staged_ledger ~coinbase_receiver ~logger
+                  Staged_ledger.create_diff ~constraint_constants ~global_slot
+                    staged_ledger ~coinbase_receiver ~logger
                     ~current_state_view:previous_state_view
                     ~transactions_by_fee:transactions ~get_completed_work
-                    ~log_block_creation ~supercharge_coinbase
-                    ~zkapp_cmd_limit
+                    ~log_block_creation ~supercharge_coinbase ~zkapp_cmd_limit
                   |> Result.map ~f:(fun (diff, failed_txns) ->
                          if not (List.is_empty failed_txns) then
                            don't_wait_for
@@ -167,8 +166,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                         "Block reward $reward is less than the \
                          min-block-reward $threshold, creating empty block"
                         ~metadata:
-                          [ ( "threshold"
-                            , Currency.Amount.to_yojson threshold )
+                          [ ("threshold", Currency.Amount.to_yojson threshold)
                           ; ("reward", Currency.Amount.to_yojson net_return)
                           ] ;
                       Ok
@@ -180,9 +178,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
       [%log internal] "Apply_staged_ledger_diff" ;
       let%map res =
         let%bind.Deferred.Result diff = return diff in
-        Staged_ledger.apply_diff_unchecked staged_ledger
-          ~constraint_constants ~global_slot diff ~logger
-          ~current_state_view:previous_state_view
+        Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
+          ~global_slot diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
             (previous_protocol_state_hash, previous_protocol_state_body_hash)
           ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
@@ -194,8 +191,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
           ( `Ledger_proof ledger_proof_opt
           , `Staged_ledger transitioned_staged_ledger
           , `Accounts_created _
-          , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
-          ) ->
+          , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) )
+        ->
           [%log internal] "Hash_new_staged_ledger" ;
           let staged_ledger_hash =
             Staged_ledger.hash transitioned_staged_ledger
@@ -220,8 +217,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 Ledger_proof.Cached.statement proof
             | None ->
                 let state =
-                  previous_protocol_state
-                  |> Protocol_state.blockchain_state
+                  previous_protocol_state |> Protocol_state.blockchain_state
                 in
                 Blockchain_state.ledger_proof_statement state
           in
@@ -250,8 +246,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                has a different slot from the [scheduled_time]
             *)
             Blockchain_state.create_value ~timestamp:scheduled_time
-              ~genesis_ledger_hash
-              ~staged_ledger_hash ~body_reference
+              ~genesis_ledger_hash ~staged_ledger_hash ~body_reference
               ~ledger_proof_statement
           in
           let current_time =
@@ -263,9 +258,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 Consensus_state_hooks.generate_transition
                   ~previous_protocol_state ~blockchain_state ~current_time
                   ~block_data ~supercharge_coinbase
-                  ~snarked_ledger_hash:previous_ledger_hash
-                  ~genesis_ledger_hash ~supply_increase ~logger
-                  ~constraint_constants )
+                  ~snarked_ledger_hash:previous_ledger_hash ~genesis_ledger_hash
+                  ~supply_increase ~logger ~constraint_constants )
           in
           let snark_transition =
             O1trace.sync_thread "generate_snark_transition" (fun () ->
@@ -282,7 +276,11 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                     (Consensus.Data.Block_data.prover_state block_data)
                   ~staged_ledger_diff:
                     (Staged_ledger_diff.forget
-                       (match diff with Ok diff -> diff | Error _ -> assert false) )
+                       ( match diff with
+                       | Ok diff ->
+                           diff
+                       | Error _ ->
+                           assert false ) )
                   ~ledger_proof:
                     (Option.map ledger_proof_opt ~f:(fun proof ->
                          Ledger_proof.Cached.read_proof_from_disk proof ) ) )
@@ -304,8 +302,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
               [%log error]
                 ~metadata:
                   [ ( "error"
-                    , `String
-                        (Staged_ledger.Staged_ledger_error.to_string e) )
+                    , `String (Staged_ledger.Staged_ledger_error.to_string e) )
                   ; ( "diff"
                     , Staged_ledger_diff.Stable.Latest.to_yojson
                       @@ Staged_ledger_diff.read_all_proofs_from_disk
@@ -316,8 +313,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
               [%log error] "Error building the diff: $error"
                 ~metadata:
                   [ ( "error"
-                    , `String
-                        (Staged_ledger.Staged_ledger_error.to_string e) )
+                    , `String (Staged_ledger.Staged_ledger_error.to_string e) )
                   ] ) ;
           None )
 
@@ -572,8 +568,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
     ~verifier ~trust_system ~get_completed_work ~transaction_resource_pool
     ~frontier_reader ~time_controller ~transition_writer ~log_block_creation
     ~block_reward_threshold ~block_produced_bvar ~slot_tx_end ~slot_chain_end
-    ~net ~zkapp_cmd_limit_hardcap
-    (scheduled_time, block_data, winner_pubkey) =
+    ~net ~zkapp_cmd_limit_hardcap (scheduled_time, block_data, winner_pubkey) =
   let open Context in
   let module Breadcrumb = Transition_frontier.Breadcrumb in
   let rejected_blocks_logger =
@@ -803,8 +798,8 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
             in
             let transition_receipt_time = Some (Time.now ()) in
             let%bind breadcrumb =
-              time ~logger ~time_controller
-                "Build breadcrumb on produced block" (fun () ->
+              time ~logger ~time_controller "Build breadcrumb on produced block"
+                (fun () ->
                   Breadcrumb.build ~logger ~precomputed_values ~verifier
                     ~get_completed_work:(Fn.const None) ~trust_system
                     ~parent:crumb ~transition
@@ -898,8 +893,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 Deferred.map ~f:Result.return
                   (Mina_networking.broadcast_state net
                      ( Breadcrumb.block_with_hash breadcrumb
-                     |> With_hash.map ~f:Mina_block.read_all_proofs_from_disk
-                     ) )
+                     |> With_hash.map ~f:Mina_block.read_all_proofs_from_disk ) )
             | `Timed_out ->
                 (* FIXME #3167: this should be fatal, and more
                    importantly, shouldn't happen.
@@ -907,10 +901,9 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                 [%log internal] "Transition_accept_timeout" ;
                 let msg : (_, unit, string, unit) format4 =
                   "Timed out waiting for generated transition $state_hash to \
-                   enter transition frontier. Continuing to produce new \
-                   blocks anyway. This may mean your CPU is overloaded. \
-                   Consider disabling `-run-snark-worker` if it's \
-                   configured."
+                   enter transition frontier. Continuing to produce new blocks \
+                   anyway. This may mean your CPU is overloaded. Consider \
+                   disabling `-run-snark-worker` if it's configured."
                 in
                 let span =
                   Block_time.diff (Block_time.now time_controller) start
@@ -1208,9 +1201,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     ~constants:consensus_constants ~consensus_state
                     ~local_state:consensus_local_state
                    = None ) ; *)
-            let next_vrf_check_now () =
-              return (new_global_slot, i')
-            in
+            let next_vrf_check_now () = return (new_global_slot, i') in
             let produce_block_now data =
               produce data >>| Fn.const (new_global_slot, i')
             in
@@ -1226,9 +1217,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
               ~schedule_block_production ~next_vrf_check_now ~genesis_breadcrumb
               ~context:(module Context)
               ~vrf_evaluator ~time_controller ~coinbase_receiver
-              ~frontier_reader ~set_next_producer_timing
-              ~transition_frontier ~vrf_evaluation_state ~epoch_data_for_vrf
-              ~ledger_snapshot i slot
+              ~frontier_reader ~set_next_producer_timing ~transition_frontier
+              ~vrf_evaluation_state ~epoch_data_for_vrf ~ledger_snapshot i slot
       in
       let start _ =
         Deferred.forever
@@ -1249,12 +1239,11 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
               , `Int
                   (Int64.to_int_exn
                      (Block_time.Span.to_ms
-                        (Block_time.diff genesis_state_timestamp now) ) )
-              )
+                        (Block_time.diff genesis_state_timestamp now) ) ) )
             ]
           "Node started before genesis: waiting $time_till_genesis \
            milliseconds before starting block producer" ;
-        upon (schedule ~time_controller genesis_state_timestamp) start )
+      upon (schedule ~time_controller genesis_state_timestamp) start )
 
 let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
     ~time_controller ~frontier_reader ~transition_writer ~precomputed_blocks =
