@@ -153,6 +153,7 @@ let dockerName =
             , DaemonLegacyHardfork = dockerServiceName artifact
             , DaemonAutoHardfork = dockerServiceName artifact
             , DaemonAppsOnly = dockerServiceName artifact
+            , DaemonAutomode = dockerServiceName artifact
             , Archive = dockerServiceName artifact
             , TestExecutive = dockerServiceName artifact
             , LogProc = dockerServiceName artifact
