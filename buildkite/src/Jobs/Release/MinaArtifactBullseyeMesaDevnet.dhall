@@ -32,7 +32,6 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Rosetta
-            , PipelineTag.Type.Mesa
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Bullseye
             ]
