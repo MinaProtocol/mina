@@ -4,12 +4,33 @@ open struct
   module Work = Snark_work_lib
 end
 
+open Mina_stdlib
 module Snark_worker_shared = Snark_worker_shared
 module Single_id_map = Map.Make (Work.Id.Single)
+
 module Sent_zkapp_job_pool =
-  Job_pool.Make (Work.Id.Sub_zkapp) (Work.Spec.Sub_zkapp.Stable.Latest)
+  Job_pool.Make
+    (Work.Id.Sub_zkapp)
+    (struct
+      type t =
+        ( Work.Spec.Sub_zkapp.Stable.Latest.t
+        , Work.Id.Sub_zkapp.t )
+        Work.With_job_meta.t
+
+      let id Work.With_job_meta.{ job_id; _ } = job_id
+    end)
+
 module Sent_single_job_pool =
-  Job_pool.Make (Work.Id.Single) (Work.Spec.Single.Stable.Latest)
+  Job_pool.Make
+    (Work.Id.Single)
+    (struct
+      type t =
+        ( Work.Spec.Single.Stable.Latest.t
+        , Work.Id.Single.t )
+        Work.With_job_meta.t
+
+      let id Work.With_job_meta.{ job_id; _ } = job_id
+    end)
 
 type t =
   { logger : Logger.t
@@ -95,11 +116,13 @@ let register_pending_zkapp_command_job ~(id : Work.Id.Single.t)
       ; sok_message = (Pending_zkapp_command.zkapp_job pending).sok_message
       }
   in
-  Sent_zkapp_job_pool.add_now_exn ~id:job_id ~job
-    ~message:
-      "Work Partitioner generated a duplicated ID for a subzkapp job that \
-       happens to be still used by another job."
-    partitioner.zkapp_jobs_sent_by_partitioner ;
+  ignore
+    ( Sent_zkapp_job_pool.add_now_exn ~job
+        ~message:
+          "Work Partitioner generated a duplicated ID for a subzkapp job that \
+           happens to be still used by another job."
+        partitioner.zkapp_jobs_sent_by_partitioner
+      : Time.t ) ;
 
   Work.Spec.Partitioned.Poly.Sub_zkapp_command job
 
@@ -168,22 +191,26 @@ let convert_single_work_from_selector ~(partitioner : t)
             Work.With_job_meta.map
               ~f_spec:Work.Spec.Single.read_all_proofs_from_disk job
           in
-          Sent_single_job_pool.add_now_exn ~id:pairing ~job
-            ~message:
-              "Id generator generated a repeated Id that happens to be \
-               occupied by a job in sent single job pool"
-            partitioner.single_jobs_sent_by_partitioner ;
+          ignore
+            ( Sent_single_job_pool.add_now_exn ~job
+                ~message:
+                  "Id generator generated a repeated Id that happens to be \
+                   occupied by a job in sent single job pool"
+                partitioner.single_jobs_sent_by_partitioner
+              : Time.t ) ;
           Ok (Single job) )
   | Merge _ ->
       let job =
         Work.With_job_meta.map
           ~f_spec:Work.Spec.Single.read_all_proofs_from_disk job
       in
-      Sent_single_job_pool.add_now_exn ~id:pairing ~job
-        ~message:
-          "Id generator generated a repeated Id that happens to be occupied by \
-           a job in sent single job pool"
-        partitioner.single_jobs_sent_by_partitioner ;
+      ignore
+        ( Sent_single_job_pool.add_now_exn ~job
+            ~message:
+              "Id generator generated a repeated Id that happens to be \
+               occupied by a job in sent single job pool"
+            partitioner.single_jobs_sent_by_partitioner
+          : Time.t ) ;
       Ok (Single job)
 
 let schedule_from_tmp_slot ~(partitioner : t) =
