@@ -91,12 +91,10 @@ struct
                     Pipe.write_without_pushback_if_open event_writer (node, a)
                 | Error e ->
                     [%log warn] "Error parsing log $error"
-                      ~metadata:
-                        [ ("error", `String (Error.to_string_hum e)) ] ) ;
+                      ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
             Deferred.return `Continue ) )
         ~on_error:(fun err ->
-          [%log error]
-            "Encountered an error while polling $node for logs: $err"
+          [%log error] "Encountered an error while polling $node for logs: $err"
             ~metadata:
               [ ("node", `String (Node.infra_id node))
               ; ("err", Error_json.error_to_yojson err)

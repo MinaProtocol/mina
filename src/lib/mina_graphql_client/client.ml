@@ -802,25 +802,25 @@ let poll_filtered_log_entries ?(initial_delay_sec = 0.) ~poll_interval_sec
     | Some d when Time.( >= ) (Time.now ()) d ->
         Deferred.Or_error.error_string
           "Timed out polling for filtered log entries"
-    | _ ->
+    | _ -> (
         let%bind () = after (Time.Span.of_sec poll_interval_sec) in
         let%bind result =
           get_filtered_log_entries ~last_log_index_seen node_uri
         in
-        ( match result with
-        | Ok entries ->
+        match result with
+        | Ok entries -> (
             let last_log_index_seen =
               Array.length entries + last_log_index_seen
             in
             let%bind action = on_entries entries in
-            ( match action with
+            match action with
             | `Continue ->
                 loop ~last_log_index_seen
             | `Stop ->
                 Deferred.Or_error.ok_unit )
-        | Error e ->
+        | Error e -> (
             let%bind action = on_error e in
-            ( match action with
+            match action with
             | `Continue ->
                 loop ~last_log_index_seen
             | `Stop ->
