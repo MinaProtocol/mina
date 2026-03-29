@@ -1,6 +1,35 @@
 open Async
 open Core_kernel
 
+module type S = sig
+  type instance
+  type state
+  type handles
+
+  val create :
+       logger:Logger.t
+    -> name:Yojson.Safe.t
+    -> state:state
+    -> instance * handles
+
+  val terminate : instance:instance -> unit
+  val spawn : instance:instance -> unit Deferred.t Or_error.t
+
+  type ('msg, 'returns) channel_handle
+
+  val send :
+       instance:instance
+    -> channel:('msg, 'returns) channel_handle
+    -> message:'msg
+    -> 'returns
+end
+
+(* Global channel_handle types, abstractly defined for the public API *)
+(* Concrete constructors are internal to the Make functor *)
+type ('msg, 'returns) channel_handle
+
+
+
 type 'state msg_processed = MNext of 'state | MExit | MUnprocessed
 
 type ('state, 'response) req_processed =
@@ -29,38 +58,6 @@ type (_, _, _, _) channel_type =
       [ `Capacity of int ]
       * [ `Overflow of ('state, 'data, 'returns, 'behavior) overflow_behavior ]
       -> ('state, 'data, 'returns, 'behavior) channel_type
-
-module DummyMessage = struct
-  type t = unit [@@deriving to_yojson]
-
-  let handler ~state ~message:() = Deferred.return (MNext state)
-end
-
-module DummyRequest = struct
-  type _ t = Nothing : unit t
-
-  let handler :
-      type response.
-         state:'state
-      -> request:response t
-      -> ('state, response) req_processed Deferred.t =
-   fun ~state ~request:Nothing -> Deferred.return (RNext (state, ()))
-end
-
-(** Named record type for polymorphic request handlers, parameterized by the
-    request module. Logic modules reference this type from outside the functor. *)
-module RequestHandler (Request : sig
-  type _ t
-end) =
-struct
-  type 'state t =
-    { f :
-        'response.
-           state:'state
-        -> request:'response Request.t
-        -> ('state, 'response) req_processed Deferred.t
-    }
-end
 
 module WithRequest (DataMessage : sig
   type t [@@deriving to_yojson]
@@ -298,43 +295,4 @@ module type S = sig
   val send_data : instance:instance -> message:message -> data_returns
 
   val terminate : instance:instance -> unit
-end
-
-module Regular (DataMessage : sig
-  type t
-
-  val to_yojson : t -> Yojson.Safe.t
-end) (Logic : sig
-  type state
-
-  type data_returns
-
-  type data_overflew
-
-  type control_msg
-
-  val data_channel_type :
-    (state, DataMessage.t, data_returns, data_overflew) channel_type
-
-  val control_handler :
-    state:state -> message:control_msg -> state msg_processed Deferred.t
-
-  val data_handler :
-    state:state -> message:DataMessage.t -> state msg_processed Deferred.t
-end) =
-struct
-  type state = Logic.state
-
-  type message = DataMessage.t
-
-  type data_returns = Logic.data_returns
-
-  include
-    WithRequest (DataMessage) (DummyRequest)
-      (struct
-        include Logic
-
-        let request_handler : state RequestHandler(DummyRequest).t =
-          { f = DummyRequest.handler }
-      end)
 end

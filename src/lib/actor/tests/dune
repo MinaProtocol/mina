@@ -1,12 +1,11 @@
 (tests
  (names test_actor)
+ (modules test_actor ping_pong_new)
  (libraries
-  ;; OPAM libraries
   alcotest
   async
   core
-  ;; MINA libraries
   actor
-  logger)
- (preprocess
-  (pps ppx_deriving_yojson ppx_let)))
+  logger
+  ppx_deriving_yojson
+  ppx_let))

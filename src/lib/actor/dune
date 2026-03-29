@@ -1,6 +1,7 @@
 (library
  (name actor)
  (public_name actor)
+ (modules actor_new)
  (libraries
   ;; OPAM libraries
   async
@@ -14,4 +15,4 @@
    ppx_version))
  (instrumentation
   (backend bisect_ppx))
- (synopsis "Actor pattern for mass concurrency"))
+ (synopsis "Generalized Actor pattern for mass concurrency"))
