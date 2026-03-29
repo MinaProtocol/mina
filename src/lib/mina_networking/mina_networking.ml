@@ -400,7 +400,6 @@ module Sl_downloader = struct
 
         let key = fst
       end)
-      (Ledger_hash)
 end
 
 let glue_sync_ledger :
@@ -467,7 +466,7 @@ let glue_sync_ledger :
     (let%bind downloader = downloader in
      Linear_pipe.iter_unordered ~max_concurrency:400 query_reader ~f:(fun q ->
          match%bind
-           Sl_downloader.Job.result
+           Downloader.Job.result
              (Sl_downloader.download downloader ~key:q ~attempts:Peer.Map.empty)
          with
          | Error _ ->

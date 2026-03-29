@@ -394,7 +394,7 @@ let try_to_connect_hash_chain t hashes ~frontier
       then Result.fail `No_common_ancestor
       else Result.fail `Peer_moves_too_fast )
 
-module Downloader = struct
+module BlockDownloader = struct
   module Key = struct
     module T = struct
       type t = State_hash.t * Length.t [@@deriving to_yojson, hash, sexp]
@@ -427,9 +427,6 @@ module Downloader = struct
             |> Mina_state.Protocol_state.hashes )
               .state_hash
           , Mina_block.blockchain_length t )
-      end)
-      (struct
-        type t = (State_hash.t * Length.t) option
       end)
 end
 
@@ -465,7 +462,6 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
         | Ok transition_chain_proof ->
             Result.return transition_chain_proof
       in
-      let now = Time.now () in
       (* a list of state_hashes from new to old *)
       let%bind hashes =
         match
@@ -473,8 +469,8 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
         with
         | Some hs ->
             let ks = with_lengths hs ~target_length in
-            Downloader.update_knowledge downloader peer (`Some ks) ;
-            Downloader.mark_preferred downloader peer ~now ;
+            BlockDownloader.update_knowledge downloader peer (`Some ks) ;
+            BlockDownloader.mark_preferred_now downloader peer ;
             Deferred.Result.return hs
         | None ->
             let error_msg =
@@ -495,7 +491,7 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
               ~blockchain_length_of_target_hash
           with
         | Ok x ->
-            Downloader.mark_preferred downloader peer ~now ;
+            BlockDownloader.mark_preferred_now downloader peer ;
             Ok x
         | Error e ->
             Error e ) )
@@ -674,17 +670,18 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
 open Frontier_base
 
 let check_invariant ~downloader t =
-  Downloader.check_invariant downloader ;
+  BlockDownloader.check_invariant downloader ;
   [%test_eq: int]
-    (Downloader.total_jobs downloader)
+    (BlockDownloader.total_jobs downloader)
     (Hashtbl.count t.nodes ~f:(fun node ->
          Node.State.Enum.equal (Node.State.enum node.state) To_download ) )
 
 let download s d ~key ~attempts =
-  [%log' debug (Downloader.logger d)]
-    ~metadata:[ ("key", Downloader.Key.to_yojson key); ("caller", `String s) ]
+  [%log' debug (BlockDownloader.logger d)]
+    ~metadata:
+      [ ("key", BlockDownloader.Key.to_yojson key); ("caller", `String s) ]
     "Download download $key" ;
-  Downloader.download d ~key ~attempts
+  BlockDownloader.download d ~key ~attempts
 
 let create_node ~logger ~downloader t x =
   let attempts = Attempt_history.empty in
@@ -749,7 +746,7 @@ let create_node ~logger ~downloader t x =
     { Node.state; state_hash = h; blockchain_length; attempts; parent; result }
   in
   upon (Ivar.read node.result) (fun _ ->
-      Downloader.cancel downloader (h, blockchain_length) ) ;
+      BlockDownloader.cancel downloader (h, blockchain_length) ) ;
   Transition_frontier.Full_catchup_tree.add_state t.states node ;
   Hashtbl.set t.nodes ~key:h ~data:node ;
   ( try check_invariant ~downloader t
@@ -877,8 +874,8 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                 `List
                   (List.map (Hashtbl.to_alist s) ~f:(fun (k, v) ->
                        `List [ Node.State.Enum.to_yojson k; `Int v ] ) ) )
-            ; ("total_jobs", `Int (Downloader.total_jobs downloader))
-            ; ("downloader", Downloader.to_yojson downloader)
+            ; ("total_jobs", `Int (BlockDownloader.total_jobs downloader))
+            ; ("downloader", BlockDownloader.to_yojson downloader)
             ]
           "download finished $state_hash" ;
         node.attempts <- attempts ;
@@ -1160,7 +1157,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
               | None ->
                   `Some [] ) )
     in
-    Downloader.create ~stop ~trust_system ~logger ~preferred:[]
+    BlockDownloader.create ~stop ~trust_system ~logger ~preferred:[]
       ~max_batch_size:5
       ~get:(fun peer hs ->
         let sec =
@@ -1192,7 +1189,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
   in
   check_invariant ~downloader t ;
   let () =
-    Downloader.set_check_invariant (fun downloader ->
+    BlockDownloader.set_check_invariant (fun downloader ->
         check_invariant ~downloader t )
   in
   (*
@@ -1262,7 +1259,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                       | Local ->
                           ()
                       | Remote peer ->
-                          Downloader.add_knowledge downloader peer
+                          BlockDownloader.add_knowledge downloader peer
                             [ (target_parent_hash, target_length) ] ) ;
                       let%bind.Option { proof = path, root_header; _ } =
                         Best_tip_lru.get h
@@ -1368,7 +1365,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
               | Ok (root, state_hashes) ->
                   [%log' debug t.logger]
                     ~metadata:
-                      [ ("downloader", Downloader.to_yojson downloader)
+                      [ ("downloader", BlockDownloader.to_yojson downloader)
                       ; ( "node_states"
                         , let s = Node.State.Enum.Table.create () in
                           Hashtbl.iter t.nodes ~f:(fun node ->
