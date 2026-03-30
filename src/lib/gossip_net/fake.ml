@@ -183,8 +183,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
         Linear_pipe.create ()
       in
       let time_controller =
-        Block_time.Controller.create
-        @@ Block_time.Controller.basic ~logger:(Logger.create ())
+        Block_time.Controller.basic ~logger:(Logger.create ())
       in
       let t =
         { network

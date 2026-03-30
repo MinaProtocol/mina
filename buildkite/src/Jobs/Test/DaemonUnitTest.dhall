@@ -26,7 +26,11 @@ let buildTestCmd
                 , commands =
                     RunInToolchain.runInToolchain
                       [ "DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN" ]
-                      "buildkite/scripts/unit-test.sh ${profile} ${path} && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
+                      (     "buildkite/scripts/unit-test.sh ${profile} ${path}"
+                        ++  " && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
+                        ++  " && buildkite/scripts/profile-dependent-tests.sh devnet"
+                        ++  " && buildkite/scripts/profile-dependent-tests.sh mainnet"
+                      )
                 , label = "${profile} unit-tests"
                 , key = command_key
                 , target = cmd_target
@@ -43,6 +47,7 @@ in  Pipeline.build
                 , S.exactly "buildkite/src/Jobs/Test/DaemonUnitTest" "dhall"
                 , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
                 , S.exactly "scripts/link-coredumps" "sh"
+                , S.exactly "buildkite/scripts/profile-dependent-tests" "sh"
                 , S.exactly "buildkite/scripts/unit-test" "sh"
                 ]
 

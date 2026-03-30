@@ -35,7 +35,7 @@
   test_util
   mina_transaction_logic
   mina_transaction
-  bounded_types)
+  mina_stdlib)
  (library_flags -linkall)
  (inline_tests)
  (preprocess

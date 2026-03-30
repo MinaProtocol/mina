@@ -32,6 +32,7 @@
   test_util)
  (preprocess
   (pps
+   ppx_bench
    ppx_compare
    ppx_hash
    ppx_inline_test

@@ -185,7 +185,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
       let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
       let block_data =
         { Payload.block = block_base64
-        ; created_at = Rfc3339_time.get_rfc3339_time ()
+        ; created_at = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
         ; peer_id
         ; snark_work = None
         ; graphql_control_port
@@ -231,7 +231,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
         let state_hash = Transition_frontier.Breadcrumb.state_hash best_tip in
         let block_data =
           { Payload.block = block_base64
-          ; created_at = Rfc3339_time.get_rfc3339_time ()
+          ; created_at = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
           ; peer_id
           ; snark_work = None
           ; graphql_control_port
@@ -272,7 +272,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
             in
             let block_data =
               { Payload.block = block_base64
-              ; created_at = Rfc3339_time.get_rfc3339_time ()
+              ; created_at = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
               ; peer_id
               ; snark_work = None
               ; graphql_control_port
@@ -316,7 +316,8 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                 in
                 let block_data =
                   { Payload.block = block_base64
-                  ; created_at = Rfc3339_time.get_rfc3339_time ()
+                  ; created_at =
+                      Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
                   ; peer_id
                   ; snark_work = None
                   ; graphql_control_port
@@ -326,12 +327,41 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                 send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
                   ~state_hash ~produced:false block_data
             | Some single_spec -> (
-                match%bind
-                  make_interruptible
-                    (Uptime_snark_worker.perform_single snark_worker
-                       ( message
-                       , read_all_proofs_for_work_single_spec single_spec ) )
-                with
+                let s =
+                  match single_spec with
+                  | Transition (input, witness) -> (
+                      match witness.transaction with
+                      | Command (Zkapp_command zkapp_command) ->
+                          Ok (`Zk_app (input, witness, zkapp_command))
+                      | Command (Signed_command _) | Fee_transfer _ | Coinbase _
+                        ->
+                          Ok (`Transaction single_spec) )
+                  | Merge _ ->
+                      Error
+                        (Error.of_string "Undexpecetd merge operation in spec")
+                in
+                let work =
+                  match s with
+                  | Ok (`Zk_app (input, witness, zkapp_command)) ->
+                      let zkapp_command =
+                        Zkapp_command.read_all_proofs_from_disk zkapp_command
+                      in
+                      let witness =
+                        Transaction_witness.read_all_proofs_from_disk witness
+                      in
+                      make_interruptible
+                      @@ Uptime_snark_worker.perform_partitioned snark_worker
+                           (witness, input, zkapp_command, staged_ledger_hash)
+                  | Ok (`Transaction single_spec) ->
+                      make_interruptible
+                      @@ Uptime_snark_worker.perform_single snark_worker
+                           ( message
+                           , read_all_proofs_for_work_single_spec single_spec )
+                  | Error error ->
+                      Interruptible.return (Error error)
+                in
+
+                match%bind work with
                 | Error e ->
                     (* error in submitting to process *)
                     [%log error]
@@ -358,7 +388,8 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                     in
                     let block_data =
                       { Payload.block = block_base64
-                      ; created_at = Rfc3339_time.get_rfc3339_time ()
+                      ; created_at =
+                          Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
                       ; peer_id
                       ; snark_work = Some snark_work_base64
                       ; graphql_control_port

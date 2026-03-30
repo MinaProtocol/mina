@@ -289,12 +289,13 @@ struct
         ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
         ; vk_cache_db : Zkapp_vk_cache_tag.cache_db
         ; proof_cache_db : Proof_cache_tag.cache_db
+        ; signature_kind : Mina_signature_kind.t
         }
 
       (* remove next line if there's a way to force [@@deriving make] write a
          named parameter instead of an optional parameter *)
       let make ~trust_system ~pool_max_size ~verifier ~genesis_constants
-          ~slot_tx_end ~vk_cache_db ~proof_cache_db =
+          ~slot_tx_end ~vk_cache_db ~proof_cache_db ~signature_kind =
         { trust_system
         ; pool_max_size
         ; verifier
@@ -302,6 +303,7 @@ struct
         ; slot_tx_end
         ; vk_cache_db
         ; proof_cache_db
+        ; signature_kind
         }
     end
 
@@ -1126,7 +1128,6 @@ struct
           ( verified Envelope.Incoming.t
           , Intf.Verification_error.t )
           Deferred.Result.t =
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let open Deferred.Result.Let_syntax in
         let open Intf.Verification_error in
         let%bind () =
@@ -1186,7 +1187,8 @@ struct
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
               List.map
                 ~f:
-                  (User_command.write_all_proofs_to_disk ~signature_kind
+                  (User_command.write_all_proofs_to_disk
+                     ~signature_kind:t.config.signature_kind
                      ~proof_cache_db:t.config.proof_cache_db )
                 diff
               |> User_command.Unapplied_sequence.to_all_verifiable
@@ -1711,8 +1713,12 @@ let%test_module _ =
         let compile_time_genesis =
           (*not using Precomputed_values.for_unit_test because of dependency cycle*)
           Mina_state.Genesis_protocol_state.t
-            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
-            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+            ~genesis_ledger:
+              (Consensus.Genesis_data.Ledger.to_hashed
+                 Genesis_ledger.for_unit_tests )
+            ~genesis_epoch_data:
+              (Consensus.Genesis_data.Epoch.to_hashed
+                 Consensus.Genesis_data.Epoch.for_unit_tests )
             ~constraint_constants ~consensus_constants
             ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
         in
@@ -1951,6 +1957,7 @@ let%test_module _ =
           ~genesis_constants ~slot_tx_end
           ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
           ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
+          ~signature_kind
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
@@ -1962,13 +1969,12 @@ let%test_module _ =
       let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
       { txn_pool; best_tip_diff_w; best_tip_ref; frontier_pipe_w }
 
-    let independent_cmds : User_command.Valid.t list =
+    let independent_cmds ~signature_kind : User_command.Valid.t list =
       let rec go n cmds =
         let open Quickcheck.Generator.Let_syntax in
         if n < Array.length test_keys then
           let%bind cmd =
             let sender = test_keys.(n) in
-            let signature_kind = Mina_signature_kind.t_DEPRECATED in
             User_command.Valid.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:
                 (Quickcheck.Generator.tuple2 (return sender)
@@ -1980,9 +1986,8 @@ let%test_module _ =
       in
       Quickcheck.random_value ~seed:(`Deterministic "constant") (go 0 [])
 
-    let mk_payment' ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount
-        () =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    let mk_payment' ~sender_idx ~receiver_idx ~fee ~nonce ~amount
+        ~signature_kind ?valid_until () =
       let get_pk idx = Public_key.compress test_keys.(idx).public_key in
       Signed_command.sign ~signature_kind test_keys.(sender_idx)
         (Signed_command_payload.create
@@ -1996,8 +2001,8 @@ let%test_module _ =
                 ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
 
-    let mk_single_account_update ~signature_kind ~fee_payer_idx
-        ~zkapp_account_idx ~fee ~nonce ~ledger =
+    let mk_single_account_update ~fee_payer_idx ~zkapp_account_idx ~fee ~nonce
+        ~ledger =
       let fee = Currency.Fee.of_nanomina_int_exn fee in
       let fee_payer_kp = test_keys.(fee_payer_idx) in
       let nonce = Account.Nonce.of_int nonce in
@@ -2014,8 +2019,8 @@ let%test_module _ =
           }
       in
       let%map zkapp_command =
-        Transaction_snark.For_tests.single_account_update ~signature_kind
-          ~constraint_constants spec
+        Transaction_snark.For_tests.single_account_update ~constraint_constants
+          ~signature_kind spec
       in
       Or_error.ok_exn
         (Zkapp_command.Verifiable.create ~failed:false
@@ -2097,11 +2102,11 @@ let%test_module _ =
       in
       User_command.Zkapp_command zkapp_command
 
-    let mk_payment ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount ()
-        =
+    let mk_payment ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount
+        ~signature_kind () =
       User_command.Signed_command
-        (mk_payment' ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount
-           () )
+        (mk_payment' ~sender_idx ~fee ~nonce ~receiver_idx ~amount
+           ~signature_kind ?valid_until () )
 
     let mk_zkapp_commands_single_block num_cmds (pool : Test.Resource_pool.t) :
         User_command.Valid.t list Deferred.t =
@@ -2295,7 +2300,7 @@ let%test_module _ =
               let applied, _ =
                 Or_error.ok_exn
                 @@ Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                     ~constraint_constants
+                     ~signature_kind ~constraint_constants
                      ~global_slot:dummy_state_view.global_slot_since_genesis
                      ~state_view:dummy_state_view ledger p
               in
@@ -2356,6 +2361,7 @@ let%test_module _ =
     let mk_linear_case_test t cmds =
       assert_pool_txs t [] ;
       let%bind () = add_commands' t cmds in
+      let independent_cmds = independent_cmds ~signature_kind in
       let%bind () = advance_chain t (List.take independent_cmds 1) in
       assert_pool_txs t (List.drop cmds 1) ;
       let%bind () =
@@ -2363,6 +2369,8 @@ let%test_module _ =
       in
       assert_pool_txs t (List.drop cmds 3) ;
       Deferred.unit
+
+    let independent_cmds = independent_cmds ~signature_kind
 
     let%test_unit "transactions are removed in linear case (user cmds)" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -2446,7 +2454,7 @@ let%test_module _ =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
           mk_now_invalid_test test independent_cmds
-            ~mk_command:(mk_payment ?valid_until:None) )
+            ~mk_command:(mk_payment ?valid_until:None ~signature_kind) )
 
     let%test_unit "Now-invalid transactions are removed from the pool on fork \
                    changes (zkapps)" =
@@ -2476,13 +2484,14 @@ let%test_module _ =
       in
       let valid_command =
         mk_payment ~valid_until:curr_slot_plus_padding ~sender_idx:1
-          ~fee:minimum_fee ~nonce:1 ~receiver_idx:7 ~amount:1_000_000_000 ()
+          ~fee:minimum_fee ~nonce:1 ~receiver_idx:7 ~amount:1_000_000_000
+          ~signature_kind ()
       in
       let expired_commands =
         [ mk_payment ~valid_until:curr_slot ~sender_idx:0 ~fee:minimum_fee
-            ~nonce:1 ~receiver_idx:9 ~amount:1_000_000_000 ()
+            ~nonce:1 ~receiver_idx:9 ~amount:1_000_000_000 ~signature_kind ()
         ; mk_payment ~sender_idx:0 ~fee:minimum_fee ~nonce:2 ~receiver_idx:9
-            ~amount:1_000_000_000 ()
+            ~amount:1_000_000_000 ~signature_kind ()
         ]
       in
       (* Wait till global slot increases by 1 which invalidates
@@ -2533,12 +2542,12 @@ let%test_module _ =
           let expires_later1 =
             mk_payment ~valid_until:curr_slot_plus_three ~sender_idx:0
               ~fee:minimum_fee ~nonce:1 ~receiver_idx:9 ~amount:10_000_000_000
-              ()
+              ~signature_kind ()
           in
           let expires_later2 =
             mk_payment ~valid_until:curr_slot_plus_seven ~sender_idx:0
               ~fee:minimum_fee ~nonce:2 ~receiver_idx:9 ~amount:10_000_000_000
-              ()
+              ~signature_kind ()
           in
           let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
           let%bind () = add_commands' t valid_commands in
@@ -2553,11 +2562,12 @@ let%test_module _ =
           (* Add new commands, remove old commands some of which are now expired *)
           let expired_command =
             mk_payment ~valid_until:curr_slot ~sender_idx:9 ~fee:minimum_fee
-              ~nonce:0 ~receiver_idx:5 ~amount:1_000_000_000 ()
+              ~nonce:0 ~receiver_idx:5 ~amount:1_000_000_000 ~signature_kind ()
           in
           let unexpired_command =
             mk_payment ~valid_until:curr_slot_plus_seven ~sender_idx:8
-              ~fee:minimum_fee ~nonce:0 ~receiver_idx:9 ~amount:1_000_000_000 ()
+              ~fee:minimum_fee ~nonce:0 ~receiver_idx:9 ~amount:1_000_000_000
+              ~signature_kind ()
           in
           let valid_forever = List.nth_exn few_now 0 in
           let removed_commands =
@@ -2691,11 +2701,11 @@ let%test_module _ =
       in
       let txs0 =
         [ mk_payment' ~sender_idx:0 ~fee:minimum_fee ~nonce:0 ~receiver_idx:9
-            ~amount:20_000_000_000 ()
+            ~amount:20_000_000_000 ~signature_kind ()
         ; mk_payment' ~sender_idx:0 ~fee:minimum_fee ~nonce:1 ~receiver_idx:9
-            ~amount:12_000_000_000 ()
+            ~amount:12_000_000_000 ~signature_kind ()
         ; mk_payment' ~sender_idx:0 ~fee:minimum_fee ~nonce:2 ~receiver_idx:9
-            ~amount:500_000_000_000 ()
+            ~amount:500_000_000_000 ~signature_kind ()
         ]
       in
       let txs0' = List.map txs0 ~f:Signed_command.forget_check in
@@ -2714,16 +2724,16 @@ let%test_module _ =
             ~fee:
               ( minimum_fee
               + Currency.Fee.to_nanomina_int Indexed_pool.replace_fee )
-            ~nonce:0 ~receiver_idx:1 ~amount:440_000_000_000 ()
+            ~nonce:0 ~receiver_idx:1 ~amount:440_000_000_000 ~signature_kind ()
         ; (* insufficient fee *)
           mk_payment ~sender_idx:1 ~fee:minimum_fee ~nonce:0 ~receiver_idx:1
-            ~amount:788_000_000_000 ()
+            ~amount:788_000_000_000 ~signature_kind ()
         ; (* sufficient *)
           mk_payment ~sender_idx:2
             ~fee:
               ( minimum_fee
               + Currency.Fee.to_nanomina_int Indexed_pool.replace_fee )
-            ~nonce:1 ~receiver_idx:4 ~amount:721_000_000_000 ()
+            ~nonce:1 ~receiver_idx:4 ~amount:721_000_000_000 ~signature_kind ()
         ; (* insufficient *)
           (let amount = 927_000_000_000 in
            let fee =
@@ -2743,7 +2753,8 @@ let%test_module _ =
              in
              Currency.Balance.to_nanomina_int account.balance - amount
            in
-           mk_payment ~sender_idx:3 ~fee ~nonce:1 ~receiver_idx:4 ~amount () )
+           mk_payment ~sender_idx:3 ~fee ~nonce:1 ~receiver_idx:4 ~amount
+             ~signature_kind () )
         ]
       in
       add_commands t replace_txs
@@ -2757,16 +2768,16 @@ let%test_module _ =
       let%bind t = setup_test () in
       let txs =
         [ mk_payment ~sender_idx:0 ~fee:minimum_fee ~nonce:0 ~receiver_idx:9
-            ~amount:20_000_000_000 ()
+            ~amount:20_000_000_000 ~signature_kind ()
         ; mk_payment ~sender_idx:0 ~fee:minimum_fee ~nonce:1 ~receiver_idx:5
-            ~amount:77_000_000_000 ()
+            ~amount:77_000_000_000 ~signature_kind ()
         ; mk_payment ~sender_idx:0 ~fee:minimum_fee ~nonce:2 ~receiver_idx:3
-            ~amount:891_000_000_000 ()
+            ~amount:891_000_000_000 ~signature_kind ()
         ]
       in
       let committed_tx =
         mk_payment ~sender_idx:0 ~fee:minimum_fee ~nonce:0 ~receiver_idx:2
-          ~amount:25_000_000_000 ()
+          ~amount:25_000_000_000 ~signature_kind ()
       in
       let%bind () = add_commands' t txs in
       assert_pool_txs t txs ;
@@ -3102,7 +3113,7 @@ let%test_module _ =
           let%bind () =
             let send_command =
               mk_payment ~sender_idx:0 ~fee:minimum_fee ~nonce:1 ~receiver_idx:1
-                ~amount:1_000_000 ()
+                ~amount:1_000_000 ~signature_kind ()
             in
             run_test_cases send_command
           in
@@ -3129,9 +3140,8 @@ let%test_module _ =
               ()
           in
           let%bind zkapp_command =
-            mk_single_account_update
-              ~signature_kind:Mina_signature_kind.(Other_network "invalid")
-              ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0 ~zkapp_account_idx:1
+            mk_single_account_update ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0
+              ~zkapp_account_idx:1
               ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
           in
           let tx =
@@ -3440,7 +3450,7 @@ let%test_module _ =
             |> User_command.Zkapp_command
         | Payment { sender; fee; amount; receiver_idx } ->
             mk_payment ~sender_idx:sender.key_idx ~fee ~nonce:sender.nonce
-              ~receiver_idx ~amount ()
+              ~receiver_idx ~amount ~signature_kind ()
     end
 
     (** appends a and b to the end of c, taking an element of a or b at random, 

@@ -12,7 +12,7 @@
   yojson
   ;; local libraries
   mina_base.import
-  bounded_types
+  mina_stdlib
   pickles
   pickles.backend
   kimchi_pasta

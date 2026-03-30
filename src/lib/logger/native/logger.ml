@@ -82,7 +82,7 @@ module Metadata = struct
 
       include
         Binable.Of_binable_without_uuid
-          (Bounded_types.String.Stable.V1)
+          (Mina_stdlib.Bounded_types.String.Stable.V1)
           (struct
             type nonrec t = t
 
@@ -332,7 +332,7 @@ end
 type t =
   { null : bool
   ; metadata : Metadata.Stable.Latest.t
-  ; id : Bounded_types.String.Stable.V1.t
+  ; id : Mina_stdlib.Bounded_types.String.Stable.V1.t
   ; itn_features : bool
   }
 [@@deriving bin_io_unversioned]

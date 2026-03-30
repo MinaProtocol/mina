@@ -9,7 +9,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
@@ -26,7 +27,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
     }
 
-  let run network t =
+  let run ~config:_ network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
@@ -53,7 +54,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Network.Node.get_ingress_uri node)
            ~account_id:bp_pk_account_id
        in
-       (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
+       (* TODO, the intg test framework is ignoring
+          test_constants.coinbase_amount for whatever reason, so hardcoding this
+          until that is fixed *)
        let bp_expected =
          Currency.Amount.add bp_original_balance coinbase_reward
          |> Option.value_exn

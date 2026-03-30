@@ -1,3 +1,0 @@
-prometheus_client
-python_graphql_client
-requests

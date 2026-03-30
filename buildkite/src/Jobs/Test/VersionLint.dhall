@@ -20,15 +20,7 @@ let Size = ../../Command/Size.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Network = ../../Constants/Network.dhall
-
-let Profiles = ../../Constants/Profiles.dhall
-
-let dependsOn =
-      DebianVersions.dependsOn
-        DebianVersions.DebVersion.Bullseye
-        Network.Type.Berkeley
-        Profiles.Type.Standard
+let dependsOn = DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
 
 let buildTestCmd
     : Text -> Size -> List Command.TaggedKey.Type -> B/SoftFail -> Command.Type
@@ -40,13 +32,13 @@ let buildTestCmd
             Command.Config::{
             , commands =
                   RunInToolchain.runInToolchain
-                    ([] : List Text)
+                    DebianVersions.overrideEnvs
                     "buildkite/scripts/dump-mina-type-shapes.sh"
                 # RunInToolchain.runInToolchain
-                    ([] : List Text)
+                    DebianVersions.overrideEnvs
                     "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}"
                 # RunInToolchain.runInToolchain
-                    ([] : List Text)
+                    DebianVersions.overrideEnvs
                     "buildkite/scripts/version-linter.sh ${release_branch}"
             , label = "Versioned type linter for ${release_branch}"
             , key = "version-linter-${release_branch}"

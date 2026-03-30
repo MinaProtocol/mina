@@ -75,9 +75,8 @@ module Zkapp_command_applied = struct
     ; new_accounts : Account_id.t list
     }
 
-  let write_all_proofs_to_disk ~proof_cache_db
+  let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
       { Stable.Latest.accounts; command; new_accounts } : t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     { accounts
     ; command =
         With_status.map
@@ -116,12 +115,14 @@ module Command_applied = struct
     | Signed_command of Signed_command_applied.t
     | Zkapp_command of Zkapp_command_applied.t
 
-  let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t = function
+  let write_all_proofs_to_disk ~signature_kind ~proof_cache_db :
+      Stable.Latest.t -> t = function
     | Signed_command c ->
         Signed_command c
     | Zkapp_command c ->
         Zkapp_command
-          (Zkapp_command_applied.write_all_proofs_to_disk ~proof_cache_db c)
+          (Zkapp_command_applied.write_all_proofs_to_disk ~signature_kind
+             ~proof_cache_db c )
 
   let read_all_proofs_from_disk : t -> Stable.Latest.t = function
     | Signed_command c ->
@@ -178,7 +179,10 @@ module Varying : sig
     | Coinbase of Coinbase_applied.t
 
   val write_all_proofs_to_disk :
-    proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+       signature_kind:Mina_signature_kind.t
+    -> proof_cache_db:Proof_cache_tag.cache_db
+    -> Stable.Latest.t
+    -> t
 
   val read_all_proofs_from_disk : t -> Stable.Latest.t
 end = struct
@@ -202,9 +206,12 @@ end = struct
     | Fee_transfer of Fee_transfer_applied.t
     | Coinbase of Coinbase_applied.t
 
-  let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t = function
+  let write_all_proofs_to_disk ~signature_kind ~proof_cache_db :
+      Stable.Latest.t -> t = function
     | Command c ->
-        Command (Command_applied.write_all_proofs_to_disk ~proof_cache_db c)
+        Command
+          (Command_applied.write_all_proofs_to_disk ~signature_kind
+             ~proof_cache_db c )
     | Fee_transfer f ->
         Fee_transfer f
     | Coinbase c ->
@@ -307,6 +314,19 @@ let supply_increase :
   Option.value_map total ~default:(Or_error.error_string "overflow")
     ~f:(fun v -> Ok v)
 
+let transaction : t -> Transaction.t =
+ fun { varying; _ } ->
+  match varying with
+  | Command (Signed_command { common = { user_command = { data; _ }; _ }; _ })
+    ->
+      Transaction.Command (User_command.Signed_command data)
+  | Command (Zkapp_command { command = { data; _ }; _ }) ->
+      Transaction.Command (User_command.Zkapp_command data)
+  | Fee_transfer { fee_transfer = { data; _ }; _ } ->
+      Transaction.Fee_transfer data
+  | Coinbase { coinbase = { data; _ }; _ } ->
+      Transaction.Coinbase data
+
 let transaction_with_status : t -> Transaction.t With_status.t =
  fun { varying; _ } ->
   match varying with
@@ -334,10 +354,11 @@ let transaction_status : t -> Transaction_status.t =
   | Coinbase c ->
       c.coinbase.status
 
-let write_all_proofs_to_disk ~proof_cache_db
+let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
     { Stable.Latest.previous_hash; varying } : t =
   { previous_hash
-  ; varying = Varying.write_all_proofs_to_disk ~proof_cache_db varying
+  ; varying =
+      Varying.write_all_proofs_to_disk ~signature_kind ~proof_cache_db varying
   }
 
 let read_all_proofs_from_disk { previous_hash; varying } =

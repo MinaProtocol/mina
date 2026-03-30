@@ -13,9 +13,9 @@ let
       rustc = rustWithTargetPlatforms;
     };
   toolchainHashes = {
-    "1.81.0" = "sha256-VZZnlyP69+Y3crrLHQyJirqlHrTtGTsyiSnZB8jEvVo=";
+    "1.92.0" = "sha256-sqSWJDUxc+zaz1nBWMAJKTAGBuGWP25GCftIOlCEAtA=";
     "nightly-2024-09-05" =
-      "sha256-s5nlYcYG9EuO2HK2BU3PkI928DZBKCTJ4U9bz3RX1t4=";
+      "sha256-3aoA7PuH09g8F+60uTUQhnHrb/ARDLueSOD08ZVsWe0=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
     # That is,
     # 1. Put the correct version name;
@@ -142,7 +142,7 @@ in {
   # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
   kimchi-rust-std-deps = final.rustPlatform.importCargoLock {
     lockFile = final.runCommand "cargo.lock" { } ''
-      cp ${final.kimchi-rust.rust-src}/lib/rustlib/src/rust/Cargo.lock $out
+      cp ${final.kimchi-rust.rust-src}/lib/rustlib/src/rust/library/Cargo.lock $out
     '';
   };
 
@@ -161,10 +161,10 @@ in {
       version = deps.wasm-bindgen.version;
       src = final.fetchCrate {
         inherit pname version;
-        sha256 = "sha256-IPxP68xtNSpwJjV2yNMeepAS0anzGl02hYlSTvPocz8=";
+        sha256 = "sha256-3RJzK7mkYFrs7C/WkhW9Rr4LdP5ofb2FdYGz1P7Uxog=";
       };
 
-      cargoHash = "sha256-pBeQaG6i65uJrJptZQLuIaCb/WCQMhba1Z1OhYqA8Zc=";
+      cargoHash = "sha256-tD0OY2PounRqsRiFh8Js5nyknQ809ZcHMvCOLrvYHRE=";
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;
@@ -174,11 +174,18 @@ in {
           libiconv
         ];
 
-      checkInputs = [ final.nodejs ];
-
-      # other tests, like --test=wasm-bindgen, require it to be ran in the
-      # wasm-bindgen monorepo
-      cargoTestFlags = [ "--test=reference" ];
+      # wasm-bindgen-cli >= 0.2.100 no longer ships the `reference` test target
+      # in the crates.io tarball, so the old `--test=reference` check fails with:
+      # "error: no test target named `reference`".
+      #
+      # Keep a basic CI guardrail by smoke-testing the installed binary instead.
+      doCheck = false;
+      doInstallCheck = true;
+      installCheckPhase = ''
+        runHook preInstallCheck
+        "$out/bin/wasm-bindgen" --version | grep -F "wasm-bindgen ${version}"
+        runHook postInstallCheck
+      '';
     };
   in rustPlatform.buildRustPackage {
     pname = "kimchi_wasm";

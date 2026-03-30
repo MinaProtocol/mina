@@ -19,7 +19,7 @@
   ;; local libraries
   error_json
   transition_frontier_base
-  rfc3339_time
+  mina_stdlib_unix
   gossip_net
   signature_lib
   network_peer

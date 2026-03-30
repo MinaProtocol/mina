@@ -22,7 +22,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Bounded_types.String.Stable.V1.t
+        type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
         [@@deriving sexp, equal, compare, hash]
 
         let to_latest = Fn.id
@@ -106,7 +106,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Bounded_types.String.Stable.V1.t
+        type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
         [@@deriving sexp, equal, compare, hash]
 
         let to_latest = Fn.id

@@ -21,8 +21,6 @@ module Selection_methods = struct
   module Random_offset = Random_offset.Make (Lib)
 end
 
-let remove = Lib.State.remove
-
 let pending_work_statements = Lib.pending_work_statements
 
 let all_work = Lib.all_work

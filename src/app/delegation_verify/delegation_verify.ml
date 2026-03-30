@@ -45,10 +45,12 @@ let timestamp =
   anon ("timestamp" %: string)
 
 let instantiate_verify_functions ~logger ~genesis_constants
-    ~constraint_constants ~proof_level ~cli_proof_level = function
+    ~constraint_constants ~proof_level ~cli_proof_level ~signature_kind =
+  function
   | None ->
       Deferred.return
-        (Verifier.verify_functions ~constraint_constants ~proof_level ())
+        (Verifier.verify_functions ~constraint_constants ~proof_level
+           ~signature_kind () )
   | Some config_file ->
       let%bind.Deferred precomputed_values =
         let%bind.Deferred.Or_error config_json =
@@ -60,11 +62,11 @@ let instantiate_verify_functions ~logger ~genesis_constants
           @@ Runtime_config.of_yojson config_json
         in
         Genesis_ledger_helper.init_from_config_file ~logger ~proof_level
-          ~constraint_constants ~genesis_constants config ~cli_proof_level
+          ~constraint_constants ~genesis_constants ~cli_proof_level config
       in
       let%map.Deferred precomputed_values =
         match precomputed_values with
-        | Ok (precomputed_values, _) ->
+        | Ok precomputed_values ->
             Deferred.return precomputed_values
         | Error _ ->
             Output.display_error "fail to read config file" ;
@@ -73,7 +75,8 @@ let instantiate_verify_functions ~logger ~genesis_constants
       let constraint_constants =
         Precomputed_values.constraint_constants precomputed_values
       in
-      Verifier.verify_functions ~constraint_constants ~proof_level:Full ()
+      Verifier.verify_functions ~constraint_constants ~proof_level:Full
+        ~signature_kind ()
 
 module Make_verifier (Source : Submission.Data_source) = struct
   let verify_transaction_snarks = Source.verify_transaction_snarks
@@ -150,7 +153,8 @@ let filesystem_command =
       let%map_open block_dir = block_dir_flag
       and inputs = anon (sequence ("filename" %: Filename.arg_type))
       and no_checks = no_checks_flag
-      and config_file = config_flag in
+      and config_file = config_flag
+      and signature_kind = Cli_lib.Flag.signature_kind in
       fun () ->
         let logger = Logger.create () in
         let genesis_constants = Genesis_constants.Compiled.genesis_constants in
@@ -161,6 +165,7 @@ let filesystem_command =
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
+            ~signature_kind
         in
         let submission_paths = get_filenames inputs in
         let module V = Make_verifier (struct
@@ -188,7 +193,8 @@ let cassandra_command =
       and config_file = config_flag
       and keyspace = keyspace_flag
       and period_start = timestamp
-      and period_end = timestamp in
+      and period_end = timestamp
+      and signature_kind = Cli_lib.Flag.signature_kind in
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
@@ -200,6 +206,7 @@ let cassandra_command =
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
+            ~signature_kind
         in
         let module V = Make_verifier (struct
           include Submission.Cassandra
@@ -226,7 +233,9 @@ let stdin_command =
   Command.async
     ~summary:"Verify submissions and blocks read from standard input"
     Command.Let_syntax.(
-      let%map_open config_file = config_flag and no_checks = no_checks_flag in
+      let%map_open config_file = config_flag
+      and no_checks = no_checks_flag
+      and signature_kind = Cli_lib.Flag.signature_kind in
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
@@ -238,6 +247,7 @@ let stdin_command =
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
+            ~signature_kind
         in
         let module V = Make_verifier (struct
           include Submission.Stdin

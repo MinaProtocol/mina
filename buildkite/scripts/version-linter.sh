@@ -7,16 +7,11 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
-TESTNET_NAME="${TESTNET_NAME:-berkeley}"
-
-# Don't prompt for answers during apt-get install
-export DEBIAN_FRONTEND=noninteractive
-
-sudo apt-get update
-sudo apt-get install -y git apt-transport-https ca-certificates tzdata curl python3 python3-pip wget
+TESTNET_NAME="${TESTNET_NAME:-devnet-generic}"
 
 git config --global --add safe.directory /workdir
 
+source buildkite/scripts/debian/update.sh --verbose
 
 source buildkite/scripts/handle-fork.sh
 source buildkite/scripts/export-git-env-vars.sh

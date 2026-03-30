@@ -1,27 +1,26 @@
-(include ../../../../dune.flags.inc)
-
 (library
  (name mina_cli_entrypoint)
  (public_name cli.mina_cli_entrypoint)
  (modes native)
  (libraries
   ;;opam libraries
-  stdio
+  async
   async_kernel
   async_unix
+  async.async_command
   base
-  core_kernel
-  core
+  base.caml
   bin_prot
   bin_prot.shape
-  init
-  async
+  core_kernel
+  core
   core.daemon
-  base.caml
-  uri
-  async.async_command
+  init
+  memtrace
   result
   sexplib0
+  stdio
+  uri
   ;;local libraries
   verifier
   ledger_proof
@@ -58,8 +57,8 @@
   transaction_snark
   mina_compile_config
   node_error_service
-  mina_user_error
-  file_system
+  mina_stdlib
+  mina_stdlib_unix
   mina_version
   mina_net2
   block_time

@@ -105,7 +105,8 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
 
 let process_transition ~context:(module Context : CONTEXT) ~trust_system
     ~verifier ~get_completed_work ~frontier ~catchup_scheduler
-    ~processed_transition_writer ~time_controller ~block_or_header ~valid_cb =
+    ~processed_transition_writer ~time_controller ~block_or_header ~valid_cb
+    ?transaction_pool_proxy =
   let is_block_in_frontier =
     Fn.compose Option.is_some @@ Transition_frontier.find frontier
   in
@@ -131,8 +132,9 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
   let parent_hash =
     Protocol_state.previous_state_hash (Header.protocol_state header)
   in
-  let root_block =
-    Transition_frontier.(Breadcrumb.block_with_hash @@ root frontier)
+  let root_consensus_state =
+    Transition_frontier.(
+      Breadcrumb.consensus_state_with_hashes @@ root frontier)
   in
   let metadata = [ ("state_hash", State_hash.to_yojson transition_hash) ] in
   let state_hash = transition_hash in
@@ -161,7 +163,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       match
         Mina_block.Validation.validate_frontier_dependencies
           ~context:(module Context)
-          ~root_block ~is_block_in_frontier ~to_header:ident
+          ~root_consensus_state ~is_block_in_frontier ~to_header:ident
           (Envelope.Incoming.data env)
       with
       | Ok _ | Error `Parent_missing_from_frontier ->
@@ -192,8 +194,8 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         match
           Mina_block.Validation.validate_frontier_dependencies
             ~context:(module Context)
-            ~root_block ~is_block_in_frontier ~to_header:Mina_block.header
-            initially_validated_transition
+            ~root_consensus_state ~is_block_in_frontier
+            ~to_header:Mina_block.header initially_validated_transition
         with
         | Ok t ->
             return (Ok t)
@@ -239,8 +241,24 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       in
       (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
       [%log internal] "Find_parent_breadcrumb" ;
-      let parent_breadcrumb =
-        Transition_frontier.find_exn frontier parent_hash
+      let%bind parent_breadcrumb =
+        match Transition_frontier.find frontier parent_hash with
+        | None ->
+            (* Unexpected case: if it happens, there is a bug somewhere. Still,
+               we should attempt to handle it gracefully. *)
+            [%log internal] "Failure"
+              ~metadata:[ ("reason", `String "Parent_missing_from_frontier") ] ;
+            [%log error] ~metadata
+              "Refusing to process the transition with hash $state_hash \
+               because parent is missing from the transition frontier \
+               (unexpected case, there is likely a bug somewhere)" ;
+            let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
+              Cached.invalidate_with_failure
+                cached_initially_validated_transition
+            in
+            Deferred.return (Error ())
+        | Some x ->
+            return x
       in
       let%bind breadcrumb =
         cached_transform_deferred_result cached_initially_validated_transition
@@ -249,7 +267,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
               ~verifier ~get_completed_work ~trust_system
               ~transition_receipt_time ~sender:(Some sender)
               ~parent:parent_breadcrumb ~transition:mostly_validated_transition
-              (* TODO: Can we skip here? *) () )
+              ?transaction_pool_proxy (* TODO: Can we skip here? *) () )
           ~transform_result:(function
             | Error (`Invalid_staged_ledger_hash error)
             | Error (`Invalid_staged_ledger_diff error) ->
@@ -303,19 +321,19 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
     ~(catchup_breadcrumbs_reader :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Mina_net2.Validation_callback.t option )
-         Rose_tree.t
+         Mina_stdlib.Rose_tree.t
          list
        * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ] )
        Reader.t )
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Mina_net2.Validation_callback.t option )
-         Rose_tree.t
+         Mina_stdlib.Rose_tree.t
          list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
        , unit )
-       Writer.t ) ~processed_transition_writer =
+       Writer.t ) ~processed_transition_writer ?transaction_pool_proxy =
   let open Context in
   let catchup_scheduler =
     Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~trust_system
@@ -360,7 +378,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                   ( match%map
                       Deferred.Or_error.List.iter breadcrumb_subtrees
                         ~f:(fun subtree ->
-                          Rose_tree.Deferred.Or_error.iter
+                          Mina_stdlib.Rose_tree.Deferred.Or_error.iter
                             subtree
                             (* It could be the case that by the time we try and
                                * add the breadcrumb, it's no longer relevant when
@@ -390,7 +408,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                       ()
                   | Error err ->
                       List.iter breadcrumb_subtrees ~f:(fun tree ->
-                          Rose_tree.iter tree
+                          Mina_stdlib.Rose_tree.iter tree
                             ~f:(fun (cached_breadcrumb, _vc) ->
                               let (_ : Transition_frontier.Breadcrumb.t) =
                                 Cached.invalidate_with_failure cached_breadcrumb
@@ -458,7 +476,8 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                       Transition_frontier_controller.transitions_being_processed)
               | `Partially_valid_transition (block_or_header, `Valid_cb valid_cb)
                 ->
-                  process_transition ~block_or_header ~valid_cb ) ) )
+                  process_transition ~block_or_header ~valid_cb
+                    ?transaction_pool_proxy ) ) )
 
 let%test_module "Transition_handler.Processor tests" =
   ( module struct
@@ -563,7 +582,7 @@ let%test_module "Transition_handler.Processor tests" =
                   ~primary_transition_reader:valid_transition_reader
                   ~producer_transition_reader ~catchup_job_writer
                   ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-                  ~processed_transition_writer ;
+                  ~processed_transition_writer ?transaction_pool_proxy:None ;
                 List.iter branch ~f:(fun breadcrumb ->
                     let b =
                       downcast_breadcrumb breadcrumb

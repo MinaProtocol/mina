@@ -81,6 +81,8 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let set_at_index_exn (T ((module Base), t)) = Base.set_at_index_exn t
 
+    let get_at_index (T ((module Base), t)) = Base.get_at_index t
+
     let get_at_index_exn (T ((module Base), t)) = Base.get_at_index_exn t
 
     let set_batch ?hash_cache (T ((module Base), t)) =
@@ -118,6 +120,8 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let token_owners (T ((module Base), t)) = Base.token_owners t
 
+    let iteri_untrusted (T ((module Base), t)) = Base.iteri_untrusted t
+
     let iteri (T ((module Base), t)) = Base.iteri t
 
     (* ignored_keys must be Base.Keys.Set.t, but that isn't necessarily the same as Keys.Set.t for the
@@ -153,5 +157,8 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
     let depth (T ((module Base), t)) = Base.depth t
 
     let detached_signal (T ((module Base), t)) = Base.detached_signal t
+
+    let all_accounts_on_masks (T ((module Base), t)) =
+      Base.all_accounts_on_masks t
   end
 end

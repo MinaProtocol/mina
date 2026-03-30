@@ -33,7 +33,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_archive_nodes = 1
     }
 
-  let run network t =
+  let run ~config:Test_config.{ signature_kind; _ } network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
@@ -104,7 +104,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let%map.Async.Deferred deploy_zkapp =
         Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-          zkapp_command_spec
+          ~signature_kind zkapp_command_spec
       in
       ( deploy_zkapp
       , timing_account_id
@@ -151,7 +151,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Malleable_error.lift
       @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-           zkapp_command_spec
+           ~signature_kind zkapp_command_spec
     in
     (* Create a timed account that with initial liquid balance being 0, and vesting 1 mina at each slot.
        This account would be used to test the edge case of vesting. See `zkapp_command_transfer_from_third_timed_account`
@@ -202,7 +202,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let%map.Async.Deferred deploy_zkapp =
         Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-          zkapp_command_spec
+          ~signature_kind zkapp_command_spec
       in
       (deploy_zkapp, timing_account_id, zkapp_keypair)
     in
@@ -244,7 +244,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-        zkapp_command_spec
+        ~signature_kind zkapp_command_spec
     in
     let%bind zkapp_command_transfer_from_timed_account =
       let open Mina_base in

@@ -1,4 +1,4 @@
-(executable
+(test
  (name test)
  (modes js)
  (js_of_ocaml

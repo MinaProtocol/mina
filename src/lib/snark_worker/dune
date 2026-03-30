@@ -22,7 +22,7 @@
   result
   sexplib0
   ;; local libraries
-  bounded_types
+  mina_stdlib
   cli_lib
   currency
   error_json

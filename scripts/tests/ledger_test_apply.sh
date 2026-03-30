@@ -27,7 +27,9 @@ FULL_ACTIONS_EVENTS=""
 while [[ "$#" -gt 0 ]]; do case $1 in
   -m|--mina-app) MINA_APP="$2"; shift; shift;;
   -r|--runtime-ledger-app) RUNTIME_LEDGER_APP="$2"; shift; shift;;
-  $ACTIONS_EVENTS_OPT) FULL_ACTIONS_EVENTS="$ACTIONS_EVENTS_OPT"; shift;;
+  "$ACTIONS_EVENTS_OPT") 
+    # shellcheck disable=SC2034
+    FULL_ACTIONS_EVENTS="$ACTIONS_EVENTS_OPT"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; done
 

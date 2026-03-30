@@ -110,16 +110,6 @@ module Make (Inputs : Inputs_intf) = struct
         in
         `With_degree_bound { unshifted; shifted }
 
-  (*
-     type 'a t =
-       [ `With_degree_bound of
-         ('a * 'a) Plonkish_prelude.Or_infinity.t
-         Plonk_types.Poly_comm.With_degree_bound.t
-       | `Without_degree_bound of
-         ('a * 'a) Plonk_types.Poly_comm.Without_degree_bound.t
-       ]
-  *)
-
   let of_backend_without_degree_bound (t : Backend.t) =
     let open Plonk_types.Poly_comm in
     let unshifted = Backend.unshifted t in
