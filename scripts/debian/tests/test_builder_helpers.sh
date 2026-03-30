@@ -729,18 +729,17 @@ test_build_daemon_devnet_postfork_deb() {
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina-dispatch"
     assert_file_captured "$CAPTURED_FILES" "usr/local/bin/mina"
 
-    # Config for postfork (current commit hash)
-    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
-    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/devnet.json"
+    # Config files (config_<hash>.json, <network>.json) are provided by
+    # the mina-<network>-config package, not the postfork package
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/devnet.json"
 
     # Config for prefork daemon (resolved 8-char hash from legacy version)
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_ef01abcd.json"
 
-    # Both configs should have the same content (devnet genesis ledger)
+    # Prefork config should have correct content
     assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
         "var/lib/coda/config_ef01abcd.json" "devnet"
-    assert_captured_file_contains "$CAPTURED_LAST_BUILD_DIR" \
-        "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json" "devnet"
 
     unset PREFORK_LEGACY_VERSION
 }
@@ -754,32 +753,31 @@ test_build_daemon_mainnet_postfork_deb() {
     assert_eq "deb name" "mina-mainnet-postfork-mesa" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-postfork-mesa"
 
-    # Config for both postfork and prefork
-    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+    # Postfork config comes from the config package, not this one
+    assert_file_not_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
+
+    # Prefork config shipped here (different hash)
     assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_ef01abcd.json"
 
     unset PREFORK_LEGACY_VERSION
 }
 
 test_build_daemon_postfork_deb_without_prefork_version() {
-    # When PREFORK_LEGACY_VERSION is not set, only the postfork config should be shipped
+    # When PREFORK_LEGACY_VERSION is not set, no config files should be shipped
+    # (config comes from the mina-<network>-config package)
     unset PREFORK_LEGACY_VERSION 2>/dev/null || true
 
     safe_build build_daemon_postfork_deb devnet || { log_fail "build exited non-zero"; return; }
 
     load_captured_state
 
-    # Postfork config present
-    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
-
-    # No prefork config (no PREFORK_LEGACY_VERSION means no extra config_*.json)
-    # Only one config_*.json should exist
+    # No config files at all — neither postfork nor prefork
     local config_count
     config_count=$(echo "$CAPTURED_FILES" | grep -c "config_" || true)
-    if [[ "$config_count" -eq 1 ]]; then
+    if [[ "$config_count" -eq 0 ]]; then
         log_pass
     else
-        log_fail "Expected 1 config_*.json file, got ${config_count}"
+        log_fail "Expected 0 config_*.json files, got ${config_count}"
     fi
 }
 
@@ -791,16 +789,14 @@ test_build_daemon_postfork_deb_unresolvable_prefork_hash() {
 
     load_captured_state
 
-    # Postfork config present
-    assert_file_captured "$CAPTURED_FILES" "var/lib/coda/config_${EXPECTED_GITHASH_CONFIG}.json"
-
-    # No prefork config since hash was unresolvable
+    # No config files — postfork config comes from config package,
+    # and prefork config can't be shipped because hash is unresolvable
     local config_count
     config_count=$(echo "$CAPTURED_FILES" | grep -c "config_" || true)
-    if [[ "$config_count" -eq 1 ]]; then
+    if [[ "$config_count" -eq 0 ]]; then
         log_pass
     else
-        log_fail "Expected 1 config_*.json (unresolvable prefork hash), got ${config_count}"
+        log_fail "Expected 0 config_*.json (unresolvable prefork hash), got ${config_count}"
     fi
 
     unset PREFORK_LEGACY_VERSION
