@@ -103,7 +103,16 @@ create_control_file() {
   echo "Dependencies: ${2}"
   echo "Description: ${3}"
   if [ -n "${4:-}" ]; then
-    echo "Broken/Replaces: ${4}"
+    echo "Suggests: ${4}"
+  fi
+  if [ -n "${5:-}" ]; then
+    echo "Replaces/Breaks: ${5}"
+  fi
+  if [ -n "${6:-}" ]; then
+    echo "Provides: ${6}"
+  fi
+  if [ -n "${7:-}" ]; then
+    echo "Conflicts: ${7}"
   fi
   # Make sure the directory exists
   mkdir -p "${BUILDDIR}/DEBIAN"
@@ -137,6 +146,12 @@ EOF
   if [ -n "${5:-}" ]; then
     echo "Replaces: ${5}" >> ${CONTROL}
     echo "Breaks: ${5}" >> ${CONTROL}
+  fi
+  if [ -n "${6:-}" ]; then
+    echo "Provides: ${6}" >> ${CONTROL}
+  fi
+  if [ -n "${7:-}" ]; then
+    echo "Conflicts: ${7}" >> ${CONTROL}
   fi
 
   cat <<EOF >> ${CONTROL}
@@ -747,16 +762,7 @@ build_daemon_automode_deb() {
 
   create_control_file "${package_name}" "${depends}" \
     "Transitional metapackage for Mina ${network} automode (installs both prefork and postfork runtimes)" \
-    "" "mina-${network}"
-
-  # Add Provides and Conflicts fields (create_control_file only writes Replaces+Breaks)
-  local CONTROL="${BUILDDIR}/DEBIAN/control"
-  echo "Provides: mina-${network}" >> "${CONTROL}"
-  echo "Conflicts: mina-${network}" >> "${CONTROL}"
-
-  echo "------------------------------------------------------------"
-  echo "Control File (with Provides/Conflicts):"
-  cat "${CONTROL}"
+    "" "mina-${network}" "mina-${network}" "mina-${network}"
 
   build_deb "${package_name}"
   ARCHITECTURE="${saved_arch}"
