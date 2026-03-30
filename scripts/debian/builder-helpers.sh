@@ -534,7 +534,7 @@ build_daemon_deb() {
   esac
 
   create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network}-config (>=${MINA_DEB_VERSION})" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION})"
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION}), mina-${network}-postfork-${POSTFORK_CODENAME}"
 
   copy_common_daemon_apps "${network}"
 
@@ -648,10 +648,10 @@ copy_common_daemon_post_automode_apps_and_configs() {
   # dispatch to the correct runtime based on env var set in /etc/default/mina-dispatch
   create_symlinks_for_shared_apps "${prefork_network}"
 
-  copy_common_daemon_configs "${prefork_network}"
-
-  # Also ship config for prefork daemon's commit-id-based config lookup.
-  # The prefork binary looks for config_<its_own_8char_hash>.json at startup.
+  # Config files (config_<hash>.json, <network>.json) are provided by the
+  # mina-<network>-config package, so we do NOT ship them here to avoid
+  # dpkg file conflicts.  Only ship the prefork config when it differs from
+  # the postfork hash, since the config package won't contain it.
   if [[ -n "${PREFORK_LEGACY_VERSION:-}" ]]; then
     local prefork_short_hash="${PREFORK_LEGACY_VERSION##*-}"
     local prefork_githash_config
@@ -661,7 +661,8 @@ copy_common_daemon_post_automode_apps_and_configs() {
         echo "Prefork githash (${prefork_githash_config}) is the same as postfork; skipping config copy."
       else
         echo "Copying config for prefork daemon as config_${prefork_githash_config}.json"
-        cp "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json" \
+        mkdir -p "${BUILDDIR}/var/lib/coda"
+        cp "../genesis_ledgers/${prefork_network}.json" \
            "${BUILDDIR}/var/lib/coda/config_${prefork_githash_config}.json"
       fi
     else
@@ -686,7 +687,8 @@ build_daemon_postfork_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building ${prefork_network} postfork deb for hardfork automode:"
 
-  create_control_file "$package_name" "${SHARED_DEPS}${DAEMON_DEPS}" \
+  local config_dep="mina-${prefork_network}-config (>= ${MINA_DEB_VERSION})"
+  create_control_file "$package_name" "${SHARED_DEPS}${DAEMON_DEPS}, ${config_dep}" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
   local seed_list_url
