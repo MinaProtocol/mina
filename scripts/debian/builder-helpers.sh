@@ -702,8 +702,7 @@ build_daemon_postfork_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building ${prefork_network} postfork deb for hardfork automode:"
 
-  local config_dep="mina-${prefork_network}-config (>= ${MINA_DEB_VERSION})"
-  create_control_file "$package_name" "${SHARED_DEPS}${DAEMON_DEPS}, ${config_dep}" \
+  create_control_file "$package_name" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
   local seed_list_url
