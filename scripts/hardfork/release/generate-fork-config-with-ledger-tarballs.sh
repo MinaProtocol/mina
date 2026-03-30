@@ -3,7 +3,7 @@
 set -ex
 
 usage() {
-  echo "Usage: $0 --network NETWORK_NAME --config-url CONFIG_JSON_GZ_URL --runtime-ledger RUNTIME_GENESIS_LEDGER --logproc LOGPROC --output-dir OUTPUT_DIR [--prefork-genesis-config PREFORK_GENESIS_CONFIG]"
+  echo "Usage: $0 --network NETWORK_NAME --config-url CONFIG_JSON_GZ_URL --runtime-ledger RUNTIME_GENESIS_LEDGER --logproc LOGPROC --output-dir OUTPUT_DIR"
   echo ""
   echo "Generates hardfork ledger tarballs and runtime config for the specified network."
   echo ""
@@ -13,7 +13,6 @@ usage() {
   echo "  --runtime-ledger RUNTIME_GENESIS_LEDGER   Path to the runtime genesis ledger generator executable"
   echo "  --logproc LOGPROC                      Command to process log output (e.g., cat, grep)"
   echo "  --output-dir OUTPUT_DIR                Directory to output the generated ledger tarballs. WARNING: will be cleared if it exists."
-  echo "  --prefork-genesis-config PREFORK_GENESIS_CONFIG  Path to the prefork genesis config (must contain daemon.slot_chain_end and daemon.hard_fork_genesis_slot_delta for vesting updates)"
 }
 
 NETWORK_NAME=""
@@ -23,8 +22,6 @@ LOGPROC="cat"
 OUTPUT_DIR="hardfork_ledgers"
 
 TMP=$(mktemp -d)
-
-PREFORK_GENESIS_CONFIG=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -38,10 +35,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --runtime-ledger)
       RUNTIME_GENESIS_LEDGER="$2"
-      shift 2
-      ;;
-    --prefork-genesis-config)
-      PREFORK_GENESIS_CONFIG="$2"
       shift 2
       ;;
     --logproc)
@@ -111,13 +104,9 @@ jq 'del(.genesis)' "$TMP/config.json" > "$TMP/fork_config_no_genesis.json"
 echo "--- Generate hardfork ledger tarballs"
 mkdir "$OUTPUT_DIR"
 
-PREFORK_GENESIS_CONFIG_ARG=""
-if [[ -n "$PREFORK_GENESIS_CONFIG" ]]; then
-  jq 'del(.genesis)' "$PREFORK_GENESIS_CONFIG" > "$TMP/config_no_genesis.json"
-  PREFORK_GENESIS_CONFIG_ARG="--prefork-genesis-config $TMP/config_no_genesis.json"
-fi
+jq 'del(.genesis)' "$FORKING_FROM_CONFIG_JSON" > "$TMP/config_no_genesis.json"
 
-"$RUNTIME_GENESIS_LEDGER" --pad-app-state --config-file "$TMP/fork_config_no_genesis.json" $PREFORK_GENESIS_CONFIG_ARG --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
+"$RUNTIME_GENESIS_LEDGER" --pad-app-state --config-file "$TMP/fork_config_no_genesis.json" --prefork-genesis-config "$TMP/config_no_genesis.json" --genesis-dir "$OUTPUT_DIR"/ --hash-output-file hashes.json | tee runtime_genesis_ledger.log | $LOGPROC
 
 echo "--- Create hardfork config"
 FORK_CONFIG_JSON="$TMP/fork_config_no_genesis.json" LEDGER_HASHES_JSON=hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json

@@ -360,7 +360,6 @@ func main() {
 		"PRECOMPUTED_FORK_BLOCK_PREFIX":     *precomputedPrefix,
 		"USE_ARTIFACTS_FROM_BUILDKITE_BUILD": *useArtifactsFrom,
 		"USE_GENERIC_DOCKERS_FROM_VERSION":   "",
-		"PREFORK_GENESIS_CONFIG":             "",
 	}
 
 	// Print configuration

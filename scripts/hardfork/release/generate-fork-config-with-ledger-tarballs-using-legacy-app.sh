@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Usage: generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe <mina_legacy_genesis_exe> --config <fork_config> --workdir <workdir> --ledger-name <ledger_name> --hash-name <hash_name> --prefork-genesis-config <prefork_genesis_config>
+# Usage: generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe <mina_legacy_genesis_exe> --config <fork_config> --workdir <workdir> [--ledger-name <ledger_name>] [--hash-name <hash_name>] [--prefork-genesis-config <prefork_genesis_config>]
 
 set -e
 

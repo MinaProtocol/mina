@@ -8,8 +8,6 @@ WORKDIR=$(pwd)
 FORCE_VERSION="*"
 CACHED_BUILDKITE_BUILD_ID="${CACHED_BUILDKITE_BUILD_ID:-}"
 CONFIG_JSON_GZ_URL=""
-PREFORK_GENESIS_CONFIG=""
-
 while [[ $# -gt 0 ]]; do
   case $1 in
     --network)
@@ -32,13 +30,9 @@ while [[ $# -gt 0 ]]; do
       CONFIG_JSON_GZ_URL="$2"
       shift 2
       ;;
-    --prefork-genesis-config)
-      PREFORK_GENESIS_CONFIG="$2"
-      shift 2
-      ;;
     *)
       echo "Unknown argument: $1"
-      echo "Usage: $0 --network <network> --config-json-gz-url <url> [--version <version>] --codename <codename> [--cached-buildkite-build-id <id>] [--prefork-genesis-config <config>]"
+      echo "Usage: $0 --network <network> --config-json-gz-url <url> [--version <version>] --codename <codename> [--cached-buildkite-build-id <id>]"
       exit 1
       ;;
   esac
@@ -47,11 +41,6 @@ done
 if [ -z "$NETWORK" ] || [ -z "$CODENAME" ]; then
   echo "Usage: $0 --network <network> [--version <version>] --codename <codename>"
   exit 1
-fi
-
-PREFORK_GENESIS_CONFIG_ARG=""
-if [[ -n "$PREFORK_GENESIS_CONFIG" ]]; then
-  PREFORK_GENESIS_CONFIG_ARG="--prefork-genesis-config $PREFORK_GENESIS_CONFIG"
 fi
 
 # Install mina-logproc from cached build if available, else from current build
@@ -65,7 +54,7 @@ MINA_DEB_CODENAME=$CODENAME FORCE_VERSION=$FORCE_VERSION ROOT="legacy" ./buildki
 
 curl "${CONFIG_JSON_GZ_URL}" > config.json.gz && gunzip config.json.gz
 
-./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe mina-create-prefork-genesis --config "config.json" --workdir "$WORKDIR" $PREFORK_GENESIS_CONFIG_ARG
+./scripts/hardfork/release/generate-fork-config-with-ledger-tarballs-using-legacy-app.sh --exe mina-create-prefork-genesis --config "config.json" --workdir "$WORKDIR" --prefork-genesis-config "genesis_ledgers/${NETWORK}.json"
 
 echo "--- Caching legacy ledger tarballs and hashes"
 
