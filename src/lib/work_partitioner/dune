@@ -8,6 +8,7 @@
   core_kernel
   ;; Local libraries
   mina_base
+  mina_stdlib
   snark_work_lib
   transaction_snark
   transaction_witness

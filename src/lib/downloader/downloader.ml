@@ -12,29 +12,79 @@ module Job = struct
         Ivar.t
     }
 
+  let to_yojson ~key ~attempt (t : _ t) : Yojson.Safe.t =
+    `Assoc
+      [ ("key", key t.key)
+      ; ( "attempts"
+        , `Assoc
+            (List.map (Map.to_alist t.attempts) ~f:(fun (p, a) ->
+                 (Peer.to_multiaddr_string p, attempt a) ) ) )
+      ]
+
   let result t = Ivar.read t.res
 end
 
-type 'a pred = 'a -> bool [@@deriving sexp_of]
+let sample_k_from_list lst k =
+  let arr = Array.of_list lst in
+  let len = Array.length arr in
+  let k = min k len in
+  for i = 0 to k - 1 do
+    let j = i + Random.int (len - i) in
+    let temp = arr.(i) in
+    arr.(i) <- arr.(j) ;
+    arr.(j) <- temp
+  done ;
+  Array.sub arr ~pos:0 ~len:k |> Array.to_list
 
-let pred_to_yojson _f _x = `String "<opaque>"
+module Yojson' = struct
+  module List = struct
+    let chunked (type a) ~(f : a -> Yojson.Safe.t) ~(limit : int) (l : a list) :
+        Yojson.Safe.t =
+      let len = List.length l in
+      let representatives =
+        if limit >= len then l else sample_k_from_list l limit
+      in
+      `Assoc
+        [ ("length", `Int len)
+        ; ("representatives", `List (List.map ~f representatives))
+        ]
 
-let sexp_opaque_to_yojson _f _x = `String "<opaque>"
+    let with_length ~f l : Yojson.Safe.t =
+      `Assoc
+        [ ("length", `Int (List.length l)); ("elts", `List (List.map ~f l)) ]
+  end
+end
 
+(** What a peer claims to know, as reported during a knowledge-refresh query.
+    This is the positive side of a peer's knowledge: it describes which keys the
+    peer asserts it can serve.  The negative side (keys we tried and the peer
+    couldn't deliver) is tracked separately in [Knowledge.tried_and_failed].
+
+    The three variants reflect how precise the peer's self-report is:
+    - [`All]      – the peer claims to have every key; no enumeration needed.
+    - [`Some ks]  – the peer returned an explicit list of keys it holds.
+    - [`Call f]   – knowledge is encoded as a predicate, used when the caller
+                    merges an incoming [`Some] list on top of an existing [`Call]
+                    (see [Useful_peers.update / Add_knowledge]). *)
 module Claimed_knowledge = struct
   type 'key t =
-    [ `All | `Some of 'key list | `Call of ('key pred[@sexp.opaque]) ]
+    [ `All
+    | `Some of 'key list [@to_yojson fun f -> Yojson'.List.chunked ~f]
+    | `Call of
+      ('key -> bool[@sexp.opaque] [@to_yojson fun _ -> `String "<opaque>"]) ]
   [@@deriving sexp_of, to_yojson]
 
   let to_yojson f t =
     match t with
-    | `Some ks ->
-        let n = List.length ks in
-        if n > 5 then to_yojson (fun x -> `Int x) (`Some [ n ])
-        else to_yojson f t
+    | `Some keys ->
+        Yojson'.List.chunked ~f ~limit:5 keys
     | _ ->
         to_yojson f t
 
+  (** [check ~equal t k] returns [true] iff this claimed knowledge covers key [k].
+      - [`All]    always returns [true].
+      - [`Some ks] does a linear membership test using [equal].
+      - [`Call f] delegates to the stored predicate. *)
   let check ~equal t k =
     match t with
     | `All ->
@@ -61,211 +111,119 @@ end) (Result : sig
   type t
 
   val key : t -> Key.t
-end) (Knowledge_context : sig
-  type t
-end) : sig
-  type t [@@deriving to_yojson]
-
-  module Job : sig
-    type t = (Key.t, Attempt.t, Result.t) Job.t
-
-    val result :
-         t
-      -> ( Result.t Envelope.Incoming.t * Attempt.t Peer.Map.t
-         , [ `Finished ] )
-         Base.Result.t
-         Deferred.t
-  end
-
-  val cancel : t -> Key.t -> unit
-
-  val create :
-       max_batch_size:int
-    -> stop:unit Deferred.t
-    -> logger:Logger.t
-    -> trust_system:Trust_system.t
-    -> get:(Peer.t -> Key.t list -> Result.t list Deferred.Or_error.t)
-    -> knowledge_context:Knowledge_context.t Broadcast_pipe.Reader.t
-    -> knowledge:
-         (Knowledge_context.t -> Peer.t -> Key.t Claimed_knowledge.t Deferred.t)
-    -> peers:(unit -> Peer.t list Deferred.t)
-    -> preferred:Peer.t list
-    -> t Deferred.t
-
-  val download : t -> key:Key.t -> attempts:Attempt.t Peer.Map.t -> Job.t
-
-  val mark_preferred : t -> Peer.t -> now:Time.t -> unit
-
-  val add_knowledge : t -> Peer.t -> Key.t list -> unit
-
-  val update_knowledge : t -> Peer.t -> Key.t Claimed_knowledge.t -> unit
-
-  val total_jobs : t -> int
-
-  val check_invariant : t -> unit
-
-  val set_check_invariant : (t -> unit) -> unit
-
-  val logger : t -> Logger.t
-end = struct
+end) =
+struct
   let max_wait = Time.Span.of_ms 100.
 
-  module J = Job
+  type job = (Key.t, Attempt.t, Result.t) Job.t
 
-  module Job = struct
-    type t = (Key.t, Attempt.t, Result.t) Job.t
+  (** Per-peer knowledge record: what a peer claims to have ([claimed]) minus
+      what we have empirically learned it cannot deliver ([tried_and_failed]).
 
-    let to_yojson ({ key; attempts; _ } : t) : Yojson.Safe.t =
-      `Assoc
-        [ ("key", Key.to_yojson key)
-        ; ( "attempts"
-          , `Assoc
-              (List.map (Map.to_alist attempts) ~f:(fun (p, a) ->
-                   (Peer.to_multiaddr_string p, Attempt.to_yojson a) ) ) )
-        ]
+      The two fields form a two-layer filter used by [knows]:
+      - [tried_and_failed] is the authoritative negative evidence — real download
+        attempts that the peer failed and that are not worth retrying.  It
+        overrides whatever [claimed] says.
+      - [claimed] is the peer's self-reported positive knowledge.  [None] means
+        we have never queried this peer; a [Some] value comes from a
+        knowledge-refresh response (see [Useful_peers.update / Knowledge]).
 
-    let result = Job.result
-  end
-
-  module Make_hash_queue (Key : Hashable.S) = struct
-    module Key_value = struct
-      type 'a t = { key : Key.t; mutable value : 'a } [@@deriving fields]
-    end
-
-    (* Hash_queue would be perfect, but it doesn't expose enough for
-         us to make sure the underlying queue is sorted by blockchain_length. *)
-    type 'a t =
-      { queue : 'a Key_value.t Doubly_linked.t
-      ; table : 'a Key_value.t Doubly_linked.Elt.t Key.Table.t
-      }
-
-    let dequeue t =
-      Option.map (Doubly_linked.remove_first t.queue) ~f:(fun { key; value } ->
-          Hashtbl.remove t.table key ; value )
-
-    let enqueue t (e : _ J.t) =
-      if Hashtbl.mem t.table e.key then `Key_already_present
-      else
-        let kv = { Key_value.key = e.key; value = e } in
-        let elt =
-          match
-            Doubly_linked.find_elt t.queue ~f:(fun { value; _ } ->
-                Key.compare e.key value.J.key < 0 )
-          with
-          | None ->
-              (* e is >= everything. Put it at the back. *)
-              Doubly_linked.insert_last t.queue kv
-          | Some pred ->
-              Doubly_linked.insert_before t.queue pred kv
-        in
-        Hashtbl.set t.table ~key:e.key ~data:elt ;
-        `Ok
-
-    let lookup t k =
-      Option.map (Hashtbl.find t.table k) ~f:(fun x ->
-          (Doubly_linked.Elt.value x).value )
-
-    let remove t k =
-      match Hashtbl.find_and_remove t.table k with
-      | None ->
-          ()
-      | Some elt ->
-          Doubly_linked.remove t.queue elt
-
-    let length t = Doubly_linked.length t.queue
-
-    let to_list t = List.map (Doubly_linked.to_list t.queue) ~f:Key_value.value
-
-    let create () =
-      { table = Key.Table.create (); queue = Doubly_linked.create () }
-  end
-
-  module Q = Make_hash_queue (Key)
-
+      A fresh record (from [create]) starts with [claimed = None] and an empty
+      [tried_and_failed], meaning the peer is a complete unknown — treated as a
+      low-priority candidate rather than excluded outright. *)
   module Knowledge = struct
-    module Key_set = struct
-      type t = Key.Hash_set.t [@@deriving sexp]
-
-      let to_yojson t = `List (List.map (Hash_set.to_list t) ~f:Key.to_yojson)
-    end
-
     type t =
       { claimed : Key.t Claimed_knowledge.t option
-      ; tried_and_failed : Key_set.t
+      ; tried_and_failed : Key.Set.t
+            [@to_yojson fun t -> `List (List.map Key.to_yojson (Set.to_list t))]
       }
     [@@deriving sexp_of, to_yojson]
 
-    let clear t = Hash_set.clear t.tried_and_failed
+    let empty = { claimed = None; tried_and_failed = Key.Set.empty }
 
-    let create () =
-      { claimed = None; tried_and_failed = Key.Hash_set.create () }
+    (** [knows t k] answers whether this peer is expected to have key [k].
 
+        Returns:
+        - [`No]           – [k] is in [tried_and_failed] (empirical failure), or
+                            the peer's [claimed] set explicitly excludes [k].
+        - [`No_information] – [claimed] is [None]; we have never queried the peer.
+                              The peer is still a candidate with a small score bonus.
+        - [`Claims_to]    – [k] passes [Claimed_knowledge.check] on [claimed].
+
+        [tried_and_failed] is checked first and takes precedence over [claimed]. *)
     let knows t k =
-      if Hash_set.mem t.tried_and_failed k then `No
+      if Set.mem t.tried_and_failed k then `No
       else
         match t.claimed with
         | None ->
             `No_information
-        | Some claimed ->
-            if Claimed_knowledge.check ~equal:Key.equal claimed k then
-              `Claims_to
-            else `No
+        | Some claimed when Claimed_knowledge.check ~equal:Key.equal claimed k
+          ->
+            `Claims_to
+        | _ ->
+            `No
   end
 
+  (** Tracks which peers are candidates for the next download batch and what
+      each peer is believed to know.
+
+      The module has two responsibilities:
+      1. **State maintenance** – mutated via [update] as downloads start/finish,
+         knowledge-refresh responses arrive, and the peer set changes.
+      2. **Peer selection** – [useful_peer] reads the accumulated state and
+         returns the single best available peer for the current pending queue,
+         or a signal explaining why no peer can be selected right now.
+
+      The [r]/[w] strict pipe is an internal wakeup channel: every [update] call
+      writes a unit to [w] so that the downloader loop, which may be blocked
+      reading [r], wakes up and re-evaluates peer selection. *)
   module Useful_peers = struct
-    module Preferred_heap = struct
-      (* The preferred peers, sorted by the last time that they were useful to us. *)
-      type t =
-        { heap : (Peer.t * Time.t) Pairing_heap.t
-        ; table : (Peer.t * Time.t) Pairing_heap.Elt.t Peer.Table.t
-        }
+    (** Priority queue of peers that have recently delivered at least one
+        successful result.  Preferred peers are tried before ordinary peers in
+        [useful_peer].  A peer enters this set on a successful [Download_finished]
+        and is evicted when [reset_knowledge] is called (stall recovery). *)
+    module Preferred_peers = struct
+      include
+        Mina_stdlib.Job_pool.Make
+          (Peer)
+          (struct
+            include Peer
 
-      let cmp (p1, t1) (p2, t2) =
-        (* Later is smaller *)
-        match Int.neg (Time.compare t1 t2) with
-        | 0 ->
-            Peer.compare p1 p2
-        | c ->
-            c
-
-      let clear t =
-        let rec go t =
-          match Pairing_heap.pop t with None -> () | Some _ -> go t
-        in
-        go t.heap ; Hashtbl.clear t.table
-
-      let create () =
-        { heap = Pairing_heap.create ~cmp (); table = Peer.Table.create () }
-
-      let add t (p, time) =
-        Option.iter (Hashtbl.find t.table p) ~f:(fun elt ->
-            Pairing_heap.remove t.heap elt ) ;
-        Hashtbl.set t.table ~key:p
-          ~data:(Pairing_heap.add_removable t.heap (p, time))
+            let id = Fn.id
+          end)
 
       let sexp_of_t (t : t) =
-        List.sexp_of_t [%sexp_of: Peer.t * Time.t] (Pairing_heap.to_list t.heap)
-
-      let of_list xs =
-        let now = Time.now () in
-        let t = create () in
-        List.iter xs ~f:(fun p -> add t (p, now)) ;
-        t
-
-      let mem t p = Hashtbl.mem t.table p
-
-      let fold t ~init ~f =
-        Pairing_heap.fold t.heap ~init ~f:(fun acc (p, _) -> f acc p)
-
-      let to_list (t : t) = List.map ~f:fst (Pairing_heap.to_list t.heap)
+        Sexp.List
+          ( to_list t
+          |> List.map ~f:(fun { job; scheduled } ->
+                 [%sexp_of: Peer.t * Time.t] (job, scheduled) ) )
     end
 
+    (** State held for the full peer pool.
+
+        - [knowledge]                  – per-peer [Knowledge.t]; the primary
+                                         data structure for peer selection.
+        - [downloading_peers]          – peers with an in-flight download; excluded
+                                         from selection until the download completes.
+        - [knowledge_requesting_peers] – peers currently being queried for knowledge;
+                                         excluded from selection to avoid redundant
+                                         concurrent queries.
+        - [temporary_ignores]          – peers that returned zero successes on their
+                                         last download; each entry holds a [Clock.Event]
+                                         that removes the peer after [ignore_period]
+                                         (2 min) and signals [w].
+        - [all_preferred]              – [Preferred_peers] priority queue; these peers
+                                         are placed at the front of the candidate list
+                                         in [useful_peer].
+        - [r]/[w]                      – drop-head buffered pipe of capacity 0; written
+                                         on every state change so blocked consumers
+                                         wake up exactly once per batch of changes. *)
     type t =
       { downloading_peers : Peer.Hash_set.t
       ; knowledge_requesting_peers : Peer.Hash_set.t
       ; temporary_ignores :
           ((unit, unit) Clock.Event.t[@sexp.opaque]) Peer.Table.t
-      ; mutable all_preferred : Preferred_heap.t
+      ; mutable all_preferred : Preferred_peers.t
       ; knowledge : Knowledge.t Peer.Table.t
             (* Written to when something changes. *)
       ; r : (unit Strict_pipe.Reader.t[@sexp.opaque])
@@ -278,15 +236,23 @@ end = struct
       }
     [@@deriving sexp_of]
 
+    (** [reset_knowledge t ~all_peers] performs a full stall-recovery reset:
+        - Clears [all_preferred] so no peer has priority advantage.
+        - For every peer in [knowledge]: clears [tried_and_failed] and sets
+          [claimed = None], making all keys eligible for retry.
+        - Removes knowledge entries for peers no longer in [all_peers].
+        - Adds blank [Knowledge.t] entries for any new peers in [all_peers].
+        - Signals [w] to wake the downloader loop.
+
+        Called by [step] when [useful_peer] returns [`Stalled]. *)
     let reset_knowledge t ~all_peers =
       (* Reset preferred *)
-      Preferred_heap.clear t.all_preferred ;
-      Hashtbl.filter_mapi_inplace t.knowledge ~f:(fun ~key:p ~data:k ->
-          Hash_set.clear k.tried_and_failed ;
-          if Set.mem all_peers p then Some { k with claimed = None } else None ) ;
+      t.all_preferred <- Preferred_peers.create () ;
+      Hashtbl.filter_mapi_inplace t.knowledge ~f:(fun ~key:p ~data:_ ->
+          if Set.mem all_peers p then Some Knowledge.empty else None ) ;
       Set.iter all_peers ~f:(fun p ->
           if not (Hashtbl.mem t.knowledge p) then
-            Hashtbl.add_exn t.knowledge ~key:p ~data:(Knowledge.create ()) ) ;
+            Hashtbl.add_exn t.knowledge ~key:p ~data:Knowledge.empty ) ;
       Strict_pipe.Writer.write t.w ()
 
     let to_yojson
@@ -309,8 +275,9 @@ end = struct
                    (Peer.to_multiaddr_string p, f s) ) ) )
         ; ( "preferred"
           , `List
-              (List.map (Preferred_heap.to_list all_preferred) ~f:(fun p ->
-                   `String (Peer.to_multiaddr_string p) ) ) )
+              (List.map (Preferred_peers.to_list all_preferred)
+                 ~f:(fun { job = peer; _ } ->
+                   `String (Peer.to_multiaddr_string peer) ) ) )
         ; ( "temporary_ignores"
           , list (List.map ~f:Peer.to_yojson (Hashtbl.keys temporary_ignores))
           )
@@ -324,25 +291,35 @@ end = struct
                  (Hash_set.to_list knowledge_requesting_peers) ) )
         ]
 
+    (** [create ~preferred ~all_peers] allocates a fresh [Useful_peers.t].
+        [all_peers] are registered with blank [Knowledge.t] records.
+        [preferred] peers are immediately inserted into [all_preferred] so they
+        get priority on the very first selection pass. *)
     let create ~preferred ~all_peers =
       let knowledge =
         Peer.Table.of_alist_exn
           (List.map (List.dedup_and_sort ~compare:Peer.compare all_peers)
-             ~f:(fun p -> (p, Knowledge.create ())) )
+             ~f:(fun p -> (p, Knowledge.empty)) )
       in
       let r, w =
         Strict_pipe.create ~name:"useful_peers-available" ~warn_on_drop:false
           (Buffered (`Capacity 0, `Overflow (Drop_head ignore)))
       in
+      let all_preferred = Preferred_peers.create () in
+      List.iter preferred ~f:(fun peer ->
+          ignore (Preferred_peers.replace_now ~job:peer all_preferred : Time.t) ) ;
       { downloading_peers = Peer.Hash_set.create ()
       ; knowledge_requesting_peers = Peer.Hash_set.create ()
       ; temporary_ignores = Peer.Table.create ()
       ; knowledge
       ; r
       ; w
-      ; all_preferred = Preferred_heap.of_list preferred
+      ; all_preferred
       }
 
+    (** [tear_down t] releases all resources: cancels pending [Clock.Event]
+        timers in [temporary_ignores], clears all sets and tables, and closes
+        [w] so any reader of [r] sees EOF. *)
     let tear_down
         { downloading_peers
         ; temporary_ignores
@@ -350,18 +327,23 @@ end = struct
         ; knowledge
         ; r = _
         ; w
-        ; all_preferred
+        ; all_preferred = _
         } =
       Hashtbl.iter temporary_ignores ~f:(fun e ->
           Clock.Event.abort_if_possible e () ) ;
       Hashtbl.clear temporary_ignores ;
       Hash_set.clear downloading_peers ;
       Hash_set.clear knowledge_requesting_peers ;
-      Hashtbl.iter knowledge ~f:Knowledge.clear ;
       Hashtbl.clear knowledge ;
-      Preferred_heap.clear all_preferred ;
       Strict_pipe.Writer.close w
 
+    (** Aggregated view of a peer's knowledge over all pending jobs, used to
+        rank peers in [useful_peer].
+
+        - [claims_to]     – number of pending jobs the peer explicitly claims to have.
+        - [no_information] – number of pending jobs for which we have no data.
+        - [no]            – number of pending jobs the peer is known not to have
+                            (not used in scoring, kept for diagnostics). *)
     module Knowledge_summary = struct
       type t = { no_information : int; no : int; claims_to : int }
       [@@deriving fields]
@@ -371,6 +353,8 @@ end = struct
         Float.of_int claims_to +. (0.1 *. Float.of_int no_information)
     end
 
+    (** [maxes ~compare xs] returns all elements of [xs] that are tied for the
+        maximum according to [compare], preserving their relative order. *)
     let maxes ~compare xs =
       O1trace.sync_thread "compute_downloader_maxes" (fun () ->
           Sequence.fold xs ~init:[] ~f:(fun acc x ->
@@ -382,19 +366,40 @@ end = struct
                   if c = 0 then x :: acc else if c < 0 then [ x ] else acc )
           |> List.rev )
 
+    (** [useful_peer t ~pending_jobs] selects the best available peer to serve
+        the current pending queue.
+
+        Selection algorithm:
+        1. Build a candidate list with [all_preferred] peers first, then the rest.
+        2. Among candidates, find those with the best claim on the *first* pending
+           job ([`Claims_to] beats [`No_information]); if any exist, restrict the
+           candidate set to them.
+        3. Score each remaining candidate across *all* pending jobs using
+           [Knowledge_summary.score] and collect the jobs the peer might know.
+        4. Exclude peers that are currently in [downloading_peers],
+           [knowledge_requesting_peers], or [temporary_ignores].
+        5. Return:
+           - [`Useful (peer, jobs)] – best available peer and the jobs to send it.
+           - [`Useful_but_busy]     – a suitable peer exists but is currently busy;
+                                      caller should wait on [t.r].
+           - [`Stalled]             – all candidates score 0; caller should call
+                                      [reset_knowledge] and retry after a delay.
+           - [`No_peers]            – no peers at all in [knowledge]. *)
     let useful_peer t ~pending_jobs =
       O1trace.sync_thread "compute_downloader_useful_peers" (fun () ->
           let ts =
             List.rev
-              (Preferred_heap.fold t.all_preferred ~init:[] ~f:(fun acc p ->
+              (Preferred_peers.fold t.all_preferred ~init:[]
+                 ~f:(fun acc { job = p; _ } ->
                    match Hashtbl.find t.knowledge p with
                    | None ->
                        acc
                    | Some k ->
                        (p, k) :: acc ) )
             @ Hashtbl.fold t.knowledge ~init:[] ~f:(fun ~key:p ~data:k acc ->
-                  if not (Preferred_heap.mem t.all_preferred p) then
-                    (p, k) :: acc
+                  if
+                    Option.is_empty (Preferred_peers.find t.all_preferred ~id:p)
+                  then (p, k) :: acc
                   else acc )
           in
           (*
@@ -410,7 +415,7 @@ end = struct
                 []
             | Some j ->
                 Sequence.filter_map (Sequence.of_list ts) ~f:(fun (p, k) ->
-                    match Knowledge.knows k j.J.key with
+                    match Knowledge.knows k j.Job.key with
                     | `No ->
                         None
                     | `Claims_to ->
@@ -449,7 +454,7 @@ end = struct
                     ~f:(fun (acc, js) j ->
                       let field, js =
                         let open Knowledge_summary.Fields in
-                        match Knowledge.knows k j.J.key with
+                        match Knowledge.knows k j.Job.key with
                         | `Claims_to ->
                             (claims_to, j :: js)
                         | `No ->
@@ -478,12 +483,27 @@ end = struct
           | Some ((p, k), score) ->
               if Float.(score <= 0.) then `Stalled else `Useful (p, k) )
 
+    (** Events that drive state transitions in [update].
+
+        - [Refreshed_peers]           – the live peer set changed; sync [knowledge].
+        - [Download_starting]         – mark peer as busy in [downloading_peers].
+        - [Download_finished]         – unmark busy; promote to [all_preferred] on
+                                        success, or add to [temporary_ignores] on
+                                        total failure; record unsuccessful keys in
+                                        [tried_and_failed].
+        - [Job_cancelled]             – remove the key from all [tried_and_failed]
+                                        sets so it doesn't pollute future queries.
+        - [Knowledge_request_starting] – mark peer as busy in
+                                         [knowledge_requesting_peers].
+        - [Knowledge]                 – full knowledge refresh for a peer; replaces
+                                        [claimed] and re-derives [tried_and_failed]
+                                        from [active_jobs].
+        - [Add_knowledge]             – incremental update; merges new keys into the
+                                        peer's existing [claimed] set. *)
     type update =
       | Refreshed_peers of { all_peers : Peer.Set.t }
       | Download_finished of
-          Peer.t
-          * [ `Successful of Key.t list ]
-          * [ `Unsuccessful of Key.t list ]
+          Peer.t * [ `Successful of Key.t list ] * [ `Unsuccessful of Key.Set.t ]
       | Download_starting of Peer.t
       | Job_cancelled of Key.t
       | Add_knowledge of
@@ -492,16 +512,25 @@ end = struct
       | Knowledge of
           { peer : Peer.t
           ; claimed : Key.t Claimed_knowledge.t
-          ; active_jobs : Job.t list
+          ; active_jobs : job list
           ; out_of_band : bool
           }
 
+    (** [jobs_no_longer_needed t ks] removes keys [ks] from every peer's
+        [tried_and_failed].  Called after successful downloads and job
+        cancellations so stale failure records don't prevent future retries on
+        unrelated jobs. *)
     let jobs_no_longer_needed t ks =
-      Hashtbl.iter t.knowledge ~f:(fun s ->
-          List.iter ks ~f:(Hash_set.remove s.tried_and_failed) )
+      Hashtbl.filter_mapi_inplace t.knowledge ~f:(fun ~key:_ ~data ->
+          Some
+            { data with
+              Knowledge.tried_and_failed = Key.Set.diff data.tried_and_failed ks
+            } )
 
+    (** Duration a peer is ignored after delivering zero successes. *)
     let ignore_period = Time.Span.of_min 2.
 
+    (** Internal [update] without the wakeup write. *)
     let update t u =
       O1trace.sync_thread "update_downloader" (fun () ->
           match u with
@@ -511,7 +540,7 @@ end = struct
               Hashtbl.update t.knowledge peer ~f:(function
                 | None ->
                     { Knowledge.claimed = Some (`Some claimed)
-                    ; tried_and_failed = Key.Hash_set.create ()
+                    ; tried_and_failed = Key.Set.empty
                     }
                 | Some k ->
                     let claimed =
@@ -534,33 +563,40 @@ end = struct
           | Knowledge { peer; claimed; active_jobs; out_of_band } ->
               if not out_of_band then
                 Hash_set.remove t.knowledge_requesting_peers peer ;
-              let tried_and_failed =
-                let s =
-                  match Hashtbl.find t.knowledge peer with
-                  | None ->
-                      Key.Hash_set.create ()
-                  | Some { tried_and_failed; _ } ->
-                      tried_and_failed
-                in
-                List.iter active_jobs ~f:(fun j ->
-                    match Map.find j.J.attempts peer with
-                    | None ->
-                        ()
-                    | Some a ->
-                        if not (Attempt.worth_retrying a) then
-                          Hash_set.add s j.key ) ;
-                s
+              let extra_failed =
+                List.filter_map active_jobs ~f:(fun j ->
+                    match Map.find j.attempts peer with
+                    | Some a when Attempt.worth_retrying a ->
+                        Some j.key
+                    | _ ->
+                        None )
+                |> Key.Set.of_list
               in
-              Hashtbl.set t.knowledge ~key:peer
-                ~data:{ Knowledge.claimed = Some claimed; tried_and_failed }
+              let update_knowledge = function
+                | None ->
+                    { Knowledge.claimed = Some claimed
+                    ; tried_and_failed = extra_failed
+                    }
+                | Some { Knowledge.tried_and_failed; _ } ->
+                    { Knowledge.claimed = Some claimed
+                    ; tried_and_failed =
+                        Key.Set.union tried_and_failed extra_failed
+                    }
+              in
+
+              Hashtbl.update t.knowledge peer ~f:update_knowledge
           | Job_cancelled h ->
-              jobs_no_longer_needed t [ h ] ;
-              Hashtbl.iter t.knowledge ~f:(fun s ->
-                  Hash_set.remove s.tried_and_failed h )
+              jobs_no_longer_needed t (Key.Set.singleton h) ;
+              Hashtbl.filter_mapi_inplace t.knowledge ~f:(fun ~key:_ ~data ->
+                  Some
+                    { data with
+                      Knowledge.tried_and_failed =
+                        Set.remove data.tried_and_failed h
+                    } )
           | Download_starting peer ->
               Hash_set.add t.downloading_peers peer
           | Download_finished (peer0, `Successful succs, `Unsuccessful unsuccs)
-            -> (
+            ->
               (let cancel =
                  Option.iter ~f:(fun e -> Clock.Event.abort_if_possible e ())
                in
@@ -575,14 +611,20 @@ end = struct
                        () )
                else (
                  Hashtbl.find_and_remove t.temporary_ignores peer0 |> cancel ;
-                 Preferred_heap.add t.all_preferred (peer0, Time.now ()) ) ) ;
+                 ignore
+                   ( Preferred_peers.replace_now ~job:peer0 t.all_preferred
+                     : Time.t ) ) ) ;
               Hash_set.remove t.downloading_peers peer0 ;
-              jobs_no_longer_needed t succs ;
-              match Hashtbl.find t.knowledge peer0 with
-              | None ->
-                  ()
-              | Some { tried_and_failed; claimed = _ } ->
-                  List.iter unsuccs ~f:(Hash_set.add tried_and_failed) )
+              jobs_no_longer_needed t (Key.Set.of_list succs) ;
+              Hashtbl.change t.knowledge peer0 ~f:(function
+                | None ->
+                    None
+                | Some ({ tried_and_failed; _ } as k) ->
+                    Some
+                      { k with
+                        tried_and_failed =
+                          Key.Set.union tried_and_failed unsuccs
+                      } )
           | Refreshed_peers { all_peers } ->
               Hashtbl.filter_keys_inplace t.knowledge ~f:(Set.mem all_peers) ;
               Set.iter all_peers ~f:(fun p ->
@@ -590,9 +632,11 @@ end = struct
                     Hashtbl.add_exn t.knowledge ~key:p
                       ~data:
                         { Knowledge.claimed = None
-                        ; tried_and_failed = Key.Hash_set.create ()
+                        ; tried_and_failed = Key.Set.empty
                         } ) )
 
+    (** [update t u] applies event [u] to [t] then unconditionally signals [t.w]
+        to wake any consumer blocked on [t.r]. *)
     let update t u : unit =
       update t u ;
       if not (Strict_pipe.Writer.is_closed t.w) then
@@ -603,8 +647,8 @@ end = struct
     { mutable proposed_new_flush_at : Time.t option
     ; mutable flush_scheduled : bool
     ; mutable all_peers : Peer.Set.t
-    ; pending : Job.t Q.t
-    ; downloading : (Peer.t * Job.t * Time.t) Key.Table.t
+    ; mutable pending : job Key.Map.t
+    ; downloading : (Peer.t * job * Time.t) Key.Table.t
     ; useful_peers : Useful_peers.t
     ; flush_r : unit Strict_pipe.Reader.t (* Single reader *)
     ; flush_w :
@@ -634,15 +678,13 @@ end = struct
 
   let jobs_added t = Bvar.broadcast t.jobs_added_bvar ()
 
-  let total_jobs (t : t) = Q.length t.pending + Hashtbl.length t.downloading
+  let total_jobs (t : t) = Map.length t.pending + Hashtbl.length t.downloading
 
   (* Checks disjointness *)
   let check_invariant (t : t) =
     Set.length
       (Key.Set.union_list
-         [ Q.to_list t.pending
-           |> List.map ~f:(fun j -> j.key)
-           |> Key.Set.of_list
+         [ Key.Map.keys t.pending |> Key.Set.of_list
          ; Key.Set.of_hashtbl_keys t.downloading
          ] )
     |> [%test_eq: int] (total_jobs t)
@@ -652,7 +694,7 @@ end = struct
   let set_check_invariant f = check_invariant_r := f
 
   let job_finished t j x =
-    Hashtbl.remove t.downloading j.J.key ;
+    Hashtbl.remove t.downloading j.Job.key ;
     Ivar.fill_if_empty j.res x ;
     try !check_invariant_r t
     with e ->
@@ -660,7 +702,7 @@ end = struct
         ~metadata:[ ("exn", `String (Exn.to_string e)) ]
         "job_finished $exn"
 
-  let kill_job _t j = Ivar.fill_if_empty j.J.res (Error `Finished)
+  let kill_job j = Ivar.fill_if_empty j.Job.res (Error `Finished)
 
   let hard_flush_batch_rate = 3
 
@@ -684,7 +726,8 @@ end = struct
           in
           if
             Time.is_later possible_delayed_flush_time ~than:at
-            && Q.length t.pending < t.max_batch_size * hard_flush_batch_rate
+            && Key.Map.length t.pending
+               < t.max_batch_size * hard_flush_batch_rate
           then schedule_flush ~at:possible_delayed_flush_time
           else Deferred.return @@ flush_now ()
     in
@@ -697,32 +740,35 @@ end = struct
   let cancel t h =
     let job =
       List.find_map ~f:Lazy.force
-        [ lazy (Q.lookup t.pending h)
+        [ lazy (Map.find t.pending h)
         ; lazy
             (Option.map ~f:(fun (_, j, _) -> j) (Hashtbl.find t.downloading h))
         ]
     in
-    Q.remove t.pending h ;
+    t.pending <- Key.Map.remove t.pending h ;
     Hashtbl.remove t.downloading h ;
     match job with
     | None ->
         ()
     | Some j ->
-        kill_job t j ;
+        kill_job j ;
         Useful_peers.update t.useful_peers (Job_cancelled h)
 
   let enqueue t e =
-    match Q.enqueue t.pending e with
-    | `Ok ->
-        jobs_added t ; flush_soon t ; `Ok
-    | `Key_already_present ->
+    match Key.Map.add t.pending ~key:e.Job.key ~data:e with
+    | `Duplicate ->
         `Key_already_present
+    | `Ok new_pending ->
+        t.pending <- new_pending ;
+        jobs_added t ;
+        flush_soon t ;
+        `Ok
 
   let enqueue_exn t e =
     assert ([%equal: [ `Ok | `Key_already_present ]] (enqueue t e) `Ok)
 
   let active_jobs t =
-    Q.to_list t.pending
+    Key.Map.data t.pending
     @ List.map (Hashtbl.data t.downloading) ~f:(fun (_, j, _) -> j)
 
   let refresh_peers t peers =
@@ -741,50 +787,33 @@ end = struct
     |> don't_wait_for
 
   let tear_down
-      ( { proposed_new_flush_at = _
-        ; flush_scheduled = _
-        ; all_peers = _
-        ; flush_w
-        ; get = _
-        ; got_new_peers_w
-        ; flush_r = _
-        ; jobs_added_bvar = _
-        ; useful_peers
-        ; got_new_peers_r = _
-        ; pending
-        ; downloading
-        ; max_batch_size = _
-        ; logger = _
-        ; trust_system = _
-        ; stop = _
-        } as t ) =
-    let rec clear_queue q =
-      match Q.dequeue q with
-      | None ->
-          ()
-      | Some j ->
-          kill_job t j ; clear_queue q
-    in
+      { proposed_new_flush_at = _
+      ; flush_scheduled = _
+      ; all_peers = _
+      ; flush_w
+      ; get = _
+      ; got_new_peers_w
+      ; flush_r = _
+      ; jobs_added_bvar = _
+      ; useful_peers
+      ; got_new_peers_r = _
+      ; pending
+      ; downloading
+      ; max_batch_size = _
+      ; logger = _
+      ; trust_system = _
+      ; stop = _
+      } =
     Strict_pipe.Writer.close flush_w ;
     Useful_peers.tear_down useful_peers ;
     Strict_pipe.Writer.close got_new_peers_w ;
-    Hashtbl.iter downloading ~f:(fun (_, j, _) -> kill_job t j) ;
+    Hashtbl.iter downloading ~f:(fun (_, j, _) -> kill_job j) ;
     Hashtbl.clear downloading ;
-    clear_queue pending
+    Key.Map.iter pending ~f:kill_job
 
   let download t peer xs =
     O1trace.thread "download" (fun () ->
-        let f xs =
-          let n = List.length xs in
-          `Assoc
-            ( ("length", `Int n)
-            ::
-            ( if n > 8 then []
-            else
-              [ ("elts", `List (List.map xs ~f:(fun j -> Key.to_yojson j.J.key)))
-              ] ) )
-        in
-        let keys = List.map xs ~f:(fun x -> x.J.key) in
+        let keys = List.map xs ~f:(fun x -> x.Job.key) in
         let fail (e : Error.t) =
           let e = Error.to_string_hum e in
           [%log' debug t.logger]
@@ -792,7 +821,7 @@ end = struct
             ~metadata:
               [ ("peer", Peer.to_yojson peer)
               ; ("error", `String e)
-              ; ("keys", f xs)
+              ; ("keys", Yojson'.List.chunked ~f:Key.to_yojson ~limit:8 keys)
               ] ;
           List.iter xs ~f:(fun x ->
               enqueue_exn t
@@ -809,7 +838,7 @@ end = struct
             let succs, unsuccs =
               match res with
               | Error _ ->
-                  ([], keys)
+                  ([], Key.Set.of_list keys)
               | Ok rs ->
                   let all = Key.Hash_set.of_list keys in
                   let succ =
@@ -818,7 +847,7 @@ end = struct
                         if Hash_set.mem all k then Some k else None )
                   in
                   List.iter succ ~f:(Hash_set.remove all) ;
-                  (succ, Hash_set.to_list all)
+                  (succ, Hash_set.to_list all |> Key.Set.of_list)
             in
             Useful_peers.update t.useful_peers
               (Download_finished (peer, `Successful succs, `Unsuccessful unsuccs)
@@ -836,7 +865,7 @@ end = struct
         List.iter xs ~f:(fun j -> Hashtbl.remove t.downloading j.key) ;
         match res with
         | `Stopped ->
-            List.iter xs ~f:(kill_job t)
+            List.iter xs ~f:kill_job
         | `Not_stopped r -> (
             match r with
             | Error e ->
@@ -844,7 +873,8 @@ end = struct
             | Ok rs ->
                 [%log' debug t.logger] "result is $result"
                   ~metadata:
-                    [ ("result", f xs)
+                    [ ( "result"
+                      , Yojson'.List.chunked ~f:Key.to_yojson ~limit:8 keys )
                     ; ("peer", `String (Peer.to_multiaddr_string peer))
                     ] ;
                 let received_at = Time.now () in
@@ -870,7 +900,7 @@ end = struct
                              , j.attempts ) ) ) ;
                 (* Anything left in jobs, we did not get results for :( *)
                 Hashtbl.iter jobs ~f:(fun x ->
-                    Hashtbl.remove t.downloading x.J.key ;
+                    Hashtbl.remove t.downloading x.Job.key ;
                     enqueue_exn t
                       { x with
                         attempts =
@@ -879,76 +909,76 @@ end = struct
 
   let to_yojson t : Yojson.Safe.t =
     check_invariant t ;
-    let list xs =
-      `Assoc [ ("length", `Int (List.length xs)); ("elts", `List xs) ]
-    in
     let now = Time.now () in
-    let f q = list (List.map ~f:Job.to_yojson (Q.to_list q)) in
+    let jobs_to_yojson =
+      Yojson'.List.with_length
+        ~f:(Job.to_yojson ~key:Key.to_yojson ~attempt:Attempt.to_yojson)
+    in
+    let pending_to_yojson pending = jobs_to_yojson @@ Key.Map.data pending in
     `Assoc
       [ ("total_jobs", `Int (total_jobs t))
       ; ("useful_peers", Useful_peers.to_yojson t.useful_peers)
-      ; ("pending", f t.pending)
+      ; ("pending", pending_to_yojson t.pending)
       ; ( "downloading"
-        , list
-            (List.map (Hashtbl.to_alist t.downloading)
-               ~f:(fun (h, (p, _, start)) ->
-                 `Assoc
-                   [ ("hash", Key.to_yojson h)
-                   ; ("start", `String (Time.to_string start))
-                   ; ( "time_since_start"
-                     , `String (Time.Span.to_string_hum (Time.diff now start))
-                     )
-                   ; ("peer", `String (Peer.to_multiaddr_string p))
-                   ] ) ) )
+        , Yojson'.List.with_length
+            ~f:(fun (h, (p, _, start)) ->
+              `Assoc
+                [ ("hash", Key.to_yojson h)
+                ; ("start", `String (Time.to_string start))
+                ; ( "time_since_start"
+                  , `String (Time.Span.to_string_hum (Time.diff now start)) )
+                ; ("peer", `String (Peer.to_multiaddr_string p))
+                ] )
+            (Hashtbl.to_alist t.downloading) )
       ]
 
   let post_stall_retry_delay = Time.Span.of_min 1.
 
-  let rec step t =
-    if Q.length t.pending = 0 then (
+  let step t =
+    if Key.Map.length t.pending = 0 then (
       [%log' debug t.logger] "Downloader: no jobs. waiting" ;
-      match%bind Strict_pipe.Reader.read t.flush_r with
+      match%map Strict_pipe.Reader.read t.flush_r with
       | `Eof ->
           [%log' debug t.logger] "Downloader: flush eof" ;
-          Deferred.unit
+          `Finished ()
       | `Ok () ->
-          step t )
+          `Repeat t )
     else
       match
         Useful_peers.useful_peer t.useful_peers
-          ~pending_jobs:(Q.to_list t.pending)
+          ~pending_jobs:(Key.Map.data t.pending)
       with
       | `No_peers -> (
-          match%bind Strict_pipe.Reader.read t.got_new_peers_r with
+          match%map Strict_pipe.Reader.read t.got_new_peers_r with
           | `Eof ->
               [%log' debug t.logger] "Downloader: new peers eof" ;
-              Deferred.unit
+              `Finished ()
           | `Ok () ->
-              step t )
+              `Repeat t )
       | `Useful_but_busy -> (
           [%log' debug t.logger] "Downloader: Waiting. All useful peers busy" ;
           let read p =
             Pipe.read_choice_single_consumer_exn
               (Strict_pipe.Reader.to_linear_pipe p).pipe [%here]
           in
-          match%bind
+          match%map
             Deferred.choose [ read t.flush_r; read t.useful_peers.r ]
           with
           | `Eof ->
               [%log' debug t.logger] "Downloader: flush eof" ;
-              Deferred.unit
+              `Finished ()
           | `Ok () ->
               (* Try again, something might have changed *)
-              step t )
+              `Repeat t )
       | `Stalled ->
           [%log' debug t.logger]
             "Downloader: all stalled. Resetting knowledge, waiting %s and then \
              retrying."
             (Time.Span.to_string_hum post_stall_retry_delay) ;
           Useful_peers.reset_knowledge t.useful_peers ~all_peers:t.all_peers ;
-          let%bind () = after post_stall_retry_delay in
+          let%map () = after post_stall_retry_delay in
           [%log' debug t.logger] "Downloader: continuing after reset" ;
-          step t
+          `Repeat t
       | `Useful (peer, might_know) -> (
           let to_download = List.take might_know t.max_batch_size in
           [%log' debug t.logger] "Downloader: downloading $n from $peer"
@@ -956,13 +986,14 @@ end = struct
               [ ("n", `Int (List.length to_download))
               ; ("peer", Peer.to_yojson peer)
               ] ;
-          List.iter to_download ~f:(fun j -> Q.remove t.pending j.key) ;
+          List.iter to_download ~f:(fun j ->
+              t.pending <- Key.Map.remove t.pending j.key ) ;
           match to_download with
           | [] ->
-              step t
+              Deferred.return @@ `Repeat t
           | _ :: _ ->
               don't_wait_for (download t peer to_download) ;
-              step t )
+              Deferred.return @@ `Repeat t )
 
   let add_knowledge t peer claimed =
     Useful_peers.update t.useful_peers
@@ -973,8 +1004,11 @@ end = struct
       (Knowledge
          { peer; claimed; active_jobs = active_jobs t; out_of_band = true } )
 
-  let mark_preferred t peer ~now =
-    Useful_peers.Preferred_heap.add t.useful_peers.all_preferred (peer, now)
+  let mark_preferred_now t peer =
+    ignore
+      ( Useful_peers.Preferred_peers.replace_now t.useful_peers.all_preferred
+          ~job:peer
+        : Time.t )
 
   let create ~max_batch_size ~stop ~logger ~trust_system ~get ~knowledge_context
       ~knowledge ~peers ~preferred =
@@ -987,7 +1021,7 @@ end = struct
     let got_new_peers_r, got_new_peers_w = pipe ~name:"got_new_peers" 0 in
     let t =
       { all_peers = Peer.Set.of_list all_peers
-      ; pending = Q.create ()
+      ; pending = Key.Map.empty
       ; proposed_new_flush_at = None
       ; flush_scheduled = false
       ; flush_r
@@ -1092,7 +1126,8 @@ end = struct
                       ; claimed = k
                       ; active_jobs = active_jobs t
                       } ) ) ) ) ;
-    O1trace.background_thread "execute_downlader_node_fstm" (fun () -> step t) ;
+    O1trace.background_thread "execute_downlader_node_fstm" (fun () ->
+        Deferred.repeat_until_finished t step ) ;
     upon stop (fun () -> tear_down t) ;
     every ~stop (Time.Span.of_sec 30.) (fun () ->
         [%log' debug t.logger]
@@ -1103,13 +1138,13 @@ end = struct
 
   (* After calling download, if no one else has called within time [max_wait],
        we flush our queue. *)
-  let download t ~key ~attempts : Job.t =
-    match (Q.lookup t.pending key, Hashtbl.find t.downloading key) with
+  let download t ~key ~attempts : job =
+    match (Key.Map.find t.pending key, Hashtbl.find t.downloading key) with
     | Some _, Some _ ->
         assert false
     | Some x, None | None, Some (_, x, _) ->
         x
     | None, None ->
-        let e = { J.key; attempts; res = Ivar.create () } in
+        let e = { Job.key; attempts; res = Ivar.create () } in
         enqueue_exn t e ; e
 end
