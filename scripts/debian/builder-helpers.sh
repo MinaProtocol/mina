@@ -103,7 +103,16 @@ create_control_file() {
   echo "Dependencies: ${2}"
   echo "Description: ${3}"
   if [ -n "${4:-}" ]; then
-    echo "Broken/Replaces: ${4}"
+    echo "Suggests: ${4}"
+  fi
+  if [ -n "${5:-}" ]; then
+    echo "Replaces/Breaks: ${5}"
+  fi
+  if [ -n "${6:-}" ]; then
+    echo "Provides: ${6}"
+  fi
+  if [ -n "${7:-}" ]; then
+    echo "Conflicts: ${7}"
   fi
   # Make sure the directory exists
   mkdir -p "${BUILDDIR}/DEBIAN"
@@ -137,6 +146,12 @@ EOF
   if [ -n "${5:-}" ]; then
     echo "Replaces: ${5}" >> ${CONTROL}
     echo "Breaks: ${5}" >> ${CONTROL}
+  fi
+  if [ -n "${6:-}" ]; then
+    echo "Provides: ${6}" >> ${CONTROL}
+  fi
+  if [ -n "${7:-}" ]; then
+    echo "Conflicts: ${7}" >> ${CONTROL}
   fi
 
   cat <<EOF >> ${CONTROL}
@@ -534,7 +549,7 @@ build_daemon_deb() {
   esac
 
   create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network}-config (>=${MINA_DEB_VERSION})" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION})"
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION}), mina-${network}-postfork-${POSTFORK_CODENAME}"
 
   copy_common_daemon_apps "${network}"
 
@@ -648,10 +663,10 @@ copy_common_daemon_post_automode_apps_and_configs() {
   # dispatch to the correct runtime based on env var set in /etc/default/mina-dispatch
   create_symlinks_for_shared_apps "${prefork_network}"
 
-  copy_common_daemon_configs "${prefork_network}"
-
-  # Also ship config for prefork daemon's commit-id-based config lookup.
-  # The prefork binary looks for config_<its_own_8char_hash>.json at startup.
+  # Config files (config_<hash>.json, <network>.json) are provided by the
+  # mina-<network>-config package, so we do NOT ship them here to avoid
+  # dpkg file conflicts.  Only ship the prefork config when it differs from
+  # the postfork hash, since the config package won't contain it.
   if [[ -n "${PREFORK_LEGACY_VERSION:-}" ]]; then
     local prefork_short_hash="${PREFORK_LEGACY_VERSION##*-}"
     local prefork_githash_config
@@ -661,7 +676,8 @@ copy_common_daemon_post_automode_apps_and_configs() {
         echo "Prefork githash (${prefork_githash_config}) is the same as postfork; skipping config copy."
       else
         echo "Copying config for prefork daemon as config_${prefork_githash_config}.json"
-        cp "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json" \
+        mkdir -p "${BUILDDIR}/var/lib/coda"
+        cp "../genesis_ledgers/${prefork_network}.json" \
            "${BUILDDIR}/var/lib/coda/config_${prefork_githash_config}.json"
       fi
     else
@@ -712,6 +728,45 @@ build_daemon_postfork_deb() {
   build_deb "$package_name"
 
 }
+
+## AUTOMODE METAPACKAGE ##
+
+#
+# Builds mina-NETWORK-automode transitional metapackage
+#
+# Output: mina-${NETWORK}-automode_${MINA_DEB_VERSION}_all.deb
+#
+# This is an empty metapackage that depends on both prefork and postfork
+# automode packages. It Conflicts/Replaces/Provides mina-${NETWORK} so that
+# running `apt-get install mina-${NETWORK}-automode` will automatically
+# remove mina-${NETWORK} and pull in both automode runtimes.
+#
+
+build_daemon_automode_deb() {
+
+  local network="$1"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building ${network} automode transitional metapackage:"
+
+  local package_name="mina-${network}-automode"
+
+  # Automode metapackage is architecture-independent (no binaries).
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
+  local prefork_pkg="mina-${network}-prefork-${POSTFORK_CODENAME}"
+  local postfork_pkg="mina-${network}-postfork-${POSTFORK_CODENAME}"
+  local depends="${postfork_pkg} (>= ${MINA_DEB_VERSION}), ${prefork_pkg} (>= ${MINA_DEB_VERSION})"
+
+  create_control_file "${package_name}" "${depends}" \
+    "Transitional metapackage for Mina ${network} automode (installs both prefork and postfork runtimes)" \
+    "" "mina-${network}" "mina-${network}" "mina-${network}"
+
+  build_deb "${package_name}"
+  ARCHITECTURE="${saved_arch}"
+}
+## END AUTOMODE METAPACKAGE ##
 
 ## GENERIC PACKAGE ##
 

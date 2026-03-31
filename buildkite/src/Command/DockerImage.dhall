@@ -165,6 +165,7 @@ let generateStep =
                   , DaemonAppsOnly = ""
                   , DaemonPrefork = ""
                   , DaemonAutoHardfork = ""
+                  , DaemonAutomode = ""
                   , LogProc = ""
                   , Archive = ""
                   , TestExecutive = ""

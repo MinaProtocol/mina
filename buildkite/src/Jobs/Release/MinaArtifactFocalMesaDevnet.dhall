@@ -24,6 +24,7 @@ in  Pipeline.build
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonAutomode
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
