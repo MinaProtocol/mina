@@ -519,13 +519,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~context:(module Context)
             ~genesis_epoch_ledger:genesis_epoch_ledger_next
         in
-        let is_next_loaded_from_genesis =
-          match next_epoch_ledger with
-          | Genesis_epoch_ledger _ ->
-              true
-          | _ ->
-              false
-        in
         let staking_epoch_ledger_config =
           ledger_config epoch_ledger_uuids.staking
         in
@@ -537,8 +530,11 @@ module Make_str (A : Wire_types.Concrete) = struct
            * This code heavily relies on the fact that we write only non-genesis
            * ledgers to disk. *)
           let genesis_epoch_ledger =
-            if is_next_loaded_from_genesis then genesis_epoch_ledger_staking
-            else genesis_epoch_ledger_next
+            match next_epoch_ledger with
+            | Genesis_epoch_ledger _ ->
+                genesis_epoch_ledger_staking
+            | Ledger_root _ ->
+                genesis_epoch_ledger_next
           in
           create_epoch_ledger ~config:staking_epoch_ledger_config
             ~context:(module Context)
