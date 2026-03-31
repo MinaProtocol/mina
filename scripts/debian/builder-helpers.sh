@@ -753,7 +753,8 @@ build_daemon_automode_deb() {
 
   local prefork_pkg="mina-${network}-prefork-${POSTFORK_CODENAME}"
   local postfork_pkg="mina-${network}-postfork-${POSTFORK_CODENAME}"
-  local depends="${postfork_pkg} (>= ${MINA_DEB_VERSION}), ${prefork_pkg} (>= ${MINA_DEB_VERSION})"
+  local prefork_version="${PREFORK_VERSION:-${MINA_DEB_VERSION}}"
+  local depends="${postfork_pkg} (>= ${MINA_DEB_VERSION}), ${prefork_pkg} (>= ${prefork_version})"
 
   create_control_file "${package_name}" "${depends}" \
     "Transitional metapackage for Mina ${network} automode (installs both prefork and postfork runtimes)" \
