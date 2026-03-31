@@ -312,6 +312,14 @@ if (( EXTRA_KEYS > PLAIN_KEYS )); then
     exit 1
 fi
 
+# Resolve relative binary paths to absolute before changing directory
+if [[ -n "$MINA_BINARY" ]] && [[ "$MINA_BINARY" != /* ]]; then
+    MINA_BINARY="$(cd "$(dirname "$MINA_BINARY")" && pwd)/$(basename "$MINA_BINARY")"
+fi
+if [[ -n "$RUNTIME_GENESIS_LEDGER_BINARY" ]] && [[ "$RUNTIME_GENESIS_LEDGER_BINARY" != /* ]]; then
+    RUNTIME_GENESIS_LEDGER_BINARY="$(cd "$(dirname "$RUNTIME_GENESIS_LEDGER_BINARY")" && pwd)/$(basename "$RUNTIME_GENESIS_LEDGER_BINARY")"
+fi
+
 # Check if nix is needed after parsing arguments
 check_nix_if_needed
 
