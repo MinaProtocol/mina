@@ -429,7 +429,12 @@ module Make_str (A : Wire_types.Concrete) = struct
       let epoch_ledger_uuids_from_file location =
         let open Yojson.Safe.Util in
         let open Result.Let_syntax in
-        let json = Yojson.Safe.from_file location in
+        let%bind json =
+          if Sys.file_exists location then Ok (Yojson.Safe.from_file location)
+          else
+            Error
+              (Printf.sprintf "epoch ledger uuids doesn't exist at %s" location)
+        in
         let uuid str =
           Result.(
             map_error
@@ -487,49 +492,40 @@ module Make_str (A : Wire_types.Concrete) = struct
               ~directory_name:(epoch_ledger_location ^ Uuid.to_string uuid))
         in
         let epoch_ledger_uuids =
-          if Sys.file_exists epoch_ledger_uuids_location then (
-            let epoch_ledger_uuids =
-              match
-                epoch_ledger_uuids_from_file epoch_ledger_uuids_location
-              with
-              | Ok res ->
-                  res
-              | Error str ->
-                  [%log error]
-                    "Failed to read epoch ledger uuids from file $path: \
-                     $error. Creating new uuids.."
-                    ~metadata:
-                      [ ("path", `String epoch_ledger_uuids_location)
-                      ; ("error", `String str)
-                      ] ;
-                  create_new_uuids ()
-            in
-            (*If the genesis hash matches and both the files are present. If only one of them is present then it could be stale data and might cause the node to never be able to bootstrap*)
-            if
-              Mina_base.State_hash.equal epoch_ledger_uuids.genesis_state_hash
-                genesis_state_hash
-            then epoch_ledger_uuids
-            else
-              (*Clean-up outdated epoch ledgers*)
-              let staking_ledger_config =
-                ledger_config epoch_ledger_uuids.staking
-              in
-              let next_ledger_config = ledger_config epoch_ledger_uuids.next in
+          match epoch_ledger_uuids_from_file epoch_ledger_uuids_location with
+          | Ok uuids
+            when Mina_base.State_hash.equal uuids.genesis_state_hash
+                   genesis_state_hash ->
+              uuids
+          | Ok uuids ->
+              (* NOTE: Parts of state hash mismatched between on-disk epoch
+                 ledgers and expected genesis state hash. It could be staling
+                 on-disk ledger data, and might cause the node to never be able
+                 to bootstrap, clean up both ledgers here to avoid the issue. *)
+              let staking_ledger_config = ledger_config uuids.staking in
+              let next_ledger_config = ledger_config uuids.next in
               [%log info]
                 "Cleaning up old epoch ledgers with genesis state $state_hash \
                  with configs $staking and $next"
                 ~metadata:
                   [ ( "state_hash"
-                    , Mina_base.State_hash.to_yojson
-                        epoch_ledger_uuids.genesis_state_hash )
+                    , Mina_base.State_hash.to_yojson uuids.genesis_state_hash )
                   ; ( "staking"
                     , Root_ledger.Config.to_yojson staking_ledger_config )
                   ; ("next", Root_ledger.Config.to_yojson next_ledger_config)
                   ] ;
               Root_ledger.Config.delete_backing staking_ledger_config ;
               Root_ledger.Config.delete_backing next_ledger_config ;
-              create_new_uuids () )
-          else create_new_uuids ()
+              create_new_uuids ()
+          | Error e ->
+              [%log error]
+                "Failed to read epoch ledger uuids from file $path: $error. \
+                 Creating new uuids.."
+                ~metadata:
+                  [ ("path", `String epoch_ledger_uuids_location)
+                  ; ("error", `String e)
+                  ] ;
+              create_new_uuids ()
         in
         let next_epoch_ledger_config = ledger_config epoch_ledger_uuids.next in
         let next_epoch_ledger =
