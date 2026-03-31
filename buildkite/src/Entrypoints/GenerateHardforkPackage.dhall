@@ -57,7 +57,6 @@ let Spec =
           , suffix : Text
           , precomputed_block_prefix : Optional Text
           , use_artifacts_from_buildkite_build : Optional Text
-          , hardfork_shift_slot_delta : Optional Natural
           , use_generic_dockers_from_version : Optional Text
           , size : Size
           , deb_legacy_version : Text
@@ -77,7 +76,6 @@ let Spec =
           , version = "\\\${MINA_DEB_VERSION}"
           , precomputed_block_prefix = None Text
           , use_artifacts_from_buildkite_build = None Text
-          , hardfork_shift_slot_delta = None Natural
           , use_generic_dockers_from_version = None Text
           , size = Size.XLarge
           , deb_legacy_version = defaultMinaArtifactSpec.deb_legacy_version
@@ -134,18 +132,6 @@ let generateTarballsCommand =
                   }
                   spec.use_artifacts_from_buildkite_build
 
-          let hardforkShiftSlotDeltaArg =
-                merge
-                  { Some =
-                          \(delta : Natural)
-                      ->      "--hardfork-shift-slot-delta "
-                          ++  Natural/show delta
-                          ++  " --prefork-genesis-config /workdir/genesis_ledgers/${Network.lowerName
-                                                                                      spec.network}.json"
-                  , None = ""
-                  }
-                  spec.hardfork_shift_slot_delta
-
           let genesis_timestamp_env =
                 merge
                   { Some = \(ts : Text) -> [ "GENESIS_TIMESTAMP=" ++ ts ]
@@ -171,7 +157,6 @@ let generateTarballsCommand =
                         ++  "--config-url ${spec.config_json_gz_url} "
                         ++  "--codename ${DebianVersions.lowerName
                                             codename.DebVersion} "
-                        ++  "${hardforkShiftSlotDeltaArg} "
                         ++  "${cacheArg}"
                       )
                 , label =
@@ -657,7 +642,6 @@ let generate_hardfork_package =
       ->  \(version : Optional Text)
       ->  \(precomputed_block_prefix : Optional Text)
       ->  \(use_artifacts_from_buildkite_build : Optional Text)
-      ->  \(hardfork_shift_slot_delta : Optional Natural)
       ->  \(use_generic_dockers_from_version : Optional Text)
       ->  ( pipeline
               Spec::{
@@ -673,7 +657,6 @@ let generate_hardfork_package =
               , precomputed_block_prefix = precomputed_block_prefix
               , use_artifacts_from_buildkite_build =
                   use_artifacts_from_buildkite_build
-              , hardfork_shift_slot_delta = hardfork_shift_slot_delta
               , use_generic_dockers_from_version =
                   use_generic_dockers_from_version
               }
