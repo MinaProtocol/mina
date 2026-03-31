@@ -812,7 +812,7 @@ test_build_daemon_devnet_automode_deb() {
     load_captured_state
     assert_eq "deb name" "mina-devnet-automode" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-devnet-automode"
-    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-postfork-mesa"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-devnet-prefork-mesa"
     assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-devnet"
@@ -830,7 +830,7 @@ test_build_daemon_mainnet_automode_deb() {
     load_captured_state
     assert_eq "deb name" "mina-mainnet-automode" "$CAPTURED_DEB_NAME"
     assert_control_field "$CAPTURED_CONTROL" "Package" "mina-mainnet-automode"
-    assert_control_field "$CAPTURED_CONTROL" "Architecture" "all"
+    assert_control_field "$CAPTURED_CONTROL" "Architecture" "amd64"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-postfork-mesa"
     assert_control_contains "$CAPTURED_CONTROL" "Depends" "mina-mainnet-prefork-mesa"
     assert_control_contains "$CAPTURED_CONTROL" "Replaces" "mina-mainnet"
