@@ -530,14 +530,12 @@ module Make_str (A : Wire_types.Concrete) = struct
           ledger_config epoch_ledger_uuids.staking
         in
         let staking_epoch_ledger =
-          (* If next epoch ledger is loaded from disk, then we know that
+          (* HACK: If next epoch ledger is loaded from disk, then we know that
            * at least one epoch transition has happened, hence either the staking
            * ledger will also be loaded from disk or the genesis next ledger must
            * be the used.
-           *
            * This code heavily relies on the fact that we write only non-genesis
-           * ledgers to disk.
-           *)
+           * ledgers to disk. *)
           let genesis_epoch_ledger =
             if is_next_loaded_from_genesis then genesis_epoch_ledger_staking
             else genesis_epoch_ledger_next
