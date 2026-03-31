@@ -446,19 +446,12 @@ module Make_str (A : Wire_types.Concrete) = struct
                ~depth:constraint_constants.ledger_depth () ) )
         else Genesis_epoch_ledger genesis_epoch_ledger
 
-      let create ~context:(module Context : CONTEXT) ~genesis_ledger
-          ~genesis_epoch_data ~epoch_ledger_location ~genesis_state_hash
-          ~epoch_ledger_backing_type block_producer_pubkeys =
+      let create ~context:(module Context : CONTEXT)
+          ~(genesis_ledger : Genesis_ledger.Packed.t)
+          ~(genesis_epoch_data : Genesis_ledger.Packed.t Genesis_data.Epoch.t)
+          ~epoch_ledger_location ~genesis_state_hash ~epoch_ledger_backing_type
+          block_producer_pubkeys =
         let open Context in
-        (* TODO: remove this duplicate of the genesis ledger *)
-        let genesis_epoch_ledger_staking, genesis_epoch_ledger_next =
-          Option.value_map genesis_epoch_data
-            ~default:(genesis_ledger, genesis_ledger)
-            ~f:(fun { Genesis_data.Epoch.staking; next } ->
-              ( staking.ledger
-              , Option.value_map next ~default:staking.ledger ~f:(fun next ->
-                    next.ledger ) ) )
-        in
         let epoch_ledger_uuids_location = epoch_ledger_location ^ ".json" in
         let create_new_uuids () =
           let epoch_ledger_uuids =
@@ -514,7 +507,23 @@ module Make_str (A : Wire_types.Concrete) = struct
               create_new_uuids ()
         in
         let next_epoch_ledger_config = ledger_config epoch_ledger_uuids.next in
-        let next_epoch_ledger =
+        let genesis_epoch_ledger_next =
+          match genesis_epoch_data with
+          | None ->
+              genesis_ledger
+          | Some { next = Some next; _ } ->
+              next.ledger
+          | Some { next = None; staking } ->
+              staking.ledger
+        in
+        let genesis_epoch_ledger_staking =
+          match genesis_epoch_data with
+          | None ->
+              genesis_ledger
+          | Some { staking; _ } ->
+              staking.ledger
+        in
+        let current_epoch_ledger_next =
           create_epoch_ledger ~config:next_epoch_ledger_config
             ~context:(module Context)
             ~genesis_epoch_ledger:genesis_epoch_ledger_next
@@ -522,7 +531,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let staking_epoch_ledger_config =
           ledger_config epoch_ledger_uuids.staking
         in
-        let staking_epoch_ledger =
+        let current_epoch_ledger_staking =
           (* HACK: If next epoch ledger is loaded from disk, then we know that
            * at least one epoch transition has happened, hence either the staking
            * ledger will also be loaded from disk or the genesis next ledger must
@@ -530,10 +539,11 @@ module Make_str (A : Wire_types.Concrete) = struct
            * This code heavily relies on the fact that we write only non-genesis
            * ledgers to disk. *)
           let genesis_epoch_ledger =
-            match next_epoch_ledger with
+            match current_epoch_ledger_next with
             | Genesis_epoch_ledger _ ->
                 genesis_epoch_ledger_staking
             | Ledger_root _ ->
+                (* NOTE: We're in epoch 1. *)
                 genesis_epoch_ledger_next
           in
           create_epoch_ledger ~config:staking_epoch_ledger_config
@@ -542,16 +552,16 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         ref
           { Data.staking_epoch_snapshot =
-              { Snapshot.ledger = staking_epoch_ledger
+              { Snapshot.ledger = current_epoch_ledger_staking
               ; delegatee_table =
                   Snapshot.Ledger_snapshot.compute_delegatee_table
-                    block_producer_pubkeys staking_epoch_ledger
+                    block_producer_pubkeys current_epoch_ledger_staking
               }
           ; next_epoch_snapshot =
-              { Snapshot.ledger = next_epoch_ledger
+              { Snapshot.ledger = current_epoch_ledger_next
               ; delegatee_table =
                   Snapshot.Ledger_snapshot.compute_delegatee_table
-                    block_producer_pubkeys next_epoch_ledger
+                    block_producer_pubkeys current_epoch_ledger_next
               }
           ; last_checked_slot_and_epoch =
               make_last_checked_slot_and_epoch_table
