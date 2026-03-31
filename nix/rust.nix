@@ -159,10 +159,10 @@ in {
       version = deps.wasm-bindgen.version;
       src = final.fetchCrate {
         inherit pname version;
-        sha256 = "sha256-3RJzK7mkYFrs7C/WkhW9Rr4LdP5ofb2FdYGz1P7Uxog=";
+        sha256 = "xrCym+rFY6EUQFWyWl6OPA+LtftpUAE5pIaElAIVqW0=";
       };
 
-      cargoHash = "sha256-tD0OY2PounRqsRiFh8Js5nyknQ809ZcHMvCOLrvYHRE=";
+      cargoHash = "sha256-rG4HhmmjC42kmpL+zMG6O4QwVWh+IGZLzJMAzu/oYs8=";
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;
