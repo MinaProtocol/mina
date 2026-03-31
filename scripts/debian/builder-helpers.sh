@@ -734,7 +734,7 @@ build_daemon_postfork_deb() {
 #
 # Builds mina-NETWORK-automode transitional metapackage
 #
-# Output: mina-${NETWORK}-automode_${MINA_DEB_VERSION}_all.deb
+# Output: mina-${NETWORK}-automode_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 #
 # This is an empty metapackage that depends on both prefork and postfork
 # automode packages. It Conflicts/Replaces/Provides mina-${NETWORK} so that
@@ -751,10 +751,6 @@ build_daemon_automode_deb() {
 
   local package_name="mina-${network}-automode"
 
-  # Automode metapackage is architecture-independent (no binaries).
-  local saved_arch="${ARCHITECTURE}"
-  ARCHITECTURE=all
-
   local prefork_pkg="mina-${network}-prefork-${POSTFORK_CODENAME}"
   local postfork_pkg="mina-${network}-postfork-${POSTFORK_CODENAME}"
   local depends="${postfork_pkg} (>= ${MINA_DEB_VERSION}), ${prefork_pkg} (>= ${MINA_DEB_VERSION})"
@@ -764,7 +760,6 @@ build_daemon_automode_deb() {
     "" "mina-${network}" "mina-${network}" "mina-${network}"
 
   build_deb "${package_name}"
-  ARCHITECTURE="${saved_arch}"
 }
 ## END AUTOMODE METAPACKAGE ##
 
