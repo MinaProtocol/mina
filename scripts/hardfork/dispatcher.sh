@@ -268,6 +268,17 @@ if [[ "$first_arg" == "--version" || "$first_arg" == "-version" ]]; then
   exec "$bin" "$first_arg"
 fi
 
+if [[ "$first_arg" == "client" ]]; then
+  # client subcommand always uses mesa runtime
+  runtime="mesa"
+  bin="${RUNTIMES_BASE_PATH}/${runtime}/${cmd}"
+  if [[ "${MINA_DISPATCHER_DRYRUN:-0}" -ne 0 ]]; then
+    echo "mina-dispatch DRYRUN: exec $bin ${args[*]}" >&2
+    exit 0
+  fi
+  exec "$bin" "${args[@]}"
+fi
+
 if [[ "$first_arg" != "daemon" ]]; then
   echo "mina-dispatch ERROR: unsupported subcommand '$first_arg' for automatic hardfork handling" >&2
   print_argument_warning
