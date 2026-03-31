@@ -535,7 +535,7 @@ module Make_str (A : Wire_types.Concrete) = struct
            * ledger will also be loaded from disk or the genesis next ledger must
            * be the used.
            *
-           * This code heavily relies on the fact that we writer only non-genesis
+           * This code heavily relies on the fact that we write only non-genesis
            * ledgers to disk.
            *)
           let genesis_epoch_ledger =
