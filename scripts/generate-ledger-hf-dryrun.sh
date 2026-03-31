@@ -314,9 +314,15 @@ fi
 
 # Resolve relative binary paths to absolute before changing directory
 if [[ -n "$MINA_BINARY" ]] && [[ "$MINA_BINARY" != /* ]]; then
+    echo "Note: --mina-binary was provided as a relative path; resolving it relative to the current invocation directory." >&2
+    echo "      Resulting absolute path: $(cd "$(dirname "$MINA_BINARY")" && pwd)/$(basename "$MINA_BINARY")" >&2
+    echo "      Consider using an absolute path for --mina-binary to avoid ambiguity." >&2
     MINA_BINARY="$(cd "$(dirname "$MINA_BINARY")" && pwd)/$(basename "$MINA_BINARY")"
 fi
 if [[ -n "$RUNTIME_GENESIS_LEDGER_BINARY" ]] && [[ "$RUNTIME_GENESIS_LEDGER_BINARY" != /* ]]; then
+    echo "Note: --runtime-genesis-ledger-binary was provided as a relative path; resolving it relative to the current invocation directory." >&2
+    echo "      Resulting absolute path: $(cd "$(dirname "$RUNTIME_GENESIS_LEDGER_BINARY")" && pwd)/$(basename "$RUNTIME_GENESIS_LEDGER_BINARY")" >&2
+    echo "      Consider using an absolute path for --runtime-genesis-ledger-binary to avoid ambiguity." >&2
     RUNTIME_GENESIS_LEDGER_BINARY="$(cd "$(dirname "$RUNTIME_GENESIS_LEDGER_BINARY")" && pwd)/$(basename "$RUNTIME_GENESIS_LEDGER_BINARY")"
 fi
 
