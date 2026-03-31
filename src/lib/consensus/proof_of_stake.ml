@@ -531,19 +531,38 @@ module Make_str (A : Wire_types.Concrete) = struct
               create_new_uuids () )
           else create_new_uuids ()
         in
-        let staking_epoch_ledger_config =
-          ledger_config epoch_ledger_uuids.staking
-        in
-        let staking_epoch_ledger =
-          create_epoch_ledger ~config:staking_epoch_ledger_config
-            ~context:(module Context)
-            ~genesis_epoch_ledger:genesis_epoch_ledger_staking
-        in
         let next_epoch_ledger_config = ledger_config epoch_ledger_uuids.next in
         let next_epoch_ledger =
           create_epoch_ledger ~config:next_epoch_ledger_config
             ~context:(module Context)
             ~genesis_epoch_ledger:genesis_epoch_ledger_next
+        in
+        let is_next_loaded_from_genesis =
+          match next_epoch_ledger with
+          | Genesis_epoch_ledger _ ->
+              true
+          | _ ->
+              false
+        in
+        let staking_epoch_ledger_config =
+          ledger_config epoch_ledger_uuids.staking
+        in
+        let staking_epoch_ledger =
+          (* If next epoch ledger is loaded from disk, then we know that
+           * at least one epoch transition has happened, hence either the staking
+           * ledger will also be loaded from disk or the genesis next ledger must
+           * be the used.
+           *
+           * This code heavily relies on the fact that we writer only non-genesis
+           * ledgers to disk.
+           *)
+          let genesis_epoch_ledger =
+            if is_next_loaded_from_genesis then genesis_epoch_ledger_staking
+            else genesis_epoch_ledger_next
+          in
+          create_epoch_ledger ~config:staking_epoch_ledger_config
+            ~context:(module Context)
+            ~genesis_epoch_ledger
         in
         ref
           { Data.staking_epoch_snapshot =
