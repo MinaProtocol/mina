@@ -99,6 +99,7 @@ in {
       # Using the same toolchain which is used by the local stubs crate
       ../src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml;
     rust_platform = rustPlatformFor toolchain.rust;
+    lock = ../src/lib/crypto/proof-systems/Cargo.lock;
   in rust_platform.buildRustPackage {
     pname = "kimchi_stubs_static_lib";
     version = "0.1.0";
@@ -109,8 +110,8 @@ in {
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
     cargoLock = let fixupLockFile = path: builtins.readFile path;
     in {
-      lockFileContents =
-        fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
+      lockFileContents = fixupLockFile lock;
+      outputHashes = narHashesFromCargoLock lock;
     };
     buildPhase = ''
       cargo build -p kimchi-stubs --release --lib
