@@ -147,13 +147,14 @@ ORIG_DAEMON_DEB=$(ls "${DEB_DIR}"/${PKG_DAEMON}_*.deb | head -1)
 ORIG_AUTOMODE_DEB=$(ls "${DEB_DIR}"/${PKG_AUTOMODE}_*.deb | head -1)
 ORIG_CONFIG_DEB=$(ls "${DEB_DIR}"/${PKG_CONFIG}_*.deb | head -1)
 ORIG_POSTFORK_DEB=$(ls "${DEB_DIR}"/${PKG_POSTFORK}_*.deb | head -1)
-ORIG_PREFORK_DEB=$(ls "${DEB_DIR}"/${PKG_PREFORK}_*.deb | head -1)
 ORIG_LOGPROC_DEB=$(ls "${DEB_DIR}"/mina-logproc_*.deb | head -1)
 
-# The prefork deb comes from the legacy cache at its original version.
-# Copy it directly into the repo — no reversioning needed since the automode
+# The prefork debs come from the legacy cache at their original versions.
+# Copy all of them into the repo — no reversioning needed since the automode
 # metapackage already references the legacy version in its dependency.
-cp "${ORIG_PREFORK_DEB}" "${REPO_DIR}/"
+# We must include all variants so the correct one satisfying the dependency
+# constraint (>= PREFORK_LEGACY_VERSION) is available.
+cp "${DEB_DIR}"/${PKG_PREFORK}_*.deb "${REPO_DIR}/"
 
 reversion_deb() {
     local input_deb="$1"
