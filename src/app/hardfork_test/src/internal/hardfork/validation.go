@@ -2,6 +2,7 @@ package hardfork
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -165,7 +166,7 @@ func (t *HardforkTest) CollectEpochHashes(mainGenesisTs int64) (*SnarkedHashByEp
 	snarkedHashByEpoch := make(SnarkedHashByEpoch)
 	lastSlotPerEpoch := make(map[int]int)
 	for time.Now().Before(slotChainEnd) {
-		recentBlocks, err := t.Client.RecentBlocks(t.Config.AnyPortOfType(config.PORT_REST), config.ProtocolK)
+		recentBlocks, err := t.Client.RecentBlocks(t.Config.AnyDaemon().Port(config.PORT_REST), config.ProtocolK)
 		if err != nil {
 			return nil, err
 		}
@@ -189,33 +190,33 @@ func (t *HardforkTest) CollectEpochHashes(mainGenesisTs int64) (*SnarkedHashByEp
 	return &snarkedHashByEpoch, nil
 }
 
-func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, error) {
-	allRestPorts := t.Config.AllPortOfType(config.PORT_REST)
+func (t *HardforkTest) ConsensusAcrossNodesAfterSlotChainEnd() (*ConsensusState, error) {
+	allAliveDaemons := t.Config.AllDaemonSatisfying("alive(non-auto)", func(di *config.DaemonInfo) bool { return di.ForkMethod != config.Auto })
 
 	var wg sync.WaitGroup
 
-	states := make([]*ConsensusState, len(allRestPorts)) // store results
-	errors := make([]error, len(allRestPorts))
+	states := make([]*ConsensusState, len(allAliveDaemons)) // store results
+	errors := make([]error, len(allAliveDaemons))
 
-	for i, port := range allRestPorts {
+	for i, daemon := range allAliveDaemons {
 		wg.Add(1)
-		go func(i, port int) {
+		go func(i int, daemon *config.DaemonInfo) {
 			defer wg.Done()
-			state, err := t.ConsensusStateOnNode(port)
+			state, err := t.ConsensusStateOnNode(daemon.Port(config.PORT_REST))
 			states[i] = state
 			errors[i] = err
-		}(i, port)
+		}(i, daemon)
 	}
 
 	wg.Wait()
 
-	for i, port := range allRestPorts {
+	for i, daemon := range allAliveDaemons {
 		if errors[i] != nil {
-			return nil, fmt.Errorf("Failed to query consensus state on port %d: %w", port, errors[i])
+			return nil, fmt.Errorf("Failed to query consensus state on node %s: %w", daemon.Name, errors[i])
 		}
 	}
 
-	for i := range allRestPorts {
+	for i := range allAliveDaemons {
 		if i == 0 {
 			continue
 		}
@@ -225,25 +226,50 @@ func (t *HardforkTest) ConsensusAcrossNodes() (*ConsensusState, error) {
 
 		if state.LastBlockBeforeTxEnd != last_state.LastBlockBeforeTxEnd {
 			return nil, fmt.Errorf(
-				"Port %d and %d doesn't agree on last block seen before tx end! The previous has %v while the later has %v",
-				allRestPorts[i-1], allRestPorts[i], last_state, state)
+				"Node %s and node %s doesn't agree on last block seen before tx end! The previous has %v while the later has %v",
+				allAliveDaemons[i-1].Name, allAliveDaemons[i].Name, last_state, state)
 		}
 	}
 
-	if len(allRestPorts) == 0 {
-		return nil, fmt.Errorf("Unreachable: no nodes are running!")
+	if len(allAliveDaemons) == 0 {
+		return nil, fmt.Errorf("Unreachable: no nodes are running after slot-chain-end!")
 	}
 
 	return states[0], nil
 }
 
-// AnalyzeBlocks performs comprehensive block analysis including finding genesis epoch hashes
-func (t *HardforkTest) AnalyzeBlocks(mainGenesisTs int64) (*BlockAnalysisResult, error) {
+func (t *HardforkTest) GenesisBlockAcrossNetwork() (*client.BlockData, error) {
+	seenBlock := false
+	var commonGenesisBlock *client.BlockData
+	var daemonReturningCommonGenesisBlock config.DaemonInfo
 
-	portUsed := t.Config.AnyPortOfType(config.PORT_REST)
-	genesisBlock, err := t.Client.GenesisBlock(portUsed)
+	for _, info := range t.Config.DaemonInfos {
+		ourGenesisBlock, err := t.Client.GenesisBlock(info.Port(config.PORT_REST))
+		if err != nil {
+			return nil, fmt.Errorf("Failed to query genesis block on node %s: %w", info.Name, err)
+		}
+		if seenBlock {
+			if !reflect.DeepEqual(ourGenesisBlock, commonGenesisBlock) {
+				return nil, fmt.Errorf("Node %s has genesis block %v, while node %s has genesis block %v, they don't agree", daemonReturningCommonGenesisBlock.Name, commonGenesisBlock, info.Name, ourGenesisBlock)
+			}
+		} else {
+			seenBlock = true
+			commonGenesisBlock = ourGenesisBlock
+			daemonReturningCommonGenesisBlock = info
+		}
+	}
+	if !seenBlock {
+		panic("Unreachable(GenesisBlockAcrossNetwork): No daemon is running!")
+	}
+	return commonGenesisBlock, nil
+}
+
+// AnalyzeBlocks performs comprehensive block analysis including finding genesis epoch hashes
+func (t *HardforkTest) AnalyzeBlocksOnMainNetwork(mainGenesisTs int64) (*BlockAnalysisResult, error) {
+
+	genesisBlock, err := t.GenesisBlockAcrossNetwork()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get genesis block on port %d: %w", portUsed, err)
+		return nil, fmt.Errorf("main network doesn't have a common genesis: %w", err)
 	}
 	t.Logger.Info("Genesis block: %v", genesisBlock)
 
@@ -260,7 +286,7 @@ func (t *HardforkTest) AnalyzeBlocks(mainGenesisTs int64) (*BlockAnalysisResult,
 	// slot chain end; sleeping ensures we have definitely reached that instant.
 	time.Sleep(time.Until(t.Config.MainSlotChainEnd(mainGenesisTs)))
 
-	consensus, err := t.ConsensusAcrossNodes()
+	consensus, err := t.ConsensusAcrossNodesAfterSlotChainEnd()
 	if err != nil {
 		return nil, err
 	}
@@ -294,52 +320,6 @@ func (t *HardforkTest) FindStakingHash(
 	}
 
 	return hash, nil
-}
-
-// waitForEarliestBlock waits for the earliest block to appear in the fork network with retry mechanism
-// Returns the height and slot of the earliest block, or an error if max retries exceeded
-func (t *HardforkTest) waitForEarliestBlockInForkNetwork(port int) (height int, slot int, err error) {
-	for attempt := 1; attempt <= t.Config.ForkEarliestBlockMaxRetries; attempt++ {
-		genesisBlock, queryError := t.Client.GenesisBlock(port)
-		if queryError == nil && genesisBlock.BlockHeight > 0 {
-			return genesisBlock.BlockHeight, genesisBlock.Slot, nil
-		}
-
-		if attempt < t.Config.ForkEarliestBlockMaxRetries {
-			t.Logger.Debug("Waiting for earliest block (attempt %d/%d)...", attempt, t.Config.ForkEarliestBlockMaxRetries)
-			time.Sleep(time.Duration(t.Config.ForkSlot) * time.Second)
-		} else {
-			err = queryError
-		}
-	}
-
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get earliest block after %d attempts: %w", t.Config.ForkEarliestBlockMaxRetries, err)
-	}
-	return 0, 0, fmt.Errorf("no blocks found after %d attempts", t.Config.ForkEarliestBlockMaxRetries)
-}
-
-// ValidateFirstBlockOfForkChain checks that the fork network is producing blocks
-func (t *HardforkTest) ValidateFirstBlockOfForkChain(port int, latestPreForkHeight int, expectedGenesisSlot int64) error {
-	// Wait for the earliest block to appear
-	earliestHeight, earliestSlot, err := t.waitForEarliestBlockInForkNetwork(port)
-	if err != nil {
-		return err
-	}
-
-	// Check earliest height
-	if earliestHeight != latestPreForkHeight+1 {
-		t.Logger.Error("Assertion failed: unexpected block height %d at the beginning of the fork", earliestHeight)
-		return fmt.Errorf("unexpected block height %d at beginning of fork", earliestHeight)
-	}
-
-	// Check earliest slot
-	if earliestSlot < int(expectedGenesisSlot) {
-		t.Logger.Error("Assertion failed: unexpected slot %d at the beginning of the fork", earliestSlot)
-		return fmt.Errorf("unexpected slot %d at beginning of fork", earliestSlot)
-	}
-
-	return nil
 }
 
 // ValidateBlockWithUserCommandCreated checks that blocks contain user commands
