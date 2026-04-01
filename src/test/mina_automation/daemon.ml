@@ -176,6 +176,22 @@ module Process = struct
   let force_kill t = Utils.force_kill t.process
 end
 
+let expected_init_event_id =
+  Structured_log_events.string_of_id
+    Transition_router
+    .starting_transition_frontier_controller_structured_events_id
+
+let entry_has_event_id ~event_id entry =
+  match Yojson.Safe.from_string entry with
+  | json -> (
+      match Yojson.Safe.Util.member "event_id" json with
+      | `String id ->
+          String.equal id event_id
+      | _ ->
+          false )
+  | exception _ ->
+      false
+
 let wait_for_node_init ?(initial_delay_sec = 2.) ?(poll_interval_sec = 5.)
     ?(timeout_sec = 600.) (process : Process.t) =
   let node_uri =
@@ -187,10 +203,19 @@ let wait_for_node_init ?(initial_delay_sec = 2.) ?(poll_interval_sec = 5.)
   Mina_graphql_client.Client.poll_filtered_log_entries ~initial_delay_sec
     ~poll_interval_sec ~timeout_sec
     ~on_entries:(fun entries ->
-      if Array.length entries > 0 then (
+      if
+        Array.exists entries
+          ~f:(entry_has_event_id ~event_id:expected_init_event_id)
+      then (
         Async.printf "Node initialization detected via GraphQL\n" ;
         Deferred.return `Stop )
-      else Deferred.return `Continue )
+      else (
+        if Array.length entries > 0 then
+          Async.printf
+            "Received %d log entries but none matched expected init event, \
+             continuing...\n"
+            (Array.length entries) ;
+        Deferred.return `Continue ) )
     ~on_error:(fun e ->
       Async.printf "GraphQL not ready (%s), retrying...\n"
         (Error.to_string_hum e) ;
