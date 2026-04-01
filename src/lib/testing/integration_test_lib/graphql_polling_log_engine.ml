@@ -88,7 +88,7 @@ struct
             Array.iter log_entries ~f:(fun log_entry ->
                 match parse_event_from_log_entry ~logger log_entry with
                 | Ok a ->
-                    Pipe.write_without_pushback_if_open event_writer (node, a)
+                    Pipe.write_without_pushback event_writer (node, a)
                 | Error e ->
                     [%log warn] "Error parsing log $error"
                       ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
@@ -99,7 +99,7 @@ struct
               [ ("node", `String (Node.infra_id node))
               ; ("err", Error_json.error_to_yojson err)
               ] ;
-          Pipe.write_without_pushback_if_open event_writer
+          Pipe.write_without_pushback event_writer
             (node, Event (Node_offline, ())) ;
           Deferred.return `Stop )
         (Node.get_ingress_uri node)
