@@ -883,7 +883,8 @@ let apply_diffs ({ context = (module Context); _ } as t) diffs
   [%log' trace t.logger] "Applying %d diffs to full frontier "
     (List.length diffs) ;
   let local_state_was_synced_at_start =
-    Consensus.Hooks.required_local_state_sync ~constants:consensus_constants
+    Consensus.Hooks.required_local_state_sync ~logger
+      ~constants:consensus_constants
       ~consensus_state:(Breadcrumb.consensus_state (best_tip t))
       ~local_state:t.consensus_local_state
     |> Option.is_none
@@ -911,7 +912,8 @@ let apply_diffs ({ context = (module Context); _ } as t) diffs
   then
     assert (
       match
-        Consensus.Hooks.required_local_state_sync ~constants:consensus_constants
+        Consensus.Hooks.required_local_state_sync ~logger
+          ~constants:consensus_constants
           ~consensus_state:(Breadcrumb.consensus_state @@ best_tip t)
           ~local_state:t.consensus_local_state
       with

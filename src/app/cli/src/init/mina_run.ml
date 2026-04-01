@@ -438,7 +438,7 @@ let setup_local_server ?(client_trustlist = []) ~rest_server_port
                   let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
                   let%map accts = Mina_ledger.Ledger.to_list l_inner in
                   Ok accts
-              | Ledger_root l ->
+              | Ledger_root { ledger = l; _ } ->
                   let casted = Root_ledger.as_unmasked l in
                   let%map accts =
                     Mina_ledger.Ledger.Any_ledger.M.to_list casted

@@ -76,7 +76,7 @@ module Make (Inputs : Inputs_intf) :
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
           _ ->
           None
-      | Ledger_root ledger ->
+      | Ledger_root { ledger; _ } ->
           Some (Root_ledger.as_unmasked ledger)
     else if
       Ledger_hash.equal ledger_hash
@@ -87,7 +87,7 @@ module Make (Inputs : Inputs_intf) :
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
           _ ->
           None
-      | Ledger_root ledger ->
+      | Ledger_root { ledger; _ } ->
           Some (Root_ledger.as_unmasked ledger)
     else None
 

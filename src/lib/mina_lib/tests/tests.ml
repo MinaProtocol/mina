@@ -418,9 +418,9 @@ let%test_module "Epoch ledger sync tests" =
       in
       (* store snapshots in local state *)
       Consensus.Data.Local_state.For_tests.set_snapshot consensus_local_state
-        Staking_epoch_snapshot staking_epoch_snapshot ;
+        Staking staking_epoch_snapshot ;
       Consensus.Data.Local_state.For_tests.set_snapshot consensus_local_state
-        Next_epoch_snapshot next_epoch_snapshot ;
+        Next next_epoch_snapshot ;
       let net_info2_tm0 = Unix.gettimeofday () in
       let%map network_info2 =
         make_mina_network ~name ~instance:1 ~test_number
@@ -593,7 +593,12 @@ let%test_module "Epoch ledger sync tests" =
           | Error _ ->
               failwith "Could not add account" ) ;
       Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_root
-        root_ledger
+        { ledger = root_ledger
+        ; config =
+            Root_ledger.Config.with_directory ~backing_type:Stable_db
+              ~directory_name:
+                "/tmp/i-am-a-non-existent-directory-that-should-not-be-accessed"
+        }
 
     let test_accounts =
       Quickcheck.(random_value @@ Generator.list_with_length 20 Account.gen)

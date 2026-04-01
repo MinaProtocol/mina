@@ -336,7 +336,8 @@ module type S = sig
         module Ledger_snapshot : sig
           type t =
             | Genesis_epoch_ledger of Genesis_ledger.Packed.t
-            | Ledger_root of Root_ledger.t
+            | Ledger_root of
+                { config : Root_ledger.Config.t; ledger : Root_ledger.t }
 
           val close : t -> unit
 
@@ -384,9 +385,7 @@ module type S = sig
         -> unit
 
       module For_tests : sig
-        type snapshot_identifier =
-          | Staking_epoch_snapshot
-          | Next_epoch_snapshot
+        type snapshot_identifier = Staking | Next
 
         (* set epoch ledgers in local state for testing
            relies on persnickety imperative code that should not be exposed more generally
@@ -787,7 +786,8 @@ module type S = sig
         synchronization.
      *)
     val required_local_state_sync :
-         constants:Constants.t
+         logger:Logger.t
+      -> constants:Constants.t
       -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
       -> local_state_sync option
