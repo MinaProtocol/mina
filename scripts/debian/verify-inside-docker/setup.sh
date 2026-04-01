@@ -15,8 +15,8 @@ TRUSTED_FLAG="${7:-[trusted=yes]}"
 
 echo "Installing $PACKAGE=$VERSION from $REPO ($CODENAME/$CHANNEL)"
 
-apt-get update > /dev/null
-apt-get install -y lsb-release ca-certificates wget gnupg > /dev/null
+apt-get update
+apt-get install -y lsb-release ca-certificates wget gnupg
 
 if [[ "$SIGNED" == "1" ]]; then
   wget -q "https://${REPO}/repo-signing-key.gpg" -O /etc/apt/trusted.gpg.d/minaprotocol.gpg
@@ -24,7 +24,7 @@ if [[ "$SIGNED" == "1" ]]; then
 fi
 
 echo "deb ${TRUSTED_FLAG} https://${REPO} ${CODENAME} ${CHANNEL}" > /etc/apt/sources.list.d/mina.list
-apt-get update > /dev/null
+apt-get update
 
 apt list -a "$PACKAGE"
 apt-get install -y --allow-downgrades "${PACKAGE}=${VERSION}"

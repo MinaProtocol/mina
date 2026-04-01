@@ -126,8 +126,12 @@ log_info "=== Step 1: Download debs from cache ==="
 ./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_AUTOMODE}_*" "${DEB_DIR}"
 ./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_CONFIG}_*" "${DEB_DIR}"
 ./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_POSTFORK}_*" "${DEB_DIR}"
-./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/${PKG_PREFORK}_*" "${DEB_DIR}"
 ./buildkite/scripts/cache/manager.sh read "debians/${CODENAME}/mina-logproc_*" "${DEB_DIR}"
+
+# Download the legacy prefork deb from the persistent legacy cache.
+# The automode metapackage depends on prefork at PREFORK_LEGACY_VERSION (not the
+# current build version), so we need the real legacy deb to satisfy that constraint.
+./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/${CODENAME}/${PKG_PREFORK}_*" "${DEB_DIR}"
 
 log_info "Downloaded debs:"
 ls -la "${DEB_DIR}"/*.deb
@@ -145,6 +149,11 @@ ORIG_CONFIG_DEB=$(ls "${DEB_DIR}"/${PKG_CONFIG}_*.deb | head -1)
 ORIG_POSTFORK_DEB=$(ls "${DEB_DIR}"/${PKG_POSTFORK}_*.deb | head -1)
 ORIG_PREFORK_DEB=$(ls "${DEB_DIR}"/${PKG_PREFORK}_*.deb | head -1)
 ORIG_LOGPROC_DEB=$(ls "${DEB_DIR}"/mina-logproc_*.deb | head -1)
+
+# The prefork deb comes from the legacy cache at its original version.
+# Copy it directly into the repo — no reversioning needed since the automode
+# metapackage already references the legacy version in its dependency.
+cp "${ORIG_PREFORK_DEB}" "${REPO_DIR}/"
 
 reversion_deb() {
     local input_deb="$1"
@@ -168,10 +177,10 @@ reversion_deb "${ORIG_DAEMON_DEB}"  "${V1}" "${REPO_DIR}/${PKG_DAEMON}_${V1}_amd
 reversion_deb "${ORIG_CONFIG_DEB}"  "${V1}" "${REPO_DIR}/${PKG_CONFIG}_${V1}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}" "${V1}" "${REPO_DIR}/mina-logproc_${V1}_amd64.deb"
 
-# V2: automode + postfork + prefork + config + logproc (hardfork)
+# V2: automode + postfork + config + logproc (hardfork)
+# Note: prefork is already in REPO_DIR from the legacy cache (not reversioned)
 reversion_deb "${ORIG_AUTOMODE_DEB}" "${V2}" "${REPO_DIR}/${PKG_AUTOMODE}_${V2}_all.deb"
 reversion_deb "${ORIG_POSTFORK_DEB}" "${V2}" "${REPO_DIR}/${PKG_POSTFORK}_${V2}_amd64.deb"
-reversion_deb "${ORIG_PREFORK_DEB}"  "${V2}" "${REPO_DIR}/${PKG_PREFORK}_${V2}_amd64.deb"
 reversion_deb "${ORIG_CONFIG_DEB}"   "${V2}" "${REPO_DIR}/${PKG_CONFIG}_${V2}_all.deb"
 reversion_deb "${ORIG_LOGPROC_DEB}"  "${V2}" "${REPO_DIR}/mina-logproc_${V2}_amd64.deb"
 
@@ -200,7 +209,7 @@ log_info "=== Step 3: Start local apt repository ==="
 
 # Add local repo to apt sources
 $SUDO bash -c "echo 'deb [trusted=yes] http://localhost:${APTLY_PORT}/ ${CODENAME} unstable' > /etc/apt/sources.list.d/transition-test.list"
-$SUDO apt-get update -qq
+$SUDO apt-get update
 
 log_info "Available packages:"
 apt-cache showpkg "${PKG_DAEMON}" 2>/dev/null | head -20 || true
@@ -243,7 +252,7 @@ log_info "PASS: No automode paths in v1"
 
 log_info "=== Step 5: Upgrade to ${PKG_AUTOMODE} v2 ==="
 
-$SUDO apt-get install -y -qq --allow-downgrades "${PKG_AUTOMODE}=${V2}" "${PKG_CONFIG}=${V2}" "mina-logproc=${V2}"
+$SUDO apt-get install -y --allow-downgrades "${PKG_AUTOMODE}=${V2}" "${PKG_CONFIG}=${V2}" "mina-logproc=${V2}"
 
 log_info "Package state after automode install:"
 dpkg -l "${PKG_AUTOMODE}" 2>/dev/null | tail -1 || true
@@ -278,13 +287,13 @@ log_info "PASS: /usr/local/bin/mina is a symlink (automode dispatcher)"
 
 log_info "=== Step 6: Restore ${PKG_DAEMON} v3 ==="
 
-$SUDO apt-get install -y -qq --allow-downgrades "${PKG_DAEMON}=${V3}" "${PKG_CONFIG}=${V3}" "mina-logproc=${V3}"
+$SUDO apt-get install -y --allow-downgrades "${PKG_DAEMON}=${V3}" "${PKG_CONFIG}=${V3}" "mina-logproc=${V3}"
 
 # automode metapackage conflicts with mina-devnet, so apt should remove it.
 # The prefork/postfork sub-packages were only dependencies of automode, so
 # they become orphans. Run autoremove to clean them up (simulates operator
 # running apt autoremove after a transition).
-$SUDO apt-get autoremove -y -qq
+$SUDO apt-get autoremove -y
 
 log_info "Package state after restore:"
 dpkg -l "${PKG_DAEMON}" 2>/dev/null | tail -1 || true
