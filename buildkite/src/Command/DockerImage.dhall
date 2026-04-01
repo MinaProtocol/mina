@@ -237,61 +237,6 @@ let generateStep =
 
                 else  " --load-only "
 
-          let debSuffix =
-                merge
-                  { None = if spec.generic then " --deb-suffix generic" else ""
-                  , Some = \(s : Text) -> " --deb-suffix " ++ s
-                  }
-                  spec.deb_suffix
-
-          let maybeVerify =
-                      if     spec.verify
-                         &&  DockerPublish.shouldPublish
-                               spec.docker_publish
-                               spec.service
-
-                then      " && "
-                      ++  VerifyDockers.verify
-                            VerifyDockers.Spec::{
-                            , artifacts = [ spec.service ]
-                            , networks = [ spec.network ]
-                            , version = spec.deb_version
-                            , codenames = [ spec.deb_codename ]
-                            , profile = spec.deb_profile
-                            , buildFlag = spec.build_flags
-                            , archs = [ spec.arch ]
-                            , repo = spec.docker_repo
-                            , generic = spec.generic
-                            }
-
-                else  ""
-
-          let pruneDockerImages =
-                    "if [ -z \"\\\${SKIP_DOCKER_PRUNE:-}\" ]; then "
-                ++  "docker system prune --all --force "
-                ++  merge
-                      { Arm64 = ""
-                      , XLarge = "--filter until=24h"
-                      , Large = "--filter until=24h"
-                      , Medium = "--filter until=24h"
-                      , Small = "--filter until=24h"
-                      , Integration = "--filter until=24h"
-                      , QA = "--filter until=24h"
-                      , Multi = "--filter until=24h"
-                      , Perf = "--filter until=24h"
-                      }
-                      spec.size
-                ++  "; else echo 'Skipping docker prune due to SKIP_DOCKER_PRUNE'; fi"
-
-          let loadOnlyArg =
-                      if DockerPublish.shouldPublish
-                           spec.docker_publish
-                           spec.service
-
-                then  ""
-
-                else  " --load-only "
-
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
                 ++  " --service ${Artifacts.dockerServiceName spec.service}"
