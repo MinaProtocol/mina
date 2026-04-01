@@ -228,8 +228,8 @@ in {
       -C link-arg=--export=__tls_size \
       -C link-arg=--export=__tls_align \
       -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs kimchi-wasm -- --features nodejs -Z build-std=panic_abort,std
-      wasm-pack build --mode no-install --target web --out-dir $out/web kimchi-wasm -Z build-std=panic_abort,std
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs kimchi-wasm -- -Z build-std=panic_abort,std --features nodejs
+      wasm-pack build --mode no-install --target web --out-dir $out/web kimchi-wasm -- -Z build-std=panic_abort,std
       )
       runHook postBuild
     '';
