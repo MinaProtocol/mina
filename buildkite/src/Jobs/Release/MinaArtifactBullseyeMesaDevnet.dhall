@@ -20,11 +20,13 @@ in  Pipeline.build
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonAutomode
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Mesa
           , tags =
@@ -32,7 +34,6 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Rosetta
-            , PipelineTag.Type.Mesa
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Bullseye
             ]

@@ -65,6 +65,7 @@ let MinaBuildSpec =
           , buildScript : Text
           , arch : Arch.Type
           , deb_legacy_version : Text
+          , deb_storage_repair_version : Text
           , docker_publish : DockerPublish.Type
           , suffix : Optional Text
           , if_ : Optional B/If
@@ -87,6 +88,7 @@ let MinaBuildSpec =
           , extraBuildEnvs = [] : List Text
           , suffix = None Text
           , deb_legacy_version = "3.3.0-compatible-4fa3a5b"
+          , deb_storage_repair_version = "3.3.0-master-35445f7"
           , arch = Arch.Type.Amd64
           , docker_publish = DockerPublish.Type.Essential
           , if_ = None B/If
@@ -139,6 +141,7 @@ let build_artifacts
                                                  spec.debVersion}"
                         , "ARCHITECTURE=${Arch.lowerName spec.arch}"
                         , Network.buildMainnetEnv spec.network
+                        , "PREFORK_LEGACY_VERSION=${spec.deb_legacy_version}"
                         ]
                       # BuildFlags.buildEnvs spec.buildFlags
                       # spec.extraBuildEnvs
@@ -199,6 +202,8 @@ let docker_step
                     , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
+                    , deb_storage_repair_version = Some
+                        spec.deb_storage_repair_version
                     , verify = True
                     , arch = spec.arch
                     , size = size
@@ -261,6 +266,8 @@ let docker_step
                     , docker_publish = spec.docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
+                    , deb_storage_repair_version = Some
+                        spec.deb_storage_repair_version
                     , generic = True
                     , verify = True
                     , arch = spec.arch
@@ -277,12 +284,15 @@ let docker_step
                             , network = spec.network
                             , profile = spec.profile
                             , artifact = Artifacts.Type.DaemonAppsOnly
+                            , arch = spec.arch
                             , buildFlags = spec.buildFlags
                             }
                     , service = Artifacts.Type.DaemonConfig
                     , network = spec.network
                     , deb_codename = spec.debVersion
                     , docker_publish = spec.docker_publish
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
                     , deb_install_mode =
                         DockerImage.DebianInstallMode.DownloadOnly
                     , arch = spec.arch
@@ -293,6 +303,7 @@ let docker_step
                 , LogProc = [] : List DockerImage.ReleaseSpec.Type
                 , CreatePreforkGenesis = [] : List DockerImage.ReleaseSpec.Type
                 , DaemonPrefork = [] : List DockerImage.ReleaseSpec.Type
+                , DaemonAutomode = [] : List DockerImage.ReleaseSpec.Type
                 , BatchTxn =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
@@ -391,6 +402,8 @@ let docker_step
                             }
                     , service = Artifacts.Type.RosettaConfig
                     , network = spec.network
+                    , image_name = Some
+                        (Artifacts.dockerName Artifacts.Type.Rosetta)
                     , deb_codename = spec.debVersion
                     , docker_publish = spec.docker_publish
                     , deb_install_mode =

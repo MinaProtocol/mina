@@ -103,7 +103,16 @@ create_control_file() {
   echo "Dependencies: ${2}"
   echo "Description: ${3}"
   if [ -n "${4:-}" ]; then
-    echo "Broken/Replaces: ${4}"
+    echo "Suggests: ${4}"
+  fi
+  if [ -n "${5:-}" ]; then
+    echo "Replaces/Breaks: ${5}"
+  fi
+  if [ -n "${6:-}" ]; then
+    echo "Provides: ${6}"
+  fi
+  if [ -n "${7:-}" ]; then
+    echo "Conflicts: ${7}"
   fi
   # Make sure the directory exists
   mkdir -p "${BUILDDIR}/DEBIAN"
@@ -137,6 +146,12 @@ EOF
   if [ -n "${5:-}" ]; then
     echo "Replaces: ${5}" >> ${CONTROL}
     echo "Breaks: ${5}" >> ${CONTROL}
+  fi
+  if [ -n "${6:-}" ]; then
+    echo "Provides: ${6}" >> ${CONTROL}
+  fi
+  if [ -n "${7:-}" ]; then
+    echo "Conflicts: ${7}" >> ${CONTROL}
   fi
 
   cat <<EOF >> ${CONTROL}
@@ -471,12 +486,22 @@ build_daemon_config_deb() {
 
   local package_name="mina-${network}-config"
 
+  # Config package contains only architecture-independent configuration data
+  # (no binaries), so we build it with Architecture: all to make it usable on
+  # all supported architectures.
+
+  # Save and override architecture to "all" for the config package; restore
+  # the original architecture after building the package.
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
   create_control_file "${package_name}" "" \
      "Mina Protocol Config for daemons running under ${network}" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_configs "${network}"
 
   build_deb "${package_name}"
+  ARCHITECTURE="${saved_arch}"
 }
 ## END CONFIG PACKAGE ##
 
@@ -524,7 +549,7 @@ build_daemon_deb() {
   esac
 
   create_control_file "${package_name}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-${network}-config (>=${MINA_DEB_VERSION})" \
-    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION})"
+    'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}" "mina-${network} (<< ${MINA_DEB_VERSION}), mina-${network}-postfork-${POSTFORK_CODENAME}"
 
   copy_common_daemon_apps "${network}"
 
@@ -638,7 +663,27 @@ copy_common_daemon_post_automode_apps_and_configs() {
   # dispatch to the correct runtime based on env var set in /etc/default/mina-dispatch
   create_symlinks_for_shared_apps "${prefork_network}"
 
-  copy_common_daemon_configs "${prefork_network}"
+  # Config files (config_<hash>.json, <network>.json) are provided by the
+  # mina-<network>-config package, so we do NOT ship them here to avoid
+  # dpkg file conflicts.  Only ship the prefork config when it differs from
+  # the postfork hash, since the config package won't contain it.
+  if [[ -n "${PREFORK_LEGACY_VERSION:-}" ]]; then
+    local prefork_short_hash="${PREFORK_LEGACY_VERSION##*-}"
+    local prefork_githash_config
+    prefork_githash_config=$(git rev-parse --short=8 "$prefork_short_hash" 2>/dev/null || echo "")
+    if [[ -n "$prefork_githash_config" ]]; then
+      if [[ "$prefork_githash_config" == "$GITHASH_CONFIG" ]]; then
+        echo "Prefork githash (${prefork_githash_config}) is the same as postfork; skipping config copy."
+      else
+        echo "Copying config for prefork daemon as config_${prefork_githash_config}.json"
+        mkdir -p "${BUILDDIR}/var/lib/coda"
+        cp "../genesis_ledgers/${prefork_network}.json" \
+           "${BUILDDIR}/var/lib/coda/config_${prefork_githash_config}.json"
+      fi
+    else
+      echo "WARNING: Could not resolve prefork commit hash from '${prefork_short_hash}'. Prefork config not shipped."
+    fi
+  fi
 
   # Copy seed list with correct URL for postfork runtime and
   # bash completion that points to the correct seed list URL
@@ -683,6 +728,41 @@ build_daemon_postfork_deb() {
   build_deb "$package_name"
 
 }
+
+## AUTOMODE METAPACKAGE ##
+
+#
+# Builds mina-NETWORK-automode transitional metapackage
+#
+# Output: mina-${NETWORK}-automode_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+#
+# This is an empty metapackage that depends on both prefork and postfork
+# automode packages. It Conflicts/Replaces/Provides mina-${NETWORK} so that
+# running `apt-get install mina-${NETWORK}-automode` will automatically
+# remove mina-${NETWORK} and pull in both automode runtimes.
+#
+
+build_daemon_automode_deb() {
+
+  local network="$1"
+
+  echo "------------------------------------------------------------"
+  echo "--- Building ${network} automode transitional metapackage:"
+
+  local package_name="mina-${network}-automode"
+
+  local prefork_pkg="mina-${network}-prefork-${POSTFORK_CODENAME}"
+  local postfork_pkg="mina-${network}-postfork-${POSTFORK_CODENAME}"
+  local prefork_version="${PREFORK_VERSION:-${MINA_DEB_VERSION}}"
+  local depends="${postfork_pkg} (>= ${MINA_DEB_VERSION}), ${prefork_pkg} (>= ${prefork_version})"
+
+  create_control_file "${package_name}" "${depends}" \
+    "Transitional metapackage for Mina ${network} automode (installs both prefork and postfork runtimes)" \
+    "" "mina-${network}" "mina-${network}" "mina-${network}"
+
+  build_deb "${package_name}"
+}
+## END AUTOMODE METAPACKAGE ##
 
 ## GENERIC PACKAGE ##
 
@@ -750,12 +830,11 @@ copy_common_daemon_hardfork_configs() {
 ## HARDFORK PACKAGE ##
 
 #
-# Builds mina-${NETWORK}-hardfork package for specified network
+# Builds mina-${NETWORK}-config package for specified network with hardfork configuration
 #
-# Output: mina-${NETWORK}-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+# Output: mina-${NETWORK}-config_${MINA_DEB_VERSION}_all.deb
 #
-# Config only package with hardfork-specific runtime config and ledgers. 
+# Config only package with hardfork-specific runtime config and ledgers.
 # Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
 #
 build_daemon_hardfork_config_deb() {
@@ -766,13 +845,22 @@ build_daemon_hardfork_config_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building hardfork config for ${network} network deb without keys:"
 
+  # Config package contains only architecture-independent configuration data
+  # (no binaries), so we build it with Architecture: all to make it usable on
+  # all supported architectures.
+
+  # Save and override architecture to "all" for the hardfork config package; restore
+  # the original architecture after building the package.
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
   create_control_file "${package_name}" "" \
     "Mina Protocol hardfork config for the ${network} Network" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_hardfork_configs "${network}"
 
   build_deb "${package_name}"
-
+  ARCHITECTURE="${saved_arch}"
 }
 
 ## END HARDFORK PACKAGE ##
@@ -924,7 +1012,38 @@ build_delegation_verify_deb () {
 ## CREATE PREFORK GENESIS PACKAGE ##
 
 #
-# Builds mina-create-NETWORK-prefork-genesis package for prefork genesis creation
+# Builds mina-create-devnet-prefork-genesis package for prefork genesis creation
+#
+# Output: mina-create-devnet-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+#
+# Utility for creating prefork genesis ledgers for post-hardfork verification.
+# Contains the runtime_genesis_ledger tool for Mina protocol.
+#
+build_prefork_devnet_genesis_ledger_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Generic devnet create prefork genesis tool:"
+
+  DEB_NAME="mina-create-devnet-prefork-genesis-ledger"
+
+  create_control_file "$DEB_NAME" \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Utility to verify post hardfork ledger for Mina'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binaries
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-create-prefork-genesis"
+
+  build_deb "$DEB_NAME"
+}
+
+#
+# Builds mina-create-mainnet-prefork-genesis package for prefork genesis creation
+#
+# Output: mina-create-mainnet-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Output: mina-create-${NETWORK}-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}

@@ -45,6 +45,8 @@ let List/map = Prelude.List.map
 let DebianArchPair =
       { DebVersion : DebianVersions.DebVersion, Arch : Arch.Type }
 
+let defaultMinaArtifactSpec = MinaArtifact.MinaBuildSpec::{=}
+
 let Spec =
       { Type =
           { codenames : List DebianArchPair
@@ -55,9 +57,10 @@ let Spec =
           , suffix : Text
           , precomputed_block_prefix : Optional Text
           , use_artifacts_from_buildkite_build : Optional Text
-          , hardfork_shift_slot_delta : Optional Natural
+          , use_generic_dockers_from_version : Optional Text
           , size : Size
-          , mina_create_legacy_genesis_version : Text
+          , deb_legacy_version : Text
+          , deb_storage_repair_version : Text
           }
       , default =
           { codenames =
@@ -70,12 +73,14 @@ let Spec =
           , config_json_gz_url =
               "https://storage.googleapis.com/o1labs-gitops-infrastructure/devnet/devnet-state-dump-3NK4eDgbkCjKj9fFUXVkrJXsfpfXzJySoAvrFJVCropPW7LLF14F-676026c4d4d2c18a76b357d6422a06f932c3ef4667a8fd88717f68b53fd6b2d7.json.gz"
           , suffix = ""
-          , version = "\\\$MINA_DEB_VERSION"
+          , version = "\\\${MINA_DEB_VERSION}"
           , precomputed_block_prefix = None Text
           , use_artifacts_from_buildkite_build = None Text
-          , hardfork_shift_slot_delta = None Natural
+          , use_generic_dockers_from_version = None Text
           , size = Size.XLarge
-          , mina_create_legacy_genesis_version = "3.3.0-2b689c8"
+          , deb_legacy_version = defaultMinaArtifactSpec.deb_legacy_version
+          , deb_storage_repair_version =
+              defaultMinaArtifactSpec.deb_storage_repair_version
           }
       }
 
@@ -94,18 +99,6 @@ let generateReferenceTarballsCommand =
                   }
                   spec.use_artifacts_from_buildkite_build
 
-          let hardforkShiftSlotDeltaArg =
-                merge
-                  { Some =
-                          \(delta : Natural)
-                      ->      "--hardfork-shift-slot-delta "
-                          ++  Natural/show delta
-                          ++  " --prefork-genesis-config /workdir/genesis_ledgers/${Network.lowerName
-                                                                                      spec.network}.json"
-                  , None = ""
-                  }
-                  spec.hardfork_shift_slot_delta
-
           in  Command.build
                 Command.Config::{
                 , commands =
@@ -115,8 +108,8 @@ let generateReferenceTarballsCommand =
                       codename.Arch
                       [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
                       "./buildkite/scripts/hardfork/release/generate-fork-config-and-ledger-tarballs-using-legacy-app.sh --network ${Network.lowerName
-                                                                                                                                       spec.network} --version ${spec.mina_create_legacy_genesis_version}  --codename ${DebianVersions.lowerName
-                                                                                                                                                                                                                          codename.DebVersion} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg} ${hardforkShiftSlotDeltaArg}"
+                                                                                                                                       spec.network} --version ${spec.deb_legacy_version}  --codename ${DebianVersions.lowerName
+                                                                                                                                                                                                          codename.DebVersion} --config-json-gz-url ${spec.config_json_gz_url} ${cacheArg}"
                 , label =
                     "Generate hardfork reference tarballs for ${DebianVersions.lowerName
                                                                   codename.DebVersion}"
@@ -138,18 +131,6 @@ let generateTarballsCommand =
                   , None = ""
                   }
                   spec.use_artifacts_from_buildkite_build
-
-          let hardforkShiftSlotDeltaArg =
-                merge
-                  { Some =
-                          \(delta : Natural)
-                      ->      "--hardfork-shift-slot-delta "
-                          ++  Natural/show delta
-                          ++  " --prefork-genesis-config /workdir/genesis_ledgers/${Network.lowerName
-                                                                                      spec.network}.json"
-                  , None = ""
-                  }
-                  spec.hardfork_shift_slot_delta
 
           let genesis_timestamp_env =
                 merge
@@ -176,7 +157,6 @@ let generateTarballsCommand =
                         ++  "--config-url ${spec.config_json_gz_url} "
                         ++  "--codename ${DebianVersions.lowerName
                                             codename.DebVersion} "
-                        ++  "${hardforkShiftSlotDeltaArg} "
                         ++  "${cacheArg}"
                       )
                 , label =
@@ -200,20 +180,6 @@ let generateDockerForCodename =
           let dependsOnBuildHfDebian =
                 [ { name = pipelineName, key = buildHfDebian } ]
 
-          let dockerDaemonSpec =
-                DockerImage.ReleaseSpec::{
-                , deps = dependsOnBuildHfDebian
-                , service = Artifacts.Type.Daemon
-                , network = spec.network
-                , deb_codename = codename.DebVersion
-                , deb_profile = profile
-                , deb_repo = DebianRepo.Type.Local
-                , step_key_suffix =
-                    "-${DebianVersions.lowerName
-                          codename.DebVersion}-docker-image"
-                , size = spec.size
-                }
-
           let buildOrGetArtifacts =
                 merge
                   { Some =
@@ -230,7 +196,7 @@ let generateDockerForCodename =
                                       ++  " --backend local --artifacts mina-logproc,mina-${Network.lowerName
                                                                                               spec.network},mina-archive-${Network.lowerName
                                                                                                                              spec.network},mina-rosetta-${Network.lowerName
-                                                                                                                                                            spec.network},mina-zkapp-test-transaction "
+                                                                                                                                                            spec.network},mina-zkapp-test-transaction,mina-daemon-storage-toolbox "
                                       ++  " --buildkite-build-id ${cached_build_id}"
                                       ++  " --codename ${lowerNameCodename} "
                                       ++  " --target \\\${BUILDKITE_BUILD_ID} "
@@ -247,11 +213,15 @@ let generateDockerForCodename =
                         MinaArtifact.MinaBuildSpec::{
                         , artifacts =
                           [ Artifacts.Type.LogProc
+                          , Artifacts.Type.DaemonAppsOnly
                           , Artifacts.Type.Daemon
                           , Artifacts.Type.DaemonConfig
                           , Artifacts.Type.Archive
+                          , Artifacts.Type.RosettaAppsOnly
+                          , Artifacts.Type.RosettaConfig
                           , Artifacts.Type.Rosetta
                           , Artifacts.Type.ZkappTestTransaction
+                          , Artifacts.Type.DaemonStorageToolbox
                           ]
                         , debVersion = codename.DebVersion
                         , profile = profile
@@ -263,37 +233,139 @@ let generateDockerForCodename =
                   }
                   spec.use_artifacts_from_buildkite_build
 
+          let dockerSpecs =
+                merge
+                  { Some =
+                          \(version : Text)
+                      ->  [ DockerImage.ReleaseSpec::{
+                            , deps = dependsOnBuildHfDebian
+                            , service = Artifacts.Type.DaemonConfig
+                            , network = spec.network
+                            , deb_codename = codename.DebVersion
+                            , deb_profile = profile
+                            , deb_install_mode =
+                                DockerImage.DebianInstallMode.DownloadOnly
+                            , deb_legacy_version = spec.deb_legacy_version
+                            , size = spec.size
+                            , verify = True
+                            , version =
+                                "${version}-${DebianVersions.lowerName
+                                                codename.DebVersion}"
+                            , deb_version = spec.version
+                            , step_key_suffix =
+                                "-${DebianVersions.lowerName
+                                      codename.DebVersion}-docker-image"
+                            }
+                          , DockerImage.ReleaseSpec::{
+                            , deps = dependsOnBuildHfDebian
+                            , service = Artifacts.Type.RosettaConfig
+                            , network = spec.network
+                            , deb_codename = codename.DebVersion
+                            , deb_profile = profile
+                            , deb_install_mode =
+                                DockerImage.DebianInstallMode.DownloadOnly
+                            , deb_legacy_version = spec.deb_legacy_version
+                            , image_name = Some
+                                (Artifacts.dockerName Artifacts.Type.Rosetta)
+                            , size = spec.size
+                            , verify = True
+                            , version =
+                                "${version}-${DebianVersions.lowerName
+                                                codename.DebVersion}"
+                            , deb_version = spec.version
+                            , step_key_suffix =
+                                "-${DebianVersions.lowerName
+                                      codename.DebVersion}-docker-image"
+                            }
+                          ]
+                  , None =
+                    [ DockerImage.ReleaseSpec::{
+                      , deps = dependsOnBuildHfDebian
+                      , service = Artifacts.Type.DaemonAppsOnly
+                      , network = spec.network
+                      , deb_codename = codename.DebVersion
+                      , deb_profile = profile
+                      , deb_legacy_version = spec.deb_legacy_version
+                      , deb_storage_repair_version = Some
+                          spec.deb_storage_repair_version
+                      , size = spec.size
+                      , deb_version = spec.version
+                      , generic = True
+                      , step_key_suffix =
+                          "-${DebianVersions.lowerName
+                                codename.DebVersion}-docker-image"
+                      }
+                    , DockerImage.ReleaseSpec::{
+                      , deps = dependsOnBuildHfDebian
+                      , service = Artifacts.Type.Daemon
+                      , network = spec.network
+                      , deb_codename = codename.DebVersion
+                      , deb_profile = profile
+                      , deb_legacy_version = spec.deb_legacy_version
+                      , deb_storage_repair_version = Some
+                          spec.deb_storage_repair_version
+                      , size = spec.size
+                      , verify = True
+                      , deb_version = spec.version
+                      , step_key_suffix =
+                          "-${DebianVersions.lowerName
+                                codename.DebVersion}-docker-image"
+                      }
+                    , DockerImage.ReleaseSpec::{
+                      , deps = dependsOnBuildHfDebian
+                      , service = Artifacts.Type.Archive
+                      , network = spec.network
+                      , deb_codename = codename.DebVersion
+                      , deb_profile = profile
+                      , deb_legacy_version = spec.deb_legacy_version
+                      , deb_storage_repair_version = Some
+                          spec.deb_storage_repair_version
+                      , size = spec.size
+                      , deb_version = spec.version
+                      , step_key_suffix =
+                          "-${DebianVersions.lowerName
+                                codename.DebVersion}-docker-image"
+                      }
+                    , DockerImage.ReleaseSpec::{
+                      , deps = dependsOnBuildHfDebian
+                      , service = Artifacts.Type.Rosetta
+                      , network = spec.network
+                      , deb_codename = codename.DebVersion
+                      , deb_profile = profile
+                      , deb_legacy_version = spec.deb_legacy_version
+                      , size = spec.size
+                      , verify = True
+                      , deb_version = spec.version
+                      , step_key_suffix =
+                          "-${DebianVersions.lowerName
+                                codename.DebVersion}-docker-image"
+                      }
+                    , DockerImage.ReleaseSpec::{
+                      , deps = dependsOnBuildHfDebian
+                      , service = Artifacts.Type.RosettaAppsOnly
+                      , network = spec.network
+                      , deb_codename = codename.DebVersion
+                      , deb_profile = profile
+                      , deb_legacy_version = spec.deb_legacy_version
+                      , size = spec.size
+                      , deb_version = spec.version
+                      , generic = True
+                      , step_key_suffix =
+                          "-${DebianVersions.lowerName
+                                codename.DebVersion}-docker-image"
+                      }
+                    ]
+                  }
+                  spec.use_generic_dockers_from_version
+
           in    buildOrGetArtifacts
-              # [ DockerImage.generateStep dockerDaemonSpec
-                , DockerImage.generateStep
-                    DockerImage.ReleaseSpec::{
-                    , deps = dependsOnBuildHfDebian
-                    , service = Artifacts.Type.Archive
-                    , network = spec.network
-                    , deb_codename = codename.DebVersion
-                    , deb_profile = profile
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_version = spec.version
-                    , size = spec.size
-                    , step_key_suffix =
-                        "-${DebianVersions.lowerName
-                              codename.DebVersion}-docker-image"
-                    }
-                , DockerImage.generateStep
-                    DockerImage.ReleaseSpec::{
-                    , deps = dependsOnBuildHfDebian
-                    , service = Artifacts.Type.Rosetta
-                    , network = spec.network
-                    , deb_profile = profile
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_codename = codename.DebVersion
-                    , deb_version = spec.version
-                    , size = spec.size
-                    , step_key_suffix =
-                        "-${DebianVersions.lowerName
-                              codename.DebVersion}-docker-image"
-                    }
-                ]
+              # List/map
+                  DockerImage.ReleaseSpec.Type
+                  Command.Type
+                  (     \(spec : DockerImage.ReleaseSpec.Type)
+                    ->  DockerImage.generateStep spec
+                  )
+                  dockerSpecs
 
 let generateHfRelatedStepsForCodename =
           \(spec : Spec.Type)
@@ -305,6 +377,15 @@ let generateHfRelatedStepsForCodename =
                   Artifacts.Tag::{
                   , remove_profile_from_name = True
                   , network = spec.network
+                  , version =
+                      merge
+                        { Some =
+                                \(v : Text)
+                            ->  "${v}-${DebianVersions.lowerName
+                                          codename.DebVersion}"
+                        , None = "\\\${MINA_DOCKER_TAG}"
+                        }
+                        spec.use_generic_dockers_from_version
                   }
 
           let profile = Profiles.fromNetwork spec.network
@@ -320,20 +401,24 @@ let generateHfRelatedStepsForCodename =
           let dependsOnTarballs =
                 [ { name = pipelineName, key = tarballGenKey } ]
 
-          let dependsOnBuildHfDebian =
-                [ { name = pipelineName, key = buildHfDebian } ]
-
           let dependsOnArtifacts =
                 [ { name = pipelineName, key = artifactsGenKey } ]
 
+          let service =
+                merge
+                  { Some = \(v : Text) -> Artifacts.Type.DaemonConfig
+                  , None = Artifacts.Type.Daemon
+                  }
+                  spec.use_generic_dockers_from_version
+
           let dockerDaemonSpec =
                 DockerImage.ReleaseSpec::{
-                , deps = dependsOnBuildHfDebian
-                , service = Artifacts.Type.Daemon
+                , service = service
                 , network = spec.network
                 , deb_codename = codename.DebVersion
                 , deb_profile = profile
                 , deb_repo = DebianRepo.Type.Local
+                , deb_legacy_version = spec.deb_legacy_version
                 , step_key_suffix =
                     "-${DebianVersions.lowerName
                           codename.DebVersion}-docker-image"
@@ -403,9 +488,11 @@ let generateHfRelatedStepsForCodename =
                           Toolchain.SelectionMode.ByDebianAndArch
                           codename.DebVersion
                           codename.Arch
-                          [ "NETWORK_NAME=${Network.lowerName spec.network}"
-                          , "MINA_DEB_CODENAME=${lowerNameCodename}"
-                          ]
+                          (   [ "NETWORK_NAME=${Network.lowerName spec.network}"
+                              , "MINA_DEB_CODENAME=${lowerNameCodename}"
+                              ]
+                            # DebianVersions.overrideEnvs
+                          )
                           "mkdir -p _build && ./buildkite/scripts/cache/manager.sh read hardfork /workdir && RUNTIME_CONFIG_JSON=/workdir/hardfork/new_config.json LEDGER_TARBALLS='/workdir/hardfork/ledgers/*.tar.gz' ./buildkite/scripts/debian/build.sh --codenames ${debianCodenamesList} --arch all daemon_${Network.lowerName
                                                                                                                                                                                                                                                                                                                      spec.network}_hardfork_config"
                     , label =
@@ -555,7 +642,7 @@ let generate_hardfork_package =
       ->  \(version : Optional Text)
       ->  \(precomputed_block_prefix : Optional Text)
       ->  \(use_artifacts_from_buildkite_build : Optional Text)
-      ->  \(hardfork_shift_slot_delta : Optional Natural)
+      ->  \(use_generic_dockers_from_version : Optional Text)
       ->  ( pipeline
               Spec::{
               , codenames = codenames
@@ -570,7 +657,8 @@ let generate_hardfork_package =
               , precomputed_block_prefix = precomputed_block_prefix
               , use_artifacts_from_buildkite_build =
                   use_artifacts_from_buildkite_build
-              , hardfork_shift_slot_delta = hardfork_shift_slot_delta
+              , use_generic_dockers_from_version =
+                  use_generic_dockers_from_version
               }
           ).pipeline
 

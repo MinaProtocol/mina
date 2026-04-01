@@ -24,6 +24,7 @@ in  Pipeline.build
             , Artifacts.Type.LogProc
 ========
             , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonAutomode
             , Artifacts.Type.DaemonConfig
             , Artifacts.Type.DaemonPrefork
             , Artifacts.Type.LogProc

@@ -90,6 +90,7 @@ let is_dirty_proof = function
       ; coinbase_amount = None
       ; supercharged_coinbase_factor = None
       ; account_creation_fee = None
+      ; _
       } ->
       false
   | _ ->
@@ -166,12 +167,12 @@ let load_config_exn config_file =
 
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
-    ~pad_app_state ~hardfork_slot ~prefork_genesis_config () =
+    ~pad_app_state ~prefork_genesis_config () =
   let hardfork_slot =
-    match (hardfork_slot, prefork_genesis_config) with
-    | None, None ->
+    match prefork_genesis_config with
+    | None ->
         None
-    | Some hardfork_slot, Some prefork_genesis_config ->
+    | Some prefork_genesis_config -> (
         let runtime_config =
           Yojson.Safe.from_file prefork_genesis_config
           |> Runtime_config.of_yojson |> Result.ok_or_failwith
@@ -183,17 +184,28 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           Mina_numbers.Global_slot_since_genesis.of_int
             global_slot_since_genesis
         in
-        Option.some
-        @@ Mina_numbers.Global_slot_since_hard_fork.to_global_slot_since_genesis
-             ~current_genesis_global_slot hardfork_slot
-    | Some _, None ->
-        failwith
-          "hardfork slot is present but no prefork genesis config is provided"
-    | None, Some _ ->
-        [%log info]
-          "prefork genesis config is provided with no hardfork slot provided, \
-           ignoring" ;
-        None
+        match
+          Runtime_config.scheduled_hard_fork_genesis_slot runtime_config
+        with
+        | None ->
+            [%log info]
+              "prefork genesis config does not contain slot_chain_end and \
+               hard_fork_genesis_slot_delta, skipping vesting parameter update" ;
+            None
+        | Some hardfork_slot_since_hf ->
+            let slot =
+              Mina_numbers.Global_slot_since_hard_fork
+              .to_global_slot_since_genesis ~current_genesis_global_slot
+                hardfork_slot_since_hf
+            in
+            [%log info]
+              "Computed hardfork slot since genesis from prefork config: $slot"
+              ~metadata:
+                [ ( "slot"
+                  , `String
+                      (Mina_numbers.Global_slot_since_genesis.to_string slot) )
+                ] ;
+            Some slot )
   in
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
@@ -260,21 +272,14 @@ let () =
              ~doc:
                "BOOL whether to pad app_state to max allowed size (default: \
                 false)"
-         and hardfork_slot =
-           flag "--hardfork-slot"
-             (optional Cli_lib.Arg_type.hardfork_slot)
-             ~doc:
-               "INT the scheduled hardfork slot since last hardfork at which \
-                vesting parameter update should happen. If absent, don't \
-                update the vesting parameters"
          and prefork_genesis_config =
            flag "--prefork-genesis-config" (optional string)
              ~doc:
-               "STRING path to prefork genesis confg, should be present if \
-                `--hardfork-slot` is set, the program would read the genesis \
-                timestamps in the config to calculate the proper hardfork \
-                slot."
+               "STRING path to prefork genesis config. The hardfork slot for \
+                vesting parameter updates is computed from \
+                daemon.slot_chain_end + daemon.hard_fork_genesis_slot_delta in \
+                this config. If those fields are absent, no vesting parameter \
+                update is performed."
          in
          main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
-           ~ignore_missing_fields ~pad_app_state ~hardfork_slot
-           ~prefork_genesis_config) )
+           ~ignore_missing_fields ~pad_app_state ~prefork_genesis_config) )

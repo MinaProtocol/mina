@@ -281,6 +281,7 @@ func main() {
 		repo              = flag.String("repo", "Nightly", "REPO environment variable")
 		precomputedPrefix = flag.String("precomputed-prefix", "", "PRECOMPUTED_FORK_BLOCK_PREFIX environment variable")
 		useArtifactsFrom  = flag.String("use-artifacts-from", "", "USE_ARTIFACTS_FROM_BUILDKITE_BUILD environment variable")
+		codenamesConfig   = flag.String("codenames-config", "", "CODENAMES_CONFIG environment variable (e.g. Noble_Amd64,Bullseye_Amd64). Defaults to <codename>_Amd64")
 		ledgerBucket      = flag.String("ledger-bucket", "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net", "MINA_LEDGER_S3_BUCKET environment variable")
 		monitor           = flag.Bool("monitor", false, "Monitor build progress in real-time")
 		pollInterval      = flag.Int("poll-interval", 10, "Polling interval in seconds")
@@ -319,29 +320,46 @@ func main() {
 		fmt.Printf("Using config URL: %s\n\n", resolvedConfigURL)
 	}
 
-	// Prepare environment variables
-	env := map[string]string{
-		"CODENAMES":             *codename,
-		"NETWORK":               *network,
-		"REPO":                  *repo,
-		"GIT_LFS_SKIP_SMUDGE":   "1",
-		"MINA_LEDGER_S3_BUCKET": *ledgerBucket,
+	// Default CODENAMES_CONFIG to <codename>_Amd64 (per codename) if not explicitly provided
+	resolvedCodenamesConfig := *codenamesConfig
+	if resolvedCodenamesConfig == "" && *codename != "" {
+		codenameParts := strings.Split(*codename, ",")
+		var configParts []string
+		for _, part := range codenameParts {
+			trimmed := strings.TrimSpace(part)
+			if trimmed == "" {
+				continue
+			}
+			configParts = append(configParts, trimmed+"_Amd64")
+		}
+		if len(configParts) > 0 {
+			resolvedCodenamesConfig = strings.Join(configParts, ",")
+		}
 	}
 
-	if *version != "" {
-		env["VERSION"] = *version
+	// Validate required configuration URL before creating the build.
+	if resolvedConfigURL == "" {
+		fmt.Fprintf(os.Stderr, "error: CONFIG_JSON_GZ_URL (resolvedConfigURL) must be non-empty; refusing to create a build that will immediately fail\n")
+		os.Exit(1)
 	}
-	if resolvedConfigURL != "" {
-		env["CONFIG_JSON_GZ_URL"] = resolvedConfigURL
-	}
-	if *genesisTimestamp != "" {
-		env["GENESIS_TIMESTAMP"] = *genesisTimestamp
-	}
-	if *precomputedPrefix != "" {
-		env["PRECOMPUTED_FORK_BLOCK_PREFIX"] = *precomputedPrefix
-	}
-	if *useArtifactsFrom != "" {
-		env["USE_ARTIFACTS_FROM_BUILDKITE_BUILD"] = *useArtifactsFrom
+
+	// Prepare environment variables
+	// All pipeline-level env vars must be explicitly set here (even to empty)
+	// to prevent stale values from the pipeline's env: block leaking into
+	// API-created builds.
+	env := map[string]string{
+		"CODENAMES":                          *codename,
+		"CODENAMES_CONFIG":                   resolvedCodenamesConfig,
+		"NETWORK":                            *network,
+		"REPO":                               *repo,
+		"GIT_LFS_SKIP_SMUDGE":               "1",
+		"MINA_LEDGER_S3_BUCKET":             *ledgerBucket,
+		"VERSION":                            *version,
+		"CONFIG_JSON_GZ_URL":                resolvedConfigURL,
+		"GENESIS_TIMESTAMP":                 *genesisTimestamp,
+		"PRECOMPUTED_FORK_BLOCK_PREFIX":     *precomputedPrefix,
+		"USE_ARTIFACTS_FROM_BUILDKITE_BUILD": *useArtifactsFrom,
+		"USE_GENERIC_DOCKERS_FROM_VERSION":   "",
 	}
 
 	// Print configuration
