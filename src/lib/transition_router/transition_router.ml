@@ -462,7 +462,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
           Broadcast_pipe.Writer.write frontier_w (Some frontier) )
         else
           match
-            Consensus.Hooks.required_local_state_sync
+            Consensus.Hooks.required_local_state_sync ~logger
               ~constants:precomputed_values.consensus_constants
               ~consensus_state:
                 (Transition_frontier.Breadcrumb.consensus_state curr_best_tip)

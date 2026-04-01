@@ -525,7 +525,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
                , (local_state_sync_required, local_state_sync_result) ) =
         time_deferred
           ( match
-              Consensus.Hooks.required_local_state_sync
+              Consensus.Hooks.required_local_state_sync ~logger
                 ~constants:precomputed_values.consensus_constants
                 ~consensus_state ~local_state:consensus_local_state
             with

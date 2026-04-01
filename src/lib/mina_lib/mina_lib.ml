@@ -2727,7 +2727,8 @@ module Hardfork_config = struct
     | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger l
       ->
         `Genesis l
-    | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_root l ->
+    | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_root
+        { ledger = l; _ } ->
         `Root l
 
   let genesis_source_ledger_cast = function

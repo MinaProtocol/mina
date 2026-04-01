@@ -1514,7 +1514,7 @@ module AccountObj = struct
                             genesis ledger. The account was not present in the \
                             ledger." ;
                          None )
-                 | Ledger_root staking_ledger -> (
+                 | Ledger_root { ledger = staking_ledger; _ } -> (
                      let casted = Root_ledger.as_unmasked staking_ledger in
                      try
                        let index =
