@@ -239,6 +239,9 @@ in {
     cargoBuildFeatures = [ "nodejs" ];
   };
 
+  # Keep the historical package name expected by ocaml/javascript Nix code.
+  kimchi_wasm = final.plonk_wasm;
+
   # Jobs/Lint/Rust.dhall
   trace-tool = final.rustPlatform.buildRustPackage rec {
     pname = "trace-tool";
