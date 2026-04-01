@@ -29,6 +29,7 @@ type HardforkTest struct {
 // NewHardforkTest creates a new instance of the hardfork test
 func NewHardforkTest(cfg *config.Config) *HardforkTest {
 	ctx, cancel := context.WithCancel(context.Background())
+	cfg.InitDaemonInfos()
 	return &HardforkTest{
 		Config:      cfg,
 		Client:      client.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.ClientMaxRetries),
