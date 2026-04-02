@@ -55,6 +55,8 @@ let
     procps
     curl
     jq
+    gnutar
+    gzip
     cacert
     localtime
     zoneinfo
