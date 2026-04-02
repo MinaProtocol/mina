@@ -96,4 +96,5 @@ let collected_errors ~port =
 (** [stop t] kills the mock-server process. *)
 let stop t =
   let%map result = Utils.force_kill t.process in
-  Or_error.ok_exn result
+  let (_ : [> `Exited of int | `Sig_killed ]) = Or_error.ok_exn result in
+  ()
