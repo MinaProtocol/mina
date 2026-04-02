@@ -87,7 +87,7 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen = [ S.everything ]
         , path = "Promote"
-        , tags = [ PipelineTag.Type.Promote, PipelineTag.Type.TearDown ]
+        , tags = [ PipelineTag.Type.Promote ]
         , name = "AutoPromoteNightly"
         , scope = [ PipelineScope.Type.MainlineNightly ]
         }
