@@ -1,6 +1,6 @@
 { lib, dockerTools, buildEnv, ocamlPackages_mina, linkFarm, runCommand
 , dumb-init, tzdata, coreutils, findutils, bashInteractive, python3
-, libp2p_helper, procps, postgresql, curl, jq, stdenv, rsync, bash, gnutar, gzip
+, libp2p_helper, procps, postgresql, curl, jq, stdenv, rsync, bash, gnutar, gzip, cacert
 , currentTime, flockenzeit }:
 let
   created = flockenzeit.lib.ISO-8601 currentTime;
@@ -55,6 +55,7 @@ let
     procps
     curl
     jq
+    cacert
     localtime
     zoneinfo
   ];
@@ -78,7 +79,7 @@ let
         chmod 777 tmp
       '';
       config = {
-        env = [ "MINA_TIME_OFFSET=0" ];
+        env = [ "MINA_TIME_OFFSET=0" "SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt" ];
         WorkingDir = "/root";
         Entrypoint = [ "/bin/dumb-init" "/entrypoint.sh" ];
       };
