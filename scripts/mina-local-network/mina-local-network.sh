@@ -186,9 +186,8 @@ stop-node() {
 
     echo "Stopping $tag at $port"
 
-    "$MINA_EXE" client stop-daemon --daemon-port "$port"
-    if [ $? -ne 0 ]; then
-        echo "Failed to stop $tag on port $port" >&2
+    if ! "$MINA_EXE" client stop-daemon --daemon-port "$port"; then
+        echo "Failed to stop $tag on port $port, maybe it has already exited?" >&2
     fi
 }
 
