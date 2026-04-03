@@ -269,7 +269,11 @@ if [[ "$first_arg" == "--version" || "$first_arg" == "-version" ]]; then
 fi
 
 if [[ "$first_arg" == "client" ]]; then
-  # client subcommand always uses mesa runtime
+  # HACK: 'client' subcommands (e.g. 'mina client status') are always routed to
+  # the mesa binary. This works only because the GraphQL schema exposed by the
+  # daemon did not change between berkeley and mesa. If a future hard fork
+  # changes the GraphQL schema, client commands must be dispatched to the
+  # correct runtime binary instead of unconditionally using mesa.
   runtime="mesa"
   bin="${RUNTIMES_BASE_PATH}/${runtime}/${cmd}"
   if [[ "${MINA_DISPATCHER_DRYRUN:-0}" -ne 0 ]]; then
