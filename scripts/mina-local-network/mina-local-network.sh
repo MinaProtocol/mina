@@ -260,6 +260,8 @@ on-exit() {
       echo "Unknown ON_EXIT value: $1" >&2
       return 1 ;;
   esac
+
+  echo "Completed shutdown phase of mina local network"
 }
 
 trap on-exit TERM INT
