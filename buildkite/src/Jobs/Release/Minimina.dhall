@@ -19,8 +19,7 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.contains "src/app/minimina"
-          , S.strictlyStart
-              (S.contains "buildkite/src/Jobs/Release/Minimina")
+          , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/Minimina")
           ]
         , path = "Release"
         , name = "Minimina"

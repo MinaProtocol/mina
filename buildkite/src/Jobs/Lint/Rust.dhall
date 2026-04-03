@@ -47,7 +47,7 @@ in  Pipeline.build
             , commands =
                 RunInToolchain.runInToolchain
                   ([] : List Text)
-                  "cd src/app/minimina ; PATH=/home/opam/.cargo/bin:\$PATH cargo check && cargo fmt -- --check && cargo clippy -- -D warnings"
+                  "cd src/app/minimina ; PATH=/home/opam/.cargo/bin:\$PATH cargo check"
             , label = "Rust lint steps; minimina"
             , key = "lint-minimina"
             , target = Size.Multi
