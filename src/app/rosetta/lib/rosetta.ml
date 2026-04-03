@@ -38,33 +38,35 @@ let router ~signature_kind ~graphql_uri ~minimum_user_command_fee
       | `App _ as x ->
           x )
   in
-  try
-    match route with
-    | "network" :: tl ->
-        Network.router tl body ~get_graphql_uri_or_error ~logger
-          ~with_db:with_db' ~minimum_user_command_fee
-    | "account" :: tl ->
-        let%bind graphql_uri = get_graphql_uri_or_error () in
-        Account.router tl body ~graphql_uri ~logger ~with_db
-          ~minimum_user_command_fee
-    | "mempool" :: tl when not safe_mode ->
-        let%bind graphql_uri = get_graphql_uri_or_error () in
-        Mempool.router tl body ~graphql_uri ~logger ~minimum_user_command_fee
-    | "block" :: tl ->
-        let%bind graphql_uri = get_graphql_uri_or_error () in
-        Block.router tl body ~graphql_uri ~logger ~with_db:with_db'
-          ~minimum_user_command_fee
-    | "construction" :: tl when not safe_mode ->
-        Construction.router tl body ~signature_kind ~get_graphql_uri_or_error
-          ~logger ~with_db:with_db' ~minimum_user_command_fee
-          ~account_creation_fee
-    | "search" :: tl ->
-        let%bind graphql_uri = get_graphql_uri_or_error () in
-        Search.router tl body ~graphql_uri ~logger ~with_db:with_db'
-          ~minimum_user_command_fee
-    | _ ->
-        Deferred.return (Error `Page_not_found)
-  with exn -> Deferred.return (Error (`Exception exn))
+  Monitor.try_with ~extract_exn:true (fun () ->
+      match route with
+      | "network" :: tl ->
+          Network.router tl body ~get_graphql_uri_or_error ~logger
+            ~with_db:with_db' ~minimum_user_command_fee
+      | "account" :: tl ->
+          let%bind graphql_uri = get_graphql_uri_or_error () in
+          Account.router tl body ~graphql_uri ~logger ~with_db
+            ~minimum_user_command_fee
+      | "mempool" :: tl when not safe_mode ->
+          let%bind graphql_uri = get_graphql_uri_or_error () in
+          Mempool.router tl body ~graphql_uri ~logger ~minimum_user_command_fee
+      | "block" :: tl ->
+          let%bind graphql_uri = get_graphql_uri_or_error () in
+          Block.router tl body ~graphql_uri ~logger ~with_db:with_db'
+            ~minimum_user_command_fee
+      | "construction" :: tl when not safe_mode ->
+          Construction.router tl body ~signature_kind ~get_graphql_uri_or_error
+            ~logger ~with_db:with_db' ~minimum_user_command_fee
+            ~account_creation_fee
+      | "search" :: tl ->
+          let%bind graphql_uri = get_graphql_uri_or_error () in
+          Search.router tl body ~graphql_uri ~logger ~with_db:with_db'
+            ~minimum_user_command_fee
+      | _ ->
+          Deferred.return (Error `Page_not_found) )
+  |> Deferred.map ~f:(function
+       | Ok x -> x
+       | Error exn -> Error (`Exception exn) )
 
 let pg_log_data ~logger ~pool : unit Deferred.t =
   match%bind Lazy.force pool with
