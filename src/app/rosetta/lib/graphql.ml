@@ -48,17 +48,26 @@ let query ~minimum_user_command_fee query_obj uri =
     Cohttp_async.Body.to_string body |> Deferred.map ~f:Result.return
   in
   let%bind body_json =
+    Deferred.return
+    @@
     match
       Cohttp.Code.code_of_status (Cohttp_async.Response.status response)
     with
-    | 200 ->
-        Deferred.return (Ok (Yojson.Basic.from_string body_str))
+    | 200 -> (
+        try
+          let parsed = Yojson.Basic.from_string body_str in
+          Ok parsed
+        with _ ->
+          Error
+            (Errors.create
+               ~context:"Can't parse mina daemon's GraphQL response as json"
+               (`Graphql_mina_query
+                 (Printf.sprintf "Can't parse as json: %s" body_str) ) ) )
     | code ->
-        Deferred.return
-          (Error
-             (Errors.create ~context:"Response from Mina Daemon is not a 200"
-                (`Graphql_mina_query
-                  (Printf.sprintf "Status code %d -- %s" code body_str) ) ) )
+        Error
+          (Errors.create ~context:"Response from Mina Daemon is not a 200"
+             (`Graphql_mina_query
+               (Printf.sprintf "Status code %d -- %s" code body_str) ) )
   in
   let open Yojson.Basic.Util in
   ( match (member "errors" body_json, member "data" body_json) with
