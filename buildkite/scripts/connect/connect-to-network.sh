@@ -146,29 +146,10 @@ mina client stop-daemon
 wait "$DAEMON_PID"
 
 # --- Step 3: Convert RocksDB to legacy format ---
-# Discover scanner paths dynamically since the mina version in the path changes with each build
-CURRENT_SCANNER=$(find /usr/lib/mina/storage/10.5.2 -name mina-rocksdb-scanner -type f | head -1)
-STABLE_SCANNER=$(find /usr/lib/mina/storage/5.7.12 -name mina-rocksdb-scanner -type f | head -1)
-
-if [[ -z "$CURRENT_SCANNER" ]]; then
-    echo "Error: Could not find current rocksdb scanner under /usr/lib/mina/storage/10.5.2/"
-    ls -laR /usr/lib/mina/storage/ || true
-    exit 1
-fi
-
-if [[ -z "$STABLE_SCANNER" ]]; then
-    echo "Error: Could not find stable rocksdb scanner under /usr/lib/mina/storage/5.7.12/"
-    ls -laR /usr/lib/mina/storage/ || true
-    exit 1
-fi
-
-echo "Using current scanner: $CURRENT_SCANNER"
-echo "Using stable scanner: $STABLE_SCANNER"
-
 mina-storage-converter \
     --node-dir /home/opam/.mina-config \
-    --current-scanner "$CURRENT_SCANNER" \
-    --stable-scanner "$STABLE_SCANNER" \
+    --current-scanner /usr/lib/mina/storage/10.5.2/3.3.0/mina-rocksdb-scanner \
+    --stable-scanner /usr/lib/mina/storage/5.7.12/3.3.0/mina-rocksdb-scanner \
     --yes --verbose
 
 if [[ "$MINA_DEBIAN_NETWORK" == "mainnet" ]]; then
