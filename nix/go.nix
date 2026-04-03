@@ -24,9 +24,7 @@ let
         Then, run [37;1m./nix/update-go-hashes.sh ${name} [35;1m"<got hash here>"[31;0m
       '' final.lib.fakeHash;
 
-in
-
-final: prev: {
+in final: prev: {
   vend = final.callPackage ./vend { };
 
   go-capnproto2 = final.buildGo119Module rec {
@@ -104,7 +102,7 @@ final: prev: {
     };
     vendorHash = "sha256-lCBAsCNtorEu0WRZRLEMEaNyjtVIdJSAZg3icrpHIsQ=";
   };
-  
+
   # Hardfork test application
   hardfork_test = final.buildGoModule {
     pname = "hardfork_test";

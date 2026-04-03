@@ -129,7 +129,9 @@ let
   info = dune-nix.info duneDescLoaded;
   allDeps = dune-nix.allDeps info;
   commonOverrides = {
-    DUNE_PROFILE = "dev";
+    # It breaks execution of tests in nix, but allows building dockers
+    # In future it will be removed, once we get rid of reliance on DUNE_PROFILE
+    DUNE_PROFILE = "devnet";
     buildInputs = [ base-libs ] ++ external-libs;
     nativeBuildInputs = [ ];
   };
