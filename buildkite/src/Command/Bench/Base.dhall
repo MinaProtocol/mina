@@ -112,7 +112,6 @@ let pipeline
               , PipelineTag.Type.Test
               , PipelineTag.Type.Stable
               ]
-            , scope = spec.scope
             }
           , steps = [ command spec ]
           }
