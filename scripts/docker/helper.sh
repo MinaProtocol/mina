@@ -5,7 +5,7 @@ set -eox pipefail
 source "$(dirname "$0")/../export-git-env-vars.sh"
 
 # Array of valid service names
-export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-legacy-hardfork' 'mina-daemon-auto-hardfork' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'leaderboard' 'delegation-backend' 'mina-delegation-verifier' 'delegation-backend-toolchain')
+export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-generic' 'mina-daemon-configured' 'mina-daemon-legacy-hardfork' 'mina-daemon-auto-hardfork' 'mina-rosetta' 'mina-rosetta-generic' 'mina-rosetta-configured' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'leaderboard' 'delegation-backend' 'mina-delegation-verifier' 'delegation-backend-toolchain')
 
 function export_base_image () {
     # Determine the proper image for ubuntu or debian
@@ -25,7 +25,7 @@ function export_base_image () {
 
 function export_version () {
     case "${SERVICE}" in
-        mina-daemon|mina-archive|mina-batch-txn|mina-rosetta|mina-daemon-legacy-hardfork|mina-daemon-auto-hardfork) export VERSION="${VERSION}-${NETWORK##*=}" ;;
+        mina-daemon|mina-archive|mina-batch-txn|mina-rosetta|mina-daemon-auto-hardfork) export VERSION="${VERSION}-${NETWORK##*=}" ;;
         *)  ;;
 esac
 }
@@ -75,6 +75,8 @@ function export_suffixes () {
     local __build_flags="${DEB_BUILD_FLAGS:-}"
     if [[ "$__build_flags" == "none" ]]; then
         __build_flags=""
+    else
+        __build_flags="-${__build_flags}"
     fi
     export BUILD_FLAGS_SUFFIX_ARG="--build-arg build_flags_suffix=${__build_flags}"
 }
@@ -106,13 +108,17 @@ function export_docker_tag() {
     check_docker_registry
     export DOCKER_REGISTRY="${DOCKER_REGISTRY}"
 
+    CUSTOM_SUFFIX_ARG=""
     if [[ -z "${CUSTOM_SUFFIX:-}" ]]; then
         CUSTOM_SUFFIX=""
     else
         CUSTOM_SUFFIX="-${CUSTOM_SUFFIX}"
+        CUSTOM_SUFFIX_ARG="--build-arg custom_suffix=${CUSTOM_SUFFIX}"
     fi
 
+
     PLATFORM_SUFFIX="$(get_platform_suffix)"
+    export CUSTOM_SUFFIX_ARG
     export TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}${COMBINED_SUFFIX}${PLATFORM_SUFFIX}${CUSTOM_SUFFIX}"
     export PLATFORM_SUFFIX
     export HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${COMBINED_SUFFIX}${PLATFORM_SUFFIX}${CUSTOM_SUFFIX}"

@@ -461,7 +461,9 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
         let () =
           match e with
           | `Unexpected_termination ->
-              [%log error] "verifier terminated unexpectedly"
+              [%log error]
+                "verifier terminated unexpectedly; the verifier process will \
+                 be restarted automatically"
                 ~metadata:[ ("verifier_pid", `Int (Pid.to_int pid)) ] ;
               Ivar.fill_if_empty create_worker_trigger ()
           | `Wait_threw_an_exception _ -> (

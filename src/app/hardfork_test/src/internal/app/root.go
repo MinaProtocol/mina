@@ -85,11 +85,12 @@ func init() {
 	rootCmd.Flags().IntVar(&cfg.ForkEarliestBlockMaxRetries, "fork-earliest-block-max-retries", cfg.ForkEarliestBlockMaxRetries, "Maximum number of retries to wait for earliest block in fork network")
 	rootCmd.Flags().IntVar(&cfg.HTTPClientTimeoutSeconds, "http-timeout", cfg.HTTPClientTimeoutSeconds, "HTTP client timeout in seconds for GraphQL requests")
 	rootCmd.Flags().IntVar(&cfg.ClientMaxRetries, "client-max-retries", cfg.ClientMaxRetries, "Maximum number of retries for client requests")
-	rootCmd.Flags().Var(&cfg.ForkMethod, "fork-method", "The implementation of fork")
 
-	// Mark required flags
+	rootCmd.Flags().Var(&cfg.ForkMethods, "allow-fork-method", "Implementation of fork to use")
+
 	rootCmd.MarkFlagRequired("main-mina-exe")
 	rootCmd.MarkFlagRequired("main-runtime-genesis-ledger")
 	rootCmd.MarkFlagRequired("fork-mina-exe")
 	rootCmd.MarkFlagRequired("fork-runtime-genesis-ledger")
+	rootCmd.MarkFlagRequired("allow-fork-method")
 }

@@ -13,6 +13,6 @@ in  MinaArtifactToolchain.pipeline
       , service = Artifacts.Type.Toolchain
       , deb_codename = DebianVersions.DebVersion.Bookworm
       , no_cache = True
-      , no_debian = True
+      , deb_install_mode = DockerImage.DebianInstallMode.NoInstall
       , size = Size.XLarge
       }

@@ -95,6 +95,8 @@
 (package (name mina_disk_caching_stats))
 (package (name mina_generators))
 (package (name mina_graphql))
+(package (name mina_graphql_client))
+(package (name mina_graphql_client_app))
 (package (name mina_incremental))
 (package (name mina_intf))
 (package (name mina_ledger))
