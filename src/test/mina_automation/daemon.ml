@@ -23,12 +23,6 @@ let path () =
           "Could not find released mina daemon environment. App is not \
            executable outside the dune" )
 
-let default_init_log_filters =
-  [ Structured_log_events.string_of_id
-      Transition_router
-      .starting_transition_frontier_controller_structured_events_id
-  ]
-
 (** 
   Module [Client] provides functions to interact with a Mina daemon.
 *)
@@ -49,6 +43,46 @@ module Client = struct
         ()
     in
     ()
+
+  (** [daemon_status t] retrieves the status of the daemon running on the specified port.
+    It executes the command `client status -daemon-port <port>` using the provided executor.
+    
+    @param t The daemon instance containing the executor and port information.
+    @return The result of the executor run, which may be ignored if the command fails.
+  *)
+  let daemon_status t =
+    Executor.run t.executor
+      ~args:[ "client"; "status"; "-daemon-port"; string_of_int t.port ]
+      ~ignore_failure:true ()
+
+  (** [wait_for_bootstrap t ?client_delay ?retry_delay ?retry_attempts ()] waits for the daemon to bootstrap.
+    @param t The daemon instance containing the executor and port information.
+    @param client_delay The delay before connecting to the daemon.
+    @param retry_delay The delay between retries.
+    @param retry_attempts The number of retries.
+    @return A deferred result indicating the success or failure of the operation. 
+  *)
+  let wait_for_bootstrap t ?(client_delay = 60.) ?(retry_delay = 60.)
+      ?(retry_attempts = 40) () =
+    Async.printf "Waiting initial %d s. before connecting\n"
+      (int_of_float client_delay) ;
+    let%bind _ =
+      Deferred.map (after @@ Time.Span.of_sec client_delay) ~f:Or_error.return
+    in
+    let rec go retries_remaining =
+      let%bind output = daemon_status t in
+      Async.printf "%s" output ;
+      if String.is_substring output ~substring:"Synced" then
+        Deferred.Or_error.ok_unit
+      else if retries_remaining > 0 then (
+        Async.printf "Daemon not responding.. retrying (%i/%i)\n"
+          (retry_attempts - retries_remaining)
+          retry_attempts ;
+        let%bind () = after @@ Time.Span.of_sec retry_delay in
+        go (retries_remaining - 1) )
+      else Deferred.Or_error.error_string output
+    in
+    go retry_attempts
 
   let ledger_hash t ~ledger_file =
     Executor.run t.executor
@@ -176,52 +210,6 @@ module Process = struct
   let force_kill t = Utils.force_kill t.process
 end
 
-let expected_init_event_id =
-  Structured_log_events.string_of_id
-    Transition_router
-    .starting_transition_frontier_controller_structured_events_id
-
-let entry_has_event_id ~event_id entry =
-  match Yojson.Safe.from_string entry with
-  | json -> (
-      match Yojson.Safe.Util.member "event_id" json with
-      | `String id ->
-          String.equal id event_id
-      | _ ->
-          false )
-  | exception _ ->
-      false
-
-let wait_for_node_init ?(initial_delay_sec = 2.) ?(poll_interval_sec = 5.)
-    ?(timeout_sec = 600.) (process : Process.t) =
-  let node_uri =
-    Uri.make ~scheme:"http" ~host:"localhost" ~port:process.config.rest_port
-      ~path:"/graphql" ()
-  in
-  Async.printf "Waiting initial %.0f s. before polling GraphQL for node init\n"
-    initial_delay_sec ;
-  Mina_graphql_client.Client.poll_filtered_log_entries ~initial_delay_sec
-    ~poll_interval_sec ~timeout_sec
-    ~on_entries:(fun entries ->
-      if
-        Array.exists entries
-          ~f:(entry_has_event_id ~event_id:expected_init_event_id)
-      then (
-        Async.printf "Node initialization detected via GraphQL\n" ;
-        Deferred.return `Stop )
-      else (
-        if Array.length entries > 0 then
-          Async.printf
-            "Received %d log entries but none matched expected init event, \
-             continuing...\n"
-            (Array.length entries) ;
-        Deferred.return `Continue ) )
-    ~on_error:(fun e ->
-      Async.printf "GraphQL not ready (%s), retrying...\n"
-        (Error.to_string_hum e) ;
-      Deferred.return `Continue )
-    node_uri
-
 let archive_blocks t ~archive_address ~format blocks =
   let format_arg =
     match format with
@@ -303,10 +291,6 @@ let start ?hardfork_handling ?block_producer_key ?config_files ?env
     | Some files ->
         List.concat_map files ~f:(fun f -> [ "--config-file"; f ])
   in
-  let start_filtered_log_args =
-    List.concat_map start_filtered_logs ~f:(fun f ->
-        [ "--start-filtered-logs"; f ] )
-  in
   let args =
     base_args
     @ opt_arg "--hardfork-handling" hardfork_handling
@@ -316,7 +300,6 @@ let start ?hardfork_handling ?block_producer_key ?config_files ?env
     @ bool_flag "--simplified-node-stats" simplified_node_stats
     @ config_file_args
     @ opt_arg "--peer-list-url" peer_list_url
-    @ start_filtered_log_args
   in
   [%log debug] "Starting daemon" ;
 
