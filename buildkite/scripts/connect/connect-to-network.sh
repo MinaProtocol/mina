@@ -7,7 +7,7 @@ MINA_DEBIAN_NETWORK=""
 NETWORK_NAME=""
 WAIT_BETWEEN_POLLING_GRAPHQL=""
 SYNC_TIMEOUT=""
-STABLE_VERSION="3.3.0*"
+STABLE_VERSION="3.3.0"
 
 usage() {
     cat << EOF
@@ -146,18 +146,17 @@ mina client stop-daemon
 wait "$DAEMON_PID"
 
 # --- Step 3: Convert RocksDB to legacy format ---
-LEGACY_MINA_VERSION="3.3.0"
 
 mina-storage-converter \
     --node-dir /home/opam/.mina-config \
     --current-scanner /usr/lib/mina/storage/10.5.2/${GITTAG}/mina-rocksdb-scanner \
-    --stable-scanner /usr/lib/mina/storage/5.7.12/${LEGACY_MINA_VERSION}/mina-rocksdb-scanner \
+    --stable-scanner /usr/lib/mina/storage/5.7.12/${STABLE_VERSION}/mina-rocksdb-scanner \
     --yes --verbose
 
 if [[ "$MINA_DEBIAN_NETWORK" == "mainnet" ]]; then
-    source buildkite/scripts/debian/install_official.sh --package "mina-mainnet" --channel stable --version "$STABLE_VERSION"
+    source buildkite/scripts/debian/install_official.sh --package "mina-mainnet" --channel stable --version "$STABLE_VERSION*"
 else
-    source buildkite/scripts/debian/install_official.sh --package "mina-${MINA_DEBIAN_NETWORK}" --version "$STABLE_VERSION"
+    source buildkite/scripts/debian/install_official.sh --package "mina-${MINA_DEBIAN_NETWORK}" --version "$STABLE_VERSION*"
 fi
 
 # --- Step 4: Test with legacy mina ---
