@@ -10,23 +10,44 @@ let RunInToolchain = ./RunInToolchain.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
-in  { step =
-            \(dependsOn : List Command.TaggedKey.Type)
-        ->  \(mina_suffix : Text)
-        ->  \(testnet : Text)
-        ->  \(wait_between_graphql_poll : Text)
-        ->  \(sync_timeout : Text)
-        ->  \(soft_fail : B/SoftFail)
+let Spec =
+      { Type =
+          { dependsOn : List Command.TaggedKey.Type
+          , mina_suffix : Text
+          , testnet : Text
+          , wait_between_graphql_poll : Text
+          , sync_timeout : Text
+          , soft_fail : B/SoftFail
+          , peer_list_url : Optional Text
+          }
+      , default =
+          { wait_between_graphql_poll = "40s"
+          , sync_timeout = "25min"
+          , soft_fail = B/SoftFail.Boolean False
+          , peer_list_url = None Text
+          }
+      }
+
+let peer_list_url_flag =
+          \(peer_list_url : Optional Text)
+      ->  merge
+            { Some = \(url : Text) -> " --peer-list-url ${url}", None = "" }
+            peer_list_url
+
+in  { Spec = Spec
+    , step =
+            \(spec : Spec.Type)
         ->  Command.build
               Command.Config::{
               , commands =
                   RunInToolchain.runInToolchain
                     DebianVersions.overrideEnvs
-                    "./buildkite/scripts/connect/connect-to-network.sh --mina-debian-network ${mina_suffix} --network-name ${testnet} --wait-between-polling ${wait_between_graphql_poll} --sync-timeout ${sync_timeout} "
-              , label = "Connect to ${testnet}"
-              , soft_fail = Some soft_fail
-              , key = "connect-to-${testnet}"
+                    "./buildkite/scripts/connect/connect-to-network.sh --mina-debian-network ${spec.mina_suffix} --network-name ${spec.testnet} --wait-between-polling ${spec.wait_between_graphql_poll} --sync-timeout ${spec.sync_timeout}${peer_list_url_flag
+                                                                                                                                                                                                                                                spec.peer_list_url}"
+              , label = "Connect to ${spec.testnet}"
+              , soft_fail = Some spec.soft_fail
+              , key = "connect-to-${spec.testnet}"
               , target = Size.Large
-              , depends_on = dependsOn
+              , depends_on = spec.dependsOn
               }
     }

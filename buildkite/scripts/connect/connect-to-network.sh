@@ -108,7 +108,7 @@ start_daemon_and_wait_for_sync() {
     DAEMON_PID="$!"
 
     local deadline
-    deadline=$(date -d "+ $SYNC_TIMEOUT" +%s)
+    deadline=$(date -d "+$SYNC_TIMEOUT" +%s)
 
     local sync_status=""
     while [ "$(date +%s)" -lt $deadline ]; do
