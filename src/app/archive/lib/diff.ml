@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 module Breadcrumb = Transition_frontier.Breadcrumb
 
@@ -53,7 +53,7 @@ module Builder = struct
     let sender_receipt_chains_from_parent_ledger =
       let senders =
         commands
-        |> List.map ~f:(fun { data; _ } ->
+        |> List.map ~f:(fun { With_status.data; _ } ->
                User_command.(fee_payer (forget_check data)) )
         |> Account_id.Set.of_list
       in

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* Applicative validation -- like https://hackage.haskell.org/package/validation-1.1/docs/Data-Validation.html   *)
 module T = struct

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Field = Snark_params.Tick.Field
 
 module Make (Schema : Graphql_intf.Schema) = struct

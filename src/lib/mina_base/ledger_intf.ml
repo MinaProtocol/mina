@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 type account_state = [ `Added | `Existed ] [@@deriving equal]
 

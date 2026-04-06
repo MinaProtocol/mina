@@ -70,7 +70,7 @@ let validate_protocol_versions ~logger ~trust_system ~rpc_name ~sender headers =
         (`Invalid_current_version, x) )
     @ List.map invalid_next_versions ~f:(fun x -> (`Invalid_next_version, x))
     @ List.map current_version_mismatches ~f:(fun x ->
-          (`Current_version_mismatch, x) )
+        (`Current_version_mismatch, x) )
   in
   let%map () =
     (* NB: these errors aren't always accurate... sometimes we are calling this when we were
@@ -197,7 +197,7 @@ module Get_some_initial_peers = struct
   let handle_request (module Context : CONTEXT) ~version:_ _request =
     Context.list_peers ()
 
-  let rate_limit_budget = (1, `Per Time.Span.minute)
+  let rate_limit_budget = (1, `Per Time_float.Span.minute)
 
   let rate_limit_cost = Fn.const 1
 end]
@@ -304,7 +304,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
           record_envelope_sender trust_system logger
             (Envelope.Incoming.sender request)
             Actions.
-              (Requested_unknown_item, Some (receipt_trust_action_message hash)))
+              (Requested_unknown_item, Some (receipt_trust_action_message hash)) )
         >>| const None
     | Some (scan_state, expected_merkle_root, pending_coinbases, protocol_states)
       ->
@@ -315,7 +315,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
              , pending_coinbases
              , protocol_states ) )
 
-  let rate_limit_budget = (4, `Per Time.Span.minute)
+  let rate_limit_budget = (4, `Per Time_float.Span.minute)
 
   let rate_limit_cost = Fn.const 1
 end]
@@ -485,11 +485,11 @@ module Answer_sync_ledger_query = struct
                             Mina_ledger.Ledger.Addr.to_yojson
                             (Envelope.Incoming.data query) )
                       ; ("error", Error_json.error_to_yojson err)
-                      ] ) ))
+                      ] ) ) )
     in
     result
 
-  let rate_limit_budget = (Int.pow 2 17, `Per Time.Span.minute)
+  let rate_limit_budget = (Int.pow 2 17, `Per Time_float.Span.minute)
 
   let rate_limit_cost = Fn.const 1
 end]
@@ -541,9 +541,9 @@ module Get_transition_chain = struct
 
       let callee_model_of_query = Fn.id
 
-      let response_of_callee_model = ident
+      let response_of_callee_model = Fn.id
 
-      let caller_model_of_response = ident
+      let caller_model_of_response = Fn.id
     end
 
     module T' =
@@ -591,11 +591,11 @@ module Get_transition_chain = struct
               (Envelope.Incoming.sender request)
               Actions.
                 ( Requested_unknown_item
-                , Some (receipt_trust_action_message hashes) ))
+                , Some (receipt_trust_action_message hashes) ) )
         in
         None
 
-  let rate_limit_budget = (1, `Per Time.Span.second)
+  let rate_limit_budget = (1, `Per Time_float.Span.second)
 
   let rate_limit_cost hashes = Int.max 1 (List.length hashes)
 end]
@@ -683,7 +683,7 @@ module Get_transition_knowledge = struct
     in
     return (Option.value result ~default:[])
 
-  let rate_limit_budget = (1, `Per Time.Span.minute)
+  let rate_limit_budget = (1, `Per Time_float.Span.minute)
 
   let rate_limit_cost = Fn.const 1
 end]
@@ -777,12 +777,12 @@ module Get_transition_chain_proof = struct
           record_envelope_sender trust_system logger
             (Envelope.Incoming.sender request)
             Actions.
-              (Requested_unknown_item, Some (receipt_trust_action_message hash)))
+              (Requested_unknown_item, Some (receipt_trust_action_message hash)) )
       else return ()
     in
     result
 
-  let rate_limit_budget = (3, `Per Time.Span.minute)
+  let rate_limit_budget = (3, `Per Time_float.Span.minute)
 
   let rate_limit_cost = Fn.const 1
 end]
@@ -834,9 +834,9 @@ module Get_completed_snarks = struct
 
       let callee_model_of_query = Fn.id
 
-      let response_of_callee_model = ident
+      let response_of_callee_model = Fn.id
 
-      let caller_model_of_response = ident
+      let caller_model_of_response = Fn.id
     end
 
     module T' =
@@ -871,12 +871,12 @@ module Get_completed_snarks = struct
         |> List.map
              ~f:
                Transaction_snark_work.(
-                 Fn.compose read_all_proofs_from_disk forget)
+                 Fn.compose read_all_proofs_from_disk forget )
         |> Option.some |> return
     | _, _ ->
         return None
 
-  let rate_limit_budget = (1, `Per Time.Span.minute)
+  let rate_limit_budget = (1, `Per Time_float.Span.minute)
 
   let rate_limit_cost = Fn.const 1
 end]
@@ -943,9 +943,9 @@ module Get_ancestry = struct
 
       let callee_model_of_query = Fn.id
 
-      let response_of_callee_model = ident
+      let response_of_callee_model = Fn.id
 
-      let caller_model_of_response = ident
+      let caller_model_of_response = Fn.id
     end
 
     module T' =
@@ -976,7 +976,7 @@ module Get_ancestry = struct
       let%bind.Option frontier = get_transition_frontier () in
       consensus_state_with_hash
       |> With_hash.map_hash ~f:(fun state_hash ->
-             { State_hash.State_hashes.state_hash; state_body_hash = None } )
+          { State_hash.State_hashes.state_hash; state_body_hash = None } )
       |> Sync_handler.Root.prove ~context:(module Context) ~frontier
     in
     match result with
@@ -988,7 +988,7 @@ module Get_ancestry = struct
               Actions.
                 ( Requested_unknown_item
                 , Some (receipt_trust_action_message consensus_state_with_hash)
-                ))
+                ) )
         in
         None
     | Some { proof = chain, base_block; data = block } ->
@@ -1006,7 +1006,7 @@ module Get_ancestry = struct
           ; data = Mina_block.read_all_proofs_from_disk block
           }
 
-  let rate_limit_budget = (5, `Per Time.Span.minute)
+  let rate_limit_budget = (5, `Per Time_float.Span.minute)
 
   let rate_limit_cost = Fn.const 1
 end]
@@ -1020,7 +1020,7 @@ module Ban_notify = struct
 
     module T = struct
       (* banned until this time *)
-      type query = Core.Time.t [@@deriving sexp]
+      type query = Time_float_unix.t [@@deriving sexp]
 
       type response = unit
     end
@@ -1049,9 +1049,19 @@ module Ban_notify = struct
     include Master
   end)
 
+  open struct
+    module Time_float_unix_Stable = struct
+      module V1 = struct
+        include Time_float_unix.Stable.V1
+
+        let __versioned__ = ()
+      end
+    end
+  end
+
   module V1 = struct
     module T = struct
-      type query = Core.Time.Stable.V1.t [@@deriving sexp]
+      type query = Time_float_unix_Stable.V1.t [@@deriving sexp]
 
       type response = unit
 
@@ -1083,14 +1093,15 @@ module Ban_notify = struct
       ~metadata:
         [ ("peer", Peer.to_yojson sender)
         ; ( "ban_until"
-          , `String (Time.to_string_abs ~zone:Time.Zone.utc ban_until) )
+          , `String
+              (Time_float.to_string_abs ~zone:Time_float.Zone.utc ban_until) )
         ]
 
   let response_is_successful = Fn.const true
 
   let handle_request _ctx ~version:_ _request = Deferred.unit
 
-  let rate_limit_budget = (1, `Per Time.Span.minute)
+  let rate_limit_budget = (1, `Per Time_float.Span.minute)
 
   let rate_limit_cost = Fn.const 1
 end]
@@ -1150,9 +1161,9 @@ module Get_best_tip = struct
 
       let callee_model_of_query = Fn.id
 
-      let response_of_callee_model = ident
+      let response_of_callee_model = Fn.id
 
-      let caller_model_of_response = ident
+      let caller_model_of_response = Fn.id
     end
 
     module T' =
@@ -1189,7 +1200,7 @@ module Get_best_tip = struct
             record_envelope_sender trust_system logger
               (Envelope.Incoming.sender request)
               Actions.
-                (Requested_unknown_item, Some (receipt_trust_action_message ())))
+                (Requested_unknown_item, Some (receipt_trust_action_message ())) )
         in
         None
     | Some { data = data_block; proof = chain, proof_block } ->
@@ -1213,33 +1224,33 @@ module Get_best_tip = struct
           ; proof = (chain, Mina_block.read_all_proofs_from_disk proof_block)
           }
 
-  let rate_limit_budget = (3, `Per Time.Span.minute)
+  let rate_limit_budget = (3, `Per Time_float.Span.minute)
 
   let rate_limit_cost = Fn.const 1
 end]
 
 type ('query, 'response) rpc =
-  | Get_some_initial_peers
-      : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
-  | Get_staged_ledger_aux_and_pending_coinbases_at_hash
-      : ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
-        , Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
-        rpc
-  | Answer_sync_ledger_query
-      : (Answer_sync_ledger_query.query, Answer_sync_ledger_query.response) rpc
-  | Get_transition_chain
-      : (Get_transition_chain.query, Get_transition_chain.response) rpc
-  | Get_transition_knowledge
-      : (Get_transition_knowledge.query, Get_transition_knowledge.response) rpc
-  | Get_transition_chain_proof
-      : ( Get_transition_chain_proof.query
-        , Get_transition_chain_proof.response )
-        rpc
+  | Get_some_initial_peers :
+      (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
+  | Get_staged_ledger_aux_and_pending_coinbases_at_hash :
+      ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
+      , Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
+      rpc
+  | Answer_sync_ledger_query :
+      (Answer_sync_ledger_query.query, Answer_sync_ledger_query.response) rpc
+  | Get_transition_chain :
+      (Get_transition_chain.query, Get_transition_chain.response) rpc
+  | Get_transition_knowledge :
+      (Get_transition_knowledge.query, Get_transition_knowledge.response) rpc
+  | Get_transition_chain_proof :
+      ( Get_transition_chain_proof.query
+      , Get_transition_chain_proof.response )
+      rpc
   | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
   | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
   | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-  | Get_completed_snarks
-      : (Get_completed_snarks.query, Get_completed_snarks.response) rpc
+  | Get_completed_snarks :
+      (Get_completed_snarks.query, Get_completed_snarks.response) rpc
 
 type any_rpc = Rpc : ('q, 'r) rpc -> any_rpc
 
@@ -1256,8 +1267,8 @@ let all_rpcs =
   ; Rpc Get_completed_snarks
   ]
 
-let implementation :
-    type q r. (q, r) rpc -> (ctx, q, r) Gossip_net.rpc_implementation = function
+let implementation : type q r.
+    (q, r) rpc -> (ctx, q, r) Gossip_net.rpc_implementation = function
   | Get_some_initial_peers ->
       (module Get_some_initial_peers)
   | Get_staged_ledger_aux_and_pending_coinbases_at_hash ->

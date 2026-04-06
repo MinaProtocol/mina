@@ -1,6 +1,6 @@
 (* This is partial work to be combined into a Snark_work_lib.Result.Combined.t *)
 
-open Core_kernel
+open Core
 
 type half = [ `First | `Second ] [@@deriving equal]
 

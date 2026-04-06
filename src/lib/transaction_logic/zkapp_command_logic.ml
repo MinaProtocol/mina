@@ -1,6 +1,6 @@
 (* zkapp_command_logic.ml *)
 
-open Core_kernel
+open Core
 open Mina_base
 
 module type Iffable = sig
@@ -188,7 +188,7 @@ module type Valid_while_precondition_intf = sig
 end
 
 module Local_state = struct
-  open Core_kernel
+  open Core
 
   [%%versioned
   module Stable = struct
@@ -967,7 +967,7 @@ module type Inputs_intf = sig
 end
 
 module Start_data = struct
-  open Core_kernel
+  open Core
 
   [%%versioned
   module Stable = struct

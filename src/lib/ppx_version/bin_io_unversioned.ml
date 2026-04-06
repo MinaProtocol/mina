@@ -10,7 +10,7 @@
    we used [@@deriving bin_io] directly.
 *)
 
-open Core_kernel
+open Core
 open Ppxlib
 open Versioned_util
 
@@ -53,7 +53,7 @@ let bin_io_gens :
           (* Ppxlib.Deriving.Deriver.T x -> x *)
           |> (fun r -> field r extension_constructor_argument_idx)
           (* Ppxlib.Deriving.Deriver.Actual_deriver x -> x *)
-          |> fun r -> field r constructor_argument_idx)
+          |> fun r -> field r constructor_argument_idx )
       in
       let name =
         (* Ppxlib.Deriving.Deriver.Actual_deriver.t, 0th field is name *)

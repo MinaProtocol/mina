@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 module type Printable_intf = sig

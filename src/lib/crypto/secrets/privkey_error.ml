@@ -3,7 +3,7 @@ open Core
 type t =
   [ `Corrupted_privkey of Error.t
   | `Incorrect_password_or_corrupted_privkey
-  | `Cannot_open_file of string * Unix.Error.t
+  | `Cannot_open_file of string * Core_unix.Error.t
   | `Parent_directory_does_not_exist of string
   | `Password_not_in_environment of string list ]
 
@@ -13,7 +13,7 @@ let to_string : t -> string = function
   | `Incorrect_password_or_corrupted_privkey ->
       "The password was incorrect, or the key is corrupted"
   | `Cannot_open_file (path, e) ->
-      sprintf "Cannot open file: %s. Error: %s" path (Unix.Error.message e)
+      sprintf "Cannot open file: %s. Error: %s" path (Core_unix.Error.message e)
   | `Parent_directory_does_not_exist directory_name ->
       sprintf
         "Parent directory %s does not exist\n\n\

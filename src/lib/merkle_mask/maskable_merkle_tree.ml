@@ -101,20 +101,20 @@ module Make (Inputs : Inputs_intf) = struct
   module Graphviz = Visualization.Make_ocamlgraph (Node)
 
   let to_graph () =
-    let masks = List.concat @@ Uuid.Table.data registered_masks in
+    let masks = List.concat @@ Hashtbl.data registered_masks in
     let uuid_to_masks_table =
       Uuid.Table.of_alist_exn
         (List.map masks ~f:(fun mask -> (Mask.Attached.get_uuid mask, mask)))
     in
     let open Graphviz in
-    Uuid.Table.fold uuid_to_masks_table ~init:empty
+    Hashtbl.fold uuid_to_masks_table ~init:empty
       ~f:(fun ~key:uuid ~data:mask graph ->
         let graph_with_mask = add_vertex graph mask in
-        Uuid.Table.find registered_masks uuid
+        Hashtbl.find registered_masks uuid
         |> Option.value_map ~default:graph_with_mask ~f:(fun children_masks ->
-               List.fold ~init:graph_with_mask children_masks
-                 ~f:(fun graph_with_mask_and_child ->
-                   add_edge graph_with_mask_and_child mask ) ) )
+            List.fold ~init:graph_with_mask children_masks
+              ~f:(fun graph_with_mask_and_child ->
+                add_edge graph_with_mask_and_child mask ) ) )
 
   module Debug = struct
     let visualize ~filename =
@@ -132,7 +132,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let register_mask ?accumulated t mask =
     let attached_mask = Mask.set_parent ?accumulated mask t in
-    List.iter (Uuid.Table.data registered_masks) ~f:(fun ms ->
+    List.iter (Hashtbl.data registered_masks) ~f:(fun ms ->
         List.iter ms ~f:(fun m ->
             [%test_result: bool]
               ~message:
@@ -140,7 +140,7 @@ module Make (Inputs : Inputs_intf) = struct
               ~expect:false
               (Uuid.equal (Mask.Attached.get_uuid m) (Mask.get_uuid mask)) ) ) ;
     (* handles cases where no entries for t, or where there are existing entries *)
-    Uuid.Table.add_multi registered_masks ~key:(get_uuid t) ~data:attached_mask ;
+    Hashtbl.add_multi registered_masks ~key:(get_uuid t) ~data:attached_mask ;
     attached_mask
 
   let rec iter_descendants ~f uuid =
@@ -152,15 +152,15 @@ module Make (Inputs : Inputs_intf) = struct
 
   let unregister_mask_error_msg ~uuid ~parent_uuid suffix =
     sprintf "Couldn't unregister mask with UUID %s from parent %s, %s"
-      (Uuid.to_string_hum uuid)
-      (Uuid.to_string_hum parent_uuid)
+      (Uuid.to_string uuid)
+      (Uuid.to_string parent_uuid)
       suffix
 
   let unregister_mask_exn_do ?trigger_signal mask =
     let uuid = Mask.Attached.get_uuid mask in
     let parent_uuid = Mask.Attached.get_parent mask |> get_uuid in
     let error_msg = unregister_mask_error_msg ~uuid ~parent_uuid in
-    match Uuid.Table.find registered_masks parent_uuid with
+    match Hashtbl.find registered_masks parent_uuid with
     | None ->
         failwith @@ error_msg "parent not in registered_masks"
     | Some masks ->
@@ -171,8 +171,8 @@ module Make (Inputs : Inputs_intf) = struct
           failwith @@ error_msg "mask not registered with that parent" ;
         if List.is_empty good then
           (* no other masks for this maskable *)
-          Uuid.Table.remove registered_masks parent_uuid
-        else Uuid.Table.set registered_masks ~key:parent_uuid ~data:good ;
+          Hashtbl.remove registered_masks parent_uuid
+        else Hashtbl.set registered_masks ~key:parent_uuid ~data:good ;
         Mask.Attached.unset_parent ?trigger_signal mask
 
   let unregister_mask_exn ?(grandchildren = `Check) ~loc (mask : Mask.Attached.t)
@@ -210,7 +210,7 @@ module Make (Inputs : Inputs_intf) = struct
   let set t location account =
     Base.set t location account ;
     let uuid = get_uuid t in
-    match Uuid.Table.find registered_masks uuid with
+    match Hashtbl.find registered_masks uuid with
     | None ->
         ()
     | Some masks ->
@@ -223,8 +223,8 @@ module Make (Inputs : Inputs_intf) = struct
               [%log error]
                 "Update of an account in parent %s conflicted with an account \
                  in mask %s"
-                (Uuid.to_string_hum uuid)
-                (Uuid.to_string_hum child_uuid) ) )
+                (Uuid.to_string uuid)
+                (Uuid.to_string child_uuid) ) )
 
   let remove_and_reparent_exn t t_as_mask =
     let parent = Mask.Attached.get_parent t_as_mask in
@@ -245,7 +245,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let batch_notify_mask_children t accounts =
     let uuid = get_uuid t in
-    match Uuid.Table.find registered_masks uuid with
+    match Hashtbl.find registered_masks uuid with
     | None ->
         ()
     | Some masks ->
@@ -257,8 +257,8 @@ module Make (Inputs : Inputs_intf) = struct
               [%log error]
                 "Update of an account in parent %s conflicted with an account \
                  in mask %s"
-                (Uuid.to_string_hum uuid)
-                (Uuid.to_string_hum child_uuid) ;
+                (Uuid.to_string uuid)
+                (Uuid.to_string child_uuid) ;
               List.iter accounts ~f:(fun account ->
                   Mask.Attached.parent_set_notify mask account ) ) )
 

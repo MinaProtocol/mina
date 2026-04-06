@@ -10,7 +10,7 @@
     into the processor as if catchup had successfully completed. *)
 
 (* Only show stdout for failed inline tests. *)
-open Core_kernel
+open Core
 open Async_kernel
 open Pipe_lib.Strict_pipe
 open Cache_lib

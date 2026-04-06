@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pickles_types
 module Max_state_size = Nat.N8
 
@@ -43,7 +43,7 @@ let _type_equal :
 
 let typ t = Vector.typ t Max_state_size.n
 
-open Core_kernel
+open Core
 
 module Value = struct
   [%%versioned

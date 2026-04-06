@@ -9,6 +9,6 @@
   mina_stdlib_unix
   logger)
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane))
+  (pps ppx_let ppx_mina ppx_version))
  (instrumentation
   (backend bisect_ppx)))

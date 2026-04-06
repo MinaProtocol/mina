@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Multi_key_file_storage
 
 (* Helper to create temp file names *)

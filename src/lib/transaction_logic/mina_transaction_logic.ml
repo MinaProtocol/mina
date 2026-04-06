@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Currency
 open Signature_lib
@@ -675,8 +675,8 @@ module Make (L : Ledger_intf.S) :
                 (* Subtract the creation fee from the transaction amount. *)
                 sub_account_creation_fee ~constraint_constants `Added amount
                 |> Result.map_error ~f:(fun _ ->
-                       Transaction_status.Failure
-                       .Amount_insufficient_to_create_account )
+                    Transaction_status.Failure
+                    .Amount_insufficient_to_create_account )
           in
           let%map receiver_account =
             incr_balance receiver_account receiver_amount
@@ -1620,7 +1620,7 @@ module Make (L : Ledger_intf.S) :
         , Option.Let_syntax.(
             let%bind loc = L.location_of_account ledger id in
             let%map a = L.get ledger loc in
-            (loc, a)) )
+            (loc, a) ) )
       ]
     in
     let perform eff = Env.perform ~constraint_constants eff in
@@ -1638,10 +1638,11 @@ module Make (L : Ledger_intf.S) :
         ; block_global_slot = global_slot
         }
       , { stack_frame =
-            ({ calls = []
-             ; caller = Token_id.default
-             ; caller_caller = Token_id.default
-             } : Inputs.Stack_frame.t)
+            ( { calls = []
+              ; caller = Token_id.default
+              ; caller_caller = Token_id.default
+              }
+              : Inputs.Stack_frame.t )
         ; call_stack = []
         ; transaction_commitment = Inputs.Transaction_commitment.empty
         ; full_transaction_commitment = Inputs.Transaction_commitment.empty
@@ -1695,7 +1696,7 @@ module Make (L : Ledger_intf.S) :
     let%map partial_stmt, _user_acc =
       apply_zkapp_command_first_pass_aux ~signature_kind ~constraint_constants
         ~global_slot ~state_view ~fee_excess ~supply_increase ledger command
-        ~init:None ~f:(fun _acc state -> Some state)
+        ~init:None ~f:(fun _acc state -> Some state )
     in
     partial_stmt
 
@@ -1714,11 +1715,10 @@ module Make (L : Ledger_intf.S) :
       (* IMPORTANT: this account list must be sorted by Account_id in increasing order,
          if this ordering changes the scan state hash will be affected and made
          incompatible. *)
-      Account_id.Map.to_alist ~key_order:`Increasing
+      Map.to_alist ~key_order:`Increasing
       @@ List.fold ~init:Account_id.Map.empty
            ~f:(fun account_states (id, acc_opt) ->
-             Account_id.Map.update account_states id
-               ~f:(Option.value ~default:acc_opt) )
+             Map.update account_states id ~f:(Option.value ~default:acc_opt) )
            ( c.original_first_pass_account_states
            @ List.map (Zkapp_command.accounts_referenced c.command)
                ~f:(fun id ->
@@ -1726,7 +1726,7 @@ module Make (L : Ledger_intf.S) :
                  , Option.Let_syntax.(
                      let%bind loc = L.location_of_account ledger id in
                      let%map a = L.get ledger loc in
-                     (loc, a)) ) ) )
+                     (loc, a) ) ) ) )
     in
     let rec step_all (user_acc : user_acc)
         ( (g_state : Inputs.Global_state.t)
@@ -1752,7 +1752,7 @@ module Make (L : Ledger_intf.S) :
           , Option.Let_syntax.(
               let%bind loc = L.location_of_account ledger id in
               let%map a = L.get ledger loc in
-              (loc, a)) ) )
+              (loc, a) ) ) )
     in
     let accounts () =
       List.map original_account_states
@@ -1818,7 +1818,7 @@ module Make (L : Ledger_intf.S) :
                   { With_status.data = c.command
                   ; status =
                       ( if successfully_applied then Applied
-                      else Failed failure_status_tbl )
+                        else Failed failure_status_tbl )
                   }
               ; new_accounts
               }
@@ -1878,7 +1878,7 @@ module Make (L : Ledger_intf.S) :
           ~f:(fun _acc (global_state, local_state) ->
             Some (local_state, global_state.fee_excess) )
     |> Result.map ~f:(fun (account_update_applied, state_res) ->
-           (account_update_applied, Option.value_exn state_res) )
+        (account_update_applied, Option.value_exn state_res) )
 
   let update_timing_when_no_deduction ~txn_global_slot account =
     validate_timing ~txn_amount:Amount.zero ~txn_global_slot ~account
@@ -2058,12 +2058,13 @@ module Make (L : Ledger_intf.S) :
         ({ receiver; fee_transfer; amount = coinbase_amount } as cb : Coinbase.t)
       =
     let open Or_error.Let_syntax in
-    let%bind ( receiver_reward
-             , new_accounts1
-             , transferee_update
-             , transferee_timing_prev
-             , failures1
-             , burned_tokens1 ) =
+    let%bind
+        ( receiver_reward
+        , new_accounts1
+        , transferee_update
+        , transferee_timing_prev
+        , failures1
+        , burned_tokens1 ) =
       match fee_transfer with
       | None ->
           return (coinbase_amount, [], None, None, empty, Currency.Amount.zero)
@@ -2367,13 +2368,13 @@ module For_tests = struct
         Currency.Amount.(
           gen_incl
             (of_nanomina_int_exn 1_000_000)
-            (of_nanomina_int_exn 100_000_000))
+            (of_nanomina_int_exn 100_000_000) )
       in
       let gen_fee () =
         Currency.Fee.(
           gen_incl
             (of_nanomina_int_exn 1_000_000)
-            (of_nanomina_int_exn 100_000_000))
+            (of_nanomina_int_exn 100_000_000) )
       in
       let nonce : Account_nonce.t = Map.find_exn nonces sender in
       let%bind fee = gen_fee () in
@@ -2480,12 +2481,12 @@ module For_tests = struct
                 ; implicit_account_creation_fee = true
                 ; authorization_kind =
                     ( if use_full_commitment then Signature
-                    else Proof Zkapp_basic.F.zero )
+                      else Proof Zkapp_basic.F.zero )
                 }
               ~authorization:
                 ( if use_full_commitment then
-                  Control.Poly.Signature Signature.dummy
-                else Proof (Lazy.force Mina_base.Proof.transaction_dummy) )
+                    Control.Poly.Signature Signature.dummy
+                  else Proof (Lazy.force Mina_base.Proof.transaction_dummy) )
           ; Account_update.with_no_aux
               ~body:
                 { Account_update.Body.Simple.public_key = receiver
@@ -2532,9 +2533,9 @@ module For_tests = struct
     let account_updates =
       Zkapp_command.Call_forest.map zkapp_command.account_updates
         ~f:(fun
-             (account_update :
-               (Account_update.Body.t, _, _) Account_update.Poly.t )
-           ->
+            (account_update :
+              (Account_update.Body.t, _, _) Account_update.Poly.t )
+          ->
           match account_update.body.authorization_kind with
           | Signature ->
               { account_update with

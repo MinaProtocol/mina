@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Make (Key : Binable.S) (Value : Binable.S) :
   Key_value_database.Intf.S

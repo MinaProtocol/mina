@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Fee_currency = Currency.Fee
 module Amount_currency = Currency.Amount
 open Rosetta_models

@@ -1,6 +1,6 @@
 open Graphql_basic_scalars.Utils
 open Graphql_basic_scalars.Testing
-open Core_kernel
+open Core
 
 module Make (Schema : Schema) = struct
   module type Json_intf =

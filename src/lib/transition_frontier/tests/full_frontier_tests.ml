@@ -1,6 +1,6 @@
 (* Only show stdout for failed inline tests. *)
 open Async_kernel
-open Core_kernel
+open Core
 open Mina_base
 open Frontier_base
 open Deferred.Let_syntax
@@ -86,8 +86,9 @@ let%test_module "Full_frontier tests" =
                 ~message:"best tip should change when all of best tip is added" ;
               clean_up_persistent_root ~frontier ) )
 
-    let%test_unit "The root should be updated after (> max_length) nodes are \
-                   added in sequence" =
+    let%test_unit
+        "The root should be updated after (> max_length) nodes are added in \
+         sequence" =
       Quickcheck.test
         (gen_breadcrumb_seq ~verifier (max_length * 2))
         ~trials:4
@@ -100,24 +101,23 @@ let%test_module "Full_frontier tests" =
               let%map seq = make_seq root in
               ignore
               @@ List.fold seq ~init:1 ~f:(fun i breadcrumb ->
-                     let pre_root = Full_frontier.root frontier in
-                     add_breadcrumb frontier breadcrumb ;
-                     let post_root = Full_frontier.root frontier in
-                     if i > max_length then
-                       test_not_eq pre_root post_root
-                         ~message:
-                           "roots should be different after max_length \
-                            breadcrumbs are added"
-                     else
-                       test_eq pre_root post_root
-                         ~message:
-                           "roots should be the same before max_length \
-                            breadcrumbs" ;
-                     i + 1 ) ;
+                  let pre_root = Full_frontier.root frontier in
+                  add_breadcrumb frontier breadcrumb ;
+                  let post_root = Full_frontier.root frontier in
+                  if i > max_length then
+                    test_not_eq pre_root post_root
+                      ~message:
+                        "roots should be different after max_length \
+                         breadcrumbs are added"
+                  else
+                    test_eq pre_root post_root
+                      ~message:
+                        "roots should be the same before max_length breadcrumbs" ;
+                  i + 1 ) ;
               clean_up_persistent_root ~frontier ) )
 
-    let%test_unit "Protocol states are available for every transaction in the \
-                   frontier" =
+    let%test_unit
+        "Protocol states are available for every transaction in the frontier" =
       Quickcheck.test
         (gen_breadcrumb_seq ~verifier (max_length * 4))
         ~trials:2
@@ -135,20 +135,20 @@ let%test_module "Full_frontier tests" =
                     |> Staged_ledger.scan_state
                     |> Staged_ledger.Scan_state.required_state_hashes
                   in
-                  List.iter (State_hash.Set.to_list required_state_hashes)
-                    ~f:(fun hash ->
+                  List.iter (Set.to_list required_state_hashes) ~f:(fun hash ->
                       ignore
                         ( Full_frontier.For_tests.find_protocol_state_exn
                             frontier hash
                           : Mina_state.Protocol_state.value ) ) ) ;
               clean_up_persistent_root ~frontier ) )
 
-    let%test_unit "The length of the longest branch should never be greater \
-                   than max_length" =
+    let%test_unit
+        "The length of the longest branch should never be greater than \
+         max_length" =
       let gen =
         Quickcheck.Generator.Let_syntax.(
           Int.gen_incl max_length (max_length * 2)
-          >>= gen_breadcrumb_seq ~verifier)
+          >>= gen_breadcrumb_seq ~verifier )
       in
       Quickcheck.test gen ~trials:4 ~f:(fun make_seq ->
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -162,7 +162,7 @@ let%test_module "Full_frontier tests" =
                   [%test_pred: int] (( >= ) max_length)
                     (List.length
                        Full_frontier.(
-                         path_map frontier (best_tip frontier) ~f:Fn.id) ) ) ;
+                         path_map frontier (best_tip frontier) ~f:Fn.id ) ) ) ;
               clean_up_persistent_root ~frontier ) )
 
     let%test_unit "Common ancestor can be reliably found" =

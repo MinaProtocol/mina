@@ -4,7 +4,7 @@
     tests and production.
 *)
 
-open Core_kernel
+open Core
 
 module Inputs = struct
   type t =
@@ -39,14 +39,14 @@ type t =
   ; default_transaction_fee : Currency.Fee.Stable.Latest.t
   ; default_snark_worker_fee : Currency.Fee.Stable.Latest.t
   ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t
-  ; compaction_interval : Time.Span.t option
-  ; block_window_duration : Time.Span.t
-  ; vrf_poll_interval : Time.Span.t
+  ; compaction_interval : Time_float.Span.t option
+  ; block_window_duration : Time_float.Span.t
+  ; vrf_poll_interval : Time_float.Span.t
   ; network_id : string
   ; zkapp_cmd_limit : int option
-  ; rpc_handshake_timeout : Time.Span.t
-  ; rpc_heartbeat_timeout : Time.Span.t
-  ; rpc_heartbeat_send_every : Time.Span.t
+  ; rpc_handshake_timeout : Time_float.Span.t
+  ; rpc_heartbeat_timeout : Time_float.Span.t
+  ; rpc_heartbeat_send_every : Time_float.Span.t
   ; zkapp_proof_update_cost : float
   ; zkapp_signed_pair_update_cost : float
   ; zkapp_signed_single_update_cost : float
@@ -70,16 +70,18 @@ let make (inputs : Inputs.t) =
       Currency.Fee.of_mina_string_exn inputs.minimum_user_command_fee_string
   ; compaction_interval =
       Option.map
-        ~f:(fun x -> Float.of_int x |> Time.Span.of_ms)
+        ~f:(fun x -> Float.of_int x |> Time_float.Span.of_ms)
         inputs.compaction_interval_ms
   ; block_window_duration =
-      Float.of_int inputs.block_window_duration_ms |> Time.Span.of_ms
+      Float.of_int inputs.block_window_duration_ms |> Time_float.Span.of_ms
   ; vrf_poll_interval =
-      Float.of_int inputs.vrf_poll_interval_ms |> Time.Span.of_ms
-  ; rpc_handshake_timeout = Time.Span.of_sec inputs.rpc_handshake_timeout_sec
-  ; rpc_heartbeat_timeout = Time.Span.of_sec inputs.rpc_heartbeat_timeout_sec
+      Float.of_int inputs.vrf_poll_interval_ms |> Time_float.Span.of_ms
+  ; rpc_handshake_timeout =
+      Time_float.Span.of_sec inputs.rpc_handshake_timeout_sec
+  ; rpc_heartbeat_timeout =
+      Time_float.Span.of_sec inputs.rpc_heartbeat_timeout_sec
   ; rpc_heartbeat_send_every =
-      Time.Span.of_sec inputs.rpc_heartbeat_send_every_sec
+      Time_float.Span.of_sec inputs.rpc_heartbeat_send_every_sec
   ; zkapp_proof_update_cost = inputs.zkapp_proof_update_cost
   ; zkapp_signed_pair_update_cost = inputs.zkapp_signed_pair_update_cost
   ; zkapp_signed_single_update_cost = inputs.zkapp_signed_single_update_cost
@@ -105,16 +107,17 @@ let to_yojson t =
       , Currency.Fee.to_yojson t.minimum_user_command_fee )
     ; ( "compaction_interval"
       , Option.value_map ~default:`Null
-          ~f:(fun x -> `Float (Time.Span.to_ms x))
+          ~f:(fun x -> `Float (Time_float.Span.to_ms x))
           t.compaction_interval )
-    ; ("block_window_duration", `Float (Time.Span.to_ms t.block_window_duration))
-    ; ("vrf_poll_interval", `Float (Time.Span.to_ms t.vrf_poll_interval))
+    ; ( "block_window_duration"
+      , `Float (Time_float.Span.to_ms t.block_window_duration) )
+    ; ("vrf_poll_interval", `Float (Time_float.Span.to_ms t.vrf_poll_interval))
     ; ( "rpc_handshake_timeout"
-      , `Float (Time.Span.to_sec t.rpc_handshake_timeout) )
+      , `Float (Time_float.Span.to_sec t.rpc_handshake_timeout) )
     ; ( "rpc_heartbeat_timeout"
-      , `Float (Time.Span.to_sec t.rpc_heartbeat_timeout) )
+      , `Float (Time_float.Span.to_sec t.rpc_heartbeat_timeout) )
     ; ( "rpc_heartbeat_send_every"
-      , `Float (Time.Span.to_sec t.rpc_heartbeat_send_every) )
+      , `Float (Time_float.Span.to_sec t.rpc_heartbeat_send_every) )
     ; ("zkapp_proof_update_cost", `Float t.zkapp_proof_update_cost)
     ; ("zkapp_signed_pair_update_cost", `Float t.zkapp_signed_pair_update_cost)
     ; ( "zkapp_signed_single_update_cost"

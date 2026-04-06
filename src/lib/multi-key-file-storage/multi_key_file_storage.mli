@@ -1,5 +1,5 @@
 (** Multi-key file storage - stores multiple keys with heterogeneous types in a single file *)
-open Core_kernel
+open Core
 
 module Tag : sig
   [%%versioned:

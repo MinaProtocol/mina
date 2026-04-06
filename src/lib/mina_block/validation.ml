@@ -6,7 +6,7 @@
 *)
 
 open Async_kernel
-open Core_kernel
+open Core
 open Mina_base
 open Mina_state
 open Consensus.Data
@@ -479,7 +479,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   let consensus_state = Protocol_state.consensus_state protocol_state in
   let global_slot = Consensus_state.global_slot_since_genesis consensus_state in
   let body = Block.body block in
-  let apply_start_time = Core.Time.now () in
+  let apply_start_time = Time_float.now () in
   let body_ref_from_header = Blockchain_state.body_reference blockchain_state in
   let body_ref_computed =
     Staged_ledger_diff.Body.compute_reference
@@ -491,10 +491,11 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
       Deferred.Result.return ()
     else Deferred.Result.fail `Invalid_body_reference
   in
-  let%bind.Deferred.Result ( `Ledger_proof proof_opt
-                           , `Staged_ledger transitioned_staged_ledger
-                           , `Accounts_created accounts_created
-                           , `Pending_coinbase_update _ ) =
+  let%bind.Deferred.Result
+      ( `Ledger_proof proof_opt
+      , `Staged_ledger transitioned_staged_ledger
+      , `Accounts_created accounts_created
+      , `Pending_coinbase_update _ ) =
     Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
       ~get_completed_work
       ~constraint_constants:
@@ -518,7 +519,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
           .zkapp_cmd_limit_hardcap
       ~signature_kind:Mina_signature_kind.t_DEPRECATED ?transaction_pool_proxy
     |> Deferred.Result.map_error ~f:(fun e ->
-           `Staged_ledger_application_failed e )
+        `Staged_ledger_application_failed e )
   in
   let staged_ledger_hash_opt =
     match skip_staged_ledger_verification with
@@ -533,7 +534,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   [%log debug]
     ~metadata:
       [ ( "time_elapsed"
-        , `Float Core.Time.(Span.to_ms @@ diff (now ()) apply_start_time) )
+        , `Float Time_float.(Span.to_ms @@ diff (now ()) apply_start_time) )
       ]
     "Staged_ledger.apply takes $time_elapsed" ;
   let snarked_ledger_hash =

@@ -16,6 +16,6 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
+  (pps ppx_compare ppx_deriving.std ppx_enumerate ppx_deriving_yojson ppx_mina ppx_sexp_conv ppx_version))
  (implements logger)
  (synopsis "Fake logging library"))

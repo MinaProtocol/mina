@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (** Loosely modelled on https://chromium.googlesource.com/chromium/src/+/HEAD/tools/metrics/histograms/README.md *)
 
@@ -71,15 +71,15 @@ end
 
 module Exp_time_spans = Make (struct
   (** Note: All time spans are represented in JSON as floating point millis *)
-  type t = Time.Span.t [@@deriving bin_io_unversioned]
+  type t = Time_float.Span.t [@@deriving bin_io_unversioned]
 
-  let to_yojson t = `Float (Time.Span.to_ms t)
+  let to_yojson t = `Float (Time_float.Span.to_ms t)
 
   let of_yojson t =
     let open Ppx_deriving_yojson_runtime in
     match t with
     | `Float ms ->
-        Result.Ok (Time.Span.of_ms ms)
+        Result.Ok (Time_float.Span.of_ms ms)
     | _ ->
         Result.Error "Not a floating point milliseconds value"
 
@@ -92,8 +92,8 @@ module Exp_time_spans = Make (struct
 
     (* See http://mathworld.wolfram.com/LeastSquaresFittingLogarithmic.html *)
     let fit min max buckets =
-      let x0, y0 = (Time.Span.to_ms min, Float.zero) in
-      let x1, y1 = (Time.Span.to_ms max, Float.of_int buckets) in
+      let x0, y0 = (Time_float.Span.to_ms min, Float.zero) in
+      let x1, y1 = (Time_float.Span.to_ms max, Float.of_int buckets) in
       let n = 2.0 in
       let sum f = f (x0, y0) +. f (x1, y1) in
       let b =
@@ -126,8 +126,8 @@ module Exp_time_spans = Make (struct
       in
       (a, b)
 
-    let create ?(min = Time.Span.of_sec 1.) ?(max = Time.Span.of_min 10.)
-        ?(buckets = 50) () =
+    let create ?(min = Time_float.Span.of_sec 1.)
+        ?(max = Time_float.Span.of_min 10.) ?(buckets = 50) () =
       let a, b = fit min max buckets in
       { a; b; buckets }
   end
@@ -138,10 +138,10 @@ module Exp_time_spans = Make (struct
       let y = Float.of_int y in
       Float.exp ((y /. b) -. (a /. b))
     in
-    (Time.Span.of_ms (f_1 i), Time.Span.of_ms (f_1 (i + 1)))
+    (Time_float.Span.of_ms (f_1 i), Time_float.Span.of_ms (f_1 (i + 1)))
 
   let bucket ~params:{ Params.a; b; buckets } span =
-    let x = Time.Span.to_ms span in
+    let x = Time_float.Span.to_ms span in
     if Float.( <= ) x 0.0 then `Underflow
     else
       (* y = a + b log(x) *)
@@ -154,19 +154,21 @@ end)
 let%test_unit "reports properly with overflows and underflows and table hits" =
   let open Exp_time_spans in
   let tbl =
-    create ~buckets:50 ~min:(Time.Span.of_ms 1.) ~max:(Time.Span.of_day 1.) ()
+    create ~buckets:50 ~min:(Time_float.Span.of_ms 1.)
+      ~max:(Time_float.Span.of_day 1.)
+      ()
   in
   let r = report tbl in
   assert (r.Pretty.underflow = 0) ;
   assert (r.Pretty.overflow = 0) ;
   (* underflow *)
-  add tbl (Time.Span.of_us 100.) ;
+  add tbl (Time_float.Span.of_us 100.) ;
   (* in the table *)
-  add tbl (Time.Span.of_ms 100.) ;
-  add tbl (Time.Span.of_sec 100.) ;
-  add tbl (Time.Span.of_day 0.5) ;
+  add tbl (Time_float.Span.of_ms 100.) ;
+  add tbl (Time_float.Span.of_sec 100.) ;
+  add tbl (Time_float.Span.of_day 0.5) ;
   (* overflow *)
-  add tbl (Time.Span.of_day 2.) ;
+  add tbl (Time_float.Span.of_day 2.) ;
   let r = report tbl in
   assert (List.sum ~f:Fn.id (module Int) r.Pretty.values = 3) ;
   assert (r.Pretty.underflow = 1) ;

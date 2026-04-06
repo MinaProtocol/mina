@@ -1,6 +1,6 @@
 (* missing_blocks_auditor.ml *)
 
-open Core_kernel
+open Core
 open Async
 
 (* bits in error code *)

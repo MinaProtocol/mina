@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Signature_lib
 open Snark_params.Tick

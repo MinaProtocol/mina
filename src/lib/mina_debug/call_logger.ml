@@ -1,6 +1,6 @@
-open Core_kernel
+open Core
 
-let genesis = Time.now ()
+let genesis = Time_float.now ()
 
 module Call_ring = struct
   type t = string * int ref * int array
@@ -14,10 +14,10 @@ module Call_ring = struct
       (String.concat ~sep:"," (Array.to_list (Array.map cs ~f:string_of_int)))
 
   let record ((name, epoch, cs) : t) =
-    let now = Time.now () in
-    let span_since_genesis = Time.diff now genesis in
+    let now = Time_float.now () in
+    let span_since_genesis = Time_float.diff now genesis in
     let mins_since_genesis =
-      int_of_float (Time.Span.to_min span_since_genesis)
+      int_of_float (Time_float.Span.to_min span_since_genesis)
     in
     let curr_epoch = mins_since_genesis / window in
     let curr_index = mins_since_genesis mod window in

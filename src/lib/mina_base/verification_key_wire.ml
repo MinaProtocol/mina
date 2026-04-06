@@ -1,6 +1,6 @@
 (* verification_key_wire.ml *)
 
-open Core_kernel
+open Core
 open Zkapp_basic
 
 (* the digest functions are declared locally in Zkapp_account, which depends on

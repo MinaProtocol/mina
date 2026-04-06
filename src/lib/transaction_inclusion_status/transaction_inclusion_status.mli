@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Pipe_lib
 open Mina_base
 

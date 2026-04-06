@@ -43,9 +43,14 @@
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_mina
-   ppx_version
-   ppx_jane
+   ppx_assert
+   ppx_compare
+   ppx_custom_printf
    ppx_deriving.std
+   ppx_deriving_yojson
+   ppx_here
+   ppx_inline_test
    ppx_let
-   ppx_deriving_yojson)))
+   ppx_mina
+   ppx_sexp_conv
+   ppx_version)))

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 open Frontier_base
 module Queue = Hash_queue.Make (State_hash)
@@ -35,25 +35,26 @@ module T = struct
   let enqueue t new_root =
     let open Root_data.Historical in
     ( if Queue.length t.history >= t.capacity then
-      let oldest_root = Queue.dequeue_front_exn t.history in
-      (*Update the protocol states required for scan state at the new root*)
-      let _new_oldest_hash, new_oldest_root =
-        Queue.first_with_key t.history |> Option.value_exn
-      in
-      let new_protocol_states_map =
-        Full_frontier.Protocol_states_for_root_scan_state
-        .protocol_states_for_next_root_scan_state
-          t.protocol_states_for_root_scan_state
-          ~new_scan_state:(scan_state new_oldest_root)
-          ~old_root_state:
-            ( transition oldest_root |> Mina_block.Validated.forget
-            |> With_hash.map ~f:(fun block ->
-                   block |> Mina_block.header
-                   |> Mina_block.Header.protocol_state ) )
-        |> List.map ~f:(fun s -> State_hash.With_state_hashes.(state_hash s, s))
-        |> State_hash.Map.of_alist_exn
-      in
-      t.protocol_states_for_root_scan_state <- new_protocol_states_map ) ;
+        let oldest_root = Queue.dequeue_front_exn t.history in
+        (*Update the protocol states required for scan state at the new root*)
+        let _new_oldest_hash, new_oldest_root =
+          Queue.first_with_key t.history |> Option.value_exn
+        in
+        let new_protocol_states_map =
+          Full_frontier.Protocol_states_for_root_scan_state
+          .protocol_states_for_next_root_scan_state
+            t.protocol_states_for_root_scan_state
+            ~new_scan_state:(scan_state new_oldest_root)
+            ~old_root_state:
+              ( transition oldest_root |> Mina_block.Validated.forget
+              |> With_hash.map ~f:(fun block ->
+                  block |> Mina_block.header |> Mina_block.Header.protocol_state )
+              )
+          |> List.map ~f:(fun s ->
+              State_hash.With_state_hashes.(state_hash s, s) )
+          |> State_hash.Map.of_alist_exn
+        in
+        t.protocol_states_for_root_scan_state <- new_protocol_states_map ) ;
     assert (
       [%equal: [ `Ok | `Key_already_present ]] `Ok
         (Queue.enqueue_back t.history
@@ -102,7 +103,7 @@ let protocol_states_for_scan_state t state_hash =
   let%bind data = Queue.lookup history state_hash in
   let required_state_hashes =
     Staged_ledger.Scan_state.required_state_hashes (scan_state data)
-    |> State_hash.Set.to_list
+    |> Set.to_list
   in
   List.fold_until ~init:[]
     ~finish:(fun lst -> Some lst)
@@ -117,12 +118,11 @@ let protocol_states_for_scan_state t state_hash =
         | None ->
             (*Not present in the history queue, check in the protocol states map that has all the protocol states required for transactions in the root*)
             let%map.Option state_with_hash =
-              State_hash.Map.find protocol_states_for_root_scan_state hash
+              Map.find protocol_states_for_root_scan_state hash
             in
             With_hash.data state_with_hash
       in
-      match res with None -> Stop None | Some state -> Continue (state :: acc)
-      )
+      match res with None -> Stop None | Some state -> Continue (state :: acc) )
 
 let most_recent { history; _ } =
   (* unfortunately, there is not function to inspect the last element in the queue,

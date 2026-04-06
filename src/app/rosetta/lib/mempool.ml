@@ -50,7 +50,7 @@ module Get_transactions_by_hash =
 module Mina_currency = Currency
 
 (* Avoid shadowing graphql_ppx functions *)
-open Core_kernel
+open Core
 open Async
 open Rosetta_lib
 open Rosetta_models

@@ -16,14 +16,14 @@ let remove_dir dir =
   Deferred.unit
 
 let rec rmrf path =
-  match Core.Sys.is_directory path with
+  match Sys_unix.is_directory path with
   | `Yes ->
-      Core.Sys.readdir path
+      Sys_unix.readdir path
       |> Array.iter ~f:(fun name -> rmrf (Filename.concat path name)) ;
-      Core.Unix.rmdir path
+      Core_unix.rmdir path
   | _ ->
-      if [%equal: [ `Yes | `No | `Unknown ]] (Core.Sys.file_exists path) `Yes
-      then Core.Sys.remove path
+      if [%equal: [ `Yes | `No | `Unknown ]] (Sys_unix.file_exists path) `Yes
+      then Sys_unix.remove path
 
 let try_finally ~(f : unit -> 'a Deferred.t) ~(finally : unit -> unit Deferred.t)
     =
@@ -57,7 +57,7 @@ let clear_dir toplevel_dir =
     | `Yes ->
         let%map dirs, files =
           Sys.ls_dir fullname
-          >>= Deferred.List.map ~f:(all_files fullname)
+          >>= Deferred.List.map ~f:(all_files fullname) ~how:`Parallel
           >>| List.unzip
         in
         let dirs =
@@ -69,12 +69,14 @@ let clear_dir toplevel_dir =
         Deferred.return ([], [ fullname ])
   in
   let%bind dirs, files = all_files toplevel_dir "" in
-  let%bind () = Deferred.List.iter files ~f:(fun file -> Sys.remove file) in
-  Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file)
+  let%bind () =
+    Deferred.List.iter files ~f:(fun file -> Sys.remove file) ~how:`Parallel
+  in
+  Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file) ~how:`Parallel
 
 let create_dir ?(clear_if_exists = false) dir =
-  match Core.Sys.file_exists dir with
+  match Sys_unix.file_exists dir with
   | `Yes ->
       if clear_if_exists then clear_dir dir else return ()
   | _ ->
-      return (Core.Unix.mkdir_p dir)
+      return (Core_unix.mkdir_p dir)

@@ -17,7 +17,7 @@ val create : Diff.t -> t
 
 val staged_ledger_diff : t -> Diff.t
 
-val to_binio_bigstring : Stable.V1.t -> Core_kernel.Bigstring.t
+val to_binio_bigstring : Stable.V1.t -> Core.Bigstring.t
 
 val compute_reference : tag:int -> Stable.V1.t -> Consensus.Body_reference.t
 

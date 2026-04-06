@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Js = Js_of_ocaml.Js
 module Field = Pickles.Impls.Step.Field.Constant
 

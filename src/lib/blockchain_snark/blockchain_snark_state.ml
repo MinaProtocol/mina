@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snark_params
 open Tick
 open Mina_base
@@ -69,7 +69,7 @@ module Impl = Pickles.Impls.Step
 
 let non_pc_registers_equal_var t1 t2 =
   Impl.make_checked (fun () ->
-      let module F = Core_kernel.Field in
+      let module F = Core.Field in
       let ( ! ) eq x1 x2 = Impl.run_checked (eq x1 x2) in
       let f eq acc field = eq (F.get field t1) (F.get field t2) :: acc in
       Registers.Fields.fold ~init:[]
@@ -86,7 +86,7 @@ let txn_statement_ledger_hashes_equal
     (s1 : Transaction_snark.Statement.Checked.t)
     (s2 : Transaction_snark.Statement.Checked.t) =
   Impl.make_checked (fun () ->
-      let module F = Core_kernel.Field in
+      let module F = Core.Field in
       let ( ! ) x = Impl.run_checked x in
       let source_eq =
         !(non_pc_registers_equal_var
@@ -154,10 +154,11 @@ let%snarkydef_ step ~(logger : Logger.t)
         exists Transaction_snark.Statement.With_sok.typ
           ~request:(As_prover.return Txn_snark) )
   in
-  let%bind ( previous_state
-           , previous_state_hash
-           , previous_blockchain_proof_input
-           , previous_state_body_hash ) =
+  let%bind
+      ( previous_state
+      , previous_state_hash
+      , previous_blockchain_proof_input
+      , previous_state_body_hash ) =
     let%bind prev_state_ref =
       with_label __LOC__ (fun () ->
           exists (Typ.prover_value ()) ~request:(As_prover.return Prev_state) )
@@ -187,7 +188,7 @@ let%snarkydef_ step ~(logger : Logger.t)
       Signed.Checked.if_ txn_stmt_ledger_hashes_didn't_change
         ~then_:
           (Signed.create_var ~magnitude:(var_of_t zero) ~sgn:Sgn.Checked.pos)
-        ~else_:txn_snark.supply_increase)
+        ~else_:txn_snark.supply_increase )
   in
   let%bind `Success updated_consensus_state, consensus_state =
     with_label __LOC__ (fun () ->
@@ -283,7 +284,7 @@ let%snarkydef_ step ~(logger : Logger.t)
             Snarked_ledger_state.(
               valid_ledgers_at_merge_checked
                 (Statement_ledgers.of_statement previous_ledger_statement)
-                (Statement_ledgers.of_statement current_ledger_statement)) )
+                (Statement_ledgers.of_statement current_ledger_statement) ) )
       in
       (*TODO: Any assertion about the local state and sok digest
          in the statement required?*)
@@ -344,7 +345,7 @@ let%snarkydef_ step ~(logger : Logger.t)
                 ; ("correct_coinbase_status", `Bool correct_coinbase_status)
                 ; ("result", `Bool result)
                 ; ("no_coinbases_popped", `Bool no_coinbases_popped)
-                ]))
+                ] ) )
     in
     (transaction_snark_should_verifiy, result)
   in

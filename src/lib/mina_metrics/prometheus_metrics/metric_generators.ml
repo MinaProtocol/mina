@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Prometheus
 
@@ -13,18 +13,18 @@ end
 module type Bucketed_average_spec_intf = sig
   include Metric_spec_intf
 
-  val bucket_interval : Time.Span.t -> Time.Span.t
+  val bucket_interval : Time_float.Span.t -> Time_float.Span.t
 
-  val num_buckets : Time.Span.t -> int
+  val num_buckets : Time_float.Span.t -> int
 
   val render_average : (float * int) list -> float
 end
 
 module Intervals = struct
-  type t = { rolling : Time.Span.t; tick : Time.Span.t }
+  type t = { rolling : Time_float.Span.t; tick : Time_float.Span.t }
 
   let make ~rolling_interval ~tick_interval =
-    let open Time.Span in
+    let open Time_float.Span in
     let ( = ) = Float.equal in
     let ( mod ) = Float.mod_float in
     if not (to_ns rolling_interval mod to_ns tick_interval = 0.0) then
@@ -37,7 +37,7 @@ end
 module type Time_average_spec_intf = sig
   include Metric_spec_intf
 
-  val intervals : Time.Span.t -> Intervals.t
+  val intervals : Time_float.Span.t -> Intervals.t
 end
 
 module type Moving_average_metric_intf = sig
@@ -49,7 +49,7 @@ module type Moving_average_metric_intf = sig
 
   val v : Gauge.t
 
-  val initialize : Time.Span.t -> unit
+  val initialize : Time_float.Span.t -> unit
 end
 
 module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) :
@@ -79,7 +79,7 @@ module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) :
     let rec tick () =
       upon
         (after
-           ( Time_ns.Span.of_ns @@ Time.Span.to_ns
+           ( Time_ns.Span.of_ns @@ Time_float.Span.to_ns
            @@ bucket_interval block_window_duration ) )
         (fun () ->
           let num_buckets = num_buckets block_window_duration in
@@ -96,7 +96,7 @@ module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) :
 end
 
 module Moving_time_average (Spec : Time_average_spec_intf) :
-  Moving_average_metric_intf with type datum := Time.Span.t = struct
+  Moving_average_metric_intf with type datum := Time_float.Span.t = struct
   include Moving_bucketed_average (struct
     include Spec
 
@@ -106,7 +106,8 @@ module Moving_time_average (Spec : Time_average_spec_intf) :
     let num_buckets block_window_duration =
       let intervals = Spec.intervals block_window_duration in
       Float.to_int
-        (Time.Span.to_ns intervals.rolling /. Time.Span.to_ns intervals.tick)
+        ( Time_float.Span.to_ns intervals.rolling
+        /. Time_float.Span.to_ns intervals.tick )
 
     let render_average buckets =
       let total_sum, count_sum =
@@ -117,5 +118,5 @@ module Moving_time_average (Spec : Time_average_spec_intf) :
       total_sum /. Float.of_int count_sum
   end)
 
-  let update span = update (Time.Span.to_sec span)
+  let update span = update (Time_float.Span.to_sec span)
 end

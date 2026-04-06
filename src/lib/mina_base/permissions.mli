@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Snark_params.Tick
 
 module Auth_required : sig
@@ -90,7 +90,7 @@ end]
 (** if [auth_tag] is provided, the generated permissions will be compatible with
     the corresponding authorization
 *)
-val gen : auth_tag:Control.Tag.t -> t Core_kernel.Quickcheck.Generator.t
+val gen : auth_tag:Control.Tag.t -> t Quickcheck.Generator.t
 
 val to_input : t -> Field.t Random_oracle_input.Chunked.t
 
@@ -133,7 +133,7 @@ val deriver :
       ; nullable_graphql_fields :
           t option Fields_derivers_zkapps.Graphql.Fields.Input.T.t ref
       ; of_json : (Yojson.Safe.t -> t) ref
-      ; of_json_creator : Yojson.Safe.t Core_kernel.String.Map.t ref
+      ; of_json_creator : Yojson.Safe.t String.Map.t ref
       ; skip : bool ref
       ; to_json : (t -> Yojson.Safe.t) ref
       ; to_json_accumulator : (string * (t -> Yojson.Safe.t)) option list ref

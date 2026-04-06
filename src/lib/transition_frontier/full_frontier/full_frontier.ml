@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 module Root_ledger = Mina_ledger.Root
@@ -54,18 +54,17 @@ module Protocol_states_for_root_scan_state = struct
       ~(old_root_state : Protocol_state.value State_hash.With_state_hashes.t) =
     let required_state_hashes =
       Staged_ledger.Scan_state.required_state_hashes new_scan_state
-      |> State_hash.Set.to_list
+      |> Set.to_list
     in
     let protocol_state_map =
       (*Note: Protocol states for the next root should all be in this map
         assuming roots transition to their successors and do not skip any node in
         between*)
-      State_hash.Map.set protocol_states_for_old_root
+      Map.set protocol_states_for_old_root
         ~key:(State_hash.With_state_hashes.state_hash old_root_state)
         ~data:old_root_state
     in
-    List.map required_state_hashes
-      ~f:(State_hash.Map.find_exn protocol_state_map)
+    List.map required_state_hashes ~f:(Map.find_exn protocol_state_map)
 end
 
 (* Invariant: The path from the root to the tip inclusively, will be max_length *)
@@ -116,9 +115,7 @@ let find_exn ~message t hash =
 let find_protocol_state (t : t) hash =
   match find t hash with
   | None ->
-      let%map.Option s =
-        State_hash.Map.find t.protocol_states_for_root_scan_state hash
-      in
+      let%map.Option s = Map.find t.protocol_states_for_root_scan_state hash in
       With_hash.data s
   | Some breadcrumb ->
       Some (Breadcrumb.protocol_state breadcrumb)
@@ -195,7 +192,7 @@ let root_data t =
   let root = root t in
   { transition = Breadcrumb.validated_transition root
   ; staged_ledger = Breadcrumb.staged_ledger root
-  ; protocol_states = State_hash.Map.data t.protocol_states_for_root_scan_state
+  ; protocol_states = Map.data t.protocol_states_for_root_scan_state
   }
 
 let max_length { max_length; _ } = max_length
@@ -290,7 +287,7 @@ module Visualizor = struct
         let graph_with_node = add_vertex graph node in
         List.fold node.successor_hashes ~init:graph_with_node
           ~f:(fun acc_graph successor_state_hash ->
-            match State_hash.Table.find t.table successor_state_hash with
+            match Hashtbl.find t.table successor_state_hash with
             | Some child_node ->
                 add_edge acc_graph node child_node
             | None ->
@@ -791,7 +788,7 @@ let update_metrics_with_diff (type mutant)
         Gauge.inc_one Transition_frontier.active_breadcrumbs ;
         Counter.inc_one Transition_frontier.total_breadcrumbs ;
         Gauge.set Transition_frontier.accepted_block_slot_time_sec
-          (slot_time t b |> slot_time_to_offset_time_span))
+          (slot_time t b |> slot_time_to_offset_time_span) )
   | Root_transitioned { garbage = Full garbage_breadcrumbs; _ } ->
       let new_root_breadcrumb = root t in
       Mina_metrics.(
@@ -810,7 +807,7 @@ let update_metrics_with_diff (type mutant)
         Counter.inc Transition_frontier.finalized_staged_txns
           num_finalized_staged_txns ;
         Counter.inc_one Transition_frontier.root_transitions ;
-        Transition_frontier.TPS_30min.update num_finalized_staged_txns)
+        Transition_frontier.TPS_30min.update num_finalized_staged_txns )
       (* TODO: optimize and add these metrics back in (#2850) *)
       (*
         let root_snarked_ledger_accounts =
@@ -860,7 +857,7 @@ let update_metrics_with_diff (type mutant)
                         c + 1
                     | _ ->
                         c )
-                  valid_commands ) )) ;
+                  valid_commands ) ) ) ;
         if is_recent_block then
           Gauge.set Transition_frontier.best_tip_coinbase
             (if has_coinbase best_tip then 1. else 0.) ;
@@ -874,7 +871,7 @@ let update_metrics_with_diff (type mutant)
         Gauge.set Transition_frontier.best_tip_block_height
           (Mina_numbers.Length.to_int height |> Int.to_float) ;
         Gauge.set Transition_frontier.empty_blocks_at_best_tip
-          (Int.to_float (empty_blocks_at_best_tip t)))
+          (Int.to_float (empty_blocks_at_best_tip t)) )
 
 let apply_diffs ({ context = (module Context); _ } as t) diffs
     ~enable_epoch_ledger_sync ~has_long_catchup_job =
@@ -934,7 +931,7 @@ let apply_diffs ({ context = (module Context); _ } as t) diffs
   `New_root_and_diffs_with_mutants (new_root, diffs_with_mutants)
 
 module For_tests = struct
-  open Core_kernel
+  open Core
   open Mina_base
   open Signature_lib
 
@@ -1029,7 +1026,7 @@ module For_tests = struct
     in
     let persistent_root =
       Persistent_root.create ~logger ~backing_type:Stable_db
-        ~directory:(Filename.temp_file "snarked_ledger" "")
+        ~directory:(Filename_unix.temp_file "snarked_ledger" "")
         ~ledger_depth
     in
     let%map () =

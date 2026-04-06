@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* deriving bin_io, version, but not wrapped in %%versioned *)
 

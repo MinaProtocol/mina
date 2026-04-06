@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 (** The is a monad which is conceptually similar to `Deferred.Or_error.t`,

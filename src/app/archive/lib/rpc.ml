@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 
 let t : (Diff.t, Unit.Stable.V1.t) Rpc.Rpc.t =

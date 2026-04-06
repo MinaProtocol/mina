@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Instance : sig
   type chunking_data = { num_chunks : int; domain_size : int; zk_rows : int }

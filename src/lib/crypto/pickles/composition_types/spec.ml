@@ -1,5 +1,5 @@
 module D = Digest
-open Core_kernel
+open Core
 open Pickles_types
 open Hlist
 module Sc = Kimchi_backend_common.Scalar_challenge

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* an extension that's not a test module *)
 

@@ -11,7 +11,7 @@
    ones, and is meant to be used by client code (via grapqh_ppx).
 *)
 
-open Core_kernel
+open Core
 open Utils
 
 module Make (Schema : Schema) = struct
@@ -103,32 +103,32 @@ module Make (Schema : Schema) = struct
   end
 
   module Time = struct
-    type t = Core_kernel.Time.t
+    type t = Time_float.t
 
     let parse json =
-      Yojson.Basic.Util.to_string json |> Core_kernel.Time.of_string
+      Yojson.Basic.Util.to_string json |> Time_float_unix.of_string
 
-    let serialize t = `String (Core_kernel.Time.to_string t)
+    let serialize t = `String (Time_float_unix.to_string t)
 
     let typ () = scalar "Time" ~coerce:serialize
   end
 
   module Span = struct
-    type t = Core.Time.Span.t
+    type t = Time_float.Span.t
 
     let parse json =
       Yojson.Basic.Util.to_string json
-      |> Int64.of_string |> Int64.to_float |> Core.Time.Span.of_ms
+      |> Int64.of_string |> Int64.to_float |> Time_float.Span.of_ms
 
     let serialize x =
-      `String (Core.Time.Span.to_ms x |> Int64.of_float |> Int64.to_string)
+      `String (Time_float.Span.to_ms x |> Int64.of_float |> Int64.to_string)
 
     let typ () = scalar "Span" ~doc:"span" ~coerce:serialize
   end
 
   module InetAddr =
     Make_scalar_using_to_string
-      (Core.Unix.Inet_addr)
+      (Core_unix.Inet_addr)
       (struct
         let name = "InetAddr"
 

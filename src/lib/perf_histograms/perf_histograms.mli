@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Rpc : sig
   module Plain : sig
@@ -18,14 +18,14 @@ end
 module Report : sig
   type t =
     { values : int list
-    ; intervals : (Time.Span.t * Time.Span.t) list
+    ; intervals : (Time_float.Span.t * Time_float.Span.t) list
     ; underflow : int
     ; overflow : int
     }
   [@@deriving yojson, bin_io, fields]
 end
 
-val add_span : name:string -> Time.Span.t -> unit
+val add_span : name:string -> Time_float.Span.t -> unit
 
 val report : name:string -> Report.t option
 

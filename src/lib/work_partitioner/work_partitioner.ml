@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 open struct
   module Work = Snark_work_lib
@@ -20,7 +20,7 @@ type t =
            not the other. throw it here. *)
   ; mutable pending_zkapp_commands : Pending_zkapp_command.t Single_id_map.t
         (** This is a map because we need [iteri_until]  *)
-  ; reassignment_timeout : Time.Span.t
+  ; reassignment_timeout : Time_float.Span.t
   ; zkapp_jobs_sent_by_partitioner : Sent_zkapp_job_pool.t
   ; single_jobs_sent_by_partitioner : Sent_single_job_pool.t
   ; mutable tmp_slot :
@@ -30,7 +30,7 @@ type t =
   ; proof_cache_db : Proof_cache_tag.cache_db
   }
 
-let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t)
+let create ~(reassignment_timeout : Time_float.Span.t) ~(logger : Logger.t)
     ~(proof_cache_db : Proof_cache_tag.cache_db)
     ~(signature_kind : Mina_signature_kind.t) : t =
   let module T = Transaction_snark.Make (struct
@@ -57,8 +57,8 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t)
 let reschedule_if_old ~reassignment_timeout
     ({ job; scheduled } :
       _ Work.With_job_meta.Stable.Latest.t Job_pool.scheduled ) =
-  let delta = Time.(diff (now ()) scheduled) in
-  if Time.Span.( > ) delta reassignment_timeout then `Stop_reschedule job
+  let delta = Time_float.(diff (now ()) scheduled) in
+  if Time_float.Span.( > ) delta reassignment_timeout then `Stop_reschedule job
   else `Stop_keep
 
 (* NOTE: below are logics for work requesting *)
@@ -117,7 +117,7 @@ let schedule_from_any_pending_zkapp_command ~(partitioner : t) :
   (* TODO: Consider remove all works no longer relevant for current frontier,
      this may need changes from underlying work selector. *)
   ignore
-    (Single_id_map.iteri_until
+    (Map.iteri_until
        ~f:(fun ~key:id ~data ->
          match schedule_from_pending_zkapp_command ~id ~partitioner data with
          | None ->
@@ -135,14 +135,13 @@ let convert_zkapp_command_from_selector ~partitioner ~job ~pairing
     Snark_worker_shared.Zkapp_command_inputs.read_all_proofs_from_disk
       unscheduled_segments
     |> Mina_stdlib.Nonempty_list.map ~f:(fun (witness, spec, statement) ->
-           Work.Spec.Sub_zkapp.Stable.Latest.Segment
-             { statement; witness; spec } )
+        Work.Spec.Sub_zkapp.Stable.Latest.Segment { statement; witness; spec } )
   in
   let pending_zkapp_command, first_segment, first_range =
     Pending_zkapp_command.create_and_yield_segment ~job ~unscheduled_segments
   in
   partitioner.pending_zkapp_commands <-
-    Single_id_map.add_exn ~key:pairing ~data:pending_zkapp_command
+    Map.add_exn ~key:pairing ~data:pending_zkapp_command
       partitioner.pending_zkapp_commands ;
   register_pending_zkapp_command_job ~id:pairing ~partitioner ~range:first_range
     ~sub_zkapp_spec:first_segment ~pending:pending_zkapp_command
@@ -268,8 +267,7 @@ let submit_into_combining_result ~submitted_result ~partitioner
          meaning it's completed by another worker, ignoring"
         ~metadata:
           [ ( "result"
-            , Work.Result.Single.Poly.to_yojson
-                (const `Null)
+            , Work.Result.Single.Poly.to_yojson (const `Null)
                 Ledger_proof.to_yojson submitted_result )
           ] ;
       `Removed
@@ -281,7 +279,7 @@ let submit_into_combining_result ~submitted_result ~partitioner
           [ ( "spec"
             , One_or_two.to_yojson
                 Work.Spec.Single.(
-                  Fn.compose Stable.Latest.to_yojson read_all_proofs_from_disk)
+                  Fn.compose Stable.Latest.to_yojson read_all_proofs_from_disk )
                 spec )
           ; ( "result"
             , Work.Result.Single.Poly.to_yojson
@@ -333,8 +331,7 @@ let submit_single ~is_from_zkapp ~partitioner
          meaning it's completed/no longer needed, ignoring"
         ~metadata:
           [ ( "result"
-            , Work.Result.Single.Poly.to_yojson
-                (const `Null)
+            , Work.Result.Single.Poly.to_yojson (const `Null)
                 Ledger_proof.to_yojson submitted_result )
           ] ;
       Removed
@@ -353,7 +350,7 @@ let submit_into_pending_zkapp_command ~partitioner
     ~job_id:({ range; _ } as job_id : Work.Id.Sub_zkapp.t)
     ~data:
       ({ proof; data = elapsed } :
-        (Core.Time.Span.t, Ledger_proof.t) Proof_carrying_data.t ) =
+        (Core.Time_float.Span.t, Ledger_proof.t) Proof_carrying_data.t ) =
   let single_id = Work.Id.Sub_zkapp.to_single job_id in
   let finalize_zkapp_proof pending =
     match Pending_zkapp_command.try_finalize pending with
@@ -362,7 +359,7 @@ let submit_into_pending_zkapp_command ~partitioner
     | Some ({ job_id; _ }, proof, elapsed) ->
         [%log' debug partitioner.logger] "Finalized proof for zkapp command" ;
         partitioner.pending_zkapp_commands <-
-          Single_id_map.remove partitioner.pending_zkapp_commands single_id ;
+          Map.remove partitioner.pending_zkapp_commands single_id ;
         submit_single ~is_from_zkapp:true ~partitioner
           ~submitted_result:{ spec = (); proof; elapsed }
           ~job_id
@@ -370,7 +367,7 @@ let submit_into_pending_zkapp_command ~partitioner
   match
     ( Sent_zkapp_job_pool.remove ~id:job_id
         partitioner.zkapp_jobs_sent_by_partitioner
-    , Single_id_map.find partitioner.pending_zkapp_commands single_id )
+    , Map.find partitioner.pending_zkapp_commands single_id )
   with
   | Some { job; _ }, Some pending -> (
       match

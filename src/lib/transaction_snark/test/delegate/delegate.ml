@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 module U = Transaction_snark_tests.Util
 
@@ -32,7 +32,7 @@ let%test_module "Update account delegate" =
     include Transaction_snark_tests.Test_zkapp_update.Make (Test_input)
 
     let () =
-      match Sys.getenv_opt "PROOF_CACHE_OUT" with
+      match Sys.getenv "PROOF_CACHE_OUT" with
       | Some path ->
           Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
       | None ->

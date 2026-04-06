@@ -1,6 +1,6 @@
 (* quickcheck_lib.ml *)
 
-open Core_kernel
+open Core
 open Quickcheck.Generator
 open Quickcheck.Let_syntax
 

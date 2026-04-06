@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Snark_params.Tick
 open Snark_params.Tick.Run
@@ -132,7 +132,7 @@ module Account_update_under_construction = struct
       let add_events t events : t = { events = t.events @ events }
 
       let to_zkapp_command_events ({ events } : t) : Zkapp_account.Events.var =
-        let open Core_kernel in
+        let open Core in
         let empty_var : Zkapp_account.Events.var =
           exists ~compute:(fun () -> []) Zkapp_account.Events.typ
         in
@@ -150,7 +150,7 @@ module Account_update_under_construction = struct
 
       let to_zkapp_command_actions ({ actions } : t) : Zkapp_account.Actions.var
           =
-        let open Core_kernel in
+        let open Core in
         let empty_var : Zkapp_account.Events.var =
           exists ~compute:(fun () -> []) Zkapp_account.Actions.typ
         in

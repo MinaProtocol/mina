@@ -1,7 +1,7 @@
 (* test_common.ml -- code common to tests *)
 
 open Integration_test_lib
-open Core_kernel
+open Core
 open Async
 open Mina_transaction
 

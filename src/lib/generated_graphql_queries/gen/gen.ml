@@ -1,5 +1,5 @@
 open Ppxlib
-open Core_kernel
+open Core
 
 module Zkapp_command_templates = struct
   let pooled_zkapp_commands =

@@ -5,7 +5,7 @@
    run benchmarks for all libraries
 *)
 
-open Core_kernel
+open Core
 
 let available_libraries = [ "vrf_lib_tests"; "mina_base"; "data_hash_lib" ]
 

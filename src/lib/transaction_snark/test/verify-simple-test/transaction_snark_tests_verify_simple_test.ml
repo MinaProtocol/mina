@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 let `VK vk, `Prover p = Transaction_snark.For_tests.create_trivial_snapp ()

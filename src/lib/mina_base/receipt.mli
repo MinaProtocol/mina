@@ -1,6 +1,6 @@
 (* receipt.mli *)
 
-open Core_kernel
+open Core
 open Snark_params.Tick
 
 module Signed_command_elt : sig

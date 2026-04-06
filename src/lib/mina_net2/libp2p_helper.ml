@@ -79,7 +79,7 @@ module Go_log = struct
 
   let record_to_message r =
     Logger.Message.
-      { timestamp = Time.of_string r.ts
+      { timestamp = Time_float.of_string_with_utc_offset r.ts
       ; level = ours_of_go r.level
       ; source =
           Some
@@ -158,7 +158,8 @@ let handle_libp2p_helper_termination t ~pids ~killed result =
         [%log' fatal t.logger]
           !"libp2p_helper process died unexpectedly: $exit_status"
           ~metadata:
-            [ ("exit_status", `String (Unix.Exit_or_signal.to_string_hum e)) ] ;
+            [ ("exit_status", `String (Core_unix.Exit_or_signal.to_string_hum e))
+            ] ;
         t.finished <- true ;
         let%map () = Ivar.read t.stderr_finished in
         raise Libp2p_helper_died_unexpectedly
@@ -179,7 +180,7 @@ let handle_libp2p_helper_termination t ~pids ~killed result =
     let exit_status =
       match result with
       | Ok e ->
-          `String (Unix.Exit_or_signal.to_string_hum e)
+          `String (Core_unix.Exit_or_signal.to_string_hum e)
       | Error err ->
           Error_json.error_to_yojson err
     in
@@ -198,7 +199,7 @@ let handle_incoming_message t msg ~handle_push_message =
     in
     Mina_metrics.Network.(
       Ipc_latency_histogram.observe ipc_latency_ns_summary
-        (Time_ns.Span.to_ns message_delay))
+        (Time_ns.Span.to_ns message_delay) )
   in
   match msg with
   | RpcResponse rpc_response ->
@@ -234,8 +235,7 @@ let handle_incoming_message t msg ~handle_push_message =
                 DaemonInterface.PushMessage.header_get push_msg
               in
               record_message_delay (PushMessageHeader.time_sent_get push_header) ;
-              handle_push_message t (DaemonInterface.PushMessage.get push_msg) )
-          )
+              handle_push_message t (DaemonInterface.PushMessage.get push_msg) ) )
   | Undefined n ->
       Libp2p_ipc.undefined_union ~context:"DaemonInterface.Message" n
 
@@ -247,12 +247,12 @@ let spawn ?(allow_multiple_instances = false) ~logger ~pids ~conf_dir
         Child_processes.start_custom ~allow_multiple_instances ~logger
           ~name:"libp2p_helper"
           ~git_root_relative_path:
-            "src/app/libp2p_helper/result/bin/libp2p_helper" ~conf_dir ~args:[]
-          ~stdout:`Chunks ~stderr:`Lines
+            "src/app/libp2p_helper/result/bin/libp2p_helper"
+          ~conf_dir ~args:[] ~stdout:`Chunks ~stderr:`Lines
           ~termination:
             (`Handler
-              (fun ~killed _process result ->
-                !termination_handler ~killed result ) )
+               (fun ~killed _process result ->
+                 !termination_handler ~killed result ) )
           () )
   with
   | Error e ->
@@ -280,47 +280,41 @@ let spawn ?(allow_multiple_instances = false) ~logger ~pids ~conf_dir
           let%map () =
             Child_processes.stderr process
             |> Strict_pipe.Reader.iter ~f:(fun line ->
-                   Mina_metrics.(
-                     Counter.inc_one
-                       Mina_metrics.Network.ipc_logs_received_total) ;
-                   let record_result =
-                     try
-                       Some
-                         ( Go_log.record_of_yojson
-                         @@ Yojson.Safe.from_string line )
-                     with Yojson.Json_error _error -> None
-                   in
-                   ( match record_result with
-                   | Some (Ok record) ->
-                       record |> Go_log.record_to_message |> Logger.raw logger
-                   | Some (Error error) ->
-                       [%log error]
-                         "failed to parse record over libp2p_helper stderr: \
-                          $error"
-                         ~metadata:[ ("error", `String error) ]
-                   | None ->
-                       Core.print_endline line ) ;
-                   Deferred.unit )
+                Mina_metrics.(
+                  Counter.inc_one Mina_metrics.Network.ipc_logs_received_total ) ;
+                let record_result =
+                  try
+                    Some
+                      (Go_log.record_of_yojson @@ Yojson.Safe.from_string line)
+                  with Yojson.Json_error _error -> None
+                in
+                ( match record_result with
+                | Some (Ok record) ->
+                    record |> Go_log.record_to_message |> Logger.raw logger
+                | Some (Error error) ->
+                    [%log error]
+                      "failed to parse record over libp2p_helper stderr: $error"
+                      ~metadata:[ ("error", `String error) ]
+                | None ->
+                    Core.print_endline line ) ;
+                Deferred.unit )
           in
           Ivar.fill t.stderr_finished () ) ;
       O1trace.background_thread "handle_libp2p_ipc_incoming" (fun () ->
           Child_processes.stdout process
           |> Libp2p_ipc.read_incoming_messages
           |> Strict_pipe.Reader.iter ~f:(function
-               | Ok msg ->
-                   let msg =
-                     Libp2p_ipc.Reader.DaemonInterface.Message.get msg
-                   in
-                   if not t.finished then
-                     handle_incoming_message t msg ~handle_push_message
-                   else Deferred.unit
-               | Error error ->
-                   [%log error]
-                     "failed to parse IPC message over libp2p_helper stdout: \
-                      $error"
-                     ~metadata:
-                       [ ("error", `String (Error.to_string_hum error)) ] ;
-                   Deferred.unit ) ) ;
+            | Ok msg ->
+                let msg = Libp2p_ipc.Reader.DaemonInterface.Message.get msg in
+                if not t.finished then
+                  handle_incoming_message t msg ~handle_push_message
+                else Deferred.unit
+            | Error error ->
+                [%log error]
+                  "failed to parse IPC message over libp2p_helper stdout: \
+                   $error"
+                  ~metadata:[ ("error", `String (Error.to_string_hum error)) ] ;
+                Deferred.unit ) ) ;
       Or_error.return t
 
 let shutdown t =

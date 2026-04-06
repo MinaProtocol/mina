@@ -53,7 +53,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
           { name : string
           ; doc : string option
           ; typ : ('obj_arg option, 'a) arg_typ
-          ; default : 'obj_arg
+          ; default : Graphql_parser.const_value
           }
           -> ('obj_arg, 'a) arg
 
@@ -202,7 +202,8 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
     let arg ?doc name ~typ = Arg { name; typ; doc }
 
-    let arg' ?doc name ~typ ~default = DefaultArg { name; typ; doc; default }
+    let arg' ?doc name ~typ ~default =
+      DefaultArg { name; typ; doc; default }
   end
 
   module Fields = struct

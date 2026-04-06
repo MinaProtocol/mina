@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base_util
 open Snark_params.Tick
 open Signature_lib
@@ -216,20 +216,20 @@ module May_use_token = struct
                    , ( ( bool t
                        , ( bool t
                          , ( bool t
-                           , ( (< contramap : (bool t -> bool t) Core_kernel.ref
+                           , ( (< contramap : (bool t -> bool t) Core.ref
                                 ; graphql_arg :
                                     (   unit
                                      -> bool t
                                         Fields_derivers_graphql.Schema.Arg
                                         .arg_typ )
-                                    Core_kernel.ref
+                                    Core.ref
                                 ; graphql_arg_accumulator :
                                     bool t
                                     Fields_derivers_zkapps.Derivers.Graphql.Args
                                     .Acc
                                     .T
                                     .t
-                                    Core_kernel.ref
+                                    Core.ref
                                 ; graphql_creator :
                                     (   ( ( 'a
                                           , bool t
@@ -248,7 +248,7 @@ module May_use_token = struct
                                         .Input
                                         .t
                                      -> bool t )
-                                    Core_kernel.ref
+                                    Core.ref
                                 ; graphql_fields :
                                     bool t
                                     Fields_derivers_zkapps.Derivers.Graphql
@@ -256,7 +256,7 @@ module May_use_token = struct
                                     .Input
                                     .T
                                     .t
-                                    Core_kernel.ref
+                                    Core.ref
                                 ; graphql_fields_accumulator :
                                     bool t
                                     Fields_derivers_zkapps.Derivers.Graphql
@@ -265,16 +265,14 @@ module May_use_token = struct
                                     .T
                                     .t
                                     list
-                                    Core_kernel.ref
-                                ; graphql_query : string option Core_kernel.ref
+                                    Core.ref
+                                ; graphql_query : string option Core.ref
                                 ; graphql_query_accumulator :
-                                    (Core_kernel.String.t * string option)
-                                    option
-                                    list
-                                    Core_kernel.ref
+                                    (Core.String.t * string option) option list
+                                    Core.ref
                                 ; js_layout :
                                     [> `Assoc of (string * Yojson.Safe.t) list ]
-                                    Core_kernel.ref
+                                    Core.ref
                                 ; js_layout_accumulator :
                                     Fields_derivers_zkapps__.Fields_derivers_js
                                     .Js_layout
@@ -282,14 +280,14 @@ module May_use_token = struct
                                     .field
                                     option
                                     list
-                                    Core_kernel.ref
-                                ; map : (bool t -> bool t) Core_kernel.ref
+                                    Core.ref
+                                ; map : (bool t -> bool t) Core.ref
                                 ; nullable_graphql_arg :
                                     (   unit
                                      -> 'b
                                         Fields_derivers_graphql.Schema.Arg
                                         .arg_typ )
-                                    Core_kernel.ref
+                                    Core.ref
                                 ; nullable_graphql_fields :
                                     bool t option
                                     Fields_derivers_zkapps.Derivers.Graphql
@@ -297,21 +295,17 @@ module May_use_token = struct
                                     .Input
                                     .T
                                     .t
-                                    Core_kernel.ref
-                                ; of_json :
-                                    (Yojson.Safe.t -> bool t) Core_kernel.ref
+                                    Core.ref
+                                ; of_json : (Yojson.Safe.t -> bool t) Core.ref
                                 ; of_json_creator :
-                                    Yojson.Safe.t Core_kernel.String.Map.t
-                                    Core_kernel.ref
-                                ; skip : bool Core_kernel.ref
-                                ; to_json :
-                                    (bool t -> Yojson.Safe.t) Core_kernel.ref
+                                    Yojson.Safe.t Core.String.Map.t Core.ref
+                                ; skip : bool Core.ref
+                                ; to_json : (bool t -> Yojson.Safe.t) Core.ref
                                 ; to_json_accumulator :
-                                    ( Core_kernel.String.t
-                                    * (bool t -> Yojson.Safe.t) )
+                                    (Core.String.t * (bool t -> Yojson.Safe.t))
                                     option
                                     list
-                                    Core_kernel.ref
+                                    Core.ref
                                 ; .. >
                                 as
                                 'a )
@@ -409,7 +403,7 @@ module May_use_token = struct
               let%bind () = typ.check x in
               let sum =
                 Field.Var.(
-                  add (parents_own_token :> t) (inherit_from_parent :> t))
+                  add (parents_own_token :> t) (inherit_from_parent :> t) )
               in
               (* Assert boolean; we should really have a helper for this
                  somewhere.
@@ -885,7 +879,7 @@ module Update = struct
         |> Typ.transport_var
              ~there:
                (Set_or_keep.Checked.map
-                  ~f:(fun { Zkapp_basic.Flagged_option.data; _ } -> data) )
+                  ~f:(fun { Zkapp_basic.Flagged_option.data; _ } -> data ) )
              ~back:(fun x ->
                Set_or_keep.Checked.map x ~f:(fun data ->
                    { Zkapp_basic.Flagged_option.data
@@ -962,12 +956,12 @@ module Account_precondition = struct
     Quickcheck.Generator.variant3 Zkapp_precondition.Account.gen
       Account.Nonce.gen Unit.quickcheck_generator
     |> Quickcheck.Generator.map ~f:(function
-         | `A precondition ->
-             precondition
-         | `B n ->
-             Zkapp_precondition.Account.nonce n
-         | `C () ->
-             Zkapp_precondition.Account.accept )
+      | `A precondition ->
+          precondition
+      | `B n ->
+          Zkapp_precondition.Account.nonce n
+      | `C () ->
+          Zkapp_precondition.Account.accept )
 
   module Tag = struct
     type t = Full | Nonce | Accept [@@deriving equal, compare, sexp, yojson]
@@ -979,7 +973,7 @@ module Account_precondition = struct
     let digest x =
       Random_oracle.(
         hash ~init:Hash_prefix_states.account_update_account_precondition
-          (pack_input x))
+          (pack_input x) )
     in
     t |> Zkapp_precondition.Account.to_input |> digest
 
@@ -990,7 +984,7 @@ module Account_precondition = struct
       let digest x =
         Random_oracle.Checked.(
           hash ~init:Hash_prefix_states.account_update_account_precondition
-            (pack_input x))
+            (pack_input x) )
       in
       Zkapp_precondition.Account.Checked.to_input t |> digest
 
@@ -1335,7 +1329,7 @@ module Body = struct
       Fields.make_creator obj ~public_key:!.public_key ~fee:!.fee
         ~valid_until:
           !.Fields_derivers_zkapps.Derivers.(
-              option ~js_type:Or_undefined @@ global_slot_since_genesis @@ o ())
+              option ~js_type:Or_undefined @@ global_slot_since_genesis @@ o () )
         ~nonce:!.uint32
       |> finish "FeePayerBody" ~t_toplevel_annots
   end
@@ -1494,7 +1488,7 @@ module Body = struct
       Random_oracle.Checked.(
         hash
           ~init:(Hash_prefix.zkapp_body ~signature_kind)
-          (pack_input (to_input t)))
+          (pack_input (to_input t)) )
   end
 
   let typ () : (Checked.t, t) Typ.t =
@@ -1569,7 +1563,7 @@ module Body = struct
     Random_oracle.(
       hash
         ~init:(Hash_prefix.zkapp_body ~signature_kind)
-        (pack_input (to_input t)))
+        (pack_input (to_input t)) )
 
   module Digested = struct
     type t = Random_oracle.Digest.t

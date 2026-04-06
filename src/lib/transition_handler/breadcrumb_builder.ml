@@ -31,8 +31,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                              |> Envelope.Incoming.data
                            in
                            Mina_base.State_hash.(
-                             to_yojson (With_state_hashes.state_hash transition))
-                           )
+                             to_yojson (With_state_hashes.state_hash transition) ) )
                          subtree ) ) )
             ]
           "Transition frontier already garbage-collected the parent of \
@@ -41,7 +40,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
     | Some breadcrumb ->
         Or_error.return breadcrumb
   in
-  Deferred.Or_error.List.map subtrees_of_enveloped_transitions
+  Deferred.Or_error.List.map subtrees_of_enveloped_transitions ~how:`Sequential
     ~f:(fun subtree_of_enveloped_transitions ->
       let%bind.Deferred.Or_error init_breadcrumb =
         breadcrumb_if_present
@@ -52,9 +51,11 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
       Mina_stdlib.Rose_tree.Deferred.Or_error.fold_map_over_subtrees
         subtree_of_enveloped_transitions
         ~init:(Cached.pure init_breadcrumb, None)
-        ~f:(fun (cached_parent, _parent_vc)
-                ( Mina_stdlib.Rose_tree.T
-                    ((cached_enveloped_transition, valid_cb), _) as subtree ) ->
+        ~f:(fun
+            (cached_parent, _parent_vc)
+            ( Mina_stdlib.Rose_tree.T
+                ((cached_enveloped_transition, valid_cb), _) as subtree )
+          ->
           let%map.Deferred cached_result =
             Cached.transform cached_enveloped_transition
               ~f:(fun enveloped_transition ->
@@ -62,7 +63,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                 let transition_with_initial_validation =
                   Envelope.Incoming.data enveloped_transition
                 in
-                let transition_receipt_time = Some (Time.now ()) in
+                let transition_receipt_time = Some (Time_float.now ()) in
                 let transition_with_hash, _ =
                   transition_with_initial_validation
                 in
@@ -111,7 +112,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                         Mina_metrics.(
                           Counter.inc_one
                             Transition_frontier_controller
-                            .breadcrumbs_built_by_builder) ;
+                            .breadcrumbs_built_by_builder ) ;
                         Deferred.return
                           (let%map (_ : Transition_frontier.Breadcrumb.t) =
                              breadcrumb_if_present
@@ -144,7 +145,8 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                         let ip_addresses = Set.to_list ip_address_set in
                         let trust_system_record_invalid msg error =
                           let%map () =
-                            Deferred.List.iter ip_addresses ~f:(fun ip_addr ->
+                            Deferred.List.iter ip_addresses ~how:`Sequential
+                              ~f:(fun ip_addr ->
                                 Trust_system.record trust_system logger ip_addr
                                   ( Trust_system.Actions
                                     .Gossiped_invalid_transition

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Integration_test_lib
 

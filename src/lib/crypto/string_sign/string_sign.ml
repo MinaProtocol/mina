@@ -2,7 +2,7 @@
 
 module Inner_curve = Snark_params.Tick.Inner_curve
 open Signature_lib
-open Core_kernel
+open Core
 
 let nybble_bits = function
   | 0x0 ->
@@ -41,7 +41,7 @@ let nybble_bits = function
       failwith "nybble_bits: expected value from 0 to 0xF"
 
 let char_bits c =
-  let open Core_kernel in
+  let open Core in
   let n = Char.to_int c in
   let hi = Int.(shift_right (bit_and n 0xF0) 4) in
   let lo = Int.bit_and n 0x0F in

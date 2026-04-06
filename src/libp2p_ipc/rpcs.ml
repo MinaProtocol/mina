@@ -2,7 +2,7 @@
 
 open Build
 open Ipc
-open Core_kernel
+open Core
 
 module type Rpc_intf = sig
   val name : string

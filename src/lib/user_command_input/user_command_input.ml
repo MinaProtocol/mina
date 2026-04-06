@@ -1,7 +1,7 @@
 open Mina_base
 open Signature_lib
 open Mina_numbers
-open Core_kernel
+open Core
 open Async_kernel
 
 module Payload = struct

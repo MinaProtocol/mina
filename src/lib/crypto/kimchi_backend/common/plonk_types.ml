@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 module Step_impl = Kimchi_pasta_snarky_backend.Step_impl
 module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
 
@@ -1751,7 +1751,7 @@ module Proof = struct
 end
 
 module Shifts = struct
-  open Core_kernel
+  open Core
 
   [%%versioned
   module Stable = struct

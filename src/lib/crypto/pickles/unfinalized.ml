@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Backend
 open Impls.Step
 open Pickles_types
@@ -73,7 +73,7 @@ module Constant = struct
            ~zk_rows:Plonk_checks.zk_rows_by_default
            ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
            ~field_of_hex:
-             (Core_kernel.Fn.compose Tock.Field.of_bigint (fun x ->
+             (Core.Fn.compose Tock.Field.of_bigint (fun x ->
                   Kimchi_pasta.Pasta.Bigint256.of_hex_string x ) )
            ~domain:
              (Plonk_checks.domain

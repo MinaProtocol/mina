@@ -1,5 +1,5 @@
 open Async
-open Core_kernel
+open Core
 open Network_pool
 open Network_peer
 

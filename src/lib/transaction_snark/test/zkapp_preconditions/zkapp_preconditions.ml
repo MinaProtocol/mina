@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Currency
 open Signature_lib
 module U = Transaction_snark_tests.Util
@@ -268,7 +268,7 @@ let%test_module "Protocol state precondition tests" =
                         Zkapp_basic.Or_ignore.(
                           Check
                             Zkapp_precondition.Closed_interval.
-                              { lower = new_slot; upper = new_slot })
+                              { lower = new_slot; upper = new_slot } )
                     }
                   in
                   let sender, sender_nonce = spec.sender in
@@ -331,7 +331,7 @@ let%test_module "Protocol state precondition tests" =
                                    (sub amount
                                       (of_fee
                                          constraint_constants
-                                           .account_creation_fee ) ) ))
+                                           .account_creation_fee ) ) ) )
                         ; increment_nonce = false
                         ; implicit_account_creation_fee = true
                         ; events = []
@@ -754,7 +754,7 @@ let%test_module "Account precondition tests" =
                     List.fold [ token_owner; token_account ]
                       ~init:Public_key.Compressed.Map.empty
                       ~f:(fun map { private_key; public_key } ->
-                        Public_key.Compressed.Map.add_exn map
+                        Map.add_exn map
                           ~key:(Public_key.compress public_key)
                           ~data:private_key )
                   in
@@ -809,7 +809,7 @@ let%test_module "Account precondition tests" =
           Mina_generators.Zkapp_command_generators.(
             gen_account_precondition_from_account ~first_use_of_account:true
               ~is_nonce_precondition:true ~failure:Invalid_account_precondition
-              snapp_account)
+              snapp_account )
         in
         (l, account_precondition)
       in
@@ -1022,7 +1022,7 @@ let%test_module "Account precondition tests" =
                       (Str.regexp
                          (sprintf {|.*\(%s\).*|}
                             Transaction_status.Failure.(
-                              to_string Account_nonce_precondition_unsatisfied) ) )
+                              to_string Account_nonce_precondition_unsatisfied ) ) )
                       (Error.to_string_hum e) 0 )
               | Ok _ ->
                   failwith
@@ -1030,7 +1030,7 @@ let%test_module "Account precondition tests" =
                      precondition in the fee payer" ) )
 
     let () =
-      match Sys.getenv_opt "PROOF_CACHE_OUT" with
+      match Sys.getenv "PROOF_CACHE_OUT" with
       | Some path ->
           Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
       | None ->

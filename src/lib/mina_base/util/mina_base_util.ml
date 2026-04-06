@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let field_of_bool =
   Snark_params.Tick.(fun b -> if b then Field.one else Field.zero)

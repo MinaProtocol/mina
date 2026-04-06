@@ -1,5 +1,5 @@
 open Signature_lib
-open Core_kernel
+open Core
 open Mina_base
 open Integration_test_lib
 module Impl = Pickles.Impls.Step

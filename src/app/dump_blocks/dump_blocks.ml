@@ -54,7 +54,7 @@ let encoded_block =
           failwith "invalid format" )
 
 let () =
-  let open Core_kernel in
+  let open Core in
   Backtrace.elide := false ;
   Async.Scheduler.set_record_backtraces true
 

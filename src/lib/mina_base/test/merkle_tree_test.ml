@@ -6,7 +6,7 @@
     Subject:    Test Merkle trees.
  *)
 
-open Core_kernel
+open Core
 open Snarky_backendless.Merkle_tree
 
 (* Need comparison in order to test hash equality. This implementation

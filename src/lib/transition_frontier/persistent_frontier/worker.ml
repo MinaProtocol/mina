@@ -66,7 +66,10 @@ module Worker = struct
         let extra_garbage =
           List.drop_last root_transition_diffs
           |> Option.value ~default:[]
-          |> List.bind ~f:(fun { new_root; garbage = Lite garbage; _ } ->
+          |> List.bind
+               ~f:(fun
+                   { Diff.Root_transition.new_root; garbage = Lite garbage; _ }
+                 ->
                  (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
                  :: garbage )
         in
@@ -79,7 +82,7 @@ module Worker = struct
           List.concat
             [ other_diffs
             ; Option.value_map total_root_transition_diff ~default:[]
-                ~f:(fun diff -> [ Diff.Lite.E.E (Root_transitioned diff) ])
+                ~f:(fun diff -> [ Diff.Lite.E.E (Root_transitioned diff) ] )
             ; Option.value_map final_best_tip_diff ~default:[] ~f:(fun diff ->
                   [ Diff.Lite.E.E (Best_tip_changed diff) ] )
             ]
@@ -102,7 +105,7 @@ module Worker = struct
                     |> Mina_state.Protocol_state.previous_state_hash
                   in
                   Option.some_if
-                    (not @@ State_hash.Set.mem state_hashes parent_hash)
+                    (not @@ Set.mem state_hashes parent_hash)
                     parent_hash
               | _ ->
                   None )

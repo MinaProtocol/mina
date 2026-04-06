@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 module Impl = Snark_worker.Impl
 module Graphql_client = Graphql_lib.Client

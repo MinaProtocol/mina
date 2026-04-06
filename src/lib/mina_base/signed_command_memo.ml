@@ -1,6 +1,6 @@
 (* signed_command_memo.ml *)
 
-open Core_kernel
+open Core
 open Snark_params
 
 (** See documentation of the {!Mina_wire_types} library *)

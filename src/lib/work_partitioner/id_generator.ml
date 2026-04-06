@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* NOTE: This range is both inclusive *)
 let id_lower_bound = Int64.min_value

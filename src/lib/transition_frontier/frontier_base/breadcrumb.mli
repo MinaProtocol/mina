@@ -4,7 +4,7 @@
  *)
 
 open Async_kernel
-open Core_kernel
+open Core
 open Signature_lib
 open Mina_base
 open Mina_state
@@ -24,7 +24,7 @@ val create :
      validated_transition:Mina_block.Validated.t
   -> staged_ledger:Staged_ledger.t
   -> just_emitted_a_proof:bool
-  -> transition_receipt_time:Time.t option
+  -> transition_receipt_time:Time_float.t option
   -> accounts_created:Account_id.t list
   -> t
 
@@ -41,7 +41,7 @@ val build :
        (   Transaction_snark_work.Statement.t
         -> Transaction_snark_work.Checked.t option )
   -> sender:Envelope.Sender.t option
-  -> transition_receipt_time:Time.t option
+  -> transition_receipt_time:Time_float.t option
   -> unit
   -> ( t
      , [> `Invalid_staged_ledger_diff of Error.t
@@ -60,7 +60,7 @@ val staged_ledger : t -> Staged_ledger.t
 
 val just_emitted_a_proof : t -> bool
 
-val transition_receipt_time : t -> Time.t option
+val transition_receipt_time : t -> Time_float.t option
 
 val hash : t -> int
 
@@ -128,7 +128,7 @@ module For_tests : sig
     -> parent:t
     -> transition:Mina_block.almost_valid_block
     -> sender:Envelope.Sender.t option
-    -> transition_receipt_time:Time.t option
+    -> transition_receipt_time:Time_float.t option
     -> unit
     -> ( t
        , [> `Invalid_staged_ledger_diff of Error.t

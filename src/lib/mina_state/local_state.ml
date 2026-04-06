@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Currency
 open Mina_base
 module Impl = Pickles.Impls.Step
@@ -144,8 +144,8 @@ module Checked = struct
   let assert_equal (t1 : t) (t2 : t) =
     let ( ! ) f x y = Impl.run_checked (f x y) in
     let f eq f =
-      Impl.with_label (Core_kernel.Field.name f) (fun () ->
-          Core_kernel.Field.(eq (get f t1) (get f t2)) )
+      Impl.with_label (Core.Field.name f) (fun () ->
+          Core.Field.(eq (get f t1) (get f t2)) )
     in
     Mina_transaction_logic.Zkapp_command_logic.Local_state.Fields.iter
       ~stack_frame:(f Stack_frame.Digest.Checked.Assert.equal)
@@ -162,7 +162,7 @@ module Checked = struct
 
   let equal' (t1 : t) (t2 : t) =
     let ( ! ) f x y = Impl.run_checked (f x y) in
-    let f eq acc f = Core_kernel.Field.(eq (get f t1) (get f t2)) :: acc in
+    let f eq acc f = Core.Field.(eq (get f t1) (get f t2)) :: acc in
     Mina_transaction_logic.Zkapp_command_logic.Local_state.Fields.fold ~init:[]
       ~stack_frame:(f Stack_frame.Digest.Checked.equal)
       ~call_stack:(f Call_stack_digest.Checked.equal)

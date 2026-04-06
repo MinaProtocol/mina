@@ -12,7 +12,7 @@
  (libraries
   ; opam libraries
   alcotest
-  core_kernel
+  core
   sexplib0
   ; local libraries
   kimchi_pasta

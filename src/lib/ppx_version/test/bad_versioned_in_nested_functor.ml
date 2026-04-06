@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (* deriving bin_io in nested functor body *)
 

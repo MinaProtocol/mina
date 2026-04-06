@@ -1,6 +1,6 @@
 (* archive_blocks.ml *)
 
-open Core_kernel
+open Core
 open Async
 open Archive_lib
 

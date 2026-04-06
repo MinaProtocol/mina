@@ -16,7 +16,7 @@ struct
 
   let initialize path ~logger =
     Async.Deferred.Result.map (Disk_cache_utils.initialize_dir path ~logger)
-      ~f:(fun path -> (path, ref 0))
+      ~f:(fun path -> (path, ref 0) )
 
   let path root i = root ^ Filename.dir_sep ^ Int.to_string i
 
@@ -33,13 +33,13 @@ struct
     (* When this reference is GC'd, delete the file. *)
     Core.Gc.Expert.add_finalizer_last_exn res (fun () ->
         (* Ignore errors: if a directory is deleted, it's ok. *)
-        try Core.Unix.unlink (path root idx) with _ -> () ) ;
+        try Core_unix.unlink (path root idx) with _ -> () ) ;
     (* Write the proof to the file. *)
     Out_channel.with_file ~binary:true (path root idx) ~f:(fun chan ->
         Out_channel.output_string chan @@ Binable.to_string (module B) x ) ;
     res
 
-  let count ((path, _) : t) = Sys.ls_dir path |> List.length
+  let count ((path, _) : t) = Sys_unix.ls_dir path |> List.length
 end
 
 let%test_module "disk_cache filesystem" =

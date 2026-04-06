@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 open Pipe_lib
 module Timeout = Timeout_lib.Core_time
 

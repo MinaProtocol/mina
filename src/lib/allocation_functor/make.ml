@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Partial = struct
   module Bin_io (M : Intf.Input.Bin_io_intf) :

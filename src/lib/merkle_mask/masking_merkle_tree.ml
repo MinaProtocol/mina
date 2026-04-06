@@ -35,10 +35,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       ; hashes = Map.merge_skewed ~combine base.hashes hashes
       ; locations = Map.merge_skewed ~combine base.locations locations
       ; non_existent_accounts =
-          Account_id.Set.(
+          Set.(
             union
               (diff base.non_existent_accounts @@ of_map_keys locations)
-              non_existent_accounts)
+              non_existent_accounts )
       }
       : maps_t )
 
@@ -508,7 +508,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           accounts =
             Map.remove t.maps.accounts location (* update token info. *)
         ; token_owners =
-            Token_id.Map.remove t.maps.token_owners
+            Map.remove t.maps.token_owners
               (Account_id.derive_token_id ~owner:account_id)
             (* TODO : use stack database to save unused location, which can be used
                when allocating a location *)
@@ -566,14 +566,15 @@ module Make (Inputs : Inputs_intf.S) = struct
     let parent_set_notify t account =
       assert_is_attached t ;
       Option.value ~default:()
-      @@ let%bind.Option location =
-           Map.find t.maps.locations (Account.identifier account)
-         in
-         let%bind.Option existing_account = Map.find t.maps.accounts location in
-         let%map.Option () =
-           Option.some_if (Account.equal account existing_account) ()
-         in
-         remove_account_and_update_hashes t location
+      @@
+      let%bind.Option location =
+        Map.find t.maps.locations (Account.identifier account)
+      in
+      let%bind.Option existing_account = Map.find t.maps.accounts location in
+      let%map.Option () =
+        Option.some_if (Account.equal account existing_account) ()
+      in
+      remove_account_and_update_hashes t location
 
     let is_committing t = t.is_committing
 
@@ -719,7 +720,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       let set_location_batch ~last_location t account_to_location_list =
         t.current_location <- Some last_location ;
         Mina_stdlib.Nonempty_list.iter account_to_location_list
-          ~f:(fun (key, data) -> self_set_location t key data)
+          ~f:(fun (key, data) -> self_set_location t key data )
 
       let set_raw_account_batch t locations_and_accounts =
         assert_is_attached t ;
@@ -754,7 +755,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       let maps, ancestor = maps_and_ancestor t in
       let mask_owners =
         Map.fold maps.token_owners ~init:Account_id.Set.empty
-          ~f:(fun ~key:_tid ~data:owner acc -> Set.add acc owner)
+          ~f:(fun ~key:_tid ~data:owner acc -> Set.add acc owner )
       in
       Set.union mask_owners (Base.token_owners ancestor)
 
@@ -764,9 +765,9 @@ module Make (Inputs : Inputs_intf.S) = struct
       let mask_tokens =
         Map.keys maps.locations
         |> List.filter_map ~f:(fun aid ->
-               if Key.equal pk (Account_id.public_key aid) then
-                 Some (Account_id.token_id aid)
-               else None )
+            if Key.equal pk (Account_id.public_key aid) then
+              Some (Account_id.token_id aid)
+            else None )
         |> Token_id.Set.of_list
       in
       Set.union mask_tokens (Base.tokens ancestor pk)
@@ -830,9 +831,9 @@ module Make (Inputs : Inputs_intf.S) = struct
         Option.value_map (last_filled t) ~default:[] ~f:(fun init ->
             snd
             @@ List.fold_map empty_keys ~init ~f:(fun loc _ ->
-                   Location.next loc
-                   |> Option.value_map ~default:(loc, loc) ~f:(fun loc' ->
-                          (loc', loc') ) ) )
+                Location.next loc
+                |> Option.value_map ~default:(loc, loc) ~f:(fun loc' ->
+                    (loc', loc') ) ) )
       in
       let locations = empty_locations @ non_empty_locations in
       let all_hash_locations =
@@ -940,7 +941,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       let mask_ignored_accounts = Account_id.Set.of_list mask_accounts in
       let all_ignored_accounts =
-        Account_id.Set.union ignored_accounts mask_ignored_accounts
+        Set.union ignored_accounts mask_ignored_accounts
       in
       (* in parent, ignore any passed-in ignored accounts and accounts in mask *)
       let parent_result =
@@ -948,8 +949,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       let f' accum (location, account) =
         (* for mask, ignore just passed-in ignored accounts *)
-        if Account_id.Set.mem ignored_accounts (Account.identifier account) then
-          accum
+        if Set.mem ignored_accounts (Account.identifier account) then accum
         else
           let address = Location.to_path_exn location in
           f address accum account

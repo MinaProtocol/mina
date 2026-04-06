@@ -4,7 +4,7 @@
     zkApps have been introduced in the first Mina protocol upgrade called
     Berkeley, which was release in June 2024.
 *)
-open Core_kernel
+open Core
 
 open Snark_params.Tick
 open Zkapp_basic
@@ -126,7 +126,7 @@ module Actions = struct
 
   let is_empty_var (e : var) =
     Snark_params.Tick.Field.(
-      Checked.equal (Data_as_hash.hash e) (Var.constant Actions_impl.empty_hash))
+      Checked.equal (Data_as_hash.hash e) (Var.constant Actions_impl.empty_hash) )
 
   let empty_state_element : Field.t =
     let salt_phrase = "MinaZkappActionStateEmptyElt" in
@@ -308,7 +308,7 @@ module Checked = struct
   let to_input' (t : _ Poly.t) :
       Snark_params.Tick.Field.Var.t Random_oracle.Input.Chunked.t =
     let open Random_oracle.Input.Chunked in
-    let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
+    let f mk acc field = mk (Core.Field.get field t) :: acc in
     let app_state v =
       Random_oracle.Input.Chunked.field_elements (Vector.to_array v)
     in
@@ -334,15 +334,15 @@ module Checked = struct
   let digest_vk t =
     Random_oracle.Checked.(
       hash ~init:Hash_prefix_states.side_loaded_vk
-        (pack_input (Pickles.Side_loaded.Verification_key.Checked.to_input t)))
+        (pack_input (Pickles.Side_loaded.Verification_key.Checked.to_input t)) )
 
   let digest t =
     Random_oracle.Checked.(
-      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
+      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)) )
 
   let digest' t =
     Random_oracle.Checked.(
-      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input' t)))
+      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input' t)) )
 end
 
 [%%define_locally Verification_key_wire.(digest_vk, dummy_vk_hash)]
@@ -407,7 +407,7 @@ let zkapp_uri_to_input zkapp_uri =
 
 let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
   let open Random_oracle.Input.Chunked in
-  let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
+  let f mk acc field = mk (Core.Field.get field t) :: acc in
   let app_state v =
     Random_oracle.Input.Chunked.field_elements (Pickles_types.Vector.to_array v)
   in
@@ -441,7 +441,7 @@ let default : _ Poly.t =
 
 let digest (t : t) =
   Random_oracle.(
-    hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
+    hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)) )
 
 let default_digest = lazy (digest default)
 
@@ -525,7 +525,7 @@ module Hardfork = struct
 
   let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
     let open Random_oracle.Input.Chunked in
-    let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
+    let f mk acc field = mk (Core.Field.get field t) :: acc in
     let app_state v =
       Random_oracle.Input.Chunked.field_elements
         (Pickles_types.Vector.to_array v)
@@ -545,7 +545,7 @@ module Hardfork = struct
 
   let digest (t : t) =
     Random_oracle.(
-      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
+      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)) )
 
   let default = of_stable default
 

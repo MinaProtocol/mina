@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Make () = struct
   let digest_size_in_bits = 256

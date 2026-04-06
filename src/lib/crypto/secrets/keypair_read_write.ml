@@ -1,6 +1,6 @@
 (* keypair_read_write.ml -- readers, writers for keypairs *)
 
-open Core_kernel
+open Core
 open Async
 open Signature_lib
 

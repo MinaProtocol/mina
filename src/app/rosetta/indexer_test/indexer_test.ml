@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 
 type async_pool = (Caqti_async.connection, Caqti_error.t) Mina_caqti.Pool.t

@@ -1936,7 +1936,8 @@ module Queries = struct
               ~typ:(non_null Types.Input.PublicKey.arg_typ)
           ; arg' "token"
               ~doc:"Token of account being retrieved (defaults to MINA)"
-              ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
+              ~typ:Types.Input.TokenId.arg_typ
+              ~default:(`String (Token_id.to_string Token_id.default))
           ]
       ~resolve:(fun { ctx = mina; _ } () pk token ->
         Option.bind (Utils.get_ledger_and_breadcrumb mina)
@@ -2183,7 +2184,8 @@ module Queries = struct
               ~typ:(non_null Types.Input.PublicKey.arg_typ)
           ; arg' "token"
               ~doc:"Token of account being retrieved (defaults to MINA)"
-              ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
+              ~typ:Types.Input.TokenId.arg_typ
+              ~default:(`String (Token_id.to_string Token_id.default))
           ; arg "maxLength"
               ~doc:
                 "The maximum number of blocks to search for actions. If there \
@@ -2219,7 +2221,7 @@ module Queries = struct
                             let actions =
                               c.Zkapp_command.Poly.account_updates
                               |> Zkapp_command.Call_forest.fold ~init:(0, [])
-                                   ~f:(fun acc au ->
+                                   ~f:(fun acc (au : Account_update.t) ->
                                      let action_seq, acc = acc in
                                      let account_id =
                                        Account_id.create au.body.public_key

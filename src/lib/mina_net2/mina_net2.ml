@@ -119,7 +119,7 @@ module Pubsub = struct
     let topic_subscription_already_exists =
       Hashtbl.data t.subscriptions
       |> List.exists ~f:(fun (Subscription.E sub') ->
-             String.equal (Subscription.topic sub') topic )
+          String.equal (Subscription.topic sub') topic )
     in
     if topic_subscription_already_exists then
       Deferred.Or_error.errorf "already subscribed to topic %s" topic
@@ -185,7 +185,7 @@ let list_peers t =
       (* FIXME #4039: filter_map shouldn't be necessary *)
       peers
       |> List.map ~f:Libp2p_ipc.unsafe_parse_peer
-      |> List.filter ~f:(fun peer -> not (Int.equal peer.libp2p_port 0))
+      |> List.filter ~f:(fun peer -> not (Int.equal peer.Peer.libp2p_port 0))
   | Error error ->
       [%log' error t.logger]
         "Encountered $error while asking libp2p_helper for peers"
@@ -220,7 +220,7 @@ let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
       ~direct_peers:(List.map ~f:Multiaddr.to_libp2p_ipc direct_peers)
       ~seed_peers:(List.map ~f:Multiaddr.to_libp2p_ipc seed_peers)
       ~known_private_ip_nets:
-        (List.map ~f:Core.Unix.Cidr.to_string known_private_ip_nets)
+        (List.map ~f:Core_unix.Cidr.to_string known_private_ip_nets)
       ~peer_exchange ~peer_protection_ratio ~min_connections ~max_connections
       ~validation_queue_size
       ~gating_config:(gating_config_to_helper_format initial_gating_config)
@@ -450,7 +450,7 @@ let handle_push_message t push_message =
               t.all_peers_seen <- Some all_peers_seen ;
               Mina_metrics.(
                 Gauge.set Network.all_peers
-                  (Set.length all_peers_seen |> Int.to_float)) ) ;
+                  (Set.length all_peers_seen |> Int.to_float) ) ) ;
           let stream =
             Libp2p_stream.create_from_existing ~logger:t.logger ~helper:t.helper
               ~stream_id ~protocol ~peer ~release_stream:(release_stream t)
@@ -471,7 +471,7 @@ let handle_push_message t push_message =
                     *)
                     match%map
                       Monitor.try_with ~here:[%here] ~extract_exn:true
-                        (fun () -> ph.handler stream)
+                        (fun () -> ph.handler stream )
                     with
                     | Ok () ->
                         ()
@@ -606,30 +606,30 @@ let create ?(allow_multiple_instances = false) ~all_peers_seen_metric ~logger
   in
   (push_message_handler := fun msg -> handle_push_message t msg) ;
   ( if all_peers_seen_metric then
-    let log_all_peers_interval = Time.Span.of_hr 2.0 in
-    let log_message_batch_size = 50 in
-    every log_all_peers_interval (fun () ->
-        Option.iter t.all_peers_seen ~f:(fun all_peers_seen ->
-            let num_batches, num_in_batch, batches, batch =
-              Set.fold_right all_peers_seen ~init:(0, 0, [], [])
-                ~f:(fun peer (num_batches, num_in_batch, batches, batch) ->
-                  if num_in_batch >= log_message_batch_size then
-                    (num_batches + 1, 1, batch :: batches, [ peer ])
-                  else (num_batches, num_in_batch + 1, batches, peer :: batch) )
-            in
-            let num_batches, batches =
-              if num_in_batch > 0 then (num_batches + 1, batch :: batches)
-              else (num_batches, batches)
-            in
-            List.iteri batches ~f:(fun batch_num batch ->
-                [%log info]
-                  "All peers seen by this node, batch $batch_num/$num_batches"
-                  ~metadata:
-                    [ ("batch_num", `Int batch_num)
-                    ; ("num_batches", `Int num_batches)
-                    ; ( "peers"
-                      , `List (List.map ~f:Peer_without_id.to_yojson batch) )
-                    ] ) ) ) ) ;
+      let log_all_peers_interval = Time_float.Span.of_hr 2.0 in
+      let log_message_batch_size = 50 in
+      every log_all_peers_interval (fun () ->
+          Option.iter t.all_peers_seen ~f:(fun all_peers_seen ->
+              let num_batches, num_in_batch, batches, batch =
+                Set.fold_right all_peers_seen ~init:(0, 0, [], [])
+                  ~f:(fun peer (num_batches, num_in_batch, batches, batch) ->
+                    if num_in_batch >= log_message_batch_size then
+                      (num_batches + 1, 1, batch :: batches, [ peer ])
+                    else (num_batches, num_in_batch + 1, batches, peer :: batch) )
+              in
+              let num_batches, batches =
+                if num_in_batch > 0 then (num_batches + 1, batch :: batches)
+                else (num_batches, batches)
+              in
+              List.iteri batches ~f:(fun batch_num batch ->
+                  [%log info]
+                    "All peers seen by this node, batch $batch_num/$num_batches"
+                    ~metadata:
+                      [ ("batch_num", `Int batch_num)
+                      ; ("num_batches", `Int num_batches)
+                      ; ( "peers"
+                        , `List (List.map ~f:Peer_without_id.to_yojson batch) )
+                      ] ) ) ) ) ;
   Deferred.Or_error.return t
 
 let send_heartbeat t peer_id = Libp2p_helper.send_heartbeat ~peer_id t.helper

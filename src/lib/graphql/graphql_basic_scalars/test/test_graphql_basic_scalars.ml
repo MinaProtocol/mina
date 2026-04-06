@@ -6,7 +6,7 @@
    Invocation: dune exec src/lib/graphql_basic_scalars/test/test_graphql_basic_scalars.exe
 *)
 
-open Core_kernel
+open Core
 open Graphql_basic_scalars.Utils
 include Graphql_basic_scalars.Make (Test_schema)
 module Make_test_alcotest = Graphql_basic_scalars.Testing.Produce_test
@@ -46,10 +46,10 @@ module String_gen = struct
 end
 
 module Span_gen = struct
-  include Core_kernel.Time.Span
+  include Time_float.Span
 
   let gen =
-    let open Core_kernel_private.Span_float in
+    let open Core_private.Span_float in
     let millenium = of_day (Float.round_up (365.2425 *. 1000.)) in
     Quickcheck.Generator.filter quickcheck_generator ~f:(fun t ->
         neg millenium <= t && t <= millenium )
@@ -69,26 +69,25 @@ module Span_gen = struct
 end
 
 module Time_gen = struct
-  type t = Core_kernel.Time.t
+  type t = Time_float.t
 
   (* The following generator function is copied from version 0.15.0 of the core
      library, and only generates values that can be serialized.
      https://github.com/janestreet/core/blob/35941320a3eab628786ae3853e5f753a3ab357c2/core/src/span_float.ml#L742-L754.
      See issue https://github.com/MinaProtocol/mina/issues/11310.
      Once the core library is updated to >= 0.15.0,
-     [Core.Time.quickcheck_generator] should be used instead work.*)
+     [Time_float.quickcheck_generator] should be used instead work.*)
 
   let gen =
-    Quickcheck.Generator.map Span_gen.gen
-      ~f:Core_kernel.Time.of_span_since_epoch
+    Quickcheck.Generator.map Span_gen.gen ~f:Time_float.of_span_since_epoch
 
-  let sexp_of_t = Core.Time.sexp_of_t
+  let sexp_of_t = Time_float_unix.sexp_of_t
 
-  let compare x y = Core_kernel.Time.robustly_compare x y
+  let compare x y = Time_float.robustly_compare x y
 end
 
 module InetAddr_gen = struct
-  include Core.Unix.Inet_addr
+  include Core_unix.Inet_addr
 
   let gen =
     Int32.gen_incl 0l Int32.max_value

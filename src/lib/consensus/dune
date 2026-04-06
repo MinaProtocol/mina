@@ -10,7 +10,6 @@
   ;; opam libraries
   ppx_inline_test.config
   async_unix
-  core.uuid
   async_kernel
   sexplib0
   base.caml
@@ -24,7 +23,7 @@
   result
   core_kernel.uuid
   async_rpc_kernel
-  sexp_diff_kernel
+  sexp_diff
   ;; local libraries
   mina_wire_types
   mina_base.util
@@ -113,6 +112,6 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane))
- (enabled_if false) ;; Compilation is disabled until this executable has been fixed.
- )
+  (pps ppx_version))
+ (enabled_if false)) ;; Compilation is disabled until this executable has been fixed.
+ 

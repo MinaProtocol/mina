@@ -1,5 +1,5 @@
 (* data_hash.ml *)
-open Core_kernel
+open Core
 open Snark_params.Tick
 open Bitstring_lib
 

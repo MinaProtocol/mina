@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 type t = Epochs of int | Slots of int | Literal of Time.Span.t
 

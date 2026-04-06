@@ -620,8 +620,10 @@ let _ =
            let x = f () in
            let stop = new%js Js_of_ocaml.Js.date_now in
            log
-             (Core_kernel.ksprintf Js.string "%s: %f seconds" label
-                ((stop##getTime -. start##getTime) /. 1000.) ) ;
+             (Core.ksprintf Js.string "%s: %f seconds" label
+                ( (Js.to_float stop##getTime -. Js.to_float start##getTime)
+                /. 1000. ) ) ;
+
            x
          in
          let open Impl in
@@ -670,12 +672,13 @@ let _ =
             let stop = new%js Js_of_ocaml.Js.date_now in
             let log x = (Js.Unsafe.js_expr "console.log" : _ -> unit) x in
             log
-              (Core_kernel.ksprintf Js.string "%s: %f seconds" label
-                 ((stop##getTime -. start##getTime) /. 1000.) ) ;
+              (Core.ksprintf Js.string "%s: %f seconds" label
+                 ( (Js.to_float stop##getTime -. Js.to_float start##getTime)
+                 /. 1000. ) ) ;
             x
           in
           let n = 131072 in
-          let log_n = Core_kernel.Int.ceil_log2 n in
+          let log_n = Core.Int.ceil_log2 n in
           let urs = time "create" (fun () -> create n) in
           let inputs =
             time "inputs" (fun () -> Array.init n (fun i -> Pasta_fp.of_int i))

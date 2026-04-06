@@ -22,36 +22,36 @@ module Root_test = struct
     let module LocMap = L.Any_ledger.Location.Map in
     Quickcheck.Generator.(
       list_with_length num Mina_base.Account.gen
-      |> generate ~size:quickcheck_size ~random)
+      |> generate ~size:quickcheck_size ~random )
     |> List.fold ~init:LocMap.empty ~f:(fun acc acct ->
-           let acct_id = Account_id.create acct.public_key Token_id.default in
-           match L.Any_ledger.M.get_or_create_account unmasked acct_id acct with
-           | Ok (_, loc) -> (
-               match LocMap.add ~key:loc ~data:acct acc with
-               | `Ok acc ->
-                   acc
-               | `Duplicate ->
-                   (* NOTE: This branch will be ran into if randomly
+        let acct_id = Account_id.create acct.public_key Token_id.default in
+        match L.Any_ledger.M.get_or_create_account unmasked acct_id acct with
+        | Ok (_, loc) -> (
+            match Map.add ~key:loc ~data:acct acc with
+            | `Ok acc ->
+                acc
+            | `Duplicate ->
+                (* NOTE: This branch will be ran into if randomly
                       generated accounts happened to clash *)
-                   acc )
-           | Error _ ->
-               failwith "Could not add starting account" )
+                acc )
+        | Error _ ->
+            failwith "Could not add starting account" )
 
   let assert_accounts ~loc_with_accounts ~root =
     let module LocMap = L.Any_ledger.Location.Map in
-    let locations = LocMap.keys loc_with_accounts in
+    let locations = Map.keys loc_with_accounts in
     L.Any_ledger.M.get_batch (Root_ledger.as_unmasked root) locations
     |> List.iter ~f:(fun (loc, account) ->
-           let actual_account =
-             Option.value_exn account
-               ~message:
-                 "Account is inserted in stable db backed root, but when \
-                  reloading with unstable DB backed root it's gone "
-           in
-           let expected = LocMap.find_exn loc_with_accounts loc in
-           assert (
-             Account.equal expected actual_account
-             || failwith "Inserted account didn't match actual account" ) )
+        let actual_account =
+          Option.value_exn account
+            ~message:
+              "Account is inserted in stable db backed root, but when \
+               reloading with unstable DB backed root it's gone "
+        in
+        let expected = Map.find_exn loc_with_accounts loc in
+        assert (
+          Account.equal expected actual_account
+          || failwith "Inserted account didn't match actual account" ) )
 
   let converting_config_with_random_hf_slot () =
     Root_ledger.Config.Converting_db
@@ -102,7 +102,7 @@ module Root_test = struct
         ~config:
           (In_directories (Config.with_primary ~directory_name:primary_dir))
         ~logger ~depth:ledger_depth ~assert_synced:true ()
-      |> close)
+      |> close )
 
   let test_root_moving ~random () =
     Mina_stdlib_unix.File_system.with_temp_dir "root_moving" ~f:(fun cwd ->

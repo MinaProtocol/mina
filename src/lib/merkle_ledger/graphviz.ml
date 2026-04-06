@@ -1,5 +1,5 @@
 open Async
-open Core_kernel
+open Core
 
 module Make (Inputs : Intf.Graphviz.I) :
   Intf.Graphviz.S

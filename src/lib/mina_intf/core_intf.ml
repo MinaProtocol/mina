@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module type Security_intf = sig
   (** In production we set this to (hopefully a prefix of) k for our consensus

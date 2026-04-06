@@ -14,9 +14,9 @@ module type S_base = sig
 
   val of_string : string -> t
 
-  val gen : t Core_kernel.Quickcheck.Generator.t
+  val gen : t Core.Quickcheck.Generator.t
 
-  val gen_incl : t -> t -> t Core_kernel.Quickcheck.Generator.t
+  val gen_incl : t -> t -> t Core.Quickcheck.Generator.t
 
   val zero : t
 
@@ -38,7 +38,7 @@ module type S_base = sig
 
   val random : unit -> t
 
-  include Core_kernel.Comparable.S with type t := t
+  include Core.Comparable.S with type t := t
 end
 
 module type S = sig

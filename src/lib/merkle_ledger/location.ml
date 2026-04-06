@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Unsigned
 module Bigstring = Mina_stdlib.Bigstring
 

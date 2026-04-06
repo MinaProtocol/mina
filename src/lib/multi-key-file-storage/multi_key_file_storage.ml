@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (** Buffer size for writing: 128 KB *)
 let default_buffer_size = 131072

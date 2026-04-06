@@ -28,7 +28,7 @@ module Config = struct
         Converting_db hardfork_slot
 
   let file_exists path =
-    Sys.file_exists path |> [%equal: [ `No | `Unknown | `Yes ]] `Yes
+    Sys_unix.file_exists path |> [%equal: [ `No | `Unknown | `Yes ]] `Yes
 
   let exists_backing = function
     | Stable_db_config path ->
@@ -85,7 +85,7 @@ module Config = struct
   let move_backing_exn ~src ~dst =
     match (src, dst) with
     | Stable_db_config src, Stable_db_config dst ->
-        Sys.rename src dst
+        Sys_unix.rename src dst
     | ( Converting_db_config
           { db_config =
               { primary_directory = src_primary
@@ -100,8 +100,8 @@ module Config = struct
               }
           ; _
           } ) ->
-        Sys.rename src_primary dst_primary ;
-        Sys.rename src_converted dst_converted
+        Sys_unix.rename src_primary dst_primary ;
+        Sys_unix.rename src_converted dst_converted
     | cfg1, cfg2 ->
         raise
           (Backing_mismatch

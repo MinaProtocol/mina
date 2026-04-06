@@ -66,8 +66,8 @@ module Schema = struct
     | Root_hash : State_hash.Stable.V1.t t
     | Root_common : Root_data.Common.Stable.V2.t t
     | Best_tip : State_hash.Stable.V1.t t
-    | Protocol_states_for_root_scan_state
-        : Mina_state.Protocol_state.Value.Stable.V2.t list t
+    | Protocol_states_for_root_scan_state :
+        Mina_state.Protocol_state.Value.Stable.V2.t list t
 
   [@@@warning "+22"]
 
@@ -252,8 +252,8 @@ module Rocks = Rocksdb.Serializable.GADT.Make (Schema)
 type t = { directory : string; logger : Logger.t; db : Rocks.t }
 
 let create ~logger ~directory =
-  if not (Result.is_ok (Unix.access directory [ `Exists ])) then
-    Unix.mkdir ~perm:0o766 directory ;
+  if not (Result.is_ok (Core_unix.access directory [ `Exists ])) then
+    Core_unix.mkdir ~perm:0o766 directory ;
   { directory; logger; db = Rocks.create directory }
 
 let close t = Rocks.close t.db
@@ -405,7 +405,7 @@ let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
     let%bind.Result () = res in
     match arc_opt with
     | Some (Key.Some_key_value (Arcs _, (data : State_hash.t list))) ->
-        State_hash.Table.set arcs_cache ~key:parent_hash ~data ;
+        Hashtbl.set arcs_cache ~key:parent_hash ~data ;
         Result.return ()
     | _ ->
         Error (`Not_found (`Arcs parent_hash))
@@ -426,9 +426,9 @@ let add ~arcs_cache ~transition =
     With_hash.data transition |> Mina_block.header |> Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
   in
-  let parent_arcs = State_hash.Table.find_exn arcs_cache parent_hash in
-  State_hash.Table.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
-  State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
+  let parent_arcs = Hashtbl.find_exn arcs_cache parent_hash in
+  Hashtbl.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
+  Hashtbl.set arcs_cache ~key:hash ~data:[] ;
   let transition_unwrapped =
     With_hash.data transition |> Mina_block.read_all_proofs_from_disk
   in

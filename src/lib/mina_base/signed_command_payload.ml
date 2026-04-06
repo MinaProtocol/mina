@@ -1,6 +1,6 @@
 (* user_command_payload.ml *)
 
-open Core_kernel
+open Core
 open Snark_params.Tick
 open Signature_lib
 module Memo = Signed_command_memo

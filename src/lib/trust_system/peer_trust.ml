@@ -28,11 +28,11 @@ module type Input_intf = sig
   module Peer_id : sig
     type t [@@deriving sexp, to_yojson]
 
-    val ip : t -> Unix.Inet_addr.Blocking_sexp.t
+    val ip : t -> Core_unix.Inet_addr.Blocking_sexp.t
   end
 
   module Now : sig
-    val now : unit -> Time.t
+    val now : unit -> Time_float.t
   end
 
   module Config : sig
@@ -49,22 +49,21 @@ module type Input_intf = sig
 
   type Structured_log_events.t +=
     | Peer_banned of
-        { sender_id : Peer_id.t; expiration : Time.t; action : string }
+        { sender_id : Peer_id.t; expiration : Time_float.t; action : string }
     [@@deriving register_event]
 
   val remove_dir : Config.t -> unit Deferred.t
 end
 
 module Time_with_json = struct
-  include Time
+  include Time_float
 
   let to_yojson expiration =
-    `String (Time.to_string_abs expiration ~zone:Time.Zone.utc)
+    `String (Time_float.to_string_abs expiration ~zone:Time_float.Zone.utc)
 
   let of_yojson = function
     | `String time ->
-        Ok
-          (Time.of_string_gen ~if_no_timezone:(`Use_this_one Time.Zone.utc) time)
+        Ok (Time_float_unix.of_string_abs time)
     | _ ->
         Error "Trust_system.Peer_trust: Could not parse time"
 end
@@ -91,7 +90,8 @@ include Log_events
 module Make0 (Inputs : Input_intf) = struct
   open Inputs
 
-  type upcall_msg_t = [ `Ban of Peer_id.t * Time.t | `Heartbeat of Peer_id.t ]
+  type upcall_msg_t =
+    [ `Ban of Peer_id.t * Time_float.t | `Heartbeat of Peer_id.t ]
 
   type t =
     { db : Db.t option
@@ -144,11 +144,11 @@ module Make0 (Inputs : Input_intf) = struct
     Option.value_map db ~default:[] ~f:(fun db' ->
         Db.to_alist db'
         |> List.map ~f:(fun (peer, record) ->
-               (peer, Record_inst.to_peer_status record) ) )
+            (peer, Record_inst.to_peer_status record) ) )
 
   let lookup_ip t ip =
     List.filter (peer_statuses t) ~f:(fun (p, _status) ->
-        Unix.Inet_addr.equal (Peer_id.ip p) ip )
+        Core_unix.Inet_addr.equal (Peer_id.ip p) ip )
 
   let reset_ip ({ db; _ } as t) ip =
     Option.value_map db ~default:() ~f:(fun db' ->
@@ -239,11 +239,11 @@ let%test_module "peer_trust" =
   ( module struct
     (* Mock the current time *)
     module Mock_now = struct
-      let current_time = ref Time.epoch
+      let current_time = ref Time_float.epoch
 
       let now () = !current_time
 
-      let advance span = current_time := Time.add !current_time span
+      let advance span = current_time := Time_float.add !current_time span
     end
 
     module Mock_record = Record.Make (Mock_now)
@@ -252,7 +252,7 @@ let%test_module "peer_trust" =
     module Peer_id = struct
       type t = int [@@deriving sexp, yojson]
 
-      let ip t = Unix.Inet_addr.of_string (sprintf "127.0.0.%d" t)
+      let ip t = Core_unix.Inet_addr.of_string (sprintf "127.0.0.%d" t)
     end
 
     module Action = struct
@@ -320,12 +320,13 @@ let%test_module "peer_trust" =
 
     let nolog = Logger.null ()
 
-    let ip_of_id id = Unix.Inet_addr.of_string (sprintf "127.0.0.%d" id)
+    let ip_of_id id = Core_unix.Inet_addr.of_string (sprintf "127.0.0.%d" id)
 
     let peer0 = ip_of_id 0
 
-    let%test "Peers are not present in the db on initialization and have no \
-              statuss" =
+    let%test
+        "Peers are not present in the db on initialization and have no statuss"
+        =
       let db = setup_mock_db () in
       match Peer_trust_test.lookup_ip db peer0 with
       | [] ->
@@ -341,8 +342,8 @@ let%test_module "peer_trust" =
             let%map () = Peer_trust_test.record db nolog 0 Insta_ban in
             match Peer_trust_test.lookup_ip db peer0 with
             | [ (_, { trust = -1.0; banned = Banned_until time }) ] ->
-                [%test_eq: Time.t] time
-                @@ Time.add !Mock_now.current_time Time.Span.day ;
+                [%test_eq: Time_float_unix.t] time
+                @@ Time_float.add !Mock_now.current_time Time_float.Span.day ;
                 assert_upcall_pipe [ 0 ] ;
                 true
             | _ ->
@@ -354,7 +355,7 @@ let%test_module "peer_trust" =
           let%map () = Peer_trust_test.record db nolog 0 Action.Big_credit in
           match Peer_trust_test.lookup_ip db peer0 with
           | [ (_, { trust = start_trust; banned = Unbanned }) ] -> (
-              Mock_now.advance Time.Span.day ;
+              Mock_now.advance Time_float.Span.day ;
               assert_upcall_pipe [] ;
               match Peer_trust_test.lookup_ip db peer0 with
               | [ (_, { trust = decayed_trust; banned = Unbanned }) ] ->
@@ -374,7 +375,7 @@ let%test_module "peer_trust" =
       let rec go n =
         if n < instances then (
           let%bind () = f () in
-          Mock_now.advance Time.Span.(second / rate) ;
+          Mock_now.advance Time_float.Span.(second / rate) ;
           go (n + 1) )
         else Deferred.unit
       in
@@ -404,8 +405,7 @@ let%test_module "peer_trust" =
             let%map () = act_constant_rate db 1.1 Action.Slow_punish in
             match Peer_trust_test.lookup_ip db peer0 with
             | [ (_, { banned = Banned_until _; _ }) ] ->
-                assert_upcall_pipe [ 0 ] ;
-                true
+                assert_upcall_pipe [ 0 ] ; true
             | [ (_, { banned = Unbanned; _ }) ] ->
                 false
             | _ ->
@@ -446,8 +446,7 @@ let%test_module "peer_trust" =
             let%map () = Peer_trust_test.record db nolog 0 Action.Insta_ban in
             match Peer_trust_test.lookup_ip db peer0 with
             | [ (_, { trust = -1.0; banned = Banned_until _ }) ] ->
-                assert_upcall_pipe [ 0 ] ;
-                true
+                assert_upcall_pipe [ 0 ] ; true
             | [ (_, { banned = Banned_until _; _ }) ] ->
                 failwith "Trust not set to -1"
             | [ (_, { banned = Unbanned; _ }) ] ->
@@ -492,7 +491,7 @@ module Make (Action : Action_intf) = Make0 (struct
   module Peer_id = Network_peer.Peer
 
   module Now = struct
-    let now = Time.now
+    let now = Time_float.now
   end
 
   module Config = String

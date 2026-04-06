@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Container_images = struct
   type t =

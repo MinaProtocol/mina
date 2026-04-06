@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
@@ -43,7 +43,7 @@ let validate_header_is_relevant ~context:(module Context : CONTEXT) ~frontier
     match slot_chain_end with
     | Some slot_chain_end
       when Mina_numbers.Global_slot_since_hard_fork.(
-             block_slot >= slot_chain_end) ->
+             block_slot >= slot_chain_end ) ->
         [%log' internal Context.logger] "Block after slot_chain_end, rejecting" ;
         Result.fail `Block_after_after_stop_slot
     | None | Some _ ->
@@ -198,7 +198,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
               in
               Perf_histograms.add_span
                 ~name:"accepted_transition_remote_latency"
-                (Core_kernel.Time.diff
+                (Time_float.diff
                    Block_time.(now time_controller |> to_time_exn)
                    transition_time ) ;
               [%log internal] "Validate_transition_done" ;

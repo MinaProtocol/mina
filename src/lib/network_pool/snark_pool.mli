@@ -1,5 +1,5 @@
 open Pipe_lib
-open Core_kernel
+open Core
 
 module type S = sig
   type transition_frontier
@@ -17,7 +17,7 @@ module type S = sig
   module For_tests : sig
     val get_rebroadcastable :
          Resource_pool.t
-      -> has_timed_out:(Core.Time.t -> [ `Timed_out | `Ok ])
+      -> has_timed_out:(Time_float.t -> [ `Timed_out | `Ok ])
       -> Resource_pool.Diff.t list
   end
 
@@ -67,13 +67,14 @@ module type Transition_frontier_intf = sig
 end
 
 module Make
-    (Base_ledger : Intf.Base_ledger_intf) (Staged_ledger : sig
+    (Base_ledger : Intf.Base_ledger_intf)
+    (Staged_ledger : sig
       type t
 
       val ledger : t -> Base_ledger.t
     end)
-    (Transition_frontier : Transition_frontier_intf
-                             with type staged_ledger := Staged_ledger.t) :
+    (Transition_frontier :
+      Transition_frontier_intf with type staged_ledger := Staged_ledger.t) :
   S with type transition_frontier := Transition_frontier.t
 
 include S with type transition_frontier := Transition_frontier.t

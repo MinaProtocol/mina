@@ -5,7 +5,7 @@
   The better name for this file should really be poly.ml, because the types here
   are polymorphic, and we really need the concretized version in selector.ml
  *)
-open Core_kernel
+open Core
 
 module Single = struct
   module Spec = Single_spec.Poly
@@ -47,6 +47,14 @@ module Spec = struct
     { instances; fee }
 end
 
+module TimeSpanStable = struct
+  module V1 = struct
+    include Time_float.Stable.Span.V1
+
+    let __versioned__ = ()
+  end
+end
+
 module Result = struct
   [%%versioned
   module Stable = struct
@@ -54,7 +62,7 @@ module Result = struct
       type ('spec, 'single) t =
         { proofs : 'single One_or_two.Stable.V1.t
         ; metrics :
-            (Core.Time.Stable.Span.V1.t * [ `Transition | `Merge ])
+            (TimeSpanStable.V1.t * [ `Transition | `Merge ])
             One_or_two.Stable.V1.t
         ; spec : 'spec
         ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t

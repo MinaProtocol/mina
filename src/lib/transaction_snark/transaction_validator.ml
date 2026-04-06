@@ -9,7 +9,8 @@ let within_mask l ~f =
   let r = f mask in
   if Result.is_ok r then Ledger.commit mask ;
   ignore
-    (Ledger.unregister_mask_exn ~loc:Caml.__LOC__ mask : Ledger.unattached_mask) ;
+    ( Ledger.unregister_mask_exn ~loc:Stdlib.__LOC__ mask
+      : Ledger.unattached_mask ) ;
   r
 
 let apply_user_command ~constraint_constants ~txn_global_slot l uc =

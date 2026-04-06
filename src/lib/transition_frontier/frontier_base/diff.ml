@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 type full = Full
@@ -56,7 +56,8 @@ module Node_list = struct
           let of_binable ls = Lite ls
         end
 
-        include Binable.Of_binable (Binable_arg.Stable.V1) (T_nonbinable)
+        include
+          Binable.Of_binable_without_uuid (Binable_arg.Stable.V1) (T_nonbinable)
 
         let to_latest = Fn.id
       end
@@ -136,7 +137,8 @@ module Root_transition = struct
             }
         end
 
-        include Binable.Of_binable (Binable_arg.Stable.V4) (T_nonbinable)
+        include
+          Binable.Of_binable_without_uuid (Binable_arg.Stable.V4) (T_nonbinable)
 
         let to_latest = Fn.id
       end

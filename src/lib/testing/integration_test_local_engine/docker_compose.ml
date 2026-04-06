@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Integration_test_lib
 
 module Dockerfile = struct

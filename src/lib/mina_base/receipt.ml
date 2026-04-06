@@ -1,6 +1,6 @@
 (* receipt.ml *)
 
-open Core_kernel
+open Core
 module B58_lib = Base58_check
 open Snark_params.Tick
 

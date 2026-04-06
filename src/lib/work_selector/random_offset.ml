@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 (** The work selection method implemented here is the following. We distinguish
 two cases:
