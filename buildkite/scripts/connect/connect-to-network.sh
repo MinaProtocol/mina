@@ -18,6 +18,7 @@ All arguments are mandatory:
   --network-name <val>               Testnet name (used for seeds URL and validation)
   --wait-between-polling <val>       Duration to wait between GraphQL polling
   --sync-timeout <val>               Duration to wait before considering the sync is failed
+  --peer-list-url <val>              (Optional) Override peer list URL
   --help                             Display this help message
 
 Example:
@@ -35,6 +36,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --network-name)
             NETWORK_NAME="$2"
+            shift 2
+            ;;
+        --peer-list-url)
+            PEER_LIST_URL="$2"
             shift 2
             ;;
         --wait-between-polling)
@@ -65,6 +70,10 @@ if [[ -z "$MINA_DEBIAN_NETWORK" || -z "$NETWORK_NAME" || -z "$WAIT_BETWEEN_POLLI
     usage
 fi
 
+if [[ -z "$PEER_LIST_URL" ]]; then
+    PEER_LIST_URL="https://storage.googleapis.com/seed-lists/${NETWORK_NAME}_seeds.txt"
+fi
+
 # --- Main Script Logic ---
 
 git config --global --add safe.directory /workdir
@@ -92,7 +101,7 @@ start_daemon_and_wait_for_sync() {
 
     # Start the daemon in the background
     "$MINA" daemon \
-      --peer-list-url "https://storage.googleapis.com/seed-lists/${NETWORK_NAME}_seeds.txt" \
+      --peer-list-url "$PEER_LIST_URL" \
       --libp2p-keypair "/home/opam/libp2p-keys/key" \
     &
 
