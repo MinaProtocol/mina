@@ -20,10 +20,10 @@ module Transactions = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t =
         { commands :
-            ( User_command.Stable.V2.t
+            ( User_command.Stable.V3.t
             , Transaction_hash.Stable.V1.t )
             With_hash.Stable.V1.t
             With_status.Stable.V2.t
@@ -43,11 +43,11 @@ end
 module Protocol_state = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
         { previous_state_hash : State_hash.Stable.V1.t
         ; blockchain_state : Mina_state.Blockchain_state.Value.Stable.V2.t
-        ; consensus_state : Consensus.Data.Consensus_state.Value.Stable.V2.t
+        ; consensus_state : Consensus.Data.Consensus_state.Value.Stable.V3.t
         }
 
       let to_latest = Fn.id
@@ -59,12 +59,12 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
       { creator : Public_key.Compressed.Stable.V1.t
       ; winner : Public_key.Compressed.Stable.V1.t
-      ; protocol_state : Protocol_state.Stable.V2.t
-      ; transactions : Transactions.Stable.V2.t
+      ; protocol_state : Protocol_state.Stable.V3.t
+      ; transactions : Transactions.Stable.V3.t
       ; snark_jobs : Transaction_snark_work.Info.Stable.V2.t list
       ; proof : Proof.Stable.V2.t
       }

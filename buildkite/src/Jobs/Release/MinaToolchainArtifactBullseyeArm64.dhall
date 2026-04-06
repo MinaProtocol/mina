@@ -15,7 +15,7 @@ in  MinaArtifactToolchain.pipeline
       , service = Artifacts.Type.Toolchain
       , deb_codename = DebianVersions.DebVersion.Bullseye
       , no_cache = True
-      , no_debian = True
+      , deb_install_mode = DockerImage.DebianInstallMode.NoInstall
       , arch = Arch.Type.Arm64
       , size = Size.Arm64
       }

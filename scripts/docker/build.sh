@@ -21,6 +21,7 @@ function usage() {
     echo -e "${RED}☞  $1${CLEAR}\n";
   fi
   echo "Usage: $0 [-s service-to-release] [-v service-version] [-n network]"
+  echo "  -i, --image-name          (Optional) Custom image name for the built docker image. Default is based on service name and version (e.g. mina-daemon:3.3.0-devnet)"
   echo "  -s, --service             The Service being released to Dockerhub"
   echo "  -v, --version             The version to be used in the docker image tag"
   echo "  -n, --network             The network configuration to use (devnet or mainnet). Default=devnet"
@@ -32,7 +33,9 @@ function usage() {
   echo "      --deb-profile         The profile string for the debian package to install"
   echo "      --deb-build-flags     The build-flags string for the debian package to install"
   echo "      --deb-suffix          The debian suffix to use for the docker image"
-  echo "  -c, --custom-suffix       A custom suffix to append to the docker tag (e.g. -instrumented)"
+  echo "  -c, --cache-from          Docker cache source image(s) to use for build caching"
+  echo "      --custom-suffix       A custom suffix to append to the docker tag (e.g. -instrumented)"
+  echo "      --custom-arg          Custom build arg to pass to docker build (e.g. --build-arg my_arg=value)"
   echo "  -p, --platform            The target platform for the docker build (e.g. linux/amd64). Default=linux/amd64"
   echo "  -l, --load-only           Load the built image into local docker daemon only, do not push to remote registry"
   echo ""
@@ -49,6 +52,7 @@ NO_CACHE=""
 CUSTOM_ARG=""
 
 while [[ "$#" -gt 0 ]]; do case $1 in
+  -i|--image-name) IMAGE_NAME="$2"; shift;;
   -s|--service) SERVICE="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -n|--network) INPUT_NETWORK="$2"; shift;;
@@ -59,17 +63,21 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -l|--load-only) DOCKER_ACTION="load" ;;
   --docker-registry) export DOCKER_REGISTRY="$2"; shift;;
   --no-cache) NO_CACHE="--no-cache"; ;;
+  --custom-suffix) export CUSTOM_SUFFIX="$2"; shift;;
   --deb-codename) INPUT_CODENAME="$2"; shift;;
   --deb-release) INPUT_RELEASE="$2"; shift;;
-  --deb-version) INPUT_VERSION="$2"; shift;;
+  --deb-version) DEB_VERSION="$2"; shift;;
   --deb-legacy-version) INPUT_LEGACY_VERSION="$2"; shift;;
+  --deb-storage-repair-version) INPUT_STORAGE_REPAIR_VERSION="$2"; shift;;
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --deb-repo) INPUT_REPO="$2"; shift;;
+  --deb-arch) DEB_ARCH="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
   --deb-suffix) export DOCKER_DEB_SUFFIX="$2"; shift;;
   --deb-repo-key)
       # shellcheck disable=SC2034
       DEB_REPO_KEY="$2"; shift;;
+  --custom-arg) CUSTOM_ARG="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -88,6 +96,12 @@ if [[ -n "${INPUT_LEGACY_VERSION:-}" ]]; then
   LEGACY_VERSION="--build-arg deb_legacy_version=$INPUT_LEGACY_VERSION"
 fi
 
+if [[ -z "${IMAGE_NAME:-}" ]]; then
+  IMAGE_NAME_ARG=""
+else
+  IMAGE_NAME_ARG="--build-arg image_name=$IMAGE_NAME"
+fi
+
 if [[ -z "${INPUT_BRANCH:-}" ]]; then
   echo "Branch is not set. Using the default (compatible)"
   BRANCH="--build-arg MINA_BRANCH=compatible"
@@ -95,11 +109,25 @@ else
   BRANCH="--build-arg MINA_BRANCH=$INPUT_BRANCH"
 fi
 
+if [[ -z "${INPUT_STORAGE_REPAIR_VERSION:-}" ]]; then
+  echo "Debian storage repair version is not set. Using the default (unset)"
+  DEB_STORAGE_REPAIR_VERSION=""
+else
+  DEB_STORAGE_REPAIR_VERSION="--build-arg deb_storage_repair_version=$INPUT_STORAGE_REPAIR_VERSION"
+fi
+
 if [[ -z "${MINA_REPO:-}" ]]; then
   echo "Repository is not set. Using the default (https://github.com/MinaProtocol/mina)"
   REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
 else
   REPO="--build-arg MINA_REPO=$MINA_REPO"
+fi
+
+if [[ -z "${DEB_ARCH:-}" ]]; then
+  echo "Debian architecture is not set. Using the default (all)"
+  DEB_ARCH="--build-arg deb_arch=all"
+else
+  DEB_ARCH="--build-arg deb_arch=$DEB_ARCH"
 fi
 
 if [[ -z "${INPUT_CODENAME:-}" ]]; then
@@ -129,12 +157,15 @@ else
   DEB_RELEASE="--build-arg deb_release=$INPUT_RELEASE"
 fi
 
-if [[ -z "${INPUT_VERSION:-}" ]]; then
+if [[ -z "${DEB_VERSION:-}" ]]; then
   echo "Debian version is not set. Using the default ($VERSION)"
   DEB_VERSION="--build-arg deb_version=$VERSION"
 else
-  DEB_VERSION="--build-arg deb_version=$INPUT_VERSION"
+  DEB_VERSION="--build-arg deb_version=$DEB_VERSION"
 fi
+
+VERSION_ARG="--build-arg version=$VERSION"
+
 
 if [[ -z "${DEB_PROFILE:-}" ]]; then
   echo "Debian profile is not set. Using the default (devnet)"
@@ -175,6 +206,8 @@ if [[ $(echo "${VALID_SERVICES[@]}" | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; th
 
 export_base_image
 
+CUSTOM_ARG=${CUSTOM_ARG:-""}
+
 case "${SERVICE}" in
     mina-archive)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
@@ -183,6 +216,14 @@ case "${SERVICE}" in
     mina-daemon)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
         DOCKER_CONTEXT="dockerfiles/"
+        ;;
+    mina-daemon-configured)
+        DOCKERFILE_PATH="dockerfiles/stages/install-config"
+        DOCKER_CONTEXT="dockerfiles/"
+        SERVICE="mina-daemon"
+        # The --version arg points to the base generic image for the Dockerfile FROM.
+        # Override VERSION_ARG to keep it, then set VERSION to current commit for output tags.
+        VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
         ;;
     mina-daemon-legacy-hardfork)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
@@ -194,7 +235,7 @@ case "${SERVICE}" in
           echo "Please provide the --deb-legacy-version argument."
           exit 1
         fi
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon-hardfork"
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon-auto-hardfork"
         DOCKER_CONTEXT="dockerfiles/"
         ;;
     mina-toolchain)
@@ -206,6 +247,12 @@ case "${SERVICE}" in
         ;;
     mina-rosetta)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
+        ;;
+    mina-rosetta-configured)
+        DOCKERFILE_PATH="dockerfiles/stages/install-config"
+        DOCKER_CONTEXT="dockerfiles/"
+        SERVICE="mina-rosetta"
+        VERSION_ARG_OVERRIDE="--build-arg version=$VERSION"
         ;;
     mina-zkapp-test-transaction)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
@@ -235,6 +282,13 @@ case "${SERVICE}" in
         ;;
 esac
 
+if [[ -n "${VERSION_ARG_OVERRIDE:-}" ]]; then
+  # For services like mina-daemon-configured, the build arg version (base image)
+  # differs from the output tag version (current commit).
+  VERSION_ARG="$VERSION_ARG_OVERRIDE"
+  VERSION="$MINA_DOCKER_TAG"
+fi
+
 export_version
 export_docker_tag
 
@@ -243,9 +297,9 @@ BUILD_NETWORK="--allow=network.host"
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT:-}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
-  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG  $DEB_REPO $BRANCH $REPO $LEGACY_VERSION $CUSTOM_ARG -t "$TAG" -t "$HASHTAG" -
+  --"$DOCKER_ACTION" --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG  $DEB_REPO $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_STORAGE_REPAIR_VERSION $DEB_ARCH $IMAGE_NAME_ARG $VERSION_ARG -t "$TAG" -t "$HASHTAG" -
 else
-  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $BRANCH $REPO $LEGACY_VERSION $CUSTOM_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
+  docker buildx build --"$DOCKER_ACTION" --network=host --progress=plain $PLATFORM $DOCKER_REPO_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX_ARG $BUILD_FLAGS_SUFFIX_ARG $DEB_REPO $BRANCH $REPO $LEGACY_VERSION $CUSTOM_SUFFIX_ARG $CUSTOM_ARG $DEB_ARCH $DEB_STORAGE_REPAIR_VERSION $IMAGE_NAME_ARG $VERSION_ARG "$DOCKER_CONTEXT" -t "$TAG" -t "$HASHTAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."

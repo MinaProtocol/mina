@@ -52,7 +52,7 @@ func (t *HardforkTest) startLocalNetwork(minaExecutable string, profile string, 
 }
 
 // RunMainNetwork starts the main network
-func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
+func (t *HardforkTest) RunMainNetwork(extraFilesRoot string, mainGenesisTs int64) (*exec.Cmd, error) {
 
 	mainGenesisTimestamp := config.FormatTimestamp(mainGenesisTs)
 
@@ -63,6 +63,7 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 		"--slot-transaction-end", strconv.Itoa(t.Config.SlotTxEnd),
 		"--slot-chain-end", strconv.Itoa(t.Config.SlotChainEnd),
 		"--hardfork-genesis-slot-delta", strconv.Itoa(t.Config.HfSlotDelta),
+		"--extra-files-root", extraFilesRoot,
 	}
 
 	return t.startLocalNetwork(t.Config.MainMinaExe, "main", args)
@@ -78,7 +79,7 @@ func (t *HardforkTest) RunForkNetwork() (*exec.Cmd, error) {
 
 // WaitUntilBestChainQuery calculates and waits until it's time to query the best chain
 func (t *HardforkTest) WaitUntilBestChainQuery(slotDurationSec int, genesisSlot int) {
-	t.WaitForBestTip(t.Config.AnyPortOfType(config.PORT_REST), func(block client.BlockData) bool {
+	t.WaitForBestTip(t.Config.AnyDaemon().Port(config.PORT_REST), func(block client.BlockData) bool {
 		return block.Slot >= t.Config.BestChainQueryFrom+genesisSlot
 	}, fmt.Sprintf("best tip reached slot %d", t.Config.BestChainQueryFrom),
 		time.Duration(2*t.Config.BestChainQueryFrom*slotDurationSec)*time.Second,

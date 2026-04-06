@@ -312,6 +312,52 @@ if (( EXTRA_KEYS > PLAIN_KEYS )); then
     exit 1
 fi
 
+# Resolve relative binary paths to absolute before changing directory
+if [[ -n "$MINA_BINARY" ]] && [[ "$MINA_BINARY" != /* ]]; then
+    echo "Note: --mina-binary was provided as a relative path; resolving it relative to the current invocation directory." >&2
+    echo "      Resulting absolute path: $(cd "$(dirname "$MINA_BINARY")" && pwd)/$(basename "$MINA_BINARY")" >&2
+    echo "      Consider using an absolute path for --mina-binary to avoid ambiguity." >&2
+    MINA_BINARY="$(cd "$(dirname "$MINA_BINARY")" && pwd)/$(basename "$MINA_BINARY")"
+fi
+if [[ -n "$RUNTIME_GENESIS_LEDGER_BINARY" ]] && [[ "$RUNTIME_GENESIS_LEDGER_BINARY" != /* ]]; then
+    mina_dir=$(dirname -- "$MINA_BINARY") || {
+        echo "Error: Failed to determine directory for --mina-binary: $MINA_BINARY" >&2
+        exit 1
+    }
+    mina_base=$(basename -- "$MINA_BINARY") || {
+        echo "Error: Failed to determine basename for --mina-binary: $MINA_BINARY" >&2
+        exit 1
+    }
+    case "$mina_dir" in
+        /*) mina_dir_abs="$mina_dir" ;;
+        *)  mina_dir_abs="$PWD/$mina_dir" ;;
+    esac
+    if [[ ! -d "$mina_dir_abs" ]]; then
+        echo "Error: Directory for --mina-binary does not exist: $mina_dir_abs" >&2
+        exit 1
+    fi
+    MINA_BINARY="$mina_dir_abs/$mina_base"
+fi
+if [[ -n "$RUNTIME_GENESIS_LEDGER_BINARY" ]] && [[ "$RUNTIME_GENESIS_LEDGER_BINARY" != /* ]]; then
+    rgl_dir=$(dirname -- "$RUNTIME_GENESIS_LEDGER_BINARY") || {
+        echo "Error: Failed to determine directory for --runtime-genesis-ledger-binary: $RUNTIME_GENESIS_LEDGER_BINARY" >&2
+        exit 1
+    }
+    rgl_base=$(basename -- "$RUNTIME_GENESIS_LEDGER_BINARY") || {
+        echo "Error: Failed to determine basename for --runtime-genesis-ledger-binary: $RUNTIME_GENESIS_LEDGER_BINARY" >&2
+        exit 1
+    }
+    case "$rgl_dir" in
+        /*) rgl_dir_abs="$rgl_dir" ;;
+        *)  rgl_dir_abs="$PWD/$rgl_dir" ;;
+    esac
+    if [[ ! -d "$rgl_dir_abs" ]]; then
+        echo "Error: Directory for --runtime-genesis-ledger-binary does not exist: $rgl_dir_abs" >&2
+        exit 1
+    fi
+    RUNTIME_GENESIS_LEDGER_BINARY="$rgl_dir_abs/$rgl_base"
+fi
+
 # Check if nix is needed after parsing arguments
 check_nix_if_needed
 

@@ -112,7 +112,6 @@ var free_on_finalize = function (x) {
   if (kimchi_is_native) {
     return x;
   }
-
   // wasm-bindgen wrappers already carry their own finalization logic.
   // Registering an extra free path for them can cause double-free / borrow
   // errors (and eventually memory corruption).

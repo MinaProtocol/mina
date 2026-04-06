@@ -90,11 +90,24 @@ let is_dirty_proof = function
       ; coinbase_amount = None
       ; supercharged_coinbase_factor = None
       ; account_creation_fee = None
-      ; fork = _
+      ; _
       } ->
       false
   | _ ->
       true
+
+let sanitize_proof (pf : Runtime_config.Proof_keys.t) =
+  { pf with
+    level = None
+  ; sub_windows_per_window = None
+  ; ledger_depth = None
+  ; work_delay = None
+  ; block_window_duration_ms = None
+  ; transaction_capacity = None
+  ; coinbase_amount = None
+  ; supercharged_coinbase_factor = None
+  ; account_creation_fee = None
+  }
 
 let extract_accounts_exn = function
   | { Runtime_config.Ledger.base = Accounts accounts
@@ -109,6 +122,23 @@ let extract_accounts_exn = function
   | _ ->
       failwith "Wrong ledger supplied"
 
+let sanitize_runtime_config (config : Runtime_config.t) : Runtime_config.t =
+  if Option.is_some config.daemon then
+    [%log warn] "Ignoring field .daemon from runtime config" ;
+  if Option.is_some config.genesis then
+    [%log warn] "Ignoring field .genesis from runtime config" ;
+  if Option.value_map ~default:false ~f:is_dirty_proof config.proof then
+    [%log warn]
+      "Ignoring field .proof | {level, sub_windows_per_window, ledger_depth, \
+       work_delay, block_window_duration_ms, transaction_capacity, \
+       coinbase_amount, supercharged_coinbase_factor, account_creation_fee} \
+       from runtime config" ;
+  { config with
+    daemon = None
+  ; genesis = None
+  ; proof = Option.map ~f:sanitize_proof config.proof
+  }
+
 let load_config_exn config_file =
   let%map config_json =
     Deferred.Or_error.ok_exn
@@ -120,11 +150,7 @@ let load_config_exn config_file =
            Failure ("Could not parse configuration: " ^ err) )
     |> Result.ok_exn
   in
-  if
-    Option.(
-      is_some config.daemon || is_some config.genesis
-      || Option.value_map ~default:false ~f:is_dirty_proof config.proof)
-  then failwith "Runtime config has unexpected fields" ;
+  let config = sanitize_runtime_config config in
   let ledger = Option.value_exn ~message:"No ledger provided" config.ledger in
   let staking_ledger =
     let%map.Option { staking; _ } = config.epoch_data in
@@ -141,12 +167,12 @@ let load_config_exn config_file =
 
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
-    ~pad_app_state ~hardfork_slot ~prefork_genesis_config () =
+    ~pad_app_state ~prefork_genesis_config () =
   let hardfork_slot =
-    match (hardfork_slot, prefork_genesis_config) with
-    | None, None ->
+    match prefork_genesis_config with
+    | None ->
         None
-    | Some hardfork_slot, Some prefork_genesis_config ->
+    | Some prefork_genesis_config -> (
         let runtime_config =
           Yojson.Safe.from_file prefork_genesis_config
           |> Runtime_config.of_yojson |> Result.ok_or_failwith
@@ -158,17 +184,28 @@ let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           Mina_numbers.Global_slot_since_genesis.of_int
             global_slot_since_genesis
         in
-        Option.some
-        @@ Mina_numbers.Global_slot_since_hard_fork.to_global_slot_since_genesis
-             ~current_genesis_global_slot hardfork_slot
-    | Some _, None ->
-        failwith
-          "hardfork slot is present but no prefork genesis config is provided"
-    | None, Some _ ->
-        [%log info]
-          "prefork genesis config is provided with no hardfork slot provided, \
-           ignoring" ;
-        None
+        match
+          Runtime_config.scheduled_hard_fork_genesis_slot runtime_config
+        with
+        | None ->
+            [%log info]
+              "prefork genesis config does not contain slot_chain_end and \
+               hard_fork_genesis_slot_delta, skipping vesting parameter update" ;
+            None
+        | Some hardfork_slot_since_hf ->
+            let slot =
+              Mina_numbers.Global_slot_since_hard_fork
+              .to_global_slot_since_genesis ~current_genesis_global_slot
+                hardfork_slot_since_hf
+            in
+            [%log info]
+              "Computed hardfork slot since genesis from prefork config: $slot"
+              ~metadata:
+                [ ( "slot"
+                  , `String
+                      (Mina_numbers.Global_slot_since_genesis.to_string slot) )
+                ] ;
+            Some slot )
   in
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
@@ -235,21 +272,14 @@ let () =
              ~doc:
                "BOOL whether to pad app_state to max allowed size (default: \
                 false)"
-         and hardfork_slot =
-           flag "--hardfork-slot"
-             (optional Cli_lib.Arg_type.hardfork_slot)
-             ~doc:
-               "INT the scheduled hardfork slot since last hardfork at which \
-                vesting parameter update should happen. If absent, don't \
-                update the vesting parameters"
          and prefork_genesis_config =
            flag "--prefork-genesis-config" (optional string)
              ~doc:
-               "STRING path to prefork genesis confg, should be present if \
-                `--hardfork-slot` is set, the program would read the genesis \
-                timestamps in the config to calculate the proper hardfork \
-                slot."
+               "STRING path to prefork genesis config. The hardfork slot for \
+                vesting parameter updates is computed from \
+                daemon.slot_chain_end + daemon.hard_fork_genesis_slot_delta in \
+                this config. If those fields are absent, no vesting parameter \
+                update is performed."
          in
          main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
-           ~ignore_missing_fields ~pad_app_state ~hardfork_slot
-           ~prefork_genesis_config) )
+           ~ignore_missing_fields ~pad_app_state ~prefork_genesis_config) )

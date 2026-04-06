@@ -799,8 +799,7 @@ module Mutations = struct
       ~typ:(non_null string)
       ~resolve:(fun { ctx = mina; _ } ()
                     (proof_bundle :
-                      Ledger_proof.t
-                      Snark_work_lib.Work.Result_without_metrics.t ) ->
+                      Ledger_proof.t Snark_work_lib.Result.Without_metrics.t ) ->
         let solved_work =
           Network_pool.Snark_pool.Resource_pool.Diff.Add_solved_work
             ( proof_bundle.statements
@@ -2807,7 +2806,7 @@ module Queries = struct
         match encoding_opt with
         | Some `BASE64 ->
             Bin_prot.Writer.to_string
-              Mina_state.Protocol_state.Value.Stable.V2.bin_t.writer
+              Mina_state.Protocol_state.Value.Stable.Latest.bin_t.writer
               protocol_state
             |> Base64.encode_exn
         | Some `JSON | None ->

@@ -1,5 +1,10 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
+<<<<<<<< HEAD:buildkite/src/Jobs/Release/MinaArtifactBullseyeDevnetLightnet.dhall
+let Profiles = ../../Constants/Profiles.dhall
+
+========
+>>>>>>>> develop:buildkite/src/Jobs/Release/MinaArtifactBullseyeDevnetDevnet.dhall
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -14,7 +19,16 @@ in  Pipeline.build
           , artifacts =
             [ Artifacts.Type.Daemon
             , Artifacts.Type.DaemonAppsOnly
+<<<<<<<< HEAD:buildkite/src/Jobs/Release/MinaArtifactBullseyeDevnetLightnet.dhall
+            , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.DaemonConfig
+            , Artifacts.Type.LogProc
+            ]
+          , profile = Profiles.Type.Lightnet
+========
+            , Artifacts.Type.DaemonConfig
+            , Artifacts.Type.DaemonAutoHardfork
+            , Artifacts.Type.DaemonAutomode
             , Artifacts.Type.DaemonPrefork
             , Artifacts.Type.CreatePreforkGenesis
             , Artifacts.Type.LogProc
@@ -23,14 +37,20 @@ in  Pipeline.build
             , Artifacts.Type.TestExecutive
             , Artifacts.Type.RosettaAppsOnly
             , Artifacts.Type.ZkappTestTransaction
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Devnet
+>>>>>>>> develop:buildkite/src/Jobs/Release/MinaArtifactBullseyeDevnetDevnet.dhall
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
+<<<<<<<< HEAD:buildkite/src/Jobs/Release/MinaArtifactBullseyeDevnetLightnet.dhall
+            , PipelineTag.Type.Lightnet
+========
             , PipelineTag.Type.Rosetta
             , PipelineTag.Type.Devnet
+>>>>>>>> develop:buildkite/src/Jobs/Release/MinaArtifactBullseyeDevnetDevnet.dhall
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Bullseye
             ]

@@ -891,8 +891,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           module Permissions = struct
             type controller = Permissions.Auth_required.Checked.t
 
-            type txn_version = Mina_numbers.Txn_version.Checked.t
-
             let edit_state : t -> controller =
              fun a -> a.data.permissions.edit_state
 
@@ -910,9 +908,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let set_verification_key_auth : t -> controller =
              fun a -> fst a.data.permissions.set_verification_key
-
-            let set_verification_key_txn_version : t -> txn_version =
-             fun a -> snd a.data.permissions.set_verification_key
 
             let set_zkapp_uri : t -> controller =
              fun a -> a.data.permissions.set_zkapp_uri
@@ -1064,10 +1059,25 @@ module Make_str (A : Wire_types.Concrete) = struct
           let set_voting_for voting_for ({ data = a; hash } : t) : t =
             { data = { a with voting_for }; hash }
 
+          type txn_version = Mina_numbers.Txn_version.Checked.t
+
+          let txn_version ({ data = a; _ } : t) =
+            snd a.permissions.set_verification_key
+
           let permissions (a : t) = a.data.permissions
 
-          let set_permissions permissions ({ data = a; hash } : t) : t =
+          let set_permissions (permissions : Permissions.t)
+              ({ data = a; hash } : t) : t =
             { data = { a with permissions }; hash }
+
+          let set_txn_version_to_current ({ data = a; hash } : t) : t =
+            let set_verification_key =
+              ( fst a.permissions.set_verification_key
+              , Mina_numbers.Txn_version.current_checked )
+            in
+            let permissions = { a.permissions with set_verification_key } in
+            let data = { a with permissions } in
+            { data; hash }
         end
 
         module Opt = struct
@@ -1473,6 +1483,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             let verification_key_perm_fallback_to_signature_with_older_version =
               Permissions.Auth_required.Checked
               .verification_key_perm_fallback_to_signature_with_older_version
+
+            let access_perm_fallback_to_signature_with_older_version =
+              Permissions.Auth_required.Checked
+              .access_perm_fallback_to_signature_with_older_version
           end
 
           module Txn_version = struct
@@ -2499,9 +2513,12 @@ module Make_str (A : Wire_types.Concrete) = struct
                       Boolean.Assert.any
                         [ Boolean.not is_user_command; permitted_to_send ] )
                 in
-                (*second fee receiver of a fee transfer and fee receiver of a coinbase transaction remain unchanged if
-                   1. These accounts are not permitted to receive tokens and,
-                   2. Receiver account that corresponds to first fee receiver of a fee transfer or coinbase receiver of a coinbase transaction, doesn't allow receiving tokens*)
+                (* second fee receiver of a fee transfer and fee receiver of a
+                   coinbase transaction remain unchanged if
+                     1. These accounts are not permitted to receive tokens and,
+                     2. Receiver account that corresponds to first fee receiver of
+                     a fee transfer or coinbase receiver of a coinbase
+                     transaction, doesn't allow receiving tokens *)
                 let%bind update_account =
                   let%bind receiving_allowed =
                     Boolean.all
@@ -2511,7 +2528,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 in
                 let%bind is_empty_and_writeable =
                   (* If this is a coinbase with zero fee, do not create the
-                     account, since the fee amount won't be enough to pay for it.
+                     account, since the fee amount won't be enough to pay for
+                     it.
                   *)
                   Boolean.(all [ is_empty_and_writeable; not is_zero_fee ])
                 in
@@ -2655,7 +2673,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Account.Checked.has_permission ~to_:`Receive account
                   |> Boolean.( &&& ) permitted_to_access
                 in
-                (*Account remains unchanged if balance update is not permitted for payments, fee_transfers and coinbase transactions*)
+                (* Account remains unchanged if balance update is not permitted
+                   for payments, fee_transfers and coinbase transactions *)
                 let%bind payment_or_internal_command =
                   Boolean.any [ is_payment; is_coinbase_or_fee_transfer ]
                 in
@@ -2784,7 +2803,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Boolean.(!receiver_overflow ||| user_command_fails)
                 in
                 let%bind is_empty_and_writeable =
-                  (* Do not create a new account if the user command will fail or if receiving is not permitted *)
+                  (* Do not create a new account if the user command will fail
+                     or if receiving is not permitted *)
                   Boolean.all
                     [ is_empty_and_writeable
                     ; Boolean.not user_command_fails
@@ -2889,7 +2909,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let permitted_to_receive =
                   Account.Checked.has_permission ~to_:`Receive account
                 in
-                (*Account remains unchanged if not permitted to send, receive, or set delegate*)
+                (* Account remains unchanged if not permitted to send, receive,
+                   or set delegate *)
                 let%bind payment_permitted =
                   Boolean.all
                     [ is_payment
@@ -3059,7 +3080,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     (* Someday:
        write the following soundness tests:
        - apply a transaction where the signature is incorrect
-       - apply a transaction where the sender does not have enough money in their account
+       - apply a transaction where the sender does not have enough money in
+         their account
        - apply a transaction and stuff in the wrong target hash
     *)
 
@@ -3067,8 +3089,10 @@ module Make_str (A : Wire_types.Concrete) = struct
        constraints pass iff there exists
           t : Tagged_transaction.t
        such that
-       - applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2].
-       - applying [t] to [pc.source] with results in pending coinbase stack [pc.target]
+       - applying [t] to ledger with merkle hash [l1] results in ledger with
+         merkle hash [l2].
+       - applying [t] to [pc.source] with results in pending coinbase stack
+         [pc.target]
        - t has fee excess equal to [fee_excess]
        - t has supply increase equal to [supply_increase]
          where statement includes
@@ -3358,7 +3382,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     module type S = sig
       val tag : tag
 
-      val verify : (t * Sok_message.t) list -> unit Or_error.t Async.Deferred.t
+      val verify : t list -> unit Or_error.t Async.Deferred.t
 
       val id : Pickles.Verification_key.Id.t Async.Deferred.t Lazy.t
 
@@ -3541,38 +3565,14 @@ module Make_str (A : Wire_types.Concrete) = struct
           init_stack pending_coinbase_stack_state handler
 
   let verify_impl ~f ts =
-    if
-      List.for_all ts ~f:(fun ((p : Stable.Latest.t), m) ->
-          Sok_message.Digest.equal (Sok_message.digest m) p.data.sok_digest )
-    then
-      f
-        (List.map ts ~f:(fun ({ Proof_carrying_data.data; proof }, _) ->
-             (data, proof) ) )
-    else
-      Async.return
-        (Or_error.error_string
-           "Transaction_snark.verify: Mismatched sok_message" )
+    f
+      (List.map ts
+         ~f:(fun ({ Proof_carrying_data.data; proof } : Stable.Latest.t) ->
+           (data, proof) ) )
 
   let verify ~key =
     verify_impl
       ~f:(Pickles.verify (module Nat.N2) (module Statement.With_sok) key)
-
-  let constraint_system_digests ~signature_kind ~constraint_constants () =
-    let digest = Tick.R1CS_constraint_system.digest in
-    [ ( "transaction-merge"
-      , digest
-          Merge.(
-            Tick.constraint_system ~input_typ:Statement.With_sok.typ
-              ~return_typ:Tick.Typ.unit (fun x ->
-                let open Tick in
-                Checked.map ~f:ignore @@ main x )) )
-    ; ( "transaction-base"
-      , digest
-          Base.(
-            Tick.constraint_system ~input_typ:Statement.With_sok.typ
-              ~return_typ:Tick.Typ.unit
-              (main ~signature_kind ~constraint_constants)) )
-    ]
 
   (** Return the constraint system for the transaction-merge circuit. *)
   let merge_constraint_system () =
@@ -3625,6 +3625,25 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~constraint_constants stmt
         in
         Checked.return () )
+
+  let constraint_system_digests ~signature_kind ~constraint_constants () =
+    let digest = Tick.R1CS_constraint_system.digest in
+    [ ("transaction-merge", digest (merge_constraint_system ()))
+    ; ( "transaction-base"
+      , digest (base_constraint_system ~signature_kind ~constraint_constants) )
+    ; ( "zkapp-opt_signed-opt_signed"
+      , digest
+          (zkapp_opt_signed_opt_signed_constraint_system ~signature_kind
+             ~constraint_constants ) )
+    ; ( "zkapp-opt_signed"
+      , digest
+          (zkapp_opt_signed_constraint_system ~signature_kind
+             ~constraint_constants ) )
+    ; ( "zkapp-proved"
+      , digest
+          (zkapp_proved_constraint_system ~signature_kind ~constraint_constants)
+      )
+    ]
 
   module Account_update_group = Zkapp_command.Make_update_group (struct
     type local_state =
@@ -3794,7 +3813,7 @@ module Make_str (A : Wire_types.Concrete) = struct
              Account_update_group.Zkapp_command_intermediate_state.t )
            witnesses
          ->
-        (*Transaction snark says nothing about failure status*)
+        (* Transaction snark says nothing about failure status *)
         let source_local = { source_local with failure_status_tbl = [] } in
         let target_local = { target_local with failure_status_tbl = [] } in
         let current_commitment = !commitment in
@@ -3876,7 +3895,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                   remaining_zkapp_command := rest ;
                   commitment := commitment' ;
                   full_commitment := full_commitment' ;
-                  (*TODO: Remove `Two_new case because the resulting pending_coinbase_init_stack will not be correct for zkapp_command2 if it is in a different scan state tree*)
+                  (*TODO: Remove `Two_new case because the resulting
+                    pending_coinbase_init_stack will not be correct for
+                    zkapp_command2 if it is in a different scan state tree*)
                   pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
                   pending_coinbase_stack_state :=
                     { pending_coinbase_stack_state1 with
@@ -4761,10 +4782,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       Zkapp_command.of_simple ~signature_kind ~proof_cache_db
         { fee_payer; memo; account_updates }
 
-    (* This spec is intended to build a zkapp command with only one account update
-       with proof authorization. This is mainly for cross-network replay tests. We
-       want to test the condition that when a proof is generated in one network
-       and being rejected by another network.
+    (* This spec is intended to build a zkapp command with only one account
+       update with proof authorization. This is mainly for cross-network replay
+       tests. We want to test the condition that when a proof is generated in
+       one network and being rejected by another network.
     *)
     module Single_account_update_spec = struct
       type t =

@@ -17,6 +17,7 @@ let Artifact
       | DaemonAppsOnly
       | DaemonPrefork
       | DaemonAutoHardfork
+      | DaemonAutomode
       | DaemonConfig
       | LogProc
       | Archive
@@ -24,11 +25,13 @@ let Artifact
       | BatchTxn
       | Rosetta
       | RosettaAppsOnly
+      | RosettaConfig
       | ZkappTestTransaction
       | FunctionalTestSuite
       | Toolchain
       | CreatePreforkGenesis
       | DelegationVerifier
+      | DaemonStorageToolbox
       >
 
 let AllButTests =
@@ -36,6 +39,7 @@ let AllButTests =
       , Artifact.DaemonLegacyHardfork
       , Artifact.DaemonPrefork
       , Artifact.DaemonAutoHardfork
+      , Artifact.DaemonAutomode
       , Artifact.DaemonAppsOnly
       , Artifact.DaemonConfig
       , Artifact.LogProc
@@ -45,9 +49,11 @@ let AllButTests =
       , Artifact.Rosetta
       , Artifact.ZkappTestTransaction
       , Artifact.RosettaAppsOnly
+      , Artifact.RosettaConfig
       , Artifact.Toolchain
       , Artifact.CreatePreforkGenesis
       , Artifact.DelegationVerifier
+      , Artifact.DaemonStorageToolbox
       ]
 
 let Main =
@@ -67,6 +73,7 @@ let capitalName =
             , DaemonPrefork = "DaemonPrefork"
             , DaemonLegacyHardfork = "DaemonLegacyHardfork"
             , DaemonAutoHardfork = "DaemonAutoHardfork"
+            , DaemonAutomode = "DaemonAutomode"
             , DaemonAppsOnly = "DaemonAppsOnly"
             , DaemonConfig = "DaemonConfig"
             , LogProc = "LogProc"
@@ -75,11 +82,13 @@ let capitalName =
             , BatchTxn = "BatchTxn"
             , Rosetta = "Rosetta"
             , RosettaAppsOnly = "RosettaAppsOnly"
+            , RosettaConfig = "RosettaConfig"
             , ZkappTestTransaction = "ZkappTestTransaction"
             , DelegationVerifier = "DelegationVerifier"
             , FunctionalTestSuite = "FunctionalTestSuite"
             , Toolchain = "Toolchain"
             , CreatePreforkGenesis = "CreatePreforkGenesis"
+            , DaemonStorageToolbox = "DaemonStorageToolbox"
             }
             artifact
 
@@ -90,6 +99,7 @@ let lowerName =
             , DaemonPrefork = "daemon_prefork"
             , DaemonLegacyHardfork = "daemon_hardfork"
             , DaemonAutoHardfork = "daemon_auto_hardfork"
+            , DaemonAutomode = "daemon_automode"
             , DaemonAppsOnly = "daemon_apps_only"
             , DaemonConfig = "daemon_config"
             , LogProc = "logproc"
@@ -98,21 +108,24 @@ let lowerName =
             , BatchTxn = "batch_txn"
             , Rosetta = "rosetta"
             , RosettaAppsOnly = "rosetta_apps_only"
+            , RosettaConfig = "rosetta_config"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , CreatePreforkGenesis = "create_prefork_genesis"
+            , DaemonStorageToolbox = "daemon_storage_toolbox"
             , Toolchain = "toolchain"
             , DelegationVerifier = "delegation_verifier"
             }
             artifact
 
-let dockerName =
+let dockerServiceName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "mina-daemon"
             , DaemonPrefork = ""
-            , DaemonLegacyHardfork = "mina-daemon-pre-hardfork"
+            , DaemonLegacyHardfork = "mina-daemon-legacy-hardfork"
             , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
+            , DaemonAutomode = ""
             , DaemonAppsOnly = "mina-daemon"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
@@ -120,12 +133,40 @@ let dockerName =
             , BatchTxn = "mina-batch-txn"
             , Rosetta = "mina-rosetta"
             , RosettaAppsOnly = "mina-rosetta"
+            , RosettaConfig = "mina-rosetta-configured"
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
             , FunctionalTestSuite = "mina-test-suite"
             , Toolchain = "mina-toolchain"
             , CreatePreforkGenesis = ""
             , DelegationVerifier = "mina-delegation-verifier"
-            , DaemonConfig = ""
+            , DaemonStorageToolbox = "mina-daemon-storage-toolbox"
+            , DaemonConfig = "mina-daemon-configured"
+            }
+            artifact
+
+let dockerName =
+          \(artifact : Artifact)
+      ->  merge
+            { DaemonConfig = "mina-daemon"
+            , Daemon = dockerServiceName artifact
+            , DaemonPrefork = dockerServiceName artifact
+            , DaemonLegacyHardfork = dockerServiceName artifact
+            , DaemonAutoHardfork = dockerServiceName artifact
+            , DaemonAppsOnly = dockerServiceName artifact
+            , DaemonAutomode = dockerServiceName artifact
+            , Archive = dockerServiceName artifact
+            , TestExecutive = dockerServiceName artifact
+            , LogProc = dockerServiceName artifact
+            , BatchTxn = dockerServiceName artifact
+            , Rosetta = dockerServiceName artifact
+            , RosettaAppsOnly = dockerServiceName artifact
+            , RosettaConfig = "mina-rosetta"
+            , ZkappTestTransaction = dockerServiceName artifact
+            , FunctionalTestSuite = dockerServiceName artifact
+            , Toolchain = dockerServiceName artifact
+            , CreatePreforkGenesis = dockerServiceName artifact
+            , DelegationVerifier = dockerServiceName artifact
+            , DaemonStorageToolbox = dockerServiceName artifact
             }
             artifact
 
@@ -145,7 +186,9 @@ let toDebianName =
             , DaemonPrefork = "daemon_${Network.lowerName network}_prefork"
             , DaemonLegacyHardfork =
                 "daemon_${Network.lowerName network}_hardfork_config"
-            , DaemonAutoHardfork = ""
+            , DaemonAutoHardfork =
+                "daemon_${Network.lowerName network}_postfork"
+            , DaemonAutomode = "daemon_${Network.lowerName network}_automode"
             , DaemonAppsOnly = "daemon_${Network.lowerName network}_generic"
             , LogProc = "logproc"
             , Archive = "archive_${Network.lowerName network}"
@@ -153,6 +196,7 @@ let toDebianName =
             , BatchTxn = "batch_txn"
             , Rosetta = "rosetta_${Network.lowerName network}"
             , RosettaAppsOnly = ""
+            , RosettaConfig = ""
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = ""
@@ -160,6 +204,7 @@ let toDebianName =
             , CreatePreforkGenesis =
                 "prefork_${Network.lowerName network}_genesis_ledger"
             , DaemonConfig = "daemon_${Network.lowerName network}_config"
+            , DaemonStorageToolbox = "daemon_storage_toolbox"
             }
             artifact
 
@@ -176,6 +221,7 @@ let toDebianNames =
                           , DaemonPrefork = [ toDebianName a network ]
                           , DaemonLegacyHardfork = [ toDebianName a network ]
                           , DaemonAutoHardfork = [ toDebianName a network ]
+                          , DaemonAutomode = [ toDebianName a network ]
                           , DaemonConfig = [ toDebianName a network ]
                           , DaemonAppsOnly = [ toDebianName a network ]
                           , Archive = [ toDebianName a network ]
@@ -184,10 +230,12 @@ let toDebianNames =
                           , BatchTxn = [ "batch_txn" ]
                           , Rosetta = [ toDebianName a network ]
                           , RosettaAppsOnly = [ toDebianName a network ]
+                          , RosettaConfig = [ toDebianName a network ]
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
                           , CreatePreforkGenesis = [ toDebianName a network ]
                           , DelegationVerifier = [ "delegation_verify" ]
+                          , DaemonStorageToolbox = [ "daemon_storage_toolbox" ]
                           , Toolchain = [] : List Text
                           }
                           a
@@ -247,6 +295,7 @@ let dockerTag =
                 { Daemon =
                     "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
                 , DaemonPrefork = ""
+                , DaemonAutomode = ""
                 , DaemonLegacyHardfork =
                     "${spec.version}${network_part}${extraordinary_profile_part}"
                 , DaemonAutoHardfork =
@@ -260,6 +309,8 @@ let dockerTag =
                 , BatchTxn = "${spec.version}"
                 , Rosetta =
                     "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
+                , RosettaConfig =
+                    "${spec.version}${network_part}${extraordinary_profile_part}${extra_build_flags_part}"
                 , RosettaAppsOnly =
                     "${spec.version}${network_part}-generic${extraordinary_profile_part}${extra_build_flags_part}"
                 , ZkappTestTransaction = "${spec.version}"
@@ -269,6 +320,7 @@ let dockerTag =
                 , DelegationVerifier = "${spec.version}"
                 , CreatePreforkGenesis = "${spec.version}"
                 , DaemonConfig = "${spec.version}"
+                , DaemonStorageToolbox = "${spec.version}"
                 }
                 spec.artifact
 
@@ -452,6 +504,7 @@ in  { Type = Artifact
     , lowerName = lowerName
     , toDebianName = toDebianName
     , toDebianNames = toDebianNames
+    , dockerServiceName = dockerServiceName
     , dockerName = dockerName
     , dockerNames = dockerNames
     , dockerTag = dockerTag
