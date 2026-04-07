@@ -267,7 +267,8 @@ module Transaction_pool = struct
       * ( Pickles.Side_loaded.Verification_key.t
         * Zkapp_statement.t
         * Pickles.Side_loaded.Proof.t )
-        list ]
+        list
+      * Error.t ]
   [@@deriving sexp_of]
 
   type partial = partial_item list [@@deriving sexp_of]
@@ -323,7 +324,7 @@ module Transaction_pool = struct
                           match c with
                           | `Valid _ ->
                               None
-                          | `Valid_assuming (v, _) ->
+                          | `Valid_assuming (v, _, _) ->
                               (* TODO: This rechecks the signatures on zkApp transactions... oh well for now *)
                               Some ((i, j), v) ) )
             in
@@ -356,7 +357,7 @@ module Transaction_pool = struct
                 | `Invalid_proof err ->
                     (* Invalidate the whole diff *)
                     result.(i) <- `Invalid_proof err
-                | `Valid_assuming xs -> (
+                | `Valid_assuming (xs, err) -> (
                     match result.(i) with
                     | `Invalid_keys _
                     | `Invalid_signature _
@@ -369,7 +370,7 @@ module Transaction_pool = struct
                         ()
                     | `In_progress a ->
                         (* The diff may still be valid. *)
-                        a.(j) <- `Valid_assuming (v, xs) )
+                        a.(j) <- `Valid_assuming (v, xs, err) )
                 | `Valid c -> (
                     (* Similar to the above. *)
                     match result.(i) with
@@ -402,15 +403,24 @@ module Transaction_pool = struct
                   | Some res ->
                       `Valid res
                   | None ->
+                      let collected_errors =
+                        Array.to_sequence a
+                        |> Sequence.filter_map ~f:(function
+                             | `Valid_assuming (_, _, err) ->
+                                 Some err
+                             | _ ->
+                                 None )
+                        |> Sequence.to_list
+                      in
                       `Potentially_invalid
                         ( list_of_array_map a ~f:(function
                             | `Unknown ->
                                 assert false
                             | `Valid c ->
                                 `Valid c
-                            | `Valid_assuming (v, xs) ->
-                                `Valid_assuming (v, xs) )
-                        , Error.of_string "In progress" ) ) ) ) )
+                            | `Valid_assuming (v, xs, err) ->
+                                `Valid_assuming (v, xs, err) )
+                        , Error.of_list collected_errors ) ) ) ) )
 
   let verify (t : t) = verify t
 end
