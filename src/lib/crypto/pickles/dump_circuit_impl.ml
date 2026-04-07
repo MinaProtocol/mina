@@ -4463,13 +4463,54 @@ let step_main_simple_chain () =
   in
   constraint_builder.finish_computation res
 
-(* Dump a step_main constraint system to JSON. *)
+(* Dump a step_main constraint system with full metadata (labels, gate labels, cached constants).
+   Same output as dump_tick_with_labels but uses constraint_system_manual for Promise-based circuits. *)
 let dump_step_main output_dir name cs_fn =
+  let module VCS = Kimchi_pasta_snarky_backend.Vesta_based_plonk.R1CS_constraint_system in
+  let events = ref [] in
+  let label_stack = ref [] in
+  Impl.set_constraint_logger
+    (fun ?at_label_boundary constraint_opt ->
+       ( match at_label_boundary with
+         | Some (`Start, lab) ->
+             label_stack := lab :: !label_stack ;
+             VCS.set_gate_label_stack !label_stack
+         | Some (`End, _lab) ->
+             label_stack := (match !label_stack with _ :: rest -> rest | [] -> []) ;
+             VCS.set_gate_label_stack !label_stack
+         | None -> () ) ;
+       match constraint_opt with
+       | Some c ->
+           let path = String.concat ~sep:"/" (List.rev !label_stack) in
+           events := (path, constraint_type_name_tick c) :: !events
+       | None -> () ) ;
   let cs = cs_fn () in
+  Impl.clear_constraint_logger () ;
+  VCS.set_gate_label_stack [] ;
+  (* Circuit JSON *)
   let json = Kimchi_pasta_constraint_system.Vesta_constraint_system.to_json cs in
   let path = output_dir ^ "/" ^ name ^ ".json" in
   Out_channel.write_all path ~data:(json ^ "\n") ;
-  Printf.printf "Wrote %s\n" path
+  Printf.printf "Wrote %s\n" path ;
+  (* Label events JSONL *)
+  let labels_path = output_dir ^ "/" ^ name ^ "_labels.jsonl" in
+  let events_rev = List.rev !events in
+  let lines = List.map events_rev ~f:(fun (path, ctype) ->
+    Printf.sprintf "{\"label\":\"%s\",\"constraint\":\"%s\"}"
+      (json_escape path) (json_escape ctype)) in
+  Out_channel.write_all labels_path
+    ~data:(String.concat ~sep:"\n" lines ^ "\n") ;
+  Printf.printf "Wrote %s (%d constraint events)\n" labels_path (List.length events_rev) ;
+  (* Gate-level labels JSONL *)
+  let gate_labels_path = output_dir ^ "/" ^ name ^ "_gate_labels.jsonl" in
+  let gate_labels_data = VCS.dump_gate_labels cs in
+  Out_channel.write_all gate_labels_path ~data:(gate_labels_data ^ "\n") ;
+  Printf.printf "Wrote %s\n" gate_labels_path ;
+  (* Cached constants *)
+  let constants_path = output_dir ^ "/" ^ name ^ "_cached_constants.json" in
+  let constants_json = Kimchi_pasta_constraint_system.Vesta_constraint_system.dump_cached_constants cs in
+  Out_channel.write_all constants_path ~data:(constants_json ^ "\n") ;
+  Printf.printf "Wrote %s\n" constants_path
 
 (* ---- Entry point ---- *)
 
