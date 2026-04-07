@@ -590,30 +590,6 @@ somehow, but not correctly filled in). It will however fail with a
 strange error during the build, when it fails to find a
 dependency. Make sure you do this!
 
-### git LFS
-
-If you have git LFS installed and configured on your system, the build may fail with strange errors similar to this:
-
-```
-Downloading docs/res/all_data_structures.dot.png (415 KB)
-Error downloading object: docs/res/all_data_structures.dot.png (fed6771): Smudge error: Error downloading docs/res/all_data_structures.dot.png (fed6771190a9b063246074bbfe3b1fc0ba4240fdc41abcf026d5bc449ca4f9b8): batch request: missing protocol: ""
-
-Errors logged to /tmp/nix-115798-1/lfs/logs/20220121T113801.442266054.log
-Use `git lfs logs last` to view the log.
-error: external filter 'git-lfs filter-process' failed
-fatal: docs/res/all_data_structures.dot.png: smudge filter lfs failed
-error: program 'git' failed with exit code 128
-(use '--show-trace' to show detailed location information)
-```
-
-You can fix this by setting `GIT_LFS_SKIP_SMUDGE=1` env variable, e.g. by running
-
-```
-export GIT_LFS_SKIP_SMUDGE=1
-```
-
-Before running any `nix` commands.
-
 ### `Warning: ignoring untrusted substituter`
 
 Update your `/etc/nix/nix.conf` with the following content (concatenating new
