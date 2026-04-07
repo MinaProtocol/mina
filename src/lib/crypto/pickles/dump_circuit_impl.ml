@@ -4512,6 +4512,111 @@ let dump_step_main output_dir name cs_fn =
   Out_channel.write_all constants_path ~data:(constants_json ^ "\n") ;
   Printf.printf "Wrote %s\n" constants_path
 
+(* ---- step_main Simple_Chain N2 ---- *)
+(* Same Simple_Chain rule but with max_proofs_verified=N2 and prevs=[self, self].
+   This avoids needing to register a separate tag in Types_map. *)
+
+let step_main_simple_chain_n2 () =
+  let open Impls.Step in
+  let open Pickles_types in
+  let self : (Field.t, Field.Constant.t, Nat.N2.n, Nat.N1.n) Tag.t =
+    Tag.create "simple_chain_n2"
+  in
+  let feature_flags = Plonk_types.Features.none_bool in
+  let feature_flags_full =
+    Kimchi_backend_common.Plonk_types.Features.Full.none
+  in
+  let rule : _ Inductive_rule.Kimchi.Promise.t =
+    { identifier = "main"
+    ; prevs = [ self; self ]
+    ; feature_flags
+    ; main =
+        (fun { public_input = self_input } ->
+          let prev1 =
+            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
+          in
+          let proof1 =
+            exists (Typ.prover_value ()) ~compute:(fun () ->
+                Proof.dummy Nat.N2.n Nat.N1.n ~domain_log2:14 )
+          in
+          let prev2 =
+            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
+          in
+          let proof2 =
+            exists (Typ.prover_value ()) ~compute:(fun () ->
+                Proof.dummy Nat.N2.n Nat.N1.n ~domain_log2:14 )
+          in
+          let is_base_case = Field.equal Field.zero self_input in
+          let proof_must_verify = Boolean.not is_base_case in
+          let self_correct = Field.(equal (one + prev1 + prev2) self_input) in
+          Boolean.Assert.any [ self_correct; is_base_case ] ;
+          Promise.return
+            { Inductive_rule.Kimchi.previous_proof_statements =
+                [ { public_input = prev1
+                  ; proof = proof1
+                  ; proof_must_verify
+                  }
+                ; { public_input = prev2
+                  ; proof = proof2
+                  ; proof_must_verify
+                  }
+                ]
+            ; public_output = ()
+            ; auxiliary_output = ()
+            } )
+    }
+  in
+  let max_proofs_verified : (module Nat.Add.Intf with type n = Nat.N2.n) =
+    (module Nat.N2)
+  in
+  let module Step_requests = Requests.Step (Inductive_rule.Kimchi) in
+  let requests = Step_requests.create () in
+  let wrap_domains =
+    { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 14 }
+  in
+  let step_domains =
+    Vector.[ { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 16 }
+           ]
+  in
+  let basic : _ Types_map.Compiled.basic =
+    { public_input = Field.typ
+    ; wrap_domains
+    ; step_domains
+    ; feature_flags = feature_flags_full
+    ; num_chunks = 1
+    ; zk_rows = 3
+    }
+  in
+  let step_main_fn =
+    Staged.unstage
+      (Step_main_for_dump.step_main requests max_proofs_verified rule
+         ~self_branches:(Nat.N1.n : Nat.N1.n Nat.t)
+         ~local_signature:([ Nat.N2.n; Nat.N2.n ] : _ Hlist.H1.T(Nat).t)
+         ~local_signature_length:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
+         ~local_branches_length:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
+         ~proofs_verified:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
+         ~lte:(Nat.Lte.S (Nat.Lte.S Nat.Lte.Z))
+         ~public_input:(Input Field.typ)
+         ~auxiliary_typ:Typ.unit
+         ~basic
+         ~known_wrap_keys:([ None; None ] : _ Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t)
+         ~self )
+  in
+  let etyp = Impls.Step.input ~proofs_verified:Nat.N2.n in
+  let (T (return_typ, _conv, conv_inv)) = etyp in
+  let main () () =
+    let%map.Promise res = step_main_fn () in
+    Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+  in
+  let constraint_builder =
+    Impl.constraint_system_manual ~input_typ:Typ.unit ~return_typ
+  in
+  let res =
+    Promise.block_on_async_exn (fun () ->
+        constraint_builder.run_circuit main )
+  in
+  constraint_builder.finish_computation res
+
 (* ---- Isolation circuits ---- *)
 
 (* Outer hash_messages_for_next_step_proof for Simple_Chain (N1):
@@ -4929,4 +5034,6 @@ let run ~output_dir =
     ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit ;
   (* Step_main circuit for Simple_Chain *)
   dump_step_main output_dir "step_main_simple_chain_circuit"
-    step_main_simple_chain
+    step_main_simple_chain ;
+  dump_step_main output_dir "step_main_simple_chain_n2_circuit"
+    step_main_simple_chain_n2
