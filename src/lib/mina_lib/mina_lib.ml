@@ -1565,7 +1565,8 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
 module type Itn_settable = sig
   type t
 
-  val set_itn_logger_data : t -> daemon_port:int -> unit Deferred.Or_error.t
+  val set_itn_logger_data :
+    t -> daemon_port:int option -> unit Deferred.Or_error.t
 end
 
 let start_filtered_log ~commit_id
@@ -1775,7 +1776,13 @@ let create ~commit_id ?wallets (config : Config.t) =
           let ({ client_port; _ } : Node_addrs_and_ports.t) =
             config.gossip_net_params.addrs_and_ports
           in
-          match%map M.set_itn_logger_data t ~daemon_port:client_port with
+          let itn_subprocess_logging =
+            Sys.getenv "ITN_SUBPROCESS_LOGGING" |> Option.is_some
+          in
+          match%map
+            M.set_itn_logger_data t
+              ~daemon_port:(Option.some_if itn_subprocess_logging client_port)
+          with
           | Ok () ->
               ()
           | Error err ->
