@@ -284,7 +284,7 @@ module Transaction_pool = struct
       | `Init d ->
           (* Initially, the status of all the transactions in a never-before-seen
              diff are unknown. *)
-          `In_progress (Array.of_list_map d.data ~f:(fun _ -> `Unknown))
+          `In_progress (Array.create ~len:(List.length d.data) `Unknown)
       | `Partially_validated d ->
           (* We've seen this diff before, so we have some information about its
              transactions. *)
