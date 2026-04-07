@@ -470,90 +470,7 @@ let create_zkapp_accounts_tx
       ~signature_kind:Testnet zkapp_command_spec
   in
   Ref.replace nonce_ref Unsigned.UInt32.succ ;
-  tx
-
-let generate_txs ~valid_until ~nonce_ref ~n_zkapp_txs ~n_payments ~n_blocks
-    ~constraint_constants ~max_cost ~account_state_tbl ~vk ~genesis_constants
-    fee_payer_keypair : User_command.Valid.t list list =
-  let signer_pk = Public_key.compress fee_payer_keypair.Keypair.public_key in
-  let event_elements = 12 in
-  let action_elements = 12 in
-  let generate_payments () =
-    List.init (n_payments + n_zkapp_txs) ~f:(fun i ->
-        let command =
-          if i < n_payments then (
-            (* Creates a simple payment that initializes a new account *)
-            let res =
-              User_command.Signed_command
-                (mk_payment ~valid_until ~nonce:!nonce_ref ~signer_pk
-                   fee_payer_keypair )
-            in
-            Ref.replace nonce_ref Unsigned.UInt32.succ ;
-            res )
-          else if max_cost then (
-            let fee_payer_id =
-              Account_id.create
-                (Public_key.compress fee_payer_keypair.public_key)
-                Token_id.default
-            in
-            Account_id.Table.change account_state_tbl fee_payer_id
-              ~f:
-                (Option.map ~f:(fun ((a : Account.t), role) ->
-                     ({ a with nonce = !nonce_ref }, role) ) ) ;
-            let max_cost_cmd =
-              Quickcheck.Generator.generate
-                (Mina_generators.Zkapp_command_generators
-                 .gen_max_cost_zkapp_command_from ~n_updates:15
-                   ~fee_payer_pk:
-                     (Public_key.compress fee_payer_keypair.public_key)
-                   ~account_state_tbl ~vk ~genesis_constants () )
-                ~size:1
-                ~random:(Splittable_random.State.create Random.State.default)
-            in
-            (* Sign the fee payer with the real key (the generator uses
-               Signature.dummy). Account updates use Proof auth so they
-               are not signature-checked. *)
-            let _txn_commitment, full_txn_commitment =
-              Zkapp_command.get_transaction_commitments
-                ~signature_kind:Mina_signature_kind.Testnet max_cost_cmd
-            in
-            let fee_payer_signature =
-              Signature_lib.Schnorr.Chunked.sign
-                ~signature_kind:Mina_signature_kind.Testnet
-                fee_payer_keypair.private_key
-                (Random_oracle.Input.Chunked.field full_txn_commitment)
-            in
-            let max_cost_cmd =
-              { max_cost_cmd with
-                fee_payer =
-                  { max_cost_cmd.fee_payer with
-                    authorization = fee_payer_signature
-                  }
-              }
-            in
-            Ref.replace nonce_ref Unsigned.UInt32.succ ;
-            Zkapp_command max_cost_cmd )
-          else
-            (* Generates a 9-account-update zkapp transaction
-               creating 8 new accounts with 0 balance each *)
-            let res =
-              User_command.Zkapp_command
-                (Test_ledger_application.mk_tx
-                   ~transfer_parties_get_actions_events:true ~event_elements
-                   ~action_elements ~constraint_constants fee_payer_keypair
-                   !nonce_ref )
-            in
-            Ref.replace nonce_ref Unsigned.UInt32.succ ;
-            res
-        in
-        (* This is used in the context of a test, and we know that the command is valid *)
-        let (`If_this_is_used_it_should_have_a_comment_justifying_it
-              valid_command ) =
-          User_command.to_valid_unsafe command
-        in
-        valid_command )
-  in
-  List.init n_blocks ~f:(fun _ -> generate_payments ())
+  (tx, zkapp_keypairs)
 
 let assert_max_cost_zkapp ~logger ~genesis_constants
     (zkapp_cmd : Zkapp_command.t) =
@@ -592,6 +509,98 @@ let assert_max_cost_zkapp ~logger ~genesis_constants
   assert all_proof_auth ;
   assert (total_events = max_event_elements) ;
   assert (total_actions = max_action_elements)
+
+(** Generate a single max-cost zkapp transaction with real proofs.
+    Generates the command, replaces dummy authorizations with real proofs,
+    runs structural assertions, and optionally verifies via Side_loaded.verify. *)
+let generate_max_cost_tx ~logger ~prover ~keymap ~vk ~genesis_constants
+    ~account_state_tbl ~verify ~nonce_ref fee_payer_keypair =
+  let zkapp_cmd =
+    Quickcheck.Generator.generate
+      (Mina_generators.Zkapp_command_generators.gen_max_cost_zkapp_command_from
+         ~n_updates:15
+         ~fee_payer_pk:
+           (Public_key.compress fee_payer_keypair.Keypair.public_key)
+         ~account_state_tbl ~vk ~genesis_constants () )
+      ~size:1
+      ~random:(Splittable_random.State.create Random.State.default)
+  in
+  Ref.replace nonce_ref Unsigned.UInt32.succ ;
+  (* Replace dummy proof authorizations with real proofs and sign fee payer *)
+  let%bind replaced =
+    Zkapp_command_builder.replace_authorizations ~prover ~keymap zkapp_cmd
+  in
+  assert_max_cost_zkapp ~logger ~genesis_constants replaced ;
+  let%map () =
+    if verify then (
+      let triples =
+        Zkapp_command.Call_forest.mapi_with_trees replaced.account_updates
+          ~f:(fun _i (au : _ Account_update.Poly.t) tree ->
+            match au.authorization with
+            | Control.Poly.Proof proof_tag ->
+                let stmt = Zkapp_statement.of_tree tree in
+                let proof = Proof_cache_tag.read_proof_from_disk proof_tag in
+                Some (vk.data, stmt, proof)
+            | _ ->
+                None )
+        |> Zkapp_command.Call_forest.to_list |> List.filter_map ~f:Fn.id
+      in
+      [%log info] "Verifying %d proof triples for max-cost zkapp"
+        (List.length triples) ;
+      assert (List.length triples = 15) ;
+      Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ triples
+      >>| Or_error.ok_exn )
+    else return ()
+  in
+  let (`If_this_is_used_it_should_have_a_comment_justifying_it valid_command) =
+    User_command.to_valid_unsafe (Zkapp_command replaced)
+  in
+  valid_command
+
+let generate_txs ~valid_until ~nonce_ref ~n_zkapp_txs ~n_payments ~n_blocks
+    ~constraint_constants ~account_state_tbl fee_payer_keypair :
+    User_command.Valid.t list list =
+  let signer_pk = Public_key.compress fee_payer_keypair.Keypair.public_key in
+  let fee_payer_id = Account_id.create signer_pk Token_id.default in
+  let advance_nonce () =
+    Ref.replace nonce_ref Unsigned.UInt32.succ ;
+    Account_id.Table.change account_state_tbl fee_payer_id
+      ~f:
+        (Option.map ~f:(fun ((a : Account.t), role) ->
+             ({ a with nonce = !nonce_ref }, role) ) )
+  in
+  let event_elements = 12 in
+  let action_elements = 12 in
+  let generate_payments () =
+    List.init (n_payments + n_zkapp_txs) ~f:(fun i ->
+        let command =
+          if i < n_payments then (
+            (* Creates a simple payment that initializes a new account *)
+            let res =
+              User_command.Signed_command
+                (mk_payment ~valid_until ~nonce:!nonce_ref ~signer_pk
+                   fee_payer_keypair )
+            in
+            advance_nonce () ; res )
+          else
+            (* Generates a 9-account-update zkapp transaction
+               creating 8 new accounts with 0 balance each *)
+            let res =
+              User_command.Zkapp_command
+                (Test_ledger_application.mk_tx
+                   ~transfer_parties_get_actions_events:true ~event_elements
+                   ~action_elements ~constraint_constants fee_payer_keypair
+                   !nonce_ref )
+            in
+            advance_nonce () ; res
+        in
+        let (`If_this_is_used_it_should_have_a_comment_justifying_it
+              valid_command ) =
+          User_command.to_valid_unsafe command
+        in
+        valid_command )
+  in
+  List.init n_blocks ~f:(fun _ -> generate_payments ())
 
 let load_and_initialize_config ~genesis_dir ~logger ~config_file =
   let%bind runtime_config_json =
@@ -643,8 +652,9 @@ let initialize_verifier_and_components ~logger
   in
   ((module Context : Consensus.Intf.CONTEXT), (module Keys : Keys_S), verifier)
 
-let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
-    ~n_blocks ~n_zkapp_txs ~n_payments ~max_cost ~fee_payer_keypair genesis =
+let generate_all_transactions ~logger
+    ~(precomputed_values : Precomputed_values.t) ~n_blocks ~n_zkapp_txs
+    ~n_payments ~max_cost ~verify ~fee_payer_keypair genesis =
   let genesis_slot =
     Block.protocol_state genesis
     |> Protocol_state.consensus_state
@@ -681,18 +691,9 @@ let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
       in
       Account_id.Table.set account_state_tbl ~key:account_id
         ~data:(account, role) ) ;
-  let vk =
-    let data =
-      Pickles.Side_loaded.Verification_key.(
-        dummy |> to_base58_check |> of_base58_check_exn)
-    in
-    let hash = Zkapp_account.digest_vk data in
-    { With_hash.data; hash }
-  in
-
   (* Always generate zkApp accounts in the first block *)
-  let%map gen_zk_apps_tx =
-    let%map tx =
+  let%bind gen_zk_apps_tx, zkapp_keypairs =
+    let%map tx, zkapp_keypairs =
       create_zkapp_accounts_tx ?fee:None ?initial_balance:None
         ~constraint_constants:precomputed_values.constraint_constants
         ~sender:fee_payer_keypair ~nonce_ref ~n_accounts:10 ~account_state_tbl
@@ -705,14 +706,40 @@ let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
         =
       User_command.to_valid_unsafe (Zkapp_command tx)
     in
-    valid_command
+    (valid_command, zkapp_keypairs)
   in
 
   let rest_txs =
     generate_txs ~nonce_ref ~valid_until ~n_payments ~n_zkapp_txs ~n_blocks
-      ~constraint_constants:precomputed_values.constraint_constants ~max_cost
-      ~account_state_tbl ~vk
-      ~genesis_constants:precomputed_values.genesis_constants fee_payer_keypair
+      ~constraint_constants:precomputed_values.constraint_constants
+      ~account_state_tbl fee_payer_keypair
+  in
+  let%map rest_txs =
+    if max_cost then
+      (* create_trivial_snapp compiles a real Pickles circuit, giving us a
+         VK and prover for Proof-authorized account updates. deploy_snapp
+         (called inside create_zkapp_accounts_tx) also calls
+         create_trivial_snapp() internally; without ~unique_id the Pickles
+         cache ensures both produce the same VK. *)
+      let `VK vk_deferred, `Prover prover =
+        Transaction_snark.For_tests.create_trivial_snapp ()
+      in
+      let%bind vk = vk_deferred in
+      let keymap =
+        List.fold (fee_payer_keypair :: zkapp_keypairs)
+          ~init:Signature_lib.Public_key.Compressed.Map.empty ~f:(fun map kp ->
+            Map.set map
+              ~key:(Signature_lib.Public_key.compress kp.Keypair.public_key)
+              ~data:kp.Keypair.private_key )
+      in
+      Deferred.List.map rest_txs ~f:(fun block_txs ->
+          let%map max_cost_tx =
+            generate_max_cost_tx ~logger ~prover ~keymap ~vk
+              ~genesis_constants:precomputed_values.genesis_constants
+              ~account_state_tbl ~verify ~nonce_ref fee_payer_keypair
+          in
+          block_txs @ [ max_cost_tx ] )
+    else return rest_txs
   in
   List.cons [ gen_zk_apps_tx ] rest_txs
 
@@ -739,7 +766,7 @@ let create_blocks_with_diffs ~logger
   List.rev diffs_rev
 
 let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
-    ~n_payments ~n_blocks ~max_cost ~output_file ~genesis_dir =
+    ~n_payments ~n_blocks ~max_cost ~verify ~output_file ~genesis_dir =
   (* Section 1: Load and initialize precomputed values from config *)
   let%bind precomputed_values =
     load_and_initialize_config ~logger ~config_file ~genesis_dir
@@ -770,28 +797,9 @@ let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
      transactions and %d payments"
     (n_blocks + 1) n_blocks n_zkapp_txs n_payments ;
   let%bind all_transactions =
-    generate_all_transactions ~precomputed_values ~n_blocks ~n_zkapp_txs
-      ~n_payments ~max_cost ~fee_payer_keypair:keypair genesis
+    generate_all_transactions ~logger ~precomputed_values ~n_blocks ~n_zkapp_txs
+      ~n_payments ~max_cost ~verify ~fee_payer_keypair:keypair genesis
   in
-
-  ( if max_cost then
-    let found =
-      List.exists all_transactions ~f:(fun txs ->
-          List.exists txs ~f:(fun cmd ->
-              match (User_command.forget_check cmd : User_command.t) with
-              | Zkapp_command zkapp_cmd
-                when List.length
-                       (Zkapp_command.Call_forest.to_list
-                          zkapp_cmd.account_updates )
-                     = 15 ->
-                  assert_max_cost_zkapp ~logger
-                    ~genesis_constants:precomputed_values.genesis_constants
-                    zkapp_cmd ;
-                  true
-              | _ ->
-                  false ) )
-    in
-    if not found then failwith "No max-cost zkapp transaction found" ) ;
 
   (* Section 6: Create blocks *)
   [%log info] "Creating %d blocks" (List.length winning_slots) ;
@@ -874,6 +882,12 @@ let command =
       flag "--num-blocks" ~doc:"NUM Number of blocks to generate" (required int)
     and max_cost =
       flag "--max-cost" ~doc:" Generate maximum cost zkApp transactions" no_arg
+    and verify =
+      flag "--verify"
+        ~doc:
+          " Verify proofs in max-cost zkApp transactions using \
+           Side_loaded.verify"
+        no_arg
     and output_file =
       flag "--output-file"
         ~doc:
@@ -891,6 +905,7 @@ let command =
       ; ("n_payments", `Int n_payments)
       ; ("n_blocks", `Int n_blocks)
       ; ("max_cost", `Bool max_cost)
+      ; ("verify", `Bool verify)
       ; ("archive_node_port", [%to_yojson: int option] archive_node_port)
       ; ("output_file", [%to_yojson: int option] archive_node_port)
       ]
@@ -923,4 +938,4 @@ let command =
     let genesis_dir = Option.value ~default:"genesis" genesis_dir in
 
     run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
-      ~n_payments ~n_blocks ~max_cost ~output_file ~genesis_dir)
+      ~n_payments ~n_blocks ~max_cost ~verify ~output_file ~genesis_dir)
