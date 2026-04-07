@@ -343,26 +343,33 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                 Req.Compute_prev_proof_parts previous_proof_statements )
           in
           let dlog_plonk_index =
+            with_label "exists_wrap_index" (fun () ->
             let num_chunks = (* TODO *) Plonk_checks.num_chunks_by_default in
             exists
               ~request:(fun () -> Req.Wrap_index)
               (Plonk_verification_key_evals.typ
-                 (Typ.array ~length:num_chunks Step_verifier.Inner_curve.typ) )
-          and prevs =
+                 (Typ.array ~length:num_chunks Step_verifier.Inner_curve.typ) ))
+          in
+          let prevs =
+            with_label "exists_prevs" (fun () ->
             exists (Prev_typ.f prev_proof_typs) ~request:(fun () ->
-                Req.Proof_with_datas )
-          and unfinalized_proofs_unextended =
+                Req.Proof_with_datas ))
+          in
+          let unfinalized_proofs_unextended =
+            with_label "exists_unfinalized" (fun () ->
             exists
               (Vector.typ'
                  (Vector.map
                     ~f:(fun _feature_flags ->
                       Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n )
                     feature_flags_and_num_chunks ) )
-              ~request:(fun () -> Req.Unfinalized_proofs)
-          and messages_for_next_wrap_proof =
+              ~request:(fun () -> Req.Unfinalized_proofs))
+          in
+          let messages_for_next_wrap_proof =
             exists (Vector.typ Digest.typ Max_proofs_verified.n)
               ~request:(fun () -> Req.Messages_for_next_wrap_proof)
-          and actual_wrap_domains =
+          in
+          let actual_wrap_domains =
             exists
               (Vector.typ (Typ.prover_value ()) (Length.to_nat proofs_verified))
               ~request:(fun () -> Req.Wrap_domain_indices)

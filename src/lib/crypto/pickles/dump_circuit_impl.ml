@@ -4512,6 +4512,35 @@ let dump_step_main output_dir name cs_fn =
   Out_channel.write_all constants_path ~data:(constants_json ^ "\n") ;
   Printf.printf "Wrote %s\n" constants_path
 
+(* ---- Typ check isolation circuits ---- *)
+
+(* A single Other_field.typ value: allocate via exists and discard.
+   This isolates the exact constraints from Other_field.check. *)
+let other_field_check_circuit () () =
+  let open Impls.Step in
+  let (_ : Other_field.t) = exists Other_field.typ ~compute:(fun () -> Other_field.Constant.zero) in
+  ()
+
+(* A single Unfinalized.typ value: allocate via exists and discard.
+   This isolates the constraints from Unfinalized.typ (which uses
+   Other_field.typ for shifted values + assert_16_bits for scalar challenges). *)
+let unfinalized_typ_check_circuit () () =
+  let open Impls.Step in
+  let (_ : Unfinalized.t) = exists (Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n)
+            ~compute:(fun () -> Lazy.force Unfinalized.Constant.dummy) in
+  ()
+
+(* Per_proof_witness.typ (No_app_state) for a single proof:
+   isolates all the curve checks + Other_field checks from exists_prevs. *)
+let per_proof_witness_typ_check_circuit () () =
+  let open Impls.Step in
+  let feature_flags = Kimchi_backend_common.Plonk_types.Features.Full.none in
+  let num_chunks = 1 in
+  let prev_typ = Per_proof_witness.typ Typ.unit Pickles_types.Nat.N1.n ~feature_flags ~num_chunks in
+  let (_ : _ Per_proof_witness.No_app_state.t) = exists prev_typ
+            ~request:(fun () -> failwith "per_proof_witness: never called") in
+  ()
+
 (* ---- Entry point ---- *)
 
 let run ~output_dir =
@@ -4849,6 +4878,13 @@ let run ~output_dir =
   in
   dump_step "full_step_verify_one_n2_circuit" full_step_verify_one_n2_circuit
     ~input_typ:full_step_verify_one_n2_input_typ ~return_typ:Impl.Typ.unit ;
+  (* Typ check isolation circuits *)
+  dump_step "other_field_check_step_circuit" other_field_check_circuit
+    ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit ;
+  dump_step "unfinalized_typ_check_step_circuit" unfinalized_typ_check_circuit
+    ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit ;
+  dump_step "per_proof_witness_typ_check_step_circuit" per_proof_witness_typ_check_circuit
+    ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit ;
   (* Step_main circuit for Simple_Chain *)
   dump_step_main output_dir "step_main_simple_chain_circuit"
     step_main_simple_chain
