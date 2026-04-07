@@ -122,7 +122,7 @@ val gen_max_cost_zkapp_command_from :
     proofs by public key and reuse them across multiple transactions.
 *)
 val replace_proof_authorizations_for_max_cost :
-     cache:Proof_cache_tag.t Signature_lib.Public_key.Compressed.Map.t ref
+     cache:Proof_cache_tag.t Zkapp_statement.Map.t ref
   -> prover:
        (   ?handler:
              (   Snarky_backendless.Request.request

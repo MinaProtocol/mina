@@ -1748,9 +1748,9 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range ?(n_updates : int = 5)
    proofs by public key and reuse them across multiple transactions.
 *)
 let replace_proof_authorizations_for_max_cost
-    ~(cache : Proof_cache_tag.t Signature_lib.Public_key.Compressed.Map.t ref)
-    ~prover ~keymap (zkapp_command : Zkapp_command.t) :
-    Zkapp_command.t Async_kernel.Deferred.t =
+    ~(cache : Proof_cache_tag.t Zkapp_statement.Map.t ref) ~prover ~keymap
+    (zkapp_command : Zkapp_command.t) : Zkapp_command.t Async_kernel.Deferred.t
+    =
   let fee_payer_with_valid_signature =
     let fee_payer_signature =
       let sign_for_account_update ~use_full_commitment sk =
@@ -1781,13 +1781,11 @@ let replace_proof_authorizations_for_max_cost
         let%map valid_authorization =
           match authorization with
           | Control.Poly.Proof _proof -> (
-              let pk = body.Account_update.Body.public_key in
-              match Signature_lib.Public_key.Compressed.Map.find !cache pk with
+              let txn_stmt = Zkapp_statement.of_tree tree in
+              match Map.find !cache txn_stmt with
               | Some cached_proof ->
                   return (Control.Poly.Proof cached_proof)
               | None ->
-                  (* Generate new proof and cache it *)
-                  let txn_stmt = Zkapp_statement.of_tree tree in
                   let handler
                       (Snarky_backendless.Request.With { request; respond }) =
                     match request with _ -> respond Unhandled
@@ -1798,10 +1796,7 @@ let replace_proof_authorizations_for_max_cost
                   let proof =
                     Proof_cache_tag.write_proof_to_disk proof_cache_db proof
                   in
-                  (* Add to cache *)
-                  cache :=
-                    Signature_lib.Public_key.Compressed.Map.add_exn !cache
-                      ~key:pk ~data:proof ;
+                  cache := Map.set !cache ~key:txn_stmt ~data:proof ;
                   Control.Poly.Proof proof )
           | _ ->
               return authorization
@@ -1940,7 +1935,7 @@ let%test_module _ =
             acc )
       in
       (* Use cache for proof generation *)
-      let cache = ref Signature_lib.Public_key.Compressed.Map.empty in
+      let cache = ref Zkapp_statement.Map.empty in
       let open Async.Deferred.Let_syntax in
       let%map (command_final : Zkapp_command.t) =
         Async.Deferred.(
@@ -2043,7 +2038,7 @@ let%test_module _ =
             (Sexp.equal
                (Zkapp_command.sexp_of_t cmd1)
                (Zkapp_command.sexp_of_t cmd2) ) ) ;
-        let cache = ref Public_key.Compressed.Map.empty in
+        let cache = ref Zkapp_statement.Map.empty in
         let open Deferred.Let_syntax in
         (* First transaction: primes the cache *)
         let%bind cmd1_with_proofs =
@@ -2051,14 +2046,14 @@ let%test_module _ =
           >>= Zkapp_command_builder.replace_authorizations ~keymap
         in
         assert (Map.length !cache = 1) ;
-        (* Second transaction: cache returns stale proof *)
+        (* Second transaction: different statement, so cache misses
+           and a fresh proof is generated. *)
         let%bind cmd2_with_proofs =
           replace_proof_authorizations_for_max_cost ~cache ~prover ~keymap cmd2
           >>= Zkapp_command_builder.replace_authorizations ~keymap
         in
-        (* Cache still has 1 entry — the second transaction hit it,
-           not missed. This confirms the stale proof was reused. *)
-        assert (Map.length !cache = 1) ;
+        (* Cache now has 2 entries — one per distinct Zkapp_statement. *)
+        assert (Map.length !cache = 2) ;
         let verify_proofs cmd =
           let triples =
             Zkapp_command.Call_forest.mapi_with_trees
@@ -2080,5 +2075,5 @@ let%test_module _ =
         let%bind result1 = verify_proofs cmd1_with_proofs in
         assert (Or_error.is_ok result1) ;
         let%map result2 = verify_proofs cmd2_with_proofs in
-        assert (Or_error.is_error result2))
+        assert (Or_error.is_ok result2))
   end )
