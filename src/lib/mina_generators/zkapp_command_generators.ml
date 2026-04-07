@@ -1989,4 +1989,96 @@ let%test_module _ =
             ~genesis_constants ()
         in
         gen_and_test_tx ~n_expected_updates:n_updates ~keymap max_cost_cmd_gen)
+
+    let%test_unit "proof cache in replace_proof_authorizations_for_max_cost is \
+                   keyed incorrectly" =
+      (* Demonstrates the caching bug: proofs are cached by public key, but
+         the Zkapp_statement includes the account update body (with random
+         events/actions). Two transactions for the same PK produce different
+         statements, so the cached proof from the first is invalid for the
+         second.
+
+         Minimal setup: 1 zkapp account, n_updates=1, 2 transactions.
+         The first primes the cache. The second gets a stale proof.
+         Once the cache is fixed to key on Zkapp_statement, the second
+         assert should flip to [is_ok]. *)
+      Async.(
+        Thread_safe.block_on_async_exn
+        @@ fun () ->
+        let account_state_tbl = Account_id.Table.create () in
+        let fee_payer_sk, fee_payer_account =
+          Quickcheck.random_value ~seed:(`Deterministic "fee_payer")
+          @@ Account.gen_with_private_key ~token_id:Token_id.default
+               ~balance:(Currency.Balance.of_mina_int_exn 1000)
+        in
+        Account_id.Table.set account_state_tbl
+          ~key:(Account.identifier fee_payer_account)
+          ~data:(fee_payer_account, `Fee_payer) ;
+        let sk, zkapp_account =
+          Quickcheck.random_value ~seed:(`Deterministic "0")
+          @@ Account.gen_zkapp_account_with_private_key
+               ~token_id:Token_id.default
+               ~balance:(Currency.Balance.of_mina_int_exn 100)
+        in
+        Account_id.Table.set account_state_tbl
+          ~key:(Account.identifier zkapp_account)
+          ~data:(zkapp_account, `Ordinary_participant) ;
+        let keymap =
+          [ (fee_payer_account.public_key, fee_payer_sk)
+          ; (zkapp_account.public_key, sk)
+          ]
+          |> Public_key.Compressed.Map.of_alist_exn
+        in
+        let gen =
+          gen_max_cost_zkapp_command_from ~n_updates:1
+            ~fee_payer_pk:fee_payer_account.public_key ~account_state_tbl ~vk
+            ~genesis_constants ()
+        in
+        let random = Splittable_random.State.create Random.State.default in
+        let cmd1 = Quickcheck.Generator.generate gen ~size:1 ~random in
+        let cmd2 = Quickcheck.Generator.generate gen ~size:1 ~random in
+        (* Sanity check: the two commands are distinct transactions. *)
+        assert (
+          not
+            (Sexp.equal
+               (Zkapp_command.sexp_of_t cmd1)
+               (Zkapp_command.sexp_of_t cmd2) ) ) ;
+        let cache = ref Public_key.Compressed.Map.empty in
+        let open Deferred.Let_syntax in
+        (* First transaction: primes the cache *)
+        let%bind cmd1_with_proofs =
+          replace_proof_authorizations_for_max_cost ~cache ~prover ~keymap cmd1
+          >>= Zkapp_command_builder.replace_authorizations ~keymap
+        in
+        assert (Map.length !cache = 1) ;
+        (* Second transaction: cache returns stale proof *)
+        let%bind cmd2_with_proofs =
+          replace_proof_authorizations_for_max_cost ~cache ~prover ~keymap cmd2
+          >>= Zkapp_command_builder.replace_authorizations ~keymap
+        in
+        (* Cache still has 1 entry — the second transaction hit it,
+           not missed. This confirms the stale proof was reused. *)
+        assert (Map.length !cache = 1) ;
+        let verify_proofs cmd =
+          let triples =
+            Zkapp_command.Call_forest.mapi_with_trees
+              cmd.Zkapp_command.Poly.account_updates
+              ~f:(fun _i (au : _ Account_update.Poly.t) tree ->
+                match au.authorization with
+                | Control.Poly.Proof proof_tag ->
+                    let stmt = Zkapp_statement.of_tree tree in
+                    let proof =
+                      Proof_cache_tag.read_proof_from_disk proof_tag
+                    in
+                    (vk.data, stmt, proof)
+                | _ ->
+                    failwith "Expected Proof authorization" )
+            |> Zkapp_command.Call_forest.to_list
+          in
+          Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ triples
+        in
+        let%bind result1 = verify_proofs cmd1_with_proofs in
+        assert (Or_error.is_ok result1) ;
+        let%map result2 = verify_proofs cmd2_with_proofs in
+        assert (Or_error.is_error result2))
   end )
