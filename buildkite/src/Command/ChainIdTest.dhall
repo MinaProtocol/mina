@@ -14,6 +14,8 @@ let RunInToolchain = ../Command/RunInToolchain.dhall
 
 let Size = ../Command/Size.dhall
 
+let DebianVersions = ../Constants/DebianVersions.dhall
+
 let Network = ../Constants/Network.dhall
 
 let buildTestStep =
@@ -26,7 +28,7 @@ let buildTestStep =
                 Command.Config::{
                 , commands =
                     RunInToolchain.runInToolchain
-                      ([] : List Text)
+                      DebianVersions.overrideEnvs
                       "buildkite/scripts/test-chain-id.sh ${networkName} ${expectedChainId}"
                 , label = "Test chain-id for ${networkName}"
                 , key = "test-chain-id-${networkName}"
