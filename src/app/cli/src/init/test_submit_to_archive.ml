@@ -390,7 +390,7 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
   Frontier_base.Breadcrumb.build ~logger ~precomputed_values ~verifier
     ~get_completed_work:(Fn.const None) ~trust_system
     ~parent:previous.breadcrumb ~transition ~sender:None
-    ~skip_staged_ledger_verification:`All ~transition_receipt_time ()
+    ~skip_staged_ledger_verification:`Proofs ~transition_receipt_time ()
   >>| Result.map_error ~f:(fun e ->
           let msg =
             match e with
@@ -540,10 +540,11 @@ let generate_max_cost_tx ~logger ~prover ~keymap ~vk ~genesis_constants
             | Control.Poly.Proof proof_tag ->
                 let stmt = Zkapp_statement.of_tree tree in
                 let proof = Proof_cache_tag.read_proof_from_disk proof_tag in
-                Some (vk.data, stmt, proof)
+                (vk.data, stmt, proof)
             | _ ->
-                None )
-        |> Zkapp_command.Call_forest.to_list |> List.filter_map ~f:Fn.id
+                failwith
+                  "Expected Proof authorization on max-cost account update" )
+        |> Zkapp_command.Call_forest.to_list
       in
       [%log info] "Verifying %d proof triples for max-cost zkapp"
         (List.length triples) ;
