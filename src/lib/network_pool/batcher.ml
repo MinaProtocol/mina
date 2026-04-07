@@ -412,6 +412,13 @@ module Transaction_pool = struct
                                  None )
                         |> Sequence.to_list
                       in
+                      let error_attached =
+                        match collected_errors with
+                        | [] ->
+                            Error.of_string "In progress"
+                        | errors ->
+                            Error.of_list errors
+                      in
                       `Potentially_invalid
                         ( list_of_array_map a ~f:(function
                             | `Unknown ->
@@ -420,7 +427,7 @@ module Transaction_pool = struct
                                 `Valid c
                             | `Valid_assuming (v, xs, err) ->
                                 `Valid_assuming (v, xs, err) )
-                        , Error.of_list collected_errors ) ) ) ) )
+                        , error_attached ) ) ) ) )
 
   let verify (t : t) = verify t
 end
