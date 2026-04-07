@@ -105,6 +105,7 @@ val gen_list_of_zkapp_command_from :
 val gen_max_cost_zkapp_command_from :
      ?memo:string
   -> ?fee_range:Currency.Fee.t * Currency.Fee.t
+  -> ?pk:Signature_lib.Public_key.Compressed.t
   -> ?n_updates:int
   -> fee_payer_pk:Signature_lib.Public_key.Compressed.t
   -> account_state_tbl:(Account.t * role) Account_id.Table.t

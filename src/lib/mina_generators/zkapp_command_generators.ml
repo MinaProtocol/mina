@@ -1676,7 +1676,7 @@ let mk_fee_payer ~fee ~pk ~nonce : Account_update.Fee_payer.t =
     ~body:{ public_key = pk; fee; valid_until = None; nonce }
     ~authorization:Signature.dummy
 
-let gen_max_cost_zkapp_command_from ?memo ?fee_range ?(n_updates : int = 5)
+let gen_max_cost_zkapp_command_from ?memo ?fee_range ?pk ?(n_updates : int = 5)
     ~(fee_payer_pk : Signature_lib.Public_key.Compressed.t)
     ~(account_state_tbl : (Account.t * role) Account_id.Table.t) ~vk
     ~(genesis_constants : Genesis_constants.t) () =
@@ -1688,33 +1688,33 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range ?(n_updates : int = 5)
     | None ->
         Signed_command_memo.gen
   in
-  let zkapp_accounts =
-    Account_id.Table.data account_state_tbl
-    |> List.filter_map ~f:(fun ((a, role) : Account.t * role) ->
-           match role with
-           | `Ordinary_participant ->
-               Option.map a.zkapp ~f:(fun _ -> a)
-           | _ ->
-               None )
-  in
-  let zkapp_pks = List.map zkapp_accounts ~f:(fun a -> a.public_key) in
   let%bind pks =
-    Quickcheck.Generator.(of_list zkapp_pks |> list_with_length n_updates)
+    match pk with
+    | Some pk ->
+        return (List.init n_updates ~f:(fun _ -> pk))
+    | None ->
+        let zkapp_accounts =
+          Account_id.Table.data account_state_tbl
+          |> List.filter_map ~f:(fun ((a, role) : Account.t * role) ->
+                 match role with
+                 | `Ordinary_participant ->
+                     Option.map a.zkapp ~f:(fun _ -> a)
+                 | _ ->
+                     None )
+        in
+        let zkapp_pks = List.map zkapp_accounts ~f:(fun a -> a.public_key) in
+        Quickcheck.Generator.(of_list zkapp_pks |> list_with_length n_updates)
   in
   let[@warning "-8"] (head :: tail) =
     List.map pks ~f:(fun pk -> mk_account_update ~pk ~vk)
   in
-  let%bind events =
-    Snark_params.Tick.Field.gen
-    |> Quickcheck.Generator.map ~f:(fun x -> [| x |])
-    |> Quickcheck.Generator.list_with_length
-         genesis_constants.max_event_elements
+  let events =
+    List.init genesis_constants.max_event_elements ~f:(fun i ->
+        [| Snark_params.Tick.Field.of_int i |] )
   in
-  let%bind actions =
-    Snark_params.Tick.Field.gen
-    |> Quickcheck.Generator.map ~f:(fun x -> [| x |])
-    |> Quickcheck.Generator.list_with_length
-         genesis_constants.max_action_elements
+  let actions =
+    List.init genesis_constants.max_action_elements ~f:(fun i ->
+        [| Snark_params.Tick.Field.of_int i |] )
   in
   let account_updates =
     { head with body = { head.body with events; actions } } :: tail
@@ -1985,18 +1985,11 @@ let%test_module _ =
         in
         gen_and_test_tx ~n_expected_updates:n_updates ~keymap max_cost_cmd_gen)
 
-    let%test_unit "proof cache in replace_proof_authorizations_for_max_cost is \
-                   keyed incorrectly" =
-      (* Demonstrates the caching bug: proofs are cached by public key, but
-         the Zkapp_statement includes the account update body (with random
-         events/actions). Two transactions for the same PK produce different
-         statements, so the cached proof from the first is invalid for the
-         second.
-
-         Minimal setup: 1 zkapp account, n_updates=1, 2 transactions.
-         The first primes the cache. The second gets a stale proof.
-         Once the cache is fixed to key on Zkapp_statement, the second
-         assert should flip to [is_ok]. *)
+    let%test_unit "proof cache keys on Zkapp_statement enables reuse across \
+                   transactions" =
+      (* Verifies that the proof cache, keyed on Zkapp_statement, produces
+         valid proofs across multiple transactions and that deterministic
+         events/actions enable cache reuse. *)
       Async.(
         Thread_safe.block_on_async_exn
         @@ fun () ->
@@ -2009,50 +2002,48 @@ let%test_module _ =
         Account_id.Table.set account_state_tbl
           ~key:(Account.identifier fee_payer_account)
           ~data:(fee_payer_account, `Fee_payer) ;
-        let sk, zkapp_account =
-          Quickcheck.random_value ~seed:(`Deterministic "0")
-          @@ Account.gen_zkapp_account_with_private_key
-               ~token_id:Token_id.default
-               ~balance:(Currency.Balance.of_mina_int_exn 100)
+        let gen_account i =
+          let sk, zkapp_account =
+            Quickcheck.random_value ~seed:(`Deterministic (string_of_int i))
+            @@ Account.gen_zkapp_account_with_private_key
+                 ~token_id:Token_id.default
+                 ~balance:(Currency.Balance.of_mina_int_exn 100)
+          in
+          Account_id.Table.set account_state_tbl
+            ~key:(Account.identifier zkapp_account)
+            ~data:(zkapp_account, `Ordinary_participant) ;
+          (zkapp_account.public_key, sk)
         in
-        Account_id.Table.set account_state_tbl
-          ~key:(Account.identifier zkapp_account)
-          ~data:(zkapp_account, `Ordinary_participant) ;
+        let zkapp_accounts = List.init 3 ~f:gen_account in
+        let focal_pk = fst (List.hd_exn zkapp_accounts) in
         let keymap =
-          [ (fee_payer_account.public_key, fee_payer_sk)
-          ; (zkapp_account.public_key, sk)
-          ]
+          (fee_payer_account.public_key, fee_payer_sk) :: zkapp_accounts
           |> Public_key.Compressed.Map.of_alist_exn
         in
+        let n_updates = 5 in
         let gen =
-          gen_max_cost_zkapp_command_from ~n_updates:1
-            ~fee_payer_pk:fee_payer_account.public_key ~account_state_tbl ~vk
-            ~genesis_constants ()
+          gen_max_cost_zkapp_command_from ~n_updates ~memo:"max-cost-test"
+            ~fee_range:
+              Currency.Fee.(of_mina_string_exn "1.0", of_mina_string_exn "1.0")
+            ~pk:focal_pk ~fee_payer_pk:fee_payer_account.public_key
+            ~account_state_tbl ~vk ~genesis_constants ()
         in
         let random = Splittable_random.State.create Random.State.default in
         let cmd1 = Quickcheck.Generator.generate gen ~size:1 ~random in
         let cmd2 = Quickcheck.Generator.generate gen ~size:1 ~random in
-        (* Sanity check: the two commands are distinct transactions. *)
-        assert (
-          not
-            (Sexp.equal
-               (Zkapp_command.sexp_of_t cmd1)
-               (Zkapp_command.sexp_of_t cmd2) ) ) ;
         let cache = ref Zkapp_statement.Map.empty in
         let open Deferred.Let_syntax in
-        (* First transaction: primes the cache *)
         let%bind cmd1_with_proofs =
           replace_proof_authorizations_for_max_cost ~cache ~prover ~keymap cmd1
           >>= Zkapp_command_builder.replace_authorizations ~keymap
         in
-        assert (Map.length !cache = 1) ;
-        (* Second transaction: different statement, so cache misses
-           and a fresh proof is generated. *)
+        (* head (with events/actions) and tail (without) = 2 distinct statements *)
+        assert (Map.length !cache = 2) ;
         let%bind cmd2_with_proofs =
           replace_proof_authorizations_for_max_cost ~cache ~prover ~keymap cmd2
           >>= Zkapp_command_builder.replace_authorizations ~keymap
         in
-        (* Cache now has 2 entries — one per distinct Zkapp_statement. *)
+        (* All cache hits — deterministic events/actions + fixed PK *)
         assert (Map.length !cache = 2) ;
         let verify_proofs cmd =
           let triples =
