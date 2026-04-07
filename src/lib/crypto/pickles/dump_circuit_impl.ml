@@ -4512,6 +4512,46 @@ let dump_step_main output_dir name cs_fn =
   Out_channel.write_all constants_path ~data:(constants_json ^ "\n") ;
   Printf.printf "Wrote %s\n" constants_path
 
+(* ---- Isolation circuits ---- *)
+
+(* Outer hash_messages_for_next_step_proof for Simple_Chain (N1):
+   VK as circuit variables, appState = 1 field, 1 proof with sg + 16 bp_challenges.
+   This isolates the exact constraints from the outer hash in step_main. *)
+let outer_hash_step_circuit () () =
+  let open Impls.Step in
+  (* Allocate VK as circuit variables (same as step_main) *)
+  let num_chunks = Plonk_checks.num_chunks_by_default in
+  let dlog_plonk_index =
+    exists
+      (Kimchi_backend_common.Plonk_verification_key_evals.typ
+         (Typ.array ~length:num_chunks Step_verifier.Inner_curve.typ) )
+      ~request:(fun () -> failwith "outer_hash: never called")
+  in
+  (* Allocate app_state *)
+  let app_state = exists Field.typ ~compute:(fun () -> Field.Constant.zero) in
+  (* Allocate sg point *)
+  let sg = exists Step_verifier.Inner_curve.typ
+      ~request:(fun () -> failwith "outer_hash sg: never called") in
+  (* Allocate 16 bp_challenges (as plain fields, matching FOP output) *)
+  let bp_challenges =
+    Pickles_types.Vector.init Backend.Tick.Rounds.n ~f:(fun _ ->
+      exists Field.typ ~compute:(fun () -> Field.Constant.zero)) in
+  (* Run the non-opt hash (same as step_main's outer hash) *)
+  let to_field_elements x = let (Typ typ) = Field.typ in fst (typ.var_to_fields x) in
+  let (_ : Field.t) =
+    with_label "hash_messages_for_next_step_proof" (fun () ->
+      let hash_fn = unstage
+        (Step_verifier.hash_messages_for_next_step_proof
+           ~index:dlog_plonk_index to_field_elements) in
+      hash_fn
+        { app_state
+        ; dlog_plonk_index
+        ; challenge_polynomial_commitments = Pickles_types.Vector.singleton sg
+        ; old_bulletproof_challenges =
+            Pickles_types.Vector.singleton bp_challenges
+        }) in
+  ()
+
 (* ---- Typ check isolation circuits ---- *)
 
 (* A single Other_field.typ value: allocate via exists and discard.
@@ -4878,7 +4918,9 @@ let run ~output_dir =
   in
   dump_step "full_step_verify_one_n2_circuit" full_step_verify_one_n2_circuit
     ~input_typ:full_step_verify_one_n2_input_typ ~return_typ:Impl.Typ.unit ;
-  (* Typ check isolation circuits *)
+  (* Isolation circuits *)
+  dump_step "outer_hash_step_circuit" outer_hash_step_circuit
+    ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit ;
   dump_step "other_field_check_step_circuit" other_field_check_circuit
     ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit ;
   dump_step "unfinalized_typ_check_step_circuit" unfinalized_typ_check_circuit
