@@ -29,6 +29,7 @@ type HardforkTest struct {
 // NewHardforkTest creates a new instance of the hardfork test
 func NewHardforkTest(cfg *config.Config) *HardforkTest {
 	ctx, cancel := context.WithCancel(context.Background())
+	cfg.InitDaemonInfos()
 	return &HardforkTest{
 		Config:      cfg,
 		Client:      client.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.ClientMaxRetries),
@@ -120,17 +121,9 @@ func (t *HardforkTest) Run() error {
 	t.Logger.Info("Phase 1: Running main network...")
 
 	beforeShutdown := func(t *HardforkTest, analysis *BlockAnalysisResult) error {
-		t.Logger.Info("Phase 2: Forking with fork method `%s`...", t.Config.ForkMethod.String())
+		t.Logger.Info("Phase 2: Forking with fork method `%s`...", t.Config.ForkMethods)
 
-		var err error
-		switch t.Config.ForkMethod {
-		case config.Legacy:
-			err = t.LegacyForkPhase(analysis, mainGenesisTs)
-		case config.Advanced:
-			err = t.AdvancedForkPhase(analysis, mainGenesisTs)
-		}
-
-		if err != nil {
+		if err := t.ForkPhase(analysis, mainGenesisTs); err != nil {
 			return err
 		}
 		return nil

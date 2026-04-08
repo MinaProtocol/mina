@@ -3,23 +3,6 @@ open Core_kernel
 open Mina_base
 open Pipe_lib
 
-type metrics_t =
-  { block_production_delay : int list
-  ; transaction_pool_diff_received : int
-  ; transaction_pool_diff_broadcasted : int
-  ; transactions_added_to_pool : int
-  ; transaction_pool_size : int
-  }
-
-type best_chain_block =
-  { state_hash : string
-  ; command_transaction_count : int
-  ; creator_pk : string
-  ; height : Mina_numbers.Length.t
-  ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
-  ; global_slot_since_hard_fork : Mina_numbers.Global_slot_since_hard_fork.t
-  }
-
 (* TODO: malleable error -> or error *)
 
 module Engine = struct

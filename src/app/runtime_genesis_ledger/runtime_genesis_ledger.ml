@@ -90,11 +90,24 @@ let is_dirty_proof = function
       ; coinbase_amount = None
       ; supercharged_coinbase_factor = None
       ; account_creation_fee = None
-      ; fork = _
+      ; _
       } ->
       false
   | _ ->
       true
+
+let sanitize_proof (pf : Runtime_config.Proof_keys.t) =
+  { pf with
+    level = None
+  ; sub_windows_per_window = None
+  ; ledger_depth = None
+  ; work_delay = None
+  ; block_window_duration_ms = None
+  ; transaction_capacity = None
+  ; coinbase_amount = None
+  ; supercharged_coinbase_factor = None
+  ; account_creation_fee = None
+  }
 
 let extract_accounts_exn = function
   | { Runtime_config.Ledger.base = Accounts accounts
@@ -109,6 +122,23 @@ let extract_accounts_exn = function
   | _ ->
       failwith "Wrong ledger supplied"
 
+let sanitize_runtime_config (config : Runtime_config.t) : Runtime_config.t =
+  if Option.is_some config.daemon then
+    [%log warn] "Ignoring field .daemon from runtime config" ;
+  if Option.is_some config.genesis then
+    [%log warn] "Ignoring field .genesis from runtime config" ;
+  if Option.value_map ~default:false ~f:is_dirty_proof config.proof then
+    [%log warn]
+      "Ignoring field .proof | {level, sub_windows_per_window, ledger_depth, \
+       work_delay, block_window_duration_ms, transaction_capacity, \
+       coinbase_amount, supercharged_coinbase_factor, account_creation_fee} \
+       from runtime config" ;
+  { config with
+    daemon = None
+  ; genesis = None
+  ; proof = Option.map ~f:sanitize_proof config.proof
+  }
+
 let load_config_exn config_file =
   let%map config_json =
     Deferred.Or_error.ok_exn
@@ -120,11 +150,7 @@ let load_config_exn config_file =
            Failure ("Could not parse configuration: " ^ err) )
     |> Result.ok_exn
   in
-  if
-    Option.(
-      is_some config.daemon || is_some config.genesis
-      || Option.value_map ~default:false ~f:is_dirty_proof config.proof)
-  then failwith "Runtime config has unexpected fields" ;
+  let config = sanitize_runtime_config config in
   let ledger = Option.value_exn ~message:"No ledger provided" config.ledger in
   let staking_ledger =
     let%map.Option { staking; _ } = config.epoch_data in

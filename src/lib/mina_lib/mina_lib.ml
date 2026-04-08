@@ -1565,7 +1565,8 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
 module type Itn_settable = sig
   type t
 
-  val set_itn_logger_data : t -> daemon_port:int -> unit Deferred.Or_error.t
+  val set_itn_logger_data :
+    t -> daemon_port:int option -> unit Deferred.Or_error.t
 end
 
 let start_filtered_log ~commit_id
@@ -1775,7 +1776,13 @@ let create ~commit_id ?wallets (config : Config.t) =
           let ({ client_port; _ } : Node_addrs_and_ports.t) =
             config.gossip_net_params.addrs_and_ports
           in
-          match%map M.set_itn_logger_data t ~daemon_port:client_port with
+          let itn_subprocess_logging =
+            Sys.getenv "ITN_SUBPROCESS_LOGGING" |> Option.is_some
+          in
+          match%map
+            M.set_itn_logger_data t
+              ~daemon_port:(Option.some_if itn_subprocess_logging client_port)
+          with
           | Ok () ->
               ()
           | Error err ->
@@ -2417,6 +2424,15 @@ let create ~commit_id ?wallets (config : Config.t) =
                 ~precomputed_values:config.precomputed_values
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 archive_process_port ) ;
+          if config.log_precomputed_blocks then
+            [%log' warn config.logger]
+              "Precomputed blocks will be included in logs. These blocks can \
+               be very large (potentially several MB each) and may be \
+               truncated by logging services or log aggregators with line size \
+               limits. Consider using --precomputed-blocks-file to write \
+               blocks to a dedicated file instead, or ensure your logging \
+               infrastructure is configured to handle large log entries. \
+               Truncated blocks cannot be used for archive recovery." ;
           let precomputed_block_writer =
             ref
               ( Option.map config.precomputed_blocks_path ~f:(fun path ->

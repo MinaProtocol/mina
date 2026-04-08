@@ -640,10 +640,16 @@ debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
 debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devnet hardfork
 	$(call build_debian_package,daemon_devnet_hardfork)
 
+.PHONY: debian-daemon-storage-toolbox
+debian-daemon-storage-toolbox: ## Build the Debian daemon storage toolbox package
+	$(call build_debian_package,daemon_storage_toolbox)
+
 .PHONY: debian-download-create-legacy-hardfork
 debian-download-create-legacy-hardfork: ## Download and create legacy hardfork Debian packages
 	$(info 📦 Downloading legacy hardfork Debian packages for debian $(CODENAME))
-	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-legacy-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend hetzner --target _build
+	$(call check_env_var,NETWORK_NAME)
+
+	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-$(NETWORK_NAME)-prefork-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend hetzner --target _build
 
 .PHONY: debian-reversion
 debian-reversion: ## Reversion a .deb package (DEB, NEW_VERSION required; NEW_SUITE, NEW_NAME, OUTPUT optional)
