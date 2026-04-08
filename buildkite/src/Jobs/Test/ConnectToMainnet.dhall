@@ -63,6 +63,7 @@ in  Pipeline.build
             , dependsOn = dependsOn
             , mina_suffix = "${Network.lowerName network}"
             , testnet = "${Network.lowerName network}"
+            , peer_list_url = Network.peerListUrl network
             }
         ]
       }

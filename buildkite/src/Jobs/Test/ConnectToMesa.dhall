@@ -41,9 +41,7 @@ in  Pipeline.build
             , dependsOn = dependsOn
             , mina_suffix = "${Network.lowerName network}"
             , testnet = "testnet"
-            , sync_timeout = "2min"
-            , peer_list_url = Some
-                "https://storage.googleapis.com/o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt"
+            , peer_list_url = Network.peerListUrl network
             }
         ]
       }

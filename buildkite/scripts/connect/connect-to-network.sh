@@ -18,7 +18,7 @@ All arguments are mandatory:
   --network-name <val>               Testnet name (used for seeds URL and validation)
   --wait-between-polling <val>       Duration to wait between GraphQL polling
   --sync-timeout <val>               Duration to wait before considering the sync is failed
-  --peer-list-url <val>              (Optional) Override peer list URL
+  --peer-list-url <val>              Peer list URL
   --help                             Display this help message
 
 Example:
@@ -65,13 +65,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- Validation ---
-if [[ -z "$MINA_DEBIAN_NETWORK" || -z "$NETWORK_NAME" || -z "$WAIT_BETWEEN_POLLING_GRAPHQL" || -z "$SYNC_TIMEOUT" ]]; then
-    echo "Error: All four required arguments must be provided."
+if [[ -z "$MINA_DEBIAN_NETWORK" || -z "$NETWORK_NAME" || -z "$WAIT_BETWEEN_POLLING_GRAPHQL" || -z "$SYNC_TIMEOUT" || -z "$PEER_LIST_URL" ]]; then
+    echo "Error: All required arguments must be provided."
     usage
-fi
-
-if [[ -z "$PEER_LIST_URL" ]]; then
-    PEER_LIST_URL="https://storage.googleapis.com/seed-lists/${NETWORK_NAME}_seeds.txt"
 fi
 
 # --- Main Script Logic ---

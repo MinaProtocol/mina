@@ -18,21 +18,14 @@ let Spec =
           , wait_between_graphql_poll : Text
           , sync_timeout : Text
           , soft_fail : B/SoftFail
-          , peer_list_url : Optional Text
+          , peer_list_url : Text
           }
       , default =
           { wait_between_graphql_poll = "40s"
           , sync_timeout = "25min"
           , soft_fail = B/SoftFail.Boolean False
-          , peer_list_url = None Text
           }
       }
-
-let peer_list_url_flag =
-          \(peer_list_url : Optional Text)
-      ->  merge
-            { Some = \(url : Text) -> " --peer-list-url ${url}", None = "" }
-            peer_list_url
 
 in  { Spec = Spec
     , step =
@@ -42,8 +35,7 @@ in  { Spec = Spec
               , commands =
                   RunInToolchain.runInToolchain
                     DebianVersions.overrideEnvs
-                    "./buildkite/scripts/connect/connect-to-network.sh --mina-debian-network ${spec.mina_suffix} --network-name ${spec.testnet} --wait-between-polling ${spec.wait_between_graphql_poll} --sync-timeout ${spec.sync_timeout}${peer_list_url_flag
-                                                                                                                                                                                                                                                spec.peer_list_url}"
+                    "./buildkite/scripts/connect/connect-to-network.sh --mina-debian-network ${spec.mina_suffix} --network-name ${spec.testnet} --wait-between-polling ${spec.wait_between_graphql_poll} --sync-timeout ${spec.sync_timeout} --peer-list-url ${spec.peer_list_url}"
               , label = "Connect to ${spec.testnet}"
               , soft_fail = Some spec.soft_fail
               , key = "connect-to-${spec.testnet}"
