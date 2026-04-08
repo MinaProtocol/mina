@@ -94,11 +94,13 @@ func main() {
 
 	client := bk.NewClient(*apiToken, *org, *pipeline)
 
-	// Fetch latest build for branch (any state - we check individual jobs)
-	fmt.Printf("Fetching latest build for branch '%s' from %s...\n", *branch, *pipeline)
+	// Fetch latest finished build for branch — skip running/scheduled builds so
+	// we don't pick up a concurrent nightly that hasn't completed yet.
+	fmt.Printf("Fetching latest finished build for branch '%s' from %s...\n", *branch, *pipeline)
 
 	builds, err := client.ListBuilds(&buildkite.BuildsListOptions{
 		Branch:      []string{*branch},
+		State:       []string{"passed", "failed"},
 		ListOptions: buildkite.ListOptions{PerPage: 1},
 	})
 	if err != nil {
