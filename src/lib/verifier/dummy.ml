@@ -73,6 +73,7 @@ let verify_commands { proof_level; signature_kind; _ }
       * Mina_base.Zkapp_statement.t
       * Pickles.Side_loaded.Proof.t )
       list
+      * Error.t
     | Common.invalid ]
     list
     Deferred.Or_error.t =
@@ -121,9 +122,12 @@ let verify_commands { proof_level; signature_kind; _ }
             invalid
         | Ok (`Assuming []) ->
             valid cmd
-        | Ok (`Assuming xs) ->
-            if Or_error.is_ok all_verified then valid cmd
-            else `Valid_assuming xs
+        | Ok (`Assuming xs) -> (
+            match all_verified with
+            | Ok () ->
+                valid cmd
+            | Error err ->
+                `Valid_assuming (xs, err) )
       in
       Ok (List.map2_exn cs results ~f)
 
