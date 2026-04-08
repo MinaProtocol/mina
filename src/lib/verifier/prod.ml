@@ -31,8 +31,16 @@ module Processor = struct
           (* The command is dropped here to avoid decoding it later in the caller
              which would create a duplicate.*)
           `Valid
-      | Ok (`Assuming xs) ->
-          if Or_error.is_ok all_verified then `Valid else `Valid_assuming xs
+      | Ok (`Assuming xs) -> (
+          (* NOTE: `Valid_assuming branch indicates some commands are invalid
+             and the verification failed partially. Since we're batching the
+             verification there's no way to know which particular command failed
+             to pass verification. *)
+          match all_verified with
+          | Ok () ->
+              `Valid
+          | Error err ->
+              `Valid_assuming (xs, err) )
     in
     List.map results ~f
 end
@@ -50,6 +58,7 @@ module Worker_state = struct
            * Zkapp_statement.t
            * Pickles.Side_loaded.Proof.t )
            list
+           * Error.t
          | invalid ]
          list
          Deferred.t
@@ -192,6 +201,7 @@ module Worker = struct
               * Zkapp_statement.t
               * Pickles.Side_loaded.Proof.t )
               list
+              * Error.t
             | invalid ]
             list )
           F.t
@@ -270,6 +280,7 @@ module Worker = struct
                     * Zkapp_statement.Stable.Latest.t
                     * Pickles.Side_loaded.Proof.Stable.Latest.t )
                     list
+                    * Error.Stable.V2.t
                   | invalid ]
                   list]
               , verify_commands )
