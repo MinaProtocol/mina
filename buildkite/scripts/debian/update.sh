@@ -30,10 +30,10 @@ export DEBIAN_FRONTEND=noninteractive
 
 # Configuration
 
-# Set BLACKLISTED_REPOS=() to start with no blacklisted repos
-# Usage: Specify name of repo files (not full paths) to blacklist by default
-
-BLACKLISTED_REPOS=()
+# Blacklist stale mina.list by default — install.sh creates it for a temporary
+# local aptly server and should clean it up, but if a previous build crashed
+# the file may persist and cause apt-get update to fail on localhost:8080.
+BLACKLISTED_REPOS=("mina.list")
 VERBOSE=false
 DRY_RUN=false
 SUDO_CMD=""
