@@ -6,7 +6,7 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type 'comm t = { account_update : 'comm; calls : 'comm }
-      [@@deriving hlist, sexp, yojson]
+      [@@deriving hlist, sexp, compare, yojson]
     end
   end]
 
@@ -19,11 +19,13 @@ end
 module Stable = struct
   module V2 = struct
     type t = Zkapp_command.Transaction_commitment.Stable.V1.t Poly.Stable.V1.t
-    [@@deriving sexp, yojson]
+    [@@deriving sexp, compare, yojson]
 
     let to_latest = Fn.id
   end
 end]
+
+include Comparable.Make (Stable.Latest)
 
 let to_field_elements : t -> _ = Poly.to_field_elements
 
