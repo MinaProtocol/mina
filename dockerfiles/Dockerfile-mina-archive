@@ -25,9 +25,6 @@ ENV MINA_DEB=mina-archive-${network}${SUFFIX}
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_codename $deb_release $deb_version"
 
-COPY scripts/archive-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \
   && apt-get install --quiet --yes --no-install-recommends ca-certificates \
@@ -87,4 +84,5 @@ RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/s
   && apt-get install --no-install-recommends --quiet --yes "${MINA_DEB}=$deb_version" \
   && rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
+ENTRYPOINT ["mina-archive"]
+CMD []
