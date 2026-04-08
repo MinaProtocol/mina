@@ -1,5 +1,41 @@
 #!/bin/bash
 
+# This script fetches a fork config from a running Mina node pod via its
+# GraphQL endpoint, processes it, and uploads the result to GCS.
+#
+# The heavy lifting (jq extraction and gzip compression) happens on the pod
+# to avoid transferring the full raw response (~640MB+). Only the compressed
+# fork config is copied locally.
+#
+# The script is split into 5 resumable steps. If a step fails, fix the issue
+# and re-run with --start-from N to skip already-completed steps. Intermediate
+# files on the pod are preserved between runs to support this.
+#
+# Steps:
+#   1. Fetch raw fork config via GraphQL (curl on pod)
+#   2. Extract .data.fork_config and gzip (jq + gzip on pod)
+#   3. Copy compressed file locally (with md5 verification and retries)
+#   4. Validate JSON, rename to mesa-<block_length>-<state_hash>.json
+#   5. Upload to GCS
+#
+# Prerequisites:
+#   - kubectl configured and pointing at the right cluster
+#   - KUBECONFIG env variable set (e.g. export KUBECONFIG=mesa_hf.json)
+#   - jq, gzip, md5sum available locally
+#   - gsutil configured for GCS access (step 5 only)
+#   - The target pod must have curl, jq, and gzip installed
+#
+# Examples:
+#   # Full run
+#   export KUBECONFIG=mesa_hf.json
+#   ./get_fork_config.sh --pod pre-mesa-whale-2-76c554dd6-pb4bm
+#
+#   # Resume from step 3 after fixing a download issue
+#   ./get_fork_config.sh --pod pre-mesa-whale-2-76c554dd6-pb4bm --start-from 3
+#
+#   # Upload to a different GCS bucket
+#   ./get_fork_config.sh --pod <pod> --gcs-bucket gs://my-bucket/path
+
 set -euo pipefail
 
 # ── Configuration ──────────────────────────────────────────────────
