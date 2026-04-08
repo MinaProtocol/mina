@@ -569,9 +569,9 @@ func (gs *CodaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) bool {
 		gs.logGate()
 		return false
 	}
-	if WithPrivate {
-		gs.MarkPrivateAddrAsKnown(remoteAddr)
-	}
+	// If we are receiving a connection, and the remote address is private,
+	// then we infer that we should be able to connect to that private address.
+	gs.MarkPrivateAddrAsKnown(remoteAddr)
 	return true
 }
 
