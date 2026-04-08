@@ -31,6 +31,7 @@ module Base = struct
            * Mina_base.Zkapp_statement.t
            * Pickles.Side_loaded.Proof.t )
            list
+           * Error.t
          | invalid ]
          list
          Deferred.Or_error.t
