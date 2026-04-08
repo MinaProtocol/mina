@@ -59,7 +59,7 @@ module Worker_state = struct
 
     val toggle_internal_tracing : bool -> unit
 
-    val set_itn_logger_data : daemon_port:int -> unit
+    val set_itn_logger_data : daemon_port:int option -> unit
   end
 
   (* bin_io required by rpc_parallel *)
@@ -196,7 +196,7 @@ module Worker = struct
             list )
           F.t
       ; toggle_internal_tracing : ('w, bool, unit) F.t
-      ; set_itn_logger_data : ('w, int, unit) F.t
+      ; set_itn_logger_data : ('w, int option, unit) F.t
       }
 
     module Worker_state = Worker_state
@@ -277,7 +277,7 @@ module Worker = struct
               , toggle_internal_tracing )
         ; set_itn_logger_data =
             f
-              ( [%bin_type_class: int]
+              ( [%bin_type_class: int option]
               , [%bin_type_class: unit]
               , set_itn_logger_data )
         }
