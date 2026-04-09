@@ -31,8 +31,16 @@ module Processor = struct
           (* The command is dropped here to avoid decoding it later in the caller
              which would create a duplicate.*)
           `Valid
-      | Ok (`Assuming xs) ->
-          if Or_error.is_ok all_verified then `Valid else `Valid_assuming xs
+      | Ok (`Assuming xs) -> (
+          (* NOTE: `Valid_assuming branch indicates some commands are invalid
+             and the verification failed partially. Since we're batching the
+             verification there's no way to know which particular command failed
+             to pass verification. *)
+          match all_verified with
+          | Ok () ->
+              `Valid
+          | Error err ->
+              `Valid_assuming (xs, err) )
     in
     List.map results ~f
 end
@@ -50,6 +58,7 @@ module Worker_state = struct
            * Zkapp_statement.t
            * Pickles.Side_loaded.Proof.t )
            list
+           * Error.t
          | invalid ]
          list
          Deferred.t
@@ -59,7 +68,7 @@ module Worker_state = struct
 
     val toggle_internal_tracing : bool -> unit
 
-    val set_itn_logger_data : daemon_port:int -> unit
+    val set_itn_logger_data : daemon_port:int option -> unit
   end
 
   (* bin_io required by rpc_parallel *)
@@ -192,11 +201,12 @@ module Worker = struct
               * Zkapp_statement.t
               * Pickles.Side_loaded.Proof.t )
               list
+              * Error.t
             | invalid ]
             list )
           F.t
       ; toggle_internal_tracing : ('w, bool, unit) F.t
-      ; set_itn_logger_data : ('w, int, unit) F.t
+      ; set_itn_logger_data : ('w, int option, unit) F.t
       }
 
     module Worker_state = Worker_state
@@ -270,6 +280,7 @@ module Worker = struct
                     * Zkapp_statement.Stable.Latest.t
                     * Pickles.Side_loaded.Proof.Stable.Latest.t )
                     list
+                    * Error.Stable.V2.t
                   | invalid ]
                   list]
               , verify_commands )
@@ -280,7 +291,7 @@ module Worker = struct
               , toggle_internal_tracing )
         ; set_itn_logger_data =
             f
-              ( [%bin_type_class: int]
+              ( [%bin_type_class: int option]
               , [%bin_type_class: unit]
               , set_itn_logger_data )
         }
@@ -461,7 +472,9 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
         let () =
           match e with
           | `Unexpected_termination ->
-              [%log error] "verifier terminated unexpectedly"
+              [%log error]
+                "verifier terminated unexpectedly; the verifier process will \
+                 be restarted automatically"
                 ~metadata:[ ("verifier_pid", `Int (Pid.to_int pid)) ] ;
               Ivar.fill_if_empty create_worker_trigger ()
           | `Wait_threw_an_exception _ -> (

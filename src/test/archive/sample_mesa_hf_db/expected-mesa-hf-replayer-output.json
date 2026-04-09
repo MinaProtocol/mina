@@ -1,0 +1,8 @@
+{
+  "start_slot_since_genesis": 1960,
+  "genesis_ledger": {
+    "hash": "jxXoV4Q8aiMrUzNkQko1xmPVhajeR6YmNhqDrLJNzQbBanvNZiE",
+    "s3_data_hash": "2d3fbe4cdc2ea276c3459f120cb65b816a5c6d9e5aa951eb5491c3605a4b1712",
+    "add_genesis_winner": false
+  }
+}

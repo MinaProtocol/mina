@@ -43,7 +43,7 @@ let perform (s : Impl.Worker_state.t) ~fee ~public_key
       ( proof
       , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )
   |> Deferred.Or_error.map ~f:(fun proofs_and_time ->
-         { Snark_work_lib.Work.Result_without_metrics.proofs =
+         { Snark_work_lib.Result.Without_metrics.proofs =
              One_or_two.map proofs_and_time ~f:fst
          ; statements =
              One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
@@ -159,7 +159,7 @@ let command =
            Caml.Format.printf
              !"@[<v>Successfully proved. Result: \n\
               \               %{sexp: Ledger_proof.t \
-               Snark_work_lib.Work.Result_without_metrics.t}@]@."
+               Snark_work_lib.Result.Without_metrics.t}@]@."
              result ;
            match proof_submission_graphql_endpoint with
            | Some endpoint ->

@@ -30,6 +30,7 @@ let Artifact
       | Toolchain
       | CreatePreforkGenesis
       | DelegationVerifier
+      | DaemonStorageToolbox
       >
 
 let AllButTests =
@@ -50,6 +51,7 @@ let AllButTests =
       , Artifact.Toolchain
       , Artifact.CreatePreforkGenesis
       , Artifact.DelegationVerifier
+      , Artifact.DaemonStorageToolbox
       ]
 
 let Main =
@@ -83,6 +85,7 @@ let capitalName =
             , FunctionalTestSuite = "FunctionalTestSuite"
             , Toolchain = "Toolchain"
             , CreatePreforkGenesis = "CreatePreforkGenesis"
+            , DaemonStorageToolbox = "DaemonStorageToolbox"
             }
             artifact
 
@@ -105,17 +108,18 @@ let lowerName =
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , CreatePreforkGenesis = "create_prefork_genesis"
+            , DaemonStorageToolbox = "daemon_storage_toolbox"
             , Toolchain = "toolchain"
             , DelegationVerifier = "delegation_verifier"
             }
             artifact
 
-let dockerName =
+let dockerServiceName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "mina-daemon"
             , DaemonPrefork = ""
-            , DaemonLegacyHardfork = "mina-daemon-pre-hardfork"
+            , DaemonLegacyHardfork = "mina-daemon-legacy-hardfork"
             , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
             , DaemonAppsOnly = "mina-daemon"
             , Archive = "mina-archive"
@@ -124,13 +128,39 @@ let dockerName =
             , BatchTxn = "mina-batch-txn"
             , Rosetta = "mina-rosetta"
             , RosettaAppsOnly = "mina-rosetta"
-            , RosettaConfig = "mina-rosetta-config"
+            , RosettaConfig = "mina-rosetta-configured"
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
             , FunctionalTestSuite = "mina-test-suite"
             , Toolchain = "mina-toolchain"
             , CreatePreforkGenesis = ""
             , DelegationVerifier = "mina-delegation-verifier"
+            , DaemonStorageToolbox = "mina-daemon-storage-toolbox"
             , DaemonConfig = "mina-daemon-configured"
+            }
+            artifact
+
+let dockerName =
+          \(artifact : Artifact)
+      ->  merge
+            { DaemonConfig = "mina-daemon"
+            , Daemon = dockerServiceName artifact
+            , DaemonPrefork = dockerServiceName artifact
+            , DaemonLegacyHardfork = dockerServiceName artifact
+            , DaemonAutoHardfork = dockerServiceName artifact
+            , DaemonAppsOnly = dockerServiceName artifact
+            , Archive = dockerServiceName artifact
+            , TestExecutive = dockerServiceName artifact
+            , LogProc = dockerServiceName artifact
+            , BatchTxn = dockerServiceName artifact
+            , Rosetta = dockerServiceName artifact
+            , RosettaAppsOnly = dockerServiceName artifact
+            , RosettaConfig = "mina-rosetta"
+            , ZkappTestTransaction = dockerServiceName artifact
+            , FunctionalTestSuite = dockerServiceName artifact
+            , Toolchain = dockerServiceName artifact
+            , CreatePreforkGenesis = dockerServiceName artifact
+            , DelegationVerifier = dockerServiceName artifact
+            , DaemonStorageToolbox = dockerServiceName artifact
             }
             artifact
 
@@ -158,7 +188,7 @@ let toDebianName =
             , BatchTxn = "batch_txn"
             , Rosetta = "rosetta_${Network.lowerName network}"
             , RosettaAppsOnly = ""
-            , RosettaConfig = "rosetta_config_${Network.lowerName network}"
+            , RosettaConfig = ""
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = ""
@@ -166,6 +196,7 @@ let toDebianName =
             , CreatePreforkGenesis =
                 "prefork_${Network.lowerName network}_genesis_ledger"
             , DaemonConfig = "daemon_${Network.lowerName network}_config"
+            , DaemonStorageToolbox = "daemon_storage_toolbox"
             }
             artifact
 
@@ -195,6 +226,7 @@ let toDebianNames =
                           , FunctionalTestSuite = [ "functional_test_suite" ]
                           , CreatePreforkGenesis = [ toDebianName a network ]
                           , DelegationVerifier = [ "delegation_verify" ]
+                          , DaemonStorageToolbox = [ "daemon_storage_toolbox" ]
                           , Toolchain = [] : List Text
                           }
                           a
@@ -278,6 +310,7 @@ let dockerTag =
                 , DelegationVerifier = "${spec.version}"
                 , CreatePreforkGenesis = "${spec.version}"
                 , DaemonConfig = "${spec.version}"
+                , DaemonStorageToolbox = "${spec.version}"
                 }
                 spec.artifact
 
@@ -461,6 +494,7 @@ in  { Type = Artifact
     , lowerName = lowerName
     , toDebianName = toDebianName
     , toDebianNames = toDebianNames
+    , dockerServiceName = dockerServiceName
     , dockerName = dockerName
     , dockerNames = dockerNames
     , dockerTag = dockerTag

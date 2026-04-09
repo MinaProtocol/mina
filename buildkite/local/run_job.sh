@@ -41,6 +41,8 @@ START_FROM=""
 JOBS_DIR=""
 ENV_FILE=""
 BUILD_ID=""
+SYNC_FILTER=""
+OVERRIDE_COMMIT=""
 LIST_JOBS=false
 LIST_STEPS=false
 
@@ -175,6 +177,8 @@ Options:
   --step KEY         Run only the step matching this key (substring match)
   --start-from KEY   Start execution from this step (skip all previous steps)
   --build-id ID      Reuse a specific BUILDKITE_BUILD_ID (for resuming/debugging)
+  --sync-filter PFX  Only sync files matching prefix (e.g. "debians/bullseye/mina-devnet")
+  --commit HASH      Override git commit hash (sets OVERRIDE_GITHASH for version strings)
   --env-file FILE    File with KEY=VALUE pairs passed to all commands (including Docker)
   --list             List available job names and exit
   --list-steps       List steps in the job and exit (requires job name)
@@ -190,6 +194,7 @@ Examples:
   $(basename "$0") --skip-dump --jobs-dir /tmp/pipelines --step "build-deb" RosettaDevnetConnect
   $(basename "$0") --start-from "upload-ledger" RosettaDevnetConnect
   $(basename "$0") --build-id abc123-def456 --start-from "step-3" MyJob  # Resume from specific build
+  $(basename "$0") --sync-filter "debians/bullseye/mina-config" MyJob   # Sync only matching files
 EOF
 }
 
@@ -207,6 +212,8 @@ parse_args() {
       --step)       STEP_FILTER="$2"; shift 2;;
       --start-from) START_FROM="$2"; shift 2;;
       --build-id)   BUILD_ID="$2"; shift 2;;
+      --sync-filter) SYNC_FILTER="$2"; shift 2;;
+      --commit)     OVERRIDE_COMMIT="$2"; shift 2;;
       --env-file)   ENV_FILE="$2"; shift 2;;
       --list)       LIST_JOBS=true; shift;;
       --list-steps) LIST_STEPS=true; shift;;
@@ -318,6 +325,12 @@ setup_environment() {
   export BUILDKITE_TIMEOUT="${BUILDKITE_TIMEOUT:-false}"
   export LOCAL_BK_RUN="${LOCAL_BK_RUN:-1}"
 
+  # --- Commit override (used by export-git-env-vars.sh) ---
+  if [[ -n "$OVERRIDE_COMMIT" ]]; then
+    export OVERRIDE_GITHASH="$OVERRIDE_COMMIT"
+    echo "Using commit override: $OVERRIDE_COMMIT"
+  fi
+
   echo "BUILDKITE_BUILD_CHECKOUT_PATH=$BUILDKITE_BUILD_CHECKOUT_PATH"
   echo "BUILDKITE_BUILD_ID=$BUILDKITE_BUILD_ID"
   echo "BUILDKITE_BRANCH=$BUILDKITE_BRANCH"
@@ -354,12 +367,24 @@ generate_pipelines() {
   fi
 }
 
-# Step 3: Sync the legacy cache folder from Hetzner via rsync.
+# Rsync wrapper that tolerates exit code 23 (permissions/times warnings).
+# Usage: rsync_tolerant <rsync_args...>
+rsync_tolerant() {
+  local rc=0
+  rsync "$@" || rc=$?
+  # Exit code 23 = partial transfer (permissions/times warnings) — data is fine
+  if [[ $rc -ne 0 && $rc -ne 23 ]]; then
+    err "rsync failed with exit code $rc"
+    exit $rc
+  fi
+}
+
+# Step 3: Sync cache folders from Hetzner via rsync.
 sync_legacy_cache() {
-  step_banner "3/5" "Syncing legacy folder from Hetzner"
+  step_banner "3/5" "Syncing cache from Hetzner"
 
   if [[ "$SKIP_SYNC" == true ]]; then
-    echo "Skipping legacy sync"
+    echo "Skipping cache sync"
     return
   fi
 
@@ -371,12 +396,42 @@ sync_legacy_cache() {
 
   require_dir_writable "$LOCAL_STORAGEBOX" "Local storagebox directory"
 
-  echo "Syncing $HETZNER_USER@$HETZNER_HOST:$CI_CACHE_ROOT/legacy/ -> $LOCAL_STORAGEBOX/legacy/"
-  rsync -avz --progress \
-    -e "ssh -p 23 -i $HETZNER_KEY -o StrictHostKeyChecking=no" \
-    "$HETZNER_USER@$HETZNER_HOST:$CI_CACHE_ROOT/legacy/" \
-    "$LOCAL_STORAGEBOX/legacy/"
+  local ssh_cmd="ssh -p 23 -i $HETZNER_KEY -o StrictHostKeyChecking=no"
+  local remote="$HETZNER_USER@$HETZNER_HOST:$CI_CACHE_ROOT"
+
+  # Build rsync filter flags: include only files matching the prefix
+  local filter_flags=()
+  if [[ -n "$SYNC_FILTER" ]]; then
+    # For a filter like "debians/bullseye/mina-devnet" we need:
+    #   --include 'debians/' --include 'debians/bullseye/'
+    #   --include 'debians/bullseye/mina-devnet*' --exclude '*'
+    local filter_dir filter_base
+    filter_dir=$(dirname "$SYNC_FILTER")
+    filter_base=$(basename "$SYNC_FILTER")
+    # Include each ancestor directory in the path
+    local path_parts
+    IFS='/' read -ra path_parts <<< "$filter_dir"
+    local accumulated=""
+    for part in "${path_parts[@]}"; do
+      accumulated+="${part}/"
+      filter_flags+=(--include "$accumulated")
+    done
+    filter_flags+=(--include "${accumulated}${filter_base}*" --exclude '*')
+    echo "Sync filter: only files matching ${SYNC_FILTER}*"
+  fi
+
+  echo "Syncing $remote/legacy/ -> $LOCAL_STORAGEBOX/legacy/"
+  rsync_tolerant -avz --progress -e "$ssh_cmd" "${filter_flags[@]}" "$remote/legacy/" "$LOCAL_STORAGEBOX/legacy/"
   echo "Legacy sync complete"
+
+  # Sync per-build cache if --build-id was provided
+  if [[ -n "$BUILD_ID" ]]; then
+    echo ""
+    echo "Syncing $remote/$BUILD_ID/ -> $LOCAL_STORAGEBOX/$BUILD_ID/"
+    mkdir -p "$LOCAL_STORAGEBOX/$BUILD_ID"
+    rsync_tolerant -avz --progress -e "$ssh_cmd" "${filter_flags[@]}" "$remote/$BUILD_ID/" "$LOCAL_STORAGEBOX/$BUILD_ID/"
+    echo "Build cache sync complete"
+  fi
 }
 
 # Step 4: Ensure local storagebox and shared directories are usable.
@@ -423,14 +478,12 @@ validate_directories() {
 # Usage: extract_step_commands <job_file> <step_index>
 extract_step_commands() {
   local job_file="$1" idx="$2"
-  yq -r "
-    .pipeline.steps[$idx] |
-    if .commands and (.commands | type == \"!!seq\") then .commands[]
-    elif .command                                    then .command
-    elif .commands                                   then .commands
-    else \"\"
-    end
-  " "$job_file" 2>/dev/null || true
+  # Try array .commands[] first, then scalar .command, then scalar .commands
+  local result
+  result=$(yq -r ".pipeline.steps[$idx].commands[]" "$job_file" 2>/dev/null) ||
+  result=$(yq -r ".pipeline.steps[$idx].command // \"\"" "$job_file" 2>/dev/null) ||
+  result=""
+  printf '%s' "$result"
 }
 
 # Patch a command string for local Docker execution:
@@ -448,6 +501,7 @@ patch_docker_command() {
   # (UID 1000) which typically matches the host user's UID, allowing sudo to
   # work inside the container for apt operations.
   local docker_flags="--env GIT_LFS_SKIP_SMUDGE=1 --env APTLY_ROOT=/tmp/aptly --env LOCAL_BK_RUN=${LOCAL_BK_RUN}${USER_ENV_DOCKER_FLAGS}"
+  [[ -n "${OVERRIDE_GITHASH:-}" ]] && docker_flags+=" --env OVERRIDE_GITHASH=${OVERRIDE_GITHASH}"
   cmd=$(printf '%s\n' "$cmd" | sed "s|docker run -it|docker run -it ${docker_flags}|g")
 
   if ! [ -t 0 ]; then

@@ -471,12 +471,22 @@ build_daemon_config_deb() {
 
   local package_name="mina-${network}-config"
 
+  # Config package contains only architecture-independent configuration data
+  # (no binaries), so we build it with Architecture: all to make it usable on
+  # all supported architectures.
+
+  # Save and override architecture to "all" for the config package; restore
+  # the original architecture after building the package.
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
   create_control_file "${package_name}" "" \
      "Mina Protocol Config for daemons running under ${network}" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_configs "${network}"
 
   build_deb "${package_name}"
+  ARCHITECTURE="${saved_arch}"
 }
 ## END CONFIG PACKAGE ##
 
@@ -633,12 +643,11 @@ copy_common_daemon_hardfork_configs() {
 ## HARDFORK PACKAGE ##
 
 #
-# Builds mina-${NETWORK}-hardfork package for specified network
+# Builds mina-${NETWORK}-config package for specified network with hardfork configuration
 #
-# Output: mina-${NETWORK}-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
+# Output: mina-${NETWORK}-config_${MINA_DEB_VERSION}_all.deb
 #
-# Config only package with hardfork-specific runtime config and ledgers. 
+# Config only package with hardfork-specific runtime config and ledgers.
 # Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
 #
 build_daemon_hardfork_config_deb() {
@@ -649,13 +658,22 @@ build_daemon_hardfork_config_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building hardfork config for ${network} network deb without keys:"
 
+  # Config package contains only architecture-independent configuration data
+  # (no binaries), so we build it with Architecture: all to make it usable on
+  # all supported architectures.
+
+  # Save and override architecture to "all" for the hardfork config package; restore
+  # the original architecture after building the package.
+  local saved_arch="${ARCHITECTURE}"
+  ARCHITECTURE=all
+
   create_control_file "${package_name}" "" \
     "Mina Protocol hardfork config for the ${network} Network" "" "mina-${network} (<< ${MINA_DEB_VERSION})"
 
   copy_common_daemon_hardfork_configs "${network}"
 
   build_deb "${package_name}"
-
+  ARCHITECTURE="${saved_arch}"
 }
 
 ## END HARDFORK PACKAGE ##
@@ -804,9 +822,9 @@ build_delegation_verify_deb () {
 ## CREATE PREFORK GENESIS PACKAGE ##
 
 #
-# Builds mina-create-prefork-genesis package for prefork genesis creation
+# Builds mina-create-devnet-prefork-genesis package for prefork genesis creation
 #
-# Output: mina-create-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Output: mina-create-devnet-prefork-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
 # Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Utility for creating prefork genesis ledgers for post-hardfork verification.
@@ -888,3 +906,28 @@ build_prefork_testnet_generic_genesis_ledger_deb() {
 }
 
 ## END CREATE PREFORK GENESIS PACKAGE ##
+
+
+build_daemon_storage_toolbox_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Berkeley daemon storage toolbox:"
+
+  ROCKSDB_VERSION="10.5.2"
+  MINA_VERSION="${GITTAG}"
+
+  create_control_file mina-daemon-storage-toolbox \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    "Toolbox for Mina Daemon storage compatible with rocksdb in version $ROCKSDB_VERSION and mina in $MINA_VERSION"
+
+  mkdir -p "${BUILDDIR}/usr/lib/mina/storage/$ROCKSDB_VERSION/$MINA_VERSION"
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binaries
+  cp ./default/src/app/rocksdb-scanner/rocksdb_scanner.exe \
+    "${BUILDDIR}/usr/lib/mina/storage/$ROCKSDB_VERSION/$MINA_VERSION/mina-rocksdb-scanner"
+
+  cp ../scripts/rocksdb/convert-to-legacy.sh \
+    "${BUILDDIR}/usr/local/bin/mina-storage-converter"
+
+  build_deb mina-daemon-storage-toolbox
+}

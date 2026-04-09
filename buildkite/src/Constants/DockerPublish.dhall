@@ -25,6 +25,7 @@ let isEssential =
             , DaemonLegacyHardfork = True
             , CreatePreforkGenesis = False
             , DelegationVerifier = True
+            , DaemonStorageToolbox = False
             }
             service
 

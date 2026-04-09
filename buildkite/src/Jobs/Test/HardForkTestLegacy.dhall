@@ -4,4 +4,4 @@ in  HardforkTest.pipeline
       "HardForkTestLegacy"
       "hard fork test - legacy mode"
       "hard-fork-test-legacy"
-      "--fork-from origin/master"
+      "--fork-from origin/master --allow-fork-method legacy"

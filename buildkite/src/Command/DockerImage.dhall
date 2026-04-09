@@ -52,6 +52,7 @@ let ReleaseSpec =
           , deb_version : Text
           , deb_root_folder : Text
           , deb_legacy_version : Text
+          , deb_storage_repair_version : Optional Text
           , deb_suffix : Optional Text
           , deb_profile : Profiles.Type
           , deb_repo : DebianRepo.Type
@@ -59,6 +60,7 @@ let ReleaseSpec =
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
           , docker_repo : DockerRepo.Type
+          , image_name : Optional Text
           , generic : Bool
           , verify : Bool
           , size : Size
@@ -78,6 +80,7 @@ let ReleaseSpec =
           , deb_release = "unstable"
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
+          , deb_storage_repair_version = None Text
           , deb_profile = Profiles.Type.Devnet
           , build_flags = BuildFlags.Type.None
           , deb_repo = DebianRepo.Type.Local
@@ -87,6 +90,7 @@ let ReleaseSpec =
           , step_key_suffix = "-docker-image"
           , verify = False
           , deb_suffix = None Text
+          , image_name = None Text
           , if_ = None B/If
           , generic = False
           }
@@ -141,6 +145,49 @@ let generateStep =
                   }
                   spec.deb_suffix
 
+          let imageNameArg =
+                merge
+                  { None = ""
+                  , Some = \(name : Text) -> " --image-name " ++ name
+                  }
+                  spec.image_name
+
+          let archCustomSuffix =
+                merge
+                  { Arm64 = " --custom-suffix arm64 ", Amd64 = "" }
+                  spec.arch
+
+          let customSuffix =
+                merge
+                  { DaemonConfig = archCustomSuffix
+                  , Daemon = ""
+                  , DaemonLegacyHardfork = ""
+                  , DaemonAppsOnly = ""
+                  , DaemonPrefork = ""
+                  , DaemonAutoHardfork = ""
+                  , LogProc = ""
+                  , Archive = ""
+                  , TestExecutive = ""
+                  , BatchTxn = ""
+                  , Rosetta = ""
+                  , RosettaAppsOnly = ""
+                  , RosettaConfig = archCustomSuffix
+                  , ZkappTestTransaction = ""
+                  , FunctionalTestSuite = ""
+                  , Toolchain = ""
+                  , CreatePreforkGenesis = ""
+                  , DelegationVerifier = ""
+                  , DaemonStorageToolbox = ""
+                  }
+                  spec.service
+
+          let storageRepairVersionSuffix =
+                merge
+                  { None = ""
+                  , Some = \(v : Text) -> " --deb-storage-repair-version ${v} "
+                  }
+                  spec.deb_storage_repair_version
+
           let maybeVerify =
                       if     spec.verify
                          &&  DockerPublish.shouldPublish
@@ -191,7 +238,7 @@ let generateStep =
 
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
-                ++  " --service ${Artifacts.dockerName spec.service}"
+                ++  " --service ${Artifacts.dockerServiceName spec.service}"
                 ++  " --network ${Network.debianSuffix spec.network}"
                 ++  " --version ${spec.version}"
                 ++  " --branch ${spec.branch}"
@@ -206,10 +253,13 @@ let generateStep =
                                             spec.build_flags}"
                 ++  " --deb-legacy-version ${spec.deb_legacy_version}"
                 ++  debSuffix
+                ++  storageRepairVersionSuffix
                 ++  " --repo ${spec.repo}"
                 ++  " --platform ${Arch.platform spec.arch}"
                 ++  " --docker-registry ${DockerRepo.show spec.docker_repo}"
                 ++  loadOnlyArg
+                ++  customSuffix
+                ++  imageNameArg
 
           let remoteRepoCmds =
                 [ Cmd.run

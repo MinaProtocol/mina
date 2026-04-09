@@ -644,8 +644,9 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
             [ ("error", Error_json.error_to_yojson e)
             ; ("state_hash", state_hash)
             ]
-          "initial_validate: verification of blockchain snark failed but it \
-           was our fault" ;
+          "initial_validate: internal error in the verifier while verifying \
+           blockchain snark for $state_hash (the verifier process may be \
+           restarting); will retry" ;
         return (Error `Couldn't_reach_verifier)
   in
   let verification_end_time = Core.Time.now () in

@@ -22,13 +22,14 @@ ENV DEBIAN_FRONTEND noninteractive
 
 ARG deb_suffix
 ARG build_flags_suffix
+ARG apt_cache_url=""
 
 # if --build-arg deb_suffix is defined, add hypen at beginning.
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
 # build_flags_suffix contains only the build flags part (e.g. "instrumented")
 # without custom suffixes like "generic". Used for packages like archive
 # that get the instrumented suffix but not the generic suffix.
-ENV BUILD_FLAGS_SUFFIX=${build_flags_suffix:+-${build_flags_suffix}}
+ENV BUILD_FLAGS_SUFFIX=${build_flags_suffix}
 # construct mina debian package name based on network and suffix.
 # possible values:
 # - mina-devnet
@@ -46,6 +47,11 @@ ENV MINA_ROSETTA_DEB=mina-rosetta-${network}
 #    libprocps8
 #    libjemalloc2
 #    libssl
+
+# Optional: configure APT caching proxy (bypass proxy for deb_repo)
+COPY scripts/configure-apt-proxy.sh /usr/local/bin/configure-apt-proxy.sh
+RUN chmod +x /usr/local/bin/configure-apt-proxy.sh \
+  && /usr/local/bin/configure-apt-proxy.sh "$apt_cache_url" "$deb_repo"
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \

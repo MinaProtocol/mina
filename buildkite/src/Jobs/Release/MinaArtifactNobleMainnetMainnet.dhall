@@ -29,6 +29,7 @@ in  Pipeline.build
             , Artifacts.Type.DaemonAppsOnly
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.CreatePreforkGenesis
+            , Artifacts.Type.DaemonStorageToolbox
             ]
           , network = Network.Type.Mainnet
           , tags =
