@@ -64,7 +64,7 @@ module Simple_chain = struct
 
   module Proof = (val p)
 
-  type fixture =
+type fixture =
     { name : string
     ; statement : Field.Constant.t
     ; side_loaded_proof : Side_loaded.Proof.t
@@ -105,27 +105,37 @@ end
 
 let field_json (x : Field.Constant.t) = `String (Field.Constant.to_string x)
 
+let statement_fields_json (statement : Field.Constant.t) = `List [ field_json statement ]
+
 let fixture_json ({ Simple_chain.name; statement; side_loaded_proof } :
                   Simple_chain.fixture ) =
   `Assoc
     [ ("name", `String name)
     ; ("statement", field_json statement)
-    ; ("statement_fields", `List [ field_json statement ])
+    ; ("statement_fields", statement_fields_json statement)
     ; ("side_loaded_proof_base64", `String (Side_loaded.Proof.to_base64 side_loaded_proof))
+    ; ( "rust_inputs"
+      , `Assoc
+          [ ("statement_field_strings", statement_fields_json statement)
+          ; ( "side_loaded_proof_base64"
+            , `String (Side_loaded.Proof.to_base64 side_loaded_proof) )
+          ] )
     ]
 
-let export_json () =
-  let fixtures = Simple_chain.generate_fixtures () in
-  let side_loaded_vk =
-    Promise.block_on_async_exn (fun () ->
-        Side_loaded.Verification_key.of_compiled_promise Simple_chain.tag )
-  in
+let export_json fixtures ~(side_loaded_vk : Side_loaded.Verification_key.t) =
   `Assoc
     [ ("schema_version", `Int 1)
     ; ("proof_system", `String "pickles-simple-chain")
     ; ("statement_kind", `String "single_tick_field")
     ; ( "side_loaded_verification_key_base64"
       , `String (Side_loaded.Verification_key.to_base64 side_loaded_vk) )
+    ; ( "rust_bundle"
+      , `Assoc
+          [ ("bundle_version", `Int 1)
+          ; ( "side_loaded_verification_key_base64"
+            , `String (Side_loaded.Verification_key.to_base64 side_loaded_vk) )
+          ; ("fixtures", `List (List.map fixtures ~f:fixture_json))
+          ] )
     ; ("fixtures", `List (List.map fixtures ~f:fixture_json))
     ]
 
@@ -137,10 +147,37 @@ let write_json path json =
       Yojson.Safe.pretty_to_channel oc json ;
       Out_channel.newline oc)
 
+let write_string path contents = Out_channel.write_all path ~data:contents
+
+let manifest_stem path =
+  try Filename.chop_extension path with _ -> path
+
+let write_rust_bundle_files output_path
+    (fixtures : Simple_chain.fixture list)
+    ~(side_loaded_vk : Side_loaded.Verification_key.t) =
+  let stem = manifest_stem output_path in
+  write_string
+    (stem ^ ".side_loaded_vk.base64")
+    (Side_loaded.Verification_key.to_base64 side_loaded_vk ^ "\n") ;
+  List.iter fixtures ~f:(fun { name; statement; side_loaded_proof } ->
+      let prefix = stem ^ "." ^ name in
+      write_json
+        (prefix ^ ".statement_fields.json")
+        (statement_fields_json statement) ;
+      write_string
+        (prefix ^ ".side_loaded_proof.base64")
+        (Side_loaded.Proof.to_base64 side_loaded_proof ^ "\n"))
+
 let () =
   match Sys.argv with
   | [| _; output_path |] ->
-      write_json output_path (export_json ())
+      let fixtures = Simple_chain.generate_fixtures () in
+      let side_loaded_vk =
+        Promise.block_on_async_exn (fun () ->
+            Side_loaded.Verification_key.of_compiled_promise Simple_chain.tag )
+      in
+      write_json output_path (export_json fixtures ~side_loaded_vk) ;
+      write_rust_bundle_files output_path fixtures ~side_loaded_vk
   | argv ->
       eprintf "usage: %s <output.json>\n%!" argv.(0) ;
       Stdlib.exit 1
