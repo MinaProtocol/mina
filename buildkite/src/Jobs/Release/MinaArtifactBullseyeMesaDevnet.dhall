@@ -8,10 +8,6 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Expr = ../../Pipeline/Expr.dhall
-
-let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
-
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
@@ -36,12 +32,6 @@ in  Pipeline.build
             , PipelineTag.Type.Rosetta
             , PipelineTag.Type.Amd64
             , PipelineTag.Type.Bullseye
-            ]
-          , includeIf =
-            [ Expr.Type.DescendantOf
-                { ancestor = MainlineBranch.Type.Mesa
-                , reason = "Only run on Mesa descendants"
-                }
             ]
           }
       )
