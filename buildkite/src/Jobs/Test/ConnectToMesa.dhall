@@ -14,6 +14,10 @@ let Dockers = ../../Constants/DockerVersions.dhall
 
 let network = Network.Type.Mesa
 
+let Expr = ../../Pipeline/Expr.dhall
+
+let MainlineBranch = ../../Pipeline/MainlineBranch.dhall
+
 let dependsOn =
       Dockers.dependsOn Dockers.DepsSpec::{ network = Network.Type.Mesa }
 
@@ -33,6 +37,13 @@ in  Pipeline.build
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
+          ]
+        , excludeIf =
+          [ Expr.Type.DescendantOf
+              { ancestor = MainlineBranch.Type.Develop
+              , reason =
+                  "Develop branch is incompatible with current mesa network"
+              }
           ]
         }
       , steps =
