@@ -1,0 +1,33 @@
+(executable
+ (name export_simple_chain)
+ (flags
+  (:standard -warn-error +a)
+  -open
+  Core_kernel
+  -open
+  Pickles)
+ (preprocess
+  (pps ppx_jane))
+ (libraries
+  core_kernel
+  yojson
+  kimchi_backend
+  kimchi_backend_common
+  kimchi_pasta
+  kimchi_pasta.basic
+  kimchi_bindings
+  kimchi_types
+  pasta_bindings
+  pickles
+  pickles.backend
+  pickles.composition_types
+  pickles.limb_vector
+  pickles_base.one_hot_vector
+  pickles.plonk_checks
+  pickles_base
+  pickles_types
+  promise
+  snark_keys_header
+  snarky.backendless
+  sponge
+  tuple_lib))
