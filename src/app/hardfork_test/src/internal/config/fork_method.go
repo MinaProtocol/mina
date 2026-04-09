@@ -11,10 +11,11 @@ type ForkMethod int
 const (
 	Legacy ForkMethod = iota
 	Advanced
+	Auto
 )
 
 func (m ForkMethod) String() string {
-	names := [...]string{"legacy", "advanced"}
+	names := [...]string{"legacy", "advanced", "auto"}
 	if m < 0 || int(m) > len(names)-1 {
 		panic(fmt.Errorf("Can't convert fork method %d to string", int(m)))
 	}
@@ -24,6 +25,7 @@ func (m ForkMethod) String() string {
 var stringToForkMethod = map[string]ForkMethod{
 	"legacy":   Legacy,
 	"advanced": Advanced,
+	"auto":     Auto,
 }
 
 func validForkMethods() string {

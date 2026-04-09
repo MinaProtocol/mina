@@ -345,6 +345,26 @@ fi
 
 echo "PASSED: Mismatched --config-directory is rejected"
 
+# =============================================================================
+# Test 8: Client Subcommand Always Uses Mesa Runtime
+# =============================================================================
+
+echo ""
+echo "=== Test 8: Client Subcommand Uses Mesa ==="
+echo "Verifying that 'client status' always dispatches to mesa runtime"
+
+# Without activation marker - client should still use mesa
+MINA_EXEC_COMMAND=$(docker run --env MINA_DISPATCHER_DRYRUN=1 --entrypoint bash "$DOCKER_IMAGE" \
+  -c "mina client status" 2>&1)
+
+if [[ "$MINA_EXEC_COMMAND" != *"/mesa/mina client status"* ]]; then
+  echo "FAILED: client subcommand should use mesa runtime even without activation marker"
+  echo "  Expected substring: /mesa/mina client status"
+  echo "  Actual output: $MINA_EXEC_COMMAND"
+  exit 1
+fi
+
+echo "PASSED: client subcommand uses mesa runtime"
 
 # =============================================================================
 # Summary

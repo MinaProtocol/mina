@@ -268,6 +268,21 @@ if [[ "$first_arg" == "--version" || "$first_arg" == "-version" ]]; then
   exec "$bin" "$first_arg"
 fi
 
+if [[ "$first_arg" == "client" ]]; then
+  # HACK: 'client' subcommands (e.g. 'mina client status') are always routed to
+  # the mesa binary. This works only because the GraphQL schema exposed by the
+  # daemon did not change between berkeley and mesa. If a future hard fork
+  # changes the GraphQL schema, client commands must be dispatched to the
+  # correct runtime binary instead of unconditionally using mesa.
+  runtime="mesa"
+  bin="${RUNTIMES_BASE_PATH}/${runtime}/${cmd}"
+  if [[ "${MINA_DISPATCHER_DRYRUN:-0}" -ne 0 ]]; then
+    echo "mina-dispatch DRYRUN: exec $bin ${args[*]}" >&2
+    exit 0
+  fi
+  exec "$bin" "${args[@]}"
+fi
+
 if [[ "$first_arg" != "daemon" ]]; then
   echo "mina-dispatch ERROR: unsupported subcommand '$first_arg' for automatic hardfork handling" >&2
   print_argument_warning
