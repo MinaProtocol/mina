@@ -262,6 +262,7 @@ on-exit() {
   esac
 
   echo "Completed shutdown phase of mina local network"
+  exit 0
 }
 
 trap on-exit TERM INT
