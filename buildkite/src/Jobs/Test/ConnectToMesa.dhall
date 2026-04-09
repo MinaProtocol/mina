@@ -44,6 +44,10 @@ in  Pipeline.build
               , reason =
                   "Develop branch is incompatible with current mesa network"
               }
+          , Expr.Type.DescendantOf
+              { ancestor = MainlineBranch.Type.Mesa
+              , reason = "Mesa branch is incompatible with current mesa network"
+              }
           ]
         }
       , steps =
