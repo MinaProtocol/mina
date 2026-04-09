@@ -40,11 +40,7 @@ include sig
   open Mina_networking
 
   type 'a fn_with_mocks =
-       ?get_some_initial_peers:
-         ( Rpcs.Get_some_initial_peers.query
-         , Rpcs.Get_some_initial_peers.response )
-         Gossip_net.Fake.rpc_mock
-    -> ?get_staged_ledger_aux_and_pending_coinbases_at_hash:
+       ?get_staged_ledger_aux_and_pending_coinbases_at_hash:
          ( Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
          , Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
          Gossip_net.Fake.rpc_mock

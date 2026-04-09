@@ -43,12 +43,6 @@ module Sinks = Sinks
 module Gossip_net : Gossip_net.S with module Rpc_interface := Rpcs
 
 module Rpcs : sig
-  module Get_some_initial_peers : sig
-    type query = unit
-
-    type response = Peer.t list
-  end
-
   module Get_staged_ledger_aux_and_pending_coinbases_at_hash : sig
     type query = State_hash.t
 
@@ -122,8 +116,6 @@ module Rpcs : sig
   end
 
   type ('query, 'response) rpc = ('query, 'response) Rpcs.rpc =
-    | Get_some_initial_peers
-        : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
     | Get_staged_ledger_aux_and_pending_coinbases_at_hash
         : ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
           , Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )

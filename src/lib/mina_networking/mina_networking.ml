@@ -86,15 +86,6 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
   let module Rpc_context = struct
     include Context
 
-    let list_peers () =
-      match !gossip_net_ref with
-      | None ->
-          (* should be unreachable; without a network, we wouldn't receive this RPC call *)
-          [%log error] "Network not instantiated when initial peers requested" ;
-          return []
-      | Some gossip_net ->
-          Gossip_net.Any.peers gossip_net
-
     let get_transition_frontier = get_transition_frontier
 
     let get_snark_pool = get_snark_pool
