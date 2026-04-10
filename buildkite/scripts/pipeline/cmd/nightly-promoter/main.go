@@ -20,7 +20,7 @@ import (
 const (
 	defaultPipeline   = "mina-mainline-branches-nightlies"
 	defaultOrg        = "o-1-labs-2"
-	defaultArtifacts  = "mina-logproc,mina-daemon,mina-archive,mina-rosetta"
+	defaultArtifacts  = "mina-logproc,mina-daemon,mina-archive,mina-rosetta,mina-generic"
 	defaultNetworks   = "devnet"
 	defaultCodenames  = "noble,bookworm"
 	defaultArchs      = "amd64,arm64"
