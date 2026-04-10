@@ -632,3 +632,415 @@ let zkapp_stake_change_redelegate () =
         ~expected:
           (Amount.Signed.create ~magnitude:(Amount.of_fee fee) ~sgn:Sgn.Neg)
         stake_change )
+
+(* === Helpers for Payment / Fee_transfer / Coinbase tests === *)
+
+let small_fee = Fee.of_nanomina_int_exn 1_000_000
+
+(* Opt an account in to a validator. Returns the updated account. *)
+let opt_in ledger (account : Test_account.t) ~(validator : Test_account.t) =
+  delegate_and_assert_stake_change ~label:"setup opt-in" ledger account
+    ~new_delegate:validator.pk ~fee:small_fee
+
+let neg_amt amt = Amount.Signed.create ~magnitude:amt ~sgn:Sgn.Neg
+
+let pos_amt amt = Amount.Signed.create ~magnitude:amt ~sgn:Sgn.Pos
+
+let fee_plus_amt fee amt =
+  Option.value_exn (Amount.add (Amount.of_fee fee) amt)
+
+(* === Payment: missing combinations === *)
+
+(* staked sender → unstaked receiver: stake_change = -(fee + amount) *)
+let stake_change_payment_staked_to_unstaked () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind sender = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind receiver = gen_account ~min:(Balance.of_mina_int_exn 1) () in
+    let%bind validator = gen_account () in
+    let%bind amount =
+      Amount.gen_incl (Amount.of_mina_int_exn 1) (Amount.of_mina_int_exn 3)
+    in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (sender, receiver, validator, amount, fee))
+    ~f:(fun (sender, receiver, validator, amount, fee) ->
+      let ledger = mk_ledger [ sender; receiver; validator ] in
+      let sender' = opt_in ledger sender ~validator in
+      let applied =
+        apply_txn ledger
+          (payment_command ~sender:sender' ~receiver_pk:receiver.pk ~amount ~fee)
+      in
+      assert_stake_change ~label:"staked→unstaked payment"
+        ~expected:(neg_amt (fee_plus_amt fee amount))
+        (compute_stake_change ledger applied) )
+
+(* unstaked sender → staked receiver: stake_change = +amount *)
+let stake_change_payment_unstaked_to_staked () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind sender = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind receiver = gen_account ~min:(Balance.of_mina_int_exn 1) () in
+    let%bind validator = gen_account () in
+    let%bind amount =
+      Amount.gen_incl (Amount.of_mina_int_exn 1) (Amount.of_mina_int_exn 3)
+    in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (sender, receiver, validator, amount, fee))
+    ~f:(fun (sender, receiver, validator, amount, fee) ->
+      let ledger = mk_ledger [ sender; receiver; validator ] in
+      ignore (opt_in ledger receiver ~validator : Test_account.t) ;
+      let sender' = sender_from_ledger ledger sender in
+      let applied =
+        apply_txn ledger
+          (payment_command ~sender:sender' ~receiver_pk:receiver.pk ~amount ~fee)
+      in
+      assert_stake_change ~label:"unstaked→staked payment"
+        ~expected:(pos_amt amount)
+        (compute_stake_change ledger applied) )
+
+(* staked sender → brand new (unstaked-by-default) receiver:
+   stake_change = -(fee + amount) *)
+let stake_change_payment_to_new_account () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind sender = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind validator = gen_account () in
+    let%bind new_receiver_pk = Public_key.Compressed.gen in
+    let%bind amount =
+      Amount.gen_incl (Amount.of_mina_int_exn 1) (Amount.of_mina_int_exn 3)
+    in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (sender, validator, new_receiver_pk, amount, fee))
+    ~f:(fun (sender, validator, new_receiver_pk, amount, fee) ->
+      (* Use Fixed_depth so the ledger has room for the new receiver leaf. *)
+      let ledger =
+        Ledger_helpers.ledger_of_accounts
+          ~depth:(Ledger_helpers.Fixed_depth 4) [ sender; validator ]
+        |> Or_error.ok_exn
+      in
+      let sender' = opt_in ledger sender ~validator in
+      let applied =
+        apply_txn ledger
+          (payment_command ~sender:sender' ~receiver_pk:new_receiver_pk ~amount
+             ~fee )
+      in
+      (* New receiver is created with delegate = None, so its +amount
+         contribution is 0. Staked sender loses (fee + amount). *)
+      assert_stake_change ~label:"staked→new-account payment"
+        ~expected:(neg_amt (fee_plus_amt fee amount))
+        (compute_stake_change ledger applied) )
+
+(* === Stake_delegation: missing combinations === *)
+
+(* Some→Some re-delegate via signed command: stake_change = -fee *)
+let stake_change_delegation_redelegate () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind sender = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind validator_a = gen_account () in
+    let%bind validator_b = gen_account () in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (sender, validator_a, validator_b, fee))
+    ~f:(fun (sender, validator_a, validator_b, fee) ->
+      let ledger = mk_ledger [ sender; validator_a; validator_b ] in
+      let sender' = opt_in ledger sender ~validator:validator_a in
+      let applied =
+        apply_txn ledger
+          (delegation_command ~sender:sender' ~new_delegate:validator_b.pk ~fee)
+      in
+      assert_stake_change ~label:"Some→Some redelegate"
+        ~expected:(neg_amt (Amount.of_fee fee))
+        (compute_stake_change ledger applied) )
+
+(* None→None no-op: delegate to empty when already None.
+   stake_change = 0 (note: fee is still deducted from the account, but
+   the account is unstaked throughout, so it doesn't affect total_stake). *)
+let stake_change_delegation_noop () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind sender = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (sender, fee))
+    ~f:(fun (sender, fee) ->
+      let ledger = mk_ledger [ sender ] in
+      let applied =
+        apply_txn ledger
+          (delegation_command ~sender
+             ~new_delegate:Public_key.Compressed.empty ~fee )
+      in
+      assert_stake_change ~label:"None→None no-op"
+        ~expected:Amount.Signed.zero
+        (compute_stake_change ledger applied) )
+
+(* === Fee_transfer === *)
+
+let apply_fee_transfer_txn ledger ft =
+  apply_txn ledger (Mina_transaction.Transaction.Fee_transfer ft)
+
+let single_fee_transfer ~receiver_pk ~fee =
+  Fee_transfer.create_single ~receiver_pk ~fee ~fee_token:Token_id.default
+
+let two_fee_transfer ~r1_pk ~f1 ~r2_pk ~f2 =
+  Fee_transfer.of_singles
+    (`Two
+      ( Fee_transfer.Single.create ~receiver_pk:r1_pk ~fee:f1
+          ~fee_token:Token_id.default
+      , Fee_transfer.Single.create ~receiver_pk:r2_pk ~fee:f2
+          ~fee_token:Token_id.default ) )
+  |> Or_error.ok_exn
+
+(* One-single fee_transfer to staked receiver: +fee *)
+let stake_change_fee_transfer_one_staked () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind receiver = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind validator = gen_account () in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (receiver, validator, fee))
+    ~f:(fun (receiver, validator, fee) ->
+      let ledger = mk_ledger [ receiver; validator ] in
+      ignore (opt_in ledger receiver ~validator : Test_account.t) ;
+      let ft = single_fee_transfer ~receiver_pk:receiver.pk ~fee in
+      let applied = apply_fee_transfer_txn ledger ft in
+      assert_stake_change ~label:"fee_transfer one staked"
+        ~expected:(pos_amt (Amount.of_fee fee))
+        (compute_stake_change ledger applied) )
+
+(* One-single fee_transfer to unstaked receiver: 0 *)
+let stake_change_fee_transfer_one_unstaked () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind receiver = gen_account ~min:(Balance.of_mina_int_exn 1) () in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (receiver, fee))
+    ~f:(fun (receiver, fee) ->
+      let ledger = mk_ledger [ receiver ] in
+      let ft = single_fee_transfer ~receiver_pk:receiver.pk ~fee in
+      let applied = apply_fee_transfer_txn ledger ft in
+      assert_stake_change ~label:"fee_transfer one unstaked"
+        ~expected:Amount.Signed.zero
+        (compute_stake_change ledger applied) )
+
+(* Two-singles fee_transfer with mixed staking: contribution from staked
+   one only. *)
+let stake_change_fee_transfer_two_mixed () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind r1 = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind r2 = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind validator = gen_account () in
+    let%bind f1 =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    let%map f2 =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (r1, r2, validator, f1, f2))
+    ~f:(fun (r1, r2, validator, f1, f2) ->
+      let ledger = mk_ledger [ r1; r2; validator ] in
+      (* Stake r1 only *)
+      ignore (opt_in ledger r1 ~validator : Test_account.t) ;
+      let ft = two_fee_transfer ~r1_pk:r1.pk ~f1 ~r2_pk:r2.pk ~f2 in
+      let applied = apply_fee_transfer_txn ledger ft in
+      assert_stake_change ~label:"fee_transfer two mixed"
+        ~expected:(pos_amt (Amount.of_fee f1))
+        (compute_stake_change ledger applied) )
+
+(* === Coinbase === *)
+
+let apply_coinbase_txn ledger cb =
+  apply_txn ledger (Mina_transaction.Transaction.Coinbase cb)
+
+let mk_coinbase ?fee_transfer ~receiver ~amount () =
+  Coinbase.create ~amount ~receiver ~fee_transfer |> Or_error.ok_exn
+
+(* Coinbase, no fee_transfer, staked receiver: +amount *)
+let stake_change_coinbase_no_ft_staked () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind receiver = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind validator = gen_account () in
+    let%map amount =
+      Amount.gen_incl (Amount.of_mina_int_exn 1) (Amount.of_mina_int_exn 720)
+    in
+    (receiver, validator, amount))
+    ~f:(fun (receiver, validator, amount) ->
+      let ledger = mk_ledger [ receiver; validator ] in
+      ignore (opt_in ledger receiver ~validator : Test_account.t) ;
+      let cb = mk_coinbase ~receiver:receiver.pk ~amount () in
+      let applied = apply_coinbase_txn ledger cb in
+      assert_stake_change ~label:"coinbase no ft staked"
+        ~expected:(pos_amt amount)
+        (compute_stake_change ledger applied) )
+
+(* Coinbase, no fee_transfer, unstaked receiver: 0 *)
+let stake_change_coinbase_no_ft_unstaked () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind receiver = gen_account ~min:(Balance.of_mina_int_exn 1) () in
+    let%map amount =
+      Amount.gen_incl (Amount.of_mina_int_exn 1) (Amount.of_mina_int_exn 720)
+    in
+    (receiver, amount))
+    ~f:(fun (receiver, amount) ->
+      let ledger = mk_ledger [ receiver ] in
+      let cb = mk_coinbase ~receiver:receiver.pk ~amount () in
+      let applied = apply_coinbase_txn ledger cb in
+      assert_stake_change ~label:"coinbase no ft unstaked"
+        ~expected:Amount.Signed.zero
+        (compute_stake_change ledger applied) )
+
+(* Coinbase + fee_transfer, both staked: +amount
+   (receiver gets amount-fee, ft_receiver gets fee) *)
+let stake_change_coinbase_ft_both_staked () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind receiver = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind ft_recv = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind validator = gen_account () in
+    let%bind amount =
+      Amount.gen_incl (Amount.of_mina_int_exn 10) (Amount.of_mina_int_exn 720)
+    in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 5_000_000_000)
+    in
+    (receiver, ft_recv, validator, amount, fee))
+    ~f:(fun (receiver, ft_recv, validator, amount, fee) ->
+      let ledger = mk_ledger [ receiver; ft_recv; validator ] in
+      ignore (opt_in ledger receiver ~validator : Test_account.t) ;
+      ignore (opt_in ledger ft_recv ~validator : Test_account.t) ;
+      let ft =
+        Coinbase_fee_transfer.create ~receiver_pk:ft_recv.pk ~fee
+      in
+      let cb =
+        mk_coinbase ~receiver:receiver.pk ~amount ~fee_transfer:ft ()
+      in
+      let applied = apply_coinbase_txn ledger cb in
+      assert_stake_change ~label:"coinbase + ft both staked"
+        ~expected:(pos_amt amount)
+        (compute_stake_change ledger applied) )
+
+(* Coinbase + fee_transfer, only receiver staked: +(amount - fee) *)
+let stake_change_coinbase_ft_recv_staked () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind receiver = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind ft_recv = gen_account ~min:(Balance.of_mina_int_exn 1) () in
+    let%bind validator = gen_account () in
+    let%bind amount =
+      Amount.gen_incl (Amount.of_mina_int_exn 10) (Amount.of_mina_int_exn 720)
+    in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 5_000_000_000)
+    in
+    (receiver, ft_recv, validator, amount, fee))
+    ~f:(fun (receiver, ft_recv, validator, amount, fee) ->
+      let ledger = mk_ledger [ receiver; ft_recv; validator ] in
+      ignore (opt_in ledger receiver ~validator : Test_account.t) ;
+      let ft =
+        Coinbase_fee_transfer.create ~receiver_pk:ft_recv.pk ~fee
+      in
+      let cb =
+        mk_coinbase ~receiver:receiver.pk ~amount ~fee_transfer:ft ()
+      in
+      let applied = apply_coinbase_txn ledger cb in
+      let expected =
+        pos_amt
+          (Option.value_exn (Amount.sub amount (Amount.of_fee fee)))
+      in
+      assert_stake_change ~label:"coinbase + ft only recv staked" ~expected
+        (compute_stake_change ledger applied) )
+
+(* Coinbase + fee_transfer, only ft_receiver staked: +fee *)
+let stake_change_coinbase_ft_ft_recv_staked () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind receiver = gen_account ~min:(Balance.of_mina_int_exn 1) () in
+    let%bind ft_recv = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind validator = gen_account () in
+    let%bind amount =
+      Amount.gen_incl (Amount.of_mina_int_exn 10) (Amount.of_mina_int_exn 720)
+    in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 5_000_000_000)
+    in
+    (receiver, ft_recv, validator, amount, fee))
+    ~f:(fun (receiver, ft_recv, validator, amount, fee) ->
+      let ledger = mk_ledger [ receiver; ft_recv; validator ] in
+      ignore (opt_in ledger ft_recv ~validator : Test_account.t) ;
+      let ft =
+        Coinbase_fee_transfer.create ~receiver_pk:ft_recv.pk ~fee
+      in
+      let cb =
+        mk_coinbase ~receiver:receiver.pk ~amount ~fee_transfer:ft ()
+      in
+      let applied = apply_coinbase_txn ledger cb in
+      assert_stake_change ~label:"coinbase + ft only ft_recv staked"
+        ~expected:(pos_amt (Amount.of_fee fee))
+        (compute_stake_change ledger applied) )
+
+(* Coinbase + fee_transfer, both unstaked: 0 *)
+let stake_change_coinbase_ft_both_unstaked () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind receiver = gen_account ~min:(Balance.of_mina_int_exn 1) () in
+    let%bind ft_recv = gen_account ~min:(Balance.of_mina_int_exn 1) () in
+    let%bind amount =
+      Amount.gen_incl (Amount.of_mina_int_exn 10) (Amount.of_mina_int_exn 720)
+    in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 5_000_000_000)
+    in
+    (receiver, ft_recv, amount, fee))
+    ~f:(fun (receiver, ft_recv, amount, fee) ->
+      let ledger = mk_ledger [ receiver; ft_recv ] in
+      let ft =
+        Coinbase_fee_transfer.create ~receiver_pk:ft_recv.pk ~fee
+      in
+      let cb =
+        mk_coinbase ~receiver:receiver.pk ~amount ~fee_transfer:ft ()
+      in
+      let applied = apply_coinbase_txn ledger cb in
+      assert_stake_change ~label:"coinbase + ft both unstaked"
+        ~expected:Amount.Signed.zero
+        (compute_stake_change ledger applied) )

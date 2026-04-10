@@ -46,5 +46,33 @@ let () =
               `Quick zkapp_stake_change_delegate_opt_out
           ; test_case "zkapp stake_change: redelegate = -fee" `Quick
               zkapp_stake_change_redelegate
+          ; test_case "stake_change: payment staked→unstaked = -(fee+amt)"
+              `Quick stake_change_payment_staked_to_unstaked
+          ; test_case "stake_change: payment unstaked→staked = +amt" `Quick
+              stake_change_payment_unstaked_to_staked
+          ; test_case "stake_change: payment to new account = -(fee+amt)"
+              `Quick stake_change_payment_to_new_account
+          ; test_case "stake_change: redelegate Some→Some = -fee" `Quick
+              stake_change_delegation_redelegate
+          ; test_case "stake_change: delegation None→None = 0" `Quick
+              stake_change_delegation_noop
+          ; test_case "stake_change: fee_transfer one staked = +fee" `Quick
+              stake_change_fee_transfer_one_staked
+          ; test_case "stake_change: fee_transfer one unstaked = 0" `Quick
+              stake_change_fee_transfer_one_unstaked
+          ; test_case "stake_change: fee_transfer two mixed = +f1" `Quick
+              stake_change_fee_transfer_two_mixed
+          ; test_case "stake_change: coinbase no-ft staked = +amt" `Quick
+              stake_change_coinbase_no_ft_staked
+          ; test_case "stake_change: coinbase no-ft unstaked = 0" `Quick
+              stake_change_coinbase_no_ft_unstaked
+          ; test_case "stake_change: coinbase+ft both staked = +amt" `Quick
+              stake_change_coinbase_ft_both_staked
+          ; test_case "stake_change: coinbase+ft recv staked = +(amt-fee)"
+              `Quick stake_change_coinbase_ft_recv_staked
+          ; test_case "stake_change: coinbase+ft ft_recv staked = +fee"
+              `Quick stake_change_coinbase_ft_ft_recv_staked
+          ; test_case "stake_change: coinbase+ft both unstaked = 0" `Quick
+              stake_change_coinbase_ft_both_unstaked
           ] )
     ]

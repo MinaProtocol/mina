@@ -211,6 +211,135 @@ let%test_module "Transaction union tests" =
       Test_util.with_randomness 123456789 (fun () ->
           coinbase_test state_body ~carryforward:true )
 
+    (* Coinbase + fee_transfer where receiver and/or ft_receiver are
+       pre-existing accounts with delegates set. Exercises the snark
+       circuit's stake_change assertion against the unchecked path with
+       non-zero stake_change values, which the existing coinbase_test does
+       not do (its accounts all default to delegate = None). *)
+    let staked_coinbase_test state_body ~receiver_staked ~ft_receiver_staked =
+      let mk_pubkey () =
+        Public_key.(compress (of_private_key_exn (Private_key.create ())))
+      in
+      let global_slot =
+        Mina_state.Protocol_state.Body.consensus_state state_body
+        |> Consensus.Data.Consensus_state.global_slot_since_genesis
+      in
+      let producer = mk_pubkey () in
+      let producer_id = Account_id.create producer Token_id.default in
+      let receiver = mk_pubkey () in
+      let receiver_id = Account_id.create receiver Token_id.default in
+      let other = mk_pubkey () in
+      let other_id = Account_id.create other Token_id.default in
+      let validator = mk_pubkey () in
+      let pending_coinbase_init = Pending_coinbase.Stack.empty in
+      let cb =
+        Coinbase.create
+          ~amount:(Currency.Amount.of_mina_int_exn 10)
+          ~receiver
+          ~fee_transfer:
+            (Some
+               (Coinbase.Fee_transfer.create ~receiver_pk:other
+                  ~fee:U.constraint_constants.account_creation_fee ) )
+        |> Or_error.ok_exn
+      in
+      let transaction = Mina_transaction.Transaction.Coinbase cb in
+      let pending_coinbase_stack_target =
+        U.pending_coinbase_stack_target transaction U.genesis_state_body_hash
+          Mina_numbers.Global_slot_since_genesis.zero pending_coinbase_init
+      in
+      let txn_in_block =
+        { Transaction_protocol_state.Poly.transaction
+        ; block_data = state_body
+        ; global_slot
+        }
+      in
+      Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+          (* Pre-create producer (irrelevant; just to populate the ledger) *)
+          Ledger.create_new_account_exn ledger producer_id
+            (Account.create producer_id Balance.zero) ;
+          (* Pre-create receiver, optionally with delegate set *)
+          let receiver_acct =
+            let a = Account.create receiver_id (Balance.of_mina_int_exn 1) in
+            if receiver_staked then { a with delegate = Some validator } else a
+          in
+          Ledger.create_new_account_exn ledger receiver_id receiver_acct ;
+          (* Pre-create other (ft_receiver), optionally with delegate set *)
+          let other_acct =
+            let a = Account.create other_id (Balance.of_mina_int_exn 1) in
+            if ft_receiver_staked then { a with delegate = Some validator }
+            else a
+          in
+          Ledger.create_new_account_exn ledger other_id other_acct ;
+          let sparse_ledger =
+            Sparse_ledger.of_ledger_subset_exn ledger
+              [ producer_id; receiver_id; other_id ]
+          in
+          let sparse_ledger_after, applied_transaction =
+            Result.( >>= )
+              (Sparse_ledger.apply_transaction_first_pass
+                 ~constraint_constants:U.constraint_constants ~global_slot
+                 sparse_ledger
+                 ~txn_state_view:
+                   ( txn_in_block.block_data
+                   |> Mina_state.Protocol_state.Body.view )
+                 txn_in_block.transaction )
+              (fun (sparse_ledger, partially_applied) ->
+                Sparse_ledger.apply_transaction_second_pass sparse_ledger
+                  partially_applied )
+            |> Or_error.ok_exn
+          in
+          let supply_increase =
+            Mina_transaction_logic.Transaction_applied.supply_increase
+              ~constraint_constants applied_transaction
+            |> Or_error.ok_exn
+          in
+          let stake_change =
+            Mina_transaction_logic.Transaction_applied.stake_change
+              ~get_account_after:(fun account_id ->
+                Option.try_with (fun () ->
+                    let loc =
+                      Mina_ledger.Sparse_ledger.find_index_exn
+                        sparse_ledger_after account_id
+                    in
+                    let (account : Account.t) =
+                      Mina_ledger.Sparse_ledger.get_exn sparse_ledger_after loc
+                    in
+                    if Public_key.Compressed.(equal empty account.public_key)
+                    then failwith "empty account"
+                    else account ) )
+              applied_transaction
+          in
+          Transaction_snark.check_transaction ~signature_kind txn_in_block
+            (unstage (Sparse_ledger.handler sparse_ledger))
+            ~constraint_constants:U.constraint_constants
+            ~sok_message:
+              (Mina_base.Sok_message.create ~fee:Currency.Fee.zero
+                 ~prover:Public_key.Compressed.empty )
+            ~source_first_pass_ledger:(Sparse_ledger.merkle_root sparse_ledger)
+            ~target_first_pass_ledger:
+              (Sparse_ledger.merkle_root sparse_ledger_after)
+            ~init_stack:pending_coinbase_init
+            ~pending_coinbase_stack_state:
+              { source = pending_coinbase_init
+              ; target = pending_coinbase_stack_target
+              }
+            ~supply_increase ~stake_change )
+
+    let%test_unit "coinbase + ft, both receivers staked" =
+      Test_util.with_randomness 123456789 (fun () ->
+          staked_coinbase_test state_body ~receiver_staked:true
+            ~ft_receiver_staked:true )
+
+    let%test_unit "coinbase + ft, only receiver staked" =
+      Test_util.with_randomness 123456789 (fun () ->
+          staked_coinbase_test state_body ~receiver_staked:true
+            ~ft_receiver_staked:false )
+
+    let%test_unit "coinbase + ft, only ft_receiver staked" =
+      Test_util.with_randomness 123456789 (fun () ->
+          staked_coinbase_test state_body ~receiver_staked:false
+            ~ft_receiver_staked:true )
+
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = Quickcheck.random_value (U.Wallet.random_wallets ()) in
