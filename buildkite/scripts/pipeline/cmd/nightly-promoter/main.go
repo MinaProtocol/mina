@@ -28,7 +28,8 @@ const (
 	defaultSignKey    = "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
 	defaultBackend    = "local"
 	defaultProfile    = "lightnet"
-	defaultDockerRepo = "gcr.io/o1labs-192920"
+	defaultSourceDockerRepo = "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo"
+	defaultTargetDockerRepo = "gcr.io/o1labs-192920"
 )
 
 func main() {
@@ -48,7 +49,8 @@ func main() {
 		debRepo   = flag.String("debian-repo", defaultDebianRepo, "Debian repository")
 		signKey   = flag.String("debian-sign-key", defaultSignKey, "Debian signing key ID")
 		backend    = flag.String("backend", defaultBackend, "Storage backend")
-		dockerRepo = flag.String("docker-repo", defaultDockerRepo, "Docker repository (e.g., gcr.io/o1labs-192920)")
+		sourceDockerRepo = flag.String("source-docker-repo", defaultSourceDockerRepo, "Source Docker repository where nightly builds are pushed")
+		targetDockerRepo = flag.String("target-docker-repo", defaultTargetDockerRepo, "Target Docker repository for promoted images")
 		onlyDebians = flag.Bool("only-debians", false, "Only publish Debian packages (skip Docker)")
 		onlyDockers = flag.Bool("only-dockers", false, "Only publish Docker images (skip Debians)")
 		exportEnv   = flag.String("export-env", "", "Write resolved build info to a shell-sourceable file")
@@ -239,7 +241,8 @@ func main() {
 	fmt.Printf("  Codenames:          %s\n", *codenames)
 	fmt.Printf("  Architectures:      %s\n", *archs)
 	fmt.Printf("  Debian repo:        %s\n", *debRepo)
-	fmt.Printf("  Docker repo:        %s\n", *dockerRepo)
+	fmt.Printf("  Source Docker repo: %s\n", *sourceDockerRepo)
+	fmt.Printf("  Target Docker repo: %s\n", *targetDockerRepo)
 	fmt.Printf("  Docker tags:        %s\n", strings.Join(dockerTags, ", "))
 	fmt.Printf("  Backend:            %s\n", *backend)
 	fmt.Printf("%s\n", strings.Repeat("=", 80))
@@ -254,7 +257,7 @@ func main() {
 		}
 		if publishDockers {
 			for _, tag := range dockerTags {
-				dockerArgs := buildDockerArgs(commonArgs, tag, *dockerRepo)
+				dockerArgs := buildDockerArgs(commonArgs, tag, *sourceDockerRepo, *targetDockerRepo)
 				fmt.Printf("  %s %s\n", managerPath, strings.Join(dockerArgs, " "))
 			}
 		}
@@ -280,7 +283,7 @@ func main() {
 	if publishDockers {
 		for i, tag := range dockerTags {
 			fmt.Printf("\nPublishing Docker image [%d/%d] tag=%s...\n", i+1, len(dockerTags), tag)
-			dockerArgs := buildDockerArgs(commonArgs, tag, *dockerRepo)
+			dockerArgs := buildDockerArgs(commonArgs, tag, *sourceDockerRepo, *targetDockerRepo)
 			cmd := exec.Command(managerPath, dockerArgs...)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
@@ -297,14 +300,14 @@ func main() {
 }
 
 // buildDockerArgs creates manager.sh args for publishing a single Docker tag.
-func buildDockerArgs(commonArgs []string, tag, dockerRepo string) []string {
+func buildDockerArgs(commonArgs []string, tag, sourceDockerRepo, targetDockerRepo string) []string {
 	return append([]string{"publish"},
 		append(commonArgs,
 			"--verify",
 			"--target-version", tag,
 			"--only-dockers",
-			"--source-docker-repo", dockerRepo,
-			"--target-docker-repo", dockerRepo,
+			"--source-docker-repo", sourceDockerRepo,
+			"--target-docker-repo", targetDockerRepo,
 			"--force-upload-debians",
 		)...,
 	)
