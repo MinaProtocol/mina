@@ -437,14 +437,22 @@ let stake_change ~(get_account_after : Account_id.t -> Account.t option) (t : t)
         ~init:Amount.Signed.zero ~f:(fun acc { receiver_pk; fee; _ } ->
           add acc (adjust receiver_pk (pos (Amount.of_fee fee))) )
   | Coinbase { coinbase = { data; _ }; _ } ->
-      let ft_contrib =
+      (* When there's a fee_transfer, the snark worker fee is deducted from
+         the coinbase amount, so the coinbase receiver actually gets
+         amount - fee and the fee_transfer recipient gets fee. *)
+      let ft_contrib, receiver_amount =
         match data.fee_transfer with
         | Some { receiver_pk; fee; _ } ->
-            adjust receiver_pk (pos (Amount.of_fee fee))
+            let fee_amt = Amount.of_fee fee in
+            let recv_amt =
+              Option.value ~default:Amount.zero
+                (Amount.sub data.amount fee_amt)
+            in
+            (adjust receiver_pk (pos fee_amt), recv_amt)
         | None ->
-            Amount.Signed.zero
+            (Amount.Signed.zero, data.amount)
       in
-      add (adjust data.receiver (pos data.amount)) ft_contrib
+      add (adjust data.receiver (pos receiver_amount)) ft_contrib
 
 let transaction : t -> Transaction.t =
  fun { varying; _ } ->
