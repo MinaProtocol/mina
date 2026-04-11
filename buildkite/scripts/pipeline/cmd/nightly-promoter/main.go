@@ -220,6 +220,7 @@ func main() {
 			"--only-debians",
 			"--archs", *archs,
 			"--debian-sign-key", *signKey,
+			"--force-upload-debians",
 		)...,
 	)
 
