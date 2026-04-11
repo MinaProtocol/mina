@@ -294,6 +294,24 @@ function extract_version_from_deb() {
 
 
 
+# Maps a manager.sh artifact name to the docker image name used by CI.
+# Most artifacts use their name directly, but generic builds are stored
+# under the base daemon/rosetta image name.
+function get_docker_image_name() {
+    local __artifact=$1
+    case $__artifact in
+        mina-generic)
+            echo "mina-daemon"
+        ;;
+        rosetta-generic)
+            echo "mina-rosetta"
+        ;;
+        *)
+            echo "$__artifact"
+        ;;
+    esac
+}
+
 function calculate_docker_tag() {
     local __docker_repo=$1
     local __artifact=$2
@@ -302,13 +320,16 @@ function calculate_docker_tag() {
     local __network=$5
     local __profile=$6
 
+    local __docker_name
+    __docker_name=$(get_docker_image_name $__artifact)
+
     local __network_suffix
     __network_suffix=$(get_suffix $__artifact $__network "$__profile")
 
     local __arch_suffix
     __arch_suffix=$(get_arch_suffix $__arch)
 
-    echo "$__docker_repo/$__artifact:$__target_version-$__codename$__network_suffix$__arch_suffix"
+    echo "$__docker_repo/$__docker_name:$__target_version-$__codename$__network_suffix$__arch_suffix"
 }
 
 function storage_list() {
@@ -564,6 +585,9 @@ function promote_and_verify_docker() {
     local __arch=${10}
     local __dry_run=${11}
 
+    local __docker_name
+    __docker_name=$(get_docker_image_name $__artifact)
+
     local __suffix
     __suffix=$(get_suffix $__artifact $__network $__profile)
 
@@ -576,7 +600,7 @@ function promote_and_verify_docker() {
     if [[ $__dry_run == 0 ]]; then
         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/promote.sh \
             -q \
-            -n "$__artifact" \
+            -n "$__docker_name" \
             -v $__artifact_full_source_version \
             -t $__artifact_full_target_version \
             -a $__arch \
@@ -591,7 +615,7 @@ function promote_and_verify_docker() {
             echo ""
 
             prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
-                -p "$__artifact" \
+                -p "$__docker_name" \
                 -v "$__target_version" \
                 -c "$__codename" \
                 -s "$__suffix" \
