@@ -345,7 +345,11 @@ let stake_change ~(get_account_after : Account_id.t -> Account.t option) (t : t)
   | Command (Signed_command sc) -> (
       match sc.body with
       | Failed ->
-          Amount.Signed.zero
+          (* Fee is still deducted from a failed signed command's fee_payer. *)
+          let cmd = sc.common.user_command.data in
+          let fee_payer_pk = UC.fee_payer_pk cmd in
+          let fee = UC.fee cmd in
+          adjust fee_payer_pk (neg (Amount.of_fee fee))
       | Payment _ ->
           (* For signed commands, fee_payer = sender *)
           let cmd = sc.common.user_command.data in

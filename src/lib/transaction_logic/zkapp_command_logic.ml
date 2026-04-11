@@ -1782,6 +1782,36 @@ module Make (Inputs : Inputs_intf) = struct
       in
       (a, local_state)
     in
+    (* For the fee_payer (is_start'), commit its stake_change contribution to
+       global_state immediately. This ensures the fee deduction is reflected
+       in total_stake even if the zkapp subsequently fails — the body updates
+       get rolled back, but the fee is always charged. *)
+    let global_state, local_state =
+      let new_global, `Overflow fee_overflow =
+        Amount.Signed.add_flagged
+          (Global_state.stake_change global_state)
+          local_state.stake_change
+      in
+      let local_state =
+        Local_state.add_check local_state Global_supply_increase_overflow
+          Bool.((not is_start') ||| not fee_overflow)
+      in
+      let commit = Bool.(is_start' &&& not fee_overflow) in
+      let global_state =
+        Global_state.set_stake_change global_state
+          (Amount.Signed.if_ commit ~then_:new_global
+             ~else_:(Global_state.stake_change global_state) )
+      in
+      let local_state =
+        { local_state with
+          stake_change =
+            Amount.Signed.if_ commit
+              ~then_:Amount.(Signed.of_unsigned zero)
+              ~else_:local_state.stake_change
+        }
+      in
+      (global_state, local_state)
+    in
     (* Update nonce. *)
     let a, local_state =
       let nonce = Account.nonce a in

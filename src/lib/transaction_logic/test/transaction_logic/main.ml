@@ -74,5 +74,9 @@ let () =
               `Quick stake_change_coinbase_ft_ft_recv_staked
           ; test_case "stake_change: coinbase+ft both unstaked = 0" `Quick
               stake_change_coinbase_ft_both_unstaked
+          ; test_case "stake_change: failed zkapp staked fee_payer = -fee"
+              `Quick zkapp_stake_change_failed_staked
+          ; test_case "stake_change: failed payment staked fee_payer = -fee"
+              `Quick stake_change_failed_payment
           ] )
     ]

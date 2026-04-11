@@ -1044,3 +1044,141 @@ let stake_change_coinbase_ft_both_unstaked () =
       assert_stake_change ~label:"coinbase + ft both unstaked"
         ~expected:Amount.Signed.zero
         (compute_stake_change ledger applied) )
+
+(* Failed zkapp with staked fee_payer. The zkapp's body is rolled back (no
+   balance transfers happen) but the fee is always deducted from the
+   fee_payer. Expected stake_change = -fee.
+
+   Also verifies that the [global_state.stake_change] produced by the
+   unchecked [zkapp_command_logic] functor agrees with
+   [Transaction_applied.stake_change], which is the invariant the SNARK
+   scan state relies on. *)
+let zkapp_stake_change_failed_staked () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind sender = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind receiver = gen_account ~min:(Balance.of_mina_int_exn 1) () in
+    let%bind validator = gen_account () in
+    let%bind amount =
+      Amount.gen_incl (Amount.of_mina_int_exn 1) (Amount.of_mina_int_exn 3)
+    in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (sender, receiver, validator, amount, fee))
+    ~f:(fun (sender, receiver, validator, amount, fee) ->
+      let accounts = [ sender; receiver; validator ] in
+      let ledger = mk_ledger accounts in
+      ignore (opt_in ledger sender ~validator : Test_account.t) ;
+      let sender' = sender_from_ledger ledger sender in
+      (* Force the zkapp body to fail via an impossible nonce precondition
+         on every account_update. *)
+      let failing_preconditions =
+        { Mina_base.Account_update.Preconditions.network =
+            Mina_base.Zkapp_precondition.Protocol_state.accept
+        ; account =
+            Mina_base.Zkapp_precondition.Account.nonce
+              (Mina_numbers.Account_nonce.of_int 999_999)
+        ; valid_while = Ignore
+        }
+      in
+      let txn =
+        Zkapp_cmd_builder.Simple_txn.make ~preconditions:failing_preconditions
+          ~sender:sender' ~receiver amount
+      in
+      let cmd =
+        Zkapp_cmd_builder.zkapp_cmd
+          ~noncemap:(Ledger_helpers.noncemap [ sender'; receiver ])
+          ~fee:(sender'.pk, fee)
+          [ (txn :> Zkapp_cmd_builder.transaction) ]
+      in
+      (* Use apply_zkapp_command_unchecked_aux so we can capture the final
+         global_state and read its stake_change. *)
+      let final_global_stake_change = ref Amount.Signed.zero in
+      let applied, () =
+        Transaction_logic.apply_zkapp_command_unchecked_aux ~signature_kind
+          ~constraint_constants ~global_slot ~state_view:protocol_state
+          ~init:() ledger cmd
+          ~f:(fun () (global_state, _local_state) ->
+            final_global_stake_change := global_state.stake_change )
+        |> Or_error.ok_exn
+      in
+      (* The zkapp must have failed for this test to make sense. *)
+      ( match applied.command.status with
+      | Failed _ ->
+          ()
+      | Applied ->
+          failwith "expected the zkapp to fail but it applied successfully" ) ;
+      let expected =
+        Amount.Signed.create ~magnitude:(Amount.of_fee fee) ~sgn:Sgn.Neg
+      in
+      (* Per-account diff from Transaction_applied.stake_change *)
+      let applied_stake_change =
+        compute_stake_change ledger
+          { previous_hash = Ledger_hash.empty_hash
+          ; varying = Command (Zkapp_command applied)
+          }
+      in
+      assert_stake_change ~label:"failed zkapp Transaction_applied.stake_change"
+        ~expected applied_stake_change ;
+      (* Final global_state.stake_change from the zkapp_command_logic functor *)
+      assert_stake_change
+        ~label:"failed zkapp zkapp_command_logic global_state.stake_change"
+        ~expected !final_global_stake_change )
+
+(* Failed signed-command Payment with staked fee_payer: the body is rolled
+   back so no transfer happens, but the fee is still deducted. Expected
+   stake_change = -fee. We trigger the failure by sending a Payment whose
+   amount is below the account_creation_fee to a brand new receiver, which
+   produces [Amount_insufficient_to_create_account] and an applied record
+   with [sc.body = Failed]. *)
+let stake_change_failed_payment () =
+  Quickcheck.test ~trials:100
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind sender = gen_account ~min:(Balance.of_mina_int_exn 10) () in
+    let%bind validator = gen_account () in
+    let%bind new_receiver_pk = Public_key.Compressed.gen in
+    (* amount must be strictly less than the account_creation_fee *)
+    let account_creation_fee =
+      Amount.of_fee constraint_constants.account_creation_fee
+    in
+    let%bind amount =
+      Amount.gen_incl Amount.one
+        ( Amount.sub account_creation_fee Amount.one
+        |> Option.value ~default:Amount.one )
+    in
+    let%map fee =
+      Fee.gen_incl
+        (Fee.of_nanomina_int_exn 1_000_000)
+        (Fee.of_nanomina_int_exn 10_000_000)
+    in
+    (sender, validator, new_receiver_pk, amount, fee))
+    ~f:(fun (sender, validator, new_receiver_pk, amount, fee) ->
+      (* Use Fixed_depth so the (never-created) receiver leaf has room. *)
+      let ledger =
+        Ledger_helpers.ledger_of_accounts
+          ~depth:(Ledger_helpers.Fixed_depth 4) [ sender; validator ]
+        |> Or_error.ok_exn
+      in
+      let sender' = opt_in ledger sender ~validator in
+      let applied =
+        apply_txn ledger
+          (payment_command ~sender:sender' ~receiver_pk:new_receiver_pk ~amount
+             ~fee )
+      in
+      (* Verify the txn actually landed as Failed, otherwise the test is moot. *)
+      ( match applied.varying with
+      | Command
+          (Signed_command
+            { body = Failed
+            ; common = { user_command = { status = Failed _; _ }; _ }
+            } ) ->
+          ()
+      | _ ->
+          failwith
+            "expected signed command to be applied as Failed, but it wasn't" ) ;
+      assert_stake_change ~label:"failed payment with staked fee_payer"
+        ~expected:(neg_amt (Amount.of_fee fee))
+        (compute_stake_change ledger applied) )
