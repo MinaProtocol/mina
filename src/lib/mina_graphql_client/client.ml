@@ -248,12 +248,10 @@ let get_account_update ~logger t ~account_id =
                     (Signature_lib.Public_key.Compressed.to_base58_check
                        (Mina_base.Account_id.public_key account_id) ) ) )
       in
-      let%bind delegate =
+      let delegate =
         match account.delegate with
-        | Some s ->
-            return (Set s)
-        | None ->
-            fail (Error.of_string "Expected delegate in account")
+        | Some s -> Set s
+        | None -> Set Signature_lib.Public_key.Compressed.empty
       in
       let%bind verification_key =
         match account.verificationKey with
