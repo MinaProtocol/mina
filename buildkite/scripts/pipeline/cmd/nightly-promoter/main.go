@@ -20,7 +20,8 @@ import (
 const (
 	defaultPipeline   = "mina-mainline-branches-nightlies"
 	defaultOrg        = "o-1-labs-2"
-	defaultArtifacts  = "mina-logproc,mina-daemon,mina-archive,mina-rosetta,mina-generic"
+	defaultArtifacts         = "mina-logproc,mina-daemon,mina-archive,mina-rosetta,mina-generic"
+	defaultLightnetArtifacts = "mina-logproc,mina-generic"
 	defaultNetworks   = "devnet"
 	defaultCodenames  = "noble,bookworm"
 	defaultArchs      = "amd64,arm64"
@@ -57,6 +58,14 @@ func main() {
 	)
 
 	flag.Parse()
+
+	// Lightnet builds only produce a subset of artifacts (LogProc + DaemonAppsOnly).
+	// Auto-select the lightnet artifact list when profile is lightnet and the user
+	// hasn't explicitly overridden --artifacts.
+	if *profile == "lightnet" && *artifacts == defaultArtifacts {
+		*artifacts = defaultLightnetArtifacts
+		fmt.Printf("Profile is lightnet — using lightnet artifact list: %s\n", *artifacts)
+	}
 
 	if *branch == "" {
 		fmt.Fprintln(os.Stderr, "Error: --branch is required")
