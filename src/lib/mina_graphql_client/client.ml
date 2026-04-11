@@ -789,6 +789,45 @@ let get_filtered_log_entries ~last_log_index_seen node_uri =
     Deferred.Or_error.error_string
       "Node is not currently capturing structured log messages"
 
+let poll_filtered_log_entries ?(initial_delay_sec = 0.) ~poll_interval_sec
+    ?timeout_sec ~on_entries ~on_error node_uri =
+  let open Deferred.Let_syntax in
+  let%bind () = after (Time.Span.of_sec initial_delay_sec) in
+  let deadline =
+    Option.map timeout_sec ~f:(fun t ->
+        Time.add (Time.now ()) (Time.Span.of_sec t) )
+  in
+  let rec loop ~last_log_index_seen =
+    match deadline with
+    | Some d when Time.( >= ) (Time.now ()) d ->
+        Deferred.Or_error.error_string
+          "Timed out polling for filtered log entries"
+    | _ -> (
+        let%bind () = after (Time.Span.of_sec poll_interval_sec) in
+        let%bind result =
+          get_filtered_log_entries ~last_log_index_seen node_uri
+        in
+        match result with
+        | Ok entries -> (
+            let last_log_index_seen =
+              Array.length entries + last_log_index_seen
+            in
+            let%bind action = on_entries entries in
+            match action with
+            | `Continue ->
+                loop ~last_log_index_seen
+            | `Stop ->
+                Deferred.Or_error.ok_unit )
+        | Error e -> (
+            let%bind action = on_error e in
+            match action with
+            | `Continue ->
+                loop ~last_log_index_seen
+            | `Stop ->
+                Deferred.Or_error.ok_unit ) )
+  in
+  loop ~last_log_index_seen:0
+
 let get_detailed_best_chain ?max_length ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
   let query_obj =
