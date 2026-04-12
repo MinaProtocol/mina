@@ -26,12 +26,26 @@ time make libp2p_helper
 export ERROR_ON_PROOF=true
 
 
+# When coverage instrumentation is enabled and this is not a PR build (i.e. nightly),
+# force full recompilation so bisect_ppx generates .coverage files for all source files,
+# not just changed ones. Without --force, dune's incremental compilation skips unchanged
+# files, leading to incomplete and inconsistent coverage reports across builds.
+# A clean is needed before --force to avoid symlink race conditions where parallel
+# rebuilds of shared dependencies (e.g. Rust/kimchi) collide on stale build artifacts.
+FORCE_FLAG=""
+if [ -n "${DUNE_INSTRUMENT_WITH}" ] && [ "${BUILDKITE_PULL_REQUEST:-false}" = "false" ]; then
+    echo "--- Coverage instrumentation detected on non-PR build, forcing full recompilation"
+    echo "--- Cleaning build directory to avoid symlink races under --force"
+    dune clean
+    FORCE_FLAG="--force"
+fi
+
 # Note: By attempting a re-run on failure here, we can avoid rebuilding and
 # skip running all of the tests that have already succeeded, since dune will
 # only retry those tests that failed.
 echo "--- Run unit tests"
-time dune runtest "${path}" || \
+time dune runtest ${FORCE_FLAG} "${path}" || \
 (./scripts/link-coredumps.sh && \
  echo "--- Retrying failed unit tests" && \
- time dune runtest "${path}" || \
+ time dune runtest ${FORCE_FLAG} "${path}" || \
  (./scripts/link-coredumps.sh && false))
