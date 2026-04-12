@@ -404,13 +404,17 @@ let main inputs =
         in
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "Daemons started" ;
+        let all_mina_nodes =
+          Engine.Network.all_mina_nodes network |> Core.String.Map.data
+        in
         let archive_nodes =
           Engine.Network.archive_nodes network |> Core.String.Map.data
         in
         let%bind () =
-          Malleable_error.List.iter archive_nodes ~f:(fun archive_node ->
-              let node_id = Engine.Network.Node.id archive_node in
-              Engine.Network.Node.tail_mina_logs_to_file ~logger archive_node
+          Malleable_error.List.iter (all_mina_nodes @ archive_nodes)
+            ~f:(fun node ->
+              let node_id = Engine.Network.Node.id node in
+              Engine.Network.Node.tail_mina_logs_to_file ~logger node
                 ~log_file:(sprintf "%s-%s.local.test.log" test_name node_id) )
         in
         [%log trace] "executing test" ;
