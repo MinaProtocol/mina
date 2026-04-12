@@ -176,7 +176,8 @@ let summary ({ by_ip; by_peer_id } : t) =
         Peer_id.Hash_queue.foldi by_peer_id.table ~init:[]
           ~f:(fun acc ~key ~data ->
             ( Peer.Id.to_string key
-            , { capacity_used = by_ip.initial_capacity - data.remaining_capacity
+            , { capacity_used =
+                  by_peer_id.initial_capacity - data.remaining_capacity
               } )
             :: acc )
     }
