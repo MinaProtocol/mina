@@ -37,9 +37,7 @@ let%test_module "state operations" =
       let s = empty ~max_base_jobs:8 ~delay:1 in
       [%test_eq: int] (free_space s) 8 ;
       let data = [ 1; 2; 3 ] in
-      let jobs =
-        List.concat (jobs_for_slots s ~slots:(List.length data))
-      in
+      let jobs = List.concat (jobs_for_slots s ~slots:(List.length data)) in
       let completed = List.map jobs ~f:job_done in
       let _, s' = Or_error.ok_exn (update ~data ~completed_jobs:completed s) in
       [%test_eq: int] (free_space s') 8
@@ -54,9 +52,7 @@ let%test_module "state operations" =
     let%test_unit "sequence number increases after update" =
       let s = empty ~max_base_jobs:4 ~delay:0 in
       let data = [ 1; 2; 3; 4 ] in
-      let jobs =
-        List.concat (jobs_for_slots s ~slots:(List.length data))
-      in
+      let jobs = List.concat (jobs_for_slots s ~slots:(List.length data)) in
       let completed = List.map jobs ~f:job_done in
       let _, s' = Or_error.ok_exn (update ~data ~completed_jobs:completed s) in
       assert (current_job_sequence_number s' > current_job_sequence_number s)
@@ -65,9 +61,7 @@ let%test_module "state operations" =
     let%test_unit "State.map preserves structure" =
       let s = empty ~max_base_jobs:4 ~delay:1 in
       let data = [ 10; 20; 30; 40 ] in
-      let jobs =
-        List.concat (jobs_for_slots s ~slots:(List.length data))
-      in
+      let jobs = List.concat (jobs_for_slots s ~slots:(List.length data)) in
       let completed = List.map jobs ~f:job_done in
       let _, s' = Or_error.ok_exn (update ~data ~completed_jobs:completed s) in
       let s_mapped = State.map s' ~f1:(fun x -> x * 2) ~f2:(fun x -> x * 2) in
@@ -77,9 +71,7 @@ let%test_module "state operations" =
     let%test_unit "State.hash is deterministic" =
       let s = empty ~max_base_jobs:4 ~delay:1 in
       let data = [ 1; 2; 3; 4 ] in
-      let jobs =
-        List.concat (jobs_for_slots s ~slots:(List.length data))
-      in
+      let jobs = List.concat (jobs_for_slots s ~slots:(List.length data)) in
       let completed = List.map jobs ~f:job_done in
       let _, s' = Or_error.ok_exn (update ~data ~completed_jobs:completed s) in
       let h1 = State.hash s' Int.to_string Int.to_string in
@@ -106,9 +98,7 @@ let%test_module "state operations" =
     let%test_unit "fold_chronological visits all jobs" =
       let s = empty ~max_base_jobs:4 ~delay:0 in
       let data = [ 1; 2; 3; 4 ] in
-      let jobs =
-        List.concat (jobs_for_slots s ~slots:(List.length data))
-      in
+      let jobs = List.concat (jobs_for_slots s ~slots:(List.length data)) in
       let completed = List.map jobs ~f:job_done in
       let _, s' = Or_error.ok_exn (update ~data ~completed_jobs:completed s) in
       let base_count =
@@ -135,8 +125,7 @@ let%test_module "state operations" =
               List.init max_base_jobs ~f:(fun j -> (i * max_base_jobs) + j)
             in
             let jobs =
-              List.concat
-                (jobs_for_slots state ~slots:(List.length data))
+              List.concat (jobs_for_slots state ~slots:(List.length data))
             in
             let completed = List.map jobs ~f:job_done in
             let result_opt, state' =
