@@ -35,7 +35,7 @@ fi
 # This prefix protects all codename/network variants via GAR prefix matching.
 TAG_PREFIX="${GAR_TAG_PREFIX:-${GITTAG}-${GITHASH}}"
 
-GITOPS_REPO="MinaProtocol/gitops-infrastructure"
+GITOPS_REPO="o1-labs/gitops-infrastructure"
 TFVARS_PATH="platform/gcloud/artifact-registry/registries.tfvars"
 BRANCH_NAME="auto/gar-whitelist-${TAG_PREFIX}"
 
@@ -74,6 +74,9 @@ echo "📥 Cloning ${GITOPS_REPO}..."
 gh repo clone "${GITOPS_REPO}" "${WORKDIR}" -- --depth 1 -q
 
 cd "${WORKDIR}"
+git config user.email "mina-promoter-pipeline@o1labs.org"
+git config user.name "Mina Promoter Pipeline"
+gh auth setup-git 2>/dev/null || true
 git checkout -b "${BRANCH_NAME}"
 
 # Insert tag prefix into gcr.io "Keep protected mina releases" tag_prefixes list
@@ -150,6 +153,7 @@ GAR cleanup policies. The prefix covers all codename/network/arch variants
 (e.g., \`${TAG_PREFIX}-noble-devnet\`, \`${TAG_PREFIX}-bookworm-mainnet\`, etc.).
 EOF
 )" \
-    --base main
+    --base main \
+    --head "${BRANCH_NAME}"
 
 echo "✅ GAR whitelist PR created successfully."
