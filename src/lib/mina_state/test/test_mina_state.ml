@@ -75,9 +75,8 @@ let%test_module "ancestor" =
     let%test_unit "verify_and_add rejects bad proof" =
       let open Quickcheck in
       test
-        (Generator.tuple3 State_hash.gen State_body_hash.gen
-           State_body_hash.gen ) ~trials:100
-        ~f:(fun (ancestor, body1, wrong_body) ->
+        (Generator.tuple3 State_hash.gen State_body_hash.gen State_body_hash.gen)
+        ~trials:100 ~f:(fun (ancestor, body1, wrong_body) ->
           if State_body_hash.equal body1 wrong_body then ()
           else
             let prover = Prover.create ~max_size:10 in
@@ -88,9 +87,7 @@ let%test_module "ancestor" =
             Prover.add prover ~prev_hash:ancestor ~hash:hs.state_hash
               ~length:Mina_numbers.Length.(succ zero)
               ~body_hash:body1 ;
-            let input =
-              { Input.generations = 1; descendant = hs.state_hash }
-            in
+            let input = { Input.generations = 1; descendant = hs.state_hash } in
             let result =
               Prover.verify_and_add prover input ancestor
                 ~ancestor_length:Mina_numbers.Length.zero [ wrong_body ]

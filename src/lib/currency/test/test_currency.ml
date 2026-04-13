@@ -5,9 +5,7 @@ let%test_module "unchecked arithmetic" =
   ( module struct
     (* --- scale tests --- *)
     let%test_unit "scale by zero returns zero" =
-      [%test_eq: Amount.t option]
-        (Amount.scale Amount.zero 0)
-        (Some Amount.zero) ;
+      [%test_eq: Amount.t option] (Amount.scale Amount.zero 0) (Some Amount.zero) ;
       [%test_eq: Amount.t option]
         (Amount.scale (Amount.of_uint64 (Unsigned.UInt64.of_int 42)) 0)
         (Some Amount.zero)
@@ -58,8 +56,7 @@ let%test_module "unchecked arithmetic" =
       let w = Amount.of_uint64 (Unsigned.UInt64.of_int 10) in
       let result, `Overflow b = Amount.add_flagged v w in
       assert (not b) ;
-      [%test_eq: Amount.t] result
-        (Amount.of_uint64 (Unsigned.UInt64.of_int 15))
+      [%test_eq: Amount.t] result (Amount.of_uint64 (Unsigned.UInt64.of_int 15))
 
     let%test_unit "sub_flagged detects underflow" =
       let small = Amount.of_uint64 (Unsigned.UInt64.of_int 1) in
@@ -72,8 +69,7 @@ let%test_module "unchecked arithmetic" =
       let small = Amount.of_uint64 (Unsigned.UInt64.of_int 3) in
       let result, `Underflow b = Amount.sub_flagged big small in
       assert (not b) ;
-      [%test_eq: Amount.t] result
-        (Amount.of_uint64 (Unsigned.UInt64.of_int 7))
+      [%test_eq: Amount.t] result (Amount.of_uint64 (Unsigned.UInt64.of_int 7))
 
     (* --- conversion tests --- *)
     let%test_unit "of_nanomina_int rejects negative" =
@@ -291,9 +287,7 @@ let%test_module "balance operations" =
       assert b
 
     let%test_unit "sub_amount_flagged underflow flag" =
-      let _, `Underflow b =
-        Balance.sub_amount_flagged (mk 5) (mk_amount 10)
-      in
+      let _, `Underflow b = Balance.sub_amount_flagged (mk 5) (mk_amount 10) in
       assert b
 
     let%test_unit "to_amount roundtrip" =
