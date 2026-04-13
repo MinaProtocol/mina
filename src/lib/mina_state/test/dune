@@ -1,0 +1,23 @@
+(library
+ (name test_mina_state)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries
+  ;; opam libraries
+  core_kernel
+  ;; local libraries
+  currency
+  mina_base
+  mina_numbers
+  mina_state
+  random_oracle_input
+  snark_params)
+ (preprocess
+  (pps
+   ppx_assert
+   ppx_compare
+   ppx_inline_test
+   ppx_jane
+   ppx_sexp_conv))
+ (instrumentation
+  (backend bisect_ppx)))
