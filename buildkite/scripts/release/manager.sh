@@ -2186,7 +2186,8 @@ function validate_help(){
     printf "  %-25s %s\n" "--channel" "[string] target debian channel (required)";
     printf "  %-25s %s\n" "--archs" "[comma separated list] architectures. Default: $DEFAULT_ARCHITECTURES";
     printf "  %-25s %s\n" "--debian-repo" "[string] debian repository bucket. Default: $DEBIAN_REPO";
-    printf "  %-25s %s\n" "--fix" "fix broken manifests (deb-s3 verify --fix-manifests) + invalidate CDN cache";
+    printf "  %-25s %s\n" "--debian-sign-key" "[string] GPG key ID for re-signing InRelease when fixing";
+    printf "  %-25s %s\n" "--fix" "fix broken manifests + re-sign InRelease + invalidate CDN cache";
     printf "  %-25s %s\n" "--list-only" "only list packages, skip hash verification";
     echo ""
     echo "Examples:"
@@ -2206,6 +2207,7 @@ function validate(){
     local __channel=""
     local __archs="$DEFAULT_ARCHITECTURES"
     local __debian_repo="$DEBIAN_REPO"
+    local __debian_sign_key=""
     local __fix=0
     local __list_only=0
 
@@ -2229,6 +2231,10 @@ function validate(){
             ;;
             --debian-repo )
                 __debian_repo=${2:?$error_message}
+                shift 2;
+            ;;
+            --debian-sign-key )
+                __debian_sign_key=${2:?$error_message}
                 shift 2;
             ;;
             --fix )
@@ -2365,7 +2371,12 @@ function validate(){
         )
         if [[ $__fix == 1 ]]; then
             __verify_args+=("--fix-manifests")
-            echo "    🔧 Fix mode: will repair broken manifests"
+            if [[ -n "$__debian_sign_key" ]]; then
+                __verify_args+=("--sign" "$__debian_sign_key")
+                echo "    🔧 Fix mode: will repair manifests + re-sign InRelease"
+            else
+                echo "    🔧 Fix mode: will repair manifests (unsigned — pass --debian-sign-key to re-sign InRelease)"
+            fi
         fi
         deb-s3 "${__verify_args[@]}" 2>&1 | sed 's/^/    /'
 
