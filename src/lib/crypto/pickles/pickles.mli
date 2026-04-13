@@ -583,3 +583,32 @@ include
 module Dump_circuit_impl : sig
   val run : output_dir:string -> unit
 end
+
+(** Trace logger for byte-identical pickles transcript reproduction tests.
+ *  See [pickles_trace.ml] for module-level documentation. The signature
+ *  here is the explicit re-export through the wrapped library boundary. *)
+module Pickles_trace : sig
+  val tick_field : string -> Backend.Tick.Field.t -> unit
+
+  val tock_field : string -> Backend.Tock.Field.t -> unit
+
+  val tick_point : string -> Backend.Tick.Inner_curve.Affine.t -> unit
+
+  val tock_point : string -> Backend.Tock.Inner_curve.Affine.t -> unit
+
+  val int : string -> int -> unit
+
+  val bool : string -> bool -> unit
+
+  val string : string -> string -> unit
+
+  val tick_field_array : string -> Backend.Tick.Field.t array -> unit
+
+  val tock_field_array : string -> Backend.Tock.Field.t array -> unit
+
+  val tick_point_array :
+    string -> Backend.Tick.Inner_curve.Affine.t array -> unit
+
+  val tock_point_array :
+    string -> Backend.Tock.Inner_curve.Affine.t array -> unit
+end

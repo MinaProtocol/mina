@@ -820,6 +820,17 @@ struct
               , next_statement_hashed ) =
             builder.finish_computation res
           in
+          (* Trace: dump the kimchi-level public input array of the step
+           * proof. This is the serialized Step.Statement at
+           * Max_proofs_verified.n length — the same vector kimchi will
+           * commit to for x_hat. PureScript's Simple_chain analog must
+           * produce the same labels and values for byte-identical match. *)
+          let n_pub = Backend.Tick.Field.Vector.length public_inputs in
+          for i = 0 to n_pub - 1 do
+            Pickles_trace.tick_field
+              (Printf.sprintf "step.proof.public_input.%d" i)
+              (Backend.Tick.Field.Vector.get public_inputs i)
+          done ;
           [%log internal] "Backend_tick_proof_create_async" ;
           let create_proof () =
             Backend.Tick.Proof.create_async ~primary:public_inputs
