@@ -3859,7 +3859,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       List.fold_left ~init:(fee_excess, supply_increase, stake_change, [], [])
         zkapp_commands_with_context
         ~f:(fun
-             (fee_excess, supply_increase, _stake_change (* chaining not needed: statement uses target-source diff *), will_succeeds_rev, statess_rev)
+             ( fee_excess
+             , supply_increase
+             , stake_change
+             , will_succeeds_rev
+             , statess_rev )
              ( _
              , _
              , first_pass_ledger
@@ -3878,7 +3882,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               Sparse_ledger.apply_zkapp_first_pass_unchecked_with_states
                 ~signature_kind ~first_pass_ledger ~second_pass_ledger
                 ~constraint_constants ~global_slot ~state_view ~fee_excess
-                ~supply_increase zkapp_command
+                ~supply_increase ~stake_change zkapp_command
               |> Or_error.ok_exn
             in
             Sparse_ledger.apply_zkapp_second_pass_unchecked_with_states

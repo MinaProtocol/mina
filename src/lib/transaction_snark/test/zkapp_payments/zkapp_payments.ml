@@ -191,6 +191,35 @@ let%test_module "Zkapp payments tests" =
                       Ledger.set ledger loc { acct with delegate = Some pk } ) ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
+    let%test_unit "Consecutive zkapps-based payments with staked accounts" =
+      let open Mina_transaction_logic.For_tests in
+      Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let zkapp_commands =
+                    List.map
+                      ~f:(fun s ->
+                        account_update_send ~double_sender_nonce:false s )
+                      specs
+                  in
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  Array.iter init_ledger ~f:(fun (kp, _) ->
+                      let pk =
+                        Signature_lib.Public_key.compress kp.public_key
+                      in
+                      let aid = Account_id.create pk Token_id.default in
+                      let loc =
+                        Ledger.location_of_account ledger aid
+                        |> Option.value_exn
+                      in
+                      let acct =
+                        Ledger.get ledger loc |> Option.value_exn
+                      in
+                      Ledger.set ledger loc { acct with delegate = Some pk } ) ;
+                  U.check_zkapp_command_with_merges_exn ledger zkapp_commands ) ) )
+
     let%test_unit "Consecutive zkapps-based payments" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->

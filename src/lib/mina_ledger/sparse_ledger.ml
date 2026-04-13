@@ -133,10 +133,11 @@ let apply_transactions ~constraint_constants ~global_slot ~txn_state_view =
        ~txn_state_view )
 
 let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
-    ~global_slot ~state_view ~fee_excess ~supply_increase ~first_pass_ledger
-    ~second_pass_ledger c =
+    ~global_slot ~state_view ~fee_excess ~supply_increase ~stake_change
+    ~first_pass_ledger ~second_pass_ledger c =
   T.apply_zkapp_command_first_pass_aux ~constraint_constants ~global_slot
-    ~state_view ~fee_excess ~supply_increase (ref first_pass_ledger) c ~init:[]
+    ~state_view ~fee_excess ~supply_increase ~stake_change
+    (ref first_pass_ledger) c ~init:[]
     ~f:(fun
          acc
          ( { first_pass_ledger

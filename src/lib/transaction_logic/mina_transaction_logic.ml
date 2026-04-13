@@ -165,6 +165,7 @@ module type S = sig
           -> 'acc )
     -> ?fee_excess:Amount.Signed.t
     -> ?supply_increase:Amount.Signed.t
+    -> ?stake_change:Amount.Signed.t
     -> ledger
     -> Zkapp_command.t
     -> (Transaction_partially_applied.Zkapp_command_partially_applied.t * 'acc)
@@ -1626,7 +1627,8 @@ module Make (L : Ledger_intf.S) :
       ?((* TODO: can this be ripped out from here? *)
         fee_excess = Amount.Signed.zero)
       ?((* TODO: is the right? is it never used for zkapps? *)
-        supply_increase = Amount.Signed.zero) (ledger : L.t)
+        supply_increase = Amount.Signed.zero)
+      ?(stake_change = Amount.Signed.zero) (ledger : L.t)
       (command : Zkapp_command.t) :
       ( Transaction_partially_applied.Zkapp_command_partially_applied.t
       * user_acc )
@@ -1654,7 +1656,7 @@ module Make (L : Ledger_intf.S) :
             L.empty ~depth:0 ()
         ; fee_excess
         ; supply_increase
-        ; stake_change = Currency.Amount.Signed.zero
+        ; stake_change
         ; block_global_slot = global_slot
         }
       , { stack_frame =
