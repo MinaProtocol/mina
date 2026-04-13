@@ -981,7 +981,7 @@ module NodeStatusReport = struct
         in
         process_ref := Some process ;
         (* 3. Wait for bootstrap *)
-        let%bind result = Daemon.Client.wait_for_bootstrap process.client () in
+        let%bind result = Daemon.wait_for_node_init process in
         match result with
         | Error e ->
             let () = printf "Error:\n%s\n" (Error.to_string_hum e) in
