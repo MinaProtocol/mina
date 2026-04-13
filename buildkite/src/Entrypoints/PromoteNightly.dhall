@@ -81,6 +81,12 @@ let promote_nightly =
                     ++  " --only-dockers"
                   )
 
+          let updateGarWhitelistCmd =
+                Cmd.run
+                  (     ". ./buildkite/scripts/export-git-env-vars.sh && "
+                    ++  "./scripts/docker/update-gar-whitelist.sh"
+                  )
+
           let pipeline =
                 Pipeline.build
                   Pipeline.Config::{
@@ -98,6 +104,7 @@ let promote_nightly =
                             # [ buildGoBinaryCmd ]
                             # [ publishDebiansCmd ]
                             # [ publishDockersCmd ]
+                            # [ updateGarWhitelistCmd ]
                         , label = "Promote Nightly (${branch}/${profile})"
                         , key = "promote-nightly-${branch}-${profile}"
                         , target = Size.Small
