@@ -33,6 +33,9 @@ export ERROR_ON_PROOF=true
 # A clean is needed before --force to avoid symlink race conditions where parallel
 # rebuilds of shared dependencies (e.g. Rust/kimchi) collide on stale build artifacts.
 FORCE_FLAG=""
+# Note: We check BUILDKITE_PULL_REQUEST rather than BUILDKITE because both PR
+# and nightly builds run under Buildkite. We only want --force on nightlies —
+# forcing full recompilation on every PR build would waste CI time.
 if [ -n "${DUNE_INSTRUMENT_WITH}" ] && [ "${BUILDKITE_PULL_REQUEST:-false}" = "false" ]; then
     echo "--- Coverage instrumentation detected on non-PR build, forcing full recompilation"
     echo "--- Cleaning build directory to avoid symlink races under --force"
