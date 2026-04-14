@@ -262,6 +262,7 @@ on-exit() {
   esac
 
   echo "Completed shutdown phase of mina local network"
+  exit 0
 }
 
 trap on-exit TERM INT
@@ -1279,7 +1280,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_INTERVAL} seconds"
   printf "\n"
 
-  if ${ZKAPP_TRANSACTIONS}; then
+  if ${ZKAPP_TRANSACTIONS} && ! config_mode_is_inherit "${CONFIG_MODE}"; then
     echo "Set up zkapp account"
     printf "\n"
 
@@ -1291,12 +1292,22 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     ${MINA_EXE} account import -rest-server ${REST_SERVER} -privkey-path "${KEY_FILE}"
     ${MINA_EXE} account unlock -rest-server ${REST_SERVER} -public-key "${PUB_KEY}"
 
-    sleep "${TRANSACTION_INTERVAL}"
-    ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver "${PUB_KEY}" -sender "${PUB_KEY}"
+    if ! config_mode_is_inherit "${CONFIG_MODE}"; then
+      sleep "${TRANSACTION_INTERVAL}"
+      ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver "${PUB_KEY}" -sender "${PUB_KEY}"
+    fi
   fi
 
-  fee_payer_nonce=1
-  sender_nonce=1
+  FEE_PAYER_PUB_KEY=$(cat "${FEE_PAYER_KEY_FILE}.pub")
+  SENDER_PUB_KEY=$(cat "${SENDER_KEY_FILE}.pub")
+
+  fee_payer_nonce=$(curl -sS -g -X POST -H "Content-Type: application/json" \
+    -d "{\"query\":\"query { account(publicKey: \\\"${FEE_PAYER_PUB_KEY}\\\") { inferredNonce } }\"}" \
+    "${REST_SERVER}" | jq -r '.data.account.inferredNonce // 0')
+
+  sender_nonce=$(curl -sS -g -X POST -H "Content-Type: application/json" \
+    -d "{\"query\":\"query { account(publicKey: \\\"${SENDER_PUB_KEY}\\\") { inferredNonce } }\"}" \
+    "${REST_SERVER}" | jq -r '.data.account.inferredNonce // 0')
   state=0
 
   # TODO: simulate scripts/hardfork/run-localnet.sh to send txns to everyone in the ledger.

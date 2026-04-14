@@ -25,7 +25,6 @@ ENV OPAMREUSEBUILDDIR false
 # Limit logs for opam install errors to 20 lines per error
 ENV OPAMERRLOGLEN 20
 
-ENV GIT_LFS_SKIP_SMUDGE 1
 
 
 USER opam

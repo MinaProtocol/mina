@@ -241,14 +241,21 @@ let () =
       Alcotest_async.run "Mina Ledger"
         [ ( "Root"
           , [ Alcotest_async.test_case
+                ~timeout:(Core.Time.Span.of_sec 30.)
                 "closing stable root, reload as converting" `Quick
                 (Root_test.test_stable_backing_compatible_with_converting
                    ~random )
-            ; Alcotest_async.test_case "moving a root" `Quick
+            ; Alcotest_async.test_case
+                ~timeout:(Core.Time.Span.of_sec 30.)
+                "moving a root" `Quick
                 (Root_test.test_root_moving ~random)
-            ; Alcotest_async.test_case "make checkpointing a root" `Quick
+            ; Alcotest_async.test_case
+                ~timeout:(Core.Time.Span.of_sec 30.)
+                "make checkpointing a root" `Quick
                 (Root_test.test_root_make_checkpointing ~random)
-            ; Alcotest_async.test_case "make converting a root" `Quick
+            ; Alcotest_async.test_case
+                ~timeout:(Core.Time.Span.of_sec 30.)
+                "make converting a root" `Quick
                 (Root_test.test_root_make_converting ~random)
             ] )
         ] )
