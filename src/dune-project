@@ -97,6 +97,8 @@
 (package (name mina_graphql))
 (package (name mina_graphql_client))
 (package (name mina_graphql_client_app))
+(package (name mina_healthcheck))
+(package (name mina_healthcheck_lib))
 (package (name mina_incremental))
 (package (name mina_intf))
 (package (name mina_ledger))

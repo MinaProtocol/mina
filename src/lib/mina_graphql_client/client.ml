@@ -852,3 +852,86 @@ let get_detailed_best_chain ?max_length ~logger node_uri =
                ; slot_since_genesis =
                    block.protocolState.consensusState.slotSinceGenesis
                } )
+
+(** Convert the graphql_ppx sync status variant to [Sync_status.t]. *)
+let parse_sync_status = function
+  | `SYNCED ->
+      `Synced
+  | `BOOTSTRAP ->
+      `Bootstrap
+  | `CATCHUP ->
+      `Catchup
+  | `CONNECTING ->
+      `Connecting
+  | `LISTENING ->
+      `Listening
+  | `OFFLINE ->
+      `Offline
+
+(** Get the node's sync status. *)
+let get_sync_status ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting sync status"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Sync_status.(make @@ makeVariables ()) in
+  let%map result =
+    exec_graphql_request ~logger ~node_uri ~query_name:"sync_status" query_obj
+  in
+  parse_sync_status result.syncStatus
+
+(** Get comprehensive daemon status including sync state, chain heights,
+    uptime, commit, and connected peers. *)
+let get_daemon_status ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Getting daemon status"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Daemon_status.(make @@ makeVariables ()) in
+  let%map result =
+    exec_graphql_request ~logger ~node_uri ~query_name:"daemon_status" query_obj
+  in
+  let ds = result.daemonStatus in
+  let peers =
+    ds.peers |> Array.to_list
+    |> List.map ~f:(fun (p : Queries.Daemon_status.t_daemonStatus_peers) ->
+           { Types.peer_id = p.peerId; host = p.host; port = p.libp2pPort } )
+  in
+  Types.
+    { sync_status = parse_sync_status ds.syncStatus
+    ; blockchain_length = ds.blockchainLength
+    ; highest_block_length_received = Some ds.highestBlockLengthReceived
+    ; uptime_secs = Some ds.uptimeSecs
+    ; state_hash = ds.stateHash
+    ; commit_id = Some ds.commitId
+    ; peer_count = List.length peers
+    ; peers
+    }
+
+(** Check readiness: synced, peer count above threshold, chain caught up. *)
+let get_readiness ~logger node_uri ~min_peers =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Checking readiness"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let query_obj = Queries.Daemon_readiness.(make @@ makeVariables ()) in
+  let%map result =
+    exec_graphql_request ~logger ~node_uri ~query_name:"daemon_readiness"
+      query_obj
+  in
+  let ds = result.daemonStatus in
+  let sync_status = parse_sync_status ds.syncStatus in
+  let peer_count = Array.length ds.peers in
+  let is_synced = Sync_status.equal sync_status `Synced in
+  let has_peers = peer_count >= min_peers in
+  let chain_ok =
+    match ds.blockchainLength with
+    | Some cl ->
+        cl = ds.highestBlockLengthReceived
+    | None ->
+        false
+  in
+  Types.
+    { ready = is_synced && has_peers && chain_ok
+    ; sync_status
+    ; peer_count
+    ; blockchain_length = ds.blockchainLength
+    ; highest_block_length_received = Some ds.highestBlockLengthReceived
+    }

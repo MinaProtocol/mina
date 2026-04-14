@@ -1,0 +1,19 @@
+(executable
+ (name mina_healthcheck)
+ (package mina_healthcheck)
+ (public_name mina-healthcheck)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  async_unix
+  core
+  uri
+  yojson
+  ;; local libraries
+  logger
+  sync_status
+  mina_graphql_client
+  mina_healthcheck_lib)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_jane ppx_mina)))

@@ -1,0 +1,17 @@
+(library
+ (name mina_healthcheck_lib)
+ (public_name mina_healthcheck_lib)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  core
+  uri
+  yojson
+  ppx_deriving_yojson.runtime
+  ;; local libraries
+  logger
+  sync_status
+  mina_graphql_client)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_jane ppx_mina ppx_deriving_yojson)))
