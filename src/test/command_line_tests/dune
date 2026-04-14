@@ -17,7 +17,9 @@
   init
   mina_automation
   mina_automation.fixture
-  mina_automation.runner)
+  mina_automation.runner
+  mina_healthcheck_lib
+  sync_status)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

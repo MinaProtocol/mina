@@ -882,6 +882,81 @@ module PeerListUrlValidHttps = struct
                    (Core.Signal.to_string signal) ) ) )
 end
 
+(** Healthcheck integration test: starts a daemon, verifies healthcheck
+    reports NOT ready before bootstrap, uses healthcheck_lib to wait for
+    the daemon to become ready, then verifies all checks pass. *)
+module HealthcheckBootstrapLifecycle = struct
+  module HC = Mina_healthcheck_lib
+
+  let hc_logger = Logger.create ()
+
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let start_daemon (test : t) =
+    let daemon = Daemon.of_config test.config in
+    let%bind () = Daemon.Config.generate_keys test.config in
+    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+    let%bind () =
+      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+    in
+    let%map _process = Daemon.start daemon in
+    Uri.make ~scheme:"http" ~host:"localhost" ~port:test.config.rest_port
+      ~path:"/graphql" ()
+
+  let assert_not_ready node_uri =
+    let%map pre = HC.check_readiness ~logger:hc_logger node_uri ~min_peers:0 in
+    let not_ready = match pre with Error _ -> true | Ok r -> not r.ready in
+    eprintf "Pre-bootstrap not_ready=%b\n" not_ready ;
+    Ok ()
+
+  let assert_synced node_uri =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind ds = HC.get_daemon_status ~logger:hc_logger node_uri in
+    eprintf "Post-bootstrap sync=%s peers=%d\n"
+      (Sync_status.to_string ds.sync_status)
+      ds.peer_count ;
+    if not (Sync_status.equal ds.sync_status `Synced) then
+      Deferred.Or_error.errorf "expected SYNCED, got %s"
+        (Sync_status.to_string ds.sync_status)
+    else Deferred.Or_error.return ()
+
+  let test_case (test : t) =
+    let open Mina_automation_fixture.Intf in
+    let run () =
+      let open Deferred.Or_error.Let_syntax in
+      let%bind node_uri = Deferred.map (start_daemon test) ~f:Or_error.return in
+      let%bind _initial =
+        HC.wait_for_graphql ~logger:hc_logger node_uri ~timeout:120 ~interval:5
+      in
+      let%bind () = assert_not_ready node_uri in
+      let%bind _ready =
+        HC.wait_for_ready ~logger:hc_logger node_uri ~min_peers:0 ~timeout:300
+          ~interval:5
+      in
+      assert_synced node_uri
+    in
+    match%map run () with Ok () -> Passed | Error e -> Failed e
+end
+
+(** Healthcheck negative test: verifies failure for unreachable daemon. *)
+module HealthcheckUnreachable = struct
+  module HC = Mina_healthcheck_lib
+
+  let hc_logger = Logger.create ()
+
+  type t = Mina_automation_fixture.Daemon.before_bootstrap
+
+  let test_case (_test : t) =
+    let unreachable_uri = Uri.of_string "http://127.0.0.1:1/graphql" in
+    let%map result = HC.get_sync_status ~logger:hc_logger unreachable_uri in
+    match result with
+    | Error _ ->
+        Mina_automation_fixture.Intf.Passed
+    | Ok _ ->
+        Mina_automation_fixture.Intf.Failed
+          (Error.of_string "expected failure for unreachable daemon")
+end
+
 let () =
   let open Alcotest in
   run "Test commadline."
@@ -1012,5 +1087,21 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (PeerListUrlHttpWarning) ) )
+        ] )
+    ; ( "healthcheck"
+      , [ test_case
+            "Healthcheck reports not-ready before bootstrap, then ready after"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (HealthcheckBootstrapLifecycle) ) )
+        ] )
+    ; ( "healthcheck-unreachable"
+      , [ test_case "Healthcheck reports failure for unreachable daemon" `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithoutBootstrap
+                          (HealthcheckUnreachable) ) )
         ] )
     ]
