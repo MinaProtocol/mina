@@ -535,22 +535,32 @@ struct
               let index_sponge = Sponge.copy sponge_after_index in
               Sponge.squeeze_field index_sponge )
         in
+        (* === IVP TRACE: emit solve-time values of each sponge input, so
+           PureScript's matching [ivp.trace.*] traces can be diffed against
+           these to find the first divergence in the in-circuit sponge. *)
+        as_prover
+          As_prover.(
+            fun () ->
+              Pickles_trace.tick_field "ivp.trace.index_digest"
+                (read_var index_digest)) ;
         absorb sponge Field index_digest ;
         (* == IVC Step 2: Absorb the previous challenge polynomial commitments ==
-           The sg_old values are commitments to the challenge polynomials b(X)
-           from previous proofs. These commitments are the core recursion
-           accumulators - they encode the accumulated IPA verification state
-           from all previous proofs. Absorbing them into the transcript binds
-           this proof to its predecessors. Padded to a fixed length to support
-           variable numbers of previous proofs. *)
+           ... *)
         let sg_old : (_, Wrap_hack.Padded_length.n) Vector.t =
           Wrap_hack.Checked.pad_commitments sg_old
         in
+        List.iteri (Vector.to_list sg_old) ~f:(fun i (x, y) ->
+            as_prover
+              As_prover.(
+                fun () ->
+                  Pickles_trace.tick_field
+                    (Printf.sprintf "ivp.trace.sg_old.%d.x" i)
+                    (read_var x) ;
+                  Pickles_trace.tick_field
+                    (Printf.sprintf "ivp.trace.sg_old.%d.y" i)
+                    (read_var y)) ) ;
         Vector.iter ~f:(absorb sponge PC) sg_old ;
-        (* == IVC Step 3: Compute public input commitment (x_hat) ==
-           Compute the commitment to the public input polynomial using
-           Lagrange basis. For known domains, use precomputed Lagrange
-           commitments. For side-loaded, compute dynamically. *)
+        (* == IVC Step 3: Compute public input commitment (x_hat) == *)
         let x_hat =
           with_label "x_hat" (fun () ->
               match domain with
@@ -567,22 +577,46 @@ struct
                        [ 0; 1; 2 ] )
                     ~public_input )
         in
-        (* == IVC Step 4: Apply blinding to x_hat ==
-           Commitments always include a blinding factor (adding generator H).
-           We add H to x_hat to match this convention. *)
+        (* == IVC Step 4: Apply blinding to x_hat == *)
         let x_hat =
           with_label "x_hat blinding" (fun () ->
               Ops.add_fast x_hat
                 (Inner_curve.constant (Lazy.force Generators.h)) )
         in
+        ( let xh_x, xh_y = x_hat in
+          as_prover
+            As_prover.(
+              fun () ->
+                Pickles_trace.tick_field "ivp.trace.xhat.x" (read_var xh_x) ;
+                Pickles_trace.tick_field "ivp.trace.xhat.y" (read_var xh_y)) ) ;
         (* == IVC Step 5: Absorb x_hat and witness commitments == *)
         absorb sponge PC x_hat ;
         (* Absorb witness polynomial commitments *)
         let w_comm = messages.w_comm in
+        List.iteri (Vector.to_list w_comm) ~f:(fun i arr ->
+            (* Chunked commitment: each entry is an array of points.
+               For non-chunked circuits (num_chunks=1) the array has
+               exactly one element — trace that. *)
+            match[@warning "-4"] arr with
+            | [| (x, y) |] ->
+                as_prover
+                  As_prover.(
+                    fun () ->
+                      Pickles_trace.tick_field
+                        (Printf.sprintf "ivp.trace.w_comm.%d.x" i)
+                        (read_var x) ;
+                      Pickles_trace.tick_field
+                        (Printf.sprintf "ivp.trace.w_comm.%d.y" i)
+                        (read_var y))
+            | _ ->
+                () ) ;
         Vector.iter ~f:absorb_g w_comm ;
-        (* == IVC Step 6: Sample beta and gamma challenges ==
-           These challenges are used in the permutation argument. *)
+        (* == IVC Step 6: Sample beta and gamma challenges == *)
         let beta = squeeze_challenge sponge in
+        as_prover
+          As_prover.(
+            fun () ->
+              Pickles_trace.tick_field "ivp.trace.beta_squeezed" (read_var beta)) ;
         let gamma = squeeze_challenge sponge in
         (* == IVC Step 7: Absorb permutation commitment (z_comm) == *)
         let z_comm = receive without z_comm in
