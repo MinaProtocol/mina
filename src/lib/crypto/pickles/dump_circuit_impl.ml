@@ -3719,8 +3719,14 @@ let step_main_simple_chain () =
     { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 14 }
   in
   let step_domains =
+    (* `Fix_domains.domains` for Simple_chain N1's small inductive rule
+       returns 14 in production (verified via iter 7 trace emission at
+       compile.ml's `step_vks` site). Earlier this was hardcoded to 16
+       which produced a JSON fixture that didn't match the production
+       compile path — the synthetic-vs-production gap masked a real bug
+       in the SimpleChain end-to-end test. *)
     Vector.singleton
-      { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 16 }
+      { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 14 }
   in
   let basic : _ Types_map.Compiled.basic =
     { public_input = Field.typ

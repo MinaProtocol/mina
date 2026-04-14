@@ -631,16 +631,86 @@ struct
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (let step_keypairs = V.f prev_varss_length step_keypairs in
-         let%map.Promise () =
+         let%bind.Promise () =
            (* Wait for keypair promises to resolve. *)
            Vector.fold ~init:(Promise.return ()) step_keypairs
              ~f:(fun acc (_, vk) ->
                let%bind.Promise _ = Lazy.force vk in
                acc )
          in
-         Vector.map step_keypairs ~f:(fun (_, vk) ->
-             Tick.Keypair.full_vk_commitments
-               (fst (Option.value_exn @@ Promise.peek @@ Lazy.force vk)) ) )
+         let vks =
+           Vector.map step_keypairs ~f:(fun (_, vk) ->
+               Tick.Keypair.full_vk_commitments
+                 (fst (Option.value_exn @@ Promise.peek @@ Lazy.force vk)) )
+         in
+         (* === TRACE iter 7 (a): compiled step VK domain log_size_of_group ===
+            The actual kimchi domain the step circuit was compiled to (= output
+            of Fix_domains.domains for the step rule). For Simple_chain this is
+            what `branch_data.domain_log2` should equal at solve time per
+            wrap.ml:257-259 (`step_vk.domain.log_size_of_group`). *)
+         List.iteri (Vector.to_list step_keypairs) ~f:(fun i (_, vk_lazy) ->
+             let vi =
+               fst (Option.value_exn @@ Promise.peek @@ Lazy.force vk_lazy)
+             in
+             Pickles_trace.int
+               ("compile.stepVK." ^ Int.to_string i ^ ".log_size_of_group")
+               vi.domain.log_size_of_group ) ;
+         (* === TRACE iter 7 (b): step_domains.h log2 from the basic record ===
+            This is what `Fix_domains.domains` returned for each branch of the
+            step rule. It feeds into Types_map.For_step.t.step_domains and
+            (eventually) into step_verifier.domain_for_compiled. Should match
+            (a) byte-for-byte; if not, there's a divergence between the
+            compiled VK's domain and the metadata Pickles carries about it. *)
+         let%map.Promise step_domains_resolved = all_step_domains in
+         List.iteri
+           (Vector.to_list step_domains_resolved)
+           ~f:(fun i { Import.Domains.h } ->
+             Pickles_trace.int
+               ("compile.step_domains." ^ Int.to_string i ^ ".h.log2")
+               (Pickles_base.Domain.log2_size h) ) ;
+         (* === TRACE iter 6: compiled step VK commitments, dumped at the
+            point where they're consumed by Wrap_main.wrap_main. First
+            branch only (Simple_chain has a single branch); mirrors the
+            PS side's `extractStepVKComms stepCR.verifierIndex` emission
+            in `Test.Pickles.Prove.SimpleChain`. Step proofs commit on
+            Vesta, so step VK commitments are Vesta points with Fq
+            (Tock) coordinates — hence `tock_field`. *)
+         ( match Vector.to_list vks with
+         | [] ->
+             ()
+         | first_vk :: _ ->
+             let trace_point_arr label (arr : Backend.Tock.Inner_curve.Affine.t array) =
+               match arr with
+               | [| (x, y) |] ->
+                   Pickles_trace.tock_field (label ^ ".x") x ;
+                   Pickles_trace.tock_field (label ^ ".y") y
+               | _ ->
+                   Array.iteri arr ~f:(fun i (x, y) ->
+                       let ix = label ^ "." ^ Int.to_string i in
+                       Pickles_trace.tock_field (ix ^ ".x") x ;
+                       Pickles_trace.tock_field (ix ^ ".y") y )
+             in
+             List.iteri
+               (Pickles_types.Vector.to_list first_vk.sigma_comm)
+               ~f:(fun i pt ->
+                 trace_point_arr
+                   ("compile.stepVK.sigma." ^ Int.to_string i)
+                   pt ) ;
+             List.iteri
+               (Pickles_types.Vector.to_list first_vk.coefficients_comm)
+               ~f:(fun i pt ->
+                 trace_point_arr
+                   ("compile.stepVK.coeff." ^ Int.to_string i)
+                   pt ) ;
+             trace_point_arr "compile.stepVK.generic" first_vk.generic_comm ;
+             trace_point_arr "compile.stepVK.psm" first_vk.psm_comm ;
+             trace_point_arr "compile.stepVK.complete_add"
+               first_vk.complete_add_comm ;
+             trace_point_arr "compile.stepVK.mul" first_vk.mul_comm ;
+             trace_point_arr "compile.stepVK.emul" first_vk.emul_comm ;
+             trace_point_arr "compile.stepVK.endomul_scalar"
+               first_vk.endomul_scalar_comm ) ;
+         vks )
     in
     Timer.clock __LOC__ ;
     let wrap_requests, wrap_main =

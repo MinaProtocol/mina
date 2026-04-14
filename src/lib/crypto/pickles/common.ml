@@ -51,6 +51,118 @@ let hash_messages_for_next_step_proof ~app_state
          Array.concat_map x ~f:(fun x -> Array.of_list (g x)) )
        ~app_state )
 
+(** Tracing variant of [hash_messages_for_next_step_proof]. Emits one
+    trace line per input field element in hashing order, under the
+    [msgForNextStep.*] label namespace. Uses [Pickles_trace.tick_field]
+    so values are identical to what the PureScript [Pickles.Trace]
+    helper emits on its side. Labels follow:
+
+      msgForNextStep.vk.sigma.{0..6}.{x,y}
+      msgForNextStep.vk.coeff.{0..14}.{x,y}
+      msgForNextStep.vk.generic.{x,y}
+      msgForNextStep.vk.psm.{x,y}
+      msgForNextStep.vk.complete_add.{x,y}
+      msgForNextStep.vk.mul.{x,y}
+      msgForNextStep.vk.emul.{x,y}
+      msgForNextStep.vk.endomul_scalar.{x,y}
+      msgForNextStep.app_state.{0..}
+      msgForNextStep.prev.{i}.sg.{x,y}
+      msgForNextStep.prev.{i}.bp_chal.{0..}
+      msgForNextStep.final_digest
+
+    Expected to be called only from [step.ml:expand_proof] during the
+    Simple_chain trace-diff run; other call sites continue to use the
+    non-traced variant above so this doesn't pollute the trace with
+    values from unrelated calls. *)
+let hash_messages_for_next_step_proof_traced ~app_state
+    (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) =
+  let g (x, y) = [ x; y ] in
+  let { Types.Step.Proof_state.Messages_for_next_step_proof.app_state = s
+      ; dlog_plonk_index
+      ; challenge_polynomial_commitments
+      ; old_bulletproof_challenges
+      } =
+    t
+  in
+  let { Plonk_verification_key_evals.sigma_comm
+      ; coefficients_comm
+      ; generic_comm
+      ; psm_comm
+      ; complete_add_comm
+      ; mul_comm
+      ; emul_comm
+      ; endomul_scalar_comm
+      } =
+    dlog_plonk_index
+  in
+  (* Each VK commitment is a [Tock.Curve.Affine.t array] (chunked
+     commitment). For the standard (unchunked) pickles config every
+     array has a single element, which the PureScript side assumes.
+     Trace a single-element array as [label.{x,y}]; if chunking is ever
+     enabled, a trace diff will surface the mismatch immediately. *)
+  let trace_point_arr label (arr : Tock.Curve.Affine.t array) =
+    match arr with
+    | [| (x, y) |] ->
+        Pickles_trace.tick_field (label ^ ".x") x ;
+        Pickles_trace.tick_field (label ^ ".y") y
+    | _ ->
+        Array.iteri arr ~f:(fun i (x, y) ->
+            let ix = label ^ "." ^ Int.to_string i in
+            Pickles_trace.tick_field (ix ^ ".x") x ;
+            Pickles_trace.tick_field (ix ^ ".y") y )
+  in
+  (* sigma_comm: Vector_7 *)
+  List.iteri (Pickles_types.Vector.to_list sigma_comm) ~f:(fun i pt ->
+      trace_point_arr
+        ("msgForNextStep.vk.sigma." ^ Int.to_string i)
+        pt ) ;
+  (* coefficients_comm: Vector_15 *)
+  List.iteri
+    (Pickles_types.Vector.to_list coefficients_comm)
+    ~f:(fun i pt ->
+      trace_point_arr
+        ("msgForNextStep.vk.coeff." ^ Int.to_string i)
+        pt ) ;
+  trace_point_arr "msgForNextStep.vk.generic" generic_comm ;
+  trace_point_arr "msgForNextStep.vk.psm" psm_comm ;
+  trace_point_arr "msgForNextStep.vk.complete_add" complete_add_comm ;
+  trace_point_arr "msgForNextStep.vk.mul" mul_comm ;
+  trace_point_arr "msgForNextStep.vk.emul" emul_comm ;
+  trace_point_arr "msgForNextStep.vk.endomul_scalar" endomul_scalar_comm ;
+  (* app_state: flat Fp array *)
+  let app_state_fields = app_state s in
+  Array.iteri app_state_fields ~f:(fun i v ->
+      Pickles_trace.tick_field
+        ("msgForNextStep.app_state." ^ Int.to_string i)
+        v ) ;
+  (* per-proof: challenge_polynomial_commitment + old_bulletproof_challenges *)
+  let prev_commits =
+    Pickles_types.Vector.to_list challenge_polynomial_commitments
+  in
+  let prev_chals =
+    Pickles_types.Vector.to_list old_bulletproof_challenges
+  in
+  List.iteri (List.zip_exn prev_commits prev_chals)
+    ~f:(fun i ((cx, cy), chals) ->
+      let pfx = "msgForNextStep.prev." ^ Int.to_string i in
+      Pickles_trace.tick_field (pfx ^ ".sg.x") cx ;
+      Pickles_trace.tick_field (pfx ^ ".sg.y") cy ;
+      Array.iteri (Pickles_types.Vector.to_array chals) ~f:(fun j c ->
+          Pickles_trace.tick_field
+            (pfx ^ ".bp_chal." ^ Int.to_string j)
+            c ) ) ;
+  let digest =
+    Tick_field_sponge.digest Tick_field_sponge.params
+      (Types.Step.Proof_state.Messages_for_next_step_proof.to_field_elements t
+         ~g
+         ~comm:(fun (x : Tock.Curve.Affine.t array) ->
+           Array.concat_map x ~f:(fun x -> Array.of_list (g x)) )
+         ~app_state )
+  in
+  Pickles_trace.tick_field "msgForNextStep.final_digest"
+    (Digest.Constant.to_tick_field digest) ;
+  digest
+
 let when_profiling profiling default =
   match Option.map (Sys.getenv_opt "PICKLES_PROFILING") ~f:String.lowercase with
   | None | Some ("0" | "false") ->

@@ -316,6 +316,29 @@ val hash_messages_for_next_step_proof :
      Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
   -> Import.Types.Digest.Constant.t
 
+(** Tracing variant of {!hash_messages_for_next_step_proof}. Emits one
+    trace line per input field element under the [msgForNextStep.*]
+    label namespace via {!Pickles_trace.tick_field}, then computes and
+    returns the digest identically to the non-traced version.
+
+    Expected to be called only from [step.ml:expand_proof] during the
+    Simple_chain trace-diff run. Other call sites of the base hash
+    function keep using that version so the trace file isn't polluted
+    with unrelated values. *)
+val hash_messages_for_next_step_proof_traced :
+     app_state:('a -> Kimchi_pasta.Basic.Fp.Stable.Latest.t Core_kernel.Array.t)
+  -> ( Backend.Tock.Curve.Affine.t array
+     , 'a
+     , ( Kimchi_pasta.Basic.Fp.Stable.Latest.t
+         * Kimchi_pasta.Basic.Fp.Stable.Latest.t
+       , 'n )
+       Pickles_types.Vector.t
+     , ( (Kimchi_pasta.Basic.Fp.Stable.Latest.t, 'm) Pickles_types.Vector.t
+       , 'n )
+       Pickles_types.Vector.t )
+     Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
+  -> Import.Types.Digest.Constant.t
+
 (** {2 Public Input Conversion} *)
 
 (** [tick_public_input_of_statement ~max_proofs_verified statement] converts

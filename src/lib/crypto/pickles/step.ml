@@ -148,6 +148,15 @@ struct
       in
       let proof = Wrap_wire_proof.to_kimchi_proof t.proof in
       let plonk0 = t.statement.proof_state.deferred_values.plonk in
+      (* === TRACE Stage 1: Ro-derived dummy plonk0 === *)
+      Pickles_trace.tick_field "expand_proof.plonk0.alpha.raw"
+        (Challenge.Constant.to_tick_field plonk0.alpha.inner) ;
+      Pickles_trace.tick_field "expand_proof.plonk0.beta"
+        (Challenge.Constant.to_tick_field plonk0.beta) ;
+      Pickles_trace.tick_field "expand_proof.plonk0.gamma"
+        (Challenge.Constant.to_tick_field plonk0.gamma) ;
+      Pickles_trace.tick_field "expand_proof.plonk0.zeta.raw"
+        (Challenge.Constant.to_tick_field plonk0.zeta.inner) ;
       let plonk =
         let domain =
           Branch_data.domain t.statement.proof_state.deferred_values.branch_data
@@ -239,6 +248,35 @@ struct
             statement.messages_for_next_step_proof.old_bulletproof_challenges
           ~zk_rows:data.zk_rows ~proof_state:statement.proof_state
       in
+      (* === TRACE Stage 2: expand_deferred outputs (Type1 shifted values) === *)
+      ( let dvc = deferred_values_computed in
+        let (Shifted_value.Type1.Shifted_value cip) =
+          dvc.combined_inner_product
+        in
+        let (Shifted_value.Type1.Shifted_value b_v) = dvc.b in
+        let (Shifted_value.Type1.Shifted_value perm_v) = dvc.plonk.perm in
+        let (Shifted_value.Type1.Shifted_value zsrs_v) =
+          dvc.plonk.zeta_to_srs_length
+        in
+        let (Shifted_value.Type1.Shifted_value zds_v) =
+          dvc.plonk.zeta_to_domain_size
+        in
+        Pickles_trace.tick_field "expand_proof.deferred.combined_inner_product"
+          cip ;
+        Pickles_trace.tick_field "expand_proof.deferred.b" b_v ;
+        let sc =
+          SC.to_field_constant
+            (module Tick.Field)
+            ~endo:Endo.Wrap_inner_curve.scalar
+        in
+        Pickles_trace.tick_field "expand_proof.deferred.xi" (sc dvc.xi) ;
+        Pickles_trace.tick_field "expand_proof.deferred.plonk.perm" perm_v ;
+        Pickles_trace.tick_field
+          "expand_proof.deferred.plonk.zetaToSrsLength" zsrs_v ;
+        Pickles_trace.tick_field
+          "expand_proof.deferred.plonk.zetaToDomainSize" zds_v ;
+        Pickles_trace.int "expand_proof.deferred.branch_data.domain_log2"
+          (Domain.log2_size (Branch_data.domain dvc.branch_data)) ) ;
       let prev_statement_with_hashes :
           ( _
           , _
@@ -258,7 +296,11 @@ struct
                fun x -> fst (typ.value_to_fields x)
              in
              (* TODO: Only do this hashing when necessary *)
-             Common.hash_messages_for_next_step_proof
+             (* Simple_chain trace-diff instrumentation: use the
+                traced variant here so per-input trace lines land in
+                the trace file. Other call sites keep the non-traced
+                version. *)
+             Common.hash_messages_for_next_step_proof_traced
                (Reduced_messages_for_next_proof_over_same_field.Step.prepare
                   ~dlog_plonk_index:dlog_index
                   statement.messages_for_next_step_proof )
@@ -295,12 +337,25 @@ struct
             }
         }
       in
+      (* === TRACE Stage 3: msgForNextStep + msgForNextWrap digests === *)
+      Pickles_trace.tick_field "expand_proof.msgForNextStep"
+        (Digest.Constant.to_tick_field
+           prev_statement_with_hashes.messages_for_next_step_proof) ;
+      Pickles_trace.tock_field "expand_proof.msgForNextWrap"
+        (Digest.Constant.to_tock_field
+           prev_statement_with_hashes.proof_state
+             .messages_for_next_wrap_proof) ;
       let module O = Tock.Oracles in
       let o =
         let public_input =
           tock_public_input_of_statement ~feature_flags
             prev_statement_with_hashes
         in
+        (* === TRACE Stage 4: full tock_public_input === *)
+        List.iteri public_input ~f:(fun i v ->
+            Pickles_trace.tock_field
+              (Printf.sprintf "tock_pi.%d" i)
+              v ) ;
         O.create dlog_vk
           ( Vector.map2
               (Vector.extend_front_exn
@@ -316,6 +371,17 @@ struct
           |> Wrap_hack.pad_accumulator )
           public_input proof
       in
+      (* === TRACE Stage 5: oracle outputs === *)
+      ( let alpha_sc : Tock.Field.t Kimchi_types.scalar_challenge = O.alpha o in
+        let zeta_sc : Tock.Field.t Kimchi_types.scalar_challenge = O.zeta o in
+        Pickles_trace.tock_field "expand_proof.oracles.beta" (O.beta o) ;
+        Pickles_trace.tock_field "expand_proof.oracles.gamma" (O.gamma o) ;
+        Pickles_trace.tock_field "expand_proof.oracles.alpha_chal"
+          alpha_sc.inner ;
+        Pickles_trace.tock_field "expand_proof.oracles.zeta_chal"
+          zeta_sc.inner ;
+        Pickles_trace.tock_field "expand_proof.oracles.fq_digest"
+          (O.digest_before_evaluations o) ) ;
       let ((x_hat_1, _x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
       let scalar_chal f =
         Scalar_challenge.map ~f:Challenge.Constant.of_tock_field (f o)
