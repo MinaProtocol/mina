@@ -91,6 +91,7 @@ Maintainer: Mina Protocol <test@example.com>
 Depends: libssl1.1, libffi7, mina-devnet-config (>=1.0)
 Replaces: mina-devnet (<< 1.0)
 Breaks: mina-devnet (<< 1.0)
+Conflicts: mina-devnet (<< 1.0)
 Description: Sample package for deb-session tests
 EOF
 
@@ -215,6 +216,11 @@ fi
 CURRENT_BREAKS=$(grep '^Breaks:' "$SESSION_DIR/control/control")
 if [[ "$CURRENT_BREAKS" != *"mina-devnet (<< 2.0.0-rc1)"* ]]; then
   fail "Breaks not updated with new version (got: $CURRENT_BREAKS)"
+fi
+
+CURRENT_CONFLICTS=$(grep '^Conflicts:' "$SESSION_DIR/control/control")
+if [[ "$CURRENT_CONFLICTS" != *"mina-devnet (<< 2.0.0-rc1)"* ]]; then
+  fail "Conflicts not updated with new version (got: $CURRENT_CONFLICTS)"
 fi
 
 # Verify non-versioned dependencies were NOT changed

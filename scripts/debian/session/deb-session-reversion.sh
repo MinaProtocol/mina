@@ -92,7 +92,7 @@ ESCAPED_OLD=$(sed 's/[.[\*^$/]/\\&/g' <<< "$OLD_VERSION")
 ESCAPED_NEW=$(sed 's/[&/]/\\&/g' <<< "$NEW_VERSION")
 
 DEP_CHANGED=0
-for FIELD in Depends Replaces Breaks; do
+for FIELD in Depends Replaces Breaks Conflicts; do
   if grep -q "^${FIELD}:.*${ESCAPED_OLD}" "$CONTROL_FILE"; then
     sed -i "/^${FIELD}:/s/${ESCAPED_OLD}/${ESCAPED_NEW}/g" "$CONTROL_FILE"
     DEP_CHANGED=1
@@ -106,4 +106,4 @@ fi
 
 echo ""
 echo "Updated control file:"
-grep -E "^(Package|Version|Architecture|Depends|Replaces|Breaks):" "$CONTROL_FILE" || true
+grep -E "^(Package|Version|Architecture|Depends|Replaces|Breaks|Conflicts):" "$CONTROL_FILE" || true
