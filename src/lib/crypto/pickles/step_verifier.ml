@@ -618,14 +618,37 @@ struct
             fun () ->
               Pickles_trace.tick_field "ivp.trace.beta_squeezed" (read_var beta)) ;
         let gamma = squeeze_challenge sponge in
+        as_prover
+          As_prover.(
+            fun () ->
+              Pickles_trace.tick_field "ivp.trace.gamma_squeezed" (read_var gamma)) ;
         (* == IVC Step 7: Absorb permutation commitment (z_comm) == *)
         let z_comm = receive without z_comm in
+        ( match[@warning "-4"] z_comm with
+        | [| (zx, zy) |] ->
+            as_prover
+              As_prover.(
+                fun () ->
+                  Pickles_trace.tick_field "ivp.trace.zcomm.x" (read_var zx) ;
+                  Pickles_trace.tick_field "ivp.trace.zcomm.y" (read_var zy))
+        | _ ->
+            () ) ;
         (* == IVC Step 8: Sample alpha challenge ==
            Alpha is used to combine different constraint polynomials.
            It is a scalar challenge using the endomorphism optimization. *)
         let alpha = squeeze_scalar sponge in
         (* == IVC Step 9: Absorb quotient commitment (t_comm) == *)
         let t_comm = receive without t_comm in
+        Array.iteri t_comm ~f:(fun i (x, y) ->
+            as_prover
+              As_prover.(
+                fun () ->
+                  Pickles_trace.tick_field
+                    (Printf.sprintf "ivp.trace.tcomm.%d.x" i)
+                    (read_var x) ;
+                  Pickles_trace.tick_field
+                    (Printf.sprintf "ivp.trace.tcomm.%d.y" i)
+                    (read_var y)) ) ;
         (* == IVC Step 10: Sample zeta challenge ==
            Zeta is the evaluation point for polynomial openings.
            It is a scalar challenge using the endomorphism optimization. *)
@@ -639,6 +662,11 @@ struct
            in finalize_other_proof. *)
         let sponge_before_evaluations = Sponge.copy sponge in
         let sponge_digest_before_evaluations = Sponge.squeeze_field sponge in
+        as_prover
+          As_prover.(
+            fun () ->
+              Pickles_trace.tick_field "ivp.trace.digest"
+                (read_var sponge_digest_before_evaluations)) ;
 
         (* xi, r are sampled here using the other sponge. *)
         (* No need to expose polynomial evaluations as deferred values as
