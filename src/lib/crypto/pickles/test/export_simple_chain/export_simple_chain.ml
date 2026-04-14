@@ -17,6 +17,12 @@ open Impls.Step
 let () = Snarky_backendless.Snark0.set_eval_constraints true
 
 module Simple_chain = struct
+  module Raw_proof = Pickles__Proof
+  module Reduced_messages_for_next_proof_over_same_field =
+    Pickles__Reduced_messages_for_next_proof_over_same_field
+  module Wrap_deferred_values = Pickles__Wrap_deferred_values
+  module Wrap_hack = Pickles__Wrap_hack
+
   type _ Snarky_backendless.Request.t +=
     | Prev_input : Field.Constant.t Snarky_backendless.Request.t
     | Proof : Pickles_types.Nat.N1.n Proof.t Snarky_backendless.Request.t
@@ -64,10 +70,67 @@ module Simple_chain = struct
 
   module Proof = (val p)
 
+  let wrap_public_input_fields ~(statement : Field.Constant.t)
+      (proof : Pickles_types.Nat.N1.n Pickles.Proof.t) =
+    let proof : Pickles_types.Nat.N1.n Raw_proof.t = Obj.magic proof in
+    let (Raw_proof.T t) = proof in
+    let verification_key =
+      Promise.block_on_async_exn (fun () ->
+          Lazy.force Proof.verification_key_promise )
+    in
+    let verification_key : Pickles__Verification_key.t =
+      Obj.magic verification_key
+    in
+    let deferred_values =
+      Wrap_deferred_values.expand_deferred ~evals:t.prev_evals
+        ~old_bulletproof_challenges:
+          t.statement.messages_for_next_step_proof.old_bulletproof_challenges
+        ~zk_rows:Plonk_checks.zk_rows_by_default
+        ~proof_state:t.statement.proof_state
+    in
+    let prepared_statement :
+        _ Pickles__Import.Types.Wrap.Statement.In_circuit.t =
+      { messages_for_next_step_proof =
+          Common.hash_messages_for_next_step_proof
+            ~app_state:(fun x -> [| x |])
+            (Reduced_messages_for_next_proof_over_same_field.Step.prepare
+               ~dlog_plonk_index:
+                 (Pickles_types.Plonk_verification_key_evals.map
+                    ~f:(fun x -> [| x |])
+                    verification_key.commitments )
+               { t.statement.messages_for_next_step_proof with
+                 app_state = statement
+               } )
+      ; proof_state =
+          { deferred_values =
+              { plonk = deferred_values.plonk
+              ; combined_inner_product =
+                  deferred_values.combined_inner_product
+              ; b = deferred_values.b
+              ; xi = deferred_values.xi
+              ; bulletproof_challenges =
+                  t.statement.proof_state.deferred_values
+                    .bulletproof_challenges
+              ; branch_data = deferred_values.branch_data
+              }
+          ; sponge_digest_before_evaluations =
+              t.statement.proof_state.sponge_digest_before_evaluations
+          ; messages_for_next_wrap_proof =
+              Wrap_hack.hash_messages_for_next_wrap_proof
+                (Reduced_messages_for_next_proof_over_same_field.Wrap.prepare
+                   t.statement.proof_state.messages_for_next_wrap_proof )
+          }
+      }
+    in
+    Common.tock_unpadded_public_input_of_statement
+      ~feature_flags:Pickles_types.Plonk_types.Features.Full.maybe
+      prepared_statement
+
 type fixture =
     { name : string
     ; statement : Field.Constant.t
     ; side_loaded_proof : Side_loaded.Proof.t
+    ; wrap_public_input_fields : Pickles.Backend.Tock.Field.t list
     }
 
   let generate_fixtures () =
@@ -95,10 +158,14 @@ type fixture =
     [ { name = "base_case"
       ; statement = Field.Constant.zero
       ; side_loaded_proof = Side_loaded.Proof.of_proof b0
+      ; wrap_public_input_fields =
+          wrap_public_input_fields ~statement:Field.Constant.zero b0
       }
     ; { name = "recursive_step"
       ; statement = Field.Constant.one
       ; side_loaded_proof = Side_loaded.Proof.of_proof b1
+      ; wrap_public_input_fields =
+          wrap_public_input_fields ~statement:Field.Constant.one b1
       }
     ]
 end
@@ -107,16 +174,27 @@ let field_json (x : Field.Constant.t) = `String (Field.Constant.to_string x)
 
 let statement_fields_json (statement : Field.Constant.t) = `List [ field_json statement ]
 
-let fixture_json ({ Simple_chain.name; statement; side_loaded_proof } :
-                  Simple_chain.fixture ) =
+let wrap_public_input_field_json (x : Pickles.Backend.Tock.Field.t) =
+  `String (Pickles.Backend.Tock.Field.to_hex_string x)
+
+let wrap_public_input_fields_json fields =
+  `List (List.map fields ~f:wrap_public_input_field_json)
+
+let fixture_json
+    ({ Simple_chain.name; statement; side_loaded_proof; wrap_public_input_fields }
+      : Simple_chain.fixture ) =
   `Assoc
     [ ("name", `String name)
     ; ("statement", field_json statement)
     ; ("statement_fields", statement_fields_json statement)
+    ; ( "wrap_public_input_fields"
+      , wrap_public_input_fields_json wrap_public_input_fields )
     ; ("side_loaded_proof_base64", `String (Side_loaded.Proof.to_base64 side_loaded_proof))
     ; ( "rust_inputs"
       , `Assoc
           [ ("statement_field_strings", statement_fields_json statement)
+          ; ( "wrap_public_input_fields"
+            , wrap_public_input_fields_json wrap_public_input_fields )
           ; ( "side_loaded_proof_base64"
             , `String (Side_loaded.Proof.to_base64 side_loaded_proof) )
           ] )
@@ -159,14 +237,20 @@ let write_rust_bundle_files output_path
   write_string
     (stem ^ ".side_loaded_vk.base64")
     (Side_loaded.Verification_key.to_base64 side_loaded_vk ^ "\n") ;
-  List.iter fixtures ~f:(fun { name; statement; side_loaded_proof } ->
-      let prefix = stem ^ "." ^ name in
-      write_json
-        (prefix ^ ".statement_fields.json")
-        (statement_fields_json statement) ;
-      write_string
-        (prefix ^ ".side_loaded_proof.base64")
-        (Side_loaded.Proof.to_base64 side_loaded_proof ^ "\n"))
+  List.iter fixtures
+    ~f:
+      (fun
+        { name; statement; side_loaded_proof; wrap_public_input_fields } ->
+        let prefix = stem ^ "." ^ name in
+        write_json
+          (prefix ^ ".statement_fields.json")
+          (statement_fields_json statement) ;
+        write_json
+          (prefix ^ ".wrap_public_input_fields.json")
+          (wrap_public_input_fields_json wrap_public_input_fields) ;
+        write_string
+          (prefix ^ ".side_loaded_proof.base64")
+          (Side_loaded.Proof.to_base64 side_loaded_proof ^ "\n"))
 
 let () =
   match Sys.argv with
