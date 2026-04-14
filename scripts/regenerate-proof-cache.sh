@@ -23,7 +23,7 @@ for DIR in $DIRS; do
   echo "=== Generating cache for $DIR ==="
   # I'm not sure why but using proof_cache.json directly causes non-determinism
   echo [] > "$DIR/proof_cache_new.json"
-  PROOF_CACHE_OUT="$PWD/$DIR/proof_cache_new.json" dune runtest "$DIR"
+  PROOF_CACHE_OUT="$PWD/$DIR/proof_cache_new.json" dune build "@@$DIR/runtest"
 done
 
 # Phase 2: All generation succeeded — atomically swap all caches into place.
@@ -39,5 +39,5 @@ done
 rm -rf _build
 for DIR in $DIRS; do
   echo "=== Verifying cache for $DIR ==="
-  ERROR_ON_PROOF=true dune runtest "$DIR"
+  ERROR_ON_PROOF=true dune build "@@$DIR/runtest"
 done
