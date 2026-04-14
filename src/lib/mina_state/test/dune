@@ -14,6 +14,7 @@
   snark_params)
  (preprocess
   (pps
+   ppx_version
    ppx_assert
    ppx_compare
    ppx_inline_test
