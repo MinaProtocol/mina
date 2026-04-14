@@ -211,7 +211,7 @@ let generateDockerForCodename =
                                     , arch = codename.Arch
                                     , submodules = True
                                     }
-                                    ([] : List Text)
+                                    [ "FORCE_DOCKER_OVERWRITE" ]
                                     (     "./buildkite/scripts/release/manager.sh persist "
                                       ++  " --backend local --artifacts mina-logproc,mina-${Network.lowerName
                                                                                               spec.network},mina-archive-${Network.lowerName
