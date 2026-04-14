@@ -3102,100 +3102,198 @@ module Make_str (A : Wire_types.Concrete) = struct
             amt )
       in
       let%bind stake_change =
+        (* Terminology for the two branches below:
+
+             - "user command" means a [Payment] or [Stake_delegation] — a
+               transaction that a user signed and submitted through the
+               network (e.g. via sendPayment / sendDelegation). The
+               [is_user_command] boolean is a field of the
+               [Transaction_union.Tag] itself: it is [true] for those two
+               tags and [false] for [Fee_transfer] and [Coinbase].
+
+             - "internal" means a [Fee_transfer] or [Coinbase] — a
+               transaction synthesized by the block producer (not signed
+               by a user). [Fee_transfer] pays out fees accumulated in the
+               block's [fee_excess] to the block producer and SNARK
+               workers, and [Coinbase] mints the block reward (optionally
+               splitting a SNARK-worker fee out of it).
+
+           Universal closed-form formula — see docs/unstaking-stake-change.md.
+           The body of this block is that document's formula, transcribed:
+
+             total_stake_diff =
+               if is_user_command then signed_command_delta else internal_delta
+
+             signed_command_delta =
+                 fee_payer_pre_balance
+                     * (fee_payer_post_is_staked - fee_payer_pre_is_staked)
+               -   fee_amount * fee_payer_post_is_staked
+               +   (is_payment && not user_command_fails)
+                     * transfer_amount
+                     * (receiver_is_staked - fee_payer_pre_is_staked)
+
+             internal_delta =
+                 fee_amount        * fee_payer_pre_is_staked
+               + receiver_increase * receiver_is_staked
+
+           Each "x * (a - b)" arithmetic difference in the signed-command
+           branch is encoded directly as
+              gated_by a (+x)  +  gated_by b (-x)
+           instead of via case-split opt-in/opt-out booleans. *)
         [%with_label_ "Calculate stake change"] (fun () ->
-            let%bind fee_payer_is_staked =
+            let signed_zero =
+              Amount.(Signed.Checked.of_unsigned (var_of_t zero))
+            in
+            let as_positive_signed unsigned_amount =
+              Amount.Signed.Checked.of_unsigned unsigned_amount
+            in
+            let as_negative_signed unsigned_amount =
+              Amount.Signed.Checked.negate (as_positive_signed unsigned_amount)
+            in
+            let gated_by boolean signed_amount =
+              Amount.Signed.Checked.if_ boolean ~then_:signed_amount
+                ~else_:signed_zero
+            in
+            let public_key_is_nonempty public_key =
               let%map is_empty =
-                Public_key.Compressed.Checked.equal !fee_payer_delegate_pre
+                Public_key.Compressed.Checked.equal public_key
                   Public_key.Compressed.Checked.empty
               in
               Boolean.not is_empty
+            in
+            let fee_amount = Amount.Checked.of_fee fee in
+            let fee_payer_pre_balance =
+              Balance.Checked.to_amount !fee_payer_balance_pre
+            in
+            let transfer_amount = payload.body.amount in
+            (* Pre-state staked flags of the two accounts touched by the tx. *)
+            let%bind fee_payer_pre_is_staked =
+              public_key_is_nonempty !fee_payer_delegate_pre
             in
             let%bind receiver_is_staked =
-              let%map is_empty =
-                Public_key.Compressed.Checked.equal !receiver_delegate_pre
-                  Public_key.Compressed.Checked.empty
-              in
-              Boolean.not is_empty
+              public_key_is_nonempty !receiver_delegate_pre
             in
-            let zero = Amount.(Signed.Checked.of_unsigned (var_of_t zero)) in
-            let adjust is_staked delta =
-              Amount.Signed.Checked.if_ is_staked ~then_:delta ~else_:zero
+            (* A tx mutates the fee_payer's delegate iff it is a
+               stake_delegation that both applied successfully and had
+               set_delegate permission. Its new delegate is encoded as
+               the receiver slot's public key. *)
+            let%bind delegate_is_being_updated =
+              Boolean.all
+                [ is_stake_delegation
+                ; Boolean.not user_command_fails
+                ; !source_delegation_permitted
+                ]
             in
-            let pos amt = Amount.Signed.Checked.of_unsigned amt in
-            let neg amt =
-              Amount.Signed.Checked.negate
-                (Amount.Signed.Checked.of_unsigned amt)
-            in
-            let fee_amt = Amount.Checked.of_fee fee in
-            (* Internal commands (fee_transfer, coinbase):
-               fee_payer gets +fee, receiver gets +receiver_increase *)
-            let%bind internal_sc =
-              let%bind fp = adjust fee_payer_is_staked (pos fee_amt) in
-              let%bind recv =
-                adjust receiver_is_staked (pos receiver_increase)
-              in
-              Amount.Signed.Checked.add fp recv
-            in
-            (* Payment: fee_payer=sender loses fee+amount, receiver gains amount *)
-            let%bind payment_sc =
-              let%bind fee_plus_amount =
-                Amount.Checked.add fee_amt payload.body.amount
-              in
-              let%bind fp = adjust fee_payer_is_staked (neg fee_plus_amount) in
-              let%bind recv =
-                adjust receiver_is_staked (pos payload.body.amount)
-              in
-              Amount.Signed.Checked.add fp recv
-            in
-            (* Delegation: 4-case on (fee_payer_is_staked, set_to_unstaked)
-                   unstaking=true       unstaking=false
-               staked    Some→None: -pre_bal   Some→Some: -fee
-               unstaked  None→None: 0          None→Some: +post_bal
-               If delegation was not permitted, delegate doesn't change
-               and stake_change is just the fee adjustment. *)
-            let%bind delegation_sc =
-              let%bind set_to_unstaked =
-                Public_key.Compressed.Checked.equal
+            (* [fee_payer_post_is_staked] is the fee_payer's staked flag AFTER
+               the tx applies. It equals [fee_payer_pre_is_staked] whenever
+               the delegate isn't being updated. *)
+            let%bind fee_payer_post_is_staked =
+              let%bind new_delegate_is_nonempty =
+                public_key_is_nonempty
                   (Account_id.Checked.public_key receiver)
-                  Public_key.Compressed.Checked.empty
               in
-              let pre_bal =
-                pos (Balance.Checked.to_amount !fee_payer_balance_pre)
-              in
-              let neg_pre_bal = Amount.Signed.Checked.negate pre_bal in
-              let neg_fee = neg fee_amt in
-              let%bind post_bal = Amount.Signed.Checked.add pre_bal neg_fee in
-              let%bind was_staked_case =
-                Amount.Signed.Checked.if_ set_to_unstaked ~then_:neg_pre_bal
-                  ~else_:neg_fee
-              in
-              let%bind was_unstaked_case =
-                Amount.Signed.Checked.if_ set_to_unstaked ~then_:zero
-                  ~else_:post_bal
-              in
-              let%bind permitted_sc =
-                Amount.Signed.Checked.if_ fee_payer_is_staked
-                  ~then_:was_staked_case ~else_:was_unstaked_case
-              in
-              let%bind not_permitted_sc = adjust fee_payer_is_staked neg_fee in
-              Amount.Signed.Checked.if_
-                !source_delegation_permitted
-                ~then_:permitted_sc ~else_:not_permitted_sc
+              Boolean.if_ delegate_is_being_updated
+                ~then_:new_delegate_is_nonempty ~else_:fee_payer_pre_is_staked
             in
-            (* Select: delegation vs payment within user commands *)
-            let%bind user_command_sc =
-              Amount.Signed.Checked.if_ is_stake_delegation ~then_:delegation_sc
-                ~else_:payment_sc
+            (* ============ signed-command delta ============ *)
+            (* Three term sum. Each term is nonzero only for certain tx
+               subcases; the other cases are zeroed by gating:
+
+                 (1) delegate_transition_term:
+                     nonzero ONLY for a successful, permitted
+                     [Stake_delegation] that actually flips the staked
+                     flag (Some→None opt-out, or None→Some opt-in). Zero
+                     for Payments and for all other delegation cases.
+
+                 (2) fee_deduction_term:
+                     nonzero for EVERY signed command (fee is always
+                     deducted). Shaped as [−fee · post_is_staked] rather
+                     than [−fee · pre_is_staked] because that's what
+                     makes the algebra in (1) close correctly on opt-in
+                     and opt-out. For Payments and non-transitioning
+                     delegations post = pre, so it collapses to the
+                     obvious [−fee · fee_payer_pre_is_staked].
+
+                 (3) payment_body_term:
+                     nonzero ONLY for a SUCCESSFUL [Payment]. Zero for
+                     failed payments, all stake_delegations, and internal
+                     commands. *)
+
+            (* (1) fee_payer_pre_balance
+                     * (fee_payer_post_is_staked - fee_payer_pre_is_staked)
+               Explicitly gated by [delegate_is_being_updated] so the
+               symmetry with term (3) (which gates on [is_payment]) is
+               visible at the call site. The inner arithmetic would already
+               evaluate to zero for non-delegation txs — because
+               [fee_payer_post_is_staked = fee_payer_pre_is_staked] in that
+               case — but making the gate explicit matches the structure
+               of the other two terms. *)
+            let%bind delegate_transition_term =
+              let%bind raw_transition =
+                let%bind balance_entering_stake =
+                  gated_by fee_payer_post_is_staked
+                    (as_positive_signed fee_payer_pre_balance)
+                in
+                let%bind balance_leaving_stake =
+                  gated_by fee_payer_pre_is_staked
+                    (as_negative_signed fee_payer_pre_balance)
+                in
+                Amount.Signed.Checked.add balance_entering_stake
+                  balance_leaving_stake
+              in
+              Amount.Signed.Checked.if_ delegate_is_being_updated
+                ~then_:raw_transition ~else_:signed_zero
             in
-            (* Select: user command vs internal command *)
-            let%bind sc =
-              Amount.Signed.Checked.if_ is_user_command ~then_:user_command_sc
-                ~else_:internal_sc
+            (* (2) - fee_amount * fee_payer_post_is_staked *)
+            let%bind fee_deduction_term =
+              gated_by fee_payer_post_is_staked (as_negative_signed fee_amount)
             in
-            (* Failed user command: only fee deducted from fee_payer *)
-            let%bind failed_sc = adjust fee_payer_is_staked (neg fee_amt) in
-            Amount.Signed.Checked.if_ user_command_fails ~then_:failed_sc
-              ~else_:sc )
+            (* (3) (is_payment && not user_command_fails)
+                   * transfer_amount
+                   * (receiver_is_staked - fee_payer_pre_is_staked) *)
+            let%bind payment_body_term =
+              let%bind payment_body_applies =
+                Boolean.(is_payment &&& not user_command_fails)
+              in
+              let%bind amount_entering_stake =
+                gated_by receiver_is_staked (as_positive_signed transfer_amount)
+              in
+              let%bind amount_leaving_stake =
+                gated_by fee_payer_pre_is_staked
+                  (as_negative_signed transfer_amount)
+              in
+              let%bind net_transfer =
+                Amount.Signed.Checked.add amount_entering_stake
+                  amount_leaving_stake
+              in
+              Amount.Signed.Checked.if_ payment_body_applies ~then_:net_transfer
+                ~else_:signed_zero
+            in
+            let%bind signed_command_delta =
+              let%bind partial =
+                Amount.Signed.Checked.add delegate_transition_term
+                  fee_deduction_term
+              in
+              Amount.Signed.Checked.add partial payment_body_term
+            in
+            (* ============ internal-command delta ============ *)
+            (* For Coinbase-without-fee_transfer and
+               Fee_transfer-with-one-single, Transaction_union places the
+               same account in both the fee_payer slot and the receiver
+               slot, and encodes [fee_amount] as zero so that only the
+               receiver term fires and there is no double counting. *)
+            let%bind internal_delta =
+              let%bind fee_payer_slot_credit =
+                gated_by fee_payer_pre_is_staked (as_positive_signed fee_amount)
+              in
+              let%bind receiver_slot_credit =
+                gated_by receiver_is_staked (as_positive_signed receiver_increase)
+              in
+              Amount.Signed.Checked.add fee_payer_slot_credit
+                receiver_slot_credit
+            in
+            Amount.Signed.Checked.if_ is_user_command
+              ~then_:signed_command_delta ~else_:internal_delta )
       in
       let%map final_root =
         (* Ensure that only the fee-payer was charged if this was an invalid user
