@@ -668,6 +668,13 @@ struct
              Pickles_trace.int
                ("compile.step_domains." ^ Int.to_string i ^ ".h.log2")
                (Pickles_base.Domain.log2_size h) ) ;
+         (* Wrap eval domain that production passes to Wrap_main.wrap_main
+            via [wrap_domains]. PS hardcodes 14 in SimpleChain.purs; this
+            trace lets us confirm OCaml uses the same number, AND lets us
+            pin the right [~domain_log2] when we re-target the
+            wrap_main_circuit fixture. *)
+         Pickles_trace.int "compile.wrap_domains.h.log2"
+           (Pickles_base.Domain.log2_size wrap_domains.h) ;
          (* === TRACE iter 6: compiled step VK commitments, dumped at the
             point where they're consumed by Wrap_main.wrap_main. First
             branch only (Simple_chain has a single branch); mirrors the
@@ -746,6 +753,20 @@ struct
                main
            in
            let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
+           (* Dump the production wrap CS as JSON so PureScript can do
+              a byte-for-byte comparison via the existing circuit-diffs
+              JSON tooling. Only fires when [PICKLES_WRAP_CS_DUMP] is set. *)
+           ( match Sys.getenv_opt "PICKLES_WRAP_CS_DUMP" with
+           | None ->
+               ()
+           | Some path ->
+               let json =
+                 Kimchi_pasta_constraint_system.Pallas_constraint_system.to_json
+                   cs
+               in
+               let oc = Out_channel.create path in
+               Out_channel.output_string oc json ;
+               Out_channel.close oc ) ;
            ( self_id
            , snark_keys_header
                { type_ = "wrap-proving-key"; identifier = name }
@@ -793,6 +814,49 @@ struct
                     ~override_wrap_domain argument to set the correct domain \
                     size."
                    proposed_domain_size computed_domain_size () ;
+               (* === Diagnostic: wrap CS shape ===
+                  Domain log2 size + public input width of the compiled
+                  wrap circuit. Diffing against PS's [compile.wrapCS.*]
+                  emissions tells us whether the two sides agree on the
+                  shape of the constraint system, before we dig into the
+                  actual VK commitment values. *)
+               Pickles_trace.int "compile.wrapCS.domain_log2"
+                 wrap_vk.Verification_key.index.domain.log_size_of_group ;
+               Pickles_trace.int "compile.wrapCS.public_input_size"
+                 wrap_vk.Verification_key.index.public ;
+               (* === TRACE: compiled wrap VK commitments ===
+                  Mirrors the iter 6 step VK trace above. PureScript
+                  emits the same labels via [extractWrapVKForStepHash
+                  wrapCR.verifierIndex] in [SimpleChain.purs]. Diffing
+                  these isolates whether the wrap VK divergence is in
+                  the wrap compile itself or in downstream extraction.
+                  Tock.Curve = Pallas; commitments live in Fp = Tick.Field,
+                  so we use [tick_field]. *)
+               let wrap_commits = wrap_vk.Verification_key.commitments in
+               let trace_pt label (x, y) =
+                 Pickles_trace.tick_field (label ^ ".x") x ;
+                 Pickles_trace.tick_field (label ^ ".y") y
+               in
+               List.iteri
+                 (Pickles_types.Vector.to_list wrap_commits.sigma_comm)
+                 ~f:(fun i pt ->
+                   trace_pt
+                     ("compile.wrapVK.sigma." ^ Int.to_string i)
+                     pt ) ;
+               List.iteri
+                 (Pickles_types.Vector.to_list wrap_commits.coefficients_comm)
+                 ~f:(fun i pt ->
+                   trace_pt
+                     ("compile.wrapVK.coeff." ^ Int.to_string i)
+                     pt ) ;
+               trace_pt "compile.wrapVK.generic" wrap_commits.generic_comm ;
+               trace_pt "compile.wrapVK.psm" wrap_commits.psm_comm ;
+               trace_pt "compile.wrapVK.complete_add"
+                 wrap_commits.complete_add_comm ;
+               trace_pt "compile.wrapVK.mul" wrap_commits.mul_comm ;
+               trace_pt "compile.wrapVK.emul" wrap_commits.emul_comm ;
+               trace_pt "compile.wrapVK.endomul_scalar"
+                 wrap_commits.endomul_scalar_comm ;
                res ) )
     in
     accum_dirty (Lazy.map wrap_pk ~f:(Promise.map ~f:snd)) ;

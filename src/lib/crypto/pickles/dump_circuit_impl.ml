@@ -4114,10 +4114,15 @@ let run ~output_dir =
         ()
     in
     let main_fn =
+      (* domain_log2:14 mirrors what production [Pickles.compile_promise]
+         passes to [Wrap_main.wrap_main] for Simple_chain N1 — confirmed
+         via [compile.wrap_domains.h.log2] trace. The earlier 16 was a
+         synthetic value that masked a divergence in PureScript's wrap
+         compile relative to OCaml production. *)
       Wrap_main_for_dump.build
         ~pi_branches:(Hlist.Length.S Hlist.Length.Z)
         ~padded:Vector.[ Vector.[ 0 ]; Vector.[ 1 ] ]
-        ~step_widths:Vector.[ 1 ] ~domain_log2:16
+        ~step_widths:Vector.[ 1 ] ~domain_log2:14
         ~max_proofs_verified:(module Nat.N2)
     in
     let circuit x () = main_fn (conv x) in
