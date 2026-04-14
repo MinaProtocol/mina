@@ -18,18 +18,6 @@ type chain_length_response =
   }
 [@@deriving yojson]
 
-type wait_timeout_response =
-  { ready : bool
-  ; timed_out : bool
-  ; elapsed_secs : int
-  ; sync_status : string option [@yojson.option]
-  ; peer_count : int option [@yojson.option]
-  ; blockchain_length : int option [@yojson.option]
-  ; highest_block_length_received : int option [@yojson.option]
-  ; error : string option [@yojson.option]
-  }
-[@@deriving yojson]
-
 let get_sync_status = GC.get_sync_status
 
 let get_daemon_status = GC.get_daemon_status

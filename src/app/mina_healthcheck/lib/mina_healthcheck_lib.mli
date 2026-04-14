@@ -33,18 +33,6 @@ type chain_length_response =
   }
 [@@deriving yojson]
 
-type wait_timeout_response =
-  { ready : bool
-  ; timed_out : bool
-  ; elapsed_secs : int
-  ; sync_status : string option
-  ; peer_count : int option
-  ; blockchain_length : int option
-  ; highest_block_length_received : int option
-  ; error : string option
-  }
-[@@deriving yojson]
-
 (** {1 Health check functions}
 
     Each function queries the daemon at [node_uri] and returns
@@ -63,7 +51,7 @@ val get_daemon_status :
   -> Uri.t
   -> Mina_graphql_client.Types.daemon_status Deferred.Or_error.t
 
-(** Check whether peer count exceeds [min_peers].
+(** Check whether peer count meets or exceeds [min_peers].
     Returns [(healthy, actual_peer_count)]. *)
 val check_peer_count :
   logger:Logger.t -> Uri.t -> min_peers:int -> (bool * int) Deferred.Or_error.t

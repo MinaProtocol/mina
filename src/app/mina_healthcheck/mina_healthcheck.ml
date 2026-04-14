@@ -44,7 +44,7 @@ let sync_status_command =
            Deferred.Or_error.fail e
        | Ok status ->
            let is_synced = Sync_status.equal status `Synced in
-           let s = Sync_status.to_string status in
+           let s = String.uppercase (Sync_status.to_string status) in
            if json then
              output
                (HC.sync_status_response_to_yojson
@@ -54,20 +54,39 @@ let sync_status_command =
            else Deferred.Or_error.errorf "node is not synced: %s" s )
 
 let daemon_status_command =
-  Command.async_or_error ~summary:"Get comprehensive daemon status as JSON"
-    (let%map_open.Command uri = graphql_uri_flag in
+  Command.async_or_error ~summary:"Get comprehensive daemon status"
+    (let%map_open.Command uri = graphql_uri_flag and json = json_flag in
      fun () ->
        match%bind HC.get_daemon_status ~logger (node_uri uri) with
        | Error e ->
+           if json then output_error e ;
            Deferred.Or_error.fail e
        | Ok ds ->
-           output (Types.daemon_status_to_yojson ds) ;
+           ( if json then output (Types.daemon_status_to_yojson ds)
+           else
+             let opt s = Option.value ~default:"n/a" s in
+             let opt_int n =
+               Option.value_map ~default:"n/a" ~f:Int.to_string n
+             in
+             printf "Sync status:       %s\n"
+               (Sync_status.to_string ds.sync_status) ;
+             printf "Blockchain length: %s\n" (opt_int ds.blockchain_length) ;
+             printf "Highest received:  %s\n"
+               (opt_int ds.highest_block_length_received) ;
+             printf "Uptime:            %s\n"
+               (Option.value_map ~default:"n/a"
+                  ~f:(fun s -> sprintf "%ds" s)
+                  ds.uptime_secs ) ;
+             printf "State hash:        %s\n" (opt ds.state_hash) ;
+             printf "Commit ID:         %s\n" (opt ds.commit_id) ;
+             printf "Peers:             %d\n" ds.peer_count ) ;
            Deferred.Or_error.return () )
 
 let peer_count_command =
   Command.async_or_error
     ~summary:
-      "Check peer count against threshold (exit 0 if above, exit 1 otherwise)"
+      "Check peer count against threshold (exit 0 if at or above, exit 1 \
+       otherwise)"
     (let%map_open.Command uri = graphql_uri_flag
      and json = json_flag
      and min_peers = min_peers_flag in
@@ -81,12 +100,11 @@ let peer_count_command =
              output
                (HC.peer_count_response_to_yojson
                   { healthy; peer_count = count; min_peers } )
-           else printf "%d peers (threshold: >%d)\n" count min_peers ;
+           else printf "%d peers (threshold: >= %d)\n" count min_peers ;
            if healthy then Deferred.Or_error.return ()
            else
-             Deferred.Or_error.errorf
-               "peer count %d is not greater than threshold %d" count min_peers
-    )
+             Deferred.Or_error.errorf "peer count %d is below minimum %d" count
+               min_peers )
 
 let chain_length_command =
   Command.async_or_error

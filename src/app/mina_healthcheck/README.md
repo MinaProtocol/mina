@@ -9,8 +9,8 @@ exec probes, Docker HEALTHCHECK, shell scripts, and monitoring systems.
 | Command | Description | Exit 0 when |
 |---------|-------------|-------------|
 | `sync-status` | Query daemon sync state | SYNCED |
-| `daemon-status` | Full status dump (always JSON) | Daemon reachable |
-| `peer-count` | Check peers against threshold | `peer_count > --min-peers` |
+| `daemon-status` | Full status dump (text or JSON) | Daemon reachable |
+| `peer-count` | Check peers against threshold | `peer_count >= --min-peers` |
 | `chain-length` | Compare local vs network height | Heights match |
 | `ready` | Combined check (sync + peers + chain) | All pass |
 | `wait` | Block until ready or timeout | Node becomes ready |
@@ -27,7 +27,7 @@ mina-healthcheck sync-status --json
 # Full daemon status as JSON
 mina-healthcheck daemon-status
 
-# Check peer count against threshold (default: >2)
+# Check peer count against threshold (default: >= 2)
 mina-healthcheck peer-count --min-peers 3
 
 # Check if chain length matches highest received block
@@ -73,7 +73,9 @@ This is useful for:
 - **Deployment scripts** — wait after restart before proceeding to the next node
 - **Upgrade orchestration** — wait for catchup after a rolling update
 
-## Global flags
+## Flags
+
+Flags are accepted per-subcommand (not all flags apply to every command).
 
 | Flag | Alias | Default | Description |
 |------|-------|---------|-------------|

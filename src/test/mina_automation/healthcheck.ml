@@ -35,25 +35,20 @@ module Client = struct
       [(exit_code, stdout, stderr)]. *)
   let run_raw t args =
     let full_args = args @ [ "--graphql-uri"; t.graphql_uri ] in
-    let%bind prog = Executor.PathFinder.standalone_path_exn in
-    Process.create ~prog ~args:full_args ()
-    >>= function
-    | Error e ->
-        return
-          (Or_error.errorf "failed to spawn healthcheck: %s"
-             (Error.to_string_hum e) )
-    | Ok process ->
-        let%map output = Process.collect_output_and_wait process in
-        let exit_code =
-          match output.exit_status with
-          | Ok () ->
-              0
-          | Error (`Exit_non_zero n) ->
-              n
-          | Error (`Signal _) ->
-              -1
-        in
-        Ok (exit_code, output.stdout, output.stderr)
+    let%bind _prog, process =
+      Executor.run_in_background t.executor ~args:full_args ()
+    in
+    let%map output = Process.collect_output_and_wait process in
+    let exit_code =
+      match output.exit_status with
+      | Ok () ->
+          0
+      | Error (`Exit_non_zero n) ->
+          n
+      | Error (`Signal _) ->
+          -1
+    in
+    Ok (exit_code, output.stdout, output.stderr)
 
   (** Run with [--json], parse stdout, and apply [f] to [(exit_code, json)]. *)
   let run_json_map t args ~f =

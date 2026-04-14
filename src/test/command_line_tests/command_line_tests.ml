@@ -905,9 +905,15 @@ module HealthcheckBootstrapLifecycle = struct
 
   let assert_not_ready node_uri =
     let%map pre = HC.check_readiness ~logger:hc_logger node_uri ~min_peers:0 in
-    let not_ready = match pre with Error _ -> true | Ok r -> not r.ready in
-    eprintf "Pre-bootstrap not_ready=%b\n" not_ready ;
-    Ok ()
+    match pre with
+    | Error e ->
+        Or_error.errorf "expected not-ready, got error: %s"
+          (Error.to_string_hum e)
+    | Ok r when r.ready ->
+        Or_error.errorf "expected not-ready, but node is already ready"
+    | Ok _ ->
+        eprintf "Pre-bootstrap not_ready=true\n" ;
+        Ok ()
 
   let assert_synced node_uri =
     let open Deferred.Or_error.Let_syntax in
