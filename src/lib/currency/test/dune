@@ -11,6 +11,7 @@
   sgn)
  (preprocess
   (pps
+   ppx_version
    ppx_assert
    ppx_compare
    ppx_inline_test
