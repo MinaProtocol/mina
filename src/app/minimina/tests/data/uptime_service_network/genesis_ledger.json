@@ -1,0 +1,60 @@
+{
+    "daemon": {
+        "txpool_max_size": 3000
+    },
+    "genesis": {
+        "k": 20,
+        "delta": 0,
+        "slots_per_epoch": 480,
+        "grace_period_slots": 150,
+        "slots_per_sub_window": 2,
+        "genesis_state_timestamp": "2023-10-16 12:00:03.092497Z"
+    },
+    "proof": {
+        "level": "full",
+        "work_delay": 1,
+        "block_window_duration_ms": 120000,
+        "transaction_capacity": {
+            "2_to_the": 2
+        }
+    },
+    "ledger": {
+        "accounts": [
+            {
+                "pk": "B62qp7EvyefppzUyupxbPz8C2gcLj4MT58DDtHXs9ub5SaU9Ke3iCyF",
+                "sk": "EKEeQGt7tWH2hudMz5GcSLfnuEcywGMhXavrjy5HZt1bo1wJYgSR",
+                "balance": "100"
+            },
+            {
+                "pk": "B62qkeFwEXySeXAFXaNiuQBDJPpxYRWutGE5neYtGUEAXDCWQr7c9hT",
+                "sk": "EKEUEUVN9A42Rrc8A5C5ubjhzjtzmCic6Z5aKRS9hTgeNiFCSrn9",
+                "balance": "100"
+            },
+            {
+                "pk": "B62qoEykaCCyw6JtF3EM4S33FpCon5F4HiZbgby5oPSgpVQ6MYYfxPC",
+                "sk": "EKF83r3ibZ8eCC1PwcgrTAVLVoA3dKXt2iSGxb6vDnofs9nKUY3V",
+                "balance": "400000"
+            },
+            {
+                "pk": "B62qiZv3JwF9wRGtqhNbLsfWMm6zYd71RD6Akfq9AUK8MY4EC5Ye9i6",
+                "sk": "EKF5AkJQX1B6CgmmaXgsyw4tZFp1M27TRcJrzw67Mtnp7o45rEvv",
+                "balance": "300000"
+            },
+            {
+                "pk": "B62qoztWpP8cJbknVWCcW2u56Y44wLNqpsompb5dDGoG1o6nfeatTKX",
+                "sk": "EKF44LaJVQKTT1iuSJ3XifSFFtBndMb741kHPzVcYAtYEyJbZ11s",
+                "balance": "300000"
+            },
+            {
+                "pk": "B62qjwzawZqMmm27zwDg5xF8XtrH1TcQedsS3EVStct8wr1FcpRZFbm",
+                "sk": "EKFBPN3My4Y5GqaYj9pMYvtfzvrzuSQyvTEgxTZmCx4QZg7vJePB",
+                "balance": "0"
+            },
+            {
+                "pk": "B62qk1U7rBJ7oxoYcY3qwTSdgfmPaZvhV1UbHyxCd2fqwteXwZ3u1et",
+                "sk": "EKEFB6NduHXqgGUkSSe1TFf1SCpn1SDrJtAcRJiHd4zaks4X5GrD",
+                "balance": "0"
+            }
+        ]
+    }
+}
