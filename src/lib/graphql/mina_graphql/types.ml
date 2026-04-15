@@ -1539,15 +1539,15 @@ module AccountObj = struct
                  account.Account.Poly.receipt_chain_hash )
            ; field "delegate" ~typ:public_key
                ~doc:
-                 "The public key to which you are delegating - if you are not \
-                  delegating to anybody, this would return your public key"
+                 "The public key to which you are delegating, or null if you \
+                  are not delegating to anybody (i.e. unstaked)"
                ~args:Arg.[]
                ~deprecated:(Deprecated (Some "use delegateAccount instead"))
                ~resolve:(fun _ { account; _ } -> account.Account.Poly.delegate)
            ; field "delegateAccount" ~typ:(Lazy.force account)
                ~doc:
-                 "The account to which you are delegating - if you are not \
-                  delegating to anybody, this would return your public key"
+                 "The account to which you are delegating, or null if you are \
+                  not delegating to anybody (i.e. unstaked)"
                ~args:Arg.[]
                ~resolve:(fun { ctx = mina; _ } { account; _ } ->
                  Option.map
