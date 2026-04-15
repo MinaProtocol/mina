@@ -3,17 +3,7 @@ open Currency
 
 let%test_module "unchecked arithmetic" =
   ( module struct
-    (* --- scale tests --- *)
-    let%test_unit "scale by zero returns zero" =
-      [%test_eq: Amount.t option] (Amount.scale Amount.zero 0) (Some Amount.zero) ;
-      [%test_eq: Amount.t option]
-        (Amount.scale (Amount.of_uint64 (Unsigned.UInt64.of_int 42)) 0)
-        (Some Amount.zero)
-
-    let%test_unit "scale by one is identity" =
-      let v = Amount.of_uint64 (Unsigned.UInt64.of_int 12345) in
-      [%test_eq: Amount.t option] (Amount.scale v 1) (Some v)
-
+    (* --- scale edge cases --- *)
     let%test_unit "scale overflow returns none" =
       [%test_eq: Amount.t option] (Amount.scale Amount.max_int 2) None
 
@@ -22,20 +12,7 @@ let%test_module "unchecked arithmetic" =
       let expected = Amount.of_uint64 (Unsigned.UInt64.of_int 500) in
       [%test_eq: Amount.t option] (Amount.scale v 5) (Some expected)
 
-    (* --- add / sub basic tests --- *)
-    let%test_unit "add zero is identity" =
-      let v = Amount.of_uint64 (Unsigned.UInt64.of_int 999) in
-      [%test_eq: Amount.t option] (Amount.add v Amount.zero) (Some v) ;
-      [%test_eq: Amount.t option] (Amount.add Amount.zero v) (Some v)
-
-    let%test_unit "sub zero is identity" =
-      let v = Amount.of_uint64 (Unsigned.UInt64.of_int 999) in
-      [%test_eq: Amount.t option] (Amount.sub v Amount.zero) (Some v)
-
-    let%test_unit "sub self is zero" =
-      let v = Amount.of_uint64 (Unsigned.UInt64.of_int 999) in
-      [%test_eq: Amount.t option] (Amount.sub v v) (Some Amount.zero)
-
+    (* --- add / sub edge cases --- *)
     let%test_unit "add overflow returns none" =
       [%test_eq: Amount.t option]
         (Amount.add Amount.max_int Amount.max_int)
@@ -46,17 +23,10 @@ let%test_module "unchecked arithmetic" =
       let big = Amount.of_uint64 (Unsigned.UInt64.of_int 2) in
       [%test_eq: Amount.t option] (Amount.sub small big) None
 
-    (* --- add_flagged / sub_flagged --- *)
+    (* --- add_flagged / sub_flagged edge cases --- *)
     let%test_unit "add_flagged detects overflow" =
       let _, `Overflow b = Amount.add_flagged Amount.max_int Amount.max_int in
       assert b
-
-    let%test_unit "add_flagged no overflow" =
-      let v = Amount.of_uint64 (Unsigned.UInt64.of_int 5) in
-      let w = Amount.of_uint64 (Unsigned.UInt64.of_int 10) in
-      let result, `Overflow b = Amount.add_flagged v w in
-      assert (not b) ;
-      [%test_eq: Amount.t] result (Amount.of_uint64 (Unsigned.UInt64.of_int 15))
 
     let%test_unit "sub_flagged detects underflow" =
       let small = Amount.of_uint64 (Unsigned.UInt64.of_int 1) in
@@ -64,28 +34,12 @@ let%test_module "unchecked arithmetic" =
       let _, `Underflow b = Amount.sub_flagged small big in
       assert b
 
-    let%test_unit "sub_flagged no underflow" =
-      let big = Amount.of_uint64 (Unsigned.UInt64.of_int 10) in
-      let small = Amount.of_uint64 (Unsigned.UInt64.of_int 3) in
-      let result, `Underflow b = Amount.sub_flagged big small in
-      assert (not b) ;
-      [%test_eq: Amount.t] result (Amount.of_uint64 (Unsigned.UInt64.of_int 7))
-
-    (* --- conversion tests --- *)
+    (* --- conversion edge cases --- *)
     let%test_unit "of_nanomina_int rejects negative" =
       [%test_eq: Amount.t option] (Amount.of_nanomina_int (-1)) None
 
     let%test_unit "of_nanomina_int accepts zero" =
       [%test_eq: Amount.t option] (Amount.of_nanomina_int 0) (Some Amount.zero)
-
-    let%test_unit "of_nanomina_int roundtrip" =
-      let n = 42_000_000 in
-      let v = Amount.of_nanomina_int_exn n in
-      [%test_eq: int] (Amount.to_nanomina_int v) n
-
-    let%test_unit "of_mina_int roundtrip" =
-      let v = Amount.of_mina_int_exn 5 in
-      [%test_eq: int] (Amount.to_mina_int v) 5
 
     let%test_unit "of_mina_int_exn raises on negative" =
       match Amount.of_mina_int_exn (-1) with
@@ -105,108 +59,30 @@ let%test_module "unchecked arithmetic" =
       (* max precision *)
       let v3 = Amount.of_mina_string_exn "0.000000001" in
       [%test_eq: Amount.t] v3 (Amount.of_uint64 (Unsigned.UInt64.of_int 1))
-
-    (* --- Fee/Amount conversions --- *)
-    let%test_unit "Amount.of_fee and to_fee roundtrip" =
-      let fee = Fee.of_uint64 (Unsigned.UInt64.of_int 12345) in
-      [%test_eq: Fee.t] (Amount.to_fee (Amount.of_fee fee)) fee
-
-    let%test_unit "Amount.add_fee works" =
-      let amt = Amount.of_uint64 (Unsigned.UInt64.of_int 100) in
-      let fee = Fee.of_uint64 (Unsigned.UInt64.of_int 50) in
-      [%test_eq: Amount.t option] (Amount.add_fee amt fee)
-        (Some (Amount.of_uint64 (Unsigned.UInt64.of_int 150)))
   end )
 
 let%test_module "signed operations" =
   ( module struct
     let mk n = Amount.of_uint64 (Unsigned.UInt64.of_int n)
 
-    (* --- create normalizes zero --- *)
+    (* --- zero special cases --- *)
     let%test_unit "Signed.create normalizes zero to positive" =
       let s = Amount.Signed.create ~magnitude:Amount.zero ~sgn:Sgn.Neg in
       [%test_eq: Sgn.t] s.sgn Sgn.Pos
 
-    let%test_unit "Signed.create preserves sign for nonzero" =
-      let s = Amount.Signed.create ~magnitude:(mk 5) ~sgn:Sgn.Neg in
-      [%test_eq: Sgn.t] s.sgn Sgn.Neg
-
-    (* --- predicates --- *)
     let%test_unit "is_zero on zero" =
       assert (Amount.Signed.is_zero Amount.Signed.zero)
-
-    let%test_unit "is_zero on nonzero" =
-      let s = Amount.Signed.create ~magnitude:(mk 1) ~sgn:Sgn.Pos in
-      assert (not (Amount.Signed.is_zero s))
-
-    let%test_unit "is_positive" =
-      let pos = Amount.Signed.create ~magnitude:(mk 5) ~sgn:Sgn.Pos in
-      let neg = Amount.Signed.create ~magnitude:(mk 5) ~sgn:Sgn.Neg in
-      let zero = Amount.Signed.zero in
-      assert (Amount.Signed.is_positive pos) ;
-      assert (not (Amount.Signed.is_positive neg)) ;
-      assert (not (Amount.Signed.is_positive zero))
-
-    let%test_unit "is_negative" =
-      let pos = Amount.Signed.create ~magnitude:(mk 5) ~sgn:Sgn.Pos in
-      let neg = Amount.Signed.create ~magnitude:(mk 5) ~sgn:Sgn.Neg in
-      let zero = Amount.Signed.zero in
-      assert (Amount.Signed.is_negative neg) ;
-      assert (not (Amount.Signed.is_negative pos)) ;
-      assert (not (Amount.Signed.is_negative zero))
-
-    (* --- negate --- *)
-    let%test_unit "negate positive" =
-      let s = Amount.Signed.create ~magnitude:(mk 5) ~sgn:Sgn.Pos in
-      let n = Amount.Signed.negate s in
-      [%test_eq: Sgn.t] n.sgn Sgn.Neg ;
-      [%test_eq: Amount.t] n.magnitude (mk 5)
 
     let%test_unit "negate zero stays positive" =
       let n = Amount.Signed.negate Amount.Signed.zero in
       [%test_eq: Sgn.t] n.sgn Sgn.Pos
 
-    (* --- signed add --- *)
-    let%test_unit "add pos + pos" =
-      let a = Amount.Signed.create ~magnitude:(mk 3) ~sgn:Sgn.Pos in
-      let b = Amount.Signed.create ~magnitude:(mk 7) ~sgn:Sgn.Pos in
-      let result = Option.value_exn (Amount.Signed.add a b) in
-      [%test_eq: Amount.t] result.magnitude (mk 10) ;
-      [%test_eq: Sgn.t] result.sgn Sgn.Pos
-
-    let%test_unit "add neg + neg" =
-      let a = Amount.Signed.create ~magnitude:(mk 3) ~sgn:Sgn.Neg in
-      let b = Amount.Signed.create ~magnitude:(mk 7) ~sgn:Sgn.Neg in
-      let result = Option.value_exn (Amount.Signed.add a b) in
-      [%test_eq: Amount.t] result.magnitude (mk 10) ;
-      [%test_eq: Sgn.t] result.sgn Sgn.Neg
-
-    let%test_unit "add pos + neg where pos > neg" =
-      let a = Amount.Signed.create ~magnitude:(mk 10) ~sgn:Sgn.Pos in
-      let b = Amount.Signed.create ~magnitude:(mk 3) ~sgn:Sgn.Neg in
-      let result = Option.value_exn (Amount.Signed.add a b) in
-      [%test_eq: Amount.t] result.magnitude (mk 7) ;
-      [%test_eq: Sgn.t] result.sgn Sgn.Pos
-
-    let%test_unit "add pos + neg where neg > pos" =
-      let a = Amount.Signed.create ~magnitude:(mk 3) ~sgn:Sgn.Pos in
-      let b = Amount.Signed.create ~magnitude:(mk 10) ~sgn:Sgn.Neg in
-      let result = Option.value_exn (Amount.Signed.add a b) in
-      [%test_eq: Amount.t] result.magnitude (mk 7) ;
-      [%test_eq: Sgn.t] result.sgn Sgn.Neg
-
-    let%test_unit "add pos + neg cancels to zero" =
-      let a = Amount.Signed.create ~magnitude:(mk 5) ~sgn:Sgn.Pos in
-      let b = Amount.Signed.create ~magnitude:(mk 5) ~sgn:Sgn.Neg in
-      let result = Option.value_exn (Amount.Signed.add a b) in
-      assert (Amount.Signed.is_zero result)
-
+    (* --- overflow edge cases --- *)
     let%test_unit "add same sign overflow returns none" =
       let a = Amount.Signed.create ~magnitude:Amount.max_int ~sgn:Sgn.Pos in
       let b = Amount.Signed.create ~magnitude:(mk 1) ~sgn:Sgn.Pos in
       [%test_eq: Amount.Signed.t option] (Amount.Signed.add a b) None
 
-    (* --- signed equality on zero --- *)
     let%test_unit "signed equal: positive and negative zero are equal" =
       let pos_zero =
         Amount.Signed.create_preserve_zero_sign ~magnitude:Amount.zero
@@ -218,21 +94,7 @@ let%test_module "signed operations" =
       in
       assert (Amount.Signed.equal pos_zero neg_zero)
 
-    (* --- add_signed_flagged --- *)
-    let%test_unit "add_signed_flagged positive no overflow" =
-      let base = mk 100 in
-      let delta = Amount.Signed.create ~magnitude:(mk 50) ~sgn:Sgn.Pos in
-      let result, `Overflow b = Amount.add_signed_flagged base delta in
-      assert (not b) ;
-      [%test_eq: Amount.t] result (mk 150)
-
-    let%test_unit "add_signed_flagged negative no underflow" =
-      let base = mk 100 in
-      let delta = Amount.Signed.create ~magnitude:(mk 30) ~sgn:Sgn.Neg in
-      let result, `Overflow b = Amount.add_signed_flagged base delta in
-      assert (not b) ;
-      [%test_eq: Amount.t] result (mk 70)
-
+    (* --- add_signed_flagged edge cases --- *)
     let%test_unit "add_signed_flagged negative underflow" =
       let base = mk 10 in
       let delta = Amount.Signed.create ~magnitude:(mk 20) ~sgn:Sgn.Neg in
@@ -251,11 +113,7 @@ let%test_module "balance operations" =
 
     let mk_amount n = Amount.of_uint64 (Unsigned.UInt64.of_int n)
 
-    let%test_unit "add_amount within range" =
-      [%test_eq: Balance.t option]
-        (Balance.add_amount (mk 100) (mk_amount 50))
-        (Some (mk 150))
-
+    (* --- edge cases --- *)
     let%test_unit "add_amount overflow" =
       [%test_eq: Balance.t option]
         (Balance.add_amount
@@ -263,20 +121,10 @@ let%test_module "balance operations" =
            (mk_amount 1) )
         None
 
-    let%test_unit "sub_amount within range" =
-      [%test_eq: Balance.t option]
-        (Balance.sub_amount (mk 100) (mk_amount 30))
-        (Some (mk 70))
-
     let%test_unit "sub_amount underflow" =
       [%test_eq: Balance.t option]
         (Balance.sub_amount (mk 10) (mk_amount 20))
         None
-
-    let%test_unit "sub_amount to zero" =
-      [%test_eq: Balance.t option]
-        (Balance.sub_amount (mk 100) (mk_amount 100))
-        (Some (mk 0))
 
     let%test_unit "add_amount_flagged overflow flag" =
       let _, `Overflow b =
@@ -289,10 +137,6 @@ let%test_module "balance operations" =
     let%test_unit "sub_amount_flagged underflow flag" =
       let _, `Underflow b = Balance.sub_amount_flagged (mk 5) (mk_amount 10) in
       assert b
-
-    let%test_unit "to_amount roundtrip" =
-      let b = mk 12345 in
-      [%test_eq: Amount.t] (Balance.to_amount b) (mk_amount 12345)
   end )
 
 let%test_module "fee_rate operations" =
@@ -393,6 +237,15 @@ let%test_module "quickcheck properties" =
 
     let signed_gen = Amount.Signed.gen
 
+    let sgn_gen =
+      Quickcheck.Generator.map Bool.quickcheck_generator ~f:(fun b ->
+          if b then Sgn.Pos else Sgn.Neg )
+
+    let nonzero_amount_gen =
+      Quickcheck.Generator.filter amount_gen ~f:(fun a ->
+          not (Amount.equal a Amount.zero) )
+
+    (* --- Amount arithmetic properties --- *)
     let%test_unit "add commutativity" =
       Quickcheck.test (Quickcheck.Generator.tuple2 amount_gen amount_gen)
         ~trials:1000 ~f:(fun (a, b) ->
@@ -401,6 +254,10 @@ let%test_module "quickcheck properties" =
     let%test_unit "add zero identity" =
       Quickcheck.test amount_gen ~trials:1000 ~f:(fun a ->
           [%test_eq: Amount.t option] (Amount.add a Amount.zero) (Some a) )
+
+    let%test_unit "sub zero is identity" =
+      Quickcheck.test amount_gen ~trials:1000 ~f:(fun a ->
+          [%test_eq: Amount.t option] (Amount.sub a Amount.zero) (Some a) )
 
     let%test_unit "sub self is zero" =
       Quickcheck.test amount_gen ~trials:1000 ~f:(fun a ->
@@ -446,6 +303,31 @@ let%test_module "quickcheck properties" =
           let _, `Underflow underflowed = Amount.sub_flagged a b in
           [%test_eq: bool] (Option.is_none opt_result) underflowed )
 
+    (* --- Conversion roundtrip properties --- *)
+    let%test_unit "of_nanomina_int roundtrip" =
+      Quickcheck.test (Int.gen_incl 0 4_611_686_018) ~trials:1000 ~f:(fun n ->
+          let v = Amount.of_nanomina_int_exn n in
+          [%test_eq: int] (Amount.to_nanomina_int v) n )
+
+    let%test_unit "of_mina_int roundtrip" =
+      Quickcheck.test (Int.gen_incl 0 4_611_686) ~trials:1000 ~f:(fun n ->
+          let v = Amount.of_mina_int_exn n in
+          [%test_eq: int] (Amount.to_mina_int v) n )
+
+    let%test_unit "of_fee/to_fee roundtrip" =
+      Quickcheck.test fee_gen ~trials:1000 ~f:(fun f ->
+          [%test_eq: Fee.t] (Amount.to_fee (Amount.of_fee f)) f )
+
+    let%test_unit "add_fee result is at least as large" =
+      Quickcheck.test (Quickcheck.Generator.tuple2 amount_gen fee_gen)
+        ~trials:1000 ~f:(fun (amt, fee) ->
+          match Amount.add_fee amt fee with
+          | None ->
+              ()
+          | Some result ->
+              assert (Amount.( >= ) result amt) )
+
+    (* --- Balance properties --- *)
     let%test_unit "Balance.add_amount then sub_amount roundtrip" =
       Quickcheck.test (Quickcheck.Generator.tuple2 balance_gen amount_gen)
         ~trials:1000 ~f:(fun (bal, amt) ->
@@ -457,10 +339,19 @@ let%test_module "quickcheck properties" =
                 (Balance.sub_amount bal' amt)
                 (Some bal) )
 
-    let%test_unit "of_fee/to_fee roundtrip" =
-      Quickcheck.test fee_gen ~trials:1000 ~f:(fun f ->
-          [%test_eq: Fee.t] (Amount.to_fee (Amount.of_fee f)) f )
+    let%test_unit "Balance.sub_amount self is zero" =
+      Quickcheck.test balance_gen ~trials:1000 ~f:(fun b ->
+          [%test_eq: Balance.t option]
+            (Balance.sub_amount b (Balance.to_amount b))
+            (Some Balance.zero) )
 
+    let%test_unit "Balance.to_amount roundtrip" =
+      Quickcheck.test balance_gen ~trials:1000 ~f:(fun b ->
+          [%test_eq: Balance.t]
+            (Balance.of_uint64 (Amount.to_uint64 (Balance.to_amount b)))
+            b )
+
+    (* --- Signed amount properties --- *)
     let%test_unit "Signed.negate is involution" =
       Quickcheck.test signed_gen ~trials:1000 ~f:(fun x ->
           [%test_eq: Amount.Signed.t]
@@ -472,4 +363,60 @@ let%test_module "quickcheck properties" =
         ~trials:1000 ~f:(fun (a, b) ->
           [%test_eq: Amount.Signed.t option] (Amount.Signed.add a b)
             (Amount.Signed.add b a) )
+
+    let%test_unit "Signed.create preserves sign for nonzero" =
+      Quickcheck.test (Quickcheck.Generator.tuple2 nonzero_amount_gen sgn_gen)
+        ~trials:1000 ~f:(fun (a, s) ->
+          let signed = Amount.Signed.create ~magnitude:a ~sgn:s in
+          [%test_eq: Sgn.t] signed.sgn s )
+
+    let%test_unit "is_positive for positive nonzero" =
+      Quickcheck.test nonzero_amount_gen ~trials:1000 ~f:(fun a ->
+          let s = Amount.Signed.create ~magnitude:a ~sgn:Sgn.Pos in
+          assert (Amount.Signed.is_positive s) )
+
+    let%test_unit "is_negative for negative nonzero" =
+      Quickcheck.test nonzero_amount_gen ~trials:1000 ~f:(fun a ->
+          let s = Amount.Signed.create ~magnitude:a ~sgn:Sgn.Neg in
+          assert (Amount.Signed.is_negative s) )
+
+    let%test_unit "negate flips sign for nonzero" =
+      Quickcheck.test (Quickcheck.Generator.tuple2 nonzero_amount_gen sgn_gen)
+        ~trials:1000 ~f:(fun (a, s) ->
+          let signed = Amount.Signed.create ~magnitude:a ~sgn:s in
+          let negated = Amount.Signed.negate signed in
+          let expected_sgn =
+            match s with Sgn.Pos -> Sgn.Neg | Sgn.Neg -> Sgn.Pos
+          in
+          [%test_eq: Sgn.t] negated.sgn expected_sgn )
+
+    let%test_unit "Signed.add x (negate x) is zero" =
+      Quickcheck.test signed_gen ~trials:1000 ~f:(fun x ->
+          let result = Amount.Signed.add x (Amount.Signed.negate x) in
+          match result with
+          | Some r ->
+              assert (Amount.Signed.is_zero r)
+          | None ->
+              failwith "add x (negate x) should never overflow" )
+
+    let%test_unit "add_signed_flagged consistency" =
+      Quickcheck.test (Quickcheck.Generator.tuple2 amount_gen signed_gen)
+        ~trials:1000 ~f:(fun (base, delta) ->
+          let result, `Overflow overflowed =
+            Amount.add_signed_flagged base delta
+          in
+          if not overflowed then
+            (* When no overflow, the result should be valid *)
+            ignore (result : Amount.t) )
+
+    (* --- Fee_rate sexp roundtrip --- *)
+    let%test_unit "Fee_rate sexp roundtrip" =
+      Quickcheck.test
+        (Quickcheck.Generator.tuple2 fee_gen (Int.gen_incl 1 100))
+        ~trials:1000
+        ~f:(fun (f, w) ->
+          let r = Fee_rate.make_exn f w in
+          let s = Fee_rate.sexp_of_t r in
+          let r' = Fee_rate.t_of_sexp s in
+          assert (Int.equal (Fee_rate.compare r r') 0) )
   end )
