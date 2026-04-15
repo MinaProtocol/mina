@@ -592,9 +592,13 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
                 ( "failed to initialize transition frontier after \
                    bootstrapping: " ^ msg )
             in
+            let max_frontier_depth =
+              (Precomputed_values.genesis_constants Context.precomputed_values)
+                .protocol.k
+            in
             Transition_frontier.load
               ~context:(module Context)
-              ~retry_with_fresh_db:false ~verifier ~consensus_local_state
+              ~retry_with_fresh_db:false ~max_frontier_depth ~verifier ~consensus_local_state
               ~persistent_root ~persistent_frontier ~catchup_mode ()
             >>| function
             | Ok frontier ->

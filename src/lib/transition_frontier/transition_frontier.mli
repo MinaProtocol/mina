@@ -66,7 +66,7 @@ val global_max_length : Genesis_constants.t -> int
 
 val load :
      ?retry_with_fresh_db:bool
-  -> ?max_frontier_depth:int
+  -> max_frontier_depth:int
   -> ?set_best_tip:bool
   -> context:(module CONTEXT)
   -> verifier:Verifier.t

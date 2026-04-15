@@ -303,10 +303,13 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
 let load_frontier ~context:(module Context : CONTEXT) ~verifier
     ~persistent_frontier ~persistent_root ~consensus_local_state ~catchup_mode =
   let open Context in
+  let max_frontier_depth =
+    (Precomputed_values.genesis_constants precomputed_values).protocol.k
+  in
   match%map
     Transition_frontier.load
       ~context:(module Context)
-      ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
+      ~max_frontier_depth ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
       ~catchup_mode ()
   with
   | Ok frontier ->

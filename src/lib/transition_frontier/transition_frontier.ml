@@ -100,7 +100,7 @@ let genesis_root_data ~precomputed_values =
 let load_from_persistence_and_start ~context:(module Context : CONTEXT)
     ~verifier ~consensus_local_state ~max_length ~persistent_root
     ~persistent_root_instance ~persistent_frontier ~persistent_frontier_instance
-    ~catchup_mode ?max_frontier_depth ?(set_best_tip = true)
+    ~catchup_mode ~max_frontier_depth ?(set_best_tip = true)
     ignore_consensus_local_state =
   let open Context in
   let open Deferred.Result.Let_syntax in
@@ -143,7 +143,7 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
         ~root_ledger:
           (Persistent_root.Instance.snarked_ledger persistent_root_instance)
         ~consensus_local_state ~ignore_consensus_local_state
-        ~persistent_root_instance ?max_frontier_depth ()
+        ~persistent_root_instance ~max_frontier_depth ()
     with
     | Error `Sync_cannot_be_running ->
         Error (`Failure "sync job is already running on persistent frontier")
@@ -200,7 +200,7 @@ let rec load_with_max_length :
        context:(module CONTEXT)
     -> max_length:int
     -> ?retry_with_fresh_db:bool
-    -> ?max_frontier_depth:int
+    -> max_frontier_depth:int
     -> verifier:Verifier.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
@@ -215,7 +215,7 @@ let rec load_with_max_length :
          | `Failure of string ] )
        Deferred.Result.t =
  fun ~context:(module Context : CONTEXT) ~max_length
-     ?(retry_with_fresh_db = true) ?max_frontier_depth ~verifier
+     ?(retry_with_fresh_db = true) ~max_frontier_depth ~verifier
      ~consensus_local_state ~persistent_root ~persistent_frontier ~catchup_mode
      ?set_best_tip () ->
   let open Context in
@@ -248,7 +248,7 @@ let rec load_with_max_length :
             ~context:(module Context)
             ~verifier ~consensus_local_state ~max_length ~persistent_root
             ~persistent_root_instance ~catchup_mode ~persistent_frontier
-            ~persistent_frontier_instance ?max_frontier_depth ?set_best_tip
+            ~persistent_frontier_instance ~max_frontier_depth ?set_best_tip
             ignore_consensus_local_state
         with
         | Ok _ as result ->
@@ -353,7 +353,7 @@ let rec load_with_max_length :
         in
         load_with_max_length
           ~context:(module Context)
-          ~max_length ~verifier ~consensus_local_state ~persistent_root
+          ~max_length ~max_frontier_depth ~verifier ~consensus_local_state ~persistent_root
           ~persistent_frontier ~retry_with_fresh_db:false ~catchup_mode ()
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
@@ -381,7 +381,7 @@ let rec load_with_max_length :
           [%str_log trace] Transition_frontier_loaded_from_persistence ;
           return res )
 
-let load ?(retry_with_fresh_db = true) ?max_frontier_depth ?set_best_tip
+let load ?(retry_with_fresh_db = true) ~max_frontier_depth ?set_best_tip
     ~context:(module Context : CONTEXT) ~verifier ~consensus_local_state
     ~persistent_root ~persistent_frontier ~catchup_mode () =
   let open Context in
@@ -392,7 +392,7 @@ let load ?(retry_with_fresh_db = true) ?max_frontier_depth ?set_best_tip
       in
       load_with_max_length
         ~context:(module Context)
-        ~max_length ~retry_with_fresh_db ?max_frontier_depth ~verifier
+        ~max_length ~retry_with_fresh_db ~max_frontier_depth ~verifier
         ~consensus_local_state ~persistent_root ~persistent_frontier
         ~catchup_mode ?set_best_tip () )
 
@@ -757,7 +757,7 @@ module For_tests = struct
             |> Mina_block.Validated.state_hash ) ) ;
     let frontier_result =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          load_with_max_length ~max_length ~retry_with_fresh_db:false
+          load_with_max_length ~max_length ~max_frontier_depth:max_length ~retry_with_fresh_db:false
             ~context:(module Context)
             ~verifier ~consensus_local_state ~persistent_root
             ~catchup_mode:`Super ~persistent_frontier () )
