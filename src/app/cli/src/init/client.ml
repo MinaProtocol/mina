@@ -2231,6 +2231,58 @@ let hash_transaction =
            Format.eprintf "Could not hash transaction: %s@."
              (Error.to_string_hum err) )
 
+let persistent_frontier_arcs_csv =
+  let open Command.Let_syntax in
+  Command.basic
+    ~summary:
+      "Print CSV rows of reachable persistent frontier arcs as <state \
+       hash>,<entries in raw arcs list>"
+    (let%map_open database_dir =
+       flag "--database-dir"
+         ~doc:"PATH Path to the persistent frontier RocksDB directory"
+         (required string)
+     in
+     fun () ->
+       let logger = Logger.null () in
+       let db =
+         Persistent_frontier.Database.create ~logger ~directory:database_dir
+       in
+       let rec crawl visited hash =
+         let open Result.Let_syntax in
+         match Persistent_frontier.Database.get_arcs db hash with
+         | Error err ->
+             Or_error.error_string
+               (Persistent_frontier.Database.Error.not_found_message err)
+         | Ok successors ->
+             printf "%s,%d\n"
+               (State_hash.to_base58_check hash)
+               (List.length successors) ;
+             List.fold successors ~init:(Ok ()) ~f:(fun acc succ_hash ->
+                 let%bind () = acc in
+                 if Hash_set.mem visited succ_hash then Ok ()
+                 else (
+                   Hash_set.add visited succ_hash ;
+                   crawl visited succ_hash ) )
+       in
+       let result =
+         match Persistent_frontier.Database.get_root_hash db with
+         | Error err ->
+             Or_error.error_string
+               (Persistent_frontier.Database.Error.not_found_message err)
+         | Ok root_hash ->
+             let visited = State_hash.Hash_set.create () in
+             Hash_set.add visited root_hash ;
+             crawl visited root_hash
+       in
+       Persistent_frontier.Database.close db ;
+       match result with
+       | Ok () ->
+           ()
+       | Error err ->
+           Format.eprintf "Failed to inspect persistent frontier arcs: %s@."
+             (Error.to_string_hum err) ;
+           Core.exit 1 )
+
 let humanize_graphql_error
     ~(graphql_endpoint : Uri.t Cli_lib.Flag.Types.with_name) = function
   | `Failed_request e ->
@@ -2560,6 +2612,7 @@ let advanced ~itn_features =
     ; ("archive-blocks", archive_blocks)
     ; ("compute-receipt-chain-hash", receipt_chain_hash)
     ; ("hash-transaction", hash_transaction)
+    ; ("persistent-frontier-arcs-csv", persistent_frontier_arcs_csv)
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
     ; ("chain-id-inputs", chain_id_inputs)
     ; ("runtime-config", runtime_config)

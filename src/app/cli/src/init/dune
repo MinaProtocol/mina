@@ -72,6 +72,7 @@
   mina_generators
   mina_ledger
   mina_block
+  transition_frontier_persistent_frontier
   mina_lib
   mina_base
   cli_lib
