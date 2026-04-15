@@ -2254,9 +2254,10 @@ let persistent_frontier_arcs_csv =
              Or_error.error_string
                (Persistent_frontier.Database.Error.not_found_message err)
          | Ok successors ->
-             Core.printf "%s,%d\n%!"
-               (State_hash.to_base58_check hash)
-               (List.length successors) ;
+             List.iter successors ~f:(fun succ_hash ->
+                 Core.printf "%s,%s\n%!"
+                   (State_hash.to_base58_check hash)
+                   (State_hash.to_base58_check succ_hash) ) ;
              List.fold successors ~init:(Ok ()) ~f:(fun acc succ_hash ->
                  let%bind () = acc in
                  if Hash_set.mem visited succ_hash then Ok ()
