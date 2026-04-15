@@ -914,7 +914,8 @@ module HealthcheckBootstrapLifecycle = struct
         Or_error.errorf "pre-bootstrap readiness check errored: %s"
           (Error.to_string_hum e)
     | Ok r when r.ready ->
-        eprintf "Pre-bootstrap: node already ready (fast bootstrap in demo mode)\n" ;
+        eprintf
+          "Pre-bootstrap: node already ready (fast bootstrap in demo mode)\n" ;
         Ok ()
     | Ok _ ->
         eprintf "Pre-bootstrap not_ready=true\n" ;
@@ -1100,8 +1101,7 @@ let () =
                           (PeerListUrlHttpWarning) ) )
         ] )
     ; ( "healthcheck"
-      , [ test_case
-            "Healthcheck lifecycle: readiness check then wait for ready"
+      , [ test_case "Healthcheck lifecycle: readiness check then wait for ready"
             `Quick
             (Mina_automation_runner.Runner.run_blocking
                ( module Mina_automation_fixture.Daemon
