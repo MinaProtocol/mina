@@ -2254,7 +2254,7 @@ let persistent_frontier_arcs_csv =
              Or_error.error_string
                (Persistent_frontier.Database.Error.not_found_message err)
          | Ok successors ->
-             printf "%s,%d\n"
+             Core.printf "%s,%d\n%!"
                (State_hash.to_base58_check hash)
                (List.length successors) ;
              List.fold successors ~init:(Ok ()) ~f:(fun acc succ_hash ->
