@@ -287,7 +287,6 @@ setup_environment() {
   # --- Static CI constants ---
   export BUILDKITE="${BUILDKITE:-true}"
   export CI="${CI:-true}"
-  export GIT_LFS_SKIP_SMUDGE=1
   export SKIP_DOCKER_PRUNE=1
   export BUILDKIT_PROGRESS="${BUILDKIT_PROGRESS:-plain}"
   export BUILDKITE_COMMIT_RESOLVED="${BUILDKITE_COMMIT_RESOLVED:-true}"
@@ -500,7 +499,7 @@ patch_docker_command() {
   # Note: We intentionally do NOT use --user flag. The container runs as opam
   # (UID 1000) which typically matches the host user's UID, allowing sudo to
   # work inside the container for apt operations.
-  local docker_flags="--env GIT_LFS_SKIP_SMUDGE=1 --env APTLY_ROOT=/tmp/aptly --env LOCAL_BK_RUN=${LOCAL_BK_RUN}${USER_ENV_DOCKER_FLAGS}"
+  local docker_flags="--env APTLY_ROOT=/tmp/aptly --env LOCAL_BK_RUN=${LOCAL_BK_RUN}${USER_ENV_DOCKER_FLAGS}"
   [[ -n "${OVERRIDE_GITHASH:-}" ]] && docker_flags+=" --env OVERRIDE_GITHASH=${OVERRIDE_GITHASH}"
   cmd=$(printf '%s\n' "$cmd" | sed "s|docker run -it|docker run -it ${docker_flags}|g")
 

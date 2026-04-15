@@ -124,7 +124,8 @@ presetup_tools() {
         if ! command -v gem &> /dev/null; then
             log_info "RubyGems not found. Installing Ruby and RubyGems..."
             if command -v apt-get &> /dev/null; then
-                apt-get update && apt-get install -y ruby ruby-dev build-essential
+                source ./buildkite/scripts/debian/update.sh --verbose
+                apt-get install -y ruby ruby-dev build-essential
             else
                 log_error "Could not install Ruby"
                 exit 1

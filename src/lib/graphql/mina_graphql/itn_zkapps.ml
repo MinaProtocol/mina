@@ -187,8 +187,7 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
     Transaction_snark.For_tests.create_trivial_snapp ()
   in
   let%bind.Deferred vk = vk in
-  (* Cache for max cost zkapp proof reuse *)
-  let cache = ref Signature_lib.Public_key.Compressed.Map.empty in
+  let cache = ref Mina_base.Zkapp_statement.Map.empty in
   let account_queue = Queue.create () in
   let num_fee_payers = Array.length fee_payer_array in
   Deferred.repeat_until_finished (init_tm_next, init_counter)

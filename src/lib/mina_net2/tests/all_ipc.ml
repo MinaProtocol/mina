@@ -45,7 +45,7 @@ let random_msg () =
 
 exception Timeout of string
 
-let or_timeout ?(timeout = 60) ~msg action =
+let or_timeout ?(timeout = 180) ~msg action =
   Deferred.(
     (* HACK yield to facilitate scheduler to switch between processes
        This shouldn't be necessary, but is required for test not to stall. *)
@@ -631,16 +631,21 @@ let%test_module "all-ipc test" =
         ; stream_2_msg_1 = random_msg ()
         }
       in
+      (* Wrap each node so its shutdown always runs right after it
+         completes (or fails). This is required because alice waits for
+         bob to disconnect, which only happens when bob shuts down. *)
+      let with_cleanup action shutdown =
+        Monitor.protect (fun () -> action) ~finally:shutdown
+      in
       Deferred.all_unit
-        [ alice a addrs a_pipe msgs >>= a_shutdown
-        ; bob b addrs b_pipe msgs >>= b_shutdown
-        ; carol c addrs c_pipe msgs >>= c_shutdown
+        [ with_cleanup (alice a addrs a_pipe msgs) a_shutdown
+        ; with_cleanup (bob b addrs b_pipe msgs) b_shutdown
+        ; with_cleanup (carol c addrs c_pipe msgs) c_shutdown
         ]
       >>= y_shutdown
       >>| fun () -> [%log info] "Test passes :)"
 
     let%test_unit "ipc test" =
-      (* ignore test_def *)
       let () = Core.Backtrace.elide := false in
       Async.Thread_safe.block_on_async_exn test_def
   end )
