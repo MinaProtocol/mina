@@ -427,15 +427,28 @@ let add ~arcs_cache ~transition =
     |> Mina_state.Protocol_state.previous_state_hash
   in
   let parent_arcs = State_hash.Table.find_exn arcs_cache parent_hash in
-  State_hash.Table.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
-  State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
-  let transition_unwrapped =
-    With_hash.data transition |> Mina_block.read_all_proofs_from_disk
-  in
-  fun batch ->
-    Batch.set batch ~key:(Transition hash) ~data:transition_unwrapped ;
-    Batch.set batch ~key:(Arcs hash) ~data:[] ;
-    Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
+  (* Guard against duplicate New_node diffs for the same block: if this block
+     is already listed as a successor of its parent, skip the write entirely.
+     Without this check, replaying the same New_node diff (e.g. when
+     add_breadcrumb_exn is called twice for the same block) would append the
+     hash again to the Arcs list, causing crawl_successors to visit the block
+     and all its descendants multiple times during load_full_frontier. *)
+  if List.mem parent_arcs hash ~equal:State_hash.equal then (
+    (* Still populate the cache entry for this block so that any children of
+       this block appearing later in the same batch can find their parent. *)
+    if not (State_hash.Table.mem arcs_cache hash) then
+      State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
+    fun _batch -> () )
+  else (
+    State_hash.Table.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
+    State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
+    let transition_unwrapped =
+      With_hash.data transition |> Mina_block.read_all_proofs_from_disk
+    in
+    fun batch ->
+      Batch.set batch ~key:(Transition hash) ~data:transition_unwrapped ;
+      Batch.set batch ~key:(Arcs hash) ~data:[] ;
+      Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs) )
 
 let move_root ~old_root_hash ~new_root ~garbage =
   let new_root_hash =
