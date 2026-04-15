@@ -604,6 +604,32 @@ struct
         let q = p_prime + lr_prod in
         absorb sponge PC delta ;
         let c = squeeze_scalar sponge in
+        (* === TRACE: wrap IPA check inputs + LHS/RHS for byte-diff
+           against PS's `ipa.dbg.*` labels. Emitted only on the wrap
+           side; the step-side check_bulletproof (which also runs this
+           code) will overwrite with its own values. *)
+        as_prover (fun () ->
+            let read_pt (x, y) =
+              (As_prover.read_var x, As_prover.read_var y)
+            in
+            let sg_x, sg_y = read_pt challenge_polynomial_commitment in
+            Pickles_trace.tock_field "ipa.dbg.sg.x" sg_x ;
+            Pickles_trace.tock_field "ipa.dbg.sg.y" sg_y ;
+            let dx, dy = read_pt delta in
+            Pickles_trace.tock_field "ipa.dbg.delta.x" dx ;
+            Pickles_trace.tock_field "ipa.dbg.delta.y" dy ;
+            let cpx, cpy = read_pt combined_polynomial in
+            Pickles_trace.tock_field "ipa.dbg.cp.x" cpx ;
+            Pickles_trace.tock_field "ipa.dbg.cp.y" cpy ;
+            let ux, uy = read_pt u in
+            Pickles_trace.tock_field "ipa.dbg.u.x" ux ;
+            Pickles_trace.tock_field "ipa.dbg.u.y" uy ;
+            let qx, qy = read_pt q in
+            Pickles_trace.tock_field "ipa.dbg.q.x" qx ;
+            Pickles_trace.tock_field "ipa.dbg.q.y" qy ;
+            let { Import.Scalar_challenge.inner = c_inner } = c in
+            Pickles_trace.tock_field "ipa.dbg.c"
+              (As_prover.read_var c_inner)) ;
         (* c Q + delta = z1 (G + b U) + z2 H *)
         let lhs =
           let cq = Scalar_challenge.endo q c in
@@ -619,6 +645,16 @@ struct
           in
           z_1_g_plus_b_u + z2_h
         in
+        as_prover (fun () ->
+            let read_pt (x, y) =
+              (As_prover.read_var x, As_prover.read_var y)
+            in
+            let lx, ly = read_pt lhs in
+            Pickles_trace.tock_field "ipa.dbg.lhs.x" lx ;
+            Pickles_trace.tock_field "ipa.dbg.lhs.y" ly ;
+            let rx, ry = read_pt rhs in
+            Pickles_trace.tock_field "ipa.dbg.rhs.x" rx ;
+            Pickles_trace.tock_field "ipa.dbg.rhs.y" ry) ;
         (`Success (equal_g lhs rhs), challenges) )
 
   module Opt = struct

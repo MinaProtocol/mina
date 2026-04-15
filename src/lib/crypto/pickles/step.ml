@@ -466,6 +466,10 @@ struct
              dummyWrapProof has different evals than OCaml's Proof.dummy
              (e.g. Ro counter divergence), kimchi's cip will diverge,
              then prechals will diverge. *)
+          Pickles_trace.tock_field "expand_proof.dummy_proof.z1"
+            proof.openings.proof.z_1 ;
+          Pickles_trace.tock_field "expand_proof.dummy_proof.z2"
+            proof.openings.proof.z_2 ;
           Pickles_trace.tock_field "expand_proof.dummy_proof.ft_eval1"
             proof.openings.ft_eval1 ;
           let ev = proof.openings.evals in
