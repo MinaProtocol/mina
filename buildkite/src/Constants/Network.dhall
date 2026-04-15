@@ -36,6 +36,20 @@ let debianSuffix =
             }
             network
 
+let peerListUrl =
+          \(network : Network)
+      ->  merge
+            { Devnet =
+                "https://storage.googleapis.com/seed-lists/devnet_seeds.txt"
+            , Mainnet =
+                "https://storage.googleapis.com/seed-lists/mainnet_seeds.txt"
+            , PreMesa1 =
+                "https://storage.googleapis.com/o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt"
+            , Mesa =
+                "https://storage.googleapis.com/o1labs-gitops-infrastructure/mina-mesa-network/mina-mesa-network-seeds.txt"
+            }
+            network
+
 let toLabelSegment = \(network : Network) -> "-${debianSuffix network}"
 
 let requiresMainnetBuild =
@@ -64,6 +78,7 @@ in  { Type = Network
     , capitalName = capitalName
     , lowerName = lowerName
     , debianSuffix = debianSuffix
+    , peerListUrl = peerListUrl
     , toLabelSegment = toLabelSegment
     , requiresMainnetBuild = requiresMainnetBuild
     , foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv
