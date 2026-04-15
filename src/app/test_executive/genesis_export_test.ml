@@ -249,13 +249,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               gql_account.delegate
           then Malleable_error.return ()
           else
+            let show_opt f = Option.value_map ~default:"<none>" ~f in
             Malleable_error.soft_error_format ~value:()
               "Error: delegate mismatch in account %s.  \n\
                In the genesis ledger: %s.  \n\
                On the original blockchain: %s." genesis_account.pk
-              (Option.value_exn genesis_account.delegate)
-              ( Public_key.Compressed.to_base58_check
-              @@ Option.value_exn gql_account.delegate )
+              (show_opt Fn.id genesis_account.delegate)
+              (show_opt Public_key.Compressed.to_base58_check
+                 gql_account.delegate )
         in
         if Balance.equal genesis_account.balance gql_account.total_balance then (
           [%log info] "balance check successful for account %s."
