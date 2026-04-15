@@ -554,11 +554,11 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
               V.f proofs_verified (M.f proof_witnesses)
             in
             with_label "hash_messages_for_next_step_proof" (fun () ->
+                let to_field_elements =
+                  let (Typ typ) = basic.public_input in
+                  fun x -> fst (typ.var_to_fields x)
+                in
                 let hash_messages_for_next_step_proof =
-                  let to_field_elements =
-                    let (Typ typ) = basic.public_input in
-                    fun x -> fst (typ.var_to_fields x)
-                  in
                   unstage
                     (Step_verifier.hash_messages_for_next_step_proof
                        ~index:dlog_plonk_index to_field_elements )
@@ -572,14 +572,91 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                   | Input_and_output _ ->
                       (app_state, ret_var)
                 in
-                hash_messages_for_next_step_proof
-                  { app_state
-                  ; dlog_plonk_index
-                  ; challenge_polynomial_commitments
-                  ; old_bulletproof_challenges =
-                      (* Note: the bulletproof_challenges here are unpadded! *)
-                      bulletproof_challenges
-                  } )
+                (* === TRACE: outer hash inputs (NEW step proof's
+                   msgForNextStep). PI[32] is the digest of these
+                   inputs; any divergence in PI[32] is a diff in one of
+                   them. *)
+                as_prover (fun () ->
+                    let read_field x =
+                      As_prover.read Impls.Step.Field.typ x
+                    in
+                    let read_pt (x, y) = (read_field x, read_field y) in
+                    let i = ref 0 in
+                    Vector.iter dlog_plonk_index.sigma_comm ~f:(fun pts ->
+                        let cx, cy = read_pt pts.(0) in
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.vk.sigma.%d.x" !i)
+                          cx ;
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.vk.sigma.%d.y" !i)
+                          cy ;
+                        incr i) ;
+                    let i = ref 0 in
+                    Vector.iter dlog_plonk_index.coefficients_comm
+                      ~f:(fun pts ->
+                        let cx, cy = read_pt pts.(0) in
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.vk.coeff.%d.x" !i)
+                          cx ;
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.vk.coeff.%d.y" !i)
+                          cy ;
+                        incr i) ;
+                    let idx_pts =
+                      [ ("generic", dlog_plonk_index.generic_comm)
+                      ; ("psm", dlog_plonk_index.psm_comm)
+                      ; ("complete_add", dlog_plonk_index.complete_add_comm)
+                      ; ("mul", dlog_plonk_index.mul_comm)
+                      ; ("emul", dlog_plonk_index.emul_comm)
+                      ; ("endomul_scalar", dlog_plonk_index.endomul_scalar_comm)
+                      ]
+                    in
+                    List.iter idx_pts ~f:(fun (name, pts) ->
+                        let cx, cy = read_pt pts.(0) in
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.vk.idx.%s.x" name) cx ;
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.vk.idx.%s.y" name) cy) ;
+                    let app_fields = to_field_elements app_state in
+                    Array.iteri app_fields ~f:(fun i v ->
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.app_state.%d" i)
+                          (read_field v)) ;
+                    let i = ref 0 in
+                    Vector.iter challenge_polynomial_commitments
+                      ~f:(fun (sx, sy) ->
+                        let cx, cy = read_pt (sx, sy) in
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.proof.%d.sg.x" !i)
+                          cx ;
+                        Pickles_trace.tick_field
+                          (Printf.sprintf "step_main_outer.proof.%d.sg.y" !i)
+                          cy ;
+                        incr i) ;
+                    let i = ref 0 in
+                    Vector.iter bulletproof_challenges ~f:(fun chals ->
+                        let j = ref 0 in
+                        Vector.iter chals ~f:(fun c ->
+                            Pickles_trace.tick_field
+                              (Printf.sprintf
+                                 "step_main_outer.proof.%d.bp_chal.%d" !i !j )
+                              (read_field c) ;
+                            incr j ) ;
+                        incr i ) ) ;
+                let result =
+                  hash_messages_for_next_step_proof
+                    { app_state
+                    ; dlog_plonk_index
+                    ; challenge_polynomial_commitments
+                    ; old_bulletproof_challenges =
+                        (* Note: the bulletproof_challenges here are unpadded! *)
+                        bulletproof_challenges
+                    }
+                in
+                as_prover (fun () ->
+                    Pickles_trace.tick_field "step_main_outer.digest"
+                      (As_prover.read Impls.Step.Field.typ result) ) ;
+                result )
           in
           let unfinalized_proofs =
             Vector.extend_front unfinalized_proofs_unextended lte
