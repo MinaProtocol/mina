@@ -40,6 +40,13 @@ let must_send_payment_with_raw_sig ~logger node_uri ~sender_pub_key
     ~raw_signature
   |> lift
 
+let must_send_delegation_with_raw_sig ~logger node_uri ~sender_pub_key
+    ~receiver_pub_key ~fee ~nonce ~memo
+    ~(valid_until : Mina_numbers.Global_slot_since_genesis.t) ~raw_signature =
+  send_delegation_with_raw_sig ~logger node_uri ~sender_pub_key
+    ~receiver_pub_key ~fee ~nonce ~memo ~valid_until ~raw_signature
+  |> lift
+
 let must_send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders
     ~receiver_pub_key ~amount ~fee =
   send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders

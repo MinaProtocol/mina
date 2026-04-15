@@ -606,6 +606,47 @@ let send_payment_with_raw_sig ~logger node_uri ~sender_pub_key ~receiver_pub_key
       ] ;
   res
 
+let send_delegation_with_raw_sig ~logger node_uri ~sender_pub_key
+    ~receiver_pub_key ~fee ~nonce ~memo
+    ~(valid_until : Mina_numbers.Global_slot_since_genesis.t) ~raw_signature =
+  [%log info] "Sending a stake delegation with raw signature"
+    ~metadata:
+      [ ( "sender_pub_key"
+        , Signature_lib.Public_key.Compressed.to_yojson sender_pub_key )
+      ; ("node_uri", `String (Uri.to_string node_uri))
+      ] ;
+  let open Deferred.Or_error.Let_syntax in
+  let send_delegation_graphql () =
+    let open Queries.Send_delegation_with_raw_sig in
+    let input =
+      Mina_graphql.Types.Input.SendDelegationInput.make_input
+        ~from:sender_pub_key ~to_:receiver_pub_key ~fee ~memo ~nonce
+        ~valid_until:
+          (Mina_numbers.Global_slot_since_genesis.to_uint32 valid_until)
+        ()
+    in
+    let variables = makeVariables ~input ~rawSignature:raw_signature () in
+    let send_delegation_obj = make variables in
+    exec_graphql_request ~logger ~node_uri
+      ~query_name:"Send_delegation_with_raw_sig_graphql" send_delegation_obj
+  in
+  let%map result_obj = send_delegation_graphql () in
+  let return_obj = result_obj.sendDelegation.delegation in
+  let res =
+    Types.
+      { id = transaction_id_to_string return_obj.id
+      ; hash = return_obj.hash
+      ; nonce = Mina_numbers.Account_nonce.of_int return_obj.nonce
+      }
+  in
+  [%log info] "Sent stake delegation with raw signature"
+    ~metadata:
+      [ ("user_command_id", `String res.id)
+      ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
+      ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
+      ] ;
+  res
+
 let sign_and_send_payment ~logger node_uri
     ~(sender_keypair : Signature_lib.Keypair.t) ~receiver_pub_key ~amount ~fee
     ~nonce ~memo ~valid_until ~signature_kind =
