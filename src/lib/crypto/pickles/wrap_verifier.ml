@@ -578,7 +578,25 @@ struct
           , Other_field.Packed.t Shifted_value.Type1.t )
           Openings.Bulletproof.t ) =
     with_label __LOC__ (fun () ->
+        (* === TRACE: sponge state at check_bulletproof entry (pre CIP
+           absorb). Compare to PS `ipa.dbg.sponge_pre.*` and kimchi
+           native `pallas_sponge_checkpoint`. *)
+        as_prover (fun () ->
+            Pickles_trace.tock_field "ipa.dbg.wrap_sponge_pre.s0"
+              (As_prover.read_var sponge.state.(0)) ;
+            Pickles_trace.tock_field "ipa.dbg.wrap_sponge_pre.s1"
+              (As_prover.read_var sponge.state.(1)) ;
+            Pickles_trace.tock_field "ipa.dbg.wrap_sponge_pre.s2"
+              (As_prover.read_var sponge.state.(2))) ;
         Other_field.Packed.absorb_shifted sponge advice.combined_inner_product ;
+        (* === TRACE: sponge state after CIP absorb === *)
+        as_prover (fun () ->
+            Pickles_trace.tock_field "ipa.dbg.wrap_sponge_post.s0"
+              (As_prover.read_var sponge.state.(0)) ;
+            Pickles_trace.tock_field "ipa.dbg.wrap_sponge_post.s1"
+              (As_prover.read_var sponge.state.(1)) ;
+            Pickles_trace.tock_field "ipa.dbg.wrap_sponge_post.s2"
+              (As_prover.read_var sponge.state.(2))) ;
         (* combined_inner_product should be equal to
            sum_i < t, r^i pows(beta_i) >
            = sum_i r^i < t, pows(beta_i) >
