@@ -315,6 +315,31 @@ build_logproc_deb() {
 }
 ## END LOGPROC PACKAGE ##
 
+## GENERATE MINIMINA PACKAGE ##
+
+#
+# Builds minimina package for local Mina network tool
+#
+# Output: minimina_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: none (standalone Rust binary)
+#
+# The binary is expected at src/app/minimina/target/release/minimina
+# after running: cargo build --release --manifest-path src/app/minimina/Cargo.toml
+#
+build_minimina_deb() {
+  create_control_file minimina "" \
+    'MiniMina - command line tool for spinning up local Mina networks'
+
+  mkdir -p "${BUILDDIR}/usr/local/bin"
+
+  # Binary built by cargo
+  cp ../src/app/minimina/target/release/minimina \
+    "${BUILDDIR}/usr/local/bin/minimina"
+
+  build_deb minimina
+}
+## END MINIMINA PACKAGE ##
+
 ## GENERATE TEST_EXECUTIVE PACKAGE ##
 
 #

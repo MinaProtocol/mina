@@ -143,7 +143,6 @@ These are derived from your local git state:
 |----------|---------|-------------|
 | `LOCAL_BK_RUN` | `1` | Indicates local execution (scripts can check this) |
 | `SKIP_DOCKER_PRUNE` | `1` | Prevents docker system prune |
-| `GIT_LFS_SKIP_SMUDGE` | `1` | Skips LFS file download |
 | `APTLY_ROOT` | `/tmp/aptly` | Writable directory for aptly database (avoids ~/.aptly permission issues) |
 
 ### Cache Configuration
