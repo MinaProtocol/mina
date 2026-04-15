@@ -382,3 +382,94 @@ let%test_module "fee_rate operations" =
       let r' = Fee_rate.t_of_sexp s in
       assert (Int.equal (Fee_rate.compare r r') 0)
   end )
+
+let%test_module "quickcheck properties" =
+  ( module struct
+    let amount_gen = Amount.gen
+
+    let fee_gen = Fee.gen
+
+    let balance_gen = Balance.gen
+
+    let signed_gen = Amount.Signed.gen
+
+    let%test_unit "add commutativity" =
+      Quickcheck.test (Quickcheck.Generator.tuple2 amount_gen amount_gen)
+        ~trials:1000 ~f:(fun (a, b) ->
+          [%test_eq: Amount.t option] (Amount.add a b) (Amount.add b a) )
+
+    let%test_unit "add zero identity" =
+      Quickcheck.test amount_gen ~trials:1000 ~f:(fun a ->
+          [%test_eq: Amount.t option] (Amount.add a Amount.zero) (Some a) )
+
+    let%test_unit "sub self is zero" =
+      Quickcheck.test amount_gen ~trials:1000 ~f:(fun a ->
+          [%test_eq: Amount.t option] (Amount.sub a a) (Some Amount.zero) )
+
+    let%test_unit "add then sub roundtrip" =
+      Quickcheck.test (Quickcheck.Generator.tuple2 amount_gen amount_gen)
+        ~trials:1000 ~f:(fun (a, b) ->
+          match Amount.add a b with
+          | None ->
+              ()
+          | Some c ->
+              [%test_eq: Amount.t option] (Amount.sub c b) (Some a) )
+
+    let%test_unit "sub then add roundtrip" =
+      Quickcheck.test (Quickcheck.Generator.tuple2 amount_gen amount_gen)
+        ~trials:1000 ~f:(fun (a, b) ->
+          match Amount.sub a b with
+          | None ->
+              ()
+          | Some c ->
+              [%test_eq: Amount.t option] (Amount.add c b) (Some a) )
+
+    let%test_unit "scale by 1 is identity" =
+      Quickcheck.test amount_gen ~trials:1000 ~f:(fun a ->
+          [%test_eq: Amount.t option] (Amount.scale a 1) (Some a) )
+
+    let%test_unit "scale by 0 is zero" =
+      Quickcheck.test amount_gen ~trials:1000 ~f:(fun a ->
+          [%test_eq: Amount.t option] (Amount.scale a 0) (Some Amount.zero) )
+
+    let%test_unit "add overflow consistency" =
+      Quickcheck.test (Quickcheck.Generator.tuple2 amount_gen amount_gen)
+        ~trials:1000 ~f:(fun (a, b) ->
+          let opt_result = Amount.add a b in
+          let _, `Overflow overflowed = Amount.add_flagged a b in
+          [%test_eq: bool] (Option.is_none opt_result) overflowed )
+
+    let%test_unit "sub underflow consistency" =
+      Quickcheck.test (Quickcheck.Generator.tuple2 amount_gen amount_gen)
+        ~trials:1000 ~f:(fun (a, b) ->
+          let opt_result = Amount.sub a b in
+          let _, `Underflow underflowed = Amount.sub_flagged a b in
+          [%test_eq: bool] (Option.is_none opt_result) underflowed )
+
+    let%test_unit "Balance.add_amount then sub_amount roundtrip" =
+      Quickcheck.test (Quickcheck.Generator.tuple2 balance_gen amount_gen)
+        ~trials:1000 ~f:(fun (bal, amt) ->
+          match Balance.add_amount bal amt with
+          | None ->
+              ()
+          | Some bal' ->
+              [%test_eq: Balance.t option]
+                (Balance.sub_amount bal' amt)
+                (Some bal) )
+
+    let%test_unit "of_fee/to_fee roundtrip" =
+      Quickcheck.test fee_gen ~trials:1000 ~f:(fun f ->
+          [%test_eq: Fee.t] (Amount.to_fee (Amount.of_fee f)) f )
+
+    let%test_unit "Signed.negate is involution" =
+      Quickcheck.test signed_gen ~trials:1000 ~f:(fun x ->
+          [%test_eq: Amount.Signed.t]
+            (Amount.Signed.negate (Amount.Signed.negate x))
+            x )
+
+    let%test_unit "Signed.add commutative" =
+      Quickcheck.test (Quickcheck.Generator.tuple2 signed_gen signed_gen)
+        ~trials:1000 ~f:(fun (a, b) ->
+          [%test_eq: Amount.Signed.t option] (Amount.Signed.add a b)
+            (Amount.Signed.add b a) )
+  end )
