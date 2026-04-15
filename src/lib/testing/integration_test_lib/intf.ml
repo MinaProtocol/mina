@@ -261,6 +261,9 @@ module Dsl = struct
       -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
 
+    val signed_command_to_be_included_in_frontier_with_status :
+      txn_hash:Mina_transaction.Transaction_hash.t -> has_failures:bool -> t
+
     val ledger_proofs_emitted_since_genesis :
       test_config:Test_config.t -> num_proofs:int -> t
 
