@@ -875,7 +875,22 @@ struct
            encode the accumulated IPA verification state. Absorbing them binds
            this proof to its predecessors. *)
         absorb sponge Field (Boolean.true_, index_digest) ;
+        (* === TRACE: wrap IVP step 1 === *)
+        as_prover (fun () ->
+            Pickles_trace.tock_field "ivp.trace.wrap.index_digest"
+              (As_prover.read_var index_digest)) ;
         Vector.iter ~f:(absorb sponge PC) sg_old ;
+        (* === TRACE: wrap IVP step 2 (sg_old) === *)
+        as_prover (fun () ->
+            let i = ref 0 in
+            Vector.iter sg_old ~f:(fun (_keep, (sx, sy)) ->
+                Pickles_trace.tock_field
+                  (Printf.sprintf "ivp.trace.wrap.sg_old.%d.x" !i)
+                  (As_prover.read_var sx) ;
+                Pickles_trace.tock_field
+                  (Printf.sprintf "ivp.trace.wrap.sg_old.%d.y" !i)
+                  (As_prover.read_var sy) ;
+                incr i)) ;
         (* == IVC Step 3: Compute public input commitment (x_hat) ==
            Compute the commitment to the public input polynomial using
            Lagrange basis. The domain is selected based on which_branch. *)
@@ -966,9 +981,37 @@ struct
         in
         Array.iter x_hat ~f:(fun x_hat ->
             absorb sponge PC (Boolean.true_, x_hat) ) ;
+        (* === TRACE: wrap IVP step 4 (x_hat post-blinding) ===
+           PS uses non-indexed labels `xhat.x` / `xhat.y` because the
+           wrap circuit only handles single-chunk public input
+           commitments. Match by emitting only the i=0 element. *)
+        as_prover (fun () ->
+            Array.iteri x_hat ~f:(fun i (xh_x, xh_y) ->
+                if i = 0 then begin
+                  Pickles_trace.tock_field "ivp.trace.wrap.xhat.x"
+                    (As_prover.read_var xh_x) ;
+                  Pickles_trace.tock_field "ivp.trace.wrap.xhat.y"
+                    (As_prover.read_var xh_y)
+                end)) ;
         (* == IVC Step 5: Absorb witness commitments (w_comm) == *)
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
+        (* === TRACE: wrap IVP step 5 (w_comm) ===
+           PS uses non-chunk-indexed labels `w_comm.i.x/y`. Emit only
+           j=0 to match (single-chunk wrap proof). *)
+        as_prover (fun () ->
+            let i = ref 0 in
+            Vector.iter w_comm ~f:(fun arr ->
+                Array.iteri arr ~f:(fun j (wx, wy) ->
+                    if j = 0 then begin
+                      Pickles_trace.tock_field
+                        (Printf.sprintf "ivp.trace.wrap.w_comm.%d.x" !i)
+                        (As_prover.read_var wx) ;
+                      Pickles_trace.tock_field
+                        (Printf.sprintf "ivp.trace.wrap.w_comm.%d.y" !i)
+                        (As_prover.read_var wy)
+                    end) ;
+                incr i)) ;
         (* == IVC Step 6: Handle lookup arguments (if present) ==
            Extract and process lookup-related commitments. This section handles
            runtime tables, sorted columns, and the joint_combiner challenge. *)
@@ -1253,6 +1296,11 @@ struct
         (* == IVC Step 7: Sample beta and gamma challenges ==
            These challenges are used in the permutation argument. *)
         let beta = Opt.challenge sponge in
+        (* === TRACE: wrap IVP step 7 (beta squeeze) ===
+           PS uses label `beta_squeezed`. Match exactly. *)
+        as_prover (fun () ->
+            Pickles_trace.tock_field "ivp.trace.wrap.beta_squeezed"
+              (As_prover.read_var beta)) ;
         let gamma = Opt.challenge sponge in
         (* == IVC Step 8: Absorb lookup aggregation commitment (if used) == *)
         let () =
@@ -1416,6 +1464,12 @@ struct
                        ~f:(Array.map ~f:(fun x -> `Finite x)) )
               , [] )
         in
+        (* === TRACE: wrap IVP step 16 (advice plonk.beta — the value
+           that should equal beta_squeezed). The PS-side trace at the
+           assertEq site uses the same label to localize the divergence. *)
+        as_prover (fun () ->
+            Pickles_trace.tock_field "ivp.trace.wrap.beta_used"
+              (As_prover.read_var plonk.beta)) ;
         (* == IVC Step 16: Assert deferred values match sampled challenges ==
            The challenges sampled from the sponge must match the deferred values
            provided by the prover. *)

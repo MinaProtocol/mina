@@ -356,20 +356,37 @@ struct
             Pickles_trace.tock_field
               (Printf.sprintf "tock_pi.%d" i)
               v ) ;
-        O.create dlog_vk
-          ( Vector.map2
-              (Vector.extend_front_exn
-                 statement.messages_for_next_step_proof
-                   .challenge_polynomial_commitments Local_max_proofs_verified.n
-                 (Lazy.force Dummy.Ipa.Wrap.sg) )
-              (* This should indeed have length Max_proofs_verified... No! It should have type Max_proofs_verified_a. That is, the max_proofs_verified specific to a proof of this type...*)
-              prev_challenges
-              ~f:(fun commitment chals ->
-                { Tock.Proof.Challenge_polynomial.commitment
-                ; challenges = Vector.to_array chals
-                } )
-          |> Wrap_hack.pad_accumulator )
-          public_input proof
+        let chal_polys_padded =
+          Vector.map2
+            (Vector.extend_front_exn
+               statement.messages_for_next_step_proof
+                 .challenge_polynomial_commitments Local_max_proofs_verified.n
+               (Lazy.force Dummy.Ipa.Wrap.sg) )
+            (* This should indeed have length Max_proofs_verified... No! It should have type Max_proofs_verified_a. That is, the max_proofs_verified specific to a proof of this type...*)
+            prev_challenges
+            ~f:(fun commitment chals ->
+              { Tock.Proof.Challenge_polynomial.commitment
+              ; challenges = Vector.to_array chals
+              } )
+          |> Wrap_hack.pad_accumulator
+        in
+        (* === TRACE: chal_polys passed to O.create ===
+           Trace each entry's commitment x and first challenge so PS can
+           compare against the [dummyChalEntry; dummyChalEntry] it sends
+           to vestaProofOpeningPrechallenges. *)
+        List.iteri chal_polys_padded ~f:(fun i cp ->
+            let cx, cy = cp.commitment in
+            Pickles_trace.tick_field
+              (Printf.sprintf "expand_proof.chal_polys.%d.comm.x" i)
+              cx ;
+            Pickles_trace.tick_field
+              (Printf.sprintf "expand_proof.chal_polys.%d.comm.y" i)
+              cy ;
+            if Array.length cp.challenges > 0 then
+              Pickles_trace.tock_field
+                (Printf.sprintf "expand_proof.chal_polys.%d.chal.0" i)
+                cp.challenges.(0)) ;
+        O.create dlog_vk chal_polys_padded public_input proof
       in
       (* === TRACE Stage 5: oracle outputs === *)
       ( let alpha_sc : Tock.Field.t Kimchi_types.scalar_challenge = O.alpha o in
@@ -427,6 +444,41 @@ struct
           Array.map (O.opening_prechallenges o) ~f:(fun x ->
               Scalar_challenge.map ~f:Challenge.Constant.of_tock_field x )
         in
+        Array.iteri prechals ~f:(fun i pc ->
+            Pickles_trace.tock_field
+              (Printf.sprintf "expand_proof.bp_prechal.%d" i)
+              (Challenge.Constant.to_tock_field pc.inner) ) ;
+        (* === TRACE: dummy proof lr coordinates ===
+           If dummyWrapProof in PS uses different point coordinates than
+           OCaml's Proof.dummy, the IPA prechallenges loop will diverge
+           even with identical sponge state. Trace the first lr pair to
+           detect the mismatch. *)
+        ( let lr = proof.openings.proof.lr in
+          if Array.length lr > 0 then begin
+            let (lx, ly), (rx, ry) = lr.(0) in
+            Pickles_trace.tick_field "expand_proof.dummy_proof.lr.0.l.x" lx ;
+            Pickles_trace.tick_field "expand_proof.dummy_proof.lr.0.l.y" ly ;
+            Pickles_trace.tick_field "expand_proof.dummy_proof.lr.0.r.x" rx ;
+            Pickles_trace.tick_field "expand_proof.dummy_proof.lr.0.r.y" ry
+          end ;
+          (* Trace ft_eval1 + evals.z.{zeta,zeta_omega} — these flow
+             into kimchi's combined_inner_product computation. If PS's
+             dummyWrapProof has different evals than OCaml's Proof.dummy
+             (e.g. Ro counter divergence), kimchi's cip will diverge,
+             then prechals will diverge. *)
+          Pickles_trace.tock_field "expand_proof.dummy_proof.ft_eval1"
+            proof.openings.ft_eval1 ;
+          let ev = proof.openings.evals in
+          let zz, zo = ev.z in
+          Pickles_trace.tock_field "expand_proof.dummy_proof.evals.z.zeta"
+            zz.(0) ;
+          Pickles_trace.tock_field "expand_proof.dummy_proof.evals.z.zeta_omega"
+            zo.(0) ;
+          let gz, go = ev.generic_selector in
+          Pickles_trace.tock_field "expand_proof.dummy_proof.evals.gen.zeta"
+            gz.(0) ;
+          Pickles_trace.tock_field "expand_proof.dummy_proof.evals.gen.zeta_omega"
+            go.(0) ) ;
         let chals =
           Array.map prechals ~f:(fun x -> Ipa.Wrap.compute_challenge x)
         in
