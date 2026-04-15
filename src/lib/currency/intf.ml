@@ -83,12 +83,21 @@ end
 module type Arithmetic_intf = sig
   type t
 
+  (** [add a b] returns [Some (a + b)] if the result fits in [t], or [None] on
+      overflow. *)
   val add : t -> t -> t option
 
+  (** [add_flagged a b] returns the (possibly wrapped) sum together with an
+      [`Overflow] flag that is [true] when the true result exceeds the
+      representable range. *)
   val add_flagged : t -> t -> t * [ `Overflow of bool ]
 
+  (** [sub a b] returns [Some (a - b)] when [a >= b], or [None] on underflow
+      (i.e. when [b > a]). *)
   val sub : t -> t -> t option
 
+  (** [sub_flagged a b] returns the (possibly wrapped) difference together with
+      an [`Underflow] flag that is [true] when [b > a]. *)
   val sub_flagged : t -> t -> t * [ `Underflow of bool ]
 
   val ( + ) : t -> t -> t option
