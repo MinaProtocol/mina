@@ -51,6 +51,7 @@ in  Pipeline.build
         , TestExecutive.executeLocal "payments" dependsOn
         , TestExecutive.executeLocal "peers-reliability" dependsOn
         , TestExecutive.executeLocal "slot-end" dependsOn
+        , TestExecutive.executeLocal "staking" dependsOn
         , TestExecutive.executeLocal "verification-key" dependsOn
         , TestExecutive.executeLocal "zkapps" dependsOn
         , TestExecutive.executeLocal "zkapps-timing" dependsOn
