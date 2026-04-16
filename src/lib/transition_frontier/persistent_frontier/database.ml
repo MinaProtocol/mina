@@ -396,8 +396,8 @@ let initialize t ~root_data =
           ( Root_data.Limited.protocol_states root_data
           |> List.map ~f:With_hash.data ) )
 
-let find_arcs_and_root t
-    ~(arcs_cache : State_hash.Hash_set.t State_hash.Table.t) ~parent_hashes =
+let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
+    ~parent_hashes =
   let f h = Rocks.Key.Some_key (Arcs h) in
   let root_hash = get_root_hash t in
   let arcs = get_batch t.db ~keys:(List.map parent_hashes ~f) in
@@ -405,8 +405,7 @@ let find_arcs_and_root t
     let%bind.Result () = res in
     match arc_opt with
     | Some (Key.Some_key_value (Arcs _, (data : State_hash.t list))) ->
-        State_hash.Table.set arcs_cache ~key:parent_hash
-          ~data:(State_hash.Hash_set.of_list data) ;
+        State_hash.Table.set arcs_cache ~key:parent_hash ~data ;
         Result.return ()
     | _ ->
         Error (`Not_found (`Arcs parent_hash))
@@ -428,19 +427,15 @@ let add ~arcs_cache ~transition =
     |> Mina_state.Protocol_state.previous_state_hash
   in
   let parent_arcs = State_hash.Table.find_exn arcs_cache parent_hash in
-  if Hash_set.mem parent_arcs hash then fun _batch -> ()
-  else (
-    Hash_set.add parent_arcs hash ;
-    State_hash.Table.set arcs_cache ~key:hash
-      ~data:(State_hash.Hash_set.create ()) ;
-    let transition_unwrapped =
-      With_hash.data transition |> Mina_block.read_all_proofs_from_disk
-    in
-    fun batch ->
-      Batch.set batch ~key:(Transition hash) ~data:transition_unwrapped ;
-      Batch.set batch ~key:(Arcs hash) ~data:[] ;
-      Batch.set batch ~key:(Arcs parent_hash)
-        ~data:(Hash_set.to_list parent_arcs) )
+  State_hash.Table.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
+  State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
+  let transition_unwrapped =
+    With_hash.data transition |> Mina_block.read_all_proofs_from_disk
+  in
+  fun batch ->
+    Batch.set batch ~key:(Transition hash) ~data:transition_unwrapped ;
+    Batch.set batch ~key:(Arcs hash) ~data:[] ;
+    Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
 let move_root ~old_root_hash ~new_root ~garbage =
   let new_root_hash =

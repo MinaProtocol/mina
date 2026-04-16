@@ -73,14 +73,14 @@ val initialize : t -> root_data:Root_data.Limited.t -> unit
 
 val find_arcs_and_root :
      t
-  -> arcs_cache:State_hash.Hash_set.t State_hash.Table.t
+  -> arcs_cache:State_hash.t list State_hash.Table.t
   -> parent_hashes:State_hash.t list
   -> ( State_hash.t
      , [> `Not_found of [> `Arcs of State_hash.t | `Old_root_transition ] ] )
      result
 
 val add :
-     arcs_cache:State_hash.Hash_set.t State_hash.Table.t
+     arcs_cache:State_hash.t list State_hash.Table.t
   -> transition:Mina_block.Validated.t
   -> batch_t
   -> unit
