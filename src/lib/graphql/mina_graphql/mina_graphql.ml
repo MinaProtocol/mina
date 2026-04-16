@@ -1544,9 +1544,10 @@ module Mutations = struct
               let clean_config = Option.value ~default:false clean_config in
               let conf_dir = (Mina_lib.config mina).conf_dir in
               if clean_config then
-                Mina_stdlib_unix.Exit_handlers.register_async_shutdown_handler
+                Exit_handlers.register_async_shutdown_handler
                   ~logger:(Mina_lib.config mina).logger
-                  ~description:"Remove configuration data" (fun () ->
+                  ~description:"Remove configuration data"
+                  ~tier:DestroyConfigAndLedgers (fun () ->
                     let epoch_ledger_json_file =
                       conf_dir ^/ "epoch_ledger.json"
                     in
