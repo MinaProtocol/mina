@@ -14,6 +14,15 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
+echo "Installing mina-devnet-config package"
+
+CONFIG_DEB=$(find src/test/archive/sample_mesa_hf_db -name 'mina-devnet-config_*.deb' | head -1)
+if [[ -z "$CONFIG_DEB" ]]; then
+  echo "ERROR: mina-devnet-config deb not found in src/test/archive/sample_mesa_hf_db/"
+  exit 1
+fi
+dpkg -i "$CONFIG_DEB"
+
 echo "Running replayer from mesa hard fork checkpoint"
 
 export MINA_LEDGER_S3_BUCKET
