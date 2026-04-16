@@ -39,6 +39,7 @@ use std::{
 const LEAST_COMPOSE_VERSION: &str = "2.21.0";
 
 // Hardcoded daemon image for default network
+// TODO: This image is very old (berkeley-rc1). Update to a more current image in a separate PR.
 const DEFAULT_DAEMON_DOCKER_IMAGE: &str =
     "gcr.io/o1labs-192920/mina-daemon:2.0.0berkeley-rc1-1551e2f-bullseye-berkeley";
 
@@ -344,7 +345,7 @@ fn main() -> Result<()> {
                         container_state => {
                             info!(
                                 "Node '{node_id}' is {} in network '{network_id}'.",
-                                container_state.to_string()
+                                container_state
                             );
                             false
                         }
@@ -885,12 +886,12 @@ fn generate_default_genesis_ledger(
             *bp_keys_opt = Some(
                 keys_manager
                     .generate_bp_key_pairs(&all_services)
-                    .expect("Failed to generate key pairs for mina services."),
+                    .map_err(|e| Error::other(format!("Failed to generate key pairs for mina services: {e}")))?,
             );
             *libp2p_keys_opt = Some(
                 keys_manager
                     .generate_libp2p_key_pairs(&all_services)
-                    .expect("Failed to generate libp2p key pairs for mina services."),
+                    .map_err(|e| Error::other(format!("Failed to generate libp2p key pairs for mina services: {e}")))?,
             );
         }
         ExecutionMode::Native => {
@@ -898,12 +899,12 @@ fn generate_default_genesis_ledger(
             *bp_keys_opt = Some(
                 keys_manager
                     .generate_bp_key_pairs(&all_services)
-                    .expect("Failed to generate key pairs for mina services."),
+                    .map_err(|e| Error::other(format!("Failed to generate key pairs for mina services: {e}")))?,
             );
             *libp2p_keys_opt = Some(
                 keys_manager
                     .generate_libp2p_key_pairs(&all_services)
-                    .expect("Failed to generate libp2p key pairs for mina services."),
+                    .map_err(|e| Error::other(format!("Failed to generate libp2p key pairs for mina services: {e}")))?,
             );
         }
     }
@@ -1209,44 +1210,125 @@ fn handle_topology(
 fn check_execution_environment(mode: &ExecutionMode, bin_path: &Path) -> Result<()> {
     match mode {
         ExecutionMode::Docker => {
-            let compose_version = DockerManager::compose_version();
-            match compose_version {
-                Some(version) => {
+            // First check if docker itself is available
+            let docker_available = std::process::Command::new("docker")
+                .arg("--version")
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+
+            if !docker_available {
+                error!(
+                    "Docker is not installed. Please install Docker: https://docs.docker.com/get-docker/"
+                );
+                return Err(Error::new(ErrorKind::NotFound, "docker is not installed"));
+            }
+
+            // Docker is installed, now check docker compose plugin
+            let compose_result = std::process::Command::new("docker")
+                .args(["compose", "version", "--short"])
+                .output();
+
+            match compose_result {
+                Ok(output) if output.status.success() => {
+                    let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
                     if version.as_str() < LEAST_COMPOSE_VERSION {
                         error!(
-                            "Docker compose version '{version}' is less than \
-                                the least supported version '{LEAST_COMPOSE_VERSION}'."
+                            "Docker Compose version '{version}' is older than \
+                                the minimum supported version '{LEAST_COMPOSE_VERSION}'. \
+                                Please update Docker Compose: https://docs.docker.com/compose/install/"
                         );
-
                         return Err(Error::new(
                             ErrorKind::InvalidInput,
                             "docker compose needs to be updated",
                         ));
                     }
-
                     Ok(())
                 }
-                None => {
+                Ok(output) => {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
                     error!(
-                        "It seems that docker not installed! Please install docker and try again."
+                        "Docker Compose plugin (v2) is not installed. \
+                            'docker compose' command failed. \
+                            Please install Docker Compose: https://docs.docker.com/compose/install/\n\
+                            stderr: {stderr}"
                     );
-                    Err(Error::new(ErrorKind::NotFound, "docker is missing"))
+                    Err(Error::new(
+                        ErrorKind::NotFound,
+                        "docker compose plugin is not installed",
+                    ))
+                }
+                Err(e) => {
+                    error!(
+                        "Docker Compose plugin (v2) is not installed. \
+                            'docker compose' command failed: {e}. \
+                            Please install Docker Compose: https://docs.docker.com/compose/install/"
+                    );
+                    Err(Error::new(
+                        ErrorKind::NotFound,
+                        "docker compose plugin is not installed",
+                    ))
                 }
             }
         }
         ExecutionMode::Native => {
             let mina_bin = bin_path.join("mina");
-            if !mina_bin.exists() {
-                error!(
-                    "Mina binary not found at '{}'. Please install mina or use --bin-path.",
-                    mina_bin.display()
-                );
-                return Err(Error::new(
-                    ErrorKind::NotFound,
-                    format!("mina binary not found at '{}'", mina_bin.display()),
-                ));
+            if mina_bin.exists() {
+                return Ok(());
             }
-            Ok(())
+
+            // Check common locations
+            let common_paths = ["/usr/bin/mina", "/usr/local/bin/mina"];
+            let mut found_at: Option<&str> = None;
+            for path in &common_paths {
+                if Path::new(path).exists() {
+                    found_at = Some(path);
+                    break;
+                }
+            }
+
+            // Also try `which mina`
+            let which_result = std::process::Command::new("which")
+                .arg("mina")
+                .output()
+                .ok()
+                .and_then(|o| {
+                    if o.status.success() {
+                        Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+                    } else {
+                        None
+                    }
+                });
+
+            let mut msg = format!(
+                "Mina binary not found at '{}'. Searched also in {}.",
+                mina_bin.display(),
+                common_paths.join(", ")
+            );
+
+            if let Some(path) = found_at {
+                msg.push_str(&format!(
+                    " Found mina at '{}'. Use --bin-path {} to use it.",
+                    path,
+                    Path::new(path).parent().unwrap_or(Path::new("/")).display()
+                ));
+            } else if let Some(ref which_path) = which_result {
+                msg.push_str(&format!(
+                    " Found mina via PATH at '{}'. Use --bin-path {} to use it.",
+                    which_path,
+                    Path::new(which_path.as_str())
+                        .parent()
+                        .unwrap_or(Path::new("/"))
+                        .display()
+                ));
+            } else {
+                msg.push_str(
+                    " Please install mina or use --bin-path to specify the location.",
+                );
+            }
+
+            error!("{msg}");
+            Err(Error::new(ErrorKind::NotFound, msg))
         }
     }
 }

@@ -216,6 +216,7 @@ impl DockerManager {
 
     /// Compose version
     /// returns Option<String>
+    #[allow(dead_code)]
     pub fn compose_version() -> Option<String> {
         let output = run_command("docker", &["compose", "version", "--short"]).ok()?;
         if output.status.success() {
