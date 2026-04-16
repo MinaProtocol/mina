@@ -182,6 +182,7 @@ build-daemon-utils: ocaml_checks reformat-diff libp2p_helper ## Build daemon uti
 		src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
 		src/lib/snark_worker/standalone/run_snark_worker.exe \
 		src/app/rocksdb-scanner/rocksdb_scanner.exe \
+		src/app/mina_healthcheck/mina_healthcheck.exe \
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
