@@ -113,7 +113,8 @@ let handler_spec_gen =
 let handler_list_gen = Quickcheck.Generator.list_non_empty handler_spec_gen
 
 let test_property_tier_ordering () =
-  Quickcheck.test ~trials:200 handler_list_gen ~f:(fun handler_specs ->
+  Async.Quickcheck.async_test ~trials:200 handler_list_gen
+    ~f:(fun handler_specs ->
       Exit_handlers.For_testing.reset () ;
       let log = ref [] in
       let handler_specs =
@@ -122,15 +123,13 @@ let test_property_tier_ordering () =
       in
       List.iter handler_specs ~f:(fun (tier, description) ->
           register ~tier ~description ~log ) ;
-      Thread_safe.block_on_async_exn (fun () ->
-          Exit_handlers.For_testing.run_shutdown_handlers () ) ;
+      let%map () = Exit_handlers.For_testing.run_shutdown_handlers () in
       let expected =
         List.stable_sort handler_specs ~compare:(fun (t1, _) (t2, _) ->
             Int.compare (tier_index t1) (tier_index t2) )
         |> List.map ~f:snd
       in
-      [%test_result: string list] !log ~expect:expected ) ;
-  Deferred.unit
+      [%test_result: string list] !log ~expect:expected )
 
 (* -- runner -------------------------------------------------------------- *)
 
