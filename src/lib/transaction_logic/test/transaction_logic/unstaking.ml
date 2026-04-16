@@ -56,9 +56,7 @@ let opt_out_via_empty_delegation () =
         Ledger_helpers.ledger_of_accounts [ delegator; validator ]
         |> Or_error.ok_exn
       in
-      apply_txn_exn ledger
-        (signed_command ~sender:delegator ~fee
-           (delegation_body ~new_delegate:validator.pk) ) ;
+      set_delegate_in_ledger ledger delegator.pk (Some validator.pk) ;
       (* Refresh nonce/balance after the first txn before submitting the next. *)
       let after = get_account_exn ledger delegator.pk in
       let sender =

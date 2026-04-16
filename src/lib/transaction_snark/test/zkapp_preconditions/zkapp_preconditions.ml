@@ -717,32 +717,32 @@ let%test_module "Account precondition tests" =
                     [ zkapp_command ] ) ) )
 
     (* Shared setup for the custom-token delegate tests below: initialize a
-       ledger with [token_owner] funded, derive the token id, and build a
-       keymap covering both the owner and the (not-yet-created) token account. *)
+       ledger with [token_creator] funded, derive the token id, and build a
+       keymap covering both the creator and the (not-yet-created) token holder. *)
     let setup_custom_token_ledger ~ledger
-        ~(token_owner : Signature_lib.Keypair.t)
-        ~(token_account : Signature_lib.Keypair.t) =
+        ~(token_creator : Signature_lib.Keypair.t)
+        ~(token_holder : Signature_lib.Keypair.t) =
       let module Init_ledger = Mina_transaction_logic.For_tests.Init_ledger in
-      let token_owner_pk =
-        Signature_lib.Public_key.compress token_owner.public_key
+      let token_creator_pk =
+        Signature_lib.Public_key.compress token_creator.public_key
       in
       Init_ledger.init
         (module Mina_ledger.Ledger.Ledger_inner)
-        [| (token_owner, 5_000_000_000L) |]
+        [| (token_creator, 5_000_000_000L) |]
         ledger ;
       let custom_token_id =
         Account_id.derive_token_id
-          ~owner:(Account_id.create token_owner_pk Token_id.default)
+          ~owner:(Account_id.create token_creator_pk Token_id.default)
       in
       let keymap =
-        List.fold [ token_owner; token_account ]
+        List.fold [ token_creator; token_holder ]
           ~init:Public_key.Compressed.Map.empty
           ~f:(fun map { Signature_lib.Keypair.private_key; public_key } ->
             Public_key.Compressed.Map.add_exn map
               ~key:(Public_key.compress public_key)
               ~data:private_key )
       in
-      (token_owner_pk, custom_token_id, keymap)
+      (token_creator_pk, custom_token_id, keymap)
 
     let%test_unit "custom tokens have empty delegation" =
       (* A newly-minted custom-token account has delegate = empty. Verified
@@ -755,29 +755,29 @@ let%test_module "Account precondition tests" =
       in
       Quickcheck.test ~trials:5
         (Quickcheck.Generator.tuple2 Signature_lib.Keypair.gen
-           Signature_lib.Keypair.gen ) ~f:(fun (token_owner, token_account) ->
+           Signature_lib.Keypair.gen ) ~f:(fun (token_creator, token_holder) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let open Async.Deferred.Let_syntax in
-                  let token_owner_pk, custom_token_id, keymap =
-                    setup_custom_token_ledger ~ledger ~token_owner
-                      ~token_account
+                  let token_creator_pk, custom_token_id, keymap =
+                    setup_custom_token_ledger ~ledger ~token_creator
+                      ~token_holder
                   in
                   let%bind mint_token_zkapp_command =
                     let open Zkapp_command_builder in
                     let zkapp0 =
                       mk_forest
                         [ mk_node
-                            (mk_account_update_body Signature No token_owner
+                            (mk_account_update_body Signature No token_creator
                                Token_id.default (-account_creation_fee) )
                             [ mk_node
                                 (mk_account_update_body Signature
-                                   Parents_own_token token_account
+                                   Parents_own_token token_holder
                                    custom_token_id 100 )
                                 []
                             ]
                         ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:token_owner_pk
+                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:token_creator_pk
                            ~fee_payer_nonce:Account.Nonce.zero
                     in
                     let zkapp_dummy_signatures =
@@ -806,13 +806,13 @@ let%test_module "Account precondition tests" =
       Quickcheck.test ~trials:5
         (Quickcheck.Generator.tuple3 Signature_lib.Keypair.gen
            Signature_lib.Keypair.gen Signature_lib.Public_key.Compressed.gen )
-        ~f:(fun (token_owner, token_account, attempted_delegate) ->
+        ~f:(fun (token_creator, token_holder, attempted_delegate) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let open Async.Deferred.Let_syntax in
-                  let token_owner_pk, custom_token_id, keymap =
-                    setup_custom_token_ledger ~ledger ~token_owner
-                      ~token_account
+                  let token_creator_pk, custom_token_id, keymap =
+                    setup_custom_token_ledger ~ledger ~token_creator
+                      ~token_holder
                   in
                   let delegate_update =
                     { Account_update.Update.noop with
@@ -824,16 +824,16 @@ let%test_module "Account precondition tests" =
                     let zkapp0 =
                       mk_forest
                         [ mk_node
-                            (mk_account_update_body Signature No token_owner
+                            (mk_account_update_body Signature No token_creator
                                Token_id.default (-account_creation_fee) )
                             [ mk_node
                                 (mk_account_update_body ~update:delegate_update
-                                   Signature Parents_own_token token_account
+                                   Signature Parents_own_token token_holder
                                    custom_token_id 100 )
                                 []
                             ]
                         ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:token_owner_pk
+                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:token_creator_pk
                            ~fee_payer_nonce:Account.Nonce.zero
                     in
                     let zkapp_dummy_signatures =
