@@ -43,11 +43,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "nodes are synced"
         (wait_for t (Wait_condition.nodes_to_synchronize [ node_a; node_b ]))
     in
-    let receiver_kp = Signature_lib.Keypair.create () in
-    let receiver_pk =
-      Signature_lib.Public_key.compress receiver_kp.public_key
+    let delegator_kp = Signature_lib.Keypair.create () in
+    let delegator_pk =
+      Signature_lib.Public_key.compress delegator_kp.public_key
     in
-    let receiver_account_id = Account_id.create receiver_pk Token_id.default in
+    let receiver_account_id = Account_id.create delegator_pk Token_id.default in
     let node_a_uri = Network.Node.get_ingress_uri node_a in
     let must_get_receiver () =
       Integration_test_lib.Graphql_requests.must_get_account_data ~logger
@@ -72,7 +72,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            in
            let common =
              { Signed_command_payload.Common.Poly.fee
-             ; fee_payer_pk = receiver_pk
+             ; fee_payer_pk = delegator_pk
              ; nonce = sender_nonce
              ; valid_until
              ; memo = Signed_command_memo.create_from_string_exn memo
@@ -81,14 +81,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            { Signed_command_payload.Poly.common; body }
          in
          let raw_signature =
-           Signed_command.sign_payload ~signature_kind receiver_kp.private_key
+           Signed_command.sign_payload ~signature_kind delegator_kp.private_key
              payload
            |> Signature.Raw.encode
          in
          let%bind { hash; _ } =
            Integration_test_lib.Graphql_requests
            .must_send_delegation_with_raw_sig ~logger node_a_uri
-             ~sender_pub_key:receiver_pk ~receiver_pub_key:new_delegate ~fee
+             ~sender_pub_key:delegator_pk ~receiver_pub_key:new_delegate ~fee
              ~nonce:sender_nonce ~memo ~valid_until ~raw_signature
          in
          let%bind () =
@@ -122,7 +122,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind { hash; _ } =
            Integration_test_lib.Graphql_requests.must_send_online_payment
              ~logger node_a_uri ~sender_pub_key:sender_pk
-             ~receiver_pub_key:receiver_pk ~amount ~fee
+             ~receiver_pub_key:delegator_pk ~amount ~fee
          in
          let%bind () =
            wait_for t
