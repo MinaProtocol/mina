@@ -39,7 +39,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
                 RunInToolchain.runInToolchain
-                  ([] : List Text)
+                  (DebianVersions.overrideEnvs)
                   "buildkite/scripts/tests/convert-debian-to-hf-test.sh"
             , label = "Hardfork: Package Conversion"
             , key = "hf-package-conversion-test"
