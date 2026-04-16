@@ -1229,12 +1229,27 @@ module T = struct
                 t.scan_state work )
     in
     [%log internal] "Prediff" ;
+    let check =
+      match skip_verification with
+      | Some `All ->
+          (* These blocks were already fully verified before persistence;
+             skip signature/proof verification when loading from disk. *)
+          fun cs ->
+           Deferred.Or_error.return
+             (Ok
+                (List.map cs ~f:(fun { With_status.data; _ } ->
+                     let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                           v ) =
+                       User_command.to_valid_unsafe data
+                     in
+                     v ) ) )
+      | _ ->
+          Check_commands.check_commands t.ledger ~verifier
+            ~transaction_pool_proxy
+    in
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
-        ~supercharge_coinbase
-        ~check:
-          (Check_commands.check_commands t.ledger ~verifier
-             ~transaction_pool_proxy )
+        ~supercharge_coinbase ~check
       |> Deferred.map
            ~f:
              (Result.map_error ~f:(fun error ->
