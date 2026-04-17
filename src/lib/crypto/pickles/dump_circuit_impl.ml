@@ -3767,6 +3767,97 @@ let step_main_simple_chain () =
   in
   constraint_builder.finish_computation res
 
+(* ---- step_main Add_one_return (N0, Input_and_output) ---- *)
+(* Verbatim Add_one_return from test_no_sideloaded.ml: N0, no previous
+   proofs, rule `output = 1 + input`. Exercises the Input_and_output
+   public-input layout with the simplest possible rule. *)
+
+let step_main_add_one_return () =
+  let open Impls.Step in
+  let open Pickles_types in
+  (* For Input_and_output mode, `basic.public_input` is
+     `Typ.(input_typ * output_typ)` — see compile.ml:1257-1264. The
+     rule's `public_input` field receives only the input var; the
+     computed `public_output` var is passed through
+     `Inductive_rule.public_output`. *)
+  let self :
+      ( Field.t * Field.t
+      , Field.Constant.t * Field.Constant.t
+      , Nat.N0.n
+      , Nat.N1.n )
+      Tag.t =
+    Tag.create "add_one_return"
+  in
+  let feature_flags = Plonk_types.Features.none_bool in
+  let feature_flags_full =
+    Kimchi_backend_common.Plonk_types.Features.Full.none
+  in
+  let rule : _ Inductive_rule.Kimchi.Promise.t =
+    { identifier = "main"
+    ; prevs = []
+    ; feature_flags
+    ; main =
+        (fun { public_input = x } ->
+          Promise.return
+            { Inductive_rule.Kimchi.previous_proof_statements = []
+            ; public_output = Field.(one + x)
+            ; auxiliary_output = ()
+            } )
+    }
+  in
+  let max_proofs_verified : (module Nat.Add.Intf with type n = Nat.N0.n) =
+    (module Nat.N0)
+  in
+  let module Step_requests = Requests.Step (Inductive_rule.Kimchi) in
+  let requests = Step_requests.create () in
+  let wrap_domains =
+    { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 13 }
+  in
+  (* step_domains is indexed by self_branches (= N1, one rule), not by
+     max_proofs_verified. A single entry for the Add_one_return rule. *)
+  let step_domains =
+    Vector.[ { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 9 } ]
+  in
+  let basic : _ Types_map.Compiled.basic =
+    { public_input = Typ.(Field.typ * Field.typ)
+    ; wrap_domains
+    ; step_domains
+    ; feature_flags = feature_flags_full
+    ; num_chunks = 1
+    ; zk_rows = 3
+    }
+  in
+  let step_main_fn =
+    Staged.unstage
+      (Step_main_for_dump.step_main requests max_proofs_verified rule
+         ~self_branches:(Nat.N1.n : Nat.N1.n Nat.t)
+         ~local_signature:([] : _ Hlist.H1.T(Nat).t)
+         ~local_signature_length:Hlist.Length.Z
+         ~local_branches_length:Hlist.Length.Z
+         ~proofs_verified:Hlist.Length.Z
+         ~lte:Nat.Lte.Z
+         ~public_input:
+           (Input_and_output (Field.typ, Field.typ))
+         ~auxiliary_typ:Typ.unit
+         ~basic
+         ~known_wrap_keys:([] : _ Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t)
+         ~self )
+  in
+  let etyp = Impls.Step.input ~proofs_verified:Nat.N0.n in
+  let (T (return_typ, _conv, conv_inv)) = etyp in
+  let main () () =
+    let%map.Promise res = step_main_fn () in
+    Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+  in
+  let constraint_builder =
+    Impl.constraint_system_manual ~input_typ:Typ.unit ~return_typ
+  in
+  let res =
+    Promise.block_on_async_exn (fun () ->
+        constraint_builder.run_circuit main )
+  in
+  constraint_builder.finish_computation res
+
 (* Dump a step_main constraint system with full metadata (labels, gate labels, cached constants).
    Same output as dump_tick_with_labels but uses constraint_system_manual for Promise-based circuits. *)
 let dump_step_main output_dir name cs_fn =
@@ -4147,6 +4238,32 @@ let run ~output_dir =
     dump_wrap "wrap_main_n2_circuit" circuit ~input_typ:typ
       ~return_typ:Impls.Wrap.Typ.unit
   in
+  (* ---- Add_one_return wrap circuit (N=0) ----
+     Single branch, step_widths=[0] (no prev proofs), wrap domain 2^13
+     (as reported by [compile.wrap_domains.h.log2] from dump_add_one_return).
+     Pads every Max_proofs_verified slot with the zero-width value.
+
+     This is the only N=0 wrap fixture in the suite — exercises the wrap
+     circuit for a step proof whose own public input has no unfinalized_proofs
+     slots and no messages_for_next_wrap_proof entries. *)
+  let () =
+    let open Pickles_types in
+    let (Composition_types.Spec.Wrap_etyp.T (typ, conv, _conv_inv)) =
+      Impls.Wrap.input
+        ~feature_flags:Kimchi_backend_common.Plonk_types.Features.Full.none
+        ()
+    in
+    let main_fn =
+      Wrap_main_for_dump.build
+        ~pi_branches:(Hlist.Length.S Hlist.Length.Z)
+        ~padded:Vector.[ Vector.[ 0 ]; Vector.[ 0 ] ]
+        ~step_widths:Vector.[ 0 ] ~domain_log2:13
+        ~max_proofs_verified:(module Nat.N2)
+    in
+    let circuit x () = main_fn (conv x) in
+    dump_wrap "wrap_main_add_one_return_circuit" circuit ~input_typ:typ
+      ~return_typ:Impls.Wrap.Typ.unit
+  in
   (* ---- Pseudo module sub-circuits ---- *)
   let array1_field_ps = Impl.Typ.array ~length:1 Impl.Field.typ in
   let array1_wrap_ps = Impls.Wrap.Typ.array ~length:1 Impls.Wrap.Field.typ in
@@ -4314,4 +4431,6 @@ let run ~output_dir =
   dump_step_main output_dir "step_main_simple_chain_circuit"
     step_main_simple_chain ;
   dump_step_main output_dir "step_main_simple_chain_n2_circuit"
-    step_main_simple_chain_n2
+    step_main_simple_chain_n2 ;
+  dump_step_main output_dir "step_main_add_one_return_circuit"
+    step_main_add_one_return
