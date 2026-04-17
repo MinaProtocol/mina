@@ -35,6 +35,7 @@
 (package (name downloader))
 (package (name dummy_values))
 (package (name error_json))
+(package (name exit_handlers))
 (package (name extract_blocks))
 (package (name fake_network))
 (package (name fields_derivers))
