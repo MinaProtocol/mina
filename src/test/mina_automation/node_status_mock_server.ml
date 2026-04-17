@@ -89,10 +89,6 @@ let health_check ~port ?(retries = 30) ?(delay = 1.0) () =
 let collected_status ~port =
   get_json_string_list (sprintf "http://localhost:%d/collected-status" port)
 
-(** [collected_errors ~port] returns all node-error payloads received so far. *)
-let collected_errors ~port =
-  get_json_string_list (sprintf "http://localhost:%d/collected-errors" port)
-
 (** [stop t] kills the mock-server process. *)
 let stop t =
   let%map result = Utils.force_kill t.process in

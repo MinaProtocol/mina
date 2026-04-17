@@ -890,53 +890,92 @@ end
 module NodeStatusReport = struct
   type t = Mina_automation_fixture.Daemon.before_bootstrap
 
+  let default_mock_server_port = 19876
+
   let mock_server_port =
-    match Sys.getenv "MINA_NODE_STATUS_MOCK_PORT" with
-    | Some s -> (
-        match Option.try_with (fun () -> Int.of_string s) with
-        | Some port ->
-            port
-        | None ->
-            19876 )
-    | None ->
-        19876
+    Sys.getenv "MINA_NODE_STATUS_MOCK_PORT"
+    |> Option.bind ~f:(fun s -> Option.try_with (fun () -> Int.of_string s))
+    |> Option.value ~default:default_mock_server_port
 
-  let required_status_fields =
-    [ "block_height_at_best_tip"; "sync_status"; "peer_id" ]
+  (** Schema entries describing the payload contract: field name and the
+      JSON shape we expect to see for that field. Validation fails if a
+      field is missing or if the value has a different shape than declared. *)
+  type field_kind = Int | Non_empty_string | Object
 
-  (** Extract the inner payload: if the top-level object has a ["data"] key
-      use its value, otherwise use the object as-is. *)
-  let extract_data json =
-    match json with
+  let status_schema =
+    [ ("version", Int)
+    ; ("block_height_at_best_tip", Int)
+    ; ("max_observed_block_height", Int)
+    ; ("sync_status", Non_empty_string)
+    ; ("peer_id", Non_empty_string)
+    ; ("chain_id", Non_empty_string)
+    ; ("commit_hash", Non_empty_string)
+    ; ("ip_address", Non_empty_string)
+    ; ("timestamp", Non_empty_string)
+    ; ("peer_count", Int)
+    ; ("rpc_received", Object)
+    ; ("rpc_sent", Object)
+    ; ("pubsub_msg_received", Object)
+    ; ("pubsub_msg_broadcasted", Object)
+    ; ("sysinfo", Object)
+    ]
+
+  (** Extract the inner payload from the top-level [{"data": ...}] envelope.
+      The daemon always wraps the payload in a "data" key (see
+      [Node_status_service.send_node_status_data]) — fail loudly if it does
+      not, so a contract regression is caught instead of silently accepted. *)
+  let extract_data = function
     | `Assoc fields -> (
         match List.Assoc.find fields ~equal:String.equal "data" with
         | Some d ->
-            d
+            Ok d
         | None ->
-            json )
+            Error "Top-level payload is missing the \"data\" key" )
     | _ ->
-        json
+        Error "Top-level payload is not a JSON object"
 
-  (** Check that all [required_status_fields] are present in [json]. *)
-  let validate_status_payload raw_body =
-    try
-      let data = Yojson.Safe.from_string raw_body |> extract_data in
-      let has_field name =
-        match data with
-        | `Assoc fields ->
-            List.Assoc.mem fields ~equal:String.equal name
-        | _ ->
-            false
-      in
-      let missing =
-        List.filter required_status_fields ~f:(fun f -> not (has_field f))
-      in
-      if List.is_empty missing then Ok ()
-      else
+  let check_field_value name kind value =
+    match (kind, value) with
+    | Int, `Int _ ->
+        Ok ()
+    | Non_empty_string, `String s when not (String.is_empty s) ->
+        Ok ()
+    | Non_empty_string, `String _ ->
+        Error (sprintf "Field %S is an empty string" name)
+    | Object, `Assoc _ ->
+        Ok ()
+    | _ ->
         Error
-          (sprintf "Missing fields in node status: %s"
-             (String.concat ~sep:", " missing) )
-    with exn -> Error (sprintf "Invalid JSON: %s" (Exn.to_string exn))
+          (sprintf "Field %S has unexpected JSON shape: %s" name
+             (Yojson.Safe.to_string value) )
+
+  (** Validate the payload against [status_schema]: every field must be
+      present and have the declared JSON shape. *)
+  let validate_status_payload raw_body =
+    let open Result.Let_syntax in
+    Result.try_with (fun () -> Yojson.Safe.from_string raw_body)
+    |> Result.map_error ~f:(fun exn ->
+           sprintf "Invalid JSON: %s" (Exn.to_string exn) )
+    >>= extract_data
+    >>= function
+    | `Assoc fields ->
+        let lookup name = List.Assoc.find fields ~equal:String.equal name in
+        let errors =
+          List.filter_map status_schema ~f:(fun (name, kind) ->
+              match lookup name with
+              | None ->
+                  Some (sprintf "Missing field %S" name)
+              | Some value -> (
+                  match check_field_value name kind value with
+                  | Ok () ->
+                      None
+                  | Error msg ->
+                      Some msg ) )
+        in
+        if List.is_empty errors then Ok ()
+        else Error (String.concat ~sep:"; " errors)
+    | _ ->
+        Error "Inner payload is not a JSON object"
 
   (** Poll [/collected-status] until at least one payload arrives. *)
   let poll_for_status ~port ~timeout_min =
