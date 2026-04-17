@@ -253,7 +253,7 @@ let get_account_update ~logger t ~account_id =
         | Some s ->
             return (Set s)
         | None ->
-            fail (Error.of_string "Expected delegate in account")
+            return (Set Signature_lib.Public_key.Compressed.empty)
       in
       let%bind verification_key =
         match account.verificationKey with
