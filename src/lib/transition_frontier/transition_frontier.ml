@@ -493,7 +493,8 @@ let add_breadcrumb_exn t breadcrumb =
       ; ("state_hash", State_hash.to_yojson (Breadcrumb.state_hash breadcrumb))
       ] ;
   let lite_diffs =
-    List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
+    List.map diffs_with_mutants
+      ~f:Diff.(fun (Full.With_mutant.E (diff, _)) -> Lite.E.E (to_lite diff))
   in
   [%log internal] "Synchronize_persistent_frontier" ;
   let%bind sync_result =

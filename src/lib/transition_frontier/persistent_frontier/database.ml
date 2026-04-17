@@ -494,26 +494,38 @@ let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 
 let set_best_tip data = Batch.set ~key:Best_tip ~data
 
-let rec crawl_successors ?max_depth ~signature_kind ~proof_cache_db ~init ~f t
-    hash =
-  let open Deferred.Result.Let_syntax in
-  match max_depth with
-  | Some 0 ->
-      (* Depth limit reached, stop crawling *)
-      Deferred.Result.return ()
-  | _ ->
-      let remaining_depth = Option.map max_depth ~f:(fun d -> d - 1) in
-      let%bind successors = Deferred.return (get_arcs t hash) in
-      deferred_list_result_iter successors ~f:(fun succ_hash ->
-          let%bind transition =
-            Deferred.return
-              (get_transition ~signature_kind ~proof_cache_db t succ_hash)
-          in
-          let%bind init' =
-            Deferred.map (f init transition)
-              ~f:(Result.map_error ~f:(fun err -> `Crawl_error err))
-          in
-          crawl_successors ~signature_kind ~proof_cache_db
-            ?max_depth:remaining_depth t succ_hash ~init:init' ~f )
+let crawl_successors ?max_depth ~signature_kind ~proof_cache_db ~init ~f t hash
+    =
+  (* Track visited hashes globally across the traversal.  A hash should appear
+     in at most one node's Arcs list in a well-formed DB, but if the DB was
+     written before the duplicate-arc bug was fixed a hash may appear several
+     times in the same list (or, defensively, in multiple lists).  Skipping
+     already-visited successors prevents the same subtree from being loaded and
+     applied to the in-memory frontier more than once. *)
+  let visited = State_hash.Hash_set.create () in
+  let rec go ?max_depth ~init hash =
+    let open Deferred.Result.Let_syntax in
+    match max_depth with
+    | Some 0 ->
+        (* Depth limit reached, stop crawling *)
+        Deferred.Result.return ()
+    | _ ->
+        let remaining_depth = Option.map max_depth ~f:(fun d -> d - 1) in
+        let%bind successors = Deferred.return (get_arcs t hash) in
+        deferred_list_result_iter successors ~f:(fun succ_hash ->
+            if Hash_set.mem visited succ_hash then Deferred.Result.return ()
+            else (
+              Hash_set.add visited succ_hash ;
+              let%bind transition =
+                Deferred.return
+                  (get_transition ~signature_kind ~proof_cache_db t succ_hash)
+              in
+              let%bind init' =
+                Deferred.map (f init transition)
+                  ~f:(Result.map_error ~f:(fun err -> `Crawl_error err))
+              in
+              go ?max_depth:remaining_depth ~init:init' succ_hash ) )
+  in
+  go ?max_depth ~init hash
 
 let with_batch t = Batch.with_batch t.db
