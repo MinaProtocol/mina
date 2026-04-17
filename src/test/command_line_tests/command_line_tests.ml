@@ -908,7 +908,9 @@ module NodeStatusReport = struct
       match statuses_result with
       | Error (raw, msg) ->
           Deferred.return
-            (Error (sprintf "Failed to parse status payload: %s\nRaw: %s" msg raw))
+            (Error
+               (sprintf "Failed to parse status payload: %s\nRaw: %s" msg raw)
+            )
       | Ok [] ->
           if
             Core.Time.Span.( > )
