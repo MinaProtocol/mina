@@ -20,6 +20,8 @@ let MainlineBranch = ../Pipeline/MainlineBranch.dhall
 
 let Expr = ../Pipeline/Expr.dhall
 
+let DebianVersions = ../Constants/DebianVersions.dhall
+
 let buildTestStep =
           \(network : Network.Type)
       ->  \(expectedChainId : Text)
@@ -30,7 +32,7 @@ let buildTestStep =
                 Command.Config::{
                 , commands =
                     RunInToolchain.runInToolchain
-                      ([] : List Text)
+                      DebianVersions.overrideEnvs
                       "buildkite/scripts/test-chain-id.sh ${networkName} ${expectedChainId}"
                 , label = "Test chain-id for ${networkName}"
                 , key = "test-chain-id-${networkName}"
