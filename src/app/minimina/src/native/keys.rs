@@ -4,6 +4,23 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+fn mina_command_error(mina_bin: &Path, service_name: &str, e: io::Error) -> io::Error {
+    if e.kind() == io::ErrorKind::NotFound {
+        io::Error::new(
+            e.kind(),
+            format!(
+                "Failed to run '{}': {}. Is mina installed and in your PATH or specified via --bin-path?",
+                mina_bin.display(), e
+            ),
+        )
+    } else {
+        io::Error::other(format!(
+            "Failed to run mina for {}: {}",
+            service_name, e
+        ))
+    }
+}
+
 pub struct NativeKeysManager {
     pub network_path: PathBuf,
     pub bin_path: PathBuf,
@@ -32,22 +49,7 @@ impl NativeKeysManager {
             ])
             .env("MINA_PRIVKEY_PASS", "naughty blue worm")
             .output()
-            .map_err(|e| {
-                if e.kind() == io::ErrorKind::NotFound {
-                    io::Error::new(
-                        e.kind(),
-                        format!(
-                            "Failed to run '{}': {}. Is mina installed and in your PATH or specified via --bin-path?",
-                            mina_bin.display(), e
-                        ),
-                    )
-                } else {
-                    io::Error::other(format!(
-                        "Failed to run mina for {}: {}",
-                        service_name, e
-                    ))
-                }
-            })?;
+            .map_err(|e| mina_command_error(&mina_bin, service_name, e))?;
 
         if !output.status.success() {
             return Err(io::Error::other(format!(
@@ -107,22 +109,7 @@ impl NativeKeysManager {
             ])
             .env("MINA_LIBP2P_PASS", "naughty blue worm")
             .output()
-            .map_err(|e| {
-                if e.kind() == io::ErrorKind::NotFound {
-                    io::Error::new(
-                        e.kind(),
-                        format!(
-                            "Failed to run '{}': {}. Is mina installed and in your PATH or specified via --bin-path?",
-                            mina_bin.display(), e
-                        ),
-                    )
-                } else {
-                    io::Error::other(format!(
-                        "Failed to run mina for {}: {}",
-                        service_name, e
-                    ))
-                }
-            })?;
+            .map_err(|e| mina_command_error(&mina_bin, service_name, e))?;
 
         if !output.status.success() {
             return Err(io::Error::other(format!(

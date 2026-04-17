@@ -214,20 +214,6 @@ impl DockerManager {
         Ok(containers)
     }
 
-    /// Compose version
-    /// returns Option<String>
-    #[allow(dead_code)]
-    pub fn compose_version() -> Option<String> {
-        let output = run_command("docker", &["compose", "version", "--short"]).ok()?;
-        if output.status.success() {
-            let stdout_str = String::from_utf8_lossy(&output.stdout);
-            let version = stdout_str.trim().to_string();
-            Some(version)
-        } else {
-            None
-        }
-    }
-
     /// Execute a command in a compose service
     pub fn compose_dump_precomputed_blocks(
         &self,
