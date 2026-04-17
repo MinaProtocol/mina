@@ -112,6 +112,26 @@ if [[ "$UPDATED_VERSION" != "$NEW_VERSION" ]]; then
 fi
 
 echo "✓ Version replaced successfully"
+
+# Update versioned references in dependency fields (Depends, Replaces, Breaks)
+# When a dependency pins the old version (e.g. "mina-devnet-config (>=1.0.0)"),
+# replace it with the new version so the package stays internally consistent.
+ESCAPED_OLD=$(sed 's/[.[\*^$/]/\\&/g' <<< "$OLD_VERSION")
+ESCAPED_NEW=$(sed 's/[&/]/\\&/g' <<< "$NEW_VERSION")
+
+DEP_CHANGED=0
+for FIELD in Depends Replaces Breaks Conflicts; do
+  if grep -q "^${FIELD}:.*${ESCAPED_OLD}" "$CONTROL_FILE"; then
+    sed -i "/^${FIELD}:/s/${ESCAPED_OLD}/${ESCAPED_NEW}/g" "$CONTROL_FILE"
+    DEP_CHANGED=1
+    echo "✓ Updated $OLD_VERSION → $NEW_VERSION in ${FIELD} field"
+  fi
+done
+
+if [[ "$DEP_CHANGED" -eq 0 ]]; then
+  echo "  (no versioned dependencies referencing $OLD_VERSION found)"
+fi
+
 echo ""
 echo "Updated control file:"
-grep -E "^(Package|Version|Architecture):" "$CONTROL_FILE" || true
+grep -E "^(Package|Version|Architecture|Depends|Replaces|Breaks|Conflicts):" "$CONTROL_FILE" || true

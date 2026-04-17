@@ -1553,9 +1553,10 @@ module Mutations = struct
                 (Mina_lib.config mina).epoch_ledger_location
               in
               if clean_config then
-                Mina_stdlib_unix.Exit_handlers.register_async_shutdown_handler
+                Exit_handlers.register_async_shutdown_handler
                   ~logger:(Mina_lib.config mina).logger
-                  ~description:"Remove configuration data" (fun () ->
+                  ~description:"Remove configuration data"
+                  ~tier:DestroyConfigAndLedgers (fun () ->
                     let epoch_ledger_json_file =
                       epoch_ledger_location ^/ ".json"
                     in
