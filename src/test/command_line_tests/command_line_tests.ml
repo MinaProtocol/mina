@@ -136,8 +136,8 @@ module ExportSnarkedLedger = struct
           let log_file = Daemon.Config.ConfigDirs.mina_log test.config.dirs in
           let%bind logs = Reader.file_contents log_file in
           let () = printf "Daemon logs:\n%s\n" logs in
-          let%bind () = Daemon.Client.stop_daemon process.client in
-          Deferred.return false
+          let%map () = Daemon.Client.stop_daemon process.client in
+          false
     in
     if not bootstrap_ok then
       Deferred.return
@@ -897,101 +897,30 @@ module NodeStatusReport = struct
     |> Option.bind ~f:(fun s -> Option.try_with (fun () -> Int.of_string s))
     |> Option.value ~default:default_mock_server_port
 
-  (** Schema entries describing the payload contract: field name and the
-      JSON shape we expect to see for that field. Validation fails if a
-      field is missing or if the value has a different shape than declared. *)
-  type field_kind = Int | Non_empty_string | Object
-
-  let status_schema =
-    [ ("version", Int)
-    ; ("block_height_at_best_tip", Int)
-    ; ("max_observed_block_height", Int)
-    ; ("sync_status", Non_empty_string)
-    ; ("peer_id", Non_empty_string)
-    ; ("chain_id", Non_empty_string)
-    ; ("commit_hash", Non_empty_string)
-    ; ("ip_address", Non_empty_string)
-    ; ("timestamp", Non_empty_string)
-    ; ("peer_count", Int)
-    ; ("rpc_received", Object)
-    ; ("rpc_sent", Object)
-    ; ("pubsub_msg_received", Object)
-    ; ("pubsub_msg_broadcasted", Object)
-    ; ("sysinfo", Object)
-    ]
-
-  (** Extract the inner payload from the top-level [{"data": ...}] envelope.
-      The daemon always wraps the payload in a "data" key (see
-      [Node_status_service.send_node_status_data]) — fail loudly if it does
-      not, so a contract regression is caught instead of silently accepted. *)
-  let extract_data = function
-    | `Assoc fields -> (
-        match List.Assoc.find fields ~equal:String.equal "data" with
-        | Some d ->
-            Ok d
-        | None ->
-            Error "Top-level payload is missing the \"data\" key" )
-    | _ ->
-        Error "Top-level payload is not a JSON object"
-
-  let check_field_value name kind value =
-    match (kind, value) with
-    | Int, `Int _ ->
-        Ok ()
-    | Non_empty_string, `String s when not (String.is_empty s) ->
-        Ok ()
-    | Non_empty_string, `String _ ->
-        Error (sprintf "Field %S is an empty string" name)
-    | Object, `Assoc _ ->
-        Ok ()
-    | _ ->
-        Error
-          (sprintf "Field %S has unexpected JSON shape: %s" name
-             (Yojson.Safe.to_string value) )
-
-  (** Validate the payload against [status_schema]: every field must be
-      present and have the declared JSON shape. *)
-  let validate_status_payload raw_body =
-    let open Result.Let_syntax in
-    Result.try_with (fun () -> Yojson.Safe.from_string raw_body)
-    |> Result.map_error ~f:(fun exn ->
-           sprintf "Invalid JSON: %s" (Exn.to_string exn) )
-    >>= extract_data
-    >>= function
-    | `Assoc fields ->
-        let lookup name = List.Assoc.find fields ~equal:String.equal name in
-        let errors =
-          List.filter_map status_schema ~f:(fun (name, kind) ->
-              match lookup name with
-              | None ->
-                  Some (sprintf "Missing field %S" name)
-              | Some value -> (
-                  match check_field_value name kind value with
-                  | Ok () ->
-                      None
-                  | Error msg ->
-                      Some msg ) )
-        in
-        if List.is_empty errors then Ok ()
-        else Error (String.concat ~sep:"; " errors)
-    | _ ->
-        Error "Inner payload is not a JSON object"
-
   (** Poll [/collected-status] until at least one payload arrives. *)
   let poll_for_status ~port ~timeout_min =
     let start_time = Core.Time.now () in
     let timeout = Core.Time.Span.of_min timeout_min in
     let rec go () =
-      let%bind statuses = Node_status_mock_server.collected_status ~port in
-      if not (List.is_empty statuses) then Deferred.return (Ok statuses)
-      else if
-        Core.Time.Span.( > )
-          (Core.Time.diff (Core.Time.now ()) start_time)
-          timeout
-      then Deferred.return (Error "Timed out waiting for node status reports")
-      else
-        let%bind () = after (Core.Time.Span.of_sec 5.) in
-        go ()
+      let%bind statuses_result =
+        Node_status_mock_server.collected_status ~port
+      in
+      match statuses_result with
+      | Error (raw, msg) ->
+          Deferred.return
+            (Error (sprintf "Failed to parse status payload: %s\nRaw: %s" msg raw))
+      | Ok [] ->
+          if
+            Core.Time.Span.( > )
+              (Core.Time.diff (Core.Time.now ()) start_time)
+              timeout
+          then
+            Deferred.return (Error "Timed out waiting for node status reports")
+          else
+            let%bind () = after (Core.Time.Span.of_sec 5.) in
+            go ()
+      | Ok (hd :: rest) ->
+          Deferred.return (Ok (Mina_stdlib.Nonempty_list.init hd rest))
     in
     go ()
 
@@ -1031,21 +960,15 @@ module NodeStatusReport = struct
             Deferred.return
               (Mina_automation_fixture.Intf.Failed
                  (Error.tag e ~tag:"Bootstrap failed") )
-        | Ok () ->
+        | Ok () -> (
             (* 4. Poll for status reports *)
-            let%bind status_result = poll_for_status ~port ~timeout_min:3. in
-            (* 5. Validate *)
-            Deferred.return
-              ( match status_result with
-              | Error msg ->
-                  Mina_automation_fixture.Intf.Failed (Error.of_string msg)
-              | Ok statuses -> (
-                  match validate_status_payload (List.hd_exn statuses) with
-                  | Ok () ->
-                      Mina_automation_fixture.Intf.Passed
-                  | Error msg ->
-                      Mina_automation_fixture.Intf.Failed (Error.of_string msg)
-                  ) ) )
+            let%map status_result = poll_for_status ~port ~timeout_min:3. in
+            (* 5. Validate - if we got statuses, they're already validated by parsing *)
+            match status_result with
+            | Error msg ->
+                Mina_automation_fixture.Intf.Failed (Error.of_string msg)
+            | Ok _statuses ->
+                Mina_automation_fixture.Intf.Passed ) )
       ~finally:(fun () ->
         let%bind () =
           match !process_ref with

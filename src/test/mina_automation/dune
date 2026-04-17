@@ -27,6 +27,7 @@
   mina_ledger
   mina_base
   mina_block
+  node_status_service
   cmdliner)
  (instrumentation
   (backend bisect_ppx))

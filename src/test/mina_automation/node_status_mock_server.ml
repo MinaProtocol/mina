@@ -8,6 +8,13 @@ open Core
 open Async
 
 (* ------------------------------------------------------------------
+   Types for parsing node status payloads
+   ------------------------------------------------------------------ *)
+
+type payload_wrapped = { data : Node_status_service.node_status_data }
+[@@deriving of_yojson]
+
+(* ------------------------------------------------------------------
    Executor — locates the mock-server binary via the standard
    AutoDetect mechanism (dune _build → debian package → dune exec).
    ------------------------------------------------------------------ *)
@@ -85,9 +92,24 @@ let health_check ~port ?(retries = 30) ?(delay = 1.0) () =
   in
   go retries
 
-(** [collected_status ~port] returns all node-status payloads received so far. *)
+(** [collected_status ~port] returns all node-status payloads as parsed
+    data structures. Returns [Ok data_list] on success or [Error (raw, msg)]
+    for the first payload that fails to parse. *)
 let collected_status ~port =
-  get_json_string_list (sprintf "http://localhost:%d/collected-status" port)
+  let%map raw_statuses =
+    get_json_string_list (sprintf "http://localhost:%d/collected-status" port)
+  in
+  List.fold_result raw_statuses ~init:[] ~f:(fun acc raw_body ->
+      try
+        let json = Yojson.Safe.from_string raw_body in
+        match payload_wrapped_of_yojson json with
+        | Ok { data } ->
+            Ok (data :: acc)
+        | Error msg ->
+            Error (raw_body, sprintf "Failed to parse payload: %s" msg)
+      with exn ->
+        Error (raw_body, sprintf "Invalid JSON: %s" (Exn.to_string exn)) )
+  |> Result.map ~f:List.rev
 
 (** [stop t] kills the mock-server process. *)
 let stop t =
