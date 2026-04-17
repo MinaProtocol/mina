@@ -10,6 +10,8 @@ let Command = ./Base.dhall
 
 let Size = ./Size.dhall
 
+let Cmd = ../Lib/Cmds.dhall
+
 let RunWithPostgres = ./RunWithPostgres.dhall
 
 let key = "replayer-mesa-hf-test"
@@ -19,7 +21,9 @@ in  { step =
         ->  Command.build
               Command.Config::{
               , commands =
-                [ RunWithPostgres.runInDockerWithPostgresConn
+                [ Cmd.run
+                    "cp /var/storagebox/test_data/develop/replayer_mesa/mina-devnet-config_*.deb ./src/test/archive/sample_mesa_hf_db/"
+                , RunWithPostgres.runInDockerWithPostgresConn
                     ([] : List Text)
                     ( Some
                         ( RunWithPostgres.ScriptOrArchive.Archive

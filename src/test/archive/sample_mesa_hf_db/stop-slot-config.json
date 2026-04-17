@@ -1,6 +1,6 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2026-02-24T19:30:00Z"
+    "genesis_state_timestamp": "2026-04-02T12:00:00Z"
   },
   "ledger": {
     "add_genesis_winner": false,
@@ -8,9 +8,9 @@
     "hash": "jwXMfukdwJVNpZ3wMEZbuq4zwucYS4cJnij23buAnNYo1GKKrFB"
   },
   "daemon": {
-    "slot_tx_end": 1900,
-    "hard_fork_genesis_slot_delta": 40,
-    "slot_chain_end": 1920
+    "slot_tx_end": 3060,
+    "slot_chain_end": 3080,
+    "hard_fork_genesis_slot_delta": 40
   },
   "epoch_data": {
     "staking": {
