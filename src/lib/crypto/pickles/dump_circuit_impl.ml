@@ -3858,6 +3858,181 @@ let step_main_add_one_return () =
   in
   constraint_builder.finish_computation res
 
+(* ---- step_main Tree_proof_return (N2, Output mode, heterogeneous prevs) ----
+   Verbatim Tree_proof_return from test_no_sideloaded.ml:315-392:
+   - public_input:(Output Field.typ) — Output mode, input_typ = Typ.unit,
+     output_typ = Field.typ. basic.public_input is the typ for the
+     compiled Statement, which for Output mode is just Field.typ
+     (see compile.ml:1257-1264).
+   - max_proofs_verified: N2.
+   - override_wrap_domain: Proofs_verified.N1 → wrap_domains.h = 2^14
+     (common.ml:25-29).
+   - prevs = [No_recursion_return.tag; self] — heterogeneous in
+     max_proofs_verified (N0 and N2) but BOTH prev.public_input slots
+     are Field.typ (since both rules are Output mode with Field output).
+   - Rule body computes self = if is_base_case then 0 else 1 + prev,
+     returns two previous_proof_statements + public_output = self. *)
+
+let step_main_tree_proof_return () =
+  let open Impls.Step in
+  let open Pickles_types in
+  let no_rec_tag :
+      (Field.t, Field.Constant.t, Nat.N0.n, Nat.N1.n) Tag.t =
+    Tag.create "no_recursion_return"
+  in
+  let self : (Field.t, Field.Constant.t, Nat.N2.n, Nat.N1.n) Tag.t =
+    Tag.create "tree_proof_return"
+  in
+  (* step_main does a `Types_map.lookup_compiled` on each non-self prev
+     tag (step_main.ml:522) plus `feature_flags d` / `num_chunks d`
+     (line 196). Register a minimal Compiled.t entry for no_rec_tag so
+     those lookups succeed. The `wrap_key` and `step_domains` fields
+     are discarded by `of_compiled_with_known_wrap_key` (we pass a
+     real known_wrap_key via `~known_wrap_keys` below), so lazy
+     failures there never fire. `wrap_vk` is likewise unused during
+     constraint-system build. *)
+  let () =
+    let no_rec_data : _ Types_map.Compiled.t =
+      { max_proofs_verified = (module Nat.N0)
+      ; public_input = Field.typ
+      ; wrap_key = lazy (failwith "dump: wrap_key not forced")
+      ; wrap_vk = lazy (failwith "dump: wrap_vk not forced")
+      ; wrap_domains =
+          { h = Pickles_base.Domain.Pow_2_roots_of_unity 13 }
+      ; step_domains =
+          Vector.singleton
+            (Promise.return
+               { Import.Domains.h =
+                   Pickles_base.Domain.Pow_2_roots_of_unity 13 })
+      ; feature_flags = Kimchi_backend_common.Plonk_types.Features.Full.none
+      ; num_chunks = 1
+      ; zk_rows = 3
+      }
+    in
+    Types_map.add_exn no_rec_tag no_rec_data
+  in
+  let feature_flags = Plonk_types.Features.none_bool in
+  let feature_flags_full =
+    Kimchi_backend_common.Plonk_types.Features.Full.none
+  in
+  let rule : _ Inductive_rule.Kimchi.Promise.t =
+    { identifier = "main"
+    ; prevs = [ no_rec_tag; self ]
+    ; feature_flags
+    ; main =
+        (fun { public_input = () } ->
+          let no_recursive_input =
+            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
+          in
+          let no_recursive_proof =
+            exists (Typ.prover_value ()) ~compute:(fun () ->
+                Proof.dummy Nat.N0.n Nat.N2.n ~domain_log2:14 )
+          in
+          let prev =
+            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
+          in
+          let prev_proof =
+            exists (Typ.prover_value ()) ~compute:(fun () ->
+                Proof.dummy Nat.N2.n Nat.N2.n ~domain_log2:15 )
+          in
+          let is_base_case =
+            exists Boolean.typ ~compute:(fun () -> true)
+          in
+          let proof_must_verify = Boolean.not is_base_case in
+          let self_out =
+            Field.(if_ is_base_case ~then_:zero ~else_:(one + prev))
+          in
+          Promise.return
+            { Inductive_rule.Kimchi.previous_proof_statements =
+                [ { public_input = no_recursive_input
+                  ; proof = no_recursive_proof
+                  ; proof_must_verify = Boolean.true_
+                  }
+                ; { public_input = prev
+                  ; proof = prev_proof
+                  ; proof_must_verify
+                  }
+                ]
+            ; public_output = self_out
+            ; auxiliary_output = ()
+            } )
+    }
+  in
+  let max_proofs_verified : (module Nat.Add.Intf with type n = Nat.N2.n) =
+    (module Nat.N2)
+  in
+  let module Step_requests = Requests.Step (Inductive_rule.Kimchi) in
+  let requests = Step_requests.create () in
+  let wrap_domains =
+    (* override_wrap_domain:N1 → common.ml:25-29 gives h = 2^14. *)
+    { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 14 }
+  in
+  let step_domains =
+    (* Single rule (branches=N1); step circuit size at the same 2^16
+       Simple_chain_n2 uses, since this is also N=2 with a real
+       inductive body. *)
+    Vector.[ { Import.Domains.h = Pickles_base.Domain.Pow_2_roots_of_unity 16 } ]
+  in
+  let basic : _ Types_map.Compiled.basic =
+    { public_input = Field.typ
+    ; wrap_domains
+    ; step_domains
+    ; feature_flags = feature_flags_full
+    ; num_chunks = 1
+    ; zk_rows = 3
+    }
+  in
+  let step_main_fn =
+    Staged.unstage
+      (Step_main_for_dump.step_main requests max_proofs_verified rule
+         ~self_branches:(Nat.N1.n : Nat.N1.n Nat.t)
+         ~local_signature:([ Nat.N0.n; Nat.N2.n ] : _ Hlist.H1.T(Nat).t)
+         ~local_signature_length:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
+         ~local_branches_length:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
+         ~proofs_verified:(Hlist.Length.S (Hlist.Length.S Hlist.Length.Z))
+         ~lte:(Nat.Lte.S (Nat.Lte.S Nat.Lte.Z))
+         ~public_input:(Output Field.typ)
+         ~auxiliary_typ:Typ.unit
+         ~basic
+         ~known_wrap_keys:
+           (let no_rec_known : _ Types_map.For_step.Optional_wrap_key.known =
+              let g = Backend.Tick.Inner_curve.(to_affine_exn one) in
+              let arr = [| g |] in
+              { wrap_key =
+                  { sigma_comm = Vector.init Nat.N7.n ~f:(fun _ -> arr)
+                  ; coefficients_comm = Vector.init Nat.N15.n ~f:(fun _ -> arr)
+                  ; generic_comm = arr
+                  ; psm_comm = arr
+                  ; complete_add_comm = arr
+                  ; mul_comm = arr
+                  ; emul_comm = arr
+                  ; endomul_scalar_comm = arr
+                  }
+              ; step_domains =
+                  Vector.[ { Import.Domains.h =
+                               Pickles_base.Domain.Pow_2_roots_of_unity 13 }
+                         ]
+              }
+            in
+            ([ Some no_rec_known; None ]
+              : _ Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t))
+         ~self )
+  in
+  let etyp = Impls.Step.input ~proofs_verified:Nat.N2.n in
+  let (T (return_typ, _conv, conv_inv)) = etyp in
+  let main () () =
+    let%map.Promise res = step_main_fn () in
+    Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+  in
+  let constraint_builder =
+    Impl.constraint_system_manual ~input_typ:Typ.unit ~return_typ
+  in
+  let res =
+    Promise.block_on_async_exn (fun () ->
+        constraint_builder.run_circuit main )
+  in
+  constraint_builder.finish_computation res
+
 (* Dump a step_main constraint system with full metadata (labels, gate labels, cached constants).
    Same output as dump_tick_with_labels but uses constraint_system_manual for Promise-based circuits. *)
 let dump_step_main output_dir name cs_fn =
@@ -4433,4 +4608,6 @@ let run ~output_dir =
   dump_step_main output_dir "step_main_simple_chain_n2_circuit"
     step_main_simple_chain_n2 ;
   dump_step_main output_dir "step_main_add_one_return_circuit"
-    step_main_add_one_return
+    step_main_add_one_return ;
+  dump_step_main output_dir "step_main_tree_proof_return_circuit"
+    step_main_tree_proof_return
